@@ -31,24 +31,24 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
 
 /**
  * {@snippet lang=c :
- * struct {
- *     uint8_t code;
- *     uint8_t bits;
- *     uint16_t lanes;
+ * struct cudaLaunchAttribute_st {
+ *     cudaLaunchAttributeID id;
+ *     char pad[4];
+ *     cudaLaunchAttributeValue val;
  * }
  * }
  */
-public class DLDataType {
+public class cudaLaunchAttribute_st {
 
-    DLDataType() {
+    cudaLaunchAttribute_st() {
         // Should not be called directly
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        PanamaFFMAPI.C_CHAR.withName("code"),
-        PanamaFFMAPI.C_CHAR.withName("bits"),
-        PanamaFFMAPI.C_SHORT.withName("lanes")
-    ).withName("$anon$145:9");
+        PanamaFFMAPI.C_INT.withName("id"),
+        MemoryLayout.sequenceLayout(4, PanamaFFMAPI.C_CHAR).withName("pad"),
+        cudaLaunchAttributeValue.layout().withName("val")
+    ).withName("cudaLaunchAttribute_st");
 
     /**
      * The layout of this struct
@@ -57,136 +57,169 @@ public class DLDataType {
         return $LAYOUT;
     }
 
-    private static final OfByte code$LAYOUT = (OfByte)$LAYOUT.select(groupElement("code"));
+    private static final OfInt id$LAYOUT = (OfInt)$LAYOUT.select(groupElement("id"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * cudaLaunchAttributeID id
      * }
      */
-    public static final OfByte code$layout() {
-        return code$LAYOUT;
+    public static final OfInt id$layout() {
+        return id$LAYOUT;
     }
 
-    private static final long code$OFFSET = 0;
+    private static final long id$OFFSET = 0;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * cudaLaunchAttributeID id
      * }
      */
-    public static final long code$offset() {
-        return code$OFFSET;
+    public static final long id$offset() {
+        return id$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * cudaLaunchAttributeID id
      * }
      */
-    public static byte code(MemorySegment struct) {
-        return struct.get(code$LAYOUT, code$OFFSET);
+    public static int id(MemorySegment struct) {
+        return struct.get(id$LAYOUT, id$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * cudaLaunchAttributeID id
      * }
      */
-    public static void code(MemorySegment struct, byte fieldValue) {
-        struct.set(code$LAYOUT, code$OFFSET, fieldValue);
+    public static void id(MemorySegment struct, int fieldValue) {
+        struct.set(id$LAYOUT, id$OFFSET, fieldValue);
     }
 
-    private static final OfByte bits$LAYOUT = (OfByte)$LAYOUT.select(groupElement("bits"));
+    private static final SequenceLayout pad$LAYOUT = (SequenceLayout)$LAYOUT.select(groupElement("pad"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * char pad[4]
      * }
      */
-    public static final OfByte bits$layout() {
-        return bits$LAYOUT;
+    public static final SequenceLayout pad$layout() {
+        return pad$LAYOUT;
     }
 
-    private static final long bits$OFFSET = 1;
+    private static final long pad$OFFSET = 4;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * char pad[4]
      * }
      */
-    public static final long bits$offset() {
-        return bits$OFFSET;
+    public static final long pad$offset() {
+        return pad$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * char pad[4]
      * }
      */
-    public static byte bits(MemorySegment struct) {
-        return struct.get(bits$LAYOUT, bits$OFFSET);
+    public static MemorySegment pad(MemorySegment struct) {
+        return struct.asSlice(pad$OFFSET, pad$LAYOUT.byteSize());
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * char pad[4]
      * }
      */
-    public static void bits(MemorySegment struct, byte fieldValue) {
-        struct.set(bits$LAYOUT, bits$OFFSET, fieldValue);
+    public static void pad(MemorySegment struct, MemorySegment fieldValue) {
+        MemorySegment.copy(fieldValue, 0L, struct, pad$OFFSET, pad$LAYOUT.byteSize());
     }
 
-    private static final OfShort lanes$LAYOUT = (OfShort)$LAYOUT.select(groupElement("lanes"));
+    private static long[] pad$DIMS = { 4 };
+
+    /**
+     * Dimensions for array field:
+     * {@snippet lang=c :
+     * char pad[4]
+     * }
+     */
+    public static long[] pad$dimensions() {
+        return pad$DIMS;
+    }
+    private static final VarHandle pad$ELEM_HANDLE = pad$LAYOUT.varHandle(sequenceElement());
+
+    /**
+     * Indexed getter for field:
+     * {@snippet lang=c :
+     * char pad[4]
+     * }
+     */
+    public static byte pad(MemorySegment struct, long index0) {
+        return (byte)pad$ELEM_HANDLE.get(struct, 0L, index0);
+    }
+
+    /**
+     * Indexed setter for field:
+     * {@snippet lang=c :
+     * char pad[4]
+     * }
+     */
+    public static void pad(MemorySegment struct, long index0, byte fieldValue) {
+        pad$ELEM_HANDLE.set(struct, 0L, index0, fieldValue);
+    }
+
+    private static final GroupLayout val$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("val"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * cudaLaunchAttributeValue val
      * }
      */
-    public static final OfShort lanes$layout() {
-        return lanes$LAYOUT;
+    public static final GroupLayout val$layout() {
+        return val$LAYOUT;
     }
 
-    private static final long lanes$OFFSET = 2;
+    private static final long val$OFFSET = 8;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * cudaLaunchAttributeValue val
      * }
      */
-    public static final long lanes$offset() {
-        return lanes$OFFSET;
+    public static final long val$offset() {
+        return val$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * cudaLaunchAttributeValue val
      * }
      */
-    public static short lanes(MemorySegment struct) {
-        return struct.get(lanes$LAYOUT, lanes$OFFSET);
+    public static MemorySegment val(MemorySegment struct) {
+        return struct.asSlice(val$OFFSET, val$LAYOUT.byteSize());
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * cudaLaunchAttributeValue val
      * }
      */
-    public static void lanes(MemorySegment struct, short fieldValue) {
-        struct.set(lanes$LAYOUT, lanes$OFFSET, fieldValue);
+    public static void val(MemorySegment struct, MemorySegment fieldValue) {
+        MemorySegment.copy(fieldValue, 0L, struct, val$OFFSET, val$LAYOUT.byteSize());
     }
 
     /**

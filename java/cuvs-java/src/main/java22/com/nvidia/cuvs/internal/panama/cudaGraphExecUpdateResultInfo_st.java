@@ -31,24 +31,25 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
 
 /**
  * {@snippet lang=c :
- * struct {
- *     uint8_t code;
- *     uint8_t bits;
- *     uint16_t lanes;
+ * struct cudaGraphExecUpdateResultInfo_st {
+ *     enum cudaGraphExecUpdateResult result;
+ *     cudaGraphNode_t errorNode;
+ *     cudaGraphNode_t errorFromNode;
  * }
  * }
  */
-public class DLDataType {
+public class cudaGraphExecUpdateResultInfo_st {
 
-    DLDataType() {
+    cudaGraphExecUpdateResultInfo_st() {
         // Should not be called directly
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        PanamaFFMAPI.C_CHAR.withName("code"),
-        PanamaFFMAPI.C_CHAR.withName("bits"),
-        PanamaFFMAPI.C_SHORT.withName("lanes")
-    ).withName("$anon$145:9");
+        PanamaFFMAPI.C_INT.withName("result"),
+        MemoryLayout.paddingLayout(4),
+        PanamaFFMAPI.C_POINTER.withName("errorNode"),
+        PanamaFFMAPI.C_POINTER.withName("errorFromNode")
+    ).withName("cudaGraphExecUpdateResultInfo_st");
 
     /**
      * The layout of this struct
@@ -57,136 +58,136 @@ public class DLDataType {
         return $LAYOUT;
     }
 
-    private static final OfByte code$LAYOUT = (OfByte)$LAYOUT.select(groupElement("code"));
+    private static final OfInt result$LAYOUT = (OfInt)$LAYOUT.select(groupElement("result"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * enum cudaGraphExecUpdateResult result
      * }
      */
-    public static final OfByte code$layout() {
-        return code$LAYOUT;
+    public static final OfInt result$layout() {
+        return result$LAYOUT;
     }
 
-    private static final long code$OFFSET = 0;
+    private static final long result$OFFSET = 0;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * enum cudaGraphExecUpdateResult result
      * }
      */
-    public static final long code$offset() {
-        return code$OFFSET;
+    public static final long result$offset() {
+        return result$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * enum cudaGraphExecUpdateResult result
      * }
      */
-    public static byte code(MemorySegment struct) {
-        return struct.get(code$LAYOUT, code$OFFSET);
+    public static int result(MemorySegment struct) {
+        return struct.get(result$LAYOUT, result$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * enum cudaGraphExecUpdateResult result
      * }
      */
-    public static void code(MemorySegment struct, byte fieldValue) {
-        struct.set(code$LAYOUT, code$OFFSET, fieldValue);
+    public static void result(MemorySegment struct, int fieldValue) {
+        struct.set(result$LAYOUT, result$OFFSET, fieldValue);
     }
 
-    private static final OfByte bits$LAYOUT = (OfByte)$LAYOUT.select(groupElement("bits"));
+    private static final AddressLayout errorNode$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("errorNode"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * cudaGraphNode_t errorNode
      * }
      */
-    public static final OfByte bits$layout() {
-        return bits$LAYOUT;
+    public static final AddressLayout errorNode$layout() {
+        return errorNode$LAYOUT;
     }
 
-    private static final long bits$OFFSET = 1;
+    private static final long errorNode$OFFSET = 8;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * cudaGraphNode_t errorNode
      * }
      */
-    public static final long bits$offset() {
-        return bits$OFFSET;
+    public static final long errorNode$offset() {
+        return errorNode$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * cudaGraphNode_t errorNode
      * }
      */
-    public static byte bits(MemorySegment struct) {
-        return struct.get(bits$LAYOUT, bits$OFFSET);
+    public static MemorySegment errorNode(MemorySegment struct) {
+        return struct.get(errorNode$LAYOUT, errorNode$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * cudaGraphNode_t errorNode
      * }
      */
-    public static void bits(MemorySegment struct, byte fieldValue) {
-        struct.set(bits$LAYOUT, bits$OFFSET, fieldValue);
+    public static void errorNode(MemorySegment struct, MemorySegment fieldValue) {
+        struct.set(errorNode$LAYOUT, errorNode$OFFSET, fieldValue);
     }
 
-    private static final OfShort lanes$LAYOUT = (OfShort)$LAYOUT.select(groupElement("lanes"));
+    private static final AddressLayout errorFromNode$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("errorFromNode"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * cudaGraphNode_t errorFromNode
      * }
      */
-    public static final OfShort lanes$layout() {
-        return lanes$LAYOUT;
+    public static final AddressLayout errorFromNode$layout() {
+        return errorFromNode$LAYOUT;
     }
 
-    private static final long lanes$OFFSET = 2;
+    private static final long errorFromNode$OFFSET = 16;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * cudaGraphNode_t errorFromNode
      * }
      */
-    public static final long lanes$offset() {
-        return lanes$OFFSET;
+    public static final long errorFromNode$offset() {
+        return errorFromNode$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * cudaGraphNode_t errorFromNode
      * }
      */
-    public static short lanes(MemorySegment struct) {
-        return struct.get(lanes$LAYOUT, lanes$OFFSET);
+    public static MemorySegment errorFromNode(MemorySegment struct) {
+        return struct.get(errorFromNode$LAYOUT, errorFromNode$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * cudaGraphNode_t errorFromNode
      * }
      */
-    public static void lanes(MemorySegment struct, short fieldValue) {
-        struct.set(lanes$LAYOUT, lanes$OFFSET, fieldValue);
+    public static void errorFromNode(MemorySegment struct, MemorySegment fieldValue) {
+        struct.set(errorFromNode$LAYOUT, errorFromNode$OFFSET, fieldValue);
     }
 
     /**

@@ -31,24 +31,24 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
 
 /**
  * {@snippet lang=c :
- * struct {
- *     uint8_t code;
- *     uint8_t bits;
- *     uint16_t lanes;
+ * struct cudaArrayMemoryRequirements {
+ *     size_t size;
+ *     size_t alignment;
+ *     unsigned int reserved[4];
  * }
  * }
  */
-public class DLDataType {
+public class cudaArrayMemoryRequirements {
 
-    DLDataType() {
+    cudaArrayMemoryRequirements() {
         // Should not be called directly
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        PanamaFFMAPI.C_CHAR.withName("code"),
-        PanamaFFMAPI.C_CHAR.withName("bits"),
-        PanamaFFMAPI.C_SHORT.withName("lanes")
-    ).withName("$anon$145:9");
+        PanamaFFMAPI.C_LONG.withName("size"),
+        PanamaFFMAPI.C_LONG.withName("alignment"),
+        MemoryLayout.sequenceLayout(4, PanamaFFMAPI.C_INT).withName("reserved")
+    ).withName("cudaArrayMemoryRequirements");
 
     /**
      * The layout of this struct
@@ -57,136 +57,169 @@ public class DLDataType {
         return $LAYOUT;
     }
 
-    private static final OfByte code$LAYOUT = (OfByte)$LAYOUT.select(groupElement("code"));
+    private static final OfLong size$LAYOUT = (OfLong)$LAYOUT.select(groupElement("size"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * size_t size
      * }
      */
-    public static final OfByte code$layout() {
-        return code$LAYOUT;
+    public static final OfLong size$layout() {
+        return size$LAYOUT;
     }
 
-    private static final long code$OFFSET = 0;
+    private static final long size$OFFSET = 0;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * size_t size
      * }
      */
-    public static final long code$offset() {
-        return code$OFFSET;
+    public static final long size$offset() {
+        return size$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * size_t size
      * }
      */
-    public static byte code(MemorySegment struct) {
-        return struct.get(code$LAYOUT, code$OFFSET);
+    public static long size(MemorySegment struct) {
+        return struct.get(size$LAYOUT, size$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * size_t size
      * }
      */
-    public static void code(MemorySegment struct, byte fieldValue) {
-        struct.set(code$LAYOUT, code$OFFSET, fieldValue);
+    public static void size(MemorySegment struct, long fieldValue) {
+        struct.set(size$LAYOUT, size$OFFSET, fieldValue);
     }
 
-    private static final OfByte bits$LAYOUT = (OfByte)$LAYOUT.select(groupElement("bits"));
+    private static final OfLong alignment$LAYOUT = (OfLong)$LAYOUT.select(groupElement("alignment"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * size_t alignment
      * }
      */
-    public static final OfByte bits$layout() {
-        return bits$LAYOUT;
+    public static final OfLong alignment$layout() {
+        return alignment$LAYOUT;
     }
 
-    private static final long bits$OFFSET = 1;
+    private static final long alignment$OFFSET = 8;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * size_t alignment
      * }
      */
-    public static final long bits$offset() {
-        return bits$OFFSET;
+    public static final long alignment$offset() {
+        return alignment$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * size_t alignment
      * }
      */
-    public static byte bits(MemorySegment struct) {
-        return struct.get(bits$LAYOUT, bits$OFFSET);
+    public static long alignment(MemorySegment struct) {
+        return struct.get(alignment$LAYOUT, alignment$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * size_t alignment
      * }
      */
-    public static void bits(MemorySegment struct, byte fieldValue) {
-        struct.set(bits$LAYOUT, bits$OFFSET, fieldValue);
+    public static void alignment(MemorySegment struct, long fieldValue) {
+        struct.set(alignment$LAYOUT, alignment$OFFSET, fieldValue);
     }
 
-    private static final OfShort lanes$LAYOUT = (OfShort)$LAYOUT.select(groupElement("lanes"));
+    private static final SequenceLayout reserved$LAYOUT = (SequenceLayout)$LAYOUT.select(groupElement("reserved"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * unsigned int reserved[4]
      * }
      */
-    public static final OfShort lanes$layout() {
-        return lanes$LAYOUT;
+    public static final SequenceLayout reserved$layout() {
+        return reserved$LAYOUT;
     }
 
-    private static final long lanes$OFFSET = 2;
+    private static final long reserved$OFFSET = 16;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * unsigned int reserved[4]
      * }
      */
-    public static final long lanes$offset() {
-        return lanes$OFFSET;
+    public static final long reserved$offset() {
+        return reserved$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * unsigned int reserved[4]
      * }
      */
-    public static short lanes(MemorySegment struct) {
-        return struct.get(lanes$LAYOUT, lanes$OFFSET);
+    public static MemorySegment reserved(MemorySegment struct) {
+        return struct.asSlice(reserved$OFFSET, reserved$LAYOUT.byteSize());
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * unsigned int reserved[4]
      * }
      */
-    public static void lanes(MemorySegment struct, short fieldValue) {
-        struct.set(lanes$LAYOUT, lanes$OFFSET, fieldValue);
+    public static void reserved(MemorySegment struct, MemorySegment fieldValue) {
+        MemorySegment.copy(fieldValue, 0L, struct, reserved$OFFSET, reserved$LAYOUT.byteSize());
+    }
+
+    private static long[] reserved$DIMS = { 4 };
+
+    /**
+     * Dimensions for array field:
+     * {@snippet lang=c :
+     * unsigned int reserved[4]
+     * }
+     */
+    public static long[] reserved$dimensions() {
+        return reserved$DIMS;
+    }
+    private static final VarHandle reserved$ELEM_HANDLE = reserved$LAYOUT.varHandle(sequenceElement());
+
+    /**
+     * Indexed getter for field:
+     * {@snippet lang=c :
+     * unsigned int reserved[4]
+     * }
+     */
+    public static int reserved(MemorySegment struct, long index0) {
+        return (int)reserved$ELEM_HANDLE.get(struct, 0L, index0);
+    }
+
+    /**
+     * Indexed setter for field:
+     * {@snippet lang=c :
+     * unsigned int reserved[4]
+     * }
+     */
+    public static void reserved(MemorySegment struct, long index0, int fieldValue) {
+        reserved$ELEM_HANDLE.set(struct, 0L, index0, fieldValue);
     }
 
     /**

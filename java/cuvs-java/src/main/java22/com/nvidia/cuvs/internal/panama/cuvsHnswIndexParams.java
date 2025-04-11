@@ -31,24 +31,24 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
 
 /**
  * {@snippet lang=c :
- * struct {
- *     uint8_t code;
- *     uint8_t bits;
- *     uint16_t lanes;
+ * struct cuvsHnswIndexParams {
+ *     enum cuvsHnswHierarchy hierarchy;
+ *     int ef_construction;
+ *     int num_threads;
  * }
  * }
  */
-public class DLDataType {
+public class cuvsHnswIndexParams {
 
-    DLDataType() {
+    cuvsHnswIndexParams() {
         // Should not be called directly
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        PanamaFFMAPI.C_CHAR.withName("code"),
-        PanamaFFMAPI.C_CHAR.withName("bits"),
-        PanamaFFMAPI.C_SHORT.withName("lanes")
-    ).withName("$anon$145:9");
+        PanamaFFMAPI.C_INT.withName("hierarchy"),
+        PanamaFFMAPI.C_INT.withName("ef_construction"),
+        PanamaFFMAPI.C_INT.withName("num_threads")
+    ).withName("cuvsHnswIndexParams");
 
     /**
      * The layout of this struct
@@ -57,136 +57,136 @@ public class DLDataType {
         return $LAYOUT;
     }
 
-    private static final OfByte code$LAYOUT = (OfByte)$LAYOUT.select(groupElement("code"));
+    private static final OfInt hierarchy$LAYOUT = (OfInt)$LAYOUT.select(groupElement("hierarchy"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * enum cuvsHnswHierarchy hierarchy
      * }
      */
-    public static final OfByte code$layout() {
-        return code$LAYOUT;
+    public static final OfInt hierarchy$layout() {
+        return hierarchy$LAYOUT;
     }
 
-    private static final long code$OFFSET = 0;
+    private static final long hierarchy$OFFSET = 0;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * enum cuvsHnswHierarchy hierarchy
      * }
      */
-    public static final long code$offset() {
-        return code$OFFSET;
+    public static final long hierarchy$offset() {
+        return hierarchy$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * enum cuvsHnswHierarchy hierarchy
      * }
      */
-    public static byte code(MemorySegment struct) {
-        return struct.get(code$LAYOUT, code$OFFSET);
+    public static int hierarchy(MemorySegment struct) {
+        return struct.get(hierarchy$LAYOUT, hierarchy$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * enum cuvsHnswHierarchy hierarchy
      * }
      */
-    public static void code(MemorySegment struct, byte fieldValue) {
-        struct.set(code$LAYOUT, code$OFFSET, fieldValue);
+    public static void hierarchy(MemorySegment struct, int fieldValue) {
+        struct.set(hierarchy$LAYOUT, hierarchy$OFFSET, fieldValue);
     }
 
-    private static final OfByte bits$LAYOUT = (OfByte)$LAYOUT.select(groupElement("bits"));
+    private static final OfInt ef_construction$LAYOUT = (OfInt)$LAYOUT.select(groupElement("ef_construction"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * int ef_construction
      * }
      */
-    public static final OfByte bits$layout() {
-        return bits$LAYOUT;
+    public static final OfInt ef_construction$layout() {
+        return ef_construction$LAYOUT;
     }
 
-    private static final long bits$OFFSET = 1;
+    private static final long ef_construction$OFFSET = 4;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * int ef_construction
      * }
      */
-    public static final long bits$offset() {
-        return bits$OFFSET;
+    public static final long ef_construction$offset() {
+        return ef_construction$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * int ef_construction
      * }
      */
-    public static byte bits(MemorySegment struct) {
-        return struct.get(bits$LAYOUT, bits$OFFSET);
+    public static int ef_construction(MemorySegment struct) {
+        return struct.get(ef_construction$LAYOUT, ef_construction$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * int ef_construction
      * }
      */
-    public static void bits(MemorySegment struct, byte fieldValue) {
-        struct.set(bits$LAYOUT, bits$OFFSET, fieldValue);
+    public static void ef_construction(MemorySegment struct, int fieldValue) {
+        struct.set(ef_construction$LAYOUT, ef_construction$OFFSET, fieldValue);
     }
 
-    private static final OfShort lanes$LAYOUT = (OfShort)$LAYOUT.select(groupElement("lanes"));
+    private static final OfInt num_threads$LAYOUT = (OfInt)$LAYOUT.select(groupElement("num_threads"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * int num_threads
      * }
      */
-    public static final OfShort lanes$layout() {
-        return lanes$LAYOUT;
+    public static final OfInt num_threads$layout() {
+        return num_threads$LAYOUT;
     }
 
-    private static final long lanes$OFFSET = 2;
+    private static final long num_threads$OFFSET = 8;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * int num_threads
      * }
      */
-    public static final long lanes$offset() {
-        return lanes$OFFSET;
+    public static final long num_threads$offset() {
+        return num_threads$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * int num_threads
      * }
      */
-    public static short lanes(MemorySegment struct) {
-        return struct.get(lanes$LAYOUT, lanes$OFFSET);
+    public static int num_threads(MemorySegment struct) {
+        return struct.get(num_threads$LAYOUT, num_threads$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * int num_threads
      * }
      */
-    public static void lanes(MemorySegment struct, short fieldValue) {
-        struct.set(lanes$LAYOUT, lanes$OFFSET, fieldValue);
+    public static void num_threads(MemorySegment struct, int fieldValue) {
+        struct.set(num_threads$LAYOUT, num_threads$OFFSET, fieldValue);
     }
 
     /**

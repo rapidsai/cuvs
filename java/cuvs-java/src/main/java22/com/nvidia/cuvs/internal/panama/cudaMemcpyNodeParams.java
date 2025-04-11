@@ -31,24 +31,24 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
 
 /**
  * {@snippet lang=c :
- * struct {
- *     uint8_t code;
- *     uint8_t bits;
- *     uint16_t lanes;
+ * struct cudaMemcpyNodeParams {
+ *     int flags;
+ *     int reserved[3];
+ *     struct cudaMemcpy3DParms copyParams;
  * }
  * }
  */
-public class DLDataType {
+public class cudaMemcpyNodeParams {
 
-    DLDataType() {
+    cudaMemcpyNodeParams() {
         // Should not be called directly
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        PanamaFFMAPI.C_CHAR.withName("code"),
-        PanamaFFMAPI.C_CHAR.withName("bits"),
-        PanamaFFMAPI.C_SHORT.withName("lanes")
-    ).withName("$anon$145:9");
+        PanamaFFMAPI.C_INT.withName("flags"),
+        MemoryLayout.sequenceLayout(3, PanamaFFMAPI.C_INT).withName("reserved"),
+        cudaMemcpy3DParms.layout().withName("copyParams")
+    ).withName("cudaMemcpyNodeParams");
 
     /**
      * The layout of this struct
@@ -57,136 +57,169 @@ public class DLDataType {
         return $LAYOUT;
     }
 
-    private static final OfByte code$LAYOUT = (OfByte)$LAYOUT.select(groupElement("code"));
+    private static final OfInt flags$LAYOUT = (OfInt)$LAYOUT.select(groupElement("flags"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * int flags
      * }
      */
-    public static final OfByte code$layout() {
-        return code$LAYOUT;
+    public static final OfInt flags$layout() {
+        return flags$LAYOUT;
     }
 
-    private static final long code$OFFSET = 0;
+    private static final long flags$OFFSET = 0;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * int flags
      * }
      */
-    public static final long code$offset() {
-        return code$OFFSET;
+    public static final long flags$offset() {
+        return flags$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * int flags
      * }
      */
-    public static byte code(MemorySegment struct) {
-        return struct.get(code$LAYOUT, code$OFFSET);
+    public static int flags(MemorySegment struct) {
+        return struct.get(flags$LAYOUT, flags$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * int flags
      * }
      */
-    public static void code(MemorySegment struct, byte fieldValue) {
-        struct.set(code$LAYOUT, code$OFFSET, fieldValue);
+    public static void flags(MemorySegment struct, int fieldValue) {
+        struct.set(flags$LAYOUT, flags$OFFSET, fieldValue);
     }
 
-    private static final OfByte bits$LAYOUT = (OfByte)$LAYOUT.select(groupElement("bits"));
+    private static final SequenceLayout reserved$LAYOUT = (SequenceLayout)$LAYOUT.select(groupElement("reserved"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * int reserved[3]
      * }
      */
-    public static final OfByte bits$layout() {
-        return bits$LAYOUT;
+    public static final SequenceLayout reserved$layout() {
+        return reserved$LAYOUT;
     }
 
-    private static final long bits$OFFSET = 1;
+    private static final long reserved$OFFSET = 4;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * int reserved[3]
      * }
      */
-    public static final long bits$offset() {
-        return bits$OFFSET;
+    public static final long reserved$offset() {
+        return reserved$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * int reserved[3]
      * }
      */
-    public static byte bits(MemorySegment struct) {
-        return struct.get(bits$LAYOUT, bits$OFFSET);
+    public static MemorySegment reserved(MemorySegment struct) {
+        return struct.asSlice(reserved$OFFSET, reserved$LAYOUT.byteSize());
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * int reserved[3]
      * }
      */
-    public static void bits(MemorySegment struct, byte fieldValue) {
-        struct.set(bits$LAYOUT, bits$OFFSET, fieldValue);
+    public static void reserved(MemorySegment struct, MemorySegment fieldValue) {
+        MemorySegment.copy(fieldValue, 0L, struct, reserved$OFFSET, reserved$LAYOUT.byteSize());
     }
 
-    private static final OfShort lanes$LAYOUT = (OfShort)$LAYOUT.select(groupElement("lanes"));
+    private static long[] reserved$DIMS = { 3 };
+
+    /**
+     * Dimensions for array field:
+     * {@snippet lang=c :
+     * int reserved[3]
+     * }
+     */
+    public static long[] reserved$dimensions() {
+        return reserved$DIMS;
+    }
+    private static final VarHandle reserved$ELEM_HANDLE = reserved$LAYOUT.varHandle(sequenceElement());
+
+    /**
+     * Indexed getter for field:
+     * {@snippet lang=c :
+     * int reserved[3]
+     * }
+     */
+    public static int reserved(MemorySegment struct, long index0) {
+        return (int)reserved$ELEM_HANDLE.get(struct, 0L, index0);
+    }
+
+    /**
+     * Indexed setter for field:
+     * {@snippet lang=c :
+     * int reserved[3]
+     * }
+     */
+    public static void reserved(MemorySegment struct, long index0, int fieldValue) {
+        reserved$ELEM_HANDLE.set(struct, 0L, index0, fieldValue);
+    }
+
+    private static final GroupLayout copyParams$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("copyParams"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * struct cudaMemcpy3DParms copyParams
      * }
      */
-    public static final OfShort lanes$layout() {
-        return lanes$LAYOUT;
+    public static final GroupLayout copyParams$layout() {
+        return copyParams$LAYOUT;
     }
 
-    private static final long lanes$OFFSET = 2;
+    private static final long copyParams$OFFSET = 16;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * struct cudaMemcpy3DParms copyParams
      * }
      */
-    public static final long lanes$offset() {
-        return lanes$OFFSET;
+    public static final long copyParams$offset() {
+        return copyParams$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * struct cudaMemcpy3DParms copyParams
      * }
      */
-    public static short lanes(MemorySegment struct) {
-        return struct.get(lanes$LAYOUT, lanes$OFFSET);
+    public static MemorySegment copyParams(MemorySegment struct) {
+        return struct.asSlice(copyParams$OFFSET, copyParams$LAYOUT.byteSize());
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * struct cudaMemcpy3DParms copyParams
      * }
      */
-    public static void lanes(MemorySegment struct, short fieldValue) {
-        struct.set(lanes$LAYOUT, lanes$OFFSET, fieldValue);
+    public static void copyParams(MemorySegment struct, MemorySegment fieldValue) {
+        MemorySegment.copy(fieldValue, 0L, struct, copyParams$OFFSET, copyParams$LAYOUT.byteSize());
     }
 
     /**

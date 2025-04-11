@@ -31,24 +31,26 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
 
 /**
  * {@snippet lang=c :
- * struct {
- *     uint8_t code;
- *     uint8_t bits;
- *     uint16_t lanes;
+ * struct ushort4 {
+ *     unsigned short x;
+ *     unsigned short y;
+ *     unsigned short z;
+ *     unsigned short w;
  * }
  * }
  */
-public class DLDataType {
+public class ushort4 {
 
-    DLDataType() {
+    ushort4() {
         // Should not be called directly
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        PanamaFFMAPI.C_CHAR.withName("code"),
-        PanamaFFMAPI.C_CHAR.withName("bits"),
-        PanamaFFMAPI.C_SHORT.withName("lanes")
-    ).withName("$anon$145:9");
+        PanamaFFMAPI.C_SHORT.withName("x"),
+        PanamaFFMAPI.C_SHORT.withName("y"),
+        PanamaFFMAPI.C_SHORT.withName("z"),
+        PanamaFFMAPI.C_SHORT.withName("w")
+    ).withName("ushort4");
 
     /**
      * The layout of this struct
@@ -57,136 +59,180 @@ public class DLDataType {
         return $LAYOUT;
     }
 
-    private static final OfByte code$LAYOUT = (OfByte)$LAYOUT.select(groupElement("code"));
+    private static final OfShort x$LAYOUT = (OfShort)$LAYOUT.select(groupElement("x"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * unsigned short x
      * }
      */
-    public static final OfByte code$layout() {
-        return code$LAYOUT;
+    public static final OfShort x$layout() {
+        return x$LAYOUT;
     }
 
-    private static final long code$OFFSET = 0;
+    private static final long x$OFFSET = 0;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * unsigned short x
      * }
      */
-    public static final long code$offset() {
-        return code$OFFSET;
+    public static final long x$offset() {
+        return x$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * unsigned short x
      * }
      */
-    public static byte code(MemorySegment struct) {
-        return struct.get(code$LAYOUT, code$OFFSET);
+    public static short x(MemorySegment struct) {
+        return struct.get(x$LAYOUT, x$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * unsigned short x
      * }
      */
-    public static void code(MemorySegment struct, byte fieldValue) {
-        struct.set(code$LAYOUT, code$OFFSET, fieldValue);
+    public static void x(MemorySegment struct, short fieldValue) {
+        struct.set(x$LAYOUT, x$OFFSET, fieldValue);
     }
 
-    private static final OfByte bits$LAYOUT = (OfByte)$LAYOUT.select(groupElement("bits"));
+    private static final OfShort y$LAYOUT = (OfShort)$LAYOUT.select(groupElement("y"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * unsigned short y
      * }
      */
-    public static final OfByte bits$layout() {
-        return bits$LAYOUT;
+    public static final OfShort y$layout() {
+        return y$LAYOUT;
     }
 
-    private static final long bits$OFFSET = 1;
+    private static final long y$OFFSET = 2;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * unsigned short y
      * }
      */
-    public static final long bits$offset() {
-        return bits$OFFSET;
+    public static final long y$offset() {
+        return y$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * unsigned short y
      * }
      */
-    public static byte bits(MemorySegment struct) {
-        return struct.get(bits$LAYOUT, bits$OFFSET);
+    public static short y(MemorySegment struct) {
+        return struct.get(y$LAYOUT, y$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * unsigned short y
      * }
      */
-    public static void bits(MemorySegment struct, byte fieldValue) {
-        struct.set(bits$LAYOUT, bits$OFFSET, fieldValue);
+    public static void y(MemorySegment struct, short fieldValue) {
+        struct.set(y$LAYOUT, y$OFFSET, fieldValue);
     }
 
-    private static final OfShort lanes$LAYOUT = (OfShort)$LAYOUT.select(groupElement("lanes"));
+    private static final OfShort z$LAYOUT = (OfShort)$LAYOUT.select(groupElement("z"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * unsigned short z
      * }
      */
-    public static final OfShort lanes$layout() {
-        return lanes$LAYOUT;
+    public static final OfShort z$layout() {
+        return z$LAYOUT;
     }
 
-    private static final long lanes$OFFSET = 2;
+    private static final long z$OFFSET = 4;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * unsigned short z
      * }
      */
-    public static final long lanes$offset() {
-        return lanes$OFFSET;
+    public static final long z$offset() {
+        return z$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * unsigned short z
      * }
      */
-    public static short lanes(MemorySegment struct) {
-        return struct.get(lanes$LAYOUT, lanes$OFFSET);
+    public static short z(MemorySegment struct) {
+        return struct.get(z$LAYOUT, z$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * unsigned short z
      * }
      */
-    public static void lanes(MemorySegment struct, short fieldValue) {
-        struct.set(lanes$LAYOUT, lanes$OFFSET, fieldValue);
+    public static void z(MemorySegment struct, short fieldValue) {
+        struct.set(z$LAYOUT, z$OFFSET, fieldValue);
+    }
+
+    private static final OfShort w$LAYOUT = (OfShort)$LAYOUT.select(groupElement("w"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * unsigned short w
+     * }
+     */
+    public static final OfShort w$layout() {
+        return w$LAYOUT;
+    }
+
+    private static final long w$OFFSET = 6;
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * unsigned short w
+     * }
+     */
+    public static final long w$offset() {
+        return w$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * unsigned short w
+     * }
+     */
+    public static short w(MemorySegment struct) {
+        return struct.get(w$LAYOUT, w$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * unsigned short w
+     * }
+     */
+    public static void w(MemorySegment struct, short fieldValue) {
+        struct.set(w$LAYOUT, w$OFFSET, fieldValue);
     }
 
     /**

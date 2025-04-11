@@ -31,24 +31,26 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
 
 /**
  * {@snippet lang=c :
- * struct {
- *     uint8_t code;
- *     uint8_t bits;
- *     uint16_t lanes;
+ * struct cudaConditionalNodeParams {
+ *     cudaGraphConditionalHandle handle;
+ *     enum cudaGraphConditionalNodeType type;
+ *     unsigned int size;
+ *     cudaGraph_t *phGraph_out;
  * }
  * }
  */
-public class DLDataType {
+public class cudaConditionalNodeParams {
 
-    DLDataType() {
+    cudaConditionalNodeParams() {
         // Should not be called directly
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        PanamaFFMAPI.C_CHAR.withName("code"),
-        PanamaFFMAPI.C_CHAR.withName("bits"),
-        PanamaFFMAPI.C_SHORT.withName("lanes")
-    ).withName("$anon$145:9");
+        PanamaFFMAPI.C_LONG_LONG.withName("handle"),
+        PanamaFFMAPI.C_INT.withName("type"),
+        PanamaFFMAPI.C_INT.withName("size"),
+        PanamaFFMAPI.C_POINTER.withName("phGraph_out")
+    ).withName("cudaConditionalNodeParams");
 
     /**
      * The layout of this struct
@@ -57,136 +59,180 @@ public class DLDataType {
         return $LAYOUT;
     }
 
-    private static final OfByte code$LAYOUT = (OfByte)$LAYOUT.select(groupElement("code"));
+    private static final OfLong handle$LAYOUT = (OfLong)$LAYOUT.select(groupElement("handle"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * cudaGraphConditionalHandle handle
      * }
      */
-    public static final OfByte code$layout() {
-        return code$LAYOUT;
+    public static final OfLong handle$layout() {
+        return handle$LAYOUT;
     }
 
-    private static final long code$OFFSET = 0;
+    private static final long handle$OFFSET = 0;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * cudaGraphConditionalHandle handle
      * }
      */
-    public static final long code$offset() {
-        return code$OFFSET;
+    public static final long handle$offset() {
+        return handle$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * cudaGraphConditionalHandle handle
      * }
      */
-    public static byte code(MemorySegment struct) {
-        return struct.get(code$LAYOUT, code$OFFSET);
+    public static long handle(MemorySegment struct) {
+        return struct.get(handle$LAYOUT, handle$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * cudaGraphConditionalHandle handle
      * }
      */
-    public static void code(MemorySegment struct, byte fieldValue) {
-        struct.set(code$LAYOUT, code$OFFSET, fieldValue);
+    public static void handle(MemorySegment struct, long fieldValue) {
+        struct.set(handle$LAYOUT, handle$OFFSET, fieldValue);
     }
 
-    private static final OfByte bits$LAYOUT = (OfByte)$LAYOUT.select(groupElement("bits"));
+    private static final OfInt type$LAYOUT = (OfInt)$LAYOUT.select(groupElement("type"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * enum cudaGraphConditionalNodeType type
      * }
      */
-    public static final OfByte bits$layout() {
-        return bits$LAYOUT;
+    public static final OfInt type$layout() {
+        return type$LAYOUT;
     }
 
-    private static final long bits$OFFSET = 1;
+    private static final long type$OFFSET = 8;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * enum cudaGraphConditionalNodeType type
      * }
      */
-    public static final long bits$offset() {
-        return bits$OFFSET;
+    public static final long type$offset() {
+        return type$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * enum cudaGraphConditionalNodeType type
      * }
      */
-    public static byte bits(MemorySegment struct) {
-        return struct.get(bits$LAYOUT, bits$OFFSET);
+    public static int type(MemorySegment struct) {
+        return struct.get(type$LAYOUT, type$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * enum cudaGraphConditionalNodeType type
      * }
      */
-    public static void bits(MemorySegment struct, byte fieldValue) {
-        struct.set(bits$LAYOUT, bits$OFFSET, fieldValue);
+    public static void type(MemorySegment struct, int fieldValue) {
+        struct.set(type$LAYOUT, type$OFFSET, fieldValue);
     }
 
-    private static final OfShort lanes$LAYOUT = (OfShort)$LAYOUT.select(groupElement("lanes"));
+    private static final OfInt size$LAYOUT = (OfInt)$LAYOUT.select(groupElement("size"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * unsigned int size
      * }
      */
-    public static final OfShort lanes$layout() {
-        return lanes$LAYOUT;
+    public static final OfInt size$layout() {
+        return size$LAYOUT;
     }
 
-    private static final long lanes$OFFSET = 2;
+    private static final long size$OFFSET = 12;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * unsigned int size
      * }
      */
-    public static final long lanes$offset() {
-        return lanes$OFFSET;
+    public static final long size$offset() {
+        return size$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * unsigned int size
      * }
      */
-    public static short lanes(MemorySegment struct) {
-        return struct.get(lanes$LAYOUT, lanes$OFFSET);
+    public static int size(MemorySegment struct) {
+        return struct.get(size$LAYOUT, size$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * unsigned int size
      * }
      */
-    public static void lanes(MemorySegment struct, short fieldValue) {
-        struct.set(lanes$LAYOUT, lanes$OFFSET, fieldValue);
+    public static void size(MemorySegment struct, int fieldValue) {
+        struct.set(size$LAYOUT, size$OFFSET, fieldValue);
+    }
+
+    private static final AddressLayout phGraph_out$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("phGraph_out"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * cudaGraph_t *phGraph_out
+     * }
+     */
+    public static final AddressLayout phGraph_out$layout() {
+        return phGraph_out$LAYOUT;
+    }
+
+    private static final long phGraph_out$OFFSET = 16;
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * cudaGraph_t *phGraph_out
+     * }
+     */
+    public static final long phGraph_out$offset() {
+        return phGraph_out$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * cudaGraph_t *phGraph_out
+     * }
+     */
+    public static MemorySegment phGraph_out(MemorySegment struct) {
+        return struct.get(phGraph_out$LAYOUT, phGraph_out$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * cudaGraph_t *phGraph_out
+     * }
+     */
+    public static void phGraph_out(MemorySegment struct, MemorySegment fieldValue) {
+        struct.set(phGraph_out$LAYOUT, phGraph_out$OFFSET, fieldValue);
     }
 
     /**

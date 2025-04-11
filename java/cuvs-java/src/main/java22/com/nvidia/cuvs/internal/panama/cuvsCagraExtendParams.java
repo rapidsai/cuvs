@@ -31,24 +31,20 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
 
 /**
  * {@snippet lang=c :
- * struct {
- *     uint8_t code;
- *     uint8_t bits;
- *     uint16_t lanes;
+ * struct cuvsCagraExtendParams {
+ *     uint32_t max_chunk_size;
  * }
  * }
  */
-public class DLDataType {
+public class cuvsCagraExtendParams {
 
-    DLDataType() {
+    cuvsCagraExtendParams() {
         // Should not be called directly
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        PanamaFFMAPI.C_CHAR.withName("code"),
-        PanamaFFMAPI.C_CHAR.withName("bits"),
-        PanamaFFMAPI.C_SHORT.withName("lanes")
-    ).withName("$anon$145:9");
+        PanamaFFMAPI.C_INT.withName("max_chunk_size")
+    ).withName("cuvsCagraExtendParams");
 
     /**
      * The layout of this struct
@@ -57,136 +53,48 @@ public class DLDataType {
         return $LAYOUT;
     }
 
-    private static final OfByte code$LAYOUT = (OfByte)$LAYOUT.select(groupElement("code"));
+    private static final OfInt max_chunk_size$LAYOUT = (OfInt)$LAYOUT.select(groupElement("max_chunk_size"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * uint32_t max_chunk_size
      * }
      */
-    public static final OfByte code$layout() {
-        return code$LAYOUT;
+    public static final OfInt max_chunk_size$layout() {
+        return max_chunk_size$LAYOUT;
     }
 
-    private static final long code$OFFSET = 0;
+    private static final long max_chunk_size$OFFSET = 0;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * uint32_t max_chunk_size
      * }
      */
-    public static final long code$offset() {
-        return code$OFFSET;
+    public static final long max_chunk_size$offset() {
+        return max_chunk_size$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * uint32_t max_chunk_size
      * }
      */
-    public static byte code(MemorySegment struct) {
-        return struct.get(code$LAYOUT, code$OFFSET);
+    public static int max_chunk_size(MemorySegment struct) {
+        return struct.get(max_chunk_size$LAYOUT, max_chunk_size$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * uint32_t max_chunk_size
      * }
      */
-    public static void code(MemorySegment struct, byte fieldValue) {
-        struct.set(code$LAYOUT, code$OFFSET, fieldValue);
-    }
-
-    private static final OfByte bits$LAYOUT = (OfByte)$LAYOUT.select(groupElement("bits"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * uint8_t bits
-     * }
-     */
-    public static final OfByte bits$layout() {
-        return bits$LAYOUT;
-    }
-
-    private static final long bits$OFFSET = 1;
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * uint8_t bits
-     * }
-     */
-    public static final long bits$offset() {
-        return bits$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * uint8_t bits
-     * }
-     */
-    public static byte bits(MemorySegment struct) {
-        return struct.get(bits$LAYOUT, bits$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * uint8_t bits
-     * }
-     */
-    public static void bits(MemorySegment struct, byte fieldValue) {
-        struct.set(bits$LAYOUT, bits$OFFSET, fieldValue);
-    }
-
-    private static final OfShort lanes$LAYOUT = (OfShort)$LAYOUT.select(groupElement("lanes"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * uint16_t lanes
-     * }
-     */
-    public static final OfShort lanes$layout() {
-        return lanes$LAYOUT;
-    }
-
-    private static final long lanes$OFFSET = 2;
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * uint16_t lanes
-     * }
-     */
-    public static final long lanes$offset() {
-        return lanes$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * uint16_t lanes
-     * }
-     */
-    public static short lanes(MemorySegment struct) {
-        return struct.get(lanes$LAYOUT, lanes$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * uint16_t lanes
-     * }
-     */
-    public static void lanes(MemorySegment struct, short fieldValue) {
-        struct.set(lanes$LAYOUT, lanes$OFFSET, fieldValue);
+    public static void max_chunk_size(MemorySegment struct, int fieldValue) {
+        struct.set(max_chunk_size$LAYOUT, max_chunk_size$OFFSET, fieldValue);
     }
 
     /**

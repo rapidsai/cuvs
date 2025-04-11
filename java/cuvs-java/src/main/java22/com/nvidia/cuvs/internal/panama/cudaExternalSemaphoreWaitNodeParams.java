@@ -31,24 +31,25 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
 
 /**
  * {@snippet lang=c :
- * struct {
- *     uint8_t code;
- *     uint8_t bits;
- *     uint16_t lanes;
+ * struct cudaExternalSemaphoreWaitNodeParams {
+ *     cudaExternalSemaphore_t *extSemArray;
+ *     const struct cudaExternalSemaphoreWaitParams *paramsArray;
+ *     unsigned int numExtSems;
  * }
  * }
  */
-public class DLDataType {
+public class cudaExternalSemaphoreWaitNodeParams {
 
-    DLDataType() {
+    cudaExternalSemaphoreWaitNodeParams() {
         // Should not be called directly
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        PanamaFFMAPI.C_CHAR.withName("code"),
-        PanamaFFMAPI.C_CHAR.withName("bits"),
-        PanamaFFMAPI.C_SHORT.withName("lanes")
-    ).withName("$anon$145:9");
+        PanamaFFMAPI.C_POINTER.withName("extSemArray"),
+        PanamaFFMAPI.C_POINTER.withName("paramsArray"),
+        PanamaFFMAPI.C_INT.withName("numExtSems"),
+        MemoryLayout.paddingLayout(4)
+    ).withName("cudaExternalSemaphoreWaitNodeParams");
 
     /**
      * The layout of this struct
@@ -57,136 +58,136 @@ public class DLDataType {
         return $LAYOUT;
     }
 
-    private static final OfByte code$LAYOUT = (OfByte)$LAYOUT.select(groupElement("code"));
+    private static final AddressLayout extSemArray$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("extSemArray"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * cudaExternalSemaphore_t *extSemArray
      * }
      */
-    public static final OfByte code$layout() {
-        return code$LAYOUT;
+    public static final AddressLayout extSemArray$layout() {
+        return extSemArray$LAYOUT;
     }
 
-    private static final long code$OFFSET = 0;
+    private static final long extSemArray$OFFSET = 0;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * cudaExternalSemaphore_t *extSemArray
      * }
      */
-    public static final long code$offset() {
-        return code$OFFSET;
+    public static final long extSemArray$offset() {
+        return extSemArray$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * cudaExternalSemaphore_t *extSemArray
      * }
      */
-    public static byte code(MemorySegment struct) {
-        return struct.get(code$LAYOUT, code$OFFSET);
+    public static MemorySegment extSemArray(MemorySegment struct) {
+        return struct.get(extSemArray$LAYOUT, extSemArray$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * cudaExternalSemaphore_t *extSemArray
      * }
      */
-    public static void code(MemorySegment struct, byte fieldValue) {
-        struct.set(code$LAYOUT, code$OFFSET, fieldValue);
+    public static void extSemArray(MemorySegment struct, MemorySegment fieldValue) {
+        struct.set(extSemArray$LAYOUT, extSemArray$OFFSET, fieldValue);
     }
 
-    private static final OfByte bits$LAYOUT = (OfByte)$LAYOUT.select(groupElement("bits"));
+    private static final AddressLayout paramsArray$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("paramsArray"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * const struct cudaExternalSemaphoreWaitParams *paramsArray
      * }
      */
-    public static final OfByte bits$layout() {
-        return bits$LAYOUT;
+    public static final AddressLayout paramsArray$layout() {
+        return paramsArray$LAYOUT;
     }
 
-    private static final long bits$OFFSET = 1;
+    private static final long paramsArray$OFFSET = 8;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * const struct cudaExternalSemaphoreWaitParams *paramsArray
      * }
      */
-    public static final long bits$offset() {
-        return bits$OFFSET;
+    public static final long paramsArray$offset() {
+        return paramsArray$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * const struct cudaExternalSemaphoreWaitParams *paramsArray
      * }
      */
-    public static byte bits(MemorySegment struct) {
-        return struct.get(bits$LAYOUT, bits$OFFSET);
+    public static MemorySegment paramsArray(MemorySegment struct) {
+        return struct.get(paramsArray$LAYOUT, paramsArray$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * const struct cudaExternalSemaphoreWaitParams *paramsArray
      * }
      */
-    public static void bits(MemorySegment struct, byte fieldValue) {
-        struct.set(bits$LAYOUT, bits$OFFSET, fieldValue);
+    public static void paramsArray(MemorySegment struct, MemorySegment fieldValue) {
+        struct.set(paramsArray$LAYOUT, paramsArray$OFFSET, fieldValue);
     }
 
-    private static final OfShort lanes$LAYOUT = (OfShort)$LAYOUT.select(groupElement("lanes"));
+    private static final OfInt numExtSems$LAYOUT = (OfInt)$LAYOUT.select(groupElement("numExtSems"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * unsigned int numExtSems
      * }
      */
-    public static final OfShort lanes$layout() {
-        return lanes$LAYOUT;
+    public static final OfInt numExtSems$layout() {
+        return numExtSems$LAYOUT;
     }
 
-    private static final long lanes$OFFSET = 2;
+    private static final long numExtSems$OFFSET = 16;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * unsigned int numExtSems
      * }
      */
-    public static final long lanes$offset() {
-        return lanes$OFFSET;
+    public static final long numExtSems$offset() {
+        return numExtSems$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * unsigned int numExtSems
      * }
      */
-    public static short lanes(MemorySegment struct) {
-        return struct.get(lanes$LAYOUT, lanes$OFFSET);
+    public static int numExtSems(MemorySegment struct) {
+        return struct.get(numExtSems$LAYOUT, numExtSems$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * unsigned int numExtSems
      * }
      */
-    public static void lanes(MemorySegment struct, short fieldValue) {
-        struct.set(lanes$LAYOUT, lanes$OFFSET, fieldValue);
+    public static void numExtSems(MemorySegment struct, int fieldValue) {
+        struct.set(numExtSems$LAYOUT, numExtSems$OFFSET, fieldValue);
     }
 
     /**

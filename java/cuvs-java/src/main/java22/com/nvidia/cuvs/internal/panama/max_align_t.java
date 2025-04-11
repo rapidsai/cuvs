@@ -32,23 +32,21 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
 /**
  * {@snippet lang=c :
  * struct {
- *     uint8_t code;
- *     uint8_t bits;
- *     uint16_t lanes;
+ *     long long __clang_max_align_nonce1;
+ *     long double __clang_max_align_nonce2;
  * }
  * }
  */
-public class DLDataType {
+public class max_align_t {
 
-    DLDataType() {
+    max_align_t() {
         // Should not be called directly
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        PanamaFFMAPI.C_CHAR.withName("code"),
-        PanamaFFMAPI.C_CHAR.withName("bits"),
-        PanamaFFMAPI.C_SHORT.withName("lanes")
-    ).withName("$anon$145:9");
+        PanamaFFMAPI.C_LONG_LONG.withName("__clang_max_align_nonce1"),
+        MemoryLayout.paddingLayout(24)
+    ).withName("$anon$19:9");
 
     /**
      * The layout of this struct
@@ -57,136 +55,48 @@ public class DLDataType {
         return $LAYOUT;
     }
 
-    private static final OfByte code$LAYOUT = (OfByte)$LAYOUT.select(groupElement("code"));
+    private static final OfLong __clang_max_align_nonce1$LAYOUT = (OfLong)$LAYOUT.select(groupElement("__clang_max_align_nonce1"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * long long __clang_max_align_nonce1
      * }
      */
-    public static final OfByte code$layout() {
-        return code$LAYOUT;
+    public static final OfLong __clang_max_align_nonce1$layout() {
+        return __clang_max_align_nonce1$LAYOUT;
     }
 
-    private static final long code$OFFSET = 0;
+    private static final long __clang_max_align_nonce1$OFFSET = 0;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * long long __clang_max_align_nonce1
      * }
      */
-    public static final long code$offset() {
-        return code$OFFSET;
+    public static final long __clang_max_align_nonce1$offset() {
+        return __clang_max_align_nonce1$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * long long __clang_max_align_nonce1
      * }
      */
-    public static byte code(MemorySegment struct) {
-        return struct.get(code$LAYOUT, code$OFFSET);
+    public static long __clang_max_align_nonce1(MemorySegment struct) {
+        return struct.get(__clang_max_align_nonce1$LAYOUT, __clang_max_align_nonce1$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * long long __clang_max_align_nonce1
      * }
      */
-    public static void code(MemorySegment struct, byte fieldValue) {
-        struct.set(code$LAYOUT, code$OFFSET, fieldValue);
-    }
-
-    private static final OfByte bits$LAYOUT = (OfByte)$LAYOUT.select(groupElement("bits"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * uint8_t bits
-     * }
-     */
-    public static final OfByte bits$layout() {
-        return bits$LAYOUT;
-    }
-
-    private static final long bits$OFFSET = 1;
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * uint8_t bits
-     * }
-     */
-    public static final long bits$offset() {
-        return bits$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * uint8_t bits
-     * }
-     */
-    public static byte bits(MemorySegment struct) {
-        return struct.get(bits$LAYOUT, bits$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * uint8_t bits
-     * }
-     */
-    public static void bits(MemorySegment struct, byte fieldValue) {
-        struct.set(bits$LAYOUT, bits$OFFSET, fieldValue);
-    }
-
-    private static final OfShort lanes$LAYOUT = (OfShort)$LAYOUT.select(groupElement("lanes"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * uint16_t lanes
-     * }
-     */
-    public static final OfShort lanes$layout() {
-        return lanes$LAYOUT;
-    }
-
-    private static final long lanes$OFFSET = 2;
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * uint16_t lanes
-     * }
-     */
-    public static final long lanes$offset() {
-        return lanes$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * uint16_t lanes
-     * }
-     */
-    public static short lanes(MemorySegment struct) {
-        return struct.get(lanes$LAYOUT, lanes$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * uint16_t lanes
-     * }
-     */
-    public static void lanes(MemorySegment struct, short fieldValue) {
-        struct.set(lanes$LAYOUT, lanes$OFFSET, fieldValue);
+    public static void __clang_max_align_nonce1(MemorySegment struct, long fieldValue) {
+        struct.set(__clang_max_align_nonce1$LAYOUT, __clang_max_align_nonce1$OFFSET, fieldValue);
     }
 
     /**

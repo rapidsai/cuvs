@@ -31,24 +31,27 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
 
 /**
  * {@snippet lang=c :
- * struct {
- *     uint8_t code;
- *     uint8_t bits;
- *     uint16_t lanes;
+ * struct cudaGraphInstantiateParams_st {
+ *     unsigned long long flags;
+ *     cudaStream_t uploadStream;
+ *     cudaGraphNode_t errNode_out;
+ *     cudaGraphInstantiateResult result_out;
  * }
  * }
  */
-public class DLDataType {
+public class cudaGraphInstantiateParams_st {
 
-    DLDataType() {
+    cudaGraphInstantiateParams_st() {
         // Should not be called directly
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        PanamaFFMAPI.C_CHAR.withName("code"),
-        PanamaFFMAPI.C_CHAR.withName("bits"),
-        PanamaFFMAPI.C_SHORT.withName("lanes")
-    ).withName("$anon$145:9");
+        PanamaFFMAPI.C_LONG_LONG.withName("flags"),
+        PanamaFFMAPI.C_POINTER.withName("uploadStream"),
+        PanamaFFMAPI.C_POINTER.withName("errNode_out"),
+        PanamaFFMAPI.C_INT.withName("result_out"),
+        MemoryLayout.paddingLayout(4)
+    ).withName("cudaGraphInstantiateParams_st");
 
     /**
      * The layout of this struct
@@ -57,136 +60,180 @@ public class DLDataType {
         return $LAYOUT;
     }
 
-    private static final OfByte code$LAYOUT = (OfByte)$LAYOUT.select(groupElement("code"));
+    private static final OfLong flags$LAYOUT = (OfLong)$LAYOUT.select(groupElement("flags"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * unsigned long long flags
      * }
      */
-    public static final OfByte code$layout() {
-        return code$LAYOUT;
+    public static final OfLong flags$layout() {
+        return flags$LAYOUT;
     }
 
-    private static final long code$OFFSET = 0;
+    private static final long flags$OFFSET = 0;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * unsigned long long flags
      * }
      */
-    public static final long code$offset() {
-        return code$OFFSET;
+    public static final long flags$offset() {
+        return flags$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * unsigned long long flags
      * }
      */
-    public static byte code(MemorySegment struct) {
-        return struct.get(code$LAYOUT, code$OFFSET);
+    public static long flags(MemorySegment struct) {
+        return struct.get(flags$LAYOUT, flags$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t code
+     * unsigned long long flags
      * }
      */
-    public static void code(MemorySegment struct, byte fieldValue) {
-        struct.set(code$LAYOUT, code$OFFSET, fieldValue);
+    public static void flags(MemorySegment struct, long fieldValue) {
+        struct.set(flags$LAYOUT, flags$OFFSET, fieldValue);
     }
 
-    private static final OfByte bits$LAYOUT = (OfByte)$LAYOUT.select(groupElement("bits"));
+    private static final AddressLayout uploadStream$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("uploadStream"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * cudaStream_t uploadStream
      * }
      */
-    public static final OfByte bits$layout() {
-        return bits$LAYOUT;
+    public static final AddressLayout uploadStream$layout() {
+        return uploadStream$LAYOUT;
     }
 
-    private static final long bits$OFFSET = 1;
+    private static final long uploadStream$OFFSET = 8;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * cudaStream_t uploadStream
      * }
      */
-    public static final long bits$offset() {
-        return bits$OFFSET;
+    public static final long uploadStream$offset() {
+        return uploadStream$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * cudaStream_t uploadStream
      * }
      */
-    public static byte bits(MemorySegment struct) {
-        return struct.get(bits$LAYOUT, bits$OFFSET);
+    public static MemorySegment uploadStream(MemorySegment struct) {
+        return struct.get(uploadStream$LAYOUT, uploadStream$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint8_t bits
+     * cudaStream_t uploadStream
      * }
      */
-    public static void bits(MemorySegment struct, byte fieldValue) {
-        struct.set(bits$LAYOUT, bits$OFFSET, fieldValue);
+    public static void uploadStream(MemorySegment struct, MemorySegment fieldValue) {
+        struct.set(uploadStream$LAYOUT, uploadStream$OFFSET, fieldValue);
     }
 
-    private static final OfShort lanes$LAYOUT = (OfShort)$LAYOUT.select(groupElement("lanes"));
+    private static final AddressLayout errNode_out$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("errNode_out"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * cudaGraphNode_t errNode_out
      * }
      */
-    public static final OfShort lanes$layout() {
-        return lanes$LAYOUT;
+    public static final AddressLayout errNode_out$layout() {
+        return errNode_out$LAYOUT;
     }
 
-    private static final long lanes$OFFSET = 2;
+    private static final long errNode_out$OFFSET = 16;
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * cudaGraphNode_t errNode_out
      * }
      */
-    public static final long lanes$offset() {
-        return lanes$OFFSET;
+    public static final long errNode_out$offset() {
+        return errNode_out$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * cudaGraphNode_t errNode_out
      * }
      */
-    public static short lanes(MemorySegment struct) {
-        return struct.get(lanes$LAYOUT, lanes$OFFSET);
+    public static MemorySegment errNode_out(MemorySegment struct) {
+        return struct.get(errNode_out$LAYOUT, errNode_out$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint16_t lanes
+     * cudaGraphNode_t errNode_out
      * }
      */
-    public static void lanes(MemorySegment struct, short fieldValue) {
-        struct.set(lanes$LAYOUT, lanes$OFFSET, fieldValue);
+    public static void errNode_out(MemorySegment struct, MemorySegment fieldValue) {
+        struct.set(errNode_out$LAYOUT, errNode_out$OFFSET, fieldValue);
+    }
+
+    private static final OfInt result_out$LAYOUT = (OfInt)$LAYOUT.select(groupElement("result_out"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * cudaGraphInstantiateResult result_out
+     * }
+     */
+    public static final OfInt result_out$layout() {
+        return result_out$LAYOUT;
+    }
+
+    private static final long result_out$OFFSET = 24;
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * cudaGraphInstantiateResult result_out
+     * }
+     */
+    public static final long result_out$offset() {
+        return result_out$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * cudaGraphInstantiateResult result_out
+     * }
+     */
+    public static int result_out(MemorySegment struct) {
+        return struct.get(result_out$LAYOUT, result_out$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * cudaGraphInstantiateResult result_out
+     * }
+     */
+    public static void result_out(MemorySegment struct, int fieldValue) {
+        struct.set(result_out$LAYOUT, result_out$OFFSET, fieldValue);
     }
 
     /**
