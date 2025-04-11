@@ -16,6 +16,13 @@
 
 package com.nvidia.cuvs.internal;
 
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
+import static com.nvidia.cuvs.internal.common.Util.checkError;
+import static java.lang.foreign.ValueLayout.ADDRESS;
+
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -39,17 +46,10 @@ import com.nvidia.cuvs.CagraSearchParams;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.SearchResults;
 import com.nvidia.cuvs.internal.common.Util;
-import com.nvidia.cuvs.internal.panama.CuVSCagraCompressionParams;
-import com.nvidia.cuvs.internal.panama.CuVSCagraIndex;
-import com.nvidia.cuvs.internal.panama.CuVSCagraIndexParams;
-import com.nvidia.cuvs.internal.panama.CuVSCagraSearchParams;
-
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
-import static com.nvidia.cuvs.internal.common.Util.checkError;
-import static java.lang.foreign.ValueLayout.ADDRESS;
+import com.nvidia.cuvs.internal.panama.cuvsCagraCompressionParams;
+import com.nvidia.cuvs.internal.panama.cuvsCagraIndex;
+import com.nvidia.cuvs.internal.panama.cuvsCagraIndexParams;
+import com.nvidia.cuvs.internal.panama.cuvsCagraSearchParams;
 
 /**
  * {@link CagraIndex} encapsulates a CAGRA index, along with methods to interact
@@ -374,13 +374,13 @@ public class CagraIndexImpl implements CagraIndex {
    * Allocates the configured compression parameters in the MemorySegment.
    */
   private MemorySegment segmentFromCompressionParams(CagraCompressionParams params) {
-    MemorySegment seg = CuVSCagraCompressionParams.allocate(resources.getArena());
-    CuVSCagraCompressionParams.pq_bits(seg, params.getPqBits());
-    CuVSCagraCompressionParams.pq_dim(seg, params.getPqDim());
-    CuVSCagraCompressionParams.vq_n_centers(seg, params.getVqNCenters());
-    CuVSCagraCompressionParams.kmeans_n_iters(seg, params.getKmeansNIters());
-    CuVSCagraCompressionParams.vq_kmeans_trainset_fraction(seg, params.getVqKmeansTrainsetFraction());
-    CuVSCagraCompressionParams.pq_kmeans_trainset_fraction(seg, params.getPqKmeansTrainsetFraction());
+    MemorySegment seg = cuvsCagraCompressionParams.allocate(resources.getArena());
+    cuvsCagraCompressionParams.pq_bits(seg, params.getPqBits());
+    cuvsCagraCompressionParams.pq_dim(seg, params.getPqDim());
+    cuvsCagraCompressionParams.vq_n_centers(seg, params.getVqNCenters());
+    cuvsCagraCompressionParams.kmeans_n_iters(seg, params.getKmeansNIters());
+    cuvsCagraCompressionParams.vq_kmeans_trainset_fraction(seg, params.getVqKmeansTrainsetFraction());
+    cuvsCagraCompressionParams.pq_kmeans_trainset_fraction(seg, params.getPqKmeansTrainsetFraction());
     return seg;
   }
 
@@ -388,12 +388,12 @@ public class CagraIndexImpl implements CagraIndex {
    * Allocates the configured index parameters in the MemorySegment.
    */
   private MemorySegment segmentFromIndexParams(CagraIndexParams params) {
-    MemorySegment seg = CuVSCagraIndexParams.allocate(resources.getArena());
-    CuVSCagraIndexParams.intermediate_graph_degree(seg, params.getIntermediateGraphDegree());
-    CuVSCagraIndexParams.graph_degree(seg, params.getGraphDegree());
-    CuVSCagraIndexParams.build_algo(seg, params.getCagraGraphBuildAlgo().value);
-    CuVSCagraIndexParams.nn_descent_niter(seg, params.getNNDescentNumIterations());
-    CuVSCagraIndexParams.metric(seg, params.getCuvsDistanceType().value);
+    MemorySegment seg = cuvsCagraIndexParams.allocate(resources.getArena());
+    cuvsCagraIndexParams.intermediate_graph_degree(seg, params.getIntermediateGraphDegree());
+    cuvsCagraIndexParams.graph_degree(seg, params.getGraphDegree());
+    cuvsCagraIndexParams.build_algo(seg, params.getCagraGraphBuildAlgo().value);
+    cuvsCagraIndexParams.nn_descent_niter(seg, params.getNNDescentNumIterations());
+    cuvsCagraIndexParams.metric(seg, params.getCuvsDistanceType().value);
     return seg;
   }
 
@@ -401,23 +401,23 @@ public class CagraIndexImpl implements CagraIndex {
    * Allocates the configured search parameters in the MemorySegment.
    */
   private MemorySegment segmentFromSearchParams(CagraSearchParams params) {
-    MemorySegment seg = CuVSCagraSearchParams.allocate(resources.getArena());
-    CuVSCagraSearchParams.max_queries(seg, params.getMaxQueries());
-    CuVSCagraSearchParams.itopk_size(seg, params.getITopKSize());
-    CuVSCagraSearchParams.max_iterations(seg, params.getMaxIterations());
+    MemorySegment seg = cuvsCagraSearchParams.allocate(resources.getArena());
+    cuvsCagraSearchParams.max_queries(seg, params.getMaxQueries());
+    cuvsCagraSearchParams.itopk_size(seg, params.getITopKSize());
+    cuvsCagraSearchParams.max_iterations(seg, params.getMaxIterations());
     if (params.getCagraSearchAlgo() != null) {
-      CuVSCagraSearchParams.algo(seg, params.getCagraSearchAlgo().value);
+      cuvsCagraSearchParams.algo(seg, params.getCagraSearchAlgo().value);
     }
-    CuVSCagraSearchParams.team_size(seg, params.getTeamSize());
-    CuVSCagraSearchParams.search_width(seg, params.getSearchWidth());
-    CuVSCagraSearchParams.min_iterations(seg, params.getMinIterations());
-    CuVSCagraSearchParams.thread_block_size(seg, params.getThreadBlockSize());
+    cuvsCagraSearchParams.team_size(seg, params.getTeamSize());
+    cuvsCagraSearchParams.search_width(seg, params.getSearchWidth());
+    cuvsCagraSearchParams.min_iterations(seg, params.getMinIterations());
+    cuvsCagraSearchParams.thread_block_size(seg, params.getThreadBlockSize());
     if (params.getHashMapMode() != null) {
-      CuVSCagraSearchParams.hashmap_mode(seg, params.getHashMapMode().value);
+      cuvsCagraSearchParams.hashmap_mode(seg, params.getHashMapMode().value);
     }
-    CuVSCagraSearchParams.hashmap_max_fill_rate(seg, params.getHashMapMaxFillRate());
-    CuVSCagraSearchParams.num_random_samplings(seg, params.getNumRandomSamplings());
-    CuVSCagraSearchParams.rand_xor_mask(seg, params.getRandXORMask());
+    cuvsCagraSearchParams.hashmap_max_fill_rate(seg, params.getHashMapMaxFillRate());
+    cuvsCagraSearchParams.num_random_samplings(seg, params.getNumRandomSamplings());
+    cuvsCagraSearchParams.rand_xor_mask(seg, params.getRandXORMask());
     return seg;
   }
 
@@ -489,7 +489,7 @@ public class CagraIndexImpl implements CagraIndex {
      * Constructs CagraIndexReference and allocate the MemorySegment.
      */
     protected IndexReference(CuVSResourcesImpl resources) {
-      memorySegment = CuVSCagraIndex.allocate(resources.getArena());
+      memorySegment = cuvsCagraIndex.allocate(resources.getArena());
     }
 
     /**
