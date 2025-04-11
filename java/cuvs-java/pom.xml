@@ -62,7 +62,6 @@
         <maven.compiler.source>22</maven.compiler.source>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <gpg.passphrase>${GPG_PASSPHRASE}</gpg.passphrase>
     </properties>
 
     <distributionManagement>
@@ -268,20 +267,6 @@
                     <configuration>
                         <additionalparam>-Xdoclint:none</additionalparam>
                     </configuration>
-                </execution>
-            </executions>
-        </plugin>
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-gpg-plugin</artifactId>
-            <version>1.5</version>
-            <executions>
-                <execution>
-                    <id>sign-artifacts</id>
-                    <phase>verify</phase>
-                    <goals>
-                        <goal>sign</goal>
-                    </goals>
                 </execution>
             </executions>
         </plugin>
