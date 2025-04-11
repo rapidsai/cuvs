@@ -39,6 +39,8 @@ done
 for GENERATED_PANAMA_JAVA_FILE in ${GENERATED_PANAMA_BINDINGS_PATH}/*; do
   CURR_FILENAME=$(basename $GENERATED_PANAMA_JAVA_FILE)
   EXISTING_PANAMA_JAVA_FILE="${PANAMA_JAVA_FILES_PATH}/${CURR_FILENAME}"
+  sed -i '${/^$/d}' $GENERATED_PANAMA_JAVA_FILE # remove last blank line
+
   if ! test -f $EXISTING_PANAMA_JAVA_FILE;
   then
     echo "[NEW] ${CURR_FILENAME}"
@@ -49,7 +51,6 @@ for GENERATED_PANAMA_JAVA_FILE in ${GENERATED_PANAMA_BINDINGS_PATH}/*; do
       echo "[UPDATE] ${CURR_FILENAME}"
       truncate -s 0 $EXISTING_PANAMA_JAVA_FILE # remove current source from the file
       cat $GENERATED_PANAMA_JAVA_FILE > $EXISTING_PANAMA_JAVA_FILE # put updated source
-      sed -i '${/^$/d}' $EXISTING_PANAMA_JAVA_FILE # remove last blank line
     else
       echo "[IGNORE] ${CURR_FILENAME} (already exists and not changed)"
     fi
