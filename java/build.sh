@@ -9,6 +9,14 @@ fi
 # Generate Panama FFM API bindings and update (if any of them changed)
 /bin/bash panama-bindings/generate-bindings.sh
 
+BINDINGS_GENERATION_RETURN_VALUE=$?
+if [ $BINDINGS_GENERATION_RETURN_VALUE != 0 ]
+then
+  echo "Bindings generation did not complete normally (returned value ${BINDINGS_GENERATION_RETURN_VALUE})"
+  echo "Forcing this build process to abort"
+  exit 1
+fi
+
 cd internal && cmake . && cmake --build . \
   && cd .. \
   && mvn install:install-file -DgroupId=$GROUP_ID -DartifactId=cuvs-java-internal -Dversion=$VERSION -Dpackaging=so -Dfile=$SO_FILE_PATH/libcuvs_java.so \

@@ -9,6 +9,7 @@ TARGET_PACKAGE="com.nvidia.cuvs.internal.panama"
 GENERATED_PANAMA_BINDINGS_PATH="${OUTPUT_FOLDER}/${TARGET_PACKAGE//./\/}"
 PANAMA_JAVA_FILES_PATH="${REPODIR}/java/cuvs-java/src/main/java22/${TARGET_PACKAGE//./\/}"
 
+# Use Jextract utility to generate panama bindings
 jextract \
  --include-dir ${REPODIR}/cpp/build/_deps/dlpack-src/include/ \
  --include-dir ${CUDA_HOME}/include \
@@ -17,6 +18,16 @@ jextract \
  --target-package ${TARGET_PACKAGE} \
  --header-class-name PanamaFFMAPI \
  ${CURDIR}/headers.h
+
+# Did Jextract complete normally? If not, stop and return
+JEXTRACT_RETURN_VALUE=$?
+if [ $JEXTRACT_RETURN_VALUE == 0 ]
+then
+  echo "Jextract SUCCESS"
+else
+  echo "Jextract encountered issues (returned value ${JEXTRACT_RETURN_VALUE})"
+  exit $JEXTRACT_RETURN_VALUE
+fi
 
 # Insert license headers in the generated files
 for BINDING_FILE in ${GENERATED_PANAMA_BINDINGS_PATH}/*; do
