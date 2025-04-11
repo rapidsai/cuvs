@@ -36,8 +36,9 @@ for GENERATED_PANAMA_JAVA_FILE in ${TARGET_PACKAGE_PATH}/*; do
     if ! cmp --silent -- "$EXISTING_PANAMA_JAVA_FILE" "$GENERATED_PANAMA_JAVA_FILE";
     then
       echo "[UPDATE] ${CURR_FILENAME}"
-      truncate -s 0 $EXISTING_PANAMA_JAVA_FILE
-      cat $GENERATED_PANAMA_JAVA_FILE > $EXISTING_PANAMA_JAVA_FILE
+      truncate -s 0 $EXISTING_PANAMA_JAVA_FILE # remove current source from the file
+      cat $GENERATED_PANAMA_JAVA_FILE > $EXISTING_PANAMA_JAVA_FILE # put updated source
+      sed -i '${/^$/d}' $EXISTING_PANAMA_JAVA_FILE # remove last blank line
     else
       echo "[IGNORE] ${CURR_FILENAME} (already exists and not changed)"
     fi
