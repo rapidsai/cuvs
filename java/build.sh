@@ -6,6 +6,9 @@ if [ -z "$CMAKE_PREFIX_PATH" ]; then
     export CMAKE_PREFIX_PATH=`pwd`/../cpp/build
 fi
 
+# Generate Panama FFM API bindings and update (if any of them changed)
+/bin/bash panama-bindings/generate-bindings.sh
+
 cd internal && cmake . && cmake --build . \
   && cd .. \
   && mvn install:install-file -DgroupId=$GROUP_ID -DartifactId=cuvs-java-internal -Dversion=$VERSION -Dpackaging=so -Dfile=$SO_FILE_PATH/libcuvs_java.so \

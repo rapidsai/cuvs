@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Starting ..."
+echo "Starting Panama FFM API bindings generation ..."
 REPODIR=$(cd $(dirname $0); cd ../../ ; pwd)
 CURDIR=$(cd $(dirname $0); pwd)
 CUDA_HOME=$(which nvcc | cut -d/ -f-4)
@@ -15,7 +15,7 @@ jextract \
  --include-dir ${REPODIR}/cpp/include \
  --output ${OUTPUT_FOLDER} \
  --target-package ${TARGET_PACKAGE} \
- --header-class-name PanamaBindings \
+ --header-class-name PanamaFFMAPI \
  ${CURDIR}/headers.h
 
 # Insert license headers in the generated files
@@ -30,20 +30,20 @@ for GENERATED_PANAMA_JAVA_FILE in ${TARGET_PACKAGE_PATH}/*; do
   EXISTING_PANAMA_JAVA_FILE="${PANAMA_JAVA_FILES_PATH}/${CURR_FILENAME}"
   if ! test -f $EXISTING_PANAMA_JAVA_FILE;
   then
-    echo "[NEW] File ${CURR_FILENAME} does not exist. Moving this file in the target folder."
+    echo "[NEW] ${CURR_FILENAME}"
     mv ${TARGET_PACKAGE_PATH}/${CURR_FILENAME} $PANAMA_JAVA_FILES_PATH
   else
     if ! cmp --silent -- "$EXISTING_PANAMA_JAVA_FILE" "$GENERATED_PANAMA_JAVA_FILE";
     then
-      echo "[UPDATE] File ${CURR_FILENAME} exists in target folder but seems to be changed. Updating."
+      echo "[UPDATE] ${CURR_FILENAME}"
       truncate -s 0 $EXISTING_PANAMA_JAVA_FILE
       cat $GENERATED_PANAMA_JAVA_FILE > $EXISTING_PANAMA_JAVA_FILE
     else
-      echo "[IGNORE] File ${CURR_FILENAME} exists and is the same. Ignoring."
+      echo "[IGNORE] ${CURR_FILENAME} (already exists and not changed)"
     fi
   fi
 done
 
 # Cleanup
 rm -rf $OUTPUT_FOLDER
-echo "Done"
+echo "Panama FFM API bindings generation done"
