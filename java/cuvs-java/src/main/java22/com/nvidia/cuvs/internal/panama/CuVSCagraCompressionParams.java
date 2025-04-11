@@ -46,9 +46,9 @@ public class CuVSCagraCompressionParams {
   }
 
   private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(CagraH.C_INT.withName("pq_bits"),
-      CagraH.C_INT.withName("pq_dim"), CagraH.C_INT.withName("vq_n_centers"),
-      CagraH.C_INT.withName("kmeans_n_iters"), CagraH.C_DOUBLE.withName("vq_kmeans_trainset_fraction"),
-      CagraH.C_DOUBLE.withName("pq_kmeans_trainset_fraction")).withName("cuvsCagraCompressionParams");
+      CagraH.C_INT.withName("pq_dim"), CagraH.C_INT.withName("vq_n_centers"), CagraH.C_INT.withName("kmeans_n_iters"),
+      CagraH.C_DOUBLE.withName("vq_kmeans_trainset_fraction"), CagraH.C_DOUBLE.withName("pq_kmeans_trainset_fraction"))
+      .withName("cuvsCagraCompressionParams");
 
   /**
    * The layout of this struct

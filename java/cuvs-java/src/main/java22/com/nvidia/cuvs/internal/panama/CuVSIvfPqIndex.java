@@ -23,25 +23,25 @@ import java.lang.foreign.GroupLayout;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SegmentAllocator;
-import java.lang.foreign.ValueLayout.OfInt;
+import java.lang.foreign.ValueLayout.OfLong;
 import java.util.function.Consumer;
 
 /**
  * {@snippet lang = c :
  * struct {
- *     uint32_t major;
- *     uint32_t minor;
+ *     uintptr_t addr;
+ *     DLDataType dtype;
  * }
  * }
  */
-public class DLPackVersion {
+public class CuVSIvfPqIndex {
 
-  DLPackVersion() {
+  CuVSIvfPqIndex() {
     // Should not be called directly
   }
 
-  private static final GroupLayout $LAYOUT = MemoryLayout
-      .structLayout(DlpackH.C_INT.withName("major"), DlpackH.C_INT.withName("minor")).withName("$anon$61:9");
+  private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(CagraH.C_LONG.withName("addr"),
+      DLDataType.layout().withName("dtype"), MemoryLayout.paddingLayout(4)).withName("$anon$207:9");
 
   /**
    * The layout of this struct
@@ -50,84 +50,84 @@ public class DLPackVersion {
     return $LAYOUT;
   }
 
-  private static final OfInt major$LAYOUT = (OfInt) $LAYOUT.select(groupElement("major"));
+  private static final OfLong addr$LAYOUT = (OfLong) $LAYOUT.select(groupElement("addr"));
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * uint32_t major
+   * {@snippet lang = c : * uintptr_t addr
    * }
    */
-  public static final OfInt major$layout() {
-    return major$LAYOUT;
+  public static final OfLong addr$layout() {
+    return addr$LAYOUT;
   }
 
-  private static final long major$OFFSET = 0;
+  private static final long addr$OFFSET = 0;
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * uint32_t major
+   * {@snippet lang = c : * uintptr_t addr
    * }
    */
-  public static final long major$offset() {
-    return major$OFFSET;
+  public static final long addr$offset() {
+    return addr$OFFSET;
   }
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * uint32_t major
+   * {@snippet lang = c : * uintptr_t addr
    * }
    */
-  public static int major(MemorySegment struct) {
-    return struct.get(major$LAYOUT, major$OFFSET);
+  public static long addr(MemorySegment struct) {
+    return struct.get(addr$LAYOUT, addr$OFFSET);
   }
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * uint32_t major
+   * {@snippet lang = c : * uintptr_t addr
    * }
    */
-  public static void major(MemorySegment struct, int fieldValue) {
-    struct.set(major$LAYOUT, major$OFFSET, fieldValue);
+  public static void addr(MemorySegment struct, long fieldValue) {
+    struct.set(addr$LAYOUT, addr$OFFSET, fieldValue);
   }
 
-  private static final OfInt minor$LAYOUT = (OfInt) $LAYOUT.select(groupElement("minor"));
+  private static final GroupLayout dtype$LAYOUT = (GroupLayout) $LAYOUT.select(groupElement("dtype"));
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * uint32_t minor
+   * {@snippet lang = c : * DLDataType dtype
    * }
    */
-  public static final OfInt minor$layout() {
-    return minor$LAYOUT;
+  public static final GroupLayout dtype$layout() {
+    return dtype$LAYOUT;
   }
 
-  private static final long minor$OFFSET = 4;
+  private static final long dtype$OFFSET = 8;
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * uint32_t minor
+   * {@snippet lang = c : * DLDataType dtype
    * }
    */
-  public static final long minor$offset() {
-    return minor$OFFSET;
+  public static final long dtype$offset() {
+    return dtype$OFFSET;
   }
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * uint32_t minor
+   * {@snippet lang = c : * DLDataType dtype
    * }
    */
-  public static int minor(MemorySegment struct) {
-    return struct.get(minor$LAYOUT, minor$OFFSET);
+  public static MemorySegment dtype(MemorySegment struct) {
+    return struct.asSlice(dtype$OFFSET, dtype$LAYOUT.byteSize());
   }
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * uint32_t minor
+   * {@snippet lang = c : * DLDataType dtype
    * }
    */
-  public static void minor(MemorySegment struct, int fieldValue) {
-    struct.set(minor$LAYOUT, minor$OFFSET, fieldValue);
+  public static void dtype(MemorySegment struct, MemorySegment fieldValue) {
+    MemorySegment.copy(fieldValue, 0L, struct, dtype$OFFSET, dtype$LAYOUT.byteSize());
   }
 
   /**
