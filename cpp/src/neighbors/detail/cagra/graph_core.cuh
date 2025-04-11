@@ -78,7 +78,8 @@ __global__ void kern_sort(const DATA_T* const dataset,  // [dataset_chunk_size, 
                           const uint32_t dataset_dim,
                           IdxT* const knn_graph,  // [graph_chunk_size, graph_degree]
                           const uint32_t graph_size,
-                          const uint32_t graph_degree)
+                          const uint32_t graph_degree,
+                          const cuvs::distance::DistanceType metric)
 {
   const IdxT srcNode = (blockDim.x * blockIdx.x + threadIdx.x) / raft::WarpSize;
   if (srcNode >= graph_size) { return; }
@@ -91,19 +92,46 @@ __global__ void kern_sort(const DATA_T* const dataset,  // [dataset_chunk_size, 
   // Compute distance from a src node to its neighbors
   for (int k = 0; k < graph_degree; k++) {
     const IdxT dstNode = knn_graph[k + static_cast<uint64_t>(graph_degree) * srcNode];
-    float dist         = 0.0;
-    for (int d = lane_id; d < dataset_dim; d += raft::WarpSize) {
-      float diff = cuvs::spatial::knn::detail::utils::mapping<float>{}(
-                     dataset[d + static_cast<uint64_t>(dataset_dim) * srcNode]) -
-                   cuvs::spatial::knn::detail::utils::mapping<float>{}(
-                     dataset[d + static_cast<uint64_t>(dataset_dim) * dstNode]);
-      dist += diff * diff;
+    float dist         = 0;
+    float norm2_dst    = 0;
+    if (metric == cuvs::distance::DistanceType::InnerProduct ||
+        metric == cuvs::distance::DistanceType::CosineExpanded) {
+      for (int d = lane_id; d < dataset_dim; d += raft::WarpSize) {
+        auto elem_b = cuvs::spatial::knn::detail::utils::mapping<float>{}(
+          dataset[d + static_cast<uint64_t>(dataset_dim) * dstNode]);
+        dist -= cuvs::spatial::knn::detail::utils::mapping<float>{}(
+                  dataset[d + static_cast<uint64_t>(dataset_dim) * srcNode]) *
+                elem_b;
+
+        if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+          norm2_dst += elem_b * elem_b;
+        }
+      }
+    } else {
+      // L2Expanded
+      for (int d = lane_id; d < dataset_dim; d += raft::WarpSize) {
+        float diff = cuvs::spatial::knn::detail::utils::mapping<float>{}(
+                       dataset[d + static_cast<uint64_t>(dataset_dim) * srcNode]) -
+                     cuvs::spatial::knn::detail::utils::mapping<float>{}(
+                       dataset[d + static_cast<uint64_t>(dataset_dim) * dstNode]);
+        dist += diff * diff;
+      }
     }
     dist += __shfl_xor_sync(0xffffffff, dist, 1);
     dist += __shfl_xor_sync(0xffffffff, dist, 2);
     dist += __shfl_xor_sync(0xffffffff, dist, 4);
     dist += __shfl_xor_sync(0xffffffff, dist, 8);
     dist += __shfl_xor_sync(0xffffffff, dist, 16);
+
+    if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+      norm2_dst += __shfl_xor_sync(0xffffffff, norm2_dst, 1);
+      norm2_dst += __shfl_xor_sync(0xffffffff, norm2_dst, 2);
+      norm2_dst += __shfl_xor_sync(0xffffffff, norm2_dst, 4);
+      norm2_dst += __shfl_xor_sync(0xffffffff, norm2_dst, 8);
+      norm2_dst += __shfl_xor_sync(0xffffffff, norm2_dst, 16);
+      if (lane_id == (k % raft::WarpSize)) { dist /= sqrt(norm2_dst); }
+    }
+
     if (lane_id == (k % raft::WarpSize)) {
       my_keys[k / raft::WarpSize] = dist;
       my_vals[k / raft::WarpSize] = dstNode;
@@ -471,11 +499,17 @@ template <
     raft::host_device_accessor<std::experimental::default_accessor<IdxT>, raft::memory_type::host>>
 void sort_knn_graph(
   raft::resources const& res,
+  const cuvs::distance::DistanceType metric,
   raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, d_accessor> dataset,
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph)
 {
   RAFT_EXPECTS(dataset.extent(0) == knn_graph.extent(0),
                "dataset size is expected to have the same number of graph index size");
+  RAFT_EXPECTS(
+    metric == cuvs::distance::DistanceType::InnerProduct ||
+      metric == cuvs::distance::DistanceType::CosineExpanded ||
+      metric == cuvs::distance::DistanceType::L2Expanded,
+    "Unsupported metric. Only InnerProduct, CosineExpanded, and L2Expanded are supported");
   const uint64_t dataset_size = dataset.extent(0);
   const uint64_t dataset_dim  = dataset.extent(1);
   const DataT* dataset_ptr    = dataset.data_handle();
@@ -507,8 +541,13 @@ void sort_knn_graph(
              graph_size * input_graph_degree,
              raft::resource::get_cuda_stream(res));
 
-  void (*kernel_sort)(
-    const DataT* const, const IdxT, const uint32_t, IdxT* const, const uint32_t, const uint32_t);
+  void (*kernel_sort)(const DataT* const,
+                      const IdxT,
+                      const uint32_t,
+                      IdxT* const,
+                      const uint32_t,
+                      const uint32_t,
+                      const cuvs::distance::DistanceType);
   if (input_graph_degree <= 32) {
     constexpr int numElementsPerThread = 1;
     kernel_sort                        = kern_sort<DataT, IdxT, numElementsPerThread>;
@@ -545,7 +584,8 @@ void sort_knn_graph(
     dataset_dim,
     d_input_graph.data_handle(),
     graph_size,
-    input_graph_degree);
+    input_graph_degree,
+    metric);
   raft::resource::sync_stream(res);
   RAFT_LOG_DEBUG(".");
   raft::copy(input_graph_ptr,
