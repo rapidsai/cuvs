@@ -323,6 +323,7 @@ const std::vector<AnnNNDescentInputs> inputs =
                                                      {4, 16, 64, 256, 1024},  // dim
                                                      {32, 64},                // graph_degree
                                                      {cuvs::distance::DistanceType::L2Expanded,
+                                                      cuvs::distance::DistanceType::L2SqrtExpanded,
                                                       cuvs::distance::DistanceType::InnerProduct,
                                                       cuvs::distance::DistanceType::CosineExpanded},
                                                      {false, true},
