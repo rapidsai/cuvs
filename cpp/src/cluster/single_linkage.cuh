@@ -101,4 +101,35 @@ void single_linkage(raft::resources const& handle,
                                             c.has_value() ? c.value() : DEFAULT_CONST_C,
                                             n_clusters);
 }
+
+template <typename value_t, typename value_idx>
+void build_mutual_reachability_linkage(raft::resources const& handle,
+const value_t* X,
+                    size_t m,
+                    size_t n,
+                    cuvs::distance::DistanceType metric,
+                    value_t* core_dists,
+                    raft::sparse::COO<value_t, value_idx>& mutual_reachability_coo,
+                    value_idx* out_mst_src,
+                    value_idx* out_mst_dst,
+                    value_t* out_mst_weights,
+                    value_idx* out_children,
+                    value_t* out_deltas,
+                    value_idx* out_sizes)
+{
+  detail::build_mutual_reachability_linkage(
+                    handle,
+                    X,
+                    m,
+                    n,
+                    metric,
+                    core_dists,
+                    mutual_reachability_coo,
+                    out_mst_src,
+                    out_mst_dst,
+                    out_mst_weights,
+                    out_children,
+                    out_deltas,
+                    out_sizes);
+}
 };  // namespace   cuvs::cluster::agglomerative
