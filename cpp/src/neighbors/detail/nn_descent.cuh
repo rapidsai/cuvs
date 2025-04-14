@@ -874,10 +874,10 @@ void GnndGraph<Index_t>::sample_graph_new(InternalID_t<Index_t>* new_neighbors, 
 template <typename Index_t>
 void GnndGraph<Index_t>::init_random_graph()
 {
-  const auto segment_block_size = node_degree / segment_size;
+  const auto segment_block_size = node_degree / num_segments;
 
   uint64_t stride = nrow / node_degree;
-  while (std::gcd(nrow, stride) != 1 || std::gcd(segment_size, stride) != 1) {
+  while (std::gcd(nrow, stride) != 1 || std::gcd(num_segments, stride) != 1) {
     stride++;
   }
 
@@ -888,19 +888,13 @@ void GnndGraph<Index_t>::init_random_graph()
     auto h_neighbor_list = h_graph + i * node_degree;
     auto h_dist_list     = h_dists.data_handle() + i * node_degree;
     for (uint32_t j = 0; j < (uint32_t)node_degree; j++) {
-      const uint64_t id_base = start_neighbor_id + j * stride;
-      auto id                = id_base % nrow;
+      std::size_t id = (start_neighbor_id + j * stride) % nrow;
 
-      // permutate the output array so that the id `mod` segment_size equals to the segment_id
-      // (=j/segment_size)
-      const auto store_segment_lane_id  = j / segment_size;
-      const auto store_segment_block_id = id % segment_size;
+      const auto store_segment_lane_id  = j / num_segments;
+      const auto store_segment_block_id = (start_neighbor_id + j * stride) % num_segments;
       const auto store_index = store_segment_lane_id + store_segment_block_id * segment_block_size;
 
-      // id will be modified if id `mod` segment_size is not equal to the segment_id, otherwise no
-      // change
-      id = (id / segment_size) * segment_size + store_segment_block_id % segment_size;
-
+      id = (id / num_segments) * num_segments + store_segment_block_id % num_segments;
       h_neighbor_list[store_index].id_with_flag() = id;
       h_dist_list[store_index]                    = std::numeric_limits<DistData_t>::max();
     }
