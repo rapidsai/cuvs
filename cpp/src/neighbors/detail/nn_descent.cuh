@@ -1267,17 +1267,47 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
 
   Index_t* graph_shrink_buffer = (Index_t*)graph_.h_dists.data_handle();
 
+  // Copy the output graph while removing duplicates.
 #pragma omp parallel for
   for (size_t i = 0; i < (size_t)nrow_; i++) {
-    for (size_t j = 0; j < build_config_.node_degree; j++) {
-      size_t idx = i * graph_.node_degree + j;
-      int id     = graph_.h_graph[idx].id();
-      if (id < static_cast<int>(nrow_)) {
-        graph_shrink_buffer[i * build_config_.node_degree + j] = id;
-      } else {
-        graph_shrink_buffer[i * build_config_.node_degree + j] =
-          cuvs::neighbors::cagra::detail::device::xorshift64(idx) % nrow_;
+    auto output_neighbor_list_ptr = graph_shrink_buffer + i * build_config_.node_degree;
+
+    size_t out_j = 0;
+
+    // Copy neighbor list while removing duplicates.
+    for (size_t in_j = 0; in_j < build_config_.node_degree; in_j++) {
+      size_t idx = graph_.h_graph[i * graph_.node_degree + in_j].id();
+
+      bool dup = false;
+      for (size_t exi_j = 0; exi_j < out_j; exi_j++) {
+        if (static_cast<decltype(idx)>(output_neighbor_list_ptr[exi_j]) == idx || i == idx) {
+          dup = true;
+          break;
+        }
       }
+      if (!dup) {
+        output_neighbor_list_ptr[out_j] = idx;
+        out_j++;
+      }
+    }
+
+    // Fill with random nodes if the length of the filled neighbor list is less than the degree.
+    for (size_t j = out_j; j < build_config_.node_degree; j++) {
+      size_t rnd = i + 1;
+      size_t idx;
+      bool dup = false;
+      do {
+        rnd = cuvs::neighbors::cagra::detail::device::xorshift64(rnd);
+        idx = rnd % nrow_;
+        dup = false;
+        for (size_t exi_j = 0; exi_j < j; exi_j++) {
+          if (static_cast<decltype(idx)>(output_neighbor_list_ptr[exi_j]) == idx || i == idx) {
+            dup = true;
+            break;
+          }
+        }
+      } while (dup);
+      output_neighbor_list_ptr[j] = static_cast<int>(idx);
     }
   }
   graph_.h_graph = nullptr;
