@@ -1157,26 +1157,6 @@ void optimize(
   {
     raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
       "cagra::graph::optimize/prune");
-    //
-    // Prune kNN graph
-    //
-    auto d_detour_count = raft::make_device_mdarray<uint8_t>(
-      res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, input_graph_degree));
-
-    RAFT_CUDA_TRY(cudaMemsetAsync(d_detour_count.data_handle(),
-                                  0xff,
-                                  graph_size * input_graph_degree * sizeof(uint8_t),
-                                  raft::resource::get_cuda_stream(res)));
-
-    auto d_num_no_detour_edges = raft::make_device_mdarray<uint32_t>(
-      res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
-    RAFT_CUDA_TRY(cudaMemsetAsync(d_num_no_detour_edges.data_handle(),
-                                  0x00,
-                                  graph_size * sizeof(uint32_t),
-                                  raft::resource::get_cuda_stream(res)));
-
-    auto dev_stats  = raft::make_device_vector<uint64_t>(res, 2);
-    auto host_stats = raft::make_host_vector<uint64_t>(2);
 
     //
     // Prune unimportant edges.
@@ -1191,57 +1171,155 @@ void optimize(
     // specified number of edges are picked up for each node, starting with the
     // edge with the lowest number of 2-hop detours.
     //
-    const double time_prune_start = cur_time();
-    RAFT_LOG_DEBUG("# Pruning kNN Graph on GPUs\r");
+    auto detour_count = raft::make_host_matrix<uint8_t, int64_t>(graph_size, input_graph_degree);
 
-    // Copy input_graph_ptr over to device if necessary
-    device_matrix_view_from_host d_input_graph(
-      res,
-      raft::make_host_matrix_view<IdxT, int64_t>(input_graph_ptr, graph_size, input_graph_degree));
-
-    constexpr int MAX_DEGREE = 1024;
-    if (input_graph_degree > MAX_DEGREE) {
-      RAFT_FAIL(
-        "The degree of input knn graph is too large (%zu). "
-        "It must be equal to or smaller than %d.",
-        input_graph_degree,
-        1024);
+    //
+    // If the available device memory is insufficient, do not use the GPU to count
+    // the number of 2-hop detours, but use the CPU.
+    //
+    bool use_gpu = true;
+    try {
+      auto d_detour_count =
+        raft::make_device_matrix<uint8_t, int64_t>(res, graph_size, input_graph_degree);
+      auto d_num_no_detour_edges = raft::make_device_vector<uint32_t, int64_t>(res, graph_size);
+      auto d_input_graph =
+        raft::make_device_matrix<IdxT, int64_t>(res, graph_size, input_graph_degree);
+    } catch (std::bad_alloc& e) {
+      RAFT_LOG_DEBUG("Insufficient memory for 2-hop node counting on GPU");
+      use_gpu = false;
+    } catch (raft::logic_error& e) {
+      RAFT_LOG_DEBUG("Insufficient memory for 2-hop node counting on GPU (logic error)");
+      use_gpu = false;
     }
-    const uint32_t batch_size =
-      std::min(static_cast<uint32_t>(graph_size), static_cast<uint32_t>(256 * 1024));
-    const uint32_t num_batch = (graph_size + batch_size - 1) / batch_size;
-    const dim3 threads_prune(32, 1, 1);
-    const dim3 blocks_prune(batch_size, 1, 1);
+    uint64_t num_keep __attribute__((unused)) = 0;
+    uint64_t num_full __attribute__((unused)) = 0;
+    if (use_gpu) {
+      // Count 2-hop detours on GPU
+      raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
+        "cagra::graph::optimize/prune/2-hop-counting-by-GPU");
 
-    RAFT_CUDA_TRY(cudaMemsetAsync(
-      dev_stats.data_handle(), 0, sizeof(uint64_t) * 2, raft::resource::get_cuda_stream(res)));
+      auto d_detour_count = raft::make_device_mdarray<uint8_t>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, input_graph_degree));
 
-    for (uint32_t i_batch = 0; i_batch < num_batch; i_batch++) {
-      kern_prune<MAX_DEGREE, IdxT>
-        <<<blocks_prune, threads_prune, 0, raft::resource::get_cuda_stream(res)>>>(
-          d_input_graph.data_handle(),
-          graph_size,
+      RAFT_CUDA_TRY(cudaMemsetAsync(d_detour_count.data_handle(),
+                                    0xff,
+                                    graph_size * input_graph_degree * sizeof(uint8_t),
+                                    raft::resource::get_cuda_stream(res)));
+
+      auto d_num_no_detour_edges = raft::make_device_mdarray<uint32_t>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
+      RAFT_CUDA_TRY(cudaMemsetAsync(d_num_no_detour_edges.data_handle(),
+                                    0x00,
+                                    graph_size * sizeof(uint32_t),
+                                    raft::resource::get_cuda_stream(res)));
+
+      auto dev_stats  = raft::make_device_vector<uint64_t>(res, 2);
+      auto host_stats = raft::make_host_vector<uint64_t>(2);
+
+      const double time_prune_start = cur_time();
+      RAFT_LOG_DEBUG("# Pruning kNN Graph on GPUs\r");
+
+      // Copy input_graph_ptr over to device if necessary
+      device_matrix_view_from_host d_input_graph(
+        res,
+        raft::make_host_matrix_view<IdxT, int64_t>(
+          input_graph_ptr, graph_size, input_graph_degree));
+
+      constexpr int MAX_DEGREE = 1024;
+      if (input_graph_degree > MAX_DEGREE) {
+        RAFT_FAIL(
+          "The degree of input knn graph is too large (%zu). "
+          "It must be equal to or smaller than %d.",
           input_graph_degree,
-          output_graph_degree,
-          batch_size,
-          i_batch,
-          d_detour_count.data_handle(),
-          d_num_no_detour_edges.data_handle(),
-          dev_stats.data_handle());
+          1024);
+      }
+      const uint32_t batch_size =
+        std::min(static_cast<uint32_t>(graph_size), static_cast<uint32_t>(256 * 1024));
+      const uint32_t num_batch = (graph_size + batch_size - 1) / batch_size;
+      const dim3 threads_prune(32, 1, 1);
+      const dim3 blocks_prune(batch_size, 1, 1);
+
+      RAFT_CUDA_TRY(cudaMemsetAsync(
+        dev_stats.data_handle(), 0, sizeof(uint64_t) * 2, raft::resource::get_cuda_stream(res)));
+
+      for (uint32_t i_batch = 0; i_batch < num_batch; i_batch++) {
+        kern_prune<MAX_DEGREE, IdxT>
+          <<<blocks_prune, threads_prune, 0, raft::resource::get_cuda_stream(res)>>>(
+            d_input_graph.data_handle(),
+            graph_size,
+            input_graph_degree,
+            output_graph_degree,
+            batch_size,
+            i_batch,
+            d_detour_count.data_handle(),
+            d_num_no_detour_edges.data_handle(),
+            dev_stats.data_handle());
+        raft::resource::sync_stream(res);
+        RAFT_LOG_DEBUG(
+          "# Pruning kNN Graph on GPUs (%.1lf %%)\r",
+          (double)std::min<IdxT>((i_batch + 1) * batch_size, graph_size) / graph_size * 100);
+      }
       raft::resource::sync_stream(res);
-      RAFT_LOG_DEBUG(
-        "# Pruning kNN Graph on GPUs (%.1lf %%)\r",
-        (double)std::min<IdxT>((i_batch + 1) * batch_size, graph_size) / graph_size * 100);
+      RAFT_LOG_DEBUG("\n");
+
+      raft::copy(detour_count.data_handle(),
+                 d_detour_count.data_handle(),
+                 detour_count.size(),
+                 raft::resource::get_cuda_stream(res));
+
+      raft::copy(
+        host_stats.data_handle(), dev_stats.data_handle(), 2, raft::resource::get_cuda_stream(res));
+      num_keep = host_stats.data_handle()[0];
+      num_full = host_stats.data_handle()[1];
+    } else {
+      // Count 2-hop detours on CPU
+      raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
+        "cagra::graph::optimize/prune/2-hop-counting-by-CPU");
+
+#pragma omp parallel for reduction(+ : num_keep, num_full)
+      for (IdxT iA = 0; iA < graph_size; iA++) {
+        uint32_t num_edges_no_detour = 0;
+        // Create a list of nodes, iB_candidates, that can be reached in 2-hops from node A.
+        auto iB_candidates = raft::make_host_vector<IdxT, int64_t>((input_graph_degree - 1) *
+                                                                   (input_graph_degree - 1));
+        for (uint64_t kAC = 0; kAC < input_graph_degree - 1; kAC++) {
+          IdxT iC = input_graph_ptr[kAC + (input_graph_degree * iA)];
+          for (uint64_t kCB = 0; kCB < input_graph_degree - 1; kCB++) {
+            IdxT iB_candidate;
+            if (iC == iA || iC >= graph_size) {
+              iB_candidate = graph_size;
+            } else {
+              iB_candidate = input_graph_ptr[kCB + (input_graph_degree * iC)];
+              if (iB_candidate == iA || iB_candidate == iC) { iB_candidate = graph_size; }
+            }
+            uint64_t idx;
+            if (kAC < kCB) {
+              idx = (kCB * kCB) + kAC;
+            } else {
+              idx = (kAC * (kAC + 1)) + kCB;
+            }
+            iB_candidates(idx) = iB_candidate;
+          }
+        }
+        // Count how many 2-hop detours are on each edge of node A.
+        for (uint64_t kAB = 0; kAB < input_graph_degree; kAB++) {
+          constexpr uint32_t max_count = 255;
+          uint32_t count               = 0;
+          IdxT iB                      = input_graph_ptr[kAB + (input_graph_degree * iA)];
+          if (iB == iA) {
+            count = max_count;
+          } else {
+            for (uint64_t idx = 0; idx < kAB * kAB; idx++) {
+              if (iB_candidates(idx) == iB) { count += 1; }
+            }
+          }
+          detour_count(iA, kAB) = std::min(count, max_count);
+          if (count == 0) { num_edges_no_detour += 1; }
+        }
+        num_keep += num_edges_no_detour;
+        if (num_edges_no_detour > input_graph_degree) { num_full += 1; }
+      }
     }
-    raft::resource::sync_stream(res);
-    RAFT_LOG_DEBUG("\n");
-
-    host_matrix_view_from_device<uint8_t, int64_t> detour_count(res, d_detour_count.view());
-
-    raft::copy(
-      host_stats.data_handle(), dev_stats.data_handle(), 2, raft::resource::get_cuda_stream(res));
-    const auto num_keep = host_stats.data_handle()[0];
-    const auto num_full = host_stats.data_handle()[1];
 
     // Create pruned kNN graph
     bool invalid_neighbor_list = false;

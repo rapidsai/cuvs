@@ -44,6 +44,8 @@
 #include <cstdio>
 #include <vector>
 
+#include <sys/mman.h>
+
 namespace cuvs::neighbors::cagra::detail {
 
 template <typename IdxT>
@@ -485,6 +487,19 @@ auto iterative_build_graph(
     }
   }
 
+  // Allocate memory for neighbors list using Transparent HugePage
+  constexpr size_t thp_size = 2 * 1024 * 1024;
+  size_t byte_size          = sizeof(IdxT) * final_graph_size * topk;
+  if (byte_size % thp_size) { byte_size += thp_size - (byte_size % thp_size); }
+  IdxT* neighbors_ptr =
+    (IdxT*)mmap(NULL, byte_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  if (neighbors_ptr == MAP_FAILED) {
+    perror("mmap");
+    exit(-1);
+  }
+  if (madvise(neighbors_ptr, byte_size, MADV_HUGEPAGE) != 0) { perror("madvise"); }
+  memset(neighbors_ptr, 0, byte_size);
+
   auto curr_graph_size = initial_graph_size;
   while (true) {
     RAFT_LOG_DEBUG("# graph_size = %lu (%.3lf)",
@@ -516,7 +531,9 @@ auto iterative_build_graph(
 
     auto dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
       dev_dataset.data_handle(), (int64_t)curr_query_size, dev_dataset.extent(1));
-    auto neighbors = raft::make_host_matrix<IdxT, int64_t>(curr_query_size, curr_topk);
+
+    auto neighbors_view =
+      raft::make_host_matrix_view<IdxT, int64_t>(neighbors_ptr, curr_query_size, curr_topk);
 
     // Search.
     // Since there are many queries, divide them into batches and search them.
@@ -543,7 +560,7 @@ auto iterative_build_graph(
                                      batch_dev_distances_view);
 
       auto batch_neighbors_view = raft::make_host_matrix_view<IdxT, int64_t>(
-        neighbors.data_handle() + batch.offset() * curr_topk, batch.size(), curr_topk);
+        neighbors_view.data_handle() + batch.offset() * curr_topk, batch.size(), curr_topk);
       raft::copy(batch_neighbors_view.data_handle(),
                  batch_dev_neighbors_view.data_handle(),
                  batch_neighbors_view.size(),
@@ -556,8 +573,13 @@ auto iterative_build_graph(
     cagra_graph     = raft::make_host_matrix<IdxT, int64_t>(0, 0);  // delete existing grahp
     cagra_graph     = raft::make_host_matrix<IdxT, int64_t>(curr_graph_size, curr_graph_degree);
     optimize<IdxT>(
-      res, neighbors.view(), cagra_graph.view(), flag_last ? params.guarantee_connectivity : 0);
+      res, neighbors_view, cagra_graph.view(), flag_last ? params.guarantee_connectivity : 0);
     if (flag_last) { break; }
+  }
+
+  if (munmap(neighbors_ptr, byte_size) != 0) {
+    perror("munmap");
+    exit(-1);
   }
 
   return cagra_graph;
