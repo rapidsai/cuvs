@@ -574,6 +574,13 @@ index<T, IdxT> build(
 {
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
+  common::nvtx::range<common::nvtx::domain::cuvs> function_scope(
+    "cagra::build<%s>(%zu, %zu)",
+    Accessor::is_managed_type::value ? "managed"
+    : Accessor::is_host_type::value  ? "host"
+                              : "device",
+    intermediate_degree,
+    graph_degree);
   if (intermediate_degree >= static_cast<size_t>(dataset.extent(0))) {
     RAFT_LOG_WARN(
       "Intermediate graph degree cannot be larger than dataset size, reducing it to %lu",
