@@ -578,7 +578,7 @@ index<T, IdxT> build(
     "cagra::build<%s>(%zu, %zu)",
     Accessor::is_managed_type::value ? "managed"
     : Accessor::is_host_type::value  ? "host"
-                              : "device",
+                                     : "device",
     intermediate_degree,
     graph_degree);
   if (intermediate_degree >= static_cast<size_t>(dataset.extent(0))) {
