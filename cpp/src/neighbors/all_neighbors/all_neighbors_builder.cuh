@@ -22,6 +22,8 @@
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <cuvs/neighbors/refine.hpp>
 
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/host_mdarray.hpp>
 #include <raft/core/managed_mdspan.hpp>
 #include <raft/core/mdspan_types.hpp>
 
@@ -57,16 +59,16 @@ struct all_neighbors_builder {
   /**
    * Some memory-heavy allocations that can be used over multiple clusters should be allocated here
    * Arguments:
-   * - [in] dataset: host_matrix_view of the the ENTIRE dataset
+   * - [in] dataset: host_matrix_view or device_matrix_view of the the ENTIRE dataset
    */
-  virtual void prepare_build(raft::host_matrix_view<const T, IdxT, raft::row_major> dataset) {}
+  virtual void prepare_build(raft::host_matrix_view<const T, IdxT, row_major> dataset) {}
+  virtual void prepare_build(raft::device_matrix_view<const T, IdxT, row_major> dataset) {}
 
   /**
    * Running the ann algorithm on the given cluster, and merging it into the global result
    * Arguments:
-   * - [in] res: raft resource
    * - [in] params: all_neighbors::index_params
-   * - [in] dataset: host_matrix_view of the cluster dataset
+   * - [in] dataset: host_matrix_view or device_matrix_view of the cluster dataset
    * - [in] index
    * - [in] inverted_indices (optional): global data indices for the data points in the current
    * cluster of size (num_data_in_cluster). Only needed when calling with the batching algorithm
@@ -76,13 +78,18 @@ struct all_neighbors_builder {
    * final all-neighbors graph distances. Only needed when calling with the batching algorithm
    */
   virtual void build_knn(
-    raft::resources const& res,
     const index_params& params,
     raft::host_matrix_view<const T, IdxT, row_major> dataset,
     all_neighbors::index<IdxT, T>& index,
     std::optional<raft::host_vector_view<IdxT, IdxT>> inverted_indices    = std::nullopt,
     std::optional<raft::managed_matrix_view<IdxT, IdxT>> global_neighbors = std::nullopt,
     std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt)
+  {
+  }
+
+  virtual void build_knn(const index_params& params,
+                         raft::device_matrix_view<const T, IdxT, row_major> dataset,
+                         all_neighbors::index<IdxT, T>& index)
   {
   }
 
@@ -117,14 +124,11 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
     }
   }
 
-  void prepare_build(raft::host_matrix_view<const T, IdxT, row_major> dataset) override
+  void prepare_build_common(size_t num_cols)
   {
-    size_t num_cols = static_cast<size_t>(dataset.extent(1));
-    candidate_k     = std::min<IdxT>(
+    candidate_k = std::min<IdxT>(
       std::max(static_cast<size_t>(this->k * all_ivf_pq_params.refinement_rate), this->k),
       this->min_cluster_size);
-    data_d.emplace(
-      raft::make_device_matrix<T, IdxT, row_major>(this->res, this->max_cluster_size, num_cols));
 
     distances_candidate_d.emplace(
       raft::make_device_matrix<T, IdxT, row_major>(this->res, this->max_cluster_size, candidate_k));
@@ -133,8 +137,9 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
     neighbors_candidate_h.emplace(
       raft::make_host_matrix<IdxT, IdxT, row_major>(this->max_cluster_size, candidate_k));
 
-    // for host refining
     if (this->do_batch) {
+      // if we don't do batching, we store the refined results directly in the returned index.
+      // this we only need this when we do batching.
       refined_neighbors_h.emplace(
         raft::make_host_matrix<IdxT, IdxT, row_major>(this->max_cluster_size, this->k));
     }
@@ -142,34 +147,42 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
       raft::make_host_matrix<T, IdxT, row_major>(this->max_cluster_size, this->k));
   }
 
-  void build_knn(
-    raft::resources const& res,
+  void prepare_build(raft::host_matrix_view<const T, IdxT, row_major> dataset) override
+  {
+    // if dataset is on host, then allocate space for device data because ivfpq requires data to be
+    // on device
+    size_t num_cols = dataset.extent(1);
+    data_d.emplace(
+      raft::make_device_matrix<T, IdxT, row_major>(this->res, this->max_cluster_size, num_cols));
+    prepare_build_common(num_cols);
+  }
+
+  void prepare_build(raft::device_matrix_view<const T, IdxT, row_major> dataset) override
+  {
+    prepare_build_common(dataset.extent(1));
+  }
+
+  // Actual build logic using ivfpq.
+  // need device and host views of the dataset because ivfpq build and search uses the device view,
+  // and refine uses the host view
+  void build_knn_common(
     const index_params& params,
-    raft::host_matrix_view<const T, IdxT, row_major> dataset,
+    raft::device_matrix_view<const T, IdxT, row_major> dataset_d,
+    raft::host_matrix_view<const T, IdxT, row_major> dataset_h,
     all_neighbors::index<IdxT, T>& index,
     std::optional<raft::host_vector_view<IdxT, IdxT>> inverted_indices    = std::nullopt,
     std::optional<raft::managed_matrix_view<IdxT, IdxT>> global_neighbors = std::nullopt,
-    std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt) override
+    std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt)
   {
     RAFT_EXPECTS(!this->do_batch || (inverted_indices.has_value() && global_neighbors.has_value() &&
                                      global_distances.has_value()),
-                 "inverted_indices, gloabl_neighbors, and global_distances should be passed for "
+                 "inverted_indices, global_neighbors, and global_distances should be passed for "
                  "build_knn if doing batching.");
 
-    size_t num_data_in_cluster = dataset.extent(0);
-    size_t num_cols            = dataset.extent(1);
+    size_t num_data_in_cluster = dataset_d.extent(0);
+    size_t num_cols            = dataset_d.extent(1);
 
-    // we need data on device for ivfpq build and search.
-    // num_data_in_cluster is always <= max_cluster_size
-    raft::copy(data_d.value().data_handle(),
-               dataset.data_handle(),
-               num_data_in_cluster * num_cols,
-               raft::resource::get_cuda_stream(this->res));
-
-    auto data_view = raft::make_device_matrix_view<const T, IdxT>(
-      data_d.value().data_handle(), num_data_in_cluster, num_cols);
-
-    auto index_ivfpq = ivf_pq::build(this->res, all_ivf_pq_params.build_params, data_view);
+    auto index_ivfpq = ivf_pq::build(this->res, all_ivf_pq_params.build_params, dataset_d);
 
     auto distances_candidate_view = raft::make_device_matrix_view<T, IdxT>(
       distances_candidate_d.value().data_handle(), num_data_in_cluster, candidate_k);
@@ -178,7 +191,7 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
     cuvs::neighbors::ivf_pq::search(this->res,
                                     all_ivf_pq_params.search_params,
                                     index_ivfpq,
-                                    data_view,
+                                    dataset_d,
                                     neighbors_candidate_view,
                                     distances_candidate_view);
     raft::copy(neighbors_candidate_h.value().data_handle(),
@@ -191,17 +204,18 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
     auto refined_distances_h_view = raft::make_host_matrix_view<T, IdxT>(
       refined_distances_h.value().data_handle(), num_data_in_cluster, this->k);
 
-    raft::host_matrix_view<IdxT, IdxT> refined_neighbors_h_view;
-    if (this->do_batch) {
-      refined_neighbors_h_view = raft::make_host_matrix_view<IdxT, IdxT>(
-        refined_neighbors_h.value().data_handle(), num_data_in_cluster, this->k);
-    } else {
-      refined_neighbors_h_view = index.graph();
-    }
+    auto refined_neighbors_h_view = [&]() {
+      if (this->do_batch) {
+        return raft::make_host_matrix_view<IdxT, IdxT>(
+          refined_neighbors_h.value().data_handle(), num_data_in_cluster, this->k);
+      } else {
+        return index.graph();
+      }
+    }();
 
     refine(this->res,
-           dataset,
-           dataset,
+           dataset_h,
+           dataset_h,
            raft::make_const_mdspan(neighbors_candidate_h_view),
            refined_neighbors_h_view,
            refined_distances_h_view,
@@ -235,13 +249,65 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
     }
   }
 
+  void build_knn(
+    const index_params& params,
+    raft::host_matrix_view<const T, IdxT, row_major> dataset,
+    all_neighbors::index<IdxT, T>& index,
+    std::optional<raft::host_vector_view<IdxT, IdxT>> inverted_indices    = std::nullopt,
+    std::optional<raft::managed_matrix_view<IdxT, IdxT>> global_neighbors = std::nullopt,
+    std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt) override
+  {
+    RAFT_EXPECTS(data_d.has_value(), "space for device data should be allocated.");
+
+    // we need data on device for ivfpq build and search.
+    raft::copy(data_d.value().data_handle(),
+               dataset.data_handle(),
+               dataset.size(),
+               raft::resource::get_cuda_stream(this->res));
+
+    build_knn_common(params,
+                     raft::make_device_matrix_view<const T, IdxT, row_major>(
+                       data_d.value().data_handle(), dataset.extent(0), dataset.extent(1)),
+                     dataset,
+                     index,
+                     inverted_indices,
+                     global_neighbors,
+                     global_distances);
+  }
+
+  void build_knn(const index_params& params,
+                 raft::device_matrix_view<const T, IdxT, row_major> dataset,
+                 all_neighbors::index<IdxT, T>& index) override
+  {
+    RAFT_EXPECTS(!this->do_batch,
+                 "build_knn with dataset on device is not supported for batch building");
+
+    // we allocate host memory here and not in the prepare_build function because this function is
+    // not called for batching
+    auto dataset_h = raft::make_host_matrix<T, IdxT>(dataset.extent(0), dataset.extent(1));
+
+    // we need data on host for refining
+    raft::copy(dataset_h.data_handle(),
+               dataset.data_handle(),
+               dataset.size(),
+               raft::resource::get_cuda_stream(this->res));
+
+    build_knn_common(params,
+                     dataset,
+                     raft::make_host_matrix_view<const T, IdxT, row_major>(
+                       dataset_h.data_handle(), dataset.extent(0), dataset.extent(1)),
+                     index);
+  }
+
   all_neighbors::graph_build_params::ivf_pq_params all_ivf_pq_params;
   size_t candidate_k;
 
   std::optional<raft::device_matrix<T, IdxT>> data_d;
+
   std::optional<raft::device_matrix<T, IdxT>> distances_candidate_d;
   std::optional<raft::device_matrix<IdxT, IdxT>> neighbors_candidate_d;
   std::optional<raft::host_matrix<IdxT, IdxT>> neighbors_candidate_h;
+
   std::optional<raft::host_matrix<IdxT, IdxT>> refined_neighbors_h;
   std::optional<raft::host_matrix<T, IdxT>> refined_distances_h;
 };
@@ -266,7 +332,8 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
     }
   }
 
-  void prepare_build(raft::host_matrix_view<const T, IdxT, row_major> dataset) override
+  template <typename Accessor>
+  void prepare_build_common(mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> dataset)
   {
     if (nnd_params.graph_degree < this->k) {
       RAFT_LOG_WARN(
@@ -287,14 +354,24 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
       this->max_cluster_size, static_cast<IdxT>(extended_graph_degree)));
   }
 
-  void build_knn(
-    raft::resources const& res,
+  void prepare_build(raft::device_matrix_view<const T, IdxT, row_major> dataset) override
+  {
+    prepare_build_common(dataset);
+  }
+
+  void prepare_build(raft::host_matrix_view<const T, IdxT, row_major> dataset) override
+  {
+    prepare_build_common(dataset);
+  }
+
+  template <typename Accessor>
+  void build_knn_common(
     const index_params& params,
-    raft::host_matrix_view<const T, IdxT> dataset,
+    mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> dataset,
     all_neighbors::index<IdxT, T>& index,
     std::optional<raft::host_vector_view<IdxT, IdxT>> inverted_indices    = std::nullopt,
     std::optional<raft::managed_matrix_view<IdxT, IdxT>> global_neighbors = std::nullopt,
-    std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt) override
+    std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt)
   {
     RAFT_EXPECTS(!this->do_batch || (inverted_indices.has_value() && global_neighbors.has_value() &&
                                      global_distances.has_value()),
@@ -302,7 +379,6 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
                  "build_knn if doing batching.");
 
     if (this->do_batch) {
-      // TODO add raft expect value for global and inverted
       bool return_distances      = true;
       size_t num_data_in_cluster = dataset.extent(0);
       nnd_builder.value().build(dataset.data_handle(),
@@ -311,7 +387,7 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
                                 return_distances,
                                 this->batch_distances_d.value().data_handle());
 
-      remap_and_merge_subgraphs<T, IdxT, int>(res,
+      remap_and_merge_subgraphs<T, IdxT, int>(this->res,
                                               this->inverted_indices_d.value().view(),
                                               inverted_indices.value(),
                                               int_graph.value().view(),
@@ -340,6 +416,26 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
         }
       }
     }
+  }
+
+  void build_knn(
+    const index_params& params,
+    raft::host_matrix_view<const T, IdxT> dataset,
+    all_neighbors::index<IdxT, T>& index,
+    std::optional<raft::host_vector_view<IdxT, IdxT>> inverted_indices    = std::nullopt,
+    std::optional<raft::managed_matrix_view<IdxT, IdxT>> global_neighbors = std::nullopt,
+    std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt) override
+  {
+    build_knn_common(params, dataset, index, inverted_indices, global_neighbors, global_distances);
+  }
+
+  void build_knn(const index_params& params,
+                 raft::device_matrix_view<const T, IdxT> dataset,
+                 all_neighbors::index<IdxT, T>& index) override
+  {
+    RAFT_EXPECTS(!this->do_batch,
+                 "build_knn with dataset on device is not supported for batch building");
+    build_knn_common(params, dataset, index);
   }
 
   nn_descent::index_params nnd_params;

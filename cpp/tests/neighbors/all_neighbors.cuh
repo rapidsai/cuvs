@@ -51,6 +51,7 @@ struct AllNeighborsInputs {
   int dim;
   int k;
   cuvs::distance::DistanceType metric;
+  bool data_on_host;
 };
 
 inline ::std::ostream& operator<<(::std::ostream& os, const AllNeighborsInputs& p)
@@ -113,11 +114,26 @@ void get_graphs(raft::resources& handle,
   }
 
   {
-    auto database_h = raft::make_host_matrix<DataT, IdxT>(handle, ps.n_rows, ps.dim);
-    raft::copy(database_h.data_handle(), database.data(), ps.n_rows * ps.dim, cuda_stream);
+    auto index = [&]() {
+      if (ps.data_on_host) {
+        auto database_h = raft::make_host_matrix<DataT, IdxT>(handle, ps.n_rows, ps.dim);
+        raft::copy(database_h.data_handle(), database.data(), ps.n_rows * ps.dim, cuda_stream);
 
-    auto index = all_neighbors::build(
-      handle, raft::make_const_mdspan(database_h.view()), static_cast<int64_t>(ps.k), params, true);
+        return all_neighbors::build(handle,
+                                    raft::make_const_mdspan(database_h.view()),
+                                    static_cast<int64_t>(ps.k),
+                                    params,
+                                    true);
+
+      } else {
+        return all_neighbors::build(
+          handle,
+          raft::make_device_matrix_view<const DataT, IdxT>(database.data(), ps.n_rows, ps.dim),
+          static_cast<int64_t>(ps.k),
+          params,
+          true);
+      }
+    }();
 
     raft::copy(indices_allNN.data(), index.graph().data_handle(), queries_size, cuda_stream);
     if (index.distances().has_value()) {
@@ -249,7 +265,9 @@ const std::vector<AllNeighborsInputs> inputsSingle =
     {5000, 7151},                      // n_rows
     {64, 137},                         // dim
     {16, 23},                          // graph_degree
-    {cuvs::distance::DistanceType::L2Expanded});
+    {cuvs::distance::DistanceType::L2Expanded},
+    {true, false}  // data on host
+  );
 
 const std::vector<AllNeighborsInputs> inputsBatch =
   raft::util::itertools::product<AllNeighborsInputs>(
@@ -262,6 +280,8 @@ const std::vector<AllNeighborsInputs> inputsBatch =
     {5000, 7151},  // n_rows
     {64, 137},     // dim
     {16, 23},      // graph_degree
-    {cuvs::distance::DistanceType::L2Expanded});
+    {cuvs::distance::DistanceType::L2Expanded},
+    {true}  // data on host
+  );
 
 }  // namespace cuvs::neighbors::all_neighbors

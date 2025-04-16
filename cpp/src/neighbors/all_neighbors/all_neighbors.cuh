@@ -21,9 +21,10 @@
 namespace cuvs::neighbors::all_neighbors::detail {
 using namespace cuvs::neighbors;
 
-template <typename T, typename IdxT>
+// Supports both host and device datasets
+template <typename T, typename IdxT, typename Accessor>
 void single_build(const raft::resources& handle,
-                  raft::host_matrix_view<const T, IdxT, row_major> dataset,
+                  mdspan<const T, matrix_extent<IdxT>, row_major, Accessor> dataset,
                   const index_params& params,
                   all_neighbors::index<IdxT, T>& index)
 {
@@ -34,7 +35,7 @@ void single_build(const raft::resources& handle,
     handle, params, static_cast<size_t>(index.k()), num_rows, num_rows, false);
 
   knn_builder->prepare_build(dataset);
-  knn_builder->build_knn(handle, params, dataset, index);
+  knn_builder->build_knn(params, dataset, index);
 }
 
 template <typename T, typename IdxT>
@@ -62,6 +63,41 @@ all_neighbors::index<IdxT, T> build(
     handle, static_cast<int64_t>(dataset.extent(0)), k, return_distances};
   build(handle, dataset, params, index);
   return index;
+}
+
+template <typename T, typename IdxT>
+void build(const raft::resources& handle,
+           raft::device_matrix_view<const T, IdxT, row_major> dataset,
+           const index_params& params,
+           all_neighbors::index<IdxT, T>& index)
+{
+  if (params.n_clusters > 1) {
+    RAFT_FAIL(
+      "Batched all-neighbors build is not supported with data on device. Put data on host for "
+      "batch build.");
+  } else {
+    single_build(handle, dataset, params, index);
+  }
+}
+
+template <typename T, typename IdxT = int64_t>
+all_neighbors::index<IdxT, T> build(
+  const raft::resources& handle,
+  raft::device_matrix_view<const T, IdxT, row_major> dataset,
+  int64_t k,
+  const index_params& params,
+  bool return_distances = false)  // distance type same as data type
+{
+  if (params.n_clusters > 1) {
+    RAFT_FAIL(
+      "Batched all-neighbors build is not supported with data on device. Put data on host for "
+      "batch build.");
+  } else {
+    all_neighbors::index<IdxT, T> index{
+      handle, static_cast<int64_t>(dataset.extent(0)), k, return_distances};
+    single_build(handle, dataset, params, index);
+    return index;
+  }
 }
 
 }  // namespace cuvs::neighbors::all_neighbors::detail

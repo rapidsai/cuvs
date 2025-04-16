@@ -28,7 +28,6 @@
 
 namespace cuvs::neighbors::all_neighbors::detail {
 using namespace cuvs::neighbors;
-using align32 = raft::Pow2<32>;
 
 template <typename KeyType, typename ValueType>
 struct CustomComparator {
