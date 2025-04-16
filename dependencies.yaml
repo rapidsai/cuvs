@@ -17,6 +17,7 @@ files:
       - depends_on_cupy
       - depends_on_librmm
       - depends_on_pylibraft
+      - depends_on_nccl
       - docs
       - rapids_build
       - run_py_cuvs
@@ -42,6 +43,7 @@ files:
       - depends_on_pylibraft
       - depends_on_libcuvs
       - depends_on_librmm
+      - depends_on_nccl
       - rapids_build
       - rapids_build_setuptools
   test_cpp:
@@ -94,6 +96,7 @@ files:
       - rust
       - depends_on_libcuvs
       - depends_on_libraft
+      - depends_on_nccl
   go:
     output: conda
     matrix:
@@ -107,6 +110,7 @@ files:
       - go
       - depends_on_libcuvs
       - depends_on_libraft
+      - depends_on_nccl
   py_build_libcuvs:
     output: pyproject
     pyproject_dir: python/libcuvs
@@ -123,6 +127,7 @@ files:
     includes:
       - depends_on_libraft
       - depends_on_librmm
+      - depends_on_nccl
       - rapids_build
   py_run_libcuvs:
     output: pyproject
@@ -133,6 +138,7 @@ files:
       - cuda_wheels
       - depends_on_libraft
       - depends_on_librmm
+      - depends_on_nccl
   py_build_cuvs:
     output: pyproject
     pyproject_dir: python/cuvs
@@ -226,7 +232,6 @@ dependencies:
         packages:
           - c-compiler
           - cxx-compiler
-          - nccl>=2.19
     specific:
       - output_types: conda
         matrices:
@@ -706,3 +711,18 @@ dependencies:
             packages:
               - pylibraft-cu11==25.6.*,>=0.0.0a0
           - {matrix: null, packages: [*pylibraft_unsuffixed]}
+  depends_on_nccl:
+    common:
+      - output_types: conda
+        packages:
+          - &nccl_unsuffixed nccl>=2.19
+    specific:
+      - output_types: [pyproject, requirements]
+        matrices:
+          - matrix:
+              cuda: "12.*"
+              cuda_suffixed: "true"
+            packages:
+              - nvidia-nccl-cu12>=2.19
+          - matrix:
+            packages:
