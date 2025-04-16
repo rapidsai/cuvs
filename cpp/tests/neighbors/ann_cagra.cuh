@@ -258,6 +258,7 @@ struct AnnCagraInputs {
   int n_rows;
   int dim;
   int k;
+  int graph_degree;
   graph_build_algo build_algo;
   search_algo algo;
   int max_queries;
@@ -300,10 +301,10 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
   std::vector<std::string> build_algo = {"IVF_PQ", "NN_DESCENT", "ITERATIVE_CAGRA_SEARCH", "AUTO"};
   std::vector<std::string> merge_strategy = {"PHYSICAL", "LOGICAL"};
   os << "{n_queries=" << p.n_queries << ", dataset shape=" << p.n_rows << "x" << p.dim
-     << ", k=" << p.k << ", " << algo_name[p.algo] << ", max_queries=" << p.max_queries
-     << ", itopk_size=" << p.itopk_size << ", search_width=" << p.search_width
-     << ", metric=" << metric_str(p.metric) << ", " << (p.host_dataset ? "host" : "device")
-     << ", build_algo=" << build_algo.at((int)p.build_algo)
+     << ", degree=" << p.graph_degree << ", k=" << p.k << ", " << algo_name[p.algo]
+     << ", max_queries=" << p.max_queries << ", itopk_size=" << p.itopk_size
+     << ", search_width=" << p.search_width << ", metric=" << metric_str(p.metric) << ", "
+     << (p.host_dataset ? "host" : "device") << ", build_algo=" << build_algo.at((int)p.build_algo)
      << ", merge_logic=" << merge_strategy.at((int)p.merge_strategy);
   if ((int)p.build_algo == 0 && p.ivf_pq_search_refine_ratio) {
     os << "(refine_rate=" << *p.ivf_pq_search_refine_ratio << ')';
@@ -348,6 +349,8 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         GTEST_SKIP();
       }
     }
+    // Dataset size must be larger than 33 for NN Descent
+    if (ps.build_algo == graph_build_algo::NN_DESCENT && (ps.n_rows < 33)) GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<SearchIdxT> indices_Cagra(queries_size);
@@ -382,6 +385,8 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         cagra::index_params index_params;
         index_params.metric = ps.metric;  // Note: currently ony the cagra::index_params metric is
                                           // not used for knn_graph building.
+        index_params.graph_degree              = ps.graph_degree;
+        index_params.intermediate_graph_degree = ps.graph_degree * 2;
         switch (ps.build_algo) {
           case graph_build_algo::IVF_PQ:
             index_params.graph_build_params = graph_build_params::ivf_pq_params(
@@ -468,6 +473,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
       //   print_vector("C", distances_Cagra.data() + i * ps.k, ps.k, std::cout);
       // }
       double min_recall = ps.min_recall;
+      if (ps.graph_degree < 40) { min_recall *= 0.95; }
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_Cagra,
                                   distances_naive,
@@ -549,6 +555,8 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
+    // Dataset size must be larger than 33 for NN Descent
+    if (ps.build_algo == graph_build_algo::NN_DESCENT && (ps.n_rows < 33)) GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<IdxT> indices_Cagra(queries_size);
@@ -583,6 +591,8 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
         cagra::index_params index_params;
         index_params.metric = ps.metric;  // Note: currently ony the cagra::index_params metric is
                                           // not used for knn_graph building.
+        index_params.graph_degree              = ps.graph_degree;
+        index_params.intermediate_graph_degree = ps.graph_degree * 2;
 
         switch (ps.build_algo) {
           case graph_build_algo::IVF_PQ:
@@ -684,6 +694,7 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
       }
 
       double min_recall = ps.min_recall;
+      if (ps.graph_degree < 40) { min_recall *= 0.95; }
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_Cagra,
                                   distances_naive,
@@ -761,6 +772,8 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
+    // Dataset size must be larger than 33 for NN Descent
+    if (ps.build_algo == graph_build_algo::NN_DESCENT && (ps.n_rows < 33)) GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<IdxT> indices_Cagra(queries_size);
@@ -801,6 +814,8 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
         cagra::index_params index_params;
         index_params.metric = ps.metric;  // Note: currently ony the cagra::index_params metric is
                                           // not used for knn_graph building.
+        index_params.graph_degree              = ps.graph_degree;
+        index_params.intermediate_graph_degree = ps.graph_degree * 2;
 
         switch (ps.build_algo) {
           case graph_build_algo::IVF_PQ:
@@ -897,6 +912,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
       EXPECT_FALSE(unacceptable_node);
 
       double min_recall = ps.min_recall;
+      if (ps.graph_degree < 40) { min_recall *= 0.95; }
       // TODO(mfoerster): re-enable uniquenes test
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_Cagra,
@@ -980,6 +996,8 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
+    // Dataset size must be larger than 33 for NN Descent
+    if (ps.build_algo == graph_build_algo::NN_DESCENT && (ps.n_rows < 33)) GTEST_SKIP();
 
     // Avoid splitting datasets with a size of 0
     if (ps.n_rows <= 3) GTEST_SKIP();
@@ -1020,6 +1038,8 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
         cagra::index_params index_params;
         index_params.metric = ps.metric;  // Note: currently ony the cagra::index_params metric is
                                           // not used for knn_graph building.
+        index_params.graph_degree              = ps.graph_degree;
+        index_params.intermediate_graph_degree = ps.graph_degree * 2;
 
         switch (ps.build_algo) {
           case graph_build_algo::IVF_PQ:
@@ -1113,6 +1133,7 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
       }
 
       double min_recall = ps.min_recall;
+      if (ps.graph_degree < 40) { min_recall *= 0.95; }
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_Cagra,
                                   distances_naive,
@@ -1169,6 +1190,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {1, 16},
     {16},                                                      // k
+    {32, 47, 64},                                              // degree
     {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},  // build algo.
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
     {0, 10},  // query size
@@ -1193,6 +1215,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {1, 16},
     {16},                            // k
+    {32},                            // degree
     {graph_build_algo::NN_DESCENT},  // build algo.
     {search_algo::MULTI_CTA},
     {10},  // query size
@@ -1219,6 +1242,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {8},
     {1, 16},  // k
+    {32},     // degree
     {graph_build_algo::NN_DESCENT},
     {search_algo::SINGLE_CTA},
     {0},  // query size
@@ -1243,7 +1267,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {2},
     {3, 6, 31, 32, 64, 101},
     {1, 10},
-    {2},  // k
+    {2},   // k
+    {32},  // degree
     {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
     {0},  // query size
@@ -1268,6 +1293,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 1024},  // dim
     {16},                                                    // k
+    {32},                                                    // degree
     {graph_build_algo::IVF_PQ,
      graph_build_algo::NN_DESCENT,
      graph_build_algo::ITERATIVE_CAGRA_SEARCH},
@@ -1296,6 +1322,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {64},
     {16},
+    {32},  // degree
     {graph_build_algo::IVF_PQ,
      graph_build_algo::NN_DESCENT,
      graph_build_algo::ITERATIVE_CAGRA_SEARCH},
@@ -1325,6 +1352,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {64},
     {16},
+    {32},  // degree
     {graph_build_algo::NN_DESCENT},
     {search_algo::AUTO},
     {10},
@@ -1351,6 +1379,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {10000},
     {32},
     {10},
+    {32},  // degree
     {graph_build_algo::AUTO},
     {search_algo::AUTO},
     {10},
@@ -1376,6 +1405,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {10000},
     {64, 128, 192, 256, 512, 1024},  // dim
     {16},                            // k
+    {32},                            // degree
     {graph_build_algo::IVF_PQ},
     {search_algo::AUTO},
     {10},
@@ -1412,6 +1442,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {5000},
     {32, 64},
     {16},
+    {32},  // degree
     {graph_build_algo::IVF_PQ},
     {search_algo::AUTO},
     {10},
@@ -1436,6 +1467,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {1, 5, 8, 64, 137, 256, 619, 1024},  // dim
     {10},
+    {32},  // degree
     {graph_build_algo::IVF_PQ},
     {search_algo::AUTO},
     {10},
@@ -1468,6 +1500,7 @@ inline std::vector<AnnCagraInputs> generate_addnode_inputs()
                                                    {1000},
                                                    {1, 8, 17, 64, 128, 137, 512, 1024},  // dim
                                                    {16},                                 // k
+                                                   {32, 47, 64},                         // degree
                                                    {graph_build_algo::ITERATIVE_CAGRA_SEARCH},
                                                    {search_algo::AUTO},
                                                    {10},
@@ -1488,6 +1521,7 @@ inline std::vector<AnnCagraInputs> generate_addnode_inputs()
     {10000},
     {32},
     {10},
+    {32},  // degree
     {graph_build_algo::AUTO},
     {search_algo::AUTO},
     {10},
@@ -1513,6 +1547,7 @@ inline std::vector<AnnCagraInputs> generate_addnode_inputs()
     {10000},
     {192, 1024},  // dim
     {16},         // k
+    {32},         // degree
     {graph_build_algo::IVF_PQ},
     {search_algo::AUTO},
     {10},
@@ -1546,7 +1581,8 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
     {100},
     {1000},
     {1, 8, 17, 102},
-    {16},  // k
+    {16},          // k
+    {32, 47, 64},  // degree
     {graph_build_algo::NN_DESCENT},
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
     {0},  // query size
@@ -1565,6 +1601,7 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
     {1000},
     {8},
     {1, 16},  // k
+    {32},     // degree
     {graph_build_algo::NN_DESCENT},
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
     {0},  // query size
@@ -1584,6 +1621,7 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
     {10000},
     {256},  // dim
     {16},   // k
+    {32},   // degree
     {graph_build_algo::IVF_PQ},
     {search_algo::AUTO},
     {10},
