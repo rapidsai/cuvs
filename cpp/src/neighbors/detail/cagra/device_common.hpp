@@ -112,9 +112,13 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
   const uint32_t visited_hash_bitlen,
   IndexT* __restrict__ traversed_hash_ptr,
   const uint32_t traversed_hash_bitlen,
-  const uint32_t block_id   = 0,
-  const uint32_t num_blocks = 1)
+  const uint32_t block_id              = 0,
+  const uint32_t num_blocks            = 1,
+  const IndexT* __restrict__ knn_graph = nullptr,
+  const uint32_t knn_k                 = 0)
 {
+  constexpr IndexT invalid_index = ~static_cast<IndexT>(0);
+
   const auto team_size_bits = dataset_desc.team_size_bitshift_from_smem();
   const auto max_i = raft::round_up_safe<uint32_t>(num_pickup, warp_size >> team_size_bits);
   const auto compute_distance = dataset_desc.compute_distance_impl;
@@ -126,7 +130,7 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
     DistanceT best_norm2_team_local = raft::upper_bound<DistanceT>();
     for (uint32_t j = 0; j < num_distilation; j++) {
       // Select a node randomly and compute the distance to it
-      IndexT seed_index;
+      IndexT seed_index = invalid_index;
       if (valid_i) {
         // uint32_t gid = i + (num_pickup * (j + (num_distilation * block_id)));
         uint32_t gid = block_id + (num_blocks * (i + (num_pickup * j)));
@@ -135,9 +139,15 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_random_nodes(
         } else {
           seed_index = device::xorshift64(gid ^ rand_xor_mask) % dataset_desc.size;
         }
+
+        if (knn_graph) {
+          // If the first edge of a node is a self-edge, consider that node deactivated
+          if (knn_graph[(int64_t)knn_k * seed_index] == seed_index) { seed_index = invalid_index; }
+        }
       }
 
-      const auto norm2 = dataset_desc.compute_distance(seed_index, valid_i);
+      const auto norm2 =
+        dataset_desc.compute_distance(seed_index, valid_i && (seed_index != invalid_index));
 
       if (valid_i && (norm2 < best_norm2_team_local)) {
         best_norm2_team_local = norm2;

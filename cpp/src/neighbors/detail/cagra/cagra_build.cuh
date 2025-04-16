@@ -276,6 +276,45 @@ void build_knn_graph(
       // we need to ensure the copy operations are done prior using the host data
       raft::resource::sync_stream(res);
 
+      {
+        char buffer[256];
+        std::string message = "";
+        std::sprintf(buffer, "[%s, %d] Checking neighbors_host\n", __FILE__, __LINE__);
+        message += buffer;
+        uint64_t count = 0;
+        for (int64_t i = 0; i < (int64_t)batch.size(); i++) {
+          int64_t num_unique_nodes = 1;
+          for (int64_t k0 = 1; k0 < neighbors_host.extent(1); k0++) {
+            bool dup = false;
+            for (int64_t k1 = 0; k1 < k0; k1++) {
+              if (neighbors_host(i, k1) != neighbors_host(i, k0)) { continue; }
+              dup = true;
+              break;
+            }
+            if (!dup) { num_unique_nodes += 1; }
+          }
+          if (num_unique_nodes >= neighbors_host.extent(1)) { continue; }
+          count++;
+          if (count <= 5) {
+            std::sprintf(buffer,
+                         "# i:%lu (batch_offset:%lu), neighbors_graph:",
+                         (uint64_t)i + batch.offset(),
+                         batch.offset());
+            message += buffer;
+            for (int64_t k = 0; k < neighbors_host.extent(1); k++) {
+              std::sprintf(buffer, " %lu,", (uint64_t)neighbors_host(i, k));
+              message += buffer;
+            }
+            message += "\n";
+          }
+        }
+        if (count > 0) {
+          std::sprintf(buffer, "# count: %ld", count);
+          message += buffer;
+          RAFT_LOG_WARN("%s", message.c_str());
+        }
+      }
+
       // process last batch
       if (previous_batch_offset + previous_batch_size == (size_t)num_queries) {
         refine_host_and_write_graph(res,
@@ -343,6 +382,43 @@ void build_knn_graph(
     first = false;
   }
 
+  RAFT_LOG_INFO("[%s, %d] Checking knn_graph", __FILE__, __LINE__);  // **** debug ****
+  uint64_t count = 0;
+  char buffer[256];
+  std::string message = "";
+  for (int64_t i = 0; i < knn_graph.extent(0); i++) {
+    int64_t num_unique_nodes = 1;
+    for (int64_t k0 = 1; k0 < knn_graph.extent(1); k0++) {
+      bool dup = false;
+      for (int64_t k1 = 0; k1 < k0; k1++) {
+        if (knn_graph(i, k1) != knn_graph(i, k0)) { continue; }
+        dup = true;
+        break;
+      }
+      if (!dup) { num_unique_nodes += 1; }
+    }
+    if (num_unique_nodes >= knn_graph.extent(1)) { continue; }
+    if (count < 10) {
+      if (count == 0) {
+        std::sprintf(buffer, "Duplicate nodes exist in knn_graph\n");
+        message += buffer;
+      }
+      std::sprintf(buffer, "# i:%ld, knn_graph:", i);
+      message += buffer;
+      for (int64_t k = 0; k < knn_graph.extent(1); k++) {
+        std::sprintf(buffer, " %lu,", (uint64_t)knn_graph(i, k));
+        message += buffer;
+      }
+      message += "\n";
+    }
+    count++;
+  }
+  if (count > 0) {
+    std::sprintf(buffer, "# count: %ld\n", count);
+    message += buffer;
+    RAFT_LOG_WARN("%s", message.c_str());
+  }
+
   if (!first) RAFT_LOG_DEBUG("# Finished building kNN graph");
 }
 
@@ -380,7 +456,8 @@ void optimize(
   raft::resources const& res,
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph,
-  const bool guarantee_connectivity = false)
+  const bool guarantee_connectivity        = false,
+  const uint32_t* deactivated_nodes_bitset = nullptr)
 {
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
 
@@ -399,7 +476,110 @@ void optimize(
       knn_graph.extent(1));
 
   cagra::detail::graph::optimize(
-    res, knn_graph_internal, new_graph_internal, guarantee_connectivity);
+    res, knn_graph_internal, new_graph_internal, guarantee_connectivity, deactivated_nodes_bitset);
+}
+
+template <typename T,
+          typename IdxT     = uint32_t,
+          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
+                                                         raft::memory_type::host>>
+bool check_if_same_vector(
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
+  const IdxT i,
+  const IdxT j)
+{
+  for (auto k = 0; k < dataset.extent(1); k++) {
+    if (dataset(i, k) != dataset(j, k)) { return false; }
+  }
+  return true;
+}
+
+template <typename IdxT = uint32_t>
+IdxT get_small_node(raft::host_vector_view<IdxT, int64_t> small_node, IdxT i)
+{
+  IdxT si = i;
+  while (si != small_node(si)) {
+    si = small_node(si);
+  }
+  return si;
+}
+
+template <typename T,
+          typename IdxT     = uint32_t,
+          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
+                                                         raft::memory_type::host>>
+void deactivate_duplicate_nodes(
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> graph,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
+  uint32_t* bitset_ptr = nullptr)
+{
+  if (bitset_ptr == nullptr) return;
+
+  // If there are multiple nodes with an identical vector, the one with the
+  // smallest ID is kept active and the others are deactivated as duplicate
+  // nodes.
+
+  // If there are 3 or more vectors that are identical and they are not
+  // all-to-all connected in the graph, it may not be possible to select
+  // one of the vectors with the smallest ID among the identical vectors
+  // if decision is made by an edge-by-edege basis.
+  // An array 'small_node', which managed which vector has the smallest
+  // ID among the identical vectors, is used to address this problem.
+  auto small_node = raft::make_host_vector<IdxT, int64_t>(graph.extent(0));
+#pragma omp parallel for
+  for (IdxT i = 0; i < graph.extent(0); i++) {
+    small_node(i) = i;
+  }
+
+#pragma omp parallel for
+  for (IdxT i = 0; i < graph.extent(0); i++) {
+    for (uint32_t k = 0; k < graph.extent(1); k++) {
+      auto j = graph(i, k);
+      if (!check_if_same_vector(dataset, i, j)) { break; }
+      auto si = get_small_node(small_node.view(), i);
+      auto sj = get_small_node(small_node.view(), j);
+      if (si == sj) { continue; }
+#pragma omp critical
+      {
+        if (si > sj) {
+          cuvs::neighbors::cagra::detail::bitset_set(bitset_ptr, si, true);
+          small_node(si) = sj;
+        } else {
+          cuvs::neighbors::cagra::detail::bitset_set(bitset_ptr, sj, true);
+          small_node(sj) = si;
+        }
+      }
+      break;
+    }
+  }
+
+  uint64_t count = 0;
+#pragma omp parallel for schedule(static, 32) reduction(+ : count)
+  for (IdxT i = 0; i < graph.extent(0); i++) {
+    if (cuvs::neighbors::cagra::detail::bitset_test(bitset_ptr, i)) { count += 1; }
+  }
+  if (count > 0) {
+    RAFT_LOG_INFO("Duplicate nodes were found (# deactivated nodes: %lu / %lu (%.2lf%%))",
+                  count,
+                  (uint64_t)graph.extent(0),
+                  100 * (double)count / graph.extent(0));
+  }
+
+#pragma omp parallel for
+  for (IdxT i = 0; i < graph.extent(0); i++) {
+    if (cuvs::neighbors::cagra::detail::bitset_test(bitset_ptr, i)) {
+      // If node-i is a duplicate node, all edges from it are directed back to itself.
+      for (int64_t k = 0; k < graph.extent(1); k++) {
+        graph(i, k) = i;
+      }
+    } else {
+      for (int64_t k = 0; k < graph.extent(1); k++) {
+        auto j = graph(i, k);
+        // If node-j is a duplicate node, an edge to it is directed back to node-i.
+        if (cuvs::neighbors::cagra::detail::bitset_test(bitset_ptr, j)) { graph(i, k) = i; }
+      }
+    }
+  }
 }
 
 template <typename T,
@@ -409,7 +589,8 @@ template <typename T,
 auto iterative_build_graph(
   raft::resources const& res,
   const index_params& params,
-  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
+  uint32_t* deactivated_nodes_bitset = nullptr)
 {
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
@@ -485,11 +666,18 @@ auto iterative_build_graph(
     }
   }
 
+  auto pre_neighbors                     = raft::make_host_matrix<IdxT, int64_t>(0, 0);
+  bool check_match_rate                  = false;
+  int32_t num_check_match_rate           = 0;
+  constexpr int32_t max_check_match_rate = 1;
+  constexpr double match_rate_threshold  = 0.9;
+
   auto curr_graph_size = initial_graph_size;
   while (true) {
-    RAFT_LOG_DEBUG("# graph_size = %lu (%.3lf)",
-                   (uint64_t)curr_graph_size,
-                   (double)curr_graph_size / final_graph_size);
+    // **** debug ****
+    RAFT_LOG_INFO("graph_size = %lu (%.3lf)",
+                  (uint64_t)curr_graph_size,
+                  (double)curr_graph_size / final_graph_size);
 
     auto curr_query_size   = std::min(2 * curr_graph_size, final_graph_size);
     auto curr_topk         = small_topk;
@@ -518,6 +706,7 @@ auto iterative_build_graph(
       dev_dataset.data_handle(), (int64_t)curr_query_size, dev_dataset.extent(1));
     auto neighbors = raft::make_host_matrix<IdxT, int64_t>(curr_query_size, curr_topk);
 
+    RAFT_LOG_INFO("Searching ...");  // **** debug ****
     // Search.
     // Since there are many queries, divide them into batches and search them.
     cuvs::spatial::knn::detail::utils::batch_load_iterator<T> query_batch(
@@ -550,14 +739,59 @@ auto iterative_build_graph(
                  raft::resource::get_cuda_stream(res));
     }
 
+    RAFT_LOG_INFO("Deactivating duplicate nodes ...");  // **** debug ****
+    // Deactivate duplicate nodes
+    deactivate_duplicate_nodes(neighbors.view(), dataset, deactivated_nodes_bitset);
+
+    bool flag_last = false;
+    if (check_match_rate) {
+      if (num_check_match_rate >= max_check_match_rate) {
+        flag_last = true;
+      } else {
+        RAFT_LOG_INFO("Checking match rate ...");  // **** debug ****
+        // Check match rate between pre_neighbors and neighbors
+        int64_t count = 0;
+#pragma omp parallel for reduction(+ : count)
+        for (int64_t i = 0; i < neighbors.extent(0); i++) {
+          for (int64_t k1 = 0; k1 < neighbors.extent(1); k1++) {
+            auto j = neighbors(i, k1);
+            for (int64_t k2 = 0; k2 < pre_neighbors.extent(1); k2++) {
+              if (j != pre_neighbors(i, k2)) { continue; }
+              count += 1;
+              break;
+            }
+          }
+        }
+        int64_t num_edges = neighbors.extent(0) * neighbors.extent(1);
+        double match_rate = (double)count / num_edges;
+        if (match_rate >= match_rate_threshold) { flag_last = true; }
+        RAFT_LOG_INFO(
+          "match_rate: %lf (%ld / %ld)", match_rate, count, num_edges);  // **** debug ****
+        num_check_match_rate += 1;
+      }
+      // delete pre_neighbors
+      pre_neighbors = raft::make_host_matrix<IdxT, int64_t>(0, 0);
+    }
+
+    RAFT_LOG_INFO("Optimizing graph ...");  // **** debug ****
     // Optimize graph
-    bool flag_last  = (curr_graph_size == final_graph_size);
+    // bool flag_last  = (curr_graph_size == final_graph_size);
     curr_graph_size = curr_query_size;
     cagra_graph     = raft::make_host_matrix<IdxT, int64_t>(0, 0);  // delete existing grahp
     cagra_graph     = raft::make_host_matrix<IdxT, int64_t>(curr_graph_size, curr_graph_degree);
-    optimize<IdxT>(
-      res, neighbors.view(), cagra_graph.view(), flag_last ? params.guarantee_connectivity : 0);
+    optimize<IdxT>(res,
+                   neighbors.view(),
+                   cagra_graph.view(),
+                   // flag_last ? params.guarantee_connectivity : 0,
+                   params.guarantee_connectivity,
+                   deactivated_nodes_bitset);
     if (flag_last) { break; }
+
+    if (curr_query_size == final_graph_size) {
+      // Keep neighbors as pre_neighbors
+      pre_neighbors    = neighbors;
+      check_match_rate = true;
+    }
   }
 
   return cagra_graph;
@@ -609,12 +843,21 @@ index<T, IdxT> build(
     "IVF_PQ and NN_DESCENT for CAGRA graph build do not support BitwiseHamming as a metric. Please "
     "use the iterative CAGRA search build.");
 
+  //
+  uint32_t* bitset_ptr = nullptr;
+  size_t bitset_size   = 0;
+  if (params.deactivate_duplicate_nodes) {
+    bitset_size = sizeof(uint32_t) * (dataset.extent(0) + 31) / 32;
+    bitset_ptr  = (uint32_t*)malloc(bitset_size);
+    memset(bitset_ptr, 0, bitset_size);
+  }
+
   auto cagra_graph = raft::make_host_matrix<IdxT, int64_t>(0, 0);
 
   // Dispatch based on graph_build_params
   if (std::holds_alternative<cagra::graph_build_params::iterative_search_params>(
         knn_build_params)) {
-    cagra_graph = iterative_build_graph<T, IdxT, Accessor>(res, params, dataset);
+    cagra_graph = iterative_build_graph<T, IdxT, Accessor>(res, params, dataset, bitset_ptr);
   } else {
     std::optional<raft::host_matrix<IdxT, int64_t>> knn_graph(
       raft::make_host_matrix<IdxT, int64_t>(dataset.extent(0), intermediate_degree));
@@ -643,14 +886,19 @@ index<T, IdxT> build(
       build_knn_graph<T, IdxT>(res, dataset, knn_graph->view(), nn_descent_params);
     }
 
+    // Deactivate duplicate nodes
+    deactivate_duplicate_nodes(knn_graph->view(), dataset, bitset_ptr);
+
     cagra_graph = raft::make_host_matrix<IdxT, int64_t>(dataset.extent(0), graph_degree);
 
     RAFT_LOG_INFO("optimizing graph");
-    optimize<IdxT>(res, knn_graph->view(), cagra_graph.view(), params.guarantee_connectivity);
+    optimize<IdxT>(
+      res, knn_graph->view(), cagra_graph.view(), params.guarantee_connectivity, bitset_ptr);
 
     // free intermediate graph before trying to create the index
     knn_graph.reset();
   }
+  if (bitset_ptr) { free(bitset_ptr); }
 
   RAFT_LOG_INFO("Graph optimized, creating index");
 
