@@ -95,8 +95,9 @@ void assign_clusters(raft::resources const& res,
     raft::make_device_matrix<T, IdxT, raft::row_major>(res, n_rows_per_batch, num_cols);
 
   // this is needed because brute force search only takes int64_t type
-  auto nearest_clusters_idx_int64_d = raft::make_device_matrix<int64_t, int64_t, raft::row_major>(
-    res, n_rows_per_batch, num_nearest_clusters);
+  // auto nearest_clusters_idx_int64_d = raft::make_device_matrix<int64_t, int64_t,
+  // raft::row_major>(
+  //   res, n_rows_per_batch, num_nearest_clusters);
   auto nearest_clusters_idx_d = raft::make_device_matrix<IdxT, int64_t, raft::row_major>(
     res, n_rows_per_batch, num_nearest_clusters);
   auto nearest_clusters_dist_d = raft::make_device_matrix<T, int64_t, raft::row_major>(
@@ -117,12 +118,12 @@ void assign_clusters(raft::resources const& res,
     cuvs::neighbors::brute_force::search(res,
                                          brute_force_index,
                                          raft::make_const_mdspan(dataset_batch_d.view()),
-                                         nearest_clusters_idx_int64_d.view(),
+                                         nearest_clusters_idx_d.view(),
                                          nearest_clusters_dist_d.view());
-    thrust::copy(raft::resource::get_thrust_policy(res),
-                 nearest_clusters_idx_int64_d.data_handle(),
-                 nearest_clusters_idx_int64_d.data_handle() + nearest_clusters_idx_int64_d.size(),
-                 nearest_clusters_idx_d.data_handle());
+    // thrust::copy(raft::resource::get_thrust_policy(res),
+    //              nearest_clusters_idx_int64_d.data_handle(),
+    //              nearest_clusters_idx_int64_d.data_handle() +
+    //              nearest_clusters_idx_int64_d.size(), nearest_clusters_idx_d.data_handle());
     raft::copy(global_nearest_cluster.data_handle() + row_offset * num_nearest_clusters,
                nearest_clusters_idx_d.data_handle(),
                n_rows_of_current_batch * num_nearest_clusters,
