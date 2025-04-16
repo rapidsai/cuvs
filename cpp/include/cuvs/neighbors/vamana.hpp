@@ -72,6 +72,10 @@ struct index_params : cuvs::neighbors::index_params {
   uint32_t queue_size = 127;
   /** Max batchsize of reverse edge processing (reduces memory footprint) */
   uint32_t reverse_batchsize = 1000000;
+  /** Path prefix to pq pivots and rotation matrix files. Expects pq pivots file at
+   * "${codebook_prefix}_pq_pivots.bin" and rotation matrix file at
+   * "${codebook_prefix}_pq_pivots.bin_rotation_matrix.bin". */
+  std::string codebook_prefix = "";
 };
 
 /**
@@ -125,6 +129,14 @@ struct index : cuvs::neighbors::index {
   [[nodiscard]] inline auto data() const noexcept -> const cuvs::neighbors::dataset<int64_t>&
   {
     return *dataset_;
+  }
+
+  /** Quantized dataset [size, codes_rowlen] */
+  [[nodiscard]] inline auto quantized_data() const
+    -> const cuvs::neighbors::dataset<int64_t>&
+  {
+    RAFT_EXPECTS(quantized_dataset_, "Invalid quantized dataset");
+    return *quantized_dataset_;
   }
 
   /** vamana graph [size, graph-degree] */
@@ -212,11 +224,28 @@ struct index : cuvs::neighbors::index {
     graph_view_ = graph_.view();
   }
 
+  /**
+   * Replace the quantized dataset with a new dataset.
+   *
+   * If `force_ownership` is set, we create a copy of the quantized dataset on the device,
+   * and the index manages the lifetime of this copy.
+   * Otherwise, we store a reference to the device data in `new_quantized_dataset`, and it
+   * is the caller's responsibility to ensure that the data stays alive as long as the index.
+   */
+  void update_quantized_dataset(
+    raft::resources const& res,
+    raft::device_matrix_view<uint8_t, int64_t, raft::row_major> new_quantized_dataset,
+    bool force_ownership)
+  {
+    quantized_dataset_ = make_aligned_dataset(res, new_quantized_dataset, 16, force_ownership);
+  }
+
  private:
   cuvs::distance::DistanceType metric_;
   raft::device_matrix<IdxT, int64_t, raft::row_major> graph_;
   raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
   std::unique_ptr<neighbors::dataset<int64_t>> dataset_;
+  std::unique_ptr<neighbors::dataset<int64_t>> quantized_dataset_;
   IdxT medoid_id_;
 };
 /**
@@ -457,13 +486,15 @@ auto build(raft::resources const& res,
  * @param[in] file_prefix prefix of path and name of index files
  * @param[in] index Vamana index
  * @param[in] include_dataset whether or not to serialize the dataset
+ * @param[in] sector_aligned whether output file should be aligned to disk sectors of 4096 bytes
  *
  */
 
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
                const cuvs::neighbors::vamana::index<float, uint32_t>& index,
-               bool include_dataset = true);
+               bool include_dataset = true,
+               bool sector_aligned  = false);
 
 /**
  * Save the index to file.
@@ -486,12 +517,14 @@ void serialize(raft::resources const& handle,
  * @param[in] file_prefix prefix of path and name of index files
  * @param[in] index Vamana index
  * @param[in] include_dataset whether or not to serialize the dataset
+ * @param[in] sector_aligned whether output file should be aligned to disk sectors of 4096 bytes
  *
  */
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
                const cuvs::neighbors::vamana::index<int8_t, uint32_t>& index,
-               bool include_dataset = true);
+               bool include_dataset = true,
+               bool sector_aligned  = false);
 
 /**
  * Save the index to file.
@@ -514,12 +547,14 @@ void serialize(raft::resources const& handle,
  * @param[in] file_prefix prefix of path and name of index files
  * @param[in] index Vamana index
  * @param[in] include_dataset whether or not to serialize the dataset
+ * @param[in] sector_aligned whether output file should be aligned to disk sectors of 4096 bytes
  *
  */
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
                const cuvs::neighbors::vamana::index<uint8_t, uint32_t>& index,
-               bool include_dataset = true);
+               bool include_dataset = true,
+               bool sector_aligned  = false);
 
 /**
  * @}
