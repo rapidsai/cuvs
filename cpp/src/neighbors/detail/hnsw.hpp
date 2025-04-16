@@ -22,6 +22,7 @@
 #include <cuvs/neighbors/hnsw.hpp>
 
 #include <raft/core/logger.hpp>
+#include <raft/core/pinned_mdarray.hpp>
 
 #include <hnswlib/hnswalg.h>
 #include <hnswlib/hnswlib.h>
@@ -281,14 +282,6 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::from_cagra<GPU>");
   auto stream      = raft::resource::get_cuda_stream(res);
   auto num_threads = params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
-  int64_t n_rows   = cagra_index.size();
-  int64_t dim      = cagra_index.dim();
-
-  // initialize HNSW index
-  auto hnsw_index = std::make_unique<index_impl<T>>(dim, cagra_index.metric(), hierarchy);
-  auto appr_algo  = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
-    hnsw_index->get_space(), n_rows, cagra_index.graph().extent(1) / 2, params.ef_construction);
-  appr_algo->cur_element_count = n_rows;
 
   /* Note: NNSW data layout
 
@@ -306,13 +299,18 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
      [linked list + linked list sizes]        [data]     [label]
   */
 
-  bool device_copy;
   const T* source_dataset = nullptr;
-  int64_t source_stride   = dim;
+  int64_t n_rows, dim, source_stride;
+  bool device_copy;
   if (dataset.has_value()) {
+    n_rows         = dataset->extent(0);
+    dim            = dataset->extent(1);
     device_copy    = false;
     source_dataset = dataset->data_handle();
+    source_stride  = dim;
   } else if (auto cagra_dataset = cagra_index.dataset(); cagra_dataset.data_handle() != nullptr) {
+    n_rows         = cagra_dataset.extent(0);
+    dim            = cagra_dataset.extent(1);
     device_copy    = true;
     source_dataset = cagra_dataset.data_handle();
     source_stride  = cagra_dataset.stride(0);
@@ -320,78 +318,80 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
     RAFT_FAIL("hnsw::from_cagra<GPU>: No dataset provided");
   }
 
+  // initialize HNSW index
+  auto hnsw_index = std::make_unique<index_impl<T>>(dim, cagra_index.metric(), hierarchy);
+  auto appr_algo  = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
+    hnsw_index->get_space(), n_rows, cagra_index.graph().extent(1) / 2, params.ef_construction);
+  appr_algo->cur_element_count = n_rows;
+
   // Initialize linked lists
   auto& levels = appr_algo->element_levels_;
   {
     common::nvtx::range<common::nvtx::domain::cuvs> block_scope(
       "parallel::initialize_data<%s>(%d threads)", device_copy ? "device" : "host", num_threads);
-    /* Note: chunked strided cuda copy
-    Ideally we want cudaMemcpy2DAsync to be completely non-blocking, running in parallel with the
-    host loop. However, the cuda copy may sync with the host, because the host memory is paged (not
-    pinned). The large the dataset, the larger the chance pages need to be swapped and thus would
-    block. To mitigate this, run cuda copy in chunks. Yet, we cannot run a single copy per row,
-    because parallel thread would fight for the cuda context and be forced to sleep.
-    Hence the compromise: run one copy per bunch of operations and balance the work by making this
-    stride not multiple of the num_threads.
+    /* Note: batching
+
+    If the dataset is on the device, we want to copy it to HNSW in parallel to the rest of the
+    initialization loop. Ideally, we could use cudaMemcpy2DAsync to do this, but this call is very
+    likely to sync with the CPU, because normally the allocated host memory is paged. To avoid this,
+    we use double-buffering and copy data in small batches via pinned memory. Hence, the cuda
+    device-to-host copy is completely overlapped with the host loop.
+
+    The batching is completely disabled if the source dataset is on the host.
     */
-    const int64_t memcpy2s_stride = num_threads * 16 + 1;
-#pragma omp parallel for num_threads(num_threads)
-    for (int64_t i = 0; i < n_rows; i++) {
-      // clear the storage (TODO: it's not clear if this is necessary)
-      memset(appr_algo->get_linklist0(i), 0, appr_algo->size_links_level0_);
-      // copy the data section
+    const int64_t max_batch_size =
+      device_copy ? raft::div_rounding_up_safe<int64_t>(64 * 1024 * 1024, source_stride * sizeof(T))
+                  : n_rows;
+    T* bufs[2]                                                  = {nullptr, nullptr};
+    std::optional<raft::pinned_matrix<T, int64_t>> bufs_storage = std::nullopt;
+    if (device_copy) {
+      bufs_storage.emplace(
+        std::move(raft::make_pinned_matrix<T, int64_t>(res, max_batch_size * 2, source_stride)));
+      bufs[0] = bufs_storage->data_handle();
+      bufs[1] = bufs[0] + max_batch_size * source_stride;
+    }
+    auto n_batches = raft::div_rounding_up_safe<int64_t>(n_rows, max_batch_size);
+    for (int64_t batch_i = -1; batch_i < n_batches; batch_i++) {
       if (device_copy) {
-        if ((i % memcpy2s_stride) == 0) {
-          auto n_copy = std::min(memcpy2s_stride, n_rows - i);
-          // Note: try to copy asynchronously and do the sync later
-          RAFT_CUDA_TRY(cudaMemcpy2DAsync(appr_algo->getDataByInternalId(i),
-                                          appr_algo->size_data_per_element_,
-                                          source_dataset + i * source_stride,
-                                          source_stride * sizeof(T),
-                                          appr_algo->data_size_,
-                                          n_copy,
-                                          cudaMemcpyDefault,
-                                          stream));
+        if (batch_i >= 0) {
+          // Sync previous batch load
+          raft::resource::sync_stream(res);
         }
-      } else {
-        memcpy(appr_algo->getDataByInternalId(i),
-               source_dataset + i * source_stride,
-               appr_algo->data_size_);
+        auto next_batch_i = batch_i + 1;
+        if (next_batch_i < n_batches) {
+          auto offset     = next_batch_i * max_batch_size;
+          auto batch_size = std::min(max_batch_size, n_rows - offset);
+          raft::copy(bufs[next_batch_i % 2],
+                     source_dataset + offset * source_stride,
+                     batch_size * source_stride,
+                     stream);
+        }
       }
-      // As we build the index from scratch, we assign labels 1-1 in data order
-      *appr_algo->getExternalLabeLp(i) = static_cast<hnswlib::labeltype>(i);
-      int32_t curlevel                 = appr_algo->getRandomLevel(appr_algo->mult_);
-      levels[i]                        = curlevel;
-      if (curlevel) {
-        appr_algo->linkLists_[i] = (char*)malloc(appr_algo->size_links_per_element_ * curlevel + 1);
-        if (appr_algo->linkLists_[i] == nullptr)
-          throw std::runtime_error("Not enough memory: addPoint failed to allocate linklist");
-        memset(appr_algo->linkLists_[i], 0, appr_algo->size_links_per_element_ * curlevel + 1);
+      if (batch_i < 0) { continue; }
+      const auto i0 = batch_i * max_batch_size;
+      const auto i1 = std::min(i0 + max_batch_size, n_rows);
+#pragma omp parallel for num_threads(num_threads)
+      for (int64_t i = i0; i < i1; i++) {
+        // clear the storage (TODO: it's not clear if this is necessary)
+        memset(appr_algo->get_linklist0(i), 0, appr_algo->size_links_level0_);
+        // copy the data section
+        auto* source_ptr = device_copy ? bufs[batch_i % 2] + (i - i0) * source_stride
+                                       : source_dataset + i * source_stride;
+        memcpy(appr_algo->getDataByInternalId(i), source_ptr, appr_algo->data_size_);
+        // As we build the index from scratch, we assign labels 1-1 in data order
+        *appr_algo->getExternalLabeLp(i) = static_cast<hnswlib::labeltype>(i);
+        int32_t curlevel                 = appr_algo->getRandomLevel(appr_algo->mult_);
+        levels[i]                        = curlevel;
+        if (curlevel) {
+          appr_algo->linkLists_[i] =
+            (char*)malloc(appr_algo->size_links_per_element_ * curlevel + 1);
+          if (appr_algo->linkLists_[i] == nullptr)
+            throw std::runtime_error("Not enough memory: addPoint failed to allocate linklist");
+          memset(appr_algo->linkLists_[i], 0, appr_algo->size_links_per_element_ * curlevel + 1);
+        }
       }
     }
   }
-
-  //   // Initialize HNSW dataset
-  //   if (dataset.has_value()) {
-  //     common::nvtx::range<common::nvtx::domain::cuvs> block_scope(
-  //       "inititialize_dataset<host>(%d threads)", num_threads);
-  //     auto host_dataset_view = dataset.value();
-  // #pragma omp parallel for num_threads(num_threads)
-  //     for (int64_t i = 0; i < n_rows; i++) {
-  //       memcpy(appr_algo->getDataByInternalId(i),
-  //              host_dataset_view.data_handle() + i * dim,
-  //              appr_algo->data_size_);
-  //     }
-  //   } else if (auto cagra_dataset = cagra_index.dataset(); cagra_dataset.data_handle() !=
-  //   nullptr) {
-  //     common::nvtx::range<common::nvtx::domain::cuvs>
-  //     block_scope("inititialize_dataset<device>");
-  //     // Copy the data
-  //     // NB: the stream sync is done later
-
-  //   } else {
-  //     RAFT_FAIL("hnsw::from_cagra<GPU>: No dataset provided");
-  //   }
 
   // sort the points by levels
   // build histogram
@@ -419,10 +419,6 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
   // set last point of the highest level as the entry point
   appr_algo->enterpoint_node_ = order.back();
   appr_algo->maxlevel_        = hist.size() - 1;
-
-  // Sync the stream only if we used it to copy the dataset;
-  // we need the dataset in the following step
-  if (device_copy) { raft::resource::sync_stream(res); }
 
   // iterate over the points in the descending order of their levels
   for (size_t pt_level = hist.size() - 1; pt_level >= 1; pt_level--) {
