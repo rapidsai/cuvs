@@ -180,10 +180,13 @@ void _search(cuvsResources_t res,
   search_params.min_iterations    = params.min_iterations;
   search_params.thread_block_size = params.thread_block_size;
   search_params.hashmap_mode = static_cast<cuvs::neighbors::cagra::hash_mode>(params.hashmap_mode);
-  search_params.hashmap_min_bitlen    = params.hashmap_min_bitlen;
-  search_params.hashmap_max_fill_rate = params.hashmap_max_fill_rate;
-  search_params.num_random_samplings  = params.num_random_samplings;
-  search_params.rand_xor_mask         = params.rand_xor_mask;
+  search_params.hashmap_min_bitlen      = params.hashmap_min_bitlen;
+  search_params.hashmap_max_fill_rate   = params.hashmap_max_fill_rate;
+  search_params.num_random_samplings    = params.num_random_samplings;
+  search_params.rand_xor_mask           = params.rand_xor_mask;
+  search_params.persistent              = params.persistent;
+  search_params.persistent_lifetime     = params.persistent_lifetime;
+  search_params.persistent_device_usage = params.persistent_device_usage;
 
   using queries_mdspan_type   = raft::device_matrix_view<T const, int64_t, raft::row_major>;
   using neighbors_mdspan_type = raft::device_matrix_view<IdxT, int64_t, raft::row_major>;
@@ -448,11 +451,16 @@ extern "C" cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t para
 extern "C" cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* params)
 {
   return cuvs::core::translate_exceptions([=] {
-    *params = new cuvsCagraSearchParams{.itopk_size            = 64,
-                                        .search_width          = 1,
-                                        .hashmap_max_fill_rate = 0.5,
-                                        .num_random_samplings  = 1,
-                                        .rand_xor_mask         = 0x128394};
+    *params = new cuvsCagraSearchParams{
+      .itopk_size              = 64,
+      .search_width            = 1,
+      .hashmap_max_fill_rate   = 0.5,
+      .num_random_samplings    = 1,
+      .rand_xor_mask           = 0x128394,
+      .persistent              = false,
+      .persistent_lifetime     = 2,
+      .persistent_device_usage = 1.0,
+    };
   });
 }
 
