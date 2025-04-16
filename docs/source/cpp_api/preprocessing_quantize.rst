@@ -17,3 +17,13 @@ namespace *cuvs::preprocessing::quantize::scalar*
 
 .. doxygengroup:: scalar
    :project: cuvs
+
+Binary
+------
+
+``#include <cuvs/preprocessing/quantize/binary.hpp>``
+
+namespace *cuvs::preprocessing::quantize::binary*
+
+.. doxygengroup:: binary
+   :project: cuvs
