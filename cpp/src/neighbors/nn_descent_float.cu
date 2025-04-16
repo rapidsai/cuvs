@@ -53,7 +53,8 @@ namespace cuvs::neighbors::nn_descent {
       cuvs::neighbors::nn_descent::build<T, IdxT>(handle, params, dataset, idx);              \
       return idx;                                                                             \
     }                                                                                         \
-  };
+  };                                                                                          \
+  template class detail::GNND<const T, int>;
 
 CUVS_INST_NN_DESCENT_BUILD(float, uint32_t);
 
