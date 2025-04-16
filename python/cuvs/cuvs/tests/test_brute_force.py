@@ -144,7 +144,7 @@ def test_prefiltered_brute_force_knn(
     queries = np.random.random_sample((n_query_rows, n_cols)).astype(dtype)
     n_prefilter_rows = n_query_rows if filter_type == "bitmap" else 1
     prefilter_bits = create_sparse_array(
-        (np.ceil(n_prefilter_rows * n_index_rows / 32).astype(np.uint32)),
+        int(np.ceil(n_prefilter_rows * n_index_rows / 32)),
         sparsity,
     )
 
