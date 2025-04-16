@@ -583,10 +583,10 @@ if(BUILD_SHARED_LIBS)
         NCCL
         HEADER_NAMES nccl.h
         LIBRARY_NAMES nccl
-        )
+      )
       find_package(NCCL REQUIRED)
       target_link_libraries(cuvs_objs PRIVATE NCCL::NCCL)
-      target_link_libraries(cuvs PUBLIC NCCL::NCCL)
+      target_link_libraries(cuvs PRIVATE NCCL::NCCL)
     endif()
 
     # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
