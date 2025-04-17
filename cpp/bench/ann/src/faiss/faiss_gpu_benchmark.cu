@@ -27,6 +27,22 @@
 #include <type_traits>
 #include <utility>
 
+namespace {
+nlohmann::json collect_conf_with_prefix(const nlohmann::json& conf,
+                                        const std::string& prefix,
+                                        bool remove_prefix = true)
+{
+  nlohmann::json out;
+  for (auto& i : conf.items()) {
+    if (i.key().compare(0, prefix.size(), prefix) == 0) {
+      auto new_key = remove_prefix ? i.key().substr(prefix.size()) : i.key();
+      out[new_key] = i.value();
+    }
+  }
+  return out;
+}
+}  // namespace
+
 namespace cuvs::bench {
 
 template <typename T>
@@ -100,6 +116,82 @@ void parse_build_param(const nlohmann::json& conf,
     param.intermediate_graph_degree = 128;
   }
   if (conf.contains("cagra_build_algo")) { param.cagra_build_algo = conf.at("cagra_build_algo"); }
+  if (conf.contains("nn_descent_niter")) {
+    param.nn_descent_niter = conf.at("nn_descent_niter");
+  } else {
+    param.nn_descent_niter = 20;
+  }
+  nlohmann::json ivf_pq_build_conf = collect_conf_with_prefix(conf, "b_");
+  if (!ivf_pq_build_conf.empty()) {
+    faiss::gpu::IVFPQBuildCagraConfig ivf_pq_build_p;
+
+    if (ivf_pq_build_conf.contains("nlist")) {
+      ivf_pq_build_p.n_lists = ivf_pq_build_conf.at("nlist");
+    }
+    if (ivf_pq_build_conf.contains("niter")) {
+      ivf_pq_build_p.kmeans_n_iters = ivf_pq_build_conf.at("niter");
+    }
+    if (ivf_pq_build_conf.contains("ratio")) {
+      ivf_pq_build_p.kmeans_trainset_fraction = 1.0 / (double)conf.at("ratio");
+    }
+    if (ivf_pq_build_conf.contains("pq_bits")) {
+      ivf_pq_build_p.pq_bits = ivf_pq_build_conf.at("pq_bits");
+    }
+    if (ivf_pq_build_conf.contains("pq_dim")) {
+      ivf_pq_build_p.pq_dim = ivf_pq_build_conf.at("pq_dim");
+    }
+    param.ivf_pq_build_params = std::make_shared<faiss::gpu::IVFPQBuildCagraConfig>(ivf_pq_build_p);
+  }
+  nlohmann::json ivf_pq_search_conf = collect_conf_with_prefix(conf, "s_");
+  if (!ivf_pq_search_conf.empty()) {
+    faiss::gpu::IVFPQSearchCagraConfig ivf_pq_search_p;
+    if (ivf_pq_search_conf.contains("nprobe")) {
+      ivf_pq_search_p.n_probes = ivf_pq_search_conf.at("nprobe");
+    }
+    if (ivf_pq_search_conf.contains("internalDistanceDtype")) {
+      std::string type = ivf_pq_search_conf.at("internalDistanceDtype");
+      if (type == "float") {
+        ivf_pq_search_p.internal_distance_dtype = CUDA_R_32F;
+      } else if (type == "half") {
+        ivf_pq_search_p.internal_distance_dtype = CUDA_R_16F;
+      } else {
+        throw std::runtime_error("internalDistanceDtype: '" + type +
+                                 "', should be either 'float' or 'half'");
+      }
+    } else {
+      // set half as default type
+      ivf_pq_search_p.internal_distance_dtype = CUDA_R_16F;
+    }
+
+    if (ivf_pq_search_conf.contains("smemLutDtype")) {
+      std::string type = ivf_pq_search_conf.at("smemLutDtype");
+      if (type == "float") {
+        ivf_pq_search_p.lut_dtype = CUDA_R_32F;
+      } else if (type == "half") {
+        ivf_pq_search_p.lut_dtype = CUDA_R_16F;
+      } else if (type == "fp8") {
+        ivf_pq_search_p.lut_dtype = CUDA_R_8U;
+      } else {
+        throw std::runtime_error("smemLutDtype: '" + type +
+                                 "', should be either 'float', 'half' or 'fp8'");
+      }
+    } else {
+      // set half as default
+      ivf_pq_search_p.lut_dtype = CUDA_R_16F;
+    }
+    param.ivf_pq_search_params =
+      std::make_shared<faiss::gpu::IVFPQSearchCagraConfig>(ivf_pq_search_p);
+  }
+}
+
+template <typename T>
+void parse_build_param(const nlohmann::json& conf,
+                       typename cuvs::bench::faiss_gpu_cagra_hnsw<T>::build_param& param)
+{
+  typename cuvs::bench::faiss_gpu_cagra<T>::build_param p;
+  parse_build_param<T>(conf, p);
+  param.p = p;
+  if (conf.contains("base_level_only")) { param.base_level_only = conf.at("base_level_only"); }
 }
 
 template <typename T>
@@ -131,7 +223,13 @@ void parse_search_param(const nlohmann::json& conf,
       THROW("Invalid value for algo: %s", tmp.c_str());
     }
   }
-  if (conf.contains("refine_ratio")) { param.refine_ratio = conf.at("refine_ratio"); }
+}
+
+template <typename T>
+void parse_search_param(const nlohmann::json& conf,
+                        typename cuvs::bench::faiss_gpu_cagra_hnsw<T>::search_param& param)
+{
+  if (conf.contains("efSearch")) { param.p.efSearch = conf.at("efSearch"); }
 }
 
 template <typename T, template <typename> class Algo>
@@ -163,6 +261,8 @@ auto create_algo(const std::string& algo_name,
       a = std::make_unique<cuvs::bench::faiss_gpu_flat<T>>(metric, dim);
     } else if (algo_name == "faiss_gpu_cagra") {
       a = make_algo<T, cuvs::bench::faiss_gpu_cagra>(metric, dim, conf);
+    } else if (algo_name == "faiss_gpu_cagra_hnsw") {
+      a = make_algo<T, cuvs::bench::faiss_gpu_cagra_hnsw>(metric, dim, conf);
     }
   }
 
@@ -185,6 +285,10 @@ auto create_search_param(const std::string& algo_name, const nlohmann::json& con
     return param;
   } else if (algo_name == "faiss_gpu_cagra") {
     auto param = std::make_unique<typename cuvs::bench::faiss_gpu_cagra<T>::search_param>();
+    parse_search_param<T>(conf, *param);
+    return param;
+  } else if (algo_name == "faiss_gpu_cagra_hnsw") {
+    auto param = std::make_unique<typename cuvs::bench::faiss_gpu_cagra_hnsw<T>::search_param>();
     parse_search_param<T>(conf, *param);
     return param;
   }
