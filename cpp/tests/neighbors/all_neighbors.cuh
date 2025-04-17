@@ -116,7 +116,6 @@ void get_graphs(raft::resources& handle,
   {
     auto index = [&]() {
       if (ps.data_on_host) {
-        std::cout << "testing data on host\n";
         auto database_h = raft::make_host_matrix<DataT, IdxT>(ps.n_rows, ps.dim);
         raft::copy(database_h.data_handle(), database.data(), ps.n_rows * ps.dim, cuda_stream);
 
@@ -127,7 +126,6 @@ void get_graphs(raft::resources& handle,
                                     true);
 
       } else {
-        std::cout << "testing data on device\n";
         return all_neighbors::build(
           handle,
           raft::make_device_matrix_view<const DataT, IdxT>(database.data(), ps.n_rows, ps.dim),
@@ -224,8 +222,6 @@ class AllNeighborsSingleTest : public ::testing::TestWithParam<AllNeighborsInput
     std::vector<DistanceT> distances_bf(queries_size);
     std::vector<IdxT> indices_bf(queries_size);
 
-    std::cout << "start running here\n";
-    raft::print_device_vector("database here", database.data(), 10, std::cout);
     get_graphs(handle_,
                database,
                indices_bf,
@@ -241,22 +237,16 @@ class AllNeighborsSingleTest : public ::testing::TestWithParam<AllNeighborsInput
 
   void SetUp() override
   {
-    std::cout << "calling setup\n";
     database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
-    std::cout << "here0\n";
     auto database_view =
       raft::make_device_matrix_view<float, IdxT>(database.data(), ps.n_rows, ps.dim);
-    std::cout << "here1\n";
     auto labels = raft::make_device_vector<IdxT, IdxT>(handle_, ps.n_rows);
-    std::cout << "here2\n";
     raft::random::make_blobs(handle_, database_view, labels.view());
-    std::cout << "here3\n";
     raft::resource::sync_stream(handle_);
   }
 
   void TearDown() override
   {
-    std::cout << "calling tear down\n";
     raft::resource::sync_stream(handle_);
     database.resize(0, stream_);
   }
