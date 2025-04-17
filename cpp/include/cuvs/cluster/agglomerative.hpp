@@ -21,6 +21,7 @@
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/sparse/coo.hpp>
 
 namespace cuvs::cluster::agglomerative {
 
@@ -119,6 +120,18 @@ void single_linkage(
   cuvs::cluster::agglomerative::Linkage linkage = cuvs::cluster::agglomerative::Linkage::KNN_GRAPH,
   std::optional<int> c                          = std::make_optional<int>(DEFAULT_CONST_C));
 
+void build_mutual_reachability_linkage(raft::resources const& handle,
+raft::device_matrix_view<const float, int, raft::row_major> X,
+cuvs::distance::DistanceType metric,
+raft::device_vector_view<float, int> core_dists,
+raft::device_vector_view<int, int> indptr,
+raft::sparse::COO<float, int> mutual_reachability_coo,
+                    raft::device_vector_view<int, int> out_mst_src,
+                    raft::device_vector_view<int, int> out_mst_dst,
+                    raft::device_vector_view<float, int> out_mst_weights,
+                    raft::device_vector_view<int, int> out_children,
+                    raft::device_vector_view<float, int> out_deltas,
+                    raft::device_vector_view<int, int> out_sizes);
 /**
  * @}
  */

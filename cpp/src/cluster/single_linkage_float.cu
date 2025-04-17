@@ -39,4 +39,19 @@ void single_linkage(raft::resources const& handle,
       handle, X, dendrogram, labels, metric, n_clusters, c);
   }
 }
+
+void build_mutual_reachability_linkage(raft::resources const& handle,
+raft::device_matrix_view<const float, int, raft::row_major> X,
+cuvs::distance::DistanceType metric,
+raft::device_vector_view<float, int> core_dists,
+raft::device_vector_view<int, int> indptr,
+raft::sparse::COO<float, int>& mutual_reachability_coo,
+                    raft::device_vector_view<int, int> out_mst_src,
+                    raft::device_vector_view<int, int> out_mst_dst,
+                    raft::device_vector_view<float, int> out_mst_weights,
+                    raft::device_vector_view<int, int> out_children,
+                    raft::device_vector_view<float, int> out_deltas,
+                    raft::device_vector_view<int, int> out_sizes) {
+                      build_mutual_reachability_linkage<float, int>(handle, X, metric, core_dists, mutual_reachability_coo, out_mst_src, out_mst_dst, out_mst_weights, out_children, out_deltas, out_sizes);
+                    }
 }  // namespace cuvs::cluster::agglomerative
