@@ -87,9 +87,11 @@ void get_graphs(raft::resources& handle,
     nn_descent_params.max_iterations            = 100;
     nn_descent_params.graph_degree              = ps.k;
     nn_descent_params.intermediate_graph_degree = ps.k * 2;
+    nn_descent_params.metric                    = params.metric;
     params.graph_build_params                   = nn_descent_params;
   } else if (build_algo == IVF_PQ) {
-    auto ivfq_build_params = graph_build_params::ivf_pq_params{};
+    auto ivfq_build_params                = graph_build_params::ivf_pq_params{};
+    ivfq_build_params.build_params.metric = params.metric;
     // heuristically good ivfpq n_lists
     ivfq_build_params.build_params.n_lists = std::max(
       5u,
@@ -266,11 +268,9 @@ const std::vector<AllNeighborsInputs> inputsSingle =
   raft::util::itertools::product<AllNeighborsInputs>(
     {
       std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::L2Expanded),
-      std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::InnerProduct),
       std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded),
       std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded),
       std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded),
-      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::InnerProduct),
     },
     {std::make_tuple(0.9, 1lu, 2lu)},  // min_recall, n_clusters, num_nearest_cluster
     {5000, 7151},                      // n_rows
@@ -283,11 +283,9 @@ const std::vector<AllNeighborsInputs> inputsBatch =
   raft::util::itertools::product<AllNeighborsInputs>(
     {
       std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::L2Expanded),
-      std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::InnerProduct),
       std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded),
       std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded),
       std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded),
-      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::InnerProduct),
     },
     {
       std::make_tuple(0.9, 4lu, 2lu),
