@@ -27,21 +27,23 @@
 #include <type_traits>
 #include <utility>
 
-namespace cuvs::bench {
-
+namespace {
 nlohmann::json collect_conf_with_prefix(const nlohmann::json& conf,
-                                        const std::string& prefix,
-                                        bool remove_prefix = true)
+  const std::string& prefix,
+  bool remove_prefix = true)
 {
-  nlohmann::json out;
-  for (auto& i : conf.items()) {
-    if (i.key().compare(0, prefix.size(), prefix) == 0) {
-      auto new_key = remove_prefix ? i.key().substr(prefix.size()) : i.key();
-      out[new_key] = i.value();
-    }
-  }
-  return out;
+nlohmann::json out;
+for (auto& i : conf.items()) {
+if (i.key().compare(0, prefix.size(), prefix) == 0) {
+auto new_key = remove_prefix ? i.key().substr(prefix.size()) : i.key();
+out[new_key] = i.value();
 }
+}
+return out;
+}
+}
+
+namespace cuvs::bench {
 
 template <typename T>
 void parse_base_build_param(const nlohmann::json& conf,
@@ -122,19 +124,51 @@ void parse_build_param(const nlohmann::json& conf,
   nlohmann::json ivf_pq_build_conf = collect_conf_with_prefix(conf, "b_");
   if (!ivf_pq_build_conf.empty()) {
     faiss::gpu::IVFPQBuildCagraConfig ivf_pq_build_p;
-    ivf_pq_build_p.pq_dim                   = ivf_pq_build_conf.at("pq_dim");
-    ivf_pq_build_p.pq_bits                  = ivf_pq_build_conf.at("pq_bits");
-    ivf_pq_build_p.kmeans_trainset_fraction = 0.1;
-    ivf_pq_build_p.kmeans_n_iters           = ivf_pq_build_conf.at("kmeans_n_iters");
-    ivf_pq_build_p.n_lists                  = ivf_pq_build_conf.at("n_lists");
+
+    if (ivf_pq_build_conf.contains("nlist")) { ivf_pq_build_p.n_lists = ivf_pq_build_conf.at("nlist"); }
+    if (ivf_pq_build_conf.contains("niter")) { ivf_pq_build_p.kmeans_n_iters = ivf_pq_build_conf.at("niter"); }
+    if (ivf_pq_build_conf.contains("ratio")) {
+      ivf_pq_build_p.kmeans_trainset_fraction = 1.0 / (double)conf.at("ratio");
+    }
+    if (ivf_pq_build_conf.contains("pq_bits")) { ivf_pq_build_p.pq_bits = ivf_pq_build_conf.at("pq_bits"); }
+    if (ivf_pq_build_conf.contains("pq_dim")) { ivf_pq_build_p.pq_dim = ivf_pq_build_conf.at("pq_dim"); }
     param.ivf_pq_build_params = std::make_shared<faiss::gpu::IVFPQBuildCagraConfig>(ivf_pq_build_p);
   }
   nlohmann::json ivf_pq_search_conf = collect_conf_with_prefix(conf, "s_");
   if (!ivf_pq_search_conf.empty()) {
     faiss::gpu::IVFPQSearchCagraConfig ivf_pq_search_p;
-    ivf_pq_search_p.lut_dtype               = CUDA_R_8U;
-    ivf_pq_search_p.internal_distance_dtype = CUDA_R_32F;
-    ivf_pq_search_p.n_probes                = ivf_pq_search_conf.at("n_probes");
+    if (ivf_pq_search_conf.contains("nprobe")) { ivf_pq_search_p.n_probes = ivf_pq_search_conf.at("nprobe"); }
+    if (ivf_pq_search_conf.contains("internalDistanceDtype")) {
+      std::string type = ivf_pq_search_conf.at("internalDistanceDtype");
+      if (type == "float") {
+        ivf_pq_search_p.internal_distance_dtype = CUDA_R_32F;
+      } else if (type == "half") {
+        ivf_pq_search_p.internal_distance_dtype = CUDA_R_16F;
+      } else {
+        throw std::runtime_error("internalDistanceDtype: '" + type +
+                                 "', should be either 'float' or 'half'");
+      }
+    } else {
+      // set half as default type
+      ivf_pq_search_p.internal_distance_dtype = CUDA_R_16F;
+    }
+
+    if (ivf_pq_search_conf.contains("smemLutDtype")) {
+      std::string type = ivf_pq_search_conf.at("smemLutDtype");
+      if (type == "float") {
+        ivf_pq_search_p.lut_dtype = CUDA_R_32F;
+      } else if (type == "half") {
+        ivf_pq_search_p.lut_dtype = CUDA_R_16F;
+      } else if (type == "fp8") {
+        ivf_pq_search_p.lut_dtype = CUDA_R_8U;
+      } else {
+        throw std::runtime_error("smemLutDtype: '" + type +
+                                 "', should be either 'float', 'half' or 'fp8'");
+      }
+    } else {
+      // set half as default
+      ivf_pq_search_p.lut_dtype = CUDA_R_16F;
+    }
     param.ivf_pq_search_params =
       std::make_shared<faiss::gpu::IVFPQSearchCagraConfig>(ivf_pq_search_p);
   }
