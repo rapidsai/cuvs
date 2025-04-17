@@ -21,6 +21,28 @@
 namespace cuvs::neighbors::all_neighbors::detail {
 using namespace cuvs::neighbors;
 
+void check_metric(const index_params& params)
+{
+  if (std::holds_alternative<graph_build_params::nn_descent_params>(params.graph_build_params)) {
+    auto allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
+                           params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+                           params.metric == cuvs::distance::DistanceType::CosineExpanded ||
+                           params.metric == cuvs::distance::DistanceType::InnerProduct;
+    RAFT_EXPECTS(allowed_metrics,
+                 "Distance metric for all-neighbors build with NN Descent should be L2Expanded, "
+                 "L2SqrtExpanded, CosineExpanded or "
+                 "InnerProduct");
+  } else if (std::holds_alternative<graph_build_params::ivf_pq_params>(params.graph_build_params)) {
+    auto allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
+                           params.metric == cuvs::distance::DistanceType::InnerProduct;
+    RAFT_EXPECTS(allowed_metrics,
+                 "Distance metric for all-neighbors build with IVFPQ should be L2Expanded, or "
+                 "InnerProduct");
+  } else {
+    RAFT_FAIL("Invalid all-neighbors build algo");
+  }
+}
+
 // Supports both host and device datasets
 template <typename T, typename IdxT, typename Accessor>
 void single_build(const raft::resources& handle,
@@ -44,6 +66,8 @@ void build(const raft::resources& handle,
            const index_params& params,
            all_neighbors::index<IdxT, T>& index)
 {
+  check_metric(params);
+
   if (params.n_clusters == 1) {
     single_build(handle, dataset, params, index);
   } else {
@@ -71,6 +95,8 @@ void build(const raft::resources& handle,
            const index_params& params,
            all_neighbors::index<IdxT, T>& index)
 {
+  check_metric(params);
+
   if (params.n_clusters > 1) {
     RAFT_FAIL(
       "Batched all-neighbors build is not supported with data on device. Put data on host for "
@@ -88,6 +114,8 @@ all_neighbors::index<IdxT, T> build(
   const index_params& params,
   bool return_distances = false)  // distance type same as data type
 {
+  check_metric(params);
+
   if (params.n_clusters > 1) {
     RAFT_FAIL(
       "Batched all-neighbors build is not supported with data on device. Put data on host for "

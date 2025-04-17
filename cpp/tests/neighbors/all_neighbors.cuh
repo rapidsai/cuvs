@@ -38,6 +38,7 @@
 #include <raft/util/itertools.hpp>
 #include <rapids_logger/logger.hpp>
 #include <rmm/device_uvector.hpp>
+#include <tuple>
 #include <vector>
 
 namespace cuvs::neighbors::all_neighbors {
@@ -45,19 +46,20 @@ namespace cuvs::neighbors::all_neighbors {
 enum knn_build_algo { NN_DESCENT, IVF_PQ };
 
 struct AllNeighborsInputs {
-  knn_build_algo build_algo;
+  // knn_build_algo build_algo;
+  std::tuple<knn_build_algo, cuvs::distance::DistanceType> build_algo_metric;
   std::tuple<double, size_t, size_t> recall_cluster_nearestcluster;
   int n_rows;
   int dim;
   int k;
-  cuvs::distance::DistanceType metric;
+  // cuvs::distance::DistanceType metric;
   bool data_on_host;
 };
 
 inline ::std::ostream& operator<<(::std::ostream& os, const AllNeighborsInputs& p)
 {
-  os << "dataset shape=" << p.n_rows << "x" << p.dim << ", graph_degree=" << p.k
-     << ", metric=" << static_cast<int>(p.metric)
+  os << "dataset shape=" << p.n_rows << "x" << p.dim << ", k=" << p.k
+     << ", metric=" << static_cast<int>(std::get<1>(p.build_algo_metric))
      << ", clusters=" << std::get<1>(p.recall_cluster_nearestcluster)
      << ", num nearest clusters=" << std::get<2>(p.recall_cluster_nearestcluster) << std::endl;
   return os;
@@ -76,15 +78,17 @@ void get_graphs(raft::resources& handle,
   index_params params;
   params.n_clusters         = std::get<1>(ps.recall_cluster_nearestcluster);
   params.n_nearest_clusters = std::get<2>(ps.recall_cluster_nearestcluster);
-  params.metric             = ps.metric;
+  params.metric             = std::get<1>(ps.build_algo_metric);
 
-  if (ps.build_algo == NN_DESCENT) {
+  auto build_algo = std::get<0>(ps.build_algo_metric);
+
+  if (build_algo == NN_DESCENT) {
     auto nn_descent_params                      = graph_build_params::nn_descent_params{};
     nn_descent_params.max_iterations            = 100;
     nn_descent_params.graph_degree              = ps.k;
     nn_descent_params.intermediate_graph_degree = ps.k * 2;
     params.graph_build_params                   = nn_descent_params;
-  } else if (ps.build_algo == IVF_PQ) {
+  } else if (build_algo == IVF_PQ) {
     auto ivfq_build_params = graph_build_params::ivf_pq_params{};
     // heuristically good ivfpq n_lists
     ivfq_build_params.build_params.n_lists = std::max(
@@ -106,7 +110,7 @@ void get_graphs(raft::resources& handle,
                                       ps.n_rows,
                                       ps.dim,
                                       ps.k,
-                                      ps.metric);
+                                      std::get<1>(ps.build_algo_metric));
     raft::update_host(indices_bf.data(), indices_naive_dev.data(), queries_size, cuda_stream);
     raft::update_host(distances_bf.data(), distances_naive_dev.data(), queries_size, cuda_stream);
 
@@ -164,7 +168,7 @@ class AllNeighborsBatchTest : public ::testing::TestWithParam<AllNeighborsInputs
     std::vector<DistanceT> distances_allNN(queries_size);
     std::vector<DistanceT> distances_bf(queries_size);
     std::vector<IdxT> indices_bf(queries_size);
-    std::cout << "start running here\n";
+
     get_graphs(handle_,
                database,
                indices_bf,
@@ -260,18 +264,31 @@ class AllNeighborsSingleTest : public ::testing::TestWithParam<AllNeighborsInput
 
 const std::vector<AllNeighborsInputs> inputsSingle =
   raft::util::itertools::product<AllNeighborsInputs>(
-    {IVF_PQ, NN_DESCENT},
+    {
+      std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::L2Expanded),
+      std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::InnerProduct),
+      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded),
+      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded),
+      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded),
+      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::InnerProduct),
+    },
     {std::make_tuple(0.9, 1lu, 2lu)},  // min_recall, n_clusters, num_nearest_cluster
     {5000, 7151},                      // n_rows
     {64, 137},                         // dim
     {16, 23},                          // graph_degree
-    {cuvs::distance::DistanceType::L2Expanded},
-    {false, true}  // data on host
+    {false, true}                      // data on host
   );
 
 const std::vector<AllNeighborsInputs> inputsBatch =
   raft::util::itertools::product<AllNeighborsInputs>(
-    {IVF_PQ, NN_DESCENT},
+    {
+      std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::L2Expanded),
+      std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::InnerProduct),
+      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded),
+      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded),
+      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded),
+      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::InnerProduct),
+    },
     {
       std::make_tuple(0.9, 4lu, 2lu),
       std::make_tuple(0.9, 7lu, 2lu),
@@ -280,8 +297,7 @@ const std::vector<AllNeighborsInputs> inputsBatch =
     {5000, 7151},  // n_rows
     {64, 137},     // dim
     {16, 23},      // graph_degree
-    {cuvs::distance::DistanceType::L2Expanded},
-    {true}  // data on host
+    {true}         // data on host
   );
 
 }  // namespace cuvs::neighbors::all_neighbors

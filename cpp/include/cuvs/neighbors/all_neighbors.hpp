@@ -42,15 +42,15 @@ struct index : cuvs::neighbors::index {
    * The type of the knn graph is a dense raft::host_matrix and dimensions are (n_rows, k).
    *
    * @param res raft::resources is an object mangaging resources
-   * @param n_rows number of rows in knn-graph
-   * @param k number of nearest neighbors in knn-graph
-   * @param return_distances whether to return distances
+   * @param n_rows number of rows in knn graph
+   * @param k number of nearest neighbors in knn graph
+   * @param return_distances bool for whether to return distances
    */
   index(raft::resources const& res, int64_t n_rows, int64_t k, bool return_distances = false)
     : cuvs::neighbors::index(),
       res_{res},
       k_{k},
-      graph_{raft::make_host_matrix<IdxT, IdxT, raft::row_major>(n_rows, k)},
+      graph_{raft::make_host_matrix<IdxT, IdxT, row_major>(n_rows, k)},
       graph_view_{graph_.view()},
       return_distances_{return_distances}
   {
@@ -67,18 +67,18 @@ struct index : cuvs::neighbors::index {
    * The type of the knn graph is a dense raft::host_matrix and dimensions are (n_rows, k).
    *
    * @param res raft::resources is an object mangaging resources
-   * @param graph_view raft::host_matrix_view<IdxT, IdxT, raft::row_major> for storing knn-graph
-   * @param distances_view optional raft::device_matrix_view<DistT, IdxT, row_major> for storing
+   * @param graph_view raft::host_matrix_view<IdxT, IdxT> for storing knn graph
+   * @param distances_view optional raft::device_matrix_view<DistT, IdxT> for storing
    * distances
    */
   index(
     raft::resources const& res,
-    raft::host_matrix_view<IdxT, IdxT, raft::row_major> graph_view,
+    raft::host_matrix_view<IdxT, IdxT, row_major> graph_view,
     std::optional<raft::device_matrix_view<DistT, IdxT, row_major>> distances_view = std::nullopt)
     : cuvs::neighbors::index(),
       res_{res},
       k_{graph_view.extent(1)},
-      graph_{raft::make_host_matrix<IdxT, IdxT, raft::row_major>(0, 0)},
+      graph_{raft::make_host_matrix<IdxT, IdxT, row_major>(0, 0)},
       graph_view_{graph_view},
       distances_view_{distances_view},
       return_distances_{distances_view.has_value()}
@@ -90,7 +90,7 @@ struct index : cuvs::neighbors::index {
   int64_t k() { return k_; }
 
   /** neighborhood graph [size, k] */
-  [[nodiscard]] inline auto graph() noexcept -> raft::host_matrix_view<IdxT, IdxT, raft::row_major>
+  [[nodiscard]] inline auto graph() noexcept -> raft::host_matrix_view<IdxT, IdxT, row_major>
   {
     return graph_view_;
   }
@@ -113,9 +113,9 @@ struct index : cuvs::neighbors::index {
   raft::resources const& res_;
   int64_t k_;
   bool return_distances_;
-  raft::host_matrix<IdxT, IdxT, raft::row_major> graph_;
+  raft::host_matrix<IdxT, IdxT, row_major> graph_;
   std::optional<raft::device_matrix<DistT, IdxT, row_major>> distances_;
-  raft::host_matrix_view<IdxT, IdxT, raft::row_major> graph_view_;
+  raft::host_matrix_view<IdxT, IdxT, row_major> graph_view_;
   std::optional<raft::device_matrix_view<DistT, IdxT, row_major>> distances_view_;
 };
 
