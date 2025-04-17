@@ -575,10 +575,12 @@ index<T, IdxT> build(
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
   if (intermediate_degree >= static_cast<size_t>(dataset.extent(0))) {
-    RAFT_LOG_WARN(
-      "Intermediate graph degree cannot be larger than dataset size, reducing it to %lu",
-      dataset.extent(0));
+    // The maximum degree is dataset size - 1, since the node itself must not be included in its
+    // neighbor list.
     intermediate_degree = dataset.extent(0) - 1;
+    RAFT_LOG_WARN(
+      "Intermediate graph degree cannot be larger than dataset size - 1, reducing it to %lu",
+      intermediate_degree);
   }
   if (intermediate_degree < graph_degree) {
     RAFT_LOG_WARN(
