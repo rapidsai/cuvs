@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <mutex>
 #include <optional>
 #include <random>
 #include <string>
@@ -55,6 +56,9 @@ struct dataset {
   blob<DataT> query_set_;
   std::optional<blob<IdxT>> ground_truth_set_;
   std::optional<blob<bitset_carrier_type>> filter_bitset_;
+
+  // Protects the lazy mutations of the blobs accessed by multiple threads
+  mutable std::mutex mutex_;
 
   mutable bool base_set_accessed_  = false;
   mutable bool query_set_accessed_ = false;
@@ -98,6 +102,7 @@ struct dataset {
   [[nodiscard]] auto distance() const -> std::string { return distance_; }
   [[nodiscard]] auto dim() const -> int
   {
+    std::lock_guard<std::mutex> lock(mutex_);
     // If any of base/query set are already accessed, use those
     if (base_set_accessed_) { return static_cast<int>(base_set_.n_cols()); }
     if (query_set_accessed_) { return static_cast<int>(query_set_.n_cols()); }
@@ -115,28 +120,33 @@ struct dataset {
   }
   [[nodiscard]] auto max_k() const -> uint32_t
   {
+    std::lock_guard<std::mutex> lock(mutex_);
     if (ground_truth_set_.has_value()) { return ground_truth_set_->n_cols(); }
     return 0;
   }
   [[nodiscard]] auto base_set_size() const -> size_t
   {
+    std::lock_guard<std::mutex> lock(mutex_);
     base_set_accessed_ = true;
     return base_set_.n_rows();
   }
   [[nodiscard]] auto query_set_size() const -> size_t
   {
+    std::lock_guard<std::mutex> lock(mutex_);
     query_set_accessed_ = true;
     return query_set_.n_rows();
   }
 
   [[nodiscard]] auto gt_set() const -> const IdxT*
   {
+    std::lock_guard<std::mutex> lock(mutex_);
     if (ground_truth_set_.has_value()) { return ground_truth_set_->data(); }
     return nullptr;
   }
 
   [[nodiscard]] auto query_set() const -> const DataT*
   {
+    std::lock_guard<std::mutex> lock(mutex_);
     query_set_accessed_ = true;
     return query_set_.data();
   }
@@ -144,12 +154,14 @@ struct dataset {
                                HugePages request_hugepages_2mb = HugePages::kDisable) const
     -> const DataT*
   {
+    std::lock_guard<std::mutex> lock(mutex_);
     query_set_accessed_ = true;
     return query_set_.data(memory_type, request_hugepages_2mb);
   }
 
   [[nodiscard]] auto base_set() const -> const DataT*
   {
+    std::lock_guard<std::mutex> lock(mutex_);
     base_set_accessed_ = true;
     return base_set_.data();
   }
@@ -157,12 +169,14 @@ struct dataset {
                               HugePages request_hugepages_2mb = HugePages::kDisable) const
     -> const DataT*
   {
+    std::lock_guard<std::mutex> lock(mutex_);
     base_set_accessed_ = true;
     return base_set_.data(memory_type, request_hugepages_2mb);
   }
 
   [[nodiscard]] auto filter_bitset() const -> const bitset_carrier_type*
   {
+    std::lock_guard<std::mutex> lock(mutex_);
     if (filter_bitset_.has_value()) { return filter_bitset_->data(); }
     return nullptr;
   }
@@ -171,6 +185,7 @@ struct dataset {
                                    HugePages request_hugepages_2mb = HugePages::kDisable) const
     -> const bitset_carrier_type*
   {
+    std::lock_guard<std::mutex> lock(mutex_);
     if (filter_bitset_.has_value()) {
       return filter_bitset_->data(memory_type, request_hugepages_2mb);
     }
