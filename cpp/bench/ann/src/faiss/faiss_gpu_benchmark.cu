@@ -29,19 +29,19 @@
 
 namespace {
 nlohmann::json collect_conf_with_prefix(const nlohmann::json& conf,
-  const std::string& prefix,
-  bool remove_prefix = true)
+                                        const std::string& prefix,
+                                        bool remove_prefix = true)
 {
-nlohmann::json out;
-for (auto& i : conf.items()) {
-if (i.key().compare(0, prefix.size(), prefix) == 0) {
-auto new_key = remove_prefix ? i.key().substr(prefix.size()) : i.key();
-out[new_key] = i.value();
+  nlohmann::json out;
+  for (auto& i : conf.items()) {
+    if (i.key().compare(0, prefix.size(), prefix) == 0) {
+      auto new_key = remove_prefix ? i.key().substr(prefix.size()) : i.key();
+      out[new_key] = i.value();
+    }
+  }
+  return out;
 }
-}
-return out;
-}
-}
+}  // namespace
 
 namespace cuvs::bench {
 
@@ -125,19 +125,29 @@ void parse_build_param(const nlohmann::json& conf,
   if (!ivf_pq_build_conf.empty()) {
     faiss::gpu::IVFPQBuildCagraConfig ivf_pq_build_p;
 
-    if (ivf_pq_build_conf.contains("nlist")) { ivf_pq_build_p.n_lists = ivf_pq_build_conf.at("nlist"); }
-    if (ivf_pq_build_conf.contains("niter")) { ivf_pq_build_p.kmeans_n_iters = ivf_pq_build_conf.at("niter"); }
+    if (ivf_pq_build_conf.contains("nlist")) {
+      ivf_pq_build_p.n_lists = ivf_pq_build_conf.at("nlist");
+    }
+    if (ivf_pq_build_conf.contains("niter")) {
+      ivf_pq_build_p.kmeans_n_iters = ivf_pq_build_conf.at("niter");
+    }
     if (ivf_pq_build_conf.contains("ratio")) {
       ivf_pq_build_p.kmeans_trainset_fraction = 1.0 / (double)conf.at("ratio");
     }
-    if (ivf_pq_build_conf.contains("pq_bits")) { ivf_pq_build_p.pq_bits = ivf_pq_build_conf.at("pq_bits"); }
-    if (ivf_pq_build_conf.contains("pq_dim")) { ivf_pq_build_p.pq_dim = ivf_pq_build_conf.at("pq_dim"); }
+    if (ivf_pq_build_conf.contains("pq_bits")) {
+      ivf_pq_build_p.pq_bits = ivf_pq_build_conf.at("pq_bits");
+    }
+    if (ivf_pq_build_conf.contains("pq_dim")) {
+      ivf_pq_build_p.pq_dim = ivf_pq_build_conf.at("pq_dim");
+    }
     param.ivf_pq_build_params = std::make_shared<faiss::gpu::IVFPQBuildCagraConfig>(ivf_pq_build_p);
   }
   nlohmann::json ivf_pq_search_conf = collect_conf_with_prefix(conf, "s_");
   if (!ivf_pq_search_conf.empty()) {
     faiss::gpu::IVFPQSearchCagraConfig ivf_pq_search_p;
-    if (ivf_pq_search_conf.contains("nprobe")) { ivf_pq_search_p.n_probes = ivf_pq_search_conf.at("nprobe"); }
+    if (ivf_pq_search_conf.contains("nprobe")) {
+      ivf_pq_search_p.n_probes = ivf_pq_search_conf.at("nprobe");
+    }
     if (ivf_pq_search_conf.contains("internalDistanceDtype")) {
       std::string type = ivf_pq_search_conf.at("internalDistanceDtype");
       if (type == "float") {
