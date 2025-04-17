@@ -234,13 +234,14 @@ void single_linkage(raft::resources const& handle,
  * @param[out] out_delta distances of output
  * @param[out] out_size cluster sizes of output
  */
- template <typename value_idx = int64_t, typename value_t = float, typename nnz_t>
+ template <typename value_idx = int, typename value_t = float, typename nnz_t>
  void build_mutual_reachability_linkage(raft::resources const& handle,
                     const value_t* X,
                     size_t m,
                     size_t n,
                     cuvs::distance::DistanceType metric,
                     value_t* core_dists,
+                    value_idx* indptr,
                     raft::sparse::COO<value_t, value_idx, nnz_t>& mutual_reachability_coo,
                     value_idx* out_mst_src,
                     value_idx* out_mst_dst,
@@ -252,12 +253,12 @@ void single_linkage(raft::resources const& handle,
    /**
     * Construct MST sorted by weights
     */
-   rmm::device_uvector<value_idx> color(handle, m);
-   FixConnectivitiesMRRedOp<value_idx, value_t> red_op(core_dists, m);
+   auto color = raft::make_device_vector<value_idx, value_idx>(handle, static_cast<value_idx>(m));
+   FixConnectivitiesMRRedOp<value_idx, value_t> red_op(core_dists, static_cast<value_idx>(m));
    // during knn graph connection
 detail::build_sorted_mst(handle,
                         X,
-                        mutual_reachability_coo.indptr(),
+                        indptr,
                         mutual_reachability_coo.cols(),
                         mutual_reachability_coo.vals(),
                         m,

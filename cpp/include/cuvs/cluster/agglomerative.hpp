@@ -121,18 +121,17 @@ void single_linkage(
   std::optional<int> c                          = std::make_optional<int>(DEFAULT_CONST_C));
 
 void build_mutual_reachability_linkage(raft::resources const& handle,
-const float* X,
-                    size_t m,
-                    size_t n,
-                    cuvs::distance::DistanceType metric,
-                    float* core_dists,
-                    raft::sparse::COO<float, int>& mutual_reachability_coo,
-                    int* out_mst_src,
-                    int* out_mst_dst,
-                    float* out_mst_weights,
-                    int* out_children,
-                    float* out_deltas,
-                    int* out_sizes);
+raft::device_matrix_view<const float, int, raft::row_major> X,
+cuvs::distance::DistanceType metric,
+raft::device_vector_view<float, int> core_dists,
+raft::device_vector_view<int, int> indptr,
+raft::sparse::COO<float, int> mutual_reachability_coo,
+                    raft::device_vector_view<int, int> out_mst_src,
+                    raft::device_vector_view<int, int> out_mst_dst,
+                    raft::device_vector_view<float, int> out_mst_weights,
+                    raft::device_vector_view<int, int> out_children,
+                    raft::device_vector_view<float, int> out_deltas,
+                    raft::device_vector_view<int, int> out_sizes);
 /**
  * @}
  */

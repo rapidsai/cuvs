@@ -109,6 +109,7 @@ const value_t* X,
                     size_t n,
                     cuvs::distance::DistanceType metric,
                     value_t* core_dists,
+                    value_idx* indptr,
                     raft::sparse::COO<value_t, value_idx>& mutual_reachability_coo,
                     value_idx* out_mst_src,
                     value_idx* out_mst_dst,
@@ -124,6 +125,7 @@ const value_t* X,
                     n,
                     metric,
                     core_dists,
+                    indptr,
                     mutual_reachability_coo,
                     out_mst_src,
                     out_mst_dst,
@@ -131,5 +133,34 @@ const value_t* X,
                     out_children,
                     out_deltas,
                     out_sizes);
+}
+
+template <typename value_t, typename value_idx>
+void build_mutual_reachability_linkage(raft::resources const& handle,
+raft::device_matrix_view<const value_t, value_idx, raft::row_major> X,
+cuvs::distance::DistanceType metric,
+raft::device_vector_view<value_t, value_idx> core_dists,
+raft::sparse::COO<value_t, value_idx>& mutual_reachability_coo,
+                    raft::device_vector_view<value_idx, value_idx> out_mst_src,
+                    raft::device_vector_view<value_idx, value_idx> out_mst_dst,
+                    raft::device_vector_view<value_t, value_idx> out_mst_weights,
+                    raft::device_vector_view<value_idx, value_idx> out_children,
+                    raft::device_vector_view<value_t, value_idx> out_deltas,
+                    raft::device_vector_view<value_idx, value_idx> out_sizes)
+{
+build_mutual_reachability_linkage(
+                    handle,
+                    X.data_handle(),
+                    static_cast<size_t>(X.extent(0)),
+                    static_cast<size_t>(X.extent(1)),
+                    metric,
+                    core_dists.data_handle(),
+                    mutual_reachability_coo,
+                    out_mst_src.data_handle(),
+                    out_mst_dst.data_handle(),
+                    out_mst_weights.data_handle(),
+                    out_children.data_handle(),
+                    out_deltas.data_handle(),
+                    out_sizes.data_handle());
 }
 };  // namespace   cuvs::cluster::agglomerative
