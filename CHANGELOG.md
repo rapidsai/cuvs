@@ -1,4 +1,4 @@
-# cuvs 25.04.00 (9 Apr 2025)
+# cuvs 25.06.00 (9 Apr 2025)
 
 ## 🚨 Breaking Changes
 
@@ -43,14 +43,14 @@
 - Consolidate more Conda solves in CI ([#701](https://github.com/rapidsai/cuvs/pull/701)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
 - Require CMake 3.30.4 ([#691](https://github.com/rapidsai/cuvs/pull/691)) [@robertmaynard](https://github.com/robertmaynard)
 - Create Conda CI test env in one step ([#684](https://github.com/rapidsai/cuvs/pull/684)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
-- Use shared-workflows branch-25.04 ([#669](https://github.com/rapidsai/cuvs/pull/669)) [@bdice](https://github.com/bdice)
+- Use shared-workflows branch-25.06 ([#669](https://github.com/rapidsai/cuvs/pull/669)) [@bdice](https://github.com/bdice)
 - Add `shellcheck` to pre-commit and fix warnings ([#662](https://github.com/rapidsai/cuvs/pull/662)) [@gforsyth](https://github.com/gforsyth)
 - Add build_type input field for test.yaml ([#661](https://github.com/rapidsai/cuvs/pull/661)) [@gforsyth](https://github.com/gforsyth)
 - Use `rapids-pip-retry` in CI jobs that might need retries ([#648](https://github.com/rapidsai/cuvs/pull/648)) [@gforsyth](https://github.com/gforsyth)
 - Use new rapids-logger library ([#644](https://github.com/rapidsai/cuvs/pull/644)) [@vyasr](https://github.com/vyasr)
 - disallow fallback to Make in Python builds ([#636](https://github.com/rapidsai/cuvs/pull/636)) [@jameslamb](https://github.com/jameslamb)
 - Add `verify-codeowners` hook ([#633](https://github.com/rapidsai/cuvs/pull/633)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
-- Forward-merge branch-25.02 into branch-25.04 ([#632](https://github.com/rapidsai/cuvs/pull/632)) [@bdice](https://github.com/bdice)
+- Forward-merge branch-25.02 into branch-25.06 ([#632](https://github.com/rapidsai/cuvs/pull/632)) [@bdice](https://github.com/bdice)
 - Account for RAFT sparse types updates ([#629](https://github.com/rapidsai/cuvs/pull/629)) [@divyegala](https://github.com/divyegala)
 - Migrate to NVKS for amd64 CI runners ([#627](https://github.com/rapidsai/cuvs/pull/627)) [@bdice](https://github.com/bdice)
 
