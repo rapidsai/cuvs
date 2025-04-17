@@ -178,7 +178,6 @@ void faiss_cpu<T>::search(
   static_assert(sizeof(size_t) == sizeof(faiss::idx_t),
                 "sizes of size_t and faiss::idx_t are different");
 
-  // Use thread pool for batch size = 1. FAISS multi-threads internally for batch size > 1.
   index_->search(batch_size, queries, k, distances, reinterpret_cast<faiss::idx_t*>(neighbors));
 }
 

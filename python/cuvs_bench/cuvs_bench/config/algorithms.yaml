@@ -27,6 +27,7 @@ faiss_cpu_ivf_pq:
   requires_gpu: false
 faiss_cpu_hnsw_flat:
   executable: FAISS_CPU_HNSW_FLAT_ANN_BENCH
+  requires_gpu: false
 cuvs_ivf_flat:
   executable: CUVS_IVF_FLAT_ANN_BENCH
   requires_gpu: true
