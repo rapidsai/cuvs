@@ -46,13 +46,11 @@ namespace cuvs::neighbors::all_neighbors {
 enum knn_build_algo { NN_DESCENT, IVF_PQ };
 
 struct AllNeighborsInputs {
-  // knn_build_algo build_algo;
   std::tuple<knn_build_algo, cuvs::distance::DistanceType> build_algo_metric;
   std::tuple<double, size_t, size_t> recall_cluster_nearestcluster;
   int n_rows;
   int dim;
   int k;
-  // cuvs::distance::DistanceType metric;
   bool data_on_host;
 };
 
@@ -151,67 +149,9 @@ void get_graphs(raft::resources& handle,
 }
 
 template <typename DistanceT, typename DataT, typename IdxT = int64_t>
-class AllNeighborsBatchTest : public ::testing::TestWithParam<AllNeighborsInputs> {
+class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
  public:
-  AllNeighborsBatchTest()
-    : stream_(raft::resource::get_cuda_stream(handle_)),
-      clique_(raft::resource::get_nccl_clique(handle_)),
-      ps(::testing::TestWithParam<AllNeighborsInputs>::GetParam()),
-      database(0, stream_)
-  {
-  }
-
- protected:
-  void run()
-  {
-    size_t queries_size = static_cast<size_t>(ps.n_rows) * static_cast<size_t>(ps.k);
-
-    std::vector<IdxT> indices_allNN(queries_size);
-    std::vector<DistanceT> distances_allNN(queries_size);
-    std::vector<DistanceT> distances_bf(queries_size);
-    std::vector<IdxT> indices_bf(queries_size);
-
-    get_graphs(handle_,
-               database,
-               indices_bf,
-               distances_bf,
-               indices_allNN,
-               distances_allNN,
-               ps,
-               queries_size);
-
-    double min_recall = std::get<0>(ps.recall_cluster_nearestcluster);
-    EXPECT_TRUE(eval_recall(indices_bf, indices_allNN, ps.n_rows, ps.k, 0.01, min_recall, true));
-  }
-
-  void SetUp() override
-  {
-    database.resize(((size_t)ps.n_rows) * ps.dim, stream_);
-    auto database_view =
-      raft::make_device_matrix_view<float, IdxT>(database.data(), ps.n_rows, ps.dim);
-    auto labels = raft::make_device_vector<IdxT, IdxT>(handle_, ps.n_rows);
-    raft::random::make_blobs(handle_, database_view, labels.view());
-    raft::resource::sync_stream(handle_);
-  }
-
-  void TearDown() override
-  {
-    raft::resource::sync_stream(handle_);
-    database.resize(0, stream_);
-  }
-
- private:
-  raft::resources handle_;
-  rmm::cuda_stream_view stream_;
-  raft::comms::nccl_clique clique_;
-  AllNeighborsInputs ps;
-  rmm::device_uvector<DataT> database;
-};
-
-template <typename DistanceT, typename DataT, typename IdxT = int64_t>
-class AllNeighborsSingleTest : public ::testing::TestWithParam<AllNeighborsInputs> {
- public:
-  AllNeighborsSingleTest()
+  AllNeighborsTest()
     : stream_(raft::resource::get_cuda_stream(handle_)),
       ps(::testing::TestWithParam<AllNeighborsInputs>::GetParam()),
       database(0, stream_)

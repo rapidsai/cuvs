@@ -22,8 +22,8 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/refine.hpp>
 #include <raft/core/managed_mdarray.hpp>
-#include <raft/core/resource/nccl_clique.hpp>
 #include <raft/matrix/sample_rows.cuh>
+#include <raft/util/cudart_utils.hpp>
 #include <variant>
 
 namespace cuvs::neighbors::all_neighbors::detail {
@@ -259,18 +259,19 @@ void multi_gpu_batch_build(const raft::resources& handle,
   size_t num_rows = dataset.extent(0);
   size_t num_cols = dataset.extent(1);
 
-  const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle);
-  size_t clusters_per_rank               = params.n_clusters / clique.num_ranks_;
-  size_t rem = params.n_clusters - clusters_per_rank * clique.num_ranks_;
+  int num_ranks = 0;
+  cudaGetDeviceCount(&num_ranks);
+
+  size_t clusters_per_rank = params.n_clusters / num_ranks;
+  size_t rem               = params.n_clusters - clusters_per_rank * num_ranks;
 
   // For efficient CPU-computation of omp parallel for regions per GPU
   omp_set_nested(1);
 
-#pragma omp parallel for num_threads(clique.num_ranks_)
-  for (int rank = 0; rank < clique.num_ranks_; rank++) {
-    int dev_id                            = clique.device_ids_[rank];
-    const raft::device_resources& dev_res = clique.device_resources_[rank];
-    RAFT_CUDA_TRY(cudaSetDevice(dev_id));
+#pragma omp parallel for num_threads(num_ranks)
+  for (int rank = 0; rank < num_ranks; rank++) {
+    auto dev_res = raft::device_resources{};
+    RAFT_CUDA_TRY(cudaSetDevice(rank));
 
     std::unique_ptr<all_neighbors_builder<T, IdxT>> knn_builder = get_knn_builder<T, IdxT>(
       dev_res, params, static_cast<size_t>(index.k()), min_cluster_size, max_cluster_size, true);
@@ -365,9 +366,10 @@ void batch_build(const raft::resources& handle,
             global_distances.data_handle() + num_rows * index.k(),
             std::numeric_limits<float>::max());
 
-  const raft::comms::nccl_clique& clique = raft::resource::get_nccl_clique(handle);
+  int num_ranks = 0;
+  cudaGetDeviceCount(&num_ranks);
 
-  if (clique.num_ranks_ > 1) {
+  if (num_ranks > 1) {
     multi_gpu_batch_build(handle,
                           dataset,
                           global_neighbors.view(),

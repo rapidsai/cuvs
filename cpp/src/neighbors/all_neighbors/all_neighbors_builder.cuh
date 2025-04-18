@@ -93,6 +93,8 @@ struct all_neighbors_builder {
   {
   }
 
+  virtual ~all_neighbors_builder() = default;
+
   raft::resources const& res;
   size_t n_clusters, min_cluster_size, max_cluster_size, k;
   cuvs::distance::DistanceType metric;
@@ -346,8 +348,13 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
 
     size_t extended_graph_degree, graph_degree;
 
-    auto build_config = nn_descent::detail::get_build_config(
-      this->res, nnd_params, dataset, nnd_params.metric, extended_graph_degree, graph_degree);
+    auto build_config                = nn_descent::detail::get_build_config(this->res,
+                                                             nnd_params,
+                                                             this->max_cluster_size,
+                                                             static_cast<size_t>(dataset.extent(1)),
+                                                             nnd_params.metric,
+                                                             extended_graph_degree,
+                                                             graph_degree);
     build_config.output_graph_degree = this->k;
     nnd_builder.emplace(this->res, build_config);
     int_graph.emplace(raft::make_host_matrix<int, IdxT, row_major>(
