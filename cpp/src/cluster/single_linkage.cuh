@@ -102,6 +102,28 @@ void single_linkage(raft::resources const& handle,
                                             n_clusters);
 }
 
+/**
+ * Given a mutual reachability graph and core distances, constructs a linkage over it by computing
+ * the minimum spanning tree and dendrogram. Returns mst edges sorted by weight and the linkage.
+ * Cluster labels are hierarchical and not flattened.
+ * @tparam value_idx
+ * @tparam value_t
+ * @param[in] handle raft handle for resource reuse
+ * @param[in] X data points (size m * n)
+ * @param[in] m number of rows
+ * @param[in] n number of columns
+ * @param[in] metric distance metric to use
+ * @param[in] core_dists core distances (size m)
+ * @param[in] indptr CSR indices of mutual reachability knn graph (size m + 1)
+ * @param[out] mutual_reachability_coo (symmetrized) maximum reachability distance for the k nearest
+ *             neighbors
+ * @param[out] out_mst_src src vertex of MST edges (size m - 1)
+ * @param[out] out_mst_dst dst vertex of MST eges (size m - 1)
+ * @param[out] out_mst_weights weights of MST edges (size m - 1)
+ * @param[out] out_dst children of output
+ * @param[out] out_delta distances of output
+ * @param[out] out_size cluster sizes of output
+ */
 template <typename value_t, typename value_idx>
 void build_mutual_reachability_linkage(
   raft::resources const& handle,

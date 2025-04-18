@@ -15,7 +15,7 @@
  */
 
 #include "single_linkage.cuh"
-// #include <cuvs/cluster/agglomerative.hpp>
+#include <cuvs/cluster/agglomerative.hpp>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
