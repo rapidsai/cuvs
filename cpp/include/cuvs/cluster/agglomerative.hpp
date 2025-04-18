@@ -120,18 +120,20 @@ void single_linkage(
   cuvs::cluster::agglomerative::Linkage linkage = cuvs::cluster::agglomerative::Linkage::KNN_GRAPH,
   std::optional<int> c                          = std::make_optional<int>(DEFAULT_CONST_C));
 
-void build_mutual_reachability_linkage(raft::resources const& handle,
-raft::device_matrix_view<const float, int, raft::row_major> X,
-cuvs::distance::DistanceType metric,
-raft::device_vector_view<float, int> core_dists,
-raft::device_vector_view<int, int> indptr,
-raft::sparse::COO<float, int> mutual_reachability_coo,
-                    raft::device_vector_view<int, int> out_mst_src,
-                    raft::device_vector_view<int, int> out_mst_dst,
-                    raft::device_vector_view<float, int> out_mst_weights,
-                    raft::device_vector_view<int, int> out_children,
-                    raft::device_vector_view<float, int> out_deltas,
-                    raft::device_vector_view<int, int> out_sizes);
+template <typename value_idx, typename value_t, typename nnz_t>
+void build_mutual_reachability_linkage(
+  raft::resources const& handle,
+  raft::device_matrix_view<const value_t, value_idx, raft::row_major> X,
+  cuvs::distance::DistanceType metric,
+  raft::device_vector_view<value_t, value_idx> core_dists,
+  raft::device_vector_view<value_idx, value_idx> indptr,
+  raft::sparse::COO<value_t, value_idx> mutual_reachability_coo,
+  raft::device_vector_view<value_idx, value_idx> out_mst_src,
+  raft::device_vector_view<value_idx, value_idx> out_mst_dst,
+  raft::device_vector_view<value_t, value_idx> out_mst_weights,
+  raft::device_vector_view<value_idx, value_idx> out_children,
+  raft::device_vector_view<value_t, value_idx> out_deltas,
+  raft::device_vector_view<value_idx, value_idx> out_sizes);
 /**
  * @}
  */
