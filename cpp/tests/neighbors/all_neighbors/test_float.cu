@@ -27,7 +27,5 @@ INSTANTIATE_TEST_CASE_P(AllNeighborsSingleTest,
                         AllNeighborsTestF,
                         ::testing::ValuesIn(inputsSingle));
 
-INSTANTIATE_TEST_CASE_P(AllNeighborsBatchTest,
-                        AllNeighborsTestF,
-                        ::testing::ValuesIn(inputsSingle));
+INSTANTIATE_TEST_CASE_P(AllNeighborsBatchTest, AllNeighborsTestF, ::testing::ValuesIn(inputsBatch));
 }  // namespace cuvs::neighbors::all_neighbors
