@@ -54,17 +54,19 @@ void build_mutual_reachability_linkage(
   raft::device_vector_view<float, int> out_deltas,
   raft::device_vector_view<int, int> out_sizes)
 {
-  build_mutual_reachability_linkage(handle,
-                                    X,
-                                    metric,
-                                    core_dists,
-                                    indptr,
-                                    mutual_reachability_coo,
-                                    out_mst_src,
-                                    out_mst_dst,
-                                    out_mst_weights,
-                                    out_children,
-                                    out_deltas,
-                                    out_sizes);
+  build_mutual_reachability_linkage<float, int>(handle,
+                                                X.data_handle(),
+                                                static_cast<size_t>(X.extent(0)),
+                                                static_cast<size_t>(X.extent(1)),
+                                                metric,
+                                                core_dists.data_handle(),
+                                                indptr.data_handle(),
+                                                mutual_reachability_coo,
+                                                out_mst_src.data_handle(),
+                                                out_mst_dst.data_handle(),
+                                                out_mst_weights.data_handle(),
+                                                out_children.data_handle(),
+                                                out_deltas.data_handle(),
+                                                out_sizes.data_handle());
 }
 }  // namespace cuvs::cluster::agglomerative

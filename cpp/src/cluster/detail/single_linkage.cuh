@@ -275,6 +275,6 @@ void build_mutual_reachability_linkage(
    * Perform hierarchical labeling
    */
   detail::build_dendrogram_host(
-    handle, out_mst_src, out_mst_dst, out_mst_dst, m - 1, out_children, out_deltas, out_sizes);
+    handle, out_mst_src, out_mst_dst, out_mst_weights, m - 1, out_children, out_deltas, out_sizes);
 }
 };  // namespace  cuvs::cluster::agglomerative::detail
