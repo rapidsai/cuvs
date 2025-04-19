@@ -19,6 +19,7 @@ list(APPEND CMAKE_MODULE_PATH "${CUVS_SOURCE_DIR}")
 
 option(CUVS_PRIMS_BENCH_USE_FUSED_L2_NN "Include Fused L2 NN benchmark" ON)
 option(CUVS_PRIMS_BENCH_USE_CUBLAS_SAMPLE "Include cuBLAS sample benchmark" ON)
+option(CUVS_PRIMS_BENCH_USE_WMMA "Include WMMA sample benchmark" ON)
 
 # ##################################################################################################
 # * Process options ----------------------------------------------------------
@@ -117,6 +118,7 @@ endif()
 if(CUVS_PRIMS_BENCH_USE_FUSED_L2_NN)
   ConfigurePrimsBench(
     NAME FUSED_L2_NN PATH src/distance/fused_l2_nn.cu
+    LINKS CUDA::cublas
   )
 endif()
 
@@ -127,5 +129,10 @@ if(CUVS_PRIMS_BENCH_USE_CUBLAS_SAMPLE)
   )
 endif()
 
+if(CUVS_PRIMS_BENCH_USE_WMMA)
+  ConfigurePrimsBench(
+    NAME WMMA PATH src/distance/wmma.cu
+  )
+endif()
 message("CUDAToolkit_LIBRARY_DIR: ${CUDAToolkit_LIBRARY_DIR}")
 

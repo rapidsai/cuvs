@@ -3,20 +3,9 @@
  * @brief Sample code demonstrating cuBLAS GEMM (General Matrix Multiplication)
  */
 
-#include <iostream>
-#include <cuda_runtime.h>
 #include <cublas_v2.h>
-
-// Error checking macro
-#define CHECK_CUDA(call)                                                 \
-  do {                                                                   \
-    cudaError_t status = call;                                           \
-    if (status != cudaSuccess) {                                         \
-      std::cerr << "CUDA Error at line " << __LINE__ << ": "             \
-                << cudaGetErrorString(status) << std::endl;              \
-      return EXIT_FAILURE;                                               \
-    }                                                                    \
-  } while (0)
+#include <benchmark/benchmark.h>
+#include "common.cuh"
 
 #define CHECK_CUBLAS(call)                                               \
   do {                                                                   \
@@ -24,9 +13,10 @@
     if (status != CUBLAS_STATUS_SUCCESS) {                               \
       std::cerr << "cuBLAS Error at line " << __LINE__ << ": "           \
                 << status << std::endl;                                  \
-      return EXIT_FAILURE;                                               \
+      exit(EXIT_FAILURE);                                                \
     }                                                                    \
   } while (0)
+
 
 //
 // @brief Benchmark for matrix multiplication using cuBLAS
@@ -42,10 +32,13 @@ static void benchmark_cublasgemm(benchmark::State& state) {
   const size_t k = state.range(2);  // cols of A and rows of B
 
   // Host matrices
-  std::vector<DataT> h_A(m * k, 1.0f);  // Initialize with 1.0
-  std::vector<DataT> h_B(k * n, 1.0f);  // Initialize with 1.0
-  std::vector<DataT> h_C(m * n, 0.0f);  // Initialize with 0.0
+  std::vector<DataT> h_A(m * k, 0.0);  // Initialize with 0.0
+  std::vector<DataT> h_B(k * n, 0.0);  // Initialize with 0.0
+  std::vector<DataT> h_C(m * n, 0.0);  // Initialize with 0.0
 
+  PCG rng(1234, 0);
+  rng.fill_buffer(h_A.data(), m * k);
+  rng.fill_buffer(h_B.data(), k * n);
   // Device matrices
   DataT *d_A, *d_B, *d_C;
  
@@ -59,10 +52,20 @@ static void benchmark_cublasgemm(benchmark::State& state) {
   CHECK_CUDA(cudaMemcpy(d_B, h_B.data(), k * n * sizeof(DataT), cudaMemcpyHostToDevice));
   CHECK_CUDA(cudaMemcpy(d_C, h_C.data(), m * n * sizeof(DataT), cudaMemcpyHostToDevice));
 
+  cudaStream_t stream;
+  CHECK_CUDA(cudaStreamCreate(&stream));
+
   // Create cuBLAS handle
   cublasHandle_t handle;
   CHECK_CUBLAS(cublasCreate(&handle));
+  // Enable TF32 mode
+  //CHECK_CUBLAS(cublasSetMathMode(handle, CUBLAS_TF32_TENSOR_OP_MATH));
 
+  CHECK_CUBLAS(cublasSetStream(handle, stream));
+
+
+  // Create a CUDA event timer
+  CudaEventTimer timer(stream);
   // Set up scaling factors
   const DataT alpha = 1.0f;
   const DataT beta = 0.0f;
@@ -93,11 +96,11 @@ static void benchmark_cublasgemm(benchmark::State& state) {
   }
 
   // Synchronize before benchmarking
-  cudaDeviceSynchronize();
+  CHECK_CUDA(cudaStreamSynchronize(stream));
 
+    timer.start();
   // Benchmark loop
   for (auto _ : state) {
-    
     // Perform matrix multiplication: C = alpha*A*B + beta*C
     // Note: cuBLAS uses column-major ordering, but we're using row-major
     // So we compute B*A instead of A*B (i.e., we swap the order)
@@ -125,13 +128,19 @@ static void benchmark_cublasgemm(benchmark::State& state) {
       ));
     }
   }
-
+  timer.stop();  
   // Synchronize to make sure the kernel is done
-  cudaDeviceSynchronize();
+  CHECK_CUDA(cudaStreamSynchronize(stream));
   // Calculate and report stats
-  state.SetBytesProcessed(int64_t(state.iterations()) * 
-                         (m * k + k * n + m * n) * sizeof(DataT));
-  state.SetItemsProcessed(int64_t(state.iterations()) * m * n * k * 2); // 2 FLOPs per element
+  //state.SetBytesProcessed(int64_t(state.iterations()) * 
+   //                      (m * k + k * n + m * n) * sizeof(DataT));
+  //state.SetItemsProcessed(int64_t(state.iterations()) * m * n * k * 2); // 2 FLOPs per element
+     state.counters["M"] = m;
+     state.counters["N"] = n;
+     state.counters["K"] = k;
+     state.counters["iter_time"] =  timer.elapsed_seconds() / state.iterations();
+  state.counters["iter_time"] =  timer.elapsed_seconds() / state.iterations();
+  state.counters["FLOP/s"] = (m * n * k * 2 * int64_t(state.iterations())) / timer.elapsed_seconds();
 
   // Clean up
   CHECK_CUBLAS(cublasDestroy(handle));
@@ -143,12 +152,26 @@ static void benchmark_cublasgemm(benchmark::State& state) {
 template <typename IdxT>
 static void CustomArguments(benchmark::internal::Benchmark* b) {
 
-  std::vector<int64_t> m_list = {1, 100'000};
-  std::vector<int64_t> n_list = {8, 100'000};
-  std::vector<int64_t> k_list = {8, 128};
-  for (auto m : m_list) {
-    for (auto n : n_list) {
-      for (auto k : k_list) {
+  /*std::vector<int64_t> m_list = {1024, 2048, 4096, 8192, 16384};
+  std::vector<int64_t> n_list = {1024, 2048, 4096, 8192, 16384};
+  std::vector<int64_t> k_list = {8, 16, 32, 64, 128, 256, 512};
+  for (auto k : k_list) {
+    for (auto m : m_list) {
+      for (auto n : n_list) {
+        if (m > n) continue;
+        b->Args({m, n, k});
+        if (m != n) {
+          b->Args({n, m, k});
+        }
+      }
+    }
+  }*/
+  std::vector<int64_t> m_list = {6*1000};
+  std::vector<int64_t> n_list = {3*1000};
+  std::vector<int64_t> k_list = {3*1000};
+  for (auto k : k_list) {
+    for (auto m : m_list) {
+      for (auto n : n_list) {
         b->Args({m, n, k});
       }
     }
@@ -159,7 +182,14 @@ int main(int argc, char* argv[]) {
 
   benchmark::internal::Benchmark* bench;
 
-  bench = benchmark::RegisterBenchmark("cublas_gemm/float", benchmark_cublasgemm<float>);
+  //bench = benchmark::RegisterBenchmark("cublas_gemm/float", benchmark_cublasgemm<float>);
+  //bench->Apply(CustomArguments<int>);
+
+  bench = benchmark::RegisterBenchmark("cublas_gemm/double", benchmark_cublasgemm<double>);
   bench->Apply(CustomArguments<int>);
+  ::benchmark::Initialize(&argc, argv);
+  if (::benchmark::ReportUnrecognizedArguments(argc, argv)) return -1;
+  ::benchmark::RunSpecifiedBenchmarks();
+  ::benchmark::Shutdown();
   return 0;
 }
