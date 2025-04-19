@@ -31,16 +31,16 @@ import java.util.function.Consumer;
 /**
  * {@snippet lang = c :
  * struct cuvsCagraSearchParams {
- *     long max_queries;
- *     long itopk_size;
- *     long max_iterations;
+ *     size_t max_queries;
+ *     size_t itopk_size;
+ *     size_t max_iterations;
  *     enum cuvsCagraSearchAlgo algo;
- *     long team_size;
- *     long search_width;
- *     long min_iterations;
- *     long thread_block_size;
+ *     size_t team_size;
+ *     size_t search_width;
+ *     size_t min_iterations;
+ *     size_t thread_block_size;
  *     enum cuvsCagraHashMode hashmap_mode;
- *     long hashmap_min_bitlen;
+ *     size_t hashmap_min_bitlen;
  *     float hashmap_max_fill_rate;
  *     uint32_t num_random_samplings;
  *     uint64_t rand_xor_mask;
@@ -74,7 +74,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * long max_queries
+   * {@snippet lang = c : * size_t max_queries
    * }
    */
   public static final OfLong max_queries$layout() {
@@ -85,7 +85,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * long max_queries
+   * {@snippet lang = c : * size_t max_queries
    * }
    */
   public static final long max_queries$offset() {
@@ -94,7 +94,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * long max_queries
+   * {@snippet lang = c : * size_t max_queries
    * }
    */
   public static long max_queries(MemorySegment struct) {
@@ -103,7 +103,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * long max_queries
+   * {@snippet lang = c : * size_t max_queries
    * }
    */
   public static void max_queries(MemorySegment struct, long fieldValue) {
@@ -114,7 +114,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * long itopk_size
+   * {@snippet lang = c : * size_t itopk_size
    * }
    */
   public static final OfLong itopk_size$layout() {
@@ -125,7 +125,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * long itopk_size
+   * {@snippet lang = c : * size_t itopk_size
    * }
    */
   public static final long itopk_size$offset() {
@@ -134,7 +134,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * long itopk_size
+   * {@snippet lang = c : * size_t itopk_size
    * }
    */
   public static long itopk_size(MemorySegment struct) {
@@ -143,7 +143,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * long itopk_size
+   * {@snippet lang = c : * size_t itopk_size
    * }
    */
   public static void itopk_size(MemorySegment struct, long fieldValue) {
@@ -154,7 +154,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * long max_iterations
+   * {@snippet lang = c : * size_t max_iterations
    * }
    */
   public static final OfLong max_iterations$layout() {
@@ -165,7 +165,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * long max_iterations
+   * {@snippet lang = c : * size_t max_iterations
    * }
    */
   public static final long max_iterations$offset() {
@@ -174,7 +174,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * long max_iterations
+   * {@snippet lang = c : * size_t max_iterations
    * }
    */
   public static long max_iterations(MemorySegment struct) {
@@ -183,7 +183,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * long max_iterations
+   * {@snippet lang = c : * size_t max_iterations
    * }
    */
   public static void max_iterations(MemorySegment struct, long fieldValue) {
@@ -234,7 +234,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * long team_size
+   * {@snippet lang = c : * size_t team_size
    * }
    */
   public static final OfLong team_size$layout() {
@@ -245,7 +245,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * long team_size
+   * {@snippet lang = c : * size_t team_size
    * }
    */
   public static final long team_size$offset() {
@@ -254,7 +254,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * long team_size
+   * {@snippet lang = c : * size_t team_size
    * }
    */
   public static long team_size(MemorySegment struct) {
@@ -263,7 +263,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * long team_size
+   * {@snippet lang = c : * size_t team_size
    * }
    */
   public static void team_size(MemorySegment struct, long fieldValue) {
@@ -274,7 +274,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * long search_width
+   * {@snippet lang = c : * size_t search_width
    * }
    */
   public static final OfLong search_width$layout() {
@@ -285,7 +285,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * long search_width
+   * {@snippet lang = c : * size_t search_width
    * }
    */
   public static final long search_width$offset() {
@@ -294,7 +294,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * long search_width
+   * {@snippet lang = c : * size_t search_width
    * }
    */
   public static long search_width(MemorySegment struct) {
@@ -303,7 +303,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * long search_width
+   * {@snippet lang = c : * size_t search_width
    * }
    */
   public static void search_width(MemorySegment struct, long fieldValue) {
@@ -314,7 +314,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * long min_iterations
+   * {@snippet lang = c : * size_t min_iterations
    * }
    */
   public static final OfLong min_iterations$layout() {
@@ -325,7 +325,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * long min_iterations
+   * {@snippet lang = c : * size_t min_iterations
    * }
    */
   public static final long min_iterations$offset() {
@@ -334,7 +334,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * long min_iterations
+   * {@snippet lang = c : * size_t min_iterations
    * }
    */
   public static long min_iterations(MemorySegment struct) {
@@ -343,7 +343,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * long min_iterations
+   * {@snippet lang = c : * size_t min_iterations
    * }
    */
   public static void min_iterations(MemorySegment struct, long fieldValue) {
@@ -354,7 +354,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * long thread_block_size
+   * {@snippet lang = c : * size_t thread_block_size
    * }
    */
   public static final OfLong thread_block_size$layout() {
@@ -365,7 +365,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * long thread_block_size
+   * {@snippet lang = c : * size_t thread_block_size
    * }
    */
   public static final long thread_block_size$offset() {
@@ -374,7 +374,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * long thread_block_size
+   * {@snippet lang = c : * size_t thread_block_size
    * }
    */
   public static long thread_block_size(MemorySegment struct) {
@@ -383,7 +383,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * long thread_block_size
+   * {@snippet lang = c : * size_t thread_block_size
    * }
    */
   public static void thread_block_size(MemorySegment struct, long fieldValue) {
@@ -434,7 +434,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * long hashmap_min_bitlen
+   * {@snippet lang = c : * size_t hashmap_min_bitlen
    * }
    */
   public static final OfLong hashmap_min_bitlen$layout() {
@@ -445,7 +445,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * long hashmap_min_bitlen
+   * {@snippet lang = c : * size_t hashmap_min_bitlen
    * }
    */
   public static final long hashmap_min_bitlen$offset() {
@@ -454,7 +454,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * long hashmap_min_bitlen
+   * {@snippet lang = c : * size_t hashmap_min_bitlen
    * }
    */
   public static long hashmap_min_bitlen(MemorySegment struct) {
@@ -463,7 +463,7 @@ public class CuVSCagraSearchParams {
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * long hashmap_min_bitlen
+   * {@snippet lang = c : * size_t hashmap_min_bitlen
    * }
    */
   public static void hashmap_min_bitlen(MemorySegment struct, long fieldValue) {

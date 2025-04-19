@@ -28,20 +28,19 @@ import java.util.function.Consumer;
 
 /**
  * {@snippet lang = c :
- * struct {
- *     uint32_t major;
- *     uint32_t minor;
+ * struct cuvsCagraExtendParams {
+ *     uint32_t max_chunk_size;
  * }
  * }
  */
-public class DLPackVersion {
+public class CuVSCagraExtendParams {
 
-  DLPackVersion() {
+  CuVSCagraExtendParams() {
     // Should not be called directly
   }
 
-  private static final GroupLayout $LAYOUT = MemoryLayout
-      .structLayout(DlpackH.C_INT.withName("major"), DlpackH.C_INT.withName("minor")).withName("$anon$61:9");
+  private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(CagraH.C_INT.withName("max_chunk_size"))
+      .withName("cuvsCagraExtendParams");
 
   /**
    * The layout of this struct
@@ -50,84 +49,44 @@ public class DLPackVersion {
     return $LAYOUT;
   }
 
-  private static final OfInt major$LAYOUT = (OfInt) $LAYOUT.select(groupElement("major"));
+  private static final OfInt max_chunk_size$LAYOUT = (OfInt) $LAYOUT.select(groupElement("max_chunk_size"));
 
   /**
    * Layout for field:
-   * {@snippet lang = c : * uint32_t major
+   * {@snippet lang = c : * uint32_t max_chunk_size
    * }
    */
-  public static final OfInt major$layout() {
-    return major$LAYOUT;
+  public static final OfInt max_chunk_size$layout() {
+    return max_chunk_size$LAYOUT;
   }
 
-  private static final long major$OFFSET = 0;
+  private static final long max_chunk_size$OFFSET = 0;
 
   /**
    * Offset for field:
-   * {@snippet lang = c : * uint32_t major
+   * {@snippet lang = c : * uint32_t max_chunk_size
    * }
    */
-  public static final long major$offset() {
-    return major$OFFSET;
+  public static final long max_chunk_size$offset() {
+    return max_chunk_size$OFFSET;
   }
 
   /**
    * Getter for field:
-   * {@snippet lang = c : * uint32_t major
+   * {@snippet lang = c : * uint32_t max_chunk_size
    * }
    */
-  public static int major(MemorySegment struct) {
-    return struct.get(major$LAYOUT, major$OFFSET);
+  public static int max_chunk_size(MemorySegment struct) {
+    return struct.get(max_chunk_size$LAYOUT, max_chunk_size$OFFSET);
   }
 
   /**
    * Setter for field:
-   * {@snippet lang = c : * uint32_t major
+   * {@snippet lang = c : * uint32_t max_chunk_size
    * }
    */
-  public static void major(MemorySegment struct, int fieldValue) {
-    struct.set(major$LAYOUT, major$OFFSET, fieldValue);
-  }
-
-  private static final OfInt minor$LAYOUT = (OfInt) $LAYOUT.select(groupElement("minor"));
-
-  /**
-   * Layout for field:
-   * {@snippet lang = c : * uint32_t minor
-   * }
-   */
-  public static final OfInt minor$layout() {
-    return minor$LAYOUT;
-  }
-
-  private static final long minor$OFFSET = 4;
-
-  /**
-   * Offset for field:
-   * {@snippet lang = c : * uint32_t minor
-   * }
-   */
-  public static final long minor$offset() {
-    return minor$OFFSET;
-  }
-
-  /**
-   * Getter for field:
-   * {@snippet lang = c : * uint32_t minor
-   * }
-   */
-  public static int minor(MemorySegment struct) {
-    return struct.get(minor$LAYOUT, minor$OFFSET);
-  }
-
-  /**
-   * Setter for field:
-   * {@snippet lang = c : * uint32_t minor
-   * }
-   */
-  public static void minor(MemorySegment struct, int fieldValue) {
-    struct.set(minor$LAYOUT, minor$OFFSET, fieldValue);
+  public static void max_chunk_size(MemorySegment struct, int fieldValue) {
+    struct.set(max_chunk_size$LAYOUT, max_chunk_size$OFFSET, fieldValue);
   }
 
   /**

@@ -90,24 +90,34 @@ public class CagraH {
   public static final AddressLayout C_POINTER = ValueLayout.ADDRESS
       .withTargetLayout(MemoryLayout.sequenceLayout(java.lang.Long.MAX_VALUE, JAVA_BYTE));
   public static final ValueLayout.OfLong C_LONG = ValueLayout.JAVA_LONG;
-  private static final int DLPACK_VERSION = (int) 80L;
+  private static final int true_ = (int) 1L;
 
   /**
-   * {@snippet lang = c : * #define DLPACK_VERSION 80
+   * {@snippet lang = c : * #define true 1
    * }
    */
-  public static int DLPACK_VERSION() {
-    return DLPACK_VERSION;
+  public static int true_() {
+    return true_;
   }
 
-  private static final int DLPACK_ABI_VERSION = (int) 1L;
+  private static final int false_ = (int) 0L;
 
   /**
-   * {@snippet lang = c : * #define DLPACK_ABI_VERSION 1
+   * {@snippet lang = c : * #define false 0
    * }
    */
-  public static int DLPACK_ABI_VERSION() {
-    return DLPACK_ABI_VERSION;
+  public static int false_() {
+    return false_;
+  }
+
+  private static final int __bool_true_false_are_defined = (int) 1L;
+
+  /**
+   * {@snippet lang = c : * #define __bool_true_false_are_defined 1
+   * }
+   */
+  public static int __bool_true_false_are_defined() {
+    return __bool_true_false_are_defined;
   }
 
   private static final int _STDINT_H = (int) 1L;
@@ -640,244 +650,24 @@ public class CagraH {
     return _BITS_STDINT_UINTN_H;
   }
 
-  private static final int true_ = (int) 1L;
+  private static final int DLPACK_VERSION = (int) 80L;
 
   /**
-   * {@snippet lang = c : * #define true 1
+   * {@snippet lang = c : * #define DLPACK_VERSION 80
    * }
    */
-  public static int true_() {
-    return true_;
+  public static int DLPACK_VERSION() {
+    return DLPACK_VERSION;
   }
 
-  private static final int false_ = (int) 0L;
+  private static final int DLPACK_ABI_VERSION = (int) 1L;
 
   /**
-   * {@snippet lang = c : * #define false 0
+   * {@snippet lang = c : * #define DLPACK_ABI_VERSION 1
    * }
    */
-  public static int false_() {
-    return false_;
-  }
-
-  private static final int __bool_true_false_are_defined = (int) 1L;
-
-  /**
-   * {@snippet lang = c : * #define __bool_true_false_are_defined 1
-   * }
-   */
-  public static int __bool_true_false_are_defined() {
-    return __bool_true_false_are_defined;
-  }
-
-  private static final int L2Expanded = (int) 0L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.L2Expanded = 0
-   * }
-   */
-  public static int L2Expanded() {
-    return L2Expanded;
-  }
-
-  private static final int L2SqrtExpanded = (int) 1L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.L2SqrtExpanded = 1
-   * }
-   */
-  public static int L2SqrtExpanded() {
-    return L2SqrtExpanded;
-  }
-
-  private static final int CosineExpanded = (int) 2L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.CosineExpanded = 2
-   * }
-   */
-  public static int CosineExpanded() {
-    return CosineExpanded;
-  }
-
-  private static final int L1 = (int) 3L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.L1 = 3
-   * }
-   */
-  public static int L1() {
-    return L1;
-  }
-
-  private static final int L2Unexpanded = (int) 4L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.L2Unexpanded = 4
-   * }
-   */
-  public static int L2Unexpanded() {
-    return L2Unexpanded;
-  }
-
-  private static final int L2SqrtUnexpanded = (int) 5L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.L2SqrtUnexpanded = 5
-   * }
-   */
-  public static int L2SqrtUnexpanded() {
-    return L2SqrtUnexpanded;
-  }
-
-  private static final int InnerProduct = (int) 6L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.InnerProduct = 6
-   * }
-   */
-  public static int InnerProduct() {
-    return InnerProduct;
-  }
-
-  private static final int Linf = (int) 7L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.Linf = 7
-   * }
-   */
-  public static int Linf() {
-    return Linf;
-  }
-
-  private static final int Canberra = (int) 8L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.Canberra = 8
-   * }
-   */
-  public static int Canberra() {
-    return Canberra;
-  }
-
-  private static final int LpUnexpanded = (int) 9L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.LpUnexpanded = 9
-   * }
-   */
-  public static int LpUnexpanded() {
-    return LpUnexpanded;
-  }
-
-  private static final int CorrelationExpanded = (int) 10L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.CorrelationExpanded = 10
-   * }
-   */
-  public static int CorrelationExpanded() {
-    return CorrelationExpanded;
-  }
-
-  private static final int JaccardExpanded = (int) 11L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.JaccardExpanded = 11
-   * }
-   */
-  public static int JaccardExpanded() {
-    return JaccardExpanded;
-  }
-
-  private static final int HellingerExpanded = (int) 12L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.HellingerExpanded = 12
-   * }
-   */
-  public static int HellingerExpanded() {
-    return HellingerExpanded;
-  }
-
-  private static final int Haversine = (int) 13L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.Haversine = 13
-   * }
-   */
-  public static int Haversine() {
-    return Haversine;
-  }
-
-  private static final int BrayCurtis = (int) 14L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.BrayCurtis = 14
-   * }
-   */
-  public static int BrayCurtis() {
-    return BrayCurtis;
-  }
-
-  private static final int JensenShannon = (int) 15L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.JensenShannon = 15
-   * }
-   */
-  public static int JensenShannon() {
-    return JensenShannon;
-  }
-
-  private static final int HammingUnexpanded = (int) 16L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.HammingUnexpanded = 16
-   * }
-   */
-  public static int HammingUnexpanded() {
-    return HammingUnexpanded;
-  }
-
-  private static final int KLDivergence = (int) 17L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.KLDivergence = 17
-   * }
-   */
-  public static int KLDivergence() {
-    return KLDivergence;
-  }
-
-  private static final int RusselRaoExpanded = (int) 18L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.RusselRaoExpanded = 18
-   * }
-   */
-  public static int RusselRaoExpanded() {
-    return RusselRaoExpanded;
-  }
-
-  private static final int DiceExpanded = (int) 19L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.DiceExpanded = 19
-   * }
-   */
-  public static int DiceExpanded() {
-    return DiceExpanded;
-  }
-
-  private static final int Precomputed = (int) 100L;
-
-  /**
-   * {@snippet lang = c : * enum <anonymous>.Precomputed = 100
-   * }
-   */
-  public static int Precomputed() {
-    return Precomputed;
+  public static int DLPACK_ABI_VERSION() {
+    return DLPACK_ABI_VERSION;
   }
 
   /**
@@ -1330,6 +1120,241 @@ public class CagraH {
    * }
    */
   public static final OfLong uintmax_t = CagraH.C_LONG;
+  private static final int CUVS_ERROR = (int) 0L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.CUVS_ERROR = 0
+   * }
+   */
+  public static int CUVS_ERROR() {
+    return CUVS_ERROR;
+  }
+
+  private static final int CUVS_SUCCESS = (int) 1L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.CUVS_SUCCESS = 1
+   * }
+   */
+  public static int CUVS_SUCCESS() {
+    return CUVS_SUCCESS;
+  }
+
+  /**
+   * {@snippet lang = c : * typedef uintptr_t cuvsResources_t
+   * }
+   */
+  public static final OfLong cuvsResources_t = CagraH.C_LONG;
+  private static final int L2Expanded = (int) 0L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.L2Expanded = 0
+   * }
+   */
+  public static int L2Expanded() {
+    return L2Expanded;
+  }
+
+  private static final int L2SqrtExpanded = (int) 1L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.L2SqrtExpanded = 1
+   * }
+   */
+  public static int L2SqrtExpanded() {
+    return L2SqrtExpanded;
+  }
+
+  private static final int CosineExpanded = (int) 2L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.CosineExpanded = 2
+   * }
+   */
+  public static int CosineExpanded() {
+    return CosineExpanded;
+  }
+
+  private static final int L1 = (int) 3L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.L1 = 3
+   * }
+   */
+  public static int L1() {
+    return L1;
+  }
+
+  private static final int L2Unexpanded = (int) 4L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.L2Unexpanded = 4
+   * }
+   */
+  public static int L2Unexpanded() {
+    return L2Unexpanded;
+  }
+
+  private static final int L2SqrtUnexpanded = (int) 5L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.L2SqrtUnexpanded = 5
+   * }
+   */
+  public static int L2SqrtUnexpanded() {
+    return L2SqrtUnexpanded;
+  }
+
+  private static final int InnerProduct = (int) 6L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.InnerProduct = 6
+   * }
+   */
+  public static int InnerProduct() {
+    return InnerProduct;
+  }
+
+  private static final int Linf = (int) 7L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.Linf = 7
+   * }
+   */
+  public static int Linf() {
+    return Linf;
+  }
+
+  private static final int Canberra = (int) 8L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.Canberra = 8
+   * }
+   */
+  public static int Canberra() {
+    return Canberra;
+  }
+
+  private static final int LpUnexpanded = (int) 9L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.LpUnexpanded = 9
+   * }
+   */
+  public static int LpUnexpanded() {
+    return LpUnexpanded;
+  }
+
+  private static final int CorrelationExpanded = (int) 10L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.CorrelationExpanded = 10
+   * }
+   */
+  public static int CorrelationExpanded() {
+    return CorrelationExpanded;
+  }
+
+  private static final int JaccardExpanded = (int) 11L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.JaccardExpanded = 11
+   * }
+   */
+  public static int JaccardExpanded() {
+    return JaccardExpanded;
+  }
+
+  private static final int HellingerExpanded = (int) 12L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.HellingerExpanded = 12
+   * }
+   */
+  public static int HellingerExpanded() {
+    return HellingerExpanded;
+  }
+
+  private static final int Haversine = (int) 13L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.Haversine = 13
+   * }
+   */
+  public static int Haversine() {
+    return Haversine;
+  }
+
+  private static final int BrayCurtis = (int) 14L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.BrayCurtis = 14
+   * }
+   */
+  public static int BrayCurtis() {
+    return BrayCurtis;
+  }
+
+  private static final int JensenShannon = (int) 15L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.JensenShannon = 15
+   * }
+   */
+  public static int JensenShannon() {
+    return JensenShannon;
+  }
+
+  private static final int HammingUnexpanded = (int) 16L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.HammingUnexpanded = 16
+   * }
+   */
+  public static int HammingUnexpanded() {
+    return HammingUnexpanded;
+  }
+
+  private static final int KLDivergence = (int) 17L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.KLDivergence = 17
+   * }
+   */
+  public static int KLDivergence() {
+    return KLDivergence;
+  }
+
+  private static final int RusselRaoExpanded = (int) 18L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.RusselRaoExpanded = 18
+   * }
+   */
+  public static int RusselRaoExpanded() {
+    return RusselRaoExpanded;
+  }
+
+  private static final int DiceExpanded = (int) 19L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.DiceExpanded = 19
+   * }
+   */
+  public static int DiceExpanded() {
+    return DiceExpanded;
+  }
+
+  private static final int Precomputed = (int) 100L;
+
+  /**
+   * {@snippet lang = c : * enum <anonymous>.Precomputed = 100
+   * }
+   */
+  public static int Precomputed() {
+    return Precomputed;
+  }
+
   /**
    * {@snippet lang = c : * typedef long ptrdiff_t
    * }
@@ -1555,6 +1580,201 @@ public class CagraH {
     return kDLBool;
   }
 
+  private static final int PER_SUBSPACE = (int) 0L;
+
+  /**
+   * {@snippet lang = c : * enum codebook_gen.PER_SUBSPACE = 0
+   * }
+   */
+  public static int PER_SUBSPACE() {
+    return PER_SUBSPACE;
+  }
+
+  private static final int PER_CLUSTER = (int) 1L;
+
+  /**
+   * {@snippet lang = c : * enum codebook_gen.PER_CLUSTER = 1
+   * }
+   */
+  public static int PER_CLUSTER() {
+    return PER_CLUSTER;
+  }
+
+  private static final int CUDA_R_16F = (int) 2L;
+
+  /**
+   * {@snippet lang = c : * enum cudaDataType_t.CUDA_R_16F = 2
+   * }
+   */
+  public static int CUDA_R_16F() {
+    return CUDA_R_16F;
+  }
+
+  private static final int CUDA_C_16F = (int) 6L;
+
+  /**
+   * {@snippet lang = c : * enum cudaDataType_t.CUDA_C_16F = 6
+   * }
+   */
+  public static int CUDA_C_16F() {
+    return CUDA_C_16F;
+  }
+
+  private static final int CUDA_R_32F = (int) 0L;
+
+  /**
+   * {@snippet lang = c : * enum cudaDataType_t.CUDA_R_32F = 0
+   * }
+   */
+  public static int CUDA_R_32F() {
+    return CUDA_R_32F;
+  }
+
+  private static final int CUDA_C_32F = (int) 4L;
+
+  /**
+   * {@snippet lang = c : * enum cudaDataType_t.CUDA_C_32F = 4
+   * }
+   */
+  public static int CUDA_C_32F() {
+    return CUDA_C_32F;
+  }
+
+  private static final int CUDA_R_64F = (int) 1L;
+
+  /**
+   * {@snippet lang = c : * enum cudaDataType_t.CUDA_R_64F = 1
+   * }
+   */
+  public static int CUDA_R_64F() {
+    return CUDA_R_64F;
+  }
+
+  private static final int CUDA_C_64F = (int) 5L;
+
+  /**
+   * {@snippet lang = c : * enum cudaDataType_t.CUDA_C_64F = 5
+   * }
+   */
+  public static int CUDA_C_64F() {
+    return CUDA_C_64F;
+  }
+
+  private static final int CUDA_R_8I = (int) 3L;
+
+  /**
+   * {@snippet lang = c : * enum cudaDataType_t.CUDA_R_8I = 3
+   * }
+   */
+  public static int CUDA_R_8I() {
+    return CUDA_R_8I;
+  }
+
+  private static final int CUDA_C_8I = (int) 7L;
+
+  /**
+   * {@snippet lang = c : * enum cudaDataType_t.CUDA_C_8I = 7
+   * }
+   */
+  public static int CUDA_C_8I() {
+    return CUDA_C_8I;
+  }
+
+  private static final int CUDA_R_8U = (int) 8L;
+
+  /**
+   * {@snippet lang = c : * enum cudaDataType_t.CUDA_R_8U = 8
+   * }
+   */
+  public static int CUDA_R_8U() {
+    return CUDA_R_8U;
+  }
+
+  private static final int CUDA_C_8U = (int) 9L;
+
+  /**
+   * {@snippet lang = c : * enum cudaDataType_t.CUDA_C_8U = 9
+   * }
+   */
+  public static int CUDA_C_8U() {
+    return CUDA_C_8U;
+  }
+
+  private static final int CUDA_R_32I = (int) 10L;
+
+  /**
+   * {@snippet lang = c : * enum cudaDataType_t.CUDA_R_32I = 10
+   * }
+   */
+  public static int CUDA_R_32I() {
+    return CUDA_R_32I;
+  }
+
+  private static final int CUDA_C_32I = (int) 11L;
+
+  /**
+   * {@snippet lang = c : * enum cudaDataType_t.CUDA_C_32I = 11
+   * }
+   */
+  public static int CUDA_C_32I() {
+    return CUDA_C_32I;
+  }
+
+  private static final int CUDA_R_32U = (int) 12L;
+
+  /**
+   * {@snippet lang = c : * enum cudaDataType_t.CUDA_R_32U = 12
+   * }
+   */
+  public static int CUDA_R_32U() {
+    return CUDA_R_32U;
+  }
+
+  private static final int CUDA_C_32U = (int) 13L;
+
+  /**
+   * {@snippet lang = c : * enum cudaDataType_t.CUDA_C_32U = 13
+   * }
+   */
+  public static int CUDA_C_32U() {
+    return CUDA_C_32U;
+  }
+
+  /**
+   * {@snippet lang = c :
+   * typedef struct cuvsIvfPqIndexParams {
+   *     cuvsDistanceType metric;
+   *     float metric_arg;
+   *     bool add_data_on_build;
+   *     uint32_t n_lists;
+   *     uint32_t kmeans_n_iters;
+   *     double kmeans_trainset_fraction;
+   *     uint32_t pq_bits;
+   *     uint32_t pq_dim;
+   *     enum codebook_gen codebook_kind;
+   *     bool force_random_rotation;
+   *     bool conservative_memory_allocation;
+   *     uint32_t max_train_points_per_pq_code;
+   * } *cuvsIvfPqIndexParams_t
+   * }
+   */
+  public static final AddressLayout cuvsIvfPqIndexParams_t = CagraH.C_POINTER;
+  /**
+   * {@snippet lang = c :
+   * typedef struct cuvsIvfPqSearchParams {
+   *     uint32_t n_probes;
+   *     enum cudaDataType_t lut_dtype;
+   *     enum cudaDataType_t internal_distance_dtype;
+   *     double preferred_shmem_carveout;
+   * } *cuvsIvfPqSearchParams_t
+   * }
+   */
+  public static final AddressLayout cuvsIvfPqSearchParams_t = CagraH.C_POINTER;
+  /**
+   * {@snippet lang = c : * typedef cuvsIvfPqIndex *cuvsIvfPqIndex_t
+   * }
+   */
+  public static final AddressLayout cuvsIvfPqIndex_t = CagraH.C_POINTER;
   private static final int AUTO_SELECT = (int) 0L;
 
   /**
@@ -1585,6 +1805,17 @@ public class CagraH {
     return NN_DESCENT;
   }
 
+  private static final int ITERATIVE_CAGRA_SEARCH = (int) 3L;
+
+  /**
+   * {@snippet lang = c
+   * : * enum cuvsCagraGraphBuildAlgo.ITERATIVE_CAGRA_SEARCH = 3
+   * }
+   */
+  public static int ITERATIVE_CAGRA_SEARCH() {
+    return ITERATIVE_CAGRA_SEARCH;
+  }
+
   /**
    * {@snippet lang = c :
    * typedef struct cuvsCagraCompressionParams {
@@ -1600,17 +1831,36 @@ public class CagraH {
   public static final AddressLayout cuvsCagraCompressionParams_t = CagraH.C_POINTER;
   /**
    * {@snippet lang = c :
+   * typedef struct cuvsIvfPqParams {
+   *     cuvsIvfPqIndexParams_t ivf_pq_build_params;
+   *     cuvsIvfPqSearchParams_t ivf_pq_search_params;
+   *     float refinement_rate;
+   * } *cuvsIvfPqParams_t
+   * }
+   */
+  public static final AddressLayout cuvsIvfPqParams_t = CagraH.C_POINTER;
+  /**
+   * {@snippet lang = c :
    * typedef struct cuvsCagraIndexParams {
    *     cuvsDistanceType metric;
-   *     long intermediate_graph_degree;
-   *     long graph_degree;
+   *     size_t intermediate_graph_degree;
+   *     size_t graph_degree;
    *     enum cuvsCagraGraphBuildAlgo build_algo;
-   *     long nn_descent_niter;
+   *     size_t nn_descent_niter;
    *     cuvsCagraCompressionParams_t compression;
+   *     cuvsIvfPqParams_t graph_build_params;
    * } *cuvsCagraIndexParams_t
    * }
    */
   public static final AddressLayout cuvsCagraIndexParams_t = CagraH.C_POINTER;
+  /**
+   * {@snippet lang = c :
+   * typedef struct cuvsCagraExtendParams {
+   *     uint32_t max_chunk_size;
+   * } *cuvsCagraExtendParams_t
+   * }
+   */
+  public static final AddressLayout cuvsCagraExtendParams_t = CagraH.C_POINTER;
   private static final int SINGLE_CTA = (int) 0L;
 
   /**
@@ -1684,16 +1934,16 @@ public class CagraH {
   /**
    * {@snippet lang = c :
    * typedef struct cuvsCagraSearchParams {
-   *     long max_queries;
-   *     long itopk_size;
-   *     long max_iterations;
+   *     size_t max_queries;
+   *     size_t itopk_size;
+   *     size_t max_iterations;
    *     enum cuvsCagraSearchAlgo algo;
-   *     long team_size;
-   *     long search_width;
-   *     long min_iterations;
-   *     long thread_block_size;
+   *     size_t team_size;
+   *     size_t search_width;
+   *     size_t min_iterations;
+   *     size_t thread_block_size;
    *     enum cuvsCagraHashMode hashmap_mode;
-   *     long hashmap_min_bitlen;
+   *     size_t hashmap_min_bitlen;
    *     float hashmap_max_fill_rate;
    *     uint32_t num_random_samplings;
    *     uint64_t rand_xor_mask;

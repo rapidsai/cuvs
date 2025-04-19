@@ -16,6 +16,13 @@
 
 package com.nvidia.cuvs.internal.common;
 
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
+import static java.lang.foreign.ValueLayout.ADDRESS;
+
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemoryLayout;
@@ -25,19 +32,11 @@ import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
 
 import com.nvidia.cuvs.GPUInfo;
 import com.nvidia.cuvs.internal.panama.GpuInfo;
-
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
-import static java.lang.foreign.ValueLayout.ADDRESS;
 
 public class Util {
 

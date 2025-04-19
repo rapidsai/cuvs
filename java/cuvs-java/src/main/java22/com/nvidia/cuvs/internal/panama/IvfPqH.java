@@ -2289,8 +2289,8 @@ public class IvfPqH {
   }
 
   private static class cuvsIvfPqBuild {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfPqH.C_INT, IvfPqH.C_LONG,
-        IvfPqH.C_POINTER, IvfPqH.C_POINTER, IvfPqH.C_POINTER);
+    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfPqH.C_INT, IvfPqH.C_LONG, IvfPqH.C_POINTER,
+        IvfPqH.C_POINTER, IvfPqH.C_POINTER);
 
     public static final MemorySegment ADDR = IvfPqH.findOrThrow("cuvsIvfPqBuild");
 
@@ -2345,8 +2345,8 @@ public class IvfPqH {
   }
 
   private static class cuvsIvfPqSearch {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfPqH.C_INT, IvfPqH.C_LONG,
-        IvfPqH.C_POINTER, IvfPqH.C_POINTER, IvfPqH.C_POINTER, IvfPqH.C_POINTER, IvfPqH.C_POINTER);
+    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfPqH.C_INT, IvfPqH.C_LONG, IvfPqH.C_POINTER,
+        IvfPqH.C_POINTER, IvfPqH.C_POINTER, IvfPqH.C_POINTER, IvfPqH.C_POINTER);
 
     public static final MemorySegment ADDR = IvfPqH.findOrThrow("cuvsIvfPqSearch");
 
@@ -2402,8 +2402,8 @@ public class IvfPqH {
   }
 
   private static class cuvsIvfPqSerialize {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfPqH.C_INT, IvfPqH.C_LONG,
-        IvfPqH.C_POINTER, IvfPqH.C_POINTER);
+    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfPqH.C_INT, IvfPqH.C_LONG, IvfPqH.C_POINTER,
+        IvfPqH.C_POINTER);
 
     public static final MemorySegment ADDR = IvfPqH.findOrThrow("cuvsIvfPqSerialize");
 
@@ -2458,8 +2458,8 @@ public class IvfPqH {
   }
 
   private static class cuvsIvfPqDeserialize {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfPqH.C_INT, IvfPqH.C_LONG,
-        IvfPqH.C_POINTER, IvfPqH.C_POINTER);
+    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfPqH.C_INT, IvfPqH.C_LONG, IvfPqH.C_POINTER,
+        IvfPqH.C_POINTER);
 
     public static final MemorySegment ADDR = IvfPqH.findOrThrow("cuvsIvfPqDeserialize");
 
@@ -2514,8 +2514,8 @@ public class IvfPqH {
   }
 
   private static class cuvsIvfPqExtend {
-    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfPqH.C_INT, IvfPqH.C_LONG,
-        IvfPqH.C_POINTER, IvfPqH.C_POINTER, IvfPqH.C_POINTER);
+    public static final FunctionDescriptor DESC = FunctionDescriptor.of(IvfPqH.C_INT, IvfPqH.C_LONG, IvfPqH.C_POINTER,
+        IvfPqH.C_POINTER, IvfPqH.C_POINTER);
 
     public static final MemorySegment ADDR = IvfPqH.findOrThrow("cuvsIvfPqExtend");
 
