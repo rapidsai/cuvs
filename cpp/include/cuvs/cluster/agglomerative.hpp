@@ -21,6 +21,7 @@
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/sparse/coo.hpp>
 
 namespace cuvs::cluster::agglomerative {
 
@@ -119,6 +120,41 @@ void single_linkage(
   cuvs::cluster::agglomerative::Linkage linkage = cuvs::cluster::agglomerative::Linkage::KNN_GRAPH,
   std::optional<int> c                          = std::make_optional<int>(DEFAULT_CONST_C));
 
+/**
+ * Given a mutual reachability graph and core distances, constructs a linkage over it by computing
+ * the minimum spanning tree and dendrogram. Returns mst edges sorted by weight and the linkage.
+ * Cluster labels are hierarchical and not flattened.
+ * @tparam value_idx
+ * @tparam value_t
+ * @param[in] handle raft handle for resource reuse
+ * @param[in] X data points (size m * n)
+ * @param[in] m number of rows
+ * @param[in] n number of columns
+ * @param[in] metric distance metric to use
+ * @param[in] core_dists core distances (size m)
+ * @param[in] indptr CSR indices of mutual reachability knn graph (size m + 1)
+ * @param[out] mutual_reachability_coo (symmetrized) maximum reachability distance for the k nearest
+ *             neighbors
+ * @param[out] out_mst_src src vertex of MST edges (size m - 1)
+ * @param[out] out_mst_dst dst vertex of MST eges (size m - 1)
+ * @param[out] out_mst_weights weights of MST edges (size m - 1)
+ * @param[out] out_dst children of output
+ * @param[out] out_delta distances of output
+ * @param[out] out_size cluster sizes of output
+ */
+void build_mutual_reachability_linkage(
+  raft::resources const& handle,
+  raft::device_matrix_view<const float, int, raft::row_major> X,
+  cuvs::distance::DistanceType metric,
+  raft::device_vector_view<float, int> core_dists,
+  raft::device_vector_view<int, int> indptr,
+  raft::sparse::COO<float, int>& mutual_reachability_coo,
+  raft::device_vector_view<int, int> out_mst_src,
+  raft::device_vector_view<int, int> out_mst_dst,
+  raft::device_vector_view<float, int> out_mst_weights,
+  raft::device_matrix_view<int, int> out_children,
+  raft::device_vector_view<float, int> out_deltas,
+  raft::device_vector_view<int, int> out_sizes);
 /**
  * @}
  */
