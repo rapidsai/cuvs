@@ -50,7 +50,7 @@ void build_mutual_reachability_linkage(
   raft::device_vector_view<int, int> out_mst_src,
   raft::device_vector_view<int, int> out_mst_dst,
   raft::device_vector_view<float, int> out_mst_weights,
-  raft::device_vector_view<int, int> out_children,
+  raft::device_matrix_view<int, int> out_children,
   raft::device_vector_view<float, int> out_deltas,
   raft::device_vector_view<int, int> out_sizes)
 {
