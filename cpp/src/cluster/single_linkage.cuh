@@ -120,9 +120,9 @@ void single_linkage(raft::resources const& handle,
  * @param[out] out_mst_src src vertex of MST edges (size m - 1)
  * @param[out] out_mst_dst dst vertex of MST eges (size m - 1)
  * @param[out] out_mst_weights weights of MST edges (size m - 1)
- * @param[out] out_dst children of output
- * @param[out] out_delta distances of output
- * @param[out] out_size cluster sizes of output
+ * @param[out] out_children children of output
+ * @param[out] out_deltas distances of output
+ * @param[out] out_sizes cluster sizes of output
  */
 template <typename value_t, typename value_idx>
 void build_mutual_reachability_linkage(
