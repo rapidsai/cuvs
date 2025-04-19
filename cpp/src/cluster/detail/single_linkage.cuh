@@ -234,9 +234,9 @@ struct FixConnectivitiesMRRedOp {
  * @param[out] out_mst_src src vertex of MST edges (size m - 1)
  * @param[out] out_mst_dst dst vertex of MST eges (size m - 1)
  * @param[out] out_mst_weights weights of MST edges (size m - 1)
- * @param[out] out_dst children of output
- * @param[out] out_delta distances of output
- * @param[out] out_size cluster sizes of output
+ * @param[out] out_children children of output
+ * @param[out] out_deltas distances of output
+ * @param[out] out_sizes cluster sizes of output
  */
 template <typename value_idx = int, typename value_t = float, typename nnz_t>
 void build_mutual_reachability_linkage(
