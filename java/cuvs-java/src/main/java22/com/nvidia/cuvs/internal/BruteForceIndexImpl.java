@@ -170,7 +170,6 @@ public class BruteForceIndexImpl implements BruteForceIndex{
     long numQueries = cuvsQuery.getQueryVectors().length;
     long numBlocks = cuvsQuery.getTopK() * numQueries;
     int vectorDimension = numQueries > 0 ? cuvsQuery.getQueryVectors()[0].length : 0;
-    long numRows = dataset != null ? dataset.length : 0;
 
     SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_LONG);
     SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);

@@ -16,6 +16,13 @@
 
 package com.nvidia.cuvs.internal.common;
 
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
+import static java.lang.foreign.ValueLayout.ADDRESS;
+
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemoryLayout;
@@ -25,36 +32,29 @@ import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
 
 import com.nvidia.cuvs.GPUInfo;
 import com.nvidia.cuvs.internal.panama.GpuInfo;
 
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
-import static java.lang.foreign.ValueLayout.ADDRESS;
-
 public class Util {
 
   public static final int CUVS_SUCCESS = 1;
 
   private static final MethodHandle getGpuInfoMethodHandle = downcallHandle("get_gpu_info",
-          FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS));
+      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS));
 
   private static final MethodHandle getLastErrorTextMethodHandle = downcallHandle("cuvsGetLastErrorText",
-          FunctionDescriptor.of(ADDRESS));
+      FunctionDescriptor.of(ADDRESS));
 
-  private Util() {}
+  private Util() {
+  }
 
   /**
    * Checks the result value of a native method handle call.
    *
-   * @param value the return value
+   * @param value  the return value
    * @param caller the native method handle that was called
    */
   public static void checkError(int value, String caller) {
@@ -130,24 +130,24 @@ public class Util {
       for (int i = 0; i < numGPUs; i++) {
         VarHandle gpuIdVarHandle = ml.varHandle(PathElement.sequenceElement(i), PathElement.groupElement("gpu_id"));
         VarHandle freeMemoryVarHandle = ml.varHandle(PathElement.sequenceElement(i),
-                PathElement.groupElement("free_memory"));
+            PathElement.groupElement("free_memory"));
         VarHandle totalMemoryVarHandle = ml.varHandle(PathElement.sequenceElement(i),
-                PathElement.groupElement("total_memory"));
+            PathElement.groupElement("total_memory"));
         VarHandle ComputeCapabilityVarHandle = ml.varHandle(PathElement.sequenceElement(i),
-                PathElement.groupElement("compute_capability"));
+            PathElement.groupElement("compute_capability"));
         StringBuilder gpuName = new StringBuilder();
         char b = 1;
         int p = 0;
         while (b != 0x00) {
           VarHandle gpuNameVarHandle = ml.varHandle(PathElement.sequenceElement(i), PathElement.groupElement("name"),
-                  PathElement.sequenceElement(p++));
+              PathElement.sequenceElement(p++));
           b = (char) (byte) gpuNameVarHandle.get(GpuInfoArrayMemorySegment, 0L);
           gpuName.append(b);
         }
         results.add(new GPUInfo((int) gpuIdVarHandle.get(GpuInfoArrayMemorySegment, 0L), gpuName.toString().trim(),
-                (long) freeMemoryVarHandle.get(GpuInfoArrayMemorySegment, 0L),
-                (long) totalMemoryVarHandle.get(GpuInfoArrayMemorySegment, 0L),
-                (float) ComputeCapabilityVarHandle.get(GpuInfoArrayMemorySegment, 0L)));
+            (long) freeMemoryVarHandle.get(GpuInfoArrayMemorySegment, 0L),
+            (long) totalMemoryVarHandle.get(GpuInfoArrayMemorySegment, 0L),
+            (float) ComputeCapabilityVarHandle.get(GpuInfoArrayMemorySegment, 0L)));
       }
       return results;
     }
@@ -206,8 +206,7 @@ public class Util {
     MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout(rows * cols, C_FLOAT);
     MemorySegment dataMemorySegment = arena.allocate(dataMemoryLayout);
     for (int r = 0; r < rows; r++) {
-      MemorySegment.copy(data[r], 0, dataMemorySegment, C_FLOAT, (r * cols * C_FLOAT.byteSize()),
-          (int) cols);
+      MemorySegment.copy(data[r], 0, dataMemorySegment, C_FLOAT, (r * cols * C_FLOAT.byteSize()), (int) cols);
     }
     return dataMemorySegment;
   }
