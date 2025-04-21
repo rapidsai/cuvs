@@ -188,10 +188,12 @@ cdef class Index:
 
         cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
-        output = np.empty((self.num_rows, self.graph_degree), dtype='uint32')
+        output = np.empty((self.num_rows, self.graph_degree), dtype='float32')
         ai = wrap_array(output)
         cdef cydlpack.DLManagedTensor* output_dlpack = cydlpack.dlpack_c(ai)
-        check_cuvs(cuvsNNDescentIndexGetGraph(res, self.index, output_dlpack))
+        check_cuvs(cuvsNNDescentIndexGetDistances(res,
+                                                  self.index,
+                                                  output_dlpack))
         return output
 
     def __repr__(self):
