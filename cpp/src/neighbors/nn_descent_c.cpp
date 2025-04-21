@@ -87,7 +87,7 @@ void _get_graph(cuvsResources_t res, cuvsNNDescentIndex_t index, DLManagedTensor
 
     cudaMemcpyAsync(dst.data_handle(),
                     src.data_handle(),
-                    dst.extent(0) * dst.extent(1) * sizeof(float),
+                    dst.extent(0) * dst.extent(1) * sizeof(uint32_t),
                     cudaMemcpyDefault,
                     raft::resource::get_cuda_stream(*res_ptr));
   } else {
