@@ -36,7 +36,7 @@ import java.util.BitSet;
 import java.util.List;
 
 import com.nvidia.cuvs.GPUInfo;
-import com.nvidia.cuvs.internal.panama.GpuInfo;
+import com.nvidia.cuvs.internal.panama.gpuInfo;
 
 public class Util {
 
@@ -123,10 +123,10 @@ public class Util {
        * before the function is invoked as cudaGetDeviceCount is inside the
        * get_gpu_info function.
        */
-      MemorySegment GpuInfoArrayMemorySegment = GpuInfo.allocateArray(1024, localArena);
+      MemorySegment GpuInfoArrayMemorySegment = gpuInfo.allocateArray(1024, localArena);
       getGpuInfoMethodHandle.invokeExact(returnValueMemorySegment, numGpuMemorySegment, GpuInfoArrayMemorySegment);
       int numGPUs = numGpuMemorySegment.get(ValueLayout.JAVA_INT, 0);
-      MemoryLayout ml = MemoryLayout.sequenceLayout(numGPUs, GpuInfo.layout());
+      MemoryLayout ml = MemoryLayout.sequenceLayout(numGPUs, gpuInfo.layout());
       for (int i = 0; i < numGPUs; i++) {
         VarHandle gpuIdVarHandle = ml.varHandle(PathElement.sequenceElement(i), PathElement.groupElement("gpu_id"));
         VarHandle freeMemoryVarHandle = ml.varHandle(PathElement.sequenceElement(i),

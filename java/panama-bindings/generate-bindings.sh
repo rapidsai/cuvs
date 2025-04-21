@@ -35,26 +35,9 @@ for BINDING_FILE in ${GENERATED_PANAMA_BINDINGS_PATH}/*; do
   cat ${CURDIR}/license-header.txt $BINDING_FILE > temp && mv temp $BINDING_FILE
 done
 
-# Update/Add the panama binding classes in the panama java folder (if existing or not present)
+# Add the panama binding classes in the panama java folder
 for GENERATED_PANAMA_JAVA_FILE in ${GENERATED_PANAMA_BINDINGS_PATH}/*; do
-  CURR_FILENAME=$(basename $GENERATED_PANAMA_JAVA_FILE)
-  EXISTING_PANAMA_JAVA_FILE="${PANAMA_JAVA_FILES_PATH}/${CURR_FILENAME}"
-  sed -i '${/^$/d}' $GENERATED_PANAMA_JAVA_FILE # remove last blank line
-
-  if ! test -f $EXISTING_PANAMA_JAVA_FILE;
-  then
-    echo "[NEW] ${CURR_FILENAME}"
-    mv ${GENERATED_PANAMA_BINDINGS_PATH}/${CURR_FILENAME} $PANAMA_JAVA_FILES_PATH
-  else
-    if ! cmp --silent -- "$EXISTING_PANAMA_JAVA_FILE" "$GENERATED_PANAMA_JAVA_FILE";
-    then
-      echo "[UPDATE] ${CURR_FILENAME}"
-      truncate -s 0 $EXISTING_PANAMA_JAVA_FILE # remove current source from the file
-      cat $GENERATED_PANAMA_JAVA_FILE > $EXISTING_PANAMA_JAVA_FILE # put updated source
-    else
-      echo "[IGNORE] ${CURR_FILENAME} (already exists and not changed)"
-    fi
-  fi
+  mv $GENERATED_PANAMA_JAVA_FILE $PANAMA_JAVA_FILES_PATH
 done
 
 # Cleanup
