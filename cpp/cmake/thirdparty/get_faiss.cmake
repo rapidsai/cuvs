@@ -40,10 +40,14 @@ function(find_and_configure_faiss)
   endif()
 
   include(cmake/modules/FindAVX)
+  include(cmake/modules/FindSVE)
   # Link against AVX CPU lib if it exists
   set(CUVS_FAISS_OPT_LEVEL "generic")
   if(CXX_AVX2_FOUND)
     set(CUVS_FAISS_OPT_LEVEL "avx2")
+  endif()
+  if(CXX_SVE_FOUND AND CUVS_CPU_ONLY_FAISS_ENABLE_SVE)
+    set(CUVS_FAISS_OPT_LEVEL "sve")
   endif()
 
   rapids_cpm_find(faiss ${version} ${build_patch_only}
