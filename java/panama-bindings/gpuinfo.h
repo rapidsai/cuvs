@@ -14,10 +14,13 @@
  * limitations under the License.
  */
 
-// Please add the required header files below for which panama FFM API bindings are needed
-
-#include <cuvs/neighbors/cagra.h>
-#include <cuvs/neighbors/brute_force.h>
-#include <cuvs/neighbors/hnsw.h>
-#include <cuvs/neighbors/ivf_pq.h>
-#include "gpuinfo.h"
+/**
+ * @brief struct for containing gpu information
+ */
+typedef struct gpuInfo {
+    int gpu_id;
+    char name[256];
+    long free_memory;
+    long total_memory;
+    float compute_capability;
+} gpuInfo;

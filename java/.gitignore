@@ -14,5 +14,6 @@
 /internal/cmake/
 /internal/cmake_install.cmake
 /internal/cpm-package-lock.cmake
+/internal/Makefile
 # examples
 /examples/target/
