@@ -18,6 +18,7 @@ include(rapids-export)
 include(rapids-find)
 
 option(BUILD_CPU_ONLY "Build CPU only components. Applies to CUVS benchmarks currently" OFF)
+option(CUVS_CPU_ONLY_FAISS_ENABLE_SVE "Enable SVE support for CPU ONLY FAISS" OFF)
 
 # workaround for rapids_cuda_init_architectures not working for arch detection with
 # enable_language(CUDA)
