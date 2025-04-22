@@ -108,6 +108,8 @@ jobs:
       script: ci/build_wheel_libcuvs.sh
       # build for every combination of arch and CUDA version, but only for the latest Python
       matrix_filter: group_by([.ARCH, (.CUDA_VER|split(".")|map(tonumber)|.[0])]) | map(max_by(.PY_VER|split(".")|map(tonumber)))
+      package-type: cpp
+      wheel-name: libcuvs
   wheel-publish-libcuvs:
     needs: wheel-build-libcuvs
     secrets: inherit
@@ -129,6 +131,8 @@ jobs:
       sha: ${{ inputs.sha }}
       date: ${{ inputs.date }}
       script: ci/build_wheel_cuvs.sh
+      package-type: python
+      wheel-name: cuvs
   wheel-publish-cuvs:
     needs: wheel-build-cuvs
     secrets: inherit
