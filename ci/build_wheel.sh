@@ -36,7 +36,7 @@ if [[ "${package_dir}" != "python/libcuvs" ]]; then
 fi
 
 RAPIDS_CUDA_MAJOR="${RAPIDS_CUDA_VERSION%%.*}"
-if [[ ${RAPIDS_CUDA_MAJOR} == "12" ]]; then
+if [[ ${RAPIDS_CUDA_MAJOR} != "11" ]]; then
     EXCLUDE_ARGS+=(
       --exclude "libnccl.so.*"
     )
