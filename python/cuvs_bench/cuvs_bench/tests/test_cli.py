@@ -103,7 +103,6 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "time",
         "threads",
         "cpu_time",
-        "GPU",
     ]
 
     common_search_header = [
@@ -114,7 +113,6 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "latency",
         "threads",
         "cpu_time",
-        "GPU",
     ]
 
     # --- Verify that the expected result files exist and are not empty ---
