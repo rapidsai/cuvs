@@ -171,11 +171,29 @@ cuvsError_t cuvsNNDescentBuild(cuvsResources_t res,
 /**
  * @brief Get the KNN graph from a built NN-Descent index
  *
+ * @param[in] res cuvsResources_t opaque C handle
  * @param[in] index cuvsNNDescentIndex_t Built NN-Descent index
- * @param[inout] graph Optional preallocated graph on host memory to store output
+ * @param[out] graph Preallocated graph on host memory to store output
  * @return cuvsError_t
  */
-cuvsError_t cuvsNNDescentIndexGetGraph(cuvsNNDescentIndex_t index, DLManagedTensor* graph);
+cuvsError_t cuvsNNDescentIndexGetGraph(cuvsResources_t res,
+                                       cuvsNNDescentIndex_t index,
+                                       DLManagedTensor* graph);
+
+/**
+ * @brief Get the distances from a build NN_Descent index
+ *
+ * This requires that the `return_distances` parameter was set when building the
+ * graph
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] index cuvsNNDescentIndex_t Built NN-Descent index
+ * @param[out] distances Preallocated memory to store the output distances tensor
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsNNDescentIndexGetDistances(cuvsResources_t res,
+                                           cuvsNNDescentIndex_t index,
+                                           DLManagedTensor* distances);
 #ifdef __cplusplus
 }
 #endif
