@@ -21,7 +21,10 @@
 #include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/refine.hpp>
+#include <raft/core/device_mdarray.hpp>
+#include <raft/core/host_mdarray.hpp>
 #include <raft/core/managed_mdarray.hpp>
+#include <raft/core/resource/cuda_stream.hpp>
 #include <raft/matrix/sample_rows.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <variant>
@@ -63,11 +66,63 @@ void get_centroids_on_data_subsample(raft::resources const& res,
     res, kmeans_params, raft::make_const_mdspan(dataset_subsample_d.view()), centroids);
 }
 
+template <typename T, typename IdxT>
+void single_gpu_assign_clusters(
+  raft::resources const& res,
+  size_t n_nearest_clusters,
+  size_t n_clusters,
+  size_t n_rows_per_batch,
+  size_t base_row_offset,
+  raft::host_matrix_view<const T, IdxT, row_major> dataset,
+  raft::device_matrix_view<T, IdxT, raft::row_major> centroids,
+  cuvs::distance::DistanceType metric,
+  raft::host_matrix_view<IdxT, IdxT, raft::row_major> global_nearest_cluster)
+{
+  size_t num_rows = static_cast<size_t>(dataset.extent(0));
+  size_t num_cols = static_cast<size_t>(dataset.extent(1));
+
+  // number of batches for this GPU to process
+  size_t num_batches = n_clusters;
+
+  auto dataset_batch_d =
+    raft::make_device_matrix<T, IdxT, raft::row_major>(res, n_rows_per_batch, num_cols);
+
+  auto nearest_clusters_idx_d = raft::make_device_matrix<IdxT, int64_t, raft::row_major>(
+    res, n_rows_per_batch, n_nearest_clusters);
+  auto nearest_clusters_dist_d = raft::make_device_matrix<T, int64_t, raft::row_major>(
+    res, n_rows_per_batch, n_nearest_clusters);
+
+  std::optional<raft::device_vector_view<const T, int64_t>> norms_view;
+  cuvs::neighbors::brute_force::index<T> brute_force_index(res, centroids, norms_view, metric);
+
+  for (size_t i = 0; i < num_batches; i++) {
+    size_t row_offset              = n_rows_per_batch * i + base_row_offset;
+    size_t n_rows_of_current_batch = std::min(n_rows_per_batch, num_rows - row_offset);
+    std::cout << "[THREAD " << omp_get_thread_num() << "] Assigning cluster " << i + 1 << " / "
+              << num_batches << " row offset " << row_offset << std::endl;
+    raft::copy(dataset_batch_d.data_handle(),
+               dataset.data_handle() + row_offset * num_cols,
+               n_rows_of_current_batch * num_cols,
+               resource::get_cuda_stream(res));
+
+    // n_clusters is usually not large, so okay to do this brute-force
+    cuvs::neighbors::brute_force::search(res,
+                                         brute_force_index,
+                                         raft::make_const_mdspan(dataset_batch_d.view()),
+                                         nearest_clusters_idx_d.view(),
+                                         nearest_clusters_dist_d.view());
+    raft::copy(global_nearest_cluster.data_handle() + row_offset * n_nearest_clusters,
+               nearest_clusters_idx_d.data_handle(),
+               n_rows_of_current_batch * n_nearest_clusters,
+               resource::get_cuda_stream(res));
+  }
+}
+
 /**
- * Assign each data point to top num_nearest_clusters number of clusters. Loads the data in batches
+ * Assign each data point to top n_nearest_clusters number of clusters. Loads the data in batches
  * onto device for efficiency. Arguments:
  * - [in] res: raft resource
- * - [in] num_nearest_clusters: number of nearest clusters that each data is assigned to
+ * - [in] n_nearest_clusters: number of nearest clusters that each data is assigned to
  * - [in] n_clusters: total number of clusters
  * - [in] dataset [num_rows x num_cols]: entire dataset on host
  * - [in] centroids [n_clusters x num_cols] : centroid vectors
@@ -77,50 +132,105 @@ void get_centroids_on_data_subsample(raft::resources const& res,
  */
 template <typename T, typename IdxT>
 void assign_clusters(raft::resources const& res,
-                     size_t num_nearest_clusters,
+                     size_t n_nearest_clusters,
                      size_t n_clusters,
                      raft::host_matrix_view<const T, IdxT, row_major> dataset,
                      raft::device_matrix_view<T, IdxT, raft::row_major> centroids,
                      cuvs::distance::DistanceType metric,
                      raft::host_matrix_view<IdxT, IdxT, raft::row_major> global_nearest_cluster)
 {
-  size_t num_rows     = static_cast<size_t>(dataset.extent(0));
-  size_t num_cols     = static_cast<size_t>(dataset.extent(1));
-  auto centroids_view = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
-    centroids.data_handle(), n_clusters, num_cols);
-  size_t num_batches      = n_clusters;
-  size_t n_rows_per_batch = (num_rows + n_clusters) / n_clusters;
+  size_t num_rows = static_cast<size_t>(dataset.extent(0));
+  size_t num_cols = static_cast<size_t>(dataset.extent(1));
+  // // auto centroids_view = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
+  // //   centroids.data_handle(), n_clusters, num_cols);
+  // size_t num_batches      = n_clusters;
+  // size_t n_rows_per_batch = (num_rows + n_clusters) / n_clusters;
 
-  auto dataset_batch_d =
-    raft::make_device_matrix<T, IdxT, raft::row_major>(res, n_rows_per_batch, num_cols);
+  int num_ranks = 0;
+  cudaGetDeviceCount(&num_ranks);
 
-  auto nearest_clusters_idx_d = raft::make_device_matrix<IdxT, int64_t, raft::row_major>(
-    res, n_rows_per_batch, num_nearest_clusters);
-  auto nearest_clusters_dist_d = raft::make_device_matrix<T, int64_t, raft::row_major>(
-    res, n_rows_per_batch, num_nearest_clusters);
+  auto centroids_h = raft::make_host_matrix<T, IdxT>(n_clusters, num_cols);
+  raft::copy(centroids_h.data_handle(),
+             centroids.data_handle(),
+             n_clusters * num_cols,
+             raft::resource::get_cuda_stream(res));
 
-  for (size_t i = 0; i < num_batches; i++) {
-    size_t row_offset              = n_rows_per_batch * i;
-    size_t n_rows_of_current_batch = std::min(n_rows_per_batch, num_rows - row_offset);
-    raft::copy(dataset_batch_d.data_handle(),
-               dataset.data_handle() + row_offset * num_cols,
-               n_rows_of_current_batch * num_cols,
-               resource::get_cuda_stream(res));
-    std::optional<raft::device_vector_view<const T, int64_t>> norms_view;
-    cuvs::neighbors::brute_force::index<T> brute_force_index(
-      res, centroids_view, norms_view, metric);
+  if (num_ranks > 1) {
+    // multi-gpu assign clusters
+    size_t clusters_per_rank  = n_clusters / num_ranks;
+    size_t rem                = n_clusters - clusters_per_rank * num_ranks;
+    size_t n_rows_per_cluster = (num_rows + n_clusters - 1) / n_clusters;
 
-    // n_clusters is usually not large, so okay to do this brute-force
-    cuvs::neighbors::brute_force::search(res,
-                                         brute_force_index,
-                                         raft::make_const_mdspan(dataset_batch_d.view()),
-                                         nearest_clusters_idx_d.view(),
-                                         nearest_clusters_dist_d.view());
-    raft::copy(global_nearest_cluster.data_handle() + row_offset * num_nearest_clusters,
-               nearest_clusters_idx_d.data_handle(),
-               n_rows_of_current_batch * num_nearest_clusters,
-               resource::get_cuda_stream(res));
+#pragma omp parallel for num_threads(num_ranks)
+    for (int rank = 0; rank < num_ranks; rank++) {
+      auto dev_res = raft::device_resources{};
+      RAFT_CUDA_TRY(cudaSetDevice(rank));
+
+      auto centroids_matrix = raft::make_device_matrix<T, IdxT>(res, n_clusters, num_cols);
+      raft::copy(centroids_matrix.data_handle(),
+                 centroids_h.data_handle(),
+                 n_clusters * num_cols,
+                 raft::resource::get_cuda_stream(dev_res));
+
+      size_t base_cluster_idx = rank * clusters_per_rank + std::min((size_t)rank, rem);
+
+      size_t n_clusters_for_this_rank =
+        (size_t)rank < rem ? clusters_per_rank + 1 : clusters_per_rank;
+      size_t base_row_offset_for_this_rank = n_rows_per_cluster * base_cluster_idx;
+
+      single_gpu_assign_clusters(dev_res,
+                                 n_nearest_clusters,
+                                 n_clusters_for_this_rank,
+                                 n_rows_per_cluster,
+                                 base_row_offset_for_this_rank,
+                                 dataset,
+                                 centroids_matrix.view(),
+                                 metric,
+                                 global_nearest_cluster);
+    }
+  } else {
+    size_t n_rows_per_batch = (num_rows + n_clusters) / n_clusters;
+    single_gpu_assign_clusters(res,
+                               n_nearest_clusters,
+                               n_clusters,
+                               n_rows_per_batch,
+                               0,
+                               dataset,
+                               centroids,
+                               metric,
+                               global_nearest_cluster);
   }
+  // auto dataset_batch_d =
+  //   raft::make_device_matrix<T, IdxT, raft::row_major>(res, n_rows_per_batch, num_cols);
+
+  // auto nearest_clusters_idx_d = raft::make_device_matrix<IdxT, int64_t, raft::row_major>(
+  //   res, n_rows_per_batch, num_nearest_clusters);
+  // auto nearest_clusters_dist_d = raft::make_device_matrix<T, int64_t, raft::row_major>(
+  //   res, n_rows_per_batch, num_nearest_clusters);
+
+  // for (size_t i = 0; i < num_batches; i++) {
+  //   std::cout << "Assigning cluster " << i+1 << " / " << num_batches << std::endl;
+  //   size_t row_offset              = n_rows_per_batch * i;
+  //   size_t n_rows_of_current_batch = std::min(n_rows_per_batch, num_rows - row_offset);
+  //   raft::copy(dataset_batch_d.data_handle(),
+  //              dataset.data_handle() + row_offset * num_cols,
+  //              n_rows_of_current_batch * num_cols,
+  //              resource::get_cuda_stream(res));
+  //   std::optional<raft::device_vector_view<const T, int64_t>> norms_view;
+  //   cuvs::neighbors::brute_force::index<T> brute_force_index(
+  //     res, centroids.view(), norms_view, metric);
+
+  //   // n_clusters is usually not large, so okay to do this brute-force
+  //   cuvs::neighbors::brute_force::search(res,
+  //                                        brute_force_index,
+  //                                        raft::make_const_mdspan(dataset_batch_d.view()),
+  //                                        nearest_clusters_idx_d.view(),
+  //                                        nearest_clusters_dist_d.view());
+  //   raft::copy(global_nearest_cluster.data_handle() + row_offset * num_nearest_clusters,
+  //              nearest_clusters_idx_d.data_handle(),
+  //              n_rows_of_current_batch * num_nearest_clusters,
+  //              resource::get_cuda_stream(res));
+  // }
 }
 
 /**
@@ -150,8 +260,8 @@ void get_inverted_indices(raft::resources const& res,
                           raft::host_vector_view<IdxT, IdxT> cluster_offsets)
 {
   // build sparse inverted indices and get number of data points for each cluster
-  size_t num_rows             = global_nearest_cluster.extent(0);
-  size_t num_nearest_clusters = global_nearest_cluster.extent(1);
+  size_t num_rows           = global_nearest_cluster.extent(0);
+  size_t n_nearest_clusters = global_nearest_cluster.extent(1);
 
   auto local_offsets = raft::make_host_vector<IdxT>(n_clusters);
 
@@ -162,7 +272,7 @@ void get_inverted_indices(raft::resources const& res,
   std::fill(local_offsets.data_handle(), local_offsets.data_handle() + n_clusters, 0);
 
   for (size_t i = 0; i < num_rows; i++) {
-    for (size_t j = 0; j < num_nearest_clusters; j++) {
+    for (size_t j = 0; j < n_nearest_clusters; j++) {
       IdxT cluster_id = global_nearest_cluster(i, j);
       cluster_sizes(cluster_id) += 1;
     }
@@ -173,7 +283,7 @@ void get_inverted_indices(raft::resources const& res,
     cluster_offsets(i) = cluster_offsets(i - 1) + cluster_sizes(i - 1);
   }
   for (size_t i = 0; i < num_rows; i++) {
-    for (size_t j = 0; j < num_nearest_clusters; j++) {
+    for (size_t j = 0; j < n_nearest_clusters; j++) {
       IdxT cluster_id = global_nearest_cluster(i, j);
       inverted_indices(cluster_offsets(cluster_id) + local_offsets(cluster_id)) = i;
       local_offsets(cluster_id) += 1;
@@ -267,9 +377,6 @@ void multi_gpu_batch_build(const raft::resources& handle,
   size_t clusters_per_rank = params.n_clusters / num_ranks;
   size_t rem               = params.n_clusters - clusters_per_rank * num_ranks;
 
-  // For efficient CPU-computation of omp parallel for regions per GPU
-  omp_set_nested(1);
-
 #pragma omp parallel for num_threads(num_ranks)
   for (int rank = 0; rank < num_ranks; rank++) {
     auto dev_res = raft::device_resources{};
@@ -323,6 +430,13 @@ void batch_build(const raft::resources& handle,
                  const index_params& batch_params,
                  all_neighbors::index<IdxT, T>& index)
 {
+  int num_ranks = 0;
+  cudaGetDeviceCount(&num_ranks);
+  if (num_ranks > 1) {
+    // For efficient CPU-computation of omp parallel for regions per GPU
+    omp_set_nested(1);
+  }
+
   size_t num_rows = static_cast<size_t>(dataset.extent(0));
   size_t num_cols = static_cast<size_t>(dataset.extent(1));
 
@@ -332,10 +446,16 @@ void batch_build(const raft::resources& handle,
                "n_nearest_clusters should be smaller than n_clusters. Recommend starting from "
                "n_nearest_clusters=2 and gradually increase it for better knn graph recall.");
 
+  auto start     = raft::curTimeMillis();
   auto centroids = raft::make_device_matrix<T, IdxT>(handle, n_clusters, num_cols);
   get_centroids_on_data_subsample<T, IdxT>(handle, batch_params.metric, dataset, centroids.view());
+  auto end = raft::curTimeMillis();
+
+  std::cout << "done getting centroids on data subsample " << end - start << std::endl;
+  ;
 
   auto global_nearest_cluster = raft::make_host_matrix<IdxT, IdxT>(num_rows, n_nearest_clusters);
+  start                       = raft::curTimeMillis();
   assign_clusters<T, IdxT>(handle,
                            n_nearest_clusters,
                            n_clusters,
@@ -343,7 +463,11 @@ void batch_build(const raft::resources& handle,
                            centroids.view(),
                            batch_params.metric,
                            global_nearest_cluster.view());
+  end = raft::curTimeMillis();
+  std::cout << "done assigning clusters " << end - start << std::endl;
+  ;
 
+  start = raft::curTimeMillis();
   auto inverted_indices =
     raft::make_host_vector<IdxT, IdxT, raft::row_major>(num_rows * n_nearest_clusters);
   auto cluster_sizes   = raft::make_host_vector<IdxT, IdxT, raft::row_major>(n_clusters);
@@ -358,6 +482,9 @@ void batch_build(const raft::resources& handle,
                        inverted_indices.view(),
                        cluster_sizes.view(),
                        cluster_offsets.view());
+  end = raft::curTimeMillis();
+  std::cout << "done getting inverted indices " << end - start << std::endl;
+  ;
 
   auto global_neighbors = raft::make_managed_matrix<IdxT, IdxT>(handle, num_rows, index.k());
   auto global_distances = raft::make_managed_matrix<float, IdxT>(handle, num_rows, index.k());
@@ -367,9 +494,6 @@ void batch_build(const raft::resources& handle,
   std::fill(global_distances.data_handle(),
             global_distances.data_handle() + num_rows * index.k(),
             std::numeric_limits<float>::max());
-
-  int num_ranks = 0;
-  cudaGetDeviceCount(&num_ranks);
 
   if (num_ranks > 1) {
     multi_gpu_batch_build(handle,
