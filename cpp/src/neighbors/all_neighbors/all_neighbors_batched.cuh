@@ -141,10 +141,6 @@ void assign_clusters(raft::resources const& res,
 {
   size_t num_rows = static_cast<size_t>(dataset.extent(0));
   size_t num_cols = static_cast<size_t>(dataset.extent(1));
-  // // auto centroids_view = raft::make_device_matrix_view<const T, int64_t, raft::row_major>(
-  // //   centroids.data_handle(), n_clusters, num_cols);
-  // size_t num_batches      = n_clusters;
-  // size_t n_rows_per_batch = (num_rows + n_clusters) / n_clusters;
 
   int num_ranks = 0;
   cudaGetDeviceCount(&num_ranks);
@@ -200,37 +196,6 @@ void assign_clusters(raft::resources const& res,
                                metric,
                                global_nearest_cluster);
   }
-  // auto dataset_batch_d =
-  //   raft::make_device_matrix<T, IdxT, raft::row_major>(res, n_rows_per_batch, num_cols);
-
-  // auto nearest_clusters_idx_d = raft::make_device_matrix<IdxT, int64_t, raft::row_major>(
-  //   res, n_rows_per_batch, num_nearest_clusters);
-  // auto nearest_clusters_dist_d = raft::make_device_matrix<T, int64_t, raft::row_major>(
-  //   res, n_rows_per_batch, num_nearest_clusters);
-
-  // for (size_t i = 0; i < num_batches; i++) {
-  //   std::cout << "Assigning cluster " << i+1 << " / " << num_batches << std::endl;
-  //   size_t row_offset              = n_rows_per_batch * i;
-  //   size_t n_rows_of_current_batch = std::min(n_rows_per_batch, num_rows - row_offset);
-  //   raft::copy(dataset_batch_d.data_handle(),
-  //              dataset.data_handle() + row_offset * num_cols,
-  //              n_rows_of_current_batch * num_cols,
-  //              resource::get_cuda_stream(res));
-  //   std::optional<raft::device_vector_view<const T, int64_t>> norms_view;
-  //   cuvs::neighbors::brute_force::index<T> brute_force_index(
-  //     res, centroids.view(), norms_view, metric);
-
-  //   // n_clusters is usually not large, so okay to do this brute-force
-  //   cuvs::neighbors::brute_force::search(res,
-  //                                        brute_force_index,
-  //                                        raft::make_const_mdspan(dataset_batch_d.view()),
-  //                                        nearest_clusters_idx_d.view(),
-  //                                        nearest_clusters_dist_d.view());
-  //   raft::copy(global_nearest_cluster.data_handle() + row_offset * num_nearest_clusters,
-  //              nearest_clusters_idx_d.data_handle(),
-  //              n_rows_of_current_batch * num_nearest_clusters,
-  //              resource::get_cuda_stream(res));
-  // }
 }
 
 /**
