@@ -206,7 +206,8 @@ if(BUILD_TESTS)
 
   if(BUILD_MG_ALGOS)
     ConfigureTest(
-      NAME NEIGHBORS_MG_TEST PATH neighbors/mg/test_float.cu GPUS 1 PERCENT 100 ADDITIONAL_DEP nccl
+      NAME NEIGHBORS_MG_TEST PATH neighbors/mg/test_float.cu GPUS 1 PERCENT 100 ADDITIONAL_DEP
+      NCCL::NCCL
     )
   endif()
 
