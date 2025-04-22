@@ -98,8 +98,6 @@ void single_gpu_assign_clusters(
   for (size_t i = 0; i < num_batches; i++) {
     size_t row_offset              = n_rows_per_batch * i + base_row_offset;
     size_t n_rows_of_current_batch = std::min(n_rows_per_batch, num_rows - row_offset);
-    std::cout << "[THREAD " << omp_get_thread_num() << "] Assigning cluster " << i + 1 << " / "
-              << num_batches << " row offset " << row_offset << std::endl;
     raft::copy(dataset_batch_d.data_handle(),
                dataset.data_handle() + row_offset * num_cols,
                n_rows_of_current_batch * num_cols,
@@ -286,9 +284,7 @@ void single_gpu_batch_build(const raft::resources& handle,
 
   for (size_t cluster_id = 0; cluster_id < n_clusters; cluster_id++) {
     size_t num_data_in_cluster = cluster_sizes(cluster_id);
-    std::cout << "[THREAD " << omp_get_thread_num() << "] cluster " << cluster_id + 1 << " / "
-              << n_clusters << "(" << num_data_in_cluster << ")" << std::endl;
-    size_t offset = cluster_offsets(cluster_id);
+    size_t offset              = cluster_offsets(cluster_id);
     if (num_data_in_cluster < static_cast<size_t>(index.k())) {
       // for the unlikely event where clustering was done lopsidedly and this cluster has less than
       // k data
@@ -411,16 +407,10 @@ void batch_build(const raft::resources& handle,
                "n_nearest_clusters should be smaller than n_clusters. Recommend starting from "
                "n_nearest_clusters=2 and gradually increase it for better knn graph recall.");
 
-  auto start     = raft::curTimeMillis();
   auto centroids = raft::make_device_matrix<T, IdxT>(handle, n_clusters, num_cols);
   get_centroids_on_data_subsample<T, IdxT>(handle, batch_params.metric, dataset, centroids.view());
-  auto end = raft::curTimeMillis();
-
-  std::cout << "done getting centroids on data subsample " << end - start << std::endl;
-  ;
 
   auto global_nearest_cluster = raft::make_host_matrix<IdxT, IdxT>(num_rows, n_nearest_clusters);
-  start                       = raft::curTimeMillis();
   assign_clusters<T, IdxT>(handle,
                            n_nearest_clusters,
                            n_clusters,
@@ -428,11 +418,7 @@ void batch_build(const raft::resources& handle,
                            centroids.view(),
                            batch_params.metric,
                            global_nearest_cluster.view());
-  end = raft::curTimeMillis();
-  std::cout << "done assigning clusters " << end - start << std::endl;
-  ;
 
-  start = raft::curTimeMillis();
   auto inverted_indices =
     raft::make_host_vector<IdxT, IdxT, raft::row_major>(num_rows * n_nearest_clusters);
   auto cluster_sizes   = raft::make_host_vector<IdxT, IdxT, raft::row_major>(n_clusters);
@@ -447,9 +433,6 @@ void batch_build(const raft::resources& handle,
                        inverted_indices.view(),
                        cluster_sizes.view(),
                        cluster_offsets.view());
-  end = raft::curTimeMillis();
-  std::cout << "done getting inverted indices " << end - start << std::endl;
-  ;
 
   auto global_neighbors = raft::make_managed_matrix<IdxT, IdxT>(handle, num_rows, index.k());
   auto global_distances = raft::make_managed_matrix<float, IdxT>(handle, num_rows, index.k());
