@@ -17,6 +17,7 @@
 #pragma once
 
 #include "../detail/knn_merge_parts.cuh"
+#include <raft/comms/nccl_clique.hpp>
 #include <raft/core/resource/nccl_clique.hpp>
 #include <raft/core/serialize.hpp>
 #include <raft/linalg/add.cuh>
