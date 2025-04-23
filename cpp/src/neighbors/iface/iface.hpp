@@ -31,7 +31,7 @@ namespace cuvs::neighbors {
 using namespace raft;
 
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor>
-void build(const raft::device_resources& handle,
+void build(const raft::resources& handle,
            cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
            const cuvs::neighbors::index_params* index_params,
            raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> index_dataset)
@@ -56,7 +56,7 @@ void build(const raft::device_resources& handle,
 
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor1, typename Accessor2>
 void extend(
-  const raft::device_resources& handle,
+  const raft::resources& handle,
   cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
   raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor1> new_vectors,
   std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, Accessor2>>
@@ -79,7 +79,7 @@ void extend(
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void search(const raft::device_resources& handle,
+void search(const raft::resources& handle,
             const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
             const cuvs::neighbors::search_params* search_params,
             raft::device_matrix_view<const T, int64_t, row_major> queries,
@@ -115,7 +115,7 @@ void search(const raft::device_resources& handle,
 
 // for MG ANN only
 template <typename AnnIndexType, typename T, typename IdxT>
-void search(const raft::device_resources& handle,
+void search(const raft::resources& handle,
             const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
             const cuvs::neighbors::search_params* search_params,
             raft::host_matrix_view<const T, int64_t, row_major> h_queries,
@@ -137,7 +137,7 @@ void search(const raft::device_resources& handle,
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void serialize(const raft::device_resources& handle,
+void serialize(const raft::resources& handle,
                const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                std::ostream& os)
 {
@@ -150,10 +150,12 @@ void serialize(const raft::device_resources& handle,
   } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
     cagra::serialize(handle, os, interface.index_.value(), true);
   }
+
+  resource::sync_stream(handle);
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void deserialize(const raft::device_resources& handle,
+void deserialize(const raft::resources& handle,
                  cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                  std::istream& is)
 {
@@ -162,20 +164,23 @@ void deserialize(const raft::device_resources& handle,
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
     ivf_flat::index<T, IdxT> idx(handle);
     ivf_flat::deserialize(handle, is, &idx);
+    resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
     ivf_pq::index<IdxT> idx(handle);
     ivf_pq::deserialize(handle, is, &idx);
+    resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
     cagra::index<T, IdxT> idx(handle);
     cagra::deserialize(handle, is, &idx);
+    resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
   }
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void deserialize(const raft::device_resources& handle,
+void deserialize(const raft::resources& handle,
                  cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                  const std::string& filename)
 {
@@ -187,14 +192,17 @@ void deserialize(const raft::device_resources& handle,
   if constexpr (std::is_same<AnnIndexType, ivf_flat::index<T, IdxT>>::value) {
     ivf_flat::index<T, IdxT> idx(handle);
     ivf_flat::deserialize(handle, is, &idx);
+    resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
     ivf_pq::index<IdxT> idx(handle);
     ivf_pq::deserialize(handle, is, &idx);
+    resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, cagra::index<T, IdxT>>::value) {
     cagra::index<T, IdxT> idx(handle);
     cagra::deserialize(handle, is, &idx);
+    resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
   }
 

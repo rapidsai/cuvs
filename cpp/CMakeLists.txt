@@ -306,7 +306,6 @@ if(BUILD_SHARED_LIBS)
         src/neighbors/mg/mg_cagra_int8_t_uint32_t.cu
         src/neighbors/mg/mg_cagra_uint8_t_uint32_t.cu
         src/neighbors/mg/omp_checks.cpp
-        src/neighbors/mg/nccl_comm.cpp
     )
   endif()
 
@@ -610,6 +609,7 @@ if(BUILD_SHARED_LIBS)
   if(BUILD_MG_ALGOS)
     target_compile_definitions(cuvs PUBLIC CUVS_BUILD_MG_ALGOS)
     target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_MG_ALGOS)
+    target_compile_definitions(cuvs-cagra-search PUBLIC CUVS_BUILD_MG_ALGOS)
   endif()
 
   if(BUILD_CAGRA_HNSWLIB)
