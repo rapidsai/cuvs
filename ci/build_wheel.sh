@@ -35,6 +35,14 @@ if [[ "${package_dir}" != "python/libcuvs" ]]; then
     )
 fi
 
+RAPIDS_CUDA_MAJOR="${RAPIDS_CUDA_VERSION%%.*}"
+if [[ ${RAPIDS_CUDA_MAJOR} != "11" ]]; then
+    EXCLUDE_ARGS+=(
+      --exclude "libnccl.so.*"
+    )
+    export SKBUILD_CMAKE_ARGS="-DUSE_NCCL_RUNTIME_WHEEL=ON"
+fi
+
 rapids-logger "Building '${package_name}' wheel"
 
 sccache --zero-stats

@@ -88,7 +88,8 @@ cdef class IndexParams:
                  intermediate_graph_degree=None,
                  max_iterations=None,
                  termination_threshold=None,
-                 n_clusters=None
+                 n_clusters=None,
+                 return_distances=None
                  ):
         if metric is not None:
             self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
@@ -102,11 +103,8 @@ cdef class IndexParams:
             self.params.termination_threshold = termination_threshold
         if n_clusters is not None:
             self.params.n_clusters = n_clusters
-
-        # setting this parameter to true will cause an exception in the c++
-        # api (`Using return_distances set to true requires distance view to
-        # be allocated.`) - so instead force to be false here
-        self.params.return_distances = False
+        if return_distances is not None:
+            self.params.return_distances = return_distances
 
     @property
     def metric(self):
@@ -163,13 +161,39 @@ cdef class Index:
 
     @property
     def graph(self):
+        return self._get_graph()
+
+    @property
+    def distances(self):
+        return self._get_distances()
+
+    @auto_sync_resources
+    def _get_graph(self, resources=None):
         if not self.trained:
             raise ValueError("Index needs to be built before getting graph")
+
+        cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
         output = np.empty((self.num_rows, self.graph_degree), dtype='uint32')
         ai = wrap_array(output)
         cdef cydlpack.DLManagedTensor* output_dlpack = cydlpack.dlpack_c(ai)
-        check_cuvs(cuvsNNDescentIndexGetGraph(self.index, output_dlpack))
+        check_cuvs(cuvsNNDescentIndexGetGraph(res, self.index, output_dlpack))
+        return output
+
+    @auto_sync_resources
+    def _get_distances(self, resources=None):
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting"
+                             " distances")
+
+        cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+        output = np.empty((self.num_rows, self.graph_degree), dtype='float32')
+        ai = wrap_array(output)
+        cdef cydlpack.DLManagedTensor* output_dlpack = cydlpack.dlpack_c(ai)
+        check_cuvs(cuvsNNDescentIndexGetDistances(res,
+                                                  self.index,
+                                                  output_dlpack))
         return output
 
     def __repr__(self):
@@ -221,6 +245,16 @@ def build(IndexParams index_params, dataset, graph=None, resources=None):
 
     cdef cydlpack.DLManagedTensor* graph_dlpack = NULL
     if graph is not None:
+        if params.return_distances:
+            # When using a pre-existing graph - having return_distances set to
+            # true will cause an exception in the C++ api
+            # (`Using return_distances set to true requires distance view to
+            # be allocated.`). Raise a more informative error here instead of
+            # the C++ exception
+            raise ValueError("Can't use return_distances with an existing"
+                             " graph. Either set params.return_distances to"
+                             " False, or set graph to None")
+
         graph_ai = wrap_array(graph)
         graph_dlpack = cydlpack.dlpack_c(graph_ai)
 
