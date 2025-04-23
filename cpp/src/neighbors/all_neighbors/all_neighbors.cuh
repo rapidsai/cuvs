@@ -64,14 +64,11 @@ void build(const raft::resources& handle,
 {
   check_metric(params);
 
-  auto start = raft::curTimeMillis();
   if (params.n_clusters == 1) {
     single_build(handle, dataset, params, index);
   } else {
     batch_build(handle, dataset, params, index);
   }
-  auto end = raft::curTimeMillis();
-  std::cout << "knn graph building time: " << end - start << std::endl;
 }
 
 template <typename T, typename IdxT = int64_t>
@@ -82,12 +79,9 @@ all_neighbors::index<IdxT, T> build(
   const index_params& params,
   bool return_distances = false)  // distance type same as data type
 {
-  auto start = raft::curTimeMillis();
   all_neighbors::index<IdxT, T> index{
     handle, static_cast<int64_t>(dataset.extent(0)), k, return_distances};
   build(handle, dataset, params, index);
-  auto end = raft::curTimeMillis();
-  std::cout << "knn graph building time: " << end - start << std::endl;
   return index;
 }
 
@@ -104,10 +98,7 @@ void build(const raft::resources& handle,
       "Batched all-neighbors build is not supported with data on device. Put data on host for "
       "batch build.");
   } else {
-    auto start = raft::curTimeMillis();
     single_build(handle, dataset, params, index);
-    auto end = raft::curTimeMillis();
-    std::cout << "knn graph building time: " << end - start << std::endl;
   }
 }
 
@@ -126,12 +117,9 @@ all_neighbors::index<IdxT, T> build(
       "Batched all-neighbors build is not supported with data on device. Put data on host for "
       "batch build.");
   } else {
-    auto start = raft::curTimeMillis();
     all_neighbors::index<IdxT, T> index{
       handle, static_cast<int64_t>(dataset.extent(0)), k, return_distances};
     single_build(handle, dataset, params, index);
-    auto end = raft::curTimeMillis();
-    std::cout << "knn graph building time: " << end - start << std::endl;
     return index;
   }
 }
