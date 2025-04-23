@@ -579,7 +579,14 @@ if(BUILD_SHARED_LIBS)
     )
 
     if(BUILD_MG_ALGOS)
-      set(CUVS_COMMS_DEPENDENCY nccl)
+      rapids_find_generate_module(
+        NCCL
+        HEADER_NAMES nccl.h
+        LIBRARY_NAMES nccl
+      )
+      find_package(NCCL REQUIRED)
+      target_link_libraries(cuvs_objs PRIVATE NCCL::NCCL)
+      target_link_libraries(cuvs PRIVATE NCCL::NCCL)
     endif()
 
     # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
@@ -587,7 +594,7 @@ if(BUILD_SHARED_LIBS)
       cuvs
       PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              cuvs-cagra-search ${CUVS_COMMS_DEPENDENCY}
+              cuvs-cagra-search
     )
 
     if(NOT CUVS_COMPILE_DYNAMIC_ONLY)
