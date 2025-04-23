@@ -267,10 +267,10 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
 
   auto build_serialize()
   {
-    std::string filename = "ivf_pq_index";
-    cuvs::neighbors::ivf_pq::serialize(handle_, filename, build_only());
+    tmp_index_file index_file;
+    cuvs::neighbors::ivf_pq::serialize(handle_, index_file.filename, build_only());
     cuvs::neighbors::ivf_pq::index<IdxT> index(handle_);
-    cuvs::neighbors::ivf_pq::deserialize(handle_, filename, &index);
+    cuvs::neighbors::ivf_pq::deserialize(handle_, index_file.filename, &index);
     return index;
   }
 
