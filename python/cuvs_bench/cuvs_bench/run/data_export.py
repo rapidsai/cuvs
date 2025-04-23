@@ -208,7 +208,9 @@ def convert_json_to_csv_search(dataset, dataset_path):
             for name in df:
                 if name not in skip_search_cols:
                     # distinguish search label from build label
-                    write["search_label" if name == "label" else name] = df[name]
+                    write["search_label" if name == "label" else name] = df[
+                        name
+                    ]
             if os.path.exists(build_file):
                 build_df = pd.read_csv(build_file)
                 write_ncols = len(write.columns)
