@@ -202,8 +202,6 @@ void assign_clusters(raft::resources const& res,
  * - [in] res: raft resource
  * - [in] n_clusters: total number of clusters
  * - [in] k
- * - [out] max_cluster_size
- * - [out] min_cluster_size
  * - [in] global_nearest_cluster [num_rows X n_nearest_clusters] : top n_nearest_clusters closest
  * clusters for each data point
  * - [out] inverted_indices [num_rows x n_nearest_clusters sized vector] : vector for data indices
@@ -215,8 +213,6 @@ template <typename IdxT = int64_t>
 void get_inverted_indices(raft::resources const& res,
                           size_t n_clusters,
                           size_t k,
-                          size_t& max_cluster_size,
-                          size_t& min_cluster_size,
                           raft::host_matrix_view<IdxT, IdxT> global_nearest_cluster,
                           raft::host_vector_view<IdxT, IdxT> inverted_indices,
                           raft::host_vector_view<IdxT, IdxT> cluster_sizes,
@@ -227,9 +223,6 @@ void get_inverted_indices(raft::resources const& res,
   size_t n_nearest_clusters = global_nearest_cluster.extent(1);
 
   auto local_offsets = raft::make_host_vector<IdxT>(n_clusters);
-
-  max_cluster_size = 0;
-  min_cluster_size = std::numeric_limits<size_t>::max();
 
   std::fill(cluster_sizes.data_handle(), cluster_sizes.data_handle() + n_clusters, 0);
   std::fill(local_offsets.data_handle(), local_offsets.data_handle() + n_clusters, 0);
@@ -252,8 +245,19 @@ void get_inverted_indices(raft::resources const& res,
       local_offsets(cluster_id) += 1;
     }
   }
+}
 
-  max_cluster_size = static_cast<size_t>(
+template <typename IdxT = int64_t>
+void get_min_max_cluster_size(size_t k,
+                              size_t& max_cluster_size,
+                              size_t& min_cluster_size,
+                              raft::host_vector_view<IdxT, IdxT> cluster_sizes)
+{
+  max_cluster_size = 0;
+  min_cluster_size = std::numeric_limits<size_t>::max();
+
+  size_t n_clusters = cluster_sizes.extent(0);
+  max_cluster_size  = static_cast<size_t>(
     *std::max_element(cluster_sizes.data_handle(), cluster_sizes.data_handle() + n_clusters));
   min_cluster_size = static_cast<size_t>(*std::min_element(
     cluster_sizes.data_handle(), cluster_sizes.data_handle() + n_clusters, [k](size_t a, size_t b) {
@@ -321,8 +325,6 @@ void multi_gpu_batch_build(const raft::resources& handle,
                            raft::host_matrix_view<const T, IdxT, row_major> dataset,
                            raft::managed_matrix_view<IdxT, IdxT> global_neighbors,
                            raft::managed_matrix_view<T, IdxT> global_distances,
-                           size_t max_cluster_size,
-                           size_t min_cluster_size,
                            all_neighbors::index<IdxT, T>& index,
                            const index_params& params,
                            raft::host_vector_view<IdxT, IdxT, row_major> cluster_sizes,
@@ -342,9 +344,6 @@ void multi_gpu_batch_build(const raft::resources& handle,
   for (int rank = 0; rank < num_ranks; rank++) {
     auto dev_res = raft::device_resources{};
     RAFT_CUDA_TRY(cudaSetDevice(rank));
-
-    std::unique_ptr<all_neighbors_builder<T, IdxT>> knn_builder = get_knn_builder<T, IdxT>(
-      dev_res, params, static_cast<size_t>(index.k()), min_cluster_size, max_cluster_size, true);
 
     // This part is to distribute clusters across ranks as equally as possible
     // E.g. if we had 5 clusters and 3 ranks, instead of splitting into 1, 1, 3
@@ -370,6 +369,16 @@ void multi_gpu_batch_build(const raft::resources& handle,
       cluster_offsets.data_handle() + base_cluster_idx, num_clusters_for_this_rank);
     auto inverted_indices_for_this_rank = raft::make_host_vector_view<IdxT, IdxT>(
       inverted_indices.data_handle() + rank_offset, num_data_for_this_rank);
+
+    size_t max_cluster_size, min_cluster_size;
+    get_min_max_cluster_size(static_cast<size_t>(index.k()),
+                             max_cluster_size,
+                             min_cluster_size,
+                             cluster_sizes_for_this_rank);
+
+    std::unique_ptr<all_neighbors_builder<T, IdxT>> knn_builder = get_knn_builder<T, IdxT>(
+      dev_res, params, static_cast<size_t>(index.k()), min_cluster_size, max_cluster_size, true);
+
     single_gpu_batch_build(dev_res,
                            dataset,
                            *knn_builder,
@@ -423,12 +432,9 @@ void batch_build(const raft::resources& handle,
     raft::make_host_vector<IdxT, IdxT, raft::row_major>(num_rows * n_nearest_clusters);
   auto cluster_sizes   = raft::make_host_vector<IdxT, IdxT, raft::row_major>(n_clusters);
   auto cluster_offsets = raft::make_host_vector<IdxT, IdxT, raft::row_major>(n_clusters);
-  size_t max_cluster_size, min_cluster_size;
   get_inverted_indices(handle,
                        n_clusters,
                        index.k(),
-                       max_cluster_size,
-                       min_cluster_size,
                        global_nearest_cluster.view(),
                        inverted_indices.view(),
                        cluster_sizes.view(),
@@ -448,14 +454,15 @@ void batch_build(const raft::resources& handle,
                           dataset,
                           global_neighbors.view(),
                           global_distances.view(),
-                          max_cluster_size,
-                          min_cluster_size,
                           index,
                           batch_params,
                           cluster_sizes.view(),
                           cluster_offsets.view(),
                           inverted_indices.view());
   } else {
+    size_t max_cluster_size, min_cluster_size;
+    get_min_max_cluster_size(
+      static_cast<size_t>(index.k()), max_cluster_size, min_cluster_size, cluster_sizes.view());
     std::unique_ptr<all_neighbors_builder<T, IdxT>> knn_builder =
       get_knn_builder<T, IdxT>(handle,
                                batch_params,
