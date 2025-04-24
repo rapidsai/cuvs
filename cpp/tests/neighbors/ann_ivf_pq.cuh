@@ -283,9 +283,11 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     // the original data cannot be reconstructed since the dataset was normalized
     if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) { return; }
     auto& rec_list = index.lists()[label];
-    auto dim       = index.dim();
-    n_take         = std::min<uint32_t>(n_take, rec_list->size.load());
-    n_skip         = std::min<uint32_t>(n_skip, rec_list->size.load() - n_take);
+    // If the data is unbalanced the list might be empty, which is actually nullptr
+    if (!rec_list) { return; }
+    auto dim = index.dim();
+    n_take   = std::min<uint32_t>(n_take, rec_list->size.load());
+    n_skip   = std::min<uint32_t>(n_skip, rec_list->size.load() - n_take);
 
     if (n_take == 0) { return; }
 
