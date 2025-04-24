@@ -5,7 +5,7 @@
 
 INCLUDE(CheckCXXSourceRuns)
 
-SET(SVE_CODE
+set(SVE_CODE
     "
   #include <arm_sve.h>
 
@@ -19,15 +19,15 @@ SET(SVE_CODE
 
 # Check for SVE support
 message("Checking for SVE support")
-SET(CMAKE_REQUIRED_FLAGS "-march=armv9-a+sve")
-CHECK_CXX_SOURCE_RUNS("${SVE_CODE}" CXX_HAS_SVE)
+set(CMAKE_REQUIRED_FLAGS "-march=armv9-a+sve")
+check_cxx_source_runs("${SVE_CODE}" CXX_HAS_SVE)
 
-IF(CXX_HAS_SVE)
-  SET(CXX_SVE_FOUND TRUE CACHE BOOL "SVE support found")
-  SET(CXX_SVE_FLAGS "-march=armv9-a+sve" CACHE STRING "Flags for SVE support")
-ELSE()
-  SET(CXX_SVE_FOUND FALSE CACHE BOOL "SVE support not found")
-  SET(CXX_SVE_FLAGS "" CACHE STRING "Flags for SVE support")
-ENDIF()
+if(CXX_HAS_SVE)
+  set(CXX_SVE_FOUND TRUE CACHE BOOL "SVE support found")
+  set(CXX_SVE_FLAGS "-march=armv9-a+sve" CACHE STRING "Flags for SVE support")
+else()
+  set(CXX_SVE_FOUND FALSE CACHE BOOL "SVE support not found")
+  set(CXX_SVE_FLAGS "" CACHE STRING "Flags for SVE support")
+endif()
 
-MARK_AS_ADVANCED(CXX_SVE_FOUND CXX_SVE_FLAGS)
+mark_as_advanced(CXX_SVE_FOUND CXX_SVE_FLAGS)
