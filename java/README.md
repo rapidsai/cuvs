@@ -11,6 +11,7 @@ CuVS Java API provides a Java based simple, efficient, and a robust vector searc
 - [CuVS libraries](https://docs.rapids.ai/api/cuvs/stable/build/#build-from-source)
 - [maven 3.9.6 or above](https://maven.apache.org/download.cgi)
 - [JDK 22](https://openjdk.org/projects/jdk/22/)
+- [jextract for JDK 22](https://jdk.java.net/jextract/) (If not already installed, the build script downloads it)
 
 
 ## Building
