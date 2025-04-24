@@ -3,7 +3,7 @@
 echo "Starting Panama FFM API bindings generation ..."
 REPODIR=$(cd $(dirname $0); cd ../../ ; pwd)
 CURDIR=$(cd $(dirname $0); pwd)
-CUDA_HOME=$(which nvcc | cut -d/ -f-4)
+CUDA_HOME=$(which nvcc | cut -d/ -f-5)
 TARGET_PACKAGE="com.nvidia.cuvs.internal.panama"
 
 JEXTRACT_COMMAND="jextract"
@@ -21,7 +21,7 @@ fi
 # Use Jextract utility to generate panama bindings
 $JEXTRACT_COMMAND \
  --include-dir ${REPODIR}/cpp/build/_deps/dlpack-src/include/ \
- --include-dir ${CUDA_HOME}/include \
+ --include-dir ${CUDA_HOME}/targets/x86_64-linux/include \
  --include-dir ${REPODIR}/cpp/include \
  --output "${REPODIR}/java/cuvs-java/src/main/java22/" \
  --target-package ${TARGET_PACKAGE} \
