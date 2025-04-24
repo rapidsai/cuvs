@@ -13,6 +13,6 @@
 # limitations under the License.
 
 
-from .kmeans import KMeansParams, cluster_cost, fit
+from .kmeans import KMeansParams, cluster_cost, fit, predict
 
-__all__ = ["KMeansParams", "cluster_cost", "fit"]
+__all__ = ["KMeansParams", "cluster_cost", "fit", "predict"]

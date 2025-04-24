@@ -25,6 +25,11 @@
 extern "C" {
 #endif
 
+/**
+ * @defgroup kmeans_c_params k-means hyperparameters
+ * @{
+ */
+
 enum cuvsKMeansInitMethod {
   /**
    * Sample the centroids using the kmeans++ strategy
@@ -118,6 +123,15 @@ cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params);
 cuvsError_t cuvsKMeansParamsDestroy(cuvsKMeansParams_t params);
 
 /**
+ * @}
+ */
+
+/**
+ * @defgroup kmeans_c k-means clustering APIs
+ * @{
+ */
+
+/**
  * @brief Find clusters with k-means algorithm.
  *
  *   Initial centroids are chosen with k-means++ algorithm. Empty
@@ -194,6 +208,10 @@ cuvsError_t cuvsKMeansClusterCost(cuvsResources_t res,
                                   DLManagedTensor* X,
                                   DLManagedTensor* centroids,
                                   double* cost);
+/**
+ * @}
+ */
+
 #ifdef __cplusplus
 }
 #endif

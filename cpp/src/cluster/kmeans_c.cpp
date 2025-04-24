@@ -101,7 +101,6 @@ void _predict(cuvsResources_t res,
   if (cuvs::core::is_dlpack_device_compatible(X)) {
     using labels_mdspan_type = raft::device_vector_view<LabelsT, IdxT, raft::row_major>;
     using const_mdspan_type  = raft::device_matrix_view<T const, IdxT, raft::row_major>;
-    using mdspan_type        = raft::device_matrix_view<T, IdxT, raft::row_major>;
 
     std::optional<raft::device_vector_view<T const, IdxT>> sample_weight;
     if (sample_weight_tensor != NULL) {
@@ -113,7 +112,7 @@ void _predict(cuvsResources_t res,
                                    kmeans_params,
                                    cuvs::core::from_dlpack<const_mdspan_type>(X_tensor),
                                    sample_weight,
-                                   cuvs::core::from_dlpack<mdspan_type>(centroids_tensor),
+                                   cuvs::core::from_dlpack<const_mdspan_type>(centroids_tensor),
                                    cuvs::core::from_dlpack<labels_mdspan_type>(labels_tensor),
                                    normalize_weight,
                                    raft::make_host_scalar_view<T, IdxT>(&inertia_temp));

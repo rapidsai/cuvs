@@ -17,7 +17,7 @@ import numpy as np
 import pytest
 from pylibraft.common import device_ndarray
 
-from cuvs.cluster.kmeans import KMeansParams, cluster_cost, fit
+from cuvs.cluster.kmeans import KMeansParams, cluster_cost, fit, predict
 from cuvs.distance import pairwise_distance
 
 
@@ -41,6 +41,10 @@ def test_kmeans_fit(n_rows, n_cols, n_clusters, dtype):
     assert inertia < original_inertia
     assert n_iter >= 1
     assert np.allclose(cluster_cost(X, centroids), inertia, rtol=1e-6)
+
+    # make sure the prediction for each centroid is the centroid itself
+    labels, inertia = predict(params, centroids, centroids)
+    assert np.all(labels.copy_to_host() == np.arange(labels.shape[0]))
 
 
 @pytest.mark.parametrize("n_rows", [100])

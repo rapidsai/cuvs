@@ -209,6 +209,100 @@ def fit(
     return FitOutput(centroids, inertia, n_iter)
 
 
+PredictOutput = namedtuple("PredictOutput", "labels inertia")
+
+
+@auto_sync_resources
+@auto_convert_output
+def predict(
+    KMeansParams params, X, centroids, sample_weights=None, labels=None,
+    normalize_weight=True, resources=None
+):
+    """
+    Predict clusters with the k-means algorithm
+
+    Parameters
+    ----------
+
+    params : KMeansParams
+        Parameters to used in fitting KMeans model
+    X : Input CUDA array interface compliant matrix shape (m, k)
+    centroids : CUDA array interface compliant matrix, calculated by fit
+                shape (n_clusters, k)
+    sample_weights : Optional input CUDA array interface compliant matrix shape
+                     (n_clusters, 1) default: None
+    labels : Optional preallocated CUDA array interface matrix shape (m, 1)
+        to hold the output
+    normalize_weight: bool
+        True if the weights should be normalized
+    {resources_docstring}
+
+    Returns
+    -------
+    labels : raft.device_ndarray
+        The label for each datapoint in X
+    inertia : float
+       Sum of squared distances of samples to their closest cluster center
+
+    Examples
+    --------
+
+    >>> import cupy as cp
+    >>>
+    >>> from cuvs.cluster.kmeans import fit, predict, KMeansParams
+    >>>
+    >>> n_samples = 5000
+    >>> n_features = 50
+    >>> n_clusters = 3
+    >>>
+    >>> X = cp.random.random_sample((n_samples, n_features),
+    ...                             dtype=cp.float32)
+
+    >>> params = KMeansParams(n_clusters=n_clusters)
+    >>> centroids, inertia, n_iter = fit(params, X)
+    >>>
+    >>> labels, inertia = predict(params, X, centroids)
+    """
+
+    x_ai = wrap_array(X)
+    _check_input_array(x_ai, [np.dtype('float32'), np.dtype('float64')])
+    cdef cydlpack.DLManagedTensor* x_dlpack = cydlpack.dlpack_c(x_ai)
+
+    cdef cydlpack.DLManagedTensor* sample_weight_dlpack = NULL
+    if sample_weights is not None:
+        sample_weight_dlpack = cydlpack.dlpack_c(wrap_array(sample_weights))
+
+    if labels is None:
+        labels = device_ndarray.empty((x_ai.shape[0]), dtype='int32')
+
+    labels_ai = wrap_array(labels)
+    _check_input_array(labels_ai, [np.dtype('int32')])
+    cdef cydlpack.DLManagedTensor * labels_dlpack = \
+        cydlpack.dlpack_c(labels_ai)
+
+    centroids_ai = wrap_array(centroids)
+    _check_input_array(centroids_ai, [np.dtype('float32'),
+                                      np.dtype('float64')])
+    cdef cydlpack.DLManagedTensor * centroids_dlpack = \
+        cydlpack.dlpack_c(centroids_ai)
+
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+    cdef double inertia = 0
+
+    with cuda_interruptible():
+        check_cuvs(cuvsKMeansPredict(
+            res,
+            params.params,
+            x_dlpack,
+            sample_weight_dlpack,
+            centroids_dlpack,
+            labels_dlpack,
+            normalize_weight,
+            &inertia))
+
+    return PredictOutput(labels, inertia)
+
+
 @auto_sync_resources
 @auto_convert_output
 def cluster_cost(X, centroids, resources=None):
@@ -221,6 +315,11 @@ def cluster_cost(X, centroids, resources=None):
     centroids : Input CUDA array interface compliant matrix shape
                     (n_clusters, k)
     {resources_docstring}
+
+    Returns
+    -------
+    inertia : float
+        The cluster cost between the input matrix and existing centroids
 
     Examples
     --------
