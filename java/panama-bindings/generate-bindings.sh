@@ -6,6 +6,20 @@ CURDIR=$(cd $(dirname $0); pwd)
 CUDA_HOME=$(which nvcc | cut -d/ -f-4)
 TARGET_PACKAGE="com.nvidia.cuvs.internal.panama"
 
+# Try to verify that a include directory exists inside CUDA_HOME
+if [ ! -d "$CUDA_HOME/include" ]; 
+then
+	echo "$CUDA_HOME/include does not exist."
+	if [ -d "/usr/local/cuda/include" ];
+	then
+		echo "Setting CUDA_HOME to /usr/local/cuda"
+		CUDA_HOME=/usr/local/cuda
+	else
+		echo "Couldn't find a suitable CUDA include directory."
+		exit 1
+	fi
+fi
+
 JEXTRACT_COMMAND="jextract"
 
 if [[ `command -v jextract` == "" ]];
@@ -18,9 +32,9 @@ then
    echo "jextract downloaded to `pwd`/jextract-22"
 fi
 
-#Debug printing
+# Debug printing
 echo "CUDA_HOME points to: $CUDA_HOME"
-echo "Include dir in CUDA_HOME has:"
+echo "include dir in CUDA_HOME has:"
 ls $CUDA_HOME/include
 echo "JEXTRACT_COMMAND points to: $JEXTRACT_COMMAND"
 echo "CURDIR is: $CURDIR"
