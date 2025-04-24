@@ -43,7 +43,7 @@ requirements:
     - glog ${{ glog_version }}
     - h5py ${{ h5py_version }}
     - libcuvs-bench-ann =${{ version }}
-    - matplotlib-base
+    - matplotlib-base>=3.9
     - pandas
     - pylibraft =${{ minor_version }}
     - python
