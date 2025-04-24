@@ -34,6 +34,7 @@ def run_hnsw_build_search_test(
     graph_degree=64,
     hierarchy="none",
     search_params={},
+    expected_recall=0.9,
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
     queries = generate_data((n_queries, n_cols), dtype)
@@ -76,7 +77,7 @@ def run_hnsw_build_search_test(
     skl_dist, skl_idx = nn_skl.kneighbors(queries, return_distance=True)
 
     recall = calc_recall(out_idx, skl_idx)
-    assert recall >= 0.9
+    assert recall >= expected_recall
 
 
 @pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
@@ -89,6 +90,9 @@ def run_hnsw_build_search_test(
 def test_hnsw(dtype, k, ef, num_threads, metric, build_algo, hierarchy):
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.
+    expected_recall = (
+        0.9 if metric == "inner_product" and dtype == np.uint8 else 0.95
+    )
     run_hnsw_build_search_test(
         dtype=dtype,
         k=k,
@@ -96,6 +100,7 @@ def test_hnsw(dtype, k, ef, num_threads, metric, build_algo, hierarchy):
         build_algo=build_algo,
         hierarchy=hierarchy,
         search_params={"ef": ef, "num_threads": num_threads},
+        expected_recall=expected_recall,
     )
 
 
