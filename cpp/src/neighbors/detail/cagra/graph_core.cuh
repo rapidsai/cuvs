@@ -174,23 +174,29 @@ __global__ void kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, g
   const uint64_t nid = blockIdx.x + (batch_size * batch_id);
   if (nid >= graph_size) { return; }
   for (uint32_t k = threadIdx.x; k < graph_degree; k += blockDim.x) {
-    smem_num_detour[k] = 0;
+    if (knn_graph[k + (graph_degree * nid)] == nid) {
+      // For self-edge, set the number of detours to the maximum.
+      smem_num_detour[k] = graph_degree;
+    } else {
+      smem_num_detour[k] = 0;
+    }
   }
   __syncthreads();
 
   const uint64_t iA = nid;
-  if (iA >= graph_size) { return; }
-
   // count number of detours (A->D->B)
   for (uint32_t kAD = 0; kAD < graph_degree - 1; kAD++) {
     const uint64_t iD = knn_graph[kAD + (graph_degree * iA)];
+    if (iD == iA) { continue; }
     if (iD >= graph_size) { continue; }
     for (uint32_t kDB = threadIdx.x; kDB < graph_degree; kDB += blockDim.x) {
       const uint64_t iB_candidate = knn_graph[kDB + ((uint64_t)graph_degree * iD)];
+      if (iB_candidate == iA) { continue; }
       for (uint32_t kAB = kAD + 1; kAB < graph_degree; kAB++) {
         // if ( kDB < kAB )
         {
           const uint64_t iB = knn_graph[kAB + (graph_degree * iA)];
+          if (iB == iA) { continue; }
           if (iB == iB_candidate) {
             atomicAdd(smem_num_detour + kAB, 1);
             break;
@@ -232,6 +238,7 @@ __global__ void kern_make_rev_graph(const IdxT* const dest_nodes,     // [graph_
 
   for (uint32_t src_id = tid; src_id < graph_size; src_id += tnum) {
     const IdxT dest_id = dest_nodes[src_id];
+    if (dest_id == src_id) continue;
     if (dest_id >= graph_size) continue;
 
     const uint32_t pos = atomicAdd(rev_graph_count + dest_id, 1);
@@ -713,7 +720,8 @@ void mst_optimization(raft::resources const& res,
                       raft::host_matrix_view<IdxT, int64_t, raft::row_major> input_graph,
                       raft::host_matrix_view<IdxT, int64_t, raft::row_major> output_graph,
                       raft::host_vector_view<uint32_t, int64_t> mst_graph_num_edges,
-                      bool use_gpu = true)
+                      const uint32_t* deactivated_nodes_bitset = nullptr,
+                      bool use_gpu                             = true)
 {
   if (use_gpu) {
     RAFT_LOG_DEBUG("# MST optimization on GPU");
@@ -747,6 +755,13 @@ void mst_optimization(raft::resources const& res,
   auto label_ptr              = label.data_handle();
   auto cluster_size_ptr       = cluster_size.data_handle();
   auto candidate_edges_ptr    = candidate_edges.data_handle();
+
+  //
+  IdxT num_deactivated_nodes = 0;
+  if (deactivated_nodes_bitset) {
+    num_deactivated_nodes =
+      cuvs::neighbors::cagra::detail::bitset_count(deactivated_nodes_bitset, graph_size);
+  }
 
   // Initialize arrays
 #pragma omp parallel for
@@ -853,6 +868,12 @@ void mst_optimization(raft::resources const& res,
       for (uint64_t i = 0; i < graph_size; i++) {
         candidate_edges_ptr[i] = graph_size;
         if (label_ptr[i] == main_cluster_label) continue;
+        if (deactivated_nodes_bitset) {
+          // If it's a deactivated node, nothing.
+          if (cuvs::neighbors::cagra::detail::bitset_test(deactivated_nodes_bitset, i)) {
+            continue;
+          }
+        }
         uint64_t j = i;
         while (label_ptr[j] != main_cluster_label) {
           constexpr uint32_t ofst = 97;
@@ -1060,12 +1081,14 @@ void mst_optimization(raft::resources const& res,
         msg += ", altenate: " + std::to_string(num_alternate);
         if (num_failure > 0) { msg += ", failure: " + std::to_string(num_failure); }
       }
-      RAFT_LOG_DEBUG("%s", msg.c_str());
+      // RAFT_LOG_DEBUG("%s", msg.c_str());
+      RAFT_LOG_INFO("%s", msg.c_str());
     }
-    RAFT_EXPECTS(num_clusters > 0, "No clusters could not be created in MST optimization.");
+    RAFT_EXPECTS(num_clusters > num_deactivated_nodes,
+                 "No clusters could not be created in MST optimization.");
     RAFT_EXPECTS(total_outgoing_edges == total_incoming_edges,
                  "The numbers of incoming and outcoming edges are mismatch.");
-    if (num_clusters == 1) { break; }
+    if (num_clusters == num_deactivated_nodes + 1) { break; }
     num_clusters_pre = num_clusters;
   }
 
@@ -1104,6 +1127,20 @@ void mst_optimization(raft::resources const& res,
   RAFT_LOG_DEBUG("# MST optimization time: %.1lf sec", time_mst_opt_end - time_mst_opt_start);
 }
 
+template <typename IdxT = uint32_t>
+bool isolate_deactivated_node(IdxT* graph_ptr,
+                              uint64_t degree,
+                              IdxT node_id,
+                              const uint32_t* bitset_ptr = nullptr)
+{
+  if (bitset_ptr == nullptr) return false;
+  if (!cuvs::neighbors::cagra::detail::bitset_test(bitset_ptr, node_id)) { return false; }
+  for (uint64_t k = 0; k < degree; k++) {
+    graph_ptr[k] = node_id;
+  }
+  return true;
+}
+
 template <
   typename IdxT = uint32_t,
   typename g_accessor =
@@ -1112,7 +1149,8 @@ void optimize(
   raft::resources const& res,
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph,
-  const bool guarantee_connectivity = true)
+  const bool guarantee_connectivity        = true,
+  const uint32_t* deactivated_nodes_bitset = nullptr)
 {
   RAFT_LOG_DEBUG(
     "# Pruning kNN graph (size=%lu, degree=%lu)\n", knn_graph.extent(0), knn_graph.extent(1));
@@ -1145,7 +1183,12 @@ void optimize(
       raft::make_host_matrix<IdxT, int64_t, raft::row_major>(graph_size, output_graph_degree);
     RAFT_LOG_INFO("MST optimization is used to guarantee graph connectivity.");
     constexpr bool use_gpu = true;
-    mst_optimization(res, knn_graph, mst_graph.view(), mst_graph_num_edges.view(), use_gpu);
+    mst_optimization(res,
+                     knn_graph,
+                     mst_graph.view(),
+                     mst_graph_num_edges.view(),
+                     deactivated_nodes_bitset,
+                     use_gpu);
 
     for (uint64_t i = 0; i < graph_size; i++) {
       if (i < 8 || i >= graph_size - 8) {
@@ -1244,9 +1287,27 @@ void optimize(
     const auto num_full = host_stats.data_handle()[1];
 
     // Create pruned kNN graph
-    bool invalid_neighbor_list = false;
-#pragma omp parallel for
+    auto output_graph_count     = raft::make_host_vector<uint32_t, int64_t>(graph_size);
+    uint64_t invalid_node_count = 0;
+    uint64_t max_invalid_edges  = 0;
+    uint64_t invalid_node_id    = graph_size;
+#pragma omp parallel for reduction(+ : invalid_node_count)
     for (uint64_t i = 0; i < graph_size; i++) {
+      // If a node is deactivated, isolate it
+      if (isolate_deactivated_node<IdxT>(output_graph_ptr + (output_graph_degree * i),
+                                         output_graph_degree,
+                                         i,
+                                         deactivated_nodes_bitset)) {
+        output_graph_count(i) = output_graph_degree;
+        continue;
+      }
+
+      // Initialize graph and graph_count
+      for (uint64_t k = 0; k < output_graph_degree; k++) {
+        output_graph_ptr[k + (output_graph_degree * i)] = i;
+      }
+      output_graph_count(i) = 0;
+
       // Find the `output_graph_degree` smallest detourable count nodes by checking the detourable
       // count of the neighbors while increasing the target detourable count from zero.
       uint64_t pk         = 0;
@@ -1263,9 +1324,11 @@ void optimize(
           // Store the neighbor index if its detourable count is equal to `num_detour`.
           if (num_detour_k != num_detour) { continue; }
 
-          // Check duplication and append
           const auto candidate_node = input_graph_ptr[k + (input_graph_degree * i)];
-          bool dup                  = false;
+          // Check self edge
+          if (candidate_node == i) { continue; }
+          // Check duplication and append
+          bool dup = false;
           for (uint32_t dk = 0; dk < pk; dk++) {
             if (candidate_node == output_graph_ptr[i * output_graph_degree + dk]) {
               dup = true;
@@ -1288,19 +1351,109 @@ void optimize(
         num_detour = next_num_detour;
       }
       if (pk != output_graph_degree) {
+        invalid_node_count += 1;
         RAFT_LOG_DEBUG(
           "Couldn't find the output_graph_degree (%lu) smallest detourable count nodes for "
           "node %lu in the rank-based node reranking process",
           output_graph_degree,
           i);
-        invalid_neighbor_list = true;
+        uint64_t num_invalid_edges = output_graph_degree - pk;
+        if (max_invalid_edges < num_invalid_edges) {
+          max_invalid_edges = num_invalid_edges;
+          invalid_node_id   = i;
+        }
       }
+      output_graph_count(i) = pk;
     }
-    RAFT_EXPECTS(
-      !invalid_neighbor_list,
-      "Could not generate an intermediate CAGRA graph because the initial kNN graph contains too "
-      "many invalid or duplicated neighbor nodes. This error can occur, for example, if too many "
-      "overflows occur during the norm computation between the dataset vectors.");
+
+    if (invalid_node_count > 0) {
+      uint64_t i = invalid_node_id;
+      char buffer[256];
+      std::string message = "";
+      std::sprintf(buffer,
+                   "There are nodes containing invalid edges after pruning (node count: %lu).\n",
+                   invalid_node_count);
+      message += buffer;
+      std::sprintf(buffer, "# [Example] node id: %lu", i);
+      message += buffer;
+      if (deactivated_nodes_bitset) {
+        if (cuvs::neighbors::cagra::detail::bitset_test(deactivated_nodes_bitset, i)) {
+          message += " (this is a deactivated node)";
+        } else {
+          message += " (this is an active node)";
+        }
+      }
+      message += "\n";
+
+      uint64_t count = 0;
+      std::sprintf(buffer, "# initial graph (degree:%lu):", (uint64_t)input_graph_degree);
+      message += buffer;
+      for (uint64_t k = 0; k < input_graph_degree; k++) {
+        uint64_t j = input_graph_ptr[k + (input_graph_degree * i)];
+        std::sprintf(buffer, " %lu,", j);
+        message += buffer;
+        if (i == j) { count += 1; }
+      }
+      message += "\n";
+      std::sprintf(buffer, "# number of self edges in initial graph: %lu\n", count);
+      message += buffer;
+
+      count = 0;
+      std::sprintf(buffer, "# pruned graph (degree:%lu):", (uint64_t)output_graph_degree);
+      message += buffer;
+      for (uint64_t k = 0; k < output_graph_degree; k++) {
+        uint64_t j = output_graph_ptr[k + (output_graph_degree * i)];
+        std::sprintf(buffer, " %lu,", j);
+        message += buffer;
+        if (i == j) { count += 1; }
+      }
+      message += "\n";
+      std::sprintf(buffer, "# number of self edges in pruned graph: %lu\n", count);
+      message += buffer;
+
+      // [WA] Add neighboring neighbors where there are invalid edges.
+#pragma omp parallel for
+      for (uint64_t i0 = 0; i0 < graph_size; i0++) {
+        if (output_graph_count(i0) >= output_graph_degree) { continue; }
+        uint64_t max_k_i0 = output_graph_count(i0);
+        uint64_t k        = output_graph_count(i0);
+        for (uint64_t k_i1 = 0; k_i1 < output_graph_degree; k_i1++) {
+          for (uint64_t k_i0 = 0; k_i0 < max_k_i0; k_i0++) {
+            uint64_t i1 = output_graph_ptr[k_i0 + (output_graph_degree * i0)];
+            if (k_i1 >= output_graph_count(i1)) { continue; }
+            uint64_t i2 = output_graph_ptr[k_i1 + (output_graph_degree * i1)];
+            if (i2 == i0) { continue; }
+            bool dup = false;
+            for (uint64_t dk = 0; dk < k; dk++) {
+              if (i2 == output_graph_ptr[dk + (output_graph_degree * i0)]) {
+                dup = true;
+                break;
+              }
+            }
+            if (dup) { continue; }
+            output_graph_ptr[k + (output_graph_degree * i0)] = i2;
+            k += 1;
+            if (k >= output_graph_degree) break;
+          }
+          if (k >= output_graph_degree) break;
+        }
+      }
+
+      count = 0;
+      std::sprintf(buffer, "# pruned graph after WA:");
+      message += buffer;
+      for (uint64_t k = 0; k < output_graph_degree; k++) {
+        uint64_t j = output_graph_ptr[k + (output_graph_degree * i)];
+        std::sprintf(buffer, " %lu,", j);
+        message += buffer;
+        if (i == j) { count += 1; }
+      }
+      message += "\n";
+      std::sprintf(buffer, "# number of self edges in pruned graph after WA: %lu", count);
+      message += buffer;
+
+      RAFT_LOG_WARN("%s", message.c_str());
+    }
 
     const double time_prune_end = cur_time();
     RAFT_LOG_DEBUG(
@@ -1397,6 +1550,12 @@ void optimize(
       auto my_rev_graph = rev_graph.data_handle() + (output_graph_degree * i);
       auto my_out_graph = output_graph_ptr + (output_graph_degree * i);
 
+      // If a node is deactivated, isolate it
+      if (isolate_deactivated_node<IdxT>(
+            my_out_graph, output_graph_degree, i, deactivated_nodes_bitset)) {
+        continue;
+      }
+
       // If guarantee_connectivity == true, use a temporal list to merge the neighbor lists of the
       // graphs.
       std::vector<IdxT> temp_output_neighbor_list;
@@ -1404,6 +1563,11 @@ void optimize(
         temp_output_neighbor_list.resize(output_graph_degree);
         my_out_graph                   = temp_output_neighbor_list.data();
         const auto mst_graph_num_edges = mst_graph_num_edges_ptr[i];
+
+        // Initialize
+        for (uint32_t j = 0; j < output_graph_degree; j++) {
+          my_out_graph[j] = i;
+        }
 
         // Set MST graph edges
         for (uint32_t j = 0; j < mst_graph_num_edges; j++) {
@@ -1415,6 +1579,7 @@ void optimize(
              (pruned_j < output_graph_degree) && (output_j < output_graph_degree);
              pruned_j++) {
           const auto v = output_graph_ptr[output_graph_degree * i + pruned_j];
+          if (v == i) { continue; }
 
           // duplication check
           bool dup = false;
@@ -1441,6 +1606,7 @@ void optimize(
       auto kr = std::min<uint32_t>(rev_graph_count.data_handle()[i], output_graph_degree);
       while (kr) {
         kr -= 1;
+        if (my_rev_graph[kr] == i) { continue; }
         if (my_rev_graph[kr] < graph_size) {
           uint64_t pos = pos_in_array<IdxT>(my_rev_graph[kr], my_out_graph, output_graph_degree);
           if (pos < num_protected_edges) { continue; }
@@ -1532,16 +1698,23 @@ void optimize(
   {
     raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
       "cagra::graph::optimize/check_duplicates");
-    uint64_t num_dup = 0;
-    uint64_t num_oor = 0;
-#pragma omp parallel for reduction(+ : num_dup) reduction(+ : num_oor)
+    uint64_t dup_node_id = graph_size;
+    uint64_t oor_node_id = graph_size;
+    uint64_t max_dup     = 0;
+    uint64_t max_oor     = 0;
+#pragma omp parallel for
     for (uint64_t i = 0; i < graph_size; i++) {
+      uint64_t num_dup = 0;
+      uint64_t num_oor = 0;
+      if (deactivated_nodes_bitset) {
+        if (cuvs::neighbors::cagra::detail::bitset_test(deactivated_nodes_bitset, i)) { continue; }
+      }
       auto my_out_graph = output_graph_ptr + (output_graph_degree * i);
       for (uint32_t j = 0; j < output_graph_degree; j++) {
         const auto neighbor_a = my_out_graph[j];
 
         // Check oor
-        if (neighbor_a > graph_size) {
+        if (neighbor_a >= graph_size) {
           num_oor++;
           continue;
         }
@@ -1552,12 +1725,65 @@ void optimize(
           if (neighbor_a == neighbor_b) { num_dup++; }
         }
       }
+
+      if (max_oor < num_oor) {
+        max_oor     = num_oor;
+        oor_node_id = i;
+      }
+      if (max_dup < num_dup) {
+        max_dup     = num_dup;
+        dup_node_id = i;
+      }
     }
-    RAFT_EXPECTS(
-      num_dup == 0, "%lu duplicated node(s) are found in the generated CAGRA graph", num_dup);
-    RAFT_EXPECTS(num_oor == 0,
-                 "%lu out-of-range index node(s) are found in the generated CAGRA graph",
-                 num_oor);
+
+    if (max_dup > 0) {
+      uint64_t i = dup_node_id;
+      char buffer[256];
+      std::string message = "";
+      std::sprintf(buffer, "Nodes containing the same edge exist in final graph.\n");
+      message += buffer;
+      std::sprintf(buffer, "Node id: %lu\n", i);
+      message += buffer;
+      uint64_t count = 0;
+      std::sprintf(buffer, "Final graph (degree:%lu):", (uint64_t)output_graph_degree);
+      message += buffer;
+      for (uint64_t k = 0; k < output_graph_degree; k++) {
+        uint64_t j = output_graph_ptr[k + (output_graph_degree * i)];
+        std::sprintf(buffer, " %lu,", j);
+        message += buffer;
+        if (i == j) { count += 1; }
+      }
+      message += "\n";
+      std::sprintf(buffer, "Number of self edges in final graph: %lu\n", count);
+      message += buffer;
+      RAFT_LOG_WARN("%s", message.c_str());
+    }
+
+    if (max_oor > 0) {
+      uint64_t i = oor_node_id;
+      char buffer[256];
+      std::string message = "";
+      std::sprintf(buffer, "Nodes containing invalid edges exist in final graph.\n");
+      message += buffer;
+      std::sprintf(buffer, "Node id: %lu\n", i);
+      message += buffer;
+      uint64_t count = 0;
+      std::sprintf(buffer, "Final graph (degree:%lu):", (uint64_t)output_graph_degree);
+      message += buffer;
+      for (uint64_t k = 0; k < output_graph_degree; k++) {
+        uint64_t j = output_graph_ptr[k + (output_graph_degree * i)];
+        std::sprintf(buffer, " %lu,", j);
+        message += buffer;
+        if (i == j) { count += 1; }
+      }
+      message += "\n";
+      std::sprintf(buffer, "Number of self edges in final graph: %lu\n", count);
+      message += buffer;
+      RAFT_LOG_WARN("%s", message.c_str());
+    }
+
+    RAFT_EXPECTS(max_dup == 0, "Duplicated node(s) are found in the generated CAGRA graph");
+    RAFT_EXPECTS(max_oor == 0, "Out-of-range index node(s) are found in the generated CAGRA graph");
   }
 }
 
