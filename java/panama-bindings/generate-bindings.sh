@@ -6,8 +6,20 @@ CURDIR=$(cd $(dirname $0); pwd)
 CUDA_HOME=$(which nvcc | cut -d/ -f-4)
 TARGET_PACKAGE="com.nvidia.cuvs.internal.panama"
 
+JEXTRACT_COMMAND="jextract"
+
+if [[ `command -v jextract` == "" ]];
+then
+   JEXTRACT_DOWNLOAD_URL="https://download.java.net/java/early_access/jextract/22/6/openjdk-22-jextract+6-47_linux-x64_bin.tar.gz"
+   echo "jextract doesn't exist. Downloading it from $JEXTRACT_DOWNLOAD_URL.";
+   wget -c $JEXTRACT_DOWNLOAD_URL
+   tar -xvf openjdk-22-jextract+6-47_linux-x64_bin.tar.gz
+   JEXTRACT_COMMAND="jextract-22/bin/jextract"
+   echo "jextract downloaded to `pwd`/jextract-22"
+fi
+
 # Use Jextract utility to generate panama bindings
-jextract \
+$JEXTRACT_COMMAND \
  --include-dir ${REPODIR}/cpp/build/_deps/dlpack-src/include/ \
  --include-dir ${CUDA_HOME}/include \
  --include-dir ${REPODIR}/cpp/include \
