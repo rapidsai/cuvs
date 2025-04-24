@@ -18,6 +18,14 @@ then
    echo "jextract downloaded to `pwd`/jextract-22"
 fi
 
+#Debug printing
+echo "CUDA_HOME points to: $CUDA_HOME"
+echo "Include dir in CUDA_HOME has:"
+ls $CUDA_HOME/include
+echo "JEXTRACT_COMMAND points to: $JEXTRACT_COMMAND"
+echo "CURDIR is: $CURDIR"
+echo "REPODIR is: $REPODIR"
+
 # Use Jextract utility to generate panama bindings
 $JEXTRACT_COMMAND \
  --include-dir ${REPODIR}/cpp/build/_deps/dlpack-src/include/ \
