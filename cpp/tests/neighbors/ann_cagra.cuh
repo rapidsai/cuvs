@@ -408,6 +408,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
           (const DataT*)database.data(), ps.n_rows, ps.dim);
 
+        tmp_index_file index_file;
         {
           std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
           cagra::index<DataT, IdxT> index(handle_, index_params.metric);
@@ -422,11 +423,11 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
             index = cagra::build(handle_, index_params, database_view);
           };
 
-          cagra::serialize(handle_, "cagra_index", index, ps.include_serialized_dataset);
+          cagra::serialize(handle_, index_file.filename, index, ps.include_serialized_dataset);
         }
 
         cagra::index<DataT, IdxT> index(handle_);
-        cagra::deserialize(handle_, "cagra_index", &index);
+        cagra::deserialize(handle_, index_file.filename, &index);
 
         if (!ps.include_serialized_dataset) { index.update_dataset(handle_, database_view); }
 
