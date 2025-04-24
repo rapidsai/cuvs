@@ -126,13 +126,14 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       auto distances = raft::make_host_matrix_view<float, int64_t, row_major>(
         distances_snmg_ann.data(), ps.num_queries, ps.k);
 
+      tmp_index_file index_file;
       {
         auto index = cuvs::neighbors::ivf_flat::build(clique_, index_params, index_dataset);
         cuvs::neighbors::ivf_flat::extend(clique_, index, index_dataset, std::nullopt);
-        cuvs::neighbors::ivf_flat::serialize(clique_, index, "mg_ivf_flat_index");
+        cuvs::neighbors::ivf_flat::serialize(clique_, index, index_file.filename);
       }
       auto new_index =
-        cuvs::neighbors::ivf_flat::deserialize<DataT, int64_t>(clique_, "mg_ivf_flat_index");
+        cuvs::neighbors::ivf_flat::deserialize<DataT, int64_t>(clique_, index_file.filename);
 
       if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK)
         search_params.merge_mode = MERGE_ON_ROOT_RANK;
@@ -187,13 +188,14 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       auto distances = raft::make_host_matrix_view<float, int64_t, row_major>(
         distances_snmg_ann.data(), ps.num_queries, ps.k);
 
+      tmp_index_file index_file;
       {
         auto index = cuvs::neighbors::ivf_pq::build(clique_, index_params, index_dataset);
         cuvs::neighbors::ivf_pq::extend(clique_, index, index_dataset, std::nullopt);
-        cuvs::neighbors::ivf_pq::serialize(clique_, index, "mg_ivf_pq_index");
+        cuvs::neighbors::ivf_pq::serialize(clique_, index, index_file.filename);
       }
       auto new_index =
-        cuvs::neighbors::ivf_pq::deserialize<DataT, int64_t>(clique_, "mg_ivf_pq_index");
+        cuvs::neighbors::ivf_pq::deserialize<DataT, int64_t>(clique_, index_file.filename);
 
       if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK)
         search_params.merge_mode = MERGE_ON_ROOT_RANK;
@@ -243,12 +245,13 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       auto distances = raft::make_host_matrix_view<float, uint32_t, row_major>(
         distances_snmg_ann.data(), ps.num_queries, ps.k);
 
+      tmp_index_file index_file;
       {
         auto index = cuvs::neighbors::cagra::build(clique_, index_params, index_dataset);
-        cuvs::neighbors::cagra::serialize(clique_, index, "mg_cagra_index");
+        cuvs::neighbors::cagra::serialize(clique_, index, index_file.filename);
       }
       auto new_index =
-        cuvs::neighbors::cagra::deserialize<DataT, uint32_t>(clique_, "mg_cagra_index");
+        cuvs::neighbors::cagra::deserialize<DataT, uint32_t>(clique_, index_file.filename);
 
       if (ps.m_mode == m_mode_t::MERGE_ON_ROOT_RANK)
         search_params.merge_mode = MERGE_ON_ROOT_RANK;
@@ -286,11 +289,12 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       search_params.n_probes    = ps.nprobe;
       search_params.search_mode = LOAD_BALANCER;
 
+      tmp_index_file index_file;
       {
         auto index_dataset = raft::make_device_matrix_view<const DataT, int64_t>(
           d_index_dataset.data(), ps.num_db_vecs, ps.dim);
         auto index = cuvs::neighbors::ivf_flat::build(clique_, index_params, index_dataset);
-        ivf_flat::serialize(clique_, "local_ivf_flat_index", index);
+        ivf_flat::serialize(clique_, index_file.filename, index);
       }
 
       auto queries = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
@@ -301,7 +305,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         distances_snmg_ann.data(), ps.num_queries, ps.k);
 
       auto distributed_index =
-        cuvs::neighbors::ivf_flat::distribute<DataT, int64_t>(clique_, "local_ivf_flat_index");
+        cuvs::neighbors::ivf_flat::distribute<DataT, int64_t>(clique_, index_file.filename);
       search_params.merge_mode = TREE_MERGE;
 
       search_params.n_rows_per_batch = n_rows_per_search_batch;
@@ -335,11 +339,12 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       search_params.n_probes    = ps.nprobe;
       search_params.search_mode = LOAD_BALANCER;
 
+      tmp_index_file index_file;
       {
         auto index_dataset = raft::make_device_matrix_view<const DataT, int64_t>(
           d_index_dataset.data(), ps.num_db_vecs, ps.dim);
         auto index = cuvs::neighbors::ivf_pq::build(clique_, index_params, index_dataset);
-        ivf_pq::serialize(clique_, "local_ivf_pq_index", index);
+        ivf_pq::serialize(clique_, index_file.filename, index);
       }
 
       auto queries = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
@@ -350,7 +355,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         distances_snmg_ann.data(), ps.num_queries, ps.k);
 
       auto distributed_index =
-        cuvs::neighbors::ivf_pq::distribute<DataT, int64_t>(clique_, "local_ivf_pq_index");
+        cuvs::neighbors::ivf_pq::distribute<DataT, int64_t>(clique_, index_file.filename);
       search_params.merge_mode = TREE_MERGE;
 
       search_params.n_rows_per_batch = n_rows_per_search_batch;
@@ -379,11 +384,12 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
 
       mg_search_params<cagra::search_params> search_params;
 
+      tmp_index_file index_file;
       {
         auto index_dataset = raft::make_device_matrix_view<const DataT, int64_t>(
           d_index_dataset.data(), ps.num_db_vecs, ps.dim);
         auto index = cuvs::neighbors::cagra::build(clique_, index_params, index_dataset);
-        cuvs::neighbors::cagra::serialize(clique_, "local_cagra_index", index);
+        cuvs::neighbors::cagra::serialize(clique_, index_file.filename, index);
       }
 
       auto queries = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
@@ -394,7 +400,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
         distances_snmg_ann.data(), ps.num_queries, ps.k);
 
       auto distributed_index =
-        cuvs::neighbors::cagra::distribute<DataT, uint32_t>(clique_, "local_cagra_index");
+        cuvs::neighbors::cagra::distribute<DataT, uint32_t>(clique_, index_file.filename);
 
       search_params.merge_mode = TREE_MERGE;
 
