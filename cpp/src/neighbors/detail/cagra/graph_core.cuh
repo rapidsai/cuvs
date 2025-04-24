@@ -1122,13 +1122,14 @@ void optimize(
                "Each input array is expected to have the same number of rows");
   RAFT_EXPECTS(new_graph.extent(1) <= knn_graph.extent(1),
                "output graph cannot have more columns than input graph");
-  const uint64_t input_graph_degree  = knn_graph.extent(1);
+  // const uint64_t input_graph_degree  = knn_graph.extent(1);
+  const uint64_t knn_graph_degree    = knn_graph.extent(1);
   const uint64_t output_graph_degree = new_graph.extent(1);
   const uint64_t graph_size          = new_graph.extent(0);
-  auto input_graph_ptr               = knn_graph.data_handle();
-  auto output_graph_ptr              = new_graph.data_handle();
+  // auto input_graph_ptr               = knn_graph.data_handle();
+  auto output_graph_ptr = new_graph.data_handle();
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
-    "cagra::graph::optimize(%zu, %zu, %u)", graph_size, input_graph_degree, output_graph_degree);
+    "cagra::graph::optimize(%zu, %zu, %u)", graph_size, knn_graph_degree, output_graph_degree);
 
   // MST optimization
   auto mst_graph               = raft::make_host_matrix<IdxT, int64_t, raft::row_major>(0, 0);
@@ -1171,25 +1172,28 @@ void optimize(
     // specified number of edges are picked up for each node, starting with the
     // edge with the lowest number of 2-hop detours.
     //
-    auto detour_count = raft::make_host_matrix<uint8_t, int64_t>(graph_size, input_graph_degree);
+    auto detour_count = raft::make_host_matrix<uint8_t, int64_t>(graph_size, knn_graph_degree);
 
     //
     // If the available device memory is insufficient, do not use the GPU to count
     // the number of 2-hop detours, but use the CPU.
     //
-    bool use_gpu = true;
-    try {
-      auto d_detour_count =
-        raft::make_device_matrix<uint8_t, int64_t>(res, graph_size, input_graph_degree);
-      auto d_num_no_detour_edges = raft::make_device_vector<uint32_t, int64_t>(res, graph_size);
-      auto d_input_graph =
-        raft::make_device_matrix<IdxT, int64_t>(res, graph_size, input_graph_degree);
-    } catch (std::bad_alloc& e) {
-      RAFT_LOG_DEBUG("Insufficient memory for 2-hop node counting on GPU");
-      use_gpu = false;
-    } catch (raft::logic_error& e) {
-      RAFT_LOG_DEBUG("Insufficient memory for 2-hop node counting on GPU (logic error)");
-      use_gpu = false;
+    // bool use_gpu = true;
+    bool use_gpu = false;
+    if (use_gpu) {
+      try {
+        auto d_detour_count =
+          raft::make_device_matrix<uint8_t, int64_t>(res, graph_size, knn_graph_degree);
+        auto d_num_no_detour_edges = raft::make_device_vector<uint32_t, int64_t>(res, graph_size);
+        auto d_input_graph =
+          raft::make_device_matrix<IdxT, int64_t>(res, graph_size, knn_graph_degree);
+      } catch (std::bad_alloc& e) {
+        RAFT_LOG_DEBUG("Insufficient memory for 2-hop node counting on GPU");
+        use_gpu = false;
+      } catch (raft::logic_error& e) {
+        RAFT_LOG_DEBUG("Insufficient memory for 2-hop node counting on GPU (logic error)");
+        use_gpu = false;
+      }
     }
     uint64_t num_keep __attribute__((unused)) = 0;
     uint64_t num_full __attribute__((unused)) = 0;
@@ -1199,11 +1203,11 @@ void optimize(
         "cagra::graph::optimize/prune/2-hop-counting-by-GPU");
 
       auto d_detour_count = raft::make_device_mdarray<uint8_t>(
-        res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, input_graph_degree));
+        res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, knn_graph_degree));
 
       RAFT_CUDA_TRY(cudaMemsetAsync(d_detour_count.data_handle(),
                                     0xff,
-                                    graph_size * input_graph_degree * sizeof(uint8_t),
+                                    graph_size * knn_graph_degree * sizeof(uint8_t),
                                     raft::resource::get_cuda_stream(res)));
 
       auto d_num_no_detour_edges = raft::make_device_mdarray<uint32_t>(
@@ -1219,19 +1223,19 @@ void optimize(
       const double time_prune_start = cur_time();
       RAFT_LOG_DEBUG("# Pruning kNN Graph on GPUs\r");
 
-      // Copy input_graph_ptr over to device if necessary
+      // Copy knn_graph over to device if necessary
       device_matrix_view_from_host d_input_graph(
         res,
         raft::make_host_matrix_view<IdxT, int64_t>(
-          input_graph_ptr, graph_size, input_graph_degree));
+          knn_graph.data_handle(), graph_size, knn_graph_degree));
 
       constexpr int MAX_DEGREE = 1024;
-      if (input_graph_degree > MAX_DEGREE) {
+      if (knn_graph_degree > MAX_DEGREE) {
         RAFT_FAIL(
           "The degree of input knn graph is too large (%zu). "
           "It must be equal to or smaller than %d.",
-          input_graph_degree,
-          1024);
+          knn_graph_degree,
+          MAX_DEGREE);
       }
       const uint32_t batch_size =
         std::min(static_cast<uint32_t>(graph_size), static_cast<uint32_t>(256 * 1024));
@@ -1247,7 +1251,7 @@ void optimize(
           <<<blocks_prune, threads_prune, 0, raft::resource::get_cuda_stream(res)>>>(
             d_input_graph.data_handle(),
             graph_size,
-            input_graph_degree,
+            knn_graph_degree,
             output_graph_degree,
             batch_size,
             i_batch,
@@ -1280,16 +1284,16 @@ void optimize(
       for (IdxT iA = 0; iA < graph_size; iA++) {
         uint32_t num_edges_no_detour = 0;
         // Create a list of nodes, iB_candidates, that can be reached in 2-hops from node A.
-        auto iB_candidates = raft::make_host_vector<IdxT, int64_t>((input_graph_degree - 1) *
-                                                                   (input_graph_degree - 1));
-        for (uint64_t kAC = 0; kAC < input_graph_degree - 1; kAC++) {
-          IdxT iC = input_graph_ptr[kAC + (input_graph_degree * iA)];
-          for (uint64_t kCB = 0; kCB < input_graph_degree - 1; kCB++) {
+        auto iB_candidates =
+          raft::make_host_vector<IdxT, int64_t>((knn_graph_degree - 1) * (knn_graph_degree - 1));
+        for (uint64_t kAC = 0; kAC < knn_graph_degree - 1; kAC++) {
+          IdxT iC = knn_graph(iA, kAC);
+          for (uint64_t kCB = 0; kCB < knn_graph_degree - 1; kCB++) {
             IdxT iB_candidate;
             if (iC == iA || iC >= graph_size) {
               iB_candidate = graph_size;
             } else {
-              iB_candidate = input_graph_ptr[kCB + (input_graph_degree * iC)];
+              iB_candidate = knn_graph(iC, kCB);
               if (iB_candidate == iA || iB_candidate == iC) { iB_candidate = graph_size; }
             }
             uint64_t idx;
@@ -1302,10 +1306,10 @@ void optimize(
           }
         }
         // Count how many 2-hop detours are on each edge of node A.
-        for (uint64_t kAB = 0; kAB < input_graph_degree; kAB++) {
+        for (uint64_t kAB = 0; kAB < knn_graph_degree; kAB++) {
           constexpr uint32_t max_count = 255;
           uint32_t count               = 0;
-          IdxT iB                      = input_graph_ptr[kAB + (input_graph_degree * iA)];
+          IdxT iB                      = knn_graph(iA, kAB);
           if (iB == iA) {
             count = max_count;
           } else {
@@ -1317,7 +1321,7 @@ void optimize(
           if (count == 0) { num_edges_no_detour += 1; }
         }
         num_keep += num_edges_no_detour;
-        if (num_edges_no_detour > input_graph_degree) { num_full += 1; }
+        if (num_edges_no_detour > knn_graph_degree) { num_full += 1; }
       }
     }
 
@@ -1329,10 +1333,10 @@ void optimize(
       // count of the neighbors while increasing the target detourable count from zero.
       uint64_t pk         = 0;
       uint32_t num_detour = 0;
-      for (uint32_t l = 0; l < input_graph_degree && pk < output_graph_degree; l++) {
+      for (uint32_t l = 0; l < knn_graph_degree && pk < output_graph_degree; l++) {
         uint32_t next_num_detour = std::numeric_limits<uint32_t>::max();
-        for (uint64_t k = 0; k < input_graph_degree; k++) {
-          const auto num_detour_k = detour_count.data_handle()[k + (input_graph_degree * i)];
+        for (uint64_t k = 0; k < knn_graph_degree; k++) {
+          const auto num_detour_k = detour_count.data_handle()[k + (knn_graph_degree * i)];
           // Find the detourable count to check in the next iteration
           if (num_detour_k > num_detour) {
             next_num_detour = std::min(static_cast<uint32_t>(num_detour_k), next_num_detour);
@@ -1342,7 +1346,7 @@ void optimize(
           if (num_detour_k != num_detour) { continue; }
 
           // Check duplication and append
-          const auto candidate_node = input_graph_ptr[k + (input_graph_degree * i)];
+          const auto candidate_node = knn_graph(i, k);
           bool dup                  = false;
           for (uint32_t dk = 0; dk < pk; dk++) {
             if (candidate_node == output_graph_ptr[i * output_graph_degree + dk]) {
