@@ -99,6 +99,9 @@ inline auto operator<<(std::ostream& os, const ivf_pq_inputs& p) -> std::ostream
   PRINT_DIFF_V(.search_params.lut_dtype, cuvs::neighbors::print_dtype{p.search_params.lut_dtype});
   PRINT_DIFF_V(.search_params.internal_distance_dtype,
                cuvs::neighbors::print_dtype{p.search_params.internal_distance_dtype});
+  PRINT_DIFF_V(.search_params.coarse_search_dtype,
+               cuvs::neighbors::print_dtype{p.search_params.coarse_search_dtype});
+  PRINT_DIFF(.search_params.max_internal_batch_size);
   os << "}";
   return os;
 }
@@ -849,6 +852,17 @@ inline auto enum_variety() -> test_cases_t
     x.search_params.lut_dtype = CUDA_R_8U;
     x.min_recall              = 0.84;
   });
+  ADD_CASE({
+    x.search_params.coarse_search_dtype = CUDA_R_16F;
+    x.min_recall                        = 0.86;
+  });
+  ADD_CASE({
+    x.search_params.coarse_search_dtype = CUDA_R_8I;
+    // 8-bit coarse search is experimental and there's no go guarantee of any recall
+    // if the data is not normalized. Especially for L2, because we store vector norms alongside the
+    // cluster centers.
+    x.min_recall = 0.1;
+  });
 
   ADD_CASE({
     x.search_params.internal_distance_dtype = CUDA_R_32F;
@@ -857,6 +871,12 @@ inline auto enum_variety() -> test_cases_t
   ADD_CASE({
     x.search_params.internal_distance_dtype = CUDA_R_16F;
     x.search_params.lut_dtype               = CUDA_R_16F;
+    x.min_recall                            = 0.86;
+  });
+  ADD_CASE({
+    x.search_params.internal_distance_dtype = CUDA_R_16F;
+    x.search_params.lut_dtype               = CUDA_R_16F;
+    x.search_params.coarse_search_dtype     = CUDA_R_16F;
     x.min_recall                            = 0.86;
   });
 
@@ -992,6 +1012,34 @@ inline auto special_cases() -> test_cases_t
     x.index_params.pq_bits       = 8;
     x.index_params.n_lists       = 1024;
     x.search_params.n_probes     = 50;
+  });
+
+  // Test large max_internal_batch_size
+  ADD_CASE({
+    x.num_db_vecs                           = 500000;
+    x.dim                                   = 100;
+    x.num_queries                           = 128 * 1024 * 1024;
+    x.k                                     = 10;
+    x.index_params.codebook_kind            = ivf_pq::codebook_gen::PER_SUBSPACE;
+    x.index_params.pq_dim                   = 10;
+    x.index_params.pq_bits                  = 8;
+    x.index_params.n_lists                  = 1024;
+    x.search_params.n_probes                = 50;
+    x.search_params.max_internal_batch_size = 64 * 1024 * 1024;
+  });
+
+  // Test small max_internal_batch_size
+  ADD_CASE({
+    x.num_db_vecs                           = 500000;
+    x.dim                                   = 100;
+    x.num_queries                           = 128 * 1024 * 1024;
+    x.k                                     = 10;
+    x.index_params.codebook_kind            = ivf_pq::codebook_gen::PER_SUBSPACE;
+    x.index_params.pq_dim                   = 10;
+    x.index_params.pq_bits                  = 8;
+    x.index_params.n_lists                  = 1024;
+    x.search_params.n_probes                = 50;
+    x.search_params.max_internal_batch_size = 1024 * 1024;
   });
 
   ADD_CASE({
