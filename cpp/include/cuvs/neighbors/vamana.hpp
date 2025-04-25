@@ -132,8 +132,7 @@ struct index : cuvs::neighbors::index {
   }
 
   /** Quantized dataset [size, codes_rowlen] */
-  [[nodiscard]] inline auto quantized_data() const
-    -> const cuvs::neighbors::dataset<int64_t>&
+  [[nodiscard]] inline auto quantized_data() const -> const cuvs::neighbors::dataset<int64_t>&
   {
     RAFT_EXPECTS(quantized_dataset_, "Invalid quantized dataset");
     return *quantized_dataset_;
