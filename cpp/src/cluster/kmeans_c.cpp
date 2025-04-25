@@ -125,7 +125,21 @@ void _predict(cuvsResources_t res,
     using const_mdspan_type  = raft::device_matrix_view<T const, IdxT, raft::row_major>;
 
     if (params.hierarchical) {
-      RAFT_FAIL("predict isn't implemented for hierarchical kmeans");
+      if (sample_weight_tensor != NULL) {
+        RAFT_FAIL("sample_weight cannot be used with hierarchical kmeans");
+      }
+
+      if constexpr (std::is_same_v<T, double>) {
+        RAFT_FAIL("float64 is an unsupported dtype for hierarchical kmeans");
+      } else {
+        auto kmeans_params = convert_balanced_params(params);
+        cuvs::cluster::kmeans::predict(*res_ptr,
+                                       kmeans_params,
+                                       cuvs::core::from_dlpack<const_mdspan_type>(X_tensor),
+                                       cuvs::core::from_dlpack<const_mdspan_type>(centroids_tensor),
+                                       cuvs::core::from_dlpack<labels_mdspan_type>(labels_tensor));
+        *inertia = 0;
+      }
     } else {
       auto kmeans_params = convert_params(params);
       T inertia_temp;

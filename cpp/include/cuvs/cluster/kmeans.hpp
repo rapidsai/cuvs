@@ -408,7 +408,8 @@ void fit(raft::resources const& handle,
  *   raft::resources handle;
  *   cuvs::cluster::kmeans::balanced_params params;
  *   int n_features = 15;
- *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
+ *   int n_clusters = 8;
+ *   auto centroids = raft::make_device_matrix<float, int>(handle, n_clusters, n_features);
  *
  *   kmeans::fit(handle,
  *               params,
@@ -441,8 +442,8 @@ void fit(const raft::resources& handle,
  *   ...
  *   raft::resources handle;
  *   cuvs::cluster::kmeans::balanced_params params;
- *   int n_features = 15;
- *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
+ *   int n_features = 15, n_clusters = 8;
+ *   auto centroids = raft::make_device_matrix<int8_t, int>(handle, n_clusters, n_features);
  *
  *   kmeans::fit(handle,
  *               params,
@@ -494,7 +495,7 @@ void fit(const raft::resources& handle,
  *                   centroids.view(),
  *                   false,
  *                   labels.view(),
- *                   raft::make_scalar_view(&ineratia));
+ *                   raft::make_scalar_view(&inertia));
  * @endcode
  *
  * @param[in]     handle           The raft handle.
@@ -552,7 +553,7 @@ void predict(raft::resources const& handle,
  *                   centroids.view(),
  *                   false,
  *                   labels.view(),
- *                   raft::make_scalar_view(&ineratia));
+ *                   raft::make_scalar_view(&inertia));
  * @endcode
  *
  * @param[in]     handle           The raft handle.
@@ -610,7 +611,7 @@ void predict(raft::resources const& handle,
  *                   centroids.view(),
  *                   false,
  *                   labels.view(),
- *                   raft::make_scalar_view(&ineratia));
+ *                   raft::make_scalar_view(&inertia));
  * @endcode
  *
  * @param[in]     handle           The raft handle.
@@ -668,7 +669,7 @@ void predict(raft::resources const& handle,
  *                   centroids.view(),
  *                   false,
  *                   labels.view(),
- *                   raft::make_scalar_view(&ineratia));
+ *                   raft::make_scalar_view(&inertia));
  * @endcode
  *
  * @param[in]     handle           The raft handle.
@@ -705,28 +706,22 @@ void predict(raft::resources const& handle,
  *   using namespace  cuvs::cluster;
  *   ...
  *   raft::resources handle;
- *   cuvs::cluster::kmeans::params params;
- *   int n_features = 15, inertia, n_iter;
- *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
+ *   cuvs::cluster::kmeans::balanced_params params;
+ *   int n_features = 15, n_clusters = 8;
+ *   auto centroids = raft::make_device_matrix<float, int>(handle, n_clusters, n_features);
  *
  *   kmeans::fit(handle,
  *               params,
  *               X,
- *               std::nullopt,
- *               centroids.view(),
- *               raft::make_scalar_view(&inertia),
- *               raft::make_scalar_view(&n_iter));
+ *               centroids.view());
  *   ...
  *   auto labels = raft::make_device_vector<int, int>(handle, X.extent(0));
  *
  *   kmeans::predict(handle,
  *                   params,
  *                   X,
- *                   std::nullopt,
  *                   centroids.view(),
- *                   false,
- *                   labels.view(),
- *                   raft::make_scalar_view(&ineratia));
+ *                   labels.view());
  * @endcode
  *
  * @param[in]     handle           The raft handle.
@@ -745,6 +740,50 @@ void predict(const raft::resources& handle,
              raft::device_matrix_view<const int8_t, int> X,
              raft::device_matrix_view<const float, int> centroids,
              raft::device_vector_view<uint32_t, int> labels);
+
+/**
+ * @brief Predict the closest cluster each sample in X belongs to.
+ *
+ * @code{.cpp}
+ *   #include <raft/core/resources.hpp>
+ *   #include <cuvs/cluster/kmeans.hpp>
+ *   using namespace  cuvs::cluster;
+ *   ...
+ *   raft::resources handle;
+ *   cuvs::cluster::kmeans::balanced_params params;
+ *   int n_features = 15, n_clusters = 8;
+ *   auto centroids = raft::make_device_matrix<float, int>(handle, n_clusters, n_features);
+ *
+ *   kmeans::fit(handle,
+ *               params,
+ *               X,
+ *               centroids.view());
+ *   ...
+ *   auto labels = raft::make_device_vector<int, int>(handle, X.extent(0));
+ *
+ *   kmeans::predict(handle,
+ *                   params,
+ *                   X,
+ *                   centroids.view(),
+ *                   labels.view());
+ * @endcode
+ *
+ * @param[in]     handle           The raft handle.
+ * @param[in]     params           Parameters for KMeans model.
+ * @param[in]     X                New data to predict.
+ *                                 [dim = n_samples x n_features]
+ * @param[in]     centroids        Cluster centroids. The data must be in
+ *                                 row-major format.
+ *                                 [dim = n_clusters x n_features]
+ * @param[out]    labels           Index of the cluster each sample in X
+ *                                 belongs to.
+ *                                 [len = n_samples]
+ */
+void predict(const raft::resources& handle,
+             cuvs::cluster::kmeans::balanced_params const& params,
+             raft::device_matrix_view<const float, int> X,
+             raft::device_matrix_view<const float, int> centroids,
+             raft::device_vector_view<int, int> labels);
 
 /**
  * @brief Compute k-means clustering and predicts cluster index for each sample
@@ -977,8 +1016,8 @@ void fit_predict(raft::resources const& handle,
  *   ...
  *   raft::resources handle;
  *   cuvs::cluster::kmeans::balanced_params params;
- *   int n_features = 15;
- *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
+ *   int n_features = 15, n_clusters = 8;
+ *   auto centroids = raft::make_device_matrix<float, int>(handle, n_clusters, n_features);
  *   auto labels = raft::make_device_vector<int, int>(handle, X.extent(0));
  *
  *   kmeans::fit_predict(handle,
@@ -1021,8 +1060,8 @@ void fit_predict(const raft::resources& handle,
  *   ...
  *   raft::resources handle;
  *   cuvs::cluster::kmeans::balanced_params params;
- *   int n_features = 15;
- *   auto centroids = raft::make_device_matrix<float, int>(handle, params.n_clusters, n_features);
+ *   int n_features = 15, n_clusters = 8;
+ *   auto centroids = raft::make_device_matrix<float, int>(handle, n_clusters, n_features);
  *   auto labels = raft::make_device_vector<int, int>(handle, X.extent(0));
  *
  *   kmeans::fit_predict(handle,
