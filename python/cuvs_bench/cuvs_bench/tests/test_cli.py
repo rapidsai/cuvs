@@ -121,6 +121,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "test-data/result/build/cuvs_ivf_flat,test.csv": {
             "header": common_build_header
             + [
+                "GPU",
                 "niter",
                 "nlist",
                 "ratio",
@@ -140,6 +141,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "test-data/result/build/faiss_gpu_ivf_flat,test.csv": {
             "header": common_build_header
             + [
+                "GPU",
                 "nlist",
                 "ratio",
                 "use_cuvs",
@@ -149,6 +151,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "test-data/result/build/cuvs_cagra,test.csv": {
             "header": common_build_header
             + [
+                "GPU",
                 "graph_degree",
                 "intermediate_graph_degree",
                 "label",
@@ -168,7 +171,6 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
                 "build threads",
                 "build cpu_time",
                 "build GPU",
-                "ef_construction",
                 "graph_degree",
                 "intermediate_graph_degree",
                 "label",
@@ -178,6 +180,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "test-data/result/search/cuvs_cagra,test,k10,bs100,latency.csv": {
             "header": common_search_header
             + [
+                "GPU",
                 "end_to_end",
                 "itopk",
                 "k",
@@ -197,6 +200,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "test-data/result/search/cuvs_cagra,test,k10,bs100,throughput.csv": {
             "header": common_search_header
             + [
+                "GPU",
                 "end_to_end",
                 "itopk",
                 "k",
@@ -216,6 +220,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "test-data/result/search/cuvs_cagra,test,k10,bs100,raw.csv": {
             "header": common_search_header
             + [
+                "GPU",
                 "end_to_end",
                 "itopk",
                 "k",
@@ -235,6 +240,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "test-data/result/search/cuvs_ivf_flat,test,k10,bs100,latency.csv": {
             "header": common_search_header
             + [
+                "GPU",
                 "end_to_end",
                 "k",
                 "n_queries",
@@ -253,6 +259,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "test-data/result/search/cuvs_ivf_flat,test,k10,bs100,raw.csv": {
             "header": common_search_header
             + [
+                "GPU",
                 "end_to_end",
                 "k",
                 "n_queries",
@@ -271,6 +278,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "test-data/result/search/cuvs_ivf_flat,test,k10,bs100,throughput.csv": {  # noqa: E501
             "header": common_search_header
             + [
+                "GPU",
                 "end_to_end",
                 "k",
                 "n_queries",
@@ -289,6 +297,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "test-data/result/search/faiss_gpu_ivf_flat,test,k10,bs100,latency.csv": {  # noqa: E501
             "header": common_search_header
             + [
+                "GPU",
                 "end_to_end",
                 "k",
                 "n_queries",
@@ -307,6 +316,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "test-data/result/search/faiss_gpu_ivf_flat,test,k10,bs100,raw.csv": {
             "header": common_search_header
             + [
+                "GPU",
                 "end_to_end",
                 "k",
                 "n_queries",
@@ -325,6 +335,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "test-data/result/search/faiss_gpu_ivf_flat,test,k10,bs100,throughput.csv": {  # noqa: E501
             "header": common_search_header
             + [
+                "GPU",
                 "end_to_end",
                 "k",
                 "n_queries",
