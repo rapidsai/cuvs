@@ -68,6 +68,10 @@ cdef class KMeansParams:
         Number of instance k-means algorithm will be run with different seeds
     oversampling_factor : double
         Oversampling factor for use in the k-means|| algorithm
+    hierarchical : bool
+        Whether to use hierarchical (balanced) kmeans or not
+    hierarchical_n_iters : int
+        For hierarchical k-means , defines the number of training iterations
     """
 
     cdef cuvsKMeansParams* params
@@ -85,7 +89,9 @@ cdef class KMeansParams:
                  max_iter=None,
                  tol=None,
                  n_init=None,
-                 oversampling_factor=None):
+                 oversampling_factor=None,
+                 hierarchical=None,
+                 hierarchical_n_iters=None):
         if metric is not None:
             self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
         if n_clusters is not None:
@@ -98,6 +104,13 @@ cdef class KMeansParams:
             self.params.n_init = n_init
         if oversampling_factor is not None:
             self.params.oversampling_factor = oversampling_factor
+        if hierarchical is not None:
+            self.params.hierarchical = hierarchical
+        if hierarchical_n_iters is not None:
+            if not self.params.hierarchical:
+                raise ValueError("Setting hierarchical_n_iters requires"
+                                 " `hierarchical` to be also set to True")
+            self.params.hierarchical_n_iters = hierarchical_n_iters
 
     @property
     def metric(self):
@@ -122,6 +135,14 @@ cdef class KMeansParams:
     @property
     def oversampling_factor(self):
         return self.params.oversampling_factor
+
+    @property
+    def hierarchical(self):
+        return self.params.hierarchical
+
+    @property
+    def hierarchical_n_iters(self):
+        return self.params.hierarchical_n_iters
 
 
 FitOutput = namedtuple("FitOutput", "centroids inertia n_iter")

@@ -102,6 +102,16 @@ struct cuvsKMeansParams {
   int batch_centroids;
 
   bool inertia_check;
+
+  /**
+   * Whether to use hierarchical (balanced) kmeans or not
+   */
+  bool hierarchical;
+
+  /**
+   * For hierarchical k-means , defines the number of training iterations
+   */
+  int hierarchical_n_iters;
 };
 
 typedef struct cuvsKMeansParams* cuvsKMeansParams_t;

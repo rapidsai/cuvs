@@ -40,6 +40,8 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
         int batch_samples,
         int batch_centroids,
         bool inertia_check,
+        bool hierarchical,
+        int hierarchical_n_iters
 
     ctypedef cuvsKMeansParams* cuvsKMeansParams_t
 

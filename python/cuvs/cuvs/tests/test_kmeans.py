@@ -25,7 +25,11 @@ from cuvs.distance import pairwise_distance
 @pytest.mark.parametrize("n_cols", [5, 25])
 @pytest.mark.parametrize("n_clusters", [5, 15])
 @pytest.mark.parametrize("dtype", [np.float32, np.float64])
-def test_kmeans_fit(n_rows, n_cols, n_clusters, dtype):
+@pytest.mark.parametrize("hierarchical", [True, False])
+def test_kmeans_fit(n_rows, n_cols, n_clusters, dtype, hierarchical):
+    if hierarchical and dtype == np.float64:
+        pytest.skip("hierarchical kmeans doesn't support float64")
+
     # generate some random input points / centroids
     X_host = np.random.random_sample((n_rows, n_cols)).astype(dtype)
     centroids = device_ndarray(X_host[:n_clusters])
@@ -34,12 +38,17 @@ def test_kmeans_fit(n_rows, n_cols, n_clusters, dtype):
     # compute the inertia, before fitting centroids
     original_inertia = cluster_cost(X, centroids)
 
-    params = KMeansParams(n_clusters=n_clusters)
+    params = KMeansParams(n_clusters=n_clusters, hierarchical=hierarchical)
 
     # fit the centroids, make sure inertia has gone down
     centroids, inertia, n_iter = fit(params, X, centroids)
-    assert inertia < original_inertia
     assert n_iter >= 1
+
+    if hierarchical:
+        # balanced kmeans doesn't return inertia, or support predict yet
+        return
+
+    assert inertia < original_inertia
     assert np.allclose(cluster_cost(X, centroids), inertia, rtol=1e-6)
 
     # make sure the prediction for each centroid is the centroid itself
