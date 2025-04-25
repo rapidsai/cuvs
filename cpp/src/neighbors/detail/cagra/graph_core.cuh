@@ -1104,6 +1104,58 @@ void mst_optimization(raft::resources const& res,
   RAFT_LOG_DEBUG("# MST optimization time: %.1lf sec", time_mst_opt_end - time_mst_opt_start);
 }
 
+template <typename IdxT = uint32_t>
+void count_2hop_detours(raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
+                        raft::host_matrix_view<uint8_t, int64_t, raft::row_major> detour_count)
+{
+  RAFT_EXPECTS(knn_graph.extent(0) == detour_count.extent(0),
+               "knn_graph and detour_count are expected to have the same number of rows");
+  RAFT_EXPECTS(knn_graph.extent(1) == detour_count.extent(1),
+               "knn_graph and detour_count are expected to have the same number of cols");
+  const uint64_t graph_size   = knn_graph.extent(0);
+  const uint64_t graph_degree = knn_graph.extent(1);
+
+#pragma omp parallel for
+  for (IdxT iA = 0; iA < graph_size; iA++) {
+    // Create a list of nodes, iB_candidates, that can be reached in 2-hops from node A.
+    auto iB_candidates =
+      raft::make_host_vector<IdxT, int64_t>((graph_degree - 1) * (graph_degree - 1));
+    for (uint64_t kAC = 0; kAC < graph_degree - 1; kAC++) {
+      IdxT iC = knn_graph(iA, kAC);
+      for (uint64_t kCB = 0; kCB < graph_degree - 1; kCB++) {
+        IdxT iB_candidate;
+        if (iC == iA || iC >= graph_size) {
+          iB_candidate = graph_size;
+        } else {
+          iB_candidate = knn_graph(iC, kCB);
+          if (iB_candidate == iA || iB_candidate == iC) { iB_candidate = graph_size; }
+        }
+        uint64_t idx;
+        if (kAC < kCB) {
+          idx = (kCB * kCB) + kAC;
+        } else {
+          idx = (kAC * (kAC + 1)) + kCB;
+        }
+        iB_candidates(idx) = iB_candidate;
+      }
+    }
+    // Count how many 2-hop detours are on each edge of node A.
+    for (uint64_t kAB = 0; kAB < graph_degree; kAB++) {
+      constexpr uint32_t max_count = 255;
+      uint32_t count               = 0;
+      IdxT iB                      = knn_graph(iA, kAB);
+      if (iB == iA) {
+        count = max_count;
+      } else {
+        for (uint64_t idx = 0; idx < kAB * kAB; idx++) {
+          if (iB_candidates(idx) == iB) { count += 1; }
+        }
+      }
+      detour_count(iA, kAB) = std::min(count, max_count);
+    }
+  }
+}
+
 template <
   typename IdxT = uint32_t,
   typename g_accessor =
@@ -1158,6 +1210,7 @@ void optimize(
   {
     raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
       "cagra::graph::optimize/prune");
+    const double time_prune_start = cur_time();
 
     //
     // Prune unimportant edges.
@@ -1195,14 +1248,15 @@ void optimize(
         use_gpu = false;
       }
     }
-    uint64_t num_keep __attribute__((unused)) = 0;
-    uint64_t num_full __attribute__((unused)) = 0;
     if (use_gpu) {
       // Count 2-hop detours on GPU
       raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
         "cagra::graph::optimize/prune/2-hop-counting-by-GPU");
+      const double time_2hop_count_start = cur_time();
 
-      auto d_detour_count = raft::make_device_mdarray<uint8_t>(
+      uint64_t num_keep __attribute__((unused)) = 0;
+      uint64_t num_full __attribute__((unused)) = 0;
+      auto d_detour_count                       = raft::make_device_mdarray<uint8_t>(
         res, large_tmp_mr, raft::make_extents<int64_t>(graph_size, knn_graph_degree));
 
       RAFT_CUDA_TRY(cudaMemsetAsync(d_detour_count.data_handle(),
@@ -1220,7 +1274,6 @@ void optimize(
       auto dev_stats  = raft::make_device_vector<uint64_t>(res, 2);
       auto host_stats = raft::make_host_vector<uint64_t>(2);
 
-      const double time_prune_start = cur_time();
       RAFT_LOG_DEBUG("# Pruning kNN Graph on GPUs\r");
 
       // Copy knn_graph over to device if necessary
@@ -1275,54 +1328,28 @@ void optimize(
         host_stats.data_handle(), dev_stats.data_handle(), 2, raft::resource::get_cuda_stream(res));
       num_keep = host_stats.data_handle()[0];
       num_full = host_stats.data_handle()[1];
+
+      const double time_2hop_count_end = cur_time();
+      RAFT_LOG_DEBUG(
+        "# Time for 2-hop detour counting on GPU: %.1lf sec, "
+        "avg_no_detour_edges_per_node: %.2lf/%u, "
+        "nodes_with_no_detour_at_all_edges: %.1lf%%",
+        time_2hop_count_end - time_2hop_count_start,
+        (double)num_keep / graph_size,
+        output_graph_degree,
+        (double)num_full / graph_size * 100);
     } else {
       // Count 2-hop detours on CPU
       raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
         "cagra::graph::optimize/prune/2-hop-counting-by-CPU");
+      const double time_2hop_count_start = cur_time();
 
-#pragma omp parallel for reduction(+ : num_keep, num_full)
-      for (IdxT iA = 0; iA < graph_size; iA++) {
-        uint32_t num_edges_no_detour = 0;
-        // Create a list of nodes, iB_candidates, that can be reached in 2-hops from node A.
-        auto iB_candidates =
-          raft::make_host_vector<IdxT, int64_t>((knn_graph_degree - 1) * (knn_graph_degree - 1));
-        for (uint64_t kAC = 0; kAC < knn_graph_degree - 1; kAC++) {
-          IdxT iC = knn_graph(iA, kAC);
-          for (uint64_t kCB = 0; kCB < knn_graph_degree - 1; kCB++) {
-            IdxT iB_candidate;
-            if (iC == iA || iC >= graph_size) {
-              iB_candidate = graph_size;
-            } else {
-              iB_candidate = knn_graph(iC, kCB);
-              if (iB_candidate == iA || iB_candidate == iC) { iB_candidate = graph_size; }
-            }
-            uint64_t idx;
-            if (kAC < kCB) {
-              idx = (kCB * kCB) + kAC;
-            } else {
-              idx = (kAC * (kAC + 1)) + kCB;
-            }
-            iB_candidates(idx) = iB_candidate;
-          }
-        }
-        // Count how many 2-hop detours are on each edge of node A.
-        for (uint64_t kAB = 0; kAB < knn_graph_degree; kAB++) {
-          constexpr uint32_t max_count = 255;
-          uint32_t count               = 0;
-          IdxT iB                      = knn_graph(iA, kAB);
-          if (iB == iA) {
-            count = max_count;
-          } else {
-            for (uint64_t idx = 0; idx < kAB * kAB; idx++) {
-              if (iB_candidates(idx) == iB) { count += 1; }
-            }
-          }
-          detour_count(iA, kAB) = std::min(count, max_count);
-          if (count == 0) { num_edges_no_detour += 1; }
-        }
-        num_keep += num_edges_no_detour;
-        if (num_edges_no_detour > knn_graph_degree) { num_full += 1; }
-      }
+      count_2hop_detours(knn_graph, detour_count.view());
+
+      const double time_2hop_count_end = cur_time();
+      RAFT_LOG_DEBUG(/* TODO: change to DEBUG */
+                     "# Time for 2-hop detour counting on CPU: %.1lf sec",
+                     time_2hop_count_end - time_2hop_count_start);
     }
 
     // Create pruned kNN graph
@@ -1385,14 +1412,7 @@ void optimize(
       "overflows occur during the norm computation between the dataset vectors.");
 
     const double time_prune_end = cur_time();
-    RAFT_LOG_DEBUG(
-      "# Pruning time: %.1lf sec, "
-      "avg_no_detour_edges_per_node: %.2lf/%u, "
-      "nodes_with_no_detour_at_all_edges: %.1lf%%\n",
-      time_prune_end - time_prune_start,
-      (double)num_keep / graph_size,
-      output_graph_degree,
-      (double)num_full / graph_size * 100);
+    RAFT_LOG_DEBUG("# Pruning time: %.1lf sec", time_prune_end - time_prune_start);
   }
 
   auto rev_graph       = raft::make_host_matrix<IdxT, int64_t>(graph_size, output_graph_degree);
