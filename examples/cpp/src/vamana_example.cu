@@ -74,7 +74,10 @@ void usage() {
   printf("Visited_size must be > degree and a power of 2.\n");
   printf("max_fraction > 0 and <= 1. Typical values are 0.06 or 0.1.\n");
   printf("Default iterations = 1, increase for better quality graph.\n");
-  printf("Optional path prefix to pq pivots and rotation matrix files. Expects pq pivots file at ${codebook_prefix}_pq_pivots.bin and rotation matrix file at ${codebook_prefix}_pq_pivots.bin_rotation_matrix.bin.\n");
+  printf(
+      "Optional path prefix to pq pivots and rotation matrix files. Expects pq "
+      "pivots file at ${codebook_prefix}_pq_pivots.bin and rotation matrix "
+      "file at ${codebook_prefix}_pq_pivots.bin_rotation_matrix.bin.\n");
   exit(1);
 }
 
@@ -105,7 +108,8 @@ int main(int argc, char *argv[]) {
   int iters = atoi(argv[6]);
   std::string codebook_prefix = "";
   if (argc >= 8)
-    codebook_prefix = (std::string)argv[7]; // Path prefix to pq pivots and rotation matrix files
+    codebook_prefix = (std::string)
+        argv[7]; // Path prefix to pq pivots and rotation matrix files
 
   // Read in binary dataset file
   auto dataset =
