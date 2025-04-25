@@ -471,7 +471,8 @@ inline std::vector<float> parse_rotation_matrix_file(const std::string& path, co
 
   // check exact length
   uint32_t length_expected = 8 + (4 * nr * nc);
-  RAFT_EXPECTS(length_expected == length, "Rotation matrix file doesn't have expected size. Expected: %lu Actual: %ld",
+  RAFT_EXPECTS(length_expected == length,
+               "Rotation matrix file doesn't have expected size. Expected: %lu Actual: %ld",
                (unsigned long)length_expected,
                (long)length);
 
@@ -543,8 +544,8 @@ index<T, IdxT> build(
 
     std::vector<float> PQEncodingTable = parse_pq_pivots_file(
       params.codebook_prefix + "_pq_pivots.bin", dim, pq_codebook_size, pq_dim);
-    std::vector<float> OPQMatrix =
-      parse_rotation_matrix_file(params.codebook_prefix + "_pq_pivots.bin_rotation_matrix.bin", dim);
+    std::vector<float> OPQMatrix = parse_rotation_matrix_file(
+      params.codebook_prefix + "_pq_pivots.bin_rotation_matrix.bin", dim);
 
     pq_params.pq_bits = std::lround(std::log2(pq_codebook_size));
     pq_params.pq_dim  = pq_dim;
