@@ -71,6 +71,57 @@ void* _build(cuvsResources_t res,
     RAFT_FAIL("dataset must be accessible on host or device memory");
   }
 }
+
+template <typename output_mdspan_type>
+void _get_graph(cuvsResources_t res, cuvsNNDescentIndex_t index, DLManagedTensor* graph)
+{
+  auto dtype = index->dtype;
+  if ((dtype.code == kDLUInt) && (dtype.bits == 32)) {
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::nn_descent::index<uint32_t>*>(index->addr);
+    auto dst       = cuvs::core::from_dlpack<output_mdspan_type>(graph);
+    auto src       = index_ptr->graph();
+    auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+
+    RAFT_EXPECTS(src.extent(0) == dst.extent(0), "Output graph has incorrect number of rows");
+    RAFT_EXPECTS(src.extent(1) == dst.extent(1), "Output graph has incorrect number of cols");
+
+    cudaMemcpyAsync(dst.data_handle(),
+                    src.data_handle(),
+                    dst.extent(0) * dst.extent(1) * sizeof(uint32_t),
+                    cudaMemcpyDefault,
+                    raft::resource::get_cuda_stream(*res_ptr));
+  } else {
+    RAFT_FAIL("Unsupported nn-descent index dtype: %d and bits: %d", dtype.code, dtype.bits);
+  }
+}
+
+template <typename output_mdspan_type>
+void _get_distances(cuvsResources_t res, cuvsNNDescentIndex_t index, DLManagedTensor* distances)
+{
+  auto dtype = index->dtype;
+  if ((dtype.code == kDLUInt) && (dtype.bits == 32)) {
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::nn_descent::index<uint32_t>*>(index->addr);
+    auto src       = index_ptr->distances();
+    if (!src.has_value()) {
+      RAFT_FAIL("nn-descent index doesn't contain distances - set return_distances when building");
+    }
+
+    auto res_ptr = reinterpret_cast<raft::resources*>(res);
+    auto dst     = cuvs::core::from_dlpack<output_mdspan_type>(distances);
+
+    RAFT_EXPECTS(src->extent(0) == dst.extent(0), "Output distances has incorrect number of rows");
+    RAFT_EXPECTS(src->extent(1) == dst.extent(1), "Output distances has incorrect number of cols");
+
+    cudaMemcpyAsync(dst.data_handle(),
+                    src->data_handle(),
+                    dst.extent(0) * dst.extent(1) * sizeof(float),
+                    cudaMemcpyDefault,
+                    raft::resource::get_cuda_stream(*res_ptr));
+
+  } else {
+    RAFT_FAIL("Unsupported nn-descent index dtype: %d and bits: %d", dtype.code, dtype.bits);
+  }
+}
 }  // namespace
 
 extern "C" cuvsError_t cuvsNNDescentIndexCreate(cuvsNNDescentIndex_t* index)
@@ -146,22 +197,32 @@ extern "C" cuvsError_t cuvsNNDescentIndexParamsDestroy(cuvsNNDescentIndexParams_
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
-extern "C" cuvsError_t cuvsNNDescentIndexGetGraph(cuvsNNDescentIndex_t index,
+extern "C" cuvsError_t cuvsNNDescentIndexGetGraph(cuvsResources_t res,
+                                                  cuvsNNDescentIndex_t index,
                                                   DLManagedTensor* graph)
 {
   return cuvs::core::translate_exceptions([=] {
-    auto dtype = index->dtype;
-    if ((dtype.code == kDLUInt) && (dtype.bits == 32)) {
-      auto index_ptr = reinterpret_cast<cuvs::neighbors::nn_descent::index<uint32_t>*>(index->addr);
-      using output_mdspan_type = raft::host_matrix_view<uint32_t, int64_t, raft::row_major>;
-      auto dst                 = cuvs::core::from_dlpack<output_mdspan_type>(graph);
-      auto src                 = index_ptr->graph();
-
-      RAFT_EXPECTS(src.extent(0) == dst.extent(0), "Output graph has incorrect number of rows");
-      RAFT_EXPECTS(src.extent(1) == dst.extent(1), "Output graph has incorrect number of cols");
-      std::copy(src.data_handle(), src.data_handle() + dst.size(), dst.data_handle());
+    if (cuvs::core::is_dlpack_device_compatible(graph->dl_tensor)) {
+      using output_mdspan_type = raft::device_matrix_view<uint32_t, int64_t, raft::row_major>;
+      _get_graph<output_mdspan_type>(res, index, graph);
     } else {
-      RAFT_FAIL("Unsupported nn-descent index dtype: %d and bits: %d", dtype.code, dtype.bits);
+      using output_mdspan_type = raft::host_matrix_view<uint32_t, int64_t, raft::row_major>;
+      _get_graph<output_mdspan_type>(res, index, graph);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsNNDescentIndexGetDistances(cuvsResources_t res,
+                                                      cuvsNNDescentIndex_t index,
+                                                      DLManagedTensor* distances)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (cuvs::core::is_dlpack_device_compatible(distances->dl_tensor)) {
+      using output_mdspan_type = raft::device_matrix_view<float, int64_t, raft::row_major>;
+      _get_distances<output_mdspan_type>(res, index, distances);
+    } else {
+      using output_mdspan_type = raft::host_matrix_view<float, int64_t, raft::row_major>;
+      _get_distances<output_mdspan_type>(res, index, distances);
     }
   });
 }
