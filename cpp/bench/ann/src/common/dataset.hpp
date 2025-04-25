@@ -64,14 +64,12 @@ struct dataset {
   // This cache variable is filled from either of the two sets loaded first.
   mutable std::atomic<int> dim_ = -1;
 
-  // Before returning the passed result, cache the dim value from the passed blob.
-  template <typename R>
-  auto with_cached_dim_from(const blob<DataT>& blob, R&& r) const -> R
+  // Cache the dim value from the passed blob.
+  inline void cache_dim(const blob<DataT>& blob) const
   {
     if (dim_.load(std::memory_order_relaxed) == -1) {
       dim_.store(static_cast<int>(blob.n_cols()), std::memory_order_relaxed);
     }
-    return std::forward<R>(r);
   }
 
  public:
@@ -138,12 +136,16 @@ struct dataset {
   [[nodiscard]] auto base_set_size() const -> size_t
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    return with_cached_dim_from(base_set_, base_set_.n_rows());
+    auto r = base_set_.n_rows();
+    cache_dim(base_set_);
+    return r;
   }
   [[nodiscard]] auto query_set_size() const -> size_t
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    return with_cached_dim_from(query_set_, query_set_.n_rows());
+    auto r = query_set_.n_rows();
+    cache_dim(query_set_);
+    return r;
   }
 
   [[nodiscard]] auto gt_set() const -> const IdxT*
@@ -156,27 +158,35 @@ struct dataset {
   [[nodiscard]] auto query_set() const -> const DataT*
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    return with_cached_dim_from(query_set_, query_set_.data());
+    auto* r = query_set_.data();
+    cache_dim(query_set_);
+    return r;
   }
   [[nodiscard]] auto query_set(MemoryType memory_type,
                                HugePages request_hugepages_2mb = HugePages::kDisable) const
     -> const DataT*
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    return with_cached_dim_from(query_set_, query_set_.data(memory_type, request_hugepages_2mb));
+    auto* r = query_set_.data(memory_type, request_hugepages_2mb);
+    cache_dim(query_set_);
+    return r;
   }
 
   [[nodiscard]] auto base_set() const -> const DataT*
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    return with_cached_dim_from(base_set_, base_set_.data());
+    auto* r = base_set_.data();
+    cache_dim(base_set_);
+    return r;
   }
   [[nodiscard]] auto base_set(MemoryType memory_type,
                               HugePages request_hugepages_2mb = HugePages::kDisable) const
     -> const DataT*
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    return with_cached_dim_from(base_set_, base_set_.data(memory_type, request_hugepages_2mb));
+    auto* r = base_set_.data(memory_type, request_hugepages_2mb);
+    cache_dim(base_set_);
+    return r;
   }
 
   [[nodiscard]] auto filter_bitset() const -> const bitset_carrier_type*
