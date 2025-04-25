@@ -48,6 +48,12 @@ from libc.stdint cimport (
 
 from cuvs.common.exceptions import check_cuvs
 
+INIT_METHOD_TYPES = {
+    "KMeansPlusPlus" : cuvsKMeansInitMethod.KMeansPlusPlus,
+    "Random" : cuvsKMeansInitMethod.Random,
+    "Array" : cuvsKMeansInitMethod.Array}
+
+INIT_METHOD_NAMES = {v: k for k, v in INIT_METHOD_TYPES.items()}
 
 cdef class KMeansParams:
     """
@@ -60,6 +66,13 @@ cdef class KMeansParams:
     n_clusters : int
         The number of clusters to form as well as the number of centroids
         to generate
+    init_method : str
+        Method for initializing clusters. One of:
+        "KMeansPlusPlus" : Use scalable k-means++ algorithm to select initial
+        cluster centers
+        "Random" : Choose 'n_clusters' observations at random from the input
+        data
+        "Array" : Use centroids as initial cluster centers
     max_iter : int
         Maximum number of iterations of the k-means algorithm for a single run
     tol : float
@@ -82,10 +95,10 @@ cdef class KMeansParams:
     def __dealloc__(self):
         check_cuvs(cuvsKMeansParamsDestroy(self.params))
 
-    # TODO: initMethod
     def __init__(self, *,
                  metric=None,
                  n_clusters=None,
+                 init_method=None,
                  max_iter=None,
                  tol=None,
                  n_init=None,
@@ -96,6 +109,9 @@ cdef class KMeansParams:
             self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
         if n_clusters is not None:
             self.params.n_clusters = n_clusters
+        if init_method is not None:
+            c_method = INIT_METHOD_TYPES[init_method]
+            self.params.init = <cuvsKMeansInitMethod>c_method
         if max_iter is not None:
             self.params.max_iter = max_iter
         if tol is not None:
@@ -119,6 +135,10 @@ cdef class KMeansParams:
     @property
     def n_clusters(self):
         return self.params.n_clusters
+
+    @property
+    def init_method(self):
+        return INIT_METHOD_NAMES[self.params.init]
 
     @property
     def max_iter(self):
