@@ -157,7 +157,8 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
 
     tmp_index_file index_file;
     vamana::serialize(handle_, index_file.filename, index);
-    vamana::serialize(handle_, index_file.filename + "_sector_aligned", index, true, true);
+    if (index_params.codebook_prefix.size())
+      vamana::serialize(handle_, index_file.filename + "_sector_aligned", index, true, true);
 
     // Test recall by searching with CAGRA search
     if (ps.graph_degree < 256) {  // CAGRA search result buffer cannot support larger graph degree
