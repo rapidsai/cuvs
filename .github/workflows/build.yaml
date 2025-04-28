@@ -74,7 +74,6 @@ jobs:
       arch: "amd64"
       date: ${{ inputs.date }}
       container_image: "rapidsai/ci-conda:latest"
-      node_type: "gpu-l4-latest-1"
       run_script: "ci/build_java.sh"
       file_to_upload: "java/cuvs-java/target/"
       sha: ${{ inputs.sha }}

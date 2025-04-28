@@ -18,7 +18,7 @@ ARGS=$*
 # scripts, and that this script resides in the repo dir!
 REPODIR=$(cd $(dirname $0); pwd)
 
-VALIDARGS="clean libcuvs python rust go java docs tests bench-ann examples --uninstall  -v -g -n --allgpuarch --no-mg --no-cpu --cpu-only --no-shared-libs --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
+VALIDARGS="clean libcuvs python rust go java docs tests bench-ann examples --uninstall  -v -g -n --allgpuarch --no-mg --no-cpu --cpu-only --no-shared-libs --no-nvtx --show_depr_warn --incl-cache-stats --time -h --skip-java-tests"
 HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<tool>] [--limit-tests=<targets>] [--limit-bench-ann=<targets>] [--build-metrics=<filename>]
  where <target> is:
    clean            - remove all existing build artifacts and configuration (start over)
@@ -53,6 +53,7 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
    --no-nvtx                   - disable nvtx (profiling markers), but allow enabling it in downstream projects
    --no-shared-libs            - build without shared libraries
    --show_depr_warn            - show cmake deprecation warnings
+   --skip-java-test            - skip java tests
    --build-metrics             - filename for generating build metrics report for libcuvs
    --incl-cache-stats          - include cache statistics in build metrics report
    --cmake-args=\\\"<args>\\\" - pass arbitrary list of CMake configuration options (escape all quotes in argument)
@@ -494,12 +495,20 @@ if (( ${NUMARGS} == 0 )) || hasArg go; then
 fi
 
 # Build the cuvs Java bindings
+SKIP_JAVA_TESTS=""
+for arg in "$@"
+do
+  if [ "$arg" == "--skip-java-tests" ]; then
+    SKIP_JAVA_TESTS="--skip-java-tests"
+  fi
+done
+
 if (( ${NUMARGS} == 0 )) || hasArg java; then
     if ! hasArg libcuvs; then
         echo "Please add 'libcuvs' to this script's arguments (ex. './build.sh libcuvs java') if libcuvs libraries are not already built"
     fi
     cd ${REPODIR}/java
-    ./build.sh
+    ./build.sh $SKIP_JAVA_TESTS
 fi
 
 export RAPIDS_VERSION="$(sed -E -e 's/^([0-9]{2})\.([0-9]{2})\.([0-9]{2}).*$/\1.\2.\3/' "${REPODIR}/VERSION")"

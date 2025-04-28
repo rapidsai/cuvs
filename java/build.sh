@@ -20,7 +20,14 @@ then
   exit 1
 fi
 
+SKIP_JAVA_TESTS=""
+for arg in "$@"
+do
+  if [ "$arg" == "--skip-java-tests" ]; then
+    SKIP_JAVA_TESTS="-DskipTests"
+  fi
+done
 mvn install:install-file -DgroupId=$GROUP_ID -DartifactId=cuvs-java-internal -Dversion=$VERSION -Dpackaging=so -Dfile=$SO_FILE_PATH/libcuvs_java.so \
   && cd cuvs-java \
-  && mvn verify \
+  && mvn verify $SKIP_JAVA_TESTS \
   && mvn install:install-file -Dfile=./target/cuvs-java-$VERSION-jar-with-dependencies.jar -DgroupId=$GROUP_ID -DartifactId=cuvs-java -Dversion=$VERSION -Dpackaging=jar
