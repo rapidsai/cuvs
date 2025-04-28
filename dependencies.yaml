@@ -620,10 +620,10 @@ dependencies:
           - scikit-learn
       - output_types: [conda]
         packages:
-          - matplotlib-base
+          - matplotlib-base>=3.9
       - output_types: [requirements, pyproject]
         packages:
-          - matplotlib
+          - matplotlib>=3.9
   depends_on_cuvs:
     common:
       - output_types: conda
