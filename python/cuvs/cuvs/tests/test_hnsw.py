@@ -88,8 +88,6 @@ def run_hnsw_build_search_test(
 @pytest.mark.parametrize("build_algo", ["ivf_pq", "nn_descent"])
 @pytest.mark.parametrize("hierarchy", ["none", "cpu", "gpu"])
 def test_hnsw(dtype, k, ef, num_threads, metric, build_algo, hierarchy):
-    # Note that inner_product tests use normalized input which we cannot
-    # represent in int8, therefore we test only sqeuclidean metric here.
     expected_recall = (
         0.9 if metric == "inner_product" and dtype == np.uint8 else 0.95
     )
