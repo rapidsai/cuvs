@@ -40,33 +40,31 @@ void single_linkage(raft::resources const& handle,
   }
 }
 
-void build_mutual_reachability_linkage(
-  raft::resources const& handle,
-  raft::device_matrix_view<const float, int, raft::row_major> X,
-  cuvs::distance::DistanceType metric,
-  raft::device_vector_view<float, int> core_dists,
-  raft::device_vector_view<int, int> indptr,
-  raft::sparse::COO<float, int>& mutual_reachability_coo,
-  raft::device_vector_view<int, int> out_mst_src,
-  raft::device_vector_view<int, int> out_mst_dst,
-  raft::device_vector_view<float, int> out_mst_weights,
-  raft::device_matrix_view<int, int> out_children,
-  raft::device_vector_view<float, int> out_deltas,
-  raft::device_vector_view<int, int> out_sizes)
+template <typename red_op>
+void build_linkage(raft::resources const& handle,
+                   raft::device_matrix_view<const float, int, raft::row_major> X,
+                   cuvs::distance::DistanceType metric,
+                   raft::device_vector_view<int, int> graph_indptr,
+                   raft::device_coo_matrix_view<float, int, int, int> graph,
+                   raft::device_coo_matrix_view<int, int, int, int> out_mst,
+                   raft::device_matrix_view<int, int> dendrogram,
+                   raft::device_vector_view<float, int> out_distances,
+                   raft::device_vector_view<int, int> out_sizes,
+                   red_op mst_red_op)
 {
-  detail::build_mutual_reachability_linkage<float, int>(handle,
-                                                        X.data_handle(),
-                                                        static_cast<size_t>(X.extent(0)),
-                                                        static_cast<size_t>(X.extent(1)),
-                                                        metric,
-                                                        core_dists.data_handle(),
-                                                        indptr.data_handle(),
-                                                        mutual_reachability_coo,
-                                                        out_mst_src.data_handle(),
-                                                        out_mst_dst.data_handle(),
-                                                        out_mst_weights.data_handle(),
-                                                        out_children.data_handle(),
-                                                        out_deltas.data_handle(),
-                                                        out_sizes.data_handle());
+  detail::build_linkage(handle,
+                        X.data_handle(),
+                        X.extent(0),
+                        X.extent(1),
+                        metric,
+                        graph_indptr.data_handle(),
+                        graph,
+                        out_mst.structure_view().get_rows().data(),
+                        out_mst.structure_view().get_cols().data(),
+                        out_mst.get_elements().data(),
+                        dendrogram.data_handle(),
+                        out_distances.data_handle(),
+                        out_sizes.data_handle(),
+                        mst_red_op);
 }
 }  // namespace cuvs::cluster::agglomerative

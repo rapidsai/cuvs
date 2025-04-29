@@ -124,99 +124,6 @@ void single_linkage(raft::resources const& handle,
 }
 
 /**
- * Functor with reduction ops for performing fused 1-nn
- * computation in the mutual reachability space and guaranteeing only cross-component
- * neighbors are considered.
- * @tparam value_idx
- * @tparam value_t
- */
-template <typename value_idx, typename value_t>
-struct FixConnectivitiesMRRedOp {
-  value_t* core_dists;
-  value_idx m;
-
-  DI FixConnectivitiesMRRedOp() : m(0) {}
-
-  FixConnectivitiesMRRedOp(value_t* core_dists_, value_idx m_) : core_dists(core_dists_), m(m_){};
-
-  typedef typename raft::KeyValuePair<value_idx, value_t> KVP;
-  DI void operator()(value_idx rit, KVP* out, const KVP& other) const
-  {
-    if (rit < m && other.value < std::numeric_limits<value_t>::max()) {
-      value_t core_dist_rit   = core_dists[rit];
-      value_t core_dist_other = max(core_dist_rit, max(core_dists[other.key], other.value));
-
-      value_t core_dist_out;
-      if (out->key > -1) {
-        core_dist_out = max(core_dist_rit, max(core_dists[out->key], out->value));
-      } else {
-        core_dist_out = out->value;
-      }
-
-      bool smaller = core_dist_other < core_dist_out;
-      out->key     = smaller ? other.key : out->key;
-      out->value   = smaller ? core_dist_other : core_dist_out;
-    }
-  }
-
-  DI KVP operator()(value_idx rit, const KVP& a, const KVP& b) const
-  {
-    if (rit < m && a.key > -1) {
-      value_t core_dist_rit = core_dists[rit];
-      value_t core_dist_a   = max(core_dist_rit, max(core_dists[a.key], a.value));
-
-      value_t core_dist_b;
-      if (b.key > -1) {
-        core_dist_b = max(core_dist_rit, max(core_dists[b.key], b.value));
-      } else {
-        core_dist_b = b.value;
-      }
-
-      return core_dist_a < core_dist_b ? KVP(a.key, core_dist_a) : KVP(b.key, core_dist_b);
-    }
-
-    return b;
-  }
-
-  DI void init(value_t* out, value_t maxVal) const { *out = maxVal; }
-  DI void init(KVP* out, value_t maxVal) const
-  {
-    out->key   = -1;
-    out->value = maxVal;
-  }
-
-  DI void init_key(value_t& out, value_idx idx) const { return; }
-  DI void init_key(KVP& out, value_idx idx) const { out.key = idx; }
-
-  DI value_t get_value(KVP& out) const { return out.value; }
-  DI value_t get_value(value_t& out) const { return out; }
-
-  void gather(const raft::resources& handle, value_idx* map)
-  {
-    auto tmp_core_dists = raft::make_device_vector<value_t>(handle, m);
-    thrust::gather(raft::resource::get_thrust_policy(handle),
-                   map,
-                   map + m,
-                   core_dists,
-                   tmp_core_dists.data_handle());
-    raft::copy_async(
-      core_dists, tmp_core_dists.data_handle(), m, raft::resource::get_cuda_stream(handle));
-  }
-
-  void scatter(const raft::resources& handle, value_idx* map)
-  {
-    auto tmp_core_dists = raft::make_device_vector<value_t>(handle, m);
-    thrust::scatter(raft::resource::get_thrust_policy(handle),
-                    core_dists,
-                    core_dists + m,
-                    map,
-                    tmp_core_dists.data_handle());
-    raft::copy_async(
-      core_dists, tmp_core_dists.data_handle(), m, raft::resource::get_cuda_stream(handle));
-  }
-};
-
-/**
  * Given a mutual reachability graph and core distances, constructs a linkage over it by computing
  * the minimum spanning tree and dendrogram. Returns mst edges sorted by weight and the linkage.
  * Cluster labels are hierarchical and not flattened.
@@ -227,59 +134,63 @@ struct FixConnectivitiesMRRedOp {
  * @param[in] m number of rows
  * @param[in] n number of columns
  * @param[in] metric distance metric to use
- * @param[in] core_dists core distances (size m)
  * @param[in] indptr CSR indices of mutual reachability knn graph (size m + 1)
- * @param[out] mutual_reachability_coo (symmetrized) maximum reachability distance for the k nearest
- *             neighbors
+ * @param[out] graph_coo (symmetrized) input graph
  * @param[out] out_mst_src src vertex of MST edges (size m - 1)
  * @param[out] out_mst_dst dst vertex of MST eges (size m - 1)
  * @param[out] out_mst_weights weights of MST edges (size m - 1)
- * @param[out] out_children children of output
+ * @param[out] out_children output dendrogram
  * @param[out] out_deltas distances of output
  * @param[out] out_sizes cluster sizes of output
+ * @param[in] mst_red_op connectivities functor for building the MST
  */
-template <typename value_idx = int, typename value_t = float, typename nnz_t>
-void build_mutual_reachability_linkage(
-  raft::resources const& handle,
-  const value_t* X,
-  size_t m,
-  size_t n,
-  cuvs::distance::DistanceType metric,
-  value_t* core_dists,
-  value_idx* indptr,
-  raft::sparse::COO<value_t, value_idx, nnz_t>& mutual_reachability_coo,
-  value_idx* out_mst_src,
-  value_idx* out_mst_dst,
-  value_t* out_mst_weights,
-  value_idx* out_children,
-  value_t* out_deltas,
-  value_idx* out_sizes)
+template <typename value_idx = int, typename value_t = float, typename nnz_t, typename red_op>
+void build_linkage(raft::resources const& handle,
+                   const value_t* X,
+                   size_t m,
+                   size_t n,
+                   cuvs::distance::DistanceType metric,
+                   value_idx* indptr,
+                   raft::device_coo_matrix_view<value_t, value_idx, value_idx, nnz_t> graph_coo,
+                   value_idx* out_mst_src,
+                   value_idx* out_mst_dst,
+                   value_t* out_mst_weights,
+                   value_idx* out_dendrogram,
+                   value_t* out_deltas,
+                   value_idx* out_sizes,
+                   red_op mst_red_op)
 {
   /**
    * Construct MST sorted by weights
    */
   auto color = raft::make_device_vector<value_idx, value_idx>(handle, static_cast<value_idx>(m));
-  FixConnectivitiesMRRedOp<value_idx, value_t> red_op(core_dists, static_cast<value_idx>(m));
+
   // during knn graph connection
   detail::build_sorted_mst(handle,
                            X,
                            indptr,
-                           mutual_reachability_coo.cols(),
-                           mutual_reachability_coo.vals(),
+                           graph_coo.structure_view().get_cols().data(),
+                           graph_coo.get_elements().data(),
                            m,
                            n,
                            out_mst_src,
                            out_mst_dst,
                            out_mst_weights,
                            color.data_handle(),
-                           mutual_reachability_coo.nnz,
-                           red_op,
+                           graph_coo.structure_view().get_nnz(),
+                           mst_red_op,
                            metric);
 
   /**
    * Perform hierarchical labeling
    */
-  detail::build_dendrogram_host(
-    handle, out_mst_src, out_mst_dst, out_mst_weights, m - 1, out_children, out_deltas, out_sizes);
+  detail::build_dendrogram_host(handle,
+                                out_mst_src,
+                                out_mst_dst,
+                                out_mst_weights,
+                                m - 1,
+                                out_dendrogram,
+                                out_deltas,
+                                out_sizes);
 }
 };  // namespace  cuvs::cluster::agglomerative::detail
