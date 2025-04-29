@@ -1196,9 +1196,16 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
     raft::matrix::slice<DistData_t, int64_t, raft::row_major>(
       res, raft::make_const_mdspan(graph_d_dists.view()), output_dist_view, coords);
 
+    // distance post-processing
     if (build_config_.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
       raft::linalg::map(
         res, output_dist_view, raft::sqrt_op{}, raft::make_const_mdspan(output_dist_view));
+    } else if (build_config_.metric == cuvs::distance::DistanceType::InnerProduct) {
+      // revert negated innerproduct
+      raft::linalg::map(res,
+                        output_dist_view,
+                        raft::mul_const_op<DistData_t>(-1),
+                        raft::make_const_mdspan(output_dist_view));
     }
     raft::resource::sync_stream(res);
   }
