@@ -60,7 +60,7 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
   std::cout << "Time to build index: " << elapsed_seconds.count() << "s\n";
 
   // Output index to file
-//  serialize(dev_resources, out_fname, index);
+  serialize(dev_resources, out_fname, index);
 }
 
 void usage()

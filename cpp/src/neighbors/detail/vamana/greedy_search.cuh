@@ -82,7 +82,18 @@ __global__ void TestSortKernel(void* query_list_ptr, int num_queries, int topk) 
   for (int i = blockIdx.x; i < num_queries; i += gridDim.x) {
     __syncthreads();
     SEARCH_SELECT_SORT(topk);
+/*
+    if(threadIdx.x==0 && i==0) {
+      printf("query:%d, sorted output [", query_list[i].queryId);
+      for(int j=0; j<query_list[i].size; j++) {
+        printf("%d (%0.3f), ", query_list[i].ids[j], query_list[i].dists[j]);
+      }
+      printf("\n");
+    }
+    */
   }
+
+
 }
 
 /********************************************************************************************

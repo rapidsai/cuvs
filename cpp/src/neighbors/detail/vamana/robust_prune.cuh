@@ -129,7 +129,8 @@ __global__ void RobustPruneKernel(
   int visited_size,
   cuvs::distance::DistanceType metric,
   float alpha,
-  int sort_smem_size)
+  int sort_smem_size,
+  T* s_coords_mem)
 {
   int n      = dataset.extent(0);
   int dim    = dataset.extent(1);
@@ -140,7 +141,8 @@ __global__ void RobustPruneKernel(
   union ShmemLayout {
     // All blocksort sizes have same alignment (16)
 //    typename cub::BlockMergeSort<DistPair<IdxT, accT>, 32, 3>::TempStorage sort_mem;
-    T coords;
+//    T coords;
+    float occlusion;
     DistPair<IdxT, accT> nbh_list;
   };
 
@@ -149,12 +151,16 @@ __global__ void RobustPruneKernel(
 
   int align_padding = raft::alignTo<int>(dim, alignof(ShmemLayout)) - dim;
 
-  T* s_coords                        = reinterpret_cast<T*>(&smem[sort_smem_size]);
+  float* occlusion_list = reinterpret_cast<float*>(&smem[sort_smem_size]);
+//  T* s_coords                        = reinterpret_cast<T*>(&smem[sort_smem_size]);
   DistPair<IdxT, accT>* new_nbh_list = reinterpret_cast<DistPair<IdxT, accT>*>(
-    &smem[(dim + align_padding) * sizeof(T) + sort_smem_size]);
+//    &smem[(dim + align_padding) * sizeof(T) + sort_smem_size]);
+    &smem[(degree + visited_size) * sizeof(float) + sort_smem_size]);
+
 
   static __shared__ Point<T, accT> s_query;
-  s_query.coords = s_coords;
+//  s_query.coords = s_coords;
+  s_query.coords = &s_coords_mem[blockIdx.x*(dim+align_padding)];
   s_query.Dim    = dim;
   static __shared__ int prev_edges;
   static __shared__ accT graphDist;
@@ -166,7 +172,7 @@ __global__ void RobustPruneKernel(
 
     int graphIdx=0;
     int listIdx=0;
-    int res_size=degree;
+    int res_size=degree+visited_size;
 
     // Count total valid edge candidates
     __syncthreads();
@@ -179,11 +185,27 @@ __global__ void RobustPruneKernel(
         }
       }
     }
+    for(int j = threadIdx.x; j<degree+visited_size; j+=blockDim.x) {
+      occlusion_list[j] = 0.0;
+    }
+    __syncthreads();
+
+    if(threadIdx.x==0 && i==0) {
+      printf("queryId:%d, degree %d, visited_size:%d\n", queryId, degree, visited_size);
+    }
     __syncthreads();
 
     DistPair<IdxT,accT> next_cand;
-    for(int outIdx = 0; outIdx < degree;) {
+    // Merge graph and candidate list
+    for(int outIdx = 0; outIdx < degree+visited_size; outIdx++) {
+if(threadIdx.x==0) {
+    printf("queryId:%d, outIdx:%d, degree:%d, visited_size:%d, graphIdx:%d, listIdx:%d\n", queryId, outIdx, degree, visited_size, graphIdx, listIdx);
+    printf("graph(qid, graphid):%d\n", graph(queryId,graphIdx));
+    printf("query_list[i].ids[listIdx]:%d\n", query_list[i].ids[listIdx]);
+}
+__syncthreads();
 
+      // Check if no more valid elements from graph or list
       if(graphIdx < degree && graph(queryId, graphIdx) == raft::upper_bound<IdxT>()) {
         graphIdx = degree;
       }
@@ -191,13 +213,17 @@ __global__ void RobustPruneKernel(
         listIdx = visited_size;
       }
 
-    // Get next candidate vector for list
+    if(threadIdx.x==0 && i==0) {
+      printf("1\n");
+    }
+    __syncthreads();
+
+      // Get next candidate vector for list
       if(graphIdx >= degree) {
         if(listIdx >= visited_size) { // Fill remaining list if no candidates
           if(res_size > outIdx) res_size = outIdx; // Set result size
           new_nbh_list[outIdx].idx = raft::upper_bound<IdxT>();
           new_nbh_list[outIdx].dist = raft::upper_bound<accT>();
-          outIdx++;
           __syncthreads();
           continue;
         }
@@ -205,17 +231,29 @@ __global__ void RobustPruneKernel(
           next_cand.idx = query_list[i].ids[listIdx];
           next_cand.dist = query_list[i].dists[listIdx];
           listIdx++;
+if(threadIdx.x==0 && i==0) printf("A outIdx:%d, no more from graph, selecting (%d, %0.3f) from list\n", outIdx, next_cand.idx, next_cand.dist);
         }
       }
       else if(listIdx >= visited_size) {
+    if(threadIdx.x==0 && i==0) {
+      printf("2\n");
+    }
+    __syncthreads();
         next_cand.idx = graph(queryId, graphIdx);
         accT tempDist = dist<T, accT>(s_query.coords, &dataset((size_t)graph(queryId, graphIdx), 0), dim, metric);
         if(threadIdx.x==0) graphDist = tempDist;
         __syncthreads();
+	next_cand.dist = graphDist;
         graphIdx++;
+if(threadIdx.x==0 && i==0) printf("B outIdx:%d, no more from list, selecting (%d, %0.3f) from graph\n", outIdx, next_cand.idx, next_cand.dist);
       }
       else {
         accT listDist = query_list[i].dists[listIdx];
+
+    if(threadIdx.x==0 && i==0) {
+      printf("3\n");
+    }
+    __syncthreads();
 
         accT tempDist = dist<T, accT>(s_query.coords, &dataset((size_t)graph(queryId, graphIdx), 0), dim, metric);
         if(threadIdx.x==0) graphDist = tempDist;
@@ -225,48 +263,133 @@ __global__ void RobustPruneKernel(
           next_cand.idx = query_list[i].ids[listIdx];
           next_cand.dist = listDist;
 
+if(threadIdx.x==0 && i==0) printf("C outIdx:%d, list < graph, selecting (%d, %0.3f) from graph\n", outIdx, next_cand.idx, next_cand.dist);
+
           if(graph(queryId, graphIdx) == query_list[i].ids[listIdx]) { // Duplicate found!
             graphIdx++; // Skip the duplicate
           }
           listIdx++;
         }
         else {
+    if(threadIdx.x==0 && i==0) {
+      printf("4\n");
+    }
+    __syncthreads();
+
           next_cand.idx = graph(queryId, graphIdx);
           next_cand.dist = graphDist;
           graphIdx++;
+if(threadIdx.x==0 && i==0) printf("D outIdx:%d, graph < list, selecting (%d, %0.3f) from graph\n", outIdx, next_cand.idx, next_cand.dist);
         }
       }
 
-      // Verify candidate doesn't violate current outlist
-      bool good=true;
-      // Only prune if have too many remaining edge candidates
-//      if((prev_edges + query_list[i].size) - (graphIdx + listIdx) > (degree - outIdx)) { 
-      if((prev_edges + query_list[i].size) > degree ) {
-//        for(int j=0; j<outIdx; j++) {
-        for(int j=0; j<outIdx-1; j++) {
-          T* cand_ptr = const_cast<T*>(&dataset((size_t)next_cand.idx, 0));
-
- //         if (new_nbh_list[j].idx != raft::upper_bound<IdxT>()) {
-            T* mem_ptr = const_cast<T*>(&dataset((size_t)new_nbh_list[j].idx, 0));
-            accT dist_starprime = dist<T, accT>(cand_ptr, mem_ptr, dim, metric);
-            if(threadIdx.x==0) graphDist = dist_starprime;
-            __syncthreads();
-
-//            if (alpha * dist_starprime <= new_nbh_list[j].dist) {
-//            if (alpha * graphDist <= new_nbh_list[j].dist) {
-            if (alpha * graphDist <= next_cand.dist) {
-              good = false;
-              j = outIdx;
-            }
-//          }
-        }
-      }
-      if(good) {
-        new_nbh_list[outIdx].idx = next_cand.idx;
-        new_nbh_list[outIdx].dist = next_cand.dist;
-        outIdx++;
-      }
+      new_nbh_list[outIdx].idx = next_cand.idx;
+      new_nbh_list[outIdx].dist = next_cand.dist;
     }
+
+    if(threadIdx.x==0 && i==0) {
+      printf("after merge, new nbh_list graphIdx:%d, listIdx:%d, res_size:%d\n", graphIdx, listIdx, res_size);
+      for(int j=0; j<res_size; j++) {
+        printf("%d (%0.3f), ", new_nbh_list[j].idx, new_nbh_list[j].dist);
+      }
+      printf("\n");
+    }
+    __syncthreads();
+
+    //TODO - WORK ON OCCLUDE LIST AND ITERATE THROUGH IT THAT WAY!
+
+    // If we need to prune at all...
+    if(res_size > degree) {
+      int accept_count=0;
+
+      /*
+      if(threadIdx.x==0 && i==0) {
+	printf("after merge / before prune, size:%d:\n", res_size);
+	for(int j=0; j<res_size; j++) {
+          printf("%d (%0.2f), ", new_nbh_list[j].idx, new_nbh_list[j].dist);
+	}
+	printf("\n");
+      }
+      */
+       
+      // Go through different alpha values. These constants are hard-coded in the MSFT DiskANN code
+      for(float cur_alpha = 1.0; cur_alpha <= alpha && accept_count < degree; cur_alpha *= 1.2) { 
+//if(threadIdx.x==0 && i==0) printf("Pass with alpha = %f\n", cur_alpha);
+        for(int pass_start = 0; pass_start < res_size && accept_count < degree; pass_start++) {
+          // pick next non-occluded element
+          if(occlusion_list[pass_start] == raft::lower_bound<float>() || occlusion_list[pass_start] > cur_alpha) 
+	  {
+//if(threadIdx.x==0 && i==0) {
+//  printf("bad - pass_start:%d, occ val:%0.3f\n", pass_start, occlusion_list[pass_start]);
+//}
+            continue; // Skip over elements already pruned or already accepted
+	  }
+
+//if(threadIdx.x==0 && i==0) {
+//  printf("good! - pass_start:%d, occ val:%0.3f\n", pass_start, occlusion_list[pass_start]);
+//}
+
+	  T* cand_ptr = const_cast<T*>(&dataset((size_t)(new_nbh_list[pass_start].idx), 0));
+
+          occlusion_list[pass_start] = raft::lower_bound<float>(); // Mark as "accepted"
+	  accept_count++;
+        
+	  // Update rets of the occlusion list
+          for(int occId = pass_start+1; occId < res_size; occId++) {
+            if(occlusion_list[occId] != raft::upper_bound<float>() && occlusion_list[occId] != raft::lower_bound<float>()) 
+	    {
+	      T* k_ptr = const_cast<T*>(&dataset((size_t)(new_nbh_list[occId].idx), 0));
+              accT djk = dist<T, accT>(cand_ptr, k_ptr, dim, metric);
+	      accT new_occ = (float)(new_nbh_list[occId].dist / djk);
+
+	      if(threadIdx.x==0 && i==0) {
+                printf("pass:%d, occId:%d, dist:%0.3f, djk:%0.3f, new_occ:%0.3f\n", pass_start, occId, new_nbh_list[occId].dist, djk, new_occ);
+	      }
+			    
+              occlusion_list[occId] = std::max(occlusion_list[occId], new_occ);
+
+            }
+          }
+        }
+      }
+
+
+      if(threadIdx.x==0 && i==0) {
+	printf("after occlusion, accepted: %d:\n", accept_count);
+	for(int j=0; j<res_size; j++) {
+          printf("%0.2f, ", occlusion_list[j]);
+	}
+	printf("\n");
+      }
+
+      // Move all "accepted" candidates to front of list and zero out the rest
+      int out_idx = 1;
+      for(int read_idx=1; out_idx < accept_count; read_idx++) {
+	if(occlusion_list[read_idx] == raft::lower_bound<float>()) { // If it is "accepted"
+          new_nbh_list[out_idx].idx = new_nbh_list[read_idx].idx;
+          new_nbh_list[out_idx].dist = new_nbh_list[read_idx].dist;
+	  out_idx++;
+	}
+      }
+      for(int out_idx=accept_count; out_idx < degree; out_idx++) {
+        new_nbh_list[out_idx].idx = raft::upper_bound<IdxT>();
+        new_nbh_list[out_idx].dist = raft::upper_bound<accT>();
+      }
+
+      if(threadIdx.x==0) {
+        res_size = accept_count;
+      }
+      __syncthreads();
+    }
+
+    if(threadIdx.x==0 && i==0) {
+	printf("after prune, size:%d:\n", res_size);
+	for(int j=0; j<res_size; j++) {
+          printf("%d (%0.2f), ", new_nbh_list[j].idx, new_nbh_list[j].dist);
+	}
+	printf("\n");
+    }
+
     __syncthreads();
     // Copy results out to graph
     for(int j=threadIdx.x; j<degree; j+=blockDim.x) {

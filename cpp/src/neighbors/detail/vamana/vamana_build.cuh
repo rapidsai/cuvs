@@ -97,7 +97,8 @@ void batched_insert_vamana(
   int degree  = graph.extent(1);
 
   // Algorithm params
-  int max_batchsize = (int)(params.max_fraction * (float)N);
+//  int max_batchsize = (int)(params.max_fraction * (float)N);
+  int max_batchsize = 1;
   if (max_batchsize > (int)dataset.extent(0)) {
     RAFT_LOG_WARN(
       "Max fraction is the fraction of the total dataset, so it cannot be larger 1.0, reducing it "
@@ -157,6 +158,11 @@ void batched_insert_vamana(
              raft::resource::get_large_workspace_resource(res),
              raft::make_extents<int64_t>(max_batchsize, visited_size));
 
+  auto s_coords_mem =
+	  raft::make_device_mdarray<T>(res,
+			  raft::resource::get_large_workspace_resource(res),
+			  raft::make_extents<int64_t>(max_batchsize, dim));
+
 
 
   // Create random permutation for order of node inserts into graph
@@ -177,9 +183,10 @@ void batched_insert_vamana(
     degree * sizeof(int) + queue_size * sizeof(DistPair<IdxT, accT>));
 
   // Total dynamic shared memory size needed by both RobustPrune calls
-  int prune_smem_total_size = prune_smem_sort_size + (dim + align_padding) * sizeof(T) +
-                              (degree) * sizeof(DistPair<IdxT, accT>);
-//                              (degree + visited_size) * sizeof(DistPair<IdxT, accT>);
+  int prune_smem_total_size = prune_smem_sort_size + //(dim + align_padding) * sizeof(T) +
+//                              (degree) * sizeof(DistPair<IdxT, accT>);
+	                      (degree + visited_size) * sizeof(float) + // Occlusion list
+                              (degree + visited_size) * sizeof(DistPair<IdxT, accT>);
 
   RAFT_LOG_DEBUG("Dynamic shared memory usage (bytes): GreedySearch: %d, RobustPrune: %d",
                  search_smem_total_size,
@@ -220,7 +227,8 @@ void batched_insert_vamana(
   // Number of passes over dataset (default 1)
   for (int iter = 0; iter < insert_iters; iter++) {
     // Loop through batches and call the insert and prune kernels
-    for (int start = 0; start < N;) {
+//    for (int start = 0; start < N;) {
+    for (int start = 0; start < 40;) {
 start_t = std::chrono::system_clock::now();
 
 
@@ -265,6 +273,7 @@ elapsed_seconds = end_t - start_t;
 segment_sort_time += elapsed_seconds.count();
 start_t = std::chrono::system_clock::now();
 
+printf("------------ PRUNE 1 ------------\n");
       // Run on candidates of vectors being inserted
       RobustPruneKernel<T, accT, IdxT>
         <<<num_blocks, blockD, prune_smem_total_size, stream>>>(d_graph.view(),
@@ -274,7 +283,12 @@ start_t = std::chrono::system_clock::now();
                                                                 visited_size,
                                                                 metric,
                                                                 alpha,
-                                                                prune_smem_sort_size);
+                                                                prune_smem_sort_size,
+								s_coords_mem.data_handle());
+// SEGMENTED SORT ON QUERY_LIST
+TestSortKernel<T, accT, IdxT, Accessor>
+	<<<num_blocks, blockD, search_smem_sort_size, stream>>>(query_list_ptr.data_handle(), step_size, degree);
+
 cudaDeviceSynchronize();
 end_t   = std::chrono::system_clock::now();
 elapsed_seconds = end_t - start_t;
@@ -469,6 +483,7 @@ start_t = std::chrono::system_clock::now();
         recompute_reverse_dists<T, accT, IdxT>
           <<<num_blocks, blockD, 0, stream>>>(reverse_list, dataset, reverse_batch, metric);
 
+printf("------------ PRUNE 2 ------------\n");
         // Call 2nd RobustPrune on reverse query_list
         RobustPruneKernel<T, accT, IdxT>
           <<<num_blocks, blockD, prune_smem_total_size, stream>>>(d_graph.view(),
@@ -478,7 +493,13 @@ start_t = std::chrono::system_clock::now();
                                                                   visited_size,
                                                                   metric,
                                                                   alpha,
-                                                                  prune_smem_sort_size);
+                                                                  prune_smem_sort_size,
+								  s_coords_mem.data_handle());
+	printf("After prune2: %d\n", cudaDeviceSynchronize());
+
+// SEGMENTED SORT ON QUERY_LIST
+TestSortKernel<T, accT, IdxT, Accessor>
+	<<<num_blocks, blockD, search_smem_sort_size, stream>>>(reverse_list_ptr.data_handle(), reverse_batch, degree);
 
         // Write new edge lists to graph
         write_graph_edges_kernel<accT, IdxT><<<num_blocks, blockD, 0, stream>>>(

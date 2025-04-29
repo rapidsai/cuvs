@@ -72,6 +72,7 @@ struct index_params : cuvs::neighbors::index_params {
   uint32_t queue_size = 127;
   /** Max batchsize of reverse edge processing (reduces memory footprint) */
   uint32_t reverse_batchsize = 1000000;
+
 };
 
 /**
