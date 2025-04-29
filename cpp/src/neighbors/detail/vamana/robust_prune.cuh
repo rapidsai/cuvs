@@ -190,20 +190,9 @@ __global__ void RobustPruneKernel(
     }
     __syncthreads();
 
-    if(threadIdx.x==0 && i==0) {
-      printf("queryId:%d, degree %d, visited_size:%d\n", queryId, degree, visited_size);
-    }
-    __syncthreads();
-
     DistPair<IdxT,accT> next_cand;
     // Merge graph and candidate list
     for(int outIdx = 0; outIdx < degree+visited_size; outIdx++) {
-if(threadIdx.x==0) {
-    printf("queryId:%d, outIdx:%d, degree:%d, visited_size:%d, graphIdx:%d, listIdx:%d\n", queryId, outIdx, degree, visited_size, graphIdx, listIdx);
-    printf("graph(qid, graphid):%d\n", graph(queryId,graphIdx));
-    printf("query_list[i].ids[listIdx]:%d\n", query_list[i].ids[listIdx]);
-}
-__syncthreads();
 
       // Check if no more valid elements from graph or list
       if(graphIdx < degree && graph(queryId, graphIdx) == raft::upper_bound<IdxT>()) {
@@ -212,11 +201,6 @@ __syncthreads();
       if(listIdx < visited_size && query_list[i].ids[listIdx] == raft::upper_bound<IdxT>()) {
         listIdx = visited_size;
       }
-
-    if(threadIdx.x==0 && i==0) {
-      printf("1\n");
-    }
-    __syncthreads();
 
       // Get next candidate vector for list
       if(graphIdx >= degree) {
@@ -231,29 +215,18 @@ __syncthreads();
           next_cand.idx = query_list[i].ids[listIdx];
           next_cand.dist = query_list[i].dists[listIdx];
           listIdx++;
-if(threadIdx.x==0 && i==0) printf("A outIdx:%d, no more from graph, selecting (%d, %0.3f) from list\n", outIdx, next_cand.idx, next_cand.dist);
         }
       }
       else if(listIdx >= visited_size) {
-    if(threadIdx.x==0 && i==0) {
-      printf("2\n");
-    }
-    __syncthreads();
         next_cand.idx = graph(queryId, graphIdx);
         accT tempDist = dist<T, accT>(s_query.coords, &dataset((size_t)graph(queryId, graphIdx), 0), dim, metric);
         if(threadIdx.x==0) graphDist = tempDist;
         __syncthreads();
 	next_cand.dist = graphDist;
         graphIdx++;
-if(threadIdx.x==0 && i==0) printf("B outIdx:%d, no more from list, selecting (%d, %0.3f) from graph\n", outIdx, next_cand.idx, next_cand.dist);
       }
       else {
         accT listDist = query_list[i].dists[listIdx];
-
-    if(threadIdx.x==0 && i==0) {
-      printf("3\n");
-    }
-    __syncthreads();
 
         accT tempDist = dist<T, accT>(s_query.coords, &dataset((size_t)graph(queryId, graphIdx), 0), dim, metric);
         if(threadIdx.x==0) graphDist = tempDist;
@@ -271,15 +244,10 @@ if(threadIdx.x==0 && i==0) printf("C outIdx:%d, list < graph, selecting (%d, %0.
           listIdx++;
         }
         else {
-    if(threadIdx.x==0 && i==0) {
-      printf("4\n");
-    }
-    __syncthreads();
 
           next_cand.idx = graph(queryId, graphIdx);
           next_cand.dist = graphDist;
           graphIdx++;
-if(threadIdx.x==0 && i==0) printf("D outIdx:%d, graph < list, selecting (%d, %0.3f) from graph\n", outIdx, next_cand.idx, next_cand.dist);
         }
       }
 
@@ -287,47 +255,20 @@ if(threadIdx.x==0 && i==0) printf("D outIdx:%d, graph < list, selecting (%d, %0.
       new_nbh_list[outIdx].dist = next_cand.dist;
     }
 
-    if(threadIdx.x==0 && i==0) {
-      printf("after merge, new nbh_list graphIdx:%d, listIdx:%d, res_size:%d\n", graphIdx, listIdx, res_size);
-      for(int j=0; j<res_size; j++) {
-        printf("%d (%0.3f), ", new_nbh_list[j].idx, new_nbh_list[j].dist);
-      }
-      printf("\n");
-    }
-    __syncthreads();
-
     //TODO - WORK ON OCCLUDE LIST AND ITERATE THROUGH IT THAT WAY!
 
     // If we need to prune at all...
     if(res_size > degree) {
       int accept_count=0;
 
-      /*
-      if(threadIdx.x==0 && i==0) {
-	printf("after merge / before prune, size:%d:\n", res_size);
-	for(int j=0; j<res_size; j++) {
-          printf("%d (%0.2f), ", new_nbh_list[j].idx, new_nbh_list[j].dist);
-	}
-	printf("\n");
-      }
-      */
-       
       // Go through different alpha values. These constants are hard-coded in the MSFT DiskANN code
       for(float cur_alpha = 1.0; cur_alpha <= alpha && accept_count < degree; cur_alpha *= 1.2) { 
-//if(threadIdx.x==0 && i==0) printf("Pass with alpha = %f\n", cur_alpha);
         for(int pass_start = 0; pass_start < res_size && accept_count < degree; pass_start++) {
           // pick next non-occluded element
           if(occlusion_list[pass_start] == raft::lower_bound<float>() || occlusion_list[pass_start] > cur_alpha) 
 	  {
-//if(threadIdx.x==0 && i==0) {
-//  printf("bad - pass_start:%d, occ val:%0.3f\n", pass_start, occlusion_list[pass_start]);
-//}
             continue; // Skip over elements already pruned or already accepted
 	  }
-
-//if(threadIdx.x==0 && i==0) {
-//  printf("good! - pass_start:%d, occ val:%0.3f\n", pass_start, occlusion_list[pass_start]);
-//}
 
 	  T* cand_ptr = const_cast<T*>(&dataset((size_t)(new_nbh_list[pass_start].idx), 0));
 
@@ -342,10 +283,10 @@ if(threadIdx.x==0 && i==0) printf("D outIdx:%d, graph < list, selecting (%d, %0.
               accT djk = dist<T, accT>(cand_ptr, k_ptr, dim, metric);
 	      accT new_occ = (float)(new_nbh_list[occId].dist / djk);
 
-	      if(threadIdx.x==0 && i==0) {
-                printf("pass:%d, occId:%d, dist:%0.3f, djk:%0.3f, new_occ:%0.3f\n", pass_start, occId, new_nbh_list[occId].dist, djk, new_occ);
-	      }
-			    
+	      // USED TO DEBUG
+//	      if(threadIdx.x==0 && i==0) {
+//                printf("pass:%d, occId:%d, dist:%0.3f, djk:%0.3f, new_occ:%0.3f\n", pass_start, occId, new_nbh_list[occId].dist, djk, new_occ);
+//	      }
               occlusion_list[occId] = std::max(occlusion_list[occId], new_occ);
 
             }
@@ -353,7 +294,7 @@ if(threadIdx.x==0 && i==0) printf("D outIdx:%d, graph < list, selecting (%d, %0.
         }
       }
 
-
+/*
       if(threadIdx.x==0 && i==0) {
 	printf("after occlusion, accepted: %d:\n", accept_count);
 	for(int j=0; j<res_size; j++) {
@@ -361,6 +302,7 @@ if(threadIdx.x==0 && i==0) printf("D outIdx:%d, graph < list, selecting (%d, %0.
 	}
 	printf("\n");
       }
+      */
 
       // Move all "accepted" candidates to front of list and zero out the rest
       int out_idx = 1;
