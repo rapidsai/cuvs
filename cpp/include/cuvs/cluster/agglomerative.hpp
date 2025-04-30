@@ -130,8 +130,7 @@ void single_linkage(
  * @param[in] X data points (size m * n)
  * @param[in] metric distance metric to use
  * @param[in] graph_indptr CSR indices of graph nodes (size m + 1)
- * @param[out] mutual_reachability_coo (symmetrized) maximum reachability distance for the k nearest
- *             neighbors
+ * @param[in] graph input graph
  * @param[out] out_mst output MST sorted by edge weights (size m - 1)
  * @param[out] dendrogram output dendrogram (size [n_rows - 1] * 2)
  * @param[out] out_distances distances for output
