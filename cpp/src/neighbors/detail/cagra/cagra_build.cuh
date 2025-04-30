@@ -164,13 +164,13 @@ void build_knn_graph(
   const auto num_queries = dataset.extent(0);
 
   // Use the same maximum batch size as the ivf_pq::search to avoid allocating more than needed.
-  constexpr uint32_t kMaxQueries = 4096;
+  const uint32_t max_queries = pq.search_params.max_internal_batch_size;
 
   // Heuristic: the build_knn_graph code should use only a fraction of the workspace memory; the
   // rest should be used by the ivf_pq::search. Here we say that the workspace size should be a good
   // multiple of what is required for the I/O batching below.
   constexpr size_t kMinWorkspaceRatio = 5;
-  auto desired_workspace_size         = kMaxQueries * kMinWorkspaceRatio *
+  auto desired_workspace_size         = max_queries * kMinWorkspaceRatio *
                                 (sizeof(DataT) * dataset.extent(1)  // queries (dataset batch)
                                  + sizeof(float) * gpu_top_k        // distances
                                  + sizeof(int64_t) * gpu_top_k      // neighbors
@@ -189,21 +189,21 @@ void build_knn_graph(
     node_degree,
     top_k,
     gpu_top_k,
-    kMaxQueries,
+    max_queries,
     pq.search_params.n_probes);
 
   auto distances = raft::make_device_mdarray<float>(
-    res, workspace_mr, raft::make_extents<int64_t>(kMaxQueries, gpu_top_k));
+    res, workspace_mr, raft::make_extents<int64_t>(max_queries, gpu_top_k));
   auto neighbors = raft::make_device_mdarray<int64_t>(
-    res, workspace_mr, raft::make_extents<int64_t>(kMaxQueries, gpu_top_k));
+    res, workspace_mr, raft::make_extents<int64_t>(max_queries, gpu_top_k));
   auto refined_distances = raft::make_device_mdarray<float>(
-    res, workspace_mr, raft::make_extents<int64_t>(kMaxQueries, top_k));
+    res, workspace_mr, raft::make_extents<int64_t>(max_queries, top_k));
   auto refined_neighbors = raft::make_device_mdarray<int64_t>(
-    res, workspace_mr, raft::make_extents<int64_t>(kMaxQueries, top_k));
-  auto neighbors_host = raft::make_host_matrix<int64_t, int64_t>(kMaxQueries, gpu_top_k);
-  auto queries_host   = raft::make_host_matrix<DataT, int64_t>(kMaxQueries, dataset.extent(1));
-  auto refined_neighbors_host = raft::make_host_matrix<int64_t, int64_t>(kMaxQueries, top_k);
-  auto refined_distances_host = raft::make_host_matrix<float, int64_t>(kMaxQueries, top_k);
+    res, workspace_mr, raft::make_extents<int64_t>(max_queries, top_k));
+  auto neighbors_host = raft::make_host_matrix<int64_t, int64_t>(max_queries, gpu_top_k);
+  auto queries_host   = raft::make_host_matrix<DataT, int64_t>(max_queries, dataset.extent(1));
+  auto refined_neighbors_host = raft::make_host_matrix<int64_t, int64_t>(max_queries, top_k);
+  auto refined_distances_host = raft::make_host_matrix<float, int64_t>(max_queries, top_k);
 
   // TODO(tfeher): batched search with multiple GPUs
   std::size_t num_self_included = 0;
@@ -214,7 +214,7 @@ void build_knn_graph(
     dataset.data_handle(),
     dataset.extent(0),
     dataset.extent(1),
-    static_cast<int64_t>(kMaxQueries),
+    static_cast<int64_t>(max_queries),
     raft::resource::get_cuda_stream(res),
     workspace_mr);
 
@@ -574,6 +574,13 @@ index<T, IdxT> build(
 {
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
+  common::nvtx::range<common::nvtx::domain::cuvs> function_scope(
+    "cagra::build<%s>(%zu, %zu)",
+    Accessor::is_managed_type::value ? "managed"
+    : Accessor::is_host_type::value  ? "host"
+                                     : "device",
+    intermediate_degree,
+    graph_degree);
   if (intermediate_degree >= static_cast<size_t>(dataset.extent(0))) {
     RAFT_LOG_WARN(
       "Intermediate graph degree cannot be larger than dataset size, reducing it to %lu",
