@@ -339,8 +339,6 @@ extern "C" cuvsError_t cuvsCagraExtend(cuvsResources_t res,
 
     if ((dataset.dtype.code == kDLFloat) && (dataset.dtype.bits == 32)) {
       _extend<float>(res, *params, index, additional_dataset_tensor, return_dataset_tensor);
-    } else if ((dataset.dtype.code == kDLFloat) && (dataset.dtype.bits == 16)) {
-      _extend<half>(res, *params, index, additional_dataset_tensor, return_dataset_tensor);
     } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
       _extend<int8_t>(res, *params, index, additional_dataset_tensor, return_dataset_tensor);
     } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
