@@ -375,6 +375,13 @@ cdef class SearchParams:
         more.
     rand_xor_mask: int, default = 0x128394
         Bit mask used for initial random seed node selection.
+    persistent: bool, default = false
+         Whether to use the persistent version of the kernel
+    persistent_lifetime: float
+         Persistent kernel: time in seconds before the kernel stops if no
+         requests are received.
+    persistent_device_usage : float
+        Sets the fraction of maximum grid size used by persistent kernel.
     """
 
     cdef cuvsCagraSearchParams params
@@ -392,7 +399,11 @@ cdef class SearchParams:
                  hashmap_min_bitlen=0,
                  hashmap_max_fill_rate=0.5,
                  num_random_samplings=1,
-                 rand_xor_mask=0x128394):
+                 rand_xor_mask=0x128394,
+                 persistent=False,
+                 persistent_lifetime=None,
+                 persistent_device_usage=None
+                 ):
         self.params.max_queries = max_queries
         self.params.itopk_size = itopk_size
         self.params.max_iterations = max_iterations
@@ -424,6 +435,11 @@ cdef class SearchParams:
         self.params.hashmap_max_fill_rate = hashmap_max_fill_rate
         self.params.num_random_samplings = num_random_samplings
         self.params.rand_xor_mask = rand_xor_mask
+        self.params.persistent = persistent
+        if persistent_lifetime is not None:
+            self.params.persistent_lifetime = persistent_lifetime
+        if persistent_device_usage is not None:
+            self.params.persistent_device_usage = persistent_device_usage
 
     def __repr__(self):
         attr_str = [attr + "=" + str(getattr(self, attr))
