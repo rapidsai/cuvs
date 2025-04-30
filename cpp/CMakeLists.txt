@@ -11,7 +11,7 @@
 # or implied. See the License for the specific language governing permissions and limitations under
 # the License.
 cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
-include(../rapids_config.cmake)
+include(../cmake/rapids_config.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
 include(rapids-export)
@@ -306,7 +306,6 @@ if(BUILD_SHARED_LIBS)
         src/neighbors/mg/mg_cagra_int8_t_uint32_t.cu
         src/neighbors/mg/mg_cagra_uint8_t_uint32_t.cu
         src/neighbors/mg/omp_checks.cpp
-        src/neighbors/mg/nccl_comm.cpp
     )
   endif()
 
@@ -426,7 +425,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/ivf_flat/ivf_flat_serialize_float_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_int8_t_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_uint8_t_int64_t.cu
-    src/neighbors/ivf_pq_index.cpp
+    src/neighbors/ivf_pq_index.cu
     src/neighbors/ivf_pq/ivf_pq_build_common.cu
     src/neighbors/ivf_pq/ivf_pq_serialize.cu
     src/neighbors/ivf_pq/ivf_pq_deserialize.cu
@@ -579,7 +578,14 @@ if(BUILD_SHARED_LIBS)
     )
 
     if(BUILD_MG_ALGOS)
-      set(CUVS_COMMS_DEPENDENCY nccl)
+      rapids_find_generate_module(
+        NCCL
+        HEADER_NAMES nccl.h
+        LIBRARY_NAMES nccl
+      )
+      find_package(NCCL REQUIRED)
+      target_link_libraries(cuvs_objs PRIVATE NCCL::NCCL)
+      target_link_libraries(cuvs PRIVATE NCCL::NCCL)
     endif()
 
     # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
@@ -587,7 +593,7 @@ if(BUILD_SHARED_LIBS)
       cuvs
       PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              cuvs-cagra-search ${CUVS_COMMS_DEPENDENCY}
+              cuvs-cagra-search
     )
 
     if(NOT CUVS_COMPILE_DYNAMIC_ONLY)
@@ -602,6 +608,7 @@ if(BUILD_SHARED_LIBS)
   if(BUILD_MG_ALGOS)
     target_compile_definitions(cuvs PUBLIC CUVS_BUILD_MG_ALGOS)
     target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_MG_ALGOS)
+    target_compile_definitions(cuvs-cagra-search PUBLIC CUVS_BUILD_MG_ALGOS)
   endif()
 
   if(BUILD_CAGRA_HNSWLIB)
