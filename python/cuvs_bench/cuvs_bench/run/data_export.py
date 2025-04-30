@@ -214,12 +214,16 @@ def convert_json_to_csv_search(dataset, dataset_path):
                 write["build time"] = None
                 write["build threads"] = None
                 write["build cpu_time"] = None
-                write["build GPU"] = None
 
-                for col_idx in range(6, len(build_df.columns)):
+                start_idx = 5
+                if "GPU" in build_df.columns:
+                    start_idx = 6
+                    write["build GPU"] = None
+                for col_idx in range(start_idx, len(build_df.columns)):
                     col_name = build_df.columns[col_idx]
                     write[col_name] = None
-
+                    if col_name == "num_threads":
+                        write["build_num_threads"] = None
                 for s_index, search_row in write.iterrows():
                     for b_index, build_row in build_df.iterrows():
                         if search_row["index_name"] == build_row["index_name"]:
