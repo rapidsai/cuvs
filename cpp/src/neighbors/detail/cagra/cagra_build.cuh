@@ -629,11 +629,27 @@ index<T, IdxT> build(
     if (std::holds_alternative<cagra::graph_build_params::ivf_pq_params>(knn_build_params)) {
       auto ivf_pq_params =
         std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(knn_build_params);
+      if (ivf_pq_params.build_params.metric != params.metric) {
+        RAFT_LOG_WARN(
+          "Metric (%lu) for IVF-PQ needs to match cagra metric (%lu), "
+          "aligning IVF-PQ metric.",
+          ivf_pq_params.build_params.metric,
+          params.metric);
+        ivf_pq_params.build_params.metric = params.metric;
+      }
       build_knn_graph(res, dataset, knn_graph->view(), ivf_pq_params);
     } else {
       auto nn_descent_params =
         std::get<cagra::graph_build_params::nn_descent_params>(knn_build_params);
 
+      if (nn_descent_params.metric != params.metric) {
+        RAFT_LOG_WARN(
+          "Metric (%lu) for nn-descent needs to match cagra metric (%lu), "
+          "aligning nn-descent metric.",
+          nn_descent_params.metric,
+          params.metric);
+        nn_descent_params.metric = params.metric;
+      }
       if (nn_descent_params.graph_degree != intermediate_degree) {
         RAFT_LOG_WARN(
           "Graph degree (%lu) for nn-descent needs to match cagra intermediate graph degree (%lu), "

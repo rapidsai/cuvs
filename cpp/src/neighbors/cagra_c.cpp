@@ -42,7 +42,7 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
   auto index   = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr);
 
   auto index_params   = cuvs::neighbors::cagra::index_params();
-  index_params.metric = static_cast<cuvs::distance::DistanceType>((int)params.metric),
+  index_params.metric = static_cast<cuvs::distance::DistanceType>((int)params.metric);
   index_params.intermediate_graph_degree = params.intermediate_graph_degree;
   index_params.graph_degree              = params.graph_degree;
 
@@ -50,7 +50,8 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
     case cuvsCagraGraphBuildAlgo::AUTO_SELECT: break;
     case cuvsCagraGraphBuildAlgo::IVF_PQ: {
       auto dataset_extent = raft::matrix_extent<int64_t>(dataset.shape[0], dataset.shape[1]);
-      auto pq_params = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(dataset_extent);
+      auto pq_params      = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(
+        dataset_extent, index_params.metric);
       auto ivf_pq_build_params  = params.graph_build_params->ivf_pq_build_params;
       auto ivf_pq_search_params = params.graph_build_params->ivf_pq_search_params;
       if (ivf_pq_build_params) {
@@ -84,9 +85,8 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
       break;
     }
     case cuvsCagraGraphBuildAlgo::NN_DESCENT: {
-      cuvs::neighbors::cagra::graph_build_params::nn_descent_params nn_descent_params{};
-      nn_descent_params =
-        cuvs::neighbors::nn_descent::index_params(index_params.intermediate_graph_degree);
+      auto nn_descent_params = cuvs::neighbors::cagra::graph_build_params::nn_descent_params{
+        index_params.intermediate_graph_degree, index_params.metric};
       nn_descent_params.max_iterations = params.nn_descent_niter;
       index_params.graph_build_params  = nn_descent_params;
       break;
