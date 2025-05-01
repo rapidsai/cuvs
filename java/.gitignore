@@ -3,17 +3,5 @@
 /cuvs-java/bin/
 /cuvs-java/src/main/java22/com/nvidia/cuvs/internal/panama/
 /cuvs-java/*.cag
-# internal
-/internal/.ninja_deps
-/internal/.ninja_log
-/internal/CMakeCache.txt
-/internal/CMakeFiles/
-/internal/CPM_modules/
-/internal/_deps/
-/internal/build.ninja
-/internal/cmake/
-/internal/cmake_install.cmake
-/internal/cpm-package-lock.cmake
-/internal/Makefile
 # examples
 /examples/target/

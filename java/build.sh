@@ -1,32 +1,22 @@
+#!/bin/bash
+
+set -e -u -o pipefail
+
 VERSION="25.06.0" # Note: The version is updated automatically when ci/release/update-version.sh is invoked
 GROUP_ID="com.nvidia.cuvs"
-SO_FILE_PATH="./internal"
+SO_FILE_PATH="./internal/build"
 
-if [ -z "$CMAKE_PREFIX_PATH" ]; then
-  export CMAKE_PREFIX_PATH=`pwd`/../cpp/build
+if [ -z "${CMAKE_PREFIX_PATH:=}" ]; then
+  export CMAKE_PREFIX_PATH="$(pwd)/../cpp/build"
 fi
 
-cd internal && cmake . && cmake --build . \
-  && cd ..
+cmake -B ./internal/build -S ./internal
+cmake --build ./internal/build
 
 # Generate Panama FFM API bindings and update (if any of them changed)
-/bin/bash panama-bindings/generate-bindings.sh
+./panama-bindings/generate-bindings.sh
 
-BINDINGS_GENERATION_RETURN_VALUE=$?
-if [ $BINDINGS_GENERATION_RETURN_VALUE != 0 ]
-then
-  echo "Bindings generation did not complete normally (returned value ${BINDINGS_GENERATION_RETURN_VALUE})"
-  echo "Forcing this build process to abort"
-  exit 1
-fi
-
-SKIP_JAVA_TESTS=""
-for arg in "$@"
-do
-  if [ "$arg" == "--skip-java-tests" ]; then
-    SKIP_JAVA_TESTS="-DskipTests"
-  fi
-done
+# Build the java layer
 mvn install:install-file -DgroupId=$GROUP_ID -DartifactId=cuvs-java-internal -Dversion=$VERSION -Dpackaging=so -Dfile=$SO_FILE_PATH/libcuvs_java.so \
   && cd cuvs-java \
   && mvn verify $SKIP_JAVA_TESTS \
