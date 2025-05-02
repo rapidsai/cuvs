@@ -5,7 +5,7 @@ set -euo pipefail
 
 . /opt/conda/etc/profile.d/conda.sh
 
-CPP_CHANNEL=$(rapids-download-conda-from-s3 cpp)
+CPP_CHANNEL=$(rapids-download-conda-from-github cpp)
 
 rapids-logger "Generate C++ testing dependencies"
 rapids-dependency-file-generator \
