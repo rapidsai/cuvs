@@ -59,7 +59,6 @@ function gpuArch {
 # Set up build configuration
 PARALLEL_LEVEL=${PARALLEL_LEVEL:=`nproc`}
 BUILD_TYPE=Release
-BUILD_DIR=build/
 CUVS_REPO_REL=""
 EXTRA_CMAKE_ARGS=""
 
