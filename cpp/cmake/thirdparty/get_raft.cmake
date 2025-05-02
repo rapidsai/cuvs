@@ -45,8 +45,8 @@ function(find_and_configure_raft)
             COMPONENTS          ${RAFT_COMPONENTS}
             CPM_ARGS
               EXCLUDE_FROM_ALL TRUE
-              GIT_REPOSITORY        https://github.com/${PKG_FORK}/raft.git
-              GIT_TAG               ${PKG_PINNED_TAG}
+              GIT_REPOSITORY        https://github.com/jinsolp/raft.git
+              GIT_TAG               multi-gpu-resource
               SOURCE_SUBDIR         cpp
               OPTIONS
               "BUILD_TESTS OFF"
