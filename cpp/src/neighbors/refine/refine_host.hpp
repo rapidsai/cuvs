@@ -43,7 +43,7 @@ DistanceT euclidean_distance_squared_generic(DataT const* a, DataT const* b, siz
   size_t constexpr max_vreg_len = 512 / (8 * sizeof(DistanceT));
 
   // max_vreg_len is a power of two
-  size_t n_rounded                 = n & (0xFFFFFFFF ^ (max_vreg_len - 1));
+  size_t n_rounded                 = n - (n % max_vreg_len);
   DistanceT distance[max_vreg_len] = {0};
 
   for (size_t i = 0; i < n_rounded; i += max_vreg_len) {
@@ -53,7 +53,7 @@ DistanceT euclidean_distance_squared_generic(DataT const* a, DataT const* b, siz
   }
 
   for (size_t i = n_rounded; i < n; ++i) {
-    distance[i] += DC::template eval<DistanceT>(a[i], b[i]);
+    distance[i - n_rounded] += DC::template eval<DistanceT>(a[i], b[i]);
   }
 
   for (size_t i = 1; i < max_vreg_len; ++i) {
