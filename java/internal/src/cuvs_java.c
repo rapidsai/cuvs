@@ -166,17 +166,27 @@ void deserialize_cagra_index(cuvsResources_t cuvs_resources, cuvsCagraIndex_t in
  * @param[out] return_value return value for cuvsCagraSearch function call
  * @param[in] search_params reference to cuvsCagraSearchParams_t holding the search parameters
  */
-void search_cagra_index(cuvsCagraIndex_t index, float *queries, int topk, long n_queries, int dimensions,
-    cuvsResources_t cuvs_resources, int *neighbors_h, float *distances_h, int *return_value, cuvsCagraSearchParams_t search_params) {
-
+void search_cagra_index(cuvsCagraIndex_t index,
+                        float *queries,
+                        int topk,
+                        long n_queries,
+                        int dimensions,
+                        cuvsResources_t cuvs_resources,
+                        int *neighbors_h,
+                        float *distances_h,
+                        int *return_value,
+                        cuvsCagraSearchParams_t search_params,
+                        uint32_t *prefilter_data,
+                        long prefilter_data_length) {
   cudaStream_t stream;
   cuvsStreamGet(cuvs_resources, &stream);
 
   uint32_t *neighbors;
   float *distances, *queries_d;
-  cuvsRMMAlloc(cuvs_resources, (void**) &queries_d, sizeof(float) * n_queries * dimensions);
-  cuvsRMMAlloc(cuvs_resources, (void**) &neighbors, sizeof(uint32_t) * n_queries * topk);
-  cuvsRMMAlloc(cuvs_resources, (void**) &distances, sizeof(float) * n_queries * topk);
+
+  cuvsRMMAlloc(cuvs_resources, (void **) &queries_d, sizeof(float) * n_queries * dimensions);
+  cuvsRMMAlloc(cuvs_resources, (void **) &neighbors, sizeof(uint32_t) * n_queries * topk);
+  cuvsRMMAlloc(cuvs_resources, (void **) &distances, sizeof(float) * n_queries * topk);
 
   cudaMemcpy(queries_d, queries, sizeof(float) * n_queries * dimensions, cudaMemcpyDefault);
 
@@ -191,12 +201,35 @@ void search_cagra_index(cuvsCagraIndex_t index, float *queries, int topk, long n
 
   cuvsStreamSync(cuvs_resources);
 
-  cuvsFilter filter; // TODO: Implement Cagra Pre-Filtering, but leave it as no-op for now
-  filter.type = NO_FILTER;
-  filter.addr = (uintptr_t)NULL;
+  cuvsFilter filter;
+  uint32_t *prefilter_d = NULL;
+  int64_t prefilter_len = 0;
+  DLManagedTensor *prefilter_tensor_ptr = NULL;
 
-  *return_value = cuvsCagraSearch(cuvs_resources, search_params, index, &queries_tensor, &neighbors_tensor,
-                  &distances_tensor, filter);
+  if (prefilter_data == NULL || prefilter_data_length == 0) {
+    filter.type = NO_FILTER;
+    filter.addr = (uintptr_t) NULL;
+  } else {
+    int64_t prefilter_shape[1] = {(prefilter_data_length + 31) / 32};
+    prefilter_len = prefilter_shape[0];
+
+    cuvsRMMAlloc(cuvs_resources, (void **) &prefilter_d, sizeof(uint32_t) * prefilter_len);
+    cudaMemcpy(prefilter_d, prefilter_data, sizeof(uint32_t) * prefilter_len, cudaMemcpyHostToDevice);
+
+    prefilter_tensor_ptr = (DLManagedTensor *) malloc(sizeof(DLManagedTensor));
+    *prefilter_tensor_ptr = prepare_tensor(prefilter_d, prefilter_shape, kDLUInt, 32, 1, kDLCUDA);
+
+    filter.type = BITSET;
+    filter.addr = (uintptr_t) prefilter_tensor_ptr;
+  }
+
+  *return_value = cuvsCagraSearch(cuvs_resources,
+                                  search_params,
+                                  index,
+                                  &queries_tensor,
+                                  &neighbors_tensor,
+                                  &distances_tensor,
+                                  filter);
 
   cudaMemcpy(neighbors_h, neighbors, sizeof(uint32_t) * n_queries * topk, cudaMemcpyDefault);
   cudaMemcpy(distances_h, distances, sizeof(float) * n_queries * topk, cudaMemcpyDefault);
@@ -204,7 +237,14 @@ void search_cagra_index(cuvsCagraIndex_t index, float *queries, int topk, long n
   cuvsRMMFree(cuvs_resources, distances, sizeof(float) * n_queries * topk);
   cuvsRMMFree(cuvs_resources, neighbors, sizeof(uint32_t) * n_queries * topk);
   cuvsRMMFree(cuvs_resources, queries_d, sizeof(float) * n_queries * dimensions);
+  if (prefilter_d != NULL) {
+    cuvsRMMFree(cuvs_resources, prefilter_d, sizeof(uint32_t) * prefilter_len);
+  }
+  if (prefilter_tensor_ptr != NULL) {
+    free(prefilter_tensor_ptr);
+  }
 }
+
 
 /**
  * @brief De-allocate BRUTEFORCE index

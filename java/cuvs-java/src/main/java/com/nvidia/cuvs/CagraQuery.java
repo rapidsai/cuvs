@@ -18,6 +18,7 @@ package com.nvidia.cuvs;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.BitSet;
 
 /**
  * CagraQuery holds the CagraSearchParams and the query vectors to be used while
@@ -31,6 +32,8 @@ public class CagraQuery {
   private List<Integer> mapping;
   private float[][] queryVectors;
   private int topK;
+  private BitSet[] prefilters;
+  private int numDocs;
 
   /**
    * Constructs an instance of {@link CagraQuery} using cagraSearchParameters,
@@ -42,12 +45,14 @@ public class CagraQuery {
    * @param mapping               an instance of ID mapping
    * @param topK                  the top k results to return
    */
-  public CagraQuery(CagraSearchParams cagraSearchParameters, float[][] queryVectors, List<Integer> mapping, int topK) {
+  public CagraQuery(CagraSearchParams cagraSearchParameters, float[][] queryVectors, List<Integer> mapping, int topK, BitSet[] prefilters, int numDocs) {
     super();
     this.cagraSearchParameters = cagraSearchParameters;
     this.queryVectors = queryVectors;
     this.mapping = mapping;
     this.topK = topK;
+    this.prefilters = prefilters;
+    this.numDocs = numDocs;
   }
 
   /**
@@ -85,6 +90,14 @@ public class CagraQuery {
   public int getTopK() {
     return topK;
   }
+  
+  public BitSet[] getPrefilters() {
+  return prefilters;
+  }
+
+  public int getNumDocs() {
+    return numDocs;
+  }
 
   @Override
   public String toString() {
@@ -101,6 +114,8 @@ public class CagraQuery {
     private float[][] queryVectors;
     private List<Integer> mapping;
     private int topK = 2;
+    private BitSet[] prefilters;
+    private int numDocs;
 
     /**
      * Default constructor.
@@ -152,6 +167,12 @@ public class CagraQuery {
       this.topK = topK;
       return this;
     }
+    
+    public Builder withPrefilter(BitSet[] prefilters, int numDocs) {
+    this.prefilters = prefilters;
+    this.numDocs = numDocs;
+    return this;
+  }
 
     /**
      * Builds an instance of CuVSQuery.
@@ -159,7 +180,7 @@ public class CagraQuery {
      * @return an instance of CuVSQuery
      */
     public CagraQuery build() {
-      return new CagraQuery(cagraSearchParams, queryVectors, mapping, topK);
+      return new CagraQuery(cagraSearchParams, queryVectors, mapping, topK, prefilters, numDocs);
     }
   }
 }
