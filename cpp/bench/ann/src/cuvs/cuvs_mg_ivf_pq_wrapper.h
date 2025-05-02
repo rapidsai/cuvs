@@ -19,7 +19,7 @@
 #include "cuvs_ann_bench_utils.h"
 #include "cuvs_ivf_pq_wrapper.h"
 #include <cuvs/neighbors/ivf_pq.hpp>
-#include <raft/core/device_resources_snmg.hpp>
+#include <raft/core/device_resources_snmg_nccl.hpp>
 
 namespace cuvs::bench {
 using namespace cuvs::neighbors;
