@@ -38,7 +38,7 @@ set +e
 
 rapids-logger "Run Java build"
 
-bash ./build.sh --skip-java-tests java
+bash ./build.sh java
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}

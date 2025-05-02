@@ -38,21 +38,7 @@ set +e
 
 rapids-logger "Run Java build and tests"
 
-bash ./build.sh java
-if [[ $? -ne 0 ]]; then
-  rapids-logger "Initial Java build & test failed. Retrying with 'mvn clean verify -X'"
-  pushd java/cuvs-java/
-  mvn clean verify -X
-  popd
-  DUMP_DIR="/__w/cuvs/cuvs/java/cuvs-java/target/failsafe-reports"
-  for file in "$DUMP_DIR"/*.dumpstream; do
-    if [ -f "$file" ]; then
-      echo "======= Dump file: $file ======="
-      cat "$file"
-      echo "======= End of dump file ======="
-    fi
-  done
-fi
+bash ./build.sh java --run-java-tests
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}

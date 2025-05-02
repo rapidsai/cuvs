@@ -17,8 +17,16 @@ cmake --build ./internal/build
 # Generate Panama FFM API bindings and update (if any of them changed)
 ./panama-bindings/generate-bindings.sh
 
+RUN_JAVA_TESTS="-DskipTests"
+for arg in "$@"
+do
+  if [ "$arg" == "--run-java-tests" ]; then
+    RUN_JAVA_TESTS=""
+  fi
+done
+
 # Build the java layer
 mvn install:install-file -DgroupId=$GROUP_ID -DartifactId=cuvs-java-internal -Dversion=$VERSION -Dpackaging=so -Dfile=$SO_FILE_PATH/libcuvs_java.so \
   && cd cuvs-java \
-  && mvn verify $SKIP_JAVA_TESTS \
+  && mvn verify $RUN_JAVA_TESTS \
   && mvn install:install-file -Dfile=./target/cuvs-java-$VERSION-jar-with-dependencies.jar -DgroupId=$GROUP_ID -DartifactId=cuvs-java -Dversion=$VERSION -Dpackaging=jar

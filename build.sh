@@ -18,7 +18,7 @@ ARGS=$*
 # scripts, and that this script resides in the repo dir!
 REPODIR=$(cd "$(dirname "$0")"; pwd)
 
-VALIDARGS="clean libcuvs python rust go java docs tests bench-ann examples --uninstall  -v -g -n --allgpuarch --no-mg --no-cpu --cpu-only --no-shared-libs --no-nvtx --show_depr_warn --incl-cache-stats --time -h --skip-java-tests"
+VALIDARGS="clean libcuvs python rust go java docs tests bench-ann examples --uninstall  -v -g -n --allgpuarch --no-mg --no-cpu --cpu-only --no-shared-libs --no-nvtx --show_depr_warn --incl-cache-stats --time -h --run-java-tests"
 HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<tool>] [--limit-tests=<targets>] [--limit-bench-ann=<targets>] [--build-metrics=<filename>]
  where <target> is:
    clean            - remove all existing build artifacts and configuration (start over)
@@ -492,11 +492,11 @@ if (( ${NUMARGS} == 0 )) || hasArg go; then
 fi
 
 # Build the cuvs Java bindings
-SKIP_JAVA_TESTS=""
+RUN_JAVA_TESTS=""
 for arg in "$@"
 do
-  if [ "$arg" == "--skip-java-tests" ]; then
-    SKIP_JAVA_TESTS="--skip-java-tests"
+  if [ "$arg" == "--run-java-tests" ]; then
+    RUN_JAVA_TESTS="--run-java-tests"
   fi
 done
 
@@ -505,7 +505,7 @@ if (( ${NUMARGS} == 0 )) || hasArg java; then
         echo "Please add 'libcuvs' to this script's arguments (ex. './build.sh libcuvs java') if libcuvs libraries are not already built"
     fi
     cd ${REPODIR}/java
-    ./build.sh $SKIP_JAVA_TESTS
+    ./build.sh $RUN_JAVA_TESTS
 fi
 
 RAPIDS_VERSION="$(sed -E -e 's/^([0-9]{2})\.([0-9]{2})\.([0-9]{2}).*$/\1.\2.\3/' "${REPODIR}/VERSION")"
