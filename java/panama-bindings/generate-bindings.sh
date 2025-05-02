@@ -3,8 +3,8 @@
 set -e -u -o pipefail
 
 echo "Starting Panama FFM API bindings generation ..."
-REPODIR=$(cd $(dirname $0); cd ../../ ; pwd)
-CURDIR=$(cd $(dirname $0); pwd)
+REPODIR=$(cd "$(dirname $0)"; cd ../../ ; pwd)
+CURDIR=$(cd "$(dirname $0)"; pwd)
 CUDA_HOME=$(which nvcc | cut -d/ -f-4)
 TARGET_PACKAGE="com.nvidia.cuvs.internal.panama"
 
@@ -29,7 +29,8 @@ then
   echo "jextract doesn't exist. Downloading it from $JEXTRACT_DOWNLOAD_URL.";
   wget -c $JEXTRACT_DOWNLOAD_URL
   tar -xvf ./"${JEXTRACT_FILENAME}"
-  export PATH="$(pwd)/jextract-22/bin/jextract:${PATH}"
+  PATH="$(pwd)/jextract-22/bin/jextract:${PATH}"
+  export PATH
   echo "jextract downloaded to $(pwd)/jextract-22"
 fi
 

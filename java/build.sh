@@ -7,7 +7,8 @@ GROUP_ID="com.nvidia.cuvs"
 SO_FILE_PATH="./internal/build"
 
 if [ -z "${CMAKE_PREFIX_PATH:=}" ]; then
-  export CMAKE_PREFIX_PATH="$(pwd)/../cpp/build"
+  CMAKE_PREFIX_PATH="$(pwd)/../cpp/build"
+  export CMAKE_PREFIX_PATH
 fi
 
 cmake -B ./internal/build -S ./internal
