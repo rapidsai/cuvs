@@ -9,10 +9,10 @@ CUDA_HOME=$(which nvcc | cut -d/ -f-4)
 TARGET_PACKAGE="com.nvidia.cuvs.internal.panama"
 
 # Try to verify that a include directory exists inside CUDA_HOME
-if [ ! -d "$CUDA_HOME/include" ];
+if [ ! -d "$CUDA_HOME/targets/x86_64-linux/include" ];
 then
-  echo "$CUDA_HOME/include does not exist."
-  if [ -d "/usr/local/cuda/include" ];
+  echo "$CUDA_HOME/targets/x86_64-linux/include does not exist."
+  if [ -d "/usr/local/cuda/targets/x86_64-linux/include" ];
   then
     echo "Setting CUDA_HOME to /usr/local/cuda"
     CUDA_HOME=/usr/local/cuda
