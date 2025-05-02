@@ -50,7 +50,7 @@ void build_linkage(raft::resources const& handle,
                    raft::device_matrix_view<int, int> dendrogram,
                    raft::device_vector_view<float, int> out_distances,
                    raft::device_vector_view<int, int> out_sizes,
-                   red_op mst_red_op)
+                   red_op reduction_op)
 {
   detail::build_linkage(handle,
                         X.data_handle(),
@@ -65,6 +65,6 @@ void build_linkage(raft::resources const& handle,
                         dendrogram.data_handle(),
                         out_distances.data_handle(),
                         out_sizes.data_handle(),
-                        mst_red_op);
+                        reduction_op);
 }
 }  // namespace cuvs::cluster::agglomerative

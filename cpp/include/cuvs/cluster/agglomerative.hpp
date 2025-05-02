@@ -135,7 +135,8 @@ void single_linkage(
  * @param[out] dendrogram output dendrogram (size [n_rows - 1] * 2)
  * @param[out] out_distances distances for output
  * @param[out] out_sizes cluster sizes of output
- * @param[in] mst_red_op reduction op for determining MST edges
+ * @param[in] reduction_op reduction operation for computing nearest neighbors while connecting
+ * graph components.  The reduction operation must have `gather` and `scatter` functions defined
  */
 template <typename red_op>
 void build_linkage(raft::resources const& handle,
@@ -147,7 +148,7 @@ void build_linkage(raft::resources const& handle,
                    raft::device_matrix_view<int, int> dendrogram,
                    raft::device_vector_view<float, int> out_distances,
                    raft::device_vector_view<int, int> out_sizes,
-                   red_op mst_red_op);
+                   red_op reduction_op);
 /**
  * @}
  */

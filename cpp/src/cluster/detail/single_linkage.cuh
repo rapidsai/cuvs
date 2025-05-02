@@ -143,7 +143,8 @@ void single_linkage(raft::resources const& handle,
  * @param[out] out_children output dendrogram
  * @param[out] out_deltas distances of output
  * @param[out] out_sizes cluster sizes of output
- * @param[in] mst_red_op connectivities functor for building the MST
+ * @param[in] reduction_op reduction operation for computing nearest neighbors while connecting
+ * graph components
  */
 template <typename value_idx = int, typename value_t = float, typename nnz_t, typename red_op>
 void build_linkage(raft::resources const& handle,
@@ -159,7 +160,7 @@ void build_linkage(raft::resources const& handle,
                    value_idx* out_dendrogram,
                    value_t* out_deltas,
                    value_idx* out_sizes,
-                   red_op mst_red_op)
+                   red_op reduction_op)
 {
   /**
    * Construct MST sorted by weights
@@ -179,7 +180,7 @@ void build_linkage(raft::resources const& handle,
                            out_mst_weights,
                            color.data_handle(),
                            graph_coo.structure_view().get_nnz(),
-                           mst_red_op,
+                           reduction_op,
                            metric);
 
   /**
