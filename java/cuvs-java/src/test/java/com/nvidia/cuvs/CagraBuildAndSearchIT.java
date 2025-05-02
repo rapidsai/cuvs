@@ -18,6 +18,8 @@ package com.nvidia.cuvs;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -32,6 +34,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.BitSet;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -121,6 +124,72 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
     }
   }
+  
+  @Test
+  public void testPrefilteringReducesResults() throws Throwable {
+  float[][] dataset = {
+    { 0.0f, 0.0f },
+    { 10.0f, 10.0f },
+    { 1.0f, 1.0f },
+    { 2.0f, 2.0f }
+  };
+  List<Integer> map = List.of(0, 1, 2, 3);
+  float[][] queries = {
+    {0.1f, 0.1f}
+  };
+
+  CagraIndexParams indexParams = new CagraIndexParams.Builder()
+    .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+    .withGraphDegree(2)
+    .withIntermediateGraphDegree(4)
+    .withNumWriterThreads(2)
+    .withMetric(CuvsDistanceType.L2Expanded)
+    .build();
+
+  try (CuVSResources resources = CuVSResources.create()) {
+    CagraIndex index = CagraIndex.newBuilder(resources)
+      .withDataset(dataset)
+      .withIndexParams(indexParams)
+      .build();
+
+    // No prefilter (all points allowed)
+    CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+    CagraQuery fullQuery = new CagraQuery.Builder()
+      .withTopK(2)
+      .withSearchParams(searchParams)
+      .withQueryVectors(queries)
+      .withMapping(map)
+      .build();
+
+    SearchResults fullResults = index.search(fullQuery);
+    List<Map<Integer, Float>> full = fullResults.getResults();
+    log.info("Full results: {}", full);
+
+    // Apply prefilter: only allow ids 0 and 3 (bitset: 1100)
+    BitSet prefilterBits = new BitSet(4);
+    prefilterBits.set(1);
+    prefilterBits.set(2);
+    prefilterBits.set(3);
+    BitSet[] prefilters = new BitSet[] { prefilterBits };
+
+    CagraQuery filteredQuery = new CagraQuery.Builder()
+      .withTopK(2)
+      .withSearchParams(searchParams)
+      .withQueryVectors(queries)
+      .withMapping(map)
+      .withPrefilter(prefilters, 4)
+      .build();
+
+    SearchResults filteredResults = index.search(filteredQuery);
+    List<Map<Integer, Float>> filtered = filteredResults.getResults();
+    log.info("Filtered results: {}", filtered);
+
+    assertTrue(full.get(0).containsKey(0));
+    assertFalse(filtered.get(0).containsKey(0)); 
+    assertTrue(filtered.get(0).containsKey(2));  
+  }
+}
+
 
   private Runnable indexAndQueryOnce(float[][] dataset, List<Integer> map, float[][] queries,
       List<Map<Integer, Float>> expectedResults, CuVSResources resources) throws Throwable, FileNotFoundException {
