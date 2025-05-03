@@ -165,6 +165,8 @@ void deserialize_cagra_index(cuvsResources_t cuvs_resources, cuvsCagraIndex_t in
  * @param[out] distances_h reference to the distance results on the host memory
  * @param[out] return_value return value for cuvsCagraSearch function call
  * @param[in] search_params reference to cuvsCagraSearchParams_t holding the search parameters
+ * @param[in] prefilter_data host pointer to bit-packed filter bitmap (uint32_t array)
+ * @param[in] prefilter_data_length total number of bits in the filter (should be equal to num_docs * num_filters)
  */
 void search_cagra_index(cuvsCagraIndex_t index,
                         float *queries,
@@ -244,7 +246,6 @@ void search_cagra_index(cuvsCagraIndex_t index,
     free(prefilter_tensor_ptr);
   }
 }
-
 
 /**
  * @brief De-allocate BRUTEFORCE index

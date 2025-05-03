@@ -44,6 +44,9 @@ public class CagraQuery {
    * @param queryVectors          2D float query vector array
    * @param mapping               an instance of ID mapping
    * @param topK                  the top k results to return
+   * @param prefilters            the prefilters data to use while searching the CAGRA index
+   * @param numDocs               Maximum of bits in each prefilter, representing number of documents in this index.
+   *                              Used only when prefilter(s) is/are passed.
    */
   public CagraQuery(CagraSearchParams cagraSearchParameters, float[][] queryVectors, List<Integer> mapping, int topK, BitSet[] prefilters, int numDocs) {
     super();
@@ -91,10 +94,20 @@ public class CagraQuery {
     return topK;
   }
   
+  /**
+   * Gets the prefilter BitSet array.
+   *
+   * @return an array of BitSet objects representing the prefilters
+   */
   public BitSet[] getPrefilters() {
-  return prefilters;
+    return prefilters;
   }
 
+  /**
+   * Gets the number of documents supposed to be in this index, as used for prefilters
+   *
+   * @return number of documents as an integer
+   */
   public int getNumDocs() {
     return numDocs;
   }
@@ -167,7 +180,14 @@ public class CagraQuery {
       this.topK = topK;
       return this;
     }
-    
+
+    /**
+     * Sets the prefilters data for building the {@link CagraQuery}.
+     *
+     * @param prefilters array of bitsets, as many as queries, each containing as
+     *        many bits as there are vectors in the index
+     * @return an instance of this Builder
+     */  
     public Builder withPrefilter(BitSet[] prefilters, int numDocs) {
     this.prefilters = prefilters;
     this.numDocs = numDocs;
