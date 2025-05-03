@@ -18,6 +18,7 @@ package com.nvidia.cuvs;
 
 import java.lang.invoke.MethodHandles;
 import java.util.List;
+import java.util.BitSet;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -48,6 +49,72 @@ public class CagraRandomizedIT extends CuVSTestCase {
       tmpResultsTopKWithRandomValues();
     }
   }
+  
+  @Test
+  public void testPrefilteringRandomizedEffect() throws Throwable {
+  int datasetSize = 500;
+  int dimensions = 128;
+  int numQueries = 3;
+  int topK = 5;
+
+  float[][] dataset = generateData(random, datasetSize, dimensions);
+  float[][] queries = generateData(random, numQueries, dimensions);
+
+  try (CuVSResources resources = CuVSResources.create()) {
+    CagraIndexParams indexParams = new CagraIndexParams.Builder()
+        .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+        .build();
+
+    CagraIndex index = CagraIndex.newBuilder(resources)
+        .withDataset(dataset)
+        .withIndexParams(indexParams)
+        .build();
+
+    CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+
+    CagraQuery fullQuery = new CagraQuery.Builder()
+        .withTopK(topK)
+        .withSearchParams(searchParams)
+        .withQueryVectors(queries)
+        .build();
+
+    SearchResults fullResults = index.search(fullQuery);
+    List<List<Integer>> fullNeighborIds = extractNeighborIds(fullResults);
+
+    java.util.BitSet filterBits = new java.util.BitSet(datasetSize);
+    for (int i = 0; i < datasetSize; i++) {
+      if (random.nextBoolean()) {
+        filterBits.set(i);
+      }
+    }
+    BitSet[] filters = new BitSet[] { filterBits };
+
+    CagraQuery filteredQuery = new CagraQuery.Builder()
+        .withTopK(topK)
+        .withSearchParams(searchParams)
+        .withQueryVectors(queries)
+        .withPrefilter(filters, datasetSize)
+        .build();
+
+    SearchResults filteredResults = index.search(filteredQuery);
+    List<List<Integer>> filteredNeighborIds = extractNeighborIds(filteredResults);
+
+    log.info("Prefilter active: size = {}, allowed = {}", datasetSize, filterBits.cardinality());
+
+    for (int i = 0; i < numQueries; i++) {
+      for (Integer id : filteredNeighborIds.get(i)) {
+        assert filterBits.get(id) : "Filtered result contains disallowed ID: " + id;
+      }
+    }
+
+    index.destroyIndex();
+  }
+}
+
+private List<List<Integer>> extractNeighborIds(SearchResults results) {
+  return results.getResults().stream().map(map -> map.keySet().stream().toList()).toList();
+}
+
 
   private void tmpResultsTopKWithRandomValues() throws Throwable {
     int DATASET_SIZE_LIMIT = 10_000;
