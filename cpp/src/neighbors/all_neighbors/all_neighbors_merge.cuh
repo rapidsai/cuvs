@@ -22,21 +22,13 @@
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/kvp.hpp>
 #include <raft/core/managed_mdspan.hpp>
+#include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/util/cudart_utils.hpp>
 
 namespace cuvs::neighbors::all_neighbors::detail {
 using namespace cuvs::neighbors;
-
-template <typename KeyType, typename ValueType>
-struct CustomComparator {
-  __device__ bool operator()(const raft::KeyValuePair<KeyType, ValueType>& a,
-                             const raft::KeyValuePair<KeyType, ValueType>& b) const
-  {
-    return a < b;
-  }
-};
 
 template <typename IdxT, int BLOCK_SIZE, int ITEMS_PER_THREAD>
 RAFT_KERNEL merge_subgraphs_kernel(IdxT* cluster_data_indices,
@@ -45,7 +37,8 @@ RAFT_KERNEL merge_subgraphs_kernel(IdxT* cluster_data_indices,
                                    float* global_distances,
                                    float* batch_distances,
                                    IdxT* global_indices,
-                                   IdxT* batch_indices)
+                                   IdxT* batch_indices,
+                                   bool select_min)
 {
   size_t batch_row = blockIdx.x;
   typedef cub::BlockMergeSort<raft::KeyValuePair<float, IdxT>, BLOCK_SIZE, ITEMS_PER_THREAD>
@@ -89,14 +82,23 @@ RAFT_KERNEL merge_subgraphs_kernel(IdxT* cluster_data_indices,
         threadKeyValuePair[i].key   = distances[arrIdxBase + colId];
         threadKeyValuePair[i].value = indices[arrIdxBase + colId];
       } else {
-        threadKeyValuePair[i].key   = std::numeric_limits<float>::max();
-        threadKeyValuePair[i].value = std::numeric_limits<IdxT>::max();
+        if (select_min) {
+          threadKeyValuePair[i].key   = std::numeric_limits<float>::max();
+          threadKeyValuePair[i].value = std::numeric_limits<IdxT>::max();
+        } else {
+          threadKeyValuePair[i].key   = std::numeric_limits<float>::min();
+          threadKeyValuePair[i].value = std::numeric_limits<IdxT>::min();
+        }
       }
     }
 
     __syncthreads();
 
-    BlockMergeSortType(tmpSmem).Sort(threadKeyValuePair, CustomComparator<float, IdxT>{});
+    if (select_min) {
+      BlockMergeSortType(tmpSmem).Sort(threadKeyValuePair, raft::less_op{});
+    } else {
+      BlockMergeSortType(tmpSmem).Sort(threadKeyValuePair, raft::greater_op{});
+    }
 
     // load sorted result into shared memory to get unique values
     idxBase = threadIdx.x * ITEMS_PER_THREAD;
@@ -157,7 +159,8 @@ void merge_subgraphs(raft::resources const& res,
                      T* global_distances,
                      T* batch_distances_d,
                      IdxT* global_neighbors,
-                     IdxT* batch_neighbors_d)
+                     IdxT* batch_neighbors_d,
+                     bool select_min)
 {
   size_t num_elems     = k * 2;
   size_t sharedMemSize = num_elems * (sizeof(float) + sizeof(IdxT) + sizeof(int16_t));
@@ -173,7 +176,8 @@ void merge_subgraphs(raft::resources const& res,
           global_distances,
           batch_distances_d,
           global_neighbors,
-          batch_neighbors_d);
+          batch_neighbors_d,
+          select_min);
     } else if (num_elems <= 512) {
       merge_subgraphs_kernel<IdxT, 128, 4>
         <<<num_data_in_cluster, 128, sharedMemSize, raft::resource::get_cuda_stream(res)>>>(
@@ -183,7 +187,8 @@ void merge_subgraphs(raft::resources const& res,
           global_distances,
           batch_distances_d,
           global_neighbors,
-          batch_neighbors_d);
+          batch_neighbors_d,
+          select_min);
     } else if (num_elems <= 1024) {
       merge_subgraphs_kernel<IdxT, 128, 8>
         <<<num_data_in_cluster, 128, sharedMemSize, raft::resource::get_cuda_stream(res)>>>(
@@ -193,7 +198,8 @@ void merge_subgraphs(raft::resources const& res,
           global_distances,
           batch_distances_d,
           global_neighbors,
-          batch_neighbors_d);
+          batch_neighbors_d,
+          select_min);
     } else if (num_elems <= 2048) {
       merge_subgraphs_kernel<IdxT, 256, 8>
         <<<num_data_in_cluster, 256, sharedMemSize, raft::resource::get_cuda_stream(res)>>>(
@@ -203,7 +209,8 @@ void merge_subgraphs(raft::resources const& res,
           global_distances,
           batch_distances_d,
           global_neighbors,
-          batch_neighbors_d);
+          batch_neighbors_d,
+          select_min);
     } else {
       // this is as far as we can get due to the shared mem usage of cub::BlockMergeSort
       RAFT_FAIL("The degree of knn is too large (%lu). It must be smaller than 1024", k);
@@ -223,7 +230,8 @@ void remap_and_merge_subgraphs(raft::resources const& res,
                                raft::managed_matrix_view<IdxT, IdxT> global_neighbors,
                                raft::managed_matrix_view<T, IdxT> global_distances,
                                size_t num_data_in_cluster,
-                               size_t k)
+                               size_t k,
+                               bool select_min)
 {
   // remap indices
 #pragma omp parallel for
@@ -251,7 +259,8 @@ void remap_and_merge_subgraphs(raft::resources const& res,
                   global_distances.data_handle(),
                   batch_distances_d.data_handle(),
                   global_neighbors.data_handle(),
-                  batch_neighbors_d.data_handle());
+                  batch_neighbors_d.data_handle(),
+                  select_min);
 }
 
 }  // namespace cuvs::neighbors::all_neighbors::detail

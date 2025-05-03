@@ -27,10 +27,11 @@ void check_metric(const index_params& params)
   if (std::holds_alternative<graph_build_params::nn_descent_params>(params.graph_build_params)) {
     auto allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
                            params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
-                           params.metric == cuvs::distance::DistanceType::CosineExpanded;
+                           params.metric == cuvs::distance::DistanceType::CosineExpanded ||
+                           params.metric == cuvs::distance::DistanceType::InnerProduct;
     RAFT_EXPECTS(allowed_metrics,
                  "Distance metric for all-neighbors build with NN Descent should be L2Expanded, "
-                 "L2SqrtExpanded, or CosineExpanded");
+                 "L2SqrtExpanded, CosineExpanded, or InnerProduct");
   } else if (std::holds_alternative<graph_build_params::ivf_pq_params>(params.graph_build_params)) {
     RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded,
                  "Distance metric for all-neighbors build with IVFPQ should be L2Expanded");

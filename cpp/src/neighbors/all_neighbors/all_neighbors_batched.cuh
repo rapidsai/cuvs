@@ -16,6 +16,7 @@
 
 #pragma once
 #include "all_neighbors_builder.cuh"
+#include "cuvs/distance/distance.hpp"
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/neighbors/all_neighbors.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
@@ -413,7 +414,7 @@ void batch_build(const raft::resources& handle,
   size_t n_nearest_clusters = batch_params.n_nearest_clusters;
   size_t n_clusters         = batch_params.n_clusters;
   RAFT_EXPECTS(n_clusters > n_nearest_clusters,
-               "n_nearest_clusters should be smaller than n_clusters. Recommend starting from "
+               "n_nearest_clusters should be smaller than n_clusters. We recommend starting from "
                "n_nearest_clusters=2 and gradually increase it for better knn graph recall.");
 
   auto centroids = raft::make_device_matrix<T, IdxT>(handle, n_clusters, num_cols);
@@ -441,13 +442,19 @@ void batch_build(const raft::resources& handle,
                        cluster_offsets.view());
 
   auto global_neighbors = raft::make_managed_matrix<IdxT, IdxT>(handle, num_rows, index.k());
-  auto global_distances = raft::make_managed_matrix<float, IdxT>(handle, num_rows, index.k());
+  auto global_distances = raft::make_managed_matrix<T, IdxT>(handle, num_rows, index.k());
+
+  bool select_min = batch_params.metric != cuvs::distance::DistanceType::InnerProduct;
+  IdxT global_neighbors_fill_value =
+    select_min ? std::numeric_limits<IdxT>::max() : std::numeric_limits<IdxT>::min();
+  T global_distances_fill_value =
+    select_min ? std::numeric_limits<T>::max() : std::numeric_limits<T>::min();
   std::fill(global_neighbors.data_handle(),
             global_neighbors.data_handle() + num_rows * index.k(),
-            std::numeric_limits<IdxT>::max());
+            global_neighbors_fill_value);
   std::fill(global_distances.data_handle(),
             global_distances.data_handle() + num_rows * index.k(),
-            std::numeric_limits<float>::max());
+            global_distances_fill_value);
 
   if (num_ranks > 1) {
     multi_gpu_batch_build(handle,

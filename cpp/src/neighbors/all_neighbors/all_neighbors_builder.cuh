@@ -239,7 +239,8 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
                                                global_neighbors.value(),
                                                global_distances.value(),
                                                num_data_in_cluster,
-                                               this->k);
+                                               this->k,
+                                               cuvs::distance::is_min_close(this->metric));
     } else {
       size_t num_rows = num_data_in_cluster;
       if (index.return_distances()) {
@@ -404,7 +405,8 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
                                               global_neighbors.value(),
                                               global_distances.value(),
                                               num_data_in_cluster,
-                                              this->k);
+                                              this->k,
+                                              cuvs::distance::is_min_close(this->metric));
     } else {
       size_t num_rows  = dataset.extent(0);
       T* distances_ptr = nullptr;

@@ -182,7 +182,8 @@ struct index_params : cuvs::neighbors::index_params {
 };
 
 /**
- * @brief Build a new all-neighbors index
+ * @brief Builds a new approximate all-neighbors knn graph. Returns an approximate nearest neighbor
+ * indices matrix and the corresponding distances (if return_distances=true) on the given dataset.
  *
  * Usage example:
  * @code{.cpp}
@@ -215,7 +216,9 @@ auto build(const raft::resources& handle,
            bool return_distances = false) -> index<int64_t, float>;
 
 /**
- * @brief Build a new all-neighbors index
+ * @brief Builds a new approximate all-neighbors knn graph. Returns an approximate nearest neighbor
+ * indices matrix and the corresponding distances (if distances_view has value in idx) on the given
+ * dataset.
  *
  * Usage example:
  * @code{.cpp}
@@ -246,7 +249,10 @@ void build(const raft::resources& handle,
            index<int64_t, float>& idx);
 
 /**
- * @brief Build a new all-neighbors index. params.n_clusters should be 1.
+ * @brief Builds a new approximate all-neighbors knn graph. Returns an approximate nearest neighbor
+ * indices matrix and the corresponding distances (if return_distances=true) on the given dataset.
+ * params.n_clusters should be 1 for data on device. . To use a larger
+ * params.n_clusters for efficient device memory usage, put data on host RAM.
  *
  * Usage example:
  * @code{.cpp}
@@ -279,7 +285,10 @@ auto build(const raft::resources& handle,
            bool return_distances = false) -> index<int64_t, float>;
 
 /**
- * @brief Build a new all-neighbors index. params.n_clusters should be 1.
+ * @brief Builds a new approximate all-neighbors knn graph. Returns an approximate nearest neighbor
+ * indices matrix and the corresponding distances (if distances_view has value in idx) on the given
+ * dataset. params.n_clusters should be 1 for data on device. To use a larger params.n_clusters for
+ * efficient device memory usage, put data on host RAM.
  *
  * Usage example:
  * @code{.cpp}

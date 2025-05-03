@@ -46,8 +46,8 @@ namespace cuvs::neighbors::all_neighbors {
 enum knn_build_algo { NN_DESCENT, IVF_PQ };
 
 struct AllNeighborsInputs {
-  std::tuple<knn_build_algo, cuvs::distance::DistanceType> build_algo_metric;
-  std::tuple<double, size_t, size_t> recall_cluster_nearestcluster;
+  std::tuple<knn_build_algo, cuvs::distance::DistanceType, double> build_algo_metric_recall;
+  std::tuple<size_t, size_t> cluster_nearestcluster;
   int n_rows;
   int dim;
   int k;
@@ -57,9 +57,9 @@ struct AllNeighborsInputs {
 inline ::std::ostream& operator<<(::std::ostream& os, const AllNeighborsInputs& p)
 {
   os << "dataset shape=" << p.n_rows << "x" << p.dim << ", k=" << p.k
-     << ", metric=" << static_cast<int>(std::get<1>(p.build_algo_metric))
-     << ", clusters=" << std::get<1>(p.recall_cluster_nearestcluster)
-     << ", num nearest clusters=" << std::get<2>(p.recall_cluster_nearestcluster) << std::endl;
+     << ", metric=" << static_cast<int>(std::get<1>(p.build_algo_metric_recall))
+     << ", clusters=" << std::get<0>(p.cluster_nearestcluster)
+     << ", num nearest clusters=" << std::get<1>(p.cluster_nearestcluster) << std::endl;
   return os;
 }
 
@@ -74,11 +74,11 @@ void get_graphs(raft::resources& handle,
                 size_t queries_size)
 {
   index_params params;
-  params.n_clusters         = std::get<1>(ps.recall_cluster_nearestcluster);
-  params.n_nearest_clusters = std::get<2>(ps.recall_cluster_nearestcluster);
-  params.metric             = std::get<1>(ps.build_algo_metric);
+  params.n_clusters         = std::get<0>(ps.cluster_nearestcluster);
+  params.n_nearest_clusters = std::get<1>(ps.cluster_nearestcluster);
+  params.metric             = std::get<1>(ps.build_algo_metric_recall);
 
-  auto build_algo = std::get<0>(ps.build_algo_metric);
+  auto build_algo = std::get<0>(ps.build_algo_metric_recall);
 
   if (build_algo == NN_DESCENT) {
     auto nn_descent_params                      = graph_build_params::nn_descent_params{};
@@ -110,7 +110,7 @@ void get_graphs(raft::resources& handle,
                                       ps.n_rows,
                                       ps.dim,
                                       ps.k,
-                                      std::get<1>(ps.build_algo_metric));
+                                      std::get<1>(ps.build_algo_metric_recall));
     raft::update_host(indices_bf.data(), indices_naive_dev.data(), queries_size, cuda_stream);
     raft::update_host(distances_bf.data(), distances_naive_dev.data(), queries_size, cuda_stream);
 
@@ -177,7 +177,7 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
                ps,
                queries_size);
 
-    double min_recall = std::get<0>(ps.recall_cluster_nearestcluster);
+    double min_recall = std::get<2>(ps.build_algo_metric_recall);
     EXPECT_TRUE(eval_recall(indices_bf, indices_allNN, ps.n_rows, ps.k, 0.01, min_recall, true));
   }
 
@@ -206,31 +206,29 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
 
 const std::vector<AllNeighborsInputs> inputsSingle =
   raft::util::itertools::product<AllNeighborsInputs>(
-    {
-      std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::L2Expanded),
-      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded),
-      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded),
-      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded),
-    },
-    {std::make_tuple(0.9, 1lu, 2lu)},  // min_recall, n_clusters, num_nearest_cluster
-    {5000, 7151},                      // n_rows
-    {64, 137},                         // dim
-    {16, 23},                          // graph_degree
-    {false, true}                      // data on host
+    {std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::L2Expanded, 0.9),
+     std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded, 0.9),
+     std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded, 0.9),
+     std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded, 0.9),
+     std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::InnerProduct, 0.85)},
+    {std::make_tuple(1lu, 2lu)},  // min_recall, n_clusters, num_nearest_cluster
+    {5000, 7151},                 // n_rows
+    {64, 137},                    // dim
+    {16, 23},                     // graph_degree
+    {false, true}                 // data on host
   );
 
 const std::vector<AllNeighborsInputs> inputsBatch =
   raft::util::itertools::product<AllNeighborsInputs>(
+    {std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::L2Expanded, 0.9),
+     std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded, 0.9),
+     std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded, 0.9),
+     std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded, 0.9),
+     std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::InnerProduct, 0.9)},
     {
-      std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::L2Expanded),
-      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded),
-      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded),
-      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded),
-    },
-    {
-      std::make_tuple(0.9, 4lu, 2lu),
-      std::make_tuple(0.9, 7lu, 2lu),
-      std::make_tuple(0.9, 10lu, 2lu),
+      std::make_tuple(4lu, 2lu),
+      std::make_tuple(7lu, 2lu),
+      std::make_tuple(10lu, 2lu),
     },             // min_recall, n_clusters, num_nearest_cluster
     {5000, 7151},  // n_rows
     {64, 137},     // dim
