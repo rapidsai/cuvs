@@ -5,21 +5,15 @@ set -e -u -o pipefail
 echo "Starting Panama FFM API bindings generation ..."
 REPODIR=$(cd "$(dirname $0)"; cd ../../ ; pwd)
 CURDIR=$(cd "$(dirname $0)"; pwd)
-CUDA_HOME=$(which nvcc | cut -d/ -f-5)
 TARGET_PACKAGE="com.nvidia.cuvs.internal.panama"
 
-# Try to verify that a include directory exists inside CUDA_HOME
-if [ ! -d "$CUDA_HOME/targets/x86_64-linux/include" ];
-then
-  echo "$CUDA_HOME/targets/x86_64-linux/include does not exist."
-  if [ -d "/usr/local/cuda/targets/x86_64-linux/include" ];
-  then
-    echo "Setting CUDA_HOME to /usr/local/cuda"
-    CUDA_HOME=/usr/local/cuda
-  else
-    echo "Couldn't find a suitable CUDA include directory."
-    exit 1
-  fi
+if [ -n "${CONDA_PREFIX:-}" ] && [ -d "${CONDA_PREFIX}/targets/x86_64-linux/include" ]; then
+  CUDA_INCLUDE_DIR="${CONDA_PREFIX}/targets/x86_64-linux/include"
+elif [ -d "/usr/local/cuda/targets/x86_64-linux/include" ]; then
+  CUDA_INCLUDE_DIR="/usr/local/cuda/targets/x86_64-linux/include"
+else
+  echo "Couldn't find a suitable CUDA include directory."
+  exit 1
 fi
 
 if [[ `command -v jextract` == "" ]];
@@ -37,7 +31,7 @@ fi
 # Use Jextract utility to generate panama bindings
 jextract \
  --include-dir ${REPODIR}/java/internal/build/_deps/dlpack-src/include/ \
- --include-dir ${CUDA_HOME}/targets/x86_64-linux/include \
+ --include-dir ${CUDA_INCLUDE_DIR} \
  --include-dir ${REPODIR}/cpp/include \
  --output "${REPODIR}/java/cuvs-java/src/main/java22/" \
  --target-package ${TARGET_PACKAGE} \
