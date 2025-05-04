@@ -480,6 +480,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/vamana_serialize_int8.cu
     src/preprocessing/quantize/scalar.cu
     src/preprocessing/quantize/binary.cu
+    src/preprocessing/spectral/spectral_embedding.cu
     src/selection/select_k_float_int64_t.cu
     src/selection/select_k_float_int32_t.cu
     src/selection/select_k_float_uint32_t.cu
