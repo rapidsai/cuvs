@@ -33,6 +33,67 @@
 
 namespace {
 
+static void _set_graph_build_params(
+  std::variant<std::monostate,
+               cuvs::neighbors::cagra::graph_build_params::ivf_pq_params,
+               cuvs::neighbors::cagra::graph_build_params::nn_descent_params,
+               cuvs::neighbors::cagra::graph_build_params::iterative_search_params>& out_params,
+  cuvsCagraIndexParams& params,
+  cuvsCagraGraphBuildAlgo algo,
+  int64_t n_rows,
+  int64_t dim)
+
+{
+  switch (algo) {
+    case cuvsCagraGraphBuildAlgo::AUTO_SELECT: break;
+    case cuvsCagraGraphBuildAlgo::IVF_PQ: {
+      auto pq_params = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(
+        raft::matrix_extent<int64_t>(n_rows, dim));
+      if (params.graph_build_params) {
+        auto ivf_params = static_cast<cuvsIvfPqParams*>(params.graph_build_params);
+        if (ivf_params->ivf_pq_build_params) {
+          auto bp                                         = ivf_params->ivf_pq_build_params;
+          pq_params.build_params.add_data_on_build        = bp->add_data_on_build;
+          pq_params.build_params.n_lists                  = bp->n_lists;
+          pq_params.build_params.kmeans_n_iters           = bp->kmeans_n_iters;
+          pq_params.build_params.kmeans_trainset_fraction = bp->kmeans_trainset_fraction;
+          pq_params.build_params.pq_bits                  = bp->pq_bits;
+          pq_params.build_params.pq_dim                   = bp->pq_dim;
+          pq_params.build_params.codebook_kind =
+            static_cast<cuvs::neighbors::ivf_pq::codebook_gen>(bp->codebook_kind);
+          pq_params.build_params.force_random_rotation = bp->force_random_rotation;
+          pq_params.build_params.conservative_memory_allocation =
+            bp->conservative_memory_allocation;
+          pq_params.build_params.max_train_points_per_pq_code = bp->max_train_points_per_pq_code;
+        }
+        if (ivf_params->ivf_pq_search_params) {
+          auto sp                                          = ivf_params->ivf_pq_search_params;
+          pq_params.search_params.n_probes                 = sp->n_probes;
+          pq_params.search_params.lut_dtype                = sp->lut_dtype;
+          pq_params.search_params.internal_distance_dtype  = sp->internal_distance_dtype;
+          pq_params.search_params.preferred_shmem_carveout = sp->preferred_shmem_carveout;
+        }
+        if (ivf_params->refinement_rate > 1.0f) {
+          pq_params.refinement_rate = ivf_params->refinement_rate;
+        }
+      }
+      out_params = pq_params;
+      break;
+    }
+    case cuvsCagraGraphBuildAlgo::NN_DESCENT: {
+      auto nn_params = cuvs::neighbors::nn_descent::index_params(params.intermediate_graph_degree);
+      nn_params.max_iterations = params.nn_descent_niter;
+      out_params               = nn_params;
+      break;
+    }
+    case cuvsCagraGraphBuildAlgo::ITERATIVE_CAGRA_SEARCH: {
+      cuvs::neighbors::cagra::graph_build_params::iterative_search_params p;
+      out_params = p;
+      break;
+    }
+  }
+}
+
 template <typename T>
 void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* dataset_tensor)
 {
@@ -46,57 +107,8 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
   index_params.intermediate_graph_degree = params.intermediate_graph_degree;
   index_params.graph_degree              = params.graph_degree;
 
-  switch (params.build_algo) {
-    case cuvsCagraGraphBuildAlgo::AUTO_SELECT: break;
-    case cuvsCagraGraphBuildAlgo::IVF_PQ: {
-      auto dataset_extent = raft::matrix_extent<int64_t>(dataset.shape[0], dataset.shape[1]);
-      auto pq_params = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(dataset_extent);
-      auto ivf_pq_build_params  = params.graph_build_params->ivf_pq_build_params;
-      auto ivf_pq_search_params = params.graph_build_params->ivf_pq_search_params;
-      if (ivf_pq_build_params) {
-        pq_params.build_params.add_data_on_build = ivf_pq_build_params->add_data_on_build;
-        pq_params.build_params.n_lists           = ivf_pq_build_params->n_lists;
-        pq_params.build_params.kmeans_n_iters    = ivf_pq_build_params->kmeans_n_iters;
-        pq_params.build_params.kmeans_trainset_fraction =
-          ivf_pq_build_params->kmeans_trainset_fraction;
-        pq_params.build_params.pq_bits = ivf_pq_build_params->pq_bits;
-        pq_params.build_params.pq_dim  = ivf_pq_build_params->pq_dim;
-        pq_params.build_params.codebook_kind =
-          static_cast<cuvs::neighbors::ivf_pq::codebook_gen>(ivf_pq_build_params->codebook_kind);
-        pq_params.build_params.force_random_rotation = ivf_pq_build_params->force_random_rotation;
-        pq_params.build_params.conservative_memory_allocation =
-          ivf_pq_build_params->conservative_memory_allocation;
-        pq_params.build_params.max_train_points_per_pq_code =
-          ivf_pq_build_params->max_train_points_per_pq_code;
-      }
-      if (ivf_pq_search_params) {
-        pq_params.search_params.n_probes  = ivf_pq_search_params->n_probes;
-        pq_params.search_params.lut_dtype = ivf_pq_search_params->lut_dtype;
-        pq_params.search_params.internal_distance_dtype =
-          ivf_pq_search_params->internal_distance_dtype;
-        pq_params.search_params.preferred_shmem_carveout =
-          ivf_pq_search_params->preferred_shmem_carveout;
-      }
-      if (params.graph_build_params->refinement_rate > 1) {
-        pq_params.refinement_rate = params.graph_build_params->refinement_rate;
-      }
-      index_params.graph_build_params = pq_params;
-      break;
-    }
-    case cuvsCagraGraphBuildAlgo::NN_DESCENT: {
-      cuvs::neighbors::cagra::graph_build_params::nn_descent_params nn_descent_params{};
-      nn_descent_params =
-        cuvs::neighbors::nn_descent::index_params(index_params.intermediate_graph_degree);
-      nn_descent_params.max_iterations = params.nn_descent_niter;
-      index_params.graph_build_params  = nn_descent_params;
-      break;
-    }
-    case cuvsCagraGraphBuildAlgo::ITERATIVE_CAGRA_SEARCH: {
-      cuvs::neighbors::cagra::graph_build_params::iterative_search_params p;
-      index_params.graph_build_params = p;
-      break;
-    }
-  };
+  _set_graph_build_params(
+    index_params.graph_build_params, params, params.build_algo, dataset.shape[0], dataset.shape[1]);
 
   if (auto* cparams = params.compression; cparams != nullptr) {
     auto compression_params                        = cuvs::neighbors::vpq_params();
@@ -282,71 +294,24 @@ void* _merge(cuvsResources_t res,
     out_idx_params.intermediate_graph_degree;
   merge_params_cpp.output_index_params.graph_degree = out_idx_params.graph_degree;
 
-  switch (out_idx_params.build_algo) {
-    case cuvsCagraGraphBuildAlgo::AUTO_SELECT: break;
-
-    case cuvsCagraGraphBuildAlgo::IVF_PQ: {
-      int64_t total_size = 0;
-      auto first_idx_ptr =
-        reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(indices[0]->addr);
-      int64_t dim = first_idx_ptr->dim();
-
-      for (size_t i = 0; i < num_indices; ++i) {
-        auto idx_ptr =
-          reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(indices[i]->addr);
-        total_size += idx_ptr->size();
-      }
-
-      auto pq_params = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(
-        raft::matrix_extent<int64_t>(total_size, dim));
-
-      if (out_idx_params.graph_build_params) {
-        auto ivf_params = static_cast<cuvsIvfPqParams*>(out_idx_params.graph_build_params);
-        if (ivf_params->ivf_pq_build_params) {
-          auto bp                                         = ivf_params->ivf_pq_build_params;
-          pq_params.build_params.add_data_on_build        = bp->add_data_on_build;
-          pq_params.build_params.n_lists                  = bp->n_lists;
-          pq_params.build_params.kmeans_n_iters           = bp->kmeans_n_iters;
-          pq_params.build_params.kmeans_trainset_fraction = bp->kmeans_trainset_fraction;
-          pq_params.build_params.pq_bits                  = bp->pq_bits;
-          pq_params.build_params.pq_dim                   = bp->pq_dim;
-          pq_params.build_params.codebook_kind =
-            static_cast<cuvs::neighbors::ivf_pq::codebook_gen>(bp->codebook_kind);
-          pq_params.build_params.force_random_rotation = bp->force_random_rotation;
-          pq_params.build_params.conservative_memory_allocation =
-            bp->conservative_memory_allocation;
-          pq_params.build_params.max_train_points_per_pq_code = bp->max_train_points_per_pq_code;
-        }
-        if (ivf_params->ivf_pq_search_params) {
-          auto sp                                          = ivf_params->ivf_pq_search_params;
-          pq_params.search_params.n_probes                 = sp->n_probes;
-          pq_params.search_params.lut_dtype                = sp->lut_dtype;
-          pq_params.search_params.internal_distance_dtype  = sp->internal_distance_dtype;
-          pq_params.search_params.preferred_shmem_carveout = sp->preferred_shmem_carveout;
-        }
-        if (ivf_params->refinement_rate > 1.0f) {
-          pq_params.refinement_rate = ivf_params->refinement_rate;
-        }
-      }
-
-      merge_params_cpp.output_index_params.graph_build_params = pq_params;
-      break;
-    }
-
-    case cuvsCagraGraphBuildAlgo::NN_DESCENT: {
-      auto nn_params = cuvs::neighbors::cagra::graph_build_params::nn_descent_params(
-        out_idx_params.intermediate_graph_degree);
-      nn_params.max_iterations                                = out_idx_params.nn_descent_niter;
-      merge_params_cpp.output_index_params.graph_build_params = nn_params;
-      break;
-    }
-
-    case cuvsCagraGraphBuildAlgo::ITERATIVE_CAGRA_SEARCH: {
-      cuvs::neighbors::cagra::graph_build_params::iterative_search_params it_params;
-      merge_params_cpp.output_index_params.graph_build_params = it_params;
-      break;
+  int64_t total_size = 0;
+  int64_t dim        = 0;
+  if (out_idx_params.build_algo == cuvsCagraGraphBuildAlgo::IVF_PQ) {
+    auto first_idx_ptr =
+      reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(indices[0]->addr);
+    dim = first_idx_ptr->dim();
+    for (size_t i = 0; i < num_indices; ++i) {
+      auto idx_ptr =
+        reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(indices[i]->addr);
+      total_size += idx_ptr->size();
     }
   }
+
+  _set_graph_build_params(merge_params_cpp.output_index_params.graph_build_params,
+                          out_idx_params,
+                          out_idx_params.build_algo,
+                          total_size,
+                          dim);
 
   std::vector<cuvs::neighbors::cagra::index<T, uint32_t>*> index_ptrs;
   index_ptrs.reserve(num_indices);
