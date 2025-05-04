@@ -256,7 +256,7 @@ auto spectral_embedding(
     embedding_row_view                               // Destination matrix (as row-major view)
   );
 
-  return 100;
+  return 0;
 }
 
 }  // namespace cuvs::preprocessing::spectral
