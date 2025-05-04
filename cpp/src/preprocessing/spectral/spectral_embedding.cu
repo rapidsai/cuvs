@@ -22,6 +22,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/handle.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/sparse/coo.hpp>
 #include <raft/sparse/linalg/laplacian.cuh>
@@ -45,34 +46,6 @@
 #include <iostream>
 
 namespace cuvs::preprocessing::spectral {
-
-void scale_eigenvectors_by_diagonal(
-  raft::device_matrix_view<float, int, raft::col_major> eigenvectors,
-  const raft::device_vector<float, int>& diagonal,
-  raft::resources const& handle)
-{
-  int n_rows = eigenvectors.extent(0);
-  int n_cols = eigenvectors.extent(1);
-
-  auto eigenvectors_ptr = eigenvectors.data_handle();
-  auto diagonal_ptr     = diagonal.data_handle();
-
-  auto policy = thrust::cuda::par.on(raft::resource::get_cuda_stream(handle));
-
-  // For each row in the eigenvectors matrix
-  thrust::for_each(policy,
-                   thrust::counting_iterator<int>(0),
-                   thrust::counting_iterator<int>(n_rows),
-                   [eigenvectors_ptr, diagonal_ptr, n_cols, n_rows] __device__(int row) {
-                     // For each column in this row
-                     for (int col = 0; col < n_cols; col++) {
-                       // With column-major layout, index is (row + col * n_rows)
-                       int idx = row + col * n_rows;
-                       // Divide by the corresponding diagonal element
-                       eigenvectors_ptr[idx] /= diagonal_ptr[row];
-                     }
-                   });
-}
 
 auto spectral_embedding(
   raft::resources const& handle,
@@ -222,7 +195,13 @@ auto spectral_embedding(
     "eigenvalues", eigenvalues.data_handle(), eigenvalues.size(), std::cout);
 
   if (spectral_embedding_config.norm_laplacian) {
-    scale_eigenvectors_by_diagonal(eigenvectors.view(), diagonal, handle);
+    raft::linalg::matrix_vector_op(
+      handle,
+      raft::make_const_mdspan(eigenvectors.view()),  // input matrix view
+      raft::make_const_mdspan(diagonal.view()),      // input vector view
+      eigenvectors.view(),                           // output matrix view (in-place)
+      raft::linalg::Apply::ALONG_COLUMNS,  // divide each row by corresponding diagonal element
+      [] __device__(float elem, float diag) { return elem / diag; });
   }
 
   // Replace the direct copy with a gather operation that reverses columns
