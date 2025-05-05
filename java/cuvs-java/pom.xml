@@ -223,15 +223,6 @@
                     </archive>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.6.2</version>
-                <configuration>
-                    <excludePackageNames>com.nvidia.cuvs.examples,com.nvidia.cuvs.panama</excludePackageNames>
-                    <reportOutputDirectory>${project.build.directory}</reportOutputDirectory>
-                </configuration>
-            </plugin>
         <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-source-plugin</artifactId>
@@ -265,7 +256,8 @@
                         <goal>jar</goal>
                     </goals>
                     <configuration>
-                        <additionalparam>-Xdoclint:none</additionalparam>
+                        <excludePackageNames>com.nvidia.cuvs.examples,com.nvidia.cuvs.panama</excludePackageNames>
+                        <doclint>all,-missing</doclint>
                     </configuration>
                 </execution>
             </executions>
