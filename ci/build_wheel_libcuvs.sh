@@ -27,28 +27,4 @@ rapids-pip-retry install \
 export PIP_NO_BUILD_ISOLATION=0
 
 ci/build_wheel.sh libcuvs ${package_dir} cpp
-
-
-# We temporarily override the values in `libcuvs` `pyproject.toml` so we can
-# track the versions that have vendored NCCL (CUDA 11) vs. the ones that don't
-# (CUDA 12+)
-RAPIDS_CUDA_MAJOR="${RAPIDS_CUDA_VERSION%%.*}"
-WHEEL_SIZE_LIMIT='0.9G'
-if [[ ${RAPIDS_CUDA_MAJOR} == "11" ]]; then
-  WHEEL_SIZE_LIMIT='1.0G'
-fi
-
-
-rapids-logger "validate packages with 'pydistcheck'"
-cd "${package_dir}"
-
-pydistcheck \
-    --inspect \
-    --max-allowed-size-compressed $WHEEL_SIZE_LIMIT \
-    "$(echo "${RAPIDS_WHEEL_BLD_OUTPUT_DIR}"/*.whl)"
-
-rapids-logger "validate packages with 'twine'"
-
-twine check \
-    --strict \
-    "$(echo "${RAPIDS_WHEEL_BLD_OUTPUT_DIR}"/*.whl)"
+ci/validate_wheel.sh ${package_dir} "${RAPIDS_WHEEL_BLD_OUTPUT_DIR}"
