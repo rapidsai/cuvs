@@ -4,21 +4,18 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.lang.invoke.MethodHandles;
 import java.util.UUID;
-
-import com.nvidia.cuvs.SearchResults;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.logging.Logger;
 
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.BruteForceIndexParams;
 import com.nvidia.cuvs.BruteForceQuery;
 import com.nvidia.cuvs.CuVSResources;
+import com.nvidia.cuvs.SearchResults;
 
 public class BruteForceExample {
 
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  private static final Logger log = Logger.getLogger(BruteForceExample.class.getName());
 
   public static void main(String[] args) throws Throwable {
 
