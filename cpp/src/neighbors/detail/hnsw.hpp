@@ -444,7 +444,7 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
       auto pt_id = order[i];
       std::copy(appr_algo->getDataByInternalId(pt_id),
                 appr_algo->getDataByInternalId(pt_id) + dim,
-                &host_query_set(i - start_idx, 0));
+                reinterpret_cast<char*>(&host_query_set(i - start_idx, 0)));
     }
 
     // find neighbors of the query set
