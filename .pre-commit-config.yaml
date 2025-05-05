@@ -4,6 +4,7 @@ repos:
       - repo: https://github.com/pre-commit/pre-commit-hooks
         rev: v5.0.0
         hooks:
+              - id: check-json
               - id: trailing-whitespace
               - id: end-of-file-fixer
       - repo: https://github.com/PyCQA/isort
@@ -100,10 +101,6 @@ repos:
                   (?x)
                     ^CHANGELOG[.]md$|
                     ^cpp/cmake/patches/cutlass/build-export[.]patch$
-      - repo: https://github.com/pre-commit/pre-commit-hooks
-        rev: v4.5.0
-        hooks:
-              - id: check-json
       - repo: https://github.com/rapidsai/pre-commit-hooks
         rev: v0.6.0
         hooks:
@@ -122,7 +119,7 @@ repos:
           - id: verify-codeowners
             args: [--fix, --project-prefix=cuvs]
       - repo: https://github.com/rapidsai/dependency-file-generator
-        rev: v1.17.0
+        rev: v1.18.1
         hooks:
             - id: rapids-dependency-file-generator
               args: ["--clean"]
@@ -131,7 +128,6 @@ repos:
         hooks:
           - id: shellcheck
             args: ["--severity=warning"]
-            files: ^ci/
 
 default_language_version:
       python: python3
