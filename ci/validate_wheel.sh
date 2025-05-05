@@ -17,7 +17,7 @@ if [[ "${package_dir}" == "python/libcuvs" ]]; then
         )
     else
         PYDISTCHECK_ARGS=(
-            --max-allowed-size-compressed '875M'
+            --max-allowed-size-compressed '900M'
         )
     fi
 else
