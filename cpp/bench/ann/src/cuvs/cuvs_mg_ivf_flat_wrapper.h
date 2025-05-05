@@ -73,7 +73,7 @@ class cuvs_mg_ivf_flat : public algo<T>, public algo_gpu {
   std::unique_ptr<algo<T>> copy() override;
 
  private:
-  raft::device_resources_snmg clique_;
+  raft::device_resources_snmg_nccl clique_;
   build_param index_params_;
   cuvs::neighbors::mg_search_params<ivf_flat::search_params> search_params_;
   std::shared_ptr<cuvs::neighbors::mg_index<cuvs::neighbors::ivf_flat::index<T, IdxT>, T, IdxT>>

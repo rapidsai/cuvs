@@ -86,7 +86,7 @@ class cuvs_mg_cagra : public algo<T>, public algo_gpu {
   std::unique_ptr<algo<T>> copy() override;
 
  private:
-  raft::device_resources_snmg clique_;
+  raft::device_resources_snmg_nccl clique_;
   float refine_ratio_;
   build_param index_params_;
   cuvs::neighbors::mg_search_params<cagra::search_params> search_params_;
