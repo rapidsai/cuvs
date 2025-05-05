@@ -344,6 +344,14 @@ void build_knn_graph(
   }
 
   if (!first) RAFT_LOG_DEBUG("# Finished building kNN graph");
+  if (static_cast<double>(num_self_included) / dataset.extent(0) * 100. < 5) {
+    RAFT_LOG_WARN(
+      "Self-included ratio is low: %2.2f %%. This can lead to poor recall. "
+      "Consider using a different configuration for the IVF-PQ index, "
+      "increasing the refinement rate, or using higher-precision data type for "
+      "LUT/Internal Distance.",
+      static_cast<double>(num_self_included) / dataset.extent(0) * 100.);
+  }
 }
 
 template <typename DataT, typename IdxT, typename accessor>
