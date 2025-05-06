@@ -53,84 +53,6 @@ public class CagraRandomizedIT extends CuVSTestCase {
     }
   }
 
-
-  @Test
-  public void testPrefilteringRandomizedEffect() throws Throwable {
-    int datasetSize = 500;
-    int dimensions = 128;
-    int numQueries = 3;
-    int topK = 5;
-
-    float[][] dataset = generateData(random, datasetSize, dimensions);
-    float[][] queries = generateData(random, numQueries, dimensions);
-
-    try (CuVSResources resources = CuVSResources.create()) {
-      CagraIndexParams indexParams = new CagraIndexParams.Builder()
-          .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
-          .build();
-
-      CagraIndex index = CagraIndex.newBuilder(resources)
-          .withDataset(dataset)
-          .withIndexParams(indexParams)
-          .build();
-
-      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
-
-      CagraQuery fullQuery = new CagraQuery.Builder()
-          .withTopK(topK)
-          .withSearchParams(searchParams)
-          .withQueryVectors(queries)
-          .build();
-
-      SearchResults fullResults = index.search(fullQuery);
-      List<List<Integer>> fullNeighborIds = extractNeighborIds(fullResults);
-
-      BitSet[] filters = new BitSet[numQueries];
-      for (int i = 0; i < numQueries; i++) {
-        BitSet filter = new BitSet(datasetSize);
-        for (int j = 0; j < datasetSize; j++) {
-          filter.set(j, random.nextBoolean());
-        }
-        filters[i] = filter;
-      }
-
-      List<List<Integer>> expected = generateExpectedResults(topK, dataset, queries, filters, log);
-
-      List<SearchResults> allResults = new ArrayList<>();
-      List<List<Integer>> expectedResults = new ArrayList<>();
-      for (int i = 0; i < numQueries; i++) {
-        CagraQuery filteredQuery = new CagraQuery.Builder()
-           .withTopK(topK)
-           .withSearchParams(searchParams)
-           .withQueryVectors(new float[][] { queries[i] })
-           .withPrefilter(new BitSet[] { filters[i] }, datasetSize)
-           .build();
-
-       SearchResults filteredResults = index.search(filteredQuery);
-       allResults.add(filteredResults);
-       expectedResults.add(expected.get(i));
-     }
-     List<Map<Integer, Float>> flatResultList = new ArrayList<>();
-     for (SearchResults result : allResults) {
-       flatResultList.addAll(result.getResults());  // Assuming one query per result
-     }
-     SearchResults mergedResults = new SearchResults(){
-       @Override
-       public List<Map<Integer, Float>> getResults() {
-         return flatResultList;
-       }
-     };
-     compareResults(mergedResults, expectedResults, topK, datasetSize, numQueries);
-
-     index.destroyIndex();
-    }
-  }
-
-private List<List<Integer>> extractNeighborIds(SearchResults results) {
-  return results.getResults().stream().map(map -> map.keySet().stream().toList()).toList();
-}
-
-
   private void tmpResultsTopKWithRandomValues() throws Throwable {
     int DATASET_SIZE_LIMIT = 10_000;
     int DIMENSIONS_LIMIT = 2048;
@@ -141,9 +63,18 @@ private List<List<Integer>> extractNeighborIds(SearchResults results) {
     int dimensions = random.nextInt(DIMENSIONS_LIMIT) + 1;
     int numQueries = random.nextInt(NUM_QUERIES_LIMIT) + 1;
     int topK = Math.min(random.nextInt(TOP_K_LIMIT) + 1, datasetSize);
+    boolean usePrefilter = random.nextBoolean();
 
     if (datasetSize < topK)
       datasetSize = topK;
+
+    BitSet sharedPrefilter = null;
+    if (usePrefilter) {
+      sharedPrefilter = new BitSet(datasetSize);
+      for (int j = 0; j < datasetSize; j++) {
+        sharedPrefilter.set(j, random.nextBoolean());
+      }
+    }
 
     // Generate a random dataset
     float[][] dataset = generateData(random, datasetSize, dimensions);
@@ -188,12 +119,17 @@ private List<List<Integer>> extractNeighborIds(SearchResults results) {
 
       try {
         // Execute search and retrieve results
-        CagraQuery query = new CagraQuery.Builder()
+        CagraQuery.Builder queryBuilder = new CagraQuery.Builder()
                 .withQueryVectors(queries)
                 .withTopK(topK)
                 .withSearchParams(new CagraSearchParams.Builder(resources)
-                        .build())
-                .build();
+                        .build());
+
+        if (sharedPrefilter != null) {
+          queryBuilder.withPrefilters(new BitSet[] { sharedPrefilter }, datasetSize);
+        }
+
+        CagraQuery query = queryBuilder.build();
         log.info("Query built successfully. Executing search...");
         SearchResults results = index.search(query);
 
