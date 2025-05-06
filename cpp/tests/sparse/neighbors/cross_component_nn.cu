@@ -384,93 +384,6 @@ INSTANTIATE_TEST_CASE_P(ConnectComponentsTest,
                         ConnectComponentsTestF_Int,
                         ::testing::ValuesIn(fix_conn_inputsf2));
 
-template <typename value_idx, typename value_t>
-struct MutualReachabilityFixConnectivitiesRedOp {
-  value_t* core_dists;
-  value_idx m;
-
-  DI MutualReachabilityFixConnectivitiesRedOp() : m(0) {}
-
-  MutualReachabilityFixConnectivitiesRedOp(value_t* core_dists_, value_idx m_)
-    : core_dists(core_dists_), m(m_){};
-
-  typedef typename raft::KeyValuePair<value_idx, value_t> KVP;
-  DI void operator()(value_idx rit, KVP* out, const KVP& other) const
-  {
-    if (rit < m && other.value < std::numeric_limits<value_t>::max()) {
-      value_t core_dist_rit   = core_dists[rit];
-      value_t core_dist_other = max(core_dist_rit, max(core_dists[other.key], other.value));
-
-      value_t core_dist_out;
-      if (out->key > -1) {
-        core_dist_out = max(core_dist_rit, max(core_dists[out->key], out->value));
-      } else {
-        core_dist_out = out->value;
-      }
-
-      bool smaller = core_dist_other < core_dist_out;
-      out->key     = smaller ? other.key : out->key;
-      out->value   = smaller ? core_dist_other : core_dist_out;
-    }
-  }
-
-  DI KVP operator()(value_idx rit, const KVP& a, const KVP& b) const
-  {
-    if (rit < m && a.key > -1) {
-      value_t core_dist_rit = core_dists[rit];
-      value_t core_dist_a   = max(core_dist_rit, max(core_dists[a.key], a.value));
-
-      value_t core_dist_b;
-      if (b.key > -1) {
-        core_dist_b = max(core_dist_rit, max(core_dists[b.key], b.value));
-      } else {
-        core_dist_b = b.value;
-      }
-
-      return core_dist_a < core_dist_b ? KVP(a.key, core_dist_a) : KVP(b.key, core_dist_b);
-    }
-
-    return b;
-  }
-
-  DI void init(value_t* out, value_t maxVal) const { *out = maxVal; }
-  DI void init(KVP* out, value_t maxVal) const
-  {
-    out->key   = -1;
-    out->value = maxVal;
-  }
-
-  DI void init_key(value_t& out, value_idx idx) const { return; }
-  DI void init_key(KVP& out, value_idx idx) const { out.key = idx; }
-
-  DI value_t get_value(KVP& out) const { return out.value; }
-  DI value_t get_value(value_t& out) const { return out; }
-
-  void gather(const raft::resources& handle, value_idx* map)
-  {
-    auto tmp_core_dists = raft::make_device_vector<value_t>(handle, m);
-    thrust::gather(raft::resource::get_thrust_policy(handle),
-                   map,
-                   map + m,
-                   core_dists,
-                   tmp_core_dists.data_handle());
-    raft::copy_async(
-      core_dists, tmp_core_dists.data_handle(), m, raft::resource::get_cuda_stream(handle));
-  }
-
-  void scatter(const raft::resources& handle, value_idx* map)
-  {
-    auto tmp_core_dists = raft::make_device_vector<value_t>(handle, m);
-    thrust::scatter(raft::resource::get_thrust_policy(handle),
-                    core_dists,
-                    core_dists + m,
-                    map,
-                    tmp_core_dists.data_handle());
-    raft::copy_async(
-      core_dists, tmp_core_dists.data_handle(), m, raft::resource::get_cuda_stream(handle));
-  }
-};
-
 template <typename value_t, typename value_idx>
 struct ConnectComponentsMutualReachabilityInputs {
   value_idx n_row;
@@ -518,8 +431,8 @@ class ConnectComponentsEdgesTest
     /**
      * 3. cross_component_nn to fix connectivities
      */
-    MutualReachabilityFixConnectivitiesRedOp<value_idx, value_t> red_op(core_dists.data(),
-                                                                        params.n_row);
+    cuvs::sparse::neighbors::MutualReachabilityFixConnectivitiesRedOp<value_idx, value_t> red_op(
+      core_dists.data(), params.n_row);
 
     cuvs::sparse::neighbors::cross_component_nn<value_idx, value_t>(handle,
                                                                     out_edges_unbatched,

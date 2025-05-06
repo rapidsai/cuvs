@@ -46,4 +46,34 @@ void mutual_reachability_graph(const raft::resources& handle,
     core_dists.data_handle(),
     out);
 }
+
+namespace helpers {
+void build_single_linkage_dendrogram(raft::resources const& handle,
+                                     raft::device_matrix_view<const float, int, raft::row_major> X,
+                                     cuvs::distance::DistanceType metric,
+                                     raft::device_vector_view<int, int> graph_indptr,
+                                     raft::device_coo_matrix_view<float, int, int, size_t> graph,
+                                     raft::device_vector_view<float, int> core_dists,
+                                     raft::device_coo_matrix_view<float, int, int, int> out_mst,
+                                     raft::device_matrix_view<int, int> dendrogram,
+                                     raft::device_vector_view<float, int> out_distances,
+                                     raft::device_vector_view<int, int> out_sizes)
+{
+  cuvs::neighbors::detail::reachability::build_single_linkage_dendrogram(
+    handle,
+    X.data_handle(),
+    static_cast<size_t>(X.extent(0)),
+    static_cast<size_t>(X.extent(1)),
+    metric,
+    graph_indptr.data_handle(),
+    graph,
+    core_dists.data_handle(),
+    out_mst.structure_view().get_rows().data(),
+    out_mst.structure_view().get_cols().data(),
+    out_mst.get_elements().data(),
+    dendrogram.data_handle(),
+    out_distances.data_handle(),
+    out_sizes.data_handle());
+}
+}  // namespace helpers
 }  // namespace cuvs::neighbors::reachability

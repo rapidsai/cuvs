@@ -15,6 +15,9 @@
  */
 
 #pragma once
+#include "../../cluster/detail/agglomerative.cuh"
+#include "../../cluster/detail/mst.cuh"
+#include "../../sparse/neighbors/cross_component_nn.cuh"
 #include "./knn_brute_force.cuh"
 
 #include <raft/linalg/unary_op.cuh>
@@ -252,6 +255,79 @@ void mutual_reachability_graph(const raft::resources& handle,
                                ? std::numeric_limits<value_t>::max()
                                : thrust::get<2>(tup);
                     });
+}
+
+/**
+ * Given a mutual reachability graph and core distances, constructs a linkage over it by computing
+ * the minimum spanning tree and dendrogram. Returns mst edges sorted by weight and the linkage.
+ * @tparam value_idx
+ * @tparam value_t
+ * @param[in] handle raft handle for resource reuse
+ * @param[in] X data points (size m * n)
+ * @param[in] m number of rows
+ * @param[in] n number of columns
+ * @param[in] metric distance metric to use
+ * @param[in] indptr CSR indices of mutual reachability knn graph (size m + 1)
+ * @param[out] graph_coo input graph
+ * @param[out] out_mst_src src vertex of MST edges (size m - 1)
+ * @param[out] out_mst_dst dst vertex of MST eges (size m - 1)
+ * @param[out] out_mst_weights weights of MST edges (size m - 1)
+ * @param[out] out_children output dendrogram
+ * @param[out] out_deltas distances of output
+ * @param[out] out_sizes cluster sizes of output
+ */
+template <typename value_idx = int, typename value_t = float, typename nnz_t>
+void build_single_linkage_dendrogram(
+  raft::resources const& handle,
+  const value_t* X,
+  size_t m,
+  size_t n,
+  cuvs::distance::DistanceType metric,
+  value_idx* indptr,
+  raft::device_coo_matrix_view<value_t, value_idx, value_idx, nnz_t> graph_coo,
+  value_t* core_dists,
+  value_idx* out_mst_src,
+  value_idx* out_mst_dst,
+  value_t* out_mst_weights,
+  value_idx* out_dendrogram,
+  value_t* out_deltas,
+  value_idx* out_sizes)
+{
+  /**
+   * Construct MST sorted by weights
+   */
+  auto color = raft::make_device_vector<value_idx, value_idx>(handle, static_cast<value_idx>(m));
+  cuvs::sparse::neighbors::MutualReachabilityFixConnectivitiesRedOp<value_idx, value_t>
+    reduction_op(core_dists, m);
+
+  // during knn graph connection
+  cuvs::cluster::agglomerative::detail::build_sorted_mst(
+    handle,
+    X,
+    indptr,
+    graph_coo.structure_view().get_cols().data(),
+    graph_coo.get_elements().data(),
+    m,
+    n,
+    out_mst_src,
+    out_mst_dst,
+    out_mst_weights,
+    color.data_handle(),
+    graph_coo.structure_view().get_nnz(),
+    reduction_op,
+    metric);
+
+  /**
+   * Perform hierarchical labeling
+   */
+  cuvs::cluster::agglomerative::detail::build_dendrogram_host(handle,
+                                                              out_mst_src,
+                                                              out_mst_dst,
+                                                              out_mst_weights,
+                                                              m - 1,
+                                                              out_dendrogram,
+                                                              out_deltas,
+                                                              out_sizes);
 }
 
 }  // namespace cuvs::neighbors::detail::reachability

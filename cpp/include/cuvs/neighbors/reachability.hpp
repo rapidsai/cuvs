@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <raft/core/device_coo_matrix.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/handle.hpp>
 #include <raft/sparse/coo.hpp>
@@ -73,6 +74,35 @@ void mutual_reachability_graph(
   raft::sparse::COO<float, int>& out,
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded,
   float alpha                         = 1.0);
+
+namespace helpers {
+/**
+ * Given a mutual reachability graph, connects graph components and build dendrogram.
+ * Returns mst edges sorted by weight and the linkage.
+ * @tparam value_idx
+ * @tparam value_t
+ * @param[in] handle raft handle for resource reuse
+ * @param[in] X data points (size m * n)
+ * @param[in] metric distance metric to use
+ * @param[in] graph_indptr CSR indices of graph nodes (size m + 1)
+ * @param[in] graph input graph
+ * @param[out] out_mst output MST sorted by edge weights (size m - 1)
+ * @param[out] dendrogram output dendrogram (size [n_rows - 1] * 2)
+ * @param[out] out_distances distances for output
+ * @param[out] out_sizes cluster sizes of output
+ */
+void build_single_linkage_dendrogram(raft::resources const& handle,
+                                     raft::device_matrix_view<const float, int, raft::row_major> X,
+                                     cuvs::distance::DistanceType metric,
+                                     raft::device_vector_view<int, int> graph_indptr,
+                                     raft::device_coo_matrix_view<float, int, int, size_t> graph,
+                                     raft::device_vector_view<float, int> core_dists,
+                                     raft::device_coo_matrix_view<float, int, int, int> out_mst,
+                                     raft::device_matrix_view<int, int> dendrogram,
+                                     raft::device_vector_view<float, int> out_distances,
+                                     raft::device_vector_view<int, int> out_sizes);
+}  // namespace helpers
+
 /**
  * @}
  */
