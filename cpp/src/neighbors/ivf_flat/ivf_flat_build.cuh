@@ -406,7 +406,8 @@ inline auto build(raft::resources const& handle,
   auto stream = raft::resource::get_cuda_stream(handle);
   cuvs::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_flat::build(%zu, %u)", size_t(n_rows), dim);
-  static_assert(std::is_same_v<T, float> || std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>,
+  static_assert(std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, uint8_t> ||
+                  std::is_same_v<T, int8_t>,
                 "unsupported data type");
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
