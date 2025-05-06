@@ -124,7 +124,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
     }
   }
-  
+
   @Test
   public void testPrefilteringReducesResults() throws Throwable {
   float[][] dataset = {
@@ -185,8 +185,8 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     log.info("Filtered results: {}", filtered);
 
     assertTrue(full.get(0).containsKey(0));
-    assertFalse(filtered.get(0).containsKey(0)); 
-    assertTrue(filtered.get(0).containsKey(2));  
+    assertFalse(filtered.get(0).containsKey(0));
+    assertTrue(filtered.get(0).containsKey(2));
   }
 }
 

@@ -210,7 +210,7 @@ public class CagraIndexImpl implements CagraIndex {
     MemorySegment neighborsMemorySegment = resources.getArena().allocate(neighborsSequenceLayout);
     MemorySegment distancesMemorySegment = resources.getArena().allocate(distancesSequenceLayout);
     MemorySegment floatsSeg = Util.buildMemorySegment(resources.getArena(), query.getQueryVectors());
-    
+
     long prefilterDataLength = 0;
     MemorySegment prefilterData = MemorySegment.NULL;
     if (query.getPrefilters() != null && query.getPrefilters().length > 0) {

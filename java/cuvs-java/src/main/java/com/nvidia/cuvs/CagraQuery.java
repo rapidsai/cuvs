@@ -93,7 +93,7 @@ public class CagraQuery {
   public int getTopK() {
     return topK;
   }
-  
+
   /**
    * Gets the prefilter BitSet array.
    *
@@ -187,7 +187,7 @@ public class CagraQuery {
      * @param prefilters array of bitsets, as many as queries, each containing as
      *        many bits as there are vectors in the index
      * @return an instance of this Builder
-     */  
+     */
     public Builder withPrefilter(BitSet[] prefilters, int numDocs) {
     this.prefilters = prefilters;
     this.numDocs = numDocs;
