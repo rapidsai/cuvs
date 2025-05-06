@@ -268,7 +268,8 @@ void mutual_reachability_graph(const raft::resources& handle,
  * @param[in] n number of columns
  * @param[in] metric distance metric to use
  * @param[in] indptr CSR indices of mutual reachability knn graph (size m + 1)
- * @param[out] graph_coo input graph
+ * @param[in] graph_coo input graph
+ * @param[in] core_dists core distances (size m)
  * @param[out] out_mst_src src vertex of MST edges (size m - 1)
  * @param[out] out_mst_dst dst vertex of MST eges (size m - 1)
  * @param[out] out_mst_weights weights of MST edges (size m - 1)

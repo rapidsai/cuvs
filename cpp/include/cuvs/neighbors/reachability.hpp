@@ -79,13 +79,12 @@ namespace helpers {
 /**
  * Given a mutual reachability graph, connects graph components and build dendrogram.
  * Returns mst edges sorted by weight and the linkage.
- * @tparam value_idx
- * @tparam value_t
  * @param[in] handle raft handle for resource reuse
  * @param[in] X data points (size m * n)
  * @param[in] metric distance metric to use
  * @param[in] graph_indptr CSR indices of graph nodes (size m + 1)
  * @param[in] graph input graph
+ * @param[in] core_dists core distances (size m)
  * @param[out] out_mst output MST sorted by edge weights (size m - 1)
  * @param[out] dendrogram output dendrogram (size [n_rows - 1] * 2)
  * @param[out] out_distances distances for output
