@@ -18,6 +18,7 @@
 
 #include "common.hpp"
 #include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
@@ -278,18 +279,7 @@ struct extend_params {
  *
  * @note Currently, only the PHYSICAL strategy is supported.
  */
-enum MergeStrategy {
-  /**
-   * @brief Physical merge: Builds a new CAGRA graph from the union of dataset points
-   * in existing CAGRA graphs.
-   *
-   * This is expensive to build but does not impact search latency or quality.
-   * Preferred for many smaller CAGRA graphs.
-   *
-   * @note Currently, this is the only supported strategy.
-   */
-  PHYSICAL
-};
+using MergeStrategy = cuvsCagraMergeStrategy;
 
 /**
  * @brief Parameters for merging CAGRA indexes.
