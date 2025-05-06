@@ -121,11 +121,9 @@ void single_gpu_assign_clusters(
  * Assign each data point to top n_nearest_clusters number of clusters. Loads the data in batches
  * onto device for efficiency. Arguments:
  * - [in] res: raft resource
- * - [in] n_nearest_clusters: number of nearest clusters that each data is assigned to
- * - [in] n_clusters: total number of clusters
- * - [in] dataset [num_rows x num_cols]: entire dataset on host
+ * - [in] params: params for graph building
+ * - [in] dataset [num_rows x num_cols]: entire dataset located on host memory
  * - [in] centroids [n_clusters x num_cols] : centroid vectors
- * - [in] metric
  * - [out] global_nearest_cluster [num_rows X n_nearest_clusters] : top n_nearest_clusters closest
  * clusters for each data point
  */
@@ -182,7 +180,6 @@ void assign_clusters(raft::resources const& res,
                                  global_nearest_cluster);
     }
   } else {
-    // size_t n_rows_per_batch = (num_rows + params.n_clusters - 1) / params.n_clusters;
     single_gpu_assign_clusters(res,
                                params.n_nearest_clusters,
                                params.n_clusters,
@@ -196,17 +193,15 @@ void assign_clusters(raft::resources const& res,
 }
 
 /**
- * Some memory-heavy allocations that can be used over multiple clusters should be allocated here
+ * Getting data indices that belong to cluster
  * Arguments:
  * - [in] res: raft resource
- * - [in] n_clusters: total number of clusters
- * - [in] k
  * - [in] global_nearest_cluster [num_rows X n_nearest_clusters] : top n_nearest_clusters closest
  * clusters for each data point
  * - [out] inverted_indices [num_rows x n_nearest_clusters sized vector] : vector for data indices
  * for each cluster
- * - [out] cluster_size [n_cluster] : cluster size for each cluster
- * - [out] cluster_offset [n_cluster] : offset in inverted_indices for each cluster
+ * - [out] cluster_sizes [n_cluster] : cluster size for each cluster
+ * - [out] cluster_offsets [n_cluster] : offset in inverted_indices for each cluster
  */
 template <typename IdxT = int64_t>
 void get_inverted_indices(raft::resources const& res,
@@ -219,7 +214,6 @@ void get_inverted_indices(raft::resources const& res,
   size_t num_rows           = global_nearest_cluster.extent(0);
   size_t n_nearest_clusters = global_nearest_cluster.extent(1);
   size_t n_clusters         = cluster_sizes.extent(0);
-  std::cout << "n_clusters in get inverted indices: " << n_clusters << std::endl;
 
   auto local_offsets = raft::make_host_vector<IdxT>(n_clusters);
 

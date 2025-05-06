@@ -73,15 +73,13 @@ struct all_neighbors_builder {
   /**
    * Running the ann algorithm on the given cluster, and merging it into the global result
    * Arguments:
-   * - [in] params: all_neighbors::index_params
    * - [in] dataset: host_matrix_view or device_matrix_view of the cluster dataset
-   * - [in] index
    * - [in] inverted_indices (optional): global data indices for the data points in the current
-   * cluster of size (num_data_in_cluster). Only needed when calling with the batching algorithm
-   * - [out] global_neighbors (optional): raft::managed_matrix_view type of (total_num_rows, k) for
-   * final all-neighbors graph indices. Only needed when calling with the batching algorithm
-   * - [out] global_distances (optional): raft::managed_matrix_view type of (total_num_rows, k) for
-   * final all-neighbors graph distances. Only needed when calling with the batching algorithm
+   * cluster of size [num_data_in_cluster]. Only needed when using the batching algorithm.
+   * - [out] global_neighbors (optional): raft::managed_matrix_view type of [total_num_rows, k] for
+   * final all-neighbors graph indices. Only needed when using the batching algorithm.
+   * - [out] global_distances (optional): raft::managed_matrix_view type of [total_num_rows, k] for
+   * final all-neighbors graph distances. Only needed when using the batching algorithm.
    */
   virtual void build_knn(
     raft::host_matrix_view<const T, IdxT, row_major> dataset,
@@ -98,7 +96,8 @@ struct all_neighbors_builder {
   raft::resources const& res;
   size_t n_clusters, min_cluster_size, max_cluster_size, k;
 
-  // optional matrices since we do not know the size at time of all_neighbors_builder construction
+  // these are optional types since we do not know the size at time of all_neighbors_builder
+  // construction
   std::optional<raft::device_vector<IdxT, IdxT>> inverted_indices_d;
   std::optional<raft::host_matrix<IdxT, IdxT>> batch_neighbors_h;
   std::optional<raft::device_matrix<IdxT, IdxT>> batch_neighbors_d;
@@ -141,12 +140,8 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
     candidate_neighbors_h.emplace(
       raft::make_host_matrix<IdxT, IdxT, row_major>(this->max_cluster_size, candidate_k));
 
-    // if (this->n_clusters <= 1) {
-    //   // if we don't do batching, we store the refined results directly in the returned index.
-    //   // this we only need this when we do batching.
     refined_neighbors_h.emplace(
       raft::make_host_matrix<IdxT, IdxT, row_major>(this->max_cluster_size, this->k));
-    // }
     refined_distances_h.emplace(
       raft::make_host_matrix<T, IdxT, row_major>(this->max_cluster_size, this->k));
   }
@@ -239,8 +234,7 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
         cuvs::distance::is_min_close(all_ivf_pq_params.build_params.metric));
     } else {
       size_t num_rows = num_data_in_cluster;
-      // copy indices and distances back to device output
-      std::cout << "attempting to copy here\n";
+      // copy resulting indices and distances to device output
       raft::copy(this->indices_.value().data_handle(),
                  refined_neighbors_h_view.data_handle(),
                  num_rows * this->k,

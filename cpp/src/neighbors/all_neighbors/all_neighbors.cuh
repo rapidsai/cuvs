@@ -40,7 +40,7 @@ void check_metric(const all_neighbors_params& params)
   }
 }
 
-// Supports both host and device datasets
+// Single build (i.e. no batching) supports both host and device datasets
 template <typename T, typename IdxT, typename Accessor>
 void single_build(
   const raft::resources& handle,
