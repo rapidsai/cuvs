@@ -103,6 +103,12 @@ cuvsCagraIndex_t build_cagra_index(float *dataset, long rows, long dimensions, c
   cuvsCagraIndex_t index;
   cuvsCagraIndexCreate(&index);
 
+  if (index_params->build_algo == 1) { // when build algo is IVF_PQ
+    uint32_t n_lists = index_params->graph_build_params->ivf_pq_build_params->n_lists;
+    // As rows cannot be less than n_lists value so trim down.
+    index_params->graph_build_params->ivf_pq_build_params->n_lists = rows < n_lists ? rows : n_lists;
+  }
+
   index_params->compression = compression_params;
   cuvsStreamSync(cuvs_resources);
   *return_value = cuvsCagraBuild(cuvs_resources, index_params, &dataset_tensor, index);
