@@ -189,9 +189,9 @@ public class CagraQuery {
      * @return an instance of this Builder
      */
     public Builder withPrefilters(BitSet[] prefilters, int numDocs) {
-    this.prefilters = prefilters;
-    this.numDocs = numDocs;
-    return this;
+      this.prefilters = prefilters;
+      this.numDocs = numDocs;
+      return this;
   }
 
     /**
