@@ -20,8 +20,6 @@ rapids-dependency-file-generator \
 
 rapids-mamba-retry env create --yes -f "${ENV_YAML_DIR}/env.yaml" -n test
 
-export CMAKE_GENERATOR=Ninja
-
 # Temporarily allow unbound variables for conda activation.
 set +u
 conda activate test

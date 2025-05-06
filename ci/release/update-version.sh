@@ -107,5 +107,6 @@ for FILE in java/*/pom.xml; do
   sed_runner "/<!--CUVS_JAVA#VERSION_UPDATE_MARKER_START-->.*<!--CUVS_JAVA#VERSION_UPDATE_MARKER_END-->/s//<!--CUVS_JAVA#VERSION_UPDATE_MARKER_START--><version>${NEXT_FULL_JAVA_TAG}<\/version><!--CUVS_JAVA#VERSION_UPDATE_MARKER_END-->/g" "${FILE}"
 done
 
-sed_runner "s| [0-9][0-9].[0-9][0-9]| ${NEXT_SHORT_TAG}|g" java/README.md
-sed_runner "s|-[0-9][0-9].[0-9][0-9].[0-9]|-${NEXT_FULL_JAVA_TAG}|g" java/examples/README.md
+sed_runner "s| ${CURRENT_SHORT_TAG} | ${NEXT_SHORT_TAG} |g" java/README.md
+sed_runner "s|-${CURRENT_SHORT_TAG}\.[0-9]\.jar|-${NEXT_FULL_JAVA_TAG}\.jar|g" java/examples/README.md
+sed_runner "s|\/${CURRENT_SHORT_TAG}\.[0-9]\/|/${NEXT_FULL_JAVA_TAG}/|g" java/examples/README.md

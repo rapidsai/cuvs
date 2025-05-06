@@ -53,7 +53,7 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
    --no-nvtx                   - disable nvtx (profiling markers), but allow enabling it in downstream projects
    --no-shared-libs            - build without shared libraries
    --show_depr_warn            - show cmake deprecation warnings
-   --skip-java-test            - skip java tests
+   --run-java-test             - run Java tests after building
    --build-metrics             - filename for generating build metrics report for libcuvs
    --incl-cache-stats          - include cache statistics in build metrics report
    --cmake-args=\\\"<args>\\\" - pass arbitrary list of CMake configuration options (escape all quotes in argument)
@@ -492,20 +492,16 @@ if (( ${NUMARGS} == 0 )) || hasArg go; then
 fi
 
 # Build the cuvs Java bindings
-RUN_JAVA_TESTS=""
-for arg in "$@"
-do
-  if [ "$arg" == "--run-java-tests" ]; then
-    RUN_JAVA_TESTS="--run-java-tests"
-  fi
-done
-
 if (( ${NUMARGS} == 0 )) || hasArg java; then
     if ! hasArg libcuvs; then
         echo "Please add 'libcuvs' to this script's arguments (ex. './build.sh libcuvs java') if libcuvs libraries are not already built"
     fi
     cd ${REPODIR}/java
-    ./build.sh $RUN_JAVA_TESTS
+    if hasArg --run-java-tests; then
+        ./build.sh --run-java-tests
+    else
+        ./build.sh
+    fi
 fi
 
 RAPIDS_VERSION="$(sed -E -e 's/^([0-9]{2})\.([0-9]{2})\.([0-9]{2}).*$/\1.\2.\3/' "${REPODIR}/VERSION")"

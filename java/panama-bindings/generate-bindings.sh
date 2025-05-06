@@ -7,10 +7,11 @@ REPODIR=$(cd "$(dirname $0)"; cd ../../ ; pwd)
 CURDIR=$(cd "$(dirname $0)"; pwd)
 TARGET_PACKAGE="com.nvidia.cuvs.internal.panama"
 
-if [ -n "${CONDA_PREFIX:-}" ] && [ -d "${CONDA_PREFIX}/targets/x86_64-linux/include" ]; then
-  CUDA_INCLUDE_DIR="${CONDA_PREFIX}/targets/x86_64-linux/include"
-elif [ -d "/usr/local/cuda/targets/x86_64-linux/include" ]; then
-  CUDA_INCLUDE_DIR="/usr/local/cuda/targets/x86_64-linux/include"
+TARGET_DIR="targets/x86_64-linux/include"
+if [ -n "${CONDA_PREFIX:-}" ] && [ -d "${CONDA_PREFIX}/${TARGET_DIR}" ]; then
+  CUDA_INCLUDE_DIR="${CONDA_PREFIX}/${TARGET_DIR}"
+elif [ -d "/usr/local/cuda/${TARGET_DIR}" ]; then
+  CUDA_INCLUDE_DIR="/usr/local/cuda/${TARGET_DIR}"
 else
   echo "Couldn't find a suitable CUDA include directory."
   exit 1
