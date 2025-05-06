@@ -122,5 +122,4 @@ void single_linkage(raft::resources const& handle,
   out->n_leaves               = m;
   out->n_connected_components = 1;
 }
-
 };  // namespace  cuvs::cluster::agglomerative::detail

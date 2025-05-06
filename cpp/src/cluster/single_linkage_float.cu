@@ -39,5 +39,4 @@ void single_linkage(raft::resources const& handle,
       handle, X, dendrogram, labels, metric, n_clusters, c);
   }
 }
-
 }  // namespace cuvs::cluster::agglomerative

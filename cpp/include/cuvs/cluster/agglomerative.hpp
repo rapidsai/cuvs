@@ -119,4 +119,7 @@ void single_linkage(
   cuvs::cluster::agglomerative::Linkage linkage = cuvs::cluster::agglomerative::Linkage::KNN_GRAPH,
   std::optional<int> c                          = std::make_optional<int>(DEFAULT_CONST_C));
 
+/**
+ * @}
+ */
 };  // end namespace  cuvs::cluster::agglomerative
