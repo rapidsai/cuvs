@@ -73,7 +73,7 @@ void get_graphs(raft::resources& handle,
                 AllNeighborsInputs& ps,
                 size_t queries_size)
 {
-  index_params params;
+  all_neighbors_params params;
   params.n_clusters         = std::get<0>(ps.cluster_nearestcluster);
   params.n_nearest_clusters = std::get<1>(ps.cluster_nearestcluster);
   params.metric             = std::get<1>(ps.build_algo_metric_recall);
@@ -118,32 +118,31 @@ void get_graphs(raft::resources& handle,
   }
 
   {
-    auto index = [&]() {
-      if (ps.data_on_host) {
-        auto database_h = raft::make_host_matrix<DataT, IdxT>(ps.n_rows, ps.dim);
-        raft::copy(database_h.data_handle(), database.data(), ps.n_rows * ps.dim, cuda_stream);
+    rmm::device_uvector<DistanceT> distances_allNN_dev(queries_size, cuda_stream);
+    rmm::device_uvector<IdxT> indices_allNN_dev(queries_size, cuda_stream);
 
-        return all_neighbors::build(handle,
-                                    raft::make_const_mdspan(database_h.view()),
-                                    static_cast<int64_t>(ps.k),
-                                    params,
-                                    true);
+    if (ps.data_on_host) {
+      auto database_h = raft::make_host_matrix<DataT, IdxT>(ps.n_rows, ps.dim);
+      raft::copy(database_h.data_handle(), database.data(), ps.n_rows * ps.dim, cuda_stream);
 
-      } else {
-        return all_neighbors::build(
-          handle,
-          raft::make_device_matrix_view<const DataT, IdxT>(database.data(), ps.n_rows, ps.dim),
-          static_cast<int64_t>(ps.k),
-          params,
-          true);
-      }
-    }();
+      all_neighbors::build(
+        handle,
+        params,
+        raft::make_const_mdspan(database_h.view()),
+        raft::make_device_matrix_view<IdxT>(indices_allNN_dev.data(), ps.n_rows, ps.k),
+        raft::make_device_matrix_view<DistanceT>(distances_allNN_dev.data(), ps.n_rows, ps.k));
 
-    raft::copy(indices_allNN.data(), index.graph().data_handle(), queries_size, cuda_stream);
-    if (index.distances().has_value()) {
-      raft::copy(
-        distances_allNN.data(), index.distances().value().data_handle(), queries_size, cuda_stream);
+    } else {
+      all_neighbors::build(
+        handle,
+        params,
+        raft::make_device_matrix_view<const DataT, IdxT>(database.data(), ps.n_rows, ps.dim),
+        raft::make_device_matrix_view<IdxT>(indices_allNN_dev.data(), ps.n_rows, ps.k),
+        raft::make_device_matrix_view<DistanceT>(distances_allNN_dev.data(), ps.n_rows, ps.k));
     }
+
+    raft::copy(indices_allNN.data(), indices_allNN_dev.data(), queries_size, cuda_stream);
+    raft::copy(distances_allNN.data(), distances_allNN_dev.data(), queries_size, cuda_stream);
     raft::resource::sync_stream(handle);
   }
 }

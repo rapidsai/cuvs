@@ -18,39 +18,23 @@
 
 namespace cuvs::neighbors::all_neighbors {
 
-#define CUVS_INST_ALL_NEIGHBORS(T, IdxT)                                                          \
-  all_neighbors::index<IdxT, T> build(const raft::resources& handle,                              \
-                                      raft::host_matrix_view<const T, IdxT, row_major> dataset,   \
-                                      int64_t k,                                                  \
-                                      const index_params& params,                                 \
-                                      bool return_distances)                                      \
-  {                                                                                               \
-    return all_neighbors::detail::build<T, IdxT>(handle, dataset, k, params, return_distances);   \
-  }                                                                                               \
-                                                                                                  \
-  void build(const raft::resources& handle,                                                       \
-             raft::host_matrix_view<const T, IdxT, row_major> dataset,                            \
-             const index_params& params,                                                          \
-             all_neighbors::index<IdxT, T>& idx)                                                  \
-  {                                                                                               \
-    return all_neighbors::detail::build<T, IdxT>(handle, dataset, params, idx);                   \
-  }                                                                                               \
-                                                                                                  \
-  all_neighbors::index<IdxT, T> build(const raft::resources& handle,                              \
-                                      raft::device_matrix_view<const T, IdxT, row_major> dataset, \
-                                      int64_t k,                                                  \
-                                      const index_params& params,                                 \
-                                      bool return_distances)                                      \
-  {                                                                                               \
-    return all_neighbors::detail::build<T, IdxT>(handle, dataset, k, params, return_distances);   \
-  }                                                                                               \
-                                                                                                  \
-  void build(const raft::resources& handle,                                                       \
-             raft::device_matrix_view<const T, IdxT, row_major> dataset,                          \
-             const index_params& params,                                                          \
-             all_neighbors::index<IdxT, T>& idx)                                                  \
-  {                                                                                               \
-    return all_neighbors::detail::build<T, IdxT>(handle, dataset, params, idx);                   \
+#define CUVS_INST_ALL_NEIGHBORS(T, IdxT)                                                       \
+  void build(const raft::resources& handle,                                                    \
+             const all_neighbors_params& params,                                               \
+             raft::host_matrix_view<const T, IdxT, row_major> dataset,                         \
+             raft::device_matrix_view<IdxT, IdxT, row_major> indices,                          \
+             std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances)            \
+  {                                                                                            \
+    return all_neighbors::detail::build<T, IdxT>(handle, params, dataset, indices, distances); \
+  }                                                                                            \
+                                                                                               \
+  void build(const raft::resources& handle,                                                    \
+             const all_neighbors_params& params,                                               \
+             raft::device_matrix_view<const T, IdxT, row_major> dataset,                       \
+             raft::device_matrix_view<IdxT, IdxT, row_major> indices,                          \
+             std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances)            \
+  {                                                                                            \
+    return all_neighbors::detail::build<T, IdxT>(handle, params, dataset, indices, distances); \
   }
 
 CUVS_INST_ALL_NEIGHBORS(float, int64_t);

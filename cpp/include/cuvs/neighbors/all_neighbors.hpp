@@ -23,101 +23,102 @@
 
 namespace cuvs::neighbors::all_neighbors {
 
-/**
- * @brief Build an all-neighbors knn graph.
- * The index contains an all-neighbors graph of the input dataset.
- * Indices are stored in host memory of dimensions (n_rows, k).
- * Distances are stored in device memory of dimensions(n_rows, k) if return_distances=true
- *
- * @tparam IdxT dtype to be used for indices
- * @tparam DistT dtype to be used for distances
- */
-template <typename IdxT, typename DistT = float>
-struct index : cuvs::neighbors::index {
- public:
-  /**
-   * @brief Construct a new all-neighbors index object
-   *
-   * This constructor creates an all-neighbors knn graph in host memory.
-   * The type of the knn graph is a dense raft::host_matrix and dimensions are (n_rows, k).
-   *
-   * @param res raft::resources is an object mangaging resources
-   * @param n_rows number of rows in knn graph
-   * @param k number of nearest neighbors in knn graph
-   * @param return_distances bool for whether to return distances
-   */
-  index(raft::resources const& res, int64_t n_rows, int64_t k, bool return_distances = false)
-    : cuvs::neighbors::index(),
-      res_{res},
-      k_{k},
-      graph_{raft::make_host_matrix<IdxT, IdxT, row_major>(n_rows, k)},
-      graph_view_{graph_.view()},
-      return_distances_{return_distances}
-  {
-    if (return_distances) {
-      distances_.emplace(raft::make_device_matrix<DistT, IdxT>(res, n_rows, k));
-      distances_view_.emplace(distances_.value().view());
-    }
-  }
+// /**
+//  * @brief Build an all-neighbors knn graph.
+//  * The index contains an all-neighbors graph of the input dataset.
+//  * Indices are stored in host memory of dimensions (n_rows, k).
+//  * Distances are stored in device memory of dimensions(n_rows, k) if return_distances=true
+//  *
+//  * @tparam IdxT dtype to be used for indices
+//  * @tparam DistT dtype to be used for distances
+//  */
+// template <typename IdxT, typename DistT = float>
+// struct index : cuvs::neighbors::index {
+//  public:
+//   /**
+//    * @brief Construct a new all-neighbors index object
+//    *
+//    * This constructor creates an all-neighbors knn graph in host memory.
+//    * The type of the knn graph is a dense raft::host_matrix and dimensions are (n_rows, k).
+//    *
+//    * @param res raft::resources is an object mangaging resources
+//    * @param n_rows number of rows in knn graph
+//    * @param k number of nearest neighbors in knn graph
+//    * @param return_distances bool for whether to return distances
+//    */
+//   index(raft::resources const& res, int64_t n_rows, int64_t k, bool return_distances = false)
+//     : cuvs::neighbors::index(),
+//       res_{res},
+//       k_{k},
+//       graph_{raft::make_host_matrix<IdxT, IdxT, row_major>(n_rows, k)},
+//       graph_view_{graph_.view()},
+//       return_distances_{return_distances}
+//   {
+//     if (return_distances) {
+//       distances_.emplace(raft::make_device_matrix<DistT, IdxT>(res, n_rows, k));
+//       distances_view_.emplace(distances_.value().view());
+//     }
+//   }
 
-  /**
-   * @brief Construct a new index object
-   *
-   * This constructor creates an all-neighbors graph using a user allocated host memory knn graph.
-   * The type of the knn graph is a dense raft::host_matrix and dimensions are (n_rows, k).
-   *
-   * @param res raft::resources is an object mangaging resources
-   * @param graph_view raft::host_matrix_view<IdxT, IdxT> for storing knn graph
-   * @param distances_view optional raft::device_matrix_view<DistT, IdxT> for storing
-   * distances
-   */
-  index(
-    raft::resources const& res,
-    raft::host_matrix_view<IdxT, IdxT, row_major> graph_view,
-    std::optional<raft::device_matrix_view<DistT, IdxT, row_major>> distances_view = std::nullopt)
-    : cuvs::neighbors::index(),
-      res_{res},
-      k_{graph_view.extent(1)},
-      graph_{raft::make_host_matrix<IdxT, IdxT, row_major>(0, 0)},
-      graph_view_{graph_view},
-      distances_view_{distances_view},
-      return_distances_{distances_view.has_value()}
-  {
-  }
+//   /**
+//    * @brief Construct a new index object
+//    *
+//    * This constructor creates an all-neighbors graph using a user allocated host memory knn
+//    graph.
+//    * The type of the knn graph is a dense raft::host_matrix and dimensions are (n_rows, k).
+//    *
+//    * @param res raft::resources is an object mangaging resources
+//    * @param graph_view raft::host_matrix_view<IdxT, IdxT> for storing knn graph
+//    * @param distances_view optional raft::device_matrix_view<DistT, IdxT> for storing
+//    * distances
+//    */
+//   index(
+//     raft::resources const& res,
+//     raft::host_matrix_view<IdxT, IdxT, row_major> graph_view,
+//     std::optional<raft::device_matrix_view<DistT, IdxT, row_major>> distances_view =
+//     std::nullopt) : cuvs::neighbors::index(),
+//       res_{res},
+//       k_{graph_view.extent(1)},
+//       graph_{raft::make_host_matrix<IdxT, IdxT, row_major>(0, 0)},
+//       graph_view_{graph_view},
+//       distances_view_{distances_view},
+//       return_distances_{distances_view.has_value()}
+//   {
+//   }
 
-  bool return_distances() { return return_distances_; }
+//   bool return_distances() { return return_distances_; }
 
-  int64_t k() { return k_; }
+//   int64_t k() { return k_; }
 
-  /** neighborhood graph [size, k] */
-  [[nodiscard]] inline auto graph() noexcept -> raft::host_matrix_view<IdxT, IdxT, row_major>
-  {
-    return graph_view_;
-  }
+//   /** neighborhood graph [size, k] */
+//   [[nodiscard]] inline auto graph() noexcept -> raft::host_matrix_view<IdxT, IdxT, row_major>
+//   {
+//     return graph_view_;
+//   }
 
-  /** neighborhood graph distances [size, k] */
-  [[nodiscard]] inline auto distances() noexcept
-    -> std::optional<device_matrix_view<DistT, IdxT, row_major>>
-  {
-    return distances_view_;
-  }
+//   /** neighborhood graph distances [size, k] */
+//   [[nodiscard]] inline auto distances() noexcept
+//     -> std::optional<device_matrix_view<DistT, IdxT, row_major>>
+//   {
+//     return distances_view_;
+//   }
 
-  // Don't allow copying the index for performance reasons (try avoiding copying data)
-  index(const index&)                    = delete;
-  index(index&&)                         = default;
-  auto operator=(const index&) -> index& = delete;
-  auto operator=(index&&) -> index&      = default;
-  ~index()                               = default;
+//   // Don't allow copying the index for performance reasons (try avoiding copying data)
+//   index(const index&)                    = delete;
+//   index(index&&)                         = default;
+//   auto operator=(const index&) -> index& = delete;
+//   auto operator=(index&&) -> index&      = default;
+//   ~index()                               = default;
 
- private:
-  raft::resources const& res_;
-  int64_t k_;
-  bool return_distances_;
-  raft::host_matrix<IdxT, IdxT, row_major> graph_;
-  std::optional<raft::device_matrix<DistT, IdxT, row_major>> distances_;
-  raft::host_matrix_view<IdxT, IdxT, row_major> graph_view_;
-  std::optional<raft::device_matrix_view<DistT, IdxT, row_major>> distances_view_;
-};
+//  private:
+//   raft::resources const& res_;
+//   int64_t k_;
+//   bool return_distances_;
+//   raft::host_matrix<IdxT, IdxT, row_major> graph_;
+//   std::optional<raft::device_matrix<DistT, IdxT, row_major>> distances_;
+//   raft::host_matrix_view<IdxT, IdxT, row_major> graph_view_;
+//   std::optional<raft::device_matrix_view<DistT, IdxT, row_major>> distances_view_;
+// };
 
 /**
  * @brief Parameters used to build an all-neighbors knn graph
@@ -134,6 +135,9 @@ struct ivf_pq_params {
 using nn_descent_params = cuvs::neighbors::nn_descent::index_params;
 }  // namespace graph_build_params
 
+using GraphBuildParams =
+  std::variant<graph_build_params::ivf_pq_params, graph_build_params::nn_descent_params>;
+
 /**
  * @brief Parameters used to build an all-neighbors graph
  *
@@ -145,7 +149,7 @@ using nn_descent_params = cuvs::neighbors::nn_descent::index_params;
  * creates an all-neighbors graph without batching
  *
  */
-struct index_params : cuvs::neighbors::index_params {
+struct all_neighbors_params {
   /** Parameters for knn graph building algorithm
    *
    * Set ivf_pq_params, or nn_descent_params to select the graph build
@@ -161,8 +165,7 @@ struct index_params : cuvs::neighbors::index_params {
    *
    * @endcode
    */
-  std::variant<graph_build_params::ivf_pq_params, graph_build_params::nn_descent_params>
-    graph_build_params;
+  GraphBuildParams graph_build_params;
 
   /**
    * Usage of n_nearest_clusters and n_clusters
@@ -177,8 +180,9 @@ struct index_params : cuvs::neighbors::index_params {
    * graph. E.g. With the similar device memory usages, (n_nearest_clusters / n_clusters) = 4/20
    * will have better accuracy than 2/10 at the cost of performance.
    */
-  size_t n_nearest_clusters = 2;
-  size_t n_clusters         = 1;  // defaults to not batching
+  size_t n_nearest_clusters           = 2;
+  size_t n_clusters                   = 1;  // defaults to not batching
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
 };
 
 /**
@@ -209,11 +213,12 @@ struct index_params : cuvs::neighbors::index_params {
  * @return index<IdxT> index containing all-neighbors knn graph in host memory (and the
  * corresponding distances in device memory if return_distances = true)
  */
-auto build(const raft::resources& handle,
-           raft::host_matrix_view<const float, int64_t, row_major> dataset,
-           int64_t k,
-           const index_params& params,
-           bool return_distances = false) -> index<int64_t, float>;
+void build(
+  const raft::resources& handle,
+  const all_neighbors_params& params,
+  raft::host_matrix_view<const float, int64_t, row_major> dataset,
+  raft::device_matrix_view<int64_t, int64_t, row_major> indices,
+  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances = std::nullopt);
 
 /**
  * @brief Builds a new approximate all-neighbors knn graph. Returns an approximate nearest neighbor
@@ -243,10 +248,10 @@ auto build(const raft::resources& handle,
  * @param[out] idx all_neighbors::index type holding the all-neighbors graph in host memory (and the
  * corresponding distances in device memory if return_distances = true)
  */
-void build(const raft::resources& handle,
-           raft::host_matrix_view<const float, int64_t, row_major> dataset,
-           const index_params& params,
-           index<int64_t, float>& idx);
+// void build(const raft::resources& handle,
+//            raft::host_matrix_view<const float, int64_t, row_major> dataset,
+//            const index_params& params,
+//            index<int64_t, float>& idx);
 
 /**
  * @brief Builds a new approximate all-neighbors knn graph. Returns an approximate nearest neighbor
@@ -278,11 +283,12 @@ void build(const raft::resources& handle,
  * @return index<IdxT> index containing all-neighbors knn graph in host memory (and the
  * corresponding distances in device memory if return_distances = true)
  */
-auto build(const raft::resources& handle,
-           raft::device_matrix_view<const float, int64_t, row_major> dataset,
-           int64_t k,
-           const index_params& params,
-           bool return_distances = false) -> index<int64_t, float>;
+void build(
+  const raft::resources& handle,
+  const all_neighbors_params& params,
+  raft::device_matrix_view<const float, int64_t, row_major> dataset,
+  raft::device_matrix_view<int64_t, int64_t, row_major> indices,
+  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances = std::nullopt);
 
 /**
  * @brief Builds a new approximate all-neighbors knn graph. Returns an approximate nearest neighbor
@@ -313,9 +319,9 @@ auto build(const raft::resources& handle,
  * @param[out] idx all_neighbors::index type holding the all-neighbors graph in host memory (and the
  * corresponding distances in device memory if return_distances = true)
  */
-void build(const raft::resources& handle,
-           raft::device_matrix_view<const float, int64_t, row_major> dataset,
-           const index_params& params,
-           index<int64_t, float>& idx);
+// void build(const raft::resources& handle,
+//            raft::device_matrix_view<const float, int64_t, row_major> dataset,
+//            const index_params& params,
+//            index<int64_t, float>& idx);
 
 }  // namespace cuvs::neighbors::all_neighbors

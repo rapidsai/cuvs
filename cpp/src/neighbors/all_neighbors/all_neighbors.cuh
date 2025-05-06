@@ -22,7 +22,7 @@
 namespace cuvs::neighbors::all_neighbors::detail {
 using namespace cuvs::neighbors;
 
-void check_metric(const index_params& params)
+void check_metric(const all_neighbors_params& params)
 {
   if (std::holds_alternative<graph_build_params::nn_descent_params>(params.graph_build_params)) {
     auto allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
@@ -42,87 +42,79 @@ void check_metric(const index_params& params)
 
 // Supports both host and device datasets
 template <typename T, typename IdxT, typename Accessor>
-void single_build(const raft::resources& handle,
-                  mdspan<const T, matrix_extent<IdxT>, row_major, Accessor> dataset,
-                  const index_params& params,
-                  all_neighbors::index<IdxT, T>& index)
+void single_build(
+  const raft::resources& handle,
+  const all_neighbors_params& params,
+  mdspan<const T, matrix_extent<IdxT>, row_major, Accessor> dataset,
+  raft::device_matrix_view<IdxT, IdxT, row_major> indices,
+  std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances = std::nullopt)
 {
   size_t num_rows = static_cast<size_t>(dataset.extent(0));
   size_t num_cols = static_cast<size_t>(dataset.extent(1));
 
-  auto knn_builder = get_knn_builder<T, IdxT>(
-    handle, params, static_cast<size_t>(index.k()), num_rows, num_rows, false);
+  auto knn_builder = get_knn_builder<T, IdxT>(handle,
+                                              params.n_clusters,
+                                              num_rows,
+                                              num_rows,
+                                              indices.extent(1),
+                                              params.graph_build_params,
+                                              params.metric,
+                                              indices,
+                                              distances);
 
   knn_builder->prepare_build(dataset);
-  knn_builder->build_knn(params, dataset, index);
+  knn_builder->build_knn(dataset);
 }
 
 template <typename T, typename IdxT>
 void build(const raft::resources& handle,
+           const all_neighbors_params& params,
            raft::host_matrix_view<const T, IdxT, row_major> dataset,
-           const index_params& params,
-           all_neighbors::index<IdxT, T>& index)
+           raft::device_matrix_view<IdxT, IdxT, row_major> indices,
+           std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances = std::nullopt)
 {
   check_metric(params);
+
+  RAFT_EXPECTS(dataset.extent(0) == indices.extent(0),
+               "number of rows in dataset should be the same as number of rows in indices matrix");
+
+  if (distances.has_value()) {
+    RAFT_EXPECTS(indices.extent(0) == distances.value().extent(0) &&
+                   indices.extent(1) == distances.value().extent(1),
+                 "indices matrix and distances matrix has to be the same shape.");
+  }
 
   if (params.n_clusters == 1) {
-    single_build(handle, dataset, params, index);
+    single_build(handle, params, dataset, indices, distances);
   } else {
-    batch_build(handle, dataset, params, index);
+    batch_build(handle, params, dataset, indices, distances);
   }
-}
-
-template <typename T, typename IdxT = int64_t>
-all_neighbors::index<IdxT, T> build(
-  const raft::resources& handle,
-  raft::host_matrix_view<const T, IdxT, row_major> dataset,
-  int64_t k,
-  const index_params& params,
-  bool return_distances = false)  // distance type same as data type
-{
-  all_neighbors::index<IdxT, T> index{
-    handle, static_cast<int64_t>(dataset.extent(0)), k, return_distances};
-  build(handle, dataset, params, index);
-  return index;
 }
 
 template <typename T, typename IdxT>
 void build(const raft::resources& handle,
+           const all_neighbors_params& params,
            raft::device_matrix_view<const T, IdxT, row_major> dataset,
-           const index_params& params,
-           all_neighbors::index<IdxT, T>& index)
+           raft::device_matrix_view<IdxT, IdxT, row_major> indices,
+           std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances = std::nullopt)
 {
   check_metric(params);
+
+  RAFT_EXPECTS(dataset.extent(0) == indices.extent(0),
+               "number of rows in dataset should be the same as number of rows in indices matrix");
+
+  if (distances.has_value()) {
+    RAFT_EXPECTS(indices.extent(0) == distances.value().extent(0) &&
+                   indices.extent(1) == distances.value().extent(1),
+                 "indices matrix and distances matrix has to be the same shape.");
+  }
 
   if (params.n_clusters > 1) {
     RAFT_FAIL(
       "Batched all-neighbors build is not supported with data on device. Put data on host for "
       "batch build.");
   } else {
-    single_build(handle, dataset, params, index);
+    single_build(handle, params, dataset, indices, distances);
   }
 }
-
-template <typename T, typename IdxT = int64_t>
-all_neighbors::index<IdxT, T> build(
-  const raft::resources& handle,
-  raft::device_matrix_view<const T, IdxT, row_major> dataset,
-  int64_t k,
-  const index_params& params,
-  bool return_distances = false)  // distance type same as data type
-{
-  check_metric(params);
-
-  if (params.n_clusters > 1) {
-    RAFT_FAIL(
-      "Batched all-neighbors build is not supported with data on device. Put data on host for "
-      "batch build.");
-  } else {
-    all_neighbors::index<IdxT, T> index{
-      handle, static_cast<int64_t>(dataset.extent(0)), k, return_distances};
-    single_build(handle, dataset, params, index);
-    return index;
-  }
-}
-
 }  // namespace cuvs::neighbors::all_neighbors::detail
