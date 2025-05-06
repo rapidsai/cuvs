@@ -122,7 +122,7 @@ def test_ivf_flat(inplace, dtype, metric):
     )
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.int8, np.uint8])
+@pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
 def test_extend(dtype):
     run_ivf_flat_build_search_test(
         n_rows=10000,

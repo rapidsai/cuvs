@@ -107,6 +107,7 @@ if(BUILD_TESTS)
     NEIGHBORS_ANN_IVF_FLAT_TEST
     PATH
     neighbors/ann_ivf_flat/test_float_int64_t.cu
+    neighbors/ann_ivf_flat/test_half_int64_t.cu
     neighbors/ann_ivf_flat/test_int8_t_int64_t.cu
     neighbors/ann_ivf_flat/test_uint8_t_int64_t.cu
     GPUS
@@ -206,7 +207,8 @@ if(BUILD_TESTS)
 
   if(BUILD_MG_ALGOS)
     ConfigureTest(
-      NAME NEIGHBORS_MG_TEST PATH neighbors/mg/test_float.cu GPUS 1 PERCENT 100 ADDITIONAL_DEP nccl
+      NAME NEIGHBORS_MG_TEST PATH neighbors/mg/test_float.cu GPUS 1 PERCENT 100 ADDITIONAL_DEP
+      NCCL::NCCL
     )
   endif()
 

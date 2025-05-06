@@ -47,6 +47,10 @@ jobs:
       node_type: "gpu-l4-latest-1"
       run_script: "ci/build_rust.sh"
       sha: ${{ inputs.sha }}
+  rust-publish:
+    needs: rust-build
+    secrets: inherit
+    uses: ./.github/workflows/publish-rust.yaml
   go-build:
     needs: cpp-build
     secrets: inherit
@@ -57,7 +61,7 @@ jobs:
       arch: "amd64"
       date: ${{ inputs.date }}
       container_image: "rapidsai/ci-conda:latest"
-      node_type: "gpu-v100-latest-1"
+      node_type: "gpu-l4-latest-1"
       run_script: "ci/build_go.sh"
       sha: ${{ inputs.sha }}
   python-build:
@@ -104,6 +108,8 @@ jobs:
       script: ci/build_wheel_libcuvs.sh
       # build for every combination of arch and CUDA version, but only for the latest Python
       matrix_filter: group_by([.ARCH, (.CUDA_VER|split(".")|map(tonumber)|.[0])]) | map(max_by(.PY_VER|split(".")|map(tonumber)))
+      package-name: libcuvs
+      package-type: cpp
   wheel-publish-libcuvs:
     needs: wheel-build-libcuvs
     secrets: inherit
@@ -125,6 +131,8 @@ jobs:
       sha: ${{ inputs.sha }}
       date: ${{ inputs.date }}
       script: ci/build_wheel_cuvs.sh
+      package-name: cuvs
+      package-type: python
   wheel-publish-cuvs:
     needs: wheel-build-cuvs
     secrets: inherit
