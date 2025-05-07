@@ -1,3 +1,4 @@
+#include "registers.cuh"
 #include <cuvs/neighbors/ball_cover.hpp>
 
 namespace cuvs::neighbors::ball_cover::detail {

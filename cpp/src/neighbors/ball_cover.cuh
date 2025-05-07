@@ -16,7 +16,6 @@
 #pragma once
 
 #include "ball_cover/ball_cover.cuh"
-#include "ball_cover/common.cuh"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ball_cover.hpp>
 

@@ -18,7 +18,7 @@
 
 #include "../detail/haversine_distance.cuh"
 #include "common.cuh"
-#include "registers.cuh"
+#include "registers.hpp"
 #include <cuvs/neighbors/ball_cover.hpp>
 
 #include <cuvs/distance/distance.hpp>
