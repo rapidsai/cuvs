@@ -41,7 +41,7 @@ set +e
 
 rapids-logger "Run Java build"
 
-bash ./build.sh java "${EXTRA_BUILDS_ARGS[@]}"
+bash ./build.sh java "${EXTRA_BUILD_ARGS[@]}"
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}
