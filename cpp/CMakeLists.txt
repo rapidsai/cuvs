@@ -471,6 +471,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/refine/detail/refine_host_int8_t_float.cpp
     src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
     src/neighbors/sample_filter.cu
+    src/neighbors/tiered_index.cu
     src/neighbors/sparse_brute_force.cu
     src/neighbors/vamana_build_float.cu
     src/neighbors/vamana_build_uint8.cu

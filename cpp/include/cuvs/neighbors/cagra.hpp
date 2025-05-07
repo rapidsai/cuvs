@@ -1757,7 +1757,7 @@ void deserialize(raft::resources const& handle,
  *
  * // create an output stream
  * std::ostream os(std::cout.rdbuf());
- * // create an index with `auto index = raft::cagra::build(...);`
+ * // create an index with `auto index = cuvs::neighbors::cagra::build(...);`
  * cuvs::neighbors::cagra::serialize_to_hnswlib(handle, os, index);
  * @endcode
  *
@@ -1790,7 +1790,7 @@ void serialize_to_hnswlib(
  *
  * // create a string with a filepath
  * std::string filename("/path/to/index");
- * // create an index with `auto index = raft::cagra::build(...);`
+ * // create an index with `auto index = cuvs::neighbors::cagra::build(...);`
  * cuvs::neighbors::cagra::serialize_to_hnswlib(handle, filename, index);
  * @endcode
  *
@@ -1824,7 +1824,7 @@ void serialize_to_hnswlib(
  *
  * // create an output stream
  * std::ostream os(std::cout.rdbuf());
- * // create an index with `auto index = raft::cagra::build(...);`
+ * // create an index with `auto index = cuvs::neighbors::cagra::build(...);`
  * cuvs::neighbors::cagra::serialize_to_hnswlib(handle, os, index);
  * @endcode
  *
@@ -1857,7 +1857,7 @@ void serialize_to_hnswlib(
  *
  * // create a string with a filepath
  * std::string filename("/path/to/index");
- * // create an index with `auto index = raft::cagra::build(...);`
+ * // create an index with `auto index = cuvs::neighbors::cagra::build(...);`
  * cuvs::neighbors::cagra::serialize_to_hnswlib(handle, filename, index);
  * @endcode
  *
@@ -1891,7 +1891,7 @@ void serialize_to_hnswlib(
  *
  * // create an output stream
  * std::ostream os(std::cout.rdbuf());
- * // create an index with `auto index = raft::cagra::build(...);`
+ * // create an index with `auto index = cuvs::neighbors::cagra::build(...);`
  * cuvs::neighbors::cagra::serialize_to_hnswlib(handle, os, index);
  * @endcode
  *
@@ -1924,7 +1924,7 @@ void serialize_to_hnswlib(
  *
  * // create a string with a filepath
  * std::string filename("/path/to/index");
- * // create an index with `auto index = raft::cagra::build(...);`
+ * // create an index with `auto index = cuvs::neighbors::cagra::build(...);`
  * cuvs::neighbors::cagra::serialize_to_hnswlib(handle, filename, index);
  * @endcode
  *
