@@ -27,9 +27,9 @@ ivf_pq_params::ivf_pq_params(raft::matrix_extent<int64_t> dataset_extents,
 
   search_params                         = cuvs::neighbors::ivf_pq::search_params{};
   search_params.n_probes                = std::max<uint32_t>(10, build_params.n_lists * 0.01);
-  search_params.lut_dtype               = CUDA_R_32F;
-  search_params.internal_distance_dtype = CUDA_R_32F;
-  search_params.coarse_search_dtype     = CUDA_R_32F;
+  search_params.lut_dtype               = CUDA_R_16F;
+  search_params.internal_distance_dtype = CUDA_R_16F;
+  search_params.coarse_search_dtype     = CUDA_R_16F;
   search_params.max_internal_batch_size = 128 * 1024;
 
   refinement_rate = 1;
