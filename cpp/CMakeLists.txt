@@ -312,6 +312,7 @@ if(BUILD_SHARED_LIBS)
   add_library(
     cuvs_objs OBJECT
     src/cluster/kmeans_balanced_fit_float.cu
+    src/cluster/kmeans_cluster_cost.cu
     src/cluster/kmeans_fit_mg_float.cu
     src/cluster/kmeans_fit_mg_double.cu
     src/cluster/kmeans_fit_double.cu
@@ -417,13 +418,16 @@ if(BUILD_SHARED_LIBS)
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
     src/neighbors/ivf_flat_index.cpp
     src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_build_extend_half_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_build_extend_int8_t_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_build_extend_uint8_t_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_helpers.cu
     src/neighbors/ivf_flat/ivf_flat_search_float_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_search_half_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_search_int8_t_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_search_uint8_t_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_float_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_serialize_half_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_int8_t_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_uint8_t_int64_t.cu
     src/neighbors/ivf_pq_index.cu
@@ -697,6 +701,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     add_library(
       cuvs_c SHARED
       src/core/c_api.cpp
+      src/cluster/kmeans_c.cpp
       src/neighbors/brute_force_c.cpp
       src/neighbors/ivf_flat_c.cpp
       src/neighbors/ivf_pq_c.cpp

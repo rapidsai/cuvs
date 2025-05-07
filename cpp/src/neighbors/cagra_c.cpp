@@ -180,10 +180,13 @@ void _search(cuvsResources_t res,
   search_params.min_iterations    = params.min_iterations;
   search_params.thread_block_size = params.thread_block_size;
   search_params.hashmap_mode = static_cast<cuvs::neighbors::cagra::hash_mode>(params.hashmap_mode);
-  search_params.hashmap_min_bitlen    = params.hashmap_min_bitlen;
-  search_params.hashmap_max_fill_rate = params.hashmap_max_fill_rate;
-  search_params.num_random_samplings  = params.num_random_samplings;
-  search_params.rand_xor_mask         = params.rand_xor_mask;
+  search_params.hashmap_min_bitlen      = params.hashmap_min_bitlen;
+  search_params.hashmap_max_fill_rate   = params.hashmap_max_fill_rate;
+  search_params.num_random_samplings    = params.num_random_samplings;
+  search_params.rand_xor_mask           = params.rand_xor_mask;
+  search_params.persistent              = params.persistent;
+  search_params.persistent_lifetime     = params.persistent_lifetime;
+  search_params.persistent_device_usage = params.persistent_device_usage;
 
   using queries_mdspan_type   = raft::device_matrix_view<T const, int64_t, raft::row_major>;
   using neighbors_mdspan_type = raft::device_matrix_view<IdxT, int64_t, raft::row_major>;
@@ -275,15 +278,18 @@ extern "C" cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index_c_ptr)
   return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
 
-    if (index.dtype.code == kDLFloat) {
+    if (index.dtype.code == kDLFloat && index.dtype.bits == 32) {
       auto index_ptr =
         reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index.addr);
       delete index_ptr;
-    } else if (index.dtype.code == kDLInt) {
+    } else if (index.dtype.code == kDLFloat && index.dtype.bits == 16) {
+      auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<half, uint32_t>*>(index.addr);
+      delete index_ptr;
+    } else if (index.dtype.code == kDLInt && index.dtype.bits == 8) {
       auto index_ptr =
         reinterpret_cast<cuvs::neighbors::cagra::index<int8_t, uint32_t>*>(index.addr);
       delete index_ptr;
-    } else if (index.dtype.code == kDLUInt) {
+    } else if (index.dtype.code == kDLUInt && index.dtype.bits == 8) {
       auto index_ptr =
         reinterpret_cast<cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>(index.addr);
       delete index_ptr;
@@ -448,11 +454,16 @@ extern "C" cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t para
 extern "C" cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* params)
 {
   return cuvs::core::translate_exceptions([=] {
-    *params = new cuvsCagraSearchParams{.itopk_size            = 64,
-                                        .search_width          = 1,
-                                        .hashmap_max_fill_rate = 0.5,
-                                        .num_random_samplings  = 1,
-                                        .rand_xor_mask         = 0x128394};
+    *params = new cuvsCagraSearchParams{
+      .itopk_size              = 64,
+      .search_width            = 1,
+      .hashmap_max_fill_rate   = 0.5,
+      .num_random_samplings    = 1,
+      .rand_xor_mask           = 0x128394,
+      .persistent              = false,
+      .persistent_lifetime     = 2,
+      .persistent_device_usage = 1.0,
+    };
   });
 }
 
@@ -476,6 +487,9 @@ extern "C" cuvsError_t cuvsCagraDeserialize(cuvsResources_t res,
     index->dtype.bits = dtype.itemsize * 8;
     if (dtype.kind == 'f' && dtype.itemsize == 4) {
       index->addr       = reinterpret_cast<uintptr_t>(_deserialize<float>(res, filename));
+      index->dtype.code = kDLFloat;
+    } else if (dtype.kind == 'f' && dtype.itemsize == 2) {
+      index->addr       = reinterpret_cast<uintptr_t>(_deserialize<half>(res, filename));
       index->dtype.code = kDLFloat;
     } else if (dtype.kind == 'i' && dtype.itemsize == 1) {
       index->addr       = reinterpret_cast<uintptr_t>(_deserialize<int8_t>(res, filename));
@@ -516,6 +530,8 @@ extern "C" cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
       _serialize_to_hnswlib<float>(res, filename, index);
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      _serialize_to_hnswlib<half>(res, filename, index);
     } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
       _serialize_to_hnswlib<int8_t>(res, filename, index);
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
