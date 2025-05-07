@@ -57,7 +57,7 @@ void deserialize_and_distribute(const raft::resources& clique,
                                 const std::string& filename)
 {
   for (int rank = 0; rank < index.num_ranks_; rank++) {
-    const raft::resources& dev_res = raft::resource::set_current_device_to_gpu_id(clique, rank);
+    const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
     auto& ann_if                   = index.ann_interfaces_.emplace_back();
     cuvs::neighbors::deserialize(dev_res, ann_if, filename);
   }
@@ -72,18 +72,18 @@ void deserialize(const raft::resources& clique,
   std::ifstream is(filename, std::ios::in | std::ios::binary);
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
-  const auto& handle = raft::resource::set_current_device_to_main_gpu(clique);
+  const auto& handle = raft::resource::set_current_device_to_root_rank(clique);
   index.mode_        = (cuvs::neighbors::distribution_mode)deserialize_scalar<int>(handle, is);
   index.num_ranks_   = deserialize_scalar<int>(handle, is);
 
-  if (index.num_ranks_ != raft::resource::get_world_size(clique)) {
+  if (index.num_ranks_ != raft::resource::get_num_ranks(clique)) {
     RAFT_FAIL("Serialized index has %d ranks whereas NCCL clique has %d ranks",
               index.num_ranks_,
-              raft::resource::get_world_size(clique));
+              raft::resource::get_num_ranks(clique));
   }
 
   for (int rank = 0; rank < index.num_ranks_; rank++) {
-    const raft::resources& dev_res = raft::resource::set_current_device_to_gpu_id(clique, rank);
+    const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
     auto& ann_if                   = index.ann_interfaces_.emplace_back();
     cuvs::neighbors::deserialize(dev_res, ann_if, is);
   }
@@ -104,7 +104,7 @@ void build(const raft::resources& clique,
     index.ann_interfaces_.resize(index.num_ranks_);
 #pragma omp parallel for
     for (int rank = 0; rank < index.num_ranks_; rank++) {
-      const raft::resources& dev_res = raft::resource::set_current_device_to_gpu_id(clique, rank);
+      const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
       auto& ann_if                   = index.ann_interfaces_[rank];
       cuvs::neighbors::build(dev_res, ann_if, index_params, index_dataset);
       resource::sync_stream(dev_res);
@@ -119,7 +119,7 @@ void build(const raft::resources& clique,
     index.ann_interfaces_.resize(index.num_ranks_);
 #pragma omp parallel for
     for (int rank = 0; rank < index.num_ranks_; rank++) {
-      const raft::resources& dev_res  = raft::resource::set_current_device_to_gpu_id(clique, rank);
+      const raft::resources& dev_res  = raft::resource::set_current_device_to_rank(clique, rank);
       int64_t offset                  = rank * n_rows_per_shard;
       int64_t n_rows_of_current_shard = std::min(n_rows_per_shard, n_rows - offset);
       const T* partition_ptr          = index_dataset.data_handle() + (offset * n_cols);
@@ -144,7 +144,7 @@ void extend(const raft::resources& clique,
 
 #pragma omp parallel for
     for (int rank = 0; rank < index.num_ranks_; rank++) {
-      const raft::resources& dev_res = raft::resource::set_current_device_to_gpu_id(clique, rank);
+      const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
       auto& ann_if                   = index.ann_interfaces_[rank];
       cuvs::neighbors::extend(dev_res, ann_if, new_vectors, new_indices);
       resource::sync_stream(dev_res);
@@ -157,7 +157,7 @@ void extend(const raft::resources& clique,
 
 #pragma omp parallel for
     for (int rank = 0; rank < index.num_ranks_; rank++) {
-      const raft::resources& dev_res  = raft::resource::set_current_device_to_gpu_id(clique, rank);
+      const raft::resources& dev_res  = raft::resource::set_current_device_to_rank(clique, rank);
       int64_t offset                  = rank * n_rows_per_shard;
       int64_t n_rows_of_current_shard = std::min(n_rows_per_shard, n_rows - offset);
       const T* new_vectors_ptr        = new_vectors.data_handle() + (offset * n_cols);
@@ -190,7 +190,7 @@ void sharded_search_with_direct_merge(const raft::resources& clique,
                                       int64_t n_neighbors,
                                       int64_t n_batches)
 {
-  const auto& root_handle = raft::resource::set_current_device_to_main_gpu(clique);
+  const auto& root_handle = raft::resource::set_current_device_to_root_rank(clique);
   auto in_neighbors       = raft::make_device_matrix<IdxT, int64_t, row_major>(
     root_handle, index.num_ranks_ * n_rows_per_batch, n_neighbors);
   auto in_distances = raft::make_device_matrix<float, int64_t, row_major>(
@@ -213,11 +213,11 @@ void sharded_search_with_direct_merge(const raft::resources& clique,
     check_omp_threads(requirements);  // should use at least num_ranks_ threads to avoid NCCL hang
 #pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
-      const raft::resources& dev_res = raft::resource::set_current_device_to_gpu_id(clique, rank);
+      const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
       auto& ann_if                   = index.ann_interfaces_[rank];
 
-      if (rank == raft::resource::get_main_gpu_id(clique)) {  // root rank
-        uint64_t batch_offset = raft::resource::get_main_gpu_id(clique) * part_size;
+      if (rank == raft::resource::get_root_rank(clique)) {  // root rank
+        uint64_t batch_offset = raft::resource::get_root_rank(clique) * part_size;
         auto d_neighbors      = raft::make_device_matrix_view<IdxT, int64_t, row_major>(
           in_neighbors.data_handle() + batch_offset, n_rows_of_current_batch, n_neighbors);
         auto d_distances = raft::make_device_matrix_view<float, int64_t, row_major>(
@@ -228,7 +228,7 @@ void sharded_search_with_direct_merge(const raft::resources& clique,
         // wait for other ranks
         ncclGroupStart();
         for (int from_rank = 0; from_rank < index.num_ranks_; from_rank++) {
-          if (from_rank == raft::resource::get_main_gpu_id(clique)) continue;
+          if (from_rank == raft::resource::get_root_rank(clique)) continue;
 
           batch_offset = from_rank * part_size;
           ncclRecv(in_neighbors.data_handle() + batch_offset,
@@ -259,13 +259,13 @@ void sharded_search_with_direct_merge(const raft::resources& clique,
         ncclSend(d_neighbors.data_handle(),
                  part_size * sizeof(IdxT),
                  ncclUint8,
-                 raft::resource::get_main_gpu_id(clique),
+                 raft::resource::get_root_rank(clique),
                  raft::resource::get_nccl_comm(dev_res),
                  raft::resource::get_cuda_stream(dev_res));
         ncclSend(d_distances.data_handle(),
                  part_size * sizeof(float),
                  ncclUint8,
-                 raft::resource::get_main_gpu_id(clique),
+                 raft::resource::get_root_rank(clique),
                  raft::resource::get_nccl_comm(dev_res),
                  raft::resource::get_cuda_stream(dev_res));
         ncclGroupEnd();
@@ -273,7 +273,7 @@ void sharded_search_with_direct_merge(const raft::resources& clique,
       }
     }
 
-    const auto& root_handle_   = raft::resource::set_current_device_to_main_gpu(clique);
+    const auto& root_handle_   = raft::resource::set_current_device_to_root_rank(clique);
     auto h_trans               = std::vector<IdxT>(index.num_ranks_);
     int64_t translation_offset = 0;
     for (int rank = 0; rank < index.num_ranks_; rank++) {
@@ -334,7 +334,7 @@ void sharded_search_with_tree_merge(const raft::resources& clique,
     check_omp_threads(requirements);  // should use at least num_ranks_ threads to avoid NCCL hang
 #pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
-      const raft::resources& dev_res = raft::resource::set_current_device_to_gpu_id(clique, rank);
+      const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
       auto& ann_if                   = index.ann_interfaces_[rank];
 
       int64_t part_size = n_rows_of_current_batch * n_neighbors;
@@ -456,7 +456,7 @@ void run_search_batch(const raft::resources& clique,
                       int64_t n_cols,
                       int64_t n_neighbors)
 {
-  const raft::resources& dev_res = raft::resource::set_current_device_to_gpu_id(clique, rank);
+  const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
   auto& ann_if                   = index.ann_interfaces_[rank];
 
   auto query_partition = raft::make_host_matrix_view<const T, int64_t, row_major>(
@@ -632,12 +632,12 @@ void serialize(const raft::resources& clique,
   std::ofstream of(filename, std::ios::out | std::ios::binary);
   if (!of) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
-  const auto& handle = raft::resource::set_current_device_to_main_gpu(clique);
+  const auto& handle = raft::resource::set_current_device_to_root_rank(clique);
   serialize_scalar(handle, of, (int)index.mode_);
   serialize_scalar(handle, of, index.num_ranks_);
 
   for (int rank = 0; rank < index.num_ranks_; rank++) {
-    const raft::resources& dev_res = raft::resource::set_current_device_to_gpu_id(clique, rank);
+    const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
     auto& ann_if                   = index.ann_interfaces_[rank];
     cuvs::neighbors::serialize(dev_res, ann_if, of);
   }
@@ -656,7 +656,7 @@ template <typename AnnIndexType, typename T, typename IdxT>
 mg_index<AnnIndexType, T, IdxT>::mg_index(const raft::resources& clique, distribution_mode mode)
   : mode_(mode), round_robin_counter_(std::make_shared<std::atomic<int64_t>>(0))
 {
-  num_ranks_ = raft::resource::get_world_size(clique);
+  num_ranks_ = raft::resource::get_num_ranks(clique);
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>
