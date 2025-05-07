@@ -16,8 +16,6 @@
 
 #pragma once
 
-#include "../detail/haversine_distance.cuh"
-
 #include <thrust/functional.h>
 #include <thrust/tuple.h>
 

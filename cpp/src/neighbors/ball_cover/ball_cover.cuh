@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include "../detail/haversine_distance.cuh"
 #include "common.cuh"
 #include "registers.hpp"
 #include <cuvs/neighbors/ball_cover.hpp>

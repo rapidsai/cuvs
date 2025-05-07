@@ -14,8 +14,12 @@
  * limitations under the License.
  */
 
-#include "registers.cuh"
+#pragma once
+
+#include "registers_types.cuh"
 #include <cuvs/neighbors/ball_cover.hpp>
+
+#include <raft/core/resources.hpp>
 
 namespace cuvs::neighbors::ball_cover::detail {
 
@@ -90,3 +94,65 @@ void rbc_eps_pass(
   value_idx* vd);
 
 }  // namespace cuvs::neighbors::ball_cover::detail
+
+extern template void
+cuvs::neighbors::ball_cover::detail::rbc_low_dim_pass_one<int64_t, float, int64_t, int64_t>(
+  raft::resources const& handle,
+  const cuvs::neighbors::ball_cover::index<int64_t, float, int64_t, int64_t>& index,
+  const float* query,
+  const int64_t n_query_rows,
+  int64_t k,
+  const int64_t* R_knn_inds,
+  const float* R_knn_dists,
+  int64_t* inds,
+  float* dists,
+  float weight,
+  int64_t* dists_counter,
+  int dims);
+
+extern template void
+cuvs::neighbors::ball_cover::detail::rbc_low_dim_pass_two<int64_t, float, int64_t, int64_t>(
+  raft::resources const& handle,
+  const cuvs::neighbors::ball_cover::index<int64_t, float, int64_t, int64_t>& index,
+  const float* query,
+  const int64_t n_query_rows,
+  int64_t k,
+  const int64_t* R_knn_inds,
+  const float* R_knn_dists,
+  int64_t* inds,
+  float* dists,
+  float weight,
+  int64_t* post_dists_counter,
+  int dims);
+
+extern template void cuvs::neighbors::ball_cover::detail::rbc_eps_pass<
+  int64_t,
+  float,
+  int64_t,
+  int64_t,
+  cuvs::neighbors::ball_cover::detail::EuclideanFunc<float, int64_t>>(
+  raft::resources const& handle,
+  const cuvs::neighbors::ball_cover::index<int64_t, float, int64_t, int64_t>& index,
+  const float* query,
+  const int64_t n_query_rows,
+  float eps,
+  const float* R,
+  cuvs::neighbors::ball_cover::detail::EuclideanFunc<float, int64_t>& dfunc,
+  bool* adj,
+  int64_t* vd);
+
+extern template void cuvs::neighbors::ball_cover::detail::rbc_eps_pass<
+  int64_t,
+  float,
+  int64_t,
+  int64_t,
+  cuvs::neighbors::ball_cover::detail::EuclideanFunc<float, int64_t>>(
+  raft::resources const& handle,
+  const cuvs::neighbors::ball_cover::index<int64_t, float, int64_t, int64_t>& index,
+  const float* query,
+  const int64_t n_query_rows,
+  float eps,
+  const float* R,
+  cuvs::neighbors::ball_cover::detail::EuclideanFunc<float, int64_t>& dfunc,
+  bool* adj,
+  int64_t* vd);

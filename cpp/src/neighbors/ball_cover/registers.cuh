@@ -18,6 +18,7 @@
 
 #include "../detail/haversine_distance.cuh"
 #include "common.cuh"
+#include "registers.hpp"
 #include "registers_types.cuh"  // DistFunc
 #include <cuvs/neighbors/ball_cover.hpp>
 
