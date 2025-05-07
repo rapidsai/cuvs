@@ -57,6 +57,16 @@ class faiss_cpu : public algo<T> {
     int nprobe;
     float refine_ratio = 1.0;
     int num_threads    = omp_get_num_procs();
+    /**
+     * parallel_mode determines how queries are parallelized with OpenMP.
+     *
+     * Options:
+     * 0: Split over queries.
+     * 1: Parallelize over inverted lists.
+     * 2: Parallelize over both queries and inverted lists.
+     * 3: Split over queries with finer granularity.
+     */
+    int parallel_mode = 0;
   };
 
   struct build_param {
@@ -159,7 +169,11 @@ void faiss_cpu<T>::set_search_param(const search_param_base& param, const void* 
   auto sp    = dynamic_cast<const search_param&>(param);
   int nprobe = sp.nprobe;
   assert(nprobe <= nlist_);
-  dynamic_cast<faiss::IndexIVF*>(index_.get())->nprobe = nprobe;
+  auto index_ivf = dynamic_cast<faiss::IndexIVF*>(index_.get());
+  if (index_ivf != nullptr) {
+    index_ivf->nprobe        = nprobe;
+    index_ivf->parallel_mode = sp.parallel_mode;
+  }
 
   if (sp.refine_ratio > 1.0) { this->index_refine_.get()->k_factor = sp.refine_ratio; }
 
