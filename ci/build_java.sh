@@ -3,6 +3,14 @@
 
 set -euo pipefail
 
+# TODO: Remove this argument-handling when build and test workflows are separated,
+#       and test_java.sh no longer calls build_java.sh
+#       ref: https://github.com/rapidsai/cuvs/issues/868
+EXTRA_BUILD_ARGS=()
+if [[ "${1:-}" == "--run-java-tests" ]]; then
+  EXTRA_BUILD_ARGS+=("--run-java-tests")
+fi
+
 . /opt/conda/etc/profile.d/conda.sh
 
 rapids-logger "Downloading artifacts from previous jobs"
@@ -20,8 +28,6 @@ rapids-dependency-file-generator \
 
 rapids-mamba-retry env create --yes -f "${ENV_YAML_DIR}/env.yaml" -n java
 
-export CMAKE_GENERATOR=Ninja
-
 # Temporarily allow unbound variables for conda activation.
 set +u
 conda activate java
@@ -29,16 +35,13 @@ set -u
 
 rapids-print-env
 
-rapids-logger "Check GPU usage"
-nvidia-smi
-
 EXITCODE=0
 trap "EXITCODE=1" ERR
 set +e
 
 rapids-logger "Run Java build"
 
-bash ./build.sh java
+bash ./build.sh java "${EXTRA_BUILDS_ARGS[@]}"
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}

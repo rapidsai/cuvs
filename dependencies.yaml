@@ -64,14 +64,6 @@ files:
       - depends_on_libcuvs
       - depends_on_cuvs
       - depends_on_cuvs_bench
-  test_java:
-    output: none
-    includes:
-      - cuda
-      - cuda_version
-      - rapids_build
-      - depends_on_libcuvs
-      - java
   checks:
     output: none
     includes:
