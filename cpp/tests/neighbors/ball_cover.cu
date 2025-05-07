@@ -234,11 +234,10 @@ class BallCoverKNNQueryTest : public ::testing::TestWithParam<BallCoverInputs<va
     auto d_pred_D_view =
       raft::make_device_matrix_view<value_t, value_int>(d_pred_D.data(), params.n_query, k);
 
-    cuvs::neighbors::ball_cover::index<value_idx, value_t, value_int, value_int> index(
-      handle, X_view, metric);
+    cuvs::neighbors::ball_cover::index<value_idx, value_t> index(handle, X_view, metric);
     cuvs::neighbors::ball_cover::build(handle, index);
     cuvs::neighbors::ball_cover::knn_query(
-      handle, index, X2_view, d_pred_I_view, d_pred_D_view, k, true);
+      handle, index, X2_view, d_pred_I_view, d_pred_D_view, true);
 
     raft::resource::sync_stream(handle);
     // What we really want are for the distances to match exactly. The
@@ -339,8 +338,7 @@ class BallCoverAllKNNTest : public ::testing::TestWithParam<BallCoverInputs<valu
 
     cuvs::neighbors::ball_cover::index<value_idx, value_t> index(handle, X_view, metric);
 
-    cuvs::neighbors::ball_cover::all_knn_query(
-      handle, index, d_pred_I_view, d_pred_D_view, k, true);
+    cuvs::neighbors::ball_cover::all_knn_query(handle, index, d_pred_I_view, d_pred_D_view, true);
 
     raft::resource::sync_stream(handle);
     // What we really want are for the distances to match exactly. The

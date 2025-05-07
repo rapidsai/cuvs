@@ -43,14 +43,11 @@ namespace cuvs::neighbors::ball_cover {
  * @tparam float
  * @tparam int
  */
-template <typename idx_t,
-          typename value_t,
-          typename int_t        = int64_t,
-          typename matrix_idx_t = int64_t>
+template <typename idx_t, typename value_t>
 struct index : cuvs::neighbors::index {
  public:
   explicit index(raft::resources const& handle_,
-                 raft::device_matrix_view<const float, matrix_idx_t, raft::row_major> X_,
+                 raft::device_matrix_view<const float, int64_t, raft::row_major> X_,
                  cuvs::distance::DistanceType metric_)
     : handle(handle_),
       X(X_),
@@ -63,63 +60,60 @@ struct index : cuvs::neighbors::index {
        * Total memory footprint of index: (2 * sqrt(m)) + (n * sqrt(m)) + (2 * m)
        */
       n_landmarks(raft::sqrt(X_.extent(0))),
-      R_indptr(raft::make_device_vector<idx_t, matrix_idx_t>(handle, raft::sqrt(X_.extent(0)) + 1)),
-      R_1nn_cols(raft::make_device_vector<idx_t, matrix_idx_t>(handle, X_.extent(0))),
-      R_1nn_dists(raft::make_device_vector<float, matrix_idx_t>(handle, X_.extent(0))),
-      R_closest_landmark_dists(raft::make_device_vector<float, matrix_idx_t>(handle, X_.extent(0))),
-      R(raft::make_device_matrix<float, matrix_idx_t>(
-        handle, raft::sqrt(X_.extent(0)), X_.extent(1))),
-      X_reordered(
-        raft::make_device_matrix<float, matrix_idx_t>(handle, X_.extent(0), X_.extent(1))),
-      R_radius(raft::make_device_vector<float, matrix_idx_t>(handle, raft::sqrt(X_.extent(0)))),
+      R_indptr(raft::make_device_vector<idx_t, int64_t>(handle, raft::sqrt(X_.extent(0)) + 1)),
+      R_1nn_cols(raft::make_device_vector<idx_t, int64_t>(handle, X_.extent(0))),
+      R_1nn_dists(raft::make_device_vector<float, int64_t>(handle, X_.extent(0))),
+      R_closest_landmark_dists(raft::make_device_vector<float, int64_t>(handle, X_.extent(0))),
+      R(raft::make_device_matrix<float, int64_t>(handle, raft::sqrt(X_.extent(0)), X_.extent(1))),
+      X_reordered(raft::make_device_matrix<float, int64_t>(handle, X_.extent(0), X_.extent(1))),
+      R_radius(raft::make_device_vector<float, int64_t>(handle, raft::sqrt(X_.extent(0)))),
       index_trained(false)
   {
   }
 
-  auto get_R_indptr() const -> raft::device_vector_view<const idx_t, matrix_idx_t>
+  auto get_R_indptr() const -> raft::device_vector_view<const idx_t, int64_t>
   {
     return R_indptr.view();
   }
-  auto get_R_1nn_cols() const -> raft::device_vector_view<const idx_t, matrix_idx_t>
+  auto get_R_1nn_cols() const -> raft::device_vector_view<const idx_t, int64_t>
   {
     return R_1nn_cols.view();
   }
-  auto get_R_1nn_dists() const -> raft::device_vector_view<const float, matrix_idx_t>
+  auto get_R_1nn_dists() const -> raft::device_vector_view<const float, int64_t>
   {
     return R_1nn_dists.view();
   }
-  auto get_R_radius() const -> raft::device_vector_view<const float, matrix_idx_t>
+  auto get_R_radius() const -> raft::device_vector_view<const float, int64_t>
   {
     return R_radius.view();
   }
-  auto get_R() const -> raft::device_matrix_view<const float, matrix_idx_t, raft::row_major>
+  auto get_R() const -> raft::device_matrix_view<const float, int64_t, raft::row_major>
   {
     return R.view();
   }
-  auto get_R_closest_landmark_dists() const -> raft::device_vector_view<const float, matrix_idx_t>
+  auto get_R_closest_landmark_dists() const -> raft::device_vector_view<const float, int64_t>
   {
     return R_closest_landmark_dists.view();
   }
-  auto get_X_reordered() const
-    -> raft::device_matrix_view<const float, matrix_idx_t, raft::row_major>
+  auto get_X_reordered() const -> raft::device_matrix_view<const float, int64_t, raft::row_major>
   {
     return X_reordered.view();
   }
 
-  raft::device_vector_view<idx_t, matrix_idx_t> get_R_indptr() { return R_indptr.view(); }
-  raft::device_vector_view<idx_t, matrix_idx_t> get_R_1nn_cols() { return R_1nn_cols.view(); }
-  raft::device_vector_view<float, matrix_idx_t> get_R_1nn_dists() { return R_1nn_dists.view(); }
-  raft::device_vector_view<float, matrix_idx_t> get_R_radius() { return R_radius.view(); }
-  raft::device_matrix_view<float, matrix_idx_t, raft::row_major> get_R() { return R.view(); }
-  raft::device_vector_view<float, matrix_idx_t> get_R_closest_landmark_dists()
+  raft::device_vector_view<idx_t, int64_t> get_R_indptr() { return R_indptr.view(); }
+  raft::device_vector_view<idx_t, int64_t> get_R_1nn_cols() { return R_1nn_cols.view(); }
+  raft::device_vector_view<float, int64_t> get_R_1nn_dists() { return R_1nn_dists.view(); }
+  raft::device_vector_view<float, int64_t> get_R_radius() { return R_radius.view(); }
+  raft::device_matrix_view<float, int64_t, raft::row_major> get_R() { return R.view(); }
+  raft::device_vector_view<float, int64_t> get_R_closest_landmark_dists()
   {
     return R_closest_landmark_dists.view();
   }
-  raft::device_matrix_view<float, matrix_idx_t, raft::row_major> get_X_reordered()
+  raft::device_matrix_view<float, int64_t, raft::row_major> get_X_reordered()
   {
     return X_reordered.view();
   }
-  raft::device_matrix_view<const float, matrix_idx_t, raft::row_major> get_X() const { return X; }
+  raft::device_matrix_view<const float, int64_t, raft::row_major> get_X() const { return X; }
 
   cuvs::distance::DistanceType get_metric() const { return metric; }
 
@@ -131,9 +125,9 @@ struct index : cuvs::neighbors::index {
 
   raft::resources const& handle;
 
-  int_t m;
-  int_t n;
-  int_t n_landmarks;
+  int64_t m;
+  int64_t n;
+  int64_t n_landmarks;
 
   raft::device_matrix_view<const float, idx_t, raft::row_major> X;
 
@@ -141,15 +135,15 @@ struct index : cuvs::neighbors::index {
 
  private:
   // CSR storing the neighborhoods for each data point
-  raft::device_vector<idx_t, matrix_idx_t> R_indptr;
-  raft::device_vector<idx_t, matrix_idx_t> R_1nn_cols;
-  raft::device_vector<float, matrix_idx_t> R_1nn_dists;
-  raft::device_vector<float, matrix_idx_t> R_closest_landmark_dists;
+  raft::device_vector<idx_t, int64_t> R_indptr;
+  raft::device_vector<idx_t, int64_t> R_1nn_cols;
+  raft::device_vector<float, int64_t> R_1nn_dists;
+  raft::device_vector<float, int64_t> R_closest_landmark_dists;
 
-  raft::device_vector<float, matrix_idx_t> R_radius;
+  raft::device_vector<float, int64_t> R_radius;
 
-  raft::device_matrix<float, matrix_idx_t, raft::row_major> R;
-  raft::device_matrix<float, matrix_idx_t, raft::row_major> X_reordered;
+  raft::device_matrix<float, int64_t, raft::row_major> R;
+  raft::device_matrix<float, int64_t, raft::row_major> X_reordered;
 
  protected:
   bool index_trained;
@@ -184,7 +178,7 @@ struct index : cuvs::neighbors::index {
  * @param[inout] index an empty (and not previous built) instance of
  * cuvs::neighbors::ball_cover::index
  */
-void build(raft::resources const& handle, index<int64_t, float, int64_t, int64_t>& index);
+void build(raft::resources const& handle, index<int64_t, float>& index);
 
 /** @} */  // end group random_ball_cover
 
@@ -225,7 +219,6 @@ void build(raft::resources const& handle, index<int64_t, float, int64_t, int64_t
  * @param[in] index ball cover index which has not yet been built
  * @param[out] inds output knn indices
  * @param[out] dists output knn distances
- * @param[in] k number of nearest neighbors to find
  * @param[in] perform_post_filtering if this is false, only the closest k landmarks
  *                               are considered (which will return approximate
  *                               results).
@@ -239,10 +232,9 @@ void build(raft::resources const& handle, index<int64_t, float, int64_t, int64_t
  *               looking in the closest landmark.
  */
 void all_knn_query(raft::resources const& handle,
-                   index<int64_t, float, int64_t, int64_t>& index,
+                   index<int64_t, float>& index,
                    raft::device_matrix_view<int64_t, int64_t, raft::row_major> inds,
                    raft::device_matrix_view<float, int64_t, raft::row_major> dists,
-                   int k,
                    bool perform_post_filtering = true,
                    float weight                = 1.0);
 
@@ -261,7 +253,7 @@ void all_knn_query(raft::resources const& handle,
  * @param[in]  eps    defines epsilon neighborhood radius
  */
 void eps_nn(raft::resources const& handle,
-            const index<int64_t, float, int64_t, int64_t>& index,
+            const index<int64_t, float>& index,
             raft::device_matrix_view<bool, int64_t, raft::row_major> adj,
             raft::device_vector_view<int64_t, int64_t> vd,
             raft::device_matrix_view<const float, int64_t, raft::row_major> query,
@@ -290,7 +282,7 @@ void eps_nn(raft::resources const& handle,
  *                     computation.
  */
 void eps_nn(raft::resources const& handle,
-            const index<int64_t, float, int64_t, int64_t>& index,
+            const index<int64_t, float>& index,
             raft::device_vector_view<int64_t, int64_t> adj_ia,
             raft::device_vector_view<int64_t, int64_t> adj_ja,
             raft::device_vector_view<int64_t, int64_t> vd,
@@ -335,7 +327,6 @@ void eps_nn(raft::resources const& handle,
  * @param[in] query device matrix containing query data points
  * @param[out] inds output knn indices
  * @param[out] dists output knn distances
- * @param[in] k number of nearest neighbors to find
  * @param[in] perform_post_filtering if this is false, only the closest k landmarks
  *                               are considered (which will return approximate
  *                               results).
@@ -349,11 +340,10 @@ void eps_nn(raft::resources const& handle,
  *               looking in the closest landmark.
  */
 void knn_query(raft::resources const& handle,
-               const index<int64_t, float, int64_t, int64_t>& index,
+               const index<int64_t, float>& index,
                raft::device_matrix_view<const float, int64_t, raft::row_major> query,
                raft::device_matrix_view<int64_t, int64_t, raft::row_major> inds,
                raft::device_matrix_view<float, int64_t, raft::row_major> dists,
-               int k,
                bool perform_post_filtering = true,
                float weight                = 1.0);
 

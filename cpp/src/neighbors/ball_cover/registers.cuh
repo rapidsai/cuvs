@@ -62,14 +62,14 @@ constexpr int MAX_COL_Q = 3;
  */
 template <typename value_idx, typename value_t, typename value_int = std::uint32_t, int tpb = 32>
 RAFT_KERNEL perform_post_filter_registers(const value_t* X,
-                                          value_int n_cols,
+                                          int64_t n_cols,
                                           const value_idx* R_knn_inds,
                                           const value_t* R_knn_dists,
                                           const value_t* R_radius,
                                           const value_t* landmarks,
                                           int n_landmarks,
                                           value_int bitset_size,
-                                          value_int k,
+                                          int64_t k,
                                           cuvs::distance::DistanceType metric,
                                           std::uint32_t* output,
                                           float weight = 1.0)
@@ -153,7 +153,7 @@ template <typename value_idx,
           int tpb              = 128>
 RAFT_KERNEL compute_final_dists_registers(const value_t* X_reordered,
                                           const value_t* X,
-                                          const value_int n_cols,
+                                          const int64_t n_cols,
                                           bitset_type* bitset,
                                           value_int bitset_size,
                                           const value_t* R_closest_landmark_dists,
@@ -162,10 +162,10 @@ RAFT_KERNEL compute_final_dists_registers(const value_t* X_reordered,
                                           const value_t* R_1nn_dists,
                                           value_idx* knn_inds,
                                           value_t* knn_dists,
-                                          value_int n_landmarks,
-                                          value_int k,
+                                          int64_t n_landmarks,
+                                          int64_t k,
                                           cuvs::distance::DistanceType metric,
-                                          value_int* dist_counter)
+                                          int64_t* dist_counter)
 {
   static constexpr int kNumWarps = tpb / raft::WarpSize;
 
@@ -301,28 +301,27 @@ RAFT_KERNEL compute_final_dists_registers(const value_t* X_reordered,
  */
 template <typename value_idx = std::int64_t,
           typename value_t,
-          int warp_q         = 32,
-          int thread_q       = 2,
-          int tpb            = 128,
-          typename value_int = std::uint32_t>
+          int warp_q   = 32,
+          int thread_q = 2,
+          int tpb      = 128>
 RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
                                        const value_t* X,
-                                       value_int n_cols,  // n_cols should be 2 or 3 dims
+                                       int64_t n_cols,  // n_cols should be 2 or 3 dims
                                        const value_idx* R_knn_inds,
                                        const value_t* R_knn_dists,
-                                       value_int m,
-                                       value_int k,
+                                       int64_t m,
+                                       int64_t k,
                                        const value_idx* R_indptr,
                                        const value_idx* R_1nn_cols,
                                        const value_t* R_1nn_dists,
                                        value_idx* out_inds,
                                        value_t* out_dists,
-                                       value_int* dist_counter,
+                                       int64_t* dist_counter,
                                        const value_t* R_radius,
                                        cuvs::distance::DistanceType metric,
                                        float weight = 1.0)
 {
-  static constexpr value_int kNumWarps = tpb / raft::WarpSize;
+  static constexpr int64_t kNumWarps = tpb / raft::WarpSize;
 
   __shared__ value_t shared_memK[kNumWarps * warp_q];
   __shared__ raft::KeyValuePair<value_t, value_idx> shared_memV[kNumWarps * warp_q];
@@ -335,7 +334,7 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
 
   // Use registers only for 2d or 3d
   value_t local_x_ptr[MAX_COL_Q];
-  for (value_int i = 0; i < n_cols; ++i) {
+  for (int64_t i = 0; i < n_cols; ++i) {
     local_x_ptr[i] = x_ptr[i];
   }
 
@@ -349,8 +348,8 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
     shared_memV,
     k);
 
-  value_t min_R_dist         = R_knn_dists[blockIdx.x * k + (k - 1)];
-  value_int n_dists_computed = 0;
+  value_t min_R_dist       = R_knn_dists[blockIdx.x * k + (k - 1)];
+  int64_t n_dists_computed = 0;
 
   /**
    * First add distances for k closest neighbors of R
@@ -358,7 +357,7 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
    */
   // Start iterating through elements of each set from closest R elements,
   // determining if the distance could even potentially be in the heap.
-  for (value_int cur_k = 0; cur_k < k; ++cur_k) {
+  for (int64_t cur_k = 0; cur_k < k; ++cur_k) {
     // index and distance to current blockIdx.x's closest landmark
     value_t cur_R_dist  = R_knn_dists[blockIdx.x * k + cur_k];
     value_idx cur_R_ind = R_knn_inds[blockIdx.x * k + cur_k];
@@ -373,8 +372,8 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
 
     value_idx R_size = R_stop_offset - R_start_offset;
 
-    value_int limit = raft::Pow2<raft::WarpSize>::roundDown(R_size);
-    value_int i     = threadIdx.x;
+    int64_t limit = raft::Pow2<raft::WarpSize>::roundDown(R_size);
+    int64_t i     = threadIdx.x;
     for (; i < limit; i += tpb) {
       // Index and distance of current candidate's nearest landmark
       value_idx cur_candidate_ind = R_1nn_cols[R_start_offset + i];
@@ -403,7 +402,7 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
       if (z <= heap.warpKTop) {
         const value_t* y_ptr = X_reordered + (n_cols * (R_start_offset + i));
         value_t local_y_ptr[MAX_COL_Q];
-        for (value_int j = 0; j < n_cols; ++j) {
+        for (int64_t j = 0; j < n_cols; ++j) {
           local_y_ptr[j] = y_ptr[j];
         }
         dist = compute_distance_by_metric(local_x_ptr, local_y_ptr, n_cols, metric);
@@ -428,7 +427,7 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
       if (z <= heap.warpKTop) {
         const value_t* y_ptr = X_reordered + (n_cols * (R_start_offset + i));
         value_t local_y_ptr[MAX_COL_Q];
-        for (value_int j = 0; j < n_cols; ++j) {
+        for (int64_t j = 0; j < n_cols; ++j) {
           local_y_ptr[j] = y_ptr[j];
         }
         dist = compute_distance_by_metric(local_x_ptr, local_y_ptr, n_cols, metric);
@@ -457,17 +456,16 @@ __device__ value_t squared(const value_t& a)
 
 template <typename value_idx = std::int64_t,
           typename value_t,
-          int tpb            = 128,
-          typename value_int = std::uint32_t,
+          int tpb = 128,
           typename distance_func>
 RAFT_KERNEL block_rbc_kernel_eps_dense(const value_t* X_reordered,
                                        const value_t* X,
-                                       const value_int n_queries,
-                                       const value_int n_cols,
+                                       const int64_t n_queries,
+                                       const int64_t n_cols,
                                        const value_t* R,
-                                       const value_int m,
+                                       const int64_t m,
                                        const value_t eps,
-                                       const value_int n_landmarks,
+                                       const int64_t n_landmarks,
                                        const value_idx* R_indptr,
                                        const value_idx* R_1nn_cols,
                                        const value_t* R_1nn_dists,
@@ -576,17 +574,16 @@ RAFT_KERNEL block_rbc_kernel_eps_dense(const value_t* X_reordered,
 
 template <typename value_idx = std::int64_t,
           typename value_t,
-          int tpb            = 128,
-          typename value_int = std::uint32_t,
+          int tpb = 128,
           typename distance_func>
 RAFT_KERNEL block_rbc_kernel_eps_csr_pass(const value_t* X_reordered,
                                           const value_t* X,
-                                          const value_int n_queries,
-                                          const value_int n_cols,
+                                          const int64_t n_queries,
+                                          const int64_t n_cols,
                                           const value_t* R,
-                                          const value_int m,
+                                          const int64_t m,
                                           const value_t eps,
-                                          const value_int n_landmarks,
+                                          const int64_t n_landmarks,
                                           const value_idx* R_indptr,
                                           const value_idx* R_1nn_cols,
                                           const value_t* R_1nn_dists,
@@ -715,18 +712,17 @@ RAFT_KERNEL block_rbc_kernel_eps_csr_pass(const value_t* X_reordered,
 
 template <typename value_idx = std::int64_t,
           typename value_t,
-          int tpb            = 128,
-          typename value_int = std::uint32_t,
+          int tpb = 128,
           typename distance_func>
 RAFT_KERNEL __launch_bounds__(tpb)
   block_rbc_kernel_eps_csr_pass_xd(const value_t* __restrict__ X_reordered,
                                    const value_t* __restrict__ X,
-                                   const value_int n_queries,
-                                   const value_int n_cols,
+                                   const int64_t n_queries,
+                                   const int64_t n_cols,
                                    const value_t* __restrict__ R,
-                                   const value_int m,
+                                   const int64_t m,
                                    const value_t eps,
-                                   const value_int n_landmarks,
+                                   const int64_t n_landmarks,
                                    const value_idx* __restrict__ R_indptr,
                                    const value_idx* __restrict__ R_1nn_cols,
                                    const value_t* __restrict__ R_1nn_dists,
@@ -861,24 +857,23 @@ RAFT_KERNEL __launch_bounds__(tpb)
 
 template <typename value_idx = std::int64_t,
           typename value_t,
-          int tpb            = 128,
-          typename value_int = std::uint32_t,
+          int tpb = 128,
           typename distance_func>
 RAFT_KERNEL block_rbc_kernel_eps_max_k(const value_t* X_reordered,
                                        const value_t* X,
-                                       const value_int n_queries,
-                                       const value_int n_cols,
+                                       const int64_t n_queries,
+                                       const int64_t n_cols,
                                        const value_t* R,
-                                       const value_int m,
+                                       const int64_t m,
                                        const value_t eps,
-                                       const value_int n_landmarks,
+                                       const int64_t n_landmarks,
                                        const value_idx* R_indptr,
                                        const value_idx* R_1nn_cols,
                                        const value_t* R_1nn_dists,
                                        const value_t* R_radius,
                                        distance_func dfunc,
                                        value_idx* vd,
-                                       const value_int max_k,
+                                       int64_t max_k,
                                        value_idx* tmp)
 {
   constexpr int num_warps = tpb / raft::WarpSize;
@@ -987,43 +982,42 @@ RAFT_KERNEL block_rbc_kernel_eps_max_k(const value_t* X_reordered,
   if (lid == 0) vd[query_id] = column_count;
 }
 
-template <typename value_idx = std::int64_t, int tpb = 128, typename value_int = std::uint32_t>
-RAFT_KERNEL block_rbc_kernel_eps_max_k_copy(const value_int max_k,
+template <typename value_idx = std::int64_t, int tpb = 128>
+RAFT_KERNEL block_rbc_kernel_eps_max_k_copy(const int64_t max_k,
                                             const value_idx* adj_ia,
                                             const value_idx* tmp,
                                             value_idx* adj_ja)
 {
-  value_int offset = blockIdx.x * max_k;
+  int64_t offset = blockIdx.x * max_k;
 
-  value_int row_idx       = blockIdx.x;
-  value_idx col_start_idx = adj_ia[row_idx];
-  value_idx num_cols      = adj_ia[row_idx + 1] - col_start_idx;
+  int64_t row_idx       = blockIdx.x;
+  int64_t col_start_idx = adj_ia[row_idx];
+  int64_t num_cols      = adj_ia[row_idx + 1] - col_start_idx;
 
-  value_int limit = raft::Pow2<raft::WarpSize>::roundDown(num_cols);
-  value_int i     = threadIdx.x;
+  int64_t limit = raft::Pow2<raft::WarpSize>::roundDown(num_cols);
+  int64_t i     = threadIdx.x;
   for (; i < limit; i += tpb) {
     adj_ja[col_start_idx + i] = tmp[offset + i];
   }
   if (i < num_cols) { adj_ja[col_start_idx + i] = tmp[offset + i]; }
 }
 
-template <typename value_idx, typename value_t, typename value_int, typename matrix_idx>
-void rbc_low_dim_pass_one(
-  raft::resources const& handle,
-  const cuvs::neighbors::ball_cover::index<value_idx, value_t, value_int, matrix_idx>& index,
-  const value_t* query,
-  const value_int n_query_rows,
-  value_int k,
-  const value_idx* R_knn_inds,
-  const value_t* R_knn_dists,
-  value_idx* inds,
-  value_t* dists,
-  float weight,
-  value_int* dists_counter,
-  int dims)
+template <typename value_idx, typename value_t>
+void rbc_low_dim_pass_one(raft::resources const& handle,
+                          const cuvs::neighbors::ball_cover::index<value_idx, value_t>& index,
+                          const value_t* query,
+                          const int64_t n_query_rows,
+                          int64_t k,
+                          const value_idx* R_knn_inds,
+                          const value_t* R_knn_dists,
+                          value_idx* inds,
+                          value_t* dists,
+                          float weight,
+                          int64_t* dists_counter,
+                          int dims)
 {
   if (k <= 32)
-    block_rbc_kernel_registers<value_idx, value_t, 32, 2, 128, value_int>
+    block_rbc_kernel_registers<value_idx, value_t, 32, 2, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1043,7 +1037,7 @@ void rbc_low_dim_pass_one(
         weight);
 
   else if (k <= 64)
-    block_rbc_kernel_registers<value_idx, value_t, 64, 3, 128, value_int>
+    block_rbc_kernel_registers<value_idx, value_t, 64, 3, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1062,7 +1056,7 @@ void rbc_low_dim_pass_one(
         index.metric,
         weight);
   else if (k <= 128)
-    block_rbc_kernel_registers<value_idx, value_t, 128, 3, 128, value_int>
+    block_rbc_kernel_registers<value_idx, value_t, 128, 3, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1082,7 +1076,7 @@ void rbc_low_dim_pass_one(
         weight);
 
   else if (k <= 256)
-    block_rbc_kernel_registers<value_idx, value_t, 256, 4, 128, value_int>
+    block_rbc_kernel_registers<value_idx, value_t, 256, 4, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1102,7 +1096,7 @@ void rbc_low_dim_pass_one(
         weight);
 
   else if (k <= 512)
-    block_rbc_kernel_registers<value_idx, value_t, 512, 8, 64, value_int>
+    block_rbc_kernel_registers<value_idx, value_t, 512, 8, 64>
       <<<n_query_rows, 64, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1122,7 +1116,7 @@ void rbc_low_dim_pass_one(
         weight);
 
   else if (k <= 1024)
-    block_rbc_kernel_registers<value_idx, value_t, 1024, 8, 64, value_int>
+    block_rbc_kernel_registers<value_idx, value_t, 1024, 8, 64>
       <<<n_query_rows, 64, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1142,29 +1136,28 @@ void rbc_low_dim_pass_one(
         weight);
 }
 
-template <typename value_idx, typename value_t, typename value_int, typename matrix_idx>
-void rbc_low_dim_pass_two(
-  raft::resources const& handle,
-  const cuvs::neighbors::ball_cover::index<value_idx, value_t, value_int, matrix_idx>& index,
-  const value_t* query,
-  const value_int n_query_rows,
-  value_int k,
-  const value_idx* R_knn_inds,
-  const value_t* R_knn_dists,
-  value_idx* inds,
-  value_t* dists,
-  float weight,
-  value_int* post_dists_counter,
-  int dims)
+template <typename value_idx, typename value_t>
+void rbc_low_dim_pass_two(raft::resources const& handle,
+                          const cuvs::neighbors::ball_cover::index<value_idx, value_t>& index,
+                          const value_t* query,
+                          const int64_t n_query_rows,
+                          int64_t k,
+                          const value_idx* R_knn_inds,
+                          const value_t* R_knn_dists,
+                          value_idx* inds,
+                          value_t* dists,
+                          float weight,
+                          int64_t* post_dists_counter,
+                          int dims)
 {
-  const value_int bitset_size = ceil(index.n_landmarks / 32.0);
+  const uint32_t bitset_size = ceil(index.n_landmarks / 32.0);
 
   rmm::device_uvector<std::uint32_t> bitset(bitset_size * n_query_rows,
                                             raft::resource::get_cuda_stream(handle));
   thrust::fill(
     raft::resource::get_thrust_policy(handle), bitset.data(), bitset.data() + bitset.size(), 0);
 
-  perform_post_filter_registers<value_idx, value_t, value_int, 128>
+  perform_post_filter_registers<value_idx, value_t, std::uint32_t, 128>
     <<<n_query_rows,
        128,
        bitset_size * sizeof(std::uint32_t),
@@ -1182,7 +1175,7 @@ void rbc_low_dim_pass_two(
                                                   weight);
 
   if (k <= 32)
-    compute_final_dists_registers<value_idx, value_t, value_int, std::uint32_t, 32, 2, 128>
+    compute_final_dists_registers<value_idx, value_t, std::uint32_t, std::uint32_t, 32, 2, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1200,7 +1193,7 @@ void rbc_low_dim_pass_two(
         index.metric,
         post_dists_counter);
   else if (k <= 64)
-    compute_final_dists_registers<value_idx, value_t, value_int, std::uint32_t, 64, 3, 128>
+    compute_final_dists_registers<value_idx, value_t, std::uint32_t, std::uint32_t, 64, 3, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1218,7 +1211,7 @@ void rbc_low_dim_pass_two(
         index.metric,
         post_dists_counter);
   else if (k <= 128)
-    compute_final_dists_registers<value_idx, value_t, value_int, std::uint32_t, 128, 3, 128>
+    compute_final_dists_registers<value_idx, value_t, std::uint32_t, std::uint32_t, 128, 3, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1236,7 +1229,7 @@ void rbc_low_dim_pass_two(
         index.metric,
         post_dists_counter);
   else if (k <= 256)
-    compute_final_dists_registers<value_idx, value_t, value_int, std::uint32_t, 256, 4, 128>
+    compute_final_dists_registers<value_idx, value_t, std::uint32_t, std::uint32_t, 256, 4, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1254,7 +1247,7 @@ void rbc_low_dim_pass_two(
         index.metric,
         post_dists_counter);
   else if (k <= 512)
-    compute_final_dists_registers<value_idx, value_t, value_int, std::uint32_t, 512, 8, 64>
+    compute_final_dists_registers<value_idx, value_t, std::uint32_t, std::uint32_t, 512, 8, 64>
       <<<n_query_rows, 64, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1272,7 +1265,7 @@ void rbc_low_dim_pass_two(
         index.metric,
         post_dists_counter);
   else if (k <= 1024)
-    compute_final_dists_registers<value_idx, value_t, value_int, std::uint32_t, 1024, 8, 64>
+    compute_final_dists_registers<value_idx, value_t, std::uint32_t, std::uint32_t, 1024, 8, 64>
       <<<n_query_rows, 64, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1291,23 +1284,18 @@ void rbc_low_dim_pass_two(
         post_dists_counter);
 }
 
-template <typename value_idx,
-          typename value_t,
-          typename value_int,
-          typename matrix_idx,
-          typename dist_func>
-void rbc_eps_pass(
-  raft::resources const& handle,
-  const cuvs::neighbors::ball_cover::index<value_idx, value_t, value_int, matrix_idx>& index,
-  const value_t* query,
-  const value_int n_query_rows,
-  value_t eps,
-  const value_t* R,
-  dist_func& dfunc,
-  bool* adj,
-  value_idx* vd)
+template <typename value_idx, typename value_t, typename dist_func>
+void rbc_eps_pass(raft::resources const& handle,
+                  const cuvs::neighbors::ball_cover::index<value_idx, value_t>& index,
+                  const value_t* query,
+                  const int64_t n_query_rows,
+                  value_t eps,
+                  const value_t* R,
+                  dist_func& dfunc,
+                  bool* adj,
+                  value_idx* vd)
 {
-  block_rbc_kernel_eps_dense<value_idx, value_t, 64, value_int>
+  block_rbc_kernel_eps_dense<value_idx, value_t, 64>
     <<<n_query_rows, 64, 0, raft::resource::get_cuda_stream(handle)>>>(
       index.get_X_reordered().data_handle(),
       query,
@@ -1339,23 +1327,18 @@ void rbc_eps_pass(
   raft::resource::sync_stream(handle);
 }
 
-template <typename value_idx,
-          typename value_t,
-          typename value_int,
-          typename matrix_idx,
-          typename dist_func>
-void rbc_eps_pass(
-  raft::resources const& handle,
-  const cuvs::neighbors::ball_cover::index<value_idx, value_t, value_int, matrix_idx>& index,
-  const value_t* query,
-  const value_int n_query_rows,
-  value_t eps,
-  value_int* max_k,
-  const value_t* R,
-  dist_func& dfunc,
-  value_idx* adj_ia,
-  value_idx* adj_ja,
-  value_idx* vd)
+template <typename value_idx, typename value_t, typename dist_func>
+void rbc_eps_pass(raft::resources const& handle,
+                  const cuvs::neighbors::ball_cover::index<value_idx, value_t>& index,
+                  const value_t* query,
+                  const int64_t n_query_rows,
+                  value_t eps,
+                  int64_t* max_k,
+                  const value_t* R,
+                  dist_func& dfunc,
+                  value_idx* adj_ia,
+                  value_idx* adj_ja,
+                  value_idx* vd)
 {
   // if max_k == nullptr we are either pass 1 or pass 2
   if (max_k == nullptr) {
@@ -1363,8 +1346,8 @@ void rbc_eps_pass(
       // pass 1 -> only compute adj_ia / vd
       value_idx* vd_ptr = (vd != nullptr) ? vd : adj_ia;
       if (index.n == 2 || index.n == 3) {
-        block_rbc_kernel_eps_csr_pass_xd<value_idx, value_t, 64, value_int>
-          <<<raft::ceildiv<value_int>(n_query_rows, 2),
+        block_rbc_kernel_eps_csr_pass_xd<value_idx, value_t, 64>
+          <<<raft::ceildiv<int64_t>(n_query_rows, 2),
              64,
              0,
              raft::resource::get_cuda_stream(handle)>>>(index.get_X_reordered().data_handle(),
@@ -1385,8 +1368,8 @@ void rbc_eps_pass(
                                                         false,
                                                         index.n);
       } else {
-        block_rbc_kernel_eps_csr_pass<value_idx, value_t, 64, value_int>
-          <<<raft::ceildiv<value_int>(n_query_rows, 2),
+        block_rbc_kernel_eps_csr_pass<value_idx, value_t, 64>
+          <<<raft::ceildiv<int64_t>(n_query_rows, 2),
              64,
              0,
              raft::resource::get_cuda_stream(handle)>>>(index.get_X_reordered().data_handle(),
@@ -1416,8 +1399,8 @@ void rbc_eps_pass(
     } else {
       // pass 2 -> fill in adj_ja
       if (index.n == 2 || index.n == 3) {
-        block_rbc_kernel_eps_csr_pass_xd<value_idx, value_t, 64, value_int>
-          <<<raft::ceildiv<value_int>(n_query_rows, 2),
+        block_rbc_kernel_eps_csr_pass_xd<value_idx, value_t, 64>
+          <<<raft::ceildiv<int64_t>(n_query_rows, 2),
              64,
              0,
              raft::resource::get_cuda_stream(handle)>>>(index.get_X_reordered().data_handle(),
@@ -1438,8 +1421,8 @@ void rbc_eps_pass(
                                                         true,
                                                         index.n);
       } else {
-        block_rbc_kernel_eps_csr_pass<value_idx, value_t, 64, value_int>
-          <<<raft::ceildiv<value_int>(n_query_rows, 2), 64, 0, resource::get_cuda_stream(handle)>>>(
+        block_rbc_kernel_eps_csr_pass<value_idx, value_t, 64>
+          <<<raft::ceildiv<int64_t>(n_query_rows, 2), 64, 0, resource::get_cuda_stream(handle)>>>(
             index.get_X_reordered().data_handle(),
             query,
             n_query_rows,
@@ -1459,38 +1442,36 @@ void rbc_eps_pass(
       }
     }
   } else {
-    value_int max_k_in = *max_k;
-    value_idx* vd_ptr  = (vd != nullptr) ? vd : adj_ia;
+    int64_t max_k_in  = *max_k;
+    value_idx* vd_ptr = (vd != nullptr) ? vd : adj_ia;
 
     rmm::device_uvector<value_idx> tmp(n_query_rows * max_k_in,
                                        raft::resource::get_cuda_stream(handle));
 
-    block_rbc_kernel_eps_max_k<value_idx, value_t, 64, value_int>
-      <<<raft::ceildiv<value_int>(n_query_rows, 2),
-         64,
-         0,
-         raft::resource::get_cuda_stream(handle)>>>(index.get_X_reordered().data_handle(),
-                                                    query,
-                                                    n_query_rows,
-                                                    index.n,
-                                                    R,
-                                                    index.m,
-                                                    eps,
-                                                    index.n_landmarks,
-                                                    index.get_R_indptr().data_handle(),
-                                                    index.get_R_1nn_cols().data_handle(),
-                                                    index.get_R_1nn_dists().data_handle(),
-                                                    index.get_R_radius().data_handle(),
-                                                    dfunc,
-                                                    vd_ptr,
-                                                    max_k_in,
-                                                    tmp.data());
+    block_rbc_kernel_eps_max_k<value_idx, value_t, 64>
+      <<<raft::ceildiv<int64_t>(n_query_rows, 2), 64, 0, raft::resource::get_cuda_stream(handle)>>>(
+        index.get_X_reordered().data_handle(),
+        query,
+        n_query_rows,
+        index.n,
+        R,
+        index.m,
+        eps,
+        index.n_landmarks,
+        index.get_R_indptr().data_handle(),
+        index.get_R_1nn_cols().data_handle(),
+        index.get_R_1nn_dists().data_handle(),
+        index.get_R_radius().data_handle(),
+        dfunc,
+        vd_ptr,
+        max_k_in,
+        tmp.data());
 
-    value_int actual_max = thrust::reduce(raft::resource::get_thrust_policy(handle),
-                                          vd_ptr,
-                                          vd_ptr + n_query_rows,
-                                          (value_idx)0,
-                                          thrust::maximum<value_idx>());
+    int64_t actual_max = thrust::reduce(raft::resource::get_thrust_policy(handle),
+                                        vd_ptr,
+                                        vd_ptr + n_query_rows,
+                                        (value_idx)0,
+                                        thrust::maximum<value_idx>());
 
     if (actual_max > max_k_in) {
       // ceil vd to max_k
@@ -1509,7 +1490,7 @@ void rbc_eps_pass(
                            adj_ia,
                            (value_idx)0);
 
-    block_rbc_kernel_eps_max_k_copy<value_idx, 32, value_int>
+    block_rbc_kernel_eps_max_k_copy<value_idx, 32>
       <<<n_query_rows, 32, 0, raft::resource::get_cuda_stream(handle)>>>(
         max_k_in, adj_ia, tmp.data(), adj_ja);
 

@@ -23,7 +23,7 @@
 
 namespace cuvs::neighbors::ball_cover::detail {
 
-template <typename value_t, typename value_int = std::uint32_t>
+template <typename value_t, typename value_int>
 struct DistFunc {
   virtual __device__ __host__ __forceinline__ value_t operator()(const value_t* a,
                                                                  const value_t* b,
@@ -33,7 +33,7 @@ struct DistFunc {
   };
 };
 
-template <typename value_t, typename value_int = std::uint32_t>
+template <typename value_t, typename value_int>
 struct HaversineFunc : public DistFunc<value_t, value_int> {
   __device__ __host__ __forceinline__ value_t operator()(const value_t* a,
                                                          const value_t* b,
@@ -43,7 +43,7 @@ struct HaversineFunc : public DistFunc<value_t, value_int> {
   }
 };
 
-template <typename value_t, typename value_int = std::uint32_t>
+template <typename value_t, typename value_int>
 struct EuclideanFunc : public DistFunc<value_t, value_int> {
   __device__ __host__ __forceinline__ value_t operator()(const value_t* a,
                                                          const value_t* b,
@@ -59,7 +59,7 @@ struct EuclideanFunc : public DistFunc<value_t, value_int> {
   }
 };
 
-template <typename value_t, typename value_int = std::uint32_t>
+template <typename value_t, typename value_int>
 struct EuclideanSqFunc : public DistFunc<value_t, value_int> {
   __device__ __host__ __forceinline__ value_t operator()(const value_t* a,
                                                          const value_t* b,
@@ -75,7 +75,7 @@ struct EuclideanSqFunc : public DistFunc<value_t, value_int> {
 };
 
 // Direct distance function for use in kernels that need metric information
-template <typename value_t, typename value_int = std::uint32_t>
+template <typename value_t, typename value_int>
 __device__ __host__ __forceinline__ value_t compute_distance_by_metric(
   const value_t* a, const value_t* b, const value_int n_dims, cuvs::distance::DistanceType metric)
 {

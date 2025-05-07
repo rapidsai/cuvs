@@ -27,40 +27,31 @@
 #include <cstdint>  // int64_t
 #include <cuvs/neighbors/ball_cover.hpp>
 
-#define instantiate_cuvs_neighbors_detail_rbc_eps_pass(                                        \
-  Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx, Mdist_func)                                   \
-  template void cuvs::neighbors::ball_cover::detail::                                          \
-    rbc_eps_pass<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>(                               \
-      raft::resources const& handle,                                                           \
-      const cuvs::neighbors::ball_cover::index<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>& \
-        index,                                                                                 \
-      const Mvalue_t* query,                                                                   \
-      const Mvalue_int n_query_rows,                                                           \
-      Mvalue_t eps,                                                                            \
-      const Mvalue_t* R_dists,                                                                 \
-      Mdist_func<Mvalue_t, Mvalue_int>& dfunc,                                                 \
-      bool* adj,                                                                               \
-      Mvalue_idx* vd);                                                                         \
-                                                                                               \
-  template void cuvs::neighbors::ball_cover::detail::                                          \
-    rbc_eps_pass<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>(                               \
-      raft::resources const& handle,                                                           \
-      const cuvs::neighbors::ball_cover::index<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>& \
-        index,                                                                                 \
-      const Mvalue_t* query,                                                                   \
-      const Mvalue_int n_query_rows,                                                           \
-      Mvalue_t eps,                                                                            \
-      Mvalue_int* max_k,                                                                       \
-      const Mvalue_t* R_dists,                                                                 \
-      Mdist_func<Mvalue_t, Mvalue_int>& dfunc,                                                 \
-      Mvalue_idx* adj_ia,                                                                      \
-      Mvalue_idx* adj_ja,                                                                      \
-      Mvalue_idx* vd)
+#define instantiate_cuvs_neighbors_detail_rbc_eps_pass(Mvalue_idx, Mvalue_t, Mdist_func) \
+  template void cuvs::neighbors::ball_cover::detail::rbc_eps_pass<Mvalue_idx, Mvalue_t>( \
+    raft::resources const& handle,                                                       \
+    const cuvs::neighbors::ball_cover::index<Mvalue_idx, Mvalue_t>& index,               \
+    const Mvalue_t* query,                                                               \
+    const int64_t n_query_rows,                                                          \
+    Mvalue_t eps,                                                                        \
+    const Mvalue_t* R_dists,                                                             \
+    Mdist_func<Mvalue_t, int64_t>& dfunc,                                                \
+    bool* adj,                                                                           \
+    Mvalue_idx* vd);                                                                     \
+                                                                                         \
+  template void cuvs::neighbors::ball_cover::detail::rbc_eps_pass<Mvalue_idx, Mvalue_t>( \
+    raft::resources const& handle,                                                       \
+    const cuvs::neighbors::ball_cover::index<Mvalue_idx, Mvalue_t>& index,               \
+    const Mvalue_t* query,                                                               \
+    const int64_t n_query_rows,                                                          \
+    Mvalue_t eps,                                                                        \
+    int64_t* max_k,                                                                      \
+    const Mvalue_t* R_dists,                                                             \
+    Mdist_func<Mvalue_t, int64_t>& dfunc,                                                \
+    Mvalue_idx* adj_ia,                                                                  \
+    Mvalue_idx* adj_ja,                                                                  \
+    Mvalue_idx* vd)
 
 instantiate_cuvs_neighbors_detail_rbc_eps_pass(
-  std::int64_t,
-  float,
-  std::int64_t,
-  std::int64_t,
-  cuvs::neighbors::ball_cover::detail::EuclideanSqFunc);
+  std::int64_t, float, cuvs::neighbors::ball_cover::detail::EuclideanSqFunc);
 #undef instantiate_cuvs_neighbors_detail_rbc_eps_pass

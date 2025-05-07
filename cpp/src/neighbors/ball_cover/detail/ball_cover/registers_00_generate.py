@@ -46,69 +46,69 @@ header = """/*
 
 macro_pass_one = """
 #define instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(                            \\
-  Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx)                          \\
+  Mvalue_idx, Mvalue_t)                          \\
   template void                                                                              \\
-  cuvs::neighbors::ball_cover::detail::rbc_low_dim_pass_one<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>( \\
+  cuvs::neighbors::ball_cover::detail::rbc_low_dim_pass_one<Mvalue_idx, Mvalue_t>( \\
     raft::resources const& handle,                                                           \\
-    const cuvs::neighbors::ball_cover::index<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>& index,              \\
+    const cuvs::neighbors::ball_cover::index<Mvalue_idx, Mvalue_t>& index,              \\
     const Mvalue_t* query,                                                                   \\
-    const Mvalue_int n_query_rows,                                                           \\
-    Mvalue_int k,                                                                            \\
+    const int64_t n_query_rows,                                                           \\
+    const int64_t k,                                                                            \\
     const Mvalue_idx* R_knn_inds,                                                            \\
     const Mvalue_t* R_knn_dists,                                                             \\
     Mvalue_idx* inds,                                                                        \\
     Mvalue_t* dists,                                                                         \\
     float weight,                                                                            \\
-    Mvalue_int* dists_counter,\\
+    int64_t* dists_counter,\\
     int dims);
 
 """
 
 macro_pass_two = """
 #define instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two(                            \\
-  Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx)                          \\
+  Mvalue_idx, Mvalue_t)                          \\
   template void                                                                              \\
-  cuvs::neighbors::ball_cover::detail::rbc_low_dim_pass_two<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>( \\
+  cuvs::neighbors::ball_cover::detail::rbc_low_dim_pass_two<Mvalue_idx, Mvalue_t>( \\
     raft::resources const& handle,                                                           \\
-    const cuvs::neighbors::ball_cover::index<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>& index,              \\
+    const cuvs::neighbors::ball_cover::index<Mvalue_idx, Mvalue_t>& index,              \\
     const Mvalue_t* query,                                                                   \\
-    const Mvalue_int n_query_rows,                                                           \\
-    Mvalue_int k,                                                                            \\
+    const int64_t n_query_rows,                                                           \\
+    const int64_t k,                                                                            \\
     const Mvalue_idx* R_knn_inds,                                                            \\
     const Mvalue_t* R_knn_dists,                                                             \\
     Mvalue_idx* inds,                                                                        \\
     Mvalue_t* dists,                                                                         \\
     float weight,                                                                            \\
-    Mvalue_int* dists_counter,\\
+    int64_t* dists_counter,\\
     int dims);
 
 """
 
 macro_pass_eps = """
 #define instantiate_cuvs_neighbors_detail_rbc_eps_pass(                                  \\
-  Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx, Mdist_func)                               \\
+  Mvalue_idx, Mvalue_t, Mdist_func)                               \\
   template void                                                                            \\
-  cuvs::neighbors::ball_cover::detail::rbc_eps_pass<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>( \\
+  cuvs::neighbors::ball_cover::detail::rbc_eps_pass<Mvalue_idx, Mvalue_t>( \\
     raft::resources const& handle,                                                         \\
-    const cuvs::neighbors::ball_cover::index<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>& index,            \\
+    const cuvs::neighbors::ball_cover::index<Mvalue_idx, Mvalue_t>& index,            \\
     const Mvalue_t* query,                                                                 \\
-    const Mvalue_int n_query_rows,                                                         \\
+    const int64_t n_query_rows,                                                         \\
     Mvalue_t eps,                                                                          \\
     const Mvalue_t* R_dists,                                                               \\
-    Mdist_func<Mvalue_t, Mvalue_int>& dfunc,                                               \\
+    Mdist_func<Mvalue_t, int64_t>& dfunc,                                               \\
     bool* adj,                                                                             \\
     Mvalue_idx* vd);                                                                       \\
                                                                                            \\
   template void                                                                            \\
-  cuvs::neighbors::ball_cover::detail::rbc_eps_pass<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>( \\
+  cuvs::neighbors::ball_cover::detail::rbc_eps_pass<Mvalue_idx, Mvalue_t>( \\
     raft::resources const& handle,                                                         \\
-    const cuvs::neighbors::ball_cover::index<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>& index,            \\
+    const cuvs::neighbors::ball_cover::index<Mvalue_idx, Mvalue_t>& index,            \\
     const Mvalue_t* query,                                                                 \\
-    const Mvalue_int n_query_rows,                                                         \\
+    const int64_t n_query_rows,                                                         \\
     Mvalue_t eps,                                                                          \\
-    Mvalue_int* max_k,                                                                     \\
+    int64_t* max_k,                                                                     \\
     const Mvalue_t* R_dists,                                                               \\
-    Mdist_func<Mvalue_t, Mvalue_int>& dfunc,                                               \\
+    Mdist_func<Mvalue_t, int64_t>& dfunc,                                               \\
     Mvalue_idx* adj_ia,                                                                    \\
     Mvalue_idx* adj_ja,                                                                    \\
     Mvalue_idx* vd)
@@ -119,7 +119,6 @@ euclideanSq="cuvs::neighbors::ball_cover::detail::EuclideanSqFunc"
 
 types = dict(
     int64_float=("std::int64_t", "float"),
-    #int64_double=("std::int64_t", "double"),
 )
 
 path = f"registers_pass_one.cu"
@@ -128,7 +127,7 @@ with open(path, "w") as f:
     f.write(macro_pass_one)
     for type_path, (int_t, data_t) in types.items():
         f.write(f"instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(\n")
-        f.write(f"  {int_t}, {data_t}, {int_t}, {int_t});\n")
+        f.write(f"  {int_t}, {data_t});\n")
     f.write("#undef instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one\n")
 print(f"src/neighbors/ball_cover/detail/ball_cover/{path}")
 
@@ -138,7 +137,7 @@ with open(path, "w") as f:
     f.write(macro_pass_two)
     for type_path, (int_t, data_t) in types.items():
         f.write(f"instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two(\n")
-        f.write(f"  {int_t}, {data_t}, {int_t}, {int_t});\n")
+        f.write(f"  {int_t}, {data_t});\n")
     f.write("#undef instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two\n")
 print(f"src/neighbors/ball_cover/detail/ball_cover/{path}")
 
@@ -147,7 +146,7 @@ with open(path, "w") as f:
     f.write(header)
     f.write(macro_pass_eps)
     for type_path, (int_t, data_t) in types.items():
-            f.write(f"instantiate_cuvs_neighbors_detail_rbc_eps_pass(\n")
-            f.write(f"  {int_t}, {data_t}, {int_t}, {int_t}, {euclideanSq});\n")
+        f.write(f"instantiate_cuvs_neighbors_detail_rbc_eps_pass(\n")
+        f.write(f"  {int_t}, {data_t}, {euclideanSq});\n")
     f.write("#undef instantiate_cuvs_neighbors_detail_rbc_eps_pass\n")
     print(f"src/neighbors/ball_cover/detail/ball_cover/{path}")

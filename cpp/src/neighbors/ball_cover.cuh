@@ -58,9 +58,9 @@ namespace cuvs::neighbors::ball_cover::detail {
  * @param[inout] index an empty (and not previous built) instance of
  * cuvs::neighbors::ball_cover::index
  */
-template <typename idx_t, typename value_t, typename int_t, typename matrix_idx_t>
+template <typename idx_t, typename value_t>
 void build_index(raft::resources const& handle,
-                 cuvs::neighbors::ball_cover::index<idx_t, value_t, int_t, matrix_idx_t>& index)
+                 cuvs::neighbors::ball_cover::index<idx_t, value_t>& index)
 {
   RAFT_EXPECTS(index.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                  index.metric == cuvs::distance::DistanceType::L2SqrtUnexpanded ||
@@ -101,10 +101,10 @@ void build_index(raft::resources const& handle,
  *               many datasets can still have great recall even by only
  *               looking in the closest landmark.
  */
-template <typename idx_t, typename value_t, typename int_t, typename matrix_idx_t>
+template <typename idx_t, typename value_t>
 void all_knn_query(raft::resources const& handle,
-                   cuvs::neighbors::ball_cover::index<idx_t, value_t, int_t, matrix_idx_t>& index,
-                   int_t k,
+                   cuvs::neighbors::ball_cover::index<idx_t, value_t>& index,
+                   int64_t k,
                    idx_t* inds,
                    value_t* dists,
                    bool perform_post_filtering = true,
@@ -163,7 +163,6 @@ void all_knn_query(raft::resources const& handle,
  * @param[in] index ball cover index which has not yet been built
  * @param[out] inds output knn indices
  * @param[out] dists output knn distances
- * @param[in] k number of nearest neighbors to find
  * @param[in] perform_post_filtering if this is false, only the closest k landmarks
  *                               are considered (which will return approximate
  *                               results).
@@ -176,27 +175,31 @@ void all_knn_query(raft::resources const& handle,
  *               many datasets can still have great recall even by only
  *               looking in the closest landmark.
  */
-template <typename idx_t, typename value_t, typename int_t, typename matrix_idx_t>
+template <typename idx_t, typename value_t>
 void all_knn_query(raft::resources const& handle,
-                   cuvs::neighbors::ball_cover::index<idx_t, value_t, int_t, matrix_idx_t>& index,
-                   raft::device_matrix_view<idx_t, matrix_idx_t, raft::row_major> inds,
-                   raft::device_matrix_view<value_t, matrix_idx_t, raft::row_major> dists,
-                   int_t k,
+                   cuvs::neighbors::ball_cover::index<idx_t, value_t>& index,
+                   raft::device_matrix_view<idx_t, int64_t, raft::row_major> inds,
+                   raft::device_matrix_view<value_t, int64_t, raft::row_major> dists,
                    bool perform_post_filtering = true,
                    float weight                = 1.0)
 {
   RAFT_EXPECTS(index.n <= 3, "only 2d and 3d vectors are supported in current implementation");
-  RAFT_EXPECTS(k <= index.m,
+  RAFT_EXPECTS(inds.extent(1) <= index.m,
                "k must be less than or equal to the number of data points in the index");
-  RAFT_EXPECTS(inds.extent(1) == dists.extent(1) && dists.extent(1) == static_cast<matrix_idx_t>(k),
-               "Number of columns in output indices and distances matrices must be equal to k");
+  RAFT_EXPECTS(inds.extent(1) == dists.extent(1),
+               "Number of columns in output indices and distances matrices must be equal");
 
   RAFT_EXPECTS(inds.extent(0) == dists.extent(0) && dists.extent(0) == index.get_X().extent(0),
                "Number of rows in output indices and distances matrices must equal number of rows "
                "in index matrix.");
 
-  all_knn_query(
-    handle, index, k, inds.data_handle(), dists.data_handle(), perform_post_filtering, weight);
+  all_knn_query(handle,
+                index,
+                inds.extent(1),
+                inds.data_handle(),
+                dists.data_handle(),
+                perform_post_filtering,
+                weight);
 }
 
 /** @} */
@@ -230,12 +233,12 @@ void all_knn_query(raft::resources const& handle,
  *               looking in the closest landmark.
  * @param[in] n_query_pts number of query points
  */
-template <typename idx_t, typename value_t, typename int_t, typename matrix_idx = std::int64_t>
+template <typename idx_t, typename value_t>
 void knn_query(raft::resources const& handle,
-               const cuvs::neighbors::ball_cover::index<idx_t, value_t, int_t, matrix_idx>& index,
-               int_t k,
+               const cuvs::neighbors::ball_cover::index<idx_t, value_t>& index,
+               int64_t k,
                const value_t* query,
-               int_t n_query_pts,
+               int64_t n_query_pts,
                idx_t* inds,
                value_t* dists,
                bool perform_post_filtering = true,
@@ -265,12 +268,12 @@ void knn_query(raft::resources const& handle,
  * @param[in]  query  first matrix [row-major] [on device] [dim = m x k]
  * @param[in]  eps    defines epsilon neighborhood radius
  */
-template <typename idx_t, typename value_t, typename int_t, typename matrix_idx_t = std::int64_t>
+template <typename idx_t, typename value_t>
 void eps_nn(raft::resources const& handle,
-            const cuvs::neighbors::ball_cover::index<idx_t, value_t, int_t, matrix_idx_t>& index,
-            raft::device_matrix_view<bool, matrix_idx_t, raft::row_major> adj,
-            raft::device_vector_view<idx_t, matrix_idx_t> vd,
-            raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> query,
+            const cuvs::neighbors::ball_cover::index<idx_t, value_t>& index,
+            raft::device_matrix_view<bool, int64_t, raft::row_major> adj,
+            raft::device_vector_view<idx_t, int64_t> vd,
+            raft::device_matrix_view<const value_t, int64_t, raft::row_major> query,
             value_t eps)
 {
   ASSERT(index.n == query.extent(1), "vector dimension needs to be the same for index and queries");
@@ -288,7 +291,7 @@ void eps_nn(raft::resources const& handle,
     query.extent(0),
     adj.data_handle(),
     vd.data_handle(),
-    cuvs::neighbors::ball_cover::detail::EuclideanSqFunc<value_t, int_t>());
+    cuvs::neighbors::ball_cover::detail::EuclideanSqFunc<value_t, int64_t>());
 }
 
 /**
@@ -317,15 +320,15 @@ void eps_nn(raft::resources const& handle,
  *                     Upon return max_k is overwritten with the actual max_k found during
  *                     computation.
  */
-template <typename idx_t, typename value_t, typename int_t, typename matrix_idx_t = std::int64_t>
+template <typename idx_t, typename value_t>
 void eps_nn(raft::resources const& handle,
-            const cuvs::neighbors::ball_cover::index<idx_t, value_t, int_t, matrix_idx_t>& index,
-            raft::device_vector_view<idx_t, matrix_idx_t> adj_ia,
-            raft::device_vector_view<idx_t, matrix_idx_t> adj_ja,
-            raft::device_vector_view<idx_t, matrix_idx_t> vd,
-            raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> query,
+            const cuvs::neighbors::ball_cover::index<idx_t, value_t>& index,
+            raft::device_vector_view<idx_t, int64_t> adj_ia,
+            raft::device_vector_view<idx_t, int64_t> adj_ja,
+            raft::device_vector_view<idx_t, int64_t> vd,
+            raft::device_matrix_view<const value_t, int64_t, raft::row_major> query,
             value_t eps,
-            std::optional<raft::host_scalar_view<int_t, matrix_idx_t>> max_k = std::nullopt)
+            std::optional<raft::host_scalar_view<int64_t, int64_t>> max_k = std::nullopt)
 {
   ASSERT(index.n == query.extent(1), "vector dimension needs to be the same for index and queries");
   ASSERT(index.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
@@ -333,7 +336,7 @@ void eps_nn(raft::resources const& handle,
          "Metric not supported");
   ASSERT(index.is_index_trained(), "index must be previously trained");
 
-  int_t* max_k_ptr = nullptr;
+  int64_t* max_k_ptr = nullptr;
   if (max_k.has_value()) { max_k_ptr = max_k.value().data_handle(); }
 
   // run query
@@ -347,7 +350,7 @@ void eps_nn(raft::resources const& handle,
     adj_ia.data_handle(),
     adj_ja.data_handle(),
     vd.data_handle(),
-    cuvs::neighbors::ball_cover::detail::EuclideanSqFunc<value_t, int_t>());
+    cuvs::neighbors::ball_cover::detail::EuclideanSqFunc<value_t, int64_t>());
 }
 
 /**
@@ -393,7 +396,6 @@ void eps_nn(raft::resources const& handle,
  * @param[in] query device matrix containing query data points
  * @param[out] inds output knn indices
  * @param[out] dists output knn distances
- * @param[in] k number of nearest neighbors to find
  * @param[in] perform_post_filtering if this is false, only the closest k landmarks
  *                               are considered (which will return approximate
  *                               results).
@@ -406,20 +408,19 @@ void eps_nn(raft::resources const& handle,
  *               many datasets can still have great recall even by only
  *               looking in the closest landmark.
  */
-template <typename idx_t, typename value_t, typename int_t, typename matrix_idx_t>
+template <typename idx_t, typename value_t>
 void knn_query(raft::resources const& handle,
-               const cuvs::neighbors::ball_cover::index<idx_t, value_t, int_t, matrix_idx_t>& index,
-               raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> query,
-               raft::device_matrix_view<idx_t, matrix_idx_t, raft::row_major> inds,
-               raft::device_matrix_view<value_t, matrix_idx_t, raft::row_major> dists,
-               int_t k,
+               const cuvs::neighbors::ball_cover::index<idx_t, value_t>& index,
+               raft::device_matrix_view<const value_t, int64_t, raft::row_major> query,
+               raft::device_matrix_view<idx_t, int64_t, raft::row_major> inds,
+               raft::device_matrix_view<value_t, int64_t, raft::row_major> dists,
                bool perform_post_filtering = true,
                float weight                = 1.0)
 {
-  RAFT_EXPECTS(k <= index.m,
+  RAFT_EXPECTS(inds.extent(1) <= index.m,
                "k must be less than or equal to the number of data points in the index");
-  RAFT_EXPECTS(inds.extent(1) == dists.extent(1) && dists.extent(1) == static_cast<idx_t>(k),
-               "Number of columns in output indices and distances matrices must be equal to k");
+  RAFT_EXPECTS(inds.extent(1) == dists.extent(1),
+               "Number of columns in output indices and distances matrices must be equal");
 
   RAFT_EXPECTS(inds.extent(0) == dists.extent(0) && dists.extent(0) == query.extent(0),
                "Number of rows in output indices and distances matrices must equal number of rows "
@@ -430,9 +431,9 @@ void knn_query(raft::resources const& handle,
 
   knn_query(handle,
             index,
-            k,
+            inds.extent(1),
             query.data_handle(),
-            (int_t)query.extent(0),
+            query.extent(0),
             inds.data_handle(),
             dists.data_handle(),
             perform_post_filtering,
