@@ -101,6 +101,9 @@ def run_ivf_pq_build_search_test(
     if not inplace:
         out_dist_device, out_idx_device = ret_output
 
+    centers = index.centers
+    assert centers.shape[0] == n_lists
+
     if not compare:
         return
 
