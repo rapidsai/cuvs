@@ -338,15 +338,18 @@ extern "C" cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index_c_ptr)
   return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
 
-    if (index.dtype.code == kDLFloat) {
+    if (index.dtype.code == kDLFloat && index.dtype.bits == 32) {
       auto index_ptr =
         reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index.addr);
       delete index_ptr;
-    } else if (index.dtype.code == kDLInt) {
+    } else if (index.dtype.code == kDLFloat && index.dtype.bits == 16) {
+      auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<half, uint32_t>*>(index.addr);
+      delete index_ptr;
+    } else if (index.dtype.code == kDLInt && index.dtype.bits == 8) {
       auto index_ptr =
         reinterpret_cast<cuvs::neighbors::cagra::index<int8_t, uint32_t>*>(index.addr);
       delete index_ptr;
-    } else if (index.dtype.code == kDLUInt) {
+    } else if (index.dtype.code == kDLUInt && index.dtype.bits == 8) {
       auto index_ptr =
         reinterpret_cast<cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>(index.addr);
       delete index_ptr;
@@ -599,6 +602,9 @@ extern "C" cuvsError_t cuvsCagraDeserialize(cuvsResources_t res,
     if (dtype.kind == 'f' && dtype.itemsize == 4) {
       index->addr       = reinterpret_cast<uintptr_t>(_deserialize<float>(res, filename));
       index->dtype.code = kDLFloat;
+    } else if (dtype.kind == 'f' && dtype.itemsize == 2) {
+      index->addr       = reinterpret_cast<uintptr_t>(_deserialize<half>(res, filename));
+      index->dtype.code = kDLFloat;
     } else if (dtype.kind == 'i' && dtype.itemsize == 1) {
       index->addr       = reinterpret_cast<uintptr_t>(_deserialize<int8_t>(res, filename));
       index->dtype.code = kDLInt;
@@ -638,6 +644,8 @@ extern "C" cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
       _serialize_to_hnswlib<float>(res, filename, index);
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      _serialize_to_hnswlib<half>(res, filename, index);
     } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
       _serialize_to_hnswlib<int8_t>(res, filename, index);
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
