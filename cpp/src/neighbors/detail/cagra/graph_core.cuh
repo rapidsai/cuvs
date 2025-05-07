@@ -1164,7 +1164,8 @@ void optimize(
   raft::resources const& res,
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph,
-  const bool guarantee_connectivity = true)
+  const bool guarantee_connectivity = true,
+  const bool use_gpu                = true)
 {
   RAFT_LOG_DEBUG(
     "# Pruning kNN graph (size=%lu, degree=%lu)\n", knn_graph.extent(0), knn_graph.extent(1));
@@ -1197,7 +1198,6 @@ void optimize(
     mst_graph =
       raft::make_host_matrix<IdxT, int64_t, raft::row_major>(graph_size, output_graph_degree);
     RAFT_LOG_INFO("MST optimization is used to guarantee graph connectivity.");
-    constexpr bool use_gpu = true;
     mst_optimization(res, knn_graph, mst_graph.view(), mst_graph_num_edges.view(), use_gpu);
 
     for (uint64_t i = 0; i < graph_size; i++) {
@@ -1231,9 +1231,8 @@ void optimize(
     // If the available device memory is insufficient, do not use the GPU to count
     // the number of 2-hop detours, but use the CPU.
     //
-    // bool use_gpu = true;
-    bool use_gpu = false;
-    if (use_gpu) {
+    bool _use_gpu = use_gpu;
+    if (_use_gpu) {
       try {
         auto d_detour_count =
           raft::make_device_matrix<uint8_t, int64_t>(res, graph_size, knn_graph_degree);
@@ -1242,13 +1241,13 @@ void optimize(
           raft::make_device_matrix<IdxT, int64_t>(res, graph_size, knn_graph_degree);
       } catch (std::bad_alloc& e) {
         RAFT_LOG_DEBUG("Insufficient memory for 2-hop node counting on GPU");
-        use_gpu = false;
+        _use_gpu = false;
       } catch (raft::logic_error& e) {
         RAFT_LOG_DEBUG("Insufficient memory for 2-hop node counting on GPU (logic error)");
-        use_gpu = false;
+        _use_gpu = false;
       }
     }
-    if (use_gpu) {
+    if (_use_gpu) {
       // Count 2-hop detours on GPU
       raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
         "cagra::graph::optimize/prune/2-hop-counting-by-GPU");
@@ -1347,8 +1346,7 @@ void optimize(
       count_2hop_detours(knn_graph, detour_count.view());
 
       const double time_2hop_count_end = cur_time();
-      RAFT_LOG_DEBUG(/* TODO: change to DEBUG */
-                     "# Time for 2-hop detour counting on CPU: %.1lf sec",
+      RAFT_LOG_DEBUG("# Time for 2-hop detour counting on CPU: %.1lf sec",
                      time_2hop_count_end - time_2hop_count_start);
     }
 
@@ -1363,7 +1361,7 @@ void optimize(
       for (uint32_t l = 0; l < knn_graph_degree && pk < output_graph_degree; l++) {
         uint32_t next_num_detour = std::numeric_limits<uint32_t>::max();
         for (uint64_t k = 0; k < knn_graph_degree; k++) {
-          const auto num_detour_k = detour_count.data_handle()[k + (knn_graph_degree * i)];
+          const auto num_detour_k = detour_count(i, k);
           // Find the detourable count to check in the next iteration
           if (num_detour_k > num_detour) {
             next_num_detour = std::min(static_cast<uint32_t>(num_detour_k), next_num_detour);
