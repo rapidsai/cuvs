@@ -78,7 +78,7 @@ RAFT_KERNEL count_discrepancies_kernel(value_idx* actual_idx,
 }
 
 struct is_nonzero {
-  __host__ __device__ bool operator()(uint32_t& i) { return i > 0; }
+  __host__ __device__ bool operator()(uint32_t i) { return i > 0; }
 };
 
 template <typename value_idx, typename value_t>
@@ -95,10 +95,18 @@ uint32_t count_discrepancies(value_idx* actual_idx,
   count_discrepancies_kernel<<<raft::ceildiv(m, tpb), tpb, 0, stream>>>(
     actual_idx, expected_idx, actual, expected, m, n, out);
 
-  auto exec_policy = rmm::exec_policy(stream);
+  // Copy results to host
+  std::vector<uint32_t> h_out(m);
+  raft::copy(h_out.data(), out, m, stream);
+  RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
 
-  uint32_t result = thrust::count_if(exec_policy, out, out + m, is_nonzero());
-  return result;
+  // Count non-zero elements on the host
+  uint32_t count = 0;
+  for (uint32_t i = 0; i < m; i++) {
+    if (h_out[i] > 0) count++;
+  }
+
+  return count;
 }
 
 template <typename value_t>
