@@ -19,7 +19,6 @@
 #include "../detail/haversine_distance.cuh"
 #include "common.cuh"
 #include "registers.cuh"
-#include "registers_types.cuh"
 #include <cuvs/neighbors/ball_cover.hpp>
 
 #include <cuvs/distance/distance.hpp>
@@ -258,8 +257,7 @@ void compute_landmark_radii(
 template <typename value_idx,
           typename value_t,
           typename value_int  = std::int64_t,
-          typename matrix_idx = std::int64_t,
-          typename dist_func>
+          typename matrix_idx = std::int64_t>
 void perform_rbc_query(
   raft::resources const& handle,
   const cuvs::neighbors::ball_cover::index<value_idx, value_t, value_int, matrix_idx>& index,
@@ -268,7 +266,6 @@ void perform_rbc_query(
   value_int k,
   const value_idx* R_knn_inds,
   const value_t* R_knn_dists,
-  dist_func dfunc,
   value_idx* inds,
   value_t* dists,
   value_int* dists_counter,
@@ -294,7 +291,6 @@ void perform_rbc_query(
                                                                   k,
                                                                   R_knn_inds,
                                                                   R_knn_dists,
-                                                                  dfunc,
                                                                   inds,
                                                                   dists,
                                                                   weight,
@@ -309,7 +305,6 @@ void perform_rbc_query(
                                                                     k,
                                                                     R_knn_inds,
                                                                     R_knn_dists,
-                                                                    dfunc,
                                                                     inds,
                                                                     dists,
                                                                     weight,
@@ -388,12 +383,10 @@ void perform_rbc_eps_nn_query(
 template <typename value_idx = std::int64_t,
           typename value_t,
           typename value_int  = std::int64_t,
-          typename matrix_idx = std::int64_t,
-          typename distance_func>
+          typename matrix_idx = std::int64_t>
 void rbc_build_index(
   raft::resources const& handle,
-  cuvs::neighbors::ball_cover::index<value_idx, value_t, value_int, matrix_idx>& index,
-  distance_func dfunc)
+  cuvs::neighbors::ball_cover::index<value_idx, value_t, value_int, matrix_idx>& index)
 {
   ASSERT(!index.is_index_trained(), "index cannot be previously trained");
 
@@ -448,15 +441,13 @@ void rbc_build_index(
 template <typename value_idx = std::int64_t,
           typename value_t,
           typename value_int  = std::int64_t,
-          typename matrix_idx = std::int64_t,
-          typename distance_func>
+          typename matrix_idx = std::int64_t>
 void rbc_all_knn_query(
   raft::resources const& handle,
   cuvs::neighbors::ball_cover::index<value_idx, value_t, value_int, matrix_idx>& index,
   value_int k,
   value_idx* inds,
   value_t* dists,
-  distance_func dfunc,
   // approximate nn options
   bool perform_post_filtering = true,
   float weight                = 1.0)
@@ -508,7 +499,6 @@ void rbc_all_knn_query(
                     k,
                     R_knn_inds.data(),
                     R_knn_dists.data(),
-                    dfunc,
                     inds,
                     dists,
                     dists_counter.data(),
@@ -524,8 +514,7 @@ void rbc_all_knn_query(
 template <typename value_idx = std::int64_t,
           typename value_t,
           typename value_int  = std::int64_t,
-          typename matrix_idx = std::int64_t,
-          typename distance_func>
+          typename matrix_idx = std::int64_t>
 void rbc_knn_query(
   raft::resources const& handle,
   const cuvs::neighbors::ball_cover::index<value_idx, value_t, value_int, matrix_idx>& index,
@@ -534,7 +523,6 @@ void rbc_knn_query(
   value_int n_query_pts,
   value_idx* inds,
   value_t* dists,
-  distance_func dfunc,
   // approximate nn options
   bool perform_post_filtering = true,
   float weight                = 1.0)
@@ -589,7 +577,6 @@ void rbc_knn_query(
                     k,
                     R_knn_inds.data(),
                     R_knn_dists.data(),
-                    dfunc,
                     inds,
                     dists,
                     dists_counter.data(),

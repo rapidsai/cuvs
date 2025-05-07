@@ -17,6 +17,7 @@
 #pragma once
 
 #include "../detail/haversine_distance.cuh"  // compute_haversine
+#include <cuvs/distance/distance.hpp>
 
 #include <cstdint>  // uint32_t
 
@@ -72,5 +73,23 @@ struct EuclideanSqFunc : public DistFunc<value_t, value_int> {
     return sum_sq;
   }
 };
+
+// Direct distance function for use in kernels that need metric information
+template <typename value_t, typename value_int = std::uint32_t>
+__device__ __host__ __forceinline__ value_t compute_distance_by_metric(
+  const value_t* a, const value_t* b, const value_int n_dims, cuvs::distance::DistanceType metric)
+{
+  if (metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+      metric == cuvs::distance::DistanceType::L2SqrtUnexpanded) {
+    // Euclidean distance implementation
+    return EuclideanFunc<value_t, value_int>{}(a, b, n_dims);
+  } else if (metric == cuvs::distance::DistanceType::Haversine) {
+    // Haversine distance implementation
+    return HaversineFunc<value_t, value_int>{}(a, b, n_dims);
+  }
+
+  // Default case
+  return -1;
+}
 
 };  // namespace cuvs::neighbors::ball_cover::detail

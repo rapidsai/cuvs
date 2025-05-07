@@ -28,7 +28,7 @@
 #include <cuvs/neighbors/ball_cover.hpp>
 
 #define instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(                                \
-  Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx, Mdist_func)                                   \
+  Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx)                                               \
   template void cuvs::neighbors::ball_cover::detail::                                          \
     rbc_low_dim_pass_one<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>(                       \
       raft::resources const& handle,                                                           \
@@ -39,17 +39,14 @@
       Mvalue_int k,                                                                            \
       const Mvalue_idx* R_knn_inds,                                                            \
       const Mvalue_t* R_knn_dists,                                                             \
-      Mdist_func<Mvalue_t, Mvalue_int>& dfunc,                                                 \
       Mvalue_idx* inds,                                                                        \
       Mvalue_t* dists,                                                                         \
       float weight,                                                                            \
       Mvalue_int* dists_counter,                                                               \
       int dims);
 
-instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(
-  std::int64_t,
-  float,
-  std::int64_t,
-  std::int64_t,
-  cuvs::neighbors::ball_cover::detail::EuclideanFunc);
+instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(std::int64_t,
+                                                       float,
+                                                       std::int64_t,
+                                                       std::int64_t);
 #undef instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one

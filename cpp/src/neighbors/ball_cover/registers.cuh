@@ -59,11 +59,7 @@ constexpr int MAX_COL_Q = 3;
  * @param output
  * @param weight
  */
-template <typename value_idx,
-          typename value_t,
-          typename value_int = std::uint32_t,
-          int tpb            = 32,
-          typename distance_func>
+template <typename value_idx, typename value_t, typename value_int = std::uint32_t, int tpb = 32>
 RAFT_KERNEL perform_post_filter_registers(const value_t* X,
                                           value_int n_cols,
                                           const value_idx* R_knn_inds,
@@ -73,7 +69,7 @@ RAFT_KERNEL perform_post_filter_registers(const value_t* X,
                                           int n_landmarks,
                                           value_int bitset_size,
                                           value_int k,
-                                          distance_func dfunc,
+                                          cuvs::distance::DistanceType metric,
                                           std::uint32_t* output,
                                           float weight = 1.0)
 {
@@ -108,7 +104,8 @@ RAFT_KERNEL perform_post_filter_registers(const value_t* X,
   // its closest landmark + the radius of the current landmark.
   for (value_int l = threadIdx.x; l < n_landmarks; l += tpb) {
     // compute p(q, r)
-    value_t dist = dfunc(local_x_ptr, landmarks + (n_cols * l), n_cols);
+    value_t dist =
+      compute_distance_by_metric(local_x_ptr, landmarks + (n_cols * l), n_cols, metric);
     if (dist > weight * (closest_R_dist + R_radius[l]) || dist > 3 * closest_R_dist) {
       _zero_bit(shared_mem, l);
     }
@@ -150,10 +147,9 @@ template <typename value_idx,
           typename value_t,
           typename value_int   = std::uint32_t,
           typename bitset_type = std::uint32_t,
-          typename dist_func,
-          int warp_q   = 32,
-          int thread_q = 2,
-          int tpb      = 128>
+          int warp_q           = 32,
+          int thread_q         = 2,
+          int tpb              = 128>
 RAFT_KERNEL compute_final_dists_registers(const value_t* X_reordered,
                                           const value_t* X,
                                           const value_int n_cols,
@@ -167,7 +163,7 @@ RAFT_KERNEL compute_final_dists_registers(const value_t* X_reordered,
                                           value_t* knn_dists,
                                           value_int n_landmarks,
                                           value_int k,
-                                          dist_func dfunc,
+                                          cuvs::distance::DistanceType metric,
                                           value_int* dist_counter)
 {
   static constexpr int kNumWarps = tpb / raft::WarpSize;
@@ -241,7 +237,7 @@ RAFT_KERNEL compute_final_dists_registers(const value_t* X_reordered,
             local_y_ptr[j] = y_ptr[j];
           }
 
-          dist = dfunc(local_x_ptr, local_y_ptr, n_cols);
+          dist = compute_distance_by_metric(local_x_ptr, local_y_ptr, n_cols, metric);
         }
 
         heap.add(dist, cur_candidate_dist, cur_candidate_ind);
@@ -269,7 +265,7 @@ RAFT_KERNEL compute_final_dists_registers(const value_t* X_reordered,
           for (value_int j = 0; j < n_cols; ++j) {
             local_y_ptr[j] = y_ptr[j];
           }
-          dist = dfunc(local_x_ptr, local_y_ptr, n_cols);
+          dist = compute_distance_by_metric(local_x_ptr, local_y_ptr, n_cols, metric);
         }
         heap.addThreadQ(dist, cur_candidate_dist, cur_candidate_ind);
       }
@@ -307,8 +303,7 @@ template <typename value_idx = std::int64_t,
           int warp_q         = 32,
           int thread_q       = 2,
           int tpb            = 128,
-          typename value_int = std::uint32_t,
-          typename distance_func>
+          typename value_int = std::uint32_t>
 RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
                                        const value_t* X,
                                        value_int n_cols,  // n_cols should be 2 or 3 dims
@@ -323,7 +318,7 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
                                        value_t* out_dists,
                                        value_int* dist_counter,
                                        const value_t* R_radius,
-                                       distance_func dfunc,
+                                       cuvs::distance::DistanceType metric,
                                        float weight = 1.0)
 {
   static constexpr value_int kNumWarps = tpb / raft::WarpSize;
@@ -387,12 +382,13 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
       // Take 2 landmarks l_1 and l_2 where l_1 is the furthest point in the heap
       // and l_2 is the current landmark R. s is the current data point and
       // t is the new candidate data point. We know that:
-      // d(s, t) cannot possibly be any smaller than | d(s, l_1) - d(l_1, l_2) | * | d(l_1, l_2) -
-      // d(l_2, t) | - d(s, l_1) * d(l_2, t)
+      // d(s, t) cannot possibly be any smaller than | d(s, l_1) - d(l_1, l_2) | * | d(l_1, l_2)
+      // - d(l_2, t) | - d(s, l_1) * d(l_2, t)
 
-      // Therefore, if d(s, t) >= d(s, l_1) from the computation above, we know that the distance to
-      // the candidate point cannot possibly be in the nearest neighbors. However, if d(s, t) < d(s,
-      // l_1) then we should compute the distance because it's possible it could be smaller.
+      // Therefore, if d(s, t) >= d(s, l_1) from the computation above, we know that the
+      // distance to the candidate point cannot possibly be in the nearest neighbors. However,
+      // if d(s, t) < d(s, l_1) then we should compute the distance because it's possible it
+      // could be smaller.
       //
       value_t z = heap.warpKTopRDist == 0.00 ? 0.0
                                              : (abs(heap.warpKTop - heap.warpKTopRDist) *
@@ -409,7 +405,7 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
         for (value_int j = 0; j < n_cols; ++j) {
           local_y_ptr[j] = y_ptr[j];
         }
-        dist = dfunc(local_x_ptr, local_y_ptr, n_cols);
+        dist = compute_distance_by_metric(local_x_ptr, local_y_ptr, n_cols, metric);
         ++n_dists_computed;
       }
 
@@ -434,7 +430,7 @@ RAFT_KERNEL block_rbc_kernel_registers(const value_t* X_reordered,
         for (value_int j = 0; j < n_cols; ++j) {
           local_y_ptr[j] = y_ptr[j];
         }
-        dist = dfunc(local_x_ptr, local_y_ptr, n_cols);
+        dist = compute_distance_by_metric(local_x_ptr, local_y_ptr, n_cols, metric);
         ++n_dists_computed;
       }
 
@@ -1010,11 +1006,7 @@ RAFT_KERNEL block_rbc_kernel_eps_max_k_copy(const value_int max_k,
   if (i < num_cols) { adj_ja[col_start_idx + i] = tmp[offset + i]; }
 }
 
-template <typename value_idx,
-          typename value_t,
-          typename value_int  = std::int64_t,
-          typename matrix_idx = std::int64_t,
-          typename dist_func>
+template <typename value_idx, typename value_t, typename value_int, typename matrix_idx>
 void rbc_low_dim_pass_one(
   raft::resources const& handle,
   const cuvs::neighbors::ball_cover::index<value_idx, value_t, value_int, matrix_idx>& index,
@@ -1023,7 +1015,6 @@ void rbc_low_dim_pass_one(
   value_int k,
   const value_idx* R_knn_inds,
   const value_t* R_knn_dists,
-  dist_func& dfunc,
   value_idx* inds,
   value_t* dists,
   float weight,
@@ -1047,7 +1038,7 @@ void rbc_low_dim_pass_one(
         dists,
         dists_counter,
         index.get_R_radius().data_handle(),
-        dfunc,
+        index.metric,
         weight);
 
   else if (k <= 64)
@@ -1067,7 +1058,7 @@ void rbc_low_dim_pass_one(
         dists,
         dists_counter,
         index.get_R_radius().data_handle(),
-        dfunc,
+        index.metric,
         weight);
   else if (k <= 128)
     block_rbc_kernel_registers<value_idx, value_t, 128, 3, 128, value_int>
@@ -1086,7 +1077,7 @@ void rbc_low_dim_pass_one(
         dists,
         dists_counter,
         index.get_R_radius().data_handle(),
-        dfunc,
+        index.metric,
         weight);
 
   else if (k <= 256)
@@ -1106,7 +1097,7 @@ void rbc_low_dim_pass_one(
         dists,
         dists_counter,
         index.get_R_radius().data_handle(),
-        dfunc,
+        index.metric,
         weight);
 
   else if (k <= 512)
@@ -1126,7 +1117,7 @@ void rbc_low_dim_pass_one(
         dists,
         dists_counter,
         index.get_R_radius().data_handle(),
-        dfunc,
+        index.metric,
         weight);
 
   else if (k <= 1024)
@@ -1146,15 +1137,11 @@ void rbc_low_dim_pass_one(
         dists,
         dists_counter,
         index.get_R_radius().data_handle(),
-        dfunc,
+        index.metric,
         weight);
 }
 
-template <typename value_idx,
-          typename value_t,
-          typename value_int  = std::int64_t,
-          typename matrix_idx = std::int64_t,
-          typename dist_func>
+template <typename value_idx, typename value_t, typename value_int, typename matrix_idx>
 void rbc_low_dim_pass_two(
   raft::resources const& handle,
   const cuvs::neighbors::ball_cover::index<value_idx, value_t, value_int, matrix_idx>& index,
@@ -1163,7 +1150,6 @@ void rbc_low_dim_pass_two(
   value_int k,
   const value_idx* R_knn_inds,
   const value_t* R_knn_dists,
-  dist_func& dfunc,
   value_idx* inds,
   value_t* dists,
   float weight,
@@ -1190,19 +1176,12 @@ void rbc_low_dim_pass_two(
                                                   index.n_landmarks,
                                                   bitset_size,
                                                   k,
-                                                  dfunc,
+                                                  index.metric,
                                                   bitset.data(),
                                                   weight);
 
   if (k <= 32)
-    compute_final_dists_registers<value_idx,
-                                  value_t,
-                                  value_int,
-                                  std::uint32_t,
-                                  dist_func,
-                                  32,
-                                  2,
-                                  128>
+    compute_final_dists_registers<value_idx, value_t, value_int, std::uint32_t, 32, 2, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1217,17 +1196,10 @@ void rbc_low_dim_pass_two(
         dists,
         index.n_landmarks,
         k,
-        dfunc,
+        index.metric,
         post_dists_counter);
   else if (k <= 64)
-    compute_final_dists_registers<value_idx,
-                                  value_t,
-                                  value_int,
-                                  std::uint32_t,
-                                  dist_func,
-                                  64,
-                                  3,
-                                  128>
+    compute_final_dists_registers<value_idx, value_t, value_int, std::uint32_t, 64, 3, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1242,17 +1214,10 @@ void rbc_low_dim_pass_two(
         dists,
         index.n_landmarks,
         k,
-        dfunc,
+        index.metric,
         post_dists_counter);
   else if (k <= 128)
-    compute_final_dists_registers<value_idx,
-                                  value_t,
-                                  value_int,
-                                  std::uint32_t,
-                                  dist_func,
-                                  128,
-                                  3,
-                                  128>
+    compute_final_dists_registers<value_idx, value_t, value_int, std::uint32_t, 128, 3, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1267,17 +1232,10 @@ void rbc_low_dim_pass_two(
         dists,
         index.n_landmarks,
         k,
-        dfunc,
+        index.metric,
         post_dists_counter);
   else if (k <= 256)
-    compute_final_dists_registers<value_idx,
-                                  value_t,
-                                  value_int,
-                                  std::uint32_t,
-                                  dist_func,
-                                  256,
-                                  4,
-                                  128>
+    compute_final_dists_registers<value_idx, value_t, value_int, std::uint32_t, 256, 4, 128>
       <<<n_query_rows, 128, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1292,17 +1250,10 @@ void rbc_low_dim_pass_two(
         dists,
         index.n_landmarks,
         k,
-        dfunc,
+        index.metric,
         post_dists_counter);
   else if (k <= 512)
-    compute_final_dists_registers<value_idx,
-                                  value_t,
-                                  value_int,
-                                  std::uint32_t,
-                                  dist_func,
-                                  512,
-                                  8,
-                                  64>
+    compute_final_dists_registers<value_idx, value_t, value_int, std::uint32_t, 512, 8, 64>
       <<<n_query_rows, 64, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1317,17 +1268,10 @@ void rbc_low_dim_pass_two(
         dists,
         index.n_landmarks,
         k,
-        dfunc,
+        index.metric,
         post_dists_counter);
   else if (k <= 1024)
-    compute_final_dists_registers<value_idx,
-                                  value_t,
-                                  value_int,
-                                  std::uint32_t,
-                                  dist_func,
-                                  1024,
-                                  8,
-                                  64>
+    compute_final_dists_registers<value_idx, value_t, value_int, std::uint32_t, 1024, 8, 64>
       <<<n_query_rows, 64, 0, raft::resource::get_cuda_stream(handle)>>>(
         index.get_X_reordered().data_handle(),
         query,
@@ -1342,14 +1286,14 @@ void rbc_low_dim_pass_two(
         dists,
         index.n_landmarks,
         k,
-        dfunc,
+        index.metric,
         post_dists_counter);
 }
 
 template <typename value_idx,
           typename value_t,
-          typename value_int  = std::int64_t,
-          typename matrix_idx = std::int64_t,
+          typename value_int,
+          typename matrix_idx,
           typename dist_func>
 void rbc_eps_pass(
   raft::resources const& handle,
@@ -1396,8 +1340,8 @@ void rbc_eps_pass(
 
 template <typename value_idx,
           typename value_t,
-          typename value_int  = std::int64_t,
-          typename matrix_idx = std::int64_t,
+          typename value_int,
+          typename matrix_idx,
           typename dist_func>
 void rbc_eps_pass(
   raft::resources const& handle,

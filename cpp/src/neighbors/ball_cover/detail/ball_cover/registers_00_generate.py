@@ -46,7 +46,7 @@ header = """/*
 
 macro_pass_one = """
 #define instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(                            \\
-  Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx, Mdist_func)                          \\
+  Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx)                          \\
   template void                                                                              \\
   cuvs::neighbors::ball_cover::detail::rbc_low_dim_pass_one<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>( \\
     raft::resources const& handle,                                                           \\
@@ -56,7 +56,6 @@ macro_pass_one = """
     Mvalue_int k,                                                                            \\
     const Mvalue_idx* R_knn_inds,                                                            \\
     const Mvalue_t* R_knn_dists,                                                             \\
-    Mdist_func<Mvalue_t, Mvalue_int>& dfunc,                                                 \\
     Mvalue_idx* inds,                                                                        \\
     Mvalue_t* dists,                                                                         \\
     float weight,                                                                            \\
@@ -67,7 +66,7 @@ macro_pass_one = """
 
 macro_pass_two = """
 #define instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two(                            \\
-  Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx, Mdist_func)                          \\
+  Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx)                          \\
   template void                                                                              \\
   cuvs::neighbors::ball_cover::detail::rbc_low_dim_pass_two<Mvalue_idx, Mvalue_t, Mvalue_int, Mmatrix_idx>( \\
     raft::resources const& handle,                                                           \\
@@ -77,7 +76,6 @@ macro_pass_two = """
     Mvalue_int k,                                                                            \\
     const Mvalue_idx* R_knn_inds,                                                            \\
     const Mvalue_t* R_knn_dists,                                                             \\
-    Mdist_func<Mvalue_t, Mvalue_int>& dfunc,                                                 \\
     Mvalue_idx* inds,                                                                        \\
     Mvalue_t* dists,                                                                         \\
     float weight,                                                                            \\
@@ -117,12 +115,6 @@ macro_pass_eps = """
 
 """
 
-
-distances = dict(
-    haversine="cuvs::neighbors::ball_cover::detail::HaversineFunc",
-    euclidean="cuvs::neighbors::ball_cover::detail::EuclideanFunc",
-)
-
 euclideanSq="cuvs::neighbors::ball_cover::detail::EuclideanSqFunc"
 
 types = dict(
@@ -130,27 +122,25 @@ types = dict(
     #int64_double=("std::int64_t", "double"),
 )
 
-for k, v in distances.items():
-    path = f"registers_pass_one_{k}.cu"
-    with open(path, "w") as f:
-        f.write(header)
-        f.write(macro_pass_one)
-        for type_path, (int_t, data_t) in types.items():
-            f.write(f"instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(\n")
-            f.write(f"  {int_t}, {data_t}, {int_t}, {int_t}, {v});\n")
-        f.write("#undef instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one\n")
-    print(f"src/neighbors/ball_cover/detail/ball_cover/{path}")
+path = f"registers_pass_one.cu"
+with open(path, "w") as f:
+    f.write(header)
+    f.write(macro_pass_one)
+    for type_path, (int_t, data_t) in types.items():
+        f.write(f"instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(\n")
+        f.write(f"  {int_t}, {data_t}, {int_t}, {int_t});\n")
+    f.write("#undef instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one\n")
+print(f"src/neighbors/ball_cover/detail/ball_cover/{path}")
 
-for k, v in distances.items():
-    path = f"registers_pass_two_{k}.cu"
-    with open(path, "w") as f:
-        f.write(header)
-        f.write(macro_pass_two)
-        for type_path, (int_t, data_t) in types.items():
-            f.write(f"instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two(\n")
-            f.write(f"  {int_t}, {data_t}, {int_t}, {int_t}, {v});\n")
-        f.write("#undef instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two\n")
-    print(f"src/neighbors/ball_cover/detail/ball_cover/{path}")
+path = f"registers_pass_two.cu"
+with open(path, "w") as f:
+    f.write(header)
+    f.write(macro_pass_two)
+    for type_path, (int_t, data_t) in types.items():
+        f.write(f"instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two(\n")
+        f.write(f"  {int_t}, {data_t}, {int_t}, {int_t});\n")
+    f.write("#undef instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two\n")
+print(f"src/neighbors/ball_cover/detail/ball_cover/{path}")
 
 path="registers_eps_pass_euclidean.cu"
 with open(path, "w") as f:
