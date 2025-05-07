@@ -22,7 +22,7 @@
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
-#include <raft/core/device_resources_snmg.hpp>
+#include <raft/core/device_resources_snmg_nccl.hpp>
 
 namespace cuvs::neighbors::mg {
 
@@ -645,7 +645,7 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
   void TearDown() override {}
 
  private:
-  raft::device_resources_snmg clique_;
+  raft::device_resources_snmg_nccl clique_;
   AnnMGInputs ps;
   std::vector<DataT> h_index_dataset;
   std::vector<DataT> h_queries;

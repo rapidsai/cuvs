@@ -19,7 +19,7 @@
 #include "cuvs_ann_bench_utils.h"
 #include "cuvs_ivf_pq_wrapper.h"
 #include <cuvs/neighbors/ivf_pq.hpp>
-#include <raft/core/device_resources_snmg.hpp>
+#include <raft/core/device_resources_snmg_nccl.hpp>
 
 namespace cuvs::bench {
 using namespace cuvs::neighbors;
@@ -73,7 +73,7 @@ class cuvs_mg_ivf_pq : public algo<T>, public algo_gpu {
   std::unique_ptr<algo<T>> copy() override;
 
  private:
-  raft::device_resources_snmg clique_;
+  raft::device_resources_snmg_nccl clique_;
   build_param index_params_;
   cuvs::neighbors::mg_search_params<ivf_pq::search_params> search_params_;
   std::shared_ptr<cuvs::neighbors::mg_index<cuvs::neighbors::ivf_pq::index<IdxT>, T, IdxT>> index_;

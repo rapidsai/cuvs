@@ -45,8 +45,8 @@ function(find_and_configure_raft)
             COMPONENTS          ${RAFT_COMPONENTS}
             CPM_ARGS
               EXCLUDE_FROM_ALL TRUE
-              GIT_REPOSITORY        https://github.com/${PKG_FORK}/raft.git
-              GIT_TAG               ${PKG_PINNED_TAG}
+              GIT_REPOSITORY        https://github.com/jinsolp/raft.git
+              GIT_TAG               multi-gpu-resource
               SOURCE_SUBDIR         cpp
               OPTIONS
               "BUILD_TESTS OFF"
@@ -61,8 +61,8 @@ endfunction()
 # To use a different RAFT locally, set the CMake variable
 # CPM_raft_SOURCE=/path/to/local/raft
 find_and_configure_raft(VERSION  ${RAFT_VERSION}.00
-        FORK                     ${RAFT_FORK}
-        PINNED_TAG               ${RAFT_PINNED_TAG}
+        FORK                     jinsolp
+        PINNED_TAG               multi-gpu-resource
         ENABLE_MNMG_DEPENDENCIES OFF
         ENABLE_NVTX              OFF
         USE_RAFT_STATIC ${CUVS_USE_RAFT_STATIC}
