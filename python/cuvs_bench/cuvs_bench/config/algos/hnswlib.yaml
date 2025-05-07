@@ -1,6 +1,6 @@
 name: hnswlib
 constraints:
-  search: cuvs_bench.constraints.hnswlib_search
+  search: cuvs_bench.config.algos.constraints.hnswlib_search
 groups:
   base:
     build:
@@ -8,3 +8,9 @@ groups:
       efConstruction: [64, 128, 256, 512]
     search:
       ef: [10, 20, 40, 60, 80, 120, 200, 400, 600, 800]
+  test:
+    build:
+      M: [12]
+      efConstruction: [64]
+    search:
+      ef: [10, 20]

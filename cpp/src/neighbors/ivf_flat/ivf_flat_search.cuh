@@ -20,13 +20,14 @@
 #include "../detail/ann_utils.cuh"
 #include "../ivf_common.cuh"              // cuvs::neighbors::detail::ivf
 #include "ivf_flat_interleaved_scan.cuh"  // interleaved_scan
-#include <cuvs/neighbors/common.hpp>      // none_ivf_sample_filter
+#include <cuvs/neighbors/common.hpp>      // none_sample_filter
 #include <cuvs/neighbors/ivf_flat.hpp>    // raft::neighbors::ivf_flat::index
 
 #include "../detail/ann_utils.cuh"      // utils::mapping
 #include <cuvs/distance/distance.hpp>   // is_min_close, DistanceType
 #include <cuvs/selection/select_k.hpp>  // cuvs::selection::select_k
-#include <raft/core/logger-ext.hpp>     // RAFT_LOG_TRACE
+#include <raft/core/error.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>   // raft::resources
 #include <raft/linalg/gemm.cuh>      // raft::linalg::gemm
@@ -83,10 +84,10 @@ void search_impl(raft::resources const& handle,
     distance_buffer_dev.data(), n_queries, index.n_lists());
 
   size_t float_query_size;
-  if constexpr (std::is_integral_v<T>) {
-    float_query_size = n_queries * index.dim();
-  } else {
+  if constexpr (std::is_same_v<T, float>) {
     float_query_size = 0;
+  } else {
+    float_query_size = n_queries * index.dim();
   }
   rmm::device_uvector<float> converted_queries_dev(float_query_size, stream, search_mr);
   float* converted_queries_ptr = converted_queries_dev.data();
@@ -307,7 +308,7 @@ void search_impl(raft::resources const& handle,
 /** See raft::neighbors::ivf_flat::search docs */
 template <typename T,
           typename IdxT,
-          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_ivf_sample_filter>
+          typename IvfSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>
 inline void search_with_filtering(raft::resources const& handle,
                                   const search_params& params,
                                   const index<T, IdxT>& index,
@@ -402,15 +403,24 @@ void search(raft::resources const& handle,
             const index<T, IdxT>& idx,
             raft::device_matrix_view<const T, IdxT, raft::row_major> queries,
             raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,
-            raft::device_matrix_view<float, IdxT, raft::row_major> distances)
+            raft::device_matrix_view<float, IdxT, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter_ref)
 {
-  search_with_filtering(handle,
-                        params,
-                        idx,
-                        queries,
-                        neighbors,
-                        distances,
-                        cuvs::neighbors::filtering::none_ivf_sample_filter());
+  try {
+    auto& sample_filter =
+      dynamic_cast<const cuvs::neighbors::filtering::none_sample_filter&>(sample_filter_ref);
+    return search_with_filtering(handle, params, idx, queries, neighbors, distances, sample_filter);
+  } catch (const std::bad_cast&) {
+  }
+
+  try {
+    auto& sample_filter =
+      dynamic_cast<const cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>&>(
+        sample_filter_ref);
+    return search_with_filtering(handle, params, idx, queries, neighbors, distances, sample_filter);
+  } catch (const std::bad_cast&) {
+    RAFT_FAIL("Unsupported sample filter type");
+  }
 }
 
 }  // namespace cuvs::neighbors::ivf_flat::detail

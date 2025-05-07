@@ -75,7 +75,7 @@ class faiss_cpu : public algo<T> {
 
   void build(const T* dataset, size_t nrow) final;
 
-  void set_search_param(const search_param_base& param) override;
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override;
 
   void init_quantizer(int dim)
   {
@@ -153,8 +153,9 @@ void faiss_cpu<T>::build(const T* dataset, size_t nrow)
 }
 
 template <typename T>
-void faiss_cpu<T>::set_search_param(const search_param_base& param)
+void faiss_cpu<T>::set_search_param(const search_param_base& param, const void* filter_bitset)
 {
+  if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
   auto sp    = dynamic_cast<const search_param&>(param);
   int nprobe = sp.nprobe;
   assert(nprobe <= nlist_);
@@ -303,8 +304,10 @@ class faiss_cpu_flat : public faiss_cpu<T> {
   }
 
   // class faiss_cpu is more like a IVF class, so need special treating here
-  void set_search_param(const typename algo<T>::search_param& param) override
+  void set_search_param(const typename algo<T>::search_param& param,
+                        const void* filter_bitset) override
   {
+    if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
     auto search_param = dynamic_cast<const typename faiss_cpu<T>::search_param&>(param);
     if (!this->thread_pool_ || this->num_threads_ != search_param.num_threads) {
       this->num_threads_ = search_param.num_threads;

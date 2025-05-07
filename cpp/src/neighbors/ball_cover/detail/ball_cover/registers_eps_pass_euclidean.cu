@@ -23,7 +23,7 @@
  *
  */
 
-#include "../../registers-inl.cuh"
+#include "../../registers.cuh"
 #include <cstdint>  // int64_t
 #include <cuvs/neighbors/ball_cover.hpp>
 

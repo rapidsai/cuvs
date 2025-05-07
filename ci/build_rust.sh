@@ -3,13 +3,18 @@
 
 set -euo pipefail
 
+rapids-logger "Downloading artifacts from previous jobs"
+CPP_CHANNEL=$(rapids-download-conda-from-github cpp)
+
 rapids-logger "Create test conda environment"
 . /opt/conda/etc/profile.d/conda.sh
 
 rapids-dependency-file-generator \
   --output conda \
   --file-key rust \
-  --matrix "cuda=${RAPIDS_CUDA_VERSION%.*};arch=$(arch);py=${RAPIDS_PY_VERSION}" | tee env.yaml
+  --matrix "cuda=${RAPIDS_CUDA_VERSION%.*};arch=$(arch);py=${RAPIDS_PY_VERSION}" \
+  --prepend-channel "${CPP_CHANNEL}" \
+  | tee env.yaml
 
 rapids-mamba-retry env create --yes -f env.yaml -n rust
 
@@ -23,16 +28,8 @@ rapids-print-env
 
 # we need to set up LIBCLANG_PATH to allow rust bindgen to work,
 # grab it from the conda env
-export LIBCLANG_PATH=$(dirname $(find /opt/conda -name libclang.so | head -n 1))
+LIBCLANG_PATH=$(dirname "$(find /opt/conda -name libclang.so | head -n 1)")
+export LIBCLANG_PATH
 echo "LIBCLANG_PATH=$LIBCLANG_PATH"
-
-rapids-logger "Downloading artifacts from previous jobs"
-CPP_CHANNEL=$(rapids-download-conda-from-s3 cpp)
-
-# installing libcuvs/libraft will speed up the rust build substantially
-rapids-mamba-retry install \
-  --channel "${CPP_CHANNEL}" \
-  libcuvs  \
-  libraft
 
 bash ./build.sh rust

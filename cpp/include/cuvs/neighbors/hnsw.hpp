@@ -34,15 +34,42 @@
 namespace cuvs::neighbors::hnsw {
 
 /**
- * @defgroup hnsw Build CAGRA index and search with hnswlib
+ * @defgroup hnsw_cpp_index_params hnswlib index wrapper params
  * @{
  */
 
-struct search_params : cuvs::neighbors::search_params {
-  int ef;               // size of the candidate list
-  int num_threads = 0;  // number of host threads to use for concurrent searches. Value of 0
-                        // automatically maximizes parallelism
+/**
+ * @brief Hierarchy for HNSW index when converting from CAGRA index
+ *
+ * NOTE: When the value is `NONE`, the HNSW index is built as a base-layer-only index.
+ */
+enum class HnswHierarchy {
+  NONE,  // base-layer-only index
+  CPU,   // full index with CPU-built hierarchy
+  GPU    // full index with GPU-built hierarchy
 };
+
+struct index_params : cuvs::neighbors::index_params {
+  /** Hierarchy build type for HNSW index when converting from CAGRA index */
+  HnswHierarchy hierarchy = HnswHierarchy::NONE;
+  /** Size of the candidate list during hierarchy construction when hierarchy is `CPU`*/
+  int ef_construction = 200;
+  /** Number of host threads to use to construct hierarchy when hierarchy is `CPU` or `GPU`.
+      When the value is 0, the number of threads is automatically determined to the
+      maximum number of threads available.
+      NOTE: When hierarchy is `GPU`, while the majority of the work is done on the GPU,
+      initialization of the HNSW index itself and some other work
+      is parallelized with the help of CPU threads.
+   */
+  int num_threads = 0;
+};
+
+/**@}*/
+
+/**
+ * @defgroup hnsw_cpp_index hnswlib index wrapper
+ * @{
+ */
 
 template <typename T>
 struct index : cuvs::neighbors::index {
@@ -55,8 +82,14 @@ struct index : cuvs::neighbors::index {
    *
    * @param[in] dim dimensions of the training dataset
    * @param[in] metric distance metric to search. Supported metrics ("L2Expanded", "InnerProduct")
+   * @param[in] hierarchy hierarchy used for upper HNSW layers
    */
-  index(int dim, cuvs::distance::DistanceType metric) : dim_{dim}, metric_{metric} {}
+  index(int dim, cuvs::distance::DistanceType metric, HnswHierarchy hierarchy = HnswHierarchy::NONE)
+    : dim_{dim}, metric_{metric}, hierarchy_{hierarchy}
+  {
+  }
+
+  virtual ~index() {}
 
   /**
   @brief Get underlying index
@@ -67,6 +100,8 @@ struct index : cuvs::neighbors::index {
 
   auto metric() const -> cuvs::distance::DistanceType { return metric_; }
 
+  auto hierarchy() const -> HnswHierarchy { return hierarchy_; }
+
   /**
   @brief Set ef for search
   */
@@ -75,16 +110,41 @@ struct index : cuvs::neighbors::index {
  private:
   int dim_;
   cuvs::distance::DistanceType metric_;
+  HnswHierarchy hierarchy_;
+};
+
+/**@}*/
+
+/**
+ * @defgroup hnsw_cpp_extend_params HNSW index extend parameters
+ * @{
+ */
+
+struct extend_params {
+  /** Number of host threads to use to add additional vectors to the index.
+  Value of 0 automatically maximizes parallelism. */
+  int num_threads = 0;
 };
 
 /**
- * @brief Construct an hnswlib base-layer-only index from a CAGRA index
- * NOTE: 1. This method uses the filesystem to write the CAGRA index in `/tmp/<random_number>.bin`
- * before reading it as an hnswlib index, then deleting the temporary file.
- *       2. This function is only offered as a compiled symbol in `libraft.so`
+ * @defgroup hnsw_cpp_index_load Load CAGRA index as hnswlib index
+ * @{
+ */
+
+/**
+ * @brief Construct an hnswlib index from a CAGRA index
+ * NOTE: When `hnsw::index_params.hierarchy` is:
+ *       1. `NONE`: This method uses the filesystem to write the CAGRA index in
+ * `/tmp/<random_number>.bin` before reading it as an hnswlib index, then deleting the temporary
+ * file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as
+ * the format is not compatible with the original hnswlib.
+ *       2. `CPU`: The returned index is mutable and can be extended with additional vectors. The
+ * serialized index is also compatible with the original hnswlib library.
  *
  * @param[in] res raft resources
+ * @param[in] params hnsw index parameters
  * @param[in] cagra_index cagra index
+ * @param[in] dataset optional dataset to avoid extra memory copy when hierarchy is `CPU`
  *
  * Usage example:
  * @code{.cpp}
@@ -93,23 +153,34 @@ struct index : cuvs::neighbors::index {
  *   // use default index parameters
  *   cagra::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
- *   auto index = cagra::build<float, uint32_t>(res, index_params, dataset);
+ *   auto index = cagra::build(res, index_params, dataset);
  *
- *   // Load CAGRA index as base-layer-only hnswlib index
- *   auto hnsw_index = hnsw::from_cagra(res, index);
+ *   // Load CAGRA index as an HNSW index
+ *   hnsw::index_params hnsw_params;
+ *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
  * @endcode
  */
 std::unique_ptr<index<float>> from_cagra(
-  raft::resources const& res, const cuvs::neighbors::cagra::index<float, uint32_t>& cagra_index);
+  raft::resources const& res,
+  const index_params& params,
+  const cuvs::neighbors::cagra::index<float, uint32_t>& cagra_index,
+  std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>> dataset =
+    std::nullopt);
 
 /**
- * @brief Construct an hnswlib base-layer-only index from a CAGRA index
- * NOTE: 1. This method uses the filesystem to write the CAGRA index in `/tmp/<random_number>.bin`
- * before reading it as an hnswlib index, then deleting the temporary file.
- *       2. This function is only offered as a compiled symbol in `libraft.so`
+ * @brief Construct an hnswlib index from a CAGRA index
+ * NOTE: When `hnsw::index_params.hierarchy` is:
+ *       1. `NONE`: This method uses the filesystem to write the CAGRA index in
+ * `/tmp/<random_number>.bin` before reading it as an hnswlib index, then deleting the temporary
+ * file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as
+ * the format is not compatible with the original hnswlib.
+ *       2. `CPU`: The returned index is mutable and can be extended with additional vectors. The
+ * serialized index is also compatible with the original hnswlib library.
  *
  * @param[in] res raft resources
+ * @param[in] params hnsw index parameters
  * @param[in] cagra_index cagra index
+ * @param[in] dataset optional dataset to avoid extra memory copy when hierarchy is `CPU`
  *
  * Usage example:
  * @code{.cpp}
@@ -118,23 +189,34 @@ std::unique_ptr<index<float>> from_cagra(
  *   // use default index parameters
  *   cagra::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
- *   auto index = cagra::build<uint8_t, uint32_t>(res, index_params, dataset);
+ *   auto index = cagra::build(res, index_params, dataset);
  *
- *   // Load CAGRA index as base-layer-only hnswlib index
- *   auto hnsw_index = hnsw::from_cagra(res, index);
+ *   // Load CAGRA index as an HNSW index
+ *   hnsw::index_params hnsw_params;
+ *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
  * @endcode
  */
 std::unique_ptr<index<uint8_t>> from_cagra(
-  raft::resources const& res, const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& cagra_index);
+  raft::resources const& res,
+  const index_params& params,
+  const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& cagra_index,
+  std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
 
 /**
- * @brief Construct an hnswlib base-layer-only index from a CAGRA index
- * NOTE: 1. This method uses the filesystem to write the CAGRA index in `/tmp/<random_number>.bin`
- * before reading it as an hnswlib index, then deleting the temporary file.
- *       2. This function is only offered as a compiled symbol in `libraft.so`
+ * @brief Construct an hnswlib index from a CAGRA index
+ * NOTE: When `hnsw::index_params.hierarchy` is:
+ *       1. `NONE`: This method uses the filesystem to write the CAGRA index in
+ * `/tmp/<random_number>.bin` before reading it as an hnswlib index, then deleting the temporary
+ * file. The returned index is immutable and can only be searched by the hnswlib wrapper in cuVS, as
+ * the format is not compatible with the original hnswlib.
+ *       2. `CPU`: The returned index is mutable and can be extended with additional vectors. The
+ * serialized index is also compatible with the original hnswlib library.
  *
  * @param[in] res raft resources
+ * @param[in] params hnsw index parameters
  * @param[in] cagra_index cagra index
+ * @param[in] dataset optional dataset to avoid extra memory copy when hierarchy is `CPU`
  *
  * Usage example:
  * @code{.cpp}
@@ -143,17 +225,152 @@ std::unique_ptr<index<uint8_t>> from_cagra(
  *   // use default index parameters
  *   cagra::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
- *   auto index = cagra::build<int8_t, uint32_t>(res, index_params, dataset);
+ *   auto index = cagra::build(res, index_params, dataset);
  *
- *   // Load CAGRA index as base-layer-only hnswlib index
- *   auto hnsw_index = hnsw::from_cagra(res, index);
+ *   // Load CAGRA index as an HNSW index
+ *   hnsw::index_params hnsw_params;
+ *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
  * @endcode
  */
 std::unique_ptr<index<int8_t>> from_cagra(
-  raft::resources const& res, const cuvs::neighbors::cagra::index<int8_t, uint32_t>& cagra_index);
+  raft::resources const& res,
+  const index_params& params,
+  const cuvs::neighbors::cagra::index<int8_t, uint32_t>& cagra_index,
+  std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
+
+/**@}*/
 
 /**
- * @brief Search hnswlib base-layer-only index constructed from a CAGRA index
+ * @defgroup hnsw_cpp_index_extend Extend HNSW index with additional vectors
+ * @{
+ */
+
+/**
+ * @brief Add new vectors to an HNSW index
+ * NOTE: The HNSW index can only be extended when the `hnsw::index_params.hierarchy` is `CPU`
+ *       when converting from a CAGRA index.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the extend
+ * @param[in] additional_dataset a host matrix view to a row-major matrix [n_rows, index->dim()]
+ * @param[inout] idx HNSW index to extend
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   // Build a CAGRA index
+ *   using namespace cuvs::neighbors;
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = cagra::build(res, index_params, dataset);
+ *
+ *   // Load CAGRA index as an HNSW index
+ *   hnsw::index_params hnsw_params;
+ *   hnsw_params.hierarchy = hnsw::HnswHierarchy::CPU;
+ *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+ *
+ *   // Extend the HNSW index with additional vectors
+ *   auto additional_dataset = raft::make_host_matrix<float>(res, add_size, index->dim());
+ *   hnsw::extend_params extend_params;
+ *   hnsw::extend(res, extend_params, additional_dataset, *hnsw_index.get());
+ */
+void extend(raft::resources const& res,
+            const extend_params& params,
+            raft::host_matrix_view<const float, int64_t, raft::row_major> additional_dataset,
+            index<float>& idx);
+
+/**
+ * @brief Add new vectors to an HNSW index
+ * NOTE: The HNSW index can only be extended when the `hnsw::index_params.hierarchy` is `CPU`
+ *       when converting from a CAGRA index.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the extend
+ * @param[in] additional_dataset a host matrix view to a row-major matrix [n_rows, index->dim()]
+ * @param[inout] idx HNSW index to extend
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   // Build a CAGRA index
+ *   using namespace cuvs::neighbors;
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = cagra::build(res, index_params, dataset);
+ *
+ *   // Load CAGRA index as an HNSW index
+ *   hnsw::index_params hnsw_params;
+ *   hnsw_params.hierarchy = hnsw::HnswHierarchy::CPU;
+ *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+ *
+ *   // Extend the HNSW index with additional vectors
+ *   auto additional_dataset = raft::make_host_matrix<float>(res, add_size, index->dim());
+ *   hnsw::extend_params extend_params;
+ *   hnsw::extend(res, extend_params, additional_dataset, *hnsw_index.get());
+ */
+void extend(raft::resources const& res,
+            const extend_params& params,
+            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> additional_dataset,
+            index<uint8_t>& idx);
+
+/**
+ * @brief Add new vectors to an HNSW index
+ * NOTE: The HNSW index can only be extended when the `hnsw::index_params.hierarchy` is `CPU`
+ *       when converting from a CAGRA index.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the extend
+ * @param[in] additional_dataset a host matrix view to a row-major matrix [n_rows, index->dim()]
+ * @param[inout] idx HNSW index to extend
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   // Build a CAGRA index
+ *   using namespace cuvs::neighbors;
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = cagra::build(res, index_params, dataset);
+ *
+ *   // Load CAGRA index as an HNSW index
+ *   hnsw::index_params hnsw_params;
+ *   hnsw_params.hierarchy = hnsw::HnswHierarchy::CPU;
+ *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+ *
+ *   // Extend the HNSW index with additional vectors
+ *   auto additional_dataset = raft::make_host_matrix<float>(res, add_size, index->dim());
+ *   hnsw::extend_params extend_params;
+ *   hnsw::extend(res, extend_params, additional_dataset, *hnsw_index.get());
+ */
+void extend(raft::resources const& res,
+            const extend_params& params,
+            raft::host_matrix_view<const int8_t, int64_t, raft::row_major> additional_dataset,
+            index<int8_t>& idx);
+
+/**@} */
+
+/**
+ * @defgroup hnsw_cpp_search_params Build CAGRA index and search with hnswlib
+ * @{
+ */
+
+struct search_params : cuvs::neighbors::search_params {
+  int ef;               // size of the candidate list
+  int num_threads = 0;  // number of host threads to use for concurrent searches. Value of 0
+                        // automatically maximizes parallelism
+};
+
+/**@}*/
+
+// TODO: Filtered Search APIs: https://github.com/rapidsai/cuvs/issues/363
+
+/**
+ * @defgroup hnsw_cpp_index_search Search hnswlib index
+ * @{
+ */
+
+/**
+ * @brief Search HNSW index constructed from a CAGRA index
+ * NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS when the hierarchy is
+ * `NONE`, as the format is not compatible with the original hnswlib.
  *
  * @param[in] res raft resources
  * @param[in] params configure the search
@@ -171,10 +388,11 @@ std::unique_ptr<index<int8_t>> from_cagra(
  *   // use default index parameters
  *   cagra::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
- *   auto index = cagra::build<float, uint32_t>(res, index_params, dataset);
+ *   auto index = cagra::build(res, index_params, dataset);
  *
- *   // Load CAGRA index as a base-layer HNSW index using the filesystem
- *   auto hnsw_index = hnsw::from_cagra(res, index);
+ *   // Load CAGRA index as an HNSW index
+ *   hnsw::index_params hnsw_params;
+ *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
  *
  *   // Search K nearest neighbors as an hnswlib index
  *   // using host threads for concurrency
@@ -194,7 +412,9 @@ void search(raft::resources const& res,
             raft::host_matrix_view<float, int64_t, raft::row_major> distances);
 
 /**
- * @brief Search hnswlib base-layer-only index constructed from a CAGRA index
+ * @brief Search HNSWindex constructed from a CAGRA index
+ * NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS when the hierarchy is
+ * `NONE`, as the format is not compatible with the original hnswlib.
  *
  * @param[in] res raft resources
  * @param[in] params configure the search
@@ -212,10 +432,11 @@ void search(raft::resources const& res,
  *   // use default index parameters
  *   cagra::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
- *   auto index = cagra::build<uint8_t, uint32_t>(res, index_params, dataset);
+ *   auto index = cagra::build(res, index_params, dataset);
  *
- *   // Load CAGRA index as a base-layer HNSW index using the filesystem
- *   auto hnsw_index = hnsw::from_cagra(res, index);
+ *   // Load CAGRA index as an HNSW index
+ *   hnsw::index_params hnsw_params;
+ *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
  *
  *   // Search K nearest neighbors as an hnswlib index
  *   // using host threads for concurrency
@@ -230,12 +451,14 @@ void search(raft::resources const& res,
 void search(raft::resources const& res,
             const search_params& params,
             const index<uint8_t>& idx,
-            raft::host_matrix_view<const int, int64_t, raft::row_major> queries,
+            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
             raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
             raft::host_matrix_view<float, int64_t, raft::row_major> distances);
 
 /**
- * @brief Search hnswlib base-layer-only index constructed from a CAGRA index
+ * @brief Search HNSW index constructed from a CAGRA index
+ * NOTE: The HNSW index can only be searched by the hnswlib wrapper in cuVS when the hierarchy is
+ * `NONE`, as the format is not compatible with the original hnswlib.
  *
  * @param[in] res raft resources
  * @param[in] params configure the search
@@ -253,10 +476,11 @@ void search(raft::resources const& res,
  *   // use default index parameters
  *   cagra::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
- *   auto index = cagra::build<int8_t, uint32_t>(res, index_params, dataset);
+ *   auto index = cagra::build(res, index_params, dataset);
  *
- *   // Load CAGRA index as a base-layer HNSW index using the filesystem
- *   auto hnsw_index = hnsw::from_cagra(res, index);
+ *   // Load CAGRA index as an HNSW index
+ *   hnsw::index_params hnsw_params;
+ *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
  *
  *   // Search K nearest neighbors as an hnswlib index
  *   // using host threads for concurrency
@@ -271,14 +495,113 @@ void search(raft::resources const& res,
 void search(raft::resources const& res,
             const search_params& params,
             const index<int8_t>& idx,
-            raft::host_matrix_view<const int, int64_t, raft::row_major> queries,
+            raft::host_matrix_view<const int8_t, int64_t, raft::row_major> queries,
             raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
             raft::host_matrix_view<float, int64_t, raft::row_major> distances);
 
+/**@}*/
+
 /**
- * @brief De-serialize a CAGRA index saved to a file as an hnsw index
+ * @defgroup hnsw_cpp_index_serialize Deserialize CAGRA index as hnswlib index
+ * @{
+ */
+
+/**
+ * @brief Serialize a CAGRA index to a file as an hnswlib index
+ * NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the
+ * hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+ * However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib
+ * library.
  *
  * @param[in] res raft resources
+ * @param[in] filename path to the file to save the serialized CAGRA index
+ * @param[in] idx cagra index
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   // Build a CAGRA index
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = cagra::build(res, index_params, dataset);
+ *
+ *   // Load CAGRA index as an HNSW index
+ *   hnsw::index_params hnsw_params;
+ *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+ *   // Save the index
+ *   hnsw::serialize(res, "index.bin", index);
+ * @endcode
+ */
+void serialize(raft::resources const& res, const std::string& filename, const index<float>& idx);
+
+/**
+ * @brief Serialize a CAGRA index to a file as an hnswlib index
+ * NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the
+ * hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+ * However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib
+ * library.
+ *
+ * @param[in] res raft resources
+ * @param[in] filename path to the file to save the serialized CAGRA index
+ * @param[in] idx cagra index
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   // Build a CAGRA index
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = cagra::build(res, index_params, dataset);
+ *
+ *   // Load CAGRA index as an HNSW index
+ *   hnsw::index_params hnsw_params;
+ *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+ *   // Save the index
+ *   hnsw::serialize(res, "index.bin", index);
+ * @endcode
+ */
+void serialize(raft::resources const& res, const std::string& filename, const index<uint8_t>& idx);
+
+/**
+ * @brief Serialize a CAGRA index to a file as an hnswlib index
+ * NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the
+ * hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+ * However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib
+ * library.
+ *
+ * @param[in] res raft resources
+ * @param[in] filename path to the file to save the serialized CAGRA index
+ * @param[in] idx cagra index
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   // Build a CAGRA index
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = cagra::build(res, index_params, dataset);
+ *
+ *   // Load CAGRA index as an HNSW index
+ *   hnsw::index_params hnsw_params;
+ *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+ *   // Save the index
+ *   hnsw::serialize(res, "index.bin", index);
+ * @endcode
+ */
+void serialize(raft::resources const& res, const std::string& filename, const index<int8_t>& idx);
+
+/**
+ * @brief De-serialize a CAGRA index saved to a file as an hnswlib index
+ * NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the
+ * hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+ * However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib
+ * library.
+ *
+ * @param[in] res raft resources
+ * @param[in] params hnsw index parameters
  * @param[in] filename path to the file containing the serialized CAGRA index
  * @param[in] dim dimensions of the training dataset
  * @param[in] metric distance metric to search. Supported metrics ("L2Expanded", "InnerProduct")
@@ -291,28 +614,37 @@ void search(raft::resources const& res,
  *   // use default index parameters
  *   cagra::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
- *   auto index = cagra::build<float, uint32_t>(res, index_params, dataset);
+ *   auto index = cagra::build(res, index_params, dataset);
  *
- *   // save a CAGRA index to a file
- *   cagra::serialize(res, index, "index.bin");
- *   // De-serialize a CAGRA index as a base-layer HNSW index using the filesystem
- *   index<float>* hnsw_index = nullptr;
- *   hnsw::deserialize(res, "index.bin", index->dim(), index->metric(), &hnsw_index);
+ *   // Load CAGRA index as an HNSW index
+ *  hnsw::index_params hnsw_params;
+ *  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+ *  // save HNSW index to a file
+ *  hnsw::serialize(res, "index.bin", hnsw_index);
+ *  // De-serialize the HNSW index
+ *  index<float>* hnsw_index = nullptr;
+ *  hnsw::deserialize(res, hnsw_params, "index.bin", index->dim(), index->metric(), &hnsw_index);
  *
  *   // Delete index after use
  *   delete hnsw_index;
  * @endcode
  */
 void deserialize(raft::resources const& res,
+                 const index_params& params,
                  const std::string& filename,
                  int dim,
                  cuvs::distance::DistanceType metric,
                  index<float>** index);
 
 /**
- * @brief De-serialize a CAGRA index saved to a file as an hnsw index
+ * @brief De-serialize a CAGRA index saved to a file as an hnswlib index
+ * NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the
+ * hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+ * However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib
+ * library.
  *
  * @param[in] res raft resources
+ * @param[in] params hnsw index parameters
  * @param[in] filename path to the file containing the serialized CAGRA index
  * @param[in] dim dimensions of the training dataset
  * @param[in] metric distance metric to search. Supported metrics ("L2Expanded", "InnerProduct")
@@ -325,28 +657,37 @@ void deserialize(raft::resources const& res,
  *   // use default index parameters
  *   cagra::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
- *   auto index = cagra::build<uint8_t, uint32_t>(res, index_params, dataset);
+ *   auto index = cagra::build(res, index_params, dataset);
  *
- *   // save a CAGRA index to a file
- *   cagra::serialize(res, index, "index.bin");
- *   // De-serialize a CAGRA index as a base-layer HNSW index using the filesystem
- *   index<uint8_t>* hnsw_index = nullptr;
- *   hnsw::deserialize(res, "index.bin", index->dim(), index->metric(), &hnsw_index);
+ *   // Load CAGRA index as an HNSW index
+ *  hnsw::index_params hnsw_params;
+ *  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+ *  // save HNSW index to a file
+ *  hnsw::serialize(res, "index.bin", hnsw_index);
+ *  // De-serialize the HNSW index
+ *  index<uint8_t>* hnsw_index = nullptr;
+ *  hnsw::deserialize(res, hnsw_params, "index.bin", index->dim(), index->metric(), &hnsw_index);
  *
  *   // Delete index after use
  *   delete hnsw_index;
  * @endcode
  */
 void deserialize(raft::resources const& res,
+                 const index_params& params,
                  const std::string& filename,
                  int dim,
                  cuvs::distance::DistanceType metric,
                  index<uint8_t>** index);
 
 /**
- * @brief De-serialize a CAGRA index saved to a file as an hnsw index
+ * @brief De-serialize a CAGRA index saved to a file as an hnswlib index
+ * NOTE: When hierarchy is `NONE`, the saved hnswlib index is immutable and can only be read by the
+ * hnswlib wrapper in cuVS, as the serialization format is not compatible with the original hnswlib.
+ * However, when hierarchy is `CPU`, the saved hnswlib index is compatible with the original hnswlib
+ * library.
  *
  * @param[in] res raft resources
+ * @param[in] params hnsw index parameters
  * @param[in] filename path to the file containing the serialized CAGRA index
  * @param[in] dim dimensions of the training dataset
  * @param[in] metric distance metric to search. Supported metrics ("L2Expanded", "InnerProduct")
@@ -359,19 +700,23 @@ void deserialize(raft::resources const& res,
  *   // use default index parameters
  *   cagra::index_params index_params;
  *   // create and fill the index from a [N, D] dataset
- *   auto index = cagra::build<int8_t, uint32_t>(res, index_params, dataset);
+ *   auto index = cagra::build(res, index_params, dataset);
  *
- *   // save a CAGRA index to a file
- *   cagra::serialize(res, index, "index.bin");
- *   // De-serialize a CAGRA index as a base-layer HNSW index using the filesystem
- *   index<int8_t>* hnsw_index = nullptr;
- *   hnsw::deserialize(res, "index.bin", index->dim(), index->metric(), &hnsw_index);
+ *   // Load CAGRA index as an HNSW index
+ *  hnsw::index_params hnsw_params;
+ *  auto hnsw_index = hnsw::from_cagra(res, hnsw_params, index);
+ *  // save HNSW index to a file
+ *  hnsw::serialize(res, "index.bin", hnsw_index);
+ *  // De-serialize the HNSW index
+ *  index<int8_t>* hnsw_index = nullptr;
+ *  hnsw::deserialize(res, hnsw_params, "index.bin", index->dim(), index->metric(), &hnsw_index);
  *
  *   // Delete index after use
  *   delete hnsw_index;
  * @endcode
  */
 void deserialize(raft::resources const& res,
+                 const index_params& params,
                  const std::string& filename,
                  int dim,
                  cuvs::distance::DistanceType metric,

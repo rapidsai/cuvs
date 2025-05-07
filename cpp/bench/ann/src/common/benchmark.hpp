@@ -118,8 +118,9 @@ inline auto parse_algo_property(algo_property prop, const nlohmann::json& conf) 
 template <typename T>
 void bench_build(::benchmark::State& state,
                  std::shared_ptr<const dataset<T>> dataset,
-                 configuration::index index,
-                 bool force_overwrite)
+                 const configuration::index& index,
+                 bool force_overwrite,
+                 bool no_lap_sync)
 {
   // NB: these two thread-local vars can be used within algo wrappers
   cuvs::bench::benchmark_thread_id = state.thread_index();
@@ -149,9 +150,22 @@ void bench_build(::benchmark::State& state,
   cuda_timer gpu_timer{algo};
   {
     nvtx_case nvtx{state.name()};
+    /* Note: GPU timing
+
+    The GPU time is measured between construction and destruction of `cuda_lap` objects (`gpu_all`
+    and `gpu_lap` variables) and added to the `gpu_timer` object.
+
+    We sync with the GPU (cudaEventSynchronize) either each iteration (lifetime of the `gpu_lap`
+    variable) or once per benchmark loop (lifetime of the `gpu_all` variable). The decision is
+
+    controlled by the `no_lap_sync` argument. In either case, we need at least one sync throughout
+    the benchmark loop to make sure the GPU has finished its work before we measure the total run
+    time.
+    */
+    [[maybe_unused]] auto gpu_all = gpu_timer.lap(no_lap_sync);
     for (auto _ : state) {
       [[maybe_unused]] auto ntx_lap = nvtx.lap();
-      [[maybe_unused]] auto gpu_lap = gpu_timer.lap();
+      [[maybe_unused]] auto gpu_lap = gpu_timer.lap(!no_lap_sync);
       try {
         algo->build(base_set, index_size);
       } catch (const std::exception& e) {
@@ -171,9 +185,10 @@ void bench_build(::benchmark::State& state,
 
 template <typename T>
 void bench_search(::benchmark::State& state,
-                  configuration::index index,
+                  const configuration::index& index,
                   std::size_t search_param_ix,
-                  std::shared_ptr<const dataset<T>> dataset)
+                  std::shared_ptr<const dataset<T>> dataset,
+                  bool no_lap_sync)
 {
   // NB: these two thread-local vars can be used within algo wrappers
   cuvs::bench::benchmark_thread_id = state.thread_index();
@@ -256,7 +271,8 @@ void bench_search(::benchmark::State& state,
       }
     }
     try {
-      a->set_search_param(*search_param);
+      a->set_search_param(*search_param,
+                          dataset->filter_bitset(current_algo_props->dataset_memory_type));
     } catch (const std::exception& ex) {
       state.SkipWithError("An error occurred setting search parameters: " + std::string(ex.what()));
       return;
@@ -300,25 +316,29 @@ void bench_search(::benchmark::State& state,
     // Initialize with algo, so that the timer.lap() object can sync with algo::get_sync_stream()
     cuda_timer gpu_timer{a};
     auto start = std::chrono::high_resolution_clock::now();
-    for (auto _ : state) {
-      [[maybe_unused]] auto ntx_lap = nvtx.lap();
-      [[maybe_unused]] auto gpu_lap = gpu_timer.lap();
-      try {
-        a->search(query_set + batch_offset * dataset->dim(),
-                  n_queries,
-                  k,
-                  neighbors_ptr + out_offset * k,
-                  distances_ptr + out_offset * k);
-      } catch (const std::exception& e) {
-        state.SkipWithError("Benchmark loop: " + std::string(e.what()));
-        break;
+    {
+      /* See the note above: GPU timing */
+      [[maybe_unused]] auto gpu_all = gpu_timer.lap(no_lap_sync);
+      for (auto _ : state) {
+        [[maybe_unused]] auto ntx_lap = nvtx.lap();
+        [[maybe_unused]] auto gpu_lap = gpu_timer.lap(!no_lap_sync);
+        try {
+          a->search(query_set + batch_offset * dataset->dim(),
+                    n_queries,
+                    k,
+                    neighbors_ptr + out_offset * k,
+                    distances_ptr + out_offset * k);
+        } catch (const std::exception& e) {
+          state.SkipWithError("Benchmark loop: " + std::string(e.what()));
+          break;
+        }
+
+        // advance to the next batch
+        batch_offset = (batch_offset + queries_stride) % query_set_size;
+        out_offset   = (out_offset + n_queries) % query_set_size;
+
+        queries_processed += n_queries;
       }
-
-      // advance to the next batch
-      batch_offset = (batch_offset + queries_stride) % query_set_size;
-      out_offset   = (out_offset + n_queries) % query_set_size;
-
-      queries_processed += n_queries;
     }
     auto end      = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(end - start).count();
@@ -340,13 +360,19 @@ void bench_search(::benchmark::State& state,
   // Each thread calculates recall on their partition of queries.
   // evaluate recall
   if (dataset->max_k() >= k) {
-    const std::int32_t* gt    = dataset->gt_set();
+    const std::int32_t* gt             = dataset->gt_set();
+    const std::uint32_t* filter_bitset = dataset->filter_bitset(MemoryType::kHostMmap);
+    auto filter                        = [filter_bitset](std::int32_t i) -> bool {
+      if (filter_bitset == nullptr) { return true; }
+      auto word = filter_bitset[i >> 5];
+      return word & (1 << (i & 31));
+    };
     const std::uint32_t max_k = dataset->max_k();
     result_buf.transfer_data(MemoryType::kHost, current_algo_props->query_memory_type);
     auto* neighbors_host    = reinterpret_cast<index_type*>(result_buf.data(MemoryType::kHost));
     std::size_t rows        = std::min(queries_processed, query_set_size);
     std::size_t match_count = 0;
-    std::size_t total_count = rows * static_cast<size_t>(k);
+    std::size_t total_count = 0;
 
     // We go through the groundtruth with same stride as the benchmark loop.
     size_t out_offset   = 0;
@@ -356,22 +382,44 @@ void bench_search(::benchmark::State& state,
         size_t i_orig_idx = batch_offset + i;
         size_t i_out_idx  = out_offset + i;
         if (i_out_idx < rows) {
-          for (std::uint32_t j = 0; j < k; j++) {
-            auto act_idx = static_cast<std::int32_t>(neighbors_host[i_out_idx * k + j]);
-            for (std::uint32_t l = 0; l < k; l++) {
-              auto exp_idx = gt[i_orig_idx * max_k + l];
+          /* NOTE: recall correctness & filtering
+
+          In the loop below, we filter the ground truth values on-the-fly.
+          We need enough ground truth values to compute recall correctly though.
+          But the ground truth file only contains `max_k` values per row; if there are less valid
+          values than k among them, we overestimate the recall. Essentially, we compare the first
+          `filter_pass_count` values of the algorithm output, and this counter can be less than `k`.
+          In the extreme case of very high filtering rate, we may be bypassing entire rows of
+          results. However, this is still better than no recall estimate at all.
+
+          TODO: consider generating the filtered ground truth on-the-fly
+          */
+          uint32_t filter_pass_count = 0;
+          for (std::uint32_t l = 0; l < max_k && filter_pass_count < k; l++) {
+            auto exp_idx = gt[i_orig_idx * max_k + l];
+            if (!filter(exp_idx)) { continue; }
+            filter_pass_count++;
+            for (std::uint32_t j = 0; j < k; j++) {
+              auto act_idx = static_cast<std::int32_t>(neighbors_host[i_out_idx * k + j]);
               if (act_idx == exp_idx) {
                 match_count++;
                 break;
               }
             }
           }
+          total_count += filter_pass_count;
         }
       }
       out_offset += n_queries;
       batch_offset = (batch_offset + queries_stride) % query_set_size;
     }
     double actual_recall = static_cast<double>(match_count) / static_cast<double>(total_count);
+    /* NOTE: recall in the throughput mode & filtering
+
+    When filtering is enabled, `total_count` may vary between individual threads, but we still take
+    the simple average across in-thread recalls. Strictly speaking, this is incorrect, but it's good
+    enough under assumption that the filtering is more-or-less uniform.
+    */
     state.counters.insert({"Recall", {actual_recall, benchmark::Counter::kAvgThreads}});
   }
 }
@@ -379,53 +427,60 @@ void bench_search(::benchmark::State& state,
 inline void printf_usage()
 {
   ::benchmark::PrintDefaultHelp();
-  fprintf(stdout,
-          "          [--build|--search] \n"
-          "          [--force]\n"
-          "          [--data_prefix=<prefix>]\n"
-          "          [--index_prefix=<prefix>]\n"
-          "          [--override_kv=<key:value1:value2:...:valueN>]\n"
-          "          [--mode=<latency|throughput>\n"
-          "          [--threads=min[:max]]\n"
-          "          <conf>.json\n"
-          "\n"
-          "Note the non-standard benchmark parameters:\n"
-          "  --build: build mode, will build index\n"
-          "  --search: search mode, will search using the built index\n"
-          "            one and only one of --build and --search should be specified\n"
-          "  --force: force overwriting existing index files\n"
-          "  --data_prefix=<prefix>:"
-          " prepend <prefix> to dataset file paths specified in the <conf>.json (default = "
-          "'data/').\n"
-          "  --index_prefix=<prefix>:"
-          " prepend <prefix> to index file paths specified in the <conf>.json (default = "
-          "'index/').\n"
-          "  --override_kv=<key:value1:value2:...:valueN>:"
-          " override a build/search key one or more times multiplying the number of configurations;"
-          " you can use this parameter multiple times to get the Cartesian product of benchmark"
-          " configs.\n"
-          "  --mode=<latency|throughput>"
-          " run the benchmarks in latency (accumulate times spent in each batch) or "
-          " throughput (pipeline batches and measure end-to-end) mode\n"
-          "  --threads=min[:max] specify the number threads to use for throughput benchmark."
-          " Power of 2 values between 'min' and 'max' will be used. If only 'min' is specified,"
-          " then a single test is run with 'min' threads. By default min=1, max=<num hyper"
-          " threads>.\n");
+  fprintf(
+    stdout,
+    "          [--build|--search] \n"
+    "          [--force]\n"
+    "          [--data_prefix=<prefix>]\n"
+    "          [--index_prefix=<prefix>]\n"
+    "          [--override_kv=<key:value1:value2:...:valueN>]\n"
+    "          [--mode=<latency|throughput>\n"
+    "          [--threads=min[:max]]\n"
+    "          [--no-lap-sync]\n"
+    "          <conf>.json\n"
+    "\n"
+    "Note the non-standard benchmark parameters:\n"
+    "  --build: build mode, will build index\n"
+    "  --search: search mode, will search using the built index\n"
+    "            one and only one of --build and --search should be specified\n"
+    "  --force: force overwriting existing index files\n"
+    "  --data_prefix=<prefix>:"
+    " prepend <prefix> to dataset file paths specified in the <conf>.json (default = "
+    "'data/').\n"
+    "  --index_prefix=<prefix>:"
+    " prepend <prefix> to index file paths specified in the <conf>.json (default = "
+    "'index/').\n"
+    "  --override_kv=<key:value1:value2:...:valueN>:"
+    " override a build/search key one or more times multiplying the number of configurations;"
+    " you can use this parameter multiple times to get the Cartesian product of benchmark"
+    " configs.\n"
+    "  --mode=<latency|throughput>"
+    " run the benchmarks in latency (accumulate times spent in each batch) or "
+    " throughput (pipeline batches and measure end-to-end) mode\n"
+    "  --threads=min[:max] specify the number threads to use for throughput benchmark."
+    " Power of 2 values between 'min' and 'max' will be used. If only 'min' is specified,"
+    " then a single test is run with 'min' threads. By default min=1, max=<num hyper"
+    " threads>.\n"
+    "  --no-lap-sync disable CUDA event synchronization between benchmark iterations. If a GPU"
+    " algorithm has no sync with CPU, this can make the GPU processing significantly lag behind the"
+    " CPU scheduling. Then this also hides the scheduling latencies and thus improves the measured"
+    " throughput (QPS). Note there's a sync at the end of the benchmark loop in any case.\n");
 }
 
 template <typename T>
 void register_build(std::shared_ptr<const dataset<T>> dataset,
-                    std::vector<configuration::index> indices,
-                    bool force_overwrite)
+                    std::vector<configuration::index>& indices,
+                    bool force_overwrite,
+                    bool no_lap_sync)
 {
-  for (auto index : indices) {
+  for (auto& index : indices) {
     auto suf      = static_cast<std::string>(index.build_param["override_suffix"]);
     auto file_suf = suf;
     index.build_param.erase("override_suffix");
     std::replace(file_suf.begin(), file_suf.end(), '/', '-');
     index.file += file_suf;
     auto* b = ::benchmark::RegisterBenchmark(
-      index.name + suf, bench_build<T>, dataset, index, force_overwrite);
+      index.name + suf, bench_build<T>, dataset, index, force_overwrite, no_lap_sync);
     b->Unit(benchmark::kSecond);
     b->MeasureProcessCPUTime();
     b->UseRealTime();
@@ -434,16 +489,18 @@ void register_build(std::shared_ptr<const dataset<T>> dataset,
 
 template <typename T>
 void register_search(std::shared_ptr<const dataset<T>> dataset,
-                     std::vector<configuration::index> indices,
+                     std::vector<configuration::index>& indices,
                      Mode metric_objective,
-                     const std::vector<int>& threads)
+                     const std::vector<int>& threads,
+                     bool no_lap_sync)
 {
-  for (auto index : indices) {
+  for (auto& index : indices) {
     for (std::size_t i = 0; i < index.search_params.size(); i++) {
       auto suf = static_cast<std::string>(index.search_params[i]["override_suffix"]);
       index.search_params[i].erase("override_suffix");
 
-      auto* b = ::benchmark::RegisterBenchmark(index.name + suf, bench_search<T>, index, i, dataset)
+      auto* b = ::benchmark::RegisterBenchmark(
+                  index.name + suf, bench_search<T>, index, i, dataset, no_lap_sync)
                   ->Unit(benchmark::kMillisecond)
                   /**
                    * The following are important for getting accuracy QPS measurements on both CPU
@@ -462,15 +519,14 @@ void register_search(std::shared_ptr<const dataset<T>> dataset,
 
 template <typename T>
 void dispatch_benchmark(std::string cmdline,
-                        const configuration& conf,
+                        configuration& conf,
                         bool force_overwrite,
                         bool build_mode,
                         bool search_mode,
-                        std::string data_prefix,
-                        std::string index_prefix,
                         kv_series override_kv,
                         Mode metric_objective,
-                        const std::vector<int>& threads)
+                        const std::vector<int>& threads,
+                        bool no_lap_sync)
 {
   ::benchmark::AddCustomContext("command_line", cmdline);
   for (auto [key, value] : host_info()) {
@@ -481,21 +537,22 @@ void dispatch_benchmark(std::string cmdline,
       ::benchmark::AddCustomContext(key, value);
     }
   }
-  const auto dataset_conf = conf.get_dataset_conf();
-  auto base_file          = combine_path(data_prefix, dataset_conf.base_file);
-  auto query_file         = combine_path(data_prefix, dataset_conf.query_file);
-  auto gt_file            = dataset_conf.groundtruth_neighbors_file;
-  if (gt_file.has_value()) { gt_file.emplace(combine_path(data_prefix, gt_file.value())); }
-  auto dataset = std::make_shared<bin_dataset<T>>(dataset_conf.name,
-                                                  base_file,
-                                                  dataset_conf.subset_first_row,
-                                                  dataset_conf.subset_size,
-                                                  query_file,
-                                                  dataset_conf.distance,
-                                                  gt_file);
+  auto& dataset_conf = conf.get_dataset_conf();
+  auto base_file     = dataset_conf.base_file;
+  auto query_file    = dataset_conf.query_file;
+  auto gt_file       = dataset_conf.groundtruth_neighbors_file;
+  auto dataset =
+    std::make_shared<bench::dataset<T>>(dataset_conf.name,
+                                        base_file,
+                                        dataset_conf.subset_first_row,
+                                        dataset_conf.subset_size,
+                                        query_file,
+                                        dataset_conf.distance,
+                                        gt_file,
+                                        search_mode ? dataset_conf.filtering_rate : std::nullopt);
   ::benchmark::AddCustomContext("dataset", dataset_conf.name);
   ::benchmark::AddCustomContext("distance", dataset_conf.distance);
-  std::vector<configuration::index> indices = conf.get_indices();
+  std::vector<configuration::index>& indices = conf.get_indices();
   if (build_mode) {
     if (file_exists(base_file)) {
       log_info("Using the dataset file '%s'", base_file.c_str());
@@ -510,11 +567,11 @@ void dispatch_benchmark(std::string cmdline,
       for (auto param : apply_overrides(index.build_param, override_kv)) {
         auto modified_index        = index;
         modified_index.build_param = param;
-        modified_index.file        = combine_path(index_prefix, modified_index.file);
         more_indices.push_back(modified_index);
       }
     }
-    register_build<T>(dataset, more_indices, force_overwrite);
+    std::swap(more_indices, indices);  // update the config in case algorithms need to access it
+    register_build<T>(dataset, indices, force_overwrite, no_lap_sync);
   } else if (search_mode) {
     if (file_exists(query_file)) {
       log_info("Using the query file '%s'", query_file.c_str());
@@ -541,9 +598,8 @@ void dispatch_benchmark(std::string cmdline,
     }
     for (auto& index : indices) {
       index.search_params = apply_overrides(index.search_params, override_kv);
-      index.file          = combine_path(index_prefix, index.file);
     }
-    register_search<T>(dataset, indices, metric_objective, threads);
+    register_search<T>(dataset, indices, metric_objective, threads, no_lap_sync);
   }
 }
 
@@ -568,17 +624,16 @@ inline auto parse_string_flag(const char* arg, const char* pat, std::string& res
 
 inline auto run_main(int argc, char** argv) -> int
 {
-  bool force_overwrite                = false;
-  bool build_mode                     = false;
-  bool search_mode                    = false;
-  std::string data_prefix             = "data";
-  std::string index_prefix            = "index";
-  std::string new_override_kv         = "";
-  std::string mode                    = "latency";
-  std::string threads_arg_txt         = "";
-  std::vector<int> threads            = {1, -1};  // min_thread, max_thread
-  std::string log_level_str           = "";
-  [[maybe_unused]] int raft_log_level = 0;  // raft::logger::get(RAFT_NAME).get_level();
+  bool force_overwrite        = false;
+  bool build_mode             = false;
+  bool search_mode            = false;
+  bool no_lap_sync            = false;
+  std::string data_prefix     = "data";
+  std::string index_prefix    = "index";
+  std::string new_override_kv = "";
+  std::string mode            = "latency";
+  std::string threads_arg_txt = "";
+  std::vector<int> threads    = {1, -1};  // min_thread, max_thread
   kv_series override_kv{};
 
   char arg0_default[] = "benchmark";  // NOLINT
@@ -604,16 +659,12 @@ inline auto run_main(int argc, char** argv) -> int
     if (parse_bool_flag(argv[i], "--force", force_overwrite) ||
         parse_bool_flag(argv[i], "--build", build_mode) ||
         parse_bool_flag(argv[i], "--search", search_mode) ||
+        parse_bool_flag(argv[i], "--no-lap-sync", no_lap_sync) ||
         parse_string_flag(argv[i], "--data_prefix", data_prefix) ||
         parse_string_flag(argv[i], "--index_prefix", index_prefix) ||
         parse_string_flag(argv[i], "--mode", mode) ||
         parse_string_flag(argv[i], "--override_kv", new_override_kv) ||
-        parse_string_flag(argv[i], "--threads", threads_arg_txt) ||
-        parse_string_flag(argv[i], "--raft_log_level", log_level_str)) {
-      if (!log_level_str.empty()) {
-        raft_log_level = std::stoi(log_level_str);
-        log_level_str  = "";
-      }
+        parse_string_flag(argv[i], "--threads", threads_arg_txt)) {
       if (!threads_arg_txt.empty()) {
         auto threads_arg = split(threads_arg_txt, ':');
         threads[0]       = std::stoi(threads_arg[0]);
@@ -641,8 +692,6 @@ inline auto run_main(int argc, char** argv) -> int
       i--;
     }
   }
-
-  // raft::logger::get(RAFT_NAME).set_level(raft_log_level);
 
   Mode metric_objective = Mode::kLatency;
   if (mode == "throughput") { metric_objective = Mode::kThroughput; }
@@ -673,7 +722,7 @@ inline auto run_main(int argc, char** argv) -> int
     log_warn("cudart library is not found, GPU-based indices won't work.");
   }
 
-  configuration conf(conf_stream);
+  auto& conf        = bench::configuration::initialize(conf_stream, data_prefix, index_prefix);
   std::string dtype = conf.get_dataset_conf().dtype;
 
   if (dtype == "float") {
@@ -682,44 +731,40 @@ inline auto run_main(int argc, char** argv) -> int
                               force_overwrite,
                               build_mode,
                               search_mode,
-                              data_prefix,
-                              index_prefix,
                               override_kv,
                               metric_objective,
-                              threads);
-    // } else if (dtype == "half") {
-    //   dispatch_benchmark<half>(cmdline
-    //                            conf,
-    //                            force_overwrite,
-    //                            build_mode,
-    //                            search_mode,
-    //                            data_prefix,
-    //                            index_prefix,
-    //                            override_kv,
-    //                            metric_objective,
-    //                            threads);
+                              threads,
+                              no_lap_sync);
+  } else if (dtype == "half") {
+    dispatch_benchmark<half>(cmdline,
+                             conf,
+                             force_overwrite,
+                             build_mode,
+                             search_mode,
+                             override_kv,
+                             metric_objective,
+                             threads,
+                             no_lap_sync);
   } else if (dtype == "uint8") {
     dispatch_benchmark<std::uint8_t>(cmdline,
                                      conf,
                                      force_overwrite,
                                      build_mode,
                                      search_mode,
-                                     data_prefix,
-                                     index_prefix,
                                      override_kv,
                                      metric_objective,
-                                     threads);
+                                     threads,
+                                     no_lap_sync);
   } else if (dtype == "int8") {
     dispatch_benchmark<std::int8_t>(cmdline,
                                     conf,
                                     force_overwrite,
                                     build_mode,
                                     search_mode,
-                                    data_prefix,
-                                    index_prefix,
                                     override_kv,
                                     metric_objective,
-                                    threads);
+                                    threads,
+                                    no_lap_sync);
   } else {
     log_error("datatype '%s' is not supported", dtype.c_str());
     return -1;

@@ -17,10 +17,12 @@
 
 #include "detail/kmeans.cuh"
 #include "detail/kmeans_auto_find_k.cuh"
+#include "kmeans_mg.hpp"
 #include <cuvs/cluster/kmeans.hpp>
 #include <raft/core/kvp.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/operators.hpp>
+#include <raft/core/resource/comms.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 
 #include <optional>
@@ -94,8 +96,13 @@ void fit(raft::resources const& handle,
          raft::host_scalar_view<DataT> inertia,
          raft::host_scalar_view<IndexT> n_iter)
 {
-  cuvs::cluster::kmeans::detail::kmeans_fit<DataT, IndexT>(
-    handle, params, X, sample_weight, centroids, inertia, n_iter);
+  // use the mnmg kmeans fit if we have comms initialize, single gpu otherwise
+  if (raft::resource::comms_initialized(handle)) {
+    cuvs::cluster::kmeans::mg::fit(handle, params, X, sample_weight, centroids, inertia, n_iter);
+  } else {
+    cuvs::cluster::kmeans::detail::kmeans_fit<DataT, IndexT>(
+      handle, params, X, sample_weight, centroids, inertia, n_iter);
+  }
 }
 
 /**
@@ -456,6 +463,60 @@ void min_cluster_distance(raft::resources const& handle,
                                                                           batch_samples,
                                                                           batch_centroids,
                                                                           workspace);
+}
+
+template <typename DataT, typename IndexT>
+void cluster_cost(raft::resources const& handle,
+                  raft::device_matrix_view<const DataT, IndexT> X,
+                  raft::device_matrix_view<const DataT, IndexT> centroids,
+                  raft::host_scalar_view<DataT> cost)
+{
+  auto stream = raft::resource::get_cuda_stream(handle);
+
+  auto n_clusters = centroids.extent(0);
+  auto n_samples  = X.extent(0);
+  auto n_features = X.extent(1);
+
+  rmm::device_uvector<char> workspace(n_samples * sizeof(IndexT), stream);
+
+  auto x_norms = raft::make_device_vector<DataT>(handle, n_samples);
+
+  raft::linalg::rowNorm(x_norms.data_handle(),
+                        X.data_handle(),
+                        n_features,
+                        n_samples,
+                        raft::linalg::L2Norm,
+                        true,
+                        stream);
+
+  auto min_cluster_distance = raft::make_device_vector<DataT>(handle, n_samples);
+  rmm::device_uvector<DataT> l2_norm_or_distance_buffer(0, stream);
+
+  auto metric = cuvs::distance::DistanceType::L2Expanded;
+
+  cuvs::cluster::kmeans::min_cluster_distance<DataT, IndexT>(
+    handle,
+    X,
+    raft::make_device_matrix_view<DataT, IndexT>(
+      const_cast<DataT*>(centroids.data_handle()), n_clusters, n_features),
+    min_cluster_distance.view(),
+    x_norms.view(),
+    l2_norm_or_distance_buffer,
+    metric,
+    n_samples,
+    n_clusters,
+    workspace);
+
+  rmm::device_scalar<DataT> device_cost(0, stream);
+
+  cuvs::cluster::kmeans::cluster_cost(handle,
+                                      min_cluster_distance.view(),
+                                      workspace,
+                                      raft::make_device_scalar_view<DataT>(device_cost.data()),
+                                      raft::add_op{});
+  raft::update_host(cost.data_handle(), device_cost.data(), 1, stream);
+
+  raft::resource::sync_stream(handle);
 }
 
 /**

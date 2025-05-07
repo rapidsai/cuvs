@@ -62,15 +62,16 @@ struct index : cuvs::neighbors::index {
        *
        * Total memory footprint of index: (2 * sqrt(m)) + (n * sqrt(m)) + (2 * m)
        */
-      n_landmarks(sqrt(X_.extent(0))),
-      R_indptr(raft::make_device_vector<idx_t, matrix_idx_t>(handle, sqrt(X_.extent(0)) + 1)),
+      n_landmarks(raft::sqrt(X_.extent(0))),
+      R_indptr(raft::make_device_vector<idx_t, matrix_idx_t>(handle, raft::sqrt(X_.extent(0)) + 1)),
       R_1nn_cols(raft::make_device_vector<idx_t, matrix_idx_t>(handle, X_.extent(0))),
       R_1nn_dists(raft::make_device_vector<float, matrix_idx_t>(handle, X_.extent(0))),
       R_closest_landmark_dists(raft::make_device_vector<float, matrix_idx_t>(handle, X_.extent(0))),
-      R(raft::make_device_matrix<float, matrix_idx_t>(handle, sqrt(X_.extent(0)), X_.extent(1))),
+      R(raft::make_device_matrix<float, matrix_idx_t>(
+        handle, raft::sqrt(X_.extent(0)), X_.extent(1))),
       X_reordered(
         raft::make_device_matrix<float, matrix_idx_t>(handle, X_.extent(0), X_.extent(1))),
-      R_radius(raft::make_device_vector<float, matrix_idx_t>(handle, sqrt(X_.extent(0)))),
+      R_radius(raft::make_device_vector<float, matrix_idx_t>(handle, raft::sqrt(X_.extent(0)))),
       index_trained(false)
   {
   }

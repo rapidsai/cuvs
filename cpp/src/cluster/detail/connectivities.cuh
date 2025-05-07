@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "../../distance/distance.cuh"
+#include "./kmeans_common.cuh"
 #include <cuvs/cluster/agglomerative.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -43,8 +43,8 @@ template <Linkage dist_type, typename value_idx, typename value_t>
 struct distance_graph_impl {
   void run(raft::resources const& handle,
            const value_t* X,
-           size_t m,
-           size_t n,
+           value_idx m,
+           value_idx n,
            cuvs::distance::DistanceType metric,
            rmm::device_uvector<value_idx>& indptr,
            rmm::device_uvector<value_idx>& indices,
@@ -61,8 +61,8 @@ template <typename value_idx, typename value_t>
 struct distance_graph_impl<Linkage::KNN_GRAPH, value_idx, value_t> {
   void run(raft::resources const& handle,
            const value_t* X,
-           size_t m,
-           size_t n,
+           value_idx m,
+           value_idx n,
            cuvs::distance::DistanceType metric,
            rmm::device_uvector<value_idx>& indptr,
            rmm::device_uvector<value_idx>& indices,
@@ -131,8 +131,8 @@ RAFT_KERNEL fill_indices2(value_idx* indices, size_t m, size_t nnz)
 template <typename value_idx, typename value_t>
 void pairwise_distances(const raft::resources& handle,
                         const value_t* X,
-                        size_t m,
-                        size_t n,
+                        value_idx m,
+                        value_idx n,
                         cuvs::distance::DistanceType metric,
                         value_idx* indptr,
                         value_idx* indices,
@@ -153,7 +153,11 @@ void pairwise_distances(const raft::resources& handle,
   // TODO: It would ultimately be nice if the MST could accept
   // dense inputs directly so we don't need to double the memory
   // usage to hand it a sparse array here.
-  distance::pairwise_distance<value_t, value_idx>(handle, X, X, data, m, m, n, metric);
+  auto X_view = raft::make_device_matrix_view<const value_t, value_idx>(X, m, n);
+
+  cuvs::cluster::kmeans::detail::pairwise_distance_kmeans<value_t, value_idx>(
+    handle, X_view, X_view, raft::make_device_matrix_view<value_t, value_idx>(data, m, m), metric);
+
   // self-loops get max distance
   auto transform_in =
     thrust::make_zip_iterator(thrust::make_tuple(thrust::make_counting_iterator(0), data));
@@ -179,8 +183,8 @@ template <typename value_idx, typename value_t>
 struct distance_graph_impl<Linkage::PAIRWISE, value_idx, value_t> {
   void run(const raft::resources& handle,
            const value_t* X,
-           size_t m,
-           size_t n,
+           value_idx m,
+           value_idx n,
            cuvs::distance::DistanceType metric,
            rmm::device_uvector<value_idx>& indptr,
            rmm::device_uvector<value_idx>& indices,
@@ -217,8 +221,8 @@ struct distance_graph_impl<Linkage::PAIRWISE, value_idx, value_t> {
 template <typename value_idx, typename value_t, Linkage dist_type>
 void get_distance_graph(raft::resources const& handle,
                         const value_t* X,
-                        size_t m,
-                        size_t n,
+                        value_idx m,
+                        value_idx n,
                         cuvs::distance::DistanceType metric,
                         rmm::device_uvector<value_idx>& indptr,
                         rmm::device_uvector<value_idx>& indices,

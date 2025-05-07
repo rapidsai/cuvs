@@ -59,7 +59,7 @@ class cuvs_ivf_flat : public algo<T>, public algo_gpu {
 
   void build(const T* dataset, size_t nrow) final;
 
-  void set_search_param(const search_param_base& param) override;
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override;
 
   void search(const T* queries,
               int batch_size,
@@ -92,6 +92,8 @@ class cuvs_ivf_flat : public algo<T>, public algo_gpu {
   std::shared_ptr<cuvs::neighbors::ivf_flat::index<T, IdxT>> index_;
   int device_;
   int dimension_;
+
+  std::shared_ptr<cuvs::neighbors::filtering::base_filter> filter_;
 };
 
 template <typename T, typename IdxT>
@@ -111,8 +113,10 @@ void cuvs_ivf_flat<T, IdxT>::build(const T* dataset, size_t nrow)
 }
 
 template <typename T, typename IdxT>
-void cuvs_ivf_flat<T, IdxT>::set_search_param(const search_param_base& param)
+void cuvs_ivf_flat<T, IdxT>::set_search_param(const search_param_base& param,
+                                              const void* filter_bitset)
 {
+  filter_        = make_cuvs_filter(filter_bitset, index_->size());
   auto sp        = dynamic_cast<const search_param&>(param);
   search_params_ = sp.ivf_flat_params;
   assert(search_params_.n_probes <= index_params_.n_lists);
@@ -162,7 +166,8 @@ void cuvs_ivf_flat<T, IdxT>::search(
     *index_,
     raft::make_device_matrix_view<const T, int64_t>(queries, batch_size, index_->dim()),
     raft::make_device_matrix_view<IdxT, int64_t>(neighbors_idx_t, batch_size, k),
-    raft::make_device_matrix_view<float, int64_t>(distances, batch_size, k));
+    raft::make_device_matrix_view<float, int64_t>(distances, batch_size, k),
+    *filter_);
   if constexpr (sizeof(IdxT) != sizeof(algo_base::index_type)) {
     raft::linalg::unaryOp(neighbors,
                           neighbors_idx_t,

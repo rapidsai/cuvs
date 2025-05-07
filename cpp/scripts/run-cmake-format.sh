@@ -17,7 +17,7 @@
 # and exits gracefully if the file is not found. If a user wishes to specify a
 # config file at a nonstandard location, they may do so by setting the
 # environment variable RAPIDS_CMAKE_FORMAT_FILE.
-# 
+#
 # This script can be invoked directly anywhere within the project repository.
 # Alternatively, it may be invoked as a pre-commit hook via
 # `pre-commit run (cmake-format)|(cmake-lint)`.
@@ -48,7 +48,7 @@ DEFAULT_FORMAT_FILE_LOCATIONS=(
 )
 
 if [ -z ${RAPIDS_CMAKE_FORMAT_FILE:+PLACEHOLDER} ]; then
-    for file_path in ${DEFAULT_FORMAT_FILE_LOCATIONS[@]}; do
+    for file_path in "${DEFAULT_FORMAT_FILE_LOCATIONS[@]}"; do
         if [ -f ${file_path} ]; then
             RAPIDS_CMAKE_FORMAT_FILE=${file_path}
             break
@@ -68,12 +68,12 @@ else
 fi
 
 if [[ $1 == "cmake-format" ]]; then
-  cmake-format -i --config-files cpp/cmake/config.json ${RAPIDS_CMAKE_FORMAT_FILE} -- ${@:2}
+  cmake-format -i --config-files cpp/cmake/config.json ${RAPIDS_CMAKE_FORMAT_FILE} -- "${@:2}"
 elif [[ $1 == "cmake-lint" ]]; then
   # Since the pre-commit hook is verbose, we have to be careful to only
   # present cmake-lint's output (which is quite verbose) if we actually
   # observe a failure.
-  OUTPUT=$(cmake-lint --config-files cpp/cmake/config.json ${RAPIDS_CMAKE_FORMAT_FILE} -- ${@:2})
+  OUTPUT=$(cmake-lint --config-files cpp/cmake/config.json ${RAPIDS_CMAKE_FORMAT_FILE} -- "${@:2}")
   status=$?
 
   if ! [ ${status} -eq 0 ]; then

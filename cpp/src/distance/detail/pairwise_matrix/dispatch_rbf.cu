@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2023, NVIDIA CORPORATION.
+ * Copyright (c) 2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ instantiate_raft_distance_detail_pairwise_matrix_dispatch(
   float,
   float,
   float,
-  cuvs::distance::kernels::detail::rbf_fin_op<float>,
+  cuvs::distance::kernels::rbf_fin_op<float>,
   int64_t);
 
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
@@ -58,7 +58,7 @@ instantiate_raft_distance_detail_pairwise_matrix_dispatch(
   double,
   double,
   double,
-  cuvs::distance::kernels::detail::rbf_fin_op<double>,
+  cuvs::distance::kernels::rbf_fin_op<double>,
   int64_t);
 
 instantiate_raft_distance_detail_pairwise_matrix_dispatch(
@@ -66,7 +66,7 @@ instantiate_raft_distance_detail_pairwise_matrix_dispatch(
   half,
   float,
   float,
-  cuvs::distance::kernels::detail::rbf_fin_op<half>,
+  cuvs::distance::kernels::rbf_fin_op<half>,
   int64_t);
 
 #undef instantiate_raft_distance_detail_pairwise_matrix_dispatch

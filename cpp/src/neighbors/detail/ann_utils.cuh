@@ -18,7 +18,7 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <raft/common/nvtx.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/integer_utils.hpp>
@@ -63,14 +63,9 @@ struct pointer_residency_count<Type, Types...> {
     auto [on_device, on_host] = pointer_residency_count<Types...>::run(ptrs...);
     cudaPointerAttributes attr;
     RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, ptr));
-    switch (attr.type) {
-      case cudaMemoryTypeUnregistered: return std::make_tuple(on_device, on_host + 1);
-      case cudaMemoryTypeHost:
-        return std::make_tuple(on_device + int(attr.devicePointer == ptr), on_host + 1);
-      case cudaMemoryTypeDevice: return std::make_tuple(on_device + 1, on_host);
-      case cudaMemoryTypeManaged: return std::make_tuple(on_device + 1, on_host + 1);
-      default: return std::make_tuple(on_device, on_host);
-    }
+    if (attr.devicePointer || attr.type == cudaMemoryTypeDevice) { ++on_device; }
+    if (attr.hostPointer || attr.type == cudaMemoryTypeUnregistered) { ++on_host; }
+    return std::make_tuple(on_device, on_host);
   }
 };
 
@@ -200,6 +195,22 @@ struct mapping {
   /** @} */
 };
 
+template <>
+template <>
+HDI constexpr auto mapping<int8_t>::operator()(const uint8_t& x) const -> int8_t
+{
+  // Avoid overflows when converting uint8_t -> int_8
+  return static_cast<int8_t>(x >> 1);
+}
+
+template <>
+template <>
+HDI constexpr auto mapping<int8_t>::operator()(const float& x) const -> int8_t
+{
+  // Carefully clamp floats if out-of-bounds.
+  return static_cast<int8_t>(std::clamp<float>(x * 128.0f, -128.0f, 127.0f));
+}
+
 /**
  * @brief Sets the first num bytes of the block of memory pointed by ptr to the specified value.
  *
@@ -224,7 +235,7 @@ inline void memzero(T* ptr, IdxT n_elems, rmm::cuda_stream_view stream)
 }
 
 template <typename T, typename IdxT>
-RAFT_KERNEL outer_add_kernel(const T* a, IdxT len_a, const T* b, IdxT len_b, T* c)
+static __global__ void outer_add_kernel(const T* a, IdxT len_a, const T* b, IdxT len_b, T* c)
 {
   IdxT gid = threadIdx.x + blockDim.x * static_cast<IdxT>(blockIdx.x);
   IdxT i   = gid / len_b;
@@ -234,12 +245,12 @@ RAFT_KERNEL outer_add_kernel(const T* a, IdxT len_a, const T* b, IdxT len_b, T* 
 }
 
 template <typename T, typename IdxT>
-RAFT_KERNEL block_copy_kernel(const IdxT* in_offsets,
-                              const IdxT* out_offsets,
-                              IdxT n_blocks,
-                              const T* in_data,
-                              T* out_data,
-                              IdxT n_mult)
+static __global__ void block_copy_kernel(const IdxT* in_offsets,
+                                         const IdxT* out_offsets,
+                                         IdxT n_blocks,
+                                         const T* in_data,
+                                         T* out_data,
+                                         IdxT n_mult)
 {
   IdxT i = static_cast<IdxT>(blockDim.x) * static_cast<IdxT>(blockIdx.x) + threadIdx.x;
   // find the source offset using the binary search.
@@ -317,7 +328,7 @@ void outer_add(const T* a, IdxT len_a, const T* b, IdxT len_b, T* c, rmm::cuda_s
 }
 
 template <typename T, typename S, typename IdxT, typename LabelT>
-RAFT_KERNEL copy_selected_kernel(
+static __global__ void copy_selected_kernel(
   IdxT n_rows, IdxT n_cols, const S* src, const LabelT* row_ids, IdxT ld_src, T* dst, IdxT ld_dst)
 {
   IdxT gid   = threadIdx.x + blockDim.x * static_cast<IdxT>(blockIdx.x);
@@ -408,6 +419,17 @@ struct batch_load_iterator {
 
   /** A single batch of data residing in device memory. */
   struct batch {
+    ~batch() noexcept
+    {
+      /*
+      If there's no copy, there's no allocation owned by the batch.
+      If there's no allocation, there's no guarantee that the device pointer is stream-ordered.
+      If there's no stream order guarantee, we must synchronize with the stream before the batch is
+      destroyed to make sure all GPU operations in that stream finish earlier.
+      */
+      if (!does_copy()) { RAFT_CUDA_TRY_NO_THROW(cudaStreamSynchronize(stream_)); }
+    }
+
     /** Logical width of a single row in a batch, in elements of type `T`. */
     [[nodiscard]] auto row_width() const -> size_type { return row_width_; }
     /** Logical offset of the batch, in rows (`row_width()`) */

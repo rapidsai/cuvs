@@ -24,6 +24,7 @@ from cuvs.common.resources import auto_sync_resources
 from cython.operator cimport dereference as deref
 from libc.stdint cimport uint32_t
 from libcpp cimport bool
+from libcpp.string cimport string
 
 from cuvs.common cimport cydlpack
 from cuvs.distance_type cimport cuvsDistanceType
@@ -31,9 +32,9 @@ from cuvs.distance_type cimport cuvsDistanceType
 from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
-from pylibraft.neighbors.common import _check_input_array
 
 from cuvs.distance import DISTANCE_TYPES
+from cuvs.neighbors.common import _check_input_array
 
 from cuvs.common.c_api cimport cuvsResources_t
 
@@ -74,7 +75,7 @@ def build(dataset, metric="sqeuclidean", metric_arg=2.0, resources=None):
     Parameters
     ----------
     dataset : CUDA array interface compliant matrix shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
+        Supported dtype [float32, float16]
     metric : Distance metric to use. Default is sqeuclidean
     metric_arg : value of 'p' for Minkowski distances
     {resources_docstring}
@@ -101,7 +102,9 @@ def build(dataset, metric="sqeuclidean", metric_arg=2.0, resources=None):
     """
 
     dataset_ai = wrap_array(dataset)
-    _check_input_array(dataset_ai, [np.dtype('float32')])
+    _check_input_array(dataset_ai,
+                       [np.dtype('float32'), np.dtype('float16')],
+                       exp_row_major=False)
 
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
@@ -140,7 +143,7 @@ def search(Index index,
     index : Index
         Trained Brute Force index.
     queries : CUDA array interface compliant matrix shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
+        Supported dtype [float32, float16]
     k : int
         The number of neighbors.
     neighbors : Optional CUDA array interface compliant matrix shape
@@ -149,12 +152,15 @@ def search(Index index,
     distances : Optional CUDA array interface compliant matrix shape
                 (n_queries, k) If supplied, the distances to the
                 neighbors will be written here in-place. (default None)
-    prefilter : Optional cuvs.neighbors.cuvsFilter can be used to filter
-                queries and neighbors based on a given bitmap. The filter
-                function should have a row-major layout and logical shape
-                [n_queries, n_samples], using the first n_samples bits to
-                indicate whether queries[0] should compute the distance with
-                index.
+    prefilter : Optional, cuvs.neighbors.cuvsFilter
+                An optional filter to exclude certain query-neighbor
+                pairs using a bitmap or bitset. The filter function should
+                have a row-major layout with logical shape
+                `(n_prefilter_rows, n_samples)`, where:
+                - `n_prefilter_rows == n_queries` when using a bitmap filter.
+                - `n_prefilter_rows == 1` when using a bitset prefilter.
+                Each bit in `n_samples` determines whether `queries[i]`
+                should be considered for distance computation with the index.
         (default None)
     {resources_docstring}
 
@@ -200,14 +206,21 @@ def search(Index index,
     >>> # Build filters
     >>> n_bitmap = np.ceil(n_samples * n_queries / 32).astype(int)
     >>> # Create your own bitmap as the filter by replacing the random one.
-    >>> bitmap = cp.random.randint(1, 1000, size=(n_bitmap,), dtype=cp.uint32)
-    >>> prefilter = filters.from_bitmap(bitmap)
+    >>> bitmap = cp.random.randint(1, 100, size=(n_bitmap,), dtype=cp.uint32)
+    >>> bitmap_prefilter = filters.from_bitmap(bitmap)
+    >>>
+    >>> # or Build bitset prefilter:
+    >>> # n_bitset = np.ceil(n_samples * 1 / 32).astype(int)
+    >>> # # Create your own bitset as the filter by replacing the random one.
+    >>> # bitset = cp.random.randint(1, 100, size=(n_bitset,), dtype=cp.uint32)
+    >>> # bitset_prefilter = filters.from_bitset(bitset)
+    >>>
     >>> k = 10
     >>> # Using a pooling allocator reduces overhead of temporary array
     >>> # creation during search. This is useful if multiple searches
     >>> # are performed with same query size.
     >>> distances, neighbors = brute_force.search(index, queries, k,
-    ...                                           prefilter=prefilter)
+    ...                                           prefilter=bitmap_prefilter)
     >>> neighbors = cp.asarray(neighbors)
     >>> distances = cp.asarray(distances)
     """
@@ -217,7 +230,9 @@ def search(Index index,
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
     queries_cai = wrap_array(queries)
-    _check_input_array(queries_cai, [np.dtype('float32')])
+    _check_input_array(queries_cai,
+                       [np.dtype('float32'), np.dtype('float16')],
+                       exp_row_major=False)
 
     cdef uint32_t n_queries = queries_cai.shape[0]
 
@@ -256,3 +271,88 @@ def search(Index index,
         ))
 
     return (distances, neighbors)
+
+
+@auto_sync_resources
+def save(filename, Index index, bool include_dataset=True, resources=None):
+    """
+    Saves the index to a file.
+
+    The serialization format can be subject to changes, therefore loading
+    an index saved with a previous version of cuvs is not guaranteed
+    to work.
+
+    Parameters
+    ----------
+    filename : string
+        Name of the file.
+    index : Index
+        Trained Brute Force index.
+    {resources_docstring}
+
+    Examples
+    --------
+    >>> import cupy as cp
+    >>> from cuvs.neighbors import brute_force
+    >>> n_samples = 50000
+    >>> n_features = 50
+    >>> dataset = cp.random.random_sample((n_samples, n_features),
+    ...                                   dtype=cp.float32)
+    >>> # Build index
+    >>> index = brute_force.build(dataset)
+    >>> # Serialize and deserialize the brute_force index built
+    >>> brute_force.save("my_index.bin", index)
+    >>> index_loaded = brute_force.load("my_index.bin")
+    """
+    cdef string c_filename = filename.encode('utf-8')
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+    check_cuvs(cuvsBruteForceSerialize(res,
+                                       c_filename.c_str(),
+                                       index.index))
+
+
+@auto_sync_resources
+def load(filename, resources=None):
+    """
+    Loads index from file.
+
+    The serialization format can be subject to changes, therefore loading
+    an index saved with a previous version of cuvs is not guaranteed
+    to work.
+
+
+    Parameters
+    ----------
+    filename : string
+        Name of the file.
+    {resources_docstring}
+
+    Returns
+    -------
+    index : Index
+
+    Examples
+    --------
+    >>> import cupy as cp
+    >>> from cuvs.neighbors import brute_force
+    >>> n_samples = 50000
+    >>> n_features = 50
+    >>> dataset = cp.random.random_sample((n_samples, n_features),
+    ...                                   dtype=cp.float32)
+    >>> # Build index
+    >>> index = brute_force.build(dataset)
+    >>> # Serialize and deserialize the brute_force index built
+    >>> brute_force.save("my_index.bin", index)
+    >>> index_loaded = brute_force.load("my_index.bin")
+    """
+    cdef Index idx = Index()
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+    cdef string c_filename = filename.encode('utf-8')
+
+    check_cuvs(cuvsBruteForceDeserialize(
+        res,
+        c_filename.c_str(),
+        idx.index
+    ))
+    idx.trained = True
+    return idx

@@ -1,15 +1,13 @@
 Installation
 ============
 
-The cuVS software development kit provides APIs for C, C++, Python, and Rust languages. This guide outlines how to install the pre-compiled packages, build it from source, and use it in downstream applications. 
+The cuVS software development kit provides APIs for C, C++, Python, and Rust languages. This guide outlines how to install the pre-compiled packages, build it from source, and use it in downstream applications.
 
 - `Installing pre-compiled packages`_
 
   * `C, C++, and Python through Conda`_
 
   * `Python through Pip`_
-
-  * `Rust through crates.io`_
 
 - `Build from source`_
 
@@ -25,7 +23,7 @@ The cuVS software development kit provides APIs for C, C++, Python, and Rust lan
 
   * `Rust Library`_
 
-  * `Using Cmake Directly`_
+  * `Using CMake Directly`_
 
 - `Build Documentation`_
 
@@ -36,33 +34,28 @@ Installing Pre-compiled Packages
 C, C++, and Python through Conda
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The easiest way to install the pre-compiled C, C++, and Python packages is through `conda <https://docs.anaconda.com/free/miniconda/index.html>`_. Use the following commands, depending on your CUDA version, to install cuVS packages (replace `rapidsai` with `rapidsai-nightly` to install more up-to-date but less stable nightly packages). `mamba` is preferred over the `conda` command.
+The easiest way to install the pre-compiled C, C++, and Python packages is through conda. You can get a minimal conda installation with `miniforge <https://github.com/conda-forge/miniforge>`__.
 
-C++ Package
-~~~~~~~~~~~
+Use the following commands, depending on your CUDA version, to install cuVS packages (replace `rapidsai` with `rapidsai-nightly` to install more up-to-date but less stable nightly packages). `mamba` is preferred over the `conda` command and can be enabled using `this guide <https://conda.github.io/conda-libmamba-solver/user-guide/>`_.
 
-.. code-block:: bash
-
-  mamba install -c rapidsai -c conda-forge -c nvidia libcuvs cuda-version=12.5
-
-C Package
-~~~~~~~~~
+C/C++ Package
+~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-    mamba install -c rapidsai -c conda-forge -c nvidia libcuvs cuda-version=12.5
+   conda install -c rapidsai -c conda-forge -c nvidia libcuvs cuda-version=12.8
 
 Python Package
 ~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-    mamba install -c rapidsai -c conda-forge -c nvidia cuvs cuda-version=12.5
+   conda install -c rapidsai -c conda-forge -c nvidia cuvs cuda-version=12.8
 
 Python through Pip
 ^^^^^^^^^^^^^^^^^^
 
-The cuVS Python package can also be `installed through pip <https://rapids.ai/pip.html#install>`_.
+The cuVS Python package can also be `installed through pip <https://docs.rapids.ai/install#pip>`_.
 
 For CUDA 11 packages:
 
@@ -76,21 +69,18 @@ And CUDA 12 packages:
 
     pip install cuvs-cu12 --extra-index-url=https://pypi.nvidia.com
 
-Note: these packages statically link the C and C++ libraries so the `libcuvs` and `libcuvs_c` shared libraries won't be readily available to use in your code. 
-
-Rust through crates.io
-^^^^^^^^^^^^^^^^^^^^^^
+Note: these packages statically link the C and C++ libraries so the `libcuvs` and `libcuvs_c` shared libraries won't be readily available to use in your code.
 
 Build from source
 -----------------
 
-The core cuVS source code is written in C++ and wrapped through a C API. The C API is wrapped around the C++ APIs and the other supported languages are built around the C API. 
+The core cuVS source code is written in C++ and wrapped through a C API. The C API is wrapped around the C++ APIs and the other supported languages are built around the C API.
 
 
 Prerequisites
 ^^^^^^^^^^^^^
 
-- Cmake 3.26.4+
+- CMake 3.26.4+
 - GCC 9.3+ (11.4+ recommended)
 - CUDA Toolkit 11.4+
 - Volta architecture or better (compute capability >= 7.0)
@@ -98,19 +88,19 @@ Prerequisites
 Create a build environment
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-`Conda <https://docs.anaconda.com/free/miniconda/index.html>`_ environment scripts are provided for installing the necessary dependencies to build cuVS from source. It is preferred to use `mamba`, as it provides significant speedup over `conda`:
+Conda environment scripts are provided for installing the necessary dependencies to build cuVS from source. It is preferred to use `mamba`, as it provides significant speedup over `conda`:
 
 .. code-block:: bash
 
-    mamba env create --name cuvs -f conda/environments/all_cuda-125_arch-x86_64.yaml
-    mamba activate cuvs
+    conda env create --name cuvs -f conda/environments/all_cuda-128_arch-x86_64.yaml
+    conda activate cuvs
 
 The process for building from source with CUDA 11 differs slightly in that your host system will also need to have CUDA toolkit installed which is greater than, or equal to, the version you install into you conda environment. Installing CUDA toolkit into your host system is necessary because `nvcc` is not provided with Conda's cudatoolkit dependencies for CUDA 11. The following example will install create and install dependencies for a CUDA 11.8 conda environment
 
 .. code-block:: bash
 
-    mamba env create --name cuvs -f conda/environments/all_cuda-118_arch-x86_64.yaml
-    mamba activate cuvs
+    conda env create --name cuvs -f conda/environments/all_cuda-118_arch-x86_64.yaml
+    conda activate cuvs
 
 The recommended way to build and install cuVS from source is to use the `build.sh` script in the root of the repository. This script can build both the C++ and Python artifacts and provides CMake options for building and installing the headers, tests, benchmarks, and the pre-compiled shared library.
 
@@ -131,6 +121,16 @@ Once installed, the shared libraries, headers (and any dependencies downloaded a
 .. code-block:: bash
 
     ./build.sh libcuvs --uninstall
+
+
+Multi-GPU features
+^^^^^^^^^^^^^^^^^^
+
+To disable the multi-gpu features run :
+
+.. code-block:: bash
+
+    ./build.sh libcuvs --no-mg
 
 
 Building the Googletests
@@ -177,7 +177,7 @@ The Rust bindings can be built with
 Using CMake directly
 ^^^^^^^^^^^^^^^^^^^^
 
-When building cuVS from source, the `build.sh` script offers a nice wrapper around the `cmake` commands to ease the burdens of manually configuring the various available cmake options. When more fine-grained control over the CMake configuration is desired, the `cmake` command can be invoked directly as the below example demonstrates. 
+When building cuVS from source, the `build.sh` script offers a nice wrapper around the `cmake` commands to ease the burdens of manually configuring the various available cmake options. When more fine-grained control over the CMake configuration is desired, the `cmake` command can be invoked directly as the below example demonstrates.
 
 The `CMAKE_INSTALL_PREFIX` installs cuVS into a specific location. The example below installs cuVS into the current Conda environment:
 
@@ -191,7 +191,7 @@ The `CMAKE_INSTALL_PREFIX` installs cuVS into a specific location. The example b
 
 cuVS has the following configurable cmake flags available:
 
-.. list-table:: Cmake Flags
+.. list-table:: CMake Flags
 
  * - Flag
    - Possible Values

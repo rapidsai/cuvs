@@ -22,8 +22,6 @@
 #include <raft/core/operators.hpp>        // raft::identity_op
 #include <raft/util/raft_explicit.hpp>    // RAFT_EXPLICIT
 
-#ifdef CUVS_EXPLICIT_INSTANTIATE_ONLY
-
 namespace cuvs::distance::detail {
 
 template <typename OpT,
@@ -46,8 +44,6 @@ void pairwise_matrix_dispatch(OpT distance_op,
                               bool is_row_major) RAFT_EXPLICIT;
 
 };  // namespace cuvs::distance::detail
-
-#endif  // CUVS_EXPLICIT_INSTANTIATE_ONLY
 
 #define instantiate_cuvs_distance_detail_pairwise_matrix_dispatch(                     \
   OpT, DataT, AccT, OutT, FinOpT, IdxT)                                                \
@@ -112,6 +108,8 @@ instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
 instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
   cuvs::distance::detail::ops::l2_exp_distance_op, int);
 instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
+  cuvs::distance::detail::ops::l2_exp_distance_op, int64_t);
+instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
   cuvs::distance::detail::ops::l2_unexp_distance_op, int);
 instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
   cuvs::distance::detail::ops::l_inf_distance_op, int);
@@ -120,9 +118,10 @@ instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
 instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
   cuvs::distance::detail::ops::russel_rao_distance_op, int);
 instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo(
-  cuvs::distance::detail::ops::l2_unexp_distance_op,
-  int64_t,
-  cuvs::distance::kernels::detail::rbf_fin_op);
+  cuvs::distance::detail::ops::l2_unexp_distance_op, int64_t, cuvs::distance::kernels::rbf_fin_op);
+
+instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
+  cuvs::distance::detail::ops::l2_exp_distance_op, int64_t);
 
 #undef instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo
 #undef instantiate_cuvs_distance_detail_pairwise_matrix_dispatch

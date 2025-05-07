@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#pragma once
+
 #include <cstdint>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
@@ -27,6 +29,8 @@
 #include <thrust/copy.h>
 #include <thrust/device_ptr.h>
 #include <thrust/iterator/counting_iterator.h>
+
+#include <fstream>
 
 // Fill dataset and queries with synthetic data.
 void generate_dataset(raft::device_resources const &dev_resources,
@@ -97,4 +101,29 @@ subsample(raft::device_resources const &dev_resources,
                           raft::make_const_mdspan(train_indices.view()));
 
   return trainset;
+}
+
+template<typename T, typename idxT>
+raft::device_matrix<T,idxT> read_bin_dataset(raft::device_resources const &dev_resources,
+		       std::string fname,
+                       int max_N = INT_MAX) {
+
+  // Read datafile in
+  std::ifstream datafile(fname, std::ifstream::binary);
+  uint32_t N;
+  uint32_t dim;
+  datafile.read((char*)&N, sizeof(uint32_t));
+  datafile.read((char*)&dim, sizeof(uint32_t));
+
+  if(N > max_N) N = max_N;
+  printf("Read in file - N:%u, dim:%u\n", N, dim);
+  std::vector<T> data;
+  data.resize((size_t)N*(size_t)dim);
+  datafile.read(reinterpret_cast<char*>(data.data()), (size_t)N*(size_t)dim*sizeof(T));
+  datafile.close();
+
+  auto dataset = raft::make_device_matrix<T, idxT>(dev_resources, N, dim);
+  raft::copy(dataset.data_handle(), data.data(), data.size(), raft::resource::get_cuda_stream(dev_resources));
+
+  return dataset;
 }

@@ -32,6 +32,7 @@
 #include <rmm/device_uvector.hpp>
 #include <rmm/mr/device/device_memory_resource.hpp>
 #include <rmm/mr/device/failure_callback_resource_adaptor.hpp>
+#include <rmm/mr/device/managed_memory_resource.hpp>
 #include <rmm/mr/device/pool_memory_resource.hpp>
 
 #include <memory>
@@ -75,13 +76,14 @@ inline auto rmm_oom_callback(std::size_t bytes, void*) -> bool
  */
 class shared_raft_resources {
  public:
-  using pool_mr_type = rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource>;
-  using mr_type      = rmm::mr::failure_callback_resource_adaptor<pool_mr_type>;
+  using pool_mr_type  = rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource>;
+  using mr_type       = rmm::mr::failure_callback_resource_adaptor<pool_mr_type>;
+  using large_mr_type = rmm::mr::managed_memory_resource;
 
   shared_raft_resources()
   try : orig_resource_{rmm::mr::get_current_device_resource()},
     pool_resource_(orig_resource_, 1024 * 1024 * 1024ull),
-    resource_(&pool_resource_, rmm_oom_callback, nullptr) {
+    resource_(&pool_resource_, rmm_oom_callback, nullptr), large_mr_() {
     rmm::mr::set_current_device_resource(&resource_);
   } catch (const std::exception& e) {
     auto cuda_status = cudaGetLastError();
@@ -104,10 +106,16 @@ class shared_raft_resources {
 
   ~shared_raft_resources() noexcept { rmm::mr::set_current_device_resource(orig_resource_); }
 
+  auto get_large_memory_resource() noexcept
+  {
+    return static_cast<rmm::mr::device_memory_resource*>(&large_mr_);
+  }
+
  private:
   rmm::mr::device_memory_resource* orig_resource_;
   pool_mr_type pool_resource_;
   mr_type resource_;
+  large_mr_type large_mr_;
 };
 
 /**
@@ -130,6 +138,12 @@ class configured_raft_resources {
       res_{std::make_unique<raft::device_resources>(
         rmm::cuda_stream_view(get_stream_from_global_pool()))}
   {
+    // set the large workspace resource to the raft handle, but without the deleter
+    // (this resource is managed by the shared_res).
+    raft::resource::set_large_workspace_resource(
+      *res_,
+      std::shared_ptr<rmm::mr::device_memory_resource>(shared_res_->get_large_memory_resource(),
+                                                       raft::void_op{}));
   }
 
   /** Default constructor creates all resources anew. */
@@ -218,27 +232,65 @@ void refine_helper(const raft::resources& res,
   } else {
     auto dataset_host = raft::make_host_matrix_view<const data_type, extents_type>(
       dataset.data_handle(), dataset.extent(0), dataset.extent(1));
-    auto queries_host    = raft::make_host_matrix<data_type, extents_type>(batch_size, dim);
-    auto candidates_host = raft::make_host_matrix<index_type, extents_type>(batch_size, k0);
-    auto neighbors_host  = raft::make_host_matrix<index_type, extents_type>(batch_size, k);
-    auto distances_host  = raft::make_host_matrix<float, extents_type>(batch_size, k);
+    if (raft::get_device_for_address(queries.data_handle()) >= 0) {
+      // Queries & results are on the device
 
-    auto stream = raft::resource::get_cuda_stream(res);
-    raft::copy(queries_host.data_handle(), queries.data_handle(), queries_host.size(), stream);
-    raft::copy(
-      candidates_host.data_handle(), candidates.data_handle(), candidates_host.size(), stream);
+      auto queries_host    = raft::make_host_matrix<data_type, extents_type>(batch_size, dim);
+      auto candidates_host = raft::make_host_matrix<index_type, extents_type>(batch_size, k0);
+      auto neighbors_host  = raft::make_host_matrix<index_type, extents_type>(batch_size, k);
+      auto distances_host  = raft::make_host_matrix<float, extents_type>(batch_size, k);
 
-    raft::resource::sync_stream(res);  // wait for the queries and candidates
-    cuvs::neighbors::refine(res,
-                            dataset_host,
-                            queries_host.view(),
-                            candidates_host.view(),
-                            neighbors_host.view(),
-                            distances_host.view(),
-                            metric);
+      auto stream = raft::resource::get_cuda_stream(res);
+      raft::copy(queries_host.data_handle(), queries.data_handle(), queries_host.size(), stream);
+      raft::copy(
+        candidates_host.data_handle(), candidates.data_handle(), candidates_host.size(), stream);
 
-    raft::copy(neighbors, neighbors_host.data_handle(), neighbors_host.size(), stream);
-    raft::copy(distances, distances_host.data_handle(), distances_host.size(), stream);
+      raft::resource::sync_stream(res);  // wait for the queries and candidates
+      cuvs::neighbors::refine(res,
+                              dataset_host,
+                              queries_host.view(),
+                              candidates_host.view(),
+                              neighbors_host.view(),
+                              distances_host.view(),
+                              metric);
+
+      raft::copy(neighbors, neighbors_host.data_handle(), neighbors_host.size(), stream);
+      raft::copy(distances, distances_host.data_handle(), distances_host.size(), stream);
+
+    } else {
+      // Queries & results are on the host - no device sync / copy needed
+
+      auto queries_host = raft::make_host_matrix_view<const data_type, extents_type>(
+        queries.data_handle(), batch_size, dim);
+      auto candidates_host = raft::make_host_matrix_view<const index_type, extents_type>(
+        candidates.data_handle(), batch_size, k0);
+      auto neighbors_host =
+        raft::make_host_matrix_view<index_type, extents_type>(neighbors, batch_size, k);
+      auto distances_host =
+        raft::make_host_matrix_view<float, extents_type>(distances, batch_size, k);
+
+      cuvs::neighbors::refine(
+        res, dataset_host, queries_host, candidates_host, neighbors_host, distances_host, metric);
+    }
+  }
+}
+
+/**
+ * Construct a cuVS-compatible bitset filter object from a raw pointer to the bitset.
+ *
+ * @param[in] filter_bitset a pointer to a pre-generated bitset
+ * @param[in] n_rows the number of elements in the bitset / dataset.
+ * @return a shared pointer to the filter object (doesn't own the bitset data!)
+ */
+inline auto make_cuvs_filter(const void* filter_bitset, int64_t n_rows)
+  -> std::shared_ptr<cuvs::neighbors::filtering::base_filter>
+{
+  if (filter_bitset != nullptr) {
+    return std::make_shared<cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>>(
+      raft::core::bitset_view<uint32_t, int64_t>(
+        const_cast<uint32_t*>(reinterpret_cast<const uint32_t*>(filter_bitset)), n_rows));
+  } else {
+    return std::make_shared<cuvs::neighbors::filtering::none_sample_filter>();
   }
 }
 

@@ -45,7 +45,38 @@ extern template class cuvs::bench::cuvs_cagra<uint8_t, uint32_t>;
 extern template class cuvs::bench::cuvs_cagra<int8_t, uint32_t>;
 #endif
 
-#ifdef CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT
+#ifdef CUVS_ANN_BENCH_USE_CUVS_MG
+#include "cuvs_ivf_flat_wrapper.h"
+#include "cuvs_mg_ivf_flat_wrapper.h"
+
+#include "cuvs_ivf_pq_wrapper.h"
+#include "cuvs_mg_ivf_pq_wrapper.h"
+
+#include "cuvs_cagra_wrapper.h"
+#include "cuvs_mg_cagra_wrapper.h"
+#endif
+
+template <typename ParamT>
+void parse_dynamic_batching_params(const nlohmann::json& conf, ParamT& param)
+{
+  if (!conf.value("dynamic_batching", false)) { return; }
+  param.dynamic_batching = true;
+  if (conf.contains("dynamic_batching_max_batch_size")) {
+    param.dynamic_batching_max_batch_size = conf.at("dynamic_batching_max_batch_size");
+  }
+  param.dynamic_batching_conservative_dispatch =
+    conf.value("dynamic_batching_conservative_dispatch", false);
+  if (conf.contains("dynamic_batching_dispatch_timeout_ms")) {
+    param.dynamic_batching_dispatch_timeout_ms = conf.at("dynamic_batching_dispatch_timeout_ms");
+  }
+  if (conf.contains("dynamic_batching_n_queues")) {
+    param.dynamic_batching_n_queues = conf.at("dynamic_batching_n_queues");
+  }
+  param.dynamic_batching_k =
+    uint32_t(uint32_t(conf.at("k")) * float(conf.value("refine_ratio", 1.0f)));
+}
+
+#if defined(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT) || defined(CUVS_ANN_BENCH_USE_CUVS_MG)
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
                        typename cuvs::bench::cuvs_ivf_flat<T, IdxT>::build_param& param)
@@ -64,7 +95,7 @@ void parse_search_param(const nlohmann::json& conf,
 #endif
 
 #if defined(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || \
-  defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
+  defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB) || defined(CUVS_ANN_BENCH_USE_CUVS_MG)
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
                        typename cuvs::bench::cuvs_ivf_pq<T, IdxT>::build_param& param)
@@ -123,14 +154,37 @@ void parse_search_param(const nlohmann::json& conf,
     // set half as default
     param.pq_param.lut_dtype = CUDA_R_16F;
   }
+
+  if (conf.contains("coarse_search_dtype")) {
+    std::string type = conf.at("coarse_search_dtype");
+    if (type == "float") {
+      param.pq_param.coarse_search_dtype = CUDA_R_32F;
+    } else if (type == "half") {
+      param.pq_param.coarse_search_dtype = CUDA_R_16F;
+    } else if (type == "int8") {
+      param.pq_param.coarse_search_dtype = CUDA_R_8I;
+    } else {
+      throw std::runtime_error("coarse_search_dtype: '" + type +
+                               "', should be either 'float', 'half' or 'int8'");
+    }
+  }
+
+  if (conf.contains("max_internal_batch_size")) {
+    param.pq_param.max_internal_batch_size = conf.at("max_internal_batch_size");
+  }
+
   if (conf.contains("refine_ratio")) {
     param.refine_ratio = conf.at("refine_ratio");
     if (param.refine_ratio < 1.0f) { throw std::runtime_error("refine_ratio should be >= 1.0"); }
   }
+
+  // enable dynamic batching
+  parse_dynamic_batching_params(conf, param);
 }
 #endif
 
-#if defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
+#if defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB) || \
+  defined(CUVS_ANN_BENCH_USE_CUVS_MG)
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::nn_descent::index_params& param)
 {
@@ -247,6 +301,16 @@ void parse_search_param(const nlohmann::json& conf,
   if (conf.contains("itopk")) { param.p.itopk_size = conf.at("itopk"); }
   if (conf.contains("search_width")) { param.p.search_width = conf.at("search_width"); }
   if (conf.contains("max_iterations")) { param.p.max_iterations = conf.at("max_iterations"); }
+  if (conf.contains("persistent")) { param.p.persistent = conf.at("persistent"); }
+  if (conf.contains("persistent_lifetime")) {
+    param.p.persistent_lifetime = conf.at("persistent_lifetime");
+  }
+  if (conf.contains("persistent_device_usage")) {
+    param.p.persistent_device_usage = conf.at("persistent_device_usage");
+  }
+  if (conf.contains("thread_block_size")) {
+    param.p.thread_block_size = conf.at("thread_block_size");
+  }
   if (conf.contains("algo")) {
     if (conf.at("algo") == "single_cta") {
       param.p.algo = cuvs::neighbors::cagra::search_algo::SINGLE_CTA;
@@ -269,5 +333,8 @@ void parse_search_param(const nlohmann::json& conf,
   }
   // Same ratio as in IVF-PQ
   param.refine_ratio = conf.value("refine_ratio", 1.0f);
+
+  // enable dynamic batching
+  parse_dynamic_batching_params(conf, param);
 }
 #endif

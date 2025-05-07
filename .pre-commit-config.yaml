@@ -1,6 +1,12 @@
-# Copyright (c) 2022-2023, NVIDIA CORPORATION.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION.
 
 repos:
+      - repo: https://github.com/pre-commit/pre-commit-hooks
+        rev: v5.0.0
+        hooks:
+              - id: check-json
+              - id: trailing-whitespace
+              - id: end-of-file-fixer
       - repo: https://github.com/PyCQA/isort
         rev: 5.12.0
         hooks:
@@ -18,7 +24,7 @@ repos:
                 # Explicitly specify the pyproject.toml at the repo root, not per-project.
                 args: ["--config", "pyproject.toml"]
       - repo: https://github.com/PyCQA/flake8
-        rev: 5.0.4
+        rev: 7.1.1
         hooks:
               - id: flake8
                 args: ["--config=.flake8"]
@@ -81,7 +87,7 @@ repos:
                 exclude: .*/thirdparty/.*
               - id: include-check
                 name: include-check
-                entry: python ./cpp/scripts/include_checker.py cpp/bench cpp/include cpp/test
+                entry: python ./cpp/scripts/include_checker.py cpp/bench cpp/include cpp/tests
                 pass_filenames: false
                 language: python
                 additional_dependencies: [gitpython]
@@ -91,13 +97,12 @@ repos:
               - id: codespell
                 additional_dependencies: [tomli]
                 args: ["--toml", "pyproject.toml"]
-                exclude: (?x)^(^CHANGELOG.md$)
-      - repo: https://github.com/pre-commit/pre-commit-hooks
-        rev: v4.5.0
-        hooks:
-              - id: check-json
+                exclude: |
+                  (?x)
+                    ^CHANGELOG[.]md$|
+                    ^cpp/cmake/patches/cutlass/build-export[.]patch$
       - repo: https://github.com/rapidsai/pre-commit-hooks
-        rev: v0.4.0
+        rev: v0.6.0
         hooks:
           - id: verify-copyright
             files: |
@@ -105,18 +110,24 @@ repos:
                   [.](cmake|cpp|cu|cuh|h|hpp|sh|pxd|py|pyx|rs)$|
                   CMakeLists[.]txt$|
                   CMakeLists_standalone[.]txt$|
-                  meta[.]yaml$|
-                  setup[.]cfg$
+                  meta[.]yaml$
             exclude: |
               (?x)
                   docs/source/sphinxext/github_link\.py|
                   cpp/cmake/modules/FindAVX\.cmake|
           - id: verify-alpha-spec
+          - id: verify-codeowners
+            args: [--fix, --project-prefix=cuvs]
       - repo: https://github.com/rapidsai/dependency-file-generator
-        rev: v1.13.11
+        rev: v1.18.1
         hooks:
             - id: rapids-dependency-file-generator
               args: ["--clean"]
+      - repo: https://github.com/shellcheck-py/shellcheck-py
+        rev: v0.10.0.1
+        hooks:
+          - id: shellcheck
+            args: ["--severity=warning"]
 
 default_language_version:
       python: python3

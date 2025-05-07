@@ -30,7 +30,8 @@
 #include "../../cluster/kmeans_balanced.cuh"
 
 #include <raft/core/device_mdarray.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
+#include <raft/core/mdspan.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/cuda_stream_pool.hpp>
@@ -41,6 +42,8 @@
 #include <raft/linalg/gemm.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/norm.cuh>
+#include <raft/linalg/norm_types.hpp>
+#include <raft/linalg/normalize.cuh>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/matrix/linewise_op.cuh>
@@ -59,13 +62,13 @@
 
 #include <cuda_fp16.h>
 #include <thrust/extrema.h>
+#include <thrust/iterator/transform_iterator.h>
 #include <thrust/scan.h>
 
 #include <memory>
 #include <variant>
 
 namespace cuvs::neighbors::ivf_pq::detail {
-using raft::RAFT_NAME;                       // TODO: this is required for RAFT_LOG_XXX messages.
 using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 using internal_extents_t = int64_t;  // The default mdspan extent type used internally.
@@ -94,8 +97,8 @@ void select_residuals(raft::resources const& handle,
   rmm::device_uvector<float> tmp(size_t(n_rows) * size_t(dim), stream, device_memory);
   // Note: the number of rows of the input dataset isn't actually n_rows, but matrix::gather doesn't
   // need to know it, any strictly positive number would work.
-  cub::TransformInputIterator<float, utils::mapping<float>, const T*> mapping_itr(
-    dataset, utils::mapping<float>{});
+  thrust::transform_iterator<utils::mapping<float>, const T*, thrust::use_default, float>
+    mapping_itr(dataset, utils::mapping<float>{});
   raft::matrix::gather(mapping_itr, (IdxT)dim, n_rows, row_ids, n_rows, tmp.data(), stream);
 
   raft::matrix::linewise_op(handle,
@@ -236,6 +239,10 @@ void set_centers(raft::resources const& handle, index<IdxT>* index, const float*
   auto stream         = raft::resource::get_cuda_stream(handle);
   auto* device_memory = raft::resource::get_workspace_resource(handle);
 
+  // Make sure to have trailing zeroes between dim and dim_ext;
+  // We rely on this to enable padded tensor gemm kernels during coarse search.
+  cuvs::spatial::knn::detail::utils::memzero(
+    index->centers().data_handle(), index->centers().size(), stream);
   // combine cluster_centers and their norms
   RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle(),
                                   sizeof(float) * index->dim_ext(),
@@ -1466,6 +1473,13 @@ void extend(raft::resources const& handle,
                   std::is_same_v<T, int8_t>,
                 "Unsupported data type");
 
+  if (index->metric() == distance::DistanceType::CosineExpanded) {
+    if constexpr (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>)
+      RAFT_FAIL(
+        "CosineExpanded distance metric is currently not supported for uint8_t and int8_t data "
+        "type");
+  }
+
   rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(handle);
   rmm::device_async_resource_ref large_memory =
     raft::resource::get_large_workspace_resource(handle);
@@ -1632,6 +1646,14 @@ void extend(raft::resources const& handle,
   vec_batches.prefetch_next_batch();
   for (const auto& vec_batch : vec_batches) {
     const auto& idx_batch = *idx_batches++;
+    if (index->metric() == CosineExpanded) {
+      auto vec_batch_view = raft::make_device_matrix_view<T, internal_extents_t>(
+        const_cast<T*>(vec_batch.data()), vec_batch.size(), index->dim());
+      raft::linalg::row_normalize(handle,
+                                  raft::make_const_mdspan(vec_batch_view),
+                                  vec_batch_view,
+                                  raft::linalg::NormType::L2Norm);
+    }
     process_and_fill_codes(handle,
                            *index,
                            vec_batch.data(),
@@ -1678,11 +1700,15 @@ auto build(raft::resources const& handle,
                   std::is_same_v<T, int8_t>,
                 "Unsupported data type");
 
-  std::cout << "using ivf_pq::index_params nrows " << (int)dataset.extent(0) << ", dim "
-            << (int)dataset.extent(1) << ", n_lits " << (int)params.n_lists << ", pq_dim "
-            << (int)params.pq_dim << std::endl;
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
+  if (params.metric == distance::DistanceType::CosineExpanded) {
+    // TODO: support int8_t and uint8_t types (https://github.com/rapidsai/cuvs/issues/389)
+    if constexpr (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>)
+      RAFT_FAIL(
+        "CosineExpanded distance metric is currently not supported for uint8_t and int8_t data "
+        "type");
+  }
 
   auto stream = raft::resource::get_cuda_stream(handle);
 
@@ -1729,6 +1755,12 @@ auto build(raft::resources const& handle,
     if constexpr (std::is_same_v<T, float>) {
       raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset.view());
     } else {
+      raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
+        "   ivf_pq::build(%zu, %zu)/sample rows with tmp trainset (%zu rows).",
+        size_t(n_rows),
+        size_t(dim),
+        size_t(n_rows_train));
+
       // TODO(tfeher): Enable codebook generation with any type T, and then remove trainset tmp.
       auto trainset_tmp = raft::make_device_mdarray<T>(
         handle, big_memory_resource, raft::make_extents<int64_t>(n_rows_train, dim));
@@ -1755,6 +1787,11 @@ auto build(raft::resources const& handle,
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)index.metric());
+
+    if (index.metric() == distance::DistanceType::CosineExpanded) {
+      raft::linalg::row_normalize(
+        handle, trainset_const_view, trainset.view(), raft::linalg::NormType::L2Norm);
+    }
     cuvs::cluster::kmeans_balanced::fit(
       handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
 
@@ -1762,6 +1799,10 @@ auto build(raft::resources const& handle,
     rmm::device_uvector<uint32_t> labels(n_rows_train, stream, big_memory_resource);
     auto centers_const_view = raft::make_device_matrix_view<const float, internal_extents_t>(
       cluster_centers, index.n_lists(), index.dim());
+    if (index.metric() == distance::DistanceType::CosineExpanded) {
+      raft::linalg::row_normalize(
+        handle, centers_const_view, centers_view, raft::linalg::NormType::L2Norm);
+    }
     auto labels_view =
       raft::make_device_vector_view<uint32_t, internal_extents_t>(labels.data(), n_rows_train);
     cuvs::cluster::kmeans_balanced::predict(handle,

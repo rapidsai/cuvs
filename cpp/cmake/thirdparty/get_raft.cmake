@@ -44,13 +44,13 @@ function(find_and_configure_raft)
             INSTALL_EXPORT_SET  cuvs-exports
             COMPONENTS          ${RAFT_COMPONENTS}
             CPM_ARGS
+              EXCLUDE_FROM_ALL TRUE
               GIT_REPOSITORY        https://github.com/${PKG_FORK}/raft.git
               GIT_TAG               ${PKG_PINNED_TAG}
               SOURCE_SUBDIR         cpp
               OPTIONS
               "BUILD_TESTS OFF"
               "BUILD_PRIMS_BENCH OFF"
-              "BUILD_ANN_BENCH OFF"
               "RAFT_NVTX ${PKG_ENABLE_NVTX}"
               "RAFT_COMPILE_LIBRARY OFF"
             )

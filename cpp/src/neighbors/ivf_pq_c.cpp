@@ -79,6 +79,8 @@ void _search(cuvsResources_t res,
   search_params.lut_dtype                = params.lut_dtype;
   search_params.internal_distance_dtype  = params.internal_distance_dtype;
   search_params.preferred_shmem_carveout = params.preferred_shmem_carveout;
+  search_params.coarse_search_dtype      = params.coarse_search_dtype;
+  search_params.max_internal_batch_size  = params.max_internal_batch_size;
 
   using queries_mdspan_type   = raft::device_matrix_view<const T, IdxT, raft::row_major>;
   using neighbors_mdspan_type = raft::device_matrix_view<IdxT, IdxT, raft::row_major>;
@@ -155,6 +157,9 @@ extern "C" cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
       index->addr =
         reinterpret_cast<uintptr_t>(_build<float, int64_t>(res, *params, dataset_tensor));
+    } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
+      index->addr =
+        reinterpret_cast<uintptr_t>(_build<half, int64_t>(res, *params, dataset_tensor));
     } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
       index->addr =
         reinterpret_cast<uintptr_t>(_build<int8_t, int64_t>(res, *params, dataset_tensor));
@@ -196,6 +201,9 @@ extern "C" cuvsError_t cuvsIvfPqSearch(cuvsResources_t res,
     auto index = *index_c_ptr;
     if (queries.dtype.code == kDLFloat && queries.dtype.bits == 32) {
       _search<float, int64_t>(
+        res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
+    } else if (queries.dtype.code == kDLFloat && queries.dtype.bits == 16) {
+      _search<half, int64_t>(
         res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
     } else if (queries.dtype.code == kDLInt && queries.dtype.bits == 8) {
       _search<int8_t, int64_t>(
@@ -240,6 +248,8 @@ extern "C" cuvsError_t cuvsIvfPqSearchParamsCreate(cuvsIvfPqSearchParams_t* para
     *params = new cuvsIvfPqSearchParams{.n_probes                 = 20,
                                         .lut_dtype                = CUDA_R_32F,
                                         .internal_distance_dtype  = CUDA_R_32F,
+                                        .coarse_search_dtype      = CUDA_R_32F,
+                                        .max_internal_batch_size  = 4096,
                                         .preferred_shmem_carveout = 1.0};
   });
 }
@@ -274,6 +284,8 @@ extern "C" cuvsError_t cuvsIvfPqExtend(cuvsResources_t res,
 
     if (vectors.dtype.code == kDLFloat && vectors.dtype.bits == 32) {
       _extend<float, int64_t>(res, new_vectors, new_indices, *index);
+    } else if (vectors.dtype.code == kDLFloat && vectors.dtype.bits == 16) {
+      _extend<half, int64_t>(res, new_vectors, new_indices, *index);
     } else if (vectors.dtype.code == kDLInt && vectors.dtype.bits == 8) {
       _extend<int8_t, int64_t>(res, new_vectors, new_indices, *index);
     } else if (vectors.dtype.code == kDLUInt && vectors.dtype.bits == 8) {

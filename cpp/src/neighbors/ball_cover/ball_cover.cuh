@@ -200,15 +200,19 @@ void k_closest_landmarks(
   value_t* R_knn_dists)
 {
   raft::device_matrix_view<const value_t, value_int> inputs = index.get_R();
+  auto bf_index_params   = cuvs::neighbors::brute_force::index_params();
+  bf_index_params.metric = index.get_metric();
+  auto bfknn             = cuvs::neighbors::brute_force::build(handle, bf_index_params, inputs);
 
-  auto bfknn = cuvs::neighbors::brute_force::build(handle, inputs, index.get_metric());
+  auto bf_search_params = cuvs::neighbors::brute_force::search_params();
   cuvs::neighbors::brute_force::search(
     handle,
+    bf_search_params,
     bfknn,
-    raft::make_device_matrix_view(query_pts, n_query_pts, inputs.extent(1)),
-    raft::make_device_matrix_view(R_knn_inds, n_query_pts, k),
-    raft::make_device_matrix_view(R_knn_dists, n_query_pts, k),
-    std::nullopt);
+    raft::make_device_matrix_view<const value_t, value_int>(
+      query_pts, n_query_pts, inputs.extent(1)),
+    raft::make_device_matrix_view<value_idx, value_int>(R_knn_inds, n_query_pts, k),
+    raft::make_device_matrix_view<value_t, value_int>(R_knn_dists, n_query_pts, k));
 }
 
 /**
@@ -282,65 +286,35 @@ void perform_rbc_query(
                dists + (k * n_query_pts),
                std::numeric_limits<value_t>::max());
 
-  if (index.n == 2) {
-    // Compute nearest k for each neighborhood in each closest R
-    rbc_low_dim_pass_one<value_idx, value_t, value_int, matrix_idx, 2>(handle,
-                                                                       index,
-                                                                       query,
-                                                                       n_query_pts,
-                                                                       k,
-                                                                       R_knn_inds,
-                                                                       R_knn_dists,
-                                                                       dfunc,
-                                                                       inds,
-                                                                       dists,
-                                                                       weight,
-                                                                       dists_counter);
+  // Compute nearest k for each neighborhood in each closest R
+  rbc_low_dim_pass_one<value_idx, value_t, value_int, matrix_idx>(handle,
+                                                                  index,
+                                                                  query,
+                                                                  n_query_pts,
+                                                                  k,
+                                                                  R_knn_inds,
+                                                                  R_knn_dists,
+                                                                  dfunc,
+                                                                  inds,
+                                                                  dists,
+                                                                  weight,
+                                                                  dists_counter,
+                                                                  index.n);
 
-    if (perform_post_filtering) {
-      rbc_low_dim_pass_two<value_idx, value_t, value_int, matrix_idx, 2>(handle,
-                                                                         index,
-                                                                         query,
-                                                                         n_query_pts,
-                                                                         k,
-                                                                         R_knn_inds,
-                                                                         R_knn_dists,
-                                                                         dfunc,
-                                                                         inds,
-                                                                         dists,
-                                                                         weight,
-                                                                         post_dists_counter);
-    }
-
-  } else if (index.n == 3) {
-    // Compute nearest k for each neighborhood in each closest R
-    rbc_low_dim_pass_one<value_idx, value_t, value_int, matrix_idx, 3>(handle,
-                                                                       index,
-                                                                       query,
-                                                                       n_query_pts,
-                                                                       k,
-                                                                       R_knn_inds,
-                                                                       R_knn_dists,
-                                                                       dfunc,
-                                                                       inds,
-                                                                       dists,
-                                                                       weight,
-                                                                       dists_counter);
-
-    if (perform_post_filtering) {
-      rbc_low_dim_pass_two<value_idx, value_t, value_int, matrix_idx, 3>(handle,
-                                                                         index,
-                                                                         query,
-                                                                         n_query_pts,
-                                                                         k,
-                                                                         R_knn_inds,
-                                                                         R_knn_dists,
-                                                                         dfunc,
-                                                                         inds,
-                                                                         dists,
-                                                                         weight,
-                                                                         post_dists_counter);
-    }
+  if (perform_post_filtering) {
+    rbc_low_dim_pass_two<value_idx, value_t, value_int, matrix_idx>(handle,
+                                                                    index,
+                                                                    query,
+                                                                    n_query_pts,
+                                                                    k,
+                                                                    R_knn_inds,
+                                                                    R_knn_dists,
+                                                                    dfunc,
+                                                                    inds,
+                                                                    dists,
+                                                                    weight,
+                                                                    post_dists_counter,
+                                                                    index.n);
   }
 }
 

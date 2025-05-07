@@ -18,8 +18,10 @@
 
 #include <cstdint>
 #include <cuvs/distance/distance.hpp>
+#include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/device_mdarray.hpp>
-#include <raft/core/device_mdspan.hpp>
+#include <raft/core/device_resources.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/util/cudart_utils.hpp>   // get_device_for_address
@@ -172,6 +174,22 @@ struct owning_dataset : public strided_dataset<DataT, IdxT> {
   };
 };
 
+template <typename DatasetT>
+struct is_strided_dataset : std::false_type {};
+
+template <typename DataT, typename IdxT>
+struct is_strided_dataset<strided_dataset<DataT, IdxT>> : std::true_type {};
+
+template <typename DataT, typename IdxT>
+struct is_strided_dataset<non_owning_dataset<DataT, IdxT>> : std::true_type {};
+
+template <typename DataT, typename IdxT, typename LayoutPolicy, typename ContainerPolicy>
+struct is_strided_dataset<owning_dataset<DataT, IdxT, LayoutPolicy, ContainerPolicy>>
+  : std::true_type {};
+
+template <typename DatasetT>
+inline constexpr bool is_strided_dataset_v = is_strided_dataset<DatasetT>::value;
+
 /**
  * @brief Contstruct a strided matrix from any mdarray or mdspan.
  *
@@ -248,6 +266,77 @@ auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t 
 }
 
 /**
+ * @brief Contstruct a strided matrix from any mdarray.
+ *
+ * This function constructs an owning device matrix and copies the data.
+ * When the data is copied, padding elements are filled with zeroes.
+ *
+ * @tparam DataT
+ * @tparam IdxT
+ * @tparam LayoutPolicy
+ * @tparam ContainerPolicy
+ *
+ * @param[in] res raft resources handle
+ * @param[in] src the source mdarray or mdspan
+ * @param[in] required_stride the leading dimension (in elements)
+ * @return owning current-device-accessible strided matrix
+ */
+template <typename DataT, typename IdxT, typename LayoutPolicy, typename ContainerPolicy>
+auto make_strided_dataset(
+  const raft::resources& res,
+  raft::mdarray<DataT, raft::matrix_extent<IdxT>, LayoutPolicy, ContainerPolicy>&& src,
+  uint32_t required_stride) -> std::unique_ptr<strided_dataset<DataT, IdxT>>
+{
+  using value_type            = DataT;
+  using index_type            = IdxT;
+  using layout_type           = LayoutPolicy;
+  using container_policy_type = ContainerPolicy;
+  static_assert(std::is_same_v<layout_type, raft::layout_right> ||
+                  std::is_same_v<layout_type, raft::layout_right_padded<value_type>> ||
+                  std::is_same_v<layout_type, raft::layout_stride>,
+                "The input must be row-major");
+  RAFT_EXPECTS(src.extent(1) <= required_stride,
+               "The input row length must be not larger than the desired stride.");
+  const uint32_t src_stride = src.stride(0) > 0 ? src.stride(0) : src.extent(1);
+  const bool stride_matches = required_stride == src_stride;
+
+  auto out_layout =
+    raft::make_strided_layout(src.extents(), std::array<index_type, 2>{required_stride, 1});
+
+  using out_mdarray_type          = raft::device_matrix<value_type, index_type>;
+  using out_layout_type           = typename out_mdarray_type::layout_type;
+  using out_container_policy_type = typename out_mdarray_type::container_policy_type;
+  using out_owning_type =
+    owning_dataset<value_type, index_type, out_layout_type, out_container_policy_type>;
+
+  if constexpr (std::is_same_v<layout_type, out_layout_type> &&
+                std::is_same_v<container_policy_type, out_container_policy_type>) {
+    if (stride_matches) {
+      // Everything matches, we can own the mdarray
+      return std::make_unique<out_owning_type>(std::move(src), out_layout);
+    }
+  }
+  // Something is wrong: have to make a copy and produce an owning dataset
+  auto out_array =
+    raft::make_device_matrix<value_type, index_type>(res, src.extent(0), required_stride);
+
+  RAFT_CUDA_TRY(cudaMemsetAsync(out_array.data_handle(),
+                                0,
+                                out_array.size() * sizeof(value_type),
+                                raft::resource::get_cuda_stream(res)));
+  RAFT_CUDA_TRY(cudaMemcpy2DAsync(out_array.data_handle(),
+                                  sizeof(value_type) * required_stride,
+                                  src.data_handle(),
+                                  sizeof(value_type) * src_stride,
+                                  sizeof(value_type) * src.extent(1),
+                                  src.extent(0),
+                                  cudaMemcpyDefault,
+                                  raft::resource::get_cuda_stream(res)));
+
+  return std::make_unique<out_owning_type>(std::move(out_array), out_layout);
+}
+
+/**
  * @brief Contstruct a strided matrix from any mdarray or mdspan.
  *
  * A variant `make_strided_dataset` that allows specifying the byte alignment instead of the
@@ -261,14 +350,15 @@ auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t 
  * @return maybe owning current-device-accessible strided matrix
  */
 template <typename SrcT>
-auto make_aligned_dataset(const raft::resources& res, const SrcT& src, uint32_t align_bytes = 16)
+auto make_aligned_dataset(const raft::resources& res, SrcT src, uint32_t align_bytes = 16)
   -> std::unique_ptr<strided_dataset<typename SrcT::value_type, typename SrcT::index_type>>
 {
-  using value_type       = typename SrcT::value_type;
+  using source_type      = std::remove_cv_t<std::remove_reference_t<SrcT>>;
+  using value_type       = typename source_type::value_type;
   constexpr size_t kSize = sizeof(value_type);
   uint32_t required_stride =
     raft::round_up_safe<size_t>(src.extent(1) * kSize, std::lcm(align_bytes, kSize)) / kSize;
-  return make_strided_dataset(res, src, required_stride);
+  return make_strided_dataset(res, std::forward<SrcT>(src), required_stride);
 }
 /**
  * @brief VPQ compressed dataset.
@@ -284,23 +374,25 @@ auto make_aligned_dataset(const raft::resources& res, const SrcT& src, uint32_t 
  */
 template <typename MathT, typename IdxT>
 struct vpq_dataset : public dataset<IdxT> {
+  using index_type = IdxT;
+  using math_type  = MathT;
   /** Vector Quantization codebook - "coarse cluster centers". */
-  raft::device_matrix<MathT, uint32_t, raft::row_major> vq_code_book;
+  raft::device_matrix<math_type, uint32_t, raft::row_major> vq_code_book;
   /** Product Quantization codebook - "fine cluster centers".  */
-  raft::device_matrix<MathT, uint32_t, raft::row_major> pq_code_book;
+  raft::device_matrix<math_type, uint32_t, raft::row_major> pq_code_book;
   /** Compressed dataset.  */
-  raft::device_matrix<uint8_t, IdxT, raft::row_major> data;
+  raft::device_matrix<uint8_t, index_type, raft::row_major> data;
 
-  vpq_dataset(raft::device_matrix<MathT, uint32_t, raft::row_major>&& vq_code_book,
-              raft::device_matrix<MathT, uint32_t, raft::row_major>&& pq_code_book,
-              raft::device_matrix<uint8_t, IdxT, raft::row_major>&& data)
+  vpq_dataset(raft::device_matrix<math_type, uint32_t, raft::row_major>&& vq_code_book,
+              raft::device_matrix<math_type, uint32_t, raft::row_major>&& pq_code_book,
+              raft::device_matrix<uint8_t, index_type, raft::row_major>&& data)
     : vq_code_book{std::move(vq_code_book)},
       pq_code_book{std::move(pq_code_book)},
       data{std::move(data)}
   {
   }
 
-  [[nodiscard]] auto n_rows() const noexcept -> IdxT final { return data.extent(0); }
+  [[nodiscard]] auto n_rows() const noexcept -> index_type final { return data.extent(0); }
   [[nodiscard]] auto dim() const noexcept -> uint32_t final { return vq_code_book.extent(1); }
   [[nodiscard]] auto is_owning() const noexcept -> bool final { return true; }
 
@@ -354,10 +446,31 @@ struct vpq_dataset : public dataset<IdxT> {
   }
 };
 
+template <typename DatasetT>
+struct is_vpq_dataset : std::false_type {};
+
+template <typename MathT, typename IdxT>
+struct is_vpq_dataset<vpq_dataset<MathT, IdxT>> : std::true_type {};
+
+template <typename DatasetT>
+inline constexpr bool is_vpq_dataset_v = is_vpq_dataset<DatasetT>::value;
+
 namespace filtering {
 
+/**
+ * @defgroup neighbors_filtering Filtering for ANN Types
+ * @{
+ */
+
+enum class FilterType { None, Bitmap, Bitset };
+
+struct base_filter {
+  virtual ~base_filter()                     = default;
+  virtual FilterType get_filter_type() const = 0;
+};
+
 /* A filter that filters nothing. This is the default behavior. */
-struct none_ivf_sample_filter {
+struct none_sample_filter : public base_filter {
   inline _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
@@ -365,15 +478,14 @@ struct none_ivf_sample_filter {
     const uint32_t cluster_ix,
     // the index of the current sample inside the current inverted list
     const uint32_t sample_ix) const;
-};
 
-/* A filter that filters nothing. This is the default behavior. */
-struct none_cagra_sample_filter {
   inline _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
     // the index of the current sample
     const uint32_t sample_ix) const;
+
+  FilterType get_filter_type() const override { return FilterType::None; }
 };
 
 /**
@@ -405,22 +517,62 @@ struct ivf_to_sample_filter {
 };
 
 /**
- * @brief Filter an index with a bitset
+ * @brief Filter an index with a bitmap
  *
+ * @tparam bitmap_t Data type of the bitmap
  * @tparam index_t Indexing type
  */
-template <typename bitset_t, typename index_t>
-struct bitset_filter {
-  // View of the bitset to use as a filter
-  const cuvs::core::bitset_view<bitset_t, index_t> bitset_view_;
+template <typename bitmap_t, typename index_t>
+struct bitmap_filter : public base_filter {
+  using view_t = cuvs::core::bitmap_view<bitmap_t, index_t>;
 
-  bitset_filter(const cuvs::core::bitset_view<bitset_t, index_t> bitset_for_filtering);
+  // View of the bitset to use as a filter
+  const view_t bitmap_view_;
+
+  bitmap_filter(const view_t bitmap_for_filtering);
   inline _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
     // the index of the current sample
     const uint32_t sample_ix) const;
+
+  FilterType get_filter_type() const override { return FilterType::Bitmap; }
+
+  view_t view() const { return bitmap_view_; }
+
+  template <typename csr_matrix_t>
+  void to_csr(raft::resources const& handle, csr_matrix_t& csr);
 };
+
+/**
+ * @brief Filter an index with a bitset
+ *
+ * @tparam bitset_t Data type of the bitset
+ * @tparam index_t Indexing type
+ */
+template <typename bitset_t, typename index_t>
+struct bitset_filter : public base_filter {
+  using view_t = cuvs::core::bitset_view<bitset_t, index_t>;
+
+  // View of the bitset to use as a filter
+  const view_t bitset_view_;
+
+  bitset_filter(const view_t bitset_for_filtering);
+  inline _RAFT_HOST_DEVICE bool operator()(
+    // query index
+    const uint32_t query_ix,
+    // the index of the current sample
+    const uint32_t sample_ix) const;
+
+  FilterType get_filter_type() const override { return FilterType::Bitset; }
+
+  view_t view() const { return bitset_view_; }
+
+  template <typename csr_matrix_t>
+  void to_csr(raft::resources const& handle, csr_matrix_t& csr);
+};
+
+/** @} */  // end group neighbors_filtering
 
 /**
  * If the filtering depends on the index of a sample, then the following
@@ -589,4 +741,133 @@ enable_if_valid_list_t<ListT> deserialize_list(const raft::resources& handle,
                                                const typename ListT::spec_type& device_spec);
 }  // namespace ivf
 
-};  // namespace cuvs::neighbors
+using namespace raft;
+
+template <typename AnnIndexType, typename T, typename IdxT>
+struct iface {
+  iface() : mutex_(std::make_shared<std::mutex>()) {}
+
+  const IdxT size() const { return index_.value().size(); }
+
+  std::optional<AnnIndexType> index_;
+  std::shared_ptr<std::mutex> mutex_;
+};
+
+template <typename AnnIndexType, typename T, typename IdxT, typename Accessor>
+void build(const raft::resources& handle,
+           cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+           const cuvs::neighbors::index_params* index_params,
+           raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> index_dataset);
+
+template <typename AnnIndexType, typename T, typename IdxT, typename Accessor1, typename Accessor2>
+void extend(
+  const raft::resources& handle,
+  cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+  raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor1> new_vectors,
+  std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, Accessor2>>
+    new_indices);
+
+template <typename AnnIndexType, typename T, typename IdxT>
+void search(const raft::resources& handle,
+            const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+            const cuvs::neighbors::search_params* search_params,
+            raft::device_matrix_view<const T, int64_t, row_major> h_queries,
+            raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,
+            raft::device_matrix_view<float, int64_t, row_major> d_distances);
+
+template <typename AnnIndexType, typename T, typename IdxT>
+void serialize(const raft::resources& handle,
+               const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+               std::ostream& os);
+
+template <typename AnnIndexType, typename T, typename IdxT>
+void deserialize(const raft::resources& handle,
+                 cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+                 std::istream& is);
+
+template <typename AnnIndexType, typename T, typename IdxT>
+void deserialize(const raft::resources& handle,
+                 cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
+                 const std::string& filename);
+
+/// \defgroup mg_cpp_index_params ANN MG index build parameters
+
+/** Distribution mode */
+/// \ingroup mg_cpp_index_params
+enum distribution_mode {
+  /** Index is replicated on each device, favors throughput */
+  REPLICATED,
+  /** Index is split on several devices, favors scaling */
+  SHARDED
+};
+
+/// \defgroup mg_cpp_search_params ANN MG search parameters
+
+/** Search mode when using a replicated index */
+/// \ingroup mg_cpp_search_params
+enum replicated_search_mode {
+  /** Search queries are splited to maintain equal load on GPUs */
+  LOAD_BALANCER,
+  /** Each search query is processed by a single GPU in a round-robin fashion */
+  ROUND_ROBIN
+};
+
+/** Merge mode when using a sharded index */
+/// \ingroup mg_cpp_search_params
+enum sharded_merge_mode {
+  /** Search batches are merged on the root rank */
+  MERGE_ON_ROOT_RANK,
+  /** Search batches are merged in a tree reduction fashion */
+  TREE_MERGE
+};
+
+/** Build parameters */
+/// \ingroup mg_cpp_index_params
+template <typename Upstream>
+struct mg_index_params : public Upstream {
+  mg_index_params() : mode(SHARDED) {}
+
+  mg_index_params(const Upstream& sp) : Upstream(sp), mode(SHARDED) {}
+
+  /** Distribution mode */
+  cuvs::neighbors::distribution_mode mode = SHARDED;
+};
+
+/** Search parameters */
+/// \ingroup mg_cpp_search_params
+template <typename Upstream>
+struct mg_search_params : public Upstream {
+  mg_search_params() : search_mode(LOAD_BALANCER), merge_mode(TREE_MERGE) {}
+
+  mg_search_params(const Upstream& sp)
+    : Upstream(sp), search_mode(LOAD_BALANCER), merge_mode(TREE_MERGE)
+  {
+  }
+
+  /** Replicated search mode */
+  cuvs::neighbors::replicated_search_mode search_mode = LOAD_BALANCER;
+  /** Sharded merge mode */
+  cuvs::neighbors::sharded_merge_mode merge_mode = TREE_MERGE;
+  /** Number of rows per batch */
+  int64_t n_rows_per_batch = 1 << 20;
+};
+
+template <typename AnnIndexType, typename T, typename IdxT>
+struct mg_index {
+  mg_index(const raft::resources& clique, distribution_mode mode);
+  mg_index(const raft::resources& clique, const std::string& filename);
+
+  mg_index(const mg_index&)                    = delete;
+  mg_index(mg_index&&)                         = default;
+  auto operator=(const mg_index&) -> mg_index& = delete;
+  auto operator=(mg_index&&) -> mg_index&      = default;
+
+  distribution_mode mode_;
+  int num_ranks_;
+  std::vector<iface<AnnIndexType, T, IdxT>> ann_interfaces_;
+
+  // for load balancing mechanism
+  std::shared_ptr<std::atomic<int64_t>> round_robin_counter_;
+};
+
+}  // namespace cuvs::neighbors

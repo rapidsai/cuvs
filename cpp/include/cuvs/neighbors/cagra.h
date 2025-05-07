@@ -17,6 +17,9 @@
 #pragma once
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/distance/distance.h>
+#include <cuvs/neighbors/common.h>
+#include <cuvs/neighbors/ivf_pq.h>
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -40,7 +43,9 @@ enum cuvsCagraGraphBuildAlgo {
   /* Use IVF-PQ to build all-neighbors knn graph */
   IVF_PQ,
   /* Experimental, use NN-Descent to build all-neighbors knn graph */
-  NN_DESCENT
+  NN_DESCENT,
+  /* Experimental, use iterative cagra search and optimize to build the knn graph */
+  ITERATIVE_CAGRA_SEARCH
 };
 
 /** Parameters for VPQ compression. */
@@ -82,11 +87,21 @@ struct cuvsCagraCompressionParams {
 
 typedef struct cuvsCagraCompressionParams* cuvsCagraCompressionParams_t;
 
+struct cuvsIvfPqParams {
+  cuvsIvfPqIndexParams_t ivf_pq_build_params;
+  cuvsIvfPqSearchParams_t ivf_pq_search_params;
+  float refinement_rate;
+};
+
+typedef struct cuvsIvfPqParams* cuvsIvfPqParams_t;
+
 /**
  * @brief Supplemental parameters to build CAGRA Index
  *
  */
 struct cuvsCagraIndexParams {
+  /** Distance type. */
+  cuvsDistanceType metric;
   /** Degree of input graph for pruning. */
   size_t intermediate_graph_degree;
   /** Degree of output graph. */
@@ -101,6 +116,10 @@ struct cuvsCagraIndexParams {
    * NOTE: this is experimental new API, consider it unsafe.
    */
   cuvsCagraCompressionParams_t compression;
+  /**
+   * Optional: specify ivf pq params when `build_algo = IVF_PQ`
+   */
+  cuvsIvfPqParams_t graph_build_params;
 };
 
 typedef struct cuvsCagraIndexParams* cuvsCagraIndexParams_t;
@@ -136,6 +155,45 @@ cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* param
  * @return cuvsError_t
  */
 cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params);
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup cagra_c_extend_params C API for CUDA ANN Graph-based nearest neighbor search
+ * @{
+ */
+/**
+ * @brief Supplemental parameters to extend CAGRA Index
+ *
+ */
+struct cuvsCagraExtendParams {
+  /** The additional dataset is divided into chunks and added to the graph. This is the knob to
+   * adjust the tradeoff between the recall and operation throughput. Large chunk sizes can result
+   * in high throughput, but use more working memory (O(max_chunk_size*degree^2)). This can also
+   * degrade recall because no edges are added between the nodes in the same chunk. Auto select when
+   * 0. */
+  uint32_t max_chunk_size;
+};
+
+typedef struct cuvsCagraExtendParams* cuvsCagraExtendParams_t;
+
+/**
+ * @brief Allocate CAGRA Extend params, and populate with default values
+ *
+ * @param[in] params cuvsCagraExtendParams_t to allocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params);
+
+/**
+ * @brief De-allocate CAGRA Extend params
+ *
+ * @param[in] params
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t params);
 
 /**
  * @}
@@ -211,6 +269,30 @@ struct cuvsCagraSearchParams {
   uint32_t num_random_samplings;
   /** Bit mask used for initial random seed node selection. */
   uint64_t rand_xor_mask;
+
+  /** Whether to use the persistent version of the kernel (only SINGLE_CTA is supported a.t.m.) */
+  bool persistent;
+  /** Persistent kernel: time in seconds before the kernel stops if no requests received. */
+  float persistent_lifetime;
+  /**
+   * Set the fraction of maximum grid size used by persistent kernel.
+   * Value 1.0 means the kernel grid size is maximum possible for the selected device.
+   * The value must be greater than 0.0 and not greater than 1.0.
+   *
+   * One may need to run other kernels alongside this persistent kernel. This parameter can
+   * be used to reduce the grid size of the persistent kernel to leave a few SMs idle.
+   * Note: running any other work on GPU alongside with the persistent kernel makes the setup
+   * fragile.
+   *   - Running another kernel in another thread usually works, but no progress guaranteed
+   *   - Any CUDA allocations block the context (this issue may be obscured by using pools)
+   *   - Memory copies to not-pinned host memory may block the context
+   *
+   * Even when we know there are no other kernels working at the same time, setting
+   * kDeviceUsage to 1.0 surprisingly sometimes hurts performance. Proceed with care.
+   * If you suspect this is an issue, you can reduce this number to ~0.9 without a significant
+   * impact on the throughput.
+   */
+  float persistent_device_usage;
 };
 
 typedef struct cuvsCagraSearchParams* cuvsCagraSearchParams_t;
@@ -268,6 +350,15 @@ cuvsError_t cuvsCagraIndexCreate(cuvsCagraIndex_t* index);
 cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index);
 
 /**
+ * @brief Get dimension of the CAGRA index
+ *
+ * @param[in] index CAGRA index
+ * @param[out] dim return dimension of the index
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int* dim);
+
+/**
  * @}
  */
 
@@ -281,8 +372,9 @@ cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index);
  *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`,
  *        or `kDLCPU`. Also, acceptable underlying types are:
  *        1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
- *        2. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
- *        3. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+ *        2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
+ *        3. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
+ *        4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
  *
  * @code {.c}
  * #include <cuvs/core/c_api.h>
@@ -328,6 +420,36 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
  */
 
 /**
+ * @defgroup cagra_c_extend_params C API for CUDA ANN Graph-based nearest neighbor search
+ * @{
+ */
+
+/**
+ * @brief Extend a CAGRA index with a `DLManagedTensor` which has underlying
+ *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`,
+ *        or `kDLCPU`. Also, acceptable underlying types are:
+ *        1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *        2. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
+ *        3. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] params cuvsCagraExtendParams_t used to extend CAGRA index
+ * @param[in] additional_dataset DLManagedTensor* additional dataset
+ * @param[in,out] index cuvsCagraIndex_t CAGRA index
+ * @param[out] return_dataset DLManagedTensor* extended dataset
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraExtend(cuvsResources_t res,
+                            cuvsCagraExtendParams_t params,
+                            DLManagedTensor* additional_dataset,
+                            cuvsCagraIndex_t index,
+                            DLManagedTensor* return_dataset);
+
+/**
+ * @}
+ */
+
+/**
  * @defgroup cagra_c_index_search C API for CUDA ANN Graph-based nearest neighbor search
  * @{
  */
@@ -337,8 +459,13 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
  *        It is also important to note that the CAGRA Index must have been built
  *        with the same type of `queries`, such that `index.dtype.code ==
  * queries.dl_tensor.dtype.code` Types for input are:
- *        1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *        1. `queries`:
+ *          a. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *          b. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
+ *          c. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
+ *          d. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
  *        2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
+ *                     or `kDLDataType.code == kDLInt`  and `kDLDataType.bits = 64`
  *        3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *
  * @code {.c}
@@ -373,13 +500,16 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
  * @param[in] queries DLManagedTensor* queries dataset to search
  * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
  * @param[out] distances DLManagedTensor* output `k` distances for queries
+ * @param[in] filter cuvsFilter input filter that can be used
+              to filter queries and neighbors based on the given bitset.
  */
 cuvsError_t cuvsCagraSearch(cuvsResources_t res,
                             cuvsCagraSearchParams_t params,
                             cuvsCagraIndex_t index,
                             DLManagedTensor* queries,
                             DLManagedTensor* neighbors,
-                            DLManagedTensor* distances);
+                            DLManagedTensor* distances,
+                            cuvsFilter filter);
 
 /**
  * @}
@@ -394,7 +524,7 @@ cuvsError_t cuvsCagraSearch(cuvsResources_t res,
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
- * @code{.cpp}
+ * @code{.c}
  * #include <cuvs/neighbors/cagra.h>
  *
  * // Create cuvsResources_t
@@ -415,6 +545,34 @@ cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
                                const char* filename,
                                cuvsCagraIndex_t index,
                                bool include_dataset);
+
+/**
+ * Save the CAGRA index to file in hnswlib format.
+ * NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
+ *       as the serialization format is not compatible with the original hnswlib.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.c}
+ * #include <cuvs/core/c_api.h>
+ * #include <cuvs/neighbors/cagra.h>
+ *
+ * // Create cuvsResources_t
+ * cuvsResources_t res;
+ * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+ *
+ * // create an index with `cuvsCagraBuild`
+ * cuvsCagraSerializeHnswlib(res, "/path/to/index", index);
+ * @endcode
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] filename the file name for saving the index
+ * @param[in] index CAGRA index
+ *
+ */
+cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
+                                        const char* filename,
+                                        cuvsCagraIndex_t index);
 
 /**
  * Load index from file.

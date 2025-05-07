@@ -24,7 +24,7 @@
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/kvp.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -45,6 +45,7 @@
 #include <cuda.h>
 #include <thrust/fill.h>
 #include <thrust/for_each.h>
+#include <thrust/iterator/transform_iterator.h>
 
 #include <algorithm>
 #include <cmath>
@@ -199,8 +200,7 @@ void computeClusterCost(raft::resources const& handle,
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
-  cub::TransformInputIterator<OutputT, MainOpT, InputT*> itr(minClusterDistance.data_handle(),
-                                                             main_op);
+  thrust::transform_iterator<MainOpT, InputT*> itr(minClusterDistance.data_handle(), main_op);
 
   size_t temp_storage_bytes = 0;
   RAFT_CUDA_TRY(cub::DeviceReduce::Reduce(nullptr,
@@ -293,7 +293,6 @@ void pairwise_distance_kmeans(raft::resources const& handle,
                               raft::device_matrix_view<const DataT, IndexT> X,
                               raft::device_matrix_view<const DataT, IndexT> centroids,
                               raft::device_matrix_view<DataT, IndexT> pairwiseDistance,
-                              rmm::device_uvector<char>& workspace,
                               cuvs::distance::DistanceType metric)
 {
   auto n_samples  = X.extent(0);
@@ -303,15 +302,23 @@ void pairwise_distance_kmeans(raft::resources const& handle,
   ASSERT(X.extent(1) == centroids.extent(1),
          "# features in dataset and centroids are different (must be same)");
 
-  cuvs::distance::pairwise_distance(handle,
-                                    X.data_handle(),
-                                    centroids.data_handle(),
-                                    pairwiseDistance.data_handle(),
-                                    n_samples,
-                                    n_clusters,
-                                    n_features,
-                                    workspace,
-                                    metric);
+  if (metric == cuvs::distance::DistanceType::L2Expanded) {
+    cuvs::distance::distance<cuvs::distance::DistanceType::L2Expanded,
+                             DataT,
+                             DataT,
+                             DataT,
+                             raft::layout_c_contiguous,
+                             IndexT>(handle, X, centroids, pairwiseDistance);
+  } else if (metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+    cuvs::distance::distance<cuvs::distance::DistanceType::L2SqrtExpanded,
+                             DataT,
+                             DataT,
+                             DataT,
+                             raft::layout_c_contiguous,
+                             IndexT>(handle, X, centroids, pairwiseDistance);
+  } else {
+    RAFT_FAIL("kmeans requires L2Expanded or L2SqrtExpanded distance, have %i", metric);
+  }
 }
 
 // shuffle and randomly select 'n_samples_to_gather' from input 'in' and stores
@@ -461,7 +468,7 @@ void minClusterAndDistanceCompute(
         // calculate pairwise distance between current tile of cluster centroids
         // and input dataset
         pairwise_distance_kmeans<DataT, IndexT>(
-          handle, datasetView, centroidsView, pairwiseDistanceView, workspace, metric);
+          handle, datasetView, centroidsView, pairwiseDistanceView, metric);
 
         // argmin reduction returning <index, value> pair
         // calculates the closest centroid and the distance to the closest
@@ -591,7 +598,7 @@ void minClusterDistanceCompute(raft::resources const& handle,
         // calculate pairwise distance between current tile of cluster centroids
         // and input dataset
         pairwise_distance_kmeans<DataT, IndexT>(
-          handle, datasetView, centroidsView, pairwiseDistanceView, workspace, metric);
+          handle, datasetView, centroidsView, pairwiseDistanceView, metric);
 
         raft::linalg::coalescedReduction(minClusterDistanceView.data_handle(),
                                          pairwiseDistanceView.data_handle(),
@@ -652,9 +659,8 @@ void countSamplesInCluster(raft::resources const& handle,
   // and converting them to just return the Key to be used in reduce_rows_by_key
   // prims
   cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT> conversion_op;
-  cub::TransformInputIterator<IndexT,
-                              cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT>,
-                              raft::KeyValuePair<IndexT, DataT>*>
+  thrust::transform_iterator<cuvs::cluster::kmeans::detail::KeyValueIndexOp<IndexT, DataT>,
+                             raft::KeyValuePair<IndexT, DataT>*>
     itr(minClusterAndDistance.data_handle(), conversion_op);
 
   // count # of samples in each cluster

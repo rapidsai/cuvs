@@ -72,6 +72,10 @@ struct ivf_pq_params {
 };
 
 using nn_descent_params = cuvs::neighbors::nn_descent::index_params;
+
+// **** Experimental ****
+using iterative_search_params = cuvs::neighbors::search_params;
+
 }  // namespace graph_build_params
 
 struct index_params : cuvs::neighbors::index_params {
@@ -87,9 +91,9 @@ struct index_params : cuvs::neighbors::index_params {
 
   /** Parameters for graph building.
    *
-   * Set ivf_pq_params or nn_descent_params to select the graph build algorithm and control their
-   * parameters. The default (std::monostate) is to use a heuristic to decide the algorithm and its
-   * parameters.
+   * Set ivf_pq_params, nn_descent_params, or iterative_search_params to select the graph build
+   * algorithm and control their parameters. The default (std::monostate) is to use a heuristic
+   *  to decide the algorithm and its parameters.
    *
    * @code{.cpp}
    * cagra::index_params params;
@@ -100,11 +104,16 @@ struct index_params : cuvs::neighbors::index_params {
    * // 2. Choose NN Descent algorithm for kNN graph construction
    * params.graph_build_params =
    * cagra::graph_build_params::nn_descent_params(params.intermediate_graph_degree);
+   *
+   * // 3. Choose iterative graph building using CAGRA's search() and optimize()  [Experimental]
+   * params.graph_build_params =
+   * cagra::graph_build_params::iterative_search_params();
    * @endcode
    */
   std::variant<std::monostate,
                graph_build_params::ivf_pq_params,
-               graph_build_params::nn_descent_params>
+               graph_build_params::nn_descent_params,
+               graph_build_params::iterative_search_params>
     graph_build_params;
 
   /**
@@ -205,6 +214,37 @@ struct search_params : cuvs::neighbors::search_params {
   uint32_t num_random_samplings = 1;
   /** Bit mask used for initial random seed node selection. */
   uint64_t rand_xor_mask = 0x128394;
+
+  /** Whether to use the persistent version of the kernel (only SINGLE_CTA is supported a.t.m.) */
+  bool persistent = false;
+  /** Persistent kernel: time in seconds before the kernel stops if no requests received. */
+  float persistent_lifetime = 2;
+  /**
+   * Set the fraction of maximum grid size used by persistent kernel.
+   * Value 1.0 means the kernel grid size is maximum possible for the selected device.
+   * The value must be greater than 0.0 and not greater than 1.0.
+   *
+   * One may need to run other kernels alongside this persistent kernel. This parameter can
+   * be used to reduce the grid size of the persistent kernel to leave a few SMs idle.
+   * Note: running any other work on GPU alongside with the persistent kernel makes the setup
+   * fragile.
+   *   - Running another kernel in another thread usually works, but no progress guaranteed
+   *   - Any CUDA allocations block the context (this issue may be obscured by using pools)
+   *   - Memory copies to not-pinned host memory may block the context
+   *
+   * Even when we know there are no other kernels working at the same time, setting
+   * kDeviceUsage to 1.0 surprisingly sometimes hurts performance. Proceed with care.
+   * If you suspect this is an issue, you can reduce this number to ~0.9 without a significant
+   * impact on the throughput.
+   */
+  float persistent_device_usage = 1.0;
+
+  /**
+   * A parameter indicating the rate of nodes to be filtered-out, when filtering is used.
+   * The value must be equal to or greater than 0.0 and less than 1.0. Default value is
+   * negative, in which case the filtering rate is automatically calculated.
+   */
+  float filtering_rate = -1.0;
 };
 
 /**
@@ -223,6 +263,51 @@ struct extend_params {
    * degrade recall because no edges are added between the nodes in the same chunk. Auto select when
    * 0. */
   uint32_t max_chunk_size = 0;
+};
+/**
+ * @}
+ */
+
+/**
+ * @defgroup cagra_cpp_merge_params CAGRA index merge parameters
+ * @{
+ */
+
+/**
+ * @brief Determines the strategy for merging CAGRA graphs.
+ *
+ * @note Currently, only the PHYSICAL strategy is supported.
+ */
+enum MergeStrategy {
+  /**
+   * @brief Physical merge: Builds a new CAGRA graph from the union of dataset points
+   * in existing CAGRA graphs.
+   *
+   * This is expensive to build but does not impact search latency or quality.
+   * Preferred for many smaller CAGRA graphs.
+   *
+   * @note Currently, this is the only supported strategy.
+   */
+  PHYSICAL
+};
+
+/**
+ * @brief Parameters for merging CAGRA indexes.
+ */
+struct merge_params {
+  merge_params() = default;
+
+  /**
+   * @brief Constructs merge parameters with given index parameters.
+   * @param params Parameters for creating the output index.
+   */
+  explicit merge_params(const cagra::index_params& params) : output_index_params(params) {}
+
+  /// Parameters for creating the output index.
+  cagra::index_params output_index_params;
+
+  /// Strategy for merging. Defaults to `MergeStrategy::PHYSICAL`.
+  MergeStrategy strategy = MergeStrategy::PHYSICAL;
 };
 
 /**
@@ -243,11 +328,18 @@ static_assert(std::is_aggregate_v<search_params>);
  * The index stores the dataset and a kNN graph in device memory.
  *
  * @tparam T data element type
- * @tparam IdxT type of the vector indices (represent dataset.extent(0))
+ * @tparam IdxT the data type used to store the neighbor indices in the  search graph.
+ *              It must be large enough to represent values up to dataset.extent(0).
  *
  */
 template <typename T, typename IdxT>
 struct index : cuvs::neighbors::index {
+  using index_params_type  = cagra::index_params;
+  using search_params_type = cagra::search_params;
+  using index_type         = IdxT;
+  using value_type         = T;
+  using dataset_index_type = int64_t;
+
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 
@@ -339,7 +431,7 @@ struct index : cuvs::neighbors::index {
    *   // search K nearest neighbours
    *   auto neighbors = raft::make_device_matrix<uint32_t, int64_t>(res, n_queries, k);
    *   auto distances = raft::make_device_matrix<float, int64_t>(res, n_queries, k);
-   *   cagra::search(res, search_params, index, queries, neighbors, distances);
+   *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
    * @endcode
    *   In the above example, we have passed a host dataset to build. The returned index will own a
    * device copy of the dataset and the knn_graph. In contrast, if we pass the dataset as a
@@ -421,14 +513,14 @@ struct index : cuvs::neighbors::index {
    */
   template <typename DatasetT>
   auto update_dataset(raft::resources const& res, DatasetT&& dataset)
-    -> std::enable_if_t<std::is_base_of_v<cuvs::neighbors::dataset<int64_t>, DatasetT>>
+    -> std::enable_if_t<std::is_base_of_v<cuvs::neighbors::dataset<dataset_index_type>, DatasetT>>
   {
     dataset_ = std::make_unique<DatasetT>(std::move(dataset));
   }
 
   template <typename DatasetT>
   auto update_dataset(raft::resources const& res, std::unique_ptr<DatasetT>&& dataset)
-    -> std::enable_if_t<std::is_base_of_v<neighbors::dataset<int64_t>, DatasetT>>
+    -> std::enable_if_t<std::is_base_of_v<neighbors::dataset<dataset_index_type>, DatasetT>>
   {
     dataset_ = std::move(dataset);
   }
@@ -472,7 +564,7 @@ struct index : cuvs::neighbors::index {
   cuvs::distance::DistanceType metric_;
   raft::device_matrix<IdxT, int64_t, raft::row_major> graph_;
   raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
-  std::unique_ptr<neighbors::dataset<int64_t>> dataset_;
+  std::unique_ptr<neighbors::dataset<dataset_index_type>> dataset_;
 };
 /**
  * @}
@@ -506,7 +598,7 @@ struct index : cuvs::neighbors::index {
  *   // search K nearest neighbours
  *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
  *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
- *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
  * @endcode
  *
  * @param[in] res
@@ -543,7 +635,7 @@ auto build(raft::resources const& res,
  *   // search K nearest neighbours
  *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
  *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
- *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
  * @endcode
  *
  * @param[in] res
@@ -580,7 +672,79 @@ auto build(raft::resources const& res,
  *   // search K nearest neighbours
  *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
  *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
- *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (device) to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed cagra index
+ */
+auto build(raft::resources const& res,
+           const cuvs::neighbors::cagra::index_params& params,
+           raft::device_matrix_view<const half, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::cagra::index<half, uint32_t>;
+
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * The build consist of two steps: build an intermediate knn-graph, and optimize it to
+ * create the final graph. The index_params struct controls the node degree of these
+ * graphs.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = cagra::build(res, index_params, dataset);
+ *   // use default search parameters
+ *   cagra::search_params search_params;
+ *   // search K nearest neighbours
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ *
+ * @return the constructed cagra index
+ */
+auto build(raft::resources const& res,
+           const cuvs::neighbors::cagra::index_params& params,
+           raft::host_matrix_view<const half, int64_t, raft::row_major> dataset)
+  -> cuvs::neighbors::cagra::index<half, uint32_t>;
+
+/**
+ * @brief Build the index from the dataset for efficient search.
+ *
+ * The build consist of two steps: build an intermediate knn-graph, and optimize it to
+ * create the final graph. The index_params struct controls the node degree of these
+ * graphs.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset
+ *   auto index = cagra::build(res, index_params, dataset);
+ *   // use default search parameters
+ *   cagra::search_params search_params;
+ *   // search K nearest neighbours
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
  * @endcode
  *
  * @param[in] res
@@ -617,7 +781,7 @@ auto build(raft::resources const& res,
  *   // search K nearest neighbours
  *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
  *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
- *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
  * @endcode
  *
  * @param[in] res
@@ -654,7 +818,7 @@ auto build(raft::resources const& res,
  *   // search K nearest neighbours
  *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
  *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
- *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
  * @endcode
  *
  * @param[in] res
@@ -691,7 +855,7 @@ auto build(raft::resources const& res,
  *   // search K nearest neighbours
  *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
  *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
- *   cagra::search(res, search_params, index, queries, neighbors, distances);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
  * @endcode
  *
  * @param[in] res
@@ -951,17 +1115,16 @@ void extend(
  *
  * See the [cagra::build](#cagra::build) documentation for a usage example.
  *
- * @tparam T data element type
- * @tparam IdxT type of the indices
- *
  * @param[in] res raft resources
  * @param[in] params configure the search
- * @param[in] idx cagra index
+ * @param[in] index cagra index
  * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
  * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
  * [n_queries, k]
  * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
  * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering)
  */
 
 void search(raft::resources const& res,
@@ -969,15 +1132,14 @@ void search(raft::resources const& res,
             const cuvs::neighbors::cagra::index<float, uint32_t>& index,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
-            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
 
 /**
  * @brief Search ANN using the constructed index.
  *
  * See the [cagra::build](#cagra::build) documentation for a usage example.
- *
- * @tparam T data element type
- * @tparam IdxT type of the indices
  *
  * @param[in] res raft resources
  * @param[in] params configure the search
@@ -987,21 +1149,47 @@ void search(raft::resources const& res,
  * [n_queries, k]
  * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
  * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering)
+ */
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::index<half, uint32_t>& index,
+            raft::device_matrix_view<const half, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index cagra index
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering)
  */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index,
             raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
-            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
 
 /**
  * @brief Search ANN using the constructed index.
  *
  * See the [cagra::build](#cagra::build) documentation for a usage example.
- *
- * @tparam T data element type
- * @tparam IdxT type of the indices
  *
  * @param[in] res raft resources
  * @param[in] params configure the search
@@ -1011,13 +1199,119 @@ void search(raft::resources const& res,
  * [n_queries, k]
  * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
  * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering)
  */
 void search(raft::resources const& res,
             cuvs::neighbors::cagra::search_params const& params,
             const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
             raft::device_matrix_view<uint32_t, int64_t, raft::row_major> neighbors,
-            raft::device_matrix_view<float, int64_t, raft::row_major> distances);
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index cagra index
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering)
+ */
+
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::index<float, uint32_t>& index,
+            raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index cagra index
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering)
+ */
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::index<half, uint32_t>& index,
+            raft::device_matrix_view<const half, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index cagra index
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering)
+ */
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index,
+            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+/**
+ * @brief Search ANN using the constructed index.
+ *
+ * See the [cagra::build](#cagra::build) documentation for a usage example.
+ *
+ * @param[in] res raft resources
+ * @param[in] params configure the search
+ * @param[in] index cagra index
+ * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
+ * @param[out] neighbors a device matrix view to the indices of the neighbors in the source dataset
+ * [n_queries, k]
+ * @param[out] distances a device matrix view to the distances to the selected neighbors [n_queries,
+ * k]
+ * @param[in] sample_filter an optional device filter function object that greenlights samples
+ * for a given query. (none_sample_filter for no filtering)
+ */
+void search(raft::resources const& res,
+            cuvs::neighbors::cagra::search_params const& params,
+            const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index,
+            raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
 /**
  * @}
  */
@@ -1132,6 +1426,111 @@ void serialize(raft::resources const& handle,
 void deserialize(raft::resources const& handle,
                  std::istream& is,
                  cuvs::neighbors::cagra::index<float, uint32_t>* index);
+/**
+ * Save the index to file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+ * // create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+ * cuvs::neighbors::cagra::serialize(handle, filename, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the file name for saving the index
+ * @param[in] index CAGRA index
+ * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ *
+ */
+void serialize(raft::resources const& handle,
+               const std::string& filename,
+               const cuvs::neighbors::cagra::index<half, uint32_t>& index,
+               bool include_dataset = true);
+
+/**
+ * Load index from file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create a string with a filepath
+ * std::string filename("/path/to/index");
+
+ * cuvs::neighbors::cagra::index<half, uint32_t> index;
+ * cuvs::neighbors::cagra::deserialize(handle, filename, &index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] filename the name of the file that stores the index
+ * @param[out] index the cagra index
+ */
+void deserialize(raft::resources const& handle,
+                 const std::string& filename,
+                 cuvs::neighbors::cagra::index<half, uint32_t>* index);
+
+/**
+ * Write the index to an output stream
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an output stream
+ * std::ostream os(std::cout.rdbuf());
+ * // create an index with `auto index = cuvs::neighbors::cagra::build(...);`
+ * cuvs::neighbors::cagra::serialize(handle, os, index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] os output stream
+ * @param[in] index CAGRA index
+ * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ */
+void serialize(raft::resources const& handle,
+               std::ostream& os,
+               const cuvs::neighbors::cagra::index<half, uint32_t>& index,
+               bool include_dataset = true);
+
+/**
+ * Load index from input stream
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <cuvs/neighbors/cagra.hpp>
+ *
+ * raft::resources handle;
+ *
+ * // create an input stream
+ * std::istream is(std::cin.rdbuf());
+ * cuvs::neighbors::cagra::index<half, uint32_t> index;
+ * cuvs::neighbors::cagra::deserialize(handle, is, &index);
+ * @endcode
+ *
+ * @param[in] handle the raft handle
+ * @param[in] is input stream
+ * @param[out] index the cagra index
+ */
+void deserialize(raft::resources const& handle,
+                 std::istream& is,
+                 cuvs::neighbors::cagra::index<half, uint32_t>* index);
 
 /**
  * Save the index to file.
@@ -1345,6 +1744,8 @@ void deserialize(raft::resources const& handle,
 
 /**
  * Write the CAGRA built index as a base layer HNSW index to an output stream
+ * NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
+ *       as the serialization format is not compatible with the original hnswlib.
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
@@ -1363,14 +1764,21 @@ void deserialize(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] os output stream
  * @param[in] index CAGRA index
+ * @param[in] dataset [optional] host array that stores the dataset, required if the index
+ *            does not contain the dataset.
  *
  */
-void serialize_to_hnswlib(raft::resources const& handle,
-                          std::ostream& os,
-                          const cuvs::neighbors::cagra::index<float, uint32_t>& index);
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  std::ostream& os,
+  const cuvs::neighbors::cagra::index<float, uint32_t>& index,
+  std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>> dataset =
+    std::nullopt);
 
 /**
  * Save a CAGRA build index in hnswlib base-layer-only serialized format
+ * NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
+ *       as the serialization format is not compatible with the original hnswlib.
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
@@ -1390,14 +1798,21 @@ void serialize_to_hnswlib(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] filename the file name for saving the index
  * @param[in] index CAGRA index
+ * @param[in] dataset [optional] host array that stores the dataset, required if the index
+ *            does not contain the dataset.
  *
  */
-void serialize_to_hnswlib(raft::resources const& handle,
-                          const std::string& filename,
-                          const cuvs::neighbors::cagra::index<float, uint32_t>& index);
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  const std::string& filename,
+  const cuvs::neighbors::cagra::index<float, uint32_t>& index,
+  std::optional<raft::host_matrix_view<const float, int64_t, raft::row_major>> dataset =
+    std::nullopt);
 
 /**
  * Write the CAGRA built index as a base layer HNSW index to an output stream
+ * NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
+ *       as the serialization format is not compatible with the original hnswlib.
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
@@ -1416,14 +1831,21 @@ void serialize_to_hnswlib(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] os output stream
  * @param[in] index CAGRA index
+ * @param[in] dataset [optional] host array that stores the dataset, required if the index
+ *            does not contain the dataset.
  *
  */
-void serialize_to_hnswlib(raft::resources const& handle,
-                          std::ostream& os,
-                          const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index);
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  std::ostream& os,
+  const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index,
+  std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
 
 /**
  * Save a CAGRA build index in hnswlib base-layer-only serialized format
+ * NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
+ *       as the serialization format is not compatible with the original hnswlib.
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
@@ -1443,14 +1865,21 @@ void serialize_to_hnswlib(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] filename the file name for saving the index
  * @param[in] index CAGRA index
+ * @param[in] dataset [optional] host array that stores the dataset, required if the index
+ *            does not contain the dataset.
  *
  */
-void serialize_to_hnswlib(raft::resources const& handle,
-                          const std::string& filename,
-                          const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index);
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  const std::string& filename,
+  const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index,
+  std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
 
 /**
  * Write the CAGRA built index as a base layer HNSW index to an output stream
+ * NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
+ *       as the serialization format is not compatible with the original hnswlib.
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
@@ -1469,14 +1898,21 @@ void serialize_to_hnswlib(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] os output stream
  * @param[in] index CAGRA index
+ * @param[in] dataset [optional] host array that stores the dataset, required if the index
+ *            does not contain the dataset.
  *
  */
-void serialize_to_hnswlib(raft::resources const& handle,
-                          std::ostream& os,
-                          const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index);
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  std::ostream& os,
+  const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index,
+  std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
 
 /**
  * Save a CAGRA build index in hnswlib base-layer-only serialized format
+ * NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
+ *       as the serialization format is not compatible with the original hnswlib.
  *
  * Experimental, both the API and the serialization format are subject to change.
  *
@@ -1496,14 +1932,615 @@ void serialize_to_hnswlib(raft::resources const& handle,
  * @param[in] handle the raft handle
  * @param[in] filename the file name for saving the index
  * @param[in] index CAGRA index
+ * @param[in] dataset [optional] host array that stores the dataset, required if the index
+ *            does not contain the dataset.
  *
  */
-void serialize_to_hnswlib(raft::resources const& handle,
-                          const std::string& filename,
-                          const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index);
+void serialize_to_hnswlib(
+  raft::resources const& handle,
+  const std::string& filename,
+  const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index,
+  std::optional<raft::host_matrix_view<const uint8_t, int64_t, raft::row_major>> dataset =
+    std::nullopt);
 
+/**
+ * @defgroup cagra_cpp_index_merge CAGRA index build functions
+ * @{
+ */
+
+/** @brief Merge multiple CAGRA indices into a single index.
+ *
+ * This function merges multiple CAGRA indices into one, combining both the datasets and graph
+ * structures.
+ *
+ * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
+ * in device memory by default; otherwise, host memory is used automatically.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   auto dataset0 = raft::make_host_matrix<float, int64_t>(handle, size0, dim);
+ *   auto dataset1 = raft::make_host_matrix<float, int64_t>(handle, size1, dim);
+ *
+ *   auto index0 = cagra::build(res, index_params, dataset0);
+ *   auto index1 = cagra::build(res, index_params, dataset1);
+ *
+ *   std::vector<cagra::index<float, uint32_t>*> indices{&index0, &index1};
+ *   cagra::merge_params params{index_params};
+ *
+ *   auto merged_index = cagra::merge(res, params, indices);
+ * @endcode
+ *
+ * @param[in] res RAFT resources used for the merge operation.
+ * @param[in] params Parameters that control the merging process.
+ * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
+ *                    - Have attached datasets with the same dimension.
+ *
+ * @return A new CAGRA index containing the merged indices, graph, and dataset.
+ */
+auto merge(raft::resources const& res,
+           const cuvs::neighbors::cagra::merge_params& params,
+           std::vector<cuvs::neighbors::cagra::index<float, uint32_t>*>& indices)
+  -> cuvs::neighbors::cagra::index<float, uint32_t>;
+
+/** @brief Merge multiple CAGRA indices into a single index.
+ *
+ * This function merges multiple CAGRA indices into one, combining both the datasets and graph
+ * structures.
+ *
+ * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
+ * in device memory by default; otherwise, host memory is used automatically.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   auto dataset0 = raft::make_host_matrix<half, int64_t>(handle, size0, dim);
+ *   auto dataset1 = raft::make_host_matrix<half, int64_t>(handle, size1, dim);
+ *
+ *   auto index0 = cagra::build(res, index_params, dataset0);
+ *   auto index1 = cagra::build(res, index_params, dataset1);
+ *
+ *   std::vector<cagra::index<half, uint32_t>*> indices{&index0, &index1};
+ *   cagra::merge_params params{index_params};
+ *
+ *   auto merged_index = cagra::merge(res, params, indices);
+ * @endcode
+ *
+ * @param[in] res RAFT resources used for the merge operation.
+ * @param[in] params Parameters that control the merging process.
+ * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
+ *                    - Have attached datasets with the same dimension.
+ *
+ * @return A new CAGRA index containing the merged indices, graph, and dataset.
+ */
+auto merge(raft::resources const& res,
+           const cuvs::neighbors::cagra::merge_params& params,
+           std::vector<cuvs::neighbors::cagra::index<half, uint32_t>*>& indices)
+  -> cuvs::neighbors::cagra::index<half, uint32_t>;
+
+/** @brief Merge multiple CAGRA indices into a single index.
+ *
+ * This function merges multiple CAGRA indices into one, combining both the datasets and graph
+ * structures.
+ *
+ * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
+ * in device memory by default; otherwise, host memory is used automatically.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   auto dataset0 = raft::make_host_matrix<int8_t, int64_t>(handle, size0, dim);
+ *   auto dataset1 = raft::make_host_matrix<int8_t, int64_t>(handle, size1, dim);
+ *
+ *   auto index0 = cagra::build(res, index_params, dataset0);
+ *   auto index1 = cagra::build(res, index_params, dataset1);
+ *
+ *   std::vector<cagra::index<int8_t, uint32_t>*> indices{&index0, &index1};
+ *   cagra::merge_params params{index_params};
+ *
+ *   auto merged_index = cagra::merge(res, params, indices);
+ * @endcode
+ *
+ * @param[in] res RAFT resources used for the merge operation.
+ * @param[in] params Parameters that control the merging process.
+ * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
+ *                    - Have attached datasets with the same dimension.
+ *
+ * @return A new CAGRA index containing the merged indices, graph, and dataset.
+ */
+auto merge(raft::resources const& res,
+           const cuvs::neighbors::cagra::merge_params& params,
+           std::vector<cuvs::neighbors::cagra::index<int8_t, uint32_t>*>& indices)
+  -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
+
+/** @brief Merge multiple CAGRA indices into a single index.
+ *
+ * This function merges multiple CAGRA indices into one, combining both the datasets and graph
+ * structures.
+ *
+ * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
+ * in device memory by default; otherwise, host memory is used automatically.
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace raft::neighbors;
+ *   auto dataset0 = raft::make_host_matrix<uint8_t, int64_t>(handle, size0, dim);
+ *   auto dataset1 = raft::make_host_matrix<uint8_t, int64_t>(handle, size1, dim);
+ *
+ *   auto index0 = cagra::build(res, index_params, dataset0);
+ *   auto index1 = cagra::build(res, index_params, dataset1);
+ *
+ *   std::vector<cagra::index<uint8_t, uint32_t>*> indices{&index0, &index1};
+ *   cagra::merge_params params{index_params};
+ *
+ *   auto merged_index = cagra::merge(res, params, indices);
+ * @endcode
+ *
+ * @param[in] res RAFT resources used for the merge operation.
+ * @param[in] params Parameters that control the merging process.
+ * @param[in] indices A vector of pointers to the CAGRA indices to merge. All indices must:
+ *                    - Have attached datasets with the same dimension.
+ *
+ * @return A new CAGRA index containing the merged indices, graph, and dataset.
+ */
+auto merge(raft::resources const& res,
+           const cuvs::neighbors::cagra::merge_params& params,
+           std::vector<cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>& indices)
+  -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
 /**
  * @}
  */
+
+/// \defgroup mg_cpp_index_build ANN MG index build
+
+/// \ingroup mg_cpp_index_build
+/**
+ * @brief Builds a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index_params configure the index building
+ * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
+ *
+ * @return the constructed CAGRA MG index
+ */
+auto build(const raft::resources& clique,
+           const cuvs::neighbors::mg_index_params<cagra::index_params>& index_params,
+           raft::host_matrix_view<const float, int64_t, row_major> index_dataset)
+  -> cuvs::neighbors::mg_index<cagra::index<float, uint32_t>, float, uint32_t>;
+
+/// \ingroup mg_cpp_index_build
+/**
+ * @brief Builds a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index_params configure the index building
+ * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
+ *
+ * @return the constructed CAGRA MG index
+ */
+auto build(const raft::resources& clique,
+           const cuvs::neighbors::mg_index_params<cagra::index_params>& index_params,
+           raft::host_matrix_view<const half, int64_t, row_major> index_dataset)
+  -> cuvs::neighbors::mg_index<cagra::index<half, uint32_t>, half, uint32_t>;
+
+/// \ingroup mg_cpp_index_build
+/**
+ * @brief Builds a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index_params configure the index building
+ * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
+ *
+ * @return the constructed CAGRA MG index
+ */
+auto build(const raft::resources& clique,
+           const cuvs::neighbors::mg_index_params<cagra::index_params>& index_params,
+           raft::host_matrix_view<const int8_t, int64_t, row_major> index_dataset)
+  -> cuvs::neighbors::mg_index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>;
+
+/// \ingroup mg_cpp_index_build
+/**
+ * @brief Builds a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index_params configure the index building
+ * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
+ *
+ * @return the constructed CAGRA MG index
+ */
+auto build(const raft::resources& clique,
+           const cuvs::neighbors::mg_index_params<cagra::index_params>& index_params,
+           raft::host_matrix_view<const uint8_t, int64_t, row_major> index_dataset)
+  -> cuvs::neighbors::mg_index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>;
+
+/// \defgroup mg_cpp_index_extend ANN MG index extend
+
+/// \ingroup mg_cpp_index_extend
+/**
+ * @brief Extends a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::cagra::extend(clique, index, new_vectors, std::nullopt);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
+ * @param[in] new_indices optional vector on host [n_rows],
+ * `std::nullopt` means default continuous range `[0...n_rows)`
+ *
+ */
+void extend(const raft::resources& clique,
+            cuvs::neighbors::mg_index<cagra::index<float, uint32_t>, float, uint32_t>& index,
+            raft::host_matrix_view<const float, int64_t, row_major> new_vectors,
+            std::optional<raft::host_vector_view<const uint32_t, int64_t>> new_indices);
+
+/// \ingroup mg_cpp_index_extend
+/**
+ * @brief Extends a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::cagra::extend(clique, index, new_vectors, std::nullopt);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
+ * @param[in] new_indices optional vector on host [n_rows],
+ * `std::nullopt` means default continuous range `[0...n_rows)`
+ *
+ */
+void extend(const raft::resources& clique,
+            cuvs::neighbors::mg_index<cagra::index<half, uint32_t>, half, uint32_t>& index,
+            raft::host_matrix_view<const half, int64_t, row_major> new_vectors,
+            std::optional<raft::host_vector_view<const uint32_t, int64_t>> new_indices);
+
+/// \ingroup mg_cpp_index_extend
+/**
+ * @brief Extends a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::cagra::extend(clique, index, new_vectors, std::nullopt);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
+ * @param[in] new_indices optional vector on host [n_rows],
+ * `std::nullopt` means default continuous range `[0...n_rows)`
+ *
+ */
+void extend(const raft::resources& clique,
+            cuvs::neighbors::mg_index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
+            raft::host_matrix_view<const int8_t, int64_t, row_major> new_vectors,
+            std::optional<raft::host_vector_view<const uint32_t, int64_t>> new_indices);
+
+/// \ingroup mg_cpp_index_extend
+/**
+ * @brief Extends a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::cagra::extend(clique, index, new_vectors, std::nullopt);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
+ * @param[in] new_indices optional vector on host [n_rows],
+ * `std::nullopt` means default continuous range `[0...n_rows)`
+ *
+ */
+void extend(const raft::resources& clique,
+            cuvs::neighbors::mg_index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
+            raft::host_matrix_view<const uint8_t, int64_t, row_major> new_vectors,
+            std::optional<raft::host_vector_view<const uint32_t, int64_t>> new_indices);
+
+/// \defgroup mg_cpp_index_search ANN MG index search
+
+/// \ingroup mg_cpp_index_search
+/**
+ * @brief Searches a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::mg_search_params<cagra::search_params> search_params;
+ * cuvs::neighbors::cagra::search(clique, index, search_params, queries, neighbors,
+ * distances);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] search_params configure the index search
+ * @param[in] queries a row-major matrix on host [n_rows, dim]
+ * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
+ * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
+ *
+ */
+void search(const raft::resources& clique,
+            const cuvs::neighbors::mg_index<cagra::index<float, uint32_t>, float, uint32_t>& index,
+            const cuvs::neighbors::mg_search_params<cagra::search_params>& search_params,
+            raft::host_matrix_view<const float, int64_t, row_major> queries,
+            raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,
+            raft::host_matrix_view<float, int64_t, row_major> distances);
+
+/// \ingroup mg_cpp_index_search
+/**
+ * @brief Searches a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::mg_search_params<cagra::search_params> search_params;
+ * cuvs::neighbors::cagra::search(clique, index, search_params, queries, neighbors,
+ * distances);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] search_params configure the index search
+ * @param[in] queries a row-major matrix on host [n_rows, dim]
+ * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
+ * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
+ *
+ */
+void search(const raft::resources& clique,
+            const cuvs::neighbors::mg_index<cagra::index<half, uint32_t>, half, uint32_t>& index,
+            const cuvs::neighbors::mg_search_params<cagra::search_params>& search_params,
+            raft::host_matrix_view<const half, int64_t, row_major> queries,
+            raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,
+            raft::host_matrix_view<float, int64_t, row_major> distances);
+
+/// \ingroup mg_cpp_index_search
+/**
+ * @brief Searches a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::mg_search_params<cagra::search_params> search_params;
+ * cuvs::neighbors::cagra::search(clique, index, search_params, queries, neighbors,
+ * distances);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] search_params configure the index search
+ * @param[in] queries a row-major matrix on host [n_rows, dim]
+ * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
+ * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
+ *
+ */
+void search(
+  const raft::resources& clique,
+  const cuvs::neighbors::mg_index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
+  const cuvs::neighbors::mg_search_params<cagra::search_params>& search_params,
+  raft::host_matrix_view<const int8_t, int64_t, row_major> queries,
+  raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,
+  raft::host_matrix_view<float, int64_t, row_major> distances);
+
+/// \ingroup mg_cpp_index_search
+/**
+ * @brief Searches a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::mg_search_params<cagra::search_params> search_params;
+ * cuvs::neighbors::cagra::search(clique, index, search_params, queries, neighbors,
+ * distances);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] search_params configure the index search
+ * @param[in] queries a row-major matrix on host [n_rows, dim]
+ * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
+ * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
+ *
+ */
+void search(
+  const raft::resources& clique,
+  const cuvs::neighbors::mg_index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
+  const cuvs::neighbors::mg_search_params<cagra::search_params>& search_params,
+  raft::host_matrix_view<const uint8_t, int64_t, row_major> queries,
+  raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,
+  raft::host_matrix_view<float, int64_t, row_major> distances);
+
+/// \defgroup mg_cpp_serialize ANN MG index serialization
+
+/// \ingroup mg_cpp_serialize
+/**
+ * @brief Serializes a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::cagra::serialize(clique, index, filename);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] filename path to the file to be serialized
+ *
+ */
+void serialize(
+  const raft::resources& clique,
+  const cuvs::neighbors::mg_index<cagra::index<float, uint32_t>, float, uint32_t>& index,
+  const std::string& filename);
+
+/// \ingroup mg_cpp_serialize
+/**
+ * @brief Serializes a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::cagra::serialize(clique, index, filename);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] filename path to the file to be serialized
+ *
+ */
+void serialize(const raft::resources& clique,
+               const cuvs::neighbors::mg_index<cagra::index<half, uint32_t>, half, uint32_t>& index,
+               const std::string& filename);
+
+/// \ingroup mg_cpp_serialize
+/**
+ * @brief Serializes a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::cagra::serialize(clique, index, filename);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] filename path to the file to be serialized
+ *
+ */
+void serialize(
+  const raft::resources& clique,
+  const cuvs::neighbors::mg_index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
+  const std::string& filename);
+
+/// \ingroup mg_cpp_serialize
+/**
+ * @brief Serializes a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::cagra::serialize(clique, index, filename);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] filename path to the file to be serialized
+ *
+ */
+void serialize(
+  const raft::resources& clique,
+  const cuvs::neighbors::mg_index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
+  const std::string& filename);
+
+/// \defgroup mg_cpp_deserialize ANN MG index deserialization
+
+/// \ingroup mg_cpp_deserialize
+/**
+ * @brief Deserializes a CAGRA multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::cagra::serialize(clique, index, filename);
+ * auto new_index = cuvs::neighbors::cagra::deserialize<float, uint32_t>(clique, filename);
+ *
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] filename path to the file to be deserialized
+ *
+ */
+template <typename T, typename IdxT>
+auto deserialize(const raft::resources& clique, const std::string& filename)
+  -> cuvs::neighbors::mg_index<cagra::index<T, IdxT>, T, IdxT>;
+
+/// \defgroup mg_cpp_distribute ANN MG local index distribution
+
+/// \ingroup mg_cpp_distribute
+/**
+ * @brief Replicates a locally built and serialized CAGRA index to all GPUs to form a distributed
+ * multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::cagra::index_params index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * const std::string filename = "local_index.cuvs";
+ * cuvs::neighbors::cagra::serialize(clique, filename, index);
+ * auto new_index = cuvs::neighbors::cagra::distribute<float, uint32_t>(clique, filename);
+ *
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] filename path to the file to be deserialized : a local index
+ *
+ */
+template <typename T, typename IdxT>
+auto distribute(const raft::resources& clique, const std::string& filename)
+  -> cuvs::neighbors::mg_index<cagra::index<T, IdxT>, T, IdxT>;
 
 }  // namespace cuvs::neighbors::cagra

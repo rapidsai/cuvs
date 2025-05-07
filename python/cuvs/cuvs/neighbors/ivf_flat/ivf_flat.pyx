@@ -31,9 +31,10 @@ from cuvs.distance_type cimport cuvsDistanceType
 from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
-from pylibraft.neighbors.common import _check_input_array
 
 from cuvs.distance import DISTANCE_TYPES
+from cuvs.neighbors.common import _check_input_array
+from cuvs.neighbors.filters import no_filter
 
 from libc.stdint cimport (
     int8_t,
@@ -190,7 +191,7 @@ def build(IndexParams index_params, dataset, resources=None):
     ----------
     index_params : :py:class:`cuvs.neighbors.ivf_flat.IndexParams`
     dataset : CUDA array interface compliant matrix shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
+        Supported dtype [float32, float16, int8, uint8]
     {resources_docstring}
 
     Returns
@@ -218,8 +219,8 @@ def build(IndexParams index_params, dataset, resources=None):
     """
 
     dataset_ai = wrap_array(dataset)
-    _check_input_array(dataset_ai, [np.dtype('float32'), np.dtype('byte'),
-                                    np.dtype('ubyte')])
+    _check_input_array(dataset_ai, [np.dtype('float32'), np.dtype('float16'),
+                                    np.dtype('byte'), np.dtype('ubyte')])
 
     cdef Index idx = Index()
     cdef cydlpack.DLManagedTensor* dataset_dlpack = \
@@ -274,7 +275,8 @@ def search(SearchParams search_params,
            k,
            neighbors=None,
            distances=None,
-           resources=None):
+           resources=None,
+           filter=None):
     """
     Find the k nearest neighbors for each query.
 
@@ -284,7 +286,7 @@ def search(SearchParams search_params,
     index : py:class:`cuvs.neighbors.ivf_flat.Index`
         Trained IvfFlat index.
     queries : CUDA array interface compliant matrix shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
+        Supported dtype [float32, float16, int8, uint8]
     k : int
         The number of neighbors.
     neighbors : Optional CUDA array interface compliant matrix shape
@@ -293,6 +295,8 @@ def search(SearchParams search_params,
     distances : Optional CUDA array interface compliant matrix shape
                 (n_queries, k) If supplied, the distances to the
                 neighbors will be written here in-place. (default None)
+    filter:     Optional cuvs.neighbors.cuvsFilter can be used to filter
+                neighbors based on a given bitset. (default None)
     {resources_docstring}
 
     Examples
@@ -320,8 +324,8 @@ def search(SearchParams search_params,
         raise ValueError("Index needs to be built before calling search.")
 
     queries_cai = wrap_array(queries)
-    _check_input_array(queries_cai, [np.dtype('float32'), np.dtype('byte'),
-                                     np.dtype('ubyte')])
+    _check_input_array(queries_cai, [np.dtype('float32'), np.dtype('float16'),
+                                     np.dtype('byte'), np.dtype('ubyte')])
 
     cdef uint32_t n_queries = queries_cai.shape[0]
 
@@ -338,6 +342,9 @@ def search(SearchParams search_params,
     distances_cai = wrap_array(distances)
     _check_input_array(distances_cai, [np.dtype('float32')],
                        exp_rows=n_queries, exp_cols=k)
+
+    if filter is None:
+        filter = no_filter()
 
     cdef cuvsIvfFlatSearchParams* params = search_params.params
     cdef cuvsError_t search_status
@@ -356,7 +363,8 @@ def search(SearchParams search_params,
             index.index,
             queries_dlpack,
             neighbors_dlpack,
-            distances_dlpack
+            distances_dlpack,
+            filter.prefilter
         ))
 
     return (distances, neighbors)
@@ -446,7 +454,7 @@ def extend(Index index, new_vectors, new_indices, resources=None):
     index : ivf_flat.Index
         Trained ivf_flat object.
     new_vectors : array interface compliant matrix shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
+        Supported dtype [float32, float16, int8, uint8]
     new_indices : array interface compliant vector shape (n_samples)
         Supported dtype [int64]
     {resources_docstring}
@@ -480,8 +488,9 @@ def extend(Index index, new_vectors, new_indices, resources=None):
     """
 
     new_vectors_ai = wrap_array(new_vectors)
-    _check_input_array(new_vectors_ai, [np.dtype('float32'), np.dtype('byte'),
-                                        np.dtype('ubyte')])
+    _check_input_array(new_vectors_ai,
+                       [np.dtype('float32'), np.dtype('float16'),
+                        np.dtype('byte'), np.dtype('ubyte')])
 
     new_indices_ai = wrap_array(new_indices)
     _check_input_array(new_indices_ai, [np.dtype('int64')])

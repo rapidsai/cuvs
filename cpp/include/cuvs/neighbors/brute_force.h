@@ -68,8 +68,7 @@ cuvsError_t cuvsBruteForceIndexDestroy(cuvsBruteForceIndex_t index);
  *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`,
  *        or `kDLCPU`. Also, acceptable underlying types are:
  *        1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
- *        2. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
- *        3. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+ *        2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
  *
  * @code {.c}
  * #include <cuvs/core/c_api.h>
@@ -120,7 +119,8 @@ cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
  *        It is also important to note that the BRUTEFORCE index must have been built
  *        with the same type of `queries`, such that `index.dtype.code ==
  *        queries.dl_tensor.dtype.code` Types for input are:
- *        1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *        1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32` or
+ *          `kDLDataType.bits = 16`
  *        2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
  *        3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *
@@ -166,6 +166,66 @@ cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
  * @}
  */
 
+/**
+ * @defgroup bruteforce_c_serialize BRUTEFORCE C-API serialize functions
+ * @{
+ */
+/**
+ * Save the index to file.
+ * The serialization format can be subject to changes, therefore loading
+ * an index saved with a previous version of cuvs is not guaranteed
+ * to work.
+ *
+ * @code{.c}
+ * #include <cuvs/neighbors/brute_force.h>
+ *
+ * // Create cuvsResources_t
+ * cuvsResources_t res;
+ * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+ *
+ * // create an index with `cuvsBruteforceBuild`
+ * cuvsBruteForceSerialize(res, "/path/to/index", index);
+ * @endcode
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] filename the file name for saving the index
+ * @param[in] index BRUTEFORCE index
+ *
+ */
+cuvsError_t cuvsBruteForceSerialize(cuvsResources_t res,
+                                    const char* filename,
+                                    cuvsBruteForceIndex_t index);
+
+/**
+ * Load index from file.
+ * The serialization format can be subject to changes, therefore loading
+ * an index saved with a previous version of cuvs is not guaranteed
+ * to work.
+ *
+ * @code{.c}
+ * #include <cuvs/neighbors/brute_force.h>
+ *
+ * // Create cuvsResources_t
+ * cuvsResources_t res;
+ * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+ *
+ * // Deserialize an index previously built with `cuvsBruteforceBuild`
+ * cuvsBruteForceIndex_t index;
+ * cuvsBruteForceIndexCreate(&index);
+ * cuvsBruteForceDeserialize(res, "/path/to/index", index);
+ * @endcode
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] filename the name of the file that stores the index
+ * @param[out] index BRUTEFORCE index loaded disk
+ */
+cuvsError_t cuvsBruteForceDeserialize(cuvsResources_t res,
+                                      const char* filename,
+                                      cuvsBruteForceIndex_t index);
+
+/**
+ * @}
+ */
 #ifdef __cplusplus
 }
 #endif
