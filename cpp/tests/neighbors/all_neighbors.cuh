@@ -29,9 +29,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/mdspan.hpp>
-#include <raft/core/resource/comms.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/core/resource/nccl_clique.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/random/make_blobs.cuh>
 #include <raft/util/cudart_utils.hpp>
