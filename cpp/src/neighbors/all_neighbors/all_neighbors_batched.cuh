@@ -16,8 +16,8 @@
 
 #pragma once
 #include "all_neighbors_builder.cuh"
-#include "cuvs/distance/distance.hpp"
 #include <cuvs/cluster/kmeans.hpp>
+#include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/all_neighbors.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/common.hpp>
@@ -26,6 +26,7 @@
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/managed_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resource/multi_gpu.hpp>
 #include <raft/matrix/sample_rows.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <variant>
@@ -137,9 +138,6 @@ void assign_clusters(raft::resources const& res,
   size_t num_rows = static_cast<size_t>(dataset.extent(0));
   size_t num_cols = static_cast<size_t>(dataset.extent(1));
 
-  int num_ranks = 0;
-  cudaGetDeviceCount(&num_ranks);
-
   auto centroids_h = raft::make_host_matrix<T, IdxT>(params.n_clusters, num_cols);
   raft::copy(centroids_h.data_handle(),
              centroids.data_handle(),
@@ -147,15 +145,16 @@ void assign_clusters(raft::resources const& res,
              raft::resource::get_cuda_stream(res));
 
   size_t n_rows_per_cluster = (num_rows + params.n_clusters - 1) / params.n_clusters;
-  if (num_ranks > 1) {
+
+  if (raft::resource::is_multi_gpu(res)) {
+    int num_ranks = raft::resource::get_num_ranks(res);
     // multi-gpu assign clusters
     size_t clusters_per_rank = params.n_clusters / num_ranks;
     size_t rem               = params.n_clusters - clusters_per_rank * num_ranks;
 
 #pragma omp parallel for num_threads(num_ranks)
     for (int rank = 0; rank < num_ranks; rank++) {
-      auto dev_res = raft::device_resources{};
-      RAFT_CUDA_TRY(cudaSetDevice(rank));
+      auto dev_res = raft::resource::set_current_device_to_rank(res, rank);
 
       auto centroids_matrix = raft::make_device_matrix<T, IdxT>(res, params.n_clusters, num_cols);
       raft::copy(centroids_matrix.data_handle(),
@@ -262,6 +261,7 @@ template <typename T, typename IdxT>
 void single_gpu_batch_build(const raft::resources& handle,
                             raft::host_matrix_view<const T, IdxT, row_major> dataset,
                             detail::all_neighbors_builder<T, IdxT>& knn_builder,
+                            size_t n_clusters,
                             raft::managed_matrix_view<IdxT, IdxT> global_neighbors,
                             raft::managed_matrix_view<T, IdxT> global_distances,
                             raft::host_vector_view<IdxT, IdxT, row_major> cluster_sizes,
@@ -276,7 +276,7 @@ void single_gpu_batch_build(const raft::resources& handle,
 
   knn_builder.prepare_build(dataset);
 
-  for (size_t cluster_id = 0; cluster_id < knn_builder.n_clusters; cluster_id++) {
+  for (size_t cluster_id = 0; cluster_id < n_clusters; cluster_id++) {
     size_t num_data_in_cluster = cluster_sizes(cluster_id);
     size_t offset              = cluster_offsets(cluster_id);
     if (num_data_in_cluster < knn_builder.k) {
@@ -320,16 +320,14 @@ void multi_gpu_batch_build(const raft::resources& handle,
   size_t num_cols = dataset.extent(1);
   size_t k        = global_neighbors.extent(1);
 
-  int num_ranks = 0;
-  cudaGetDeviceCount(&num_ranks);
+  int num_ranks = raft::resource::get_num_ranks(handle);
 
   size_t clusters_per_rank = params.n_clusters / num_ranks;
   size_t rem               = params.n_clusters - clusters_per_rank * num_ranks;
 
 #pragma omp parallel for num_threads(num_ranks)
   for (int rank = 0; rank < num_ranks; rank++) {
-    auto dev_res = raft::device_resources{};
-    RAFT_CUDA_TRY(cudaSetDevice(rank));
+    auto dev_res = raft::resource::set_current_device_to_rank(handle, rank);
 
     // This part is to distribute clusters across ranks as equally as possible
     // E.g. if we had 5 clusters and 3 ranks, instead of splitting into 1, 1, 3
@@ -360,17 +358,12 @@ void multi_gpu_batch_build(const raft::resources& handle,
     get_min_max_cluster_size(k, max_cluster_size, min_cluster_size, cluster_sizes_for_this_rank);
 
     std::unique_ptr<all_neighbors_builder<T, IdxT>> knn_builder =
-      get_knn_builder<T, IdxT>(dev_res,
-                               num_clusters_for_this_rank,
-                               min_cluster_size,
-                               max_cluster_size,
-                               k,
-                               params.graph_build_params,
-                               params.metric);
+      get_knn_builder<T, IdxT>(dev_res, params, min_cluster_size, max_cluster_size, k);
 
     single_gpu_batch_build(dev_res,
                            dataset,
                            *knn_builder,
+                           num_clusters_for_this_rank,
                            global_neighbors,
                            global_distances,
                            cluster_sizes_for_this_rank,
@@ -387,9 +380,7 @@ void batch_build(
   raft::device_matrix_view<IdxT, IdxT, row_major> indices,
   std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances = std::nullopt)
 {
-  int num_ranks = 0;
-  cudaGetDeviceCount(&num_ranks);
-  if (num_ranks > 1) {
+  if (raft::resource::is_multi_gpu(handle)) {
     // For efficient CPU-computation of omp parallel for regions per GPU
     omp_set_nested(1);
   }
@@ -435,7 +426,7 @@ void batch_build(
             global_distances.data_handle() + num_rows * k,
             global_distances_fill_value);
 
-  if (num_ranks > 1) {
+  if (raft::resource::is_multi_gpu(handle)) {
     multi_gpu_batch_build(handle,
                           params,
                           dataset,
@@ -448,16 +439,11 @@ void batch_build(
     size_t max_cluster_size, min_cluster_size;
     get_min_max_cluster_size(k, max_cluster_size, min_cluster_size, cluster_sizes.view());
     std::unique_ptr<all_neighbors_builder<T, IdxT>> knn_builder =
-      get_knn_builder<T, IdxT>(handle,
-                               params.n_clusters,
-                               min_cluster_size,
-                               max_cluster_size,
-                               k,
-                               params.graph_build_params,
-                               params.metric);
+      get_knn_builder<T, IdxT>(handle, params, min_cluster_size, max_cluster_size, k);
     single_gpu_batch_build(handle,
                            dataset,
                            *knn_builder,
+                           params.n_clusters,
                            global_neighbors.view(),
                            global_distances.view(),
                            cluster_sizes.view(),

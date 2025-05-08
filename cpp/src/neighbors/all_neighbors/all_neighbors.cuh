@@ -52,15 +52,8 @@ void single_build(
   size_t num_rows = static_cast<size_t>(dataset.extent(0));
   size_t num_cols = static_cast<size_t>(dataset.extent(1));
 
-  auto knn_builder = get_knn_builder<T, IdxT>(handle,
-                                              params.n_clusters,
-                                              num_rows,
-                                              num_rows,
-                                              indices.extent(1),
-                                              params.graph_build_params,
-                                              params.metric,
-                                              indices,
-                                              distances);
+  auto knn_builder = get_knn_builder<T, IdxT>(
+    handle, params, num_rows, num_rows, indices.extent(1), indices, distances);
 
   knn_builder->prepare_build(dataset);
   knn_builder->build_knn(dataset);

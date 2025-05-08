@@ -27,6 +27,7 @@
 #include <iostream>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
+#include <raft/core/device_resources_snmg.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -195,7 +196,7 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
   }
 
  private:
-  raft::resources handle_;
+  raft::device_resources_snmg handle_;
   rmm::cuda_stream_view stream_;
   AllNeighborsInputs ps;
   rmm::device_uvector<DataT> database;

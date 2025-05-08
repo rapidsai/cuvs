@@ -49,12 +49,10 @@ struct all_neighbors_builder {
       indices_{indices},
       distances_{distances}
   {
-    RAFT_EXPECTS(this->n_clusters > 1 || (indices.has_value() && distances.has_value()),
-                 "indices and distances are needed to create knn builder for n_clusters == 1 (no "
+    RAFT_EXPECTS(this->n_clusters > 1 || indices.has_value(),
+                 "indices should be preallocated to create knn builder for n_clusters == 1 (no "
                  "batching mode)");
-    std::cout << "calling all neighbors builder base constructor " << n_clusters << " "
-              << max_cluster_size << " " << k << std::endl;
-    if (n_clusters > 1) {  // allocating additional space eneded for batching
+    if (n_clusters > 1) {  // allocating additional space needed for batching
       inverted_indices_d.emplace(raft::make_device_vector<IdxT, IdxT>(res, max_cluster_size));
       batch_neighbors_h.emplace(raft::make_host_matrix<IdxT, IdxT>(max_cluster_size, k));
       batch_neighbors_d.emplace(raft::make_device_matrix<IdxT, IdxT>(res, max_cluster_size, k));
@@ -239,10 +237,12 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
                  refined_neighbors_h_view.data_handle(),
                  num_rows * this->k,
                  raft::resource::get_cuda_stream(this->res));
-      raft::copy(this->distances_.value().data_handle(),
-                 refined_distances_h_view.data_handle(),
-                 num_rows * this->k,
-                 raft::resource::get_cuda_stream(this->res));
+      if (this->distances_.has_value()) {
+        raft::copy(this->distances_.value().data_handle(),
+                   refined_distances_h_view.data_handle(),
+                   num_rows * this->k,
+                   raft::resource::get_cuda_stream(this->res));
+      }
     }
   }
 
@@ -444,37 +444,42 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
 template <typename T, typename IdxT>
 std::unique_ptr<all_neighbors_builder<T, IdxT>> get_knn_builder(
   const raft::resources& handle,
-  size_t n_clusters,
+  const all_neighbors_params& params,
   size_t min_cluster_size,
   size_t max_cluster_size,
   size_t k,
-  GraphBuildParams graph_build_params,
-  distance::DistanceType metric,
   std::optional<raft::device_matrix_view<IdxT, IdxT, row_major>> indices = std::nullopt,
   std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances  = std::nullopt)
 {
-  if (std::holds_alternative<graph_build_params::nn_descent_params>(graph_build_params)) {
-    auto nn_descent_params = std::get<graph_build_params::nn_descent_params>(graph_build_params);
-    if (nn_descent_params.metric != metric) {
+  if (std::holds_alternative<graph_build_params::nn_descent_params>(params.graph_build_params)) {
+    auto nn_descent_params =
+      std::get<graph_build_params::nn_descent_params>(params.graph_build_params);
+    if (nn_descent_params.metric != params.metric) {
       RAFT_LOG_WARN("Setting nnd_params metric to metric given for batching algorithm");
-      nn_descent_params.metric = metric;
+      nn_descent_params.metric = params.metric;
     }
     return std::make_unique<all_neighbors_builder_nn_descent<T, IdxT>>(handle,
-                                                                       n_clusters,
+                                                                       params.n_clusters,
                                                                        min_cluster_size,
                                                                        max_cluster_size,
                                                                        k,
                                                                        nn_descent_params,
                                                                        indices,
                                                                        distances);
-  } else if (std::holds_alternative<graph_build_params::ivf_pq_params>(graph_build_params)) {
-    auto ivf_pq_params = std::get<graph_build_params::ivf_pq_params>(graph_build_params);
-    if (ivf_pq_params.build_params.metric != metric) {
+  } else if (std::holds_alternative<graph_build_params::ivf_pq_params>(params.graph_build_params)) {
+    auto ivf_pq_params = std::get<graph_build_params::ivf_pq_params>(params.graph_build_params);
+    if (ivf_pq_params.build_params.metric != params.metric) {
       RAFT_LOG_WARN("Setting ivfpq_params metric to metric given for batching algorithm");
-      ivf_pq_params.build_params.metric = metric;
+      ivf_pq_params.build_params.metric = params.metric;
     }
-    return std::make_unique<all_neighbors_builder_ivfpq<T, IdxT>>(
-      handle, n_clusters, min_cluster_size, max_cluster_size, k, ivf_pq_params, indices, distances);
+    return std::make_unique<all_neighbors_builder_ivfpq<T, IdxT>>(handle,
+                                                                  params.n_clusters,
+                                                                  min_cluster_size,
+                                                                  max_cluster_size,
+                                                                  k,
+                                                                  ivf_pq_params,
+                                                                  indices,
+                                                                  distances);
   } else {
     RAFT_FAIL("Batch KNN build algos only supporting NN Descent and IVFPQ");
   }
