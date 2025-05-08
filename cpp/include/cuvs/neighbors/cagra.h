@@ -19,6 +19,7 @@
 #include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.h>
 #include <cuvs/neighbors/common.h>
+#include <cuvs/neighbors/common_defs.h>
 #include <cuvs/neighbors/ivf_pq.h>
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
@@ -371,11 +372,6 @@ cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int* dim);
  * @brief Supplemental parameters to merge CAGRA index
  *
  */
-/** Strategy for merging CAGRA indices. */
-typedef enum {
-  PHYSICAL = 0,  ///< Merge indices physically
-  LOGICAL  = 1   ///< Merge indices logically (if supported)
-} cuvsCagraMergeStrategy;
 
 struct cuvsCagraMergeParams {
   cuvsCagraIndexParams_t output_index_params;
