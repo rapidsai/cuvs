@@ -288,7 +288,7 @@ void eps_nn(raft::resources const& handle,
             raft::device_vector_view<int64_t, int64_t> vd,
             raft::device_matrix_view<const float, int64_t, raft::row_major> query,
             float eps,
-            std::optional<raft::host_scalar_view<int, int64_t>> max_k = std::nullopt);
+            std::optional<raft::host_scalar_view<int64_t, int64_t>> max_k = std::nullopt);
 
 /**
  * @ingroup random_ball_cover
