@@ -246,8 +246,6 @@ void perform_rbc_query(raft::resources const& handle,
                        const value_t* R_knn_dists,
                        value_idx* inds,
                        value_t* dists,
-                       int64_t* dists_counter,
-                       int64_t* post_dists_counter,
                        float weight                = 1.0,
                        bool perform_post_filtering = true)
 {
@@ -262,32 +260,12 @@ void perform_rbc_query(raft::resources const& handle,
                std::numeric_limits<value_t>::max());
 
   // Compute nearest k for each neighborhood in each closest R
-  rbc_low_dim_pass_one<value_idx, value_t>(handle,
-                                           index,
-                                           query,
-                                           n_query_pts,
-                                           k,
-                                           R_knn_inds,
-                                           R_knn_dists,
-                                           inds,
-                                           dists,
-                                           weight,
-                                           dists_counter,
-                                           index.n);
+  rbc_low_dim_pass_one<value_idx, value_t>(
+    handle, index, query, n_query_pts, k, R_knn_inds, R_knn_dists, inds, dists, weight, index.n);
 
   if (perform_post_filtering) {
-    rbc_low_dim_pass_two<value_idx, value_t>(handle,
-                                             index,
-                                             query,
-                                             n_query_pts,
-                                             k,
-                                             R_knn_inds,
-                                             R_knn_dists,
-                                             inds,
-                                             dists,
-                                             weight,
-                                             post_dists_counter,
-                                             index.n);
+    rbc_low_dim_pass_two<value_idx, value_t>(
+      handle, index, query, n_query_pts, k, R_knn_inds, R_knn_dists, inds, dists, weight, index.n);
   }
 }
 
@@ -438,10 +416,6 @@ void rbc_all_knn_query(raft::resources const& handle,
                dists + (k * index.m),
                std::numeric_limits<value_t>::max());
 
-  // For debugging / verification. Remove before releasing
-  rmm::device_uvector<int64_t> dists_counter(index.m, raft::resource::get_cuda_stream(handle));
-  rmm::device_uvector<int64_t> post_dists_counter(index.m, raft::resource::get_cuda_stream(handle));
-
   sample_landmarks<value_idx, value_t>(handle, index);
 
   k_closest_landmarks(
@@ -460,8 +434,6 @@ void rbc_all_knn_query(raft::resources const& handle,
                     R_knn_dists.data(),
                     inds,
                     dists,
-                    dists_counter.data(),
-                    post_dists_counter.data(),
                     weight,
                     perform_post_filtering);
 }
@@ -512,18 +484,6 @@ void rbc_knn_query(raft::resources const& handle,
 
   k_closest_landmarks(handle, index, query, n_query_pts, k, R_knn_inds.data(), R_knn_dists.data());
 
-  // For debugging / verification. Remove before releasing
-  rmm::device_uvector<int64_t> dists_counter(index.m, raft::resource::get_cuda_stream(handle));
-  rmm::device_uvector<int64_t> post_dists_counter(index.m, raft::resource::get_cuda_stream(handle));
-  thrust::fill(raft::resource::get_thrust_policy(handle),
-               post_dists_counter.data(),
-               post_dists_counter.data() + post_dists_counter.size(),
-               0);
-  thrust::fill(raft::resource::get_thrust_policy(handle),
-               dists_counter.data(),
-               dists_counter.data() + dists_counter.size(),
-               0);
-
   perform_rbc_query(handle,
                     index,
                     query,
@@ -533,8 +493,6 @@ void rbc_knn_query(raft::resources const& handle,
                     R_knn_dists.data(),
                     inds,
                     dists,
-                    dists_counter.data(),
-                    post_dists_counter.data(),
                     weight,
                     perform_post_filtering);
 }

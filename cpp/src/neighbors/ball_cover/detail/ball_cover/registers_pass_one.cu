@@ -39,7 +39,6 @@
     Mvalue_idx* inds,                                                                            \
     Mvalue_t* dists,                                                                             \
     float weight,                                                                                \
-    int64_t* dists_counter,                                                                      \
     int dims);
 
 instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(std::int64_t, float);

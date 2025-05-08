@@ -59,7 +59,6 @@ macro_pass_one = """
     Mvalue_idx* inds,                                                                        \\
     Mvalue_t* dists,                                                                         \\
     float weight,                                                                            \\
-    int64_t* dists_counter,\\
     int dims);
 
 """
@@ -79,7 +78,6 @@ macro_pass_two = """
     Mvalue_idx* inds,                                                                        \\
     Mvalue_t* dists,                                                                         \\
     float weight,                                                                            \\
-    int64_t* dists_counter,\\
     int dims);
 
 """

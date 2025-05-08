@@ -34,7 +34,6 @@ void rbc_low_dim_pass_one(raft::resources const& handle,
                           value_idx* inds,
                           value_t* dists,
                           float weight,
-                          int64_t* dists_counter,
                           int dims);
 
 template <typename value_idx, typename value_t>
@@ -48,7 +47,6 @@ void rbc_low_dim_pass_two(raft::resources const& handle,
                           value_idx* inds,
                           value_t* dists,
                           float weight,
-                          int64_t* post_dists_counter,
                           int dims);
 
 template <typename value_idx, typename value_t, typename dist_func>
