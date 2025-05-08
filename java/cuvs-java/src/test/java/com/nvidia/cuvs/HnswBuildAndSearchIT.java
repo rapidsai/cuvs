@@ -83,7 +83,7 @@ public class HnswBuildAndSearchIT extends CuVSTestCase {
 
         // Configure index parameters
         CagraIndexParams indexParams = new CagraIndexParams.Builder()
-            .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.IVF_PQ)
+            .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
             .withGraphDegree(64)
             .withIntermediateGraphDegree(128)
             .withNumWriterThreads(32)
