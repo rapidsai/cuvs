@@ -15,7 +15,6 @@
  */
 
 #include <cuvs/preprocessing/spectral/spectral_embedding.hpp>
-#include <cuvs/preprocessing/spectral/spectral_embedding_types.hpp>
 #include <raft/util/integer_utils.hpp>
 // #include <cuvs/neighbors/knn.hpp>
 
@@ -47,11 +46,10 @@
 
 namespace cuvs::preprocessing::spectral {
 
-auto spectral_embedding(
-  raft::resources const& handle,
-  raft::device_matrix_view<float, int, raft::row_major> nums,
-  raft::device_matrix_view<float, int, raft::col_major> embedding,
-  cuvs::preprocessing::spectral::spectral_embedding_config spectral_embedding_config) -> int
+auto spectral_embedding(raft::resources const& handle,
+                        raft::device_matrix_view<float, int, raft::row_major> nums,
+                        raft::device_matrix_view<float, int, raft::col_major> embedding,
+                        params spectral_embedding_config) -> int
 {
   // Define our sample data (similar to the Python example)
   const int n_samples     = nums.extent(0);

@@ -16,7 +16,6 @@
 
 #include "../test_utils.cuh"
 #include <cuvs/preprocessing/spectral/spectral_embedding.hpp>
-#include <cuvs/preprocessing/spectral/spectral_embedding_types.hpp>
 #include <cuvs/stats/trustworthiness_score.hpp>  // Add trustworthiness header
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -210,7 +209,7 @@ class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingI
   raft::device_vector<int, int, raft::row_major> labels_;
   raft::device_matrix<T, int, raft::col_major> embedding_;
 
-  cuvs::preprocessing::spectral::spectral_embedding_config config_;
+  cuvs::preprocessing::spectral::params config_;
 };
 
 // Define test cases with different parameters
