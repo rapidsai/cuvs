@@ -16,7 +16,6 @@
 
 #include <cuvs/preprocessing/spectral/spectral_embedding.hpp>
 #include <raft/util/integer_utils.hpp>
-// #include <cuvs/neighbors/knn.hpp>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/handle.hpp>
@@ -47,13 +46,13 @@
 namespace cuvs::preprocessing::spectral {
 
 auto spectral_embedding(raft::resources const& handle,
-                        raft::device_matrix_view<float, int, raft::row_major> nums,
-                        raft::device_matrix_view<float, int, raft::col_major> embedding,
-                        params spectral_embedding_config) -> int
+                        params spectral_embedding_config,
+                        raft::device_matrix_view<float, int, raft::row_major> dataset,
+                        raft::device_matrix_view<float, int, raft::col_major> embedding) -> int
 {
   // Define our sample data (similar to the Python example)
-  const int n_samples     = nums.extent(0);
-  const int n_features    = nums.extent(1);
+  const int n_samples     = dataset.extent(0);
+  const int n_features    = dataset.extent(1);
   const int k             = spectral_embedding_config.n_neighbors;  // Number of neighbors
   const bool include_self = false;  // Set to false to exclude self-connections
   const bool drop_first   = spectral_embedding_config.drop_first;
@@ -71,12 +70,12 @@ auto spectral_embedding(raft::resources const& handle,
   auto d_distances = raft::make_device_matrix<float>(handle, n_samples, k_search);
 
   auto index =
-    cuvs::neighbors::brute_force::build(handle, index_params, raft::make_const_mdspan(nums));
+    cuvs::neighbors::brute_force::build(handle, index_params, raft::make_const_mdspan(dataset));
 
   cuvs::neighbors::brute_force::search_params search_params;
 
   cuvs::neighbors::brute_force::search(
-    handle, search_params, index, nums, d_indices.view(), d_distances.view());
+    handle, search_params, index, dataset, d_indices.view(), d_distances.view());
 
   // Create a COO matrix for the KNN graph
   raft::sparse::COO<float> knn_coo(stream, n_samples, n_samples);

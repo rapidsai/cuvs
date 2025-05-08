@@ -36,8 +36,8 @@ struct params {
 
 // template <typename IndexTypeT, typename ValueTypeT>
 auto spectral_embedding(raft::resources const& handle,
-                        raft::device_matrix_view<float, int, raft::row_major> nums,
-                        raft::device_matrix_view<float, int, raft::col_major> embedding,
-                        params config) -> int;
+                        params config,
+                        raft::device_matrix_view<float, int, raft::row_major> dataset,
+                        raft::device_matrix_view<float, int, raft::col_major> embedding) -> int;
 
 }  // namespace cuvs::preprocessing::spectral
