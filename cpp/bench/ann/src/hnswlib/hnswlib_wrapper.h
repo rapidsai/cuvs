@@ -50,6 +50,11 @@ struct hnsw_dist_t<float> {
 };
 
 template <>
+struct hnsw_dist_t<half> {
+  using type = float;
+};
+
+template <>
 struct hnsw_dist_t<uint8_t> {
   using type = int;
 };
@@ -122,12 +127,9 @@ template <typename T>
 hnsw_lib<T>::hnsw_lib(Metric metric, int dim, const build_param& param) : algo<T>(metric, dim)
 {
   assert(dim_ > 0);
-  static_assert(std::is_same_v<T, float> || std::is_same_v<T, uint8_t>);
-  if constexpr (std::is_same_v<T, uint8_t>) {
-    if (metric_ != Metric::kEuclidean) {
-      throw std::runtime_error("hnswlib<uint8_t> only supports Euclidean distance");
-    }
-  }
+  static_assert(std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, int8_t> ||
+                  std::is_same_v<T, uint8_t>,
+                "Only float, half, uint8, and int8 are supported");
 
   ef_construction_ = param.ef_construction;
   m_               = param.m;
@@ -137,14 +139,17 @@ hnsw_lib<T>::hnsw_lib(Metric metric, int dim, const build_param& param) : algo<T
 template <typename T>
 void hnsw_lib<T>::build(const T* dataset, size_t nrow)
 {
-  if constexpr (std::is_same_v<T, float>) {
-    if (metric_ == Metric::kInnerProduct) {
-      space_ = std::make_shared<hnswlib::InnerProductSpace>(dim_);
+  static_assert(std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, int8_t> ||
+                  std::is_same_v<T, uint8_t>,
+                "Only float, half, uint8, and int8 are supported");
+  if (metric_ == Metric::kInnerProduct) {
+    space_ = std::make_shared<hnswlib::InnerProductSpace<T, typename hnsw_dist_t<T>::type>>(dim_);
+  } else {
+    if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+      space_ = std::make_shared<hnswlib::L2Space<T, typename hnsw_dist_t<T>::type>>(dim_);
     } else {
-      space_ = std::make_shared<hnswlib::L2Space>(dim_);
+      space_ = std::make_shared<hnswlib::L2SpaceI<T>>(dim_);
     }
-  } else if constexpr (std::is_same_v<T, uint8_t>) {
-    space_ = std::make_shared<hnswlib::L2SpaceI<T>>(dim_);
   }
 
   appr_alg_ = std::make_shared<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
@@ -209,14 +214,14 @@ void hnsw_lib<T>::save(const std::string& path_to_index) const
 template <typename T>
 void hnsw_lib<T>::load(const std::string& path_to_index)
 {
-  if constexpr (std::is_same_v<T, float>) {
-    if (metric_ == Metric::kInnerProduct) {
-      space_ = std::make_shared<hnswlib::InnerProductSpace>(dim_);
+  if (metric_ == Metric::kInnerProduct) {
+    space_ = std::make_shared<hnswlib::InnerProductSpace<T, typename hnsw_dist_t<T>::type>>(dim_);
+  } else {
+    if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+      space_ = std::make_shared<hnswlib::L2Space<T, typename hnsw_dist_t<T>::type>>(dim_);
     } else {
-      space_ = std::make_shared<hnswlib::L2Space>(dim_);
+      space_ = std::make_shared<hnswlib::L2SpaceI<T>>(dim_);
     }
-  } else if constexpr (std::is_same_v<T, uint8_t>) {
-    space_ = std::make_shared<hnswlib::L2SpaceI<T>>(dim_);
   }
 
   appr_alg_ = std::make_shared<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(

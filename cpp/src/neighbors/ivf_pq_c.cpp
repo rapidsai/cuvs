@@ -55,10 +55,15 @@ void* _build(cuvsResources_t res, cuvsIvfPqIndexParams params, DLManagedTensor* 
 
   auto index = new cuvs::neighbors::ivf_pq::index<IdxT>(*res_ptr, build_params, dim);
 
-  using mdspan_type = raft::device_matrix_view<const T, IdxT, raft::row_major>;
-  auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-
-  cuvs::neighbors::ivf_pq::build(*res_ptr, build_params, mds, index);
+  if (cuvs::core::is_dlpack_device_compatible(dataset)) {
+    using mdspan_type = raft::device_matrix_view<const T, IdxT, raft::row_major>;
+    auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
+    cuvs::neighbors::ivf_pq::build(*res_ptr, build_params, mds, index);
+  } else {
+    using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
+    auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
+    cuvs::neighbors::ivf_pq::build(*res_ptr, build_params, mds, index);
+  }
 
   return index;
 }
@@ -116,15 +121,27 @@ void _extend(cuvsResources_t res,
              DLManagedTensor* new_indices,
              cuvsIvfPqIndex index)
 {
-  auto res_ptr              = reinterpret_cast<raft::resources*>(res);
-  auto index_ptr            = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
-  using vectors_mdspan_type = raft::device_matrix_view<const T, IdxT, raft::row_major>;
-  using indices_mdspan_type = raft::device_vector_view<IdxT, IdxT>;
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
 
-  auto vectors_mds = cuvs::core::from_dlpack<vectors_mdspan_type>(new_vectors);
-  auto indices_mds = cuvs::core::from_dlpack<indices_mdspan_type>(new_indices);
+  bool on_device = cuvs::core::is_dlpack_device_compatible(new_vectors->dl_tensor);
+  if (on_device != cuvs::core::is_dlpack_device_compatible(new_indices->dl_tensor)) {
+    RAFT_FAIL("extend inputs must both either be on device memory or host memory");
+  }
 
-  cuvs::neighbors::ivf_pq::extend(*res_ptr, vectors_mds, indices_mds, index_ptr);
+  if (on_device) {
+    using vectors_mdspan_type = raft::device_matrix_view<const T, IdxT, raft::row_major>;
+    using indices_mdspan_type = raft::device_vector_view<IdxT, IdxT>;
+    auto vectors_mds          = cuvs::core::from_dlpack<vectors_mdspan_type>(new_vectors);
+    auto indices_mds          = cuvs::core::from_dlpack<indices_mdspan_type>(new_indices);
+    cuvs::neighbors::ivf_pq::extend(*res_ptr, vectors_mds, indices_mds, index_ptr);
+  } else {
+    using vectors_mdspan_type = raft::host_matrix_view<const T, IdxT, raft::row_major>;
+    using indices_mdspan_type = raft::host_vector_view<IdxT, IdxT>;
+    auto vectors_mds          = cuvs::core::from_dlpack<vectors_mdspan_type>(new_vectors);
+    auto indices_mds          = cuvs::core::from_dlpack<indices_mdspan_type>(new_indices);
+    cuvs::neighbors::ivf_pq::extend(*res_ptr, vectors_mds, indices_mds, index_ptr);
+  }
 }
 }  // namespace
 
