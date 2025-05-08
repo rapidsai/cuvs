@@ -24,7 +24,8 @@
 namespace cuvs::neighbors::all_neighbors {
 
 /**
- * @brief Parameters used to build an all-neighbors knn graph
+ * @brief Parameters used to build an all-neighbors knn graph (find nearest neighbors for all the
+ * training vectors)
  */
 namespace graph_build_params {
 
@@ -42,7 +43,8 @@ using GraphBuildParams =
   std::variant<graph_build_params::ivf_pq_params, graph_build_params::nn_descent_params>;
 
 /**
- * @brief Parameters used to build an all-neighbors graph
+ * @brief Parameters used to build an all-neighbors graph  (find nearest neighbors for all the
+ * training vectors)
  *
  * graph_build_params: graph building parameters for the given graph building algorithm. defaults
  * to ivfpq.
@@ -90,7 +92,8 @@ struct all_neighbors_params {
 };
 
 /**
- * @brief Builds an approximate all-neighbors knn graph.
+ * @brief Builds an approximate all-neighbors knn graph  (find nearest neighbors for all the
+ * training vectors)
  *
  * Usage example:
  * @code{.cpp}
@@ -118,9 +121,9 @@ void build(
   std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances = std::nullopt);
 
 /**
- * @brief Builds an approximate all-neighbors knn graph.
- * params.n_clusters should be 1 for data on device. To use a larger
- * params.n_clusters for efficient device memory usage, put data on host RAM.
+ * @brief Builds an approximate all-neighbors knn graph (find nearest neighbors for all the training
+ * vectors) params.n_clusters should be 1 for data on device. To use a larger params.n_clusters for
+ * efficient device memory usage, put data on host RAM.
  *
  * Usage example:
  * @code{.cpp}
