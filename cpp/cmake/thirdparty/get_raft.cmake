@@ -45,7 +45,7 @@ function(find_and_configure_raft)
             COMPONENTS          ${RAFT_COMPONENTS}
             CPM_ARGS
               EXCLUDE_FROM_ALL TRUE
-              GIT_REPOSITORY        ttps://github.com/${PKG_FORK}/raft.git
+              GIT_REPOSITORY        https://github.com/${PKG_FORK}/raft.git
               GIT_TAG               ${PKG_PINNED_TAG}
               SOURCE_SUBDIR         cpp
               OPTIONS
