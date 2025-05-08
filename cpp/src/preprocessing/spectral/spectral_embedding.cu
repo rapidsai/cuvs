@@ -59,7 +59,6 @@ auto spectral_embedding(raft::resources const& handle,
   const bool drop_first   = spectral_embedding_config.drop_first;
 
   auto stream = raft::resource::get_cuda_stream(handle);
-  // raft::device_resources res(stream);
 
   // If not including self, we need to request k+1 neighbors
   int k_search = include_self ? k : k + 1;
@@ -88,26 +87,12 @@ auto spectral_embedding(raft::resources const& handle,
   auto knn_rows = raft::make_device_vector<int>(handle, nnz);
   auto knn_cols = raft::make_device_vector<int>(handle, nnz);
 
-  // thrust::transform(thrust::device,
-  //                   d_indices.data_handle(),
-  //                   d_indices.data_handle() + nnz,
-  //                   knn_cols.data_handle(),
-  //                   [] __device__(int64_t x) -> int { return static_cast<int>(x); });
-
   raft::linalg::unary_op(
     handle, make_const_mdspan(d_indices.view()), knn_cols.view(), [] __device__(int64_t x) {
       return static_cast<int>(x);
     });
 
-  // thrust::transform(thrust::device,
-  //                   thrust::counting_iterator<int>(0),
-  //                   thrust::counting_iterator<int>(nnz),
-  //                   knn_rows.data_handle(),
-  //                   [=] __device__(int64_t i) { return static_cast<int>(i / k_search); });
-
   auto counting_vector = raft::make_device_vector<int>(handle, nnz);
-  // auto counting_vector_view = raft::make_device_vector_view<int,
-  // int>(counting_vector.data_handle(), nnz);
   auto counting_vector_view_const =
     raft::make_device_vector_view<const int, int>(counting_vector.data_handle(), nnz);
   thrust::sequence(
@@ -148,7 +133,6 @@ auto spectral_embedding(raft::resources const& handle,
   raft::sparse::op::coo_remove_zeros<float>(&sym_coo1, &sym_coo, stream);
 
   nnz = sym_coo.nnz;
-  printf("\nSymmetrized COO Matrix (nnz=%ld):\n", nnz);
 
   using value_idx = int;
   using value_t   = float;
@@ -210,9 +194,6 @@ auto spectral_embedding(raft::resources const& handle,
     std::nullopt,
     eigenvalues.view(),
     eigenvectors.view());
-
-  raft::print_device_vector(
-    "eigenvalues", eigenvalues.data_handle(), eigenvalues.size(), std::cout);
 
   if (spectral_embedding_config.norm_laplacian) {
     raft::linalg::matrix_vector_op(
