@@ -574,7 +574,8 @@ extern "C" cuvsError_t cuvsCagraMergeParamsCreate(cuvsCagraMergeParams_t* params
   return cuvs::core::translate_exceptions([=] {
     cuvsCagraIndexParams_t idx_params;
     cuvsCagraIndexParamsCreate(&idx_params);
-    *params = new cuvsCagraMergeParams{.output_index_params = idx_params, .strategy = PHYSICAL};
+    *params = new cuvsCagraMergeParams{.output_index_params = idx_params,
+                                       .strategy            = CAGRA_MERGE_STRATEGY_PHYSICAL};
   });
 }
 

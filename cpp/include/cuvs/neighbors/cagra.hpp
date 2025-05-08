@@ -121,6 +121,7 @@ struct index_params : cuvs::neighbors::index_params {
    * Whether to use MST optimization to guarantee graph connectivity.
    */
   bool guarantee_connectivity = false;
+
   /**
    * Whether to add the dataset content to the index, i.e.:
    *
@@ -277,7 +278,7 @@ struct extend_params {
 /**
  * @brief Determines the strategy for merging CAGRA graphs.
  *
- * @note Currently, only the PHYSICAL strategy is supported.
+ * @note Currently, only the CAGRA_MERGE_STRATEGY_PHYSICAL strategy is supported.
  */
 using MergeStrategy = cuvsCagraMergeStrategy;
 
@@ -296,8 +297,8 @@ struct merge_params {
   /// Parameters for creating the output index.
   cagra::index_params output_index_params;
 
-  /// Strategy for merging. Defaults to `MergeStrategy::PHYSICAL`.
-  MergeStrategy strategy = MergeStrategy::PHYSICAL;
+  /// Strategy for merging. Defaults to `MergeStrategy::CAGRA_MERGE_STRATEGY_PHYSICAL`.
+  MergeStrategy strategy = MergeStrategy::CAGRA_MERGE_STRATEGY_PHYSICAL;
 };
 
 /**

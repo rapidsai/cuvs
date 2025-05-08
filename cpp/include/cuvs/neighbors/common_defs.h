@@ -47,8 +47,8 @@ extern "C" {
  * @brief Strategy for merging CAGRA indices.
  */
 typedef enum {
-  PHYSICAL = 0,  ///< Merge indices physically
-  LOGICAL  = 1   ///< Merge indices logically (if supported)
+  CAGRA_MERGE_STRATEGY_PHYSICAL = 0,  ///< Merge indices physically
+  CAGRA_MERGE_STRATEGY_LOGICAL  = 1   ///< Merge indices logically (if supported)
 } cuvsCagraMergeStrategy;
 
 #ifdef __cplusplus
