@@ -244,12 +244,15 @@ def build(IndexParams index_params, dataset, resources=None):
     """
     Build the IvfPq index from the dataset for efficient search.
 
+    The input dataset array can be either CUDA array interface compliant matrix
+    or an array interface compliant matrix in host memory.
+
     Parameters
     ----------
     index_params : :py:class:`cuvs.neighbors.ivf_pq.IndexParams`
         Parameters on how to build the index
-    dataset : CUDA array interface compliant matrix shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
+    dataset : Array interface compliant matrix shape (n_samples, dim)
+        Supported dtype [float32, float16, int8, uint8]
     {resources_docstring}
 
     Returns
