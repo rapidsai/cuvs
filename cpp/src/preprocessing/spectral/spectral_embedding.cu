@@ -22,6 +22,7 @@
 #include <raft/core/resources.hpp>
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/matrix/gather.cuh>
+#include <raft/matrix/init.cuh>
 #include <raft/sparse/coo.hpp>
 #include <raft/sparse/linalg/laplacian.cuh>
 #include <raft/sparse/linalg/symmetrize.cuh>
@@ -87,17 +88,35 @@ auto spectral_embedding(raft::resources const& handle,
   auto knn_rows = raft::make_device_vector<int>(handle, nnz);
   auto knn_cols = raft::make_device_vector<int>(handle, nnz);
 
-  thrust::transform(thrust::device,
-                    d_indices.data_handle(),
-                    d_indices.data_handle() + nnz,
-                    knn_cols.data_handle(),
-                    [] __device__(int64_t x) -> int { return static_cast<int>(x); });
+  // thrust::transform(thrust::device,
+  //                   d_indices.data_handle(),
+  //                   d_indices.data_handle() + nnz,
+  //                   knn_cols.data_handle(),
+  //                   [] __device__(int64_t x) -> int { return static_cast<int>(x); });
 
-  thrust::transform(thrust::device,
-                    thrust::counting_iterator<int>(0),
-                    thrust::counting_iterator<int>(nnz),
-                    knn_rows.data_handle(),
-                    [=] __device__(int64_t i) { return static_cast<int>(i / k_search); });
+  raft::linalg::unary_op(
+    handle, make_const_mdspan(d_indices.view()), knn_cols.view(), [] __device__(int64_t x) {
+      return static_cast<int>(x);
+    });
+
+  // thrust::transform(thrust::device,
+  //                   thrust::counting_iterator<int>(0),
+  //                   thrust::counting_iterator<int>(nnz),
+  //                   knn_rows.data_handle(),
+  //                   [=] __device__(int64_t i) { return static_cast<int>(i / k_search); });
+
+  auto counting_vector = raft::make_device_vector<int>(handle, nnz);
+  // auto counting_vector_view = raft::make_device_vector_view<int,
+  // int>(counting_vector.data_handle(), nnz);
+  auto counting_vector_view_const =
+    raft::make_device_vector_view<const int, int>(counting_vector.data_handle(), nnz);
+  thrust::sequence(
+    thrust::device, counting_vector.data_handle(), counting_vector.data_handle() + nnz, 0, 1);
+
+  raft::linalg::unary_op(
+    handle, counting_vector_view_const, knn_rows.view(), [k_search = k_search] __device__(int x) {
+      return x / k_search;
+    });
 
   // Copy COO data to device
   raft::copy(knn_coo.rows(), knn_rows.data_handle(), nnz, stream);
@@ -108,7 +127,8 @@ auto spectral_embedding(raft::resources const& handle,
   raft::sparse::op::coo_remove_zeros<float>(&knn_coo, &coo_no_zeros, stream);
 
   // binarize to 1s
-  thrust::fill(thrust::device, coo_no_zeros.vals(), coo_no_zeros.vals() + coo_no_zeros.nnz, 1.0f);
+  raft::matrix::fill(
+    handle, raft::make_device_vector_view(coo_no_zeros.vals(), coo_no_zeros.nnz), 1.0f);
 
   // Create output COO for symmetrized result - create unallocated COO
   raft::sparse::COO<float> sym_coo1(stream);  // Don't pre-allocate dimensions
@@ -158,12 +178,15 @@ auto spectral_embedding(raft::resources const& handle,
                                : raft::sparse::linalg::compute_graph_laplacian(handle, csr_matrix_view);
   auto laplacian_structure = laplacian.structure_view();
 
-  // L *= -1
-  thrust::transform(thrust::device,
-                    laplacian.get_elements().data(),
-                    laplacian.get_elements().data() + laplacian_structure.get_nnz(),
-                    laplacian.get_elements().data(),
-                    [] __device__(float x) { return -x; });
+  auto laplacian_elements_view_const = raft::make_device_vector_view<const float, int>(
+    laplacian.get_elements().data(), laplacian_structure.get_nnz());
+  auto laplacian_elements_view = raft::make_device_vector_view<float, int>(
+    laplacian.get_elements().data(), laplacian_structure.get_nnz());
+
+  raft::linalg::unary_op(
+    handle, laplacian_elements_view_const, laplacian_elements_view, [] __device__(float x) {
+      return -x;
+    });
 
   auto config           = raft::sparse::solver::lanczos_solver_config<float>();
   config.n_components   = spectral_embedding_config.n_components;
