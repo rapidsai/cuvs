@@ -44,7 +44,7 @@
 #include <cstdio>
 #include <iostream>
 
-namespace cuvs::preprocessing::spectral {
+namespace cuvs::preprocessing::spectral_embedding {
 
 auto transform(raft::resources const& handle,
                params spectral_embedding_config,
@@ -239,4 +239,4 @@ auto transform(raft::resources const& handle,
   return 0;
 }
 
-}  // namespace cuvs::preprocessing::spectral
+}  // namespace cuvs::preprocessing::spectral_embedding

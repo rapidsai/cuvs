@@ -19,7 +19,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
-namespace cuvs::preprocessing::spectral {
+namespace cuvs::preprocessing::spectral_embedding {
 
 struct params {
   /** The number of components to reduce the data to. */
@@ -40,4 +40,4 @@ auto transform(raft::resources const& handle,
                raft::device_matrix_view<float, int, raft::row_major> dataset,
                raft::device_matrix_view<float, int, raft::col_major> embedding) -> int;
 
-}  // namespace cuvs::preprocessing::spectral
+}  // namespace cuvs::preprocessing::spectral_embedding

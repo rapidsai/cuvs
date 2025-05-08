@@ -22,7 +22,7 @@
 #include <raft/random/make_blobs.cuh>
 #include <raft/util/cudart_utils.hpp>
 
-namespace cuvs::preprocessing::spectral {
+namespace cuvs::preprocessing::spectral_embedding {
 
 template <typename T>
 struct SpectralEmbeddingInputs {
@@ -196,7 +196,7 @@ class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingI
   raft::device_vector<int, int, raft::row_major> labels_;
   raft::device_matrix<T, int, raft::col_major> embedding_;
 
-  cuvs::preprocessing::spectral::params config_;
+  params config_;
 };
 
 // Define test cases with different parameters
@@ -227,4 +227,4 @@ INSTANTIATE_TEST_CASE_P(SpectralEmbeddingTests,
                         SpectralEmbeddingTestF,
                         ::testing::ValuesIn(inputs<float>));
 
-}  // namespace cuvs::preprocessing::spectral
+}  // namespace cuvs::preprocessing::spectral_embedding
