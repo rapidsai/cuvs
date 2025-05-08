@@ -143,6 +143,24 @@ void _extend(cuvsResources_t res,
     cuvs::neighbors::ivf_pq::extend(*res_ptr, vectors_mds, indices_mds, index_ptr);
   }
 }
+
+template <typename output_mdspan_type, typename IdxT>
+void _get_centers(cuvsResources_t res, cuvsIvfPqIndex index, DLManagedTensor* centers)
+{
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  auto dst       = cuvs::core::from_dlpack<output_mdspan_type>(centers);
+  auto src       = index_ptr->centers();
+
+  RAFT_EXPECTS(src.extent(0) == dst.extent(0), "Output centers has incorrect number of rows");
+  RAFT_EXPECTS(src.extent(1) == dst.extent(1), "Output centers has incorrect number of cols");
+
+  cudaMemcpyAsync(dst.data_handle(),
+                  src.data_handle(),
+                  dst.extent(0) * dst.extent(1) * sizeof(float),
+                  cudaMemcpyDefault,
+                  raft::resource::get_cuda_stream(*res_ptr));
+}
 }  // namespace
 
 extern "C" cuvsError_t cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index)
@@ -309,6 +327,33 @@ extern "C" cuvsError_t cuvsIvfPqExtend(cuvsResources_t res,
       _extend<uint8_t, int64_t>(res, new_vectors, new_indices, *index);
     } else {
       RAFT_FAIL("Unsupported index dtype: %d and bits: %d", vectors.dtype.code, vectors.dtype.bits);
+    }
+  });
+}
+
+extern "C" uint32_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index)
+{
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+  return index_ptr->n_lists();
+}
+
+extern "C" uint32_t cuvsIvfPqIndexGetDimExt(cuvsIvfPqIndex_t index)
+{
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+  return index_ptr->dim_ext();
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexGetCenters(cuvsResources_t res,
+                                                cuvsIvfPqIndex_t index,
+                                                DLManagedTensor* centers)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (cuvs::core::is_dlpack_device_compatible(centers->dl_tensor)) {
+      using output_mdspan_type = raft::device_matrix_view<float, int64_t, raft::row_major>;
+      _get_centers<output_mdspan_type, int64_t>(res, *index, centers);
+    } else {
+      using output_mdspan_type = raft::host_matrix_view<float, int64_t, raft::row_major>;
+      _get_centers<output_mdspan_type, int64_t>(res, *index, centers);
     }
   });
 }
