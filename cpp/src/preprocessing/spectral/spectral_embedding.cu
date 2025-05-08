@@ -46,10 +46,10 @@
 
 namespace cuvs::preprocessing::spectral {
 
-auto spectral_embedding(raft::resources const& handle,
-                        params spectral_embedding_config,
-                        raft::device_matrix_view<float, int, raft::row_major> dataset,
-                        raft::device_matrix_view<float, int, raft::col_major> embedding) -> int
+auto transform(raft::resources const& handle,
+               params spectral_embedding_config,
+               raft::device_matrix_view<float, int, raft::row_major> dataset,
+               raft::device_matrix_view<float, int, raft::col_major> embedding) -> int
 {
   // Define our sample data (similar to the Python example)
   const int n_samples     = dataset.extent(0);

@@ -105,7 +105,7 @@ class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingI
   void testSpectralEmbedding()
   {
     // Call the spectral embedding function
-    int result = spectral_embedding(handle, config_, input_.view(), embedding_.view());
+    int result = transform(handle, config_, input_.view(), embedding_.view());
 
     // Check that the function executed successfully
     ASSERT_EQ(result, 0);
@@ -180,19 +180,6 @@ class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingI
     // This threshold can be adjusted based on empirical results
     ASSERT_GT(trust_score, 0.7)
       << "Trustworthiness score is too low, indicating poor embedding quality";
-
-    // Optional: Save the embedding for visualization
-    /*
-    std::ofstream out_file("embedding_output.csv");
-    for (int i = 0; i < h_embedding.extent(0); i++) {
-      for (int j = 0; j < h_embedding.extent(1); j++) {
-        out_file << h_embedding.data_handle()[i * h_embedding.extent(1) + j];
-        if (j < h_embedding.extent(1) - 1) out_file << ",";
-      }
-      out_file << std::endl;
-    }
-    out_file.close();
-    */
   }
 
  private:
