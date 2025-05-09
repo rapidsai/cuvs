@@ -31,13 +31,7 @@
 #include <raft/sparse/solver/lanczos_types.hpp>
 #include <raft/util/cudart_utils.hpp>
 
-#include <driver_types.h>
-#include <thrust/copy.h>
-#include <thrust/iterator/counting_iterator.h>
-#include <thrust/iterator/zip_iterator.h>
-#include <thrust/remove.h>
-#include <thrust/transform_scan.h>
-#include <thrust/tuple.h>
+#include <thrust/sequence.h>
 
 #include <cuvs/neighbors/brute_force.hpp>
 
