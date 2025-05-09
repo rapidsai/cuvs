@@ -21,16 +21,23 @@
 
 namespace cuvs::preprocessing::spectral_embedding {
 
+/**
+ * @brief Parameters for spectral embedding algorithm
+ */
 struct params {
-  /** The number of components to reduce the data to. */
+  /** @brief The number of components to reduce the data to. */
   int n_components;
-  /** The number of neighbors to use for the nearest neighbors graph. */
+
+  /** @brief The number of neighbors to use for the nearest neighbors graph. */
   int n_neighbors;
-  /** Whether to normalize the Laplacian matrix. */
+
+  /** @brief Whether to normalize the Laplacian matrix. */
   bool norm_laplacian;
-  /** Whether to drop the first eigenvector. */
+
+  /** @brief Whether to drop the first eigenvector. */
   bool drop_first;
-  /** random seed */
+
+  /** @brief Random seed for reproducibility */
   uint64_t seed;
 };
 
