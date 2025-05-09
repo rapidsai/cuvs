@@ -19,7 +19,6 @@
 #include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.h>
 #include <cuvs/neighbors/common.h>
-#include <cuvs/neighbors/common_defs.h>
 #include <cuvs/neighbors/ivf_pq.h>
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
