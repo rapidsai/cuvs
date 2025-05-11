@@ -35,7 +35,7 @@ dependencies:
 - libcusolver=11.4.1.48
 - libcusparse-dev=11.7.5.86
 - libcusparse=11.7.5.86
-- librmm==25.4.*,>=0.0.0a0
+- librmm==25.6.*,>=0.0.0a0
 - make
 - nccl>=2.19
 - ninja
@@ -44,7 +44,7 @@ dependencies:
 - nvcc_linux-aarch64=11.8
 - openblas
 - pre-commit
-- pylibraft==25.4.*,>=0.0.0a0
+- pylibraft==25.6.*,>=0.0.0a0
 - pytest-cov
 - pytest==7.*
 - rapids-build-backend>=0.3.0,<0.4.0.dev0

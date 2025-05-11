@@ -16,6 +16,7 @@
 
 #include "cagra.cuh"
 #include <cuvs/neighbors/cagra.hpp>
+
 namespace cuvs::neighbors::cagra {
 
 #define CUVS_INST_CAGRA_SEARCH(T, IdxT, OutputIdxT)                                     \
@@ -42,7 +43,8 @@ namespace cuvs::neighbors::cagra {
       handle, params, index, queries, neighbors, distances, sample_filter);             \
   }
 
-CUVS_INST_CAGRA_SEARCH(int8_t, uint32_t);
+CUVS_INST_CAGRA_SEARCH(int8_t, uint32_t, uint32_t);
+CUVS_INST_CAGRA_SEARCH(int8_t, uint32_t, int64_t);
 
 #undef CUVS_INST_CAGRA_SEARCH
 

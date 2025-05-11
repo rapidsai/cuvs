@@ -152,13 +152,6 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
         raft::resource::sync_stream(handle_);
       }
 
-      if (ps.metric == cuvs::distance::DistanceType::InnerProduct) {
-        std::transform(
-          distances_naive.begin(), distances_naive.end(), distances_naive.begin(), [](auto x) {
-            return -x;
-          });
-      }
-
       double min_recall = ps.min_recall;
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_NNDescent,
@@ -287,7 +280,8 @@ class AnnNNDescentBatchTest : public ::testing::TestWithParam<AnnNNDescentBatchI
                                   ps.graph_degree,
                                   0.01,
                                   min_recall,
-                                  true));
+                                  true,
+                                  static_cast<size_t>(ps.graph_degree)));
     }
   }
 
@@ -322,6 +316,7 @@ const std::vector<AnnNNDescentInputs> inputs =
                                                      {4, 16, 64, 256, 1024},  // dim
                                                      {32, 64},                // graph_degree
                                                      {cuvs::distance::DistanceType::L2Expanded,
+                                                      cuvs::distance::DistanceType::L2SqrtExpanded,
                                                       cuvs::distance::DistanceType::InnerProduct,
                                                       cuvs::distance::DistanceType::CosineExpanded},
                                                      {false, true},

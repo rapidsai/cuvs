@@ -239,6 +239,10 @@ void set_centers(raft::resources const& handle, index<IdxT>* index, const float*
   auto stream         = raft::resource::get_cuda_stream(handle);
   auto* device_memory = raft::resource::get_workspace_resource(handle);
 
+  // Make sure to have trailing zeroes between dim and dim_ext;
+  // We rely on this to enable padded tensor gemm kernels during coarse search.
+  cuvs::spatial::knn::detail::utils::memzero(
+    index->centers().data_handle(), index->centers().size(), stream);
   // combine cluster_centers and their norms
   RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle(),
                                   sizeof(float) * index->dim_ext(),
@@ -1696,9 +1700,6 @@ auto build(raft::resources const& handle,
                   std::is_same_v<T, int8_t>,
                 "Unsupported data type");
 
-  std::cout << "using ivf_pq::index_params nrows " << (int)dataset.extent(0) << ", dim "
-            << (int)dataset.extent(1) << ", n_lists " << (int)params.n_lists << ", pq_dim "
-            << (int)params.pq_dim << std::endl;
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
   if (params.metric == distance::DistanceType::CosineExpanded) {

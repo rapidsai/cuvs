@@ -43,7 +43,8 @@ namespace cuvs::neighbors::cagra {
       handle, params, index, queries, neighbors, distances, sample_filter);             \
   }
 
-CUVS_INST_CAGRA_SEARCH(uint8_t, uint32_t);
+CUVS_INST_CAGRA_SEARCH(uint8_t, uint32_t, uint32_t);
+CUVS_INST_CAGRA_SEARCH(uint8_t, uint32_t, int64_t);
 
 #undef CUVS_INST_CAGRA_SEARCH
 

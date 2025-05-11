@@ -1,6 +1,5 @@
-
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,7 +42,7 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
   auto index   = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr);
 
   auto index_params   = cuvs::neighbors::cagra::index_params();
-  index_params.metric = static_cast<cuvs::distance::DistanceType>((int)params.metric),
+  index_params.metric = static_cast<cuvs::distance::DistanceType>((int)params.metric);
   index_params.intermediate_graph_degree = params.intermediate_graph_degree;
   index_params.graph_degree              = params.graph_degree;
 
@@ -51,14 +50,43 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
     case cuvsCagraGraphBuildAlgo::AUTO_SELECT: break;
     case cuvsCagraGraphBuildAlgo::IVF_PQ: {
       auto dataset_extent = raft::matrix_extent<int64_t>(dataset.shape[0], dataset.shape[1]);
-      index_params.graph_build_params =
-        cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(dataset_extent);
+      auto pq_params      = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(
+        dataset_extent, index_params.metric);
+      auto ivf_pq_build_params  = params.graph_build_params->ivf_pq_build_params;
+      auto ivf_pq_search_params = params.graph_build_params->ivf_pq_search_params;
+      if (ivf_pq_build_params) {
+        pq_params.build_params.add_data_on_build = ivf_pq_build_params->add_data_on_build;
+        pq_params.build_params.n_lists           = ivf_pq_build_params->n_lists;
+        pq_params.build_params.kmeans_n_iters    = ivf_pq_build_params->kmeans_n_iters;
+        pq_params.build_params.kmeans_trainset_fraction =
+          ivf_pq_build_params->kmeans_trainset_fraction;
+        pq_params.build_params.pq_bits = ivf_pq_build_params->pq_bits;
+        pq_params.build_params.pq_dim  = ivf_pq_build_params->pq_dim;
+        pq_params.build_params.codebook_kind =
+          static_cast<cuvs::neighbors::ivf_pq::codebook_gen>(ivf_pq_build_params->codebook_kind);
+        pq_params.build_params.force_random_rotation = ivf_pq_build_params->force_random_rotation;
+        pq_params.build_params.conservative_memory_allocation =
+          ivf_pq_build_params->conservative_memory_allocation;
+        pq_params.build_params.max_train_points_per_pq_code =
+          ivf_pq_build_params->max_train_points_per_pq_code;
+      }
+      if (ivf_pq_search_params) {
+        pq_params.search_params.n_probes  = ivf_pq_search_params->n_probes;
+        pq_params.search_params.lut_dtype = ivf_pq_search_params->lut_dtype;
+        pq_params.search_params.internal_distance_dtype =
+          ivf_pq_search_params->internal_distance_dtype;
+        pq_params.search_params.preferred_shmem_carveout =
+          ivf_pq_search_params->preferred_shmem_carveout;
+      }
+      if (params.graph_build_params->refinement_rate > 1) {
+        pq_params.refinement_rate = params.graph_build_params->refinement_rate;
+      }
+      index_params.graph_build_params = pq_params;
       break;
     }
     case cuvsCagraGraphBuildAlgo::NN_DESCENT: {
-      cuvs::neighbors::cagra::graph_build_params::nn_descent_params nn_descent_params{};
-      nn_descent_params =
-        cuvs::neighbors::nn_descent::index_params(index_params.intermediate_graph_degree);
+      auto nn_descent_params = cuvs::neighbors::cagra::graph_build_params::nn_descent_params{
+        index_params.intermediate_graph_degree, index_params.metric};
       nn_descent_params.max_iterations = params.nn_descent_niter;
       index_params.graph_build_params  = nn_descent_params;
       break;
@@ -130,7 +158,7 @@ void _extend(cuvsResources_t res,
   }
 }
 
-template <typename T>
+template <typename T, typename IdxT>
 void _search(cuvsResources_t res,
              cuvsCagraSearchParams params,
              cuvsCagraIndex index,
@@ -152,13 +180,16 @@ void _search(cuvsResources_t res,
   search_params.min_iterations    = params.min_iterations;
   search_params.thread_block_size = params.thread_block_size;
   search_params.hashmap_mode = static_cast<cuvs::neighbors::cagra::hash_mode>(params.hashmap_mode);
-  search_params.hashmap_min_bitlen    = params.hashmap_min_bitlen;
-  search_params.hashmap_max_fill_rate = params.hashmap_max_fill_rate;
-  search_params.num_random_samplings  = params.num_random_samplings;
-  search_params.rand_xor_mask         = params.rand_xor_mask;
+  search_params.hashmap_min_bitlen      = params.hashmap_min_bitlen;
+  search_params.hashmap_max_fill_rate   = params.hashmap_max_fill_rate;
+  search_params.num_random_samplings    = params.num_random_samplings;
+  search_params.rand_xor_mask           = params.rand_xor_mask;
+  search_params.persistent              = params.persistent;
+  search_params.persistent_lifetime     = params.persistent_lifetime;
+  search_params.persistent_device_usage = params.persistent_device_usage;
 
   using queries_mdspan_type   = raft::device_matrix_view<T const, int64_t, raft::row_major>;
-  using neighbors_mdspan_type = raft::device_matrix_view<uint32_t, int64_t, raft::row_major>;
+  using neighbors_mdspan_type = raft::device_matrix_view<IdxT, int64_t, raft::row_major>;
   using distances_mdspan_type = raft::device_matrix_view<float, int64_t, raft::row_major>;
   auto queries_mds            = cuvs::core::from_dlpack<queries_mdspan_type>(queries_tensor);
   auto neighbors_mds          = cuvs::core::from_dlpack<neighbors_mdspan_type>(neighbors_tensor);
@@ -182,6 +213,28 @@ void _search(cuvsResources_t res,
                                    bitset_filter_obj);
   } else {
     RAFT_FAIL("Unsupported filter type: BITMAP");
+  }
+}
+
+template <typename T>
+void _search(cuvsResources_t res,
+             cuvsCagraSearchParams params,
+             cuvsCagraIndex index,
+             DLManagedTensor* queries_tensor,
+             DLManagedTensor* neighbors_tensor,
+             DLManagedTensor* distances_tensor,
+             cuvsFilter filter)
+{
+  if (neighbors_tensor->dl_tensor.dtype.code == kDLUInt &&
+      neighbors_tensor->dl_tensor.dtype.bits == 32) {
+    _search<T, uint32_t>(
+      res, params, index, queries_tensor, neighbors_tensor, distances_tensor, filter);
+  } else if (neighbors_tensor->dl_tensor.dtype.code == kDLInt &&
+             neighbors_tensor->dl_tensor.dtype.bits == 64) {
+    _search<T, int64_t>(
+      res, params, index, queries_tensor, neighbors_tensor, distances_tensor, filter);
+  } else {
+    RAFT_FAIL("neighbors should be of type uint32_t or int64_t");
   }
 }
 
@@ -225,15 +278,18 @@ extern "C" cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index_c_ptr)
   return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
 
-    if (index.dtype.code == kDLFloat) {
+    if (index.dtype.code == kDLFloat && index.dtype.bits == 32) {
       auto index_ptr =
         reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index.addr);
       delete index_ptr;
-    } else if (index.dtype.code == kDLInt) {
+    } else if (index.dtype.code == kDLFloat && index.dtype.bits == 16) {
+      auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<half, uint32_t>*>(index.addr);
+      delete index_ptr;
+    } else if (index.dtype.code == kDLInt && index.dtype.bits == 8) {
       auto index_ptr =
         reinterpret_cast<cuvs::neighbors::cagra::index<int8_t, uint32_t>*>(index.addr);
       delete index_ptr;
-    } else if (index.dtype.code == kDLUInt) {
+    } else if (index.dtype.code == kDLUInt && index.dtype.bits == 8) {
       auto index_ptr =
         reinterpret_cast<cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>(index.addr);
       delete index_ptr;
@@ -318,9 +374,8 @@ extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
     RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(distances),
                  "distances should have device compatible memory");
 
-    RAFT_EXPECTS(neighbors.dtype.code == kDLUInt && neighbors.dtype.bits == 32,
-                 "neighbors should be of type uint32_t");
-    RAFT_EXPECTS(distances.dtype.code == kDLFloat && neighbors.dtype.bits == 32,
+    // NB: the dtype of neighbors is checked later in _search function
+    RAFT_EXPECTS(distances.dtype.code == kDLFloat && distances.dtype.bits == 32,
                  "distances should be of type float32");
 
     auto index = *index_c_ptr;
@@ -349,17 +404,21 @@ extern "C" cuvsError_t cuvsCagraSearch(cuvsResources_t res,
 extern "C" cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params)
 {
   return cuvs::core::translate_exceptions([=] {
-    *params = new cuvsCagraIndexParams{.metric                    = L2Expanded,
-                                       .intermediate_graph_degree = 128,
-                                       .graph_degree              = 64,
-                                       .build_algo                = IVF_PQ,
-                                       .nn_descent_niter          = 20};
+    *params                       = new cuvsCagraIndexParams{.metric                    = L2Expanded,
+                                                             .intermediate_graph_degree = 128,
+                                                             .graph_degree              = 64,
+                                                             .build_algo                = IVF_PQ,
+                                                             .nn_descent_niter          = 20};
+    (*params)->graph_build_params = new cuvsIvfPqParams{nullptr, nullptr, 1};
   });
 }
 
 extern "C" cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params)
 {
-  return cuvs::core::translate_exceptions([=] { delete params; });
+  return cuvs::core::translate_exceptions([=] {
+    delete params->graph_build_params;
+    delete params;
+  });
 }
 
 extern "C" cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* params)
@@ -395,11 +454,16 @@ extern "C" cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t para
 extern "C" cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* params)
 {
   return cuvs::core::translate_exceptions([=] {
-    *params = new cuvsCagraSearchParams{.itopk_size            = 64,
-                                        .search_width          = 1,
-                                        .hashmap_max_fill_rate = 0.5,
-                                        .num_random_samplings  = 1,
-                                        .rand_xor_mask         = 0x128394};
+    *params = new cuvsCagraSearchParams{
+      .itopk_size              = 64,
+      .search_width            = 1,
+      .hashmap_max_fill_rate   = 0.5,
+      .num_random_samplings    = 1,
+      .rand_xor_mask           = 0x128394,
+      .persistent              = false,
+      .persistent_lifetime     = 2,
+      .persistent_device_usage = 1.0,
+    };
   });
 }
 
@@ -423,6 +487,9 @@ extern "C" cuvsError_t cuvsCagraDeserialize(cuvsResources_t res,
     index->dtype.bits = dtype.itemsize * 8;
     if (dtype.kind == 'f' && dtype.itemsize == 4) {
       index->addr       = reinterpret_cast<uintptr_t>(_deserialize<float>(res, filename));
+      index->dtype.code = kDLFloat;
+    } else if (dtype.kind == 'f' && dtype.itemsize == 2) {
+      index->addr       = reinterpret_cast<uintptr_t>(_deserialize<half>(res, filename));
       index->dtype.code = kDLFloat;
     } else if (dtype.kind == 'i' && dtype.itemsize == 1) {
       index->addr       = reinterpret_cast<uintptr_t>(_deserialize<int8_t>(res, filename));
@@ -463,6 +530,8 @@ extern "C" cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
       _serialize_to_hnswlib<float>(res, filename, index);
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      _serialize_to_hnswlib<half>(res, filename, index);
     } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
       _serialize_to_hnswlib<int8_t>(res, filename, index);
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
