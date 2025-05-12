@@ -361,12 +361,12 @@ void search(raft::resources const& res,
   }
 }
 
-template <typename T, typename IdxT>
+template <typename T, typename IdxT, typename OutputIdxT = IdxT>
 void search(raft::resources const& res,
             const search_params& params,
             const composite_index<T, IdxT>& idx,
             raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
-            raft::device_matrix_view<IdxT, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<OutputIdxT, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
             const cuvs::neighbors::filtering::base_filter& sample_filter_ref)
 {
@@ -375,7 +375,7 @@ void search(raft::resources const& res,
 
     auto& sample_filter     = dynamic_cast<const expected_filter_t&>(sample_filter_ref);
     auto sample_filter_copy = sample_filter;
-    return cagra::detail::search_on_composite_index<T, IdxT, expected_filter_t>(
+    return cagra::detail::search_on_composite_index<T, IdxT, OutputIdxT, expected_filter_t>(
       res, params, idx, queries, neighbors, distances, sample_filter_copy);
   } catch (const std::bad_cast&) {
     RAFT_FAIL("Unsupported sample filter type by composite_index");

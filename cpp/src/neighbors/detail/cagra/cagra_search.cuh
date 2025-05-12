@@ -47,6 +47,181 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
+template <typename T, typename IdxT>
+void merge_top_k_gpu(raft::resources const& res,
+                     T* distances_buffer,
+                     IdxT* neighbors_buffer,
+                     T* final_distances,
+                     IdxT* final_neighbors,
+                     size_t num_queries,
+                     size_t K,
+                     size_t num_indices,
+                     bool desc = false)
+{
+  size_t total_size         = num_queries * K * num_indices;
+  size_t temp_storage_bytes = 0;
+
+  auto stream        = raft::resource::get_cuda_stream(res);
+  auto thrust_policy = resource::get_thrust_policy(res);
+  auto tmp_res       = raft::resource::get_workspace_resource(res);
+
+  rmm::device_uvector<T> sorted_distances(total_size, stream, tmp_res);
+  rmm::device_uvector<IdxT> sorted_neighbors(total_size, stream, tmp_res);
+  rmm::device_uvector<int> offsets_buffer(num_queries + 1, stream, tmp_res);
+
+  thrust::sequence(thrust_policy,
+                   offsets_buffer.data(),
+                   offsets_buffer.data() + num_queries + 1,
+                   0,
+                   (int)(K * num_indices));
+  if (!desc) {
+    cub::DeviceSegmentedSort::SortPairs(nullptr,
+                                        temp_storage_bytes,
+                                        distances_buffer,
+                                        sorted_distances.data(),
+                                        neighbors_buffer,
+                                        sorted_neighbors.data(),
+                                        total_size,
+                                        num_queries,
+                                        offsets_buffer.data(),
+                                        offsets_buffer.data() + 1,
+                                        stream);
+
+    rmm::device_buffer d_temp_storage(temp_storage_bytes, stream, tmp_res);
+    cub::DeviceSegmentedSort::SortPairs(d_temp_storage.data(),
+                                        temp_storage_bytes,
+                                        distances_buffer,
+                                        sorted_distances.data(),
+                                        neighbors_buffer,
+                                        sorted_neighbors.data(),
+                                        total_size,
+                                        num_queries,
+                                        offsets_buffer.data(),
+                                        offsets_buffer.data() + 1,
+                                        stream);
+  } else {
+    cub::DeviceSegmentedSort::SortPairsDescending(nullptr,
+                                                  temp_storage_bytes,
+                                                  distances_buffer,
+                                                  sorted_distances.data(),
+                                                  neighbors_buffer,
+                                                  sorted_neighbors.data(),
+                                                  total_size,
+                                                  num_queries,
+                                                  offsets_buffer.data(),
+                                                  offsets_buffer.data() + 1,
+                                                  stream);
+
+    rmm::device_buffer d_temp_storage(temp_storage_bytes, stream, tmp_res);
+    cub::DeviceSegmentedSort::SortPairsDescending(d_temp_storage.data(),
+                                                  temp_storage_bytes,
+                                                  distances_buffer,
+                                                  sorted_distances.data(),
+                                                  neighbors_buffer,
+                                                  sorted_neighbors.data(),
+                                                  total_size,
+                                                  num_queries,
+                                                  offsets_buffer.data(),
+                                                  offsets_buffer.data() + 1,
+                                                  stream);
+  }
+
+  size_t stride = K * num_indices;
+  RAFT_CUDA_TRY(cudaMemcpy2DAsync(final_distances,
+                                  sizeof(T) * K,
+                                  sorted_distances.data(),
+                                  sizeof(T) * stride,
+                                  sizeof(T) * K,
+                                  num_queries,
+                                  cudaMemcpyDefault,
+                                  raft::resource::get_cuda_stream(res)));
+  RAFT_CUDA_TRY(cudaMemcpy2DAsync(final_neighbors,
+                                  sizeof(IdxT) * K,
+                                  sorted_neighbors.data(),
+                                  sizeof(IdxT) * stride,
+                                  sizeof(IdxT) * K,
+                                  num_queries,
+                                  cudaMemcpyDefault,
+                                  raft::resource::get_cuda_stream(res)));
+}
+
+template <typename T,
+          typename IdxT,
+          typename OutputIdxT,
+          typename CagraSampleFilterT,
+          typename DistanceT = float>
+void search_on_composite_index(
+  raft::resources const& res,
+  const search_params& params,
+  const composite_index<T, IdxT>& idx,
+  raft::device_matrix_view<const T, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<OutputIdxT, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
+  CagraSampleFilterT sample_filter = CagraSampleFilterT())
+{
+  if (idx.num_indices() == 0) {
+    RAFT_FAIL("The composite index is empty!");
+    return;
+  }
+
+  if (idx.num_indices() == 1) {
+    cagra::search(res, params, *idx.sub_indices.front(), queries, neighbors, distances);
+    return;
+  }
+
+  size_t num_queries = queries.extent(0);
+  size_t K           = neighbors.extent(1);
+  size_t num_indices = idx.num_indices();
+  size_t buffer_size = num_queries * K * num_indices;
+
+  auto stream  = raft::resource::get_cuda_stream(res);
+  auto tmp_res = raft::resource::get_workspace_resource(res);
+
+  rmm::device_uvector<OutputIdxT> neighbors_buffer(buffer_size, stream, tmp_res);
+  rmm::device_uvector<DistanceT> distances_buffer(buffer_size, stream, tmp_res);
+
+  OutputIdxT offset = 0;
+  OutputIdxT stride = K * num_indices;
+
+  for (size_t i = 0; i < idx.num_indices(); i++) {
+    const index<T, IdxT>* sub_index = idx.sub_indices[i];
+    cagra::search(res, params, *sub_index, queries, neighbors, distances);
+    if (offset != 0) {
+      raft::linalg::addScalar(
+        neighbors.data_handle(), neighbors.data_handle(), offset, neighbors.size(), stream);
+    }
+
+    RAFT_CUDA_TRY(cudaMemcpy2DAsync(neighbors_buffer.data() + i * K,
+                                    sizeof(OutputIdxT) * stride,
+                                    neighbors.data_handle(),
+                                    sizeof(OutputIdxT) * K,
+                                    sizeof(OutputIdxT) * K,
+                                    num_queries,
+                                    cudaMemcpyDefault,
+                                    stream));
+    RAFT_CUDA_TRY(cudaMemcpy2DAsync(distances_buffer.data() + i * K,
+                                    sizeof(DistanceT) * stride,
+                                    distances.data_handle(),
+                                    sizeof(DistanceT) * K,
+                                    sizeof(DistanceT) * K,
+                                    num_queries,
+                                    cudaMemcpyDefault,
+                                    stream));
+    offset += sub_index->size();
+  }
+
+  bool desc = idx.metric() == cuvs::distance::DistanceType::InnerProduct;
+  merge_top_k_gpu(res,
+                  distances_buffer.data(),
+                  neighbors_buffer.data(),
+                  distances.data_handle(),
+                  neighbors.data_handle(),
+                  num_queries,
+                  K,
+                  num_indices,
+                  desc);
+}
+
 template <typename DataT,
           typename IndexT,
           typename DistanceT,
