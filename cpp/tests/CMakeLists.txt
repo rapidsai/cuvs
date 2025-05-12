@@ -187,6 +187,8 @@ if(BUILD_TESTS)
     100
   )
 
+  ConfigureTest(NAME NEIGHBORS_BALL_COVER_TEST PATH neighbors/ball_cover.cu GPUS 1 PERCENT 100)
+
   ConfigureTest(
     NAME
     NEIGHBORS_DYNAMIC_BATCHING_TEST
