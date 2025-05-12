@@ -32,6 +32,9 @@
 #include "naive_knn.cuh"
 
 #include "../test_utils.cuh"
+#include <atomic>
+#include <cstdio>
+#include <filesystem>
 #include <gtest/gtest.h>
 #include <iostream>
 #include <limits>
@@ -346,4 +349,27 @@ auto eval_distances(raft::resources const& handle,
   }
   return testing::AssertionSuccess();
 }
+
+/**
+ * A helper class to create a temporary file for a cuVS index object in the system's temp directory.
+ * The file will be automatically deleted when the object is destroyed.
+ */
+struct tmp_index_file {
+  // Ideally, we should use std::tmpfile() or another system-provided API to create a temporary
+  // file. However, our API requires a file name, so we cannot use the file descriptors. There's no
+  // recommended way to generate a robust unique temp filenames, so we use a combination of a
+  // counter, process id, and random number.
+  std::string filename = (std::filesystem::temp_directory_path() /
+                          ("cuvs_" + std::to_string(getpid()) + "_" + std::to_string(counter++) +
+                           "_" + std::to_string(std::rand())))
+                           .string();
+  ~tmp_index_file()
+  {
+    if (std::filesystem::exists(filename)) { std::filesystem::remove(filename); }
+  }
+
+ private:
+  static inline std::atomic<uint64_t> counter = 0;
+};
+
 }  // namespace cuvs::neighbors

@@ -329,6 +329,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
   }
 
  protected:
+  template <typename SearchIdxT = IdxT>
   void testCagra()
   {
     // IVF_PQ and NN_DESCENT graph builds do not support BitwiseHamming
@@ -344,25 +345,25 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
       GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
-    std::vector<IdxT> indices_Cagra(queries_size);
-    std::vector<IdxT> indices_naive(queries_size);
+    std::vector<SearchIdxT> indices_Cagra(queries_size);
+    std::vector<SearchIdxT> indices_naive(queries_size);
     std::vector<DistanceT> distances_Cagra(queries_size);
     std::vector<DistanceT> distances_naive(queries_size);
 
     {
       rmm::device_uvector<DistanceT> distances_naive_dev(queries_size, stream_);
-      rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
+      rmm::device_uvector<SearchIdxT> indices_naive_dev(queries_size, stream_);
 
-      cuvs::neighbors::naive_knn<DistanceT, DataT, IdxT>(handle_,
-                                                         distances_naive_dev.data(),
-                                                         indices_naive_dev.data(),
-                                                         search_queries.data(),
-                                                         database.data(),
-                                                         ps.n_queries,
-                                                         ps.n_rows,
-                                                         ps.dim,
-                                                         ps.k,
-                                                         ps.metric);
+      cuvs::neighbors::naive_knn<DistanceT, DataT, SearchIdxT>(handle_,
+                                                               distances_naive_dev.data(),
+                                                               indices_naive_dev.data(),
+                                                               search_queries.data(),
+                                                               database.data(),
+                                                               ps.n_queries,
+                                                               ps.n_rows,
+                                                               ps.dim,
+                                                               ps.k,
+                                                               ps.metric);
       raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size, stream_);
       raft::update_host(indices_naive.data(), indices_naive_dev.data(), queries_size, stream_);
       raft::resource::sync_stream(handle_);
@@ -370,7 +371,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
     {
       rmm::device_uvector<DistanceT> distances_dev(queries_size, stream_);
-      rmm::device_uvector<IdxT> indices_dev(queries_size, stream_);
+      rmm::device_uvector<SearchIdxT> indices_dev(queries_size, stream_);
 
       {
         cagra::index_params index_params;
@@ -409,6 +410,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
           (const DataT*)database.data(), ps.n_rows, ps.dim);
 
+        tmp_index_file index_file;
         {
           std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
           cagra::index<DataT, IdxT> index(handle_, index_params.metric);
@@ -423,18 +425,18 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
             index = cagra::build(handle_, index_params, database_view);
           };
 
-          cagra::serialize(handle_, "cagra_index", index, ps.include_serialized_dataset);
+          cagra::serialize(handle_, index_file.filename, index, ps.include_serialized_dataset);
         }
 
         cagra::index<DataT, IdxT> index(handle_);
-        cagra::deserialize(handle_, "cagra_index", &index);
+        cagra::deserialize(handle_, index_file.filename, &index);
 
         if (!ps.include_serialized_dataset) { index.update_dataset(handle_, database_view); }
 
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
           search_queries.data(), ps.n_queries, ps.dim);
-        auto indices_out_view =
-          raft::make_device_matrix_view<IdxT, int64_t>(indices_dev.data(), ps.n_queries, ps.k);
+        auto indices_out_view = raft::make_device_matrix_view<SearchIdxT, int64_t>(
+          indices_dev.data(), ps.n_queries, ps.k);
         auto dists_out_view = raft::make_device_matrix_view<DistanceT, int64_t>(
           distances_dev.data(), ps.n_queries, ps.k);
 
@@ -570,8 +572,8 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
         switch (ps.build_algo) {
           case graph_build_algo::IVF_PQ:
-            index_params.graph_build_params =
-              graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(ps.n_rows, ps.dim));
+            index_params.graph_build_params = graph_build_params::ivf_pq_params(
+              raft::matrix_extent<int64_t>(ps.n_rows, ps.dim), index_params.metric);
             if (ps.ivf_pq_search_refine_ratio) {
               std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
                 index_params.graph_build_params)
@@ -786,8 +788,8 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
         switch (ps.build_algo) {
           case graph_build_algo::IVF_PQ:
-            index_params.graph_build_params =
-              graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(ps.n_rows, ps.dim));
+            index_params.graph_build_params = graph_build_params::ivf_pq_params(
+              raft::matrix_extent<int64_t>(ps.n_rows, ps.dim), index_params.metric);
             if (ps.ivf_pq_search_refine_ratio) {
               std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
                 index_params.graph_build_params)
@@ -936,6 +938,7 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
   }
 
  protected:
+  template <typename SearchIdxT = IdxT>
   void testCagra()
   {
     // TODO (tarang-jain): remove when NN Descent index building support InnerProduct. Reference
@@ -961,25 +964,25 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.n_rows < 8 && ps.build_algo == graph_build_algo::IVF_PQ) GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
-    std::vector<IdxT> indices_Cagra(queries_size);
-    std::vector<IdxT> indices_naive(queries_size);
+    std::vector<SearchIdxT> indices_Cagra(queries_size);
+    std::vector<SearchIdxT> indices_naive(queries_size);
     std::vector<DistanceT> distances_Cagra(queries_size);
     std::vector<DistanceT> distances_naive(queries_size);
 
     {
       rmm::device_uvector<DistanceT> distances_naive_dev(queries_size, stream_);
-      rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
+      rmm::device_uvector<SearchIdxT> indices_naive_dev(queries_size, stream_);
 
-      cuvs::neighbors::naive_knn<DistanceT, DataT, IdxT>(handle_,
-                                                         distances_naive_dev.data(),
-                                                         indices_naive_dev.data(),
-                                                         search_queries.data(),
-                                                         database.data(),
-                                                         ps.n_queries,
-                                                         ps.n_rows,
-                                                         ps.dim,
-                                                         ps.k,
-                                                         ps.metric);
+      cuvs::neighbors::naive_knn<DistanceT, DataT, SearchIdxT>(handle_,
+                                                               distances_naive_dev.data(),
+                                                               indices_naive_dev.data(),
+                                                               search_queries.data(),
+                                                               database.data(),
+                                                               ps.n_queries,
+                                                               ps.n_rows,
+                                                               ps.dim,
+                                                               ps.k,
+                                                               ps.metric);
       raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size, stream_);
       raft::update_host(indices_naive.data(), indices_naive_dev.data(), queries_size, stream_);
       raft::resource::sync_stream(handle_);
@@ -987,7 +990,7 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
     {
       rmm::device_uvector<DistanceT> distances_dev(queries_size, stream_);
-      rmm::device_uvector<IdxT> indices_dev(queries_size, stream_);
+      rmm::device_uvector<SearchIdxT> indices_dev(queries_size, stream_);
 
       {
         cagra::index_params index_params;
@@ -996,8 +999,8 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
         switch (ps.build_algo) {
           case graph_build_algo::IVF_PQ:
-            index_params.graph_build_params =
-              graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(ps.n_rows, ps.dim));
+            index_params.graph_build_params = graph_build_params::ivf_pq_params(
+              raft::matrix_extent<int64_t>(ps.n_rows, ps.dim), index_params.metric);
             if (ps.ivf_pq_search_refine_ratio) {
               std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
                 index_params.graph_build_params)
@@ -1063,8 +1066,8 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
           search_queries.data(), ps.n_queries, ps.dim);
-        auto indices_out_view =
-          raft::make_device_matrix_view<IdxT, int64_t>(indices_dev.data(), ps.n_queries, ps.k);
+        auto indices_out_view = raft::make_device_matrix_view<SearchIdxT, int64_t>(
+          indices_dev.data(), ps.n_queries, ps.k);
         auto dists_out_view = raft::make_device_matrix_view<DistanceT, int64_t>(
           distances_dev.data(), ps.n_queries, ps.k);
 
