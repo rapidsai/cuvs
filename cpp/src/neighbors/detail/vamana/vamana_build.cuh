@@ -495,7 +495,6 @@ auto quantize_all_vectors(raft::resources const& res,
 {
   auto dim         = residuals.extent(1);
   auto vq_codebook = raft::make_device_matrix<float, uint32_t, raft::row_major>(res, 1, dim);
-  raft::linalg::map_offset(res, vq_codebook.view(), [] __device__(size_t i) { return 0; });
 
   auto codes = cuvs::neighbors::detail::process_and_fill_codes_subspaces<float, int64_t>(
     res, ps, residuals, raft::make_const_mdspan(vq_codebook.view()), pq_codebook);
@@ -547,7 +546,7 @@ index<T, IdxT> build(
     std::vector<float> OPQMatrix = parse_rotation_matrix_file(
       params.codebook_prefix + "_pq_pivots.bin_rotation_matrix.bin", dim);
 
-    pq_params.pq_bits = std::lround(std::log2(pq_codebook_size));
+    pq_params.pq_bits = std::lround(raft::log2(pq_codebook_size));
     pq_params.pq_dim  = pq_dim;
 
     // transform PQEncodingTable (dimensions: pq_codebook_size x dim_per_subspace * pq_dim ) to
@@ -555,11 +554,10 @@ index<T, IdxT> build(
     auto PQEncodingTable_device_vec = raft::make_device_vector<float, uint32_t>(
       res, PQEncodingTable.size());  // logically a 2D matrix with dimensions pq_codebook_size x
                                      // dim_per_subspace * pq_dim
-    RAFT_CUDA_TRY(cudaMemcpyAsync(PQEncodingTable_device_vec.data_handle(),
-                                  PQEncodingTable.data(),
-                                  PQEncodingTable.size() * sizeof(float),
-                                  cudaMemcpyDefault,
-                                  raft::resource::get_cuda_stream(res)));
+    raft::copy(PQEncodingTable_device_vec.data_handle(),
+               PQEncodingTable.data(),
+               PQEncodingTable.size(),
+               raft::resource::get_cuda_stream(res));
     int dim_per_subspace = dim / pq_dim;
     auto pq_codebook =
       raft::make_device_matrix<float, uint32_t>(res, pq_codebook_size * pq_dim, dim_per_subspace);
@@ -581,11 +579,10 @@ index<T, IdxT> build(
 
     // prepare rotation matrix OPQMatrix
     auto OPQMatrix_device = raft::make_device_matrix<float, int64_t>(res, dim, dim);
-    RAFT_CUDA_TRY(cudaMemcpyAsync(OPQMatrix_device.data_handle(),
-                                  OPQMatrix.data(),
-                                  OPQMatrix.size() * sizeof(float),
-                                  cudaMemcpyDefault,
-                                  raft::resource::get_cuda_stream(res)));
+    raft::copy(OPQMatrix_device.data_handle(),
+               OPQMatrix.data(),
+               OPQMatrix.size(),
+               raft::resource::get_cuda_stream(res));
 
     // process in batches
     const uint32_t n_rows = dataset.extent(0);

@@ -34,9 +34,6 @@
 #include <fstream>
 #include <type_traits>
 
-#define DIV_ROUND_UP(X, Y) (((uint64_t)(X) + (Y)-1) / (Y))
-#define ROUND_UP(X, Y)     (((uint64_t)(X) + (Y)-1) / (Y) * (Y))
-
 namespace cuvs::neighbors::vamana::detail {
 
 /**
@@ -160,13 +157,14 @@ void serialize_sector_aligned(raft::resources const& res,
   // buffers
   std::unique_ptr<char[]> sector_buf = std::make_unique<char[]>(sector_len);
   std::unique_ptr<char[]> multisector_buf =
-    std::make_unique<char[]>(ROUND_UP(max_node_len, sector_len));
+    std::make_unique<char[]>(raft::round_up_safe(max_node_len, sector_len));
   std::unique_ptr<char[]> node_buf = std::make_unique<char[]>(max_node_len);
   IdxT& nnbrs                      = *(IdxT*)(node_buf.get() + ndims * sizeof(T));
   IdxT* const nhood_buf            = (IdxT*)(node_buf.get() + (ndims * sizeof(T)) + sizeof(IdxT));
 
-  const uint64_t n_sectors = nnodes_per_sector > 0 ? DIV_ROUND_UP(npts, nnodes_per_sector)
-                                                   : npts * DIV_ROUND_UP(max_node_len, sector_len);
+  const uint64_t n_sectors = nnodes_per_sector > 0
+                               ? raft::div_rounding_up_safe(npts, nnodes_per_sector)
+                               : npts * raft::div_rounding_up_safe(max_node_len, sector_len);
   // metadata
   const uint64_t disk_index_file_size = (n_sectors + 1) * sector_len;
   const uint64_t vamana_frozen_num{}, vamana_frozen_loc{};
@@ -233,7 +231,7 @@ void serialize_sector_aligned(raft::resources const& res,
     }
   } else {
     // Write multi-sector nodes
-    uint64_t nsectors_per_node = DIV_ROUND_UP(max_node_len, sector_len);
+    uint64_t nsectors_per_node = raft::div_rounding_up_safe(max_node_len, sector_len);
     for (uint64_t cur_node_id = 0; cur_node_id < npts; cur_node_id++) {
       if (cur_node_id && (cur_node_id * nsectors_per_node) % 100000 == 0)
         std::cout << "Sector #" << cur_node_id * nsectors_per_node << " written" << std::endl;
