@@ -21,6 +21,17 @@
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <mutex>
 
+namespace cuvs::neighbors::ivf_pq {
+// The default ivf-pq index doesn't have a 'value_type', since it
+// can accept multiple different types at search time.
+// However, the tiered index code needs a value_type (for the bfknn tier),
+// defined in the ann index - so this class adds this for compatibility
+template <typename T, typename IdxT>
+struct typed_index : index<IdxT> {
+  using value_type = T;
+};
+}  // namespace cuvs::neighbors::ivf_pq
+
 namespace cuvs::neighbors::tiered_index {
 
 // forward reference to tiered_index implementation.
@@ -80,6 +91,12 @@ auto build(raft::resources const& res,
            raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
   -> tiered_index::index<ivf_flat::index<float, int64_t>>;
 
+/** @copydoc build */
+auto build(raft::resources const& res,
+           const index_params<ivf_pq::index_params>& index_params,
+           raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
+  -> tiered_index::index<ivf_pq::typed_index<float, int64_t>>;
+
 /**
  * @brief Extend the index with the new data.
  *
@@ -107,6 +124,10 @@ void extend(raft::resources const& handle,
             raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
             tiered_index::index<ivf_flat::index<float, int64_t>>* idx);
 
+/** @copydoc extend */
+void extend(raft::resources const& handle,
+            raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
+            tiered_index::index<ivf_pq::typed_index<float, int64_t>>* idx);
 /**
  * @brief Compact the index
  *
@@ -122,6 +143,10 @@ void compact(raft::resources const& handle,
 /** @copydoc compact */
 void compact(raft::resources const& handle,
              tiered_index::index<ivf_flat::index<float, int64_t>>* idx);
+
+/** @copydoc compact */
+void compact(raft::resources const& handle,
+             tiered_index::index<ivf_pq::typed_index<float, int64_t>>* idx);
 
 /**
  * @brief Search the tiered_index
@@ -146,10 +171,20 @@ void search(raft::resources const& handle,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
 
-/** @copydoc compact */
+/** @copydoc search */
 void search(raft::resources const& handle,
             const ivf_flat::search_params& search_params,
             const tiered_index::index<ivf_flat::index<float, int64_t>>& index,
+            raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
+            raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
+            raft::device_matrix_view<float, int64_t, raft::row_major> distances,
+            const cuvs::neighbors::filtering::base_filter& sample_filter =
+              cuvs::neighbors::filtering::none_sample_filter{});
+
+/** @copydoc search */
+void search(raft::resources const& handle,
+            const ivf_pq::search_params& search_params,
+            const tiered_index::index<ivf_pq::typed_index<float, int64_t>>& index,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
             raft::device_matrix_view<int64_t, int64_t, raft::row_major> neighbors,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,

@@ -128,6 +128,9 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<AnnTieredIndexInputs>
                                    typename UpstreamT::search_params_type>) {
         search_params.n_probes = 128;
       }
+      if constexpr (std::is_same_v<ivf_pq::search_params, typename UpstreamT::search_params_type>) {
+        search_params.n_probes = 128;
+      }
 
       auto distances_view = raft::make_device_matrix_view<value_type, int64_t>(
         (value_type*)distances_tiered_dev.data(), ps.n_queries, ps.k);
@@ -199,4 +202,8 @@ INSTANTIATE_TEST_CASE_P(ANNTieredIndexTest, CAGRA_F, ::testing::ValuesIn(inputs)
 typedef ANNTieredIndexTest<ivf_flat::index<float, int64_t>> IvfFlat_F;
 TEST_P(IvfFlat_F, AnnTieredIndex) { this->testTieredIndex(); }
 INSTANTIATE_TEST_CASE_P(ANNTieredIndexTest, IvfFlat_F, ::testing::ValuesIn(inputs));
+
+typedef ANNTieredIndexTest<ivf_pq::typed_index<float, int64_t>> IvfPq_F;
+TEST_P(IvfPq_F, AnnTieredIndex) { this->testTieredIndex(); }
+INSTANTIATE_TEST_CASE_P(ANNTieredIndexTest, IvfPq_F, ::testing::ValuesIn(inputs));
 }  // namespace cuvs::neighbors::tiered_index
