@@ -20,6 +20,7 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <mutex>
+#include <shared_mutex>
 
 namespace cuvs::neighbors::ivf_pq {
 // The default ivf-pq index doesn't have a 'value_type', since it
@@ -47,6 +48,7 @@ template <typename UpstreamT>
 struct index : cuvs::neighbors::index {
   std::shared_ptr<detail::index_state<UpstreamT>> state;
   std::mutex write_mutex;
+  mutable std::shared_mutex ann_mutex;
 
   explicit index(std::shared_ptr<detail::index_state<UpstreamT>> state) : state(state) {}
 };

@@ -19,15 +19,15 @@
 #include <cuvs/neighbors/tiered_index.hpp>
 
 namespace cuvs::neighbors::ivf_pq {
-auto typed_build(raft::resources const& handle,
+auto typed_build(raft::resources const& res,
                  const cuvs::neighbors::ivf_pq::index_params& index_params,
                  raft::device_matrix_view<const float, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::ivf_pq::typed_index<float, int64_t>
 {
-  return static_cast<typed_index<float, int64_t>&&>(ivf_pq::build(handle, index_params, dataset));
+  return static_cast<typed_index<float, int64_t>&&>(ivf_pq::build(res, index_params, dataset));
 }
 
-void typed_search(raft::resources const& handle,
+void typed_search(raft::resources const& res,
                   const ivf_pq::search_params& search_params,
                   const ivf_pq::typed_index<float, int64_t>& index,
                   raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
@@ -35,7 +35,7 @@ void typed_search(raft::resources const& handle,
                   raft::device_matrix_view<float, int64_t, raft::row_major> distances,
                   const cuvs::neighbors::filtering::base_filter& sample_filter)
 {
-  ivf_pq::search(handle, search_params, index, queries, neighbors, distances, sample_filter);
+  ivf_pq::search(res, search_params, index, queries, neighbors, distances, sample_filter);
 }
 }  // namespace cuvs::neighbors::ivf_pq
 
@@ -69,57 +69,74 @@ auto build(raft::resources const& res,
   return cuvs::neighbors::tiered_index::index<ivf_pq::typed_index<float, int64_t>>(state);
 }
 
-void extend(raft::resources const& handle,
+void extend(raft::resources const& res,
             raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
             tiered_index::index<cagra::index<float, uint32_t>>* idx)
 {
   std::scoped_lock lock(idx->write_mutex);
-  auto next_state = detail::extend(handle, *idx->state, new_vectors);
-  idx->state      = next_state;
+  auto next_state = detail::extend(res, *idx->state, new_vectors);
+
+  auto storage = next_state->storage;
+  if (storage->num_rows_allocated != idx->state->storage->num_rows_allocated) {
+    // CAGRA could be holding on to a non-owning view of the previous dataset in the ann_index,
+    // which is problematic since the underlying ownership of the dataset could be freed here
+    // call cagra::index::update_dataset on it to update the ann_index to point to the
+    // new dataset
+    if (next_state->ann_index) {
+      auto dataset = raft::make_device_matrix_view<const float, int64_t>(
+        storage->dataset.data(), next_state->ann_rows(), storage->dim);
+
+      // Block 'search' calls during the update_dataset call to ensure that this
+      // doesn't cause issues in a multithreaded environment
+      std::unique_lock<std::shared_mutex> lock(idx->ann_mutex);
+      next_state->ann_index->update_dataset(res, dataset);
+    }
+  }
+
+  idx->state = next_state;
 }
 
-void extend(raft::resources const& handle,
+void extend(raft::resources const& res,
             raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
             tiered_index::index<ivf_flat::index<float, int64_t>>* idx)
 {
   std::scoped_lock lock(idx->write_mutex);
-  auto next_state = detail::extend(handle, *idx->state, new_vectors);
+  auto next_state = detail::extend(res, *idx->state, new_vectors);
   idx->state      = next_state;
 }
 
-void extend(raft::resources const& handle,
+void extend(raft::resources const& res,
             raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
             tiered_index::index<ivf_pq::typed_index<float, int64_t>>* idx)
 {
   std::scoped_lock lock(idx->write_mutex);
-  auto next_state = detail::extend(handle, *idx->state, new_vectors);
+  auto next_state = detail::extend(res, *idx->state, new_vectors);
   idx->state      = next_state;
 }
 
-void compact(raft::resources const& handle, tiered_index::index<cagra::index<float, uint32_t>>* idx)
+void compact(raft::resources const& res, tiered_index::index<cagra::index<float, uint32_t>>* idx)
 {
   std::scoped_lock lock(idx->write_mutex);
-  auto next_state = detail::compact(handle, *idx->state);
+  auto next_state = detail::compact(res, *idx->state);
   idx->state      = next_state;
 }
 
-void compact(raft::resources const& handle,
-             tiered_index::index<ivf_flat::index<float, int64_t>>* idx)
+void compact(raft::resources const& res, tiered_index::index<ivf_flat::index<float, int64_t>>* idx)
 {
   std::scoped_lock lock(idx->write_mutex);
-  auto next_state = detail::compact(handle, *idx->state);
+  auto next_state = detail::compact(res, *idx->state);
   idx->state      = next_state;
 }
 
-void compact(raft::resources const& handle,
+void compact(raft::resources const& res,
              tiered_index::index<ivf_pq::typed_index<float, int64_t>>* idx)
 {
   std::scoped_lock lock(idx->write_mutex);
-  auto next_state = detail::compact(handle, *idx->state);
+  auto next_state = detail::compact(res, *idx->state);
   idx->state      = next_state;
 }
 
-void search(raft::resources const& handle,
+void search(raft::resources const& res,
             const cagra::search_params& search_params,
             const tiered_index::index<cagra::index<float, uint32_t>>& index,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
@@ -127,11 +144,14 @@ void search(raft::resources const& handle,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
             const cuvs::neighbors::filtering::base_filter& sample_filter)
 {
+  // use a read-write lock to handle calls to update_dataset for cagra
+  // This allows multiple readers concurrently, but only one writer
+  std::shared_lock<std::shared_mutex> lock(index.ann_mutex);
   index.state->search(
-    handle, search_params, cagra::search, queries, neighbors, distances, sample_filter);
+    res, search_params, cagra::search, queries, neighbors, distances, sample_filter);
 }
 
-void search(raft::resources const& handle,
+void search(raft::resources const& res,
             const ivf_flat::search_params& search_params,
             const tiered_index::index<ivf_flat::index<float, int64_t>>& index,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
@@ -140,10 +160,10 @@ void search(raft::resources const& handle,
             const cuvs::neighbors::filtering::base_filter& sample_filter)
 {
   index.state->search(
-    handle, search_params, ivf_flat::search, queries, neighbors, distances, sample_filter);
+    res, search_params, ivf_flat::search, queries, neighbors, distances, sample_filter);
 }
 
-void search(raft::resources const& handle,
+void search(raft::resources const& res,
             const ivf_pq::search_params& search_params,
             const tiered_index::index<ivf_pq::typed_index<float, int64_t>>& index,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
@@ -152,6 +172,6 @@ void search(raft::resources const& handle,
             const cuvs::neighbors::filtering::base_filter& sample_filter)
 {
   index.state->search(
-    handle, search_params, ivf_pq::typed_search, queries, neighbors, distances, sample_filter);
+    res, search_params, ivf_pq::typed_search, queries, neighbors, distances, sample_filter);
 }
 }  // namespace cuvs::neighbors::tiered_index
