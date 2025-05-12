@@ -383,6 +383,10 @@ if(BUILD_SHARED_LIBS)
     src/distance/sparse_distance.cu
     src/embed/spectral.cu
     src/neighbors/all_neighbors/all_neighbors.cu
+    src/neighbors/ball_cover.cu
+    src/neighbors/ball_cover/detail/ball_cover/registers_eps_pass_euclidean.cu
+    src/neighbors/ball_cover/detail/ball_cover/registers_pass_one.cu
+    src/neighbors/ball_cover/detail/ball_cover/registers_pass_two.cu
     src/neighbors/brute_force.cu
     src/neighbors/brute_force_serialize.cu
     src/neighbors/cagra_build_float.cu
