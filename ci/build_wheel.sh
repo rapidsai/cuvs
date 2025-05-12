@@ -26,6 +26,7 @@ EXCLUDE_ARGS=(
   --exclude "libcusparse.so.*"
   --exclude "libnvJitLink.so.*"
   --exclude "librapids_logger.so"
+  --exclude "librmm.so"
 )
 
 if [[ "${package_dir}" != "python/libcuvs" ]]; then
