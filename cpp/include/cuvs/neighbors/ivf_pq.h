@@ -271,8 +271,9 @@ uint32_t cuvsIvfPqIndexGetDimExt(cuvsIvfPqIndex_t index);
  * @brief Get the cluster centers corresponding to the lists in the original space
  *
  * @param[in] res cuvsResources_t opaque C handle
- * @param[in] index cuvsIvfPqIndex_t Built NN-Descent index
- * @param[out] centers Preallocated array on host memory to store output, [n_lists, dim_ext]
+ * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
+ * @param[out] centers Preallocated array on host or device memory to store output,
+ * dimensions [n_lists, dim_ext]
  * @return cuvsError_t
  */
 cuvsError_t cuvsIvfPqIndexGetCenters(cuvsResources_t res,

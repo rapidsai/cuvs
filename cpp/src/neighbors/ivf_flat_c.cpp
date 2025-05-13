@@ -139,6 +139,36 @@ void _extend(cuvsResources_t res,
 
   cuvs::neighbors::ivf_flat::extend(*res_ptr, vectors_mds, indices_mds, index_ptr);
 }
+
+template <typename output_mdspan_type, typename T, typename IdxT>
+void _get_centers(cuvsResources_t res, cuvsIvfFlatIndex index, DLManagedTensor* centers)
+{
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_flat::index<T, IdxT>*>(index.addr);
+  auto dst       = cuvs::core::from_dlpack<output_mdspan_type>(centers);
+  auto src       = index_ptr->centers();
+
+  RAFT_EXPECTS(src.extent(0) == dst.extent(0), "Output centers has incorrect number of rows");
+  RAFT_EXPECTS(src.extent(1) == dst.extent(1), "Output centers has incorrect number of cols");
+
+  cudaMemcpyAsync(dst.data_handle(),
+                  src.data_handle(),
+                  dst.extent(0) * dst.extent(1) * sizeof(float),
+                  cudaMemcpyDefault,
+                  raft::resource::get_cuda_stream(*res_ptr));
+}
+
+template <typename T, typename IdxT>
+void get_centers(cuvsResources_t res, cuvsIvfFlatIndex index, DLManagedTensor* centers)
+{
+  if (cuvs::core::is_dlpack_device_compatible(centers->dl_tensor)) {
+    using output_mdspan_type = raft::device_matrix_view<float, int64_t, raft::row_major>;
+    _get_centers<output_mdspan_type, T, IdxT>(res, index, centers);
+  } else {
+    using output_mdspan_type = raft::host_matrix_view<float, int64_t, raft::row_major>;
+    _get_centers<output_mdspan_type, T, IdxT>(res, index, centers);
+  }
+}
 }  // namespace
 
 extern "C" cuvsError_t cuvsIvfFlatIndexCreate(cuvsIvfFlatIndex_t* index)
@@ -346,6 +376,71 @@ extern "C" cuvsError_t cuvsIvfFlatExtend(cuvsResources_t res,
       _extend<int8_t, int64_t>(res, new_vectors, new_indices, *index);
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
       _extend<uint8_t, int64_t>(res, new_vectors, new_indices, *index);
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
+    }
+  });
+}
+
+extern "C" uint32_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index)
+{
+  if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
+    auto index_ptr =
+      reinterpret_cast<cuvs::neighbors::ivf_flat::index<float, int64_t>*>(index->addr);
+    return index_ptr->n_lists();
+  } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+    auto index_ptr =
+      reinterpret_cast<cuvs::neighbors::ivf_flat::index<half, int64_t>*>(index->addr);
+    return index_ptr->n_lists();
+  } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
+    auto index_ptr =
+      reinterpret_cast<cuvs::neighbors::ivf_flat::index<int8_t, int64_t>*>(index->addr);
+    return index_ptr->n_lists();
+  } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
+    auto index_ptr =
+      reinterpret_cast<cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*>(index->addr);
+    return index_ptr->n_lists();
+  } else {
+    return 0;
+  }
+}
+
+extern "C" uint32_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index)
+{
+  if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
+    auto index_ptr =
+      reinterpret_cast<cuvs::neighbors::ivf_flat::index<float, int64_t>*>(index->addr);
+    return index_ptr->dim();
+  } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+    auto index_ptr =
+      reinterpret_cast<cuvs::neighbors::ivf_flat::index<half, int64_t>*>(index->addr);
+    return index_ptr->dim();
+  } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
+    auto index_ptr =
+      reinterpret_cast<cuvs::neighbors::ivf_flat::index<int8_t, int64_t>*>(index->addr);
+    return index_ptr->dim();
+  } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
+    auto index_ptr =
+      reinterpret_cast<cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*>(index->addr);
+    return index_ptr->dim();
+  } else {
+    return 0;
+  }
+}
+
+extern "C" cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsResources_t res,
+                                                  cuvsIvfFlatIndex_t index,
+                                                  DLManagedTensor* centers)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
+      get_centers<float, int64_t>(res, *index, centers);
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      get_centers<half, int64_t>(res, *index, centers);
+    } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
+      get_centers<int8_t, int64_t>(res, *index, centers);
+    } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
+      get_centers<uint8_t, int64_t>(res, *index, centers);
     } else {
       RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
     }
