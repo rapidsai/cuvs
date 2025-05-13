@@ -22,6 +22,7 @@
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/core/serialize.hpp>
+#include <raft/util/cudart_utils.hpp>
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/core/exceptions.hpp>
@@ -151,11 +152,10 @@ void _get_centers(cuvsResources_t res, cuvsIvfFlatIndex index, DLManagedTensor* 
   RAFT_EXPECTS(src.extent(0) == dst.extent(0), "Output centers has incorrect number of rows");
   RAFT_EXPECTS(src.extent(1) == dst.extent(1), "Output centers has incorrect number of cols");
 
-  cudaMemcpyAsync(dst.data_handle(),
-                  src.data_handle(),
-                  dst.extent(0) * dst.extent(1) * sizeof(float),
-                  cudaMemcpyDefault,
-                  raft::resource::get_cuda_stream(*res_ptr));
+  raft::copy(dst.data_handle(),
+             src.data_handle(),
+             dst.extent(0) * dst.extent(1),
+             raft::resource::get_cuda_stream(*res_ptr));
 }
 
 template <typename T, typename IdxT>
