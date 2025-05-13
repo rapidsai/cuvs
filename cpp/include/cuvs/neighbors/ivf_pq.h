@@ -264,8 +264,8 @@ cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index);
 /** Get the number of clusters/inverted lists */
 uint32_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index);
 
-/** Get the dimensionality of the cluster centers */
-uint32_t cuvsIvfPqIndexGetDimExt(cuvsIvfPqIndex_t index);
+/** Get the dimensionality*/
+uint32_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index);
 
 /**
  * @brief Get the cluster centers corresponding to the lists in the original space
@@ -273,7 +273,7 @@ uint32_t cuvsIvfPqIndexGetDimExt(cuvsIvfPqIndex_t index);
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
  * @param[out] centers Preallocated array on host or device memory to store output,
- * dimensions [n_lists, dim_ext]
+ * dimensions [n_lists, dim]
  * @return cuvsError_t
  */
 cuvsError_t cuvsIvfPqIndexGetCenters(cuvsResources_t res,
