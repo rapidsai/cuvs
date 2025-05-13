@@ -570,8 +570,8 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
         switch (ps.build_algo) {
           case graph_build_algo::IVF_PQ:
-            index_params.graph_build_params =
-              graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(ps.n_rows, ps.dim));
+            index_params.graph_build_params = graph_build_params::ivf_pq_params(
+              raft::matrix_extent<int64_t>(ps.n_rows, ps.dim), index_params.metric);
             if (ps.ivf_pq_search_refine_ratio) {
               std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
                 index_params.graph_build_params)
@@ -786,8 +786,8 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
         switch (ps.build_algo) {
           case graph_build_algo::IVF_PQ:
-            index_params.graph_build_params =
-              graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(ps.n_rows, ps.dim));
+            index_params.graph_build_params = graph_build_params::ivf_pq_params(
+              raft::matrix_extent<int64_t>(ps.n_rows, ps.dim), index_params.metric);
             if (ps.ivf_pq_search_refine_ratio) {
               std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
                 index_params.graph_build_params)
@@ -996,8 +996,8 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
         switch (ps.build_algo) {
           case graph_build_algo::IVF_PQ:
-            index_params.graph_build_params =
-              graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(ps.n_rows, ps.dim));
+            index_params.graph_build_params = graph_build_params::ivf_pq_params(
+              raft::matrix_extent<int64_t>(ps.n_rows, ps.dim), index_params.metric);
             if (ps.ivf_pq_search_refine_ratio) {
               std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
                 index_params.graph_build_params)
