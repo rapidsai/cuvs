@@ -12,232 +12,25 @@ concurrency:
 jobs:
   pr-builder:
     needs:
-      - check-nightly-ci
-      - changed-files
-      - checks
       - conda-cpp-build
-      - conda-cpp-tests
       - conda-cpp-checks
-      - conda-python-build
-      - conda-python-tests
-      - conda-java-tests
-      - docs-build
-      - rust-build
-      - go-build
-      - wheel-build-libcuvs
-      - wheel-build-cuvs
-      - wheel-tests-cuvs
-      - devcontainer
-      - telemetry-setup
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/pr-builder.yaml@python-3.13
+    uses: rapidsai/shared-workflows/.github/workflows/pr-builder.yaml@gha-artifacts/more-migrations
     if: always()
     with:
       needs: ${{ toJSON(needs) }}
-  telemetry-setup:
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    env:
-      OTEL_SERVICE_NAME: 'pr-cuvs'
-    steps:
-      - name: Telemetry setup
-        if: ${{ vars.TELEMETRY_ENABLED == 'true' }}
-        uses: rapidsai/shared-actions/telemetry-dispatch-stash-base-env-vars@main
-  check-nightly-ci:
-    needs: telemetry-setup
-    # Switch to ubuntu-latest once it defaults to a version of Ubuntu that
-    # provides at least Python 3.11 (see
-    # https://docs.python.org/3/library/datetime.html#datetime.date.fromisoformat)
-    runs-on: ubuntu-24.04
-    env:
-      RAPIDS_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    steps:
-      - name: Check if nightly CI is passing
-        uses: rapidsai/shared-actions/check_nightly_success/dispatch@main
-        with:
-          repo: cuvs
-  changed-files:
-    needs: telemetry-setup
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/changed-files.yaml@python-3.13
-    with:
-      files_yaml: |
-        test_cpp:
-          - '**'
-          - '!.devcontainer/**'
-          - '!.pre-commit-config.yaml'
-          - '!README.md'
-          - '!ci/release/update-version.sh'
-          - '!docs/**'
-          - '!img/**'
-          - '!notebooks/**'
-          - '!python/**'
-          - '!rust/**'
-          - '!go/**'
-          - '!thirdparty/LICENSES/**'
-        test_java:
-          - '**'
-          - '!.devcontainer/**'
-          - '!.pre-commit-config.yaml'
-          - '!README.md'
-          - '!docs/**'
-          - '!img/**'
-          - '!notebooks/**'
-          - '!python/**'
-          - '!rust/**'
-          - '!go/**'
-          - '!thirdparty/LICENSES/**'
-        test_notebooks:
-          - '**'
-          - '!.devcontainer/**'
-          - '!.pre-commit-config.yaml'
-          - '!ci/release/update-version.sh'
-          - '!README.md'
-          - '!rust/**'
-          - '!go/**'
-          - '!thirdparty/LICENSES/**'
-        test_python:
-          - '**'
-          - '!.devcontainer/**'
-          - '!.pre-commit-config.yaml'
-          - '!ci/release/update-version.sh'
-          - '!README.md'
-          - '!docs/**'
-          - '!img/**'
-          - '!notebooks/**'
-          - '!rust/**'
-          - '!go/**'
-          - '!thirdparty/LICENSES/**'
-  checks:
-    needs: telemetry-setup
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/checks.yaml@python-3.13
-    with:
-      enable_check_generated_files: false
-      ignored_pr_jobs: "telemetry-summarize"
   conda-cpp-build:
     needs: checks
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@python-3.13
+    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@gha-artifacts/more-migrations
     with:
       build_type: pull-request
       node_type: cpu16
-  conda-cpp-tests:
-    needs: [conda-cpp-build, changed-files]
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-tests.yaml@python-3.13
-    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
-    with:
-      build_type: pull-request
   conda-cpp-checks:
     needs: conda-cpp-build
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-post-build-checks.yaml@python-3.13
+    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-post-build-checks.yaml@gha-artifacts/more-migrations
     with:
       build_type: pull-request
       enable_check_symbols: true
       symbol_exclusions: (void (thrust::|cub::))
-  conda-python-build:
-    needs: conda-cpp-build
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-python-build.yaml@python-3.13
-    with:
-      build_type: pull-request
-  conda-python-tests:
-    needs: [conda-python-build, changed-files]
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-python-tests.yaml@python-3.13
-    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_python
-    with:
-      build_type: pull-request
-  conda-java-tests:
-    needs: [conda-cpp-build, changed-files]
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.06
-    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_java
-    with:
-      build_type: pull-request
-      node_type: "gpu-l4-latest-1"
-      arch: "amd64"
-      container_image: "rapidsai/ci-conda:latest"
-      run_script: "ci/test_java.sh"
-      file_to_upload: "java/cuvs-java/target/"
-  docs-build:
-    needs: conda-python-build
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@python-3.13
-    with:
-      build_type: pull-request
-      node_type: "gpu-l4-latest-1"
-      arch: "amd64"
-      container_image: "rapidsai/ci-conda:latest"
-      run_script: "ci/build_docs.sh"
-  rust-build:
-    needs: conda-cpp-build
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@python-3.13
-    with:
-      build_type: pull-request
-      node_type: "gpu-l4-latest-1"
-      arch: "amd64"
-      container_image: "rapidsai/ci-conda:latest"
-      run_script: "ci/build_rust.sh"
-  go-build:
-    needs: conda-cpp-build
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@python-3.13
-    with:
-      build_type: pull-request
-      node_type: "gpu-l4-latest-1"
-      arch: "amd64"
-      container_image: "rapidsai/ci-conda:latest"
-      run_script: "ci/build_go.sh"
-  wheel-build-libcuvs:
-    needs: checks
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@python-3.13
-    with:
-      build_type: pull-request
-      script: ci/build_wheel_libcuvs.sh
-      # build for every combination of arch and CUDA version, but only for the latest Python
-      matrix_filter: group_by([.ARCH, (.CUDA_VER|split(".")|map(tonumber)|.[0])]) | map(max_by(.PY_VER|split(".")|map(tonumber)))
-      package-name: libcuvs
-      package-type: cpp
-  wheel-build-cuvs:
-    needs: wheel-build-libcuvs
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-build.yaml@python-3.13
-    with:
-      build_type: pull-request
-      script: ci/build_wheel_cuvs.sh
-      package-name: cuvs
-      package-type: python
-  wheel-tests-cuvs:
-    needs: [wheel-build-cuvs, changed-files]
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-test.yaml@python-3.13
-    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_python
-    with:
-      build_type: pull-request
-      script: ci/test_wheel_cuvs.sh
-  devcontainer:
-    secrets: inherit
-    needs: telemetry-setup
-    uses: rapidsai/shared-workflows/.github/workflows/build-in-devcontainer.yaml@python-3.13
-    with:
-      arch: '["amd64"]'
-      cuda: '["12.8"]'
-      build_command: |
-        sccache -z;
-        build-all --verbose;
-        sccache -s;
-
-  telemetry-summarize:
-    # This job must use a self-hosted runner to record telemetry traces.
-    runs-on: linux-amd64-cpu4
-    needs: pr-builder
-    if: ${{ vars.TELEMETRY_ENABLED == 'true' && !cancelled() }}
-    continue-on-error: true
-    steps:
-      - name: Telemetry summarize
-        uses: rapidsai/shared-actions/telemetry-dispatch-summarize@main
