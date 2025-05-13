@@ -598,6 +598,28 @@ void sort_knn_graph(
   RAFT_LOG_DEBUG("# Sorting kNN graph time: %.1lf sec\n", time_sort_end - time_sort_start);
 }
 
+template <typename LabelT = uint32_t>
+LabelT atomic_update_label(LabelT l0, LabelT l1, LabelT* label_ptr)
+{
+  if (l0 != label_ptr[l0]) {
+    label_ptr[l0] = atomic_update_label<LabelT>(label_ptr[l0], l1, label_ptr);
+    return label_ptr[l0];
+  }
+  while (l1 != label_ptr[l1]) {
+    label_ptr[l1] = atomic_update_label<LabelT>(l0, label_ptr[l1], label_ptr);
+    return label_ptr[l1];
+  }
+  if (l0 == l1) { return l0; }
+  if (l0 > l1) {
+    LabelT tmp = l0;
+    l0         = l1;
+    l1         = tmp;
+  }
+  LabelT l1_old = __sync_val_compare_and_swap(label_ptr + l1, l1, l0);
+  if (l1_old == l1) { return l0; }
+  return atomic_update_label<LabelT>(l1_old, l0, label_ptr);
+}
+
 template <typename IdxT = uint32_t>
 void mst_opt_update_graph(IdxT* mst_graph_ptr,
                           IdxT* candidate_edges_ptr,
@@ -622,7 +644,7 @@ void mst_opt_update_graph(IdxT* mst_graph_ptr,
     if (outgoing_num_edges_ptr[i] >= outgoing_max_edges_ptr[i]) continue;
     uint64_t j = candidate_edges_ptr[i];
     if (j >= graph_size) continue;
-    if (label_ptr[i] == label_ptr[j]) continue;
+    if (get_root_label(i, label_ptr) == get_root_label(j, label_ptr)) continue;
 
     // Try to add a direct edge to destination node with different label.
     if (incoming_num_edges_ptr[j] < incoming_max_edges_ptr[j]) {
@@ -631,7 +653,7 @@ void mst_opt_update_graph(IdxT* mst_graph_ptr,
       for (uint64_t kj = 0; kj < mst_graph_degree; kj++) {
         uint64_t l = mst_graph_ptr[(mst_graph_degree * j) + kj];
         if (l >= graph_size) continue;
-        if (label_ptr[i] == label_ptr[l]) {
+        if (get_root_label(i, label_ptr) == get_root_label(l, label_ptr)) {
           ret = 0;
           break;
         }
@@ -649,6 +671,7 @@ void mst_opt_update_graph(IdxT* mst_graph_ptr,
         mst_graph_ptr[(mst_graph_degree * (i)) + ki]         = j;  // OUT
         mst_graph_ptr[(mst_graph_degree * (j + 1)) - 1 - kj] = i;  // IN
         ret                                                  = 1;
+        atomic_update_label<IdxT>(i, j, label_ptr);
       }
     }
     if (ret == 1) {
@@ -661,7 +684,7 @@ void mst_opt_update_graph(IdxT* mst_graph_ptr,
     for (uint64_t kj = 0; kj < mst_graph_degree; kj++) {
       uint64_t l = mst_graph_ptr[(mst_graph_degree * (j + 1)) - 1 - kj];
       if (l >= graph_size) continue;
-      if (label_ptr[i] == label_ptr[l]) {
+      if (get_root_label(i, label_ptr) == get_root_label(l, label_ptr)) {
         ret = 0;
         break;
       }
@@ -670,8 +693,8 @@ void mst_opt_update_graph(IdxT* mst_graph_ptr,
       // Check to avoid duplication
       for (uint64_t kl = 0; kl < mst_graph_degree; kl++) {
         uint64_t m = mst_graph_ptr[(mst_graph_degree * l) + kl];
-        if (m > graph_size) continue;
-        if (label_ptr[i] == label_ptr[m]) {
+        if (m >= graph_size) continue;
+        if (get_root_label(i, label_ptr) == get_root_label(m, label_ptr)) {
           ret = 0;
           break;
         }
@@ -688,6 +711,7 @@ void mst_opt_update_graph(IdxT* mst_graph_ptr,
         mst_graph_ptr[(mst_graph_degree * (i)) + ki]         = l;  // OUT
         mst_graph_ptr[(mst_graph_degree * (l + 1)) - 1 - kl] = i;  // IN
         ret                                                  = 2;
+        atomic_update_label<IdxT>(i, l, label_ptr);
         break;
       }
     }
@@ -697,16 +721,6 @@ void mst_opt_update_graph(IdxT* mst_graph_ptr,
       num_failure += 1;
     }
   }
-}
-
-template <typename LabelT = uint32_t>
-LabelT atomic_update_label(LabelT l0, LabelT l1, LabelT* label_ptr)
-{
-  if (l0 == l1) { return l0; }
-  if (l0 > l1) { return atomic_update_label<LabelT>(l1, l0, label_ptr); }
-  LabelT l1_old = __sync_val_compare_and_swap(label_ptr + l1, l1, l0);
-  if (l1_old == l1) { return l0; }
-  return atomic_update_label(l1_old, l0, label_ptr);
 }
 
 template <typename IdxT = uint32_t>
@@ -788,6 +802,9 @@ void mst_optimization_cpu(raft::resources const& res,
         // If the number of clusters does not converge to 1, then edges are
         // made from all nodes not belonging to the main cluster to any node
         // in the main cluster.
+        RAFT_LOG_INFO(
+          "# Random edges added to guarantee connectivity, because the number of connected "
+          "components in the input knn graph is not 1.");
         uint32_t main_cluster_label = graph_size;
 #pragma omp parallel for reduction(min : main_cluster_label)
         for (uint64_t i = 0; i < graph_size; i++) {
@@ -811,6 +828,7 @@ void mst_optimization_cpu(raft::resources const& res,
 
     // 2. Update MST graph
     //  * Try to add candidate edges to MST graph
+    //  * Update labels at the same time.
     mst_opt_update_graph(mst_graph_ptr,
                          candidate_edges_ptr,
                          outgoing_num_edges_ptr,
@@ -825,28 +843,12 @@ void mst_optimization_cpu(raft::resources const& res,
                          num_alternate,
                          num_failure);
 
-    // 3. Labeling
-#pragma omp parallel for
-    for (uint64_t i = 0; i < graph_size; i++) {
-      uint64_t j = candidate_edges(i);
-      if (j >= graph_size) continue;
-      auto ri = get_root_label(i, label_ptr);
-      auto rj = get_root_label(j, label_ptr);
-      if (ri == rj) continue;
-      auto val = atomic_update_label<IdxT>(ri, rj, label_ptr);
-      if (i > val) { label(i) = val; }
-      if (j > val) { label(j) = val; }
-    }
-#pragma omp parallel for
-    for (uint64_t i = 0; i < graph_size; i++) {
-      label_ptr[i] = get_root_label(i, label_ptr);
-    }
-
-    // 4. Calculate the number of clusters and the size of each cluster
+    // 3. Calculate the number of clusters and the size of each cluster
     num_clusters = 0;
 #pragma omp parallel for reduction(+ : num_clusters)
     for (uint64_t i = 0; i < graph_size; i++) {
-      uint64_t ri = get_root_label(i, label_ptr);
+      label(i)    = get_root_label(i, label_ptr);
+      uint64_t ri = label(i);
       if (ri == i) {
         num_clusters += 1;
       } else {
@@ -856,7 +858,7 @@ void mst_optimization_cpu(raft::resources const& res,
       }
     }
 
-    // 5. Postprocessings
+    // 4. Postprocessings
     //  * Adjust incoming_num_edges
     //  * Calculate the min/max size of clusters.
     //  * Calculate the total number of outgoing/incoming edges
@@ -890,13 +892,14 @@ void mst_optimization_cpu(raft::resources const& res,
       if (outgoing_num_edges(i) + incoming_num_edges(i) == mst_graph_degree) continue;
       if (outgoing_num_edges(i) + incoming_num_edges(i) > mst_graph_degree) {
         check_num_mst_edges = false;
+      } else {
+        outgoing_max_edges(i) += 1;
+        incoming_max_edges(i) = mst_graph_degree - outgoing_max_edges(i);
       }
-      outgoing_max_edges(i) += 1;
-      incoming_max_edges(i) = mst_graph_degree - outgoing_max_edges(i);
     }
     RAFT_EXPECTS(check_num_mst_edges, "Some nodes have too many MST graph edges.");
 
-    // 6. Show stats
+    // 5. Show stats
     if (num_clusters != num_clusters_pre) {
       std::string msg = "# itr: " + std::to_string(itr);
       msg += ", num_clusters: " + std::to_string(num_clusters);
@@ -977,7 +980,7 @@ void mst_optimization(raft::resources const& res,
       auto d_label              = raft::make_device_vector<IdxT, int64_t>(res, graph_size);
       auto d_cluster_size       = raft::make_device_vector<IdxT, int64_t>(res, graph_size);
       auto d_candidate_edges    = raft::make_device_vector<IdxT, int64_t>(res, graph_size);
-      throw std::bad_alloc();  // **** DEBUG ****
+      // throw std::bad_alloc();  // **** DEBUG ****
     } catch (std::bad_alloc& e) {
       RAFT_LOG_DEBUG("Insufficient memory for mst optimization on GPU");
       use_gpu = false;
