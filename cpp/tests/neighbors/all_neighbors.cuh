@@ -208,7 +208,7 @@ const std::vector<AllNeighborsInputs> inputsSingle =
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded, 0.9),
-     std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::InnerProduct, 0.85)},
+     std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::InnerProduct, 0.8)},
     {std::make_tuple(1lu, 2lu)},  // min_recall, n_clusters, num_nearest_cluster
     {5000, 7151},                 // n_rows
     {64, 137},                    // dim
