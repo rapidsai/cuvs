@@ -10,17 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pr-builder:
-    needs:
-      - conda-cpp-build
-      - conda-cpp-checks
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/pr-builder.yaml@gha-artifacts/more-migrations
-    if: always()
-    with:
-      needs: ${{ toJSON(needs) }}
   conda-cpp-build:
-    needs: checks
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@gha-artifacts/more-migrations
     with:
