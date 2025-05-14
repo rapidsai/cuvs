@@ -180,7 +180,11 @@ void bench_build(::benchmark::State& state,
 
   if (state.skipped()) { return; }
   make_sure_parent_dir_exists(index.file);
+  auto save_start = std::chrono::high_resolution_clock::now();
   algo->save(index.file);
+  auto save_end = std::chrono::high_resolution_clock::now();
+  auto save_duration = std::chrono::duration_cast<std::chrono::duration<double>>(save_end - save_start).count();
+  std::cout << "save_time " << save_duration << std::endl;
 }
 
 template <typename T>

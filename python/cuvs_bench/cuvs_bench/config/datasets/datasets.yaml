@@ -140,3 +140,18 @@
   query_file: deep-100M/query.public.10K.fbin
   groundtruth_neighbors_file: deep-100M/groundtruth.public.10K.ibin
   distance: euclidean
+
+- name: openai_5M
+  dims: 1536
+  base_file: openai_5M/base.5M.fbin
+  query_file: openai_5M/queries.fbin
+  groundtruth_neighbors_file: openai_5M/groundtruth.neighbors.ibin
+  distance: euclidean
+
+- name: Ads_nofilter
+  dim: 64
+  base_file: Ads_nofilter/ads.base.u8bin
+  query_file: Ads_nofilter/ads.query.u8bin
+  groundtruth_neighbors_file: Ads_nofilter/ads.groundtruth.neighbors.ibin
+  distance: euclidean
+

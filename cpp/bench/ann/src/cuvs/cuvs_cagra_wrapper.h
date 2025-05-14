@@ -96,6 +96,7 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
         if (nn_descent_params) { nn_params = *nn_descent_params; }
         cagra_params.graph_build_params = nn_params;
       }
+      cagra_params.guarantee_connectivity = false;
     }
   };
 
@@ -152,8 +153,8 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   [[nodiscard]] auto get_preference() const -> algo_property override
   {
     algo_property property;
-    property.dataset_memory_type = MemoryType::kHostMmap;
-    property.query_memory_type   = MemoryType::kDevice;
+    property.dataset_memory_type = MemoryType::kHost;
+    property.query_memory_type   = MemoryType::kHost;
     return property;
   }
   void save(const std::string& file) const override;
@@ -206,6 +207,7 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
   index_params_.prepare_build_params(dataset_extents);
 
   auto& params = index_params_.cagra_params;
+  params.guarantee_connectivity = true;
   auto dataset_view_host =
     raft::make_mdspan<const T, IdxT, raft::row_major, true, false>(dataset, dataset_extents);
   auto dataset_view_device =

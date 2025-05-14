@@ -1,0 +1,2937 @@
+-- Using cuVS bench found in conda environment.
+Benchmark command for cuvs_cagra_diskann,base:
+/raid/tarangj/miniconda3/envs/cuvs-cpp/bin/ann/CUVS_CAGRA_DISKANN_ANN_BENCH --build --data_prefix=/datasets/tarangj/datasets/ --benchmark_out_format=json --benchmark_counters_tabular=true --benchmark_out=/datasets/tarangj/datasets/Ads_nofilter/result/build/cuvs_cagra_diskann,base.json.lock Ads_nofilter_cuvs_cagra_diskann,base,k10,bs1_f52bf9f2-1af4-11f0-a4bf-6cfe543dd430.json
+
+Error processing search file /datasets/tarangj/datasets/Ads_nofilter/result/search/cuvs_cagra_diskann,base,k10,bs1.json: 'Recall'. Skipping...
+5 L_build
+Index(['algo_name', 'index_name', 'recall', 'throughput', 'latency', 'threads',
+       'cpu_time', 'L_search', 'end_to_end', 'k', 'n_queries', 'num_threads',
+       'total_queries', 'build time', 'build threads', 'build cpu_time',
+       'L_build'],
+      dtype='object')
+6 R
+Index(['algo_name', 'index_name', 'recall', 'throughput', 'latency', 'threads',
+       'cpu_time', 'L_search', 'end_to_end', 'k', 'n_queries', 'num_threads',
+       'total_queries', 'build time', 'build threads', 'build cpu_time',
+       'L_build', 'R'],
+      dtype='object')
+7 alpha
+Index(['algo_name', 'index_name', 'recall', 'throughput', 'latency', 'threads',
+       'cpu_time', 'L_search', 'end_to_end', 'k', 'n_queries', 'num_threads',
+       'total_queries', 'build time', 'build threads', 'build cpu_time',
+       'L_build', 'R', 'alpha'],
+      dtype='object')
+8 num_threads
+Index(['algo_name', 'index_name', 'recall', 'throughput', 'latency', 'threads',
+       'cpu_time', 'L_search', 'end_to_end', 'k', 'n_queries', 'num_threads',
+       'total_queries', 'build time', 'build threads', 'build cpu_time',
+       'L_build', 'R', 'alpha', 'build_num_threads'],
+      dtype='object')
+write
+         algo_name  ... build_num_threads
+0   diskann_memory  ...              None
+1   diskann_memory  ...              None
+2   diskann_memory  ...              None
+3   diskann_memory  ...              None
+4   diskann_memory  ...              None
+..             ...  ...               ...
+67  diskann_memory  ...              None
+68  diskann_memory  ...              None
+69  diskann_memory  ...              None
+70  diskann_memory  ...              None
+71  diskann_memory  ...              None
+
+[72 rows x 20 columns]
+build_df
+        algo_name  ... num_threads
+0  diskann_memory  ...       112.0
+1  diskann_memory  ...       112.0
+2  diskann_memory  ...       112.0
+3  diskann_memory  ...       112.0
+4  diskann_memory  ...       112.0
+5  diskann_memory  ...       112.0
+6  diskann_memory  ...       112.0
+7  diskann_memory  ...       112.0
+8  diskann_memory  ...       112.0
+
+[9 rows x 9 columns]
+diskann_memory.R32.L_build128.alpha1.2.num_threads112
+now doing prints
+0 14 0
+0
+0
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build128.alpha1.2.num_thr...
+time                                                  234.418344
+threads                                                        1
+cpu_time                                            25240.544437
+L_build                                                    128.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 0, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build128.alpha1.2.num_thr...
+recall                                                        0.856403
+throughput                                                 9349.044805
+latency                                                       0.000107
+threads                                                              1
+cpu_time                                                     23.874406
+L_search                                                          10.0
+end_to_end                                                    0.923232
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   8631.0
+build time                                                  234.418344
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 0, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build128.alpha1.2.num_threads112
+now doing prints
+1 14 0
+1
+0
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build128.alpha1.2.num_thr...
+time                                                  234.418344
+threads                                                        1
+cpu_time                                            25240.544437
+L_build                                                    128.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 0, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build128.alpha1.2.num_thr...
+recall                                                          0.9039
+throughput                                                 8797.607129
+latency                                                       0.000114
+threads                                                              1
+cpu_time                                                     25.339308
+L_search                                                          20.0
+end_to_end                                                    0.820831
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   7221.0
+build time                                                  234.418344
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 1, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build128.alpha1.2.num_threads112
+now doing prints
+2 14 0
+2
+0
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build128.alpha1.2.num_thr...
+time                                                  234.418344
+threads                                                        1
+cpu_time                                            25240.544437
+L_build                                                    128.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 0, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build128.alpha1.2.num_thr...
+recall                                                        0.906694
+throughput                                                 6143.454285
+latency                                                       0.000163
+threads                                                              1
+cpu_time                                                     36.259287
+L_search                                                          30.0
+end_to_end                                                    0.966106
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   5935.0
+build time                                                  234.418344
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 2, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build128.alpha1.2.num_threads112
+now doing prints
+3 14 0
+3
+0
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build128.alpha1.2.num_thr...
+time                                                  234.418344
+threads                                                        1
+cpu_time                                            25240.544437
+L_build                                                    128.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 0, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build128.alpha1.2.num_thr...
+recall                                                        0.923458
+throughput                                                 8540.280026
+latency                                                       0.000117
+threads                                                              1
+cpu_time                                                     25.978557
+L_search                                                          40.0
+end_to_end                                                    0.664886
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   5678.0
+build time                                                  234.418344
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 3, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build128.alpha1.2.num_threads112
+now doing prints
+4 14 0
+4
+0
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build128.alpha1.2.num_thr...
+time                                                  234.418344
+threads                                                        1
+cpu_time                                            25240.544437
+L_build                                                    128.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 0, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build128.alpha1.2.num_thr...
+recall                                                        0.954191
+throughput                                                  5202.94593
+latency                                                       0.000192
+threads                                                              1
+cpu_time                                                     42.700015
+L_search                                                          50.0
+end_to_end                                                    0.765375
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   3982.0
+build time                                                  234.418344
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 4, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build128.alpha1.2.num_threads112
+now doing prints
+5 14 0
+5
+0
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build128.alpha1.2.num_thr...
+time                                                  234.418344
+threads                                                        1
+cpu_time                                            25240.544437
+L_build                                                    128.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 0, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build128.alpha1.2.num_thr...
+recall                                                        0.976542
+throughput                                                 4609.414693
+latency                                                       0.000217
+threads                                                              1
+cpu_time                                                      48.08228
+L_search                                                         100.0
+end_to_end                                                    0.601201
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   2771.0
+build time                                                  234.418344
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 5, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build128.alpha1.2.num_threads112
+now doing prints
+6 14 0
+6
+0
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build128.alpha1.2.num_thr...
+time                                                  234.418344
+threads                                                        1
+cpu_time                                            25240.544437
+L_build                                                    128.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 0, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build128.alpha1.2.num_thr...
+recall                                                        0.982216
+throughput                                                 2513.620576
+latency                                                       0.000398
+threads                                                              1
+cpu_time                                                     88.733268
+L_search                                                         200.0
+end_to_end                                                    0.664418
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   1670.0
+build time                                                  234.418344
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 6, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build128.alpha1.2.num_threads112
+now doing prints
+7 14 0
+7
+0
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build128.alpha1.2.num_thr...
+time                                                  234.418344
+threads                                                        1
+cpu_time                                            25240.544437
+L_build                                                    128.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 0, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build128.alpha1.2.num_thr...
+recall                                                        0.990634
+throughput                                                 1842.041522
+latency                                                       0.000543
+threads                                                              1
+cpu_time                                                     120.77869
+L_search                                                         300.0
+end_to_end                                                    0.736182
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   1356.0
+build time                                                  234.418344
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 7, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build256.alpha1.2.num_threads112
+now doing prints
+8 14 1
+8
+1
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build256.alpha1.2.num_thr...
+time                                                  418.791584
+threads                                                        1
+cpu_time                                            45912.191734
+L_build                                                    256.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 1, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build256.alpha1.2.num_thr...
+recall                                                        0.871537
+throughput                                                13381.002255
+latency                                                       0.000075
+threads                                                              1
+cpu_time                                                     16.555033
+L_search                                                          10.0
+end_to_end                                                    0.761491
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                  10189.0
+build time                                                  418.791584
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 8, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build256.alpha1.2.num_threads112
+now doing prints
+9 14 1
+9
+1
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build256.alpha1.2.num_thr...
+time                                                  418.791584
+threads                                                        1
+cpu_time                                            45912.191734
+L_build                                                    256.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 1, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build256.alpha1.2.num_thr...
+recall                                                        0.893888
+throughput                                                11419.447166
+latency                                                       0.000088
+threads                                                              1
+cpu_time                                                     19.419251
+L_search                                                          20.0
+end_to_end                                                    0.659702
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   7533.0
+build time                                                  418.791584
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 9, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build256.alpha1.2.num_threads112
+now doing prints
+10 14 1
+10
+1
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build256.alpha1.2.num_thr...
+time                                                  418.791584
+threads                                                        1
+cpu_time                                            45912.191734
+L_build                                                    256.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 1, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build256.alpha1.2.num_thr...
+recall                                                        0.921828
+throughput                                                 8814.076039
+latency                                                       0.000113
+threads                                                              1
+cpu_time                                                     25.218178
+L_search                                                          30.0
+end_to_end                                                    0.703118
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   6197.0
+build time                                                  418.791584
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 10, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build256.alpha1.2.num_threads112
+now doing prints
+11 14 1
+11
+1
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build256.alpha1.2.num_thr...
+time                                                  418.791584
+threads                                                        1
+cpu_time                                            45912.191734
+L_build                                                    256.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 1, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build256.alpha1.2.num_thr...
+recall                                                         0.93021
+throughput                                                 7273.764257
+latency                                                       0.000137
+threads                                                              1
+cpu_time                                                     30.614985
+L_search                                                          40.0
+end_to_end                                                    0.685515
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   4986.0
+build time                                                  418.791584
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 11, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build256.alpha1.2.num_threads112
+now doing prints
+12 14 1
+12
+1
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build256.alpha1.2.num_thr...
+time                                                  418.791584
+threads                                                        1
+cpu_time                                            45912.191734
+L_build                                                    256.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 1, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build256.alpha1.2.num_thr...
+recall                                                         0.93021
+throughput                                                 7015.287867
+latency                                                       0.000143
+threads                                                              1
+cpu_time                                                     31.539389
+L_search                                                          50.0
+end_to_end                                                    0.681976
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   4784.0
+build time                                                  418.791584
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 12, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build256.alpha1.2.num_threads112
+now doing prints
+13 14 1
+13
+1
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build256.alpha1.2.num_thr...
+time                                                  418.791584
+threads                                                        1
+cpu_time                                            45912.191734
+L_build                                                    256.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 1, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build256.alpha1.2.num_thr...
+recall                                                         0.98213
+throughput                                                 4404.219654
+latency                                                       0.000227
+threads                                                              1
+cpu_time                                                     49.893275
+L_search                                                         100.0
+end_to_end                                                    0.684617
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   3015.0
+build time                                                  418.791584
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 13, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build256.alpha1.2.num_threads112
+now doing prints
+14 14 1
+14
+1
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build256.alpha1.2.num_thr...
+time                                                  418.791584
+threads                                                        1
+cpu_time                                            45912.191734
+L_build                                                    256.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 1, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build256.alpha1.2.num_thr...
+recall                                                        0.984924
+throughput                                                 2615.996477
+latency                                                       0.000382
+threads                                                              1
+cpu_time                                                     84.604218
+L_search                                                         200.0
+end_to_end                                                    0.682001
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   1784.0
+build time                                                  418.791584
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 14, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build256.alpha1.2.num_threads112
+now doing prints
+15 14 1
+15
+1
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build256.alpha1.2.num_thr...
+time                                                  418.791584
+threads                                                        1
+cpu_time                                            45912.191734
+L_build                                                    256.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 1, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build256.alpha1.2.num_thr...
+recall                                                        0.993412
+throughput                                                 1877.520729
+latency                                                       0.000533
+threads                                                              1
+cpu_time                                                    117.035448
+L_search                                                         300.0
+end_to_end                                                    0.679132
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   1275.0
+build time                                                  418.791584
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 15, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build384.alpha1.2.num_threads112
+now doing prints
+16 14 2
+16
+2
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build384.alpha1.2.num_thr...
+time                                                  593.403746
+threads                                                        1
+cpu_time                                            65636.060919
+L_build                                                    384.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 2, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build384.alpha1.2.num_thr...
+recall                                                        0.826834
+throughput                                                14490.104761
+latency                                                       0.000069
+threads                                                              1
+cpu_time                                                     15.191412
+L_search                                                          10.0
+end_to_end                                                    0.667879
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   9677.0
+build time                                                  593.403746
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 16, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build384.alpha1.2.num_threads112
+now doing prints
+17 14 2
+17
+2
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build384.alpha1.2.num_thr...
+time                                                  593.403746
+threads                                                        1
+cpu_time                                            65636.060919
+L_build                                                    384.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 2, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build384.alpha1.2.num_thr...
+recall                                                        0.868743
+throughput                                                11778.529369
+latency                                                       0.000085
+threads                                                              1
+cpu_time                                                      18.65897
+L_search                                                          20.0
+end_to_end                                                    0.648335
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   7636.0
+build time                                                  593.403746
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 17, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build384.alpha1.2.num_threads112
+now doing prints
+18 14 2
+18
+2
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build384.alpha1.2.num_thr...
+time                                                  593.403746
+threads                                                        1
+cpu_time                                            65636.060919
+L_build                                                    384.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 2, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build384.alpha1.2.num_thr...
+recall                                                          0.8883
+throughput                                                  9514.86307
+latency                                                       0.000105
+threads                                                              1
+cpu_time                                                     23.011551
+L_search                                                          30.0
+end_to_end                                                    0.636944
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   6060.0
+build time                                                  593.403746
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 18, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build384.alpha1.2.num_threads112
+now doing prints
+19 14 2
+19
+2
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build384.alpha1.2.num_thr...
+time                                                  593.403746
+threads                                                        1
+cpu_time                                            65636.060919
+L_build                                                    384.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 2, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build384.alpha1.2.num_thr...
+recall                                                        0.926251
+throughput                                                  7950.42761
+latency                                                       0.000126
+threads                                                              1
+cpu_time                                                     27.503518
+L_search                                                          40.0
+end_to_end                                                    0.646677
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   5141.0
+build time                                                  593.403746
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 19, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build384.alpha1.2.num_threads112
+now doing prints
+20 14 2
+20
+2
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build384.alpha1.2.num_thr...
+time                                                  593.403746
+threads                                                        1
+cpu_time                                            65636.060919
+L_build                                                    384.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 2, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build384.alpha1.2.num_thr...
+recall                                                        0.979336
+throughput                                                 5898.205205
+latency                                                        0.00017
+threads                                                              1
+cpu_time                                                     35.922921
+L_search                                                          50.0
+end_to_end                                                    0.717722
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   4233.0
+build time                                                  593.403746
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 20, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build384.alpha1.2.num_threads112
+now doing prints
+21 14 2
+21
+2
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build384.alpha1.2.num_thr...
+time                                                  593.403746
+threads                                                        1
+cpu_time                                            65636.060919
+L_build                                                    384.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 2, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build384.alpha1.2.num_thr...
+recall                                                         0.98213
+throughput                                                 4433.682829
+latency                                                       0.000226
+threads                                                              1
+cpu_time                                                     49.388584
+L_search                                                         100.0
+end_to_end                                                    0.663593
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   2942.0
+build time                                                  593.403746
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 21, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build384.alpha1.2.num_threads112
+now doing prints
+22 14 2
+22
+2
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build384.alpha1.2.num_thr...
+time                                                  593.403746
+threads                                                        1
+cpu_time                                            65636.060919
+L_build                                                    384.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 2, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build384.alpha1.2.num_thr...
+recall                                                        0.987725
+throughput                                                 2252.541554
+latency                                                       0.000444
+threads                                                              1
+cpu_time                                                     97.647869
+L_search                                                         200.0
+end_to_end                                                    0.741431
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   1670.0
+build time                                                  593.403746
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 22, dtype: object
+prints done
+assignment done
+diskann_memory.R32.L_build384.alpha1.2.num_threads112
+now doing prints
+23 14 2
+23
+2
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R32.L_build384.alpha1.2.num_thr...
+time                                                  593.403746
+threads                                                        1
+cpu_time                                            65636.060919
+L_build                                                    384.0
+R                                                           32.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 2, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R32.L_build384.alpha1.2.num_thr...
+recall                                                        0.995761
+throughput                                                 1590.792525
+latency                                                       0.000629
+threads                                                              1
+cpu_time                                                    137.500786
+L_search                                                         300.0
+end_to_end                                                    0.504197
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                    802.0
+build time                                                  593.403746
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 23, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build128.alpha1.2.num_threads112
+now doing prints
+24 14 3
+24
+3
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build128.alpha1.2.num_thr...
+time                                                  233.038295
+threads                                                        1
+cpu_time                                            25066.452809
+L_build                                                    128.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 3, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build128.alpha1.2.num_thr...
+recall                                                        0.859197
+throughput                                                13823.499064
+latency                                                       0.000072
+threads                                                              1
+cpu_time                                                     15.828195
+L_search                                                          10.0
+end_to_end                                                    0.649728
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   8981.0
+build time                                                  233.038295
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 24, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build128.alpha1.2.num_threads112
+now doing prints
+25 14 3
+25
+3
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build128.alpha1.2.num_thr...
+time                                                  233.038295
+threads                                                        1
+cpu_time                                            25066.452809
+L_build                                                    128.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 3, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build128.alpha1.2.num_thr...
+recall                                                        0.864785
+throughput                                                11051.655138
+latency                                                        0.00009
+threads                                                              1
+cpu_time                                                     19.859284
+L_search                                                          20.0
+end_to_end                                                     0.62519
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   6909.0
+build time                                                  233.038295
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 25, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build128.alpha1.2.num_threads112
+now doing prints
+26 14 3
+26
+3
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build128.alpha1.2.num_thr...
+time                                                  233.038295
+threads                                                        1
+cpu_time                                            25066.452809
+L_build                                                    128.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 3, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build128.alpha1.2.num_thr...
+recall                                                          0.9039
+throughput                                                  6142.87502
+latency                                                       0.000163
+threads                                                              1
+cpu_time                                                     34.090183
+L_search                                                          30.0
+end_to_end                                                    0.903698
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   5551.0
+build time                                                  233.038295
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 26, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build128.alpha1.2.num_threads112
+now doing prints
+27 14 3
+27
+3
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build128.alpha1.2.num_thr...
+time                                                  233.038295
+threads                                                        1
+cpu_time                                            25066.452809
+L_build                                                    128.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 3, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build128.alpha1.2.num_thr...
+recall                                                        0.920664
+throughput                                                 7540.854418
+latency                                                       0.000133
+threads                                                              1
+cpu_time                                                     29.006189
+L_search                                                          40.0
+end_to_end                                                    0.575038
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   4336.0
+build time                                                  233.038295
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 27, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build128.alpha1.2.num_threads112
+now doing prints
+28 14 3
+28
+3
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build128.alpha1.2.num_thr...
+time                                                  233.038295
+threads                                                        1
+cpu_time                                            25066.452809
+L_build                                                    128.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 3, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build128.alpha1.2.num_thr...
+recall                                                        0.954191
+throughput                                                 1810.327243
+latency                                                       0.000552
+threads                                                              1
+cpu_time                                                    106.420409
+L_search                                                          50.0
+end_to_end                                                    2.245491
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   4065.0
+build time                                                  233.038295
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 28, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build128.alpha1.2.num_threads112
+now doing prints
+29 14 3
+29
+3
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build128.alpha1.2.num_thr...
+time                                                  233.038295
+threads                                                        1
+cpu_time                                            25066.452809
+L_build                                                    128.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 3, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build128.alpha1.2.num_thr...
+recall                                                        0.979336
+throughput                                                 4304.153033
+latency                                                       0.000232
+threads                                                              1
+cpu_time                                                     50.906051
+L_search                                                         100.0
+end_to_end                                                    0.661028
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   2845.0
+build time                                                  233.038295
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 29, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build128.alpha1.2.num_threads112
+now doing prints
+30 14 3
+30
+3
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build128.alpha1.2.num_thr...
+time                                                  233.038295
+threads                                                        1
+cpu_time                                            25066.452809
+L_build                                                    128.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 3, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build128.alpha1.2.num_thr...
+recall                                                        0.985068
+throughput                                                 2450.505568
+latency                                                       0.000408
+threads                                                              1
+cpu_time                                                     89.289219
+L_search                                                         200.0
+end_to_end                                                    0.658679
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   1614.0
+build time                                                  233.038295
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 30, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build128.alpha1.2.num_threads112
+now doing prints
+31 14 3
+31
+3
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build128.alpha1.2.num_thr...
+time                                                  233.038295
+threads                                                        1
+cpu_time                                            25066.452809
+L_build                                                    128.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 3, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build128.alpha1.2.num_thr...
+recall                                                        0.984805
+throughput                                                 1782.028096
+latency                                                       0.000561
+threads                                                              1
+cpu_time                                                    122.776323
+L_search                                                         300.0
+end_to_end                                                     0.66109
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   1178.0
+build time                                                  233.038295
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 31, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build256.alpha1.2.num_threads112
+now doing prints
+32 14 4
+32
+4
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build256.alpha1.2.num_thr...
+time                                                  470.872012
+threads                                                        1
+cpu_time                                            51889.127558
+L_build                                                    256.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 4, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build256.alpha1.2.num_thr...
+recall                                                        0.891094
+throughput                                                12351.801411
+latency                                                       0.000081
+threads                                                              1
+cpu_time                                                     17.939535
+L_search                                                          10.0
+end_to_end                                                    0.678565
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   8381.0
+build time                                                  470.872012
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 32, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build256.alpha1.2.num_threads112
+now doing prints
+33 14 4
+33
+4
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build256.alpha1.2.num_thr...
+time                                                  470.872012
+threads                                                        1
+cpu_time                                            51889.127558
+L_build                                                    256.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 4, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build256.alpha1.2.num_thr...
+recall                                                        0.937427
+throughput                                                  8940.81099
+latency                                                       0.000112
+threads                                                              1
+cpu_time                                                     24.466002
+L_search                                                          20.0
+end_to_end                                                    0.675152
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   6036.0
+build time                                                  470.872012
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 33, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build256.alpha1.2.num_threads112
+now doing prints
+34 14 4
+34
+4
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build256.alpha1.2.num_thr...
+time                                                  470.872012
+threads                                                        1
+cpu_time                                            51889.127558
+L_build                                                    256.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 4, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build256.alpha1.2.num_thr...
+recall                                                        0.979336
+throughput                                                 7670.740684
+latency                                                        0.00013
+threads                                                              1
+cpu_time                                                     28.656041
+L_search                                                          30.0
+end_to_end                                                    0.622019
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   4771.0
+build time                                                  470.872012
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 34, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build256.alpha1.2.num_threads112
+now doing prints
+35 14 4
+35
+4
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build256.alpha1.2.num_thr...
+time                                                  470.872012
+threads                                                        1
+cpu_time                                            51889.127558
+L_build                                                    256.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 4, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build256.alpha1.2.num_thr...
+recall                                                        0.984924
+throughput                                                 6131.436086
+latency                                                       0.000163
+threads                                                              1
+cpu_time                                                     35.814893
+L_search                                                          40.0
+end_to_end                                                    0.649812
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   3984.0
+build time                                                  470.872012
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 35, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build256.alpha1.2.num_threads112
+now doing prints
+36 14 4
+36
+4
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build256.alpha1.2.num_thr...
+time                                                  470.872012
+threads                                                        1
+cpu_time                                            51889.127558
+L_build                                                    256.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 4, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build256.alpha1.2.num_thr...
+recall                                                        0.984924
+throughput                                                  3705.57712
+latency                                                        0.00027
+threads                                                              1
+cpu_time                                                     60.266228
+L_search                                                          50.0
+end_to_end                                                    0.844441
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   3129.0
+build time                                                  470.872012
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 36, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build256.alpha1.2.num_threads112
+now doing prints
+37 14 4
+37
+4
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build256.alpha1.2.num_thr...
+time                                                  470.872012
+threads                                                        1
+cpu_time                                            51889.127558
+L_build                                                    256.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 4, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build256.alpha1.2.num_thr...
+recall                                                        0.990512
+throughput                                                 3322.065196
+latency                                                       0.000301
+threads                                                              1
+cpu_time                                                     66.727274
+L_search                                                         100.0
+end_to_end                                                    0.738742
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   2454.0
+build time                                                  470.872012
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 37, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build256.alpha1.2.num_threads112
+now doing prints
+38 14 4
+38
+4
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build256.alpha1.2.num_thr...
+time                                                  470.872012
+threads                                                        1
+cpu_time                                            51889.127558
+L_build                                                    256.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 4, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build256.alpha1.2.num_thr...
+recall                                                        0.996178
+throughput                                                 2115.319689
+latency                                                       0.000473
+threads                                                              1
+cpu_time                                                    104.788939
+L_search                                                         200.0
+end_to_end                                                    0.606094
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   1282.0
+build time                                                  470.872012
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 38, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build256.alpha1.2.num_threads112
+now doing prints
+39 14 4
+39
+4
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build256.alpha1.2.num_thr...
+time                                                  470.872012
+threads                                                        1
+cpu_time                                            51889.127558
+L_build                                                    256.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 4, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build256.alpha1.2.num_thr...
+recall                                                        0.995921
+throughput                                                 1409.033876
+latency                                                        0.00071
+threads                                                              1
+cpu_time                                                    157.933014
+L_search                                                         300.0
+end_to_end                                                    0.504641
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                    711.0
+build time                                                  470.872012
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 39, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build384.alpha1.2.num_threads112
+now doing prints
+40 14 5
+40
+5
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build384.alpha1.2.num_thr...
+time                                                  772.636485
+threads                                                        1
+cpu_time                                            85528.357907
+L_build                                                    384.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 5, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build384.alpha1.2.num_thr...
+recall                                                        0.892724
+throughput                                                 7853.953184
+latency                                                       0.000127
+threads                                                              1
+cpu_time                                                     28.382226
+L_search                                                          10.0
+end_to_end                                                    0.985654
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   7741.0
+build time                                                  772.636485
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 40, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build384.alpha1.2.num_threads112
+now doing prints
+41 14 5
+41
+5
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build384.alpha1.2.num_thr...
+time                                                  772.636485
+threads                                                        1
+cpu_time                                            85528.357907
+L_build                                                    384.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 5, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build384.alpha1.2.num_thr...
+recall                                                        0.909488
+throughput                                                 8151.443895
+latency                                                       0.000123
+threads                                                              1
+cpu_time                                                     27.194573
+L_search                                                          20.0
+end_to_end                                                    0.766771
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   6250.0
+build time                                                  772.636485
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 41, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build384.alpha1.2.num_threads112
+now doing prints
+42 14 5
+42
+5
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build384.alpha1.2.num_thr...
+time                                                  772.636485
+threads                                                        1
+cpu_time                                            85528.357907
+L_build                                                    384.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 5, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build384.alpha1.2.num_thr...
+recall                                                        0.929045
+throughput                                                 7076.008106
+latency                                                       0.000141
+threads                                                              1
+cpu_time                                                     31.458993
+L_search                                                          30.0
+end_to_end                                                    0.536076
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   3793.0
+build time                                                  772.636485
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 42, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build384.alpha1.2.num_threads112
+now doing prints
+43 14 5
+43
+5
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build384.alpha1.2.num_thr...
+time                                                  772.636485
+threads                                                        1
+cpu_time                                            85528.357907
+L_build                                                    384.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 5, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build384.alpha1.2.num_thr...
+recall                                                        0.954191
+throughput                                                 4700.508936
+latency                                                       0.000213
+threads                                                              1
+cpu_time                                                     47.232393
+L_search                                                          40.0
+end_to_end                                                    0.764847
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   3595.0
+build time                                                  772.636485
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 43, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build384.alpha1.2.num_threads112
+now doing prints
+44 14 5
+44
+5
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build384.alpha1.2.num_thr...
+time                                                  772.636485
+threads                                                        1
+cpu_time                                            85528.357907
+L_build                                                    384.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 5, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build384.alpha1.2.num_thr...
+recall                                                        0.959779
+throughput                                                   4299.2887
+latency                                                       0.000233
+threads                                                              1
+cpu_time                                                     51.553164
+L_search                                                          50.0
+end_to_end                                                    0.783657
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   3369.0
+build time                                                  772.636485
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 44, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build384.alpha1.2.num_threads112
+now doing prints
+45 14 5
+45
+5
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build384.alpha1.2.num_thr...
+time                                                  772.636485
+threads                                                        1
+cpu_time                                            85528.357907
+L_build                                                    384.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 5, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build384.alpha1.2.num_thr...
+recall                                                        0.959779
+throughput                                                 2935.356119
+latency                                                       0.000341
+threads                                                              1
+cpu_time                                                     76.084524
+L_search                                                         100.0
+end_to_end                                                     0.65788
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   1931.0
+build time                                                  772.636485
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 45, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build384.alpha1.2.num_threads112
+now doing prints
+46 14 5
+46
+5
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build384.alpha1.2.num_thr...
+time                                                  772.636485
+threads                                                        1
+cpu_time                                            85528.357907
+L_build                                                    384.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 5, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build384.alpha1.2.num_thr...
+recall                                                        0.962472
+throughput                                                 1522.146086
+latency                                                       0.000657
+threads                                                              1
+cpu_time                                                      145.9592
+L_search                                                         200.0
+end_to_end                                                    0.589996
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                    898.0
+build time                                                  772.636485
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 46, dtype: object
+prints done
+assignment done
+diskann_memory.R64.L_build384.alpha1.2.num_threads112
+now doing prints
+47 14 5
+47
+5
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R64.L_build384.alpha1.2.num_thr...
+time                                                  772.636485
+threads                                                        1
+cpu_time                                            85528.357907
+L_build                                                    384.0
+R                                                           64.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 5, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R64.L_build384.alpha1.2.num_thr...
+recall                                                          0.9984
+throughput                                                  928.722331
+latency                                                       0.001077
+threads                                                              1
+cpu_time                                                     239.23576
+L_search                                                         300.0
+end_to_end                                                    0.538415
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                    500.0
+build time                                                  772.636485
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 47, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build128.alpha1.2.num_threads112
+now doing prints
+48 14 6
+48
+6
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build128.alpha1.2.num_thr...
+time                                                  255.441864
+threads                                                        1
+cpu_time                                            27451.481722
+L_build                                                    128.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 6, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build128.alpha1.2.num_thr...
+recall                                                        0.878754
+throughput                                                14288.812381
+latency                                                        0.00007
+threads                                                              1
+cpu_time                                                     15.435462
+L_search                                                          10.0
+end_to_end                                                    0.586722
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   8383.0
+build time                                                  255.441864
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 48, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build128.alpha1.2.num_threads112
+now doing prints
+49 14 6
+49
+6
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build128.alpha1.2.num_thr...
+time                                                  255.441864
+threads                                                        1
+cpu_time                                            27451.481722
+L_build                                                    128.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 6, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build128.alpha1.2.num_thr...
+recall                                                        0.912282
+throughput                                                10425.390442
+latency                                                       0.000096
+threads                                                              1
+cpu_time                                                     21.173962
+L_search                                                          20.0
+end_to_end                                                    0.623618
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   6501.0
+build time                                                  255.441864
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 49, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build128.alpha1.2.num_threads112
+now doing prints
+50 14 6
+50
+6
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build128.alpha1.2.num_thr...
+time                                                  255.441864
+threads                                                        1
+cpu_time                                            27451.481722
+L_build                                                    128.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 6, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build128.alpha1.2.num_thr...
+recall                                                        0.934633
+throughput                                                 5588.883323
+latency                                                       0.000179
+threads                                                              1
+cpu_time                                                     39.765735
+L_search                                                          30.0
+end_to_end                                                    0.640595
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   3580.0
+build time                                                  255.441864
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 50, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build128.alpha1.2.num_threads112
+now doing prints
+51 14 6
+51
+6
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build128.alpha1.2.num_thr...
+time                                                  255.441864
+threads                                                        1
+cpu_time                                            27451.481722
+L_build                                                    128.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 6, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build128.alpha1.2.num_thr...
+recall                                                        0.943015
+throughput                                                  6559.86137
+latency                                                       0.000152
+threads                                                              1
+cpu_time                                                     33.952318
+L_search                                                          40.0
+end_to_end                                                    0.714231
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   4685.0
+build time                                                  255.441864
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 51, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build128.alpha1.2.num_threads112
+now doing prints
+52 14 6
+52
+6
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build128.alpha1.2.num_thr...
+time                                                  255.441864
+threads                                                        1
+cpu_time                                            27451.481722
+L_build                                                    128.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 6, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build128.alpha1.2.num_thr...
+recall                                                        0.943015
+throughput                                                 5990.350901
+latency                                                       0.000167
+threads                                                              1
+cpu_time                                                     36.772818
+L_search                                                          50.0
+end_to_end                                                    0.661601
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   3963.0
+build time                                                  255.441864
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 52, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build128.alpha1.2.num_threads112
+now doing prints
+53 14 6
+53
+6
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build128.alpha1.2.num_thr...
+time                                                  255.441864
+threads                                                        1
+cpu_time                                            27451.481722
+L_build                                                    128.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 6, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build128.alpha1.2.num_thr...
+recall                                                        0.984924
+throughput                                                 3092.594143
+latency                                                       0.000323
+threads                                                              1
+cpu_time                                                     72.232911
+L_search                                                         100.0
+end_to_end                                                    0.775763
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   2399.0
+build time                                                  255.441864
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 53, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build128.alpha1.2.num_threads112
+now doing prints
+54 14 6
+54
+6
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build128.alpha1.2.num_thr...
+time                                                  255.441864
+threads                                                        1
+cpu_time                                            27451.481722
+L_build                                                    128.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 6, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build128.alpha1.2.num_thr...
+recall                                                         0.99329
+throughput                                                 2209.291698
+latency                                                       0.000453
+threads                                                              1
+cpu_time                                                      99.44345
+L_search                                                         200.0
+end_to_end                                                    0.553159
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   1222.0
+build time                                                  255.441864
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 54, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build128.alpha1.2.num_threads112
+now doing prints
+55 14 6
+55
+6
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build128.alpha1.2.num_thr...
+time                                                  255.441864
+threads                                                        1
+cpu_time                                            27451.481722
+L_build                                                    128.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 6, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build128.alpha1.2.num_thr...
+recall                                                        0.993188
+throughput                                                 1307.320361
+latency                                                       0.000765
+threads                                                              1
+cpu_time                                                     170.01711
+L_search                                                         300.0
+end_to_end                                                    0.808569
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   1057.0
+build time                                                  255.441864
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 55, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build256.alpha1.2.num_threads112
+now doing prints
+56 14 7
+56
+7
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build256.alpha1.2.num_thr...
+time                                                  499.192361
+threads                                                        1
+cpu_time                                            55031.499856
+L_build                                                    256.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 7, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build256.alpha1.2.num_thr...
+recall                                                          0.8883
+throughput                                                11873.373858
+latency                                                       0.000084
+threads                                                              1
+cpu_time                                                     18.754602
+L_search                                                          10.0
+end_to_end                                                    0.669099
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   7944.0
+build time                                                  499.192361
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 56, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build256.alpha1.2.num_threads112
+now doing prints
+57 14 7
+57
+7
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build256.alpha1.2.num_thr...
+time                                                  499.192361
+threads                                                        1
+cpu_time                                            55031.499856
+L_build                                                    256.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 7, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build256.alpha1.2.num_thr...
+recall                                                        0.940221
+throughput                                                 8180.096085
+latency                                                       0.000122
+threads                                                              1
+cpu_time                                                     27.126773
+L_search                                                          20.0
+end_to_end                                                    0.702108
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   5743.0
+build time                                                  499.192361
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 57, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build256.alpha1.2.num_threads112
+now doing prints
+58 14 7
+58
+7
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build256.alpha1.2.num_thr...
+time                                                  499.192361
+threads                                                        1
+cpu_time                                            55031.499856
+L_build                                                    256.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 7, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build256.alpha1.2.num_thr...
+recall                                                        0.940221
+throughput                                                 6881.717707
+latency                                                       0.000145
+threads                                                              1
+cpu_time                                                     32.328844
+L_search                                                          30.0
+end_to_end                                                    0.568793
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   3914.0
+build time                                                  499.192361
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 58, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build256.alpha1.2.num_threads112
+now doing prints
+59 14 7
+59
+7
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build256.alpha1.2.num_thr...
+time                                                  499.192361
+threads                                                        1
+cpu_time                                            55031.499856
+L_build                                                    256.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 7, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build256.alpha1.2.num_thr...
+recall                                                        0.945809
+throughput                                                 5841.878429
+latency                                                       0.000171
+threads                                                              1
+cpu_time                                                     38.128421
+L_search                                                          40.0
+end_to_end                                                    0.682187
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   3985.0
+build time                                                  499.192361
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 59, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build256.alpha1.2.num_threads112
+now doing prints
+60 14 7
+60
+7
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build256.alpha1.2.num_thr...
+time                                                  499.192361
+threads                                                        1
+cpu_time                                            55031.499856
+L_build                                                    256.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 7, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build256.alpha1.2.num_thr...
+recall                                                        0.945809
+throughput                                                 4088.774185
+latency                                                       0.000245
+threads                                                              1
+cpu_time                                                     54.370626
+L_search                                                          50.0
+end_to_end                                                    0.831098
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   3398.0
+build time                                                  499.192361
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 60, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build256.alpha1.2.num_threads112
+now doing prints
+61 14 7
+61
+7
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build256.alpha1.2.num_thr...
+time                                                  499.192361
+threads                                                        1
+cpu_time                                            55031.499856
+L_build                                                    256.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 7, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build256.alpha1.2.num_thr...
+recall                                                        0.979336
+throughput                                                 2813.814278
+latency                                                       0.000355
+threads                                                              1
+cpu_time                                                     79.452428
+L_search                                                         100.0
+end_to_end                                                    0.819215
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   2305.0
+build time                                                  499.192361
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 61, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build256.alpha1.2.num_threads112
+now doing prints
+62 14 7
+62
+7
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build256.alpha1.2.num_thr...
+time                                                  499.192361
+threads                                                        1
+cpu_time                                            55031.499856
+L_build                                                    256.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 7, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build256.alpha1.2.num_thr...
+recall                                                        0.987616
+throughput                                                 1734.819232
+latency                                                       0.000576
+threads                                                              1
+cpu_time                                                    128.124827
+L_search                                                         200.0
+end_to_end                                                     0.55861
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                    969.0
+build time                                                  499.192361
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 62, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build256.alpha1.2.num_threads112
+now doing prints
+63 14 7
+63
+7
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build256.alpha1.2.num_thr...
+time                                                  499.192361
+threads                                                        1
+cpu_time                                            55031.499856
+L_build                                                    256.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 7, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build256.alpha1.2.num_thr...
+recall                                                        0.995699
+throughput                                                 1231.786122
+latency                                                       0.000812
+threads                                                              1
+cpu_time                                                    181.324689
+L_search                                                         300.0
+end_to_end                                                    0.528538
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                    651.0
+build time                                                  499.192361
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 63, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build384.alpha1.2.num_threads112
+now doing prints
+64 14 8
+64
+8
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build384.alpha1.2.num_thr...
+time                                                  825.110521
+threads                                                        1
+cpu_time                                            91355.832224
+L_build                                                    384.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 8, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build384.alpha1.2.num_thr...
+recall                                                        0.945809
+throughput                                                 9251.534341
+latency                                                       0.000108
+threads                                                              1
+cpu_time                                                     24.060161
+L_search                                                          10.0
+end_to_end                                                    0.788125
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   7291.0
+build time                                                  825.110521
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 64, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build384.alpha1.2.num_threads112
+now doing prints
+65 14 8
+65
+8
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build384.alpha1.2.num_thr...
+time                                                  825.110521
+threads                                                        1
+cpu_time                                            91355.832224
+L_build                                                    384.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 8, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build384.alpha1.2.num_thr...
+recall                                                        0.948603
+throughput                                                 4705.744933
+latency                                                       0.000213
+threads                                                              1
+cpu_time                                                     47.421472
+L_search                                                          20.0
+end_to_end                                                    0.948027
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   4461.0
+build time                                                  825.110521
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 65, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build384.alpha1.2.num_threads112
+now doing prints
+66 14 8
+66
+8
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build384.alpha1.2.num_thr...
+time                                                  825.110521
+threads                                                        1
+cpu_time                                            91355.832224
+L_build                                                    384.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 8, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build384.alpha1.2.num_thr...
+recall                                                        0.979336
+throughput                                                 6316.973763
+latency                                                       0.000158
+threads                                                              1
+cpu_time                                                     35.263304
+L_search                                                          30.0
+end_to_end                                                    0.647497
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   4090.0
+build time                                                  825.110521
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 66, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build384.alpha1.2.num_threads112
+now doing prints
+67 14 8
+67
+8
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build384.alpha1.2.num_thr...
+time                                                  825.110521
+threads                                                        1
+cpu_time                                            91355.832224
+L_build                                                    384.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 8, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build384.alpha1.2.num_thr...
+recall                                                        0.979336
+throughput                                                 5334.153263
+latency                                                       0.000187
+threads                                                              1
+cpu_time                                                     41.305463
+L_search                                                          40.0
+end_to_end                                                    0.698556
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   3726.0
+build time                                                  825.110521
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 67, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build384.alpha1.2.num_threads112
+now doing prints
+68 14 8
+68
+8
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build384.alpha1.2.num_thr...
+time                                                  825.110521
+threads                                                        1
+cpu_time                                            91355.832224
+L_build                                                    384.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 8, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build384.alpha1.2.num_thr...
+recall                                                        0.984924
+throughput                                                 4605.057271
+latency                                                       0.000217
+threads                                                              1
+cpu_time                                                     48.374332
+L_search                                                          50.0
+end_to_end                                                    0.591127
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   2722.0
+build time                                                  825.110521
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 68, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build384.alpha1.2.num_threads112
+now doing prints
+69 14 8
+69
+8
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build384.alpha1.2.num_thr...
+time                                                  825.110521
+threads                                                        1
+cpu_time                                            91355.832224
+L_build                                                    384.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 8, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build384.alpha1.2.num_thr...
+recall                                                        0.993306
+throughput                                                  2556.16567
+latency                                                       0.000391
+threads                                                              1
+cpu_time                                                     87.079935
+L_search                                                         100.0
+end_to_end                                                    0.774244
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                   1979.0
+build time                                                  825.110521
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 69, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build384.alpha1.2.num_threads112
+now doing prints
+70 14 8
+70
+8
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build384.alpha1.2.num_thr...
+time                                                  825.110521
+threads                                                        1
+cpu_time                                            91355.832224
+L_build                                                    384.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 8, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build384.alpha1.2.num_thr...
+recall                                                        0.995921
+throughput                                                 1760.998878
+latency                                                       0.000568
+threads                                                              1
+cpu_time                                                    125.711868
+L_search                                                         200.0
+end_to_end                                                     0.51509
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                    907.0
+build time                                                  825.110521
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 70, dtype: object
+prints done
+assignment done
+diskann_memory.R96.L_build384.alpha1.2.num_threads112
+now doing prints
+71 14 8
+71
+8
+print 1
+algo_name                                         diskann_memory
+index_name     diskann_memory.R96.L_build384.alpha1.2.num_thr...
+time                                                  825.110521
+threads                                                        1
+cpu_time                                            91355.832224
+L_build                                                    384.0
+R                                                           96.0
+alpha                                                        1.2
+num_threads                                                112.0
+Name: 8, dtype: object
+print 2
+algo_name                                               diskann_memory
+index_name           diskann_memory.R96.L_build384.alpha1.2.num_thr...
+recall                                                        0.995652
+throughput                                                 1185.156286
+latency                                                       0.000844
+threads                                                              1
+cpu_time                                                    187.217907
+L_search                                                         300.0
+end_to_end                                                    0.562839
+k                                                                 10.0
+n_queries                                                          1.0
+num_threads                                                       None
+total_queries                                                    667.0
+build time                                                  825.110521
+build threads                                                     None
+build cpu_time                                                    None
+L_build                                                           None
+R                                                                 None
+alpha                                                             None
+build_num_threads                                                 None
+Name: 71, dtype: object
+prints done
+assignment done
