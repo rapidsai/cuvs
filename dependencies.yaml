@@ -111,6 +111,16 @@ files:
       - depends_on_libcuvs
       - depends_on_libraft
       - depends_on_nccl
+  java:
+    output: none
+    includes:
+      - cuda
+      - cuda_version
+      - depends_on_libcuvs
+      - depends_on_libraft
+      - depends_on_nccl
+      - java
+      - rapids_build
   py_build_libcuvs:
     output: pyproject
     pyproject_dir: python/libcuvs
@@ -531,8 +541,12 @@ dependencies:
             packages:
               - python=3.12
           - matrix:
+              py: "3.13"
             packages:
-              - python>=3.10,<3.13
+              - python=3.13
+          - matrix:
+            packages:
+              - python>=3.10,<3.14
   run_py_cuvs:
     common:
       - output_types: [conda, requirements, pyproject]
@@ -563,6 +577,14 @@ dependencies:
       - output_types: [conda, requirements, pyproject]
         packages:
           - scikit-learn
+  java:
+    common:
+      - output_types: conda
+        packages:
+          - *cmake_ver
+          - libboost-devel
+          - maven
+          - openjdk=22.*
   bench:
     common:
       - output_types: [conda, pyproject, requirements]
