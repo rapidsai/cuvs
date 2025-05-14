@@ -153,8 +153,8 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   [[nodiscard]] auto get_preference() const -> algo_property override
   {
     algo_property property;
-    property.dataset_memory_type = MemoryType::kHost;
-    property.query_memory_type   = MemoryType::kHost;
+    property.dataset_memory_type = MemoryType::kHostMmap;
+    property.query_memory_type   = MemoryType::kDevice;
     return property;
   }
   void save(const std::string& file) const override;
