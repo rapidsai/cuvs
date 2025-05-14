@@ -42,7 +42,7 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
   auto index   = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr);
 
   auto index_params   = cuvs::neighbors::cagra::index_params();
-  index_params.metric = static_cast<cuvs::distance::DistanceType>((int)params.metric),
+  index_params.metric = static_cast<cuvs::distance::DistanceType>((int)params.metric);
   index_params.intermediate_graph_degree = params.intermediate_graph_degree;
   index_params.graph_degree              = params.graph_degree;
 
@@ -50,7 +50,8 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
     case cuvsCagraGraphBuildAlgo::AUTO_SELECT: break;
     case cuvsCagraGraphBuildAlgo::IVF_PQ: {
       auto dataset_extent = raft::matrix_extent<int64_t>(dataset.shape[0], dataset.shape[1]);
-      auto pq_params = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(dataset_extent);
+      auto pq_params      = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(
+        dataset_extent, index_params.metric);
       auto ivf_pq_build_params  = params.graph_build_params->ivf_pq_build_params;
       auto ivf_pq_search_params = params.graph_build_params->ivf_pq_search_params;
       if (ivf_pq_build_params) {
@@ -84,9 +85,8 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
       break;
     }
     case cuvsCagraGraphBuildAlgo::NN_DESCENT: {
-      cuvs::neighbors::cagra::graph_build_params::nn_descent_params nn_descent_params{};
-      nn_descent_params =
-        cuvs::neighbors::nn_descent::index_params(index_params.intermediate_graph_degree);
+      auto nn_descent_params = cuvs::neighbors::cagra::graph_build_params::nn_descent_params{
+        index_params.intermediate_graph_degree, index_params.metric};
       nn_descent_params.max_iterations = params.nn_descent_niter;
       index_params.graph_build_params  = nn_descent_params;
       break;
@@ -278,15 +278,18 @@ extern "C" cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index_c_ptr)
   return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
 
-    if (index.dtype.code == kDLFloat) {
+    if (index.dtype.code == kDLFloat && index.dtype.bits == 32) {
       auto index_ptr =
         reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index.addr);
       delete index_ptr;
-    } else if (index.dtype.code == kDLInt) {
+    } else if (index.dtype.code == kDLFloat && index.dtype.bits == 16) {
+      auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<half, uint32_t>*>(index.addr);
+      delete index_ptr;
+    } else if (index.dtype.code == kDLInt && index.dtype.bits == 8) {
       auto index_ptr =
         reinterpret_cast<cuvs::neighbors::cagra::index<int8_t, uint32_t>*>(index.addr);
       delete index_ptr;
-    } else if (index.dtype.code == kDLUInt) {
+    } else if (index.dtype.code == kDLUInt && index.dtype.bits == 8) {
       auto index_ptr =
         reinterpret_cast<cuvs::neighbors::cagra::index<uint8_t, uint32_t>*>(index.addr);
       delete index_ptr;
@@ -485,6 +488,9 @@ extern "C" cuvsError_t cuvsCagraDeserialize(cuvsResources_t res,
     if (dtype.kind == 'f' && dtype.itemsize == 4) {
       index->addr       = reinterpret_cast<uintptr_t>(_deserialize<float>(res, filename));
       index->dtype.code = kDLFloat;
+    } else if (dtype.kind == 'f' && dtype.itemsize == 2) {
+      index->addr       = reinterpret_cast<uintptr_t>(_deserialize<half>(res, filename));
+      index->dtype.code = kDLFloat;
     } else if (dtype.kind == 'i' && dtype.itemsize == 1) {
       index->addr       = reinterpret_cast<uintptr_t>(_deserialize<int8_t>(res, filename));
       index->dtype.code = kDLInt;
@@ -524,6 +530,8 @@ extern "C" cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
       _serialize_to_hnswlib<float>(res, filename, index);
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      _serialize_to_hnswlib<half>(res, filename, index);
     } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
       _serialize_to_hnswlib<int8_t>(res, filename, index);
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {

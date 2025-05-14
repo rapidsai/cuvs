@@ -342,11 +342,7 @@ void cuvs_cagra<T, IdxT>::save(const std::string& file) const
 template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::save_to_hnswlib(const std::string& file) const
 {
-  if constexpr (!std::is_same_v<T, half>) {
-    cuvs::neighbors::cagra::serialize_to_hnswlib(handle_, file, *index_);
-  } else {
-    RAFT_FAIL("Cannot save fp16 index to hnswlib format");
-  }
+  cuvs::neighbors::cagra::serialize_to_hnswlib(handle_, file, *index_);
 }
 
 template <typename T, typename IdxT>
