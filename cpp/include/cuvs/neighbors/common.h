@@ -55,11 +55,17 @@ typedef struct {
  */
 
 /**
+ * @defgroup index_merge Index Merge
+ * @brief Common definitions related to index merging.
+ * @{
+ */
+
+/**
  * @brief Strategy for merging CAGRA indices.
  */
 typedef enum {
   CAGRA_MERGE_STRATEGY_PHYSICAL = 0,  ///< Merge indices physically
-  CAGRA_MERGE_STRATEGY_LOGICAL  = 1   ///< Merge indices logically (if supported)
+  CAGRA_MERGE_STRATEGY_LOGICAL  = 1   ///< Merge indices logically
 } cuvsCagraMergeStrategy;
 
 /**
