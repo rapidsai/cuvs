@@ -4,11 +4,11 @@
       "version": "0.7.0",
       "git_url": "https://github.com/microsoft/DiskANN.git",
       "git_tag": "main",
-      "patches": [
+      "patches" : [
         {
-          "file": "${current_json_dir}/diskann.diff",
-          "issue": "Correct compilation issues",
-          "fixed_in": ""
+          "file" : "${current_json_dir}/diskann.diff",
+          "issue" : "Correct compilation issues",
+          "fixed_in" : ""
         }
       ]
     }
