@@ -16,10 +16,7 @@
 
 #pragma once
 
-#include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.h>
-#include <cuvs/neighbors/common_defs.h>
-#include <dlpack/dlpack.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -57,6 +54,17 @@ typedef struct {
  * @}
  */
 
+/**
+ * @brief Strategy for merging CAGRA indices.
+ */
+typedef enum {
+  CAGRA_MERGE_STRATEGY_PHYSICAL = 0,  ///< Merge indices physically
+  CAGRA_MERGE_STRATEGY_LOGICAL  = 1   ///< Merge indices logically (if supported)
+} cuvsCagraMergeStrategy;
+
+/**
+ * @}
+ */
 #ifdef __cplusplus
 }
 #endif

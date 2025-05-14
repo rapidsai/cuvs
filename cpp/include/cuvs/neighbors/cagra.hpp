@@ -18,8 +18,8 @@
 
 #include "common.hpp"
 #include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/common.h>
 #include <cuvs/neighbors/common.hpp>
-#include <cuvs/neighbors/common_defs.h>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <raft/core/device_mdspan.hpp>
