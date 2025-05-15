@@ -278,9 +278,9 @@ struct extend_params {
 /**
  * @brief Determines the strategy for merging CAGRA graphs.
  *
- * @note Currently, only the CAGRA_MERGE_STRATEGY_PHYSICAL strategy is supported.
+ * @note Currently, only the MERGE_STRATEGY_PHYSICAL strategy is supported.
  */
-using MergeStrategy = cuvsCagraMergeStrategy;
+using MergeStrategy = cuvsMergeStrategy;
 
 /**
  * @brief Parameters for merging CAGRA indexes.
@@ -297,8 +297,8 @@ struct merge_params {
   /// Parameters for creating the output index.
   cagra::index_params output_index_params;
 
-  /// Strategy for merging. Defaults to `MergeStrategy::CAGRA_MERGE_STRATEGY_PHYSICAL`.
-  MergeStrategy strategy = MergeStrategy::CAGRA_MERGE_STRATEGY_PHYSICAL;
+  /// Strategy for merging. Defaults to `MergeStrategy::MERGE_STRATEGY_PHYSICAL`.
+  MergeStrategy strategy = MergeStrategy::MERGE_STRATEGY_PHYSICAL;
 };
 
 /**

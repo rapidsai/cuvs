@@ -374,7 +374,7 @@ cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int* dim);
 
 struct cuvsCagraMergeParams {
   cuvsCagraIndexParams_t output_index_params;
-  cuvsCagraMergeStrategy strategy;
+  cuvsMergeStrategy strategy;
 };
 
 typedef struct cuvsCagraMergeParams* cuvsCagraMergeParams_t;
