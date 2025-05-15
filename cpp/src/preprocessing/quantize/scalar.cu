@@ -23,15 +23,13 @@ namespace cuvs::preprocessing::quantize::scalar {
 #define CUVS_INST_QUANTIZATION(T, QuantI)                                         \
   auto train(raft::resources const& res,                                          \
              const params params,                                                 \
-             raft::device_matrix_view<const T, int64_t> dataset)                  \
-    ->quantizer<T>                                                                \
+             raft::device_matrix_view<const T, int64_t> dataset) -> quantizer<T>  \
   {                                                                               \
     return detail::train(res, params, dataset);                                   \
   }                                                                               \
   auto train(raft::resources const& res,                                          \
              const params params,                                                 \
-             raft::host_matrix_view<const T, int64_t> dataset)                    \
-    ->quantizer<T>                                                                \
+             raft::host_matrix_view<const T, int64_t> dataset) -> quantizer<T>    \
   {                                                                               \
     return detail::train(res, params, dataset);                                   \
   }                                                                               \
