@@ -300,11 +300,13 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
 
   std::vector<std::string> algo       = {"single-cta", "multi_cta", "multi_kernel", "auto"};
   std::vector<std::string> build_algo = {"IVF_PQ", "NN_DESCENT", "ITERATIVE_CAGRA_SEARCH", "AUTO"};
+  std::vector<std::string> merge_strategy = {"PHYSICAL", "LOGICAL"};
   os << "{n_queries=" << p.n_queries << ", dataset shape=" << p.n_rows << "x" << p.dim
      << ", k=" << p.k << ", " << algo.at((int)p.algo) << ", max_queries=" << p.max_queries
      << ", itopk_size=" << p.itopk_size << ", search_width=" << p.search_width
      << ", metric=" << metric_str(p.metric) << ", " << (p.host_dataset ? "host" : "device")
-     << ", build_algo=" << build_algo.at((int)p.build_algo);
+     << ", build_algo=" << build_algo.at((int)p.build_algo)
+     << ", merge_logic=" << merge_strategy.at((int)p.merge_strategy);
   if ((int)p.build_algo == 0 && p.ivf_pq_search_refine_ratio) {
     os << "(refine_rate=" << *p.ivf_pq_search_refine_ratio << ')';
   }
@@ -1193,7 +1195,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   // Corner cases for small datasets
   inputs2 = raft::util::itertools::product<AnnCagraInputs>(
     {2},
-    {3, 5, 31, 32, 64, 101},
+    {3, 6, 31, 32, 64, 101},
     {1, 10},
     {2},  // k
     {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
