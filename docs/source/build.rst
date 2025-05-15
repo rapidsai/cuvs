@@ -43,14 +43,14 @@ C/C++ Package
 
 .. code-block:: bash
 
-   conda install -c rapidsai -c conda-forge -c nvidia libcuvs cuda-version=12.8
+   conda install -c rapidsai -c conda-forge -c nvidia libcuvs cuda-version=12.9
 
 Python Package
 ~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-   conda install -c rapidsai -c conda-forge -c nvidia cuvs cuda-version=12.8
+   conda install -c rapidsai -c conda-forge -c nvidia cuvs cuda-version=12.9
 
 Python through Pip
 ^^^^^^^^^^^^^^^^^^
@@ -92,7 +92,7 @@ Conda environment scripts are provided for installing the necessary dependencies
 
 .. code-block:: bash
 
-    conda env create --name cuvs -f conda/environments/all_cuda-128_arch-x86_64.yaml
+    conda env create --name cuvs -f conda/environments/all_cuda-129_arch-x86_64.yaml
     conda activate cuvs
 
 The process for building from source with CUDA 11 differs slightly in that your host system will also need to have CUDA toolkit installed which is greater than, or equal to, the version you install into you conda environment. Installing CUDA toolkit into your host system is necessary because `nvcc` is not provided with Conda's cudatoolkit dependencies for CUDA 11. The following example will install create and install dependencies for a CUDA 11.8 conda environment

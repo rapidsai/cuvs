@@ -260,6 +260,24 @@ cuvsError_t cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index);
  * @param[in] index cuvsIvfPqIndex_t to de-allocate
  */
 cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index);
+
+/** Get the number of clusters/inverted lists */
+uint32_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index);
+
+/** Get the dimensionality of the cluster centers */
+uint32_t cuvsIvfPqIndexGetDimExt(cuvsIvfPqIndex_t index);
+
+/**
+ * @brief Get the cluster centers corresponding to the lists in the original space
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] index cuvsIvfPqIndex_t Built NN-Descent index
+ * @param[out] centers Preallocated array on host memory to store output, [n_lists, dim_ext]
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqIndexGetCenters(cuvsResources_t res,
+                                     cuvsIvfPqIndex_t index,
+                                     DLManagedTensor* centers);
 /**
  * @}
  */
