@@ -76,13 +76,13 @@ struct all_neighbors_params {
   /**
    * Usage of n_nearest_clusters and n_clusters
    *
-   * Hint1: the ratio of n_nearest_clusters / n_clusters determines device memory usage.
+   * The ratio of n_nearest_clusters / n_clusters determines device memory usage.
    * Approximately (n_nearest_clusters / n_clusters) * num_rows_in_entire_data number of rows will
    * be put on device memory at once.
    * E.g. between (n_nearest_clusters / n_clusters) = 2/10 and 2/20, the latter will use less device
    * memory.
    *
-   * Hint2: larger n_nearest_clusters results in better accuracy of the final all-neighbors knn
+   * Larger n_nearest_clusters results in better accuracy of the final all-neighbors knn
    * graph. E.g. With the similar device memory usages, (n_nearest_clusters / n_clusters) = 4/20
    * will have better accuracy than 2/10 at the cost of performance.
    */

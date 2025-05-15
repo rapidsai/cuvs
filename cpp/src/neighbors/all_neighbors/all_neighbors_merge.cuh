@@ -100,6 +100,8 @@ RAFT_KERNEL merge_subgraphs_kernel(IdxT* cluster_data_indices,
       BlockMergeSortType(tmpSmem).Sort(threadKeyValuePair, raft::greater_op{});
     }
 
+    __syncthreads();
+
     // load sorted result into shared memory to get unique values
     idxBase = threadIdx.x * ITEMS_PER_THREAD;
     for (int i = 0; i < ITEMS_PER_THREAD; i++) {
