@@ -64,7 +64,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
       datasetSize = topK;
 
     // Generate a random dataset
-    float[][] dataset = generateData(random, datasetSize, dimensions);
+    float[][] vectors = generateData(random, datasetSize, dimensions);
 
     // Generate random query vectors
     float[][] queries = generateData(random, numQueries, dimensions);
@@ -76,7 +76,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
     // Debugging: Log dataset and queries
     if (log.isDebugEnabled()) {
       log.debug("Dataset:");
-      for (float[] row : dataset) {
+      for (float[] row : vectors) {
         log.debug(java.util.Arrays.toString(row));
       }
       log.debug("Queries:");
@@ -85,23 +85,37 @@ public class CagraRandomizedIT extends CuVSTestCase {
       }
     }
     // Sanity checks
-    assert dataset.length > 0 : "Dataset is empty.";
+    assert vectors.length > 0 : "Dataset is empty.";
     assert queries.length > 0 : "Queries are empty.";
     assert dimensions > 0 : "Invalid dimensions.";
     assert topK > 0 && topK <= datasetSize : "Invalid topK value.";
 
     // Generate expected results using brute force
-    List<List<Integer>> expected = generateExpectedResults(topK, dataset, queries, null, log);
+    List<List<Integer>> expected = generateExpectedResults(topK, vectors, queries, null, log);
 
     // Create CuVS index and query
     try (CuVSResources resources = CuVSResources.create()) {
       CagraIndexParams indexParams = new CagraIndexParams.Builder()
           .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
           .build();
-      CagraIndex index = CagraIndex.newBuilder(resources)
-          .withDataset(dataset)
-          .withIndexParams(indexParams)
-          .build();
+      
+      CagraIndex index;
+      boolean useNativeMemoryDataset = random.nextBoolean();
+      if (useNativeMemoryDataset) {
+          log.info("Using " + Dataset.class + " for input data");
+          Dataset dataset = Dataset.create(vectors.length, vectors[0].length);
+          for (float[] v: vectors) dataset.addVector(v);
+          index = CagraIndex.newBuilder(resources)
+        		  .withDataset(dataset)
+        		  .withIndexParams(indexParams)
+        		  .build();    	  
+      } else {
+          log.info("Using float[][] for input data");
+    	  index = CagraIndex.newBuilder(resources)
+    	          .withDataset(vectors)
+    	          .withIndexParams(indexParams)
+    	          .build();
+      }
       log.info("Index built successfully.");
 
       try {

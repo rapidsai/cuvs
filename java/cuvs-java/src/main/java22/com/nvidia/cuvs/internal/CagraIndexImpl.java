@@ -45,6 +45,7 @@ import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.CagraQuery;
 import com.nvidia.cuvs.CagraSearchParams;
 import com.nvidia.cuvs.CuVSResources;
+import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.SearchResults;
 import com.nvidia.cuvs.internal.common.Util;
 import com.nvidia.cuvs.internal.panama.cuvsCagraCompressionParams;
@@ -87,7 +88,8 @@ public class CagraIndexImpl implements CagraIndex {
   private static final MethodHandle serializeCAGRAIndexToHNSWMethodHandle = downcallHandle("serialize_cagra_index_to_hnsw",
       FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, ADDRESS));
 
-  private final float[][] dataset;
+  private final float[][] vectors;
+  private final Dataset dataset;
   private final CuVSResourcesImpl resources;
   private final CagraIndexParams cagraIndexParameters;
   private final CagraCompressionParams cagraCompressionParams;
@@ -104,10 +106,11 @@ public class CagraIndexImpl implements CagraIndex {
    * @param dataset                the dataset for indexing
    * @param resources              an instance of {@link CuVSResources}
    */
-  private CagraIndexImpl(CagraIndexParams indexParameters, CagraCompressionParams cagraCompressionParams, float[][] dataset,
-      CuVSResourcesImpl resources) throws Throwable {
+  private CagraIndexImpl(CagraIndexParams indexParameters, CagraCompressionParams cagraCompressionParams, float[][] vectors,
+      Dataset dataset, CuVSResourcesImpl resources) throws Throwable {
     this.cagraIndexParameters = indexParameters;
     this.cagraCompressionParams = cagraCompressionParams;
+    this.vectors = vectors;
     this.dataset = dataset;
     this.resources = resources;
     this.cagraIndexReference = build();
@@ -122,6 +125,7 @@ public class CagraIndexImpl implements CagraIndex {
   private CagraIndexImpl(InputStream inputStream, CuVSResourcesImpl resources) throws Throwable {
     this.cagraIndexParameters = null;
     this.cagraCompressionParams = null;
+    this.vectors = null;
     this.dataset = null;
     this.resources = resources;
     this.cagraIndexReference = deserialize(inputStream);
@@ -146,6 +150,7 @@ public class CagraIndexImpl implements CagraIndex {
     } finally {
       destroyed = true;
     }
+    if (dataset != null) dataset.close();
   }
 
   /**
@@ -156,8 +161,8 @@ public class CagraIndexImpl implements CagraIndex {
    *         index
    */
   private IndexReference build() throws Throwable {
-    long rows = dataset.length;
-    long cols = rows > 0 ? dataset[0].length : 0;
+    long rows = dataset != null? dataset.getSize(): vectors.length;
+    long cols = dataset != null? dataset.getDimensions(): (rows > 0 ? vectors[0].length : 0);
 
     MemorySegment indexParamsMemorySegment = cagraIndexParameters != null
         ? segmentFromIndexParams(cagraIndexParameters)
@@ -169,7 +174,8 @@ public class CagraIndexImpl implements CagraIndex {
         ? segmentFromCompressionParams(cagraCompressionParams)
         : MemorySegment.NULL;
 
-    MemorySegment dataSeg = Util.buildMemorySegment(resources.getArena(), dataset);
+    MemorySegment dataSeg = dataset != null? ((DatasetImpl) dataset).seg:
+    	Util.buildMemorySegment(resources.getArena(), vectors);
 
     try (var localArena = Arena.ofConfined()) {
       MemorySegment returnValue = localArena.allocate(C_INT);
@@ -470,7 +476,8 @@ public class CagraIndexImpl implements CagraIndex {
    */
   public static class Builder implements CagraIndex.Builder{
 
-    private float[][] dataset;
+    private float[][] vectors;
+    private Dataset dataset;
     private CagraIndexParams cagraIndexParams;
     private CagraCompressionParams cagraCompressionParams;
     private CuVSResourcesImpl cuvsResources;
@@ -487,7 +494,13 @@ public class CagraIndexImpl implements CagraIndex {
     }
 
     @Override
-    public Builder withDataset(float[][] dataset) {
+    public Builder withDataset(float[][] vectors) {
+      this.vectors = vectors;
+      return this;
+    }
+
+    @Override
+    public Builder withDataset(Dataset dataset) {
       this.dataset = dataset;
       return this;
     }
@@ -509,7 +522,7 @@ public class CagraIndexImpl implements CagraIndex {
       if (inputStream != null) {
         return new CagraIndexImpl(inputStream, cuvsResources);
       } else {
-        return new CagraIndexImpl(cagraIndexParams, cagraCompressionParams, dataset, cuvsResources);
+        return new CagraIndexImpl(cagraIndexParams, cagraCompressionParams, vectors, dataset, cuvsResources);
       }
     }
   }

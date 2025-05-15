@@ -19,6 +19,7 @@ package com.nvidia.cuvs.spi;
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CuVSResources;
+import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
 
 import java.nio.file.Path;
@@ -50,6 +51,8 @@ public interface CuVSProvider {
   CuVSResources newCuVSResources(Path tempDirectory)
       throws Throwable;
 
+  Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException;
+  
   /** Creates a new BruteForceIndex Builder. */
   BruteForceIndex.Builder newBruteForceIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;
