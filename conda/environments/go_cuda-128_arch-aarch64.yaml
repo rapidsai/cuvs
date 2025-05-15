@@ -15,7 +15,7 @@ dependencies:
 - cuda-nvcc
 - cuda-nvtx-dev
 - cuda-profiler-api
-- cuda-version=12.9
+- cuda-version=12.8
 - cxx-compiler
 - dlpack>=0.8,<1.0
 - gcc_linux-aarch64=13.*
@@ -30,4 +30,4 @@ dependencies:
 - nccl>=2.19
 - ninja
 - sysroot_linux-aarch64==2.28
-name: go_cuda-129_arch-aarch64
+name: go_cuda-128_arch-aarch64
