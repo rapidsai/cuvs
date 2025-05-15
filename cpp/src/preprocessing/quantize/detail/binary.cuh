@@ -18,7 +18,9 @@
 
 #include <cuvs/preprocessing/quantize/binary.hpp>
 #include <raft/core/operators.hpp>
+#include <raft/linalg/transpose.cuh>
 #include <raft/linalg/unary_op.cuh>
+#include <raft/matrix/sample_rows.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/random/sample_without_replacement.cuh>
 #include <raft/stats/mean.cuh>
@@ -27,52 +29,6 @@
 #include <thrust/system/omp/execution_policy.h>
 
 namespace cuvs::preprocessing::quantize::detail {
-
-template <typename T>
-RAFT_KERNEL sample_and_transpose_dataset_kernel(const T* const in_ptr,
-                                                const uint32_t ldi,
-                                                const size_t dataset_size,
-                                                const uint32_t dim_chunk,
-                                                const size_t num_samples,
-                                                const size_t stride,
-                                                T* const out_ptr,
-                                                const uint32_t ldo)
-{
-  const auto tid = threadIdx.x + blockDim.x * blockIdx.x;
-  for (size_t i = tid; i < num_samples * dim_chunk; i += gridDim.x * blockDim.x) {
-    const auto sampled_mat_i = i % num_samples;
-    const auto in_mat_i      = (sampled_mat_i * stride) % dataset_size;
-    const auto mat_j         = i / num_samples;
-
-    out_ptr[sampled_mat_i + mat_j * ldo] = in_ptr[in_mat_i * ldi + mat_j];
-  }
-}
-
-template <typename T>
-inline void sample_and_transpose_dataset(const T* const in_ptr,
-                                         const uint32_t ldi,
-                                         const size_t dataset_size,
-                                         const uint32_t dim_chunk,
-                                         const size_t num_samples,
-                                         T* const out_ptr,
-                                         const uint32_t ldo,
-                                         cudaStream_t cuda_stream)
-{
-  constexpr uint32_t block_size = 256;
-  const auto grid_size =
-    std::min(raft::div_rounding_up_safe<size_t>(num_samples * dim_chunk, block_size), 2048lu);
-
-  // Note that one of the candidates must be prime to the dataset size because the product of the
-  // prime candidates exceeds the maximum of U64.
-  size_t stride_prime_list[] = {611323lu, 611333lu, 611389lu, 611393};
-  uint32_t prime_i           = 0;
-  while (dataset_size % stride_prime_list[prime_i] == 0) {
-    prime_i++;
-  }
-
-  sample_and_transpose_dataset_kernel<<<grid_size, block_size, 0, cuda_stream>>>(
-    in_ptr, ldi, dataset_size, dim_chunk, num_samples, stride_prime_list[prime_i], out_ptr, ldo);
-}
 
 template <class T>
 _RAFT_HOST_DEVICE bool is_positive(const T& a)
@@ -252,40 +208,49 @@ auto train(raft::resources const& res,
     RAFT_EXPECTS(params.sampling_ratio > 0 && params.sampling_ratio <= 1,
                  "The sampling ratio must be within the range (0, 1].");
     // Make the number of samples odd so that the median is calculated by only sort and memcpy
-    const size_t num_sampls =
+    const size_t num_samples =
       std::max(
         raft::div_rounding_up_safe(static_cast<size_t>(dataset_size * params.sampling_ratio), 2lu) *
           2lu,
         2lu) -
       1;
-    const size_t data_size_per_vector = sizeof(T) * dataset_dim;
+    const size_t data_size_per_vector = sizeof(T) * dataset_dim * 2;
     const uint32_t max_dim_chunk =
       std::min(std::max(1lu, raft::resource::get_workspace_free_bytes(res) / data_size_per_vector),
                static_cast<std::size_t>(dataset_dim));
 
+    raft::random::RngState rng(29837lu);
     auto mr                    = raft::resource::get_workspace_resource(res);
     auto sampled_dataset_chunk = raft::make_device_mdarray<T, int64_t>(
-      res, mr, raft::make_extents<int64_t>(max_dim_chunk, num_sampls));
+      res, mr, raft::make_extents<int64_t>(num_samples, max_dim_chunk));
+    auto transposed_sampled_dataset_chunk = raft::make_device_mdarray<T, int64_t>(
+      res, mr, raft::make_extents<int64_t>(max_dim_chunk, num_samples));
     for (uint32_t dim_offset = 0; dim_offset < dataset_dim; dim_offset += max_dim_chunk) {
       const auto dim_chunk = std::min(max_dim_chunk, dataset_dim - dim_offset);
 
-      sample_and_transpose_dataset<T>(dataset.data_handle() + dim_offset,
-                                      dataset_dim,
-                                      dataset_size,
-                                      dim_chunk,
-                                      num_sampls,
-                                      sampled_dataset_chunk.data_handle(),
-                                      num_sampls,
-                                      raft::resource::get_cuda_stream(res));
+      auto sampled_view =
+        raft::make_device_matrix_view<T, int64_t>(sampled_dataset_chunk.data_handle(),
+                                                  static_cast<int64_t>(num_samples),
+                                                  static_cast<int64_t>(dim_chunk));
+      raft::matrix::sample_rows(
+        res,
+        rng,
+        raft::make_device_strided_matrix_view<const T, int64_t>(
+          dataset.data_handle() + dim_offset, dataset_size, dim_chunk, dataset_dim),
+        sampled_view);
+      auto transposed_sampled_view = raft::make_device_matrix_view<T, int64_t>(
+        transposed_sampled_dataset_chunk.data_handle(), dim_chunk, num_samples);
+      raft::linalg::transpose(res, sampled_view, transposed_sampled_view);
+
       for (uint32_t i = 0; i < dim_chunk; i++) {
-        auto start_ptr = sampled_dataset_chunk.data_handle() + i * num_sampls;
-        thrust::sort(thrust::device, start_ptr, start_ptr + num_sampls);
+        auto start_ptr = transposed_sampled_dataset_chunk.data_handle() + i * num_samples;
+        thrust::sort(thrust::device, start_ptr, start_ptr + num_samples);
       }
 
       RAFT_CUDA_TRY(cudaMemcpy2DAsync(threshold_ptr + dim_offset,
                                       sizeof(T),
-                                      sampled_dataset_chunk.data_handle() + (num_sampls - 1) / 2,
-                                      num_sampls * sizeof(T),
+                                      sampled_dataset_chunk.data_handle() + (num_samples - 1) / 2,
+                                      num_samples * sizeof(T),
                                       sizeof(T),
                                       dim_chunk,
                                       cudaMemcpyDefault,
@@ -334,7 +299,7 @@ auto train(raft::resources const& res,
                  "The sampling ratio must be within the range (0, 1].");
 
     // Make the number of samples odd so that the median is calculated by only sort and memcpy
-    const size_t num_sampls =
+    const size_t num_samples =
       std::max(
         raft::div_rounding_up_safe(static_cast<size_t>(dataset_size * params.sampling_ratio), 2lu) *
           2lu,
@@ -350,21 +315,21 @@ auto train(raft::resources const& res,
     const auto stride = stride_prime_list[prime_i];
 
     // Transposed
-    auto sampled_dataset = raft::make_host_matrix<compute_t, int64_t>(dataset_dim, num_sampls);
+    auto sampled_dataset = raft::make_host_matrix<compute_t, int64_t>(dataset_dim, num_samples);
 #pragma omp parallel for
-    for (size_t out_i = 0; out_i < num_sampls; out_i++) {
+    for (size_t out_i = 0; out_i < num_samples; out_i++) {
       const auto in_i = (out_i * stride) % dataset_size;
       for (uint32_t j = 0; j < dataset_dim; j++) {
-        sampled_dataset.data_handle()[j * num_sampls + out_i] =
+        sampled_dataset.data_handle()[j * num_samples + out_i] =
           static_cast<compute_t>(dataset.data_handle()[in_i * dataset_dim + j]);
       }
     }
 
 #pragma omp parallel for
     for (uint32_t j = 0; j < dataset_dim; j++) {
-      auto start_ptr = sampled_dataset.data_handle() + j * num_sampls;
-      std::sort(start_ptr, start_ptr + num_sampls);
-      threshold_ptr[j] = start_ptr[(num_sampls - 1) / 2];
+      auto start_ptr = sampled_dataset.data_handle() + j * num_samples;
+      std::sort(start_ptr, start_ptr + num_samples);
+      threshold_ptr[j] = start_ptr[(num_samples - 1) / 2];
     }
   }
 
