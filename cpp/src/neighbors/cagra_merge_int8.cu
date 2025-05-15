@@ -23,13 +23,13 @@ namespace cuvs::neighbors::cagra {
   auto merge(raft::resources const& handle,                                                \
              const cuvs::neighbors::cagra::merge_params& params,                           \
              std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices)                \
-    ->cuvs::neighbors::cagra::index<T, IdxT>                                               \
+    -> cuvs::neighbors::cagra::index<T, IdxT>                                              \
   {                                                                                        \
     return cuvs::neighbors::cagra::merge<T, IdxT>(handle, params, indices);                \
   };                                                                                       \
   auto make_composite_index(const cagra::merge_params& params,                             \
                             std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices) \
-    ->cuvs::neighbors::cagra::composite_index<T, IdxT>                                     \
+    -> cuvs::neighbors::cagra::composite_index<T, IdxT>                                    \
   {                                                                                        \
     return cuvs::neighbors::cagra::make_composite_index<T, IdxT>(params, indices);         \
   }
