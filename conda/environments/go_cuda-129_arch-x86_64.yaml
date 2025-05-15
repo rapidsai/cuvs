@@ -8,19 +8,19 @@ channels:
 - nvidia
 dependencies:
 - c-compiler
-- clang-tools==16.0.6
-- clang==16.0.6
+- clang-tools==20.1.4
+- clang==20.1.4
 - cmake>=3.30.4
 - cuda-cudart-dev
 - cuda-nvcc
 - cuda-nvtx-dev
 - cuda-profiler-api
-- cuda-version=12.8
+- cuda-version=12.9
 - cxx-compiler
 - dlpack>=0.8,<1.0
-- gcc_linux-aarch64=13.*
+- gcc_linux-64=13.*
 - go
-- libclang==16.0.6
+- libclang==20.1.4
 - libcublas-dev
 - libcurand-dev
 - libcusolver-dev
@@ -29,5 +29,5 @@ dependencies:
 - libraft==25.6.*,>=0.0.0a0
 - nccl>=2.19
 - ninja
-- sysroot_linux-aarch64==2.28
-name: go_cuda-128_arch-aarch64
+- sysroot_linux-64==2.28
+name: go_cuda-129_arch-x86_64
