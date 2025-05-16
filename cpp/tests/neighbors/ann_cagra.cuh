@@ -283,7 +283,7 @@ struct AnnCagraInputs {
 
   std::optional<bool> non_owning_memory_buffer_flag = std::nullopt;
   cuvs::neighbors::cagra::MergeStrategy merge_strategy =
-    cuvs::neighbors::cagra::MergeStrategy::LOGICAL;
+    cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
 };
 
 inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
@@ -1079,7 +1079,8 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
         search_params.team_size   = ps.team_size;
         search_params.itopk_size  = ps.itopk_size;
 
-        if (merge_params.strategy == cuvs::neighbors::cagra::MergeStrategy::PHYSICAL) {
+        if (merge_params.strategy ==
+            cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_PHYSICAL) {
           auto index = cagra::merge(handle_, merge_params, indices);
           cagra::search(
             handle_, search_params, index, search_queries_view, indices_out_view, dists_out_view);
@@ -1166,8 +1167,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {std::optional<float>{std::nullopt}},
     {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
-    {cuvs::neighbors::cagra::MergeStrategy::PHYSICAL,
-     cuvs::neighbors::cagra::MergeStrategy::LOGICAL});
+    {cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_LOGICAL});
 
   // Fixed dim, and changing neighbors and query size (output matrix size)
   auto inputs2 = raft::util::itertools::product<AnnCagraInputs>(
@@ -1188,8 +1189,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {std::optional<float>{std::nullopt}},
     {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
-    {cuvs::neighbors::cagra::MergeStrategy::PHYSICAL,
-     cuvs::neighbors::cagra::MergeStrategy::LOGICAL});
+    {cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_LOGICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Corner cases for small datasets
@@ -1211,8 +1212,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {std::optional<float>{std::nullopt}},
     {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
-    {cuvs::neighbors::cagra::MergeStrategy::PHYSICAL,
-     cuvs::neighbors::cagra::MergeStrategy::LOGICAL});
+    {cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_LOGICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Varying dim and build algo.
@@ -1238,8 +1239,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {std::optional<float>{std::nullopt}},
     {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
-    {cuvs::neighbors::cagra::MergeStrategy::PHYSICAL,
-     cuvs::neighbors::cagra::MergeStrategy::LOGICAL});
+    {cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_LOGICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Varying team_size, graph_build_algo
@@ -1263,8 +1264,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {std::optional<float>{std::nullopt}},
     {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
-    {cuvs::neighbors::cagra::MergeStrategy::PHYSICAL,
-     cuvs::neighbors::cagra::MergeStrategy::LOGICAL});
+    {cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_LOGICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Varying graph_build_algo, itopk_size
@@ -1288,8 +1289,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {std::optional<float>{std::nullopt}},
     {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
-    {cuvs::neighbors::cagra::MergeStrategy::PHYSICAL,
-     cuvs::neighbors::cagra::MergeStrategy::LOGICAL});
+    {cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_LOGICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Varying n_rows, host_dataset
@@ -1311,8 +1312,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {std::optional<float>{std::nullopt}},
     {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
-    {cuvs::neighbors::cagra::MergeStrategy::PHYSICAL,
-     cuvs::neighbors::cagra::MergeStrategy::LOGICAL});
+    {cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_LOGICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // A few PQ configurations.
@@ -1335,9 +1336,9 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {std::optional<float>{std::nullopt}},
     {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
-    {cuvs::neighbors::cagra::MergeStrategy::PHYSICAL,
-     cuvs::neighbors::cagra::MergeStrategy::LOGICAL});  // don't demand high recall without
-                                                        // refinement
+    {cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_LOGICAL});  // don't demand high recall
+                                                                       // without refinement
   for (uint32_t pq_len : {2}) {  // for now, only pq_len = 2 is supported, more options coming  soon
     for (uint32_t vq_n_centers : {100, 1000}) {
       for (auto input : inputs2) {
@@ -1370,8 +1371,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1.0f, 2.0f, 3.0f},
     {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
-    {cuvs::neighbors::cagra::MergeStrategy::PHYSICAL,
-     cuvs::neighbors::cagra::MergeStrategy::LOGICAL});
+    {cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_LOGICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Varying dim, adding non_owning_memory_buffer_flag
@@ -1393,8 +1394,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {std::optional<float>{std::nullopt}},
     {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
-    {cuvs::neighbors::cagra::MergeStrategy::PHYSICAL,
-     cuvs::neighbors::cagra::MergeStrategy::LOGICAL});
+    {cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_LOGICAL});
   for (auto input : inputs2) {
     input.non_owning_memory_buffer_flag = true;
     inputs.push_back(input);

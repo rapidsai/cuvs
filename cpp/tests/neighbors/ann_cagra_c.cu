@@ -476,3 +476,127 @@ TEST(CagraC, BuildSearchFiltered)
   cuvsCagraIndexDestroy(index);
   cuvsResourcesDestroy(res);
 }
+
+TEST(CagraC, BuildMergeSearch)
+{
+  cuvsResources_t res;
+  cuvsResourcesCreate(&res);
+  cudaStream_t stream;
+  cuvsStreamGet(res, &stream);
+
+  float dataset[7][2] = {{0.74021935f, 0.92099380f},
+                         {0.03902049f, 0.96896291f},
+                         {0.92514056f, 0.44635010f},
+                         {0.12345678f, 0.87654321f},
+                         {0.50112233f, 0.33221100f},
+                         {0.66731918f, 0.10993068f},
+                         {0.77777777f, 0.88888888f}};
+
+  float* main_data_ptr       = &dataset[0][0];
+  float* additional_data_ptr = &dataset[4][0];
+  float* query_data_ptr      = &dataset[6][0];
+
+  rmm::device_uvector<float> main_d(8, stream);
+  rmm::device_uvector<float> additional_d(6, stream);
+  rmm::device_uvector<float> queries_d(2, stream);
+  raft::copy(main_d.data(), main_data_ptr, 8, stream);
+  raft::copy(additional_d.data(), additional_data_ptr, 6, stream);
+  raft::copy(queries_d.data(), query_data_ptr, 2, stream);
+
+  DLManagedTensor main_dataset_tensor;
+  int64_t main_shape[2]                            = {4, 2};
+  main_dataset_tensor.dl_tensor.data               = main_d.data();
+  main_dataset_tensor.dl_tensor.device.device_type = kDLCUDA;
+  main_dataset_tensor.dl_tensor.device.device_id   = 0;
+  main_dataset_tensor.dl_tensor.ndim               = 2;
+  main_dataset_tensor.dl_tensor.dtype.code         = kDLFloat;
+  main_dataset_tensor.dl_tensor.dtype.bits         = 32;
+  main_dataset_tensor.dl_tensor.dtype.lanes        = 1;
+  main_dataset_tensor.dl_tensor.shape              = main_shape;
+  main_dataset_tensor.dl_tensor.strides            = nullptr;
+
+  DLManagedTensor additional_dataset_tensor = main_dataset_tensor;
+  int64_t additional_shape[2]               = {3, 2};
+  additional_dataset_tensor.dl_tensor.data  = additional_d.data();
+  additional_dataset_tensor.dl_tensor.shape = additional_shape;
+
+  DLManagedTensor query_tensor = main_dataset_tensor;
+  int64_t query_shape[2]       = {1, 2};
+  query_tensor.dl_tensor.data  = queries_d.data();
+  query_tensor.dl_tensor.shape = query_shape;
+
+  cuvsCagraIndexParams_t build_params;
+  cuvsCagraIndexParamsCreate(&build_params);
+  cuvsCagraIndex_t index_main, index_add;
+  cuvsCagraIndexCreate(&index_main);
+  cuvsCagraIndexCreate(&index_add);
+  ASSERT_EQ(cuvsCagraBuild(res, build_params, &main_dataset_tensor, index_main), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsCagraBuild(res, build_params, &additional_dataset_tensor, index_add), CUVS_SUCCESS);
+
+  cuvsCagraMergeParams_t merge_params;
+  cuvsCagraMergeParamsCreate(&merge_params);
+  cuvsCagraIndex_t index_merged;
+  cuvsCagraIndexCreate(&index_merged);
+
+  cuvsCagraIndex_t index_array[2] = {index_main, index_add};
+  ASSERT_EQ(cuvsCagraMerge(res, merge_params, index_array, 2, index_merged), CUVS_SUCCESS);
+
+  int merged_dim = -1;
+  ASSERT_EQ(cuvsCagraIndexGetDims(index_merged, &merged_dim), CUVS_SUCCESS);
+  EXPECT_EQ(merged_dim, 2);
+
+  DLManagedTensor neighbors_tensor, distances_tensor;
+  rmm::device_uvector<int64_t> neighbors_d(1, stream);
+  rmm::device_uvector<float> distances_d(1, stream);
+  int64_t neighbors_shape[2]             = {1, 1};
+  int64_t distances_shape[2]             = {1, 1};
+  neighbors_tensor.dl_tensor.data        = neighbors_d.data();
+  neighbors_tensor.dl_tensor.device      = main_dataset_tensor.dl_tensor.device;
+  neighbors_tensor.dl_tensor.ndim        = 2;
+  neighbors_tensor.dl_tensor.dtype.code  = kDLInt;
+  neighbors_tensor.dl_tensor.dtype.bits  = 64;
+  neighbors_tensor.dl_tensor.dtype.lanes = 1;
+  neighbors_tensor.dl_tensor.shape       = neighbors_shape;
+  neighbors_tensor.dl_tensor.strides     = nullptr;
+  distances_tensor.dl_tensor.data        = distances_d.data();
+  distances_tensor.dl_tensor.device      = main_dataset_tensor.dl_tensor.device;
+  distances_tensor.dl_tensor.ndim        = 2;
+  distances_tensor.dl_tensor.dtype.code  = kDLFloat;
+  distances_tensor.dl_tensor.dtype.bits  = 32;
+  distances_tensor.dl_tensor.dtype.lanes = 1;
+  distances_tensor.dl_tensor.shape       = distances_shape;
+  distances_tensor.dl_tensor.strides     = nullptr;
+
+  cuvsCagraSearchParams_t search_params;
+  cuvsCagraSearchParamsCreate(&search_params);
+  (*search_params).itopk_size = 1;
+
+  cuvsFilter filter;
+  filter.type = NO_FILTER;
+  filter.addr = 0;
+  ASSERT_EQ(cuvsCagraSearch(res,
+                            search_params,
+                            index_merged,
+                            &query_tensor,
+                            &neighbors_tensor,
+                            &distances_tensor,
+                            filter),
+            CUVS_SUCCESS);
+
+  int64_t neighbor_host = -1;
+  float distance_host   = 1.0f;
+  raft::copy(&neighbor_host, neighbors_d.data(), 1, stream);
+  raft::copy(&distance_host, distances_d.data(), 1, stream);
+  cudaStreamSynchronize(stream);
+
+  EXPECT_EQ(neighbor_host, 6);
+  EXPECT_NEAR(distance_host, 0.0f, 1e-6);
+
+  cuvsCagraSearchParamsDestroy(search_params);
+  cuvsCagraMergeParamsDestroy(merge_params);
+  cuvsCagraIndexParamsDestroy(build_params);
+  cuvsCagraIndexDestroy(index_merged);
+  cuvsCagraIndexDestroy(index_add);
+  cuvsCagraIndexDestroy(index_main);
+  cuvsResourcesDestroy(res);
+}
