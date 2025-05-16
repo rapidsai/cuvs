@@ -47,8 +47,7 @@ static const int DEGREE_SIZES[4] = {32, 64, 128, 256};
 
 // Object used to store id,distance combination graph construction operations
 template <typename IdxT, typename accT>
-struct __align__(16) DistPair
-{
+struct __align__(16) DistPair {
   accT dist;
   IdxT idx;
 
