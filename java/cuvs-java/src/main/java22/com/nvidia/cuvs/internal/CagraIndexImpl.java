@@ -47,6 +47,7 @@ import com.nvidia.cuvs.CagraSearchParams;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.SearchResults;
 import com.nvidia.cuvs.internal.common.Util;
+import com.nvidia.cuvs.internal.panama.PanamaFFMAPI;
 import com.nvidia.cuvs.internal.panama.cuvsCagraCompressionParams;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndex;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndexParams;
@@ -140,9 +141,10 @@ public class CagraIndexImpl implements CagraIndex {
   public void destroyIndex() throws Throwable {
     checkNotDestroyed();
     try (var arena = Arena.ofConfined()) {
-      MemorySegment returnValue = arena.allocate(C_INT);
-      destroyIndexMethodHandle.invokeExact(cagraIndexReference.getMemorySegment(), returnValue);
-      checkError(returnValue.get(C_INT, 0L), "destroyIndexMethodHandle");
+//      MemorySegment returnValue = arena.allocate(C_INT);
+//      destroyIndexMethodHandle.invokeExact(cagraIndexReference.getMemorySegment(), returnValue);
+//      checkError(returnValue.get(C_INT, 0L), "destroyIndexMethodHandle");
+      CuVSPanamaBridge.destroyCagraIndex(cagraIndexReference.getMemorySegment());
     } finally {
       destroyed = true;
     }
@@ -171,21 +173,17 @@ public class CagraIndexImpl implements CagraIndex {
 
     MemorySegment dataSeg = Util.buildMemorySegment(resources.getArena(), dataset);
 
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment returnValue = localArena.allocate(C_INT);
-      var indexSeg = (MemorySegment) indexMethodHandle.invokeExact(
-        dataSeg,
-        rows,
-        cols,
-        resources.getMemorySegment(),
-        returnValue,
-        indexParamsMemorySegment,
-        compressionParamsMemorySegment,
-        numWriterThreads
-      );
-      checkError(returnValue.get(C_INT, 0L), "indexMethodHandle");
+    MemorySegment indexSeg = CuVSPanamaBridge.buildCagraIndex(
+      resources.getArena(),
+      dataSeg,
+      rows,
+      cols,
+      resources.getMemorySegment(),
+      indexParamsMemorySegment,
+      compressionParamsMemorySegment,
+      numWriterThreads);
+
       return new IndexReference(indexSeg);
-    }
   }
 
   /**
@@ -210,9 +208,25 @@ public class CagraIndexImpl implements CagraIndex {
     MemorySegment distancesMemorySegment = resources.getArena().allocate(distancesSequenceLayout);
     MemorySegment floatsSeg = Util.buildMemorySegment(resources.getArena(), query.getQueryVectors());
 
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment returnValue = localArena.allocate(C_INT);
-      searchMethodHandle.invokeExact(
+//    try (var localArena = Arena.ofConfined()) {
+//      MemorySegment returnValue = localArena.allocate(C_INT);
+//      searchMethodHandle.invokeExact(
+//        cagraIndexReference.getMemorySegment(),
+//        floatsSeg,
+//        topK,
+//        numQueries,
+//        vectorDimension,
+//        resources.getMemorySegment(),
+//        neighborsMemorySegment,
+//        distancesMemorySegment,
+//        returnValue,
+//        segmentFromSearchParams(query.getCagraSearchParameters())
+//      );
+//      checkError(returnValue.get(C_INT, 0L), "searchMethodHandle");
+//    }
+
+    CuVSPanamaBridge.searchCagraIndex(
+        resources.getArena(),
         cagraIndexReference.getMemorySegment(),
         floatsSeg,
         topK,
@@ -221,11 +235,9 @@ public class CagraIndexImpl implements CagraIndex {
         resources.getMemorySegment(),
         neighborsMemorySegment,
         distancesMemorySegment,
-        returnValue,
         segmentFromSearchParams(query.getCagraSearchParameters())
       );
-      checkError(returnValue.get(C_INT, 0L), "searchMethodHandle");
-    }
+
     return new CagraSearchResults(neighborsSequenceLayout, distancesSequenceLayout, neighborsMemorySegment,
         distancesMemorySegment, topK, query.getMapping(), numQueries);
   }
@@ -248,14 +260,20 @@ public class CagraIndexImpl implements CagraIndex {
     tempFile = tempFile.toAbsolutePath();
     MemorySegment pathSeg = Util.buildMemorySegment(resources.getArena(), tempFile.toString());
     try (var localArena = Arena.ofConfined()) {
-      MemorySegment returnValue = localArena.allocate(C_INT);
-      serializeMethodHandle.invokeExact(
-        resources.getMemorySegment(),
-        cagraIndexReference.getMemorySegment(),
-        returnValue,
-        pathSeg
-      );
-      checkError(returnValue.get(C_INT, 0L), "serializeMethodHandle");
+//      MemorySegment returnValue = localArena.allocate(C_INT);
+//      serializeMethodHandle.invokeExact(
+//        resources.getMemorySegment(),
+//        cagraIndexReference.getMemorySegment(),
+//        returnValue,
+//        pathSeg
+//      );
+//      checkError(returnValue.get(C_INT, 0L), "serializeMethodHandle");
+
+      CuVSPanamaBridge.serializeCagraIndex(
+          resources.getArena(),
+          resources.getMemorySegment(),
+          cagraIndexReference.getMemorySegment(),
+          tempFile.toString());
 
       try (FileInputStream fileInputStream = new FileInputStream(tempFile.toFile())) {
         byte[] chunk = new byte[bufferLength];
@@ -337,16 +355,21 @@ public class CagraIndexImpl implements CagraIndex {
          FileOutputStream fileOutputStream = new FileOutputStream(tmpIndexFile.toFile())) {
       in.transferTo(fileOutputStream);
       MemorySegment pathSeg = Util.buildMemorySegment(resources.getArena(), tmpIndexFile.toString());
-      try (var localArena = Arena.ofConfined()) {
-        MemorySegment returnValue = localArena.allocate(C_INT);
-        deserializeMethodHandle.invokeExact(
+//      try (var localArena = Arena.ofConfined()) {
+//        MemorySegment returnValue = localArena.allocate(C_INT);
+//        deserializeMethodHandle.invokeExact(
+//          resources.getMemorySegment(),
+//          indexReference.getMemorySegment(),
+//          returnValue,
+//          pathSeg
+//        );
+//        checkError(returnValue.get(C_INT, 0L), "deserializeMethodHandle");
+//      }
+      CuVSPanamaBridge.deserializeCagraIndex(
+          resources.getArena(),
           resources.getMemorySegment(),
           indexReference.getMemorySegment(),
-          returnValue,
-          pathSeg
-        );
-        checkError(returnValue.get(C_INT, 0L), "deserializeMethodHandle");
-      }
+          tmpIndexFile.toString());
     } finally {
       Files.deleteIfExists(tmpIndexFile);
     }
