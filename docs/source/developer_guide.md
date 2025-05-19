@@ -187,7 +187,7 @@ RAFT relies on `clang-format` to enforce code style across all C++ and CUDA sour
 1. Do not split empty functions/records/namespaces.
 2. Two-space indentation everywhere, including the line continuations.
 3. Disable reflowing of comments.
-   The reasons behind these deviations from the Google style guide are given in comments [here](https://github.com/rapidsai/raft/blob/branch-25.02/cpp/.clang-format).
+   The reasons behind these deviations from the Google style guide are given in comments [here](https://github.com/rapidsai/raft/blob/branch-25.06/cpp/.clang-format).
 
 [`doxygen`](https://doxygen.nl/) is used as documentation generator and also as a documentation linter.
 In order to run doxygen as a linter on C++/CUDA code, run
@@ -205,7 +205,7 @@ you can run  `codespell -i 3 -w .` from the repository root directory.
 This will bring up an interactive prompt to select which spelling fixes to apply.
 
 ### #include style
-[include_checker.py](https://github.com/rapidsai/raft/blob/branch-25.02/cpp/scripts/include_checker.py) is used to enforce the include style as follows:
+[include_checker.py](https://github.com/rapidsai/raft/blob/branch-25.06/cpp/scripts/include_checker.py) is used to enforce the include style as follows:
 1. `#include "..."` should be used for referencing local files only. It is acceptable to be used for referencing files in a sub-folder/parent-folder of the same algorithm, but should never be used to include files in other algorithms or between algorithms and the primitives or other dependencies.
 2. `#include <...>` should be used for referencing everything else
 
@@ -226,61 +226,6 @@ Keep in mind that this only applies to files tracked by git that have been modif
 
 ## Error handling
 Call CUDA APIs via the provided helper macros `RAFT_CUDA_TRY`, `RAFT_CUBLAS_TRY` and `RAFT_CUSOLVER_TRY`. These macros take care of checking the return values of the used API calls and generate an exception when the command is not successful. If you need to avoid an exception, e.g. inside a destructor, use `RAFT_CUDA_TRY_NO_THROW`, `RAFT_CUBLAS_TRY_NO_THROW ` and `RAFT_CUSOLVER_TRY_NO_THROW`. These macros log the error but do not throw an exception.
-
-## Logging
-
-### Introduction
-Anything and everything about logging is defined inside [logger.hpp](https://github.com/rapidsai/raft/blob/branch-25.02/cpp/include/raft/core/logger.hpp). It uses [spdlog](https://github.com/gabime/spdlog) underneath, but this information is transparent to all.
-
-### Usage
-```cpp
-#include <raft/core/logger.hpp>
-
-// Inside your method or function, use any of these macros
-RAFT_LOG_TRACE("Hello %s!", "world");
-RAFT_LOG_DEBUG("Hello %s!", "world");
-RAFT_LOG_INFO("Hello %s!", "world");
-RAFT_LOG_WARN("Hello %s!", "world");
-RAFT_LOG_ERROR("Hello %s!", "world");
-RAFT_LOG_CRITICAL("Hello %s!", "world");
-```
-
-### Changing logging level
-There are 7 logging levels with each successive level becoming quieter:
-1. RAFT_LEVEL_TRACE
-2. RAFT_LEVEL_DEBUG
-3. RAFT_LEVEL_INFO
-4. RAFT_LEVEL_WARN
-5. RAFT_LEVEL_ERROR
-6. RAFT_LEVEL_CRITICAL
-7. RAFT_LEVEL_OFF
-   Pass one of these as per your needs into the `set_level()` method as follows:
-```cpp
-raft::logger::get().set_level(RAFT_LEVEL_WARN);
-// From now onwards, this will print only WARN and above kind of messages
-```
-
-### Changing logging pattern
-Pass the [format string](https://github.com/gabime/spdlog/wiki/3.-Custom-formatting) as follows in order use a different logging pattern than the default.
-```cpp
-raft::logger::get.set_pattern(YourFavoriteFormat);
-```
-One can also use the corresponding `get_pattern()` method to know the current format as well.
-
-### Temporarily changing the logging pattern
-Sometimes, we need to temporarily change the log pattern (eg: for reporting decision tree structure). This can be achieved in a RAII-like approach as follows:
-```cpp
-{
-  PatternSetter _(MyNewTempFormat);
-  // new log format is in effect from here onwards
-  doStuff();
-  // once the above temporary object goes out-of-scope, the old format will be restored
-}
-```
-
-### Tips
-* Do NOT end your logging messages with a newline! It is automatically added by spdlog.
-* The `RAFT_LOG_TRACE()` is by default not compiled due to the `RAFT_ACTIVE_LEVEL` macro setup, for performance reasons. If you need it to be enabled, change this macro accordingly during compilation time
 
 ## Common Design Considerations
 

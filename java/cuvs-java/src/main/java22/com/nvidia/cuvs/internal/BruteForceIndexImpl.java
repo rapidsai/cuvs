@@ -16,6 +16,13 @@
 
 package com.nvidia.cuvs.internal;
 
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
+import static com.nvidia.cuvs.internal.common.Util.checkError;
+import static java.lang.foreign.ValueLayout.ADDRESS;
+
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -28,6 +35,7 @@ import java.lang.foreign.SequenceLayout;
 import java.lang.invoke.MethodHandle;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.BitSet;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -37,14 +45,7 @@ import com.nvidia.cuvs.BruteForceQuery;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.SearchResults;
 import com.nvidia.cuvs.internal.common.Util;
-import com.nvidia.cuvs.internal.panama.CuVSBruteForceIndex;
-
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
-import static com.nvidia.cuvs.internal.common.Util.checkError;
-import static java.lang.foreign.ValueLayout.ADDRESS;
+import com.nvidia.cuvs.internal.panama.cuvsBruteForceIndex;
 
 /**
  *
@@ -59,7 +60,7 @@ public class BruteForceIndexImpl implements BruteForceIndex{
       FunctionDescriptor.of(ADDRESS, ADDRESS, C_LONG, C_LONG, ADDRESS, ADDRESS, C_INT));
 
   private static final MethodHandle searchMethodHandle = downcallHandle("search_brute_force_index",
-      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, C_INT, C_LONG, C_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, C_LONG, C_LONG));
+      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, C_INT, C_LONG, C_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, C_LONG));
 
   private static final MethodHandle destroyIndexMethodHandle = downcallHandle("destroy_brute_force_index",
       FunctionDescriptor.ofVoid(ADDRESS, ADDRESS));
@@ -169,16 +170,23 @@ public class BruteForceIndexImpl implements BruteForceIndex{
     long numQueries = cuvsQuery.getQueryVectors().length;
     long numBlocks = cuvsQuery.getTopK() * numQueries;
     int vectorDimension = numQueries > 0 ? cuvsQuery.getQueryVectors()[0].length : 0;
-    long prefilterDataLength = cuvsQuery.getPrefilter() != null ? cuvsQuery.getPrefilter().length : 0;
-    long numRows = dataset != null ? dataset.length : 0;
 
     SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_LONG);
     SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
     MemorySegment neighborsMemorySegment = resources.getArena().allocate(neighborsSequenceLayout);
     MemorySegment distancesMemorySegment = resources.getArena().allocate(distancesSequenceLayout);
-    MemorySegment prefilterDataMemorySegment = cuvsQuery.getPrefilter() != null
-            ? Util.buildMemorySegment(resources.getArena(), cuvsQuery.getPrefilter())
-            : MemorySegment.NULL;
+
+    // prepare the prefiltering data
+    long prefilterDataLength = 0;
+    MemorySegment prefilterDataMemorySegment = MemorySegment.NULL;
+    BitSet[] prefilters = cuvsQuery.getPrefilters();
+    if (prefilters != null && prefilters.length > 0) {
+      BitSet concatenatedFilters = Util.concatenate(prefilters, cuvsQuery.getNumDocs());
+      long filters[] = concatenatedFilters.toLongArray();
+      prefilterDataMemorySegment = Util.buildMemorySegment(resources.getArena(), filters);
+      prefilterDataLength = cuvsQuery.getNumDocs() * prefilters.length;
+    }
+
     MemorySegment querySeg = Util.buildMemorySegment(resources.getArena(), cuvsQuery.getQueryVectors());
     try (var localArena = Arena.ofConfined()) {
       MemorySegment returnValue = localArena.allocate(C_INT);
@@ -193,7 +201,7 @@ public class BruteForceIndexImpl implements BruteForceIndex{
         distancesMemorySegment,
         returnValue,
         prefilterDataMemorySegment,
-        prefilterDataLength, numRows
+        prefilterDataLength
       );
       checkError(returnValue.get(C_INT, 0L), "searchMethodHandle");
     }
@@ -354,7 +362,7 @@ public class BruteForceIndexImpl implements BruteForceIndex{
      * Constructs CagraIndexReference and allocate the MemorySegment.
      */
     protected IndexReference(CuVSResourcesImpl resources) {
-      memorySegment = CuVSBruteForceIndex.allocate(resources.getArena());
+      memorySegment = cuvsBruteForceIndex.allocate(resources.getArena());
     }
 
     /**

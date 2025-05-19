@@ -186,17 +186,17 @@ void mutual_reachability_knn_l2(const raft::resources& handle,
       epilogue);
 }
 
-template <typename value_idx, typename value_t>
+template <typename value_idx, typename value_t, typename nnz_t>
 void mutual_reachability_graph(const raft::resources& handle,
                                const value_t* X,
-                               size_t m,
-                               size_t n,
+                               value_idx m,
+                               value_idx n,
                                cuvs::distance::DistanceType metric,
                                int min_samples,
                                value_t alpha,
                                value_idx* indptr,
                                value_t* core_dists,
-                               raft::sparse::COO<value_t, value_idx>& out)
+                               raft::sparse::COO<value_t, value_idx, nnz_t>& out)
 {
   RAFT_EXPECTS(metric == cuvs::distance::DistanceType::L2SqrtExpanded,
                "Currently only L2 expanded distance is supported");
@@ -228,8 +228,14 @@ void mutual_reachability_graph(const raft::resources& handle,
                     coo_rows.data(),
                     [min_samples] __device__(value_idx c) -> value_idx { return c / min_samples; });
 
-  raft::sparse::linalg::symmetrize(
-    handle, coo_rows.data(), inds.data(), dists.data(), m, m, min_samples * m, out);
+  raft::sparse::linalg::symmetrize(handle,
+                                   coo_rows.data(),
+                                   inds.data(),
+                                   dists.data(),
+                                   m,
+                                   m,
+                                   static_cast<nnz_t>(min_samples * m),
+                                   out);
 
   raft::sparse::convert::sorted_coo_to_csr(out.rows(), out.nnz, indptr, m + 1, stream);
 

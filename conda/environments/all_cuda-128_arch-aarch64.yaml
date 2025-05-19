@@ -9,9 +9,9 @@ channels:
 dependencies:
 - breathe>=4.35.0
 - c-compiler
-- clang-tools==16.0.6
-- clang==16.0.6
-- cmake>=3.26.4,!=3.30.0
+- clang-tools==20.1.4
+- clang==20.1.4
+- cmake>=3.30.4
 - cuda-cudart-dev
 - cuda-nvcc
 - cuda-nvtx-dev
@@ -27,12 +27,12 @@ dependencies:
 - go
 - graphviz
 - ipython
-- libclang==16.0.6
+- libclang==20.1.4
 - libcublas-dev
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev
-- librmm==25.2.*,>=0.0.0a0
+- librmm==25.6.*,>=0.0.0a0
 - make
 - nccl>=2.19
 - ninja
@@ -40,7 +40,7 @@ dependencies:
 - numpydoc
 - openblas
 - pre-commit
-- pylibraft==25.2.*,>=0.0.0a0
+- pylibraft==25.6.*,>=0.0.0a0
 - pytest-cov
 - pytest==7.*
 - rapids-build-backend>=0.3.0,<0.4.0.dev0

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ namespace cuvs::neighbors::hnsw {
   }
 
 CUVS_INST_HNSW_FROM_CAGRA(float);
+CUVS_INST_HNSW_FROM_CAGRA(half);
 CUVS_INST_HNSW_FROM_CAGRA(uint8_t);
 CUVS_INST_HNSW_FROM_CAGRA(int8_t);
 
@@ -47,6 +48,7 @@ CUVS_INST_HNSW_FROM_CAGRA(int8_t);
   }
 
 CUVS_INST_HNSW_EXTEND(float);
+CUVS_INST_HNSW_EXTEND(half);
 CUVS_INST_HNSW_EXTEND(uint8_t);
 CUVS_INST_HNSW_EXTEND(int8_t);
 
@@ -64,6 +66,7 @@ CUVS_INST_HNSW_EXTEND(int8_t);
   }
 
 CUVS_INST_HNSW_SEARCH(float);
+CUVS_INST_HNSW_SEARCH(half);
 CUVS_INST_HNSW_SEARCH(uint8_t);
 CUVS_INST_HNSW_SEARCH(int8_t);
 
@@ -85,6 +88,7 @@ CUVS_INST_HNSW_SEARCH(int8_t);
   }
 
 CUVS_INST_HNSW_SERIALIZE(float);
+CUVS_INST_HNSW_SERIALIZE(half);
 CUVS_INST_HNSW_SERIALIZE(uint8_t);
 CUVS_INST_HNSW_SERIALIZE(int8_t);
 

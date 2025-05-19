@@ -17,6 +17,7 @@
 package com.nvidia.cuvs;
 
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.List;
 
 /**
@@ -28,7 +29,8 @@ public class BruteForceQuery {
 
   private List<Integer> mapping;
   private float[][] queryVectors;
-  private long[] prefilter;
+  private BitSet[] prefilters;
+  private int numDocs = -1;
   private int topK;
 
   /**
@@ -38,14 +40,17 @@ public class BruteForceQuery {
    * @param queryVectors 2D float query vector array
    * @param mapping      an instance of ID mapping
    * @param topK         the top k results to return
-   * @param prefilter    the prefilter data to use while searching the BRUTEFORCE
+   * @param prefilters   the prefilters data to use while searching the BRUTEFORCE
    *                     index
+   * @param numDocs      Maximum of bits in each prefilter, representing number of documents in this index.
+   *                     Used only when prefilter(s) is/are passed.
    */
-  public BruteForceQuery(float[][] queryVectors, List<Integer> mapping, int topK, long[] prefilter) {
+  public BruteForceQuery(float[][] queryVectors, List<Integer> mapping, int topK, BitSet[] prefilters, int numDocs) {
     this.queryVectors = queryVectors;
     this.mapping = mapping;
     this.topK = topK;
-    this.prefilter = prefilter;
+    this.prefilters = prefilters;
+    this.numDocs = numDocs;
   }
 
   /**
@@ -78,16 +83,25 @@ public class BruteForceQuery {
   /**
    * Gets the prefilter long array
    *
-   * @return a long array
+   * @return an array of bitsets
    */
-  public long[] getPrefilter() {
-    return prefilter;
+  public BitSet[] getPrefilters() {
+    return prefilters;
+  }
+
+  /**
+   * Gets the number of documents supposed to be in this index, as used for prefilters
+   *
+   * @return number of documents as an integer
+   */
+  public int getNumDocs() {
+    return numDocs;
   }
 
   @Override
   public String toString() {
     return "BruteForceQuery [mapping=" + mapping + ", queryVectors=" + Arrays.toString(queryVectors) + ", prefilter="
-        + Arrays.toString(prefilter) + ", topK=" + topK + "]";
+        + Arrays.toString(prefilters) + ", topK=" + topK + "]";
   }
 
   /**
@@ -96,7 +110,8 @@ public class BruteForceQuery {
   public static class Builder {
 
     private float[][] queryVectors;
-    private long[] prefilter;
+    private BitSet[] prefilters;
+    private int numDocs;
     private List<Integer> mapping;
     private int topK = 2;
 
@@ -134,13 +149,15 @@ public class BruteForceQuery {
     }
 
     /**
-     * Sets the prefilter data for building the {@link BruteForceQuery}.
+     * Sets the prefilters data for building the {@link BruteForceQuery}.
      *
-     * @param prefilter a one-dimensional long array
+     * @param prefilters array of bitsets, as many as queries, each containing as
+     *        many bits as there are vectors in the index
      * @return an instance of this Builder
      */
-    public Builder withPrefilter(long[] prefilter) {
-      this.prefilter = prefilter;
+    public Builder withPrefilter(BitSet[] prefilters, int numDocs) {
+      this.prefilters = prefilters;
+      this.numDocs = numDocs;
       return this;
     }
 
@@ -150,7 +167,7 @@ public class BruteForceQuery {
      * @return an instance of {@link BruteForceQuery}
      */
     public BruteForceQuery build() {
-      return new BruteForceQuery(queryVectors, mapping, topK, prefilter);
+      return new BruteForceQuery(queryVectors, mapping, topK, prefilters, numDocs);
     }
   }
 }

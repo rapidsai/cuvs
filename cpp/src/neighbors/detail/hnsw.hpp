@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,20 @@
 
 #pragma once
 
+#include "../../core/nvtx.hpp"
+
 #include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/hnsw.hpp>
-#include <filesystem>
+
+#include <raft/core/logger.hpp>
+#include <raft/core/pinned_mdarray.hpp>
+
 #include <hnswlib/hnswalg.h>
 #include <hnswlib/hnswlib.h>
+
+#include <filesystem>
 #include <memory>
 #include <omp.h>
-#include <raft/core/logger.hpp>
 #include <random>
 #include <thread>
 
@@ -41,6 +47,11 @@ struct hnsw_dist_t {
 
 template <>
 struct hnsw_dist_t<float> {
+  using type = float;
+};
+
+template <>
+struct hnsw_dist_t<half> {
   using type = float;
 };
 
@@ -68,14 +79,12 @@ struct index_impl : index<T> {
   index_impl(int dim, cuvs::distance::DistanceType metric, HnswHierarchy hierarchy)
     : index<T>{dim, metric, hierarchy}
   {
-    if constexpr (std::is_same_v<T, float>) {
-      if (metric == cuvs::distance::DistanceType::L2Expanded) {
-        space_ = std::make_unique<hnswlib::L2Space>(dim);
-      } else if (metric == cuvs::distance::DistanceType::InnerProduct) {
-        space_ = std::make_unique<hnswlib::InnerProductSpace>(dim);
-      }
-    } else if constexpr (std::is_same_v<T, std::int8_t> or std::is_same_v<T, std::uint8_t>) {
-      if (metric == cuvs::distance::DistanceType::L2Expanded) {
+    if (metric == cuvs::distance::DistanceType::InnerProduct) {
+      space_ = std::make_unique<hnswlib::InnerProductSpace<T, typename hnsw_dist_t<T>::type>>(dim);
+    } else if (metric == cuvs::distance::DistanceType::L2Expanded) {
+      if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+        space_ = std::make_unique<hnswlib::L2Space<T, typename hnsw_dist_t<T>::type>>(dim);
+      } else if constexpr (std::is_same_v<T, std::int8_t> or std::is_same_v<T, std::uint8_t>) {
         space_ = std::make_unique<hnswlib::L2SpaceI<T>>(dim);
       }
     }
@@ -121,6 +130,7 @@ std::enable_if_t<hierarchy == HnswHierarchy::NONE, std::unique_ptr<index<T>>> fr
   const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
+  common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::from_cagra<NONE>");
   std::random_device dev;
   std::mt19937 rng(dev());
   std::uniform_int_distribution<std::mt19937::result_type> dist(0);
@@ -129,8 +139,14 @@ std::enable_if_t<hierarchy == HnswHierarchy::NONE, std::unique_ptr<index<T>>> fr
   cuvs::neighbors::cagra::serialize_to_hnswlib(res, filepath, cagra_index, dataset);
 
   index<T>* hnsw_index = nullptr;
-  cuvs::neighbors::hnsw::deserialize(
-    res, params, filepath, cagra_index.dim(), cagra_index.metric(), &hnsw_index);
+  int dim;
+  if (dataset.has_value()) {
+    dim = dataset.value().extent(1);
+  } else {
+    dim = cagra_index.dim();
+  }
+
+  cuvs::neighbors::hnsw::deserialize(res, params, filepath, dim, cagra_index.metric(), &hnsw_index);
   std::filesystem::remove(filepath);
   return std::unique_ptr<index<T>>(hnsw_index);
 }
@@ -142,6 +158,7 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
   const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
+  common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::from_cagra<CPU>");
   auto host_dataset = raft::make_host_matrix<T, int64_t>(0, 0);
   raft::host_matrix_view<const T, int64_t, raft::row_major> host_dataset_view(
     host_dataset.data_handle(), host_dataset.extent(0), host_dataset.extent(1));
@@ -220,7 +237,7 @@ template <typename T, typename DistT>
 int initialize_point_in_hnsw(hnswlib::HierarchicalNSW<DistT>* appr_algo,
                              raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,
                              int64_t real_index,
-                             int curlevel)
+                             int32_t curlevel)
 {
   auto cur_c                        = appr_algo->cur_element_count++;
   appr_algo->element_levels_[cur_c] = curlevel;
@@ -265,56 +282,127 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
   const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
-  auto host_dataset = raft::make_host_matrix<T, int64_t>(0, 0);
-  raft::host_matrix_view<const T, int64_t, raft::row_major> host_dataset_view(
-    host_dataset.data_handle(), host_dataset.extent(0), host_dataset.extent(1));
+  common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::from_cagra<GPU>");
+  auto stream      = raft::resource::get_cuda_stream(res);
+  auto num_threads = params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
+
+  /* Note: NNSW data layout
+
+  offsetLevel0_      = seems to always be 0, and it would break things otherwise
+  size_links_level0_ = maxM0_ * sizeof(tableint) + sizeof(linklistsizeint);
+  offsetData_        = size_links_level0_;
+  label_offset_      = size_links_level0_ + data_size_;
+
+  get_linklist0(i)       = data_level0_memory_ + i * size_data_per_element_ + offsetLevel0_
+  getDataByInternalId(i) = data_level0_memory_ + i * size_data_per_element_ + offsetData_
+  getExternalLabeLp(i)   = data_level0_memory_ + i * size_data_per_element_ + label_offset_
+
+  Hence the layout:
+      2M x uint32_t  +   1 x uint32_t        dim x T    1 x size_t
+     [linked list + linked list sizes]        [data]     [label]
+  */
+
+  const T* source_dataset = nullptr;
+  int64_t n_rows, dim, source_stride;
+  bool device_copy;
   if (dataset.has_value()) {
-    host_dataset_view = dataset.value();
+    n_rows         = dataset->extent(0);
+    dim            = dataset->extent(1);
+    device_copy    = false;
+    source_dataset = dataset->data_handle();
+    source_stride  = dim;
+  } else if (auto cagra_dataset = cagra_index.dataset(); cagra_dataset.data_handle() != nullptr) {
+    n_rows         = cagra_dataset.extent(0);
+    dim            = cagra_dataset.extent(1);
+    device_copy    = true;
+    source_dataset = cagra_dataset.data_handle();
+    source_stride  = cagra_dataset.stride(0);
   } else {
-    // move dataset to host, remove padding
-    auto cagra_dataset = cagra_index.dataset();
-    host_dataset =
-      raft::make_host_matrix<T, int64_t>(cagra_dataset.extent(0), cagra_dataset.extent(1));
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(host_dataset.data_handle(),
-                                    sizeof(T) * host_dataset.extent(1),
-                                    cagra_dataset.data_handle(),
-                                    sizeof(T) * cagra_dataset.stride(0),
-                                    sizeof(T) * host_dataset.extent(1),
-                                    cagra_dataset.extent(0),
-                                    cudaMemcpyDefault,
-                                    raft::resource::get_cuda_stream(res)));
-    raft::resource::sync_stream(res);
-    host_dataset_view = host_dataset.view();
+    RAFT_FAIL("hnsw::from_cagra<GPU>: No dataset provided");
   }
 
-  // initialize hnsw index
-  auto hnsw_index =
-    std::make_unique<index_impl<T>>(host_dataset_view.extent(1), cagra_index.metric(), hierarchy);
-  auto appr_algo = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
-    hnsw_index->get_space(),
-    host_dataset_view.extent(0),
-    cagra_index.graph().extent(1) / 2,
-    params.ef_construction);
+  // initialize HNSW index
+  auto hnsw_index = std::make_unique<index_impl<T>>(dim, cagra_index.metric(), hierarchy);
+  auto appr_algo  = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
+    hnsw_index->get_space(), n_rows, cagra_index.graph().extent(1) / 2, params.ef_construction);
+  appr_algo->cur_element_count = n_rows;
 
-  // assign a level to each point and initialize the points in hnsw
-  std::vector<size_t> levels(host_dataset_view.extent(0));
-  std::vector<uint32_t> hnsw_internal_ids(host_dataset_view.extent(0));
+  // Initialize linked lists
+  auto& levels = appr_algo->element_levels_;
+  {
+    common::nvtx::range<common::nvtx::domain::cuvs> block_scope(
+      "parallel::initialize_data<%s>(%d threads)", device_copy ? "device" : "host", num_threads);
+    /* Note: batching
 
-  auto num_threads = params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
+    If the dataset is on the device, we want to copy it to HNSW in parallel to the rest of the
+    initialization loop. Ideally, we could use cudaMemcpy2DAsync to do this, but this call is very
+    likely to sync with the CPU, because normally the allocated host memory is paged. To avoid this,
+    we use double-buffering and copy data in small batches via pinned memory. Hence, the cuda
+    device-to-host copy is completely overlapped with the host loop.
+
+    The batching is completely disabled if the source dataset is on the host.
+    */
+    const int64_t max_batch_size =
+      device_copy ? raft::div_rounding_up_safe<int64_t>(64 * 1024 * 1024, source_stride * sizeof(T))
+                  : n_rows;
+    T* bufs[2]                                                  = {nullptr, nullptr};
+    std::optional<raft::pinned_matrix<T, int64_t>> bufs_storage = std::nullopt;
+    if (device_copy) {
+      bufs_storage.emplace(
+        std::move(raft::make_pinned_matrix<T, int64_t>(res, max_batch_size * 2, source_stride)));
+      bufs[0] = bufs_storage->data_handle();
+      bufs[1] = bufs[0] + max_batch_size * source_stride;
+    }
+    auto n_batches = raft::div_rounding_up_safe<int64_t>(n_rows, max_batch_size);
+    for (int64_t batch_i = -1; batch_i < n_batches; batch_i++) {
+      if (device_copy) {
+        if (batch_i >= 0) {
+          // Sync previous batch load
+          raft::resource::sync_stream(res);
+        }
+        auto next_batch_i = batch_i + 1;
+        if (next_batch_i < n_batches) {
+          auto offset     = next_batch_i * max_batch_size;
+          auto batch_size = std::min(max_batch_size, n_rows - offset);
+          raft::copy(bufs[next_batch_i % 2],
+                     source_dataset + offset * source_stride,
+                     batch_size * source_stride,
+                     stream);
+        }
+      }
+      if (batch_i < 0) { continue; }
+      const auto i0 = batch_i * max_batch_size;
+      const auto i1 = std::min(i0 + max_batch_size, n_rows);
 #pragma omp parallel for num_threads(num_threads)
-  for (int64_t i = 0; i < host_dataset_view.extent(0); i++) {
-    levels[i] = appr_algo->getRandomLevel(appr_algo->mult_) + 1;
-    hnsw_internal_ids[i] =
-      initialize_point_in_hnsw(appr_algo.get(), host_dataset_view, i, levels[i] - 1);
+      for (int64_t i = i0; i < i1; i++) {
+        // clear the storage (TODO: it's not clear if this is necessary)
+        memset(appr_algo->get_linklist0(i), 0, appr_algo->size_links_level0_);
+        // copy the data section
+        auto* source_ptr = device_copy ? bufs[batch_i % 2] + (i - i0) * source_stride
+                                       : source_dataset + i * source_stride;
+        memcpy(appr_algo->getDataByInternalId(i), source_ptr, appr_algo->data_size_);
+        // As we build the index from scratch, we assign labels 1-1 in data order
+        *appr_algo->getExternalLabeLp(i) = static_cast<hnswlib::labeltype>(i);
+        int32_t curlevel                 = appr_algo->getRandomLevel(appr_algo->mult_);
+        levels[i]                        = curlevel;
+        if (curlevel) {
+          appr_algo->linkLists_[i] =
+            (char*)malloc(appr_algo->size_links_per_element_ * curlevel + 1);
+          if (appr_algo->linkLists_[i] == nullptr)
+            throw std::runtime_error("Not enough memory: addPoint failed to allocate linklist");
+          memset(appr_algo->linkLists_[i], 0, appr_algo->size_links_per_element_ * curlevel + 1);
+        }
+      }
+    }
   }
 
   // sort the points by levels
   // build histogram
   std::vector<size_t> hist;
-  std::vector<size_t> order(host_dataset_view.extent(0));
-  for (int64_t i = 0; i < host_dataset_view.extent(0); i++) {
-    auto pt_level = levels[i] - 1;
-    while (pt_level >= hist.size())
+  std::vector<size_t> order(n_rows);
+  for (int64_t i = 0; i < n_rows; i++) {
+    auto pt_level = levels[i];
+    while (pt_level >= static_cast<int32_t>(hist.size()))
       hist.push_back(0);
     hist[pt_level]++;
   }
@@ -326,17 +414,18 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
   }
 
   // bucket sort
-  for (int64_t i = 0; i < host_dataset_view.extent(0); i++) {
-    auto pt_level              = levels[i] - 1;
+  for (int64_t i = 0; i < n_rows; i++) {
+    auto pt_level              = levels[i];
     order[offsets[pt_level]++] = i;
   }
 
   // set last point of the highest level as the entry point
-  appr_algo->enterpoint_node_ = hnsw_internal_ids[order.back()];
+  appr_algo->enterpoint_node_ = order.back();
   appr_algo->maxlevel_        = hist.size() - 1;
 
   // iterate over the points in the descending order of their levels
   for (size_t pt_level = hist.size() - 1; pt_level >= 1; pt_level--) {
+    common::nvtx::range<common::nvtx::domain::cuvs> level_scope("level %zu", pt_level);
     auto start_idx     = offsets[pt_level - 1];
     auto end_idx       = offsets[hist.size() - 1];
     auto num_pts       = end_idx - start_idx;
@@ -347,15 +436,15 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
     }
 
     // gather points from dataset to form query set on host
-    auto host_query_set = raft::make_host_matrix<T, int64_t>(num_pts, host_dataset_view.extent(1));
+    auto host_query_set = raft::make_host_matrix<T, int64_t>(num_pts, dim);
     // TODO: Use `raft::matrix::gather` when available as a public API
     // Issue: https://github.com/rapidsai/raft/issues/2572
 #pragma omp parallel for num_threads(num_threads)
     for (auto i = start_idx; i < end_idx; i++) {
       auto pt_id = order[i];
-      std::copy(&host_dataset_view(pt_id, 0),
-                &host_dataset_view(pt_id + 1, 0),
-                &host_query_set(i - start_idx, 0));
+      std::copy(appr_algo->getDataByInternalId(pt_id),
+                appr_algo->getDataByInternalId(pt_id) + dim,
+                reinterpret_cast<char*>(&host_query_set(i - start_idx, 0)));
     }
 
     // find neighbors of the query set
@@ -365,19 +454,20 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
                         host_neighbors.view(),
                         cagra_index.metric());
 
-    // add points to the HNSW index upper layers
+    {
+      common::nvtx::range<common::nvtx::domain::cuvs> copy_scope(
+        "get_linklist(%zu, %zu)", start_idx, end_idx);
+      // add points to the HNSW index upper layers
 #pragma omp parallel for num_threads(num_threads)
-    for (auto i = start_idx; i < end_idx; i++) {
-      auto pt_id       = order[i];
-      auto internal_id = hnsw_internal_ids[pt_id];
-      auto ll_cur      = appr_algo->get_linklist(internal_id, pt_level);
-      appr_algo->setListCount(ll_cur, host_neighbors.extent(1));
-      auto* data     = (uint32_t*)(ll_cur + 1);
-      auto neighbors = &host_neighbors(i - start_idx, 0);
-      for (auto j = 0; j < host_neighbors.extent(1); j++) {
-        auto neighbor_id          = order[neighbors[j] + start_idx];
-        auto neighbor_internal_id = hnsw_internal_ids[neighbor_id];
-        data[j]                   = neighbor_internal_id;
+      for (auto i = start_idx; i < end_idx; i++) {
+        auto pt_id  = order[i];
+        auto ll_cur = appr_algo->get_linklist(pt_id, pt_level);
+        appr_algo->setListCount(ll_cur, host_neighbors.extent(1));
+        auto* data     = (uint32_t*)(ll_cur + 1);
+        auto neighbors = &host_neighbors(i - start_idx, 0);
+        for (auto j = 0; j < host_neighbors.extent(1); j++) {
+          data[j] = order[neighbors[j] + start_idx];
+        }
       }
     }
   }
@@ -397,14 +487,17 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
     host_graph_view = host_graph.view();
   }
 
+  {
+    common::nvtx::range<common::nvtx::domain::cuvs> copy_scope("get_linklist0");
 // copy cagra graph to hnswlib base layer
 #pragma omp parallel for num_threads(num_threads)
-  for (size_t i = 0; i < static_cast<size_t>(host_graph_view.extent(0)); ++i) {
-    auto ll_i = appr_algo->get_linklist0(hnsw_internal_ids[i]);
-    appr_algo->setListCount(ll_i, host_graph_view.extent(1));
-    auto* data = (uint32_t*)(ll_i + 1);
-    for (size_t j = 0; j < static_cast<size_t>(host_graph_view.extent(1)); ++j) {
-      data[j] = hnsw_internal_ids[host_graph_view(i, j)];
+    for (size_t i = 0; i < static_cast<size_t>(host_graph_view.extent(0)); ++i) {
+      auto ll_i = appr_algo->get_linklist0(i);
+      appr_algo->setListCount(ll_i, host_graph_view.extent(1));
+      auto* data = (uint32_t*)(ll_i + 1);
+      for (size_t j = 0; j < static_cast<size_t>(host_graph_view.extent(1)); ++j) {
+        data[j] = host_graph_view(i, j);
+      }
     }
   }
 

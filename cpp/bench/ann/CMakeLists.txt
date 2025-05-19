@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -21,11 +21,15 @@ option(CUVS_ANN_BENCH_USE_FAISS_GPU_FLAT "Include faiss' brute-force knn algorit
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_FLAT "Include faiss' ivf flat algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ "Include faiss' ivf pq algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_CAGRA "Include faiss' cagra algorithm in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_FAISS_GPU_CAGRA_HNSW
+       "Include faiss' cagra algorithm for build and hnsw for search in benchmark" ON
+)
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_FLAT "Include faiss' cpu brute-force algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_FLAT "Include faiss' cpu ivf flat algorithm in benchmark"
        ON
 )
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_PQ "Include faiss' cpu ivf pq algorithm in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_FAISS_CPU_HNSW_FLAT "Include faiss' hnsw algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT "Include cuVS ivf flat algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ "Include cuVS ivf pq algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_CAGRA "Include cuVS CAGRA in benchmark" ON)
@@ -33,6 +37,12 @@ option(CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE "Include cuVS brute force knn in benc
 option(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB "Include cuVS CAGRA with HNSW search in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_HNSWLIB "Include hnsw algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_GGNN "Include ggnn algorithm in benchmark" OFF)
+option(CUVS_ANN_BENCH_USE_DISKANN "Include DISKANN search in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_CUVS_VAMANA "Include cuVS Vamana with DiskANN search in benchmark" ON)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "(ARM|arm|aarch64)")
+  set(CUVS_ANN_BENCH_USE_DISKANN OFF)
+  set(CUVS_ANN_BENCH_USE_CUVS_VAMANA OFF)
+endif()
 option(CUVS_ANN_BENCH_USE_CUVS_MG "Include cuVS ann mg algorithm in benchmark" ${BUILD_MG_ALGOS})
 option(CUVS_ANN_BENCH_SINGLE_EXE
        "Make a single executable with benchmark as shared library modules" OFF
@@ -58,6 +68,7 @@ if(BUILD_CPU_ONLY)
   set(CUVS_ANN_BENCH_USE_GGNN OFF)
   set(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_MG OFF)
+  set(CUVS_ANN_BENCH_USE_CUVS_VAMANA OFF)
 else()
   set(CUVS_FAISS_ENABLE_GPU ON)
 endif()
@@ -70,6 +81,7 @@ if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
    OR CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB
    OR CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE
    OR CUVS_ANN_BENCH_USE_CUVS_MG
+   OR CUVS_ANN_BENCH_USE_CUVS_VAMANA
 )
   set(CUVS_ANN_BENCH_USE_CUVS ON)
 endif()
@@ -85,6 +97,10 @@ include(cmake/thirdparty/get_nlohmann_json)
 
 if(CUVS_ANN_BENCH_USE_GGNN)
   include(cmake/thirdparty/get_ggnn)
+endif()
+
+if(CUVS_ANN_BENCH_USE_DISKANN OR CUVS_ANN_BENCH_USE_CUVS_VAMANA)
+  include(cmake/thirdparty/get_diskann)
 endif()
 
 if(CUVS_ANN_BENCH_USE_FAISS)
@@ -127,11 +143,9 @@ function(ConfigureAnnBench)
     PRIVATE ${ConfigureAnnBench_LINKS}
             nlohmann_json::nlohmann_json
             Threads::Threads
-            $<TARGET_NAME_IF_EXISTS:raft::raft_logger>
             $<$<BOOL:${GPU_BUILD}>:CUDA::cudart_static>
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:conda_env>
-            $<TARGET_NAME_IF_EXISTS:cuvs_bench_logger>
   )
 
   set_target_properties(
@@ -176,13 +190,6 @@ function(ConfigureAnnBench)
 
   add_dependencies(CUVS_ANN_BENCH_ALL ${BENCH_NAME})
 endfunction()
-
-if(CUVS_FAISS_ENABLE_GPU OR CUVS_ANN_BENCH_SINGLE_EXE)
-  add_library(cuvs_bench_logger OBJECT)
-  target_link_libraries(
-    cuvs_bench_logger PRIVATE rmm::rmm_logger_impl $<TARGET_NAME_IF_EXISTS:raft::raft_logger>
-  )
-endif()
 
 # ##################################################################################################
 # * Configure benchmark targets -------------------------------------------------------------
@@ -273,6 +280,12 @@ if(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_PQ)
   )
 endif()
 
+if(CUVS_ANN_BENCH_USE_FAISS_CPU_HNSW_FLAT)
+  ConfigureAnnBench(
+    NAME FAISS_CPU_HNSW_FLAT PATH src/faiss/faiss_cpu_benchmark.cpp LINKS ${CUVS_FAISS_TARGETS}
+  )
+endif()
+
 if(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_FLAT AND CUVS_FAISS_ENABLE_GPU)
   ConfigureAnnBench(
     NAME FAISS_GPU_IVF_FLAT PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
@@ -301,11 +314,31 @@ if(CUVS_ANN_BENCH_USE_FAISS_GPU_CAGRA AND CUVS_FAISS_ENABLE_GPU)
   )
 endif()
 
+if(CUVS_ANN_BENCH_USE_FAISS_GPU_CAGRA_HNSW AND CUVS_FAISS_ENABLE_GPU)
+  ConfigureAnnBench(
+    NAME FAISS_GPU_CAGRA_HNSW PATH src/faiss/faiss_gpu_benchmark.cu LINKS ${CUVS_FAISS_TARGETS}
+    raft::raft
+  )
+endif()
+
 if(CUVS_ANN_BENCH_USE_GGNN)
   include(cmake/thirdparty/get_glog)
   ConfigureAnnBench(
     NAME GGNN PATH src/ggnn/ggnn_benchmark.cu LINKS glog::glog ggnn::ggnn CUDA::curand
   )
+endif()
+
+if(CUVS_ANN_BENCH_USE_DISKANN)
+  ConfigureAnnBench(
+    NAME DISKANN_MEMORY PATH src/diskann/diskann_benchmark.cpp LINKS diskann::diskann aio
+  )
+  ConfigureAnnBench(
+    NAME DISKANN_SSD PATH src/diskann/diskann_benchmark.cpp LINKS diskann::diskann aio
+  )
+endif()
+
+if(CUVS_ANN_BENCH_USE_CUVS_VAMANA)
+  ConfigureAnnBench(NAME CUVS_VAMANA PATH src/cuvs/cuvs_vamana.cu LINKS cuvs diskann::diskann aio)
 endif()
 
 # ##################################################################################################
@@ -316,15 +349,8 @@ if(CUVS_ANN_BENCH_SINGLE_EXE)
   target_include_directories(ANN_BENCH PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 
   target_link_libraries(
-    ANN_BENCH
-    PRIVATE raft::raft
-            nlohmann_json::nlohmann_json
-            benchmark::benchmark
-            dl
-            fmt::fmt-header-only
-            spdlog::spdlog_header_only
-            $<$<TARGET_EXISTS:CUDA::nvtx3>:CUDA::nvtx3>
-            cuvs_bench_logger
+    ANN_BENCH PRIVATE raft::raft nlohmann_json::nlohmann_json benchmark::benchmark dl
+                      $<$<TARGET_EXISTS:CUDA::nvtx3>:CUDA::nvtx3>
   )
   set_target_properties(
     ANN_BENCH

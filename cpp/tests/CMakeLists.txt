@@ -49,7 +49,6 @@ function(ConfigureTest)
     PRIVATE cuvs
             cuvs::cuvs
             raft::raft
-            test_rmm_logger
             GTest::gtest
             GTest::gtest_main
             Threads::Threads
@@ -88,9 +87,6 @@ function(ConfigureTest)
   )
 endfunction()
 
-add_library(test_rmm_logger OBJECT)
-target_link_libraries(test_rmm_logger PRIVATE rmm::rmm_logger_impl raft::raft_logger_impl)
-
 # ##################################################################################################
 # test sources ##################################################################################
 # ##################################################################################################
@@ -111,6 +107,7 @@ if(BUILD_TESTS)
     NEIGHBORS_ANN_IVF_FLAT_TEST
     PATH
     neighbors/ann_ivf_flat/test_float_int64_t.cu
+    neighbors/ann_ivf_flat/test_half_int64_t.cu
     neighbors/ann_ivf_flat/test_int8_t_int64_t.cu
     neighbors/ann_ivf_flat/test_uint8_t_int64_t.cu
     GPUS
@@ -188,6 +185,8 @@ if(BUILD_TESTS)
     100
   )
 
+  ConfigureTest(NAME NEIGHBORS_BALL_COVER_TEST PATH neighbors/ball_cover.cu GPUS 1 PERCENT 100)
+
   ConfigureTest(
     NAME
     NEIGHBORS_DYNAMIC_BATCHING_TEST
@@ -210,7 +209,8 @@ if(BUILD_TESTS)
 
   if(BUILD_MG_ALGOS)
     ConfigureTest(
-      NAME NEIGHBORS_MG_TEST PATH neighbors/mg/test_float.cu GPUS 1 PERCENT 100 ADDITIONAL_DEP nccl
+      NAME NEIGHBORS_MG_TEST PATH neighbors/mg/test_float.cu GPUS 1 PERCENT 100 ADDITIONAL_DEP
+      NCCL::NCCL
     )
   endif()
 

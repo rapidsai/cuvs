@@ -36,7 +36,8 @@ template <typename T>
 void _from_cagra(cuvsResources_t res,
                  cuvsHnswIndexParams_t params,
                  cuvsCagraIndex_t cagra_index,
-                 cuvsHnswIndex_t hnsw_index)
+                 cuvsHnswIndex_t hnsw_index,
+                 std::optional<DLManagedTensor*> dataset_tensor)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto index   = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(cagra_index->addr);
@@ -44,7 +45,13 @@ void _from_cagra(cuvsResources_t res,
   cpp_params.hierarchy       = static_cast<cuvs::neighbors::hnsw::HnswHierarchy>(params->hierarchy);
   cpp_params.ef_construction = params->ef_construction;
   cpp_params.num_threads     = params->num_threads;
-  std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset = std::nullopt;
+  std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset;
+  if (dataset_tensor.has_value()) {
+    using dataset_mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
+    dataset                   = cuvs::core::from_dlpack<dataset_mdspan_type>(*dataset_tensor);
+  } else {
+    dataset = std::nullopt;
+  }
 
   auto hnsw_index_unique_ptr =
     cuvs::neighbors::hnsw::from_cagra(*res_ptr, cpp_params, *index, dataset);
@@ -141,8 +148,11 @@ extern "C" cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index_c_ptr)
   return cuvs::core::translate_exceptions([=] {
     auto index = *index_c_ptr;
 
-    if (index.dtype.code == kDLFloat) {
+    if (index.dtype.code == kDLFloat && index.dtype.bits == 32) {
       auto index_ptr = reinterpret_cast<cuvs::neighbors::hnsw::index<float>*>(index.addr);
+      delete index_ptr;
+    } else if (index.dtype.code == kDLFloat && index.dtype.bits == 16) {
+      auto index_ptr = reinterpret_cast<cuvs::neighbors::hnsw::index<half>*>(index.addr);
       delete index_ptr;
     } else if (index.dtype.code == kDLInt) {
       auto index_ptr = reinterpret_cast<cuvs::neighbors::hnsw::index<int8_t>*>(index.addr);
@@ -174,12 +184,37 @@ extern "C" cuvsError_t cuvsHnswFromCagra(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     auto index        = *cagra_index;
     hnsw_index->dtype = index.dtype;
-    if (index.dtype.code == kDLFloat) {
-      _from_cagra<float>(res, params, cagra_index, hnsw_index);
+    if (index.dtype.code == kDLFloat && index.dtype.bits == 32) {
+      _from_cagra<float>(res, params, cagra_index, hnsw_index, std::nullopt);
+    } else if (index.dtype.code == kDLFloat && index.dtype.bits == 16) {
+      _from_cagra<half>(res, params, cagra_index, hnsw_index, std::nullopt);
     } else if (index.dtype.code == kDLUInt) {
-      _from_cagra<uint8_t>(res, params, cagra_index, hnsw_index);
+      _from_cagra<uint8_t>(res, params, cagra_index, hnsw_index, std::nullopt);
     } else if (index.dtype.code == kDLInt) {
-      _from_cagra<int8_t>(res, params, cagra_index, hnsw_index);
+      _from_cagra<int8_t>(res, params, cagra_index, hnsw_index, std::nullopt);
+    } else {
+      RAFT_FAIL("Unsupported dtype: %d", index.dtype.code);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsHnswFromCagraWithDataset(cuvsResources_t res,
+                                                    cuvsHnswIndexParams_t params,
+                                                    cuvsCagraIndex_t cagra_index,
+                                                    cuvsHnswIndex_t hnsw_index,
+                                                    DLManagedTensor* dataset_tensor)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto index        = *cagra_index;
+    hnsw_index->dtype = index.dtype;
+    if (index.dtype.code == kDLFloat && index.dtype.bits == 32) {
+      _from_cagra<float>(res, params, cagra_index, hnsw_index, dataset_tensor);
+    } else if (index.dtype.code == kDLFloat && index.dtype.bits == 16) {
+      _from_cagra<half>(res, params, cagra_index, hnsw_index, dataset_tensor);
+    } else if (index.dtype.code == kDLUInt) {
+      _from_cagra<uint8_t>(res, params, cagra_index, hnsw_index, dataset_tensor);
+    } else if (index.dtype.code == kDLInt) {
+      _from_cagra<int8_t>(res, params, cagra_index, hnsw_index, dataset_tensor);
     } else {
       RAFT_FAIL("Unsupported dtype: %d", index.dtype.code);
     }
@@ -192,8 +227,10 @@ extern "C" cuvsError_t cuvsHnswExtend(cuvsResources_t res,
                                       cuvsHnswIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] {
-    if (index->dtype.code == kDLFloat) {
+    if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
       _extend<float>(res, params, additional_dataset, *index);
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      _extend<half>(res, params, additional_dataset, *index);
     } else if (index->dtype.code == kDLUInt) {
       _extend<uint8_t>(res, params, additional_dataset, *index);
     } else if (index->dtype.code == kDLInt) {
@@ -242,8 +279,10 @@ extern "C" cuvsError_t cuvsHnswSearch(cuvsResources_t res,
     auto index = *index_c_ptr;
     RAFT_EXPECTS(queries.dtype.code == index.dtype.code, "type mismatch between index and queries");
 
-    if (index.dtype.code == kDLFloat) {
+    if (index.dtype.code == kDLFloat && index.dtype.bits == 32) {
       _search<float>(res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
+    } else if (index.dtype.code == kDLFloat && index.dtype.bits == 16) {
+      _search<half>(res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
     } else if (index.dtype.code == kDLUInt) {
       _search<uint8_t>(res, *params, index, queries_tensor, neighbors_tensor, distances_tensor);
     } else if (index.dtype.code == kDLInt) {
@@ -259,8 +298,10 @@ extern "C" cuvsError_t cuvsHnswSerialize(cuvsResources_t res,
                                          cuvsHnswIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] {
-    if (index->dtype.code == kDLFloat) {
+    if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
       _serialize<float>(res, filename, *index);
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      _serialize<half>(res, filename, *index);
     } else if (index->dtype.code == kDLInt) {
       _serialize<int8_t>(res, filename, *index);
     } else if (index->dtype.code == kDLUInt) {
@@ -282,6 +323,9 @@ extern "C" cuvsError_t cuvsHnswDeserialize(cuvsResources_t res,
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
       index->addr =
         reinterpret_cast<uintptr_t>(_deserialize<float>(res, params, filename, dim, metric));
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      index->addr =
+        reinterpret_cast<uintptr_t>(_deserialize<half>(res, params, filename, dim, metric));
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
       index->addr =
         reinterpret_cast<uintptr_t>(_deserialize<uint8_t>(res, params, filename, dim, metric));
