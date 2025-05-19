@@ -707,7 +707,7 @@ class BigMatrixDistanceTest : public ::testing::Test {
  public:
   BigMatrixDistanceTest()
     : x(m * k, raft::resource::get_cuda_stream(handle)),
-      dist(std::size_t(m) * m, raft::resource::get_cuda_stream(handle)){};
+      dist(std::size_t(m) * m, raft::resource::get_cuda_stream(handle)) {};
   void SetUp() override
   {
     auto testInfo = testing::UnitTest::GetInstance()->current_test_info();
