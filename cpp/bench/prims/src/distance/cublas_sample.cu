@@ -7,189 +7,231 @@
 #include <benchmark/benchmark.h>
 #include "common.cuh"
 
-#define CHECK_CUBLAS(call)                                               \
-  do {                                                                   \
-    cublasStatus_t status = call;                                        \
-    if (status != CUBLAS_STATUS_SUCCESS) {                               \
-      std::cerr << "cuBLAS Error at line " << __LINE__ << ": "           \
-                << status << std::endl;                                  \
-      exit(EXIT_FAILURE);                                                \
-    }                                                                    \
-  } while (0)
+template <typename DataT, typename IdxT>
+struct Reducer {
+    typedef raft::KeyValuePair<IdxT, DataT> KVType;
+
+    __device__ KVType operator()(const KVType& a, const KVType& b) {
+        if ((a.value < b.value) || (a.value == b.value && a.key < b.key)) {
+          return a;
+        } else {
+          return b;
+        }
+    }
+
+    __device__ DataT operator()(const DataT& a, const DataT& b) {
+      return a < b? a : b;
+    }
+};
+
+template <typename OutT, typename DataT, typename IdxT, int TPB>
+__global__ void neo_reduce_min_kernel(OutT* out, const DataT* z, const DataT* x_norm, const DataT* y_norm, IdxT m, IdxT n) {
+  IdxT tid = threadIdx.x + blockIdx.x * blockDim.x;
+  //IdxT row = tid;
+  IdxT row = blockIdx.x;
+
+  //if (tid >= m) return;
+  // Each thread calculates one distance and then we reduce across threads using therads
+  DataT x_norm_row = x_norm[row];
+
+  //__shared__ DataT y_norm_sh[TPB];
+
+  raft::KeyValuePair<IdxT, DataT> thread_min;
+
+  thread_min.value = max_val<DataT>();
+  thread_min.key= max_val<IdxT>();
+
+  for (IdxT col = threadIdx.x; col < n; col+=TPB) {
+    /*if (col * TPB + threadIdx.x < n) {
+      y_norm_sh[threadIdx.x] = y_norm[col * TPB + threadIdx.x];
+    }*/
+    //__syncthreads();
+    //for (IdxT c = 0; c < TPB; c++) {
+      //if (col * TPB + c >= n) break;
+      //auto dist = x_norm_row + y_norm_sh[c] - 2*z[row*n + col*TPB + c];
+      auto dist = x_norm_row + y_norm[col] - 2*z[row*n + col];
+      if (dist < thread_min.value) {
+        thread_min.value = dist;
+        //thread_min.key = col*TPB + c;
+        thread_min.key = col;
+      }
+    //}
+    //__syncthreads();
+
+  }
+  typedef cub::BlockReduce<OutT, TPB> BlockReduceT;
+  __shared__ typename BlockReduceT::TempStorage temp_storage;
+  auto block_result = BlockReduceT(temp_storage).Reduce(thread_min, Reducer<DataT, IdxT>{});
+
+  if (threadIdx.x == 0) {
+    out[row] = block_result;
+    /*if constexpr(std::is_floating_point<OutT>::value) {
+      //out[row] = thread_min.value;
+      out[row] = thread_min.value;
+    } else {
+      //out[row] = thread_min;
+      out[row] = blokc_result;
+    }*/
+  }
+}
+
+template <typename OutT, typename DataT, typename IdxT, int TPB, int M_TILE, int N_TILE>
+__global__ void reduce_min_kernel1(OutT* out, const DataT* z, const DataT* x_norm, const DataT* y_norm, IdxT m, IdxT n, IdxT num_n_tiles) {
+
+  // This block reduces rows from M_TILE * blockIdx.x to M_TILE * (blockIdx.x + 1)
+  // and cols from N_TILE * blockIdx.y to N_TILE * (blockIdx.y + 1)
+  // produces output M_TILE * 1 rows
+  // in total m * (n / N_TILE) output will be produced,
+  // which needs to reduced to m * 1 output in stage 2 kernel
+
+  typedef cub::BlockReduce<OutT, TPB> BlockReduceT;
+  raft::KeyValuePair<IdxT, DataT> thread_min;
+
+  thread_min.value = max_val<DataT>();
+  thread_min.key= max_val<IdxT>();
+
+  constexpr int num_elems = 16/sizeof(DataT);
+
+  union access {
+    float4 f4;
+    DataT dt[num_elems];
+  };
+
+  __shared__ DataT y_norm_sh[N_TILE];
+
+  IdxT first_row = M_TILE * blockIdx.x;
+  IdxT last_row = M_TILE * (blockIdx.x + 1) - 1;
+
+  IdxT first_col = N_TILE * blockIdx.y;
+  IdxT last_col = N_TILE * (blockIdx.y + 1) - 1;
+
+  for (IdxT col = first_col + threadIdx.x; col <= last_col; col+=blockDim.x) {
+    y_norm_sh[col - first_col] = y_norm[col];
+  }
+
+  __syncthreads();
+
+  const float4* z_as_f4 = reinterpret_cast<const float4*>(z);
+  for (IdxT row = first_row; row <= last_row; row++) {
+    if (row >= m) break;
+    for (IdxT col = first_col + num_elems*threadIdx.x; col <= last_col; col+=num_elems*blockDim.x) {
+      access z_r;
+      z_r.f4 = z_as_f4[row * n/num_elems + col / num_elems];
+      for (int c = 0; c < num_elems; c++) {
+        if (c + col >= n) break;
+        auto dist = x_norm[row] + y_norm_sh[c + col - first_col] - 2 * z_r.dt[c];
+        if (dist < thread_min.value) {
+          thread_min.value = dist;
+          thread_min.key = col;
+        }
+      }
+    }
+
+    __syncthreads();
+    __shared__ typename BlockReduceT::TempStorage temp_storage;
+    auto block_result = BlockReduceT(temp_storage).Reduce(thread_min, Reducer<DataT, IdxT>{});
+    if (threadIdx.x == 0) {
+      if constexpr (std::is_floating_point<OutT>::value) {
+        out[row*num_n_tiles + blockIdx.y] = block_result.value;
+      } else {
+        out[row*num_n_tiles + blockIdx.y] = block_result;
+      }
+    }
+    __syncthreads();
+  }
+}
+
+template <typename OutT, typename DataT, typename IdxT, int TPB>
+__global__ void reduce_min_kernel2(OutT* out, const OutT* in, IdxT m, IdxT num_n_tiles) {
+
+  if (blockIdx.x >= m) return;
+  OutT thread_min;
+
+  IdxT row = blockIdx.x;
+  Reducer<DataT, IdxT> reducer;
+
+  thread_min.value = max_val<DataT>();
+  thread_min.key= max_val<IdxT>();
+
+  for (IdxT blk_col = threadIdx.x; blk_col < num_n_tiles; blk_col += blockDim.x) {
+    auto dist = in[row * num_n_tiles + blk_col];
+    thread_min = reducer(thread_min, dist);
+  }
+
+  typedef cub::BlockReduce<OutT, TPB> BlockReduceT;
+  __shared__ typename BlockReduceT::TempStorage temp_storage;
+  auto block_result = BlockReduceT(temp_storage).Reduce(thread_min, Reducer<DataT, IdxT>{});
+  if (threadIdx.x == 0) {
+    out[row] = block_result;
+  }
+}
 
 
-//
-// @brief Benchmark for matrix multiplication using cuBLAS
-//  
-// This benchmark computes C = alpha*A*B + beta*C using cuBLAS GEMM
-// where A, B, and C are matrices
-//
-template <typename DataT>
-static void benchmark_cublasgemm(benchmark::State& state) {
-  // Get matrix dimensions from benchmark parameters
-  const size_t m = state.range(0);  // rows of A and C
-  const size_t n = state.range(1);  // cols of B and C
-  const size_t k = state.range(2);  // cols of A and rows of B
+template <typename OutT, typename DataT, typename IdxT>
+void reduce_min(OutT* out, const DataT* z, const DataT* x_norm, const DataT* y_norm, IdxT m, IdxT n, OutT* workspace, cudaStream_t stream) {
+  const int TPB = 128;
+  const IdxT M_TILE = 128;
+  const IdxT N_TILE = 2*TPB;
 
-  // Host matrices
-  std::vector<DataT> h_A(m * k, 0.0);  // Initialize with 0.0
-  std::vector<DataT> h_B(k * n, 0.0);  // Initialize with 0.0
-  std::vector<DataT> h_C(m * n, 0.0);  // Initialize with 0.0
+  IdxT num_m_tiles = (m + M_TILE - 1) / M_TILE;
+  IdxT num_n_tiles = (n + N_TILE - 1) / N_TILE;
+  OutT* interim_out;
+  interim_out = workspace;
+  dim3 blocks(num_m_tiles, num_n_tiles);
+  //printf("Launching %d %d tiles\n", num_m_tiles, num_n_tiles);
+  reduce_min_kernel1<OutT, DataT, IdxT, TPB, M_TILE, N_TILE><<<blocks, TPB, 0, stream>>>
+    (interim_out, z, x_norm, y_norm, m, n, num_n_tiles);
 
-  PCG rng(1234, 0);
-  rng.fill_buffer(h_A.data(), m * k);
-  rng.fill_buffer(h_B.data(), k * n);
-  // Device matrices
-  DataT *d_A, *d_B, *d_C;
- 
-  // Allocate device memory
-  CHECK_CUDA(cudaMalloc(&d_A, m * k * sizeof(DataT)));
-  CHECK_CUDA(cudaMalloc(&d_B, k * n * sizeof(DataT)));
-  CHECK_CUDA(cudaMalloc(&d_C, m * n * sizeof(DataT)));
+  reduce_min_kernel2<OutT, DataT, IdxT, TPB><<<m, TPB, 0, stream>>>
+    (out, interim_out, m, num_n_tiles);
+}
 
-  // Copy matrices from host to device
-  CHECK_CUDA(cudaMemcpy(d_A, h_A.data(), m * k * sizeof(DataT), cudaMemcpyHostToDevice));
-  CHECK_CUDA(cudaMemcpy(d_B, h_B.data(), k * n * sizeof(DataT), cudaMemcpyHostToDevice));
-  CHECK_CUDA(cudaMemcpy(d_C, h_C.data(), m * n * sizeof(DataT), cudaMemcpyHostToDevice));
+template <typename OutT, typename DataT, typename IdxT>
+void neo_reduce_min(OutT* out, const DataT* z, const DataT* x_norm, const DataT* y_norm, IdxT m, IdxT n, cudaStream_t stream) {
+  const int TPB = 128;
 
-  cudaStream_t stream;
-  CHECK_CUDA(cudaStreamCreate(&stream));
+  int blocks = m;
 
-  // Create cuBLAS handle
-  cublasHandle_t handle;
-  CHECK_CUBLAS(cublasCreate(&handle));
-  // Enable TF32 mode
-  //CHECK_CUBLAS(cublasSetMathMode(handle, CUBLAS_TF32_TENSOR_OP_MATH));
-
-  CHECK_CUBLAS(cublasSetStream(handle, stream));
-
-
-  // Create a CUDA event timer
-  CudaEventTimer timer(stream);
+  neo_reduce_min_kernel<OutT, DataT, IdxT, TPB><<<blocks, TPB, 0, stream>>>(out, z, x_norm, y_norm, m, n);
+}
+template <typename OutT, typename DataT, typename IdxT, bool GEMM_ONLY>
+void cublas_l2nn(OutT* out, const DataT* x, const DataT* y, IdxT M, IdxT N, IdxT K,
+                 DataT* x_norm, DataT* y_norm,
+                 DataT* workspace, size_t ws_size, OutT* workspace2, cublasHandle_t& handle, cudaStream_t stream) {
   // Set up scaling factors
   const DataT alpha = 1.0f;
   const DataT beta = 0.0f;
 
-  // Warm up - use the appropriate GEMM function based on data type
+  // Enable TF32 mode
+  CHECK_CUBLAS(cublasSetMathMode(handle, CUBLAS_TF32_TENSOR_OP_MATH));
+
   if constexpr (std::is_same_v<DataT, float>) {
     CHECK_CUBLAS(cublasSgemm(
       handle,
-      CUBLAS_OP_N, CUBLAS_OP_N,  // No transpositions
-      n, m, k,                   // Dimensions (swapped due to row/col-major difference)
+      CUBLAS_OP_T, CUBLAS_OP_N,
+      N, M, K,                   // Dimensions (swapped due to row/col-major difference)
       &alpha,                    // alpha
-      d_B, n,                    // B and its leading dimension
-      d_A, k,                    // A and its leading dimension
+      y, K,                      // B and its leading dimension
+      x, K,                      // A and its leading dimension
       &beta,                     // beta
-      d_C, n                     // C and its leading dimension
+      workspace, N               // C and its leading dimension
     ));
   } else if constexpr (std::is_same_v<DataT, double>) {
     CHECK_CUBLAS(cublasDgemm(
       handle,
-      CUBLAS_OP_N, CUBLAS_OP_N,  // No transpositions
-      n, m, k,                   // Dimensions (swapped due to row/col-major difference)
+      CUBLAS_OP_T, CUBLAS_OP_N,
+      N, M, K,                   // Dimensions (swapped due to row/col-major difference)
       &alpha,                    // alpha
-      d_B, n,                    // B and its leading dimension
-      d_A, k,                    // A and its leading dimension
+      y, K,                      // B and its leading dimension
+      x, K,                      // A and its leading dimension
       &beta,                     // beta
-      d_C, n                     // C and its leading dimension
+      workspace, N               // C and its leading dimension
     ));
   }
 
-  // Synchronize before benchmarking
-  CHECK_CUDA(cudaStreamSynchronize(stream));
-
-    timer.start();
-  // Benchmark loop
-  for (auto _ : state) {
-    // Perform matrix multiplication: C = alpha*A*B + beta*C
-    // Note: cuBLAS uses column-major ordering, but we're using row-major
-    // So we compute B*A instead of A*B (i.e., we swap the order)
-    if constexpr (std::is_same_v<DataT, float>) {
-      CHECK_CUBLAS(cublasSgemm(
-        handle,
-        CUBLAS_OP_N, CUBLAS_OP_N,  // No transpositions
-        n, m, k,                   // Dimensions (swapped due to row/col-major difference)
-        &alpha,                    // alpha
-        d_B, n,                    // B and its leading dimension
-        d_A, k,                    // A and its leading dimension
-        &beta,                     // beta
-        d_C, n                     // C and its leading dimension
-      ));
-    } else if constexpr (std::is_same_v<DataT, double>) {
-      CHECK_CUBLAS(cublasDgemm(
-        handle,
-        CUBLAS_OP_N, CUBLAS_OP_N,  // No transpositions
-        n, m, k,                   // Dimensions (swapped due to row/col-major difference)
-        &alpha,                    // alpha
-        d_B, n,                    // B and its leading dimension
-        d_A, k,                    // A and its leading dimension
-        &beta,                     // beta
-        d_C, n                     // C and its leading dimension
-      ));
-    }
-  }
-  timer.stop();  
-  // Synchronize to make sure the kernel is done
-  CHECK_CUDA(cudaStreamSynchronize(stream));
-  // Calculate and report stats
-  //state.SetBytesProcessed(int64_t(state.iterations()) * 
-   //                      (m * k + k * n + m * n) * sizeof(DataT));
-  //state.SetItemsProcessed(int64_t(state.iterations()) * m * n * k * 2); // 2 FLOPs per element
-     state.counters["M"] = m;
-     state.counters["N"] = n;
-     state.counters["K"] = k;
-     state.counters["iter_time"] =  timer.elapsed_seconds() / state.iterations();
-  state.counters["iter_time"] =  timer.elapsed_seconds() / state.iterations();
-  state.counters["FLOP/s"] = (m * n * k * 2 * int64_t(state.iterations())) / timer.elapsed_seconds();
-
-  // Clean up
-  CHECK_CUBLAS(cublasDestroy(handle));
-  CHECK_CUDA(cudaFree(d_A));
-  CHECK_CUDA(cudaFree(d_B));
-  CHECK_CUDA(cudaFree(d_C));
-}
-
-template <typename IdxT>
-static void CustomArguments(benchmark::internal::Benchmark* b) {
-
-  /*std::vector<int64_t> m_list = {1024, 2048, 4096, 8192, 16384};
-  std::vector<int64_t> n_list = {1024, 2048, 4096, 8192, 16384};
-  std::vector<int64_t> k_list = {8, 16, 32, 64, 128, 256, 512};
-  for (auto k : k_list) {
-    for (auto m : m_list) {
-      for (auto n : n_list) {
-        if (m > n) continue;
-        b->Args({m, n, k});
-        if (m != n) {
-          b->Args({n, m, k});
-        }
-      }
-    }
-  }*/
-  std::vector<int64_t> m_list = {6*1000};
-  std::vector<int64_t> n_list = {3*1000};
-  std::vector<int64_t> k_list = {3*1000};
-  for (auto k : k_list) {
-    for (auto m : m_list) {
-      for (auto n : n_list) {
-        b->Args({m, n, k});
-      }
-    }
+  if constexpr(!GEMM_ONLY) {
+    //reduce_min<OutT, DataT, IdxT>(out, workspace, x_norm, y_norm, M, N, workspace2, stream);
+    neo_reduce_min<OutT, DataT, IdxT>(out, workspace, x_norm, y_norm, M, N, stream);
   }
 }
 
-int main(int argc, char* argv[]) {
-
-  benchmark::internal::Benchmark* bench;
-
-  //bench = benchmark::RegisterBenchmark("cublas_gemm/float", benchmark_cublasgemm<float>);
-  //bench->Apply(CustomArguments<int>);
-
-  bench = benchmark::RegisterBenchmark("cublas_gemm/double", benchmark_cublasgemm<double>);
-  bench->Apply(CustomArguments<int>);
-  ::benchmark::Initialize(&argc, argv);
-  if (::benchmark::ReportUnrecognizedArguments(argc, argv)) return -1;
-  ::benchmark::RunSpecifiedBenchmarks();
-  ::benchmark::Shutdown();
-  return 0;
-}
