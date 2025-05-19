@@ -4,8 +4,8 @@ import static com.nvidia.cuvs.internal.common.Util.checkError;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
 
+import com.nvidia.cuvs.internal.common.LinkerHelper;
 import com.nvidia.cuvs.internal.common.Util;
 import com.nvidia.cuvs.internal.panama.DLDataType;
 import com.nvidia.cuvs.internal.panama.DLDevice;
@@ -127,37 +127,35 @@ public class CuVSPanamaBridge {
     long cuvs_res = cuvs_resources.get(PanamaFFMAPI.cuvsResources_t, 0);
     MemorySegment stream = arena.allocate(PanamaFFMAPI.cudaStream_t);
     int returnValue = PanamaFFMAPI.cuvsStreamGet(cuvs_res, stream);
-    System.out.println("cuvsStreamGet return value: " + returnValue);
 
-    MemorySegment queries_d = arena.allocate(PanamaFFMAPI.C_POINTER);
-    MemorySegment neighbors = arena.allocate(PanamaFFMAPI.C_POINTER);
-    MemorySegment distances = arena.allocate(PanamaFFMAPI.C_POINTER);
+    MemorySegment queries_d = arena.allocate(LinkerHelper.C_POINTER);
+    MemorySegment neighbors = arena.allocate(LinkerHelper.C_POINTER);
+    MemorySegment distances = arena.allocate(LinkerHelper.C_POINTER);
 
-    returnValue = PanamaFFMAPI.cuvsRMMAlloc(cuvs_res, queries_d, PanamaFFMAPI.C_FLOAT.byteSize() * n_queries * dimensions);
-    System.out.println("cuvsRMMAlloc return value: " + returnValue);
+    returnValue = PanamaFFMAPI.cuvsRMMAlloc(cuvs_res, queries_d,
+        LinkerHelper.C_FLOAT.byteSize() * n_queries * dimensions);
 
-    returnValue = PanamaFFMAPI.cuvsRMMAlloc(cuvs_res, neighbors, PanamaFFMAPI.C_INT.byteSize() * n_queries * topk);
-    System.out.println("cuvsRMMAlloc return value: " + returnValue);
+    returnValue = PanamaFFMAPI.cuvsRMMAlloc(cuvs_res, neighbors, LinkerHelper.C_INT.byteSize() * n_queries * topk);
 
-    returnValue = PanamaFFMAPI.cuvsRMMAlloc(cuvs_res, distances, PanamaFFMAPI.C_FLOAT.byteSize() * n_queries * topk);
-    System.out.println("cuvsRMMAlloc return value: " + returnValue);
+    returnValue = PanamaFFMAPI.cuvsRMMAlloc(cuvs_res, distances, LinkerHelper.C_FLOAT.byteSize() * n_queries * topk);
 
-    returnValue = PanamaFFMAPI.cudaMemcpy(queries_d, queries, PanamaFFMAPI.C_FLOAT.byteSize() * n_queries * dimensions,
-        4);
+    MemorySegment queries_d_p = queries_d.get(LinkerHelper.C_POINTER, 0);
+    MemorySegment neighbors_p = neighbors.get(LinkerHelper.C_POINTER, 0);
+    MemorySegment distances_p = distances.get(LinkerHelper.C_POINTER, 0);
 
-    System.out.println("cudaMemcpy return value: " + returnValue);
+    returnValue = PanamaFFMAPI.cudaMemcpy(queries_d.get(LinkerHelper.C_POINTER, 0), queries,
+        LinkerHelper.C_FLOAT.byteSize() * n_queries * dimensions, 4);
 
     long queries_shape[] = { n_queries, dimensions };
-    MemorySegment queries_tensor = prepareTensor(arena, queries_d, queries_shape, 2, 32, 2, 2);
+    MemorySegment queries_tensor = prepareTensor(arena, queries_d_p, queries_shape, 2, 32, 2, 2);
 
     long neighbors_shape[] = { n_queries, topk };
-    MemorySegment neighbors_tensor = prepareTensor(arena, neighbors, neighbors_shape, 1, 32, 2, 2);
+    MemorySegment neighbors_tensor = prepareTensor(arena, neighbors_p, neighbors_shape, 1, 32, 2, 2);
 
     long distances_shape[] = { n_queries, topk };
-    MemorySegment distances_tensor = prepareTensor(arena, distances, distances_shape, 2, 32, 2, 2);
+    MemorySegment distances_tensor = prepareTensor(arena, distances_p, distances_shape, 2, 32, 2, 2);
 
     returnValue = PanamaFFMAPI.cuvsStreamSync(cuvs_res);
-    System.out.println("cuvsStreamSync return value: " + returnValue);
 
     MemorySegment filter = cuvsFilter.allocate(arena);
     cuvsFilter.type(filter, 0);
@@ -166,19 +164,16 @@ public class CuVSPanamaBridge {
     returnValue = PanamaFFMAPI.cuvsCagraSearch(cuvs_res, search_params, index, queries_tensor, neighbors_tensor,
         distances_tensor, filter);
 
-    System.out.println("cuvsCagraSearch return value: " + returnValue);
+    returnValue = PanamaFFMAPI.cuvsStreamSync(cuvs_res);
 
-    returnValue = PanamaFFMAPI.cudaMemcpy(neighbors_h, neighbors, PanamaFFMAPI.C_INT.byteSize() * n_queries * topk, 4);
-    System.out.println("cudaMemcpy return value: " + returnValue);
-    returnValue = PanamaFFMAPI.cudaMemcpy(distances_h, distances, PanamaFFMAPI.C_FLOAT.byteSize() * n_queries * topk, 4);
-    System.out.println("cudaMemcpy return value: " + returnValue);
+    returnValue = PanamaFFMAPI.cudaMemcpy(neighbors_h, neighbors_p, LinkerHelper.C_INT.byteSize() * n_queries * topk,
+        4);
+    returnValue = PanamaFFMAPI.cudaMemcpy(distances_h, distances_p, LinkerHelper.C_FLOAT.byteSize() * n_queries * topk,
+        4);
 
-    returnValue = PanamaFFMAPI.cuvsRMMFree(cuvs_res, distances, PanamaFFMAPI.C_FLOAT.byteSize() * n_queries * topk);
-    System.out.println("cuvsRMMFree return value: " + returnValue);
-    returnValue = PanamaFFMAPI.cuvsRMMFree(cuvs_res, neighbors, PanamaFFMAPI.C_INT.byteSize() * n_queries * topk);
-    System.out.println("cuvsRMMFree return value: " + returnValue);
-    returnValue = PanamaFFMAPI.cuvsRMMFree(cuvs_res, queries_d, PanamaFFMAPI.C_FLOAT.byteSize() * n_queries * dimensions);
-    System.out.println("cuvsRMMFree return value: " + returnValue);
-
+    returnValue = PanamaFFMAPI.cuvsRMMFree(cuvs_res, distances_p, LinkerHelper.C_FLOAT.byteSize() * n_queries * topk);
+    returnValue = PanamaFFMAPI.cuvsRMMFree(cuvs_res, neighbors_p, LinkerHelper.C_INT.byteSize() * n_queries * topk);
+    returnValue = PanamaFFMAPI.cuvsRMMFree(cuvs_res, queries_d_p,
+        LinkerHelper.C_FLOAT.byteSize() * n_queries * dimensions);
   }
 }

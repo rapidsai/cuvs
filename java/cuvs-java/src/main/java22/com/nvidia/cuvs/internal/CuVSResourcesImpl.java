@@ -59,13 +59,8 @@ public class CuVSResourcesImpl implements CuVSResources {
   @Override
   public void close() {
     checkNotDestroyed();
-    try (var localArena = Arena.ofConfined()) {
-      CuVSPanamaBridge.destroyResources(resourcesMemorySegment);
-    } catch (Throwable e) {
-      e.printStackTrace();
-    } finally {
-      destroyed = true;
-    }
+    CuVSPanamaBridge.destroyResources(resourcesMemorySegment);
+    destroyed = true;
     if (!arena.scope().isAlive()) {
       arena.close();
     }
