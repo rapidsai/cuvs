@@ -19,10 +19,6 @@ package com.nvidia.cuvs;
 import java.lang.invoke.MethodHandles;
 import java.util.List;
 import java.util.BitSet;
-import java.util.ArrayList;
-import java.util.Map;
-
-
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -126,7 +122,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
                         .build());
 
         if (sharedPrefilter != null) {
-          queryBuilder.withPrefilters(sharedPrefilter, datasetSize);
+          queryBuilder.withPrefilter(sharedPrefilter, datasetSize);
         }
 
         CagraQuery query = queryBuilder.build();

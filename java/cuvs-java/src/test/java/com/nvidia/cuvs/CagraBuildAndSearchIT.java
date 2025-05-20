@@ -166,17 +166,17 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     log.info("Full results: {}", full);
 
     // Apply prefilter: only allow ids 0 and 3 (bitset: 1100)
-    BitSet prefilters = new BitSet(4);
-    prefilters.set(1);
-    prefilters.set(2);
-    prefilters.set(3);
+    BitSet prefilter = new BitSet(4);
+    prefilter.set(1);
+    prefilter.set(2);
+    prefilter.set(3);
 
     CagraQuery filteredQuery = new CagraQuery.Builder()
       .withTopK(2)
       .withSearchParams(searchParams)
       .withQueryVectors(queries)
       .withMapping(map)
-      .withPrefilters(prefilters, 4)
+      .withPrefilter(prefilter, 4)
       .build();
 
     SearchResults filteredResults = index.search(filteredQuery);

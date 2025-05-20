@@ -213,8 +213,8 @@ public class CagraIndexImpl implements CagraIndex {
 
     long prefilterDataLength = 0;
     MemorySegment prefilterData = MemorySegment.NULL;
-    if (query.getPrefilters() != null) {
-      long[] longArray = query.getPrefilters().toLongArray();
+    if (query.getPrefilter() != null) {
+      long[] longArray = query.getPrefilter().toLongArray();
       prefilterData = Util.buildMemorySegment(resources.getArena(), longArray);
       prefilterDataLength = query.getNumDocs();
     }

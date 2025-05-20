@@ -32,7 +32,7 @@ public class CagraQuery {
   private List<Integer> mapping;
   private float[][] queryVectors;
   private int topK;
-  private BitSet prefilters;
+  private BitSet prefilter;
   private int numDocs;
 
   /**
@@ -44,17 +44,16 @@ public class CagraQuery {
    * @param queryVectors          2D float query vector array
    * @param mapping               an instance of ID mapping
    * @param topK                  the top k results to return
-   * @param prefilters            the prefilters data to use while searching the CAGRA index
-   * @param numDocs               Maximum of bits in each prefilter, representing number of documents in this index.
-   *                              Used only when prefilter(s) is/are passed.
+   * @param prefilter             A single BitSet to use as filter while searching the CAGRA index
+   * @param numDocs               Total number of dataset vectors; used to align the prefilter correctly
    */
-  public CagraQuery(CagraSearchParams cagraSearchParameters, float[][] queryVectors, List<Integer> mapping, int topK, BitSet prefilters, int numDocs) {
+  public CagraQuery(CagraSearchParams cagraSearchParameters, float[][] queryVectors, List<Integer> mapping, int topK, BitSet prefilter, int numDocs) {
     super();
     this.cagraSearchParameters = cagraSearchParameters;
     this.queryVectors = queryVectors;
     this.mapping = mapping;
     this.topK = topK;
-    this.prefilters = prefilters;
+    this.prefilter = prefilter;
     this.numDocs = numDocs;
   }
 
@@ -97,14 +96,14 @@ public class CagraQuery {
   /**
    * Gets the prefilter BitSet.
    *
-   * @return a BitSet object representing the prefilters
+   * @return a BitSet object representing the prefilter
    */
-  public BitSet getPrefilters() {
-    return prefilters;
+  public BitSet getPrefilter() {
+    return prefilter;
   }
 
   /**
-   * Gets the number of documents in this index, as used for prefilters
+   * Gets the number of documents in this index, as used for prefilter
    *
    * @return number of documents as an integer
    */
@@ -127,7 +126,7 @@ public class CagraQuery {
     private float[][] queryVectors;
     private List<Integer> mapping;
     private int topK = 2;
-    private BitSet prefilters;
+    private BitSet prefilter;
     private int numDocs;
 
     /**
@@ -183,16 +182,16 @@ public class CagraQuery {
 
     /**
      * Sets a global prefilter for all queries in this {@link CagraQuery}.
-     * The {@code prefilters} array must contain exactly one {@link BitSet},
+     * The {@code prefilter} array must contain exactly one {@link BitSet},
      * which is applied to all queries. A bit value of {@code 1} includes the
      * corresponding dataset vector; {@code 0} excludes it.
      *
-     * @param prefilters a single-element array with the global filter BitSet
+     * @param prefilter an array with the global filter BitSet
      * @param numDocs total number of vectors in the dataset (for alignment)
      * @return this {@link Builder} instance
      */
-    public Builder withPrefilters(BitSet prefilters, int numDocs) {
-      this.prefilters = prefilters;
+    public Builder withPrefilter(BitSet prefilter, int numDocs) {
+      this.prefilter = prefilter;
       this.numDocs = numDocs;
       return this;
   }
@@ -203,7 +202,7 @@ public class CagraQuery {
      * @return an instance of CuVSQuery
      */
     public CagraQuery build() {
-      return new CagraQuery(cagraSearchParams, queryVectors, mapping, topK, prefilters, numDocs);
+      return new CagraQuery(cagraSearchParams, queryVectors, mapping, topK, prefilter, numDocs);
     }
   }
 }
