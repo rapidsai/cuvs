@@ -36,6 +36,25 @@
 
 namespace cuvs::neighbors::vamana::detail {
 
+// write matrix containing dataset to file
+template <typename T>
+void to_file(const std::string& dataset_base_file, raft::host_matrix<T, int64_t>& dataset)
+{
+  std::ofstream dataset_of(dataset_base_file, std::ios::out | std::ios::binary);
+  if (!dataset_of) { RAFT_FAIL("Cannot open file %s", dataset_base_file.c_str()); }
+  size_t dataset_file_offset = 0;
+  int size                   = static_cast<int>(dataset.extent(0));
+  int dim                    = static_cast<int>(dataset.extent(1));
+  dataset_of.seekp(dataset_file_offset, dataset_of.beg);
+  dataset_of.write((char*)&size, sizeof(int));
+  dataset_of.write((char*)&dim, sizeof(int));
+  for (int i = 0; i < size; i++) {
+    dataset_of.write((char*)(dataset.data_handle() + i * dataset.extent(1)), dim * sizeof(T));
+  }
+  dataset_of.close();
+  if (!dataset_of) { RAFT_FAIL("Error writing output %s", dataset_base_file.c_str()); }
+}
+
 /**
  * Save the dataset to file.
  *
@@ -53,32 +72,38 @@ void serialize_dataset(raft::resources const& res,
 {
   // try allocating a buffer for the dataset on host
   try {
-    const cuvs::neighbors::strided_dataset<T, int64_t>* strided_dataset =
+    const auto* strided_dataset =
       dynamic_cast<const cuvs::neighbors::strided_dataset<T, int64_t>*>(dataset);
-    if (strided_dataset == nullptr) {
-      RAFT_LOG_DEBUG("dynamic_cast to strided_dataset failed");
-    } else {
+    if (strided_dataset) {
       auto h_dataset =
         raft::make_host_matrix<T, int64_t>(strided_dataset->n_rows(), strided_dataset->dim());
       raft::copy(h_dataset.data_handle(),
                  strided_dataset->view().data_handle(),
                  strided_dataset->n_rows() * strided_dataset->dim(),
                  raft::resource::get_cuda_stream(res));
-      std::ofstream dataset_of(dataset_base_file, std::ios::out | std::ios::binary);
-      if (!dataset_of) { RAFT_FAIL("Cannot open file %s", dataset_base_file.c_str()); }
-      size_t dataset_file_offset = 0;
-      int size                   = static_cast<int>(strided_dataset->n_rows());
-      int dim                    = static_cast<int>(strided_dataset->dim());
-      dataset_of.seekp(dataset_file_offset, dataset_of.beg);
-      dataset_of.write((char*)&size, sizeof(int));
-      dataset_of.write((char*)&dim, sizeof(int));
-      for (int i = 0; i < size; i++) {
-        dataset_of.write((char*)(h_dataset.data_handle() + i * h_dataset.extent(1)),
-                         dim * sizeof(T));
-      }
-      dataset_of.close();
-      if (!dataset_of) { RAFT_FAIL("Error writing output %s", dataset_base_file.c_str()); }
+      to_file(dataset_base_file, h_dataset);
+    } else {
+      RAFT_LOG_DEBUG("dynamic_cast to strided_dataset failed");
     }
+  } catch (std::bad_alloc& e) {
+    RAFT_LOG_INFO("Failed to serialize dataset");
+  } catch (raft::logic_error& e) {
+    RAFT_LOG_INFO("Failed to serialize dataset");
+  }
+}
+template <typename T>
+void serialize_dataset(raft::resources const& res,
+                       raft::device_matrix_view<const T, int64_t> dataset,
+                       const std::string& dataset_base_file)
+{
+  // try allocating a buffer for the dataset on host
+  try {
+    auto h_dataset = raft::make_host_matrix<T, int64_t>(dataset.extent(0), dataset.extent(1));
+    raft::copy(h_dataset.data_handle(),
+               dataset.data_handle(),
+               dataset.extent(0) * dataset.extent(1),
+               raft::resource::get_cuda_stream(res));
+    to_file(dataset_base_file, h_dataset);
   } catch (std::bad_alloc& e) {
     RAFT_LOG_INFO("Failed to serialize dataset");
   } catch (raft::logic_error& e) {
@@ -318,7 +343,7 @@ void serialize(raft::resources const& res,
     RAFT_EXPECTS(index_of, "Error writing output %s", index_file_name.c_str());
 
     if (include_dataset) { serialize_dataset<T>(res, &index_.data(), file_name + ".data"); }
-    serialize_dataset<uint8_t>(res, &index_.quantized_data(), file_name + "_pq_compressed.bin");
+    serialize_dataset<uint8_t>(res, index_.quantized_data(), file_name + "_pq_compressed.bin");
     return;
   }
 

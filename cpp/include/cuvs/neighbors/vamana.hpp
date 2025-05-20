@@ -53,6 +53,16 @@ namespace cuvs::neighbors::vamana {
  */
 
 struct index_params : cuvs::neighbors::index_params {
+  /**
+   * @brief Parameters used to build quantized DiskANN index; to be generated using get_codebooks()
+   */
+  template <typename T = float>
+  struct codebook_params {
+    int pq_codebook_size;
+    int pq_dim;
+    std::vector<T> pq_encoding_table;
+    std::vector<T> rotation_matrix;
+  };
   /** Maximum degree of output graph corresponds to the R parameter in the original Vamana
    * literature. */
   uint32_t graph_degree = 32;
@@ -72,10 +82,8 @@ struct index_params : cuvs::neighbors::index_params {
   uint32_t queue_size = 127;
   /** Max batchsize of reverse edge processing (reduces memory footprint) */
   uint32_t reverse_batchsize = 1000000;
-  /** Path prefix to pq pivots and rotation matrix files. Expects pq pivots file at
-   * "${codebook_prefix}_pq_pivots.bin" and rotation matrix file at
-   * "${codebook_prefix}_pq_pivots.bin_rotation_matrix.bin". */
-  std::string codebook_prefix = "";
+  /** Codebooks and related parameters */
+  std::optional<codebook_params<float>> codebooks = std::nullopt;
 };
 
 /**
@@ -132,10 +140,10 @@ struct index : cuvs::neighbors::index {
   }
 
   /** Quantized dataset [size, codes_rowlen] */
-  [[nodiscard]] inline auto quantized_data() const -> const cuvs::neighbors::dataset<int64_t>&
+  [[nodiscard]] inline auto quantized_data() const noexcept
+    -> raft::device_matrix_view<const uint8_t, int64_t, raft::row_major>
   {
-    RAFT_EXPECTS(quantized_dataset_, "Invalid quantized dataset");
-    return *quantized_dataset_;
+    return quantized_dataset_.view();
   }
 
   /** vamana graph [size, graph-degree] */
@@ -161,7 +169,8 @@ struct index : cuvs::neighbors::index {
     : cuvs::neighbors::index(),
       metric_(metric),
       graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0)),
-      dataset_(new cuvs::neighbors::empty_dataset<int64_t>(0))
+      dataset_(new cuvs::neighbors::empty_dataset<int64_t>(0)),
+      quantized_dataset_(raft::make_device_matrix<uint8_t, int64_t>(res, 0, 0))
   {
   }
 
@@ -179,6 +188,7 @@ struct index : cuvs::neighbors::index {
       metric_(metric),
       graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0)),
       dataset_(make_aligned_dataset(res, dataset, 16)),
+      quantized_dataset_(raft::make_device_matrix<uint8_t, int64_t>(res, 0, 0)),
       medoid_id_(medoid_id)
   {
     RAFT_EXPECTS(dataset.extent(0) == vamana_graph.extent(0),
@@ -224,19 +234,15 @@ struct index : cuvs::neighbors::index {
   }
 
   /**
-   * Replace the quantized dataset with a new dataset.
+   * Replace the quantized dataset.
    *
-   * If `force_ownership` is set, we create a copy of the quantized dataset on the device,
-   * and the index manages the lifetime of this copy.
-   * Otherwise, we store a reference to the device data in `new_quantized_dataset`, and it
-   * is the caller's responsibility to ensure that the data stays alive as long as the index.
+   * Ownership of the new quantized dataset is transferred to the index.
    */
   void update_quantized_dataset(
     raft::resources const& res,
-    raft::device_matrix_view<uint8_t, int64_t, raft::row_major> new_quantized_dataset,
-    bool force_ownership)
+    raft::device_matrix<uint8_t, int64_t, raft::row_major>&& new_quantized_dataset)
   {
-    quantized_dataset_ = make_aligned_dataset(res, new_quantized_dataset, 16, force_ownership);
+    quantized_dataset_ = new_quantized_dataset;
   }
 
  private:
@@ -244,7 +250,7 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix<IdxT, int64_t, raft::row_major> graph_;
   raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
   std::unique_ptr<neighbors::dataset<int64_t>> dataset_;
-  std::unique_ptr<neighbors::dataset<int64_t>> quantized_dataset_;
+  raft::device_matrix<uint8_t, int64_t, raft::row_major> quantized_dataset_;
   IdxT medoid_id_;
 };
 /**
@@ -554,6 +560,40 @@ void serialize(raft::resources const& handle,
                const cuvs::neighbors::vamana::index<uint8_t, uint32_t>& index,
                bool include_dataset = true,
                bool sector_aligned  = false);
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup vamana_cpp_codebook Vamana codebook functions
+ * @{
+ */
+
+/**
+ * @brief Construct codebook parameters from input codebook files
+ *
+ * Expects pq pivots file at
+ * "${codebook_prefix}_pq_pivots.bin" and rotation matrix file at
+ * "${codebook_prefix}_pq_pivots.bin_rotation_matrix.bin".
+ *
+ * @code{.cpp}
+ *   #include <cuvs/neighbors/vamana.hpp>
+ *
+ *   // create a string with a filepath
+ *   std::string codebook_prefix("/path/to/index/prefix");
+ *   // define dimension of vectors in dataset
+ *   int dim = 64;
+ *   // construct codebook parameters from input codebook files
+ *   auto codebooks = cuvs::neighbors::vamana::get_codebooks(codebook_prefix, dim);
+ * @endcode
+ *
+ * @param[in] codebook_prefix path prefix to pq pivots and rotation matrix files
+ * @param[in] dim dimension of vectors in dataset
+ *
+ */
+auto get_codebooks(const std::string& codebook_prefix, const int dim)
+  -> index_params::codebook_params<float>;
 
 /**
  * @}

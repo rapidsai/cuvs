@@ -479,6 +479,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/vamana_build_float.cu
     src/neighbors/vamana_build_uint8.cu
     src/neighbors/vamana_build_int8.cu
+    src/neighbors/vamana_codebooks_float.cu
     src/neighbors/vamana_serialize_float.cu
     src/neighbors/vamana_serialize_uint8.cu
     src/neighbors/vamana_serialize_int8.cu
