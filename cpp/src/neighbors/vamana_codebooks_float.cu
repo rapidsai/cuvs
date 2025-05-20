@@ -20,7 +20,7 @@ namespace cuvs::neighbors::vamana {
 
 #define RAFT_INST_VAMANA_CODEBOOKS(T)                                       \
   auto get_codebooks(const std::string& codebook_prefix, const int dim)     \
-    ->cuvs::neighbors::vamana::index_params::codebook_params<T>             \
+    -> cuvs::neighbors::vamana::index_params::codebook_params<T>            \
   {                                                                         \
     return cuvs::neighbors::vamana::get_codebooks<T>(codebook_prefix, dim); \
   }
