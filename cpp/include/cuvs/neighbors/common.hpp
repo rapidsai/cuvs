@@ -237,8 +237,7 @@ auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t 
       raft::make_device_strided_matrix_view<const value_type, index_type>(
         device_ptr, src.extent(0), src.extent(1), required_stride));
   }
-  // Something is wrong: have to make a copy and produce an owning
-  // dataset
+  // Something is wrong: have to make a copy and produce an owning dataset
   auto out_layout =
     raft::make_strided_layout(src.extents(), std::array<index_type, 2>{required_stride, 1});
   auto out_array =
