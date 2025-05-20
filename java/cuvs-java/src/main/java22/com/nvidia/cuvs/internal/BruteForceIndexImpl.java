@@ -141,19 +141,14 @@ public class BruteForceIndexImpl implements BruteForceIndex{
     long cols = rows > 0 ? dataset[0].length : 0;
 
     MemorySegment dataSeg = Util.buildMemorySegment(resources.getArena(), dataset);
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment returnValue = localArena.allocate(C_INT);
-      MemorySegment indexSeg = (MemorySegment) indexMethodHandle.invokeExact(
+    MemorySegment indexSeg = CuVSPanamaBridge.buildBruteForceIndex(
+        resources.getArena(),
         dataSeg,
         rows,
         cols,
         resources.getMemorySegment(),
-        returnValue,
-        bruteForceIndexParams.getNumWriterThreads()
-      );
-      checkError(returnValue.get(C_INT, 0L), "indexMethodHandle");
-      return new IndexReference(indexSeg);
-    }
+        bruteForceIndexParams.getNumWriterThreads());
+    return new IndexReference(indexSeg);
   }
 
   /**
@@ -188,9 +183,9 @@ public class BruteForceIndexImpl implements BruteForceIndex{
     }
 
     MemorySegment querySeg = Util.buildMemorySegment(resources.getArena(), cuvsQuery.getQueryVectors());
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment returnValue = localArena.allocate(C_INT);
-      searchMethodHandle.invokeExact(
+
+    CuVSPanamaBridge.searchBruteForceIndex(
+        resources.getArena(),
         bruteForceIndexReference.getMemorySegment(),
         querySeg,
         cuvsQuery.getTopK(),
@@ -199,12 +194,10 @@ public class BruteForceIndexImpl implements BruteForceIndex{
         resources.getMemorySegment(),
         neighborsMemorySegment,
         distancesMemorySegment,
-        returnValue,
         prefilterDataMemorySegment,
         prefilterDataLength
-      );
-      checkError(returnValue.get(C_INT, 0L), "searchMethodHandle");
-    }
+    );
+
     return new BruteForceSearchResults(neighborsSequenceLayout, distancesSequenceLayout, neighborsMemorySegment,
             distancesMemorySegment, cuvsQuery.getTopK(), cuvsQuery.getMapping(), numQueries);
   }
@@ -219,22 +212,17 @@ public class BruteForceIndexImpl implements BruteForceIndex{
   public void serialize(OutputStream outputStream, Path tempFile) throws Throwable {
     checkNotDestroyed();
     tempFile = tempFile.toAbsolutePath();
-    MemorySegment pathSeg = Util.buildMemorySegment(resources.getArena(), tempFile.toString());
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment returnValue = localArena.allocate(C_INT);
-      serializeMethodHandle.invokeExact(
+
+    CuVSPanamaBridge.serializeBruteForceIndex(
+        resources.getArena(),
         resources.getMemorySegment(),
         bruteForceIndexReference.getMemorySegment(),
-        returnValue,
-        pathSeg
-      );
-      checkError(returnValue.get(C_INT, 0L), "serializeMethodHandle");
+        tempFile.toString());
 
-      try (FileInputStream fileInputStream = new FileInputStream(tempFile.toFile())) {
-        fileInputStream.transferTo(outputStream);
-      } finally {
-        Files.deleteIfExists(tempFile);
-      }
+    try (FileInputStream fileInputStream = new FileInputStream(tempFile.toFile())) {
+      fileInputStream.transferTo(outputStream);
+    } finally {
+      Files.deleteIfExists(tempFile);
     }
   }
 
@@ -254,17 +242,13 @@ public class BruteForceIndexImpl implements BruteForceIndex{
     try (var in = inputStream;
          FileOutputStream fileOutputStream = new FileOutputStream(tmpIndexFile.toFile())) {
       in.transferTo(fileOutputStream);
-      MemorySegment pathSeg = Util.buildMemorySegment(resources.getArena(), tmpIndexFile.toString());
-      try (var localArena = Arena.ofConfined()) {
-        MemorySegment returnValue = localArena.allocate(C_INT);
-        deserializeMethodHandle.invokeExact(
-          resources.getMemorySegment(),
-          indexReference.getMemorySegment(),
-          returnValue,
-          pathSeg
-        );
-        checkError(returnValue.get(C_INT, 0L), "deserializeMethodHandle");
-      }
+
+    CuVSPanamaBridge.deserializeBruteForceIndex(
+        resources.getArena(),
+        resources.getMemorySegment(),
+        indexReference.getMemorySegment(),
+        tmpIndexFile.toString());
+
     } finally {
       Files.deleteIfExists(tmpIndexFile);
     }

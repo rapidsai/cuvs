@@ -21,4 +21,5 @@
 #include <cuvs/neighbors/brute_force.h>
 #include <cuvs/neighbors/hnsw.h>
 #include <cuvs/neighbors/ivf_pq.h>
+#include <cuvs/neighbors/common.h>
 #include "gpuinfo.h"
