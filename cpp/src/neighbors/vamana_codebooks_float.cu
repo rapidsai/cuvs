@@ -18,15 +18,15 @@
 
 namespace cuvs::neighbors::vamana {
 
-#define RAFT_INST_VAMANA_CODEBOOKS(T)                                       \
+#define CUVS_INST_VAMANA_CODEBOOKS(T)                                       \
   auto get_codebooks(const std::string& codebook_prefix, const int dim)     \
     -> cuvs::neighbors::vamana::index_params::codebook_params<T>            \
   {                                                                         \
     return cuvs::neighbors::vamana::get_codebooks<T>(codebook_prefix, dim); \
   }
 
-RAFT_INST_VAMANA_CODEBOOKS(float);
+CUVS_INST_VAMANA_CODEBOOKS(float);
 
-#undef RAFT_INST_VAMANA_CODEBOOKS
+#undef CUVS_INST_VAMANA_CODEBOOKS
 
 }  // namespace cuvs::neighbors::vamana
