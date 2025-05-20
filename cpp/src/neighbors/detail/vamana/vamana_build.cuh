@@ -500,20 +500,28 @@ index<T, IdxT> build(
            max_batch_size,
            raft::resource::get_cuda_stream(res),
            raft::resource::get_workspace_resource(res))) {
-      // convert dataset to float
-      auto dataset_float = raft::make_device_matrix<float, int64_t>(res, batch.size(), dim);
-      auto dataset_view  = raft::make_device_matrix_view(
-        batch.data(), static_cast<int64_t>(batch.size()), static_cast<int64_t>(dim));
-      raft::linalg::map_offset(res, dataset_float.view(), [dataset_view, dim] __device__(size_t i) {
-        int row_idx = i / dim;
-        int col_idx = i % dim;
-        return static_cast<float>(dataset_view(row_idx, col_idx));
-      });
-
       // perform rotation
       auto dataset_rotated = raft::make_device_matrix<float, int64_t>(res, batch.size(), dim);
-      raft::linalg::gemm(
-        res, dataset_float.view(), rotation_matrix_device.view(), dataset_rotated.view());
+      if constexpr (std::is_same_v<T, float>) {
+        auto dataset_view = raft::make_device_matrix_view(const_cast<T*>(batch.data()),
+                                                          static_cast<int64_t>(batch.size()),
+                                                          static_cast<int64_t>(dim));
+        raft::linalg::gemm(
+          res, dataset_view, rotation_matrix_device.view(), dataset_rotated.view());
+      } else {
+        // convert dataset to float
+        auto dataset_float = raft::make_device_matrix<float, int64_t>(res, batch.size(), dim);
+        auto dataset_view  = raft::make_device_matrix_view(
+          batch.data(), static_cast<int64_t>(batch.size()), static_cast<int64_t>(dim));
+        raft::linalg::map_offset(
+          res, dataset_float.view(), [dataset_view, dim] __device__(size_t i) {
+            int row_idx = i / dim;
+            int col_idx = i % dim;
+            return static_cast<float>(dataset_view(row_idx, col_idx));
+          });
+        raft::linalg::gemm(
+          res, dataset_float.view(), rotation_matrix_device.view(), dataset_rotated.view());
+      }
 
       // quantize rotated vectors using codebook
       auto temp_vectors =
