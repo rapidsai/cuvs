@@ -14,6 +14,7 @@ import com.nvidia.cuvs.internal.panama.DLTensor;
 import com.nvidia.cuvs.internal.panama.PanamaFFMAPI;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndexParams;
 import com.nvidia.cuvs.internal.panama.cuvsFilter;
+import com.nvidia.cuvs.internal.panama.cuvsHnswIndex;
 import com.nvidia.cuvs.internal.panama.cuvsIvfPqIndexParams;
 import com.nvidia.cuvs.internal.panama.cuvsIvfPqParams;
 
@@ -218,9 +219,7 @@ public class CuVSPanamaBridge {
     long prefilter_len = 0;
 
     returnValue = PanamaFFMAPI.cuvsRMMAlloc(cuvs_res, queries_d, C_FLOAT_BYTE_SIZE * n_queries * dimensions);
-
     returnValue = PanamaFFMAPI.cuvsRMMAlloc(cuvs_res, neighbors, C_LONG_BYTE_SIZE * n_queries * topk);
-
     returnValue = PanamaFFMAPI.cuvsRMMAlloc(cuvs_res, distances, C_FLOAT_BYTE_SIZE * n_queries * topk);
 
     MemorySegment queries_d_p = queries_d.get(LinkerHelper.C_POINTER, 0);
@@ -269,15 +268,11 @@ public class CuVSPanamaBridge {
     returnValue = PanamaFFMAPI.cuvsStreamSync(cuvs_res);
 
     returnValue = PanamaFFMAPI.cudaMemcpy(neighbors_h, neighbors_p, C_LONG_BYTE_SIZE * n_queries * topk, 4);
-
     returnValue = PanamaFFMAPI.cudaMemcpy(distances_h, distances_p, C_FLOAT_BYTE_SIZE * n_queries * topk, 4);
 
     returnValue = PanamaFFMAPI.cuvsRMMFree(cuvs_res, neighbors_p, C_LONG_BYTE_SIZE * n_queries * topk);
-
     returnValue = PanamaFFMAPI.cuvsRMMFree(cuvs_res, distances_p, C_FLOAT_BYTE_SIZE * n_queries * topk);
-
     returnValue = PanamaFFMAPI.cuvsRMMFree(cuvs_res, queries_d_p, C_FLOAT_BYTE_SIZE * n_queries * dimensions);
-
     returnValue = PanamaFFMAPI.cuvsRMMFree(cuvs_res, prefilter_d_p, C_INT_BYTE_SIZE * prefilter_len);
   }
 
@@ -294,4 +289,54 @@ public class CuVSPanamaBridge {
     int returnValue = PanamaFFMAPI.cuvsBruteForceDeserialize(cuvs_res, arena.allocateFrom(filename), index);
     checkError(returnValue, "cuvsBruteForceDeserialize");
   }
+
+  public static void serializeCagraIndexToHnsw(MemorySegment cuvs_resources, MemorySegment file_path, MemorySegment index) {
+    long cuvs_res = cuvs_resources.get(PanamaFFMAPI.cuvsResources_t, 0);
+    int returnValue = PanamaFFMAPI.cuvsCagraSerializeToHnswlib(cuvs_res, file_path, index);
+    checkError(returnValue, "cuvsCagraSerializeToHnswlib");
+  }
+
+  public static MemorySegment deserializeHnswIndex(Arena arena, MemorySegment cuvs_resources, MemorySegment file_path,
+      MemorySegment hnsw_params, int vector_dimension) {
+
+    long cuvs_res = cuvs_resources.get(PanamaFFMAPI.cuvsResources_t, 0);
+    MemorySegment hnsw_index = cuvsHnswIndex.allocate(arena);
+    int returnValue = PanamaFFMAPI.cuvsHnswIndexCreate(hnsw_index);
+
+    MemorySegment dtype = DLDataType.allocate(arena);
+    DLDataType.bits(dtype, (byte) 32);
+    DLDataType.code(dtype, (byte) 2); // kDLFloat
+    DLDataType.lanes(dtype, (byte) 1);
+
+    cuvsHnswIndex.dtype(hnsw_index, dtype);
+
+    returnValue = PanamaFFMAPI.cuvsHnswDeserialize(cuvs_res, hnsw_params, file_path, vector_dimension, 0, hnsw_index);
+
+    return hnsw_index;
+  }
+
+  public static void searchHnswIndex(Arena arena, MemorySegment cuvs_resources, MemorySegment hnsw_index,
+      MemorySegment search_params, MemorySegment neighbors_h, MemorySegment distances_h, MemorySegment queries,
+      int topk, int query_dimension, int n_queries) {
+
+    long cuvs_res = cuvs_resources.get(PanamaFFMAPI.cuvsResources_t, 0);
+
+    long queries_shape[] = { n_queries, query_dimension };
+    MemorySegment queries_tensor = prepareTensor(arena, queries, queries_shape, 2, 32, 2, 1);
+
+    long neighbors_shape[] = { n_queries, topk };
+    MemorySegment neighbors_tensor = prepareTensor(arena, neighbors_h, neighbors_shape, 1, 64, 2, 1);
+
+    long distances_shape[] = { n_queries, topk };
+    MemorySegment distances_tensor = prepareTensor(arena, distances_h, distances_shape, 2, 32, 2, 1);
+
+    int returnValue = PanamaFFMAPI.cuvsHnswSearch(cuvs_res, search_params, hnsw_index, queries_tensor, neighbors_tensor,
+        distances_tensor);
+  }
+
+  public static void destroyHnswIndex(MemorySegment hnsw_index) {
+    int returnValue = PanamaFFMAPI.cuvsHnswIndexDestroy(hnsw_index);
+    checkError(returnValue, "cuvsHnswIndexDestroy");
+  }
+
 }

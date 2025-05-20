@@ -86,11 +86,7 @@ public class HnswIndexImpl implements HnswIndex {
    */
   @Override
   public void destroyIndex() throws Throwable {
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment returnValue = localArena.allocate(C_INT);
-      destroyHnswIndexMethodHandle.invokeExact(hnswIndexReference.getMemorySegment(), returnValue);
-      checkError(returnValue.get(C_INT, 0L), "destroyHnswIndexMethodHandle");
-    }
+    CuVSPanamaBridge.destroyHnswIndex(hnswIndexReference.getMemorySegment());
   }
 
   /**
@@ -103,7 +99,7 @@ public class HnswIndexImpl implements HnswIndex {
    */
   @Override
   public SearchResults search(HnswQuery query) throws Throwable {
-    long numQueries = query.getQueryVectors().length;
+    int numQueries = query.getQueryVectors().length;
     long numBlocks = query.getTopK() * numQueries;
     int vectorDimension = numQueries > 0 ? query.getQueryVectors()[0].length : 0;
 
@@ -113,22 +109,19 @@ public class HnswIndexImpl implements HnswIndex {
     MemorySegment distancesMemorySegment = resources.getArena().allocate(distancesSequenceLayout);
     MemorySegment querySeg = Util.buildMemorySegment(resources.getArena(), query.getQueryVectors());
 
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment returnValue = localArena.allocate(C_INT);
-      searchHnswIndexMethodHandle.invokeExact(
+    CuVSPanamaBridge.searchHnswIndex(
+        resources.getArena(),
         resources.getMemorySegment(),
         hnswIndexReference.getMemorySegment(),
         segmentFromSearchParams(query.getHnswSearchParams()),
-        returnValue,
         neighborsMemorySegment,
         distancesMemorySegment,
         querySeg,
         query.getTopK(),
         vectorDimension,
         numQueries
-      );
-      checkError(returnValue.get(C_INT, 0L), "searchHnswIndexMethodHandle");
-    }
+    );
+
     return new HnswSearchResults(neighborsSequenceLayout, distancesSequenceLayout, neighborsMemorySegment,
         distancesMemorySegment, query.getTopK(), query.getMapping(), numQueries);
   }
@@ -166,18 +159,17 @@ public class HnswIndexImpl implements HnswIndex {
       }
 
       MemorySegment pathSeg = Util.buildMemorySegment(resources.getArena(), tmpIndexFile.toString());
-      try (var localArena = Arena.ofConfined()) {
-        MemorySegment returnValue = localArena.allocate(C_INT);
-        MemorySegment deserSeg = (MemorySegment) deserializeHnswIndexMethodHandle.invokeExact(
+
+      MemorySegment deserSeg = CuVSPanamaBridge.deserializeHnswIndex(
+          resources.getArena(),
           resources.getMemorySegment(),
           pathSeg,
           segmentFromIndexParams(hnswIndexParams),
-          returnValue,
           hnswIndexParams.getVectorDimension()
-        );
-        checkError(returnValue.get(C_INT, 0L), "deserializeHnswIndexMethodHandle");
-        return new IndexReference(deserSeg);
-      }
+          );
+
+      return new IndexReference(deserSeg);
+
     } finally {
       Files.deleteIfExists(tmpIndexFile);
     }
