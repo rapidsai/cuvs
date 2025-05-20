@@ -142,7 +142,7 @@ __global__ void naive_l2_nn(outT* out, DataT* A, DataT* B, size_t M, size_t N, s
     timer.stop();
     CHECK_CUDA(cudaStreamSynchronize(stream));
     if constexpr (algo == AlgorithmType::gemm) {
-      neo_reduce_min<OutT, DataT, IdxT>(out.data_handle(),
+      reduce_min<OutT, DataT, IdxT>(out.data_handle(),
                                     workspace_blas,
                                     x_norm.data_handle(),
                                     y_norm.data_handle(),
