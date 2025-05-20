@@ -96,15 +96,7 @@ __global__ void naive_l2_nn(outT* out, DataT* A, DataT* B, size_t M, size_t N, s
 
     float* workspace_blas;
 
-    OutT* workspace_blas2;
-
     CHECK_CUDA(cudaMalloc(&workspace_blas, ws_size));
-
-    const int TPB = 128;
-    const IdxT N_TILE = 2*TPB;
-    IdxT num_n_tiles = (n + N_TILE - 1) / N_TILE;
-    size_t ws2_size = m * num_n_tiles * sizeof(OutT); 
-    CHECK_CUDA(cudaMalloc(&workspace_blas2, ws2_size));
 
     //const DataT alpha = 1.0f;
     //const DataT beta = 0.0f;
@@ -140,21 +132,16 @@ __global__ void naive_l2_nn(outT* out, DataT* A, DataT* B, size_t M, size_t N, s
       }
       if constexpr (algo == AlgorithmType::gemm_reduce) {
         cublas_l2nn<OutT, DataT, IdxT, false>(out.data_handle(), x.data_handle(),
-          y.data_handle(), m, n, k, x_norm.data_handle(), y_norm.data_handle(), workspace_blas, ws_size, workspace_blas2, cublas_handle, stream);
+          y.data_handle(), m, n, k, x_norm.data_handle(), y_norm.data_handle(), workspace_blas, ws_size, cublas_handle, stream);
       }
       if constexpr (algo == AlgorithmType::gemm) {
         cublas_l2nn<OutT, DataT, IdxT, true>(out.data_handle(), x.data_handle(),
-          y.data_handle(), m, n, k, x_norm.data_handle(), y_norm.data_handle(), workspace_blas, ws_size, workspace_blas2, cublas_handle, stream);
+          y.data_handle(), m, n, k, x_norm.data_handle(), y_norm.data_handle(), workspace_blas, ws_size, cublas_handle, stream);
       }
     }
     timer.stop();
     CHECK_CUDA(cudaStreamSynchronize(stream));
     if constexpr (algo == AlgorithmType::gemm) {
-      /*reduce_min<OutT, DataT, IdxT>(out.data_handle(),
-                                    workspace_blas,
-                                    x_norm.data_handle(),
-                                    y_norm.data_handle(),
-                                    m, n, workspace_blas2, stream);*/
       neo_reduce_min<OutT, DataT, IdxT>(out.data_handle(),
                                     workspace_blas,
                                     x_norm.data_handle(),
