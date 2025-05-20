@@ -57,7 +57,7 @@ class faiss_cpu : public algo<T> {
   struct search_param : public search_param_base {
     int nprobe;
     float refine_ratio = 1.0;
-    int num_threads    = omp_get_num_procs();
+    int num_threads    = omp_get_max_threads();
     /**
      * parallel_mode determines how queries are parallelized with OpenMP.
      *
