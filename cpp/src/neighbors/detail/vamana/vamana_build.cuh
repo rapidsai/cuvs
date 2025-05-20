@@ -455,7 +455,6 @@ index<T, IdxT> build(
     int dim_per_subspace = dim / pq_dim;
     auto pq_codebook =
       raft::make_device_matrix<float, uint32_t>(res, pq_codebook_size * pq_dim, dim_per_subspace);
-    raft::resource::sync_stream(res);
     auto pq_encoding_table_device_vec_view = pq_encoding_table_device_vec.view();
     raft::linalg::map_offset(
       res,
@@ -500,7 +499,7 @@ index<T, IdxT> build(
            dim,
            max_batch_size,
            raft::resource::get_cuda_stream(res),
-           rmm::mr::get_current_device_resource())) {
+           raft::resource::get_workspace_resource(res))) {
       // convert dataset to float
       auto dataset_float = raft::make_device_matrix<float, int64_t>(res, batch.size(), dim);
       auto dataset_view  = raft::make_device_matrix_view(
