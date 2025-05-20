@@ -126,7 +126,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
                         .build());
 
         if (sharedPrefilter != null) {
-          queryBuilder.withPrefilters(new BitSet[] { sharedPrefilter }, datasetSize);
+          queryBuilder.withPrefilters(sharedPrefilter, datasetSize);
         }
 
         CagraQuery query = queryBuilder.build();

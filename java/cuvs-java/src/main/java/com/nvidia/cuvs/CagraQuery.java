@@ -32,7 +32,7 @@ public class CagraQuery {
   private List<Integer> mapping;
   private float[][] queryVectors;
   private int topK;
-  private BitSet[] prefilters;
+  private BitSet prefilters;
   private int numDocs;
 
   /**
@@ -48,7 +48,7 @@ public class CagraQuery {
    * @param numDocs               Maximum of bits in each prefilter, representing number of documents in this index.
    *                              Used only when prefilter(s) is/are passed.
    */
-  public CagraQuery(CagraSearchParams cagraSearchParameters, float[][] queryVectors, List<Integer> mapping, int topK, BitSet[] prefilters, int numDocs) {
+  public CagraQuery(CagraSearchParams cagraSearchParameters, float[][] queryVectors, List<Integer> mapping, int topK, BitSet prefilters, int numDocs) {
     super();
     this.cagraSearchParameters = cagraSearchParameters;
     this.queryVectors = queryVectors;
@@ -95,11 +95,11 @@ public class CagraQuery {
   }
 
   /**
-   * Gets the prefilter BitSet array.
+   * Gets the prefilter BitSet.
    *
-   * @return an array of BitSet objects representing the prefilters
+   * @return a BitSet object representing the prefilters
    */
-  public BitSet[] getPrefilters() {
+  public BitSet getPrefilters() {
     return prefilters;
   }
 
@@ -127,7 +127,7 @@ public class CagraQuery {
     private float[][] queryVectors;
     private List<Integer> mapping;
     private int topK = 2;
-    private BitSet[] prefilters;
+    private BitSet prefilters;
     private int numDocs;
 
     /**
@@ -191,7 +191,7 @@ public class CagraQuery {
      * @param numDocs total number of vectors in the dataset (for alignment)
      * @return this {@link Builder} instance
      */
-    public Builder withPrefilters(BitSet[] prefilters, int numDocs) {
+    public Builder withPrefilters(BitSet prefilters, int numDocs) {
       this.prefilters = prefilters;
       this.numDocs = numDocs;
       return this;
