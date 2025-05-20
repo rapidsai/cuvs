@@ -182,11 +182,14 @@ public class CagraQuery {
     }
 
     /**
-     * Sets the prefilters data for building the {@link CagraQuery}.
+     * Sets a global prefilter for all queries in this {@link CagraQuery}.
+     * The {@code prefilters} array must contain exactly one {@link BitSet},
+     * which is applied to all queries. A bit value of {@code 1} includes the
+     * corresponding dataset vector; {@code 0} excludes it.
      *
-     * @param prefilters array of bitsets, as many as queries, each containing as
-     *        many bits as there are vectors in the index
-     * @return an instance of this Builder
+     * @param prefilters a single-element array with the global filter BitSet
+     * @param numDocs total number of vectors in the dataset (for alignment)
+     * @return this {@link Builder} instance
      */
     public Builder withPrefilters(BitSet[] prefilters, int numDocs) {
       this.prefilters = prefilters;
