@@ -104,7 +104,7 @@ public class CagraQuery {
   }
 
   /**
-   * Gets the number of documents supposed to be in this index, as used for prefilters
+   * Gets the number of documents in this index, as used for prefilters
    *
    * @return number of documents as an integer
    */
