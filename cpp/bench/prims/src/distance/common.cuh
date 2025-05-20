@@ -317,8 +317,7 @@ __global__ void vector_compare_kernel(const DataT* a, const DataT* b, IdxT n, do
       //printf("Expected = %f vs actual = %f\n", a[tid], b[tid]);
     } else {
       diff = abs(a[tid].value - b[tid].value);
-      //if (tid == 0) printf("Expected = %f vs actual = %f\n", a[tid].value, b[tid].value);
-      //if (tid == 0) printf("Expected = %d vs actual = %d\n", a[tid].key, b[tid].key);
+      //if (tid == 1) printf("Expected = %f vs actual = %f, %d, %d\n", a[tid].value, b[tid].value, a[tid].key, b[tid].key);
     }
     if (diff > tolerance) {
       // Acquire mutex lock using atomic compare-and-swap
@@ -381,7 +380,7 @@ void vector_compare(const DataT* a, const DataT* b, const IdxT n, double toleran
     std::cout << "First failure at index " << global_failure->first_index
               << " with difference " << global_failure->diff << std::endl;
   } else {
-    std::cout << "Vector comparison passed: all values within tolerance " << tolerance << std::endl;
+    //std::cout << "Vector comparison passed: all values within tolerance " << tolerance << std::endl;
   }
 
   CHECK_CUDA(cudaFree(global_failure));

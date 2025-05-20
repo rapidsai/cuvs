@@ -27,14 +27,9 @@ struct Reducer {
 template <typename OutT, typename DataT, typename IdxT, int TPB>
 __global__ void neo_reduce_min_kernel(OutT* out, const DataT* z, const DataT* x_norm, const DataT* y_norm, IdxT m, IdxT n) {
   IdxT tid = threadIdx.x + blockIdx.x * blockDim.x;
-  //IdxT row = tid;
   IdxT row = blockIdx.x;
 
-  //if (tid >= m) return;
-  // Each thread calculates one distance and then we reduce across threads using therads
   DataT x_norm_row = x_norm[row];
-
-  //__shared__ DataT y_norm_sh[TPB];
 
   raft::KeyValuePair<IdxT, DataT> thread_min;
 
@@ -42,22 +37,11 @@ __global__ void neo_reduce_min_kernel(OutT* out, const DataT* z, const DataT* x_
   thread_min.key= max_val<IdxT>();
 
   for (IdxT col = threadIdx.x; col < n; col+=TPB) {
-    /*if (col * TPB + threadIdx.x < n) {
-      y_norm_sh[threadIdx.x] = y_norm[col * TPB + threadIdx.x];
-    }*/
-    //__syncthreads();
-    //for (IdxT c = 0; c < TPB; c++) {
-      //if (col * TPB + c >= n) break;
-      //auto dist = x_norm_row + y_norm_sh[c] - 2*z[row*n + col*TPB + c];
       auto dist = x_norm_row + y_norm[col] - 2*z[row*n + col];
       if (dist < thread_min.value) {
         thread_min.value = dist;
-        //thread_min.key = col*TPB + c;
         thread_min.key = col;
       }
-    //}
-    //__syncthreads();
-
   }
   typedef cub::BlockReduce<OutT, TPB> BlockReduceT;
   __shared__ typename BlockReduceT::TempStorage temp_storage;
@@ -65,18 +49,11 @@ __global__ void neo_reduce_min_kernel(OutT* out, const DataT* z, const DataT* x_
 
   if (threadIdx.x == 0) {
     out[row] = block_result;
-    /*if constexpr(std::is_floating_point<OutT>::value) {
-      //out[row] = thread_min.value;
-      out[row] = thread_min.value;
-    } else {
-      //out[row] = thread_min;
-      out[row] = blokc_result;
-    }*/
   }
 }
 
 template <typename OutT, typename DataT, typename IdxT, int TPB, int M_TILE, int N_TILE>
-__global__ void reduce_min_kernel1(OutT* out, const DataT* z, const DataT* x_norm, const DataT* y_norm, IdxT m, IdxT n, IdxT num_n_tiles) {
+__global__ void reduce_min_kernel1(OutT* interim_out, const DataT* z, const DataT* x_norm, const DataT* y_norm, IdxT m, IdxT n, IdxT num_n_tiles) {
 
   // This block reduces rows from M_TILE * blockIdx.x to M_TILE * (blockIdx.x + 1)
   // and cols from N_TILE * blockIdx.y to N_TILE * (blockIdx.y + 1)
@@ -87,10 +64,9 @@ __global__ void reduce_min_kernel1(OutT* out, const DataT* z, const DataT* x_nor
   typedef cub::BlockReduce<OutT, TPB> BlockReduceT;
   raft::KeyValuePair<IdxT, DataT> thread_min;
 
-  thread_min.value = max_val<DataT>();
-  thread_min.key= max_val<IdxT>();
 
   constexpr int num_elems = 16/sizeof(DataT);
+  //constexpr int num_elems = 1;
 
   union access {
     float4 f4;
@@ -113,16 +89,23 @@ __global__ void reduce_min_kernel1(OutT* out, const DataT* z, const DataT* x_nor
 
   const float4* z_as_f4 = reinterpret_cast<const float4*>(z);
   for (IdxT row = first_row; row <= last_row; row++) {
+    thread_min.value = max_val<DataT>();
+    thread_min.key= max_val<IdxT>();
     if (row >= m) break;
     for (IdxT col = first_col + num_elems*threadIdx.x; col <= last_col; col+=num_elems*blockDim.x) {
       access z_r;
-      z_r.f4 = z_as_f4[row * n/num_elems + col / num_elems];
+      z_r.f4 = z_as_f4[(row * n + col) / num_elems];
       for (int c = 0; c < num_elems; c++) {
         if (c + col >= n) break;
         auto dist = x_norm[row] + y_norm_sh[c + col - first_col] - 2 * z_r.dt[c];
+        //auto dist = x_norm[row] + y_norm[c + col] - 2 * z[row * n + c + col];
+        /*if (row == 1 &&  ((c+col) == 2612 || (c+col) == 7754)) {
+          printf("%f %f\n", z[row * n + c + col], z_r.dt[c]);
+          printf("%d -> %f\n", c+col, dist);
+        }*/
         if (dist < thread_min.value) {
           thread_min.value = dist;
-          thread_min.key = col;
+          thread_min.key = c+col;
         }
       }
     }
@@ -132,9 +115,9 @@ __global__ void reduce_min_kernel1(OutT* out, const DataT* z, const DataT* x_nor
     auto block_result = BlockReduceT(temp_storage).Reduce(thread_min, Reducer<DataT, IdxT>{});
     if (threadIdx.x == 0) {
       if constexpr (std::is_floating_point<OutT>::value) {
-        out[row*num_n_tiles + blockIdx.y] = block_result.value;
+        interim_out[row*num_n_tiles + blockIdx.y] = block_result.value;
       } else {
-        out[row*num_n_tiles + blockIdx.y] = block_result;
+        interim_out[row*num_n_tiles + blockIdx.y] = block_result;
       }
     }
     __syncthreads();
@@ -162,21 +145,20 @@ __global__ void reduce_min_kernel2(OutT* out, const OutT* in, IdxT m, IdxT num_n
   __shared__ typename BlockReduceT::TempStorage temp_storage;
   auto block_result = BlockReduceT(temp_storage).Reduce(thread_min, Reducer<DataT, IdxT>{});
   if (threadIdx.x == 0) {
+    //if (row == 1) printf("## %d, %f, %d\n", row, block_result.value, block_result.key);
     out[row] = block_result;
   }
 }
 
 
 template <typename OutT, typename DataT, typename IdxT>
-void reduce_min(OutT* out, const DataT* z, const DataT* x_norm, const DataT* y_norm, IdxT m, IdxT n, OutT* workspace, cudaStream_t stream) {
+void reduce_min(OutT* out, const DataT* z, const DataT* x_norm, const DataT* y_norm, IdxT m, IdxT n, OutT* interim_out, cudaStream_t stream) {
   const int TPB = 128;
   const IdxT M_TILE = 128;
   const IdxT N_TILE = 2*TPB;
 
   IdxT num_m_tiles = (m + M_TILE - 1) / M_TILE;
   IdxT num_n_tiles = (n + N_TILE - 1) / N_TILE;
-  OutT* interim_out;
-  interim_out = workspace;
   dim3 blocks(num_m_tiles, num_n_tiles);
   //printf("Launching %d %d tiles\n", num_m_tiles, num_n_tiles);
   reduce_min_kernel1<OutT, DataT, IdxT, TPB, M_TILE, N_TILE><<<blocks, TPB, 0, stream>>>
@@ -191,13 +173,13 @@ void neo_reduce_min(OutT* out, const DataT* z, const DataT* x_norm, const DataT*
   const int TPB = 128;
 
   int blocks = m;
-
   neo_reduce_min_kernel<OutT, DataT, IdxT, TPB><<<blocks, TPB, 0, stream>>>(out, z, x_norm, y_norm, m, n);
+  CHECK_CUDA(cudaDeviceSynchronize());
 }
 template <typename OutT, typename DataT, typename IdxT, bool GEMM_ONLY>
 void cublas_l2nn(OutT* out, const DataT* x, const DataT* y, IdxT M, IdxT N, IdxT K,
                  DataT* x_norm, DataT* y_norm,
-                 DataT* workspace, size_t ws_size, OutT* workspace2, cublasHandle_t& handle, cudaStream_t stream) {
+                 DataT* z, size_t ws_size, OutT* interim_out, cublasHandle_t& handle, cudaStream_t stream) {
   // Set up scaling factors
   const DataT alpha = 1.0f;
   const DataT beta = 0.0f;
@@ -214,7 +196,7 @@ void cublas_l2nn(OutT* out, const DataT* x, const DataT* y, IdxT M, IdxT N, IdxT
       y, K,                      // B and its leading dimension
       x, K,                      // A and its leading dimension
       &beta,                     // beta
-      workspace, N               // C and its leading dimension
+      z, N                       // C and its leading dimension
     ));
   } else if constexpr (std::is_same_v<DataT, double>) {
     CHECK_CUBLAS(cublasDgemm(
@@ -225,13 +207,13 @@ void cublas_l2nn(OutT* out, const DataT* x, const DataT* y, IdxT M, IdxT N, IdxT
       y, K,                      // B and its leading dimension
       x, K,                      // A and its leading dimension
       &beta,                     // beta
-      workspace, N               // C and its leading dimension
+      z, N                       // C and its leading dimension
     ));
   }
 
   if constexpr(!GEMM_ONLY) {
-    //reduce_min<OutT, DataT, IdxT>(out, workspace, x_norm, y_norm, M, N, workspace2, stream);
-    neo_reduce_min<OutT, DataT, IdxT>(out, workspace, x_norm, y_norm, M, N, stream);
+    //reduce_min<OutT, DataT, IdxT>(out, z, x_norm, y_norm, M, N, interim_out, stream);
+    neo_reduce_min<OutT, DataT, IdxT>(out, z, x_norm, y_norm, M, N, stream);
   }
 }
 

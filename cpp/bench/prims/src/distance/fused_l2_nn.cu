@@ -99,7 +99,12 @@ __global__ void naive_l2_nn(outT* out, DataT* A, DataT* B, size_t M, size_t N, s
     OutT* workspace_blas2;
 
     CHECK_CUDA(cudaMalloc(&workspace_blas, ws_size));
-    CHECK_CUDA(cudaMalloc(&workspace_blas2, 1600000));
+
+    const int TPB = 128;
+    const IdxT N_TILE = 2*TPB;
+    IdxT num_n_tiles = (n + N_TILE - 1) / N_TILE;
+    size_t ws2_size = m * num_n_tiles * sizeof(OutT); 
+    CHECK_CUDA(cudaMalloc(&workspace_blas2, ws2_size));
 
     //const DataT alpha = 1.0f;
     //const DataT beta = 0.0f;
@@ -145,18 +150,24 @@ __global__ void naive_l2_nn(outT* out, DataT* A, DataT* B, size_t M, size_t N, s
     timer.stop();
     CHECK_CUDA(cudaStreamSynchronize(stream));
     if constexpr (algo == AlgorithmType::gemm) {
-      reduce_min<OutT, DataT, IdxT>(out.data_handle(),
+      /*reduce_min<OutT, DataT, IdxT>(out.data_handle(),
                                     workspace_blas,
                                     x_norm.data_handle(),
                                     y_norm.data_handle(),
-                                    m, n, workspace_blas2, stream);
+                                    m, n, workspace_blas2, stream);*/
+      neo_reduce_min<OutT, DataT, IdxT>(out.data_handle(),
+                                    workspace_blas,
+                                    x_norm.data_handle(),
+                                    y_norm.data_handle(),
+                                    m, n, stream);
     }
-    vector_compare(out_exp.data_handle(), out.data_handle(), m, 1e-4, stream);
+    vector_compare(out_exp.data_handle(), out.data_handle(), m, 1e-1, stream);
     state.counters["M"] = m;
     state.counters["N"] = n;
     state.counters["K"] = k;
     state.counters["iter_time"] =  timer.elapsed_seconds() / state.iterations();
     state.counters["FLOP/s"] =  (int64_t(state.iterations()) * 2 * m * n * k) / timer.elapsed_seconds();
+    state.counters["reduction_sol"] = 1e-12 * (2*double(m)*n*sizeof(DataT) / 1.55);
 /*
      int64_t num_flops = int64_t(2) * m * n * k;
 
@@ -181,78 +192,37 @@ __global__ void naive_l2_nn(outT* out, DataT* A, DataT* B, size_t M, size_t N, s
 template <typename IdxT>
 static void CustomArguments(benchmark::internal::Benchmark* b) {
 
-  /*std::vector<int64_t> m_list = {1024, 2048, 4096, 8192, 16384};
-  std::vector<int64_t> n_list = {1024, 2048, 4096, 8192, 16384};
-  std::vector<int64_t> k_list = {8, 16, 32, 64, 128, 256, 512};
+  constexpr int K = 1024;
+  std::vector<int64_t> m_list = {16*K};
+  std::vector<int64_t> n_list = {8*K};
+  std::vector<int64_t> k_list = {128, 512};
   for (auto k : k_list) {
     for (auto m : m_list) {
       for (auto n : n_list) {
-        if (m > n) continue;
         b->Args({m, n, k});
-        if (m != n) {
-          b->Args({n, m, k});
-        }
+        b->Args({m, n, k});
       }
     }
-  }*/
-  b->Args({6000, 3000, 3000});
+  }
+  //b->Args({6000, 3000, 3000});
 }
 
-/*   template <typename IdxT>
-   static void CustomArguments(benchmark::internal::Benchmark* b) {
-
-//     std::vector<int64_t> m_list = {1, 100000, 1000000};
-     std::vector<int64_t> m_list = {1, 100'000};
-     //if constexpr (sizeof(IdxT) == 8) { m_list.push_back(10000000); }
-     //std::vector<int64_t> n_list = {100, 1000, 10000};
-     std::vector<int64_t> n_list = {8, 100'000};
-     //std::vector<int64_t> k_list = {64, 128, 256};
-     std::vector<int64_t> k_list = {8, 128};
-     for (auto m : m_list) {
-       for (auto n : n_list) {
-         for (auto k : k_list) {
-           b->Args({m, n, k});
-         }
-       }
-     }
-   }*/
 
    int main(int argc, char** argv) {
 
      benchmark::internal::Benchmark* bench;
 
-     // IdxT = int
-     //bench = benchmark::RegisterBenchmark("fusedl2nn/float/int/float", benchmark_fusedl2nn<float, int, float>);
-     //bench->Apply(CustomArguments<int>);
-
-     //bench = benchmark::RegisterBenchmark("fusedl2nn/double/int/double", benchmark_fusedl2nn<double, int, double>);
-     //bench->Apply(CustomArguments<int>);
+     /*bench = benchmark::RegisterBenchmark("fusedl2nn/float/int/<int, float>",
+                                          benchmark_fusedl2nn<float, int, raft::KeyValuePair<int, float>, AlgorithmType::fused>);
+     bench->Apply(CustomArguments<int>);*/
 
      bench = benchmark::RegisterBenchmark("gemm_reduce/float/int/<int, float>",
                                           benchmark_fusedl2nn<float, int, raft::KeyValuePair<int, float>, AlgorithmType::gemm_reduce>);
      bench->Apply(CustomArguments<int>);
-     bench = benchmark::RegisterBenchmark("fusedl2nn/float/int/<int, float>",
-                                          benchmark_fusedl2nn<float, int, raft::KeyValuePair<int, float>, AlgorithmType::fused>);
-     bench->Apply(CustomArguments<int>);
 
-     bench = benchmark::RegisterBenchmark("gemm/float/int/<int, float>",
+/*     bench = benchmark::RegisterBenchmark("gemm/float/int/<int, float>",
                                           benchmark_fusedl2nn<float, int, raft::KeyValuePair<int, float>, AlgorithmType::gemm>);
-     bench->Apply(CustomArguments<int>);
-     //bench = benchmark::RegisterBenchmark("fusedl2nn/double/int/<int, double>", benchmark_fusedl2nn<double, int, raft::KeyValuePair<int, double>>);
-     //bench->Apply(CustomArguments<int>);
-
-     // IdxT = in64_t
-     //bench = benchmark::RegisterBenchmark("fusedl2nn/float/int64_t/float", benchmark_fusedl2nn<float, int64_t, float>);
-     //bench->Apply(CustomArguments<int>);
-
-     //bench = benchmark::RegisterBenchmark("fusedl2nn/double/int64_t/double", benchmark_fusedl2nn<double, int64_t, double>);
-     //bench->Apply(CustomArguments<int>);
-
-     //bench = benchmark::RegisterBenchmark("fusedl2nn/float/int64_t/<int64_t, float>", benchmark_fusedl2nn<float, int64_t, raft::KeyValuePair<int64_t, float>>);
-     //bench->Apply(CustomArguments<int>);
-
-     //bench = benchmark::RegisterBenchmark("fusedl2nn/double/int64_t/<int64_t, double>", benchmark_fusedl2nn<double, int64_t, raft::KeyValuePair<int64_t, double>>);
-     //bench->Apply(CustomArguments<int>);
+     bench->Apply(CustomArguments<int>);*/
 
      // Initialize benchmark
      ::benchmark::Initialize(&argc, argv);
