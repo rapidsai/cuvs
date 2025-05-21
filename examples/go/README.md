@@ -7,7 +7,7 @@ This package provides Go bindings for the cuVS (CUDA Vector Search) library.
 The required dependencies can be installed with a simple command (which creates your build environment):
 
 ```bash
-conda env create --name go -f conda/environments/go_cuda-129_arch-x86_64.yaml
+conda env create --name go -f conda/environments/go_cuda-128_arch-x86_64.yaml
 conda activate go
 ```
 You may prefer to use `mamba`, as it provides significant speedup over `conda`.

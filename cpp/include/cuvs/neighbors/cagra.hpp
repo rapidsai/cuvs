@@ -18,6 +18,7 @@
 
 #include "common.hpp"
 #include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/common.h>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
@@ -120,6 +121,7 @@ struct index_params : cuvs::neighbors::index_params {
    * Whether to use MST optimization to guarantee graph connectivity.
    */
   bool guarantee_connectivity = false;
+
   /**
    * Whether to add the dataset content to the index, i.e.:
    *
@@ -276,20 +278,9 @@ struct extend_params {
 /**
  * @brief Determines the strategy for merging CAGRA graphs.
  *
- * @note Currently, only the PHYSICAL strategy is supported.
+ * @note Currently, only the MERGE_STRATEGY_PHYSICAL strategy is supported.
  */
-enum MergeStrategy {
-  /**
-   * @brief Physical merge: Builds a new CAGRA graph from the union of dataset points
-   * in existing CAGRA graphs.
-   *
-   * This is expensive to build but does not impact search latency or quality.
-   * Preferred for many smaller CAGRA graphs.
-   *
-   * @note Currently, this is the only supported strategy.
-   */
-  PHYSICAL
-};
+using MergeStrategy = cuvsMergeStrategy;
 
 /**
  * @brief Parameters for merging CAGRA indexes.
@@ -306,8 +297,8 @@ struct merge_params {
   /// Parameters for creating the output index.
   cagra::index_params output_index_params;
 
-  /// Strategy for merging. Defaults to `MergeStrategy::PHYSICAL`.
-  MergeStrategy strategy = MergeStrategy::PHYSICAL;
+  /// Strategy for merging. Defaults to `MergeStrategy::MERGE_STRATEGY_PHYSICAL`.
+  MergeStrategy strategy = MergeStrategy::MERGE_STRATEGY_PHYSICAL;
 };
 
 /**
