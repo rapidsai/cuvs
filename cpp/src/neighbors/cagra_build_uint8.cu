@@ -23,7 +23,7 @@ namespace cuvs::neighbors::cagra {
   auto build(raft::resources const& handle,                                       \
              const cuvs::neighbors::cagra::index_params& params,                  \
              raft::device_matrix_view<const T, int64_t, raft::row_major> dataset) \
-    ->cuvs::neighbors::cagra::index<T, IdxT>                                      \
+    -> cuvs::neighbors::cagra::index<T, IdxT>                                     \
   {                                                                               \
     return cuvs::neighbors::cagra::build<T, IdxT>(handle, params, dataset);       \
   }                                                                               \
@@ -31,7 +31,7 @@ namespace cuvs::neighbors::cagra {
   auto build(raft::resources const& handle,                                       \
              const cuvs::neighbors::cagra::index_params& params,                  \
              raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)   \
-    ->cuvs::neighbors::cagra::index<T, IdxT>                                      \
+    -> cuvs::neighbors::cagra::index<T, IdxT>                                     \
   {                                                                               \
     return cuvs::neighbors::cagra::build<T, IdxT>(handle, params, dataset);       \
   }
