@@ -306,6 +306,14 @@ extern "C" cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int* dim)
   });
 }
 
+extern "C" cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int* size)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index->addr);
+    *size          = index_ptr->dataset().extent(0);
+  });
+}
+
 extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                                       cuvsCagraIndexParams_t params,
                                       DLManagedTensor* dataset_tensor,

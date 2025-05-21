@@ -20,7 +20,6 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
-import static com.nvidia.cuvs.internal.common.Util.checkError;
 import static java.lang.foreign.ValueLayout.ADDRESS;
 
 import java.io.FileInputStream;
@@ -47,7 +46,6 @@ import com.nvidia.cuvs.CagraSearchParams;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.SearchResults;
 import com.nvidia.cuvs.internal.common.Util;
-import com.nvidia.cuvs.internal.panama.PanamaFFMAPI;
 import com.nvidia.cuvs.internal.panama.cuvsCagraCompressionParams;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndex;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndexParams;
@@ -444,6 +442,24 @@ public class CagraIndexImpl implements CagraIndex {
       throw new IllegalArgumentException("Unsupported " + cuvsResources);
     }
     return new CagraIndexImpl.Builder((CuVSResourcesImpl)cuvsResources);
+  }
+
+  /**
+   * Gets the CAGRA index dimensions
+   *
+   * @return the CAGRA index dimensions
+   */
+  public int getIndexDimensions() {
+      return CuVSPanamaBridge.getDimensionsCagraDims(cagraIndexReference.getMemorySegment());
+  }
+
+  /**
+   * Gets the CAGRA index size
+   *
+   * @return the CAGRA index size
+   */
+  public int getIndexSize() {
+    return CuVSPanamaBridge.getDimensionsCagraSize(cagraIndexReference.getMemorySegment());
   }
 
   /**

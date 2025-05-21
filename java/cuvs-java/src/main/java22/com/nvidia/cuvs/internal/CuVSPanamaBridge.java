@@ -527,4 +527,28 @@ public class CuVSPanamaBridge {
       return gpuInfoArr;
     }
   }
+
+  /**
+   * @brief A function to get the CAGRA index dimensions
+   */
+  public static int getDimensionsCagraDims(MemorySegment index) {
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment dims = localArena.allocate(LinkerHelper.C_INT);
+      var returnValue = PanamaFFMAPI.cuvsCagraIndexGetDims(index, dims);
+      checkError(returnValue, "cuvsCagraIndexGetDims");
+      return dims.get(LinkerHelper.C_INT, 0);
+    }
+  }
+
+  /**
+   * @brief A function to get the CAGRA index size
+   */
+  public static int getDimensionsCagraSize(MemorySegment index) {
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment dims = localArena.allocate(LinkerHelper.C_INT);
+      var returnValue = PanamaFFMAPI.cuvsCagraIndexGetSize(index, dims);
+      checkError(returnValue, "cuvsCagraIndexGetSize");
+      return dims.get(LinkerHelper.C_INT, 0);
+    }
+  }
 }
