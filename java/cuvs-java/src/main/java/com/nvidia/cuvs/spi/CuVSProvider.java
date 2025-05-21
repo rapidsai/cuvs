@@ -20,6 +20,7 @@ import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.HnswIndex;
+import com.nvidia.cuvs.CagraMergeParams;
 
 import java.nio.file.Path;
 
@@ -70,6 +71,19 @@ public interface CuVSProvider {
    * @throws Throwable if an error occurs during the merge operation
    */
   CagraIndex mergeCagraIndexes(CagraIndex[] indexes) throws Throwable;
+
+  /**
+   * Merges multiple CAGRA indexes into a single index with the specified merge parameters.
+   * 
+   * @param indexes Array of CAGRA indexes to merge
+   * @param mergeParams Parameters to control the merge operation, or null to use defaults
+   * @return A new merged CAGRA index
+   * @throws Throwable if an error occurs during the merge operation
+   */
+  default CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraMergeParams mergeParams) throws Throwable {
+    // Default implementation falls back to the method without parameters
+    return mergeCagraIndexes(indexes);
+  }
 
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {
