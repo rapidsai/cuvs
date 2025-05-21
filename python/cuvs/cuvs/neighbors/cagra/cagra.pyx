@@ -51,6 +51,7 @@ from cuvs.common.exceptions import check_cuvs
 from cuvs.neighbors import ivf_pq
 from cuvs.neighbors.filters import no_filter
 
+
 cdef class CompressionParams:
     """
     Parameters for VPQ Compression
@@ -189,9 +190,9 @@ cdef class IndexParams:
                  build_algo="ivf_pq",
                  nn_descent_niter=20,
                  compression=None,
-                 ivf_pq_build_params: ivf_pq.IndexParams=None,
-                 ivf_pq_search_params: ivf_pq.SearchParams=None,
-                 refinement_rate: float=1.0):
+                 ivf_pq_build_params: ivf_pq.IndexParams = None,
+                 ivf_pq_search_params: ivf_pq.SearchParams = None,
+                 refinement_rate: float = 1.0):
 
         self._metric = metric
         self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
@@ -216,10 +217,14 @@ cdef class IndexParams:
             if ivf_pq_build_params.metric != self.metric:
                 raise ValueError("Metric mismatch with IVF-PQ build params")
             self.ivf_pq_build_params = ivf_pq_build_params
-            self.params.graph_build_params.ivf_pq_build_params = <cuvsIvfPqIndexParams_t><size_t>ivf_pq_build_params.get_handle()
+            self.params.graph_build_params.ivf_pq_build_params = \
+                <cuvsIvfPqIndexParams_t><size_t> \
+                ivf_pq_build_params.get_handle()
         if ivf_pq_search_params is not None:
             self.ivf_pq_search_params = ivf_pq_search_params
-            self.params.graph_build_params.ivf_pq_search_params = <cuvsIvfPqSearchParams_t><size_t>ivf_pq_search_params.get_handle()
+            self.params.graph_build_params.ivf_pq_search_params = \
+                <cuvsIvfPqSearchParams_t><size_t> \
+                ivf_pq_search_params.get_handle()
         self.params.graph_build_params.refinement_rate = refinement_rate
 
     @property

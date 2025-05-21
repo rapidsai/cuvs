@@ -197,6 +197,7 @@ def test_cagra_vpq_compression():
         n_cols=dim, compression=cagra.CompressionParams(pq_dim=dim / pq_len)
     )
 
+
 @pytest.mark.parametrize("internal_dtype", [np.float32, np.float16, np.uint8])
 def test_cagra_ivf_pq(
     internal_dtype,
@@ -227,20 +228,21 @@ def test_cagra_ivf_pq(
         build_algo=build_algo,
         ivf_pq_build_params=ivf_pq_params_build,
         ivf_pq_search_params=ivf_pq_params_search,
-        refinement_rate=1.2
+        refinement_rate=1.2,
     )
-    cudadtype_to_np = {
-        np.float32: 0,
-        np.float16: 2,
-        np.int8: 3,
-        np.uint8: 8
-    }
+    cudadtype_to_np = {np.float32: 0, np.float16: 2, np.int8: 3, np.uint8: 8}
 
-    assert build_params.ivf_pq_search_params.lut_dtype == cudadtype_to_np[internal_dtype]
-    assert build_params.ivf_pq_search_params.coarse_search_dtype == cudadtype_to_np[np.int8]
+    assert (
+        build_params.ivf_pq_search_params.lut_dtype
+        == cudadtype_to_np[internal_dtype]
+    )
+    assert (
+        build_params.ivf_pq_search_params.coarse_search_dtype
+        == cudadtype_to_np[np.int8]
+    )
     assert np.isclose(build_params.refinement_rate, 1.2)
     index = cagra.build(build_params, dataset_device)
-    
+
     queries = generate_data((n_queries, n_cols), dtype)
     queries_device = device_ndarray(queries)
     out_idx = np.zeros((n_queries, k), dtype=np.uint32)
@@ -258,12 +260,12 @@ def test_cagra_ivf_pq(
     )
     out_idx = out_idx_device.copy_to_host()
 
-    skl_idx = NearestNeighbors(
-        n_neighbors=k,
-        algorithm="brute",
-        metric="cosine"
-    ).fit(dataset).kneighbors(queries, return_distance=False)
+    skl_idx = (
+        NearestNeighbors(n_neighbors=k, algorithm="brute", metric="cosine")
+        .fit(dataset)
+        .kneighbors(queries, return_distance=False)
+    )
 
     recall = calc_recall(out_idx, skl_idx)
-    
+
     assert recall > 0.9
