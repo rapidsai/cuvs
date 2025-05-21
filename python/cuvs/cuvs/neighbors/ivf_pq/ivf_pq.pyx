@@ -365,13 +365,15 @@ cdef class SearchParams:
         Storage data type for distance/similarity computation.
         Possible values [np.float32, np.float16]
     coarse_search_dtype: default = np.float32
-        [Experimental] The data type to use as the GEMM element type when searching the clusters to
-        probe. Possible values: [np.float32, np.float16, np.int8].
+        [Experimental] The data type to use as the GEMM element type when
+        searching the clusters to probe.
+        Possible values: [np.float32, np.float16, np.int8].
         - Legacy default: np.float32
         - Recommended for performance: np.float16 (half)
         - Experimental/low-precision: np.int8
     max_internal_batch_size: default = 4096
-        Set the internal batch size to improve GPU utilization at the cost of larger memory footprint.
+        Set the internal batch size to improve GPU utilization at the cost
+        of larger memory footprint.
     """
 
     cdef cuvsIvfPqSearchParams* params
@@ -420,6 +422,7 @@ cdef class SearchParams:
 
     def get_handle(self):
         return <size_t>self.params
+
 
 @auto_sync_resources
 @auto_convert_output
