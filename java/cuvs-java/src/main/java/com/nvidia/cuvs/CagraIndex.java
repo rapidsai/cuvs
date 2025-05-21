@@ -170,6 +170,28 @@ public interface CagraIndex {
     }
 
     /**
+     * Merges multiple CAGRA indexes into a single index.
+     *
+     * @param indexes Array of CAGRA indexes to merge
+     * @return A new merged CAGRA index
+     * @throws Throwable if an error occurs during the merge operation
+     */
+    static CagraIndex merge(CagraIndex[] indexes) throws Throwable {
+        if (indexes == null || indexes.length == 0) {
+            throw new IllegalArgumentException("At least one index must be provided for merging");
+        }
+
+        CuVSResources resources = indexes[0].getCuVSResources();
+        for (int i = 1; i < indexes.length; i++) {
+            if (!resources.equals(indexes[i].getCuVSResources())) {
+                throw new IllegalArgumentException("All indexes must use the same CuVSResources instance");
+            }
+        }
+
+        return CuVSProvider.provider().mergeCagraIndexes(indexes);
+    }
+
+    /**
      * Builder helps configure and create an instance of {@link CagraIndex}.
      */
     interface Builder {

@@ -62,6 +62,15 @@ public interface CuVSProvider {
   HnswIndex.Builder newHnswIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;
 
+  /**
+   * Merges multiple CAGRA indexes into a single index.
+   *
+   * @param indexes Array of CAGRA indexes to merge
+   * @return A new merged CAGRA index
+   * @throws Throwable if an error occurs during the merge operation
+   */
+  CagraIndex mergeCagraIndexes(CagraIndex[] indexes) throws Throwable;
+
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {
     return CuVSServiceProvider.Holder.INSTANCE;

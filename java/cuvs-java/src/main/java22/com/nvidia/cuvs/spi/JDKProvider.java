@@ -57,4 +57,13 @@ final class JDKProvider implements CuVSProvider {
   public HnswIndex.Builder newHnswIndexBuilder(CuVSResources cuVSResources) {
     return HnswIndexImpl.newBuilder(Objects.requireNonNull(cuVSResources));
   }
+
+  @Override
+  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) throws Throwable {
+    if (indexes == null || indexes.length == 0) {
+      throw new IllegalArgumentException("At least one index must be provided for merging");
+    }
+
+    return CagraIndexImpl.merge(indexes);
+  }
 }

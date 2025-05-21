@@ -206,6 +206,25 @@ void search_cagra_index(cuvsCagraIndex_t index, float *queries, int topk, long n
   cuvsRMMFree(cuvs_resources, queries_d, sizeof(float) * n_queries * dimensions);
 }
 
+void merge_cagra_indexes(cuvsResources_t cuvs_resources,
+                       cuvsCagraIndex_t* index_array,
+                       cuvsCagraIndex_t merged_index,
+                       int num_indices,
+                       int* return_value,
+                       cuvsCagraMergeParams_t merge_params) {
+  // default merge_params when merge_params is null
+  cuvsCagraMergeParams_t local_merge_params = merge_params;
+  if (local_merge_params == NULL) {
+    cuvsCagraMergeParamsCreate(&local_merge_params);
+  }
+
+  *return_value = cuvsCagraMerge(cuvs_resources, local_merge_params, index_array, num_indices, merged_index);
+
+  if (merge_params == NULL && local_merge_params != NULL) {
+    cuvsCagraMergeParamsDestroy(local_merge_params);
+  }
+}
+
 /**
  * @brief De-allocate BRUTEFORCE index
  *

@@ -87,6 +87,9 @@ public class CagraIndexImpl implements CagraIndex {
   private static final MethodHandle serializeCAGRAIndexToHNSWMethodHandle = downcallHandle("serialize_cagra_index_to_hnsw",
       FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, ADDRESS));
 
+  private static final MethodHandle mergeMethodHandle = downcallHandle("merge_cagra_indexes",
+      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, C_INT, ADDRESS, ADDRESS));
+
   private final float[][] dataset;
   private final CuVSResourcesImpl resources;
   private final CagraIndexParams cagraIndexParameters;
@@ -125,6 +128,22 @@ public class CagraIndexImpl implements CagraIndex {
     this.dataset = null;
     this.resources = resources;
     this.cagraIndexReference = deserialize(inputStream);
+  }
+
+  /**
+   * Constructor for creating an index from an existing index reference.
+   * Used primarily for the merge operation.
+   *
+   * @param indexReference The reference to the existing index
+   * @param resources The resources instance
+   */
+  private CagraIndexImpl(IndexReference indexReference, CuVSResourcesImpl resources) {
+    this.cagraIndexParameters = null;
+    this.cagraCompressionParams = null;
+    this.dataset = null;
+    this.resources = resources;
+    this.cagraIndexReference = indexReference;
+    this.destroyed = false;
   }
 
   private void checkNotDestroyed() {
@@ -466,6 +485,43 @@ public class CagraIndexImpl implements CagraIndex {
   }
 
   /**
+   * Merges multiple CAGRA indexes into a single index.
+   *
+   * @param indexes Array of CAGRA indexes to merge
+   * @return A new merged CAGRA index
+   * @throws Throwable if an error occurs during the merge operation
+   */
+  public static CagraIndex merge(CagraIndex[] indexes) throws Throwable {
+
+    CuVSResourcesImpl resources = (CuVSResourcesImpl) indexes[0].getCuVSResources();
+
+    IndexReference mergedIndexReference = new IndexReference(resources);
+
+    try (var arena = Arena.ofConfined()) {
+      MemorySegment indexesSegment = arena.allocate(indexes.length * ADDRESS.byteSize());
+      for (int i = 0; i < indexes.length; i++) {
+        CagraIndexImpl indexImpl = (CagraIndexImpl) indexes[i];
+        indexesSegment.setAtIndex(ADDRESS, i, indexImpl.cagraIndexReference.getMemorySegment());
+      }
+
+      MemorySegment returnValue = arena.allocate(C_INT);
+
+      mergeMethodHandle.invokeExact(
+        resources.getMemorySegment(),
+        indexesSegment,
+        mergedIndexReference.getMemorySegment(),
+        indexes.length,
+        returnValue,
+        MemorySegment.NULL // No merge params
+      );
+
+      checkError(returnValue.get(C_INT, 0L), "mergeMethodHandle");
+    }
+
+    return new CagraIndexImpl(mergedIndexReference, resources);
+  }
+
+  /**
    * Builder helps configure and create an instance of {@link CagraIndex}.
    */
   public static class Builder implements CagraIndex.Builder{
@@ -517,7 +573,7 @@ public class CagraIndexImpl implements CagraIndex {
   /**
    * Holds the memory reference to a CAGRA index.
    */
-  protected static class IndexReference {
+  public static class IndexReference {
 
     private final MemorySegment memorySegment;
 
