@@ -23,3 +23,4 @@
 #include <cuvs/neighbors/ivf_pq.h>
 #include <cuvs/neighbors/common.h>
 #include "gpuinfo.h"
+#include <cuda_runtime.h>

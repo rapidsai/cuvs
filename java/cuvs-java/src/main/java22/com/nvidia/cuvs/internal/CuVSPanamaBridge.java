@@ -4,7 +4,10 @@ import static com.nvidia.cuvs.internal.common.Util.checkError;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import java.util.ArrayList;
+import java.util.List;
 
+import com.nvidia.cuvs.GPUInfo;
 import com.nvidia.cuvs.internal.common.LinkerHelper;
 import com.nvidia.cuvs.internal.common.Util;
 import com.nvidia.cuvs.internal.panama.DLDataType;
@@ -12,6 +15,7 @@ import com.nvidia.cuvs.internal.panama.DLDevice;
 import com.nvidia.cuvs.internal.panama.DLManagedTensor;
 import com.nvidia.cuvs.internal.panama.DLTensor;
 import com.nvidia.cuvs.internal.panama.PanamaFFMAPI;
+import com.nvidia.cuvs.internal.panama.cudaDeviceProp;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndexParams;
 import com.nvidia.cuvs.internal.panama.cuvsFilter;
 import com.nvidia.cuvs.internal.panama.cuvsHnswIndex;
@@ -24,6 +28,12 @@ public class CuVSPanamaBridge {
   private static final long C_FLOAT_BYTE_SIZE = LinkerHelper.C_FLOAT.byteSize();
   private static final long C_LONG_BYTE_SIZE = LinkerHelper.C_LONG.byteSize();
 
+  /**
+   * @brief Create an Initialized opaque C handle
+   *
+   * @param[out] return_value return value for cuvsResourcesCreate function call
+   * @return cuvsResources_t
+   */
   public static MemorySegment createResources(Arena sharedArena) {
     MemorySegment resourcesMemorySegment = sharedArena.allocate(PanamaFFMAPI.cuvsResources_t);
     var returnValue = PanamaFFMAPI.cuvsResourcesCreate(resourcesMemorySegment);
@@ -31,11 +41,27 @@ public class CuVSPanamaBridge {
     return resourcesMemorySegment;
   }
 
+  /**
+   * @brief Destroy and de-allocate opaque C handle
+   *
+   * @param[in] cuvs_resources an opaque C handle
+   * @param[out] return_value return value for cuvsResourcesDestroy function call
+   */
   public static void destroyResources(MemorySegment resourcesMemorySegment) {
     var returnValue = PanamaFFMAPI.cuvsResourcesDestroy(resourcesMemorySegment.get(PanamaFFMAPI.cuvsResources_t, 0));
     checkError(returnValue, "cuvsResourcesDestroy");
   }
 
+  /**
+   * @brief Helper function for creating DLManagedTensor instance
+   *
+   * @param[in] data the data pointer points to the allocated data
+   * @param[in] shape the shape of the tensor
+   * @param[in] code the type code of base types
+   * @param[in] bits the shape of the tensor
+   * @param[in] ndim the number of dimensions
+   * @return DLManagedTensor
+   */
   public static MemorySegment prepareTensor(Arena arena, MemorySegment data, long[] shape, int code, int bits, int ndim,
       int deviceType) {
 
@@ -65,6 +91,19 @@ public class CuVSPanamaBridge {
     return tensor;
   }
 
+  /**
+   * @brief Function for building CAGRA index
+   *
+   * @param[in] dataset index dataset
+   * @param[in] rows number of dataset rows
+   * @param[in] dimensions vector dimension of the dataset
+   * @param[in] cuvs_resources reference of the underlying opaque C handle
+   * @param[out] return_value return value for cuvsCagraBuild function call
+   * @param[in] index_params a reference to the index parameters
+   * @param[in] compression_params a reference to the compression parameters
+   * @param[in] n_writer_threads number of omp threads to use
+   * @return cuvsCagraIndex_t
+   */
   public static MemorySegment buildCagraIndex(Arena arena, MemorySegment dataset, long rows, long dimensions,
       MemorySegment cuvs_resources, MemorySegment index_params, MemorySegment compression_params,
       int n_writer_threads) {
@@ -97,11 +136,25 @@ public class CuVSPanamaBridge {
     return index;
   }
 
+  /**
+   * @brief A function to de-allocate CAGRA index
+   *
+   * @param[in] index cuvsCagraIndex_t to de-allocate
+   * @param[out] return_value return value for cuvsCagraIndexDestroy function call
+   */
   public static void destroyCagraIndex(MemorySegment index) {
     int returnValue = PanamaFFMAPI.cuvsCagraIndexDestroy(index);
     checkError(returnValue, "cuvsCagraIndexDestroy");
   }
 
+  /**
+   * @brief A function to serialize a CAGRA index
+   *
+   * @param[in] cuvs_resources reference of the underlying opaque C handle
+   * @param[in] index cuvsCagraIndex_t reference
+   * @param[out] return_value return value for cuvsCagraSerialize function call
+   * @param[in] filename the filename of the index file
+   */
   public static void serializeCagraIndex(Arena arena, MemorySegment cuvs_resources, MemorySegment index,
       String filename) {
     long cuvs_res = cuvs_resources.get(PanamaFFMAPI.cuvsResources_t, 0);
@@ -109,6 +162,14 @@ public class CuVSPanamaBridge {
     checkError(returnValue, "cuvsCagraSerialize");
   }
 
+  /**
+   * @brief A function to de-serialize a CAGRA index
+   *
+   * @param[in] cuvs_resources reference to the underlying opaque C handle
+   * @param[in] index cuvsCagraIndex_t reference
+   * @param[out] return_value return value for cuvsCagraDeserialize function call
+   * @param[in] filename the filename of the index file
+   */
   public static void deserializeCagraIndex(Arena arena, MemorySegment cuvs_resources, MemorySegment index,
       String filename) {
     long cuvs_res = cuvs_resources.get(PanamaFFMAPI.cuvsResources_t, 0);
@@ -166,6 +227,17 @@ public class CuVSPanamaBridge {
     returnValue = PanamaFFMAPI.cuvsRMMFree(cuvs_res, queries_d_p, C_FLOAT_BYTE_SIZE * n_queries * dimensions);
   }
 
+  /**
+   * @brief A function to build BRUTEFORCE index
+   *
+   * @param[in] dataset the dataset to be indexed
+   * @param[in] rows the number of rows in the dataset
+   * @param[in] dimensions the vector dimension
+   * @param[in] cuvs_resources reference to the underlying opaque C handle
+   * @param[out] return_value return value for cuvsBruteForceBuild function call
+   * @param[in] n_writer_threads number of threads to use while indexing
+   * @return cuvsBruteForceIndex_t
+   */
   public static MemorySegment buildBruteForceIndex(Arena arena, MemorySegment dataset, long rows, long dimensions,
       MemorySegment cuvs_resources, int n_writer_threads) {
 
@@ -197,11 +269,35 @@ public class CuVSPanamaBridge {
     return index;
   }
 
+  /**
+   * @brief De-allocate BRUTEFORCE index
+   *
+   * @param[in] index reference to BRUTEFORCE index
+   * @param[out] return_value return value for cuvsBruteForceIndexDestroy function
+   *             call
+   */
   public static void destroyBruteForceIndex(MemorySegment index) {
     int returnValue = PanamaFFMAPI.cuvsBruteForceIndexDestroy(index);
     checkError(returnValue, "cuvsBruteForceIndexDestroy");
   }
 
+  /**
+   * @brief A function to search the BRUTEFORCE index
+   *
+   * @param[in] index reference to a BRUTEFORCE index to search on
+   * @param[in] queries reference to query vectors
+   * @param[in] topk the top k results to return
+   * @param[in] n_queries number of queries
+   * @param[in] dimensions vector dimension
+   * @param[in] cuvs_resources reference to the underlying opaque C handle
+   * @param[out] neighbors_h reference to the neighbor results on the host memory
+   * @param[out] distances_h reference to the distance results on the host memory
+   * @param[out] return_value return value for cuvsBruteForceSearch function call
+   * @param[in] prefilter_data cuvsFilter input prefilter that can be used to
+   *            filter queries and neighbors based on the given bitmap
+   * @param[in] prefilter_data_length prefilter length input
+   * @param[in] n_rows number of rows in the dataset
+   */
   public static void searchBruteForceIndex(Arena arena, MemorySegment index, MemorySegment queries, int topk,
       long n_queries, int dimensions, MemorySegment cuvs_resources, MemorySegment neighbors_h,
       MemorySegment distances_h, MemorySegment prefilter_data, long prefilter_data_length) {
@@ -276,6 +372,15 @@ public class CuVSPanamaBridge {
     returnValue = PanamaFFMAPI.cuvsRMMFree(cuvs_res, prefilter_d_p, C_INT_BYTE_SIZE * prefilter_len);
   }
 
+  /**
+   * @brief A function to serialize a BRUTEFORCE index
+   *
+   * @param[in] cuvs_resources reference of the underlying opaque C handle
+   * @param[in] index cuvsBruteForceIndex_t reference
+   * @param[out] return_value return value for cuvsBruteForceSerialize function
+   *             call
+   * @param[in] filename the filename of the index file
+   */
   public static void serializeBruteForceIndex(Arena arena, MemorySegment cuvs_resources, MemorySegment index,
       String filename) {
     long cuvs_res = cuvs_resources.get(PanamaFFMAPI.cuvsResources_t, 0);
@@ -283,6 +388,15 @@ public class CuVSPanamaBridge {
     checkError(returnValue, "cuvsBruteForceSerialize");
   }
 
+  /**
+   * @brief A function to de-serialize a BRUTEFORCE index
+   *
+   * @param[in] cuvs_resources reference to the underlying opaque C handle
+   * @param[in] index cuvsBruteForceIndex_t reference
+   * @param[out] return_value return value for cuvsBruteForceDeserialize function
+   *             call
+   * @param[in] filename the filename of the index file
+   */
   public static void deserializeBruteForceIndex(Arena arena, MemorySegment cuvs_resources, MemorySegment index,
       String filename) {
     long cuvs_res = cuvs_resources.get(PanamaFFMAPI.cuvsResources_t, 0);
@@ -290,12 +404,32 @@ public class CuVSPanamaBridge {
     checkError(returnValue, "cuvsBruteForceDeserialize");
   }
 
-  public static void serializeCagraIndexToHnsw(MemorySegment cuvs_resources, MemorySegment file_path, MemorySegment index) {
+  /**
+   * @brief A function to create and serialize an HNSW index from CAGRA index
+   *
+   * @param[in] cuvs_resources reference to the underlying opaque C handle
+   * @param[in] file_path the path to the file of the created HNSW index
+   * @param[in] index cuvsCagraIndex_t reference to the existing CAGRA index
+   * @param[out] return_value return value for cuvsCagraSerializeToHnswlib
+   *             function call
+   */
+  public static void serializeCagraIndexToHnsw(MemorySegment cuvs_resources, MemorySegment file_path,
+      MemorySegment index) {
     long cuvs_res = cuvs_resources.get(PanamaFFMAPI.cuvsResources_t, 0);
     int returnValue = PanamaFFMAPI.cuvsCagraSerializeToHnswlib(cuvs_res, file_path, index);
     checkError(returnValue, "cuvsCagraSerializeToHnswlib");
   }
 
+  /**
+   * @brief A function to deserialize the persisted HNSW index
+   *
+   * @param[in] cuvs_resources reference to the underlying opaque C handle
+   * @param[in] file_path the path to the persisted HNSW index file
+   * @param[in] hnsw_params reference to the HNSW index params
+   * @param[out] return_value return value for cuvsHnswDeserialize function call
+   * @param[in] vector_dimension the dimension of the vectors in the HNSW index
+   * @returns cuvsHnswIndex_t reference to the created HNSW index
+   */
   public static MemorySegment deserializeHnswIndex(Arena arena, MemorySegment cuvs_resources, MemorySegment file_path,
       MemorySegment hnsw_params, int vector_dimension) {
 
@@ -315,6 +449,20 @@ public class CuVSPanamaBridge {
     return hnsw_index;
   }
 
+  /**
+   * @brief A Function to search in the HNSW index
+   *
+   * @param[in] cuvs_resources reference to the underlying opaque C handle
+   * @param[in] hnsw_index the HNSW index reference
+   * @param[in] search_params reference to the HNSW search parameters
+   * @param[out] return_value return value for cuvsHnswSearch function call
+   * @param[out] neighbors_h result container on host holding the neighbor ids
+   * @param[out] distances_h result container on host holding the distances
+   * @param[in] queries reference to the queries
+   * @param[in] topk the top k results to return
+   * @param[in] query_dimension the dimension of the query vectors
+   * @param[in] n_queries the number of queries passed to the function
+   */
   public static void searchHnswIndex(Arena arena, MemorySegment cuvs_resources, MemorySegment hnsw_index,
       MemorySegment search_params, MemorySegment neighbors_h, MemorySegment distances_h, MemorySegment queries,
       int topk, int query_dimension, int n_queries) {
@@ -334,9 +482,49 @@ public class CuVSPanamaBridge {
         distances_tensor);
   }
 
+  /**
+   * @brief A function to destroy the HNSW index
+   *
+   * @param[in] hnsw_index the HNSW index reference
+   * @param[out] return_value return value for cuvsHnswIndexDestroy function call
+   */
   public static void destroyHnswIndex(MemorySegment hnsw_index) {
     int returnValue = PanamaFFMAPI.cuvsHnswIndexDestroy(hnsw_index);
     checkError(returnValue, "cuvsHnswIndexDestroy");
   }
 
+  /**
+   * @brief A function to get GPU details
+   */
+  public static List<GPUInfo> getGpuInfo() {
+
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment num_gpus = localArena.allocate(LinkerHelper.C_INT);
+      PanamaFFMAPI.cudaGetDeviceCount(num_gpus);
+
+      int num_gpu_count = num_gpus.get(LinkerHelper.C_INT, 0);
+
+      List<GPUInfo> gpuInfoArr = new ArrayList<GPUInfo>();
+
+      MemorySegment free = localArena.allocate(PanamaFFMAPI.size_t);
+      MemorySegment total = localArena.allocate(PanamaFFMAPI.size_t);
+      MemorySegment deviceProp = cudaDeviceProp.allocate(localArena);
+
+      for (int i = 0; i < num_gpu_count; i++) {
+
+        PanamaFFMAPI.cudaSetDevice(i);
+        PanamaFFMAPI.cudaGetDeviceProperties_v2(deviceProp, i);
+        PanamaFFMAPI.cudaMemGetInfo(free, total);
+
+        String name = cudaDeviceProp.name(deviceProp).getString(0);
+        long freeMemory = free.get(LinkerHelper.C_LONG, 0);
+        long totalMemory = total.get(LinkerHelper.C_LONG, 0);
+        float computeCapability = Float
+            .parseFloat(cudaDeviceProp.major(deviceProp) + "." + cudaDeviceProp.minor(deviceProp));
+
+        gpuInfoArr.add(new GPUInfo(i, name, freeMemory, totalMemory, computeCapability));
+      }
+      return gpuInfoArr;
+    }
+  }
 }

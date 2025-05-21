@@ -18,7 +18,6 @@ package com.nvidia.cuvs.internal.common;
 
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
 import static java.lang.foreign.ValueLayout.ADDRESS;
@@ -28,7 +27,6 @@ import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemoryLayout.PathElement;
 import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
@@ -36,7 +34,7 @@ import java.util.BitSet;
 import java.util.List;
 
 import com.nvidia.cuvs.GPUInfo;
-import com.nvidia.cuvs.internal.panama.gpuInfo;
+import com.nvidia.cuvs.internal.CuVSPanamaBridge;
 
 public class Util {
 
@@ -113,44 +111,7 @@ public class Util {
    * @return a list of {@link GPUInfo} objects with GPU details
    */
   public static List<GPUInfo> availableGPUs() throws Throwable {
-    List<GPUInfo> results = new ArrayList<>();
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment returnValueMemorySegment = localArena.allocate(C_INT);
-      MemorySegment numGpuMemorySegment = localArena.allocate(C_INT);
-
-      /*
-       * Setting a value of 1024 because we cannot predict how much memory to allocate
-       * before the function is invoked as cudaGetDeviceCount is inside the
-       * get_gpu_info function.
-       */
-      MemorySegment GpuInfoArrayMemorySegment = gpuInfo.allocateArray(1024, localArena);
-      getGpuInfoMethodHandle.invokeExact(returnValueMemorySegment, numGpuMemorySegment, GpuInfoArrayMemorySegment);
-      int numGPUs = numGpuMemorySegment.get(ValueLayout.JAVA_INT, 0);
-      MemoryLayout ml = MemoryLayout.sequenceLayout(numGPUs, gpuInfo.layout());
-      for (int i = 0; i < numGPUs; i++) {
-        VarHandle gpuIdVarHandle = ml.varHandle(PathElement.sequenceElement(i), PathElement.groupElement("gpu_id"));
-        VarHandle freeMemoryVarHandle = ml.varHandle(PathElement.sequenceElement(i),
-            PathElement.groupElement("free_memory"));
-        VarHandle totalMemoryVarHandle = ml.varHandle(PathElement.sequenceElement(i),
-            PathElement.groupElement("total_memory"));
-        VarHandle ComputeCapabilityVarHandle = ml.varHandle(PathElement.sequenceElement(i),
-            PathElement.groupElement("compute_capability"));
-        StringBuilder gpuName = new StringBuilder();
-        char b = 1;
-        int p = 0;
-        while (b != 0x00) {
-          VarHandle gpuNameVarHandle = ml.varHandle(PathElement.sequenceElement(i), PathElement.groupElement("name"),
-              PathElement.sequenceElement(p++));
-          b = (char) (byte) gpuNameVarHandle.get(GpuInfoArrayMemorySegment, 0L);
-          gpuName.append(b);
-        }
-        results.add(new GPUInfo((int) gpuIdVarHandle.get(GpuInfoArrayMemorySegment, 0L), gpuName.toString().trim(),
-            (long) freeMemoryVarHandle.get(GpuInfoArrayMemorySegment, 0L),
-            (long) totalMemoryVarHandle.get(GpuInfoArrayMemorySegment, 0L),
-            (float) ComputeCapabilityVarHandle.get(GpuInfoArrayMemorySegment, 0L)));
-      }
-      return results;
-    }
+    return CuVSPanamaBridge.getGpuInfo();
   }
 
   /**
