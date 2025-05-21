@@ -48,8 +48,8 @@ from libc.stdint cimport (
 )
 
 from cuvs.common.exceptions import check_cuvs
+from cuvs.neighbors import ivf_pq
 from cuvs.neighbors.filters import no_filter
-
 
 cdef class CompressionParams:
     """
@@ -156,6 +156,13 @@ cdef class IndexParams:
     compression: CompressionParams, optional
         If compression is desired should be a CompressionParams object. If None
         compression will be disabled.
+    ivf_pq_build_params: cuvs.neighbors.ivf_pq.IndexParams, optional
+        Parameters for IVF-PQ algorithm. If provided, it will be used for
+        building the graph.
+    ivf_pq_search_params: cuvs.neighbors.ivf_pq.SearchParams, optional
+        Parameters for IVF-PQ search. If provided, it will be used for
+        searching the graph.
+    refinement_rate: float, default = 1.0
     """
 
     cdef cuvsCagraIndexParams* params
@@ -163,10 +170,14 @@ cdef class IndexParams:
 
     # hold on to a reference to the compression, to keep from being GC'ed
     cdef public object compression
+    cdef public object ivf_pq_build_params
+    cdef public object ivf_pq_search_params
 
     def __cinit__(self):
         check_cuvs(cuvsCagraIndexParamsCreate(&self.params))
         self.compression = None
+        self.ivf_pq_build_params = None
+        self.ivf_pq_search_params = None
 
     def __dealloc__(self):
         check_cuvs(cuvsCagraIndexParamsDestroy(self.params))
@@ -177,7 +188,10 @@ cdef class IndexParams:
                  graph_degree=64,
                  build_algo="ivf_pq",
                  nn_descent_niter=20,
-                 compression=None):
+                 compression=None,
+                 ivf_pq_build_params: ivf_pq.IndexParams=None,
+                 ivf_pq_search_params: ivf_pq.SearchParams=None,
+                 refinement_rate: float=1.0):
 
         self._metric = metric
         self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
@@ -198,6 +212,15 @@ cdef class IndexParams:
             self.compression = compression
             self.params.compression = \
                 <cuvsCagraCompressionParams_t><size_t>compression.get_handle()
+        if ivf_pq_build_params is not None:
+            if ivf_pq_build_params.metric != self.metric:
+                raise ValueError("Metric mismatch with IVF-PQ build params")
+            self.ivf_pq_build_params = ivf_pq_build_params
+            self.params.graph_build_params.ivf_pq_build_params = <cuvsIvfPqIndexParams_t><size_t>ivf_pq_build_params.get_handle()
+        if ivf_pq_search_params is not None:
+            self.ivf_pq_search_params = ivf_pq_search_params
+            self.params.graph_build_params.ivf_pq_search_params = <cuvsIvfPqSearchParams_t><size_t>ivf_pq_search_params.get_handle()
+        self.params.graph_build_params.refinement_rate = refinement_rate
 
     @property
     def metric(self):
@@ -218,6 +241,10 @@ cdef class IndexParams:
     @property
     def nn_descent_niter(self):
         return self.params.nn_descent_niter
+
+    @property
+    def refinement_rate(self):
+        return self.params.graph_build_params.refinement_rate
 
 
 cdef class Index:

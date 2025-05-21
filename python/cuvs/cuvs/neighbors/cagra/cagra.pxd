@@ -32,6 +32,47 @@ from cuvs.distance_type cimport cuvsDistanceType
 from cuvs.neighbors.filters.filters cimport cuvsFilter
 
 
+cdef extern from "library_types.h":
+    ctypedef enum cudaDataType_t:
+        CUDA_R_32F "CUDA_R_32F"  # float
+        CUDA_R_16F "CUDA_R_16F"  # half
+
+        # uint8 - used to refer to IVF-PQ's fp8 storage type
+        CUDA_R_8U "CUDA_R_8U"
+        CUDA_R_8I "CUDA_R_8I"
+
+cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
+
+    ctypedef enum codebook_gen:
+        PER_SUBSPACE
+        PER_CLUSTER
+
+    ctypedef struct cuvsIvfPqIndexParams:
+        cuvsDistanceType metric
+        float metric_arg
+        bool add_data_on_build
+        uint32_t n_lists
+        uint32_t kmeans_n_iters
+        double kmeans_trainset_fraction
+        uint32_t pq_bits
+        uint32_t pq_dim
+        codebook_gen codebook_kind
+        bool force_random_rotation
+        bool conservative_memory_allocation
+        uint32_t max_train_points_per_pq_code
+
+    ctypedef cuvsIvfPqIndexParams* cuvsIvfPqIndexParams_t
+
+    ctypedef struct cuvsIvfPqSearchParams:
+        uint32_t n_probes
+        cudaDataType_t lut_dtype
+        cudaDataType_t internal_distance_dtype
+        double preferred_shmem_carveout
+        cudaDataType_t coarse_search_dtype
+        uint32_t max_internal_batch_size
+
+    ctypedef cuvsIvfPqSearchParams* cuvsIvfPqSearchParams_t
+
 cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
     ctypedef enum cuvsCagraGraphBuildAlgo:
@@ -49,6 +90,12 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
     ctypedef cuvsCagraCompressionParams* cuvsCagraCompressionParams_t
 
+    ctypedef struct cuvsIvfPqParams:
+        cuvsIvfPqIndexParams_t ivf_pq_build_params
+        cuvsIvfPqSearchParams_t ivf_pq_search_params
+        float refinement_rate
+    ctypedef cuvsIvfPqParams* cuvsIvfPqParams_t
+
     ctypedef struct cuvsCagraIndexParams:
         cuvsDistanceType metric
         size_t intermediate_graph_degree
@@ -56,6 +103,7 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
         cuvsCagraGraphBuildAlgo build_algo
         size_t nn_descent_niter
         cuvsCagraCompressionParams_t compression
+        cuvsIvfPqParams_t graph_build_params
 
     ctypedef cuvsCagraIndexParams* cuvsCagraIndexParams_t
 
@@ -99,6 +147,10 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
     cuvsError_t cuvsCagraCompressionParamsDestroy(
         cuvsCagraCompressionParams_t index)
+
+    cuvsError_t cuvsIvfPqParamsCreate(cuvsIvfPqParams_t* params)
+
+    cuvsError_t cuvsIvfPqParamsDestroy(cuvsIvfPqParams_t index)
 
     cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params)
 
