@@ -311,13 +311,16 @@ class faiss_cpu_flat : public faiss_cpu<T> {
     auto search_param = dynamic_cast<const typename faiss_cpu<T>::search_param&>(param);
   }
 
-void save(const std::string& file) const override { this->template save_<faiss::IndexFlat>(file); }
-void load(const std::string& file) override { this->template load_<faiss::IndexFlat>(file); }
+  void save(const std::string& file) const override
+  {
+    this->template save_<faiss::IndexFlat>(file);
+  }
+  void load(const std::string& file) override { this->template load_<faiss::IndexFlat>(file); }
 
-std::unique_ptr<algo<T>> copy()
-{
-  return std::make_unique<faiss_cpu_flat<T>>(*this);  // use copy constructor
-}
+  std::unique_ptr<algo<T>> copy()
+  {
+    return std::make_unique<faiss_cpu_flat<T>>(*this);  // use copy constructor
+  }
 };
 
 template <typename T>
