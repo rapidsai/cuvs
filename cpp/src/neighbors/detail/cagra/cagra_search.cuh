@@ -90,20 +90,10 @@ void search_on_composite_index(
         neighbors.data_handle(), neighbors.data_handle(), offset, neighbors.size(), stream);
     }
 
-    raft::copy_matrix(neighbors_buffer.data() + i * K,
-                      stride,
-                      neighbors.data_handle(),
-                      K,
-                      K,
-                      num_queries,
-                      raft::resource::get_cuda_stream(res));
-    raft::copy_matrix(distances_buffer.data() + i * K,
-                      stride,
-                      distances.data_handle(),
-                      K,
-                      K,
-                      num_queries,
-                      raft::resource::get_cuda_stream(res));
+    raft::copy_matrix(
+      neighbors_buffer.data() + i * K, stride, neighbors.data_handle(), K, K, num_queries, stream);
+    raft::copy_matrix(
+      distances_buffer.data() + i * K, stride, distances.data_handle(), K, K, num_queries, stream);
     offset += sub_index->size();
   }
 
