@@ -16,10 +16,10 @@
 
 #pragma once
 
+#include "../../../sparse/neighbors/cross_component_nn.cuh"
 #include "greedy_search.cuh"
 #include "robust_prune.cuh"
 #include "vamana_structs.cuh"
-#include "../../../sparse/neighbors/cross_component_nn.cuh"
 #include <cuvs/neighbors/vamana.hpp>
 
 #include <raft/cluster/kmeans.cuh>

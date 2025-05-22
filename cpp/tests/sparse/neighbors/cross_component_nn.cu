@@ -87,9 +87,10 @@ class ConnectComponentsTest
      */
     raft::sparse::COO<value_t, value_idx> knn_graph_coo(stream);
 
-    auto data_view = raft::make_device_matrix_view<value_t, value_idx, raft::row_major>(data.data(), params.n_row, params.n_col);
-    cuvs::neighbors::detail::knn_graph<value_idx, value_t, size_t>(handle, data_view, cuvs::distance::DistanceType::L2SqrtExpanded, knn_graph_coo, params.c);
-
+    auto data_view = raft::make_device_matrix_view<value_t, value_idx, raft::row_major>(
+      data.data(), params.n_row, params.n_col);
+    cuvs::neighbors::detail::knn_graph<value_idx, value_t, size_t>(
+      handle, data_view, cuvs::distance::DistanceType::L2SqrtExpanded, knn_graph_coo, params.c);
 
     raft::sparse::convert::sorted_coo_to_csr(
       knn_graph_coo.rows(), knn_graph_coo.nnz, indptr.data(), params.n_row + 1, stream);

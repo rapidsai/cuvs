@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "./kmeans_common.cuh"
 #include "../../neighbors/detail/knn_graph.cuh"
+#include "./kmeans_common.cuh"
 #include <cuvs/cluster/agglomerative.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
