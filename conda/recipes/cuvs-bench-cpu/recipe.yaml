@@ -6,7 +6,7 @@ context:
   date_string: '${{ env.get("RAPIDS_DATE_STRING") }}'
   py_version: ${{ env.get("RAPIDS_PY_VERSION") }}
   py_buildstring: ${{ py_version | version_to_buildstring }}
-  head_rev: ${{ git.head_rev(".")[:8] }}
+  head_rev: '${{ git.head_rev(".")[:8] }}'
   linux64: ${{ linux and x86_64 }}
 
 package:
@@ -64,6 +64,7 @@ requirements:
     - pip
     - python =${{ py_version }}
     - rapids-build-backend>=0.3.0,<0.4.0.dev0
+    - setuptools >=64.0.0
     - if: linux64
       then:
         - libaio
@@ -74,7 +75,7 @@ requirements:
     - click
     - glog ${{ glog_version }}
     - h5py ${{ h5py_version }}
-    - matplotlib-base
+    - matplotlib-base>=3.9
     - numpy >=1.23,<3.0a0
     - pandas
     - pyyaml

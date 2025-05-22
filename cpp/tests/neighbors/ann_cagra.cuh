@@ -408,6 +408,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
           (const DataT*)database.data(), ps.n_rows, ps.dim);
 
+        tmp_index_file index_file;
         {
           std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
           cagra::index<DataT, IdxT> index(handle_, index_params.metric);
@@ -422,11 +423,11 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
             index = cagra::build(handle_, index_params, database_view);
           };
 
-          cagra::serialize(handle_, "cagra_index", index, ps.include_serialized_dataset);
+          cagra::serialize(handle_, index_file.filename, index, ps.include_serialized_dataset);
         }
 
         cagra::index<DataT, IdxT> index(handle_);
-        cagra::deserialize(handle_, "cagra_index", &index);
+        cagra::deserialize(handle_, index_file.filename, &index);
 
         if (!ps.include_serialized_dataset) { index.update_dataset(handle_, database_view); }
 
@@ -569,8 +570,8 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
         switch (ps.build_algo) {
           case graph_build_algo::IVF_PQ:
-            index_params.graph_build_params =
-              graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(ps.n_rows, ps.dim));
+            index_params.graph_build_params = graph_build_params::ivf_pq_params(
+              raft::matrix_extent<int64_t>(ps.n_rows, ps.dim), index_params.metric);
             if (ps.ivf_pq_search_refine_ratio) {
               std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
                 index_params.graph_build_params)
@@ -785,8 +786,8 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
         switch (ps.build_algo) {
           case graph_build_algo::IVF_PQ:
-            index_params.graph_build_params =
-              graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(ps.n_rows, ps.dim));
+            index_params.graph_build_params = graph_build_params::ivf_pq_params(
+              raft::matrix_extent<int64_t>(ps.n_rows, ps.dim), index_params.metric);
             if (ps.ivf_pq_search_refine_ratio) {
               std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
                 index_params.graph_build_params)
@@ -995,8 +996,8 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
         switch (ps.build_algo) {
           case graph_build_algo::IVF_PQ:
-            index_params.graph_build_params =
-              graph_build_params::ivf_pq_params(raft::matrix_extent<int64_t>(ps.n_rows, ps.dim));
+            index_params.graph_build_params = graph_build_params::ivf_pq_params(
+              raft::matrix_extent<int64_t>(ps.n_rows, ps.dim), index_params.metric);
             if (ps.ivf_pq_search_refine_ratio) {
               std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
                 index_params.graph_build_params)

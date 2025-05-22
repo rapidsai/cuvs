@@ -20,7 +20,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.Objects;
-import java.util.UUID;
 
 import com.nvidia.cuvs.spi.CuVSProvider;
 
