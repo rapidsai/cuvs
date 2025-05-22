@@ -177,13 +177,6 @@ public interface CagraIndex {
     int getIndexDimensions();
 
     /**
-     * Gets the CAGRA index size
-     *
-     * @return the CAGRA index size
-     */
-    int getIndexSize();
-
-    /**
      * Builder helps configure and create an instance of {@link CagraIndex}.
      */
     interface Builder {

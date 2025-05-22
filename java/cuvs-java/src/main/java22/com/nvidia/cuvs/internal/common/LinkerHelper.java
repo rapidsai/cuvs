@@ -43,7 +43,13 @@ public class LinkerHelper {
   public static final ValueLayout.OfFloat C_FLOAT = (ValueLayout.OfFloat) LINKER.canonicalLayouts().get("float");
 
   public static final AddressLayout C_POINTER = ((AddressLayout) LINKER.canonicalLayouts().get("void*"))
-          .withTargetLayout(MemoryLayout.sequenceLayout(Long.MAX_VALUE, C_CHAR));
+      .withTargetLayout(MemoryLayout.sequenceLayout(Long.MAX_VALUE, C_CHAR));
+
+  public static final long C_INT_BYTE_SIZE = LinkerHelper.C_INT.byteSize();
+
+  public static final long C_FLOAT_BYTE_SIZE = LinkerHelper.C_FLOAT.byteSize();
+
+  public static final long C_LONG_BYTE_SIZE = LinkerHelper.C_LONG.byteSize();
 
   static {
     var nativeLibrary = LoaderUtils.loadNativeLibrary();
@@ -53,12 +59,15 @@ public class LinkerHelper {
   }
 
   static MemorySegment functionAddress(String function) {
-    return SYMBOL_LOOKUP.find(function).orElseThrow(() -> new LinkageError("Native function " + function + " could not be found"));
+    return SYMBOL_LOOKUP.find(function)
+        .orElseThrow(() -> new LinkageError("Native function " + function + " could not be found"));
   }
 
-  public static MethodHandle downcallHandle(String function, FunctionDescriptor functionDescriptor, Linker.Option... options) {
+  public static MethodHandle downcallHandle(String function, FunctionDescriptor functionDescriptor,
+      Linker.Option... options) {
     return LINKER.downcallHandle(functionAddress(function), functionDescriptor, options);
   }
 
-  private LinkerHelper() {}
+  private LinkerHelper() {
+  }
 }

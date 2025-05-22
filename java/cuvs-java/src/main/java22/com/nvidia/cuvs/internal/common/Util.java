@@ -34,14 +34,17 @@ import java.util.BitSet;
 import java.util.List;
 
 import com.nvidia.cuvs.GPUInfo;
-import com.nvidia.cuvs.internal.CuVSPanamaBridge;
+import com.nvidia.cuvs.internal.panama.DLDataType;
+import com.nvidia.cuvs.internal.panama.DLDevice;
+import com.nvidia.cuvs.internal.panama.DLManagedTensor;
+import com.nvidia.cuvs.internal.panama.DLTensor;
+import com.nvidia.cuvs.internal.panama.PanamaFFMAPI;
+import com.nvidia.cuvs.internal.panama.cudaDeviceProp;
 
 public class Util {
 
   public static final int CUVS_SUCCESS = 1;
-
-  private static final MethodHandle getGpuInfoMethodHandle = downcallHandle("get_gpu_info",
-      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS));
+  public static final int CUDA_SUCCESS = 0;
 
   private static final MethodHandle getLastErrorTextMethodHandle = downcallHandle("cuvsGetLastErrorText",
       FunctionDescriptor.of(ADDRESS));
@@ -50,15 +53,27 @@ public class Util {
   }
 
   /**
-   * Checks the result value of a native method handle call.
+   * Checks the result value of a (CuVS) native method handle call.
    *
    * @param value  the return value
    * @param caller the native method handle that was called
    */
-  public static void checkError(int value, String caller) {
+  public static void checkCuVSError(int value, String caller) {
     if (value != CUVS_SUCCESS) {
       String errorMsg = getLastErrorText();
       throw new RuntimeException(caller + " returned " + value + "[" + errorMsg + "]");
+    }
+  }
+
+  /**
+   * Checks the result value of a (CUDA) native method handle call.
+   *
+   * @param value  the return value
+   * @param caller the native method handle that was called
+   */
+  public static void checkCudaError(int value, String caller) {
+    if (value != CUDA_SUCCESS) {
+      throw new RuntimeException(caller + " returned " + value);
     }
   }
 
@@ -111,7 +126,34 @@ public class Util {
    * @return a list of {@link GPUInfo} objects with GPU details
    */
   public static List<GPUInfo> availableGPUs() throws Throwable {
-    return CuVSPanamaBridge.getGpuInfo();
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment num_gpus = localArena.allocate(LinkerHelper.C_INT);
+      PanamaFFMAPI.cudaGetDeviceCount(num_gpus);
+
+      int num_gpu_count = num_gpus.get(LinkerHelper.C_INT, 0);
+
+      List<GPUInfo> gpuInfoArr = new ArrayList<GPUInfo>();
+
+      MemorySegment free = localArena.allocate(PanamaFFMAPI.size_t);
+      MemorySegment total = localArena.allocate(PanamaFFMAPI.size_t);
+      MemorySegment deviceProp = cudaDeviceProp.allocate(localArena);
+
+      for (int i = 0; i < num_gpu_count; i++) {
+
+        PanamaFFMAPI.cudaSetDevice(i);
+        PanamaFFMAPI.cudaGetDeviceProperties_v2(deviceProp, i);
+        PanamaFFMAPI.cudaMemGetInfo(free, total);
+
+        String name = cudaDeviceProp.name(deviceProp).getString(0);
+        long freeMemory = free.get(LinkerHelper.C_LONG, 0);
+        long totalMemory = total.get(LinkerHelper.C_LONG, 0);
+        float computeCapability = Float
+            .parseFloat(cudaDeviceProp.major(deviceProp) + "." + cudaDeviceProp.minor(deviceProp));
+
+        gpuInfoArr.add(new GPUInfo(i, name, freeMemory, totalMemory, computeCapability));
+      }
+      return gpuInfoArr;
+    }
   }
 
   /**
@@ -185,6 +227,45 @@ public class Util {
       }
     }
     return ret;
+  }
+
+  /**
+   * @brief Helper function for creating DLManagedTensor instance
+   *
+   * @param[in] data the data pointer points to the allocated data
+   * @param[in] shape the shape of the tensor
+   * @param[in] code the type code of base types
+   * @param[in] bits the shape of the tensor
+   * @param[in] ndim the number of dimensions
+   * @return DLManagedTensor
+   */
+  public static MemorySegment prepareTensor(Arena arena, MemorySegment data, long[] shape, int code, int bits, int ndim,
+      int deviceType) {
+
+    MemorySegment tensor = DLManagedTensor.allocate(arena);
+    MemorySegment dlTensor = DLTensor.allocate(arena);
+
+    DLTensor.data(dlTensor, data);
+
+    MemorySegment dlDevice = DLDevice.allocate(arena);
+    DLDevice.device_type(dlDevice, deviceType);
+    DLTensor.device(dlTensor, dlDevice);
+
+    DLTensor.ndim(dlTensor, ndim);
+
+    MemorySegment dtype = DLDataType.allocate(arena);
+    DLDataType.code(dtype, (byte) code);
+    DLDataType.bits(dtype, (byte) bits);
+    DLDataType.lanes(dtype, (short) 1);
+    DLTensor.dtype(dlTensor, dtype);
+
+    DLTensor.shape(dlTensor, Util.buildMemorySegment(arena, shape));
+
+    DLTensor.strides(dlTensor, MemorySegment.NULL);
+
+    DLManagedTensor.dl_tensor(tensor, dlTensor);
+
+    return tensor;
   }
 
 }

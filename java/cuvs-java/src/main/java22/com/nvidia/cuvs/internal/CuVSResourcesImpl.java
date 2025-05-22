@@ -16,13 +16,13 @@
 
 package com.nvidia.cuvs.internal;
 
-import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
-import static java.lang.foreign.ValueLayout.ADDRESS;
+import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
+import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI.cuvsResources_t;
+import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI.cuvsResourcesCreate;
+import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI.cuvsResourcesDestroy;
 
 import java.lang.foreign.Arena;
-import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemorySegment;
-import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
 
 import com.nvidia.cuvs.CuVSResources;
@@ -33,12 +33,6 @@ import com.nvidia.cuvs.CuVSResources;
  * @since 25.02
  */
 public class CuVSResourcesImpl implements CuVSResources {
-
-  static final MethodHandle createResourcesMethodHandle = downcallHandle("create_resources",
-      FunctionDescriptor.of(ADDRESS, ADDRESS));
-
-  private static final MethodHandle destroyResourcesMethodHandle = downcallHandle("destroy_resources",
-      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS));
 
   private final Path tempDirectory;
   private final Arena arena;
@@ -53,13 +47,16 @@ public class CuVSResourcesImpl implements CuVSResources {
   public CuVSResourcesImpl(Path tempDirectory) throws Throwable {
     this.tempDirectory = tempDirectory;
     arena = Arena.ofShared();
-    resourcesMemorySegment = CuVSPanamaBridge.createResources(arena);
+    resourcesMemorySegment = arena.allocate(cuvsResources_t);
+    int returnValue = cuvsResourcesCreate(resourcesMemorySegment);
+    checkCuVSError(returnValue, "cuvsResourcesCreate");
   }
 
   @Override
   public void close() {
     checkNotDestroyed();
-    CuVSPanamaBridge.destroyResources(resourcesMemorySegment);
+    int returnValue = cuvsResourcesDestroy(resourcesMemorySegment.get(cuvsResources_t, 0));
+    checkCuVSError(returnValue, "cuvsResourcesDestroy");
     destroyed = true;
     if (!arena.scope().isAlive()) {
       arena.close();
