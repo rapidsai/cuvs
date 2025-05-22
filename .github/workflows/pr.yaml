@@ -20,6 +20,7 @@ jobs:
       - conda-cpp-checks
       - conda-python-build
       - conda-python-tests
+      - conda-java-tests
       - docs-build
       - rust-build
       - go-build
@@ -66,6 +67,19 @@ jobs:
           - '!.devcontainer/**'
           - '!.pre-commit-config.yaml'
           - '!README.md'
+          - '!ci/release/update-version.sh'
+          - '!docs/**'
+          - '!img/**'
+          - '!notebooks/**'
+          - '!python/**'
+          - '!rust/**'
+          - '!go/**'
+          - '!thirdparty/LICENSES/**'
+        test_java:
+          - '**'
+          - '!.devcontainer/**'
+          - '!.pre-commit-config.yaml'
+          - '!README.md'
           - '!docs/**'
           - '!img/**'
           - '!notebooks/**'
@@ -77,6 +91,7 @@ jobs:
           - '**'
           - '!.devcontainer/**'
           - '!.pre-commit-config.yaml'
+          - '!ci/release/update-version.sh'
           - '!README.md'
           - '!rust/**'
           - '!go/**'
@@ -85,6 +100,7 @@ jobs:
           - '**'
           - '!.devcontainer/**'
           - '!.pre-commit-config.yaml'
+          - '!ci/release/update-version.sh'
           - '!README.md'
           - '!docs/**'
           - '!img/**'
@@ -134,6 +150,18 @@ jobs:
     if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_python
     with:
       build_type: pull-request
+  conda-java-tests:
+    needs: [conda-cpp-build, changed-files]
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.06
+    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_java
+    with:
+      build_type: pull-request
+      node_type: "gpu-l4-latest-1"
+      arch: "amd64"
+      container_image: "rapidsai/ci-conda:latest"
+      run_script: "ci/test_java.sh"
+      file_to_upload: "java/cuvs-java/target/"
   docs-build:
     needs: conda-python-build
     secrets: inherit

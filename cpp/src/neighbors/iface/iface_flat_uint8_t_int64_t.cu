@@ -29,9 +29,9 @@ namespace cuvs::neighbors {
 
 #define CUVS_INST_MG_FLAT(T, IdxT)                                                                 \
   using T_ha    = raft::host_device_accessor<std::experimental::default_accessor<const T>,         \
-                                          raft::memory_type::device>;                           \
+                                             raft::memory_type::device>;                           \
   using T_da    = raft::host_device_accessor<std::experimental::default_accessor<const T>,         \
-                                          raft::memory_type::host>;                             \
+                                             raft::memory_type::host>;                             \
   using IdxT_ha = raft::host_device_accessor<std::experimental::default_accessor<const IdxT>,      \
                                              raft::memory_type::device>;                           \
   using IdxT_da = raft::host_device_accessor<std::experimental::default_accessor<const IdxT>,      \

@@ -269,6 +269,30 @@ struct cuvsCagraSearchParams {
   uint32_t num_random_samplings;
   /** Bit mask used for initial random seed node selection. */
   uint64_t rand_xor_mask;
+
+  /** Whether to use the persistent version of the kernel (only SINGLE_CTA is supported a.t.m.) */
+  bool persistent;
+  /** Persistent kernel: time in seconds before the kernel stops if no requests received. */
+  float persistent_lifetime;
+  /**
+   * Set the fraction of maximum grid size used by persistent kernel.
+   * Value 1.0 means the kernel grid size is maximum possible for the selected device.
+   * The value must be greater than 0.0 and not greater than 1.0.
+   *
+   * One may need to run other kernels alongside this persistent kernel. This parameter can
+   * be used to reduce the grid size of the persistent kernel to leave a few SMs idle.
+   * Note: running any other work on GPU alongside with the persistent kernel makes the setup
+   * fragile.
+   *   - Running another kernel in another thread usually works, but no progress guaranteed
+   *   - Any CUDA allocations block the context (this issue may be obscured by using pools)
+   *   - Memory copies to not-pinned host memory may block the context
+   *
+   * Even when we know there are no other kernels working at the same time, setting
+   * kDeviceUsage to 1.0 surprisingly sometimes hurts performance. Proceed with care.
+   * If you suspect this is an issue, you can reduce this number to ~0.9 without a significant
+   * impact on the throughput.
+   */
+  float persistent_device_usage;
 };
 
 typedef struct cuvsCagraSearchParams* cuvsCagraSearchParams_t;
@@ -333,6 +357,33 @@ cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index);
  * @return cuvsError_t
  */
 cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int* dim);
+
+/**
+ * @}
+ */
+
+/**
+ * @defgroup cagra_c_merge_params C API for CUDA ANN Graph-based nearest neighbor search
+ * @{
+ */
+
+/**
+ * @brief Supplemental parameters to merge CAGRA index
+ *
+ */
+
+struct cuvsCagraMergeParams {
+  cuvsCagraIndexParams_t output_index_params;
+  cuvsMergeStrategy strategy;
+};
+
+typedef struct cuvsCagraMergeParams* cuvsCagraMergeParams_t;
+
+/** Allocate CAGRA merge params with default values */
+cuvsError_t cuvsCagraMergeParamsCreate(cuvsCagraMergeParams_t* params);
+
+/** De-allocate CAGRA merge params */
+cuvsError_t cuvsCagraMergeParamsDestroy(cuvsCagraMergeParams_t params);
 
 /**
  * @}
@@ -405,8 +456,9 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
  *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`,
  *        or `kDLCPU`. Also, acceptable underlying types are:
  *        1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
- *        2. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
- *        3. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+ *        2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
+ *        3. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
+ *        4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] params cuvsCagraExtendParams_t used to extend CAGRA index
@@ -560,6 +612,64 @@ cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
  * @param[out] index CAGRA index loaded disk
  */
 cuvsError_t cuvsCagraDeserialize(cuvsResources_t res, const char* filename, cuvsCagraIndex_t index);
+
+/**
+ * @brief Merge multiple CAGRA indices into a single CAGRA index.
+ *
+ * All input indices must have been built with the same data type (`index.dtype`) and
+ * have the same dimensionality (`index.dims`). The merged index uses the output
+ * parameters specified in `cuvsCagraMergeParams`.
+ *
+ * Input indices must have:
+ *  - `index.dtype.code` and `index.dtype.bits` matching across all indices.
+ *  - Supported data types for indices:
+ *      a. `kDLFloat` with `bits = 32`
+ *      b. `kDLFloat` with `bits = 16`
+ *      c. `kDLInt` with `bits = 8`
+ *      d. `kDLUInt` with `bits = 8`
+ *
+ * The resulting output index will have the same data type as the input indices.
+ *
+ * Example:
+ * @code{.c}
+ * #include <cuvs/core/c_api.h>
+ * #include <cuvs/neighbors/cagra.h>
+ *
+ * cuvsResources_t res;
+ * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+ *
+ * cuvsCagraIndex_t index1, index2, merged_index;
+ * cuvsCagraIndexCreate(&index1);
+ * cuvsCagraIndexCreate(&index2);
+ * cuvsCagraIndexCreate(&merged_index);
+ *
+ * // Assume index1 and index2 have been built using cuvsCagraBuild
+ *
+ * cuvsCagraMergeParams_t merge_params;
+ * cuvsError_t params_create_status = cuvsCagraMergeParamsCreate(&merge_params);
+ *
+ * cuvsError_t merge_status = cuvsCagraMerge(res, merge_params, (cuvsCagraIndex_t[]){index1,
+ * index2}, 2, merged_index);
+ *
+ * // Use merged_index for search operations
+ *
+ * cuvsError_t params_destroy_status = cuvsCagraMergeParamsDestroy(merge_params);
+ * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
+ * @endcode
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] params cuvsCagraMergeParams_t parameters controlling merge behavior
+ * @param[in] indices Array of input cuvsCagraIndex_t handles to merge
+ * @param[in] num_indices Number of input indices
+ * @param[out] output_index Output handle that will store the merged index.
+ *                          Must be initialized using `cuvsCagraIndexCreate` before use.
+ */
+cuvsError_t cuvsCagraMerge(cuvsResources_t res,
+                           cuvsCagraMergeParams_t params,
+                           cuvsCagraIndex_t* indices,
+                           size_t num_indices,
+                           cuvsCagraIndex_t output_index);
+
 /**
  * @}
  */
