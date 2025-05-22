@@ -58,7 +58,7 @@ class diskann_memory : public algo<T> {
   using search_param_base = typename algo<T>::search_param;
   struct search_param : public search_param_base {
     uint32_t L_search;
-    uint32_t num_threads = omp_get_max_threads();
+    uint32_t num_threads = omp_get_max_threads() / 2;
     // Mode metric_objective;
   };
 
