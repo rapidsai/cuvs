@@ -477,13 +477,19 @@ void RBFKernel<math_t>::matrixRowNormL2(raft::resources const& handle,
   int minor         = is_row_major ? matrix.extent(1) : matrix.extent(0);
   int ld            = is_row_major ? matrix.stride(0) : matrix.stride(1);
   ASSERT(ld == minor, "RBF Kernel lazy rowNorm compute does not support ld parameter");
-  raft::linalg::rowNorm(target,
-                        matrix.data_handle(),
-                        matrix.extent(1),
-                        matrix.extent(0),
-                        raft::linalg::NormType::L2Norm,
-                        is_row_major,
-                        raft::resource::get_cuda_stream(handle));
+  if (is_row_major) {
+    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(target,
+                                                      matrix.data_handle(),
+                                                      matrix.extent(1),
+                                                      matrix.extent(0),
+                                                      raft::resource::get_cuda_stream(handle));
+  } else {
+    raft::linalg::rowNorm<raft::linalg::L2Norm, false>(target,
+                                                       matrix.data_handle(),
+                                                       matrix.extent(1),
+                                                       matrix.extent(0),
+                                                       raft::resource::get_cuda_stream(handle));
+  }
 }
 
 template <typename math_t>

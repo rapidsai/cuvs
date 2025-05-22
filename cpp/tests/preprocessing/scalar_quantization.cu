@@ -78,14 +78,13 @@ class QuantizationTest : public ::testing::TestWithParam<QuantizationInputs<T>> 
     RAFT_CUDA_TRY(cudaMemsetAsync(mu.data(), 0, sizeof(double), stream));
 
     rmm::device_uvector<double> error_stddev(1, stream);
-    raft::stats::stddev(error_stddev.data(),
-                        relative_error.data(),
-                        mu.data(),
-                        1,
-                        elements_to_consider,
-                        false,
-                        true,
-                        stream);
+    raft::stats::stddev<true>(error_stddev.data(),
+                              relative_error.data(),
+                              mu.data(),
+                              1,
+                              elements_to_consider,
+                              false,
+                              stream);
 
     double error_stddev_h;
     raft::update_host(&error_stddev_h, error_stddev.data(), 1, stream);

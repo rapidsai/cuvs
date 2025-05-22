@@ -113,8 +113,8 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
 
       auto centroidsNorm =
         raft::make_device_mdarray<MathT, IdxT>(handle, mr, raft::make_extents<IdxT>(n_clusters));
-      raft::linalg::rowNorm<MathT, IdxT>(
-        centroidsNorm.data_handle(), centers, dim, n_clusters, raft::linalg::L2Norm, true, stream);
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true, MathT, IdxT>(
+        centroidsNorm.data_handle(), centers, dim, n_clusters, stream);
 
       cuvs::distance::fusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
         minClusterAndDistance.data_handle(),
@@ -156,14 +156,8 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
 
       auto centroidsNorm =
         raft::make_device_mdarray<MathT, IdxT>(handle, mr, raft::make_extents<IdxT>(n_clusters));
-      raft::linalg::rowNorm<MathT, IdxT>(centroidsNorm.data_handle(),
-                                         centers,
-                                         dim,
-                                         n_clusters,
-                                         raft::linalg::L2Norm,
-                                         true,
-                                         stream,
-                                         raft::sqrt_op{});
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true, MathT, IdxT>(
+        centroidsNorm.data_handle(), centers, dim, n_clusters, stream, raft::sqrt_op{});
 
       cuvs::distance::fusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
         minClusterAndDistance.data_handle(),
@@ -395,8 +389,8 @@ void compute_norm(const raft::resources& handle,
     dataset_ptr = static_cast<const MathT*>(mapped_dataset.data());
   }
 
-  raft::linalg::rowNorm<MathT, IdxT>(
-    dataset_norm, dataset_ptr, dim, n_rows, raft::linalg::L2Norm, true, stream, norm_fin_op);
+  raft::linalg::rowNorm<raft::linalg::L2Norm, true, MathT, IdxT>(
+    dataset_norm, dataset_ptr, dim, n_rows, stream, norm_fin_op);
 }
 
 /**
@@ -732,8 +726,8 @@ void balancing_em_iters(const raft::resources& handle,
           cluster_centers, n_clusters, dim);
         auto clusters_out_view = raft::make_device_matrix_view<MathT, IdxT, raft::row_major>(
           cluster_centers, n_clusters, dim);
-        raft::linalg::row_normalize(
-          handle, clusters_in_view, clusters_out_view, raft::linalg::L2Norm);
+        raft::linalg::row_normalize<raft::linalg::L2Norm>(
+          handle, clusters_in_view, clusters_out_view);
         break;
       }
       default: break;

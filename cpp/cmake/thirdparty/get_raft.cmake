@@ -35,6 +35,8 @@ function(find_and_configure_raft)
         string(APPEND RAFT_COMPONENTS " distributed")
     endif()
 
+    set(CPM_raft_SOURCE /raid/dgala/raft)
+
     #-----------------------------------------------------
     # Invoke CPM find_package()
     #-----------------------------------------------------

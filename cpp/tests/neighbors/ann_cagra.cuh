@@ -201,8 +201,8 @@ void InitDataset(const raft::resources& handle,
 
     if (metric == InnerProduct) {
       auto dataset_view = raft::make_device_matrix_view(datatset_ptr, size, dim);
-      raft::linalg::row_normalize(
-        handle, raft::make_const_mdspan(dataset_view), dataset_view, raft::linalg::L2Norm);
+      raft::linalg::row_normalize<raft::linalg::L2Norm>(
+        handle, raft::make_const_mdspan(dataset_view), dataset_view);
     }
   } else if constexpr (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>) {
     if constexpr (std::is_same_v<DataT, std::int8_t>) {
@@ -221,24 +221,22 @@ void InitDataset(const raft::resources& handle,
       const auto normalized_norm =
         (std::is_same_v<DataT, std::uint8_t> ? 40 : 20) * std::sqrt(static_cast<ComputeT>(dim));
 
-      raft::linalg::reduce(dev_row_norm.data_handle(),
-                           datatset_ptr,
-                           dim,
-                           size,
-                           0.f,
-                           true,
-                           true,
-                           raft::resource::get_cuda_stream(handle),
-                           false,
-                           raft::sq_op(),
-                           raft::add_op(),
-                           raft::sqrt_op());
+      raft::linalg::reduce<true, true>(dev_row_norm.data_handle(),
+                                       datatset_ptr,
+                                       dim,
+                                       size,
+                                       0.f,
+                                       raft::resource::get_cuda_stream(handle),
+                                       false,
+                                       raft::sq_op(),
+                                       raft::add_op(),
+                                       raft::sqrt_op());
       raft::linalg::matrix_vector_op(
         handle,
         raft::make_const_mdspan(dataset_view),
         raft::make_const_mdspan(dev_row_norm.view()),
         dataset_view,
-        raft::linalg::Apply::ALONG_COLUMNS,
+        raft::Apply::ALONG_COLUMNS,
         [normalized_norm] __device__(DataT elm, ComputeT norm) {
           const ComputeT v           = elm / norm * normalized_norm;
           const ComputeT max_v_range = std::numeric_limits<DataT>::max();

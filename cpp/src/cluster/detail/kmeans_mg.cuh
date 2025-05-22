@@ -228,13 +228,8 @@ void initKMeansPlusPlus(const raft::resources& handle,
   auto L2NormX = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
   if (metric == cuvs::distance::DistanceType::L2Expanded ||
       metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-    raft::linalg::rowNorm(L2NormX.data_handle(),
-                          X.data_handle(),
-                          X.extent(1),
-                          X.extent(0),
-                          raft::linalg::L2Norm,
-                          true,
-                          stream);
+    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+      L2NormX.data_handle(), X.data_handle(), X.extent(1), X.extent(0), stream);
   }
 
   auto minClusterDistance = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
@@ -578,13 +573,8 @@ void fit(const raft::resources& handle,
   auto L2NormX = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
   if (metric == cuvs::distance::DistanceType::L2Expanded ||
       metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-    raft::linalg::rowNorm(L2NormX.data_handle(),
-                          X.data_handle(),
-                          X.extent(1),
-                          X.extent(0),
-                          raft::linalg::L2Norm,
-                          true,
-                          stream);
+    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+      L2NormX.data_handle(), X.data_handle(), X.extent(1), X.extent(0), stream);
   }
 
   DataT priorClusteringCost = 0;

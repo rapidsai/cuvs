@@ -481,13 +481,8 @@ void cluster_cost(raft::resources const& handle,
 
   auto x_norms = raft::make_device_vector<DataT>(handle, n_samples);
 
-  raft::linalg::rowNorm(x_norms.data_handle(),
-                        X.data_handle(),
-                        n_features,
-                        n_samples,
-                        raft::linalg::L2Norm,
-                        true,
-                        stream);
+  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+    x_norms.data_handle(), X.data_handle(), n_features, n_samples, stream);
 
   auto min_cluster_distance = raft::make_device_vector<DataT>(handle, n_samples);
   rmm::device_uvector<DataT> l2_norm_or_distance_buffer(0, stream);

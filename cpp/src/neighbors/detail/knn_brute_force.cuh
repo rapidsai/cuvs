@@ -122,33 +122,20 @@ void tiled_brute_force_knn(const raft::resources& handle,
     // cosine needs the l2norm, where as l2 distances needs the squared norm
     if (metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (!precomputed_search_norms) {
-        raft::linalg::rowNorm(search_norms.data(),
-                              search,
-                              d,
-                              m,
-                              raft::linalg::NormType::L2Norm,
-                              true,
-                              stream,
-                              raft::sqrt_op{});
+        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+          search_norms.data(), search, d, m, stream, raft::sqrt_op{});
       }
       if (!precomputed_index_norms) {
-        raft::linalg::rowNorm(index_norms.data(),
-                              index,
-                              d,
-                              n,
-                              raft::linalg::NormType::L2Norm,
-                              true,
-                              stream,
-                              raft::sqrt_op{});
+        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+          index_norms.data(), index, d, n, stream, raft::sqrt_op{});
       }
     } else {
       if (!precomputed_search_norms) {
-        raft::linalg::rowNorm(
-          search_norms.data(), search, d, m, raft::linalg::NormType::L2Norm, true, stream);
+        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+          search_norms.data(), search, d, m, stream);
       }
       if (!precomputed_index_norms) {
-        raft::linalg::rowNorm(
-          index_norms.data(), index, d, n, raft::linalg::NormType::L2Norm, true, stream);
+        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(index_norms.data(), index, d, n, stream);
       }
     }
     pairwise_metric = cuvs::distance::DistanceType::InnerProduct;
@@ -700,26 +687,24 @@ void brute_force_search_filtered(
       if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         if (!query_norms) {
           query_norms_ = raft::make_device_vector<DistanceT, IdxT>(res, n_queries);
-          raft::linalg::rowNorm((DistanceT*)(query_norms_->data_handle()),
-                                queries.data_handle(),
-                                dim,
-                                n_queries,
-                                raft::linalg::L2Norm,
-                                true,
-                                stream,
-                                raft::sqrt_op{});
+          raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+            (DistanceT*)(query_norms_->data_handle()),
+            queries.data_handle(),
+            dim,
+            n_queries,
+            stream,
+            raft::sqrt_op{});
         }
       } else {
         if (!query_norms) {
           query_norms_ = raft::make_device_vector<DistanceT, IdxT>(res, n_queries);
-          raft::linalg::rowNorm((DistanceT*)(query_norms_->data_handle()),
-                                queries.data_handle(),
-                                dim,
-                                n_queries,
-                                raft::linalg::L2Norm,
-                                true,
-                                stream,
-                                raft::identity_op{});
+          raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+            (DistanceT*)(query_norms_->data_handle()),
+            queries.data_handle(),
+            dim,
+            n_queries,
+            stream,
+            raft::identity_op{});
         }
       }
       cuvs::neighbors::detail::epilogue_on_csr(
@@ -813,18 +798,11 @@ cuvs::neighbors::brute_force::index<T, DistT> build(
     norms = raft::make_device_vector<DistT, int64_t>(res, dataset.extent(0));
     // cosine needs the l2norm, where as l2 distances needs the squared norm
     if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-      raft::linalg::norm(res,
-                         dataset_view,
-                         norms->view(),
-                         raft::linalg::NormType::L2Norm,
-                         raft::linalg::Apply::ALONG_ROWS,
-                         raft::sqrt_op{});
+      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+        res, dataset_view, norms->view(), raft::sqrt_op{});
     } else {
-      raft::linalg::norm(res,
-                         dataset_view,
-                         norms->view(),
-                         raft::linalg::NormType::L2Norm,
-                         raft::linalg::Apply::ALONG_ROWS);
+      raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+        res, dataset_view, norms->view());
     }
   }
 

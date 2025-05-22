@@ -251,16 +251,10 @@ auto run_masked_nn(const raft::handle_t& handle, Inputs<DataT> inp, const Params
   auto x_norm = raft::make_device_vector<DataT, int>(handle, p.m);
   auto y_norm = raft::make_device_vector<DataT, int>(handle, p.n);
 
-  raft::linalg::norm(handle,
-                     std::as_const(inp.x).view(),
-                     x_norm.view(),
-                     raft::linalg::L2Norm,
-                     raft::linalg::Apply::ALONG_ROWS);
-  raft::linalg::norm(handle,
-                     std::as_const(inp.y).view(),
-                     y_norm.view(),
-                     raft::linalg::L2Norm,
-                     raft::linalg::Apply::ALONG_ROWS);
+  raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+    handle, std::as_const(inp.x).view(), x_norm.view());
+  raft::linalg::norm<raft::linalg::L2Norm, raft::Apply::ALONG_ROWS>(
+    handle, std::as_const(inp.y).view(), y_norm.view());
 
   // Create parameters for masked_l2_nn
   using IdxT       = int;
