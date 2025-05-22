@@ -560,7 +560,7 @@ public class CagraIndexImpl implements CagraIndex {
       }
 
       MemorySegment returnValue = arena.allocate(C_INT);
-      
+
       MemorySegment mergeParamsSegment = MemorySegment.NULL;
       if (mergeParams != null) {
         mergeParamsSegment = createMergeParamsSegment(mergeParams, resources);
@@ -590,16 +590,16 @@ public class CagraIndexImpl implements CagraIndex {
    */
   private static MemorySegment createMergeParamsSegment(CagraMergeParams mergeParams, CuVSResourcesImpl resources) {
     MemorySegment seg = cuvsCagraMergeParams.allocate(resources.getArena());
-    
+
     if (mergeParams.getOutputIndexParams() != null) {
       MemorySegment outputIndexParamsSeg = segmentFromIndexParams(mergeParams.getOutputIndexParams(), resources);
       cuvsCagraMergeParams.output_index_params(seg, outputIndexParamsSeg);
     } else {
       cuvsCagraMergeParams.output_index_params(seg, MemorySegment.NULL);
     }
-    
+
     cuvsCagraMergeParams.strategy(seg, mergeParams.getStrategy().value);
-    
+
     return seg;
   }
 

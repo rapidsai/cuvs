@@ -72,7 +72,7 @@ final class JDKProvider implements CuVSProvider {
     if (indexes == null || indexes.length == 0) {
       throw new IllegalArgumentException("At least one index must be provided for merging");
     }
-    
+
     return CagraIndexImpl.merge(indexes, mergeParams);
   }
 }

@@ -74,7 +74,7 @@ public interface CuVSProvider {
 
   /**
    * Merges multiple CAGRA indexes into a single index with the specified merge parameters.
-   * 
+   *
    * @param indexes Array of CAGRA indexes to merge
    * @param mergeParams Parameters to control the merge operation, or null to use defaults
    * @return A new merged CAGRA index

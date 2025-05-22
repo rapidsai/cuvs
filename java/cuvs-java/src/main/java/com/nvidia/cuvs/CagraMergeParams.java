@@ -11,7 +11,7 @@ public class CagraMergeParams {
 
     /**
      * Gets the index parameters for the output index.
-     * 
+     *
      * @return Index parameters to use for the output index
      */
     public CagraIndexParams getOutputIndexParams() {
@@ -20,19 +20,19 @@ public class CagraMergeParams {
 
     /**
      * Gets the merge strategy to use.
-     * 
+     *
      * @return The merge strategy
      */
     public MergeStrategy getStrategy() {
         return strategy;
     }
-    
+
     /**
      * Strategy to use when merging CAGRA indexes.
      */
     public enum MergeStrategy {
         PHYSICAL(0),
-        
+
         LOGICAL(1);
 
         public final int value;
@@ -51,7 +51,7 @@ public class CagraMergeParams {
 
         /**
          * Sets the index parameters for the output index.
-         * 
+         *
          * @param outputIndexParams Index parameters to use for the output index
          * @return This builder
          */
@@ -62,7 +62,7 @@ public class CagraMergeParams {
 
         /**
          * Sets the merge strategy.
-         * 
+         *
          * @param strategy The merge strategy to use
          * @return This builder
          */
@@ -73,7 +73,7 @@ public class CagraMergeParams {
 
         /**
          * Builds the {@link CagraMergeParams} object.
-         * 
+         *
          * @return The built parameters
          */
         public CagraMergeParams build() {
