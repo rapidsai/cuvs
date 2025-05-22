@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 #pragma once
 
 #include "../common/ann_types.hpp"
-#include "../common/thread_pool.hpp"
 #include "../common/util.hpp"
 
 #include <faiss/IndexFlat.h>
@@ -28,7 +27,6 @@
 #include <faiss/index_io.h>
 
 #include <cassert>
-#include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -57,7 +55,6 @@ class faiss_cpu : public algo<T> {
   struct search_param : public search_param_base {
     int nprobe;
     float refine_ratio = 1.0;
-    int num_threads    = omp_get_max_threads();
     /**
      * parallel_mode determines how queries are parallelized with OpenMP.
      *
@@ -127,9 +124,6 @@ class faiss_cpu : public algo<T> {
   faiss::MetricType metric_type_;
   int nlist_;
   double training_sample_fraction_;
-
-  int num_threads_;
-  std::shared_ptr<fixed_thread_pool> thread_pool_;
 };
 
 template <typename T>
@@ -178,19 +172,13 @@ void faiss_cpu<T>::set_search_param(const search_param_base& param, const void* 
   }
 
   if (sp.refine_ratio > 1.0) { this->index_refine_.get()->k_factor = sp.refine_ratio; }
-
-  if (!thread_pool_ || num_threads_ != sp.num_threads) {
-    num_threads_ = sp.num_threads;
-    thread_pool_ = std::make_shared<fixed_thread_pool>(num_threads_);
-  }
 }
 
 template <typename T>
 void faiss_cpu<T>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
-  static_assert(sizeof(size_t) == sizeof(faiss::idx_t),
-                "sizes of size_t and faiss::idx_t are different");
+  static_assert(sizeof(size_t) == sizeof(faiss::idx_t));
 
   index_->search(batch_size, queries, k, distances, reinterpret_cast<faiss::idx_t*>(neighbors));
 }
@@ -320,22 +308,16 @@ class faiss_cpu_flat : public faiss_cpu<T> {
   {
     if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
     auto search_param = dynamic_cast<const typename faiss_cpu<T>::search_param&>(param);
-    if (!this->thread_pool_ || this->num_threads_ != search_param.num_threads) {
-      this->num_threads_ = search_param.num_threads;
-      this->thread_pool_ = std::make_shared<fixed_thread_pool>(this->num_threads_);
-    }
-  };
-
-  void save(const std::string& file) const override
-  {
-    this->template save_<faiss::IndexFlat>(file);
   }
-  void load(const std::string& file) override { this->template load_<faiss::IndexFlat>(file); }
+};
 
-  std::unique_ptr<algo<T>> copy()
-  {
-    return std::make_unique<faiss_cpu_flat<T>>(*this);  // use copy constructor
-  }
+void save(const std::string& file) const override { this->template save_<faiss::IndexFlat>(file); }
+void load(const std::string& file) override { this->template load_<faiss::IndexFlat>(file); }
+
+std::unique_ptr<algo<T>> copy()
+{
+  return std::make_unique<faiss_cpu_flat<T>>(*this);  // use copy constructor
+}
 };
 
 template <typename T>

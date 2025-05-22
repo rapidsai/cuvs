@@ -160,7 +160,7 @@ template <typename T>
 void diskann_memory<T>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* indices, float* distances) const
 {
-#pragma omp parallel if(batch_size > 1) for schedule(dynamic, 1) num_threads(num_search_threads_)
+#pragma omp parallel if (batch_size > 1) for schedule(dynamic, 1) num_threads(num_search_threads_)
   for (int i = 0; i < batch_size; i++) {
     mem_index_->search(queries + i * this->dim_,
                        static_cast<size_t>(k),
@@ -303,7 +303,7 @@ template <typename T>
 void diskann_ssd<T>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
-#pragma omp parallel if(batch_size > 1) for schedule(dynamic, 1) num_threads(num_search_threads_)
+#pragma omp parallel if (batch_size > 1) for schedule(dynamic, 1) num_threads(num_search_threads_)
   for (int64_t i = 0; i < (int64_t)batch_size; i++) {
     p_flash_index_->cached_beam_search(queries + (i * this->dim_),
                                        static_cast<size_t>(k),
