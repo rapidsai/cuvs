@@ -33,6 +33,7 @@ jobs:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
       date: ${{ inputs.date }}
+      script: ci/build_cpp.sh
       sha: ${{ inputs.sha }}
   rust-build:
     needs: cpp-build
@@ -45,7 +46,7 @@ jobs:
       date: ${{ inputs.date }}
       container_image: "rapidsai/ci-conda:latest"
       node_type: "gpu-l4-latest-1"
-      run_script: "ci/build_rust.sh"
+      script: "ci/build_rust.sh"
       sha: ${{ inputs.sha }}
   rust-publish:
     needs: rust-build
@@ -62,7 +63,7 @@ jobs:
       date: ${{ inputs.date }}
       container_image: "rapidsai/ci-conda:latest"
       node_type: "gpu-l4-latest-1"
-      run_script: "ci/build_go.sh"
+      script: "ci/build_go.sh"
       sha: ${{ inputs.sha }}
   java-build:
     needs: cpp-build
@@ -74,7 +75,7 @@ jobs:
       arch: "amd64"
       date: ${{ inputs.date }}
       container_image: "rapidsai/ci-conda:latest"
-      run_script: "ci/build_java.sh"
+      script: "ci/build_java.sh"
       file_to_upload: "java/cuvs-java/target/"
       sha: ${{ inputs.sha }}
   python-build:
@@ -85,6 +86,7 @@ jobs:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
       date: ${{ inputs.date }}
+      script: ci/build_python.sh
       sha: ${{ inputs.sha }}
   upload-conda:
     needs: [cpp-build, python-build]
@@ -108,7 +110,7 @@ jobs:
       container_image: "rapidsai/ci-conda:latest"
       date: ${{ inputs.date }}
       node_type: "gpu-l4-latest-1"
-      run_script: "ci/build_docs.sh"
+      script: "ci/build_docs.sh"
       sha: ${{ inputs.sha }}
   wheel-build-libcuvs:
     secrets: inherit
