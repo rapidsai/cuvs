@@ -467,10 +467,16 @@ struct batch_load_iterator {
       cudaPointerAttributes attr;
       RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, source_));
       dev_ptr_ = reinterpret_cast<T*>(attr.devicePointer);
-      if (dev_ptr_ == nullptr) {
-        buf_0_.resize(row_width_ * batch_size_, stream);
-        dev_ptr_    = buf_0_.data();
+
+      if (dev_ptr_ == nullptr) { needs_copy_ = true; }
+      if (attr.hostPointer != nullptr) {
+        // Data is available in host memory. Although it might be accessible through UVM,
+        // it is preferred to copy the dataset explicitly.
         needs_copy_ = true;
+      }
+      if (needs_copy_) {
+        buf_0_.resize(row_width_ * batch_size_, stream);
+        dev_ptr_ = buf_0_.data();
         if (prefetch_) {
           buf_1_.resize(row_width_ * batch_size_, stream);
           prefetch_dev_ptr_ = buf_1_.data();
