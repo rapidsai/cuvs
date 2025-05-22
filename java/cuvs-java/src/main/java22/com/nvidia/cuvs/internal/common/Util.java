@@ -18,8 +18,14 @@ package com.nvidia.cuvs.internal.common;
 
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
+import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI_1.cudaGetDeviceCount;
+import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI_1.cudaGetDeviceProperties_v2;
+import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI_1.cudaMemGetInfo;
+import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI_1.cudaSetDevice;
+import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI_1.size_t;
 import static java.lang.foreign.ValueLayout.ADDRESS;
 
 import java.lang.foreign.Arena;
@@ -38,7 +44,6 @@ import com.nvidia.cuvs.internal.panama.DLDataType;
 import com.nvidia.cuvs.internal.panama.DLDevice;
 import com.nvidia.cuvs.internal.panama.DLManagedTensor;
 import com.nvidia.cuvs.internal.panama.DLTensor;
-import com.nvidia.cuvs.internal.panama.PanamaFFMAPI;
 import com.nvidia.cuvs.internal.panama.cudaDeviceProp;
 
 public class Util {
@@ -127,30 +132,36 @@ public class Util {
    */
   public static List<GPUInfo> availableGPUs() throws Throwable {
     try (var localArena = Arena.ofConfined()) {
-      MemorySegment num_gpus = localArena.allocate(LinkerHelper.C_INT);
-      PanamaFFMAPI.cudaGetDeviceCount(num_gpus);
 
-      int num_gpu_count = num_gpus.get(LinkerHelper.C_INT, 0);
+      MemorySegment numGpus = localArena.allocate(C_INT);
+      int returnValue = cudaGetDeviceCount(numGpus);
+      checkCudaError(returnValue, "cudaGetDeviceCount");
 
+      int numGpuCount = numGpus.get(C_INT, 0);
       List<GPUInfo> gpuInfoArr = new ArrayList<GPUInfo>();
 
-      MemorySegment free = localArena.allocate(PanamaFFMAPI.size_t);
-      MemorySegment total = localArena.allocate(PanamaFFMAPI.size_t);
+      MemorySegment free = localArena.allocate(size_t);
+      MemorySegment total = localArena.allocate(size_t);
       MemorySegment deviceProp = cudaDeviceProp.allocate(localArena);
 
-      for (int i = 0; i < num_gpu_count; i++) {
+      for (int i = 0; i < numGpuCount; i++) {
 
-        PanamaFFMAPI.cudaSetDevice(i);
-        PanamaFFMAPI.cudaGetDeviceProperties_v2(deviceProp, i);
-        PanamaFFMAPI.cudaMemGetInfo(free, total);
+        returnValue = cudaSetDevice(i);
+        checkCudaError(returnValue, "cudaSetDevice");
 
-        String name = cudaDeviceProp.name(deviceProp).getString(0);
-        long freeMemory = free.get(LinkerHelper.C_LONG, 0);
-        long totalMemory = total.get(LinkerHelper.C_LONG, 0);
+        returnValue = cudaGetDeviceProperties_v2(deviceProp, i);
+        checkCudaError(returnValue, "cudaGetDeviceProperties_v2");
+
+        returnValue = cudaMemGetInfo(free, total);
+        checkCudaError(returnValue, "cudaMemGetInfo");
+
         float computeCapability = Float
             .parseFloat(cudaDeviceProp.major(deviceProp) + "." + cudaDeviceProp.minor(deviceProp));
 
-        gpuInfoArr.add(new GPUInfo(i, name, freeMemory, totalMemory, computeCapability));
+        GPUInfo gpuInfo = new GPUInfo(i, cudaDeviceProp.name(deviceProp).getString(0), free.get(C_LONG, 0),
+            total.get(C_LONG, 0), computeCapability);
+
+        gpuInfoArr.add(gpuInfo);
       }
       return gpuInfoArr;
     }
@@ -240,7 +251,7 @@ public class Util {
    * @return DLManagedTensor
    */
   public static MemorySegment prepareTensor(Arena arena, MemorySegment data, long[] shape, int code, int bits, int ndim,
-      int deviceType) {
+      int deviceType, int lanes) {
 
     MemorySegment tensor = DLManagedTensor.allocate(arena);
     MemorySegment dlTensor = DLTensor.allocate(arena);
@@ -256,7 +267,7 @@ public class Util {
     MemorySegment dtype = DLDataType.allocate(arena);
     DLDataType.code(dtype, (byte) code);
     DLDataType.bits(dtype, (byte) bits);
-    DLDataType.lanes(dtype, (short) 1);
+    DLDataType.lanes(dtype, (short) lanes);
     DLTensor.dtype(dlTensor, dtype);
 
     DLTensor.shape(dlTensor, Util.buildMemorySegment(arena, shape));

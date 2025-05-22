@@ -18,12 +18,15 @@ package com.nvidia.cuvs.internal;
 
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
+import static com.nvidia.cuvs.internal.common.Util.buildMemorySegment;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
+import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI.cuvsHnswDeserialize;
 import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI.cuvsHnswIndexCreate;
 import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI.cuvsHnswIndexDestroy;
 import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI.cuvsHnswSearch;
 import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI.cuvsResources_t;
+import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI.cuvsStreamSync;
 
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -42,7 +45,6 @@ import com.nvidia.cuvs.HnswIndexParams;
 import com.nvidia.cuvs.HnswQuery;
 import com.nvidia.cuvs.HnswSearchParams;
 import com.nvidia.cuvs.SearchResults;
-import com.nvidia.cuvs.internal.common.Util;
 import com.nvidia.cuvs.internal.panama.DLDataType;
 import com.nvidia.cuvs.internal.panama.cuvsHnswIndex;
 import com.nvidia.cuvs.internal.panama.cuvsHnswIndexParams;
@@ -92,32 +94,42 @@ public class HnswIndexImpl implements HnswIndex {
    */
   @Override
   public SearchResults search(HnswQuery query) throws Throwable {
-    int numQueries = query.getQueryVectors().length;
-    long numBlocks = query.getTopK() * numQueries;
-    int vectorDimension = numQueries > 0 ? query.getQueryVectors()[0].length : 0;
-    Arena arena = resources.getArena();
+    try (var localArena = Arena.ofConfined()) {
+      int topK = query.getTopK();
+      float[][] queryVectors = query.getQueryVectors();
+      int numQueries = queryVectors.length;
+      long numBlocks = topK * numQueries;
+      int vectorDimension = numQueries > 0 ? queryVectors[0].length : 0;
+      Arena arena = resources.getArena();
 
-    SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_LONG);
-    SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
-    MemorySegment neighborsMemorySegment = arena.allocate(neighborsSequenceLayout);
-    MemorySegment distancesMemorySegment = arena.allocate(distancesSequenceLayout);
-    MemorySegment querySeg = Util.buildMemorySegment(arena, query.getQueryVectors());
+      SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_LONG);
+      SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
+      MemorySegment neighborsMemorySegment = arena.allocate(neighborsSequenceLayout);
+      MemorySegment distancesMemorySegment = arena.allocate(distancesSequenceLayout);
+      MemorySegment querySeg = buildMemorySegment(arena, queryVectors);
 
-    long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
+      long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
 
-    long queriesShape[] = { numQueries, vectorDimension };
-    MemorySegment queriesTensor = Util.prepareTensor(arena, querySeg, queriesShape, 2, 32, 2, 1);
-    long neighborsShape[] = { numQueries, query.getTopK() };
-    MemorySegment neighborsTensor = Util.prepareTensor(arena, neighborsMemorySegment, neighborsShape, 1, 64, 2, 1);
-    long distancesShape[] = { numQueries, query.getTopK() };
-    MemorySegment distancesTensor = Util.prepareTensor(arena, distancesMemorySegment, distancesShape, 2, 32, 2, 1);
+      long queriesShape[] = { numQueries, vectorDimension };
+      MemorySegment queriesTensor = prepareTensor(arena, querySeg, queriesShape, 2, 32, 2, 1, 1);
+      long neighborsShape[] = { numQueries, topK };
+      MemorySegment neighborsTensor = prepareTensor(arena, neighborsMemorySegment, neighborsShape, 1, 64, 2, 1, 1);
+      long distancesShape[] = { numQueries, topK };
+      MemorySegment distancesTensor = prepareTensor(arena, distancesMemorySegment, distancesShape, 2, 32, 2, 1, 1);
 
-    int returnValue = cuvsHnswSearch(cuvsRes, segmentFromSearchParams(query.getHnswSearchParams()),
-        hnswIndexReference.getMemorySegment(), queriesTensor, neighborsTensor, distancesTensor);
-    checkCuVSError(returnValue, "cuvsHnswSearch");
+      int returnValue = cuvsStreamSync(cuvsRes);
+      checkCuVSError(returnValue, "cuvsStreamSync");
 
-    return new HnswSearchResults(neighborsSequenceLayout, distancesSequenceLayout, neighborsMemorySegment,
-        distancesMemorySegment, query.getTopK(), query.getMapping(), numQueries);
+      returnValue = cuvsHnswSearch(cuvsRes, segmentFromSearchParams(query.getHnswSearchParams()),
+          hnswIndexReference.getMemorySegment(), queriesTensor, neighborsTensor, distancesTensor);
+      checkCuVSError(returnValue, "cuvsHnswSearch");
+
+      returnValue = cuvsStreamSync(cuvsRes);
+      checkCuVSError(returnValue, "cuvsStreamSync");
+
+      return new HnswSearchResults(neighborsSequenceLayout, distancesSequenceLayout, neighborsMemorySegment,
+          distancesMemorySegment, topK, query.getMapping(), numQueries);
+    }
   }
 
   /**
@@ -141,39 +153,41 @@ public class HnswIndexImpl implements HnswIndex {
    * @return an instance of {@link IndexReference}.
    */
   private IndexReference deserialize(InputStream inputStream, int bufferLength) throws Throwable {
-    Path tmpIndexFile = Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".hnsw");
-    tmpIndexFile = tmpIndexFile.toAbsolutePath();
+    try (var localArena = Arena.ofConfined()) {
+      Path tmpIndexFile = Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".hnsw");
+      tmpIndexFile = tmpIndexFile.toAbsolutePath();
 
-    try (var in = inputStream; FileOutputStream fileOutputStream = new FileOutputStream(tmpIndexFile.toFile())) {
-      byte[] chunk = new byte[bufferLength];
-      int chunkLength;
-      while ((chunkLength = in.read(chunk)) != -1) {
-        fileOutputStream.write(chunk, 0, chunkLength);
+      try (var in = inputStream; FileOutputStream fileOutputStream = new FileOutputStream(tmpIndexFile.toFile())) {
+        byte[] chunk = new byte[bufferLength];
+        int chunkLength;
+        while ((chunkLength = in.read(chunk)) != -1) {
+          fileOutputStream.write(chunk, 0, chunkLength);
+        }
+
+        Arena arena = resources.getArena();
+        MemorySegment pathSeg = buildMemorySegment(arena, tmpIndexFile.toString());
+
+        long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
+        MemorySegment hnswIndex = cuvsHnswIndex.allocate(arena);
+        int returnValue = cuvsHnswIndexCreate(hnswIndex);
+        checkCuVSError(returnValue, "cuvsHnswIndexCreate");
+
+        MemorySegment dtype = DLDataType.allocate(arena);
+        DLDataType.bits(dtype, (byte) 32);
+        DLDataType.code(dtype, (byte) 2); // kDLFloat
+        DLDataType.lanes(dtype, (byte) 1);
+
+        cuvsHnswIndex.dtype(hnswIndex, dtype);
+
+        returnValue = cuvsHnswDeserialize(cuvsRes, segmentFromIndexParams(hnswIndexParams), pathSeg,
+            hnswIndexParams.getVectorDimension(), 0, hnswIndex);
+        checkCuVSError(returnValue, "cuvsHnswDeserialize");
+
+        return new IndexReference(hnswIndex);
+
+      } finally {
+        Files.deleteIfExists(tmpIndexFile);
       }
-
-      Arena arena = resources.getArena();
-      MemorySegment pathSeg = Util.buildMemorySegment(arena, tmpIndexFile.toString());
-
-      long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
-      MemorySegment hnswIndex = cuvsHnswIndex.allocate(arena);
-      int returnValue = cuvsHnswIndexCreate(hnswIndex);
-      checkCuVSError(returnValue, "cuvsHnswIndexCreate");
-
-      MemorySegment dtype = DLDataType.allocate(arena);
-      DLDataType.bits(dtype, (byte) 32);
-      DLDataType.code(dtype, (byte) 2); // kDLFloat
-      DLDataType.lanes(dtype, (byte) 1);
-
-      cuvsHnswIndex.dtype(hnswIndex, dtype);
-
-      returnValue = cuvsHnswDeserialize(cuvsRes, segmentFromIndexParams(hnswIndexParams), pathSeg,
-          hnswIndexParams.getVectorDimension(), 0, hnswIndex);
-      checkCuVSError(returnValue, "cuvsHnswDeserialize");
-
-      return new IndexReference(hnswIndex);
-
-    } finally {
-      Files.deleteIfExists(tmpIndexFile);
     }
   }
 
