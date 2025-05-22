@@ -178,7 +178,8 @@ template <typename T>
 void faiss_cpu<T>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
-  static_assert(sizeof(size_t) == sizeof(faiss::idx_t));
+  static_assert(sizeof(size_t) == sizeof(faiss::idx_t),
+                "sizes of size_t and faiss::idx_t are different");
 
   index_->search(batch_size, queries, k, distances, reinterpret_cast<faiss::idx_t*>(neighbors));
 }
@@ -309,7 +310,6 @@ class faiss_cpu_flat : public faiss_cpu<T> {
     if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
     auto search_param = dynamic_cast<const typename faiss_cpu<T>::search_param&>(param);
   }
-};
 
 void save(const std::string& file) const override { this->template save_<faiss::IndexFlat>(file); }
 void load(const std::string& file) override { this->template load_<faiss::IndexFlat>(file); }
