@@ -20,7 +20,6 @@
 #include "greedy_search.cuh"
 #include "robust_prune.cuh"
 #include "vamana_structs.cuh"
-#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/vamana.hpp>
 
 #include <raft/cluster/kmeans.cuh>
