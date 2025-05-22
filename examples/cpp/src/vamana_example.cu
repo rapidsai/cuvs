@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "sparse/neighbors/cross_component_nn.cuh"
+#include "./sparse/neighbors/cross_component_nn.cuh"
 
 #include <cstdint>
 #include <cstdlib>
