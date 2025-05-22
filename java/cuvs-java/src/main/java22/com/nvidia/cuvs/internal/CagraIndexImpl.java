@@ -92,24 +92,20 @@ public class CagraIndexImpl implements CagraIndex {
   private final float[][] dataset;
   private final CuVSResourcesImpl resources;
   private final CagraIndexParams cagraIndexParameters;
-  private final CagraCompressionParams cagraCompressionParams;
   private final IndexReference cagraIndexReference;
   private boolean destroyed;
 
   /**
    * Constructor for building the index using specified dataset
    *
-   * @param indexParameters        an instance of {@link CagraIndexParams} holding
-   *                               the index parameters
-   * @param cagraCompressionParams an instance of {@link CagraCompressionParams}
-   *                               holding the compression parameters
-   * @param dataset                the dataset for indexing
-   * @param resources              an instance of {@link CuVSResources}
+   * @param indexParameters an instance of {@link CagraIndexParams} holding the
+   *                        index parameters
+   * @param dataset         the dataset for indexing
+   * @param resources       an instance of {@link CuVSResources}
    */
-  private CagraIndexImpl(CagraIndexParams indexParameters, CagraCompressionParams cagraCompressionParams,
-      float[][] dataset, CuVSResourcesImpl resources) throws Throwable {
+  private CagraIndexImpl(CagraIndexParams indexParameters, float[][] dataset, CuVSResourcesImpl resources)
+      throws Throwable {
     this.cagraIndexParameters = indexParameters;
-    this.cagraCompressionParams = cagraCompressionParams;
     this.dataset = dataset;
     this.resources = resources;
     this.cagraIndexReference = build();
@@ -123,7 +119,6 @@ public class CagraIndexImpl implements CagraIndex {
    */
   private CagraIndexImpl(InputStream inputStream, CuVSResourcesImpl resources) throws Throwable {
     this.cagraIndexParameters = null;
-    this.cagraCompressionParams = null;
     this.dataset = null;
     this.resources = resources;
     this.cagraIndexReference = deserialize(inputStream);
@@ -168,10 +163,6 @@ public class CagraIndexImpl implements CagraIndex {
       int numWriterThreads = cagraIndexParameters != null ? cagraIndexParameters.getNumWriterThreads() : 1;
       omp_set_num_threads(numWriterThreads);
 
-      MemorySegment compressionParamsMemorySegment = cagraCompressionParams != null
-          ? segmentFromCompressionParams(cagraCompressionParams)
-          : MemorySegment.NULL;
-
       MemorySegment dataSeg = buildMemorySegment(resources.getArena(), dataset);
 
       Arena arena = resources.getArena();
@@ -195,7 +186,6 @@ public class CagraIndexImpl implements CagraIndex {
         cuvsIvfPqIndexParams.n_lists(cuvsIvfPqIndexParamsMS, (int) (rows < n_lists ? rows : n_lists));
       }
 
-      cuvsCagraIndexParams.compression(indexParamsMemorySegment, compressionParamsMemorySegment);
       returnValue = cuvsStreamSync(cuvsRes);
       checkCuVSError(returnValue, "cuvsStreamSync");
 
@@ -432,33 +422,36 @@ public class CagraIndexImpl implements CagraIndex {
   }
 
   /**
-   * Allocates the configured compression parameters in the MemorySegment.
-   */
-  private MemorySegment segmentFromCompressionParams(CagraCompressionParams params) {
-    MemorySegment seg = cuvsCagraCompressionParams.allocate(resources.getArena());
-    cuvsCagraCompressionParams.pq_bits(seg, params.getPqBits());
-    cuvsCagraCompressionParams.pq_dim(seg, params.getPqDim());
-    cuvsCagraCompressionParams.vq_n_centers(seg, params.getVqNCenters());
-    cuvsCagraCompressionParams.kmeans_n_iters(seg, params.getKmeansNIters());
-    cuvsCagraCompressionParams.vq_kmeans_trainset_fraction(seg, params.getVqKmeansTrainsetFraction());
-    cuvsCagraCompressionParams.pq_kmeans_trainset_fraction(seg, params.getPqKmeansTrainsetFraction());
-    return seg;
-  }
-
-  /**
    * Allocates the configured index parameters in the MemorySegment.
    */
   private MemorySegment segmentFromIndexParams(CagraIndexParams params) {
-    MemorySegment seg = cuvsCagraIndexParams.allocate(resources.getArena());
+    Arena arena = resources.getArena();
+    MemorySegment seg = cuvsCagraIndexParams.allocate(arena);
     cuvsCagraIndexParams.intermediate_graph_degree(seg, params.getIntermediateGraphDegree());
     cuvsCagraIndexParams.graph_degree(seg, params.getGraphDegree());
     cuvsCagraIndexParams.build_algo(seg, params.getCagraGraphBuildAlgo().value);
     cuvsCagraIndexParams.nn_descent_niter(seg, params.getNNDescentNumIterations());
     cuvsCagraIndexParams.metric(seg, params.getCuvsDistanceType().value);
 
+    CagraCompressionParams cagraCompressionParams = params.getCagraCompressionParams();
+    if (cagraCompressionParams != null) {
+    MemorySegment cuvsCagraCompressionParamsMemorySegment = cuvsCagraCompressionParams.allocate(arena);
+    cuvsCagraCompressionParams.pq_bits(cuvsCagraCompressionParamsMemorySegment, cagraCompressionParams.getPqBits());
+    cuvsCagraCompressionParams.pq_dim(cuvsCagraCompressionParamsMemorySegment, cagraCompressionParams.getPqDim());
+    cuvsCagraCompressionParams.vq_n_centers(cuvsCagraCompressionParamsMemorySegment,
+        cagraCompressionParams.getVqNCenters());
+    cuvsCagraCompressionParams.kmeans_n_iters(cuvsCagraCompressionParamsMemorySegment,
+        cagraCompressionParams.getKmeansNIters());
+    cuvsCagraCompressionParams.vq_kmeans_trainset_fraction(cuvsCagraCompressionParamsMemorySegment,
+        cagraCompressionParams.getVqKmeansTrainsetFraction());
+    cuvsCagraCompressionParams.pq_kmeans_trainset_fraction(cuvsCagraCompressionParamsMemorySegment,
+        cagraCompressionParams.getPqKmeansTrainsetFraction());
+    cuvsCagraIndexParams.compression(seg, cuvsCagraCompressionParamsMemorySegment);
+    }
+
     if (params.getCagraGraphBuildAlgo().equals(CagraGraphBuildAlgo.IVF_PQ)) {
 
-      MemorySegment ivfpqIndexParamsMemorySegment = cuvsIvfPqIndexParams.allocate(resources.getArena());
+      MemorySegment ivfpqIndexParamsMemorySegment = cuvsIvfPqIndexParams.allocate(arena);
       CuVSIvfPqIndexParams cuVSIvfPqIndexParams = params.getCuVSIvfPqParams().getIndexParams();
 
       cuvsIvfPqIndexParams.metric(ivfpqIndexParamsMemorySegment, cuVSIvfPqIndexParams.getMetric().value);
@@ -478,7 +471,7 @@ public class CagraIndexImpl implements CagraIndex {
       cuvsIvfPqIndexParams.max_train_points_per_pq_code(ivfpqIndexParamsMemorySegment,
           cuVSIvfPqIndexParams.getMaxTrainPointsPerPqCode());
 
-      MemorySegment ivfpqSearchParamsMemorySegment = cuvsIvfPqSearchParams.allocate(resources.getArena());
+      MemorySegment ivfpqSearchParamsMemorySegment = cuvsIvfPqSearchParams.allocate(arena);
       CuVSIvfPqSearchParams cuVSIvfPqSearchParams = params.getCuVSIvfPqParams().getSearchParams();
       cuvsIvfPqSearchParams.n_probes(ivfpqSearchParamsMemorySegment, cuVSIvfPqSearchParams.getnProbes());
       cuvsIvfPqSearchParams.lut_dtype(ivfpqSearchParamsMemorySegment, cuVSIvfPqSearchParams.getLutDtype().value);
@@ -487,7 +480,7 @@ public class CagraIndexImpl implements CagraIndex {
       cuvsIvfPqSearchParams.preferred_shmem_carveout(ivfpqSearchParamsMemorySegment,
           cuVSIvfPqSearchParams.getPreferredShmemCarveout());
 
-      MemorySegment cuvsIvfPqParamsMemorySegment = cuvsIvfPqParams.allocate(resources.getArena());
+      MemorySegment cuvsIvfPqParamsMemorySegment = cuvsIvfPqParams.allocate(arena);
       cuvsIvfPqParams.ivf_pq_build_params(cuvsIvfPqParamsMemorySegment, ivfpqIndexParamsMemorySegment);
       cuvsIvfPqParams.ivf_pq_search_params(cuvsIvfPqParamsMemorySegment, ivfpqSearchParamsMemorySegment);
       cuvsIvfPqParams.refinement_rate(cuvsIvfPqParamsMemorySegment, params.getCuVSIvfPqParams().getRefinementRate());
@@ -551,7 +544,6 @@ public class CagraIndexImpl implements CagraIndex {
 
     private float[][] dataset;
     private CagraIndexParams cagraIndexParams;
-    private CagraCompressionParams cagraCompressionParams;
     private CuVSResourcesImpl cuvsResources;
     private InputStream inputStream;
 
@@ -578,17 +570,11 @@ public class CagraIndexImpl implements CagraIndex {
     }
 
     @Override
-    public Builder withCompressionParams(CagraCompressionParams cagraCompressionParams) {
-      this.cagraCompressionParams = cagraCompressionParams;
-      return this;
-    }
-
-    @Override
     public CagraIndexImpl build() throws Throwable {
       if (inputStream != null) {
         return new CagraIndexImpl(inputStream, cuvsResources);
       } else {
-        return new CagraIndexImpl(cagraIndexParams, cagraCompressionParams, dataset, cuvsResources);
+        return new CagraIndexImpl(cagraIndexParams, dataset, cuvsResources);
       }
     }
   }

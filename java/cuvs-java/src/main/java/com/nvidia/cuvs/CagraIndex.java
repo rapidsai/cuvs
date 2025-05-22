@@ -208,15 +208,6 @@ public interface CagraIndex {
         Builder withIndexParams(CagraIndexParams cagraIndexParameters);
 
         /**
-         * Registers an instance of configured {@link CagraCompressionParams} with this
-         * Builder.
-         *
-         * @param cagraCompressionParams An instance of CagraCompressionParams.
-         * @return An instance of this Builder.
-         */
-        public Builder withCompressionParams(CagraCompressionParams cagraCompressionParams);
-
-        /**
          * Builds and returns an instance of CagraIndex.
          *
          * @return an instance of CagraIndex
