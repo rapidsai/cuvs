@@ -35,7 +35,7 @@ function(find_and_configure_raft)
         string(APPEND RAFT_COMPONENTS " distributed")
     endif()
 
-    set(CPM_raft_SOURCE /raid/dgala/raft)
+    # set(CPM_raft_SOURCE /raid/dgala/raft)
 
     #-----------------------------------------------------
     # Invoke CPM find_package()
@@ -63,8 +63,8 @@ endfunction()
 # To use a different RAFT locally, set the CMake variable
 # CPM_raft_SOURCE=/path/to/local/raft
 find_and_configure_raft(VERSION  ${RAFT_VERSION}.00
-        FORK                     ${RAFT_FORK}
-        PINNED_TAG               ${RAFT_PINNED_TAG}
+        FORK                     divyegala
+        PINNED_TAG               reduction-kernels
         ENABLE_MNMG_DEPENDENCIES OFF
         ENABLE_NVTX              OFF
         USE_RAFT_STATIC ${CUVS_USE_RAFT_STATIC}
