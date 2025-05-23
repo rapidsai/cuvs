@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "../../../cpp/src/sparse/neighbors/cross_component_nn.cuh"
-
 #include <cstdint>
 #include <cstdlib>
 #include <raft/core/device_mdarray.hpp>
