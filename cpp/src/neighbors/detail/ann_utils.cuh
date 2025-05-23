@@ -470,8 +470,8 @@ struct batch_load_iterator {
 
       if (dev_ptr_ == nullptr) { needs_copy_ = true; }
       if (attr.type != cudaMemoryTypeDevice) {
-        // Data is available in host memory. Although it might be accessible through UVM,
-        // it is preferred to copy the dataset explicitly.
+        // Although data might be accessible on device through HMM or ATS,
+        // it is preferred to copy the dataset explicitly when it is not device data.
         needs_copy_ = true;
       }
       if (needs_copy_) {
