@@ -469,7 +469,7 @@ struct batch_load_iterator {
       dev_ptr_ = reinterpret_cast<T*>(attr.devicePointer);
 
       if (dev_ptr_ == nullptr) { needs_copy_ = true; }
-      if (attr.hostPointer != nullptr) {
+      if (attr.type != cudaMemoryTypeDevice) {
         // Data is available in host memory. Although it might be accessible through UVM,
         // it is preferred to copy the dataset explicitly.
         needs_copy_ = true;
