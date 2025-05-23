@@ -45,11 +45,13 @@ value_idx build_k(value_idx n_samples, int c)
  *
  * @tparam value_idx
  * @tparam value_t
+ * @tparam nnz_t
  * @param[in] res raft res
  * @param[in] X dense matrix of input data samples and observations (size m * n)
  * @param[in] metric distance metric to use when constructing neighborhoods
  * @param[out] out output edge list
- * @param c
+ * @param[in] c a constant used when constructing linkage from knn graph. Allows the indirect
+ control of k. The algorithm will set `k = log(n) + c`
  */
 template <typename value_idx = int, typename value_t = float, typename nnz_t = size_t>
 void knn_graph(raft::resources const& res,
