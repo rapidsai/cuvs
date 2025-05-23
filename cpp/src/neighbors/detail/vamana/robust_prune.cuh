@@ -24,6 +24,8 @@
 #include "macros.cuh"
 #include "vamana_structs.cuh"
 
+#define GRAPH_SLACK_FACTOR 1.05
+
 namespace cuvs::neighbors::vamana::detail {
 
 // Load candidates (from query) and previous edges (from nbh_list) into registers (tmp) spanning
@@ -236,8 +238,6 @@ __global__ void RobustPruneKernel(
           next_cand.idx = query_list[i].ids[listIdx];
           next_cand.dist = listDist;
 
-if(threadIdx.x==0 && i==0) printf("C outIdx:%d, list < graph, selecting (%d, %0.3f) from graph\n", outIdx, next_cand.idx, next_cand.dist);
-
           if(graph(queryId, graphIdx) == query_list[i].ids[listIdx]) { // Duplicate found!
             graphIdx++; // Skip the duplicate
           }
@@ -255,9 +255,9 @@ if(threadIdx.x==0 && i==0) printf("C outIdx:%d, list < graph, selecting (%d, %0.
       new_nbh_list[outIdx].dist = next_cand.dist;
     }
 
-    //TODO - WORK ON OCCLUDE LIST AND ITERATE THROUGH IT THAT WAY!
 
     // If we need to prune at all...
+//    if(res_size > degree * GRAPH_SLACK_FACTOR) {
     if(res_size > degree) {
       int accept_count=0;
 
@@ -270,6 +270,11 @@ if(threadIdx.x==0 && i==0) printf("C outIdx:%d, list < graph, selecting (%d, %0.
             continue; // Skip over elements already pruned or already accepted
 	  }
 
+	  if(new_nbh_list[pass_start].idx == queryId) {
+            printf("self loop!\n");
+	    continue;
+	  }
+
 	  T* cand_ptr = const_cast<T*>(&dataset((size_t)(new_nbh_list[pass_start].idx), 0));
 
           occlusion_list[pass_start] = raft::lower_bound<float>(); // Mark as "accepted"
@@ -277,7 +282,7 @@ if(threadIdx.x==0 && i==0) printf("C outIdx:%d, list < graph, selecting (%d, %0.
         
 	  // Update rets of the occlusion list
           for(int occId = pass_start+1; occId < res_size; occId++) {
-            if(occlusion_list[occId] != raft::upper_bound<float>() && occlusion_list[occId] != raft::lower_bound<float>()) 
+            if(occlusion_list[occId] <= alpha && occlusion_list[occId] != raft::lower_bound<float>()) 
 	    {
 	      T* k_ptr = const_cast<T*>(&dataset((size_t)(new_nbh_list[occId].idx), 0));
               accT djk = dist<T, accT>(cand_ptr, k_ptr, dim, metric);
@@ -293,16 +298,6 @@ if(threadIdx.x==0 && i==0) printf("C outIdx:%d, list < graph, selecting (%d, %0.
           }
         }
       }
-
-/*
-      if(threadIdx.x==0 && i==0) {
-	printf("after occlusion, accepted: %d:\n", accept_count);
-	for(int j=0; j<res_size; j++) {
-          printf("%0.2f, ", occlusion_list[j]);
-	}
-	printf("\n");
-      }
-      */
 
       // Move all "accepted" candidates to front of list and zero out the rest
       int out_idx = 1;
@@ -324,21 +319,13 @@ if(threadIdx.x==0 && i==0) printf("C outIdx:%d, list < graph, selecting (%d, %0.
       __syncthreads();
     }
 
-    if(threadIdx.x==0 && i==0) {
-	printf("after prune, size:%d:\n", res_size);
-	for(int j=0; j<res_size; j++) {
-          printf("%d (%0.2f), ", new_nbh_list[j].idx, new_nbh_list[j].dist);
-	}
-	printf("\n");
-    }
-
-    __syncthreads();
     // Copy results out to graph
     for(int j=threadIdx.x; j<degree; j+=blockDim.x) {
      query_list[i].ids[j] = new_nbh_list[j].idx;
      query_list[i].dists[j] = new_nbh_list[j].dist;
     }
     if(threadIdx.x==0) {
+//      if(res_size > degree && res_size <= (degree * GRAPH_SLACK_FACTOR)) res_size = degree;
       query_list[i].size = res_size;
     }
   }

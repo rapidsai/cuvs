@@ -319,19 +319,20 @@ __global__ void init_query_candidate_list(QueryCandidates<IdxT, accT>* query_lis
                                           IdxT* visited_id_ptr,
                                           accT* visited_dist_ptr,
                                           int num_queries,
-                                          int maxSize)
+                                          int maxSize,
+					  int extra_queries_in_list = 0)
 {
   IdxT* ids_ptr  = static_cast<IdxT*>(visited_id_ptr);
   accT* dist_ptr = static_cast<accT*>(visited_dist_ptr);
 
   for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < num_queries * maxSize;
-       i += blockDim.x + gridDim.x) {
+       i += blockDim.x * gridDim.x) {
     ids_ptr[i]  = raft::upper_bound<IdxT>();
     dist_ptr[i] = raft::upper_bound<accT>();
   }
 
-  for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < num_queries;
-       i += blockDim.x + gridDim.x) {
+  for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < num_queries + extra_queries_in_list;
+       i += blockDim.x * gridDim.x) {
     query_list[i].maxSize = maxSize;
     query_list[i].size    = 0;
     query_list[i].ids     = &ids_ptr[i * (size_t)(maxSize)];

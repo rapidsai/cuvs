@@ -97,8 +97,8 @@ void batched_insert_vamana(
   int degree  = graph.extent(1);
 
   // Algorithm params
-//  int max_batchsize = (int)(params.max_fraction * (float)N);
-  int max_batchsize = 1;
+  int max_batchsize = (int)(params.max_fraction * (float)N);
+
   if (max_batchsize > (int)dataset.extent(0)) {
     RAFT_LOG_WARN(
       "Max fraction is the fraction of the total dataset, so it cannot be larger 1.0, reducing it "
@@ -151,7 +151,8 @@ void batched_insert_vamana(
                                                                     visited_ids.data_handle(),
                                                                     visited_dists.data_handle(),
                                                                     (int)max_batchsize,
-                                                                    visited_size);
+                                                                    visited_size,
+								    1);
 
   auto topk_pq_mem =
         raft::make_device_mdarray<Node<accT>>(res,
@@ -161,7 +162,7 @@ void batched_insert_vamana(
   auto s_coords_mem =
 	  raft::make_device_mdarray<T>(res,
 			  raft::resource::get_large_workspace_resource(res),
-			  raft::make_extents<int64_t>(max_batchsize, dim));
+			  raft::make_extents<int64_t>(min(maxBlocks, max(max_batchsize, reverse_batch)), dim));
 
 
 
@@ -220,15 +221,16 @@ void batched_insert_vamana(
   // Random medoid has minor impact on recall
   // TODO: use heuristic for better medoid selection, issue:
   // https://github.com/rapidsai/cuvs/issues/355
-  *medoid_id = rand() % N;
+//  *medoid_id = rand() % N;
+  *medoid_id = 123742;
 
   // size of current batch of inserts, increases logarithmically until max_batchsize
   int step_size = 1;
   // Number of passes over dataset (default 1)
   for (int iter = 0; iter < insert_iters; iter++) {
     // Loop through batches and call the insert and prune kernels
-//    for (int start = 0; start < N;) {
-    for (int start = 0; start < 40;) {
+    for (int start = 0; start < N;) {
+//    for (int start = 0; start < 40;) {
 start_t = std::chrono::system_clock::now();
 
 
@@ -273,7 +275,6 @@ elapsed_seconds = end_t - start_t;
 segment_sort_time += elapsed_seconds.count();
 start_t = std::chrono::system_clock::now();
 
-printf("------------ PRUNE 1 ------------\n");
       // Run on candidates of vectors being inserted
       RobustPruneKernel<T, accT, IdxT>
         <<<num_blocks, blockD, prune_smem_total_size, stream>>>(d_graph.view(),
@@ -483,7 +484,6 @@ start_t = std::chrono::system_clock::now();
         recompute_reverse_dists<T, accT, IdxT>
           <<<num_blocks, blockD, 0, stream>>>(reverse_list, dataset, reverse_batch, metric);
 
-printf("------------ PRUNE 2 ------------\n");
         // Call 2nd RobustPrune on reverse query_list
         RobustPruneKernel<T, accT, IdxT>
           <<<num_blocks, blockD, prune_smem_total_size, stream>>>(d_graph.view(),
@@ -495,7 +495,6 @@ printf("------------ PRUNE 2 ------------\n");
                                                                   alpha,
                                                                   prune_smem_sort_size,
 								  s_coords_mem.data_handle());
-	printf("After prune2: %d\n", cudaDeviceSynchronize());
 
 // SEGMENTED SORT ON QUERY_LIST
 TestSortKernel<T, accT, IdxT, Accessor>
