@@ -279,6 +279,7 @@ __global__ void GreedySearchKernel(
         if (neighbor_array[j] == raft::upper_bound<IdxT>())
           atomicMin(&num_neighbors, (int)j);  // warp-wide min to find the number of neighbors
       }
+      __syncthreads();
 
       // computing distances between the query vector and neighbor vectors then enqueue in priority
       // queue.
