@@ -41,6 +41,7 @@
 #include <thrust/sequence.h>
 
 #include <cstddef>
+#include <filesystem>
 #include <iostream>
 #include <optional>
 #include <string>
@@ -161,8 +162,13 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
 
     tmp_index_file index_file;
     vamana::serialize(handle_, index_file.filename, index);
-    if (index_params.codebooks)
+    if (index_params.codebooks) {
       vamana::serialize(handle_, index_file.filename + "_sector_aligned", index, true, true);
+      EXPECT_FALSE(std::filesystem::is_empty(index_file.filename + "_sector_aligned_disk.index"));
+      EXPECT_FALSE(std::filesystem::is_empty(index_file.filename + "_sector_aligned.data"));
+      EXPECT_FALSE(
+        std::filesystem::is_empty(index_file.filename + "_sector_aligned_pq_compressed.bin"));
+    }
 
     // Test recall by searching with CAGRA search
     if (ps.graph_degree < 256) {  // CAGRA search result buffer cannot support larger graph degree
