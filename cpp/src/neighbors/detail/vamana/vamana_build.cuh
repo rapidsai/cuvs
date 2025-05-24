@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "../../../sparse/neighbors/cross_component_nn.cuh"
 #include "../../detail/vpq_dataset.cuh"
 #include "greedy_search.cuh"
 #include "robust_prune.cuh"
@@ -37,7 +38,6 @@
 #include <raft/matrix/init.cuh>
 #include <raft/matrix/slice.cuh>
 #include <raft/random/make_blobs.cuh>
-#include <raft/sparse/neighbors/cross_component_nn.cuh>
 
 #include <thrust/device_vector.h>
 #include <thrust/sequence.h>
@@ -287,7 +287,7 @@ void batched_insert_vamana(
 
       // Get number of unique node destinations
       IdxT unique_dests =
-        raft::sparse::neighbors::get_n_components(edge_dest.data_handle(), total_edges, stream);
+        cuvs::sparse::neighbors::get_n_components(edge_dest.data_handle(), total_edges, stream);
 
       // Find which node IDs have reverse edges and their indices in the reverse edge list
       thrust::device_vector<IdxT> edge_dest_vec(edge_dest.data_handle(),
