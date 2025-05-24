@@ -164,10 +164,11 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
     vamana::serialize(handle_, index_file.filename, index);
     if (index_params.codebooks) {
       vamana::serialize(handle_, index_file.filename + "_sector_aligned", index, true, true);
-      EXPECT_FALSE(std::filesystem::is_empty(index_file.filename + "_sector_aligned_disk.index"));
-      EXPECT_FALSE(std::filesystem::is_empty(index_file.filename + "_sector_aligned.data"));
-      EXPECT_FALSE(
-        std::filesystem::is_empty(index_file.filename + "_sector_aligned_pq_compressed.bin"));
+      EXPECT_TRUE(std::filesystem::file_size(index_file.filename + "_sector_aligned_disk.index") >
+                  0u);
+      EXPECT_TRUE(std::filesystem::file_size(index_file.filename + "_sector_aligned.data") > 0u);
+      EXPECT_TRUE(
+        std::filesystem::file_size(index_file.filename + "_sector_aligned_pq_compressed.bin") > 0u);
     }
 
     // Test recall by searching with CAGRA search
