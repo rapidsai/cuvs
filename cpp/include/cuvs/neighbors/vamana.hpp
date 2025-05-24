@@ -54,7 +54,8 @@ namespace cuvs::neighbors::vamana {
 
 struct index_params : cuvs::neighbors::index_params {
   /**
-   * @brief Parameters used to build quantized DiskANN index; to be generated using get_codebooks()
+   * @brief Parameters used to build quantized DiskANN index; to be generated using
+   * deserialize_codebooks()
    */
   template <typename T = float>
   struct codebook_params {
@@ -234,9 +235,13 @@ struct index : cuvs::neighbors::index {
   }
 
   /**
-   * Replace the quantized dataset.
+   * @brief Replace the current quantized dataset with a new quantized dataset.
    *
    * Ownership of the new quantized dataset is transferred to the index.
+   *
+   * @param[in] res
+   * @param[in] new_quantized_dataset the new quantized dataset for the index
+   *
    */
   void update_quantized_dataset(
     raft::resources const& res,
@@ -585,14 +590,14 @@ void serialize(raft::resources const& handle,
  *   // define dimension of vectors in dataset
  *   int dim = 64;
  *   // construct codebook parameters from input codebook files
- *   auto codebooks = cuvs::neighbors::vamana::get_codebooks(codebook_prefix, dim);
+ *   auto codebooks = cuvs::neighbors::vamana::deserialize_codebooks(codebook_prefix, dim);
  * @endcode
  *
  * @param[in] codebook_prefix path prefix to pq pivots and rotation matrix files
  * @param[in] dim dimension of vectors in dataset
  *
  */
-auto get_codebooks(const std::string& codebook_prefix, const int dim)
+auto deserialize_codebooks(const std::string& codebook_prefix, const int dim)
   -> index_params::codebook_params<float>;
 
 /**

@@ -18,11 +18,11 @@
 
 namespace cuvs::neighbors::vamana {
 
-#define CUVS_INST_VAMANA_CODEBOOKS(T)                                       \
-  auto get_codebooks(const std::string& codebook_prefix, const int dim)     \
-    -> cuvs::neighbors::vamana::index_params::codebook_params<T>            \
-  {                                                                         \
-    return cuvs::neighbors::vamana::get_codebooks<T>(codebook_prefix, dim); \
+#define CUVS_INST_VAMANA_CODEBOOKS(T)                                               \
+  auto deserialize_codebooks(const std::string& codebook_prefix, const int dim)     \
+    -> cuvs::neighbors::vamana::index_params::codebook_params<T>                    \
+  {                                                                                 \
+    return cuvs::neighbors::vamana::deserialize_codebooks<T>(codebook_prefix, dim); \
   }
 
 CUVS_INST_VAMANA_CODEBOOKS(float);

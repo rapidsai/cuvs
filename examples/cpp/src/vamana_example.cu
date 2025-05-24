@@ -42,7 +42,7 @@ void vamana_build_and_write(raft::device_resources const &dev_resources,
   index_params.visited_size = visited_size;
   index_params.graph_degree = degree;
   index_params.vamana_iters = iters;
-  index_params.codebooks = vamana::get_codebooks(codebook_prefix, dataset.extent(1));
+  index_params.codebooks = vamana::deserialize_codebooks(codebook_prefix, dataset.extent(1));
 
   std::cout << "Building Vamana index (search graph)" << std::endl;
 

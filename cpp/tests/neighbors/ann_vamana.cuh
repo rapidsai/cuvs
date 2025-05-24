@@ -137,6 +137,10 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
     index_params.visited_size      = ps.visited_size;
     index_params.max_fraction      = ps.max_fraction;
     index_params.reverse_batchsize = ps.reverse_batchsize;
+    // use codebooks with dim=384 to test serialization & quantization code path
+    if (ps.dim == 384)
+      index_params.codebooks = vamana::deserialize_codebooks(
+        std::string(TEST_DATA_DIR) + "neighbors/ann_vamana/quantizer_fbv6_384_64", ps.dim);
 
     auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
       (const DataT*)database.data(), ps.n_rows, ps.dim);
@@ -269,7 +273,7 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
 {
   std::vector<AnnVamanaInputs> inputs = raft::util::itertools::product<AnnVamanaInputs>(
     {1000},
-    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},
+    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 384, 512, 619, 1024},
     {32},       // graph degree
     {64, 256},  // visited_size
     {0.06, 0.1},

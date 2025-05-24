@@ -21,7 +21,7 @@ rapids_test_init()
 
 function(ConfigureTest)
 
-  set(options OPTIONAL NOCUDA C_LIB)
+  set(options OPTIONAL NOCUDA C_LIB DATA_DIR)
   set(oneValueArgs NAME GPUS PERCENT ADDITIONAL_DEP)
   set(multiValueArgs PATH TARGETS CONFIGURATIONS)
 
@@ -74,6 +74,10 @@ function(ConfigureTest)
 
   if(_CUVS_TEST_NOCUDA)
     target_compile_definitions(${TEST_NAME} PRIVATE "CUVS_DISABLE_CUDA")
+  endif()
+
+  if(_CUVS_TEST_DATA_DIR)
+    target_compile_definitions(${TEST_NAME} PRIVATE TEST_DATA_DIR="${CUVS_SOURCE_DIR}/tests/data/")
   endif()
 
   target_include_directories(${TEST_NAME} PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/tests>")
@@ -183,6 +187,7 @@ if(BUILD_TESTS)
     1
     PERCENT
     100
+    DATA_DIR
   )
 
   ConfigureTest(NAME NEIGHBORS_BALL_COVER_TEST PATH neighbors/ball_cover.cu GPUS 1 PERCENT 100)

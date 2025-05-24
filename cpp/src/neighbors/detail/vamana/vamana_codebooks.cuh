@@ -24,7 +24,7 @@
 
 namespace cuvs::neighbors::vamana::detail {
 
-/* @defgroup vamana_codebooks_detail vamana get_codebooks
+/* @defgroup vamana_codebooks_detail vamana deserialize_codebooks
  * @{
  */
 
@@ -135,7 +135,8 @@ inline std::vector<float> parse_rotation_matrix_file(const std::string& path, co
 }
 
 template <typename T>
-index_params::codebook_params<T> get_codebooks(const std::string& codebook_prefix, const int dim)
+index_params::codebook_params<T> deserialize_codebooks(const std::string& codebook_prefix,
+                                                       const int dim)
 {
   index_params::codebook_params<T> codebooks;
   codebooks.pq_encoding_table = parse_pq_pivots_file(
