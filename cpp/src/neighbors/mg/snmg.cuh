@@ -607,6 +607,9 @@ void search(const raft::resources& clique,
                                        n_neighbors,
                                        n_batches);
     } else if (merge_mode == TREE_MERGE) {
+      ASSERT(index.num_ranks_ % 2 == 0,
+             "The number of ranks should be even when running sharded search in TREE_MERGE mode.");
+
       RAFT_LOG_DEBUG(
         "SHARDED SEARCH WITH TREE_MERGE MERGE MODE %d*%drows", n_batches, n_rows_per_batch);
       sharded_search_with_tree_merge(clique,
