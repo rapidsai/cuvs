@@ -85,7 +85,7 @@ files:
   rust:
     output: conda
     matrix:
-      cuda: ["12.8"]
+      cuda: ["12.9"]
       arch: [x86_64, aarch64]
     includes:
       # clang/libclang only needed for bindgen support
@@ -326,9 +326,9 @@ dependencies:
     common:
       - output_types: conda
         packages:
-          - clang==16.0.6
-          - clang-tools==16.0.6
-          - libclang==16.0.6
+          - clang==20.1.4
+          - clang-tools==20.1.4
+          - libclang==20.1.4
   cuda_version:
     specific:
       - output_types: conda
@@ -365,6 +365,10 @@ dependencies:
               cuda: "12.8"
             packages:
               - cuda-version=12.8
+          - matrix:
+              cuda: "12.9"
+            packages:
+              - cuda-version=12.9
   cuda:
     specific:
       - output_types: conda
