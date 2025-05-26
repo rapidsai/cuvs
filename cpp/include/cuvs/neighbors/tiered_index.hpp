@@ -51,6 +51,13 @@ struct index : cuvs::neighbors::index {
   mutable std::shared_mutex ann_mutex;
 
   explicit index(std::shared_ptr<detail::index_state<UpstreamT>> state) : state(state) {}
+  explicit index(const index<UpstreamT>& other) : state(other.state) {}
+
+  /** Total length of the index. */
+  int64_t size() const noexcept;
+
+  /** Dimensionality of the data. */
+  int64_t dim() const noexcept;
 };
 
 template <typename upstream_index_params_type>

@@ -174,4 +174,21 @@ void search(raft::resources const& res,
   index.state->search(
     res, search_params, ivf_pq::typed_search, queries, neighbors, distances, sample_filter);
 }
+
+template <typename UpstreamT>
+int64_t index<UpstreamT>::size() const noexcept
+{
+  return state->size();
+}
+
+template <typename UpstreamT>
+int64_t index<UpstreamT>::dim() const noexcept
+{
+  return state->dim();
+}
+
+template struct index<cagra::index<float, uint32_t>>;
+template struct index<ivf_flat::index<float, int64_t>>;
+template struct index<ivf_pq::typed_index<float, int64_t>>;
+
 }  // namespace cuvs::neighbors::tiered_index

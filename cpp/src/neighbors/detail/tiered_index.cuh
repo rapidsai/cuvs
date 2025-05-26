@@ -160,6 +160,9 @@ struct index_state {
     storage->append_vectors(res, dataset, metric);
   }
 
+  size_t dim() const { return storage->dim; }
+  size_t size() const { return storage->num_rows_used; }
+
   // Number of rows inside the ann index
   size_t ann_rows() const { return ann_index ? ann_index->size() : 0; }
 
@@ -175,7 +178,7 @@ struct index_state {
               const cuvs::neighbors::filtering::base_filter& sample_filter)
   {
     // if we only have ANN vectors, search those and return immendiately
-    if (storage->num_rows_used == 0) {
+    if (bfknn_rows() == 0) {
       search_fn(res, search_params, *ann_index, queries, neighbors, distances, sample_filter);
       return;
     }
