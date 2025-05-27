@@ -62,6 +62,6 @@ final class JDKProvider implements CuVSProvider {
 
   @Override
   public Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException {
-	  return new DatasetImpl(size, dimensions);
+      return new DatasetImpl(size, dimensions);
   }
 }
