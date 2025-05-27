@@ -264,7 +264,7 @@ cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index);
 /** Get the number of clusters/inverted lists */
 uint32_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index);
 
-/** Get the dimensionality*/
+/** Get the dimensionality */
 uint32_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index);
 
 /**
