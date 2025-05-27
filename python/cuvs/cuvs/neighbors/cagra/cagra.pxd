@@ -84,6 +84,9 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
         float hashmap_max_fill_rate
         uint32_t num_random_samplings
         uint64_t rand_xor_mask
+        bool persistent
+        float persistent_lifetime
+        float persistent_device_usage
 
     ctypedef struct cuvsCagraIndex:
         uintptr_t addr

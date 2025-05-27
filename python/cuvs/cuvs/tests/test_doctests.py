@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 
+import cuvs.cluster
 import cuvs.distance
 import cuvs.neighbors
 import cuvs.preprocessing.quantize
@@ -96,6 +97,7 @@ DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.neighbors.cagra))
 DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.neighbors.brute_force))
 DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.neighbors.ivf_flat))
 DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.common))
+DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.cluster))
 DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.distance))
 DOC_STRINGS.extend(_find_doctests_in_obj(cuvs.preprocessing.quantize))
 

@@ -14,7 +14,7 @@
 
 cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
 
-include(../../rapids_config.cmake)
+include(../../cmake/rapids_config.cmake)
 
 # We always need CUDA for cuvs because the cuvs dependency brings in a header-only cuco dependency
 # that enables CUDA unconditionally.
@@ -57,6 +57,7 @@ target_include_directories(cuvs::cuvs INTERFACE "$<BUILD_INTERFACE:${DLPACK_INCL
 rapids_cython_init()
 
 add_subdirectory(cuvs/common)
+add_subdirectory(cuvs/cluster)
 add_subdirectory(cuvs/distance)
 add_subdirectory(cuvs/neighbors)
 add_subdirectory(cuvs/preprocessing)
