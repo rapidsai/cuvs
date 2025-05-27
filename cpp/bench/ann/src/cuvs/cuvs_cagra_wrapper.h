@@ -499,11 +499,20 @@ void cuvs_cagra<T, IdxT>::search_base(
           wrapped_indices.push_back(index_wrapper);
         }
 
+        raft::resources composite_handle(handle_);
+        size_t n_streams = std::min(wrapped_indices.size(), size_t(8));
+        raft::resource::set_cuda_stream_pool(composite_handle,
+                                             std::make_shared<rmm::cuda_stream_pool>(n_streams));
+
         auto merged_index =
-          cuvs::neighbors::composite::merge(handle_, merge_params, wrapped_indices);
+          cuvs::neighbors::composite::merge(composite_handle, merge_params, wrapped_indices);
         cuvs::neighbors::filtering::none_sample_filter empty_filter;
-        merged_index->search(
-          handle_, search_params_, queries_view, neighbors_view, distances_view, empty_filter);
+        merged_index->search(composite_handle,
+                             search_params_,
+                             queries_view,
+                             neighbors_view,
+                             distances_view,
+                             empty_filter);
       }
     }
   }

@@ -40,6 +40,38 @@ class CompositeIndex : public IndexBase<T, IdxT, OutputIdxT> {
 
   explicit CompositeIndex(std::vector<index_ptr> children) : children_(std::move(children)) {}
 
+  /**
+   * @brief Search the composite index for the k nearest neighbors.
+   *
+   * When the composite index contains multiple sub-indices, the user can set a
+   * stream pool in the input raft::resource to enable parallel search across
+   * sub-indices for improved performance.
+   *
+   * Usage example:
+   * @code{.cpp}
+   *   using namespace cuvs::neighbors;
+   *   // create a composite index with multiple sub-indices
+   *   std::vector<CompositeIndex<T, IdxT>::index_ptr> sub_indices;
+   *   // ... populate sub_indices ...
+   *   auto composite_index = CompositeIndex<T, IdxT>(std::move(sub_indices));
+   *
+   *   // optional: create a stream pool to enable parallel search across sub-indices
+   *   // recommended stream count: min(number_of_sub_indices, 8)
+   *   size_t n_streams = std::min(sub_indices.size(), size_t(8));
+   *   raft::resource::set_cuda_stream_pool(handle,
+   *                                        std::make_shared<rmm::cuda_stream_pool>(n_streams));
+   *
+   *   // perform search with parallel sub-index execution
+   *   composite_index.search(handle, search_params, queries, neighbors, distances);
+   * @endcode
+   *
+   * @param[in] handle raft resource handle
+   * @param[in] params search parameters
+   * @param[in] queries device matrix view of query vectors [n_queries, dim]
+   * @param[out] neighbors device matrix view for neighbor indices [n_queries, k]
+   * @param[out] distances device matrix view for distances [n_queries, k]
+   * @param[in] filter optional filter for search results
+   */
   void search(
     const raft::resources& handle,
     const cuvs::neighbors::search_params& params,
