@@ -1,12 +1,34 @@
+/*
+ * Copyright (c) 2025, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.nvidia.cuvs;
 public class CagraMergeParams {
 
     private final CagraIndexParams outputIndexParams;
     private final MergeStrategy strategy;
 
-    private CagraMergeParams(Builder builder) {
-        this.outputIndexParams = builder.outputIndexParams;
-        this.strategy = builder.strategy;
+    /**
+     * Constructs a CagraMergeParams with the given output index parameters and merge strategy.
+     *
+     * @param outputIndexParams Index parameters for the output index
+     * @param strategy Merge strategy to use
+     */
+    private CagraMergeParams(CagraIndexParams outputIndexParams, MergeStrategy strategy) {
+        this.outputIndexParams = outputIndexParams;
+        this.strategy = strategy;
     }
 
     /**
@@ -46,7 +68,7 @@ public class CagraMergeParams {
      * Builder class for {@link CagraMergeParams}.
      */
     public static class Builder {
-        private CagraIndexParams outputIndexParams;
+        private CagraIndexParams outputIndexParams = new CagraIndexParams.Builder().build();
         private MergeStrategy strategy = MergeStrategy.PHYSICAL; // Default to PHYSICAL
 
         /**
@@ -77,7 +99,7 @@ public class CagraMergeParams {
          * @return The built parameters
          */
         public CagraMergeParams build() {
-            return new CagraMergeParams(this);
+            return new CagraMergeParams(outputIndexParams, strategy);
         }
     }
 }

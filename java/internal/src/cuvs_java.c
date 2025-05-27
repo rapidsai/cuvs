@@ -206,6 +206,16 @@ void search_cagra_index(cuvsCagraIndex_t index, float *queries, int topk, long n
   cuvsRMMFree(cuvs_resources, queries_d, sizeof(float) * n_queries * dimensions);
 }
 
+/**
+ * @brief A function to merge multiple CAGRA indexes into a single index
+ *
+ * @param[in] cuvs_resources Reference to the underlying opaque C handle
+ * @param[in] index_array Array of input CAGRA index handles to be merged
+ * @param[out] merged_index Output handle for the merged CAGRA index
+ * @param[in] num_indices Number of indexes to merge
+ * @param[out] return_value Return value for cuvsCagraMerge function call
+ * @param[in] merge_params Reference to merge parameters, or NULL for defaults
+ */
 void merge_cagra_indexes(cuvsResources_t cuvs_resources,
                        cuvsCagraIndex_t* index_array,
                        cuvsCagraIndex_t merged_index,
