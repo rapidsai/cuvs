@@ -622,10 +622,12 @@ void batch_build(raft::resources const& res,
                        offset.view());
 
   if (intermediate_degree >= min_cluster_size) {
+    // The maximum degree is dataset size - 1, since the node itself must not be included in its
+    // neighbor list.
+    intermediate_degree = dataset.extent(0) - 1;
     RAFT_LOG_WARN(
-      "Intermediate graph degree cannot be larger than minimum cluster size, reducing it to %lu",
-      dataset.extent(0));
-    intermediate_degree = min_cluster_size - 1;
+      "Intermediate graph degree cannot be larger than dataset size - 1, reducing it to %lu",
+      intermediate_degree);
   }
   if (intermediate_degree < graph_degree) {
     RAFT_LOG_WARN(
