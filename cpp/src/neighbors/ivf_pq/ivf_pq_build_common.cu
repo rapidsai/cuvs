@@ -294,21 +294,14 @@ void extract_centers(raft::resources const& res,
                      const cuvs::neighbors::ivf_pq::index<int64_t>& index,
                      raft::device_matrix_view<float, uint32_t, raft::row_major> cluster_centers)
 {
-  RAFT_EXPECTS(cluster_centers.extent(0) == index.n_lists(),
-               "Number of rows in the output buffer for cluster centers must be equal to the "
-               "number of IVF lists");
-  RAFT_EXPECTS(
-    cluster_centers.extent(1) == index.dim(),
-    "Number of columns in the output buffer for cluster centers and index dim are different");
-  auto stream = raft::resource::get_cuda_stream(res);
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(cluster_centers.data_handle(),
-                                  sizeof(float) * index.dim(),
-                                  index.centers().data_handle(),
-                                  sizeof(float) * index.dim_ext(),
-                                  sizeof(float) * index.dim(),
-                                  index.n_lists(),
-                                  cudaMemcpyDefault,
-                                  stream));
+  detail::extract_centers(res, index, cluster_centers);
+}
+
+void extract_centers(raft::resources const& res,
+                     const cuvs::neighbors::ivf_pq::index<int64_t>& index,
+                     raft::host_matrix_view<float, uint32_t, raft::row_major> cluster_centers)
+{
+  detail::extract_centers(res, index, cluster_centers);
 }
 
 void recompute_internal_state(const raft::resources& res, index<int64_t>* index)

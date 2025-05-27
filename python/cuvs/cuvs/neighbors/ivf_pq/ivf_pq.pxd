@@ -83,7 +83,7 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
 
     uint32_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index)
 
-    uint32_t cuvsIvfPqIndexGetDimExt(cuvsIvfPqIndex_t index)
+    uint32_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index)
 
     cuvsError_t cuvsIvfPqIndexGetCenters(cuvsResources_t res,
                                          cuvsIvfPqIndex_t index,
