@@ -16,40 +16,22 @@
 
 #pragma once
 
-#include <cuvs/core/bitmap.hpp>
 #include <cuvs/core/bitset.hpp>
 #include <faiss/impl/IDSelector.h>
 
-namespace cuvs::utils {
-
-/**
- * @brief Convert a Faiss IDSelectorRange to a cuvs::core::bitset_view
- *
- * @param selector The Faiss IDSelectorRange to convert
- * @param bitset The cuvs::core::bitset_view to store the result
- */
-void convert_to_bitset(raft::resources const& res,
-                       const faiss::IDSelectorRange& selector,
-                       cuvs::core::bitset_view<uint32_t, uint32_t> bitset);
+namespace cuvs::util {
 
 /**
  * @brief Convert a Faiss IDSelector to a cuvs::core::bitset_view
  *
  * @param selector The Faiss IDSelector to convert
  * @param bitset The cuvs::core::bitset_view to store the result
+ * @param num_threads Number of threads to use for the conversion. If 0, the
+ * number of threads is set to the number of available threads.
  */
 void convert_to_bitset(raft::resources const& res,
                        const faiss::IDSelector& selector,
-                       cuvs::core::bitset_view<uint32_t, uint32_t> bitset);
+                       cuvs::core::bitset_view<uint32_t, uint32_t> bitset,
+                       int num_threads = 0);
 
-/**
- * @brief Convert a Faiss IDSelector to a cuvs::core::bitmap
- *
- * @param selector The Faiss IDSelector to convert
- * @param bitmap The cuvs::core::bitmap to store the result
- */
-void convert_to_bitmap(raft::resources const& res,
-                       const faiss::IDSelector& selector,
-                       cuvs::core::bitmap_view<uint32_t, uint32_t> bitmap);
-
-}  // namespace cuvs::utils
+}  // namespace cuvs::util

@@ -17,9 +17,12 @@
 #include <cuvs/core/bitmap.hpp>
 #include <cuvs/core/bitset.hpp>
 #include <faiss/impl/IDSelector.h>
+#include <omp.h>
 #include <raft/core/bitset.cuh>
+#include <raft/core/copy.cuh>
+#include <raft/core/host_mdarray.hpp>
 
-namespace cuvs::utils {
+namespace cuvs::util {
 
 /**
  * @brief CUDA kernel to set a range of bits in a bitset to true
@@ -103,27 +106,76 @@ void convert_to_bitset(raft::resources const& res,
 }
 
 /**
+ * @brief Convert a Faiss IDSelectorRange to a cuvs::core::bitset_view
+ *
+ * @param selector The Faiss IDSelectorRange to convert
+ * @param bitset The cuvs::core::bitset_view to store the result
+ */
+void convert_to_bitset(raft::resources const& res,
+                       const faiss::IDSelectorArray& selector,
+                       cuvs::core::bitset_view<uint32_t, uint32_t> bitset)
+{
+  uint32_t n            = selector.n;
+  auto d_indexes_to_set = raft::make_device_vector<faiss::idx_t, uint32_t>(res, n);
+  raft::copy(res,
+             d_indexes_to_set.view(),
+             raft::make_host_vector_view<const faiss::idx_t, uint32_t>(selector.ids, n));
+  thrust::for_each_n(
+    raft::resource::get_thrust_policy(res),
+    d_indexes_to_set.data_handle(),
+    n,
+    [bitset] __device__(const faiss::idx_t sample_index) { bitset.set(sample_index, true); });
+}
+
+void convert_to_bitset_bruteforce(raft::resources const& res,
+                                  const faiss::IDSelector& selector,
+                                  cuvs::core::bitset_view<uint32_t, uint32_t> bitset,
+                                  int num_threads = 0)
+{
+  auto bitset_cpu = raft::make_host_vector<uint32_t, uint32_t>(bitset.n_elements());
+  auto nbits      = sizeof(uint32_t) * 8;
+  if (num_threads == 0) num_threads = omp_get_max_threads();
+#pragma omp parallel for num_threads(num_threads)
+  for (uint32_t i = 0; i < bitset.n_elements(); i++) {
+    uint32_t element = uint32_t{0};
+    for (uint32_t j = 0; j < nbits; j++) {
+      if (i * nbits + j < bitset.size() && selector.is_member(i * nbits + j)) {
+        element |= (uint32_t{1} << j);
+      }
+    }
+    bitset_cpu(i) = element;
+  }
+  raft::copy(res, bitset.to_mdspan(), bitset_cpu.view());
+  raft::resource::sync_stream(res);
+}
+
+/**
  * @brief Convert a Faiss IDSelector to a cuvs::core::bitset_view
  *
  * @param selector The Faiss IDSelector to convert
  * @param bitset The cuvs::core::bitset_view to store the result
+ * @param num_threads Number of threads to use for the conversion. If 0, the number of threads is
+ * set to the number of available threads.
  */
 void convert_to_bitset(raft::resources const& res,
                        const faiss::IDSelector& selector,
-                       cuvs::core::bitset_view<uint32_t, uint32_t> bitset)
+                       cuvs::core::bitset_view<uint32_t, uint32_t> bitset,
+                       int num_threads)
 {
+  // If the selector is simple, we can use the specialized functions
+  // Otherwise use the brute force method
+  try {
+    auto range_selector = dynamic_cast<const faiss::IDSelectorRange&>(selector);
+    convert_to_bitset(res, range_selector, bitset);
+    return;
+  } catch (const std::bad_cast& e) {
+  }
+  try {
+    auto array_selector = dynamic_cast<const faiss::IDSelectorArray&>(selector);
+    convert_to_bitset(res, array_selector, bitset);
+    return;
+  } catch (const std::bad_cast& e) {
+  }
+  convert_to_bitset_bruteforce(res, selector, bitset, num_threads);
 }
-
-/**
- * @brief Convert a Faiss IDSelector to a cuvs::core::bitmap
- *
- * @param selector The Faiss IDSelector to convert
- * @param bitmap The cuvs::core::bitmap to store the result
- */
-void convert_to_bitmap(raft::resources const& res,
-                       const faiss::IDSelector& selector,
-                       cuvs::core::bitmap_view<uint32_t, uint32_t> bitmap)
-{
-}
-
-}  // namespace cuvs::utils
+}  // namespace cuvs::util

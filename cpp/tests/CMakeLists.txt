@@ -256,7 +256,7 @@ if(BUILD_TESTS)
     NAME STATS_TEST PATH stats/trustworthiness.cu stats/silhouette_score.cu GPUS 1 PERCENT 100
   )
 
-  ConfigureTest(NAME UTILS_TEST PATH utils/test_filters.cu GPUS 1 PERCENT 100)
+  ConfigureTest(NAME UTIL_TEST PATH util/test_filters.cu GPUS 1 PERCENT 100)
 endif()
 
 if(TARGET cuvs::c_api)
