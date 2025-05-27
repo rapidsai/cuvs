@@ -306,13 +306,13 @@ if(BUILD_SHARED_LIBS)
         src/neighbors/mg/mg_cagra_int8_t_uint32_t.cu
         src/neighbors/mg/mg_cagra_uint8_t_uint32_t.cu
         src/neighbors/mg/omp_checks.cpp
-        src/neighbors/mg/nccl_comm.cpp
     )
   endif()
 
   add_library(
     cuvs_objs OBJECT
     src/cluster/kmeans_balanced_fit_float.cu
+    src/cluster/kmeans_cluster_cost.cu
     src/cluster/kmeans_fit_mg_float.cu
     src/cluster/kmeans_fit_mg_double.cu
     src/cluster/kmeans_fit_double.cu
@@ -382,6 +382,11 @@ if(BUILD_SHARED_LIBS)
     src/distance/pairwise_distance.cu
     src/distance/sparse_distance.cu
     src/embed/spectral.cu
+    src/neighbors/all_neighbors/all_neighbors.cu
+    src/neighbors/ball_cover.cu
+    src/neighbors/ball_cover/detail/ball_cover/registers_eps_pass_euclidean.cu
+    src/neighbors/ball_cover/detail/ball_cover/registers_pass_one.cu
+    src/neighbors/ball_cover/detail/ball_cover/registers_pass_two.cu
     src/neighbors/brute_force.cu
     src/neighbors/brute_force_serialize.cu
     src/neighbors/cagra_build_float.cu
@@ -417,16 +422,19 @@ if(BUILD_SHARED_LIBS)
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
     src/neighbors/ivf_flat_index.cpp
     src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_build_extend_half_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_build_extend_int8_t_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_build_extend_uint8_t_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_helpers.cu
     src/neighbors/ivf_flat/ivf_flat_search_float_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_search_half_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_search_int8_t_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_search_uint8_t_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_float_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_serialize_half_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_int8_t_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_uint8_t_int64_t.cu
-    src/neighbors/ivf_pq_index.cpp
+    src/neighbors/ivf_pq_index.cu
     src/neighbors/ivf_pq/ivf_pq_build_common.cu
     src/neighbors/ivf_pq/ivf_pq_serialize.cu
     src/neighbors/ivf_pq/ivf_pq_deserialize.cu
@@ -609,6 +617,7 @@ if(BUILD_SHARED_LIBS)
   if(BUILD_MG_ALGOS)
     target_compile_definitions(cuvs PUBLIC CUVS_BUILD_MG_ALGOS)
     target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_MG_ALGOS)
+    target_compile_definitions(cuvs-cagra-search PUBLIC CUVS_BUILD_MG_ALGOS)
   endif()
 
   if(BUILD_CAGRA_HNSWLIB)
@@ -696,6 +705,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     add_library(
       cuvs_c SHARED
       src/core/c_api.cpp
+      src/cluster/kmeans_c.cpp
       src/neighbors/brute_force_c.cpp
       src/neighbors/ivf_flat_c.cpp
       src/neighbors/ivf_pq_c.cpp

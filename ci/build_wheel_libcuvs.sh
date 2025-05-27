@@ -3,6 +3,8 @@
 
 set -euo pipefail
 
+source rapids-init-pip
+
 package_name="libcuvs"
 package_dir="python/libcuvs"
 

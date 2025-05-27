@@ -43,6 +43,7 @@ def run_ivf_pq_build_search_test(
     kmeans_n_iters=20,
     compare=True,
     inplace=True,
+    array_type="device",
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
     if metric == "inner_product":
@@ -61,19 +62,27 @@ def run_ivf_pq_build_search_test(
         add_data_on_build=add_data_on_build,
     )
 
-    index = ivf_pq.build(build_params, dataset_device)
+    if array_type == "device":
+        index = ivf_pq.build(build_params, dataset_device)
+    else:
+        index = ivf_pq.build(build_params, dataset)
+
     if not add_data_on_build:
         dataset_1 = dataset[: n_rows // 2, :]
         dataset_2 = dataset[n_rows // 2 :, :]
         indices_1 = np.arange(n_rows // 2, dtype=np.int64)
         indices_2 = np.arange(n_rows // 2, n_rows, dtype=np.int64)
 
-        dataset_1_device = device_ndarray(dataset_1)
-        dataset_2_device = device_ndarray(dataset_2)
-        indices_1_device = device_ndarray(indices_1)
-        indices_2_device = device_ndarray(indices_2)
-        index = ivf_pq.extend(index, dataset_1_device, indices_1_device)
-        index = ivf_pq.extend(index, dataset_2_device, indices_2_device)
+        if array_type == "device":
+            dataset_1_device = device_ndarray(dataset_1)
+            dataset_2_device = device_ndarray(dataset_2)
+            indices_1_device = device_ndarray(indices_1)
+            indices_2_device = device_ndarray(indices_2)
+            index = ivf_pq.extend(index, dataset_1_device, indices_1_device)
+            index = ivf_pq.extend(index, dataset_2_device, indices_2_device)
+        else:
+            index = ivf_pq.extend(index, dataset_1, indices_1)
+            index = ivf_pq.extend(index, dataset_2, indices_2)
 
     queries = generate_data((n_queries, n_cols), dtype)
     out_idx = np.zeros((n_queries, k), dtype=np.int64)
@@ -100,6 +109,9 @@ def run_ivf_pq_build_search_test(
 
     if not inplace:
         out_dist_device, out_idx_device = ret_output
+
+    centers = index.centers
+    assert centers.shape[0] == n_lists
 
     if not compare:
         return
@@ -181,7 +193,8 @@ def test_ivf_pq_search_params(params):
 
 
 @pytest.mark.parametrize("dtype", [np.float32])
-def test_extend(dtype):
+@pytest.mark.parametrize("array_type", ["host", "device"])
+def test_extend(dtype, array_type):
     run_ivf_pq_build_search_test(
         n_rows=10000,
         n_cols=10,
@@ -191,13 +204,16 @@ def test_extend(dtype):
         metric="sqeuclidean",
         dtype=dtype,
         add_data_on_build=False,
+        array_type=array_type,
     )
 
 
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
-def test_ivf_pq_dtype(inplace, dtype):
+@pytest.mark.parametrize("array_type", ["host", "device"])
+def test_ivf_pq_dtype(inplace, dtype, array_type):
     run_ivf_pq_build_search_test(
         dtype=dtype,
         inplace=inplace,
+        array_type=array_type,
     )

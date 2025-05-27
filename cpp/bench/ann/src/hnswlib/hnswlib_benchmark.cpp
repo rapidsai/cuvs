@@ -62,11 +62,8 @@ auto create_algo(const std::string& algo_name,
   cuvs::bench::Metric metric = parse_metric(distance);
   std::unique_ptr<cuvs::bench::algo<T>> a;
 
-  if constexpr (std::is_same_v<T, float>) {
-    if (algo_name == "hnswlib") { a = make_algo<T, cuvs::bench::hnsw_lib>(metric, dim, conf); }
-  }
-
-  if constexpr (std::is_same_v<T, uint8_t>) {
+  if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, int8_t> ||
+                std::is_same_v<T, uint8_t>) {
     if (algo_name == "hnswlib") { a = make_algo<T, cuvs::bench::hnsw_lib>(metric, dim, conf); }
   }
 
@@ -90,6 +87,7 @@ auto create_search_param(const std::string& algo_name, const nlohmann::json& con
 };  // namespace cuvs::bench
 
 REGISTER_ALGO_INSTANCE(float);
+REGISTER_ALGO_INSTANCE(half);
 REGISTER_ALGO_INSTANCE(std::int8_t);
 REGISTER_ALGO_INSTANCE(std::uint8_t);
 

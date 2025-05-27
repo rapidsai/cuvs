@@ -16,6 +16,13 @@
 
 package com.nvidia.cuvs.internal;
 
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
+import static com.nvidia.cuvs.internal.common.Util.checkError;
+import static java.lang.foreign.ValueLayout.ADDRESS;
+
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.lang.foreign.Arena;
@@ -36,16 +43,9 @@ import com.nvidia.cuvs.HnswQuery;
 import com.nvidia.cuvs.HnswSearchParams;
 import com.nvidia.cuvs.SearchResults;
 import com.nvidia.cuvs.internal.common.Util;
-import com.nvidia.cuvs.internal.panama.CuVSHnswIndex;
-import com.nvidia.cuvs.internal.panama.CuVSHnswIndexParams;
-import com.nvidia.cuvs.internal.panama.CuVSHnswSearchParams;
-
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
-import static com.nvidia.cuvs.internal.common.Util.checkError;
-import static java.lang.foreign.ValueLayout.ADDRESS;
+import com.nvidia.cuvs.internal.panama.cuvsHnswIndex;
+import com.nvidia.cuvs.internal.panama.cuvsHnswIndexParams;
+import com.nvidia.cuvs.internal.panama.cuvsHnswSearchParams;
 
 /**
  * {@link HnswIndex} encapsulates a HNSW index, along with methods to interact
@@ -187,9 +187,9 @@ public class HnswIndexImpl implements HnswIndex {
    * Allocates the configured search parameters in the MemorySegment.
    */
   private MemorySegment segmentFromIndexParams(HnswIndexParams params) {
-    MemorySegment seg = CuVSHnswIndexParams.allocate(resources.getArena());
-    CuVSHnswIndexParams.ef_construction(seg, params.getEfConstruction());
-    CuVSHnswIndexParams.num_threads(seg, params.getNumThreads());
+    MemorySegment seg = cuvsHnswIndexParams.allocate(resources.getArena());
+    cuvsHnswIndexParams.ef_construction(seg, params.getEfConstruction());
+    cuvsHnswIndexParams.num_threads(seg, params.getNumThreads());
     return seg;
   }
 
@@ -197,9 +197,9 @@ public class HnswIndexImpl implements HnswIndex {
    * Allocates the configured search parameters in the MemorySegment.
    */
   private MemorySegment segmentFromSearchParams(HnswSearchParams params) {
-    MemorySegment seg = CuVSHnswSearchParams.allocate(resources.getArena());
-    CuVSHnswSearchParams.ef(seg, params.ef());
-    CuVSHnswSearchParams.num_threads(seg, params.numThreads());
+    MemorySegment seg = cuvsHnswSearchParams.allocate(resources.getArena());
+    cuvsHnswSearchParams.ef(seg, params.ef());
+    cuvsHnswSearchParams.num_threads(seg, params.numThreads());
     return seg;
   }
 
@@ -277,7 +277,7 @@ public class HnswIndexImpl implements HnswIndex {
      * Constructs CagraIndexReference and allocate the MemorySegment.
      */
     protected IndexReference(CuVSResourcesImpl resources) {
-      memorySegment = CuVSHnswIndex.allocate(resources.getArena());
+      memorySegment = cuvsHnswIndex.allocate(resources.getArena());
     }
 
     /**

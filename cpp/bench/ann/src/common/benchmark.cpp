@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,11 +49,15 @@ struct lib_handle {
 auto load_lib(const std::string& algo) -> void*
 {
   static std::unordered_map<std::string, lib_handle> libs{};
-  auto found = libs.find(algo);
+  auto lib_short_name = algo;
+  // cuvs_mg library is responsible for all mg algorithms
+  if (algo.rfind("cuvs_mg_", 0) == 0) { lib_short_name = "cuvs_mg"; }
 
+  auto found = libs.find(lib_short_name);
   if (found != libs.end()) { return found->second.handle; }
-  auto lib_name = "lib" + algo + "_ann_bench.so";
-  return libs.emplace(algo, lib_name).first->second.handle;
+
+  auto lib_name = "lib" + lib_short_name + "_ann_bench.so";
+  return libs.emplace(lib_short_name, lib_name).first->second.handle;
 }
 
 /*

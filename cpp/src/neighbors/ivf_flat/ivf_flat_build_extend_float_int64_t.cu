@@ -33,7 +33,7 @@ namespace cuvs::neighbors::ivf_flat {
   auto build(raft::resources const& handle,                                                      \
              const cuvs::neighbors::ivf_flat::index_params& params,                              \
              raft::device_matrix_view<const T, IdxT, raft::row_major> dataset)                   \
-    ->cuvs::neighbors::ivf_flat::index<T, IdxT>                                                  \
+    -> cuvs::neighbors::ivf_flat::index<T, IdxT>                                                 \
   {                                                                                              \
     return cuvs::neighbors::ivf_flat::index<T, IdxT>(                                            \
       std::move(cuvs::neighbors::ivf_flat::detail::build(handle, params, dataset)));             \
@@ -49,7 +49,7 @@ namespace cuvs::neighbors::ivf_flat {
   auto build(raft::resources const& handle,                                                      \
              const cuvs::neighbors::ivf_flat::index_params& params,                              \
              raft::host_matrix_view<const T, IdxT, raft::row_major> dataset)                     \
-    ->cuvs::neighbors::ivf_flat::index<T, IdxT>                                                  \
+    -> cuvs::neighbors::ivf_flat::index<T, IdxT>                                                 \
   {                                                                                              \
     return cuvs::neighbors::ivf_flat::index<T, IdxT>(                                            \
       std::move(cuvs::neighbors::ivf_flat::detail::build(handle, params, dataset)));             \
@@ -66,7 +66,7 @@ namespace cuvs::neighbors::ivf_flat {
               raft::device_matrix_view<const T, IdxT, raft::row_major> new_vectors,              \
               std::optional<raft::device_vector_view<const IdxT, IdxT>> new_indices,             \
               const cuvs::neighbors::ivf_flat::index<T, IdxT>& orig_index)                       \
-    ->cuvs::neighbors::ivf_flat::index<T, IdxT>                                                  \
+    -> cuvs::neighbors::ivf_flat::index<T, IdxT>                                                 \
   {                                                                                              \
     return cuvs::neighbors::ivf_flat::index<T, IdxT>(std::move(                                  \
       cuvs::neighbors::ivf_flat::detail::extend(handle, new_vectors, new_indices, orig_index))); \
@@ -83,7 +83,7 @@ namespace cuvs::neighbors::ivf_flat {
               raft::host_matrix_view<const T, IdxT, raft::row_major> new_vectors,                \
               std::optional<raft::host_vector_view<const IdxT, IdxT>> new_indices,               \
               const cuvs::neighbors::ivf_flat::index<T, IdxT>& orig_index)                       \
-    ->cuvs::neighbors::ivf_flat::index<T, IdxT>                                                  \
+    -> cuvs::neighbors::ivf_flat::index<T, IdxT>                                                 \
   {                                                                                              \
     return cuvs::neighbors::ivf_flat::index<T, IdxT>(std::move(                                  \
       cuvs::neighbors::ivf_flat::detail::extend(handle, new_vectors, new_indices, orig_index))); \

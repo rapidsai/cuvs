@@ -40,7 +40,7 @@ public class BruteForceQuery {
    * @param queryVectors 2D float query vector array
    * @param mapping      an instance of ID mapping
    * @param topK         the top k results to return
-   * @param prefilter    the prefilter data to use while searching the BRUTEFORCE
+   * @param prefilters   the prefilters data to use while searching the BRUTEFORCE
    *                     index
    * @param numDocs      Maximum of bits in each prefilter, representing number of documents in this index.
    *                     Used only when prefilter(s) is/are passed.

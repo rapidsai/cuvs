@@ -26,7 +26,7 @@ void predict(const raft::resources& handle,
              cuvs::cluster::kmeans::balanced_params const& params,
              raft::device_matrix_view<const float, int> X,
              raft::device_matrix_view<const float, int> centroids,
-             raft::device_vector_view<uint32_t, int> labels)
+             raft::device_vector_view<int, int> labels)
 {
   cuvs::cluster::kmeans_balanced::predict(
     handle, params, X, centroids, labels, cuvs::spatial::knn::detail::utils::mapping<float>{});

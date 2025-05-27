@@ -195,6 +195,22 @@ struct mapping {
   /** @} */
 };
 
+template <>
+template <>
+HDI constexpr auto mapping<int8_t>::operator()(const uint8_t& x) const -> int8_t
+{
+  // Avoid overflows when converting uint8_t -> int_8
+  return static_cast<int8_t>(x >> 1);
+}
+
+template <>
+template <>
+HDI constexpr auto mapping<int8_t>::operator()(const float& x) const -> int8_t
+{
+  // Carefully clamp floats if out-of-bounds.
+  return static_cast<int8_t>(std::clamp<float>(x * 128.0f, -128.0f, 127.0f));
+}
+
 /**
  * @brief Sets the first num bytes of the block of memory pointed by ptr to the specified value.
  *
@@ -451,10 +467,16 @@ struct batch_load_iterator {
       cudaPointerAttributes attr;
       RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, source_));
       dev_ptr_ = reinterpret_cast<T*>(attr.devicePointer);
-      if (dev_ptr_ == nullptr) {
-        buf_0_.resize(row_width_ * batch_size_, stream);
-        dev_ptr_    = buf_0_.data();
+
+      if (dev_ptr_ == nullptr) { needs_copy_ = true; }
+      if (attr.type != cudaMemoryTypeDevice) {
+        // Although data might be accessible on device through HMM or ATS,
+        // it is preferred to copy the dataset explicitly when it is not device data.
         needs_copy_ = true;
+      }
+      if (needs_copy_) {
+        buf_0_.resize(row_width_ * batch_size_, stream);
+        dev_ptr_ = buf_0_.data();
         if (prefetch_) {
           buf_1_.resize(row_width_ * batch_size_, stream);
           prefetch_dev_ptr_ = buf_1_.data();

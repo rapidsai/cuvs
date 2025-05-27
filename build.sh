@@ -16,9 +16,9 @@ ARGS=$*
 
 # NOTE: ensure all dir changes are relative to the location of this
 # scripts, and that this script resides in the repo dir!
-REPODIR=$(cd $(dirname $0); pwd)
+REPODIR=$(cd "$(dirname "$0")"; pwd)
 
-VALIDARGS="clean libcuvs python rust go java docs tests bench-ann examples --uninstall  -v -g -n --allgpuarch --no-mg --no-cpu --cpu-only --no-shared-libs --no-nvtx --show_depr_warn --incl-cache-stats --time -h"
+VALIDARGS="clean libcuvs python rust go java docs tests bench-ann examples --uninstall  -v -g -n --allgpuarch --no-mg --no-cpu --cpu-only --no-shared-libs --no-nvtx --show_depr_warn --incl-cache-stats --time -h --run-java-tests"
 HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<tool>] [--limit-tests=<targets>] [--limit-bench-ann=<targets>] [--build-metrics=<filename>]
  where <target> is:
    clean            - remove all existing build artifacts and configuration (start over)
@@ -53,6 +53,7 @@ HELP="$0 [<target> ...] [<flag> ...] [--cmake-args=\"<args>\"] [--cache-tool=<to
    --no-nvtx                   - disable nvtx (profiling markers), but allow enabling it in downstream projects
    --no-shared-libs            - build without shared libraries
    --show_depr_warn            - show cmake deprecation warnings
+   --run-java-test             - run Java tests after building
    --build-metrics             - filename for generating build metrics report for libcuvs
    --incl-cache-stats          - include cache statistics in build metrics report
    --cmake-args=\\\"<args>\\\" - pass arbitrary list of CMake configuration options (escape all quotes in argument)
@@ -75,7 +76,6 @@ BUILD_DIRS="${LIBCUVS_BUILD_DIR} ${PYTHON_BUILD_DIR} ${RUST_BUILD_DIR} ${JAVA_BU
 # Set defaults for vars modified by flags to this script
 CMAKE_LOG_LEVEL=""
 VERBOSE_FLAG=""
-BUILD_ALL_GPU_ARCH=0
 BUILD_TESTS=ON
 BUILD_MG_ALGOS=ON
 BUILD_TYPE=Release
@@ -92,7 +92,6 @@ CACHE_ARGS=""
 NVTX=ON
 LOG_COMPILE_TIME=OFF
 CLEAN=0
-UNINSTALL=0
 DISABLE_DEPRECATION_WARNINGS=ON
 CMAKE_TARGET=""
 EXTRA_CMAKE_ARGS=""
@@ -255,7 +254,6 @@ fi
 
 # This should run before build/install
 if hasArg --uninstall; then
-    UNINSTALL=1
 
     if hasArg cuvs || hasArg libcuvs || (( ${NUMARGS} == 1 )); then
 
@@ -499,11 +497,17 @@ if (( ${NUMARGS} == 0 )) || hasArg java; then
         echo "Please add 'libcuvs' to this script's arguments (ex. './build.sh libcuvs java') if libcuvs libraries are not already built"
     fi
     cd ${REPODIR}/java
-    ./build.sh
+    if hasArg --run-java-tests; then
+        ./build.sh --run-java-tests
+    else
+        ./build.sh
+    fi
 fi
 
-export RAPIDS_VERSION="$(sed -E -e 's/^([0-9]{2})\.([0-9]{2})\.([0-9]{2}).*$/\1.\2.\3/' "${REPODIR}/VERSION")"
-export RAPIDS_VERSION_MAJOR_MINOR="$(sed -E -e 's/^([0-9]{2})\.([0-9]{2})\.([0-9]{2}).*$/\1.\2/' "${REPODIR}/VERSION")"
+RAPIDS_VERSION="$(sed -E -e 's/^([0-9]{2})\.([0-9]{2})\.([0-9]{2}).*$/\1.\2.\3/' "${REPODIR}/VERSION")"
+export RAPIDS_VERSION
+RAPIDS_VERSION_MAJOR_MINOR="$(sed -E -e 's/^([0-9]{2})\.([0-9]{2})\.([0-9]{2}).*$/\1.\2/' "${REPODIR}/VERSION")"
+export RAPIDS_VERSION_MAJOR_MINOR
 
 if hasArg docs; then
     set -x

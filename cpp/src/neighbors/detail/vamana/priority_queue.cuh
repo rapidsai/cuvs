@@ -202,8 +202,7 @@ class PriorityQueue {
  * Used for other operations like checking for duplicates, etc.
  ****************************************************************************************/
 template <typename SUMTYPE>
-class __align__(16) Node
-{
+class __align__(16) Node {
  public:
   SUMTYPE distance;
   int nodeid;

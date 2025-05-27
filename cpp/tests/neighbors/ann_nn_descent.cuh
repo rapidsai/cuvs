@@ -152,13 +152,6 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
         raft::resource::sync_stream(handle_);
       }
 
-      if (ps.metric == cuvs::distance::DistanceType::InnerProduct) {
-        std::transform(
-          distances_naive.begin(), distances_naive.end(), distances_naive.begin(), [](auto x) {
-            return -x;
-          });
-      }
-
       double min_recall = ps.min_recall;
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_NNDescent,

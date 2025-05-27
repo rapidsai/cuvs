@@ -155,7 +155,8 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
 
     CheckGraph<DataT, IdxT>(&index, ps, stream_);
 
-    vamana::serialize(handle_, "vamana_index", index);
+    tmp_index_file index_file;
+    vamana::serialize(handle_, index_file.filename, index);
 
     // Test recall by searching with CAGRA search
     if (ps.graph_degree < 256) {  // CAGRA search result buffer cannot support larger graph degree

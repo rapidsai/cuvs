@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -388,7 +388,7 @@ inline auto host_info()
   uint64_t cpu_freq_max    = 0;
   int host_processors_used = 0;
   int host_cores_used      = 0;
-  std::set<int> host_cores_selected{};
+  std::set<std::pair<int, int>> host_cores_selected{};  // pairs of (socket_id, core_id)
   for (int cpu_id = 0; cpu_id < host_processors_configured; cpu_id++) {
     if (CPU_ISSET_S(cpu_id, affinity_mask_buf.size(), affinity_mask) == 0) { continue; }
     host_processors_used++;
@@ -396,12 +396,14 @@ inline auto host_info()
     if (!std::filesystem::exists(cpu_fpath)) { continue; }
 
     int this_cpu_core          = 0;
+    int this_cpu_package       = 0;
     uint64_t this_cpu_freq_min = 0;
     uint64_t this_cpu_freq_max = 0;
     std::ifstream(cpu_fpath + "/topology/core_id") >> this_cpu_core;
+    std::ifstream(cpu_fpath + "/topology/physical_package_id") >> this_cpu_package;
     std::ifstream(cpu_fpath + "/cpufreq/scaling_min_freq") >> this_cpu_freq_min;
     std::ifstream(cpu_fpath + "/cpufreq/scaling_max_freq") >> this_cpu_freq_max;
-    host_cores_selected.insert(this_cpu_core);
+    host_cores_selected.insert(std::make_pair(this_cpu_package, this_cpu_core));
     cpu_freq_min = cpu_freq_min == 0
                      ? (this_cpu_freq_min * 1000ull)
                      : std::min<uint64_t>(this_cpu_freq_min * 1000ull, cpu_freq_min);

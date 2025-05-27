@@ -115,9 +115,10 @@ class AnnBruteForceTest : public ::testing::TestWithParam<AnnBruteForceInputs<Id
                                                       stream_,
                                                       true));
 
-      brute_force::serialize(handle_, std::string{"brute_force_index"}, idx, true);
+      tmp_index_file index_file;
+      brute_force::serialize(handle_, index_file.filename, idx, true);
       auto index_loaded = brute_force::index<DataT, T>(handle_);
-      brute_force::deserialize(handle_, std::string{"brute_force_index"}, &index_loaded);
+      brute_force::deserialize(handle_, index_file.filename, &index_loaded);
 
       brute_force::search(handle_,
                           index_loaded,

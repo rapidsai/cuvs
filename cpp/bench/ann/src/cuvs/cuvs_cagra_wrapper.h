@@ -340,11 +340,7 @@ void cuvs_cagra<T, IdxT>::save(const std::string& file) const
 template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::save_to_hnswlib(const std::string& file) const
 {
-  if constexpr (!std::is_same_v<T, half>) {
-    cuvs::neighbors::cagra::serialize_to_hnswlib(handle_, file, *index_);
-  } else {
-    RAFT_FAIL("Cannot save fp16 index to hnswlib format");
-  }
+  cuvs::neighbors::cagra::serialize_to_hnswlib(handle_, file, *index_);
 }
 
 template <typename T, typename IdxT>
@@ -396,8 +392,18 @@ void cuvs_cagra<T, IdxT>::search(
   auto k0                       = static_cast<size_t>(refine_ratio_ * k);
   const bool disable_refinement = k0 <= static_cast<size_t>(k);
   const raft::resources& res    = handle_;
-  auto mem_type =
-    raft::get_device_for_address(neighbors) >= 0 ? MemoryType::kDevice : MemoryType::kHostPinned;
+  // NOTE: caching mem_type to reduce mutex locks
+  // raft::get_device_for_address call cuda API to get the pointer properties,
+  // this means it locks the context mutex for a very small amount of time.
+  // In the event of thread contention (such as thousands threads), this time can actually increase.
+  // Hence we try to bypass this check for repeated search calls.
+  thread_local MemoryType mem_type                   = MemoryType::kDevice;
+  thread_local algo_base::index_type* prev_neighbors = nullptr;
+  if (prev_neighbors != neighbors) {
+    prev_neighbors = neighbors;
+    mem_type =
+      raft::get_device_for_address(neighbors) >= 0 ? MemoryType::kDevice : MemoryType::kHostPinned;
+  }
 
   // If dynamic batching is used and there's no sync between benchmark laps, multiple sequential
   // requests can group together. The data is copied asynchronously, and if the same intermediate

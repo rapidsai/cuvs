@@ -127,7 +127,7 @@ RAFT_KERNEL set_bitmap_kernel(
     index_t col      = dst[idx];
     index_t g_idx    = row * n_cols + col;
     index_t item_idx = (g_idx) >> 5;
-    uint32_t bit_idx = (g_idx)&31;
+    uint32_t bit_idx = (g_idx) & 31;
     atomicOr(bitmap + item_idx, (uint32_t(1) << bit_idx));
   }
 }

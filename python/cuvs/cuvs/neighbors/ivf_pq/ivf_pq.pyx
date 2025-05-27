@@ -238,18 +238,50 @@ cdef class Index:
     def __repr__(self):
         return "Index(type=IvfPq)"
 
+    @property
+    def n_lists(self):
+        """ The number of inverted lists (clusters) """
+        return cuvsIvfPqIndexGetNLists(self.index)
+
+    @property
+    def dim_ext(self):
+        """ dimensionality of the cluster centers """
+        return cuvsIvfPqIndexGetDimExt(self.index)
+
+    @property
+    def centers(self):
+        """ Get the cluster centers corresponding to the lists in the
+        original space """
+        return self._get_centers()
+
+    @auto_sync_resources
+    def _get_centers(self, resources=None):
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting centers")
+
+        cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+        output = np.empty((self.n_lists, self.dim_ext), dtype='float32')
+        ai = wrap_array(output)
+        cdef cydlpack.DLManagedTensor* output_dlpack = cydlpack.dlpack_c(ai)
+        check_cuvs(cuvsIvfPqIndexGetCenters(res, self.index, output_dlpack))
+        return output
+
 
 @auto_sync_resources
 def build(IndexParams index_params, dataset, resources=None):
     """
     Build the IvfPq index from the dataset for efficient search.
 
+    The input dataset array can be either CUDA array interface compliant matrix
+    or an array interface compliant matrix in host memory.
+
     Parameters
     ----------
     index_params : :py:class:`cuvs.neighbors.ivf_pq.IndexParams`
         Parameters on how to build the index
-    dataset : CUDA array interface compliant matrix shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
+    dataset : Array interface compliant matrix shape (n_samples, dim)
+        Supported dtype [float32, float16, int8, uint8]
     {resources_docstring}
 
     Returns

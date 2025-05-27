@@ -30,6 +30,15 @@ struct Compare {
   bool operator()(const T& a, const T& b) const { return a == b; }
 };
 
+#if CUDART_VERSION < 12040
+// Workaround to support half precision on older CUDA versions. See:
+// https://docs.nvidia.com/cuda/archive/12.8.0/cuda-toolkit-release-notes/#cuda-math-release-12-4
+template <>
+struct Compare<half> {
+  bool operator()(const half& a, const half& b) const { return float{a} == float{b}; }
+};
+#endif
+
 template <typename Key, typename Value>
 struct Compare<raft::KeyValuePair<Key, Value>> {
   bool operator()(const raft::KeyValuePair<Key, Value>& a,
