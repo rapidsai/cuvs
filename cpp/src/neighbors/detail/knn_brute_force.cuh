@@ -265,7 +265,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
                            IndexType col      = j + (idx % current_centroid_size);
                            IndexType g_idx    = row * n_cols + col;
                            IndexType item_idx = (g_idx) >> 5;
-                           uint32_t bit_idx   = (g_idx)&31;
+                           uint32_t bit_idx   = (g_idx) & 31;
                            uint32_t filter    = filter_bits[item_idx];
                            if ((filter & (uint32_t(1) << bit_idx)) == 0) {
                              distances_ptr[idx] = masked_distance;
@@ -800,7 +800,7 @@ cuvs::neighbors::brute_force::index<T, DistT> build(
     auto dataset_storage = std::optional<device_matrix<T, int64_t, LayoutT>>{};
     auto dataset_view    = [&res, &dataset_storage, dataset]() {
       if constexpr (std::is_same_v<decltype(dataset),
-                                   raft::device_matrix_view<const T, int64_t, row_major>>) {
+                                      raft::device_matrix_view<const T, int64_t, row_major>>) {
         return dataset;
       } else {
         dataset_storage =

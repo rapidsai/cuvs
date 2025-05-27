@@ -107,6 +107,7 @@ if(BUILD_TESTS)
     NEIGHBORS_ANN_IVF_FLAT_TEST
     PATH
     neighbors/ann_ivf_flat/test_float_int64_t.cu
+    neighbors/ann_ivf_flat/test_half_int64_t.cu
     neighbors/ann_ivf_flat/test_int8_t_int64_t.cu
     neighbors/ann_ivf_flat/test_uint8_t_int64_t.cu
     GPUS
@@ -182,6 +183,13 @@ if(BUILD_TESTS)
     1
     PERCENT
     100
+  )
+
+  ConfigureTest(NAME NEIGHBORS_BALL_COVER_TEST PATH neighbors/ball_cover.cu GPUS 1 PERCENT 100)
+
+  ConfigureTest(
+    NAME NEIGHBORS_ALL_NEIGHBORS_TEST PATH neighbors/all_neighbors/test_float.cu GPUS 1 PERCENT 100
+    ADDITIONAL_DEP nccl
   )
 
   ConfigureTest(
