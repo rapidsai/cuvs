@@ -67,9 +67,9 @@ class ResultItem<int> {
 
  public:
   __host__ __device__ ResultItem()
-    : id_(std::numeric_limits<Index_t>::max()), dist_(std::numeric_limits<DistData_t>::max()){};
+    : id_(std::numeric_limits<Index_t>::max()), dist_(std::numeric_limits<DistData_t>::max()) {};
   __host__ __device__ ResultItem(const Index_t id_with_flag, const DistData_t dist)
-    : id_(id_with_flag), dist_(dist){};
+    : id_(id_with_flag), dist_(dist) {};
   __host__ __device__ bool is_new() const { return id_ >= 0; }
   __host__ __device__ Index_t& id_with_flag() { return id_; }
   __host__ __device__ Index_t id() const
@@ -1246,8 +1246,13 @@ void build(raft::resources const& res,
            index<IdxT>& idx)
 {
   size_t extended_graph_degree, graph_degree;
-  auto build_config =
-    get_build_config(res, params, dataset, idx.metric(), extended_graph_degree, graph_degree);
+  auto build_config = get_build_config(res,
+                                       params,
+                                       static_cast<size_t>(dataset.extent(0)),
+                                       static_cast<size_t>(dataset.extent(1)),
+                                       idx.metric(),
+                                       extended_graph_degree,
+                                       graph_degree);
 
   auto int_graph =
     raft::make_host_matrix<int, int64_t, raft::row_major>(dataset.extent(0), extended_graph_degree);
