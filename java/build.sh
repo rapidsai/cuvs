@@ -4,7 +4,7 @@ set -e -u -o pipefail
 
 ARGS="$*"
 NUMARGS=$#
-
+CURDIR=$(cd "$(dirname $0)"; pwd)
 VERSION="25.06.0" # Note: The version is updated automatically when ci/release/update-version.sh is invoked
 GROUP_ID="com.nvidia.cuvs"
 SO_FILE_PATH="./internal/build"
@@ -30,6 +30,13 @@ if ! hasArg --run-java-tests; then
 fi
 
 # Build the java layer
+if [ -z ${LD_LIBRARY_PATH+x} ]
+then export LD_LIBRARY_PATH=${CURDIR}/../cpp/build
+else export LD_LIBRARY_PATH=${CURDIR}/../cpp/build:${LD_LIBRARY_PATH}
+fi
+
+export LD_LIBRARY_PATH=${CURDIR}/../cpp/build:${LD_LIBRARY_PATH}
+echo "ld library is $LD_LIBRARY_PATH"
 mvn install:install-file -DgroupId=$GROUP_ID -DartifactId=cuvs-java-internal -Dversion=$VERSION -Dpackaging=so -Dfile=$SO_FILE_PATH/libcuvs_java.so \
   && cd cuvs-java \
   && mvn verify "${MAVEN_VERIFY_ARGS[@]}" \

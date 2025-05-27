@@ -36,6 +36,7 @@ jextract \
  --include-dir ${REPODIR}/cpp/include \
  --output "${REPODIR}/java/cuvs-java/src/main/java22/" \
  --target-package ${TARGET_PACKAGE} \
+ --library cuvs_c \
  --header-class-name PanamaFFMAPI \
  ${CURDIR}/headers.h
 
