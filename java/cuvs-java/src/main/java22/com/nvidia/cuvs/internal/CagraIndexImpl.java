@@ -161,8 +161,8 @@ public class CagraIndexImpl implements CagraIndex {
    *         index
    */
   private IndexReference build() throws Throwable {
-    long rows = dataset != null? dataset.getSize(): vectors.length;
-    long cols = dataset != null? dataset.getDimensions(): (rows > 0 ? vectors[0].length : 0);
+    long rows = dataset != null? dataset.size(): vectors.length;
+    long cols = dataset != null? dataset.dimensions(): (rows > 0 ? vectors[0].length : 0);
 
     MemorySegment indexParamsMemorySegment = cagraIndexParameters != null
         ? segmentFromIndexParams(cagraIndexParameters)
@@ -522,6 +522,9 @@ public class CagraIndexImpl implements CagraIndex {
       if (inputStream != null) {
         return new CagraIndexImpl(inputStream, cuvsResources);
       } else {
+    	if (vectors != null && dataset != null) {
+    		throw new IllegalArgumentException("Please specify only one type of dataset (a float[] or a Dataset instance)");
+    	}
         return new CagraIndexImpl(cagraIndexParams, cagraCompressionParams, vectors, dataset, cuvsResources);
       }
     }

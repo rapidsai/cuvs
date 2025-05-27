@@ -1,18 +1,50 @@
-package com.nvidia.cuvs;
+/*
+ * Copyright (c) 2025, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-import java.util.Objects;
+package com.nvidia.cuvs;
 
 import com.nvidia.cuvs.spi.CuVSProvider;
 
 public interface Dataset extends AutoCloseable {
 
+	/**
+	 * Add a single vector to the dataset.
+	 * @param vector A float array of as many elements as the dimensions
+	 */
 	public void addVector(float[] vector);
 	
+	/**
+	 * Create a new instance of a dataset
+	 * @param size Number of vectors in the dataset
+	 * @param dimensions Size of each vector in the dataset 
+	 * @return new instance of {@link Dataset}
+	 */
 	static Dataset create(int size, int dimensions) {
 		return CuVSProvider.provider().newDataset(size, dimensions);
 	}
 
-	public int getSize();
+	/**
+	 * Gets the size of the dataset
+	 * @return Size of the dataset
+	 */
+	public int size();
 	
-	public int getDimensions();
+	/**
+	 * Gets the dimensions of the vectors in this dataset
+	 * @return Dimensions of the vectors in the dataset
+	 */
+	public int dimensions();
 }

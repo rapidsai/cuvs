@@ -143,8 +143,8 @@ public class BruteForceIndexImpl implements BruteForceIndex{
    *         index
    */
   private IndexReference build() throws Throwable {
-    long rows = dataset != null? dataset.getSize(): vectors.length;
-    long cols = dataset != null? dataset.getDimensions(): (rows > 0 ? vectors[0].length : 0);
+    long rows = dataset != null? dataset.size(): vectors.length;
+    long cols = dataset != null? dataset.dimensions(): (rows > 0 ? vectors[0].length : 0);
 
     MemorySegment dataSeg = dataset != null? ((DatasetImpl) dataset).seg: 
     	Util.buildMemorySegment(resources.getArena(), vectors);
