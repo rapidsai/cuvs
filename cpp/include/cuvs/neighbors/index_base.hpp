@@ -49,6 +49,7 @@ struct IndexBase {
   using matrix_index_type = int64_t;
 
   // Don't allow copying the index for performance reasons
+  IndexBase()                                    = default;
   IndexBase(const IndexBase&)                    = delete;
   IndexBase(IndexBase&&)                         = default;
   auto operator=(const IndexBase&) -> IndexBase& = delete;
