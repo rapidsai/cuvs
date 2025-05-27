@@ -66,7 +66,8 @@ auto create_algo(const std::string& algo_name,
   [[maybe_unused]] cuvs::bench::Metric metric = parse_metric(distance);
   std::unique_ptr<cuvs::bench::algo<T>> a;
 
-  if constexpr (std::is_same_v<T, float> or std::is_same_v<T, std::uint8_t>) {
+  if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, int8_t> ||
+                std::is_same_v<T, uint8_t>) {
     if (algo_name == "raft_cagra_hnswlib" || algo_name == "cuvs_cagra_hnswlib") {
       typename cuvs::bench::cuvs_cagra_hnswlib<T, uint32_t>::build_param bparam;
       ::parse_build_param<T, uint32_t>(conf, bparam.cagra_build_param);
@@ -97,6 +98,7 @@ auto create_search_param(const std::string& algo_name, const nlohmann::json& con
 }  // namespace cuvs::bench
 
 REGISTER_ALGO_INSTANCE(float);
+REGISTER_ALGO_INSTANCE(half);
 REGISTER_ALGO_INSTANCE(std::int8_t);
 REGISTER_ALGO_INSTANCE(std::uint8_t);
 
