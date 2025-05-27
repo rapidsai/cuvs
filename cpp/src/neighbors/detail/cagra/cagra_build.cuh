@@ -44,6 +44,8 @@
 #include <cstdio>
 #include <vector>
 
+#include <sys/mman.h>
+
 namespace cuvs::neighbors::cagra::detail {
 
 template <typename IdxT>
@@ -410,6 +412,52 @@ void optimize(
     res, knn_graph_internal, new_graph_internal, guarantee_connectivity);
 }
 
+// RAII wrapper for allocating memory with Transparent HugePage
+struct mmap_owner {
+  // Allocate a new memory (not backed by a file)
+  mmap_owner(size_t size) : size_{size}
+  {
+    int flags = MAP_ANONYMOUS | MAP_PRIVATE;
+    ptr_      = mmap(nullptr, size, PROT_READ | PROT_WRITE, flags, -1, 0);
+    if (ptr_ == MAP_FAILED) {
+      ptr_ = nullptr;
+      throw std::runtime_error("cuvs::mmap_owner error");
+    }
+    if (madvise(ptr_, size, MADV_HUGEPAGE) != 0) {
+      munmap(ptr_, size);
+      ptr_ = nullptr;
+      throw std::runtime_error("cuvs::mmap_owner error");
+    }
+  }
+
+  ~mmap_owner() noexcept
+  {
+    if (ptr_ != nullptr) { munmap(ptr_, size_); }
+  }
+
+  // No copies for owning struct
+  mmap_owner(const mmap_owner& res)                      = delete;
+  auto operator=(const mmap_owner& other) -> mmap_owner& = delete;
+  // Moving is fine
+  mmap_owner(mmap_owner&& other)
+    : ptr_{std::exchange(other.ptr_, nullptr)}, size_{std::exchange(other.size_, 0)}
+  {
+  }
+  auto operator=(mmap_owner&& other) -> mmap_owner&
+  {
+    std::swap(this->ptr_, other.ptr_);
+    std::swap(this->size_, other.size_);
+    return *this;
+  }
+
+  [[nodiscard]] auto data() const -> void* { return ptr_; }
+  [[nodiscard]] auto size() const -> size_t { return size_; }
+
+ private:
+  void* ptr_;
+  size_t size_;
+};
+
 template <typename T,
           typename IdxT     = uint32_t,
           typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
@@ -493,6 +541,14 @@ auto iterative_build_graph(
     }
   }
 
+  // Allocate memory for neighbors list using Transparent HugePage
+  constexpr size_t thp_size = 2 * 1024 * 1024;
+  size_t byte_size          = sizeof(IdxT) * final_graph_size * topk;
+  if (byte_size % thp_size) { byte_size += thp_size - (byte_size % thp_size); }
+  mmap_owner neighbors_list(byte_size);
+  IdxT* neighbors_ptr = (IdxT*)neighbors_list.data();
+  memset(neighbors_ptr, 0, byte_size);
+
   auto curr_graph_size = initial_graph_size;
   while (true) {
     RAFT_LOG_DEBUG("# graph_size = %lu (%.3lf)",
@@ -524,7 +580,9 @@ auto iterative_build_graph(
 
     auto dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
       dev_dataset.data_handle(), (int64_t)curr_query_size, dev_dataset.extent(1));
-    auto neighbors = raft::make_host_matrix<IdxT, int64_t>(curr_query_size, curr_topk);
+
+    auto neighbors_view =
+      raft::make_host_matrix_view<IdxT, int64_t>(neighbors_ptr, curr_query_size, curr_topk);
 
     // Search.
     // Since there are many queries, divide them into batches and search them.
@@ -551,7 +609,7 @@ auto iterative_build_graph(
                                      batch_dev_distances_view);
 
       auto batch_neighbors_view = raft::make_host_matrix_view<IdxT, int64_t>(
-        neighbors.data_handle() + batch.offset() * curr_topk, batch.size(), curr_topk);
+        neighbors_view.data_handle() + batch.offset() * curr_topk, batch.size(), curr_topk);
       raft::copy(batch_neighbors_view.data_handle(),
                  batch_dev_neighbors_view.data_handle(),
                  batch_neighbors_view.size(),
@@ -564,7 +622,7 @@ auto iterative_build_graph(
     cagra_graph     = raft::make_host_matrix<IdxT, int64_t>(0, 0);  // delete existing grahp
     cagra_graph     = raft::make_host_matrix<IdxT, int64_t>(curr_graph_size, curr_graph_degree);
     optimize<IdxT>(
-      res, neighbors.view(), cagra_graph.view(), flag_last ? params.guarantee_connectivity : 0);
+      res, neighbors_view, cagra_graph.view(), flag_last ? params.guarantee_connectivity : 0);
     if (flag_last) { break; }
   }
 
