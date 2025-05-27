@@ -519,9 +519,25 @@ void predict(raft::resources const& handle,
              raft::device_matrix_view<const float, int> X,
              std::optional<raft::device_vector_view<const float, int>> sample_weight,
              raft::device_matrix_view<const float, int> centroids,
-             raft::device_vector_view<int, int> labels,
              bool normalize_weight,
+             raft::device_vector_view<int, int> labels,
              raft::host_scalar_view<float> inertia);
+
+// This overload is retained for backward compatibility.
+[[deprecated(
+  "The argument order of kmeans::predict has been corrected. Please use the new function "
+  "instead.")]]
+inline void predict(raft::resources const& handle,
+                    const kmeans::params& params,
+                    raft::device_matrix_view<const float, int> X,
+                    std::optional<raft::device_vector_view<const float, int>> sample_weight,
+                    raft::device_matrix_view<const float, int> centroids,
+                    raft::device_vector_view<int, int> labels,
+                    bool normalize_weight,
+                    raft::host_scalar_view<float> inertia)
+{
+  predict(handle, params, X, sample_weight, centroids, normalize_weight, labels, inertia);
+}
 
 /**
  * @brief Predict the closest cluster each sample in X belongs to.
@@ -577,9 +593,25 @@ void predict(raft::resources const& handle,
              raft::device_matrix_view<const float, int> X,
              std::optional<raft::device_vector_view<const float, int>> sample_weight,
              raft::device_matrix_view<const float, int> centroids,
-             raft::device_vector_view<int64_t, int> labels,
              bool normalize_weight,
+             raft::device_vector_view<int64_t, int> labels,
              raft::host_scalar_view<float> inertia);
+
+// This overload is retained for backward compatibility.
+[[deprecated(
+  "The argument order of kmeans::predict has been corrected. Please use the new function "
+  "instead.")]]
+inline void predict(raft::resources const& handle,
+                    const kmeans::params& params,
+                    raft::device_matrix_view<const float, int> X,
+                    std::optional<raft::device_vector_view<const float, int>> sample_weight,
+                    raft::device_matrix_view<const float, int> centroids,
+                    raft::device_vector_view<int64_t, int> labels,
+                    bool normalize_weight,
+                    raft::host_scalar_view<float> inertia)
+{
+  predict(handle, params, X, sample_weight, centroids, normalize_weight, labels, inertia);
+}
 
 /**
  * @brief Predict the closest cluster each sample in X belongs to.
@@ -635,9 +667,25 @@ void predict(raft::resources const& handle,
              raft::device_matrix_view<const double, int> X,
              std::optional<raft::device_vector_view<const double, int>> sample_weight,
              raft::device_matrix_view<const double, int> centroids,
-             raft::device_vector_view<int, int> labels,
              bool normalize_weight,
+             raft::device_vector_view<int, int> labels,
              raft::host_scalar_view<double> inertia);
+
+// This overload is retained for backward compatibility.
+[[deprecated(
+  "The argument order of kmeans::predict has been corrected. Please use the new function "
+  "instead.")]]
+inline void predict(raft::resources const& handle,
+                    const kmeans::params& params,
+                    raft::device_matrix_view<const double, int> X,
+                    std::optional<raft::device_vector_view<const double, int>> sample_weight,
+                    raft::device_matrix_view<const double, int> centroids,
+                    raft::device_vector_view<int, int> labels,
+                    bool normalize_weight,
+                    raft::host_scalar_view<double> inertia)
+{
+  predict(handle, params, X, sample_weight, centroids, normalize_weight, labels, inertia);
+}
 
 /**
  * @brief Predict the closest cluster each sample in X belongs to.
@@ -693,9 +741,25 @@ void predict(raft::resources const& handle,
              raft::device_matrix_view<const double, int> X,
              std::optional<raft::device_vector_view<const double, int>> sample_weight,
              raft::device_matrix_view<const double, int> centroids,
-             raft::device_vector_view<int64_t, int> labels,
              bool normalize_weight,
+             raft::device_vector_view<int64_t, int> labels,
              raft::host_scalar_view<double> inertia);
+
+// This overload is retained for backward compatibility.
+[[deprecated(
+  "The argument order of kmeans::predict has been corrected. Please use the new function "
+  "instead.")]]
+inline void predict(raft::resources const& handle,
+                    const kmeans::params& params,
+                    raft::device_matrix_view<const double, int> X,
+                    std::optional<raft::device_vector_view<const double, int>> sample_weight,
+                    raft::device_matrix_view<const double, int> centroids,
+                    raft::device_vector_view<int64_t, int> labels,
+                    bool normalize_weight,
+                    raft::host_scalar_view<double> inertia)
+{
+  predict(handle, params, X, sample_weight, centroids, normalize_weight, labels, inertia);
+}
 
 /**
  * @brief Predict the closest cluster each sample in X belongs to.
