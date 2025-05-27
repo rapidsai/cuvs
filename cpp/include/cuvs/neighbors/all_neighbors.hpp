@@ -22,6 +22,10 @@
 #include <variant>
 
 namespace cuvs::neighbors::all_neighbors {
+/**
+ * @defgroup all_neighbors_cpp_params The all-neighbors algorithm parameters.
+ * @{
+ */
 
 /**
  * @brief Parameters used to build an all-neighbors knn graph (find nearest neighbors for all the
@@ -43,17 +47,20 @@ using GraphBuildParams =
   std::variant<graph_build_params::ivf_pq_params, graph_build_params::nn_descent_params>;
 
 /**
- * @brief Parameters used to build an all-neighbors graph  (find nearest neighbors for all the
+ * @brief Parameters used to build an all-neighbors graph (find nearest neighbors for all the
  * training vectors)
  *
- * graph_build_params: graph building parameters for the given graph building algorithm. defaults
- * to ivfpq.
- * n_nearest_clusters: number of nearest clusters each data point will be assigned to in
- * the batching algorithm
- * n_clusters: number of total clusters (aka batches) to split the data into. If set to 1, algorithm
- * creates an all-neighbors graph without batching
- * metric: metric type
+ * Usage of n_nearest_clusters and n_clusters
  *
+ * The ratio of n_nearest_clusters / n_clusters determines device memory usage.
+ * Approximately (n_nearest_clusters / n_clusters) * num_rows_in_entire_data number of rows will
+ * be put on device memory at once.
+ * E.g. between (n_nearest_clusters / n_clusters) = 2/10 and 2/20, the latter will use less device
+ * memory.
+ *
+ * Larger n_nearest_clusters results in better accuracy of the final all-neighbors knn
+ * graph. E.g. While using similar device memory, (n_nearest_clusters / n_clusters) = 4/20
+ * will have better accuracy than 2/10 at the cost of performance.
  */
 struct all_neighbors_params {
   /** Parameters for knn graph building algorithm
@@ -74,22 +81,24 @@ struct all_neighbors_params {
   GraphBuildParams graph_build_params;
 
   /**
-   * Usage of n_nearest_clusters and n_clusters
-   *
-   * The ratio of n_nearest_clusters / n_clusters determines device memory usage.
-   * Approximately (n_nearest_clusters / n_clusters) * num_rows_in_entire_data number of rows will
-   * be put on device memory at once.
-   * E.g. between (n_nearest_clusters / n_clusters) = 2/10 and 2/20, the latter will use less device
-   * memory.
-   *
-   * Larger n_nearest_clusters results in better accuracy of the final all-neighbors knn
-   * graph. E.g. With the similar device memory usages, (n_nearest_clusters / n_clusters) = 4/20
-   * will have better accuracy than 2/10 at the cost of performance.
+   * number of nearest clusters each data point will be assigned to in the batching algorithm
    */
-  size_t n_nearest_clusters           = 2;
+  size_t n_nearest_clusters = 2;
+
+  /**
+   * number of total clusters (aka batches) to split the data into. If set to 1, algorithm creates
+   * an all-neighbors graph without batching
+   */
   size_t n_clusters                   = 1;  // defaults to not batching
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
 };
+
+/** @} */
+
+/**
+ * @defgroup all_neighbors_cpp_build The all-neighbors knn graph build
+ * @{
+ */
 
 /**
  * @brief Builds an approximate all-neighbors knn graph  (find nearest neighbors for all the
@@ -97,12 +106,12 @@ struct all_neighbors_params {
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   // use default index parameters
- *   all_neighbors::all_neighbors_params params;
+ *  using namespace cuvs::neighbors;
+ *  // use default index parameters
+ *  all_neighbors::all_neighbors_params params;
  *  auto indices = raft::make_device_matrix<int64_t, int64_t>(handle, n_row, k);
  *  auto distances = raft::make_device_matrix<float, int64_t>(handle, n_row, k);
- *   all_neighbors::build(res, params, dataset, indices.view(), distances.view());
+ *  all_neighbors::build(res, params, dataset, indices.view(), distances.view());
  * @endcode
  *
  * @param[in] handle raft::resources is an object mangaging resources
@@ -127,12 +136,12 @@ void build(
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   // use default index parameters
- *   all_neighbors::all_neighbors_params params;
+ *  using namespace cuvs::neighbors;
+ *  // use default index parameters
+ *  all_neighbors::all_neighbors_params params;
  *  auto indices = raft::make_device_matrix<int64_t, int64_t>(handle, n_row, k);
  *  auto distances = raft::make_device_matrix<float, int64_t>(handle, n_row, k);
- *   all_neighbors::build(res, params, dataset, indices.view(), distances.view());
+ *  all_neighbors::build(res, params, dataset, indices.view(), distances.view());
  * @endcode
  *
  * @param[in] handle raft::resources is an object mangaging resources
@@ -149,4 +158,6 @@ void build(
   raft::device_matrix_view<const float, int64_t, row_major> dataset,
   raft::device_matrix_view<int64_t, int64_t, row_major> indices,
   std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances = std::nullopt);
+
+/** @} */
 }  // namespace cuvs::neighbors::all_neighbors
