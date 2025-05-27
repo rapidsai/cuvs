@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "../../neighbors/detail/knn_graph.cuh"
 #include "./kmeans_common.cuh"
 #include <cuvs/cluster/agglomerative.hpp>
 #include <cuvs/distance/distance.hpp>
@@ -25,7 +26,6 @@
 #include <raft/linalg/unary_op.cuh>
 #include <raft/sparse/convert/csr.cuh>
 #include <raft/sparse/coo.hpp>
-#include <raft/sparse/neighbors/knn_graph.cuh>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
 
@@ -75,8 +75,9 @@ struct distance_graph_impl<Linkage::KNN_GRAPH, value_idx, value_t> {
     // Need to symmetrize knn into undirected graph
     raft::sparse::COO<value_t, value_idx> knn_graph_coo(stream);
 
-    raft::sparse::neighbors::knn_graph(
-      handle, X, m, n, static_cast<raft::distance::DistanceType>(metric), knn_graph_coo, c);
+    auto X_view = raft::make_device_matrix_view<const value_t, value_idx, raft::row_major>(X, m, n);
+    cuvs::neighbors::detail::knn_graph<value_idx, value_t, size_t>(
+      handle, X_view, metric, knn_graph_coo, c);
 
     indices.resize(knn_graph_coo.nnz, stream);
     data.resize(knn_graph_coo.nnz, stream);
