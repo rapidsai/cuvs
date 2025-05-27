@@ -18,7 +18,6 @@
 
 #include "common.hpp"
 #include <cuvs/distance/distance.hpp>
-#include <cuvs/neighbors/common.h>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
@@ -274,12 +273,6 @@ struct extend_params {
  * @defgroup cagra_cpp_merge_params CAGRA index merge parameters
  * @{
  */
-
-/**
- * @brief Determines the strategy for merging CAGRA graphs.
- *
- */
-using MergeStrategy = cuvsMergeStrategy;
 
 /**
  * @brief Parameters for merging CAGRA indexes.
