@@ -24,6 +24,7 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.hpp>
+#include <cuvs/neighbors/composite/merge.hpp>
 #include <cuvs/neighbors/dynamic_batching.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
@@ -255,7 +256,7 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
     }
     if (index_params_.merge_type == CagraMergeType::kPhysical) {
       cuvs::neighbors::cagra::merge_params merge_params{index_params_.cagra_params};
-      merge_params.strategy = cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
+      merge_params.merge_strategy = cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
 
       std::vector<cuvs::neighbors::cagra::index<T, IdxT>*> indices;
       indices.reserve(sub_indices_.size());
@@ -484,23 +485,25 @@ void cuvs_cagra<T, IdxT>::search_base(
       cuvs::neighbors::cagra::search(
         handle_, search_params_, *index_, queries_view, neighbors_view, distances_view, *filter_);
     } else {
-      std::vector<cuvs::neighbors::cagra::index<T, IdxT>*> indices;
-      indices.reserve(sub_indices_.size());
-      for (auto& ptr : sub_indices_) {
-        indices.push_back(ptr.get());
-      }
       if (index_params_.merge_type == CagraMergeType::kLogical) {
         cuvs::neighbors::cagra::merge_params merge_params{index_params_.cagra_params};
-        merge_params.strategy = cuvs::neighbors::cagra::MergeStrategy::MERGE_STRATEGY_LOGICAL;
-        auto index            = cuvs::neighbors::cagra::make_composite_index(merge_params, indices);
+        merge_params.merge_strategy = cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL;
+
+        // Create wrapped indices for composite merge
+        std::vector<std::shared_ptr<cuvs::neighbors::IndexWrapper<T, IdxT, algo_base::index_type>>>
+          wrapped_indices;
+        wrapped_indices.reserve(sub_indices_.size());
+        for (auto& ptr : sub_indices_) {
+          auto index_wrapper =
+            cuvs::neighbors::cagra::make_index_wrapper<T, IdxT, algo_base::index_type>(ptr.get());
+          wrapped_indices.push_back(index_wrapper);
+        }
+
+        auto merged_index =
+          cuvs::neighbors::composite::merge(handle_, merge_params, wrapped_indices);
         cuvs::neighbors::filtering::none_sample_filter empty_filter;
-        cuvs::neighbors::cagra::search(handle_,
-                                       search_params_,
-                                       index,
-                                       queries_view,
-                                       neighbors_view,
-                                       distances_view,
-                                       empty_filter);
+        merged_index->search(
+          handle_, search_params_, queries_view, neighbors_view, distances_view, empty_filter);
       }
     }
   }
