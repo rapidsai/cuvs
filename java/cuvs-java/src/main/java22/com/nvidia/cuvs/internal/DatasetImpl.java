@@ -21,7 +21,6 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.nvidia.cuvs.Dataset;
 
@@ -31,7 +30,6 @@ public class DatasetImpl implements Dataset {
   private final int size;
   private final int dimensions;
   private int current = 0;
-  private AtomicBoolean isAlive = new AtomicBoolean(true);
 
   public DatasetImpl(int size, int dimensions) {
     this.size = size;
@@ -52,7 +50,7 @@ public class DatasetImpl implements Dataset {
 
   @Override
   public void close() {
-    if (isAlive.getAndSet(false)) {
+    if (!arena.scope().isAlive()) {
       arena.close();
     }
   }
