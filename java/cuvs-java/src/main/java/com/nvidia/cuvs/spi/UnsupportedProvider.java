@@ -47,4 +47,9 @@ final class UnsupportedProvider implements CuVSProvider {
   public HnswIndex.Builder newHnswIndexBuilder(CuVSResources cuVSResources) {
     throw new UnsupportedOperationException();
   }
+
+  @Override
+  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) throws Throwable {
+    throw new UnsupportedOperationException();
+  }
 }

@@ -43,7 +43,6 @@ import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CagraIndexParams;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.CagraMergeParams;
-import com.nvidia.cuvs.CagraMergeParams.MergeStrategy;
 import com.nvidia.cuvs.CagraQuery;
 import com.nvidia.cuvs.CagraSearchParams;
 import com.nvidia.cuvs.CuVSResources;
@@ -182,7 +181,7 @@ public class CagraIndexImpl implements CagraIndex {
     long cols = rows > 0 ? dataset[0].length : 0;
 
     MemorySegment indexParamsMemorySegment = cagraIndexParameters != null
-        ? segmentFromIndexParams(cagraIndexParameters)
+        ? segmentFromIndexParams(resources, cagraIndexParameters)
         : MemorySegment.NULL;
 
     int numWriterThreads = cagraIndexParameters != null ? cagraIndexParameters.getNumWriterThreads() : 1;
@@ -413,49 +412,7 @@ public class CagraIndexImpl implements CagraIndex {
   /**
    * Allocates the configured index parameters in the MemorySegment.
    */
-  private MemorySegment segmentFromIndexParams(CagraIndexParams params) {
-    MemorySegment seg = cuvsCagraIndexParams.allocate(resources.getArena());
-    cuvsCagraIndexParams.intermediate_graph_degree(seg, params.getIntermediateGraphDegree());
-    cuvsCagraIndexParams.graph_degree(seg, params.getGraphDegree());
-    cuvsCagraIndexParams.build_algo(seg, params.getCagraGraphBuildAlgo().value);
-    cuvsCagraIndexParams.nn_descent_niter(seg, params.getNNDescentNumIterations());
-    cuvsCagraIndexParams.metric(seg, params.getCuvsDistanceType().value);
-
-
-    if (params.getCagraGraphBuildAlgo().equals(CagraGraphBuildAlgo.IVF_PQ)) {
-
-      MemorySegment ivfpqIndexParamsMemorySegment = cuvsIvfPqIndexParams.allocate(resources.getArena());
-      cuvsIvfPqIndexParams.metric(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().getMetric().value);
-      cuvsIvfPqIndexParams.metric_arg(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().getMetricArg());
-      cuvsIvfPqIndexParams.add_data_on_build(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().isAddDataOnBuild());
-      cuvsIvfPqIndexParams.n_lists(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().getnLists());
-      cuvsIvfPqIndexParams.kmeans_n_iters(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().getKmeansNIters());
-      cuvsIvfPqIndexParams.kmeans_trainset_fraction(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().getKmeansTrainsetFraction());
-      cuvsIvfPqIndexParams.pq_bits(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().getPqBits());
-      cuvsIvfPqIndexParams.pq_dim(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().getPqDim());
-      cuvsIvfPqIndexParams.codebook_kind(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().getCodebookKind().value);
-      cuvsIvfPqIndexParams.force_random_rotation(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().isForceRandomRotation());
-      cuvsIvfPqIndexParams.conservative_memory_allocation(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().isConservativeMemoryAllocation());
-      cuvsIvfPqIndexParams.max_train_points_per_pq_code(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().getMaxTrainPointsPerPqCode());
-
-      MemorySegment ivfpqSearchParamsMemorySegment = cuvsIvfPqSearchParams.allocate(resources.getArena());
-      cuvsIvfPqSearchParams.n_probes(ivfpqSearchParamsMemorySegment, params.getCuVSIvfPqParams().getSearchParams().getnProbes());
-      cuvsIvfPqSearchParams.lut_dtype(ivfpqSearchParamsMemorySegment, params.getCuVSIvfPqParams().getSearchParams().getLutDtype().value);
-      cuvsIvfPqSearchParams.internal_distance_dtype(ivfpqSearchParamsMemorySegment, params.getCuVSIvfPqParams().getSearchParams().getInternalDistanceDtype().value);
-      cuvsIvfPqSearchParams.preferred_shmem_carveout(ivfpqSearchParamsMemorySegment, params.getCuVSIvfPqParams().getSearchParams().getPreferredShmemCarveout());
-
-      MemorySegment cuvsIvfPqParamsMemorySegment = cuvsIvfPqParams.allocate(resources.getArena());
-      cuvsIvfPqParams.ivf_pq_build_params(cuvsIvfPqParamsMemorySegment, ivfpqIndexParamsMemorySegment);
-      cuvsIvfPqParams.ivf_pq_search_params(cuvsIvfPqParamsMemorySegment, ivfpqSearchParamsMemorySegment);
-      cuvsIvfPqParams.refinement_rate(cuvsIvfPqParamsMemorySegment, params.getCuVSIvfPqParams().getRefinementRate());
-
-      cuvsCagraIndexParams.graph_build_params(seg, cuvsIvfPqParamsMemorySegment);
-    }
-
-    return seg;
-  }
-
-  private static MemorySegment segmentFromIndexParams(CagraIndexParams params, CuVSResourcesImpl resources) {
+  private static MemorySegment segmentFromIndexParams(CuVSResourcesImpl resources, CagraIndexParams params) {
     MemorySegment seg = cuvsCagraIndexParams.allocate(resources.getArena());
     cuvsCagraIndexParams.intermediate_graph_degree(seg, params.getIntermediateGraphDegree());
     cuvsCagraIndexParams.graph_degree(seg, params.getGraphDegree());
@@ -592,7 +549,7 @@ public class CagraIndexImpl implements CagraIndex {
     MemorySegment seg = cuvsCagraMergeParams.allocate(resources.getArena());
 
     if (mergeParams.getOutputIndexParams() != null) {
-      MemorySegment outputIndexParamsSeg = segmentFromIndexParams(mergeParams.getOutputIndexParams(), resources);
+      MemorySegment outputIndexParamsSeg = segmentFromIndexParams(resources, mergeParams.getOutputIndexParams());
       cuvsCagraMergeParams.output_index_params(seg, outputIndexParamsSeg);
     } else {
       cuvsCagraMergeParams.output_index_params(seg, MemorySegment.NULL);
