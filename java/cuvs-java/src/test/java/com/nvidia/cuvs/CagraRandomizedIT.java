@@ -98,7 +98,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
       CagraIndexParams indexParams = new CagraIndexParams.Builder()
           .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
           .build();
-      
+
       CagraIndex index;
       boolean useNativeMemoryDataset = random.nextBoolean();
       if (useNativeMemoryDataset) {
@@ -106,15 +106,15 @@ public class CagraRandomizedIT extends CuVSTestCase {
           Dataset dataset = Dataset.create(vectors.length, vectors[0].length);
           for (float[] v: vectors) dataset.addVector(v);
           index = CagraIndex.newBuilder(resources)
-        		  .withDataset(dataset)
-        		  .withIndexParams(indexParams)
-        		  .build();    	  
+              .withDataset(dataset)
+              .withIndexParams(indexParams)
+              .build();
       } else {
           log.info("Using float[][] for input data");
-    	  index = CagraIndex.newBuilder(resources)
-    	          .withDataset(vectors)
-    	          .withIndexParams(indexParams)
-    	          .build();
+        index = CagraIndex.newBuilder(resources)
+                .withDataset(vectors)
+                .withIndexParams(indexParams)
+                .build();
       }
       log.info("Index built successfully.");
 

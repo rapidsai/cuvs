@@ -52,7 +52,7 @@ public interface CuVSProvider {
       throws Throwable;
 
   Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException;
-  
+
   /** Creates a new BruteForceIndex Builder. */
   BruteForceIndex.Builder newBruteForceIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;

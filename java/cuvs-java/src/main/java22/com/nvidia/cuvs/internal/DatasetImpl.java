@@ -26,44 +26,45 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.nvidia.cuvs.Dataset;
 
 public class DatasetImpl implements Dataset {
-	private final Arena arena;
-	protected final MemorySegment seg;
-	private final int size;
-	private final int dimensions;
-	private int current = 0;
-	private AtomicBoolean isAlive = new AtomicBoolean(true);
-	
-	public DatasetImpl(int size, int dimensions) {
-		this.size = size;
-		this.dimensions = dimensions;
-		
-	    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout(size * dimensions, C_FLOAT);
-	    
-	    this.arena = Arena.ofShared();
-	    seg = arena.allocate(dataMemoryLayout);
-	}
+  private final Arena arena;
+  protected final MemorySegment seg;
+  private final int size;
+  private final int dimensions;
+  private int current = 0;
+  private AtomicBoolean isAlive = new AtomicBoolean(true);
 
-	@Override
-	public void addVector(float[] vector) {
-	   if (current >= size) throw new ArrayIndexOutOfBoundsException();
-       MemorySegment.copy(vector, 0, seg, C_FLOAT, ((current++) * dimensions * C_FLOAT.byteSize()), (int) dimensions);
-	}
+  public DatasetImpl(int size, int dimensions) {
+    this.size = size;
+    this.dimensions = dimensions;
 
-	@Override
-	public void close() {
-		if (isAlive.getAndSet(false)) {
-			arena.close();
-		}
-	}
+    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout(size * dimensions, C_FLOAT);
 
-	@Override
-	public int size() {
-		return size;
-	}
+    this.arena = Arena.ofShared();
+    seg = arena.allocate(dataMemoryLayout);
+  }
 
-	@Override
-	public int dimensions() {
-		return dimensions;
-	}
+  @Override
+  public void addVector(float[] vector) {
+    if (current >= size)
+      throw new ArrayIndexOutOfBoundsException();
+    MemorySegment.copy(vector, 0, seg, C_FLOAT, ((current++) * dimensions * C_FLOAT.byteSize()), (int) dimensions);
+  }
+
+  @Override
+  public void close() {
+    if (isAlive.getAndSet(false)) {
+      arena.close();
+    }
+  }
+
+  @Override
+  public int size() {
+    return size;
+  }
+
+  @Override
+  public int dimensions() {
+    return dimensions;
+  }
 
 }

@@ -20,31 +20,35 @@ import com.nvidia.cuvs.spi.CuVSProvider;
 
 public interface Dataset extends AutoCloseable {
 
-	/**
-	 * Add a single vector to the dataset.
-	 * @param vector A float array of as many elements as the dimensions
-	 */
-	public void addVector(float[] vector);
-	
-	/**
-	 * Create a new instance of a dataset
-	 * @param size Number of vectors in the dataset
-	 * @param dimensions Size of each vector in the dataset 
-	 * @return new instance of {@link Dataset}
-	 */
-	static Dataset create(int size, int dimensions) {
-		return CuVSProvider.provider().newDataset(size, dimensions);
-	}
+  /**
+   * Add a single vector to the dataset.
+   *
+   * @param vector A float array of as many elements as the dimensions
+   */
+  public void addVector(float[] vector);
 
-	/**
-	 * Gets the size of the dataset
-	 * @return Size of the dataset
-	 */
-	public int size();
-	
-	/**
-	 * Gets the dimensions of the vectors in this dataset
-	 * @return Dimensions of the vectors in the dataset
-	 */
-	public int dimensions();
+  /**
+   * Create a new instance of a dataset
+   *
+   * @param size       Number of vectors in the dataset
+   * @param dimensions Size of each vector in the dataset
+   * @return new instance of {@link Dataset}
+   */
+  static Dataset create(int size, int dimensions) {
+    return CuVSProvider.provider().newDataset(size, dimensions);
+  }
+
+  /**
+   * Gets the size of the dataset
+   *
+   * @return Size of the dataset
+   */
+  public int size();
+
+  /**
+   * Gets the dimensions of the vectors in this dataset
+   *
+   * @return Dimensions of the vectors in the dataset
+   */
+  public int dimensions();
 }

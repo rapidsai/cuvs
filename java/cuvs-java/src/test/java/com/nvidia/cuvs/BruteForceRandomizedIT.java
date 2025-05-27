@@ -124,18 +124,18 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
           log.info("Using " + Dataset.class + " for input data");
           Dataset dataset = Dataset.create(vectors.length, vectors[0].length);
           for (float[] v: vectors) dataset.addVector(v);
-    	  index = BruteForceIndex.newBuilder(resources)
-    	          .withDataset(dataset)
-    	          .withIndexParams(indexParams)
-    	          .build();
+        index = BruteForceIndex.newBuilder(resources)
+                .withDataset(dataset)
+                .withIndexParams(indexParams)
+                .build();
       } else {
-    	  log.info("Using float[][] for input data");
-    	  index = BruteForceIndex.newBuilder(resources)
-    	          .withDataset(vectors)
-    	          .withIndexParams(indexParams)
-    	          .build();
+        log.info("Using float[][] for input data");
+        index = BruteForceIndex.newBuilder(resources)
+                .withDataset(vectors)
+                .withIndexParams(indexParams)
+                .build();
       }
-      
+
       log.info("Index built successfully. Executing search...");
       SearchResults results = index.search(query);
 

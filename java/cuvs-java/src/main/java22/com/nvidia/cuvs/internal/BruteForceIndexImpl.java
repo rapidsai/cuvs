@@ -89,7 +89,7 @@ public class BruteForceIndexImpl implements BruteForceIndex{
    *                              holding the index parameters
    */
   private BruteForceIndexImpl(float[][] vectors, Dataset dataset, CuVSResourcesImpl resources,
-		  BruteForceIndexParams bruteForceIndexParams)
+      BruteForceIndexParams bruteForceIndexParams)
       throws Throwable {
     this.vectors = vectors;
     this.dataset = dataset;
@@ -146,8 +146,8 @@ public class BruteForceIndexImpl implements BruteForceIndex{
     long rows = dataset != null? dataset.size(): vectors.length;
     long cols = dataset != null? dataset.dimensions(): (rows > 0 ? vectors[0].length : 0);
 
-    MemorySegment dataSeg = dataset != null? ((DatasetImpl) dataset).seg: 
-    	Util.buildMemorySegment(resources.getArena(), vectors);
+    MemorySegment dataSeg = dataset != null? ((DatasetImpl) dataset).seg:
+      Util.buildMemorySegment(resources.getArena(), vectors);
     try (var localArena = Arena.ofConfined()) {
       MemorySegment returnValue = localArena.allocate(C_INT);
       MemorySegment indexSeg = (MemorySegment) indexMethodHandle.invokeExact(
