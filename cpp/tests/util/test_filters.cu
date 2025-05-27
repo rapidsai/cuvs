@@ -200,19 +200,8 @@ auto inputs_convert = ::testing::Values(test_spec_convert{100},
                                         test_spec_convert{1000},
                                         test_spec_convert{10000},
                                         test_spec_convert{200000});
-/*
-using Uint8_32 = IDSelectorTest<uint8_t, uint32_t>;
-TEST_P(Uint8_32, Run) { run(); }
-INSTANTIATE_TEST_CASE_P(IDSelectorTest, Uint8_32, inputs_convert);
-*/
+
 using Uint32_32 = IDSelectorTest<uint32_t, uint32_t>;
 TEST_P(Uint32_32, Run) { run(); }
 INSTANTIATE_TEST_CASE_P(IDSelectorTest, Uint32_32, inputs_convert);
-
-/*
-using Uint64_32 = IDSelectorTest<uint64_t, uint32_t>;
-TEST_P(Uint64_32, Run) { run(); }
-INSTANTIATE_TEST_CASE_P(IDSelectorTest, Uint64_32, inputs_convert);
-*/
-
 }  // namespace cuvs::util
