@@ -352,15 +352,6 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             CagraIndex physicalMergedIndex = CagraIndex.merge(new CagraIndex[]{index1, index2}, physicalMergeParams);
             log.info("Physical merge completed successfully");
 
-            // CagraMergeParams logicalMergeParams = new CagraMergeParams.Builder()
-            //     .withOutputIndexParams(outputIndexParams)
-            //     .withStrategy(MergeStrategy.LOGICAL)
-            //     .build();
-
-            // log.info("Merging indexes with LOGICAL strategy...");
-            // CagraIndex logicalMergedIndex = CagraIndex.merge(new CagraIndex[]{index1, index2}, logicalMergeParams);
-            // log.info("Logical merge completed successfully");
-
             CagraSearchParams searchParams = new CagraSearchParams.Builder(resources)
                 .build();
 
@@ -377,17 +368,9 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             assertNotNull("Physical merge search results should not be null", physicalResults);
             assertEquals("Physical merge search results should match expected", expectedResults, physicalResults.getResults());
 
-            // log.info("Searching logically merged index...");
-            // SearchResults logicalResults = logicalMergedIndex.search(query);
-            // assertNotNull("Logical merge search results should not be null", logicalResults);
-            // assertEquals("Logical merge search results should match expected", expectedResults, logicalResults.getResults());
-
             // --- Serialization/deserialization check for both merged indexes ---
             String physicalIndexFileName = UUID.randomUUID().toString() + ".cag";
             physicalMergedIndex.serialize(new FileOutputStream(physicalIndexFileName));
-
-            // String logicalIndexFileName = UUID.randomUUID().toString() + ".cag";
-            // logicalMergedIndex.serialize(new FileOutputStream(logicalIndexFileName));
 
             File physicalIndexFile = new File(physicalIndexFileName);
             InputStream physicalInputStream = new FileInputStream(physicalIndexFile);
@@ -395,33 +378,17 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
                 .from(physicalInputStream)
                 .build();
 
-            // File logicalIndexFile = new File(logicalIndexFileName);
-            // java.io.InputStream logicalInputStream = new FileInputStream(logicalIndexFile);
-            // CagraIndex loadedLogicalIndex = CagraIndex.newBuilder(resources)
-            //     .from(logicalInputStream)
-            //     .build();
-
             SearchResults resultsFromLoadedPhysical = loadedPhysicalIndex.search(query);
             assertEquals("Loaded physical index search results should match expected",
                 expectedResults, resultsFromLoadedPhysical.getResults());
 
-            // SearchResults resultsFromLoadedLogical = loadedLogicalIndex.search(query);
-            // assertEquals("Loaded logical index search results should match expected",
-            //     expectedResults, resultsFromLoadedLogical.getResults());
-
             if (physicalIndexFile.exists()) {
                 physicalIndexFile.delete();
             }
-            // if (logicalIndexFile.exists()) {
-            //     logicalIndexFile.delete();
-            // }
-
             index1.destroyIndex();
             index2.destroyIndex();
             physicalMergedIndex.destroyIndex();
             loadedPhysicalIndex.destroyIndex();
-            // logicalMergedIndex.destroyIndex();
-            // loadedLogicalIndex.destroyIndex();
         }
     }
 
