@@ -60,5 +60,3 @@ if [[ ${RAPIDS_CUDA_MAJOR} == "12" ]]; then
                       "${RATTLER_CHANNELS[@]}"
   sccache --show-adv-stats
 fi
-
-rapids-upload-conda-to-s3 python
