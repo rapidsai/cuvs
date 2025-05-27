@@ -24,3 +24,4 @@
 #include <cuvs/neighbors/common.h>
 #include "omp_def.h"
 #include <cuda_runtime.h>
+#include <cuda_runtime_api.h>
