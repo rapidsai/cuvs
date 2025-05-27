@@ -18,6 +18,12 @@ package com.nvidia.cuvs;
 
 import com.nvidia.cuvs.spi.CuVSProvider;
 
+/**
+ * This represents a wrapper for a dataset to be used for index construction.
+ * The purpose is to allow a caller to place the vectors into native memory
+ * directly, instead of requiring the caller to load all the vectors into the heap
+ * (e.g. with a float[][]).
+ */
 public interface Dataset extends AutoCloseable {
 
   /**

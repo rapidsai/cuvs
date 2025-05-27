@@ -44,12 +44,15 @@ public class CagraRandomizedIT extends CuVSTestCase {
 
   @Test
   public void testResultsTopKWithRandomValues() throws Throwable {
-    for (int i = 0; i < 10; i++) {
-      tmpResultsTopKWithRandomValues();
+    boolean useNativeMemoryDatasets[] = {true, false};
+	for (int i = 0; i < 10; i++) {
+	  for (boolean use: useNativeMemoryDatasets) {
+		  tmpResultsTopKWithRandomValues(use);
+	  }
     }
   }
 
-  private void tmpResultsTopKWithRandomValues() throws Throwable {
+  private void tmpResultsTopKWithRandomValues(boolean useNativeMemoryDataset) throws Throwable {
     int DATASET_SIZE_LIMIT = 10_000;
     int DIMENSIONS_LIMIT = 2048;
     int NUM_QUERIES_LIMIT = 10;
@@ -72,6 +75,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
     log.info("Dataset size: {}x{}", datasetSize, dimensions);
     log.info("Query size: {}x{}", numQueries, dimensions);
     log.info("TopK: {}", topK);
+    log.info("Use native memory dataset? " + useNativeMemoryDataset);
 
     // Debugging: Log dataset and queries
     if (log.isDebugEnabled()) {
@@ -100,9 +104,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
           .build();
 
       CagraIndex index;
-      boolean useNativeMemoryDataset = random.nextBoolean();
       if (useNativeMemoryDataset) {
-          log.info("Using " + Dataset.class + " for input data");
           Dataset dataset = Dataset.create(vectors.length, vectors[0].length);
           for (float[] v: vectors) dataset.addVector(v);
           index = CagraIndex.newBuilder(resources)
@@ -110,7 +112,6 @@ public class CagraRandomizedIT extends CuVSTestCase {
               .withIndexParams(indexParams)
               .build();
       } else {
-          log.info("Using float[][] for input data");
         index = CagraIndex.newBuilder(resources)
                 .withDataset(vectors)
                 .withIndexParams(indexParams)

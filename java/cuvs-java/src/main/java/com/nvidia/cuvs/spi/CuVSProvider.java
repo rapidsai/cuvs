@@ -51,6 +51,7 @@ public interface CuVSProvider {
   CuVSResources newCuVSResources(Path tempDirectory)
       throws Throwable;
 
+  /** Create a {@link Dataset} instance **/
   Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException;
 
   /** Creates a new BruteForceIndex Builder. */
