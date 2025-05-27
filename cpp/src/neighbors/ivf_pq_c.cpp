@@ -163,16 +163,8 @@ void _get_centers(cuvsResources_t res, cuvsIvfPqIndex index, DLManagedTensor* ce
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
   auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
   auto dst       = cuvs::core::from_dlpack<output_mdspan_type>(centers);
-  auto src       = index_ptr->centers();
 
-  RAFT_EXPECTS(src.extent(0) == dst.extent(0), "Output centers has incorrect number of rows");
-  RAFT_EXPECTS(src.extent(1) == dst.extent(1), "Output centers has incorrect number of cols");
-
-  cudaMemcpyAsync(dst.data_handle(),
-                  src.data_handle(),
-                  dst.extent(0) * dst.extent(1) * sizeof(float),
-                  cudaMemcpyDefault,
-                  raft::resource::get_cuda_stream(*res_ptr));
+  cuvs::neighbors::ivf_pq::helpers::extract_centers(*res_ptr, *index_ptr, dst);
 }
 }  // namespace
 
@@ -350,10 +342,10 @@ extern "C" uint32_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index)
   return index_ptr->n_lists();
 }
 
-extern "C" uint32_t cuvsIvfPqIndexGetDimExt(cuvsIvfPqIndex_t index)
+extern "C" uint32_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index)
 {
   auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
-  return index_ptr->dim_ext();
+  return index_ptr->dim();
 }
 
 extern "C" cuvsError_t cuvsIvfPqIndexGetCenters(cuvsResources_t res,
