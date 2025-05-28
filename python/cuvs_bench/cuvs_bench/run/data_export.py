@@ -218,6 +218,8 @@ def convert_json_to_csv_search(dataset, dataset_path):
                 write["build threads"] = None
                 write["build cpu_time"] = None
 
+                print("build_df.columns", build_df.columns)
+
                 start_idx = 5
                 if "GPU" in build_df.columns:
                     start_idx = 6

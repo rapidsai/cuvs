@@ -366,9 +366,14 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         actual_rows = len(df)
 
         # breakpoint()
+        print("hey")
+        print(df.head())
+        print(actual_header)
+        print(expectations["header"])
         assert (
             actual_header == expectations["header"]
         ), f"Wrong header produced in file f{rel_path}"
+
         assert actual_rows == expectations["rows"]
 
 
