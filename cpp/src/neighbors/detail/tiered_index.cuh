@@ -72,9 +72,10 @@ struct brute_force_storage {
                       raft::device_matrix_view<const T, int64_t, raft::row_major> new_vectors,
                       cuvs::distance::DistanceType metric)
   {
-    RAFT_EXPECTS(num_rows_available() >= new_vectors.extent(0),
+    RAFT_EXPECTS(num_rows_available() >= static_cast<size_t>(new_vectors.extent(0)),
                  "Insufficient storage to append new vectors");
-    RAFT_EXPECTS(dim == new_vectors.extent(1), "Dimension mismatch on appending new vectors");
+    RAFT_EXPECTS(dim == static_cast<size_t>(new_vectors.extent(1)),
+                 "Dimension mismatch on appending new vectors");
 
     // append the vectors to the end of the allocated storage
     auto dst_ptr  = dataset.data() + num_rows_used * dim;
@@ -317,7 +318,7 @@ auto extend(raft::resources const& res,
   auto next_state = std::make_shared<index_state<UpstreamT>>(current);
   auto storage    = next_state->storage;
 
-  RAFT_EXPECTS(new_vectors.extent(1) == storage->dim,
+  RAFT_EXPECTS(static_cast<size_t>(new_vectors.extent(1)) == storage->dim,
                "Dimension of new vectors must match existing data");
 
   size_t new_rows    = new_vectors.extent(0);

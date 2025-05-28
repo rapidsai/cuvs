@@ -122,6 +122,9 @@ cuvsError_t cuvsTieredIndexParamsCreate(cuvsTieredIndexParams_t* index_params);
  * @return cuvsError_t
  */
 cuvsError_t cuvsTieredIndexParamsDestroy(cuvsTieredIndexParams_t index_params);
+/**
+ * @}
+ */
 
 /**
  * @defgroup tieredindex_c_index_build Tiered index build
@@ -163,8 +166,7 @@ cuvsError_t cuvsTieredIndexParamsDestroy(cuvsTieredIndexParams_t index_params);
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] dataset DLManagedTensor* training dataset
- * @param[in] metric metric
- * @param[in] metric_arg metric_arg
+ * @param[in] index_params Index parameters to use when building the index
  * @param[out] index cuvsTieredIndex_t Newly built TieredIndex index
  * @return cuvsError_t
  */
@@ -227,6 +229,9 @@ cuvsError_t cuvsTieredIndexSearch(cuvsResources_t res,
                                   cuvsFilter prefilter);
 
 /**
+ * @}
+ */
+/**
  * @defgroup tiered_c_index_extend Tiered index extend
  * @{
  */
@@ -241,9 +246,6 @@ cuvsError_t cuvsTieredIndexSearch(cuvsResources_t res,
 cuvsError_t cuvsTieredIndexExtend(cuvsResources_t res,
                                   DLManagedTensor* new_vectors,
                                   cuvsTieredIndex_t index);
-/**
- * @}
- */
 /**
  * @}
  */

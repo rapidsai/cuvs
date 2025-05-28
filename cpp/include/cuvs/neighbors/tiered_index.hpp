@@ -83,7 +83,7 @@ struct index_params : upstream_index_params_type {
  *   auto index = tiered_index::build(handle, build_params, dataset);
  * @endcode
  *
- * @param[in] handle
+ * @param[in] res
  * @param[in] index_params configure the index building
  * @param[in] dataset a device matrix view to a row-major matrix [n_rows, dim]
  *
@@ -114,27 +114,27 @@ auto build(raft::resources const& res,
  *   using namespace cuvs::neighbors;
  *   tiered_index::index_params<cagra::index_params> index_params;
  *   // train the index from a [N, D] dataset
- *   auto index_empty = tiered_index::build(handle, index_params, dataset);
+ *   auto index_empty = tiered_index::build(res, index_params, dataset);
  *
  *   // add new data to the index
- *   tiered_index::extend(handle, new_vectors, &index_empty);
+ *   tiered_index::extend(res, new_vectors, &index_empty);
  * @endcode
  *
- * @param[in] handle
+ * @param[in] res
  * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
  * @param[inout] idx
  */
-void extend(raft::resources const& handle,
+void extend(raft::resources const& res,
             raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
             tiered_index::index<cagra::index<float, uint32_t>>* idx);
 
 /** @copydoc extend */
-void extend(raft::resources const& handle,
+void extend(raft::resources const& res,
             raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
             tiered_index::index<ivf_flat::index<float, int64_t>>* idx);
 
 /** @copydoc extend */
-void extend(raft::resources const& handle,
+void extend(raft::resources const& res,
             raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
             tiered_index::index<ivf_pq::typed_index<float, int64_t>>* idx);
 /**
@@ -143,24 +143,22 @@ void extend(raft::resources const& handle,
  * This function takes any data that has been added incrementally, and ensures that it
  * been added to the ANN index.
  *
- * @param[in] handle
+ * @param[in] res
  * @param[inout] idx
  */
-void compact(raft::resources const& handle,
-             tiered_index::index<cagra::index<float, uint32_t>>* idx);
+void compact(raft::resources const& res, tiered_index::index<cagra::index<float, uint32_t>>* idx);
 
 /** @copydoc compact */
-void compact(raft::resources const& handle,
-             tiered_index::index<ivf_flat::index<float, int64_t>>* idx);
+void compact(raft::resources const& res, tiered_index::index<ivf_flat::index<float, int64_t>>* idx);
 
 /** @copydoc compact */
-void compact(raft::resources const& handle,
+void compact(raft::resources const& res,
              tiered_index::index<ivf_pq::typed_index<float, int64_t>>* idx);
 
 /**
  * @brief Search the tiered_index
  *
- * @param[in] handle
+ * @param[in] res
  * @param[in] search_params configure the search
  * @param[in] index tiered-index constructed index
  * @param[in] queries a device matrix view to a row-major matrix [n_queries, index->dim()]
@@ -171,7 +169,7 @@ void compact(raft::resources const& handle,
  * @param[in] sample_filter an optional device filter function object that greenlights samples
  * for a given query. (none_sample_filter for no filtering)
  */
-void search(raft::resources const& handle,
+void search(raft::resources const& res,
             const cagra::search_params& search_params,
             const tiered_index::index<cagra::index<float, uint32_t>>& index,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
@@ -181,7 +179,7 @@ void search(raft::resources const& handle,
               cuvs::neighbors::filtering::none_sample_filter{});
 
 /** @copydoc search */
-void search(raft::resources const& handle,
+void search(raft::resources const& res,
             const ivf_flat::search_params& search_params,
             const tiered_index::index<ivf_flat::index<float, int64_t>>& index,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
@@ -191,7 +189,7 @@ void search(raft::resources const& handle,
               cuvs::neighbors::filtering::none_sample_filter{});
 
 /** @copydoc search */
-void search(raft::resources const& handle,
+void search(raft::resources const& res,
             const ivf_pq::search_params& search_params,
             const tiered_index::index<ivf_pq::typed_index<float, int64_t>>& index,
             raft::device_matrix_view<const float, int64_t, raft::row_major> queries,
