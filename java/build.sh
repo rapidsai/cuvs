@@ -37,7 +37,6 @@ fi
 
 export LD_LIBRARY_PATH=${CURDIR}/../cpp/build:${LD_LIBRARY_PATH}
 echo "ld library is $LD_LIBRARY_PATH"
-mvn install:install-file -DgroupId=$GROUP_ID -DartifactId=cuvs-java-internal -Dversion=$VERSION -Dpackaging=so -Dfile=$SO_FILE_PATH/libcuvs_java.so \
-  && cd cuvs-java \
-  && mvn verify "${MAVEN_VERIFY_ARGS[@]}" \
+cd cuvs-java
+mvn verify "${MAVEN_VERIFY_ARGS[@]}" \
   && mvn install:install-file -Dfile=./target/cuvs-java-$VERSION-jar-with-dependencies.jar -DgroupId=$GROUP_ID -DartifactId=cuvs-java -Dversion=$VERSION -Dpackaging=jar

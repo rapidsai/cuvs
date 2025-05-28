@@ -32,7 +32,6 @@ import java.lang.invoke.MethodHandle;
 public class LinkerHelper {
 
   private static final Linker LINKER = Linker.nativeLinker();
-  private static final SymbolLookup SYMBOL_LOOKUP;
 
   public static final ValueLayout.OfByte C_CHAR = (ValueLayout.OfByte) LINKER.canonicalLayouts().get("char");
 
@@ -50,23 +49,6 @@ public class LinkerHelper {
   public static final long C_FLOAT_BYTE_SIZE = LinkerHelper.C_FLOAT.byteSize();
 
   public static final long C_LONG_BYTE_SIZE = LinkerHelper.C_LONG.byteSize();
-
-  static {
-    var nativeLibrary = LoaderUtils.loadNativeLibrary();
-    // we use a global arena here, since the symbols obtained
-    // from the returned lookup are for the lifetime of the jvm
-    SYMBOL_LOOKUP = SymbolLookup.libraryLookup(nativeLibrary.toAbsolutePath(), Arena.global());
-  }
-
-  static MemorySegment functionAddress(String function) {
-    return SYMBOL_LOOKUP.find(function)
-        .orElseThrow(() -> new LinkageError("Native function " + function + " could not be found"));
-  }
-
-  public static MethodHandle downcallHandle(String function, FunctionDescriptor functionDescriptor,
-      Linker.Option... options) {
-    return LINKER.downcallHandle(functionAddress(function), functionDescriptor, options);
-  }
 
   private LinkerHelper() {
   }

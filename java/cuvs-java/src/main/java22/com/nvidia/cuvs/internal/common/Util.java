@@ -20,7 +20,6 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaGetDeviceCount;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaGetDeviceProperties_v2;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemGetInfo;
@@ -45,14 +44,12 @@ import com.nvidia.cuvs.internal.panama.DLDevice;
 import com.nvidia.cuvs.internal.panama.DLManagedTensor;
 import com.nvidia.cuvs.internal.panama.DLTensor;
 import com.nvidia.cuvs.internal.panama.cudaDeviceProp;
+import com.nvidia.cuvs.internal.panama.headers_h;
 
 public class Util {
 
   public static final int CUVS_SUCCESS = 1;
   public static final int CUDA_SUCCESS = 0;
-
-  private static final MethodHandle getLastErrorTextMethodHandle = downcallHandle("cuvsGetLastErrorText",
-      FunctionDescriptor.of(ADDRESS));
 
   private Util() {
   }
@@ -86,12 +83,11 @@ public class Util {
 
   static String getLastErrorText() {
     try {
-      MemorySegment seg = (MemorySegment) getLastErrorTextMethodHandle.invokeExact();
+      var seg = headers_h.cuvsGetLastErrorText.makeInvoker().apply();
       if (seg.equals(MemorySegment.NULL)) {
         return "no last error text";
       }
-      return seg.reinterpret(MAX_ERROR_TEXT).getString(0L);
-    } catch (Throwable t) {
+      return seg.reinterpret(MAX_ERROR_TEXT).getString(0);    } catch (Throwable t) {
       throw new RuntimeException(t);
     }
   }
