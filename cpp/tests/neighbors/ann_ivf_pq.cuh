@@ -316,7 +316,9 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     // NB: this is not reference, the list is retained; the index will have to create a new list on
     // `erase_list` op.
     auto old_list = index->lists()[label];
-    auto n_rows   = old_list->size.load();
+    // If the data is unbalanced the list might be empty, which is actually nullptr
+    if (!old_list) { return; }
+    auto n_rows = old_list->size.load();
     if (n_rows == 0) { return; }
     if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) { return; }
 
@@ -350,7 +352,9 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
   void check_packing(index<IdxT>* index, uint32_t label)
   {
     auto old_list = index->lists()[label];
-    auto n_rows   = old_list->size.load();
+    // If the data is unbalanced the list might be empty, which is actually nullptr
+    if (!old_list) { return; }
+    auto n_rows = old_list->size.load();
 
     if (n_rows == 0) { return; }
 
