@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,6 +95,26 @@ struct index_params {
 };
 
 struct search_params {};
+
+/**
+ * @brief Strategy for merging indices.
+ *
+ * This enum is declared separately to avoid namespace pollution when including common.hpp.
+ * It provides a generic merge strategy that can be used across different index types.
+ */
+enum class MergeStrategy {
+  /** Merge indices physically by combining their data structures */
+  MERGE_STRATEGY_PHYSICAL = 0,
+  /** Merge indices logically by creating a composite wrapper */
+  MERGE_STRATEGY_LOGICAL = 1
+};
+
+/** Base merge parameters with polymorphic interface. */
+struct merge_params {
+  virtual ~merge_params() = default;
+
+  virtual MergeStrategy strategy() const = 0;
+};
 
 /** @} */  // end group neighbors_index
 
