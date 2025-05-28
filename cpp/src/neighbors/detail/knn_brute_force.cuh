@@ -18,13 +18,13 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
-#include <cuvs/neighbors/knn_merge_parts.hpp>
 #include <cuvs/selection/select_k.hpp>
 
 #include "../../distance/detail/distance_ops/l2_exp.cuh"
 #include "./faiss_distance_utils.h"
 #include "./fused_l2_knn.cuh"
 #include "./haversine_distance.cuh"
+#include "./knn_merge_parts.cuh"
 #include "./knn_utils.cuh"
 
 #include <raft/core/bitmap.cuh>
@@ -537,13 +537,7 @@ void brute_force_knn_impl(
   if (input.size() > 1 || translations != nullptr) {
     // This is necessary for proper index translations. If there are
     // no translations or partitions to combine, it can be skipped.
-    knn_merge_parts(
-      handle,
-      raft::make_device_matrix_view<const DistType, int64_t>(out_D, n, input.size() * k),
-      raft::make_device_matrix_view<const IdxType, int64_t>(out_I, n, input.size() * k),
-      raft::make_device_matrix_view<DistType, int64_t>(res_D, n, k),
-      raft::make_device_matrix_view<IdxType, int64_t>(res_I, n, k),
-      raft::make_device_vector_view<IdxType>(trans.data(), input.size()));
+    knn_merge_parts(out_D, out_I, res_D, res_I, n, input.size(), k, userStream, trans.data());
   }
 };
 

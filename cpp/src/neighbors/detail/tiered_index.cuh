@@ -29,8 +29,9 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/common.hpp>
-#include <cuvs/neighbors/knn_merge_parts.hpp>
 #include <cuvs/neighbors/tiered_index.hpp>
+
+#include "knn_merge_parts.cuh"
 
 namespace cuvs::neighbors::tiered_index::detail {
 /**
@@ -255,12 +256,15 @@ struct index_state {
     auto device_translations     = raft::make_device_vector<int64_t>(res, 2);
     raft::copy(device_translations.data_handle(), host_translations, 2, stream);
 
-    knn_merge_parts(res,
-                    temp_distances.view(),
-                    temp_neighbors.view(),
-                    distances,
-                    neighbors,
-                    device_translations.view());
+    cuvs::neighbors::detail::knn_merge_parts(temp_distances.data_handle(),
+                                             temp_neighbors.data_handle(),
+                                             distances.data_handle(),
+                                             neighbors.data_handle(),
+                                             distances.extent(0),
+                                             2,
+                                             distances.extent(1),
+                                             stream,
+                                             device_translations.data_handle());
 
     if (!distance::is_min_close(build_params.metric)) {
       raft::linalg::map(

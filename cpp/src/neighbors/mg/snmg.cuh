@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "../detail/knn_merge_parts.cuh"
 #include <raft/core/resource/multi_gpu.hpp>
 #include <raft/core/resource/nccl_comm.hpp>
 #include <raft/core/serialize.hpp>
@@ -26,7 +27,6 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
-#include <cuvs/neighbors/knn_merge_parts.hpp>
 
 #include <fstream>
 
@@ -286,12 +286,15 @@ void sharded_search_with_direct_merge(const raft::resources& clique,
                index.num_ranks_,
                raft::resource::get_cuda_stream(root_handle_));
 
-    knn_merge_parts(root_handle_,
-                    in_distances.view(),
-                    in_neighbors.view(),
-                    out_distances.view(),
-                    out_neighbors.view(),
-                    d_trans.view());
+    cuvs::neighbors::detail::knn_merge_parts(in_distances.data_handle(),
+                                             in_neighbors.data_handle(),
+                                             out_distances.data_handle(),
+                                             out_neighbors.data_handle(),
+                                             n_rows_of_current_batch,
+                                             index.num_ranks_,
+                                             n_neighbors,
+                                             raft::resource::get_cuda_stream(root_handle_),
+                                             d_trans.data_handle());
 
     raft::copy(neighbors.data_handle() + output_offset,
                out_neighbors.data_handle(),
@@ -410,12 +413,15 @@ void sharded_search_with_tree_merge(const raft::resources& clique,
 
         if (received_something) {
           // merge inplace
-          knn_merge_parts(dev_res,
-                          tmp_distances.view(),
-                          tmp_neighbors.view(),
-                          tmp_distances.view(),
-                          tmp_neighbors.view(),
-                          d_trans.view());
+          cuvs::neighbors::detail::knn_merge_parts(tmp_distances.data_handle(),
+                                                   tmp_neighbors.data_handle(),
+                                                   tmp_distances.data_handle(),
+                                                   tmp_neighbors.data_handle(),
+                                                   n_rows_of_current_batch,
+                                                   2,
+                                                   n_neighbors,
+                                                   raft::resource::get_cuda_stream(dev_res),
+                                                   d_trans.data_handle());
 
           // If done, copy the final result
           if (remaining <= 1) {
