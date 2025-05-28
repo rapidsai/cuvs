@@ -163,8 +163,8 @@ void predict(raft::resources const& handle,
              raft::device_matrix_view<const DataT, IndexT> X,
              std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
              raft::device_matrix_view<const DataT, IndexT> centroids,
-             bool normalize_weight,
              raft::device_vector_view<IndexT, IndexT> labels,
+             bool normalize_weight,
              raft::host_scalar_view<DataT> inertia)
 {
   cuvs::cluster::kmeans::detail::kmeans_predict<DataT, IndexT>(
