@@ -34,7 +34,7 @@ from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
 
-from cuvs.distance import DISTANCE_TYPES
+from cuvs.distance import DISTANCE_NAMES, DISTANCE_TYPES
 from cuvs.neighbors.common import _check_input_array
 
 from libc.stdint cimport (
@@ -159,7 +159,6 @@ cdef class IndexParams:
     """
 
     cdef cuvsCagraIndexParams* params
-    cdef object _metric
 
     # hold on to a reference to the compression, to keep from being GC'ed
     cdef public object compression
@@ -179,7 +178,6 @@ cdef class IndexParams:
                  nn_descent_niter=20,
                  compression=None):
 
-        self._metric = metric
         self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
         self.params.intermediate_graph_degree = intermediate_graph_degree
         self.params.graph_degree = graph_degree
@@ -199,9 +197,12 @@ cdef class IndexParams:
             self.params.compression = \
                 <cuvsCagraCompressionParams_t><size_t>compression.get_handle()
 
+    def get_handle(self):
+        return <size_t> self.params
+
     @property
     def metric(self):
-        return self._metric
+        return DISTANCE_NAMES[self.params.metric]
 
     @property
     def intermediate_graph_degree(self):
@@ -384,7 +385,13 @@ cdef class SearchParams:
         Sets the fraction of maximum grid size used by persistent kernel.
     """
 
-    cdef cuvsCagraSearchParams params
+    cdef cuvsCagraSearchParams * params
+
+    def __cinit__(self):
+        check_cuvs(cuvsCagraSearchParamsCreate(&self.params))
+
+    def __dealloc__(self):
+        check_cuvs(cuvsCagraSearchParamsDestroy(self.params))
 
     def __init__(self, *,
                  max_queries=0,
@@ -450,6 +457,9 @@ cdef class SearchParams:
                         "hashmap_min_bitlen", "hashmap_max_fill_rate",
                         "num_random_samplings", "rand_xor_mask"]]
         return "SearchParams(type=CAGRA, " + (", ".join(attr_str)) + ")"
+
+    def get_handle(self):
+        return <size_t> self.params
 
     @property
     def max_queries(self):
@@ -594,7 +604,7 @@ def search(SearchParams search_params,
     if filter is None:
         filter = no_filter()
 
-    cdef cuvsCagraSearchParams* params = &search_params.params
+    cdef cuvsCagraSearchParams* params = search_params.params
     cdef cydlpack.DLManagedTensor* queries_dlpack = \
         cydlpack.dlpack_c(queries_cai)
     cdef cydlpack.DLManagedTensor* neighbors_dlpack = \
