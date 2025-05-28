@@ -24,13 +24,13 @@ void predict(raft::resources const& handle,
              raft::device_matrix_view<const double, int> X,
              std::optional<raft::device_vector_view<const double, int>> sample_weight,
              raft::device_matrix_view<const double, int> centroids,
-             bool normalize_weight,
              raft::device_vector_view<int, int> labels,
+             bool normalize_weight,
              raft::host_scalar_view<double> inertia)
 
 {
   cuvs::cluster::kmeans::predict<double, int>(
-    handle, params, X, sample_weight, centroids, normalize_weight, labels, inertia);
+    handle, params, X, sample_weight, centroids, labels, normalize_weight, inertia);
 }
 
 void predict(raft::resources const& handle,
@@ -38,12 +38,12 @@ void predict(raft::resources const& handle,
              raft::device_matrix_view<const double, int> X,
              std::optional<raft::device_vector_view<const double, int>> sample_weight,
              raft::device_matrix_view<const double, int> centroids,
-             bool normalize_weight,
              raft::device_vector_view<int64_t, int> labels,
+             bool normalize_weight,
              raft::host_scalar_view<double> inertia)
 
 {
   cuvs::cluster::kmeans::predict<double, int64_t>(
-    handle, params, X, sample_weight, centroids, normalize_weight, labels, inertia);
+    handle, params, X, sample_weight, centroids, labels, normalize_weight, inertia);
 }
 }  // namespace cuvs::cluster::kmeans
