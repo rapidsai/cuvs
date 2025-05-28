@@ -3,7 +3,14 @@
       "faiss" : {
         "version": "1.10.0",
         "git_url": "https://github.com/facebookresearch/faiss.git",
-        "git_tag": "main"
+        "git_tag": "main",
+        "patches" : [
+          {
+            "file" : "${current_json_dir}/faiss.diff",
+            "issue" : "Apply RAFT breaking changes",
+            "fixed_in" : ""
+          }
+        ]
       }
     }
   }
