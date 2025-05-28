@@ -7,7 +7,6 @@ NUMARGS=$#
 CURDIR=$(cd "$(dirname $0)"; pwd)
 VERSION="25.06.0" # Note: The version is updated automatically when ci/release/update-version.sh is invoked
 GROUP_ID="com.nvidia.cuvs"
-SO_FILE_PATH="./internal/build"
 
 if [ -z "${CMAKE_PREFIX_PATH:=}" ]; then
   CMAKE_PREFIX_PATH="$(pwd)/../cpp/build"
