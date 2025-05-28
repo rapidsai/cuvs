@@ -7,9 +7,9 @@
 #include <benchmark/benchmark.h>
 #include "common.cuh"
 
-template <typename DataT, typename IdxT>
+template <typename AccT, typename IdxT>
 struct Reducer {
-    typedef raft::KeyValuePair<IdxT, DataT> KVType;
+    typedef raft::KeyValuePair<IdxT, AccT> KVType;
 
     __device__ KVType operator()(const KVType& a, const KVType& b) {
         if ((a.value < b.value) || (a.value == b.value && a.key < b.key)) {
@@ -19,25 +19,28 @@ struct Reducer {
         }
     }
 
-    __device__ DataT operator()(const DataT& a, const DataT& b) {
-      return a < b? a : b;
+    __device__ AccT operator()(const AccT& a, const AccT& b) {
+      return a < b ? a : b;
     }
 };
 
-template <typename OutT, typename DataT, typename IdxT, int TPB>
-__global__ void reduce_min_kernel(OutT* out, const DataT* z, const DataT* x_norm, const DataT* y_norm, IdxT m, IdxT n) {
+template <typename DataT, typename AccT, typename OutT, typename IdxT, int TPB>
+__global__ void reduce_min_kernel(OutT* out, const AccT* z, const AccT* x_norm, const AccT* y_norm, IdxT m, IdxT n) {
   IdxT tid = threadIdx.x + blockIdx.x * blockDim.x;
   IdxT row = blockIdx.x;
 
-  DataT x_norm_row = x_norm[row];
+  AccT x_norm_row = x_norm[row];
 
-  raft::KeyValuePair<IdxT, DataT> thread_min;
+  raft::KeyValuePair<IdxT, AccT> thread_min;
 
-  thread_min.value = max_val<DataT>();
+  thread_min.value = max_val<AccT>();
   thread_min.key= max_val<IdxT>();
 
   for (IdxT col = threadIdx.x; col < n; col+=TPB) {
       auto dist = x_norm_row + y_norm[col] - 2*z[row*n + col];
+      //if (row == 0 && (col == 112 || col == 74)) {
+      //  printf("row = %d, col = %d, dist = %f, %d\n", row, col, z[row*n+col], threadIdx.x);
+      //}
       if (dist < thread_min.value) {
         thread_min.value = dist;
         thread_min.key = col;
@@ -45,59 +48,89 @@ __global__ void reduce_min_kernel(OutT* out, const DataT* z, const DataT* x_norm
   }
   typedef cub::BlockReduce<OutT, TPB> BlockReduceT;
   __shared__ typename BlockReduceT::TempStorage temp_storage;
-  auto block_result = BlockReduceT(temp_storage).Reduce(thread_min, Reducer<DataT, IdxT>{});
+  auto block_result = BlockReduceT(temp_storage).Reduce(thread_min, Reducer<AccT, IdxT>{});
 
   if (threadIdx.x == 0) {
     out[row] = block_result;
   }
 }
 
-
-template <typename OutT, typename DataT, typename IdxT>
-void neo_reduce_min(OutT* out, const DataT* z, const DataT* x_norm, const DataT* y_norm, IdxT m, IdxT n, cudaStream_t stream) {
+template <typename DataT, typename AccT, typename OutT, typename IdxT>
+void reduce_min(OutT* out, const AccT* z, const AccT* x_norm, const AccT* y_norm, IdxT m, IdxT n, cudaStream_t stream) {
   const int TPB = 128;
 
   int blocks = m;
-  reduce_min_kernel<OutT, DataT, IdxT, TPB><<<blocks, TPB, 0, stream>>>(out, z, x_norm, y_norm, m, n);
-  CHECK_CUDA(cudaDeviceSynchronize());
+  reduce_min_kernel<DataT, AccT, OutT, IdxT, TPB><<<blocks, TPB, 0, stream>>>(out, z, x_norm, y_norm, m, n);
 }
-template <typename OutT, typename DataT, typename IdxT, bool GEMM_ONLY>
+
+template <typename DataT, typename AccT, typename OutT, typename IdxT, bool FAST_MODE, bool GEMM_ONLY>
 void cublas_l2nn(OutT* out, const DataT* x, const DataT* y, IdxT M, IdxT N, IdxT K,
-                 DataT* x_norm, DataT* y_norm,
-                 DataT* z, size_t ws_size, cublasHandle_t& handle, cudaStream_t stream) {
+                 AccT* x_norm, AccT* y_norm, AccT* z, cublasHandle_t& handle, cudaStream_t stream) {
   // Set up scaling factors
-  const DataT alpha = 1.0f;
-  const DataT beta = 0.0f;
+  const float alpha = 1.0f;
+  const float beta = 0.0f;
 
   // Enable TF32 mode
-  CHECK_CUBLAS(cublasSetMathMode(handle, CUBLAS_TF32_TENSOR_OP_MATH));
+  //CHECK_CUBLAS(cublasSetMathMode(handle, CUBLAS_TF32_TENSOR_OP_MATH));
+  cudaDataType_t xyType, zType;
+  cublasComputeType_t computeType;
 
   if constexpr (std::is_same_v<DataT, float>) {
-    CHECK_CUBLAS(cublasSgemm(
-      handle,
-      CUBLAS_OP_T, CUBLAS_OP_N,
-      N, M, K,                   // Dimensions (swapped due to row/col-major difference)
-      &alpha,                    // alpha
-      y, K,                      // B and its leading dimension
-      x, K,                      // A and its leading dimension
-      &beta,                     // beta
-      z, N                       // C and its leading dimension
-    ));
+    xyType = CUDA_R_32F;
+    zType = CUDA_R_32F;
+    computeType = CUBLAS_COMPUTE_32F;
+    // computeType = CUBLAS_COMPUTE_32F_FAST_TF32;
+    // computeType = CUBLAS_COMPUTE_32F_FAST_16F;
+    // computeType = CUBLAS_COMPUTE_32F_FAST_16BF;
+    // computeType = CUBLAS_COMPUTE_32F_EMULATED_16BFX9;
   } else if constexpr (std::is_same_v<DataT, double>) {
-    CHECK_CUBLAS(cublasDgemm(
-      handle,
-      CUBLAS_OP_T, CUBLAS_OP_N,
-      N, M, K,                   // Dimensions (swapped due to row/col-major difference)
-      &alpha,                    // alpha
-      y, K,                      // B and its leading dimension
-      x, K,                      // A and its leading dimension
-      &beta,                     // beta
-      z, N                       // C and its leading dimension
-    ));
+    xyType = CUDA_R_64F;
+    zType = CUDA_R_64F;
+    computeType = CUBLAS_COMPUTE_64F;
+  } else if constexpr (std::is_same_v<DataT, half>) {
+    xyType = CUDA_R_16F;
+    if constexpr (std::is_same_v<AccT, half>) {
+      zType = CUDA_R_16F;
+      computeType = CUBLAS_COMPUTE_16F;
+      //computeType = CUBLAS_COMPUTE_32F;
+    } else if constexpr (std::is_same_v<AccT, float>) {
+      zType = CUDA_R_32F;
+      computeType = CUBLAS_COMPUTE_32F;
+    }
+  } else if constexpr (std::is_same_v<DataT, int8_t>) {
+    xyType = CUDA_R_8I;
+    if constexpr (std::is_same_v<AccT, int32_t>) {
+      zType = CUDA_R_32I;
+      computeType = CUBLAS_COMPUTE_32I;
+    } else if constexpr (std::is_same_v<AccT, float>) {
+      zType = CUDA_R_32F;
+      computeType = CUBLAS_COMPUTE_32F;
+    }
   }
 
+  //if (zType == CUDA_R_32F && xyType == CUDA_R_16F) {
+  //  printf("Configured gemm correctly\n");
+  //}
+
+  CHECK_CUBLAS(cublasGemmEx(
+      handle,
+      CUBLAS_OP_T, CUBLAS_OP_N,
+      N, M, K,                   // Dimensions (swapped due to row/col-major difference)
+      &alpha,                    // alpha
+      y, xyType, K,            // B, its data type, and leading dimension
+      x, xyType, K,            // A, its data type, and leading dimension
+      &beta,                     // beta
+      z, zType, N,            // C, its data type, and leading dimension
+      computeType,               // Computation type
+      CUBLAS_GEMM_DEFAULT        // Algorithm selection
+    ));
+
+  /*print_kernel<half><<<1, 1>>>(x, 1, 10);
+  print_kernel<half><<<1, 1>>>(y, 1, 10);
+  print_kernel<float><<<1, 1>>>(z, 1, 10);
+  CHECK_CUDA(cudaDeviceSynchronize());*/
   if constexpr(!GEMM_ONLY) {
-    reduce_min<OutT, DataT, IdxT>(out, z, x_norm, y_norm, M, N, stream);
+    reduce_min<DataT, AccT, OutT, IdxT>(out, z, x_norm, y_norm, M, N, stream);
   }
 }
-
+// 

@@ -2,6 +2,7 @@
 
 #define LIBCUDACXX_ENABLE_EXPERIMENTAL_MEMORY_RESOURCE
 #include <iostream>
+#include <cmath>
 #include <cuda_runtime.h>
 
 #include <raft/core/device_mdarray.hpp>
@@ -31,28 +32,28 @@
   } while (0)
 
 
-template <typename DataT>
-__host__ __device__ DataT max_val() {
-  if constexpr (std::is_same<DataT, half>::value) {
+template <typename T>
+__host__ __device__ T max_val() {
+  if constexpr (std::is_same<T, half>::value) {
     return CUDART_MAX_NORMAL_FP16;
   } else {
-    return cuda::std::numeric_limits<DataT>::max();
-  }
-}
-
-template <typename DataT>
-DataT min_val() {
-  if constexpr (std::is_same<DataT, half>::value) {
-    return CUDART_MIN_DENORM_FP16;
-  } else {
-    return cuda::std::numeric_limits<DataT>::min();
+    return cuda::std::numeric_limits<T>::max();
   }
 }
 
 template <typename T>
-__global__ void print_kernel(T* f, size_t n_rows, size_t n_cols, bool is_row_major=true) {
+T min_val() {
+  if constexpr (std::is_same<T, half>::value) {
+    return CUDART_MIN_DENORM_FP16;
+  } else {
+    return cuda::std::numeric_limits<T>::min();
+  }
+}
+
+template <typename T>
+__global__ void print_kernel(const T* f, size_t n_rows, size_t n_cols, bool is_row_major=true) {
   for (size_t r = 0; r < n_rows; r++) {
-    printf("[");
+    printf("%ld [", sizeof(T));
     for (size_t c = 0; c < n_cols; c++) {
       size_t index = 0;
       if (is_row_major) {
@@ -60,23 +61,25 @@ __global__ void print_kernel(T* f, size_t n_rows, size_t n_cols, bool is_row_maj
       } else {
         index = r + c * n_rows;
       }
-      if constexpr (std::is_floating_point<T>::value) {
+      /*if constexpr (std::is_fundamental<T>::value) {
         double val;
-        if constexpr (std::is_same<T, half>::value) {
+        if constexpr (std::is_same<T, const half>::value) {
           val = double(float(f[index]));
         } else {
           val = double(f[index]);
         }
-        printf("%f, ", val);
-      } else {
-        double val;
+        printf("..\n");
+      } else {*/
+
+        printf("%f, ", float(f[index]));
+        /*double val;
         if (std::is_same<decltype(f[index].value), half>::value) {
           val = double(float(f[index].value));
         } else {
           val = double(f[index].value);
         }
-        printf("<%ld, %e>, ", int64_t(f[index].key), val);
-      }
+        printf("<%ld, %e>, ", int64_t(f[index].key), val);*/
+      //}
     }
     printf("]\n");
   }
@@ -183,16 +186,16 @@ private:
   uint64_t inc;
 };
 
-template <typename DataT, typename OutT, typename IdxT>
+template <typename DataT, typename AccT, typename OutT, typename IdxT>
 void ref_l2nn(OutT* out, const DataT* A, const DataT* B, IdxT M, IdxT N, IdxT K) {
 
   for (IdxT m = 0; m < M; m++) {
     IdxT min_index = N + 1;
-    DataT min_dist = std::numeric_limits<DataT>::max();
+    double min_dist = std::numeric_limits<double>::max();
     for (IdxT n = 0; n < N; n++) {
-      DataT dist = DataT(0.0);
+      double dist = double(0.0);
       for (IdxT k = 0; k < K; k++) {
-        DataT diff = A[m * K + k] - B[n * K + k];
+        double diff = double(A[m * K + k]) - double(B[n * K + k]);
         dist += (diff * diff);
       }
       if (dist < min_dist) {
@@ -200,17 +203,17 @@ void ref_l2nn(OutT* out, const DataT* A, const DataT* B, IdxT M, IdxT N, IdxT K)
         min_index = n;
       }
     }
-    if constexpr (std::is_floating_point<OutT>::value) {
-      out[m] = min_dist;
+    if constexpr (std::is_fundamental<OutT>::value) {
+      out[m] = AccT(min_dist);
     } else {
-      out[m].key = min_index;
-      out[m].value = min_dist;
+      out[m].key = IdxT(min_index);
+      out[m].value = AccT(min_dist);
     }
   }
 }
 
 // This is a naive implementation of l2-distance finding nearest neighbour
-template <typename DataT, typename OutT, typename IdxT>
+template <typename DataT, typename AccT, typename OutT, typename IdxT>
 __global__ void ref_l2nn_dev(OutT* out, const DataT* A, const DataT* B, IdxT M, IdxT N, IdxT K) {
   IdxT tid = threadIdx.x + blockIdx.x * size_t(blockDim.x);
   IdxT n_warps = (size_t(blockDim.x) * gridDim.x) / 32;
@@ -220,67 +223,53 @@ __global__ void ref_l2nn_dev(OutT* out, const DataT* A, const DataT* B, IdxT M, 
   const int warp_size = 32;
 
   for (IdxT m = warp_id; m < M; m+=n_warps) {
-    __shared__ DataT dist[4];
+    __shared__ AccT dist[4];
 
     IdxT min_index = N + 1;
-    DataT min_dist = max_val<DataT>();
-    /*if constexpr (std::is_same<DataT, half>::value) {
-      min_dist = CUDART_MAX_NORMAL_FP16;
-    } else {
-      min_dist = cuda::std::numeric_limits<DataT>::max();
-    }*/
-    //if (tid == 0) printf("max value = %e %ld\n", __half2float(min_dist), sizeof(DataT));
+    AccT min_dist = max_val<AccT>();
+
     for (IdxT n = 0; n < N; n++) {
       if (warp_lane == 0) {
-        dist[warp_id % 4] = DataT(0.0);
+        dist[warp_id % 4] = AccT(0.0);
       }
-      DataT th_dist = DataT(0.0);
+      AccT th_dist = AccT(0.0);
       for (IdxT k = warp_lane; k < K; k+=warp_size) {
-        DataT diff = A[m * K + k] - B[n * K + k];
+        AccT diff = AccT(A[m * K + k]) - AccT(B[n * K + k]);
         th_dist += (diff * diff);
       }
       __syncwarp();
       atomicAdd(&dist[warp_id % 4], th_dist);
       __syncwarp();
-    /*if (m == 0 && n == 0 && warp_lane == 0) {
-      for (int i = 0; i < K; i++) {
-        printf("%f, ", A[i]);
-      }
-      printf("\n");
 
-      for (int i = 0; i < K; i++) {
-        printf("%f, ", B[i]);
-      }
-      printf("\nref dist = %f\n", dist[warp_id % 4]);
-    }
-      __syncwarp();*/
       if (warp_lane == 0 && dist[warp_id % 4] < min_dist) {
         min_dist = dist[warp_id % 4];
         min_index = n;
       }
     }
-    if constexpr (std::is_floating_point<OutT>::value) {
+    if constexpr (std::is_fundamental<OutT>::value) {
       if (warp_lane == 0) {
-        out[m] = min_dist;
+        static_assert(std::is_same<OutT, AccT>::value, "OutT and AccT are not same type");
+        out[m] = AccT(min_dist);
       }
     } else {
       // output is a raft::KeyValuePair
       if (warp_lane == 0) {
-        out[m].key = min_index;
-        out[m].value = min_dist;
+        static_assert(std::is_same<OutT, raft::KeyValuePair<IdxT, AccT>>::value, "OutT is not raft::KeyValuePair<> type");
+        out[m].key = IdxT(min_index);
+        out[m].value = AccT(min_dist);
       }
     }
   }
 }
 
-template <typename DataT, typename OutT, typename IdxT>
+template <typename DataT, typename AccT, typename OutT, typename IdxT>
 void ref_l2nn_api(OutT* out, const DataT* A, const DataT* B, IdxT m, IdxT n, IdxT k, cudaStream_t stream) {
 
   //constexpr int block_dim = 128;
   //static_assert(block_dim % 32 == 0, "blockdim must be divisible by 32");
   //constexpr int warps_per_block = block_dim / 32;
   //int num_blocks = m ;
-  ref_l2nn_dev<<<m/4, 128, 0, stream>>>(out, A, B, m, n, k);
+  ref_l2nn_dev<DataT, AccT, OutT, IdxT><<<m/4, 128, 0, stream>>>(out, A, B, m, n, k);
   return;
 }
 
@@ -292,8 +281,8 @@ struct ComparisonFailure {
   int mutex;        // Simple mutex lock for thread synchronization
 };
 
-template <typename DataT, typename IdxT>
-__global__ void vector_compare_kernel(const DataT* a, const DataT* b, IdxT n, double tolerance = 1e-6,
+template <typename OutT, typename IdxT>
+__global__ void vector_compare_kernel(const OutT* a, const OutT* b, IdxT n, double tolerance = 1e-6,
                                       ComparisonFailure* global_failure = nullptr) {
   // Shared memory for tracking failures within a block
   __shared__ ComparisonFailure block_failure;
@@ -312,12 +301,12 @@ __global__ void vector_compare_kernel(const DataT* a, const DataT* b, IdxT n, do
   if (tid < n) {
 
     double diff;
-    if constexpr (std::is_floating_point<DataT>::value) {
-      diff = abs(a[tid], b[tid]);
+    if constexpr (std::is_fundamental<OutT>::value) {
+      diff = std::abs(double(a[tid]) - double(b[tid]));
       //printf("Expected = %f vs actual = %f\n", a[tid], b[tid]);
     } else {
-      diff = abs(a[tid].value - b[tid].value);
-      //if (tid == 1) printf("Expected = %f vs actual = %f, %d, %d\n", a[tid].value, b[tid].value, a[tid].key, b[tid].key);
+      diff = std::abs(double(a[tid].value) - double(b[tid].value));
+      //if (tid == 0) printf("Expected = %f vs actual = %f, %d, %d\n", a[tid].value, b[tid].value, a[tid].key, b[tid].key);
     }
     if (diff > tolerance) {
       // Acquire mutex lock using atomic compare-and-swap
@@ -358,8 +347,8 @@ __global__ void vector_compare_kernel(const DataT* a, const DataT* b, IdxT n, do
   }
 }
 
-template <typename DataT, typename IdxT>
-void vector_compare(const DataT* a, const DataT* b, const IdxT n, double tolerance = double(1e-6), cudaStream_t stream = nullptr) {
+template <typename OutT, typename IdxT>
+void vector_compare(const OutT* a, const OutT* b, const IdxT n, double tolerance = double(1e-6), cudaStream_t stream = nullptr) {
   constexpr int block_size = 256;
   const int grid_size = (n + block_size - 1) / block_size;
 
@@ -371,7 +360,7 @@ void vector_compare(const DataT* a, const DataT* b, const IdxT n, double toleran
   global_failure->diff = 0.0;
   global_failure->mutex = 0;
 
-  vector_compare_kernel<<<grid_size, block_size, 0, stream>>>(a, b, n, tolerance, global_failure);
+  vector_compare_kernel<OutT, IdxT><<<grid_size, block_size, 0, stream>>>(a, b, n, tolerance, global_failure);
 
   CHECK_CUDA(cudaStreamSynchronize(stream));
 
