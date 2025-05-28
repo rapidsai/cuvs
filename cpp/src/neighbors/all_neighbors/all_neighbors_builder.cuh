@@ -123,12 +123,6 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
         res, n_clusters, min_cluster_size, max_cluster_size, k, indices, distances),
       all_ivf_pq_params{params}
   {
-    if (params.refinement_rate != 2.0) {
-      RAFT_LOG_WARN(
-        "Recommend 2.0 for the refinement rate when using ivf_pq as the build algo. Setting "
-        "refinement rate to 2.0");
-      all_ivf_pq_params.refinement_rate = 2.0;
-    }
   }
 
   void prepare_build_common(size_t num_cols)
