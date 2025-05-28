@@ -244,9 +244,9 @@ cdef class Index:
         return cuvsIvfPqIndexGetNLists(self.index)
 
     @property
-    def dim_ext(self):
+    def dim(self):
         """ dimensionality of the cluster centers """
-        return cuvsIvfPqIndexGetDimExt(self.index)
+        return cuvsIvfPqIndexGetDim(self.index)
 
     @property
     def centers(self):
@@ -261,7 +261,7 @@ cdef class Index:
 
         cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
-        output = np.empty((self.n_lists, self.dim_ext), dtype='float32')
+        output = np.empty((self.n_lists, self.dim), dtype='float32')
         ai = wrap_array(output)
         cdef cydlpack.DLManagedTensor* output_dlpack = cydlpack.dlpack_c(ai)
         check_cuvs(cuvsIvfPqIndexGetCenters(res, self.index, output_dlpack))
