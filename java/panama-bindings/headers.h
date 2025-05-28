@@ -22,6 +22,14 @@
 #include <cuvs/neighbors/hnsw.h>
 #include <cuvs/neighbors/ivf_pq.h>
 #include <cuvs/neighbors/common.h>
-#include "omp_def.h"
 #include <cuda_runtime.h>
-#include <cuda_runtime_api.h>
+
+/**
+ * @brief function signature for setting omp threads
+ */
+void omp_set_num_threads(int n_writer_threads);
+
+/**
+ * @brief function signature for getting omp threads
+ */
+int omp_get_num_threads(void);
