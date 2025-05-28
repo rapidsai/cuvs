@@ -337,7 +337,6 @@ void search(raft::resources const& res,
     auto sample_filter_copy = sample_filter;
     return search_with_filtering<T, IdxT, none_filter_type, OutputIdxT>(
       res, params_copy, idx, queries, neighbors, distances, sample_filter_copy);
-    return;
   } catch (const std::bad_cast&) {
   }
 
