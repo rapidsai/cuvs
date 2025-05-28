@@ -28,8 +28,8 @@ void _knn_merge_parts(raft::resources const& res,
                       raft::device_matrix_view<IdxT, int64_t> outV,
                       raft::device_vector_view<IdxT> translations)
 {
-  auto rows  = inK.extent(0);
   auto parts = translations.extent(0);
+  auto rows  = outK.extent(0);
   auto k     = outK.extent(1);
 
   detail::knn_merge_parts(inK.data_handle(),
