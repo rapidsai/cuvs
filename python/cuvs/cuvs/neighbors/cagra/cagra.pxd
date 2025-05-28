@@ -30,6 +30,10 @@ from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
 from cuvs.distance_type cimport cuvsDistanceType
 from cuvs.neighbors.filters.filters cimport cuvsFilter
+from cuvs.neighbors.ivf_pq.ivf_pq cimport (
+    cuvsIvfPqIndexParams_t,
+    cuvsIvfPqSearchParams_t,
+)
 
 
 cdef extern from "library_types.h":
@@ -40,8 +44,6 @@ cdef extern from "library_types.h":
         # uint8 - used to refer to IVF-PQ's fp8 storage type
         CUDA_R_8U "CUDA_R_8U"
         CUDA_R_8I "CUDA_R_8I"
-
-from cuvs.neighbors.ivf_pq.ivf_pq cimport codebook_gen, cuvsIvfPqIndexParams, cuvsIvfPqIndexParams_t, cuvsIvfPqSearchParams, cuvsIvfPqSearchParams_t
 
 cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
