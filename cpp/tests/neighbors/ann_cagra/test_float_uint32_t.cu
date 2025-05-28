@@ -31,7 +31,8 @@ typedef AnnCagraFilterTest<float, float, std::uint32_t> AnnCagraFilterTestF_U32;
 TEST_P(AnnCagraFilterTestF_U32, AnnCagra) { this->testCagra(); }
 
 typedef AnnCagraIndexMergeTest<float, float, std::uint32_t> AnnCagraIndexMergeTestF_U32;
-TEST_P(AnnCagraIndexMergeTestF_U32, AnnCagraIndexMerge) { this->testCagra(); }
+TEST_P(AnnCagraIndexMergeTestF_U32, AnnCagraIndexMerge_U32) { this->testCagra<uint32_t>(); }
+TEST_P(AnnCagraIndexMergeTestF_U32, AnnCagraIndexMerge_I64) { this->testCagra<int64_t>(); }
 
 INSTANTIATE_TEST_CASE_P(AnnCagraTest, AnnCagraTestF_U32, ::testing::ValuesIn(inputs));
 INSTANTIATE_TEST_CASE_P(AnnCagraAddNodesTest,
