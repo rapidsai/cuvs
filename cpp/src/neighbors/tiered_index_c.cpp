@@ -55,7 +55,7 @@ void* _build(cuvsResources_t res, cuvsTieredIndexParams params, DLManagedTensor*
       build_params.min_ann_rows               = params.min_ann_rows;
       build_params.create_ann_index_on_extend = params.create_ann_index_on_extend;
       build_params.metric                     = params.metric;
-      return new tiered_index::index<cagra::index<float, uint32_t>>(
+      return new tiered_index::index<cagra::index<T, uint32_t>>(
         tiered_index::build(*res_ptr, build_params, mds));
     }
     case CUVS_TIERED_INDEX_ALGO_IVF_FLAT: {
@@ -66,7 +66,7 @@ void* _build(cuvsResources_t res, cuvsTieredIndexParams params, DLManagedTensor*
       build_params.metric                     = params.metric;
       build_params.min_ann_rows               = params.min_ann_rows;
       build_params.create_ann_index_on_extend = params.create_ann_index_on_extend;
-      return new tiered_index::index<ivf_flat::index<float, int64_t>>(
+      return new tiered_index::index<ivf_flat::index<T, int64_t>>(
         tiered_index::build(*res_ptr, build_params, mds));
     }
     case CUVS_TIERED_INDEX_ALGO_IVF_PQ: {
@@ -78,7 +78,7 @@ void* _build(cuvsResources_t res, cuvsTieredIndexParams params, DLManagedTensor*
       build_params.metric                     = params.metric;
       build_params.min_ann_rows               = params.min_ann_rows;
       build_params.create_ann_index_on_extend = params.create_ann_index_on_extend;
-      return new tiered_index::index<ivf_pq::typed_index<float, int64_t>>(
+      return new tiered_index::index<ivf_pq::typed_index<T, int64_t>>(
         tiered_index::build(*res_ptr, build_params, mds));
     }
     default: RAFT_FAIL("unsupported tiered index algorithm");
@@ -98,24 +98,26 @@ void _search(cuvsResources_t res,
   auto index_ptr = reinterpret_cast<tiered_index::index<UpstreamT>*>(index.addr);
 
   auto search_params = typename UpstreamT::search_params_type();
-  if constexpr (std::is_same_v<typename UpstreamT::search_params_type, cagra::search_params>) {
-    auto c_params = reinterpret_cast<cuvsCagraSearchParams*>(params);
-    cagra::convert_c_search_params(*c_params, &search_params);
-  }
-  if constexpr (std::is_same_v<typename UpstreamT::search_params_type, ivf_flat::search_params>) {
-    auto c_params = reinterpret_cast<cuvsIvfFlatSearchParams*>(params);
-    ivf_flat::convert_c_search_params(*c_params, &search_params);
-  }
-  if constexpr (std::is_same_v<typename UpstreamT::search_params_type, ivf_pq::search_params>) {
-    auto c_params = reinterpret_cast<cuvsIvfPqSearchParams*>(params);
-    ivf_pq::convert_c_search_params(*c_params, &search_params);
+  if (params != NULL) {
+    if constexpr (std::is_same_v<typename UpstreamT::search_params_type, cagra::search_params>) {
+      auto c_params = reinterpret_cast<cuvsCagraSearchParams*>(params);
+      cagra::convert_c_search_params(*c_params, &search_params);
+    }
+    if constexpr (std::is_same_v<typename UpstreamT::search_params_type, ivf_flat::search_params>) {
+      auto c_params = reinterpret_cast<cuvsIvfFlatSearchParams*>(params);
+      ivf_flat::convert_c_search_params(*c_params, &search_params);
+    }
+    if constexpr (std::is_same_v<typename UpstreamT::search_params_type, ivf_pq::search_params>) {
+      auto c_params = reinterpret_cast<cuvsIvfPqSearchParams*>(params);
+      ivf_pq::convert_c_search_params(*c_params, &search_params);
+    }
   }
 
   using T = typename UpstreamT::value_type;
 
   using queries_mdspan_type   = raft::device_matrix_view<T const, int64_t, raft::row_major>;
   using neighbors_mdspan_type = raft::device_matrix_view<int64_t, int64_t, raft::row_major>;
-  using distances_mdspan_type = raft::device_matrix_view<float, int64_t, raft::row_major>;
+  using distances_mdspan_type = raft::device_matrix_view<T, int64_t, raft::row_major>;
   auto queries_mds            = cuvs::core::from_dlpack<queries_mdspan_type>(queries_tensor);
   auto neighbors_mds          = cuvs::core::from_dlpack<neighbors_mdspan_type>(neighbors_tensor);
   auto distances_mds          = cuvs::core::from_dlpack<distances_mdspan_type>(distances_tensor);
@@ -171,19 +173,19 @@ extern "C" cuvsError_t cuvsTieredIndexDestroy(cuvsTieredIndex_t index_c_ptr)
       switch (index.algo) {
         case CUVS_TIERED_INDEX_ALGO_CAGRA: {
           auto index_ptr =
-            reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index.addr);
+            reinterpret_cast<tiered_index::index<cagra::index<float, uint32_t>>*>(index.addr);
           delete index_ptr;
           break;
         }
         case CUVS_TIERED_INDEX_ALGO_IVF_FLAT: {
           auto index_ptr =
-            reinterpret_cast<cuvs::neighbors::ivf_flat::index<float, int64_t>*>(index.addr);
+            reinterpret_cast<tiered_index::index<ivf_flat::index<float, int64_t>>*>(index.addr);
           delete index_ptr;
           break;
         }
         case CUVS_TIERED_INDEX_ALGO_IVF_PQ: {
           auto index_ptr =
-            reinterpret_cast<cuvs::neighbors::ivf_pq::typed_index<float, int64_t>*>(index.addr);
+            reinterpret_cast<tiered_index::index<ivf_pq::typed_index<float, int64_t>>*>(index.addr);
           delete index_ptr;
           break;
         }
@@ -277,12 +279,7 @@ extern "C" cuvsError_t cuvsTieredIndexParamsCreate(cuvsTieredIndexParams_t* para
 
 extern "C" cuvsError_t cuvsTieredIndexParamsDestroy(cuvsTieredIndexParams_t params)
 {
-  return cuvs::core::translate_exceptions([=] {
-    if (params->cagra_params) { delete params->cagra_params; }
-    if (params->ivf_flat_params) { delete params->ivf_flat_params; }
-    if (params->ivf_pq_params) { delete params->ivf_pq_params; }
-    delete params;
-  });
+  return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
 extern "C" cuvsError_t cuvsTieredIndexExtend(cuvsResources_t res,
