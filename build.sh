@@ -450,7 +450,7 @@ if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg
       MSG="${MSG}<br/>parallel setting: $PARALLEL_LEVEL"
       MSG="${MSG}<br/>parallel build time: $compile_total seconds"
       if [[ -f "${LIBCUVS_BUILD_DIR}/libcuvs.so" ]]; then
-          LIBCUVS_FS=$(stat -f %z ${LIBCUVS_BUILD_DIR}/libcuvs.so | awk '{printf "%.2f MB", $1/1024/1024}')
+          LIBCUVS_FS=$(stat -c %s ${LIBCUVS_BUILD_DIR}/libcuvs.so | awk '{printf "%.2f MB", $1/1024/1024}')
           MSG="${MSG}<br/>libcuvs.so size: $LIBCUVS_FS"
       fi
       BMR_DIR=${RAPIDS_ARTIFACTS_DIR:-"${LIBCUVS_BUILD_DIR}"}
