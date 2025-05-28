@@ -84,7 +84,7 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
     std::optional<float> ivf_pq_refine_rate                                    = std::nullopt;
     std::optional<cuvs::neighbors::ivf_pq::index_params> ivf_pq_build_params   = std::nullopt;
     std::optional<cuvs::neighbors::ivf_pq::search_params> ivf_pq_search_params = std::nullopt;
-    size_t split_num                                                           = 1;
+    size_t num_dataset_splits                                                  = 1;
     CagraMergeType merge_type = CagraMergeType::kPhysical;
 
     void prepare_build_params(const raft::extent_2d<IdxT>& dataset_extents)
@@ -218,13 +218,14 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
   auto dataset_view_device =
     raft::make_mdspan<const T, IdxT, raft::row_major, false, true>(dataset, dataset_extents);
   bool dataset_is_on_host = raft::get_device_for_address(dataset) == -1;
-  if (index_params_.split_num <= 1) {
+  if (index_params_.num_dataset_splits <= 1) {
     index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(
       dataset_is_on_host ? cuvs::neighbors::cagra::build(handle_, params, dataset_view_host)
                          : cuvs::neighbors::cagra::build(handle_, params, dataset_view_device)));
   } else {
-    IdxT rows_per_split = raft::ceildiv<IdxT>(nrow, static_cast<IdxT>(index_params_.split_num));
-    for (size_t i = 0; i < index_params_.split_num; ++i) {
+    IdxT rows_per_split =
+      raft::ceildiv<IdxT>(nrow, static_cast<IdxT>(index_params_.num_dataset_splits));
+    for (size_t i = 0; i < index_params_.num_dataset_splits; ++i) {
       IdxT start = static_cast<IdxT>(i * rows_per_split);
       if (start >= nrow) break;
       IdxT rows        = std::min(rows_per_split, static_cast<IdxT>(nrow) - start);
@@ -367,9 +368,11 @@ void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param,
 template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
 {
-  if (index_params_.split_num > 1 && index_params_.merge_type == CagraMergeType::kLogical) {
+  if (index_params_.num_dataset_splits > 1 &&
+      index_params_.merge_type == CagraMergeType::kLogical) {
     bool dataset_is_on_host = raft::get_device_for_address(dataset) == -1;
-    IdxT rows_per_split     = raft::ceildiv<IdxT>(nrow, static_cast<IdxT>(index_params_.split_num));
+    IdxT rows_per_split =
+      raft::ceildiv<IdxT>(nrow, static_cast<IdxT>(index_params_.num_dataset_splits));
     for (size_t i = 0; i < sub_indices_.size(); ++i) {
       IdxT start = static_cast<IdxT>(i * rows_per_split);
       if (start >= nrow) break;
@@ -408,7 +411,8 @@ void cuvs_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
 template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::save(const std::string& file) const
 {
-  if (index_params_.split_num > 1 && index_params_.merge_type == CagraMergeType::kLogical) {
+  if (index_params_.num_dataset_splits > 1 &&
+      index_params_.merge_type == CagraMergeType::kLogical) {
     for (size_t i = 0; i < sub_indices_.size(); ++i) {
       std::string subfile = file + (i == 0 ? "" : ".subidx." + std::to_string(i));
       cuvs::neighbors::cagra::serialize(handle_, subfile, *sub_indices_[i], false);
@@ -435,8 +439,8 @@ template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::load(const std::string& file)
 {
   std::ifstream meta(file + ".submeta", std::ios::in);
-  if (index_params_.split_num > 1 && index_params_.merge_type == CagraMergeType::kLogical &&
-      meta.good()) {
+  if (index_params_.num_dataset_splits > 1 &&
+      index_params_.merge_type == CagraMergeType::kLogical && meta.good()) {
     // Load multiple sub-indices for logical merge
     size_t count;
     meta >> count;
@@ -481,7 +485,8 @@ void cuvs_cagra<T, IdxT>::search_base(
                                               neighbors_view,
                                               distances_view);
   } else {
-    if (index_params_.split_num <= 1 || index_params_.merge_type == CagraMergeType::kPhysical) {
+    if (index_params_.num_dataset_splits <= 1 ||
+        index_params_.merge_type == CagraMergeType::kPhysical) {
       cuvs::neighbors::cagra::search(
         handle_, search_params_, *index_, queries_view, neighbors_view, distances_view, *filter_);
     } else {

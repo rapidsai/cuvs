@@ -278,7 +278,9 @@ void parse_build_param(const nlohmann::json& conf,
     param.cagra_params.compression.emplace(vpq_pams);
   }
 
-  if (conf.contains("split_num")) { param.split_num = conf.at("split_num"); }
+  if (conf.contains("num_dataset_splits")) {
+    param.num_dataset_splits = conf.at("num_dataset_splits");
+  }
   if (conf.contains("merge_type")) {
     std::string mt = conf.at("merge_type");
     if (mt == "PHYSICAL") {
