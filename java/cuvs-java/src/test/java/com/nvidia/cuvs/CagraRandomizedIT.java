@@ -137,7 +137,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
         log.info("Query built successfully. Executing search...");
         SearchResults results = index.search(query);
 
-        compareResults(results, expected, 2*topK, datasetSize, numQueries);
+        compareResults(results, expected, topK, datasetSize, numQueries);
       } finally {
         index.destroyIndex();
       }

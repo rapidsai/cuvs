@@ -99,12 +99,9 @@ public abstract class CuVSTestCase {
 
       // just make sure that the first 5 results are in the expected list (which
       // comprises of 2*topK results)
-      int SENTINEL = Integer.MAX_VALUE;
-      for (int j = 0, found = 0; j < sortedResultKeys.size() && found < 5; j++) {
-        int idx = sortedResultKeys.get(j);
-        if (idx == SENTINEL) continue; // skip padding
-        assertTrue("Not found in expected list: " + idx, expected.get(i).contains(idx));
-        found++;
+      for (int j = 0; j < Math.min(5, sortedResultKeys.size()); j++) {
+        assertTrue("Not found in expected list: " + sortedResultKeys.get(j),
+            expected.get(i).contains(sortedResultKeys.get(j)));
       }
     }
   }
