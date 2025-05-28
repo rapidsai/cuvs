@@ -48,22 +48,20 @@ using GraphBuildParams =
 
 /**
  * @brief Parameters used to build an all-neighbors graph (find nearest neighbors for all the
- * training vectors)
+ * training vectors).
+ * For scalability, the all-neighbors graph construction algorithm partitions a set of training
+ * vectors into overlapping clusters, computes a local knn graph on each cluster, and merges the
+ * local graphs into a single global graph.
+ * Device memory usage and accuracy can be configured by changing the `overlap_factor` and
+ * `n_clusters`.
+ * The algorithm used to build each local graph is also configurable.
  *
- * Usage of n_nearest_clusters and n_clusters
- *
- * The ratio of n_nearest_clusters / n_clusters determines device memory usage.
- * Approximately (n_nearest_clusters / n_clusters) * num_rows_in_entire_data number of rows will
- * be put on device memory at once.
- * E.g. between (n_nearest_clusters / n_clusters) = 2/10 and 2/20, the latter will use less device
- * memory.
- *
- * Larger n_nearest_clusters results in better accuracy of the final all-neighbors knn
- * graph. E.g. While using similar device memory, (n_nearest_clusters / n_clusters) = 4/20
- * will have better accuracy than 2/10 at the cost of performance.
  */
 struct all_neighbors_params {
   /** Parameters for knn graph building algorithm
+   * Approximate nearest neighbors methods are used to build the knn graph. Currently supported
+   * options are 'IVF-PQ' and 'NN Descent'. IVF-PQ is more accurate, but slower compared to NN
+   * Descent.
    *
    * Set ivf_pq_params, or nn_descent_params to select the graph build
    * algorithm and control their parameters.
@@ -81,15 +79,33 @@ struct all_neighbors_params {
   GraphBuildParams graph_build_params;
 
   /**
-   * number of nearest clusters each data point will be assigned to in the batching algorithm
+   * Number of nearest clusters each data point will be assigned to in the batching algorithm.
+   * Start with `overlap_factor = 2` and gradually increase (2->3->4 ...) for better accuracy at the
+   * cost of device memory usage.
    */
-  size_t n_nearest_clusters = 2;
+  size_t overlap_factor = 2;
 
   /**
-   * number of total clusters (aka batches) to split the data into. If set to 1, algorithm creates
-   * an all-neighbors graph without batching
+   * Number of total clusters (aka batches) to split the data into. If set to 1, algorithm creates
+   * an all-neighbors graph without batching.
+   * Start with `n_clusters = 4` and increase (4 → 8 → 16...) for less device memory usage at the
+   * cost of accuracy. This is independent from `overlap_factor` as long as `overlap_factor` <
+   * `n_clusters`.
+   *
+   * The ratio of `overlap_factor / n_clusters` determines device memory usage.
+   * Approximately `(overlap_factor / n_clusters) * num_rows_in_entire_data` number of rows will
+   * be put on device memory at once.
+   * E.g. between `(overlap_factor / n_clusters)` = 2/10 and 2/20, the latter will use less device
+   * memory.
+   *
+   * Larger `overlap_factor` results in better accuracy of the final all-neighbors knn
+   * graph. E.g. While using similar device memory, `(overlap_factor / n_clusters)` = 4/20
+   * will have better accuracy than 2/10 at the cost of performance.
+   *
    */
-  size_t n_clusters                   = 1;  // defaults to not batching
+  size_t n_clusters = 1;  // defaults to not batching
+
+  /** Metric used. */
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
 };
 
