@@ -41,37 +41,7 @@ cdef extern from "library_types.h":
         CUDA_R_8U "CUDA_R_8U"
         CUDA_R_8I "CUDA_R_8I"
 
-cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
-
-    ctypedef enum codebook_gen:
-        PER_SUBSPACE
-        PER_CLUSTER
-
-    ctypedef struct cuvsIvfPqIndexParams:
-        cuvsDistanceType metric
-        float metric_arg
-        bool add_data_on_build
-        uint32_t n_lists
-        uint32_t kmeans_n_iters
-        double kmeans_trainset_fraction
-        uint32_t pq_bits
-        uint32_t pq_dim
-        codebook_gen codebook_kind
-        bool force_random_rotation
-        bool conservative_memory_allocation
-        uint32_t max_train_points_per_pq_code
-
-    ctypedef cuvsIvfPqIndexParams* cuvsIvfPqIndexParams_t
-
-    ctypedef struct cuvsIvfPqSearchParams:
-        uint32_t n_probes
-        cudaDataType_t lut_dtype
-        cudaDataType_t internal_distance_dtype
-        double preferred_shmem_carveout
-        cudaDataType_t coarse_search_dtype
-        uint32_t max_internal_batch_size
-
-    ctypedef cuvsIvfPqSearchParams* cuvsIvfPqSearchParams_t
+from cuvs.neighbors.ivf_pq.ivf_pq cimport codebook_gen, cuvsIvfPqIndexParams, cuvsIvfPqIndexParams_t, cuvsIvfPqSearchParams, cuvsIvfPqSearchParams_t
 
 cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
