@@ -25,6 +25,7 @@
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/util/cudart_utils.hpp>
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
@@ -78,15 +79,13 @@ index<T, IdxT> merge(raft::resources const& handle,
   auto merge_dataset = [&](T* dst) {
     for (cagra_index_t* index : indices) {
       auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index->data());
-
-      RAFT_CUDA_TRY(cudaMemcpy2DAsync(dst + offset * dim,
-                                      sizeof(T) * dim,
-                                      strided_dset->view().data_handle(),
-                                      sizeof(T) * stride,
-                                      sizeof(T) * dim,
-                                      strided_dset->n_rows(),
-                                      cudaMemcpyDefault,
-                                      raft::resource::get_cuda_stream(handle)));
+      raft::copy_matrix(dst + offset * dim,
+                        dim,
+                        strided_dset->view().data_handle(),
+                        static_cast<size_t>(stride),
+                        dim,
+                        static_cast<size_t>(strided_dset->n_rows()),
+                        raft::resource::get_cuda_stream(handle));
 
       offset += IdxT(index->data().n_rows());
     }

@@ -18,7 +18,6 @@
 
 #include "common.hpp"
 #include <cuvs/distance/distance.hpp>
-#include <cuvs/neighbors/common.h>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
@@ -276,16 +275,9 @@ struct extend_params {
  */
 
 /**
- * @brief Determines the strategy for merging CAGRA graphs.
- *
- * @note Currently, only the MERGE_STRATEGY_PHYSICAL strategy is supported.
- */
-using MergeStrategy = cuvsMergeStrategy;
-
-/**
  * @brief Parameters for merging CAGRA indexes.
  */
-struct merge_params {
+struct merge_params : cuvs::neighbors::merge_params {
   merge_params() = default;
 
   /**
@@ -298,7 +290,11 @@ struct merge_params {
   cagra::index_params output_index_params;
 
   /// Strategy for merging. Defaults to `MergeStrategy::MERGE_STRATEGY_PHYSICAL`.
-  MergeStrategy strategy = MergeStrategy::MERGE_STRATEGY_PHYSICAL;
+  cuvs::neighbors::MergeStrategy merge_strategy =
+    cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
+
+  /// Implementation of the polymorphic strategy() method
+  cuvs::neighbors::MergeStrategy strategy() const { return merge_strategy; }
 };
 
 /**
@@ -2602,3 +2598,5 @@ auto distribute(const raft::resources& clique, const std::string& filename)
   -> cuvs::neighbors::mg_index<cagra::index<T, IdxT>, T, IdxT>;
 
 }  // namespace cuvs::neighbors::cagra
+
+#include <cuvs/neighbors/cagra_index_wrapper.hpp>
