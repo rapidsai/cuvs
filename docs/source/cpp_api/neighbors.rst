@@ -9,6 +9,7 @@ Nearest Neighbors
    :maxdepth: 2
    :caption: Contents:
 
+   neighbors_all_neighbors.rst
    neighbors_bruteforce.rst
    neighbors_cagra.rst
    neighbors_dynamic_batching.rst
