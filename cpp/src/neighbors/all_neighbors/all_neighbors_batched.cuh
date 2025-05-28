@@ -71,7 +71,7 @@ void get_centroids_on_data_subsample(raft::resources const& res,
 template <typename T, typename IdxT>
 void single_gpu_assign_clusters(
   raft::resources const& res,
-  size_t n_nearest_clusters,
+  size_t overlap_factor,
   size_t n_clusters,
   size_t n_rows_per_batch,
   size_t base_row_offset,
@@ -89,10 +89,10 @@ void single_gpu_assign_clusters(
   auto dataset_batch_d =
     raft::make_device_matrix<T, IdxT, raft::row_major>(res, n_rows_per_batch, num_cols);
 
-  auto nearest_clusters_idx_d = raft::make_device_matrix<IdxT, int64_t, raft::row_major>(
-    res, n_rows_per_batch, n_nearest_clusters);
-  auto nearest_clusters_dist_d = raft::make_device_matrix<T, int64_t, raft::row_major>(
-    res, n_rows_per_batch, n_nearest_clusters);
+  auto nearest_clusters_idx_d =
+    raft::make_device_matrix<IdxT, int64_t, raft::row_major>(res, n_rows_per_batch, overlap_factor);
+  auto nearest_clusters_dist_d =
+    raft::make_device_matrix<T, int64_t, raft::row_major>(res, n_rows_per_batch, overlap_factor);
 
   std::optional<raft::device_vector_view<const T, int64_t>> norms_view;
   cuvs::neighbors::brute_force::index<T> brute_force_index(res, centroids, norms_view, metric);
@@ -111,21 +111,21 @@ void single_gpu_assign_clusters(
                                          raft::make_const_mdspan(dataset_batch_d.view()),
                                          nearest_clusters_idx_d.view(),
                                          nearest_clusters_dist_d.view());
-    raft::copy(global_nearest_cluster.data_handle() + row_offset * n_nearest_clusters,
+    raft::copy(global_nearest_cluster.data_handle() + row_offset * overlap_factor,
                nearest_clusters_idx_d.data_handle(),
-               n_rows_of_current_batch * n_nearest_clusters,
+               n_rows_of_current_batch * overlap_factor,
                resource::get_cuda_stream(res));
   }
 }
 
 /**
- * Assign each data point to top n_nearest_clusters number of clusters. Loads the data in batches
+ * Assign each data point to top overlap_factor number of clusters. Loads the data in batches
  * onto device for efficiency. Arguments:
  * - [in] res: raft resource
  * - [in] params: params for graph building
  * - [in] dataset [num_rows x num_cols]: entire dataset located on host memory
  * - [in] centroids [n_clusters x num_cols] : centroid vectors
- * - [out] global_nearest_cluster [num_rows X n_nearest_clusters] : top n_nearest_clusters closest
+ * - [out] global_nearest_cluster [num_rows X overlap_factor] : top overlap_factor closest
  * clusters for each data point
  */
 template <typename T, typename IdxT>
@@ -169,7 +169,7 @@ void assign_clusters(raft::resources const& res,
       size_t base_row_offset_for_this_rank = n_rows_per_cluster * base_cluster_idx;
 
       single_gpu_assign_clusters(dev_res,
-                                 params.n_nearest_clusters,
+                                 params.overlap_factor,
                                  n_clusters_for_this_rank,
                                  n_rows_per_cluster,
                                  base_row_offset_for_this_rank,
@@ -180,7 +180,7 @@ void assign_clusters(raft::resources const& res,
     }
   } else {
     single_gpu_assign_clusters(res,
-                               params.n_nearest_clusters,
+                               params.overlap_factor,
                                params.n_clusters,
                                n_rows_per_cluster,
                                0,
@@ -195,9 +195,9 @@ void assign_clusters(raft::resources const& res,
  * Getting data indices that belong to cluster
  * Arguments:
  * - [in] res: raft resource
- * - [in] global_nearest_cluster [num_rows X n_nearest_clusters] : top n_nearest_clusters closest
+ * - [in] global_nearest_cluster [num_rows X overlap_factor] : top overlap_factor closest
  * clusters for each data point
- * - [out] inverted_indices [num_rows x n_nearest_clusters sized vector] : vector for data indices
+ * - [out] inverted_indices [num_rows x overlap_factor sized vector] : vector for data indices
  * for each cluster
  * - [out] cluster_sizes [n_cluster] : cluster size for each cluster
  * - [out] cluster_offsets [n_cluster] : offset in inverted_indices for each cluster
@@ -210,9 +210,9 @@ void get_inverted_indices(raft::resources const& res,
                           raft::host_vector_view<IdxT, IdxT> cluster_offsets)
 {
   // build sparse inverted indices and get number of data points for each cluster
-  size_t num_rows           = global_nearest_cluster.extent(0);
-  size_t n_nearest_clusters = global_nearest_cluster.extent(1);
-  size_t n_clusters         = cluster_sizes.extent(0);
+  size_t num_rows       = global_nearest_cluster.extent(0);
+  size_t overlap_factor = global_nearest_cluster.extent(1);
+  size_t n_clusters     = cluster_sizes.extent(0);
 
   auto local_offsets = raft::make_host_vector<IdxT>(n_clusters);
 
@@ -220,7 +220,7 @@ void get_inverted_indices(raft::resources const& res,
   std::fill(local_offsets.data_handle(), local_offsets.data_handle() + n_clusters, 0);
 
   for (size_t i = 0; i < num_rows; i++) {
-    for (size_t j = 0; j < n_nearest_clusters; j++) {
+    for (size_t j = 0; j < overlap_factor; j++) {
       IdxT cluster_id = global_nearest_cluster(i, j);
       cluster_sizes(cluster_id) += 1;
     }
@@ -231,7 +231,7 @@ void get_inverted_indices(raft::resources const& res,
     cluster_offsets(i) = cluster_offsets(i - 1) + cluster_sizes(i - 1);
   }
   for (size_t i = 0; i < num_rows; i++) {
-    for (size_t j = 0; j < n_nearest_clusters; j++) {
+    for (size_t j = 0; j < overlap_factor; j++) {
       IdxT cluster_id = global_nearest_cluster(i, j);
       inverted_indices(cluster_offsets(cluster_id) + local_offsets(cluster_id)) = i;
       local_offsets(cluster_id) += 1;
@@ -389,20 +389,19 @@ void batch_build(
   size_t num_cols = static_cast<size_t>(dataset.extent(1));
   size_t k        = indices.extent(1);
 
-  RAFT_EXPECTS(params.n_clusters > params.n_nearest_clusters,
-               "n_nearest_clusters should be smaller than n_clusters. We recommend starting from "
-               "n_nearest_clusters=2 and gradually increase it for better knn graph recall.");
+  RAFT_EXPECTS(params.n_clusters > params.overlap_factor,
+               "overlap_factor should be smaller than n_clusters. We recommend starting from "
+               "overlap_factor=2 and gradually increase it for better knn graph recall.");
 
   auto centroids = raft::make_device_matrix<T, IdxT>(handle, params.n_clusters, num_cols);
   get_centroids_on_data_subsample<T, IdxT>(handle, params.metric, dataset, centroids.view());
 
-  auto global_nearest_cluster =
-    raft::make_host_matrix<IdxT, IdxT>(num_rows, params.n_nearest_clusters);
+  auto global_nearest_cluster = raft::make_host_matrix<IdxT, IdxT>(num_rows, params.overlap_factor);
   assign_clusters<T, IdxT>(
     handle, params, dataset, centroids.view(), global_nearest_cluster.view());
 
   auto inverted_indices =
-    raft::make_host_vector<IdxT, IdxT, raft::row_major>(num_rows * params.n_nearest_clusters);
+    raft::make_host_vector<IdxT, IdxT, raft::row_major>(num_rows * params.overlap_factor);
   auto cluster_sizes   = raft::make_host_vector<IdxT, IdxT, raft::row_major>(params.n_clusters);
   auto cluster_offsets = raft::make_host_vector<IdxT, IdxT, raft::row_major>(params.n_clusters);
   get_inverted_indices(handle,
