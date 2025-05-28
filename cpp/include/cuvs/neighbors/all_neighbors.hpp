@@ -16,28 +16,13 @@
 
 #pragma once
 
+#include <cuvs/neighbors/graph_build_types.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 
 #include <variant>
 
 namespace cuvs::neighbors::all_neighbors {
-
-/**
- * @brief Parameters used to build an all-neighbors knn graph (find nearest neighbors for all the
- * training vectors)
- */
-namespace graph_build_params {
-
-/** Specialized parameters utilizing IVF-PQ to build knn graph */
-struct ivf_pq_params {
-  cuvs::neighbors::ivf_pq::index_params build_params;
-  cuvs::neighbors::ivf_pq::search_params search_params;
-  float refinement_rate = 2.0;
-};
-
-using nn_descent_params = cuvs::neighbors::nn_descent::index_params;
-}  // namespace graph_build_params
 
 using GraphBuildParams =
   std::variant<graph_build_params::ivf_pq_params, graph_build_params::nn_descent_params>;
