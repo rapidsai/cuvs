@@ -500,7 +500,7 @@ void cuvs_cagra<T, IdxT>::search_base(
         }
 
         raft::resources composite_handle(handle_);
-        size_t n_streams = std::min(wrapped_indices.size(), size_t(8));
+        size_t n_streams = wrapped_indices.size();
         raft::resource::set_cuda_stream_pool(composite_handle,
                                              std::make_shared<rmm::cuda_stream_pool>(n_streams));
 
