@@ -23,6 +23,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/core/serialize.hpp>
+#include <raft/util/cudart_utils.hpp>
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/core/exceptions.hpp>
@@ -85,11 +86,10 @@ void _get_graph(cuvsResources_t res, cuvsNNDescentIndex_t index, DLManagedTensor
     RAFT_EXPECTS(src.extent(0) == dst.extent(0), "Output graph has incorrect number of rows");
     RAFT_EXPECTS(src.extent(1) == dst.extent(1), "Output graph has incorrect number of cols");
 
-    cudaMemcpyAsync(dst.data_handle(),
-                    src.data_handle(),
-                    dst.extent(0) * dst.extent(1) * sizeof(uint32_t),
-                    cudaMemcpyDefault,
-                    raft::resource::get_cuda_stream(*res_ptr));
+    raft::copy(dst.data_handle(),
+               src.data_handle(),
+               dst.extent(0) * dst.extent(1),
+               raft::resource::get_cuda_stream(*res_ptr));
   } else {
     RAFT_FAIL("Unsupported nn-descent index dtype: %d and bits: %d", dtype.code, dtype.bits);
   }
