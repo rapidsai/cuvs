@@ -277,6 +277,20 @@ void parse_build_param(const nlohmann::json& conf,
     parse_build_param(comp_search_conf, vpq_pams);
     param.cagra_params.compression.emplace(vpq_pams);
   }
+
+  if (conf.contains("num_dataset_splits")) {
+    param.num_dataset_splits = conf.at("num_dataset_splits");
+  }
+  if (conf.contains("merge_type")) {
+    std::string mt = conf.at("merge_type");
+    if (mt == "PHYSICAL") {
+      param.merge_type = cuvs::bench::CagraMergeType::kPhysical;
+    } else if (mt == "LOGICAL") {
+      param.merge_type = cuvs::bench::CagraMergeType::kLogical;
+    } else {
+      throw std::runtime_error("invalid value for merge_type");
+    }
+  }
 }
 
 cuvs::bench::AllocatorType parse_allocator(std::string mem_type)
