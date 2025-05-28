@@ -17,9 +17,9 @@
 package com.nvidia.cuvs.internal;
 
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
-import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI.cuvsResources_t;
-import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI.cuvsResourcesCreate;
-import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI.cuvsResourcesDestroy;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResourcesCreate;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResourcesDestroy;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;

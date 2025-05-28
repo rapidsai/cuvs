@@ -21,11 +21,11 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
-import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI_1.cudaGetDeviceCount;
-import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI_1.cudaGetDeviceProperties_v2;
-import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI_1.cudaMemGetInfo;
-import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI_1.cudaSetDevice;
-import static com.nvidia.cuvs.internal.panama.PanamaFFMAPI_1.size_t;
+import static com.nvidia.cuvs.internal.panama.headers_h.cudaGetDeviceCount;
+import static com.nvidia.cuvs.internal.panama.headers_h.cudaGetDeviceProperties_v2;
+import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemGetInfo;
+import static com.nvidia.cuvs.internal.panama.headers_h.cudaSetDevice;
+import static com.nvidia.cuvs.internal.panama.headers_h.size_t;
 import static java.lang.foreign.ValueLayout.ADDRESS;
 
 import java.lang.foreign.Arena;
