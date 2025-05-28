@@ -23,6 +23,8 @@ import com.nvidia.cuvs.spi.CuVSProvider;
  * The purpose is to allow a caller to place the vectors into native memory
  * directly, instead of requiring the caller to load all the vectors into the heap
  * (e.g. with a float[][]).
+ *
+ * @since 25.06
  */
 public interface Dataset extends AutoCloseable {
 
