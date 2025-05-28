@@ -72,6 +72,14 @@ public class CagraRandomizedIT extends CuVSTestCase {
       }
     }
 
+    BitSet[] prefilters = null;
+    if (sharedPrefilter != null) {
+      prefilters = new BitSet[numQueries];
+      for (int i = 0; i < numQueries; i++) {
+        prefilters[i] = sharedPrefilter;
+      }
+    }
+
     // Generate a random dataset
     float[][] dataset = generateData(random, datasetSize, dimensions);
 
@@ -100,7 +108,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
     assert topK > 0 && topK <= datasetSize : "Invalid topK value.";
 
     // Generate expected results using brute force
-    List<List<Integer>> expected = generateExpectedResults(topK, dataset, queries, null, log);
+    List<List<Integer>> expected = generateExpectedResults(topK, dataset, queries, prefilters, log);
 
     // Create CuVS index and query
     try (CuVSResources resources = CuVSResources.create()) {
@@ -129,7 +137,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
         log.info("Query built successfully. Executing search...");
         SearchResults results = index.search(query);
 
-        compareResults(results, expected, topK, datasetSize, numQueries);
+        compareResults(results, expected, 2*topK, datasetSize, numQueries);
       } finally {
         index.destroyIndex();
       }
