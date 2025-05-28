@@ -1,6 +1,5 @@
 # =============================================================================
-# FindSVE.cmake
-# This module finds the SVE (Scalable Vector Extension) support in the compiler.
+# FindSVE.cmake This module finds the SVE (Scalable Vector Extension) support in the compiler.
 # =============================================================================
 
 INCLUDE(CheckCXXSourceRuns)
@@ -23,11 +22,23 @@ set(CMAKE_REQUIRED_FLAGS "-march=armv9-a+sve")
 check_cxx_source_runs("${SVE_CODE}" CXX_HAS_SVE)
 
 if(CXX_HAS_SVE)
-  set(CXX_SVE_FOUND TRUE CACHE BOOL "SVE support found")
-  set(CXX_SVE_FLAGS "-march=armv9-a+sve" CACHE STRING "Flags for SVE support")
+  set(CXX_SVE_FOUND
+      TRUE
+      CACHE BOOL "SVE support found"
+  )
+  set(CXX_SVE_FLAGS
+      "-march=armv9-a+sve"
+      CACHE STRING "Flags for SVE support"
+  )
 else()
-  set(CXX_SVE_FOUND FALSE CACHE BOOL "SVE support not found")
-  set(CXX_SVE_FLAGS "" CACHE STRING "Flags for SVE support")
+  set(CXX_SVE_FOUND
+      FALSE
+      CACHE BOOL "SVE support not found"
+  )
+  set(CXX_SVE_FLAGS
+      ""
+      CACHE STRING "Flags for SVE support"
+  )
 endif()
 
 mark_as_advanced(CXX_SVE_FOUND CXX_SVE_FLAGS)
