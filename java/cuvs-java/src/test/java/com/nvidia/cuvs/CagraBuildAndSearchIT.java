@@ -125,70 +125,80 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     }
   }
 
+  /**
+   * A test that checks the pre-filtering feature.
+   *
+   * @throws Throwable
+   */
   @Test
   public void testPrefilteringReducesResults() throws Throwable {
-  float[][] dataset = {
-    { 0.0f, 0.0f },
-    { 10.0f, 10.0f },
-    { 1.0f, 1.0f },
-    { 2.0f, 2.0f }
-  };
-  List<Integer> map = List.of(0, 1, 2, 3);
-  float[][] queries = {
-    {0.1f, 0.1f}
-  };
 
-  CagraIndexParams indexParams = new CagraIndexParams.Builder()
-    .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
-    .withGraphDegree(2)
-    .withIntermediateGraphDegree(4)
-    .withNumWriterThreads(2)
-    .withMetric(CuvsDistanceType.L2Expanded)
-    .build();
+    // Sample data and query
+    float[][] dataset = {
+        { 0.74021935f, 0.9209938f },
+        { 0.03902049f, 0.9689629f },
+        { 0.92514056f, 0.4463501f },
+        { 0.6673192f, 0.10993068f }
+       };
+    float[][] queries = {
+        { 0.48216683f, 0.0428398f }
+       };
 
-  try (CuVSResources resources = CuVSResources.create()) {
-    CagraIndex index = CagraIndex.newBuilder(resources)
-      .withDataset(dataset)
-      .withIndexParams(indexParams)
-      .build();
+    // Expected search results
+    List<Map<Integer, Float>> expectedResults = Arrays.asList(
+        Map.of(3, 0.038782578f, 2, 0.3590463f));
 
-    // No prefilter (all points allowed)
-    CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
-    CagraQuery fullQuery = new CagraQuery.Builder()
-      .withTopK(2)
-      .withSearchParams(searchParams)
-      .withQueryVectors(queries)
-      .withMapping(map)
-      .build();
+    // Expected filtered search results
+    List<Map<Integer, Float>> expectedFilteredResults = Arrays.asList(
+        Map.of(2, 0.3590463f, 0, 0.83774555f));
 
-    SearchResults fullResults = index.search(fullQuery);
-    List<Map<Integer, Float>> full = fullResults.getResults();
-    log.info("Full results: {}", full);
+    CagraIndexParams indexParams = new CagraIndexParams.Builder()
+        .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+        .withGraphDegree(2)
+        .withIntermediateGraphDegree(4)
+        .withNumWriterThreads(2)
+        .withMetric(CuvsDistanceType.L2Expanded)
+        .build();
 
-    // Apply prefilter: only allow ids 0 and 3 (bitset: 1100)
-    BitSet prefilter = new BitSet(4);
-    prefilter.set(1);
-    prefilter.set(2);
-    prefilter.set(3);
+    try (CuVSResources resources = CuVSResources.create()) {
+      CagraIndex index = CagraIndex.newBuilder(resources)
+          .withDataset(dataset)
+          .withIndexParams(indexParams)
+          .build();
 
-    CagraQuery filteredQuery = new CagraQuery.Builder()
-      .withTopK(2)
-      .withSearchParams(searchParams)
-      .withQueryVectors(queries)
-      .withMapping(map)
-      .withPrefilter(prefilter, 4)
-      .build();
+      // No prefilter (all points allowed)
+      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources)
+          .build();
+      CagraQuery fullQuery = new CagraQuery.Builder()
+          .withTopK(2)
+          .withSearchParams(searchParams)
+          .withQueryVectors(queries)
+          .build();
 
-    SearchResults filteredResults = index.search(filteredQuery);
-    List<Map<Integer, Float>> filtered = filteredResults.getResults();
-    log.info("Filtered results: {}", filtered);
+      SearchResults fullSearchResults = index.search(fullQuery);
+      List<Map<Integer, Float>> fullResults = fullSearchResults.getResults();
+      log.info("Full results: {}", fullResults);
 
-    assertTrue(full.get(0).containsKey(0));
-    assertFalse(filtered.get(0).containsKey(0));
-    assertTrue(filtered.get(0).containsKey(2));
+      // Apply prefilter: only allow ids 0 and 2 (bitset: 1100)
+      BitSet prefilter = new BitSet(4);
+      prefilter.set(0);
+      prefilter.set(2);
+
+      CagraQuery filteredQuery = new CagraQuery.Builder()
+          .withTopK(2)
+          .withSearchParams(searchParams)
+          .withQueryVectors(queries)
+          .withPrefilter(prefilter, 4)
+          .build();
+
+      SearchResults filteredSearchResults = index.search(filteredQuery);
+      List<Map<Integer, Float>> filteredResults = filteredSearchResults.getResults();
+      log.info("Filtered results: {}", filteredResults);
+
+      assertEquals(expectedResults, fullResults);
+      assertEquals(expectedFilteredResults, filteredResults);
+    }
   }
-}
-
 
   private Runnable indexAndQueryOnce(float[][] dataset, List<Integer> map, float[][] queries,
       List<Map<Integer, Float>> expectedResults, CuVSResources resources) throws Throwable, FileNotFoundException {
