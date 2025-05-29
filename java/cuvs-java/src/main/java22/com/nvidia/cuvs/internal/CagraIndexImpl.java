@@ -57,6 +57,7 @@ import com.nvidia.cuvs.internal.panama.cuvsCagraSearchParams;
 import com.nvidia.cuvs.internal.panama.cuvsIvfPqIndexParams;
 import com.nvidia.cuvs.internal.panama.cuvsIvfPqParams;
 import com.nvidia.cuvs.internal.panama.cuvsIvfPqSearchParams;
+import java.util.BitSet;
 
 /**
  * {@link CagraIndex} encapsulates a CAGRA index, along with methods to interact
@@ -76,7 +77,7 @@ public class CagraIndexImpl implements CagraIndex {
       FunctionDescriptor.of(ADDRESS, ADDRESS, C_LONG, C_LONG, ADDRESS, ADDRESS, ADDRESS, ADDRESS, C_INT));
 
   private static final MethodHandle searchMethodHandle = downcallHandle("search_cagra_index",
-      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, C_INT, C_LONG, C_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS));
+      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, C_INT, C_LONG, C_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, C_LONG));
 
   private static final MethodHandle serializeMethodHandle = downcallHandle("serialize_cagra_index",
       FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, ADDRESS));
@@ -239,6 +240,15 @@ public class CagraIndexImpl implements CagraIndex {
     MemorySegment distancesMemorySegment = resources.getArena().allocate(distancesSequenceLayout);
     MemorySegment floatsSeg = Util.buildMemorySegment(resources.getArena(), query.getQueryVectors());
 
+    long prefilterDataLength = 0;
+    MemorySegment prefilterData = MemorySegment.NULL;
+    if (query.getPrefilter() != null) {
+      long[] longArray = query.getPrefilter().toLongArray();
+      prefilterData = Util.buildMemorySegment(resources.getArena(), longArray);
+      prefilterDataLength = query.getNumDocs();
+    }
+
+
     try (var localArena = Arena.ofConfined()) {
       MemorySegment returnValue = localArena.allocate(C_INT);
       searchMethodHandle.invokeExact(
@@ -251,7 +261,9 @@ public class CagraIndexImpl implements CagraIndex {
         neighborsMemorySegment,
         distancesMemorySegment,
         returnValue,
-        segmentFromSearchParams(query.getCagraSearchParameters())
+        segmentFromSearchParams(query.getCagraSearchParameters()),
+        prefilterData,
+        prefilterDataLength
       );
       checkError(returnValue.get(C_INT, 0L), "searchMethodHandle");
     }

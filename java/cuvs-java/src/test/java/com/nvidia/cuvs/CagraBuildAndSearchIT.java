@@ -33,6 +33,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.BitSet;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -121,6 +122,81 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
         parallelExecutor.awaitTermination(2000, TimeUnit.SECONDS);
       }
 
+    }
+  }
+
+  /**
+   * A test that checks the pre-filtering feature.
+   *
+   * @throws Throwable
+   */
+  @Test
+  public void testPrefilteringReducesResults() throws Throwable {
+
+    // Sample data and query
+    float[][] dataset = {
+        { 0.74021935f, 0.9209938f },
+        { 0.03902049f, 0.9689629f },
+        { 0.92514056f, 0.4463501f },
+        { 0.6673192f, 0.10993068f }
+       };
+    float[][] queries = {
+        { 0.48216683f, 0.0428398f }
+       };
+
+    // Expected search results
+    List<Map<Integer, Float>> expectedResults = Arrays.asList(
+        Map.of(3, 0.038782578f, 2, 0.3590463f));
+
+    // Expected filtered search results
+    List<Map<Integer, Float>> expectedFilteredResults = Arrays.asList(
+        Map.of(2, 0.3590463f, 0, 0.83774555f));
+
+    CagraIndexParams indexParams = new CagraIndexParams.Builder()
+        .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+        .withGraphDegree(2)
+        .withIntermediateGraphDegree(4)
+        .withNumWriterThreads(2)
+        .withMetric(CuvsDistanceType.L2Expanded)
+        .build();
+
+    try (CuVSResources resources = CuVSResources.create()) {
+      CagraIndex index = CagraIndex.newBuilder(resources)
+          .withDataset(dataset)
+          .withIndexParams(indexParams)
+          .build();
+
+      // No prefilter (all points allowed)
+      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources)
+          .build();
+      CagraQuery fullQuery = new CagraQuery.Builder()
+          .withTopK(2)
+          .withSearchParams(searchParams)
+          .withQueryVectors(queries)
+          .build();
+
+      SearchResults fullSearchResults = index.search(fullQuery);
+      List<Map<Integer, Float>> fullResults = fullSearchResults.getResults();
+      log.info("Full results: {}", fullResults);
+
+      // Apply prefilter: only allow ids 0 and 2 (bitset: 1100)
+      BitSet prefilter = new BitSet(4);
+      prefilter.set(0);
+      prefilter.set(2);
+
+      CagraQuery filteredQuery = new CagraQuery.Builder()
+          .withTopK(2)
+          .withSearchParams(searchParams)
+          .withQueryVectors(queries)
+          .withPrefilter(prefilter, 4)
+          .build();
+
+      SearchResults filteredSearchResults = index.search(filteredQuery);
+      List<Map<Integer, Float>> filteredResults = filteredSearchResults.getResults();
+      log.info("Filtered results: {}", filteredResults);
+
+      assertEquals(expectedResults, fullResults);
+      assertEquals(expectedFilteredResults, filteredResults);
     }
   }
 

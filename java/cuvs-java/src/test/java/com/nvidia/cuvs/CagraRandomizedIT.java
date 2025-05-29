@@ -18,7 +18,7 @@ package com.nvidia.cuvs;
 
 import java.lang.invoke.MethodHandles;
 import java.util.List;
-
+import java.util.BitSet;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -62,9 +62,26 @@ public class CagraRandomizedIT extends CuVSTestCase {
     int dimensions = random.nextInt(DIMENSIONS_LIMIT) + 1;
     int numQueries = random.nextInt(NUM_QUERIES_LIMIT) + 1;
     int topK = Math.min(random.nextInt(TOP_K_LIMIT) + 1, datasetSize);
+    boolean usePrefilter = random.nextBoolean();
 
     if (datasetSize < topK)
       datasetSize = topK;
+
+    BitSet sharedPrefilter = null;
+    if (usePrefilter) {
+      sharedPrefilter = new BitSet(datasetSize);
+      for (int j = 0; j < datasetSize; j++) {
+        sharedPrefilter.set(j, random.nextBoolean());
+      }
+    }
+
+    BitSet[] prefilters = null;
+    if (sharedPrefilter != null) {
+      prefilters = new BitSet[numQueries];
+      for (int i = 0; i < numQueries; i++) {
+        prefilters[i] = sharedPrefilter;
+      }
+    }
 
     // Generate a random dataset
     float[][] vectors = generateData(random, datasetSize, dimensions);
@@ -95,7 +112,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
     assert topK > 0 && topK <= datasetSize : "Invalid topK value.";
 
     // Generate expected results using brute force
-    List<List<Integer>> expected = generateExpectedResults(topK, vectors, queries, null, log);
+    List<List<Integer>> expected = generateExpectedResults(topK, vectors, queries, prefilters, log);
 
     // Create CuVS index and query
     try (CuVSResources resources = CuVSResources.create()) {
@@ -121,12 +138,17 @@ public class CagraRandomizedIT extends CuVSTestCase {
 
       try {
         // Execute search and retrieve results
-        CagraQuery query = new CagraQuery.Builder()
+        CagraQuery.Builder queryBuilder = new CagraQuery.Builder()
                 .withQueryVectors(queries)
                 .withTopK(topK)
                 .withSearchParams(new CagraSearchParams.Builder(resources)
-                        .build())
-                .build();
+                        .build());
+
+        if (sharedPrefilter != null) {
+          queryBuilder.withPrefilter(sharedPrefilter, datasetSize);
+        }
+
+        CagraQuery query = queryBuilder.build();
         log.info("Query built successfully. Executing search...");
         SearchResults results = index.search(query);
 
