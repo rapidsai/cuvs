@@ -26,6 +26,7 @@
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/util/cudart_utils.hpp>
 
 #include <cuvs/distance/distance.hpp>
 
