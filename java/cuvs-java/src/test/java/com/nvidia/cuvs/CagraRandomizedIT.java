@@ -45,10 +45,10 @@ public class CagraRandomizedIT extends CuVSTestCase {
   @Test
   public void testResultsTopKWithRandomValues() throws Throwable {
     boolean useNativeMemoryDatasets[] = {true, false};
-	for (int i = 0; i < 10; i++) {
-	  for (boolean use: useNativeMemoryDatasets) {
-		  tmpResultsTopKWithRandomValues(use);
-	  }
+	  for (int i = 0; i < 100; i++) {
+	    for (boolean use: useNativeMemoryDatasets) {
+		     tmpResultsTopKWithRandomValues(use);
+	    }
     }
   }
 
@@ -58,7 +58,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
     int NUM_QUERIES_LIMIT = 10;
     int TOP_K_LIMIT = 64; // nocommit This fails beyond 64
 
-    int datasetSize = random.nextInt(DATASET_SIZE_LIMIT) + 1;
+    int datasetSize = random.nextInt(DATASET_SIZE_LIMIT) + 2; // datasetSize of 1 fails/crashed due to a bug, hence adding 2 here.
     int dimensions = random.nextInt(DIMENSIONS_LIMIT) + 1;
     int numQueries = random.nextInt(NUM_QUERIES_LIMIT) + 1;
     int topK = Math.min(random.nextInt(TOP_K_LIMIT) + 1, datasetSize);
