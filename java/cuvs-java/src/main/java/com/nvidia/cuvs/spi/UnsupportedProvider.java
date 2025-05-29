@@ -50,6 +50,11 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
+  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) throws Throwable {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException {
     throw new UnsupportedOperationException();
   }

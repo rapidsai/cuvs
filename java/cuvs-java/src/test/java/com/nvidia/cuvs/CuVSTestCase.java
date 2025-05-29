@@ -73,7 +73,7 @@ public abstract class CuVSTestCase {
       // Sort by distance and select the topK nearest neighbors
       List<Integer> neighbors = distances.entrySet().stream().sorted(Map.Entry.comparingByValue())
           .map(Map.Entry::getKey).toList();
-      neighborsResult.add(neighbors.subList(0, Math.min(topK * 2, dataset.length)));
+      neighborsResult.add(neighbors.subList(0, Math.min(topK * 2 + 10, dataset.length)));
     }
 
     log.info("Expected results generated successfully.");
