@@ -86,6 +86,10 @@ requirements:
       then:
         - mkl =2023
   ignore_run_exports:
+    from_package:
+      - ${{ compiler("c") }}
+      - ${{ compiler("cxx") }}
+      - ${{ stdlib("c") }}
     by_name:
       - glog
       - libaio
