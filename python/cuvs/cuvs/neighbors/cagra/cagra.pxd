@@ -120,10 +120,6 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
     cuvsError_t cuvsCagraCompressionParamsDestroy(
         cuvsCagraCompressionParams_t index)
 
-    cuvsError_t cuvsIvfPqParamsCreate(cuvsIvfPqParams_t* params)
-
-    cuvsError_t cuvsIvfPqParamsDestroy(cuvsIvfPqParams_t index)
-
     cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params)
 
     cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t index)
