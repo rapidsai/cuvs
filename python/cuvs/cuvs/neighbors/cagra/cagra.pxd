@@ -108,6 +108,8 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
         float persistent_lifetime
         float persistent_device_usage
 
+    ctypedef cuvsCagraSearchParams* cuvsCagraSearchParams_t
+
     ctypedef struct cuvsCagraIndex:
         uintptr_t addr
         DLDataType dtype
@@ -124,6 +126,10 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
     cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t index)
 
+    cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* params)
+
+    cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t index)
+
     cuvsError_t cuvsCagraIndexCreate(cuvsCagraIndex_t* index)
 
     cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index)
@@ -133,7 +139,7 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
     cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                                cuvsCagraIndexParams* params,
                                DLManagedTensor* dataset,
-                               cuvsCagraIndex_t index) except +
+                               cuvsCagraIndex_t index)
 
     cuvsError_t cuvsCagraSearch(cuvsResources_t res,
                                 cuvsCagraSearchParams* params,
@@ -141,20 +147,20 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
                                 DLManagedTensor* queries,
                                 DLManagedTensor* neighbors,
                                 DLManagedTensor* distances,
-                                cuvsFilter filter) except +
+                                cuvsFilter filter)
 
     cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
                                    const char * filename,
                                    cuvsCagraIndex_t index,
-                                   bool include_dataset) except +
+                                   bool include_dataset)
 
     cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
                                             const char * filename,
-                                            cuvsCagraIndex_t index) except +
+                                            cuvsCagraIndex_t index)
 
     cuvsError_t cuvsCagraDeserialize(cuvsResources_t res,
                                      const char * filename,
-                                     cuvsCagraIndex_t index) except +
+                                     cuvsCagraIndex_t index)
 
 cdef class Index:
     """
