@@ -23,7 +23,7 @@ public class CagraExample {
   public static void main(String[] args) throws Throwable {
 
     // Sample data and query
-    float[][] dataset = {
+    float[][] vectors = {
         { 0.74021935f, 0.9209938f },
         { 0.03902049f, 0.9689629f },
         { 0.92514056f, 0.4463501f },
@@ -42,14 +42,12 @@ public class CagraExample {
       // Configure index parameters
       CagraIndexParams indexParams = new CagraIndexParams.Builder()
           .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
-          .withGraphDegree(1)
-          .withIntermediateGraphDegree(2)
           .withMetric(CuvsDistanceType.L2Expanded)
           .build();
 
       // Create the index with the dataset
       CagraIndex index = CagraIndex.newBuilder(resources)
-          .withDataset(dataset)
+          .withDataset(vectors)
           .withIndexParams(indexParams)
           .build();
 

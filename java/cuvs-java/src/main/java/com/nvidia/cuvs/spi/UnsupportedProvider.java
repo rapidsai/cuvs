@@ -19,6 +19,7 @@ package com.nvidia.cuvs.spi;
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CuVSResources;
+import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
 
 import java.nio.file.Path;
@@ -45,6 +46,11 @@ final class UnsupportedProvider implements CuVSProvider {
 
   @Override
   public HnswIndex.Builder newHnswIndexBuilder(CuVSResources cuVSResources) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException {
     throw new UnsupportedOperationException();
   }
 }
