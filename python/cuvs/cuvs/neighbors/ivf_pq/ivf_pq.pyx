@@ -32,7 +32,7 @@ from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
 
-from cuvs.distance import DISTANCE_TYPES
+from cuvs.distance import DISTANCE_NAMES, DISTANCE_TYPES
 from cuvs.neighbors.common import _check_input_array
 
 from libc.stdint cimport (
@@ -143,7 +143,6 @@ cdef class IndexParams:
                  conservative_memory_allocation=False,
                  max_train_points_per_pq_code=256):
         self.params.n_lists = n_lists
-        self._metric = metric
         self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
         self.params.metric_arg = metric_arg
         self.params.kmeans_n_iters = kmeans_n_iters
@@ -163,9 +162,12 @@ cdef class IndexParams:
         self.params.max_train_points_per_pq_code = \
             max_train_points_per_pq_code
 
+    def get_handle(self):
+        return <size_t> self.params
+
     @property
     def metric(self):
-        return self._metric
+        return DISTANCE_NAMES[self.params.metric]
 
     @property
     def metric_arg(self):
@@ -396,9 +398,8 @@ cdef class SearchParams:
             _map_dtype_np_to_cuda(coarse_search_dtype)
         self.params.max_internal_batch_size = max_internal_batch_size
 
-    @property
-    def n_probes(self):
-        return self.params.n_probes
+    def get_handle(self):
+        return <size_t> self.params
 
     @property
     def n_probes(self):

@@ -276,7 +276,7 @@ auto build(raft::resources const& handle,
  *
  * @param[in] handle
  * @param[in] index_params parameters such as the distance metric to use
- * @param[in] dataset a device pointer to a row-major matrix [n_rows, dim]
+ * @param[in] dataset a device pointer to a col-major matrix [n_rows, dim]
  *
  * @return the constructed brute force index
  */
@@ -302,7 +302,7 @@ auto build(raft::resources const& handle,
  *
  * @param[in] handle
  * @param[in] index_params parameters such as the distance metric to use
- * @param[in] dataset a device pointer to a row-major matrix [n_rows, dim]
+ * @param[in] dataset a device pointer to a col-major matrix [n_rows, dim]
  *
  * @return the constructed brute force index
  */

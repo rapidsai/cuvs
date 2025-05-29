@@ -16,12 +16,12 @@
 
 #pragma once
 #include "../../distance/sparse_distance.cuh"
-#include "knn_merge_parts.cuh"
 #include <cuvs/distance/distance.hpp>
 
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/unary_op.cuh>
 
+#include <cuvs/neighbors/knn_merge_parts.hpp>
 #include <cuvs/selection/select_k.hpp>
 
 #include <raft/sparse/coo.hpp>
@@ -339,15 +339,14 @@ class sparse_knn_t {
       trans.data(), id_ranges.data(), id_ranges.size(), raft::resource::get_cuda_stream(handle));
 
     // combine merge buffers only if there's more than 1 partition to combine
-    cuvs::neighbors::detail::knn_merge_parts(merge_buffer_dists,
-                                             merge_buffer_indices,
-                                             out_dists,
-                                             out_indices,
-                                             query_batcher.batch_rows(),
-                                             2,
-                                             k,
-                                             raft::resource::get_cuda_stream(handle),
-                                             trans.data());
+    auto rows = query_batcher.batch_rows();
+    knn_merge_parts(
+      handle,
+      raft::make_device_matrix_view<const value_t, int64_t>(merge_buffer_dists, rows, 2 * k),
+      raft::make_device_matrix_view<const value_idx, int64_t>(merge_buffer_indices, rows, 2 * k),
+      raft::make_device_matrix_view<value_t, int64_t>(out_dists, rows, k),
+      raft::make_device_matrix_view<value_idx, int64_t>(out_indices, rows, k),
+      raft::make_device_vector_view<value_idx>(trans.data(), id_ranges.size()));
   }
 
   void perform_k_selection(csr_batcher_t<value_idx, value_t> idx_batcher,
