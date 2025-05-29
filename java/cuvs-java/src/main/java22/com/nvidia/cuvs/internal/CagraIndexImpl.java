@@ -42,6 +42,7 @@ import com.nvidia.cuvs.CagraCompressionParams;
 import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CagraIndexParams;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
+import com.nvidia.cuvs.CagraMergeParams;
 import com.nvidia.cuvs.CagraQuery;
 import com.nvidia.cuvs.CagraSearchParams;
 import com.nvidia.cuvs.CuVSResources;
@@ -51,6 +52,7 @@ import com.nvidia.cuvs.internal.common.Util;
 import com.nvidia.cuvs.internal.panama.cuvsCagraCompressionParams;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndex;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndexParams;
+import com.nvidia.cuvs.internal.panama.cuvsCagraMergeParams;
 import com.nvidia.cuvs.internal.panama.cuvsCagraSearchParams;
 import com.nvidia.cuvs.internal.panama.cuvsIvfPqIndexParams;
 import com.nvidia.cuvs.internal.panama.cuvsIvfPqParams;
@@ -88,6 +90,10 @@ public class CagraIndexImpl implements CagraIndex {
 
   private static final MethodHandle serializeCAGRAIndexToHNSWMethodHandle = downcallHandle("serialize_cagra_index_to_hnsw",
       FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, ADDRESS));
+
+
+  private static final MethodHandle mergeMethodHandle = downcallHandle("merge_cagra_indexes",
+      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, C_INT, ADDRESS, ADDRESS));
 
   private final float[][] vectors;
   private final Dataset dataset;
@@ -132,6 +138,23 @@ public class CagraIndexImpl implements CagraIndex {
     this.cagraIndexReference = deserialize(inputStream);
   }
 
+  /**
+   * Constructor for creating an index from an existing index reference.
+   * Used primarily for the merge operation.
+   *
+   * @param indexReference The reference to the existing index
+   * @param resources The resources instance
+   */
+  private CagraIndexImpl(IndexReference indexReference, CuVSResourcesImpl resources) {
+    this.vectors = null;
+    this.cagraIndexParameters = null;
+    this.cagraCompressionParams = null;
+    this.dataset = null;
+    this.resources = resources;
+    this.cagraIndexReference = indexReference;
+    this.destroyed = false;
+  }
+
   private void checkNotDestroyed() {
     if (destroyed) {
       throw new IllegalStateException("destroyed");
@@ -166,7 +189,7 @@ public class CagraIndexImpl implements CagraIndex {
     long cols = dataset != null? dataset.dimensions(): (rows > 0 ? vectors[0].length : 0);
 
     MemorySegment indexParamsMemorySegment = cagraIndexParameters != null
-        ? segmentFromIndexParams(cagraIndexParameters)
+        ? segmentFromIndexParams(resources, cagraIndexParameters)
         : MemorySegment.NULL;
 
     int numWriterThreads = cagraIndexParameters != null ? cagraIndexParameters.getNumWriterThreads() : 1;
@@ -409,7 +432,7 @@ public class CagraIndexImpl implements CagraIndex {
   /**
    * Allocates the configured index parameters in the MemorySegment.
    */
-  private MemorySegment segmentFromIndexParams(CagraIndexParams params) {
+  private static MemorySegment segmentFromIndexParams(CuVSResourcesImpl resources, CagraIndexParams params) {
     MemorySegment seg = cuvsCagraIndexParams.allocate(resources.getArena());
     cuvsCagraIndexParams.intermediate_graph_degree(seg, params.getIntermediateGraphDegree());
     cuvsCagraIndexParams.graph_degree(seg, params.getGraphDegree());
@@ -484,6 +507,80 @@ public class CagraIndexImpl implements CagraIndex {
   }
 
   /**
+   * Merges multiple CAGRA indexes into a single index.
+   *
+   * @param indexes Array of CAGRA indexes to merge
+   * @return A new merged CAGRA index
+   * @throws Throwable if an error occurs during the merge operation
+   */
+  public static CagraIndex merge(CagraIndex[] indexes) throws Throwable {
+    return merge(indexes, null);
+  }
+
+  /**
+   * Merges multiple CAGRA indexes into a single index with specified merge parameters.
+   *
+   * @param indexes Array of CAGRA indexes to merge
+   * @param mergeParams Parameters to control the merge operation, or null to use defaults
+   * @return A new merged CAGRA index
+   * @throws Throwable if an error occurs during the merge operation
+   */
+  public static CagraIndex merge(CagraIndex[] indexes, CagraMergeParams mergeParams) throws Throwable {
+    CuVSResourcesImpl resources = (CuVSResourcesImpl) indexes[0].getCuVSResources();
+    IndexReference mergedIndexReference = new IndexReference(resources);
+
+    try (var arena = Arena.ofConfined()) {
+      MemorySegment indexesSegment = arena.allocate(indexes.length * ADDRESS.byteSize());
+      for (int i = 0; i < indexes.length; i++) {
+        CagraIndexImpl indexImpl = (CagraIndexImpl) indexes[i];
+        indexesSegment.setAtIndex(ADDRESS, i, indexImpl.cagraIndexReference.getMemorySegment());
+      }
+
+      MemorySegment returnValue = arena.allocate(C_INT);
+
+      MemorySegment mergeParamsSegment = MemorySegment.NULL;
+      if (mergeParams != null) {
+        mergeParamsSegment = createMergeParamsSegment(mergeParams, resources);
+      }
+
+      mergeMethodHandle.invokeExact(
+        resources.getMemorySegment(),
+        indexesSegment,
+        mergedIndexReference.getMemorySegment(),
+        indexes.length,
+        returnValue,
+        mergeParamsSegment
+      );
+
+      checkError(returnValue.get(C_INT, 0L), "mergeMethodHandle");
+    }
+
+    return new CagraIndexImpl(mergedIndexReference, resources);
+  }
+
+  /**
+   * Creates a memory segment for merge parameters.
+   *
+   * @param mergeParams The merge parameters
+   * @param resources The CuVS resources
+   * @return A memory segment with the merge parameters
+   */
+  private static MemorySegment createMergeParamsSegment(CagraMergeParams mergeParams, CuVSResourcesImpl resources) {
+    MemorySegment seg = cuvsCagraMergeParams.allocate(resources.getArena());
+
+    if (mergeParams.getOutputIndexParams() != null) {
+      MemorySegment outputIndexParamsSeg = segmentFromIndexParams(resources, mergeParams.getOutputIndexParams());
+      cuvsCagraMergeParams.output_index_params(seg, outputIndexParamsSeg);
+    } else {
+      cuvsCagraMergeParams.output_index_params(seg, MemorySegment.NULL);
+    }
+
+    cuvsCagraMergeParams.strategy(seg, mergeParams.getStrategy().value);
+
+    return seg;
+  }
+
+  /**
    * Builder helps configure and create an instance of {@link CagraIndex}.
    */
   public static class Builder implements CagraIndex.Builder{
@@ -545,7 +642,7 @@ public class CagraIndexImpl implements CagraIndex {
   /**
    * Holds the memory reference to a CAGRA index.
    */
-  protected static class IndexReference {
+  public static class IndexReference {
 
     private final MemorySegment memorySegment;
 

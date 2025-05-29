@@ -21,6 +21,7 @@ import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
+import com.nvidia.cuvs.CagraMergeParams;
 import com.nvidia.cuvs.internal.BruteForceIndexImpl;
 import com.nvidia.cuvs.internal.CagraIndexImpl;
 import com.nvidia.cuvs.internal.CuVSResourcesImpl;
@@ -58,6 +59,22 @@ final class JDKProvider implements CuVSProvider {
   @Override
   public HnswIndex.Builder newHnswIndexBuilder(CuVSResources cuVSResources) {
     return HnswIndexImpl.newBuilder(Objects.requireNonNull(cuVSResources));
+  }
+
+  @Override
+  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) throws Throwable {
+    if (indexes == null || indexes.length == 0) {
+      throw new IllegalArgumentException("At least one index must be provided for merging");
+    }
+    return CagraIndexImpl.merge(indexes);
+  }
+
+  @Override
+  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraMergeParams mergeParams) throws Throwable {
+    if (indexes == null || indexes.length == 0) {
+      throw new IllegalArgumentException("At least one index must be provided for merging");
+    }
+    return CagraIndexImpl.merge(indexes, mergeParams);
   }
 
   @Override

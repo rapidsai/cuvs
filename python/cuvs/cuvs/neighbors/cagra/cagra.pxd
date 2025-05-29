@@ -30,7 +30,20 @@ from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
 from cuvs.distance_type cimport cuvsDistanceType
 from cuvs.neighbors.filters.filters cimport cuvsFilter
+from cuvs.neighbors.ivf_pq.ivf_pq cimport (
+    cuvsIvfPqIndexParams_t,
+    cuvsIvfPqSearchParams_t,
+)
 
+
+cdef extern from "library_types.h":
+    ctypedef enum cudaDataType_t:
+        CUDA_R_32F "CUDA_R_32F"  # float
+        CUDA_R_16F "CUDA_R_16F"  # half
+
+        # uint8 - used to refer to IVF-PQ's fp8 storage type
+        CUDA_R_8U "CUDA_R_8U"
+        CUDA_R_8I "CUDA_R_8I"
 
 cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
@@ -49,6 +62,12 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
     ctypedef cuvsCagraCompressionParams* cuvsCagraCompressionParams_t
 
+    ctypedef struct cuvsIvfPqParams:
+        cuvsIvfPqIndexParams_t ivf_pq_build_params
+        cuvsIvfPqSearchParams_t ivf_pq_search_params
+        float refinement_rate
+    ctypedef cuvsIvfPqParams* cuvsIvfPqParams_t
+
     ctypedef struct cuvsCagraIndexParams:
         cuvsDistanceType metric
         size_t intermediate_graph_degree
@@ -56,6 +75,7 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
         cuvsCagraGraphBuildAlgo build_algo
         size_t nn_descent_niter
         cuvsCagraCompressionParams_t compression
+        cuvsIvfPqParams_t graph_build_params
 
     ctypedef cuvsCagraIndexParams* cuvsCagraIndexParams_t
 
