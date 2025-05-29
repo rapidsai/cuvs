@@ -20,7 +20,7 @@ public class BruteForceExample {
   public static void main(String[] args) throws Throwable {
 
     // Sample data and query
-    float[][] dataset = {
+    float[][] vectors = {
         { 0.74021935f, 0.9209938f },
         { 0.03902049f, 0.9689629f },
         { 0.92514056f, 0.4463501f },
@@ -48,7 +48,7 @@ public class BruteForceExample {
 
       // Create the index with the dataset
       BruteForceIndex index = BruteForceIndex.newBuilder(resources)
-          .withDataset(dataset)
+          .withDataset(vectors)
           .withIndexParams(indexParams)
           .build();
 
