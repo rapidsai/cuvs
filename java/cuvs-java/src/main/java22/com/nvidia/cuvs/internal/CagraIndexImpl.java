@@ -145,6 +145,7 @@ public class CagraIndexImpl implements CagraIndex {
    * @param resources The resources instance
    */
   private CagraIndexImpl(IndexReference indexReference, CuVSResourcesImpl resources) {
+    this.vectors = null;
     this.cagraIndexParameters = null;
     this.cagraCompressionParams = null;
     this.dataset = null;
