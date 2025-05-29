@@ -15,13 +15,14 @@ rapids-generate-version > ./VERSION
 cd "${package_dir}"
 
 EXCLUDE_ARGS=(
-  --exclude "libraft.so"
   --exclude "libcublas.so.*"
   --exclude "libcublasLt.so.*"
   --exclude "libcurand.so.*"
   --exclude "libcusolver.so.*"
   --exclude "libcusparse.so.*"
+  --exclude "libnccl.so.*"
   --exclude "libnvJitLink.so.*"
+  --exclude "libraft.so"
   --exclude "librapids_logger.so"
   --exclude "librmm.so"
 )
@@ -33,13 +34,8 @@ if [[ "${package_dir}" != "python/libcuvs" ]]; then
     )
 fi
 
-RAPIDS_CUDA_MAJOR="${RAPIDS_CUDA_VERSION%%.*}"
-if [[ ${RAPIDS_CUDA_MAJOR} != "11" ]]; then
-    EXCLUDE_ARGS+=(
-      --exclude "libnccl.so.*"
-    )
-    export SKBUILD_CMAKE_ARGS="-DUSE_NCCL_RUNTIME_WHEEL=ON"
-fi
+SKBUILD_CMAKE_ARGS="-DUSE_NCCL_RUNTIME_WHEEL=ON"
+export SKBUILD_CMAKE_ARGS
 
 rapids-logger "Building '${package_name}' wheel"
 
