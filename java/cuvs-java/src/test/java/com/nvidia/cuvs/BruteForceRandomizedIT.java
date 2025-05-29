@@ -16,8 +16,9 @@
 
 package com.nvidia.cuvs;
 
+import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
+
 import java.lang.invoke.MethodHandles;
-import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
 
@@ -28,8 +29,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
-
-import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 
 @RunWith(RandomizedRunner.class)
 public class BruteForceRandomizedIT extends CuVSTestCase {
@@ -45,12 +44,15 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
 
   @Test
   public void testResultsTopKWithRandomValues() throws Throwable {
-    for (int i = 0; i < 10; i++) {
-      tmpResultsTopKWithRandomValues();
+	boolean useNativeMemoryDatasets[] = {true, false};
+	for (int i = 0; i < 10; i++) {
+      for (boolean use: useNativeMemoryDatasets) {
+        tmpResultsTopKWithRandomValues(use);
+      }
     }
   }
 
-  private void tmpResultsTopKWithRandomValues() throws Throwable {
+  private void tmpResultsTopKWithRandomValues(boolean useNativeMemoryDataset) throws Throwable {
     int DATASET_SIZE_LIMIT = 10_000;
     int DIMENSIONS_LIMIT = 2048;
     int NUM_QUERIES_LIMIT = 10;
@@ -77,7 +79,7 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
     }
 
     // Generate a random dataset
-    float[][] dataset = generateData(random, datasetSize, dimensions);
+    float[][] vectors = generateData(random, datasetSize, dimensions);
 
     // Generate random query vectors
     float[][] queries = generateData(random, numQueries, dimensions);
@@ -85,11 +87,12 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
     log.info("Dataset size: {}x{}", datasetSize, dimensions);
     log.info("Query size: {}x{}", numQueries, dimensions);
     log.info("TopK: {}", topK);
+    log.info("Use native memory dataset? " + useNativeMemoryDataset);
 
     // Debugging: Log dataset and queries
     if (log.isDebugEnabled()) {
       log.debug("Dataset:");
-      for (float[] row : dataset) {
+      for (float[] row : vectors) {
         log.debug(java.util.Arrays.toString(row));
       }
       log.debug("Queries:");
@@ -98,13 +101,13 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
       }
     }
     // Sanity checks
-    assert dataset.length > 0 : "Dataset is empty.";
+    assert vectors.length > 0 : "Dataset is empty.";
     assert queries.length > 0 : "Queries are empty.";
     assert dimensions > 0 : "Invalid dimensions.";
     assert topK > 0 && topK <= datasetSize : "Invalid topK value.";
 
     // Generate expected results using brute force
-    List<List<Integer>> expected = generateExpectedResults(topK, dataset, queries, prefilters, log);
+    List<List<Integer>> expected = generateExpectedResults(topK, vectors, queries, prefilters, log);
 
     // Create CuVS index and query
     try (CuVSResources resources = CuVSResources.create()) {
@@ -112,17 +115,27 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
       BruteForceQuery query = new BruteForceQuery.Builder()
           .withTopK(topK)
           .withQueryVectors(queries)
-          .withPrefilters(prefilters, dataset.length)
+          .withPrefilter(prefilters, vectors.length)
           .build();
 
       BruteForceIndexParams indexParams = new BruteForceIndexParams.Builder()
           .withNumWriterThreads(32)
           .build();
 
-      BruteForceIndex index = BruteForceIndex.newBuilder(resources)
-          .withDataset(dataset)
-          .withIndexParams(indexParams)
-          .build();
+      BruteForceIndex index;
+      if (useNativeMemoryDataset) {
+        Dataset dataset = Dataset.create(vectors.length, vectors[0].length);
+        for (float[] v: vectors) dataset.addVector(v);
+        index = BruteForceIndex.newBuilder(resources)
+                .withDataset(dataset)
+                .withIndexParams(indexParams)
+                .build();
+      } else {
+        index = BruteForceIndex.newBuilder(resources)
+                .withDataset(vectors)
+                .withIndexParams(indexParams)
+                .build();
+      }
 
       log.info("Index built successfully. Executing search...");
       SearchResults results = index.search(query);
