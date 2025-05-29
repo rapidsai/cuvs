@@ -155,7 +155,7 @@ public class BruteForceQuery {
      *        many bits as there are vectors in the index
      * @return an instance of this Builder
      */
-    public Builder withPrefilter(BitSet[] prefilters, int numDocs) {
+    public Builder withPrefilters(BitSet[] prefilters, int numDocs) {
       this.prefilters = prefilters;
       this.numDocs = numDocs;
       return this;
