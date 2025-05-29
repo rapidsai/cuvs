@@ -112,7 +112,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
     assert topK > 0 && topK <= datasetSize : "Invalid topK value.";
 
     // Generate expected results using brute force
-    List<List<Integer>> expected = generateExpectedResults(topK, vectors, queries, null, log);
+    List<List<Integer>> expected = generateExpectedResults(topK, vectors, queries, prefilters, log);
 
     // Create CuVS index and query
     try (CuVSResources resources = CuVSResources.create()) {
