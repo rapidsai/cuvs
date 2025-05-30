@@ -117,10 +117,7 @@ outputs:
         - libcusparse
       ignore_run_exports:
         from_package:
-          - ${{ compiler("c") }}
-          - ${{ compiler("cxx") }}
           - ${{ compiler("cuda") }}
-          - ${{ stdlib("c") }}
         by_name:
           - cuda-cudart
           - cuda-version
@@ -177,10 +174,7 @@ outputs:
         - libcusparse
       ignore_run_exports:
         from_package:
-          - ${{ compiler("c") }}
-          - ${{ compiler("cxx") }}
           - ${{ compiler("cuda") }}
-          - ${{ stdlib("c") }}
         by_name:
           - cuda-cudart
           - cuda-version
@@ -268,10 +262,7 @@ outputs:
         - libcusparse
       ignore_run_exports:
         from_package:
-          - ${{ compiler("c") }}
-          - ${{ compiler("cxx") }}
           - ${{ compiler("cuda") }}
-          - ${{ stdlib("c") }}
         by_name:
           - cuda-cudart
           - cuda-version
@@ -344,10 +335,7 @@ outputs:
           then: mkl =2023
       ignore_run_exports:
         from_package:
-          - ${{ compiler("c") }}
-          - ${{ compiler("cxx") }}
           - ${{ compiler("cuda") }}
-          - ${{ stdlib("c") }}
         by_name:
           - cuda-cudart
           - cuda-version
