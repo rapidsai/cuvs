@@ -32,7 +32,7 @@ from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
 
-from cuvs.distance import DISTANCE_TYPES
+from cuvs.distance import DISTANCE_NAMES, DISTANCE_TYPES
 from cuvs.neighbors.common import _check_input_array
 
 from libc.stdint cimport (
@@ -143,7 +143,6 @@ cdef class IndexParams:
                  conservative_memory_allocation=False,
                  max_train_points_per_pq_code=256):
         self.params.n_lists = n_lists
-        self._metric = metric
         self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
         self.params.metric_arg = metric_arg
         self.params.kmeans_n_iters = kmeans_n_iters
@@ -163,9 +162,12 @@ cdef class IndexParams:
         self.params.max_train_points_per_pq_code = \
             max_train_points_per_pq_code
 
+    def get_handle(self):
+        return <size_t> self.params
+
     @property
     def metric(self):
-        return self._metric
+        return DISTANCE_NAMES[self.params.metric]
 
     @property
     def metric_arg(self):
@@ -215,6 +217,9 @@ cdef class IndexParams:
     def max_train_points_per_pq_code(self):
         return self.params.max_train_points_per_pq_code
 
+    def get_handle(self):
+        return <size_t>self.params
+
 cdef class Index:
     """
     IvfPq index object. This object stores the trained IvfPq index state
@@ -244,9 +249,9 @@ cdef class Index:
         return cuvsIvfPqIndexGetNLists(self.index)
 
     @property
-    def dim_ext(self):
+    def dim(self):
         """ dimensionality of the cluster centers """
-        return cuvsIvfPqIndexGetDimExt(self.index)
+        return cuvsIvfPqIndexGetDim(self.index)
 
     @property
     def centers(self):
@@ -261,7 +266,7 @@ cdef class Index:
 
         cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
-        output = np.empty((self.n_lists, self.dim_ext), dtype='float32')
+        output = np.empty((self.n_lists, self.dim), dtype='float32')
         ai = wrap_array(output)
         cdef cydlpack.DLManagedTensor* output_dlpack = cydlpack.dlpack_c(ai)
         check_cuvs(cuvsIvfPqIndexGetCenters(res, self.index, output_dlpack))
@@ -339,7 +344,8 @@ cdef _map_dtype_np_to_cuda(dtype, supported_dtypes=None):
         raise TypeError("Type %s is not supported" % str(dtype))
     return {np.float32: cudaDataType_t.CUDA_R_32F,
             np.float16: cudaDataType_t.CUDA_R_16F,
-            np.uint8: cudaDataType_t.CUDA_R_8U}[dtype]
+            np.uint8: cudaDataType_t.CUDA_R_8U,
+            np.int8: cudaDataType_t.CUDA_R_8I}[dtype]
 
 
 cdef class SearchParams:
@@ -360,6 +366,16 @@ cdef class SearchParams:
     internal_distance_dtype: default = np.float32
         Storage data type for distance/similarity computation.
         Possible values [np.float32, np.float16]
+    coarse_search_dtype: default = np.float32
+        [Experimental] The data type to use as the GEMM element type when
+        searching the clusters to probe.
+        Possible values: [np.float32, np.float16, np.int8].
+        - Legacy default: np.float32
+        - Recommended for performance: np.float16 (half)
+        - Experimental/low-precision: np.int8
+    max_internal_batch_size: default = 4096
+        Set the internal batch size to improve GPU utilization at the cost
+        of larger memory footprint.
     """
 
     cdef cuvsIvfPqSearchParams* params
@@ -371,15 +387,19 @@ cdef class SearchParams:
         check_cuvs(cuvsIvfPqSearchParamsDestroy(self.params))
 
     def __init__(self, *, n_probes=20, lut_dtype=np.float32,
-                 internal_distance_dtype=np.float32):
+                 internal_distance_dtype=np.float32,
+                 coarse_search_dtype=np.float32,
+                 max_internal_batch_size=4096):
         self.params.n_probes = n_probes
         self.params.lut_dtype = _map_dtype_np_to_cuda(lut_dtype)
         self.params.internal_distance_dtype = \
             _map_dtype_np_to_cuda(internal_distance_dtype)
+        self.params.coarse_search_dtype = \
+            _map_dtype_np_to_cuda(coarse_search_dtype)
+        self.params.max_internal_batch_size = max_internal_batch_size
 
-    @property
-    def n_probes(self):
-        return self.params.n_probes
+    def get_handle(self):
+        return <size_t> self.params
 
     @property
     def n_probes(self):
@@ -392,6 +412,17 @@ cdef class SearchParams:
     @property
     def internal_distance_dtype(self):
         return self.params.internal_distance_dtype
+
+    @property
+    def coarse_search_dtype(self):
+        return self.params.coarse_search_dtype
+
+    @property
+    def max_internal_batch_size(self):
+        return self.params.max_internal_batch_size
+
+    def get_handle(self):
+        return <size_t>self.params
 
 
 @auto_sync_resources
