@@ -116,8 +116,6 @@ outputs:
         - libcusolver
         - libcusparse
       ignore_run_exports:
-        from_package:
-          - ${{ compiler("cuda") }}
         by_name:
           - cuda-cudart
           - cuda-version
@@ -173,8 +171,6 @@ outputs:
         - libcusolver
         - libcusparse
       ignore_run_exports:
-        from_package:
-          - ${{ compiler("cuda") }}
         by_name:
           - cuda-cudart
           - cuda-version
@@ -261,8 +257,6 @@ outputs:
         - libcusolver
         - libcusparse
       ignore_run_exports:
-        from_package:
-          - ${{ compiler("cuda") }}
         by_name:
           - cuda-cudart
           - cuda-version
@@ -334,8 +328,6 @@ outputs:
         - if: linux64
           then: mkl =2023
       ignore_run_exports:
-        from_package:
-          - ${{ compiler("cuda") }}
         by_name:
           - cuda-cudart
           - cuda-version

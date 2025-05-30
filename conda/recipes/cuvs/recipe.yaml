@@ -69,8 +69,6 @@ requirements:
     - cuda-python >=12.6.2,<13.0a0
     - cuda-cudart
   ignore_run_exports:
-    from_package:
-      - ${{ compiler("cuda") }}
     by_name:
       - cuda-version
       - cuda-cudart
