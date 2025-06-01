@@ -39,4 +39,38 @@ void single_linkage(raft::resources const& handle,
       handle, X, dendrogram, labels, metric, n_clusters, c);
   }
 }
+
+namespace helpers {
+void build_linkage(raft::resources const& handle,
+                   raft::device_matrix_view<const float, int, raft::row_major> X,
+                   cuvs::distance::DistanceType metric,
+                   raft::device_coo_matrix_view<float, int, int, int> out_mst,
+                   raft::device_matrix_view<int, int> dendrogram,
+                   raft::device_vector_view<float, int> out_distances,
+                   raft::device_vector_view<int, int> out_sizes,
+                   std::optional<raft::device_vector_view<float, int>> core_dists)
+{
+  /**
+   * Construct MST sorted by weights
+   */
+  if (core_dists.has_value()) {
+    RAFT_EXPECTS(core_dists.extent(0) == static_cast<size_t>(X.extent(0)),
+                 "core_dists doesn't have expected size");
+    RAFT_EXPECTS(indptr.extent(0) == static_cast<size_t>(X.extent(0) + 1),
+                 "indptr doesn't have expected size");
+    detail::build_mr_linkage<float, int, int>(handle,
+                                              X,
+                                              metric,
+                                              min_samples,
+                                              core_dists.value(),
+                                              out_mst,
+                                              dendrogram,
+                                              out_distances,
+                                              out_sizes)
+  } else {
+    detail::build_pw_linkage<float, int, int>(
+      handle, X, metric, c, out_mst, dendrogram, out_distances, out_sizes);
+  }
+}
+}  // namespace helpers
 }  // namespace cuvs::cluster::agglomerative
