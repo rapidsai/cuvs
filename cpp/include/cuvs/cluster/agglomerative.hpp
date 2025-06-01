@@ -121,8 +121,8 @@ void single_linkage(
 
 namespace helpers {
 /**
- * Given a mutual reachability graph, connects graph components and build dendrogram.
- * Returns mst edges sorted by weight and the linkage.
+ * Given a dataset, builds the KNN graph, connects graph components and builds a linkage (dendrogram).
+ * Returns the Minimum Spanning Tree edges sorted by weight and the dendrogram.
  * @param[in] handle raft handle for resource reuse
  * @param[in] X data points (size m * n)
  * @param[in] metric distance metric to use
@@ -130,7 +130,7 @@ namespace helpers {
  * @param[out] dendrogram output dendrogram (size [n_rows - 1] * 2)
  * @param[out] out_distances distances for output
  * @param[out] out_sizes cluster sizes of output
- * @param[in] core_dists (optional) core distances (size m). If supplied, the constructed graph will
+ * @param[out] core_dists (optional) core distances (size m). If supplied, the constructed graph will
  * be in mutual reachability space and the core distances will be populated
  */
 void build_linkage(raft::resources const& handle,
