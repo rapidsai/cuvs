@@ -51,6 +51,11 @@ struct hnsw_dist_t<float> {
 };
 
 template <>
+struct hnsw_dist_t<half> {
+  using type = float;
+};
+
+template <>
 struct hnsw_dist_t<uint8_t> {
   using type = int;
 };
@@ -74,14 +79,12 @@ struct index_impl : index<T> {
   index_impl(int dim, cuvs::distance::DistanceType metric, HnswHierarchy hierarchy)
     : index<T>{dim, metric, hierarchy}
   {
-    if constexpr (std::is_same_v<T, float>) {
-      if (metric == cuvs::distance::DistanceType::L2Expanded) {
-        space_ = std::make_unique<hnswlib::L2Space>(dim);
-      } else if (metric == cuvs::distance::DistanceType::InnerProduct) {
-        space_ = std::make_unique<hnswlib::InnerProductSpace>(dim);
-      }
-    } else if constexpr (std::is_same_v<T, std::int8_t> or std::is_same_v<T, std::uint8_t>) {
-      if (metric == cuvs::distance::DistanceType::L2Expanded) {
+    if (metric == cuvs::distance::DistanceType::InnerProduct) {
+      space_ = std::make_unique<hnswlib::InnerProductSpace<T, typename hnsw_dist_t<T>::type>>(dim);
+    } else if (metric == cuvs::distance::DistanceType::L2Expanded) {
+      if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+        space_ = std::make_unique<hnswlib::L2Space<T, typename hnsw_dist_t<T>::type>>(dim);
+      } else if constexpr (std::is_same_v<T, std::int8_t> or std::is_same_v<T, std::uint8_t>) {
         space_ = std::make_unique<hnswlib::L2SpaceI<T>>(dim);
       }
     }
@@ -441,7 +444,7 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
       auto pt_id = order[i];
       std::copy(appr_algo->getDataByInternalId(pt_id),
                 appr_algo->getDataByInternalId(pt_id) + dim,
-                &host_query_set(i - start_idx, 0));
+                reinterpret_cast<char*>(&host_query_set(i - start_idx, 0)));
     }
 
     // find neighbors of the query set

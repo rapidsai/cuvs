@@ -3,8 +3,6 @@
 
 set -euo pipefail
 
-rapids-configure-conda-channels
-
 source rapids-configure-sccache
 
 source rapids-date-string
@@ -53,8 +51,8 @@ rattler-build build --recipe conda/recipes/cuvs-bench \
 sccache --show-adv-stats
 sccache --zero-stats
 
-# Build cuvs-bench-cpu only in CUDA 12 jobs since it only depends on python
-# version
+# Build cuvs-bench-cpu only in one CUDA major version since it only depends on
+# python version
 RAPIDS_CUDA_MAJOR="${RAPIDS_CUDA_VERSION%%.*}"
 if [[ ${RAPIDS_CUDA_MAJOR} == "12" ]]; then
   rattler-build build --recipe conda/recipes/cuvs-bench-cpu \
@@ -62,5 +60,3 @@ if [[ ${RAPIDS_CUDA_MAJOR} == "12" ]]; then
                       "${RATTLER_CHANNELS[@]}"
   sccache --show-adv-stats
 fi
-
-rapids-upload-conda-to-s3 python

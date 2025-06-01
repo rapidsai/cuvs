@@ -1023,15 +1023,15 @@ void launch_kernel(Lambda lambda,
   RAFT_EXPECTS(Veclen == index.veclen(),
                "Configured Veclen does not match the index interleaving pattern.");
   constexpr auto kKernel   = interleaved_scan_kernel<Capacity,
-                                                   Veclen,
-                                                   Ascending,
-                                                   ComputeNorm,
-                                                   T,
-                                                   AccT,
-                                                   IdxT,
-                                                   IvfSampleFilterT,
-                                                   Lambda,
-                                                   PostLambda>;
+                                                     Veclen,
+                                                     Ascending,
+                                                     ComputeNorm,
+                                                     T,
+                                                     AccT,
+                                                     IdxT,
+                                                     IvfSampleFilterT,
+                                                     Lambda,
+                                                     PostLambda>;
   const int max_query_smem = 16384;
   int query_smem_elems     = std::min<int>(max_query_smem / sizeof(T),
                                        raft::Pow2<Veclen * raft::WarpSize>::roundUp(index.dim()));

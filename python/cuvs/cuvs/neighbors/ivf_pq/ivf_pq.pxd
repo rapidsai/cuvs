@@ -30,6 +30,7 @@ cdef extern from "library_types.h":
 
         # uint8 - used to refer to IVF-PQ's fp8 storage type
         CUDA_R_8U "CUDA_R_8U"
+        CUDA_R_8I "CUDA_R_8I"
 
 
 cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
@@ -59,6 +60,8 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
         cudaDataType_t lut_dtype
         cudaDataType_t internal_distance_dtype
         double preferred_shmem_carveout
+        cudaDataType_t coarse_search_dtype
+        uint32_t max_internal_batch_size
 
     ctypedef cuvsIvfPqSearchParams* cuvsIvfPqSearchParams_t
 
@@ -81,25 +84,33 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
 
     cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index)
 
+    uint32_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index)
+
+    uint32_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index)
+
+    cuvsError_t cuvsIvfPqIndexGetCenters(cuvsResources_t res,
+                                         cuvsIvfPqIndex_t index,
+                                         DLManagedTensor * centers)
+
     cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
                                cuvsIvfPqIndexParams* params,
                                DLManagedTensor* dataset,
-                               cuvsIvfPqIndex_t index) except +
+                               cuvsIvfPqIndex_t index)
 
     cuvsError_t cuvsIvfPqSearch(cuvsResources_t res,
                                 cuvsIvfPqSearchParams* params,
                                 cuvsIvfPqIndex_t index,
                                 DLManagedTensor* queries,
                                 DLManagedTensor* neighbors,
-                                DLManagedTensor* distances) except +
+                                DLManagedTensor* distances)
 
     cuvsError_t cuvsIvfPqSerialize(cuvsResources_t res,
                                    const char * filename,
-                                   cuvsIvfPqIndex_t index) except +
+                                   cuvsIvfPqIndex_t index)
 
     cuvsError_t cuvsIvfPqDeserialize(cuvsResources_t res,
                                      const char * filename,
-                                     cuvsIvfPqIndex_t index) except +
+                                     cuvsIvfPqIndex_t index)
 
     cuvsError_t cuvsIvfPqExtend(cuvsResources_t res,
                                 DLManagedTensor* new_vectors,

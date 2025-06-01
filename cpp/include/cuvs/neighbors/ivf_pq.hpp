@@ -132,7 +132,7 @@ struct index_params : cuvs::neighbors::index_params {
    *   // create index_params for a [N. D] dataset and have InnerProduct as the distance metric
    *   auto dataset = raft::make_device_matrix<float, int64_t>(res, N, D);
    *   ivf_pq::index_params index_params =
-   *     ivf_pq::index_params::from_dataset(dataset.extents(), raft::distance::InnerProduct);
+   *     ivf_pq::index_params::from_dataset(dataset.extents(), cuvs::distance::InnerProduct);
    *   // modify/update index_params as needed
    *   index_params.add_data_on_build = true;
    * @endcode
@@ -2861,6 +2861,10 @@ void extract_centers(raft::resources const& res,
                      const index<int64_t>& index,
                      raft::device_matrix_view<float, uint32_t, raft::row_major> cluster_centers);
 
+/** @copydoc extract_centers */
+void extract_centers(raft::resources const& res,
+                     const index<int64_t>& index,
+                     raft::host_matrix_view<float, uint32_t, raft::row_major> cluster_centers);
 /**
  * @brief Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
  * modified externally.
