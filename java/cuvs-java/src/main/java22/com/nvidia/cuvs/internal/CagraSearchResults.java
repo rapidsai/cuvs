@@ -49,7 +49,9 @@ public class CagraSearchResults extends SearchResultsImpl {
     for (long i = 0; i < topK * numberOfQueries; i++) {
       int id = (int) neighboursVarHandle.get(neighboursMemorySegment, 0L, i);
       float dst = (float) distancesVarHandle.get(distancesMemorySegment, 0L, i);
-      intermediateResultMap.put(mapping != null ? mapping.get(id) : id, dst);
+      if (id != Integer.MAX_VALUE) {
+        intermediateResultMap.put(mapping != null ? mapping.get(id) : id, dst);
+      }
       count += 1;
       if (count == topK) {
         results.add(intermediateResultMap);
