@@ -18,13 +18,13 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
+#include <cuvs/neighbors/knn_merge_parts.hpp>
 #include <cuvs/selection/select_k.hpp>
 
 #include "../../distance/detail/distance_ops/l2_exp.cuh"
 #include "./faiss_distance_utils.h"
 #include "./fused_l2_knn.cuh"
 #include "./haversine_distance.cuh"
-#include "./knn_merge_parts.cuh"
 #include "./knn_utils.cuh"
 
 #include <raft/core/bitmap.cuh>
@@ -265,7 +265,7 @@ void tiled_brute_force_knn(const raft::resources& handle,
                            IndexType col      = j + (idx % current_centroid_size);
                            IndexType g_idx    = row * n_cols + col;
                            IndexType item_idx = (g_idx) >> 5;
-                           uint32_t bit_idx   = (g_idx)&31;
+                           uint32_t bit_idx   = (g_idx) & 31;
                            uint32_t filter    = filter_bits[item_idx];
                            if ((filter & (uint32_t(1) << bit_idx)) == 0) {
                              distances_ptr[idx] = masked_distance;
@@ -537,7 +537,13 @@ void brute_force_knn_impl(
   if (input.size() > 1 || translations != nullptr) {
     // This is necessary for proper index translations. If there are
     // no translations or partitions to combine, it can be skipped.
-    knn_merge_parts(out_D, out_I, res_D, res_I, n, input.size(), k, userStream, trans.data());
+    knn_merge_parts(
+      handle,
+      raft::make_device_matrix_view<const DistType, int64_t>(out_D, n, input.size() * k),
+      raft::make_device_matrix_view<const IdxType, int64_t>(out_I, n, input.size() * k),
+      raft::make_device_matrix_view<DistType, int64_t>(res_D, n, k),
+      raft::make_device_matrix_view<IdxType, int64_t>(res_I, n, k),
+      raft::make_device_vector_view<IdxType>(trans.data(), input.size()));
   }
 };
 
@@ -800,7 +806,7 @@ cuvs::neighbors::brute_force::index<T, DistT> build(
     auto dataset_storage = std::optional<device_matrix<T, int64_t, LayoutT>>{};
     auto dataset_view    = [&res, &dataset_storage, dataset]() {
       if constexpr (std::is_same_v<decltype(dataset),
-                                   raft::device_matrix_view<const T, int64_t, row_major>>) {
+                                      raft::device_matrix_view<const T, int64_t, row_major>>) {
         return dataset;
       } else {
         dataset_storage =
