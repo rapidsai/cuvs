@@ -97,6 +97,10 @@ void build(const raft::resources& clique,
            const cuvs::neighbors::index_params* index_params,
            raft::host_matrix_view<const T, int64_t, row_major> index_dataset)
 {
+  // Making sure that the NCCL comms are instantiated at this stage.
+  // This prevents it being done inside of an OpenMP thread.
+  raft::resource::get_nccl_comms(clique);
+
   if (index.mode_ == REPLICATED) {
     int64_t n_rows = index_dataset.extent(0);
     RAFT_LOG_DEBUG("REPLICATED BUILD: %d*%drows", index.num_ranks_, n_rows);
