@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+#include "./detail/nn_descent_gnnd.hpp"
 #include "nn_descent.cuh"
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 
 namespace cuvs::neighbors::nn_descent {
@@ -54,7 +56,29 @@ namespace cuvs::neighbors::nn_descent {
       return idx;                                                                             \
     }                                                                                         \
   };                                                                                          \
-  template class detail::GNND<const T, int>;
+  template class detail::GNND<const T, int>;                                                  \
+  template void                                                                               \
+  detail::GNND<const T, int>::build<cuvs::neighbors::ReachabilityPostProcess<int, T>>(        \
+    const T* data,                                                                            \
+    const int nrow,                                                                           \
+    int* output_graph,                                                                        \
+    bool return_distances,                                                                    \
+    float* output_distances,                                                                  \
+    cuvs::neighbors::ReachabilityPostProcess<int, T> dist_epilogue);                          \
+                                                                                              \
+  template void                                                                               \
+  detail::GNND<const T, int>::local_join<cuvs::neighbors::ReachabilityPostProcess<int, T>>(   \
+    cudaStream_t stream, cuvs::neighbors::ReachabilityPostProcess<int, T> dist_epilogue);     \
+  template void detail::GNND<const T, int>::build<raft::identity_op>(                         \
+    const T* data,                                                                            \
+    const int nrow,                                                                           \
+    int* output_graph,                                                                        \
+    bool return_distances,                                                                    \
+    float* output_distances,                                                                  \
+    raft::identity_op dist_epilogue);                                                         \
+                                                                                              \
+  template void detail::GNND<const T, int>::local_join<raft::identity_op>(                    \
+    cudaStream_t stream, raft::identity_op dist_epilogue);
 
 CUVS_INST_NN_DESCENT_BUILD(float, uint32_t);
 

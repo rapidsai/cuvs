@@ -17,6 +17,8 @@
 #pragma once
 #include "./knn_brute_force.cuh"
 
+#include <cuvs/neighbors/common.hpp>
+
 #include <raft/linalg/unary_op.cuh>
 #include <raft/sparse/convert/csr.cuh>
 #include <raft/sparse/linalg/symmetrize.cuh>
@@ -33,6 +35,7 @@
 
 namespace cuvs::neighbors::detail::reachability {
 
+using namespace cuvs::neighbors;
 /**
  * Extract core distances from KNN graph. This is essentially
  * performing a knn_dists[:,min_pts]
@@ -120,18 +123,6 @@ void _compute_core_dists(const raft::resources& handle,
   // Slice core distances (distances to kth nearest neighbor)
   core_distances<value_idx>(dists.data(), min_samples, min_samples, m, core_dists, stream);
 }
-
-//  Functor to post-process distances into reachability space
-template <typename value_idx, typename value_t>
-struct ReachabilityPostProcess {
-  DI value_t operator()(value_t value, value_idx row, value_idx col) const
-  {
-    return max(core_dists[col], max(core_dists[row], alpha * value));
-  }
-
-  const value_t* core_dists;
-  value_t alpha;
-};
 
 /**
  * Given core distances, Fuses computations of L2 distances between all

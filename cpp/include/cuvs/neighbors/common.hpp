@@ -41,6 +41,18 @@
 
 namespace cuvs::neighbors {
 
+//  Functor to post-process distances into reachability space
+template <typename value_idx, typename value_t>
+struct ReachabilityPostProcess {
+  RAFT_DEVICE_INLINE_FUNCTION value_t operator()(value_t value, value_idx row, value_idx col) const
+  {
+    return max(core_dists[col], max(core_dists[row], alpha * value));
+  }
+
+  const value_t* core_dists;
+  value_t alpha;
+};
+
 /** Parameters for VPQ compression. */
 struct vpq_params {
   /**

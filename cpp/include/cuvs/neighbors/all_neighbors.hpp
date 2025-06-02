@@ -143,7 +143,8 @@ void build(
   const all_neighbors_params& params,
   raft::host_matrix_view<const float, int64_t, row_major> dataset,
   raft::device_matrix_view<int64_t, int64_t, row_major> indices,
-  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances = std::nullopt);
+  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances      = std::nullopt,
+  std::optional<raft::device_vector_view<float, int64_t, row_major>> core_distances = std::nullopt);
 
 /**
  * @brief Builds an approximate all-neighbors knn graph (find nearest neighbors for all the training
@@ -173,7 +174,8 @@ void build(
   const all_neighbors_params& params,
   raft::device_matrix_view<const float, int64_t, row_major> dataset,
   raft::device_matrix_view<int64_t, int64_t, row_major> indices,
-  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances = std::nullopt);
+  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances      = std::nullopt,
+  std::optional<raft::device_vector_view<float, int64_t, row_major>> core_distances = std::nullopt);
 
 /** @} */
 }  // namespace cuvs::neighbors::all_neighbors

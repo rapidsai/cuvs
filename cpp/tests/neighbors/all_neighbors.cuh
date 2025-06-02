@@ -15,6 +15,8 @@
  */
 #pragma once
 
+#include "../../src/neighbors/detail/knn_brute_force.cuh"
+#include "../../src/neighbors/detail/reachability.cuh"
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
 #include "naive_knn.cuh"
@@ -51,6 +53,7 @@ struct AllNeighborsInputs {
   int dim;
   int k;
   bool data_on_host;
+  bool mutual_reach;
 };
 
 inline ::std::ostream& operator<<(::std::ostream& os, const AllNeighborsInputs& p)
@@ -146,6 +149,118 @@ void get_graphs(raft::resources& handle,
 }
 
 template <typename DistanceT, typename DataT, typename IdxT = int64_t>
+void get_mutual_reachability_graphs(raft::resources& handle,
+                                    rmm::device_uvector<DataT>& database,
+                                    std::vector<IdxT>& indices_bf,
+                                    std::vector<DistanceT>& distances_bf,
+                                    std::vector<IdxT>& indices_allNN,
+                                    std::vector<DistanceT>& distances_allNN,
+                                    AllNeighborsInputs& ps,
+                                    size_t queries_size)
+{
+  all_neighbors_params params;
+  params.n_clusters     = std::get<0>(ps.cluster_nearestcluster);
+  params.overlap_factor = std::get<1>(ps.cluster_nearestcluster);
+  params.metric         = std::get<1>(ps.build_algo_metric_recall);
+
+  auto build_algo = std::get<0>(ps.build_algo_metric_recall);
+
+  if (build_algo == NN_DESCENT) {
+    auto nn_descent_params                      = graph_build_params::nn_descent_params{};
+    nn_descent_params.max_iterations            = 100;
+    nn_descent_params.graph_degree              = ps.k;
+    nn_descent_params.intermediate_graph_degree = ps.k * 2;
+    nn_descent_params.metric                    = params.metric;
+    params.graph_build_params                   = nn_descent_params;
+  }
+
+  auto metric      = std::get<1>(ps.build_algo_metric_recall);
+  auto cuda_stream = raft::resource::get_cuda_stream(handle);
+  {
+    rmm::device_uvector<DistanceT> distances_naive_dev(queries_size, cuda_stream);
+    rmm::device_uvector<IdxT> indices_naive_dev(queries_size, cuda_stream);
+    rmm::device_uvector<DistanceT> core_dists_dev(ps.n_rows, cuda_stream);
+
+    cuvs::neighbors::detail::tiled_brute_force_knn(handle,
+                                                   database.data(),
+                                                   database.data(),
+                                                   ps.n_rows,
+                                                   ps.n_rows,
+                                                   ps.dim,
+                                                   ps.k,
+                                                   distances_naive_dev.data(),
+                                                   indices_naive_dev.data(),
+                                                   metric);
+
+    cuvs::neighbors::detail::reachability::core_distances<IdxT, DistanceT>(
+      distances_naive_dev.data(),
+      ps.k,
+      ps.k,
+      ps.n_rows,
+      core_dists_dev.data(),
+      raft::resource::get_cuda_stream(handle));
+    auto epilogue = ReachabilityPostProcess<IdxT, DistanceT>{core_dists_dev.data(), 1.0};
+
+    cuvs::neighbors::detail::
+      tiled_brute_force_knn<DataT, IdxT, DistanceT, ReachabilityPostProcess<IdxT, DistanceT>>(
+        handle,
+        database.data(),
+        database.data(),
+        ps.n_rows,
+        ps.n_rows,
+        ps.dim,
+        ps.k,
+        distances_naive_dev.data(),
+        indices_naive_dev.data(),
+        metric,
+        2.0,
+        0,
+        0,
+        nullptr,
+        nullptr,
+        nullptr,
+        epilogue);
+
+    raft::update_host(indices_bf.data(), indices_naive_dev.data(), queries_size, cuda_stream);
+    raft::update_host(distances_bf.data(), distances_naive_dev.data(), queries_size, cuda_stream);
+
+    raft::resource::sync_stream(handle);
+  }
+
+  {
+    rmm::device_uvector<DistanceT> distances_allNN_dev(queries_size, cuda_stream);
+    rmm::device_uvector<IdxT> indices_allNN_dev(queries_size, cuda_stream);
+    rmm::device_uvector<DistanceT> allNN_core_dists_dev(ps.n_rows, cuda_stream);
+
+    if (ps.data_on_host) {
+      auto database_h = raft::make_host_matrix<DataT, IdxT>(ps.n_rows, ps.dim);
+      raft::copy(database_h.data_handle(), database.data(), ps.n_rows * ps.dim, cuda_stream);
+
+      all_neighbors::build(
+        handle,
+        params,
+        raft::make_const_mdspan(database_h.view()),
+        raft::make_device_matrix_view<IdxT>(indices_allNN_dev.data(), ps.n_rows, ps.k),
+        raft::make_device_matrix_view<DistanceT>(distances_allNN_dev.data(), ps.n_rows, ps.k),
+        raft::make_device_vector_view<DistanceT>(allNN_core_dists_dev.data(), ps.n_rows));
+
+    } else {
+      all_neighbors::build(
+        handle,
+        params,
+        raft::make_device_matrix_view<const DataT, IdxT>(database.data(), ps.n_rows, ps.dim),
+        raft::make_device_matrix_view<IdxT>(indices_allNN_dev.data(), ps.n_rows, ps.k),
+        raft::make_device_matrix_view<DistanceT>(distances_allNN_dev.data(), ps.n_rows, ps.k),
+        raft::make_device_vector_view<DistanceT>(allNN_core_dists_dev.data(), ps.n_rows));
+    }
+
+    raft::copy(indices_allNN.data(), indices_allNN_dev.data(), queries_size, cuda_stream);
+    raft::copy(distances_allNN.data(), distances_allNN_dev.data(), queries_size, cuda_stream);
+    raft::resource::sync_stream(handle);
+  }
+}
+
+template <typename DistanceT, typename DataT, typename IdxT = int64_t>
 class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
  public:
   AllNeighborsTest()
@@ -165,14 +280,25 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
     std::vector<DistanceT> distances_bf(queries_size);
     std::vector<IdxT> indices_bf(queries_size);
 
-    get_graphs(handle_,
-               database,
-               indices_bf,
-               distances_bf,
-               indices_allNN,
-               distances_allNN,
-               ps,
-               queries_size);
+    if (ps.mutual_reach) {
+      get_mutual_reachability_graphs(handle_,
+                                     database,
+                                     indices_bf,
+                                     distances_bf,
+                                     indices_allNN,
+                                     distances_allNN,
+                                     ps,
+                                     queries_size);
+    } else {
+      get_graphs(handle_,
+                 database,
+                 indices_bf,
+                 distances_bf,
+                 indices_allNN,
+                 distances_allNN,
+                 ps,
+                 queries_size);
+    }
 
     double min_recall = std::get<2>(ps.build_algo_metric_recall);
     EXPECT_TRUE(eval_recall(indices_bf, indices_allNN, ps.n_rows, ps.k, 0.01, min_recall, true));
@@ -212,7 +338,8 @@ const std::vector<AllNeighborsInputs> inputsSingle =
     {5000, 7151},                 // n_rows
     {64, 137},                    // dim
     {16, 23},                     // graph_degree
-    {false, true}                 // data on host
+    {false, true},                // data on host
+    {false}                       // mutual_reach
   );
 
 const std::vector<AllNeighborsInputs> inputsBatch =
@@ -230,7 +357,21 @@ const std::vector<AllNeighborsInputs> inputsBatch =
     {5000, 7151},  // n_rows
     {64, 137},     // dim
     {16, 23},      // graph_degree
-    {true}         // data on host
+    {true},        // data on host
+    {false}        // mutual_reach
+  );
+
+const std::vector<AllNeighborsInputs> mutualReachSingle =
+  raft::util::itertools::product<AllNeighborsInputs>(
+    {std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded, 0.9),
+     std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded, 0.9),
+     std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded, 0.9)},
+    {std::make_tuple(1lu, 2lu)},  // min_recall, n_clusters, overlap_factor
+    {5000, 7151},                 // n_rows
+    {64, 137},                    // dim
+    {16, 23},                     // graph_degree
+    {false, true},                // data on host
+    {true}                        // mutual_reach
   );
 
 }  // namespace cuvs::neighbors::all_neighbors

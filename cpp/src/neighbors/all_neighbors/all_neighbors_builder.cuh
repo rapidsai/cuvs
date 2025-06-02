@@ -300,7 +300,7 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
   std::optional<raft::host_matrix<T, IdxT>> refined_distances_h;
 };
 
-template <typename T, typename IdxT = int64_t>
+template <typename T, typename IdxT = int64_t, typename DistEpilogueT = raft::identity_op>
 struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> {
   all_neighbors_builder_nn_descent(
     raft::resources const& res,
@@ -310,10 +310,12 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
     size_t k,
     all_neighbors::graph_build_params::nn_descent_params& params,
     std::optional<raft::device_matrix_view<IdxT, IdxT, row_major>> indices = std::nullopt,
-    std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances  = std::nullopt)
+    std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances  = std::nullopt,
+    DistEpilogueT dist_epilogue                                            = DistEpilogueT{})
     : all_neighbors_builder<T, IdxT>(
         res, n_clusters, min_cluster_size, max_cluster_size, k, indices, distances),
-      nnd_params{params}
+      nnd_params{params},
+      dist_epilogue{dist_epilogue}
   {
   }
 
@@ -397,7 +399,8 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
         int_graph.value().data_handle(),
         this->distances_.has_value(),
         this->distances_.value_or(raft::make_device_matrix<T, IdxT>(this->res, 0, 0).view())
-          .data_handle());
+          .data_handle(),
+        dist_epilogue);
 
       auto tmp_indices = raft::make_host_matrix<IdxT, IdxT>(int_graph.value().extent(0), this->k);
 
@@ -439,9 +442,10 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
 
   std::optional<nn_descent::detail::GNND<const T, int>> nnd_builder;
   std::optional<raft::host_matrix<int, IdxT>> int_graph;
+  DistEpilogueT dist_epilogue;
 };
 
-template <typename T, typename IdxT>
+template <typename T, typename IdxT, typename DistEpilogueT = raft::identity_op>
 std::unique_ptr<all_neighbors_builder<T, IdxT>> get_knn_builder(
   const raft::resources& handle,
   const all_neighbors_params& params,
@@ -449,7 +453,8 @@ std::unique_ptr<all_neighbors_builder<T, IdxT>> get_knn_builder(
   size_t max_cluster_size,
   size_t k,
   std::optional<raft::device_matrix_view<IdxT, IdxT, row_major>> indices = std::nullopt,
-  std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances  = std::nullopt)
+  std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances  = std::nullopt,
+  DistEpilogueT dist_epilogue                                            = DistEpilogueT{})
 {
   if (std::holds_alternative<graph_build_params::nn_descent_params>(params.graph_build_params)) {
     auto nn_descent_params =
@@ -458,14 +463,16 @@ std::unique_ptr<all_neighbors_builder<T, IdxT>> get_knn_builder(
       RAFT_LOG_WARN("Setting nnd_params metric to metric given for batching algorithm");
       nn_descent_params.metric = params.metric;
     }
-    return std::make_unique<all_neighbors_builder_nn_descent<T, IdxT>>(handle,
-                                                                       params.n_clusters,
-                                                                       min_cluster_size,
-                                                                       max_cluster_size,
-                                                                       k,
-                                                                       nn_descent_params,
-                                                                       indices,
-                                                                       distances);
+    return std::make_unique<all_neighbors_builder_nn_descent<T, IdxT, DistEpilogueT>>(
+      handle,
+      params.n_clusters,
+      min_cluster_size,
+      max_cluster_size,
+      k,
+      nn_descent_params,
+      indices,
+      distances,
+      dist_epilogue);
   } else if (std::holds_alternative<graph_build_params::ivf_pq_params>(params.graph_build_params)) {
     auto ivf_pq_params = std::get<graph_build_params::ivf_pq_params>(params.graph_build_params);
     if (ivf_pq_params.build_params.metric != params.metric) {
