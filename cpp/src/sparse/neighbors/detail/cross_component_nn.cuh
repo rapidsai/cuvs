@@ -113,10 +113,10 @@ struct MutualReachabilityFixConnectivitiesRedOp {
   value_t* core_dists;
   value_idx m;
 
-  DI MutualReachabilityFixConnectivitiesRedOp() : m(0) {}
+  DI MutualReachabilityFixConnectivitiesRedOp() : m(0), core_dists(nullptr) {}
 
-  MutualReachabilityFixConnectivitiesRedOp(value_t* core_dists_, value_idx m_)
-    : core_dists(core_dists_), m(m_) {};
+  MutualReachabilityFixConnectivitiesRedOp(value_t* core_dists, value_idx m)
+    : core_dists(core_dists), m(m) {};
 
   typedef typename raft::KeyValuePair<value_idx, value_t> KVP;
   DI void operator()(value_idx rit, KVP* out, const KVP& other) const

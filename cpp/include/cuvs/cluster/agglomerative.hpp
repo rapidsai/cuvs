@@ -18,7 +18,9 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <optional>
+#include <variant>
 
+#include <raft/core/device_coo_matrix.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
@@ -120,27 +122,46 @@ void single_linkage(
   std::optional<int> c                          = std::make_optional<int>(DEFAULT_CONST_C));
 
 namespace helpers {
+
+namespace linkage_graph_params {
+/** Specialized parameters to build the KNN graph with regular distances */
+struct distance_params {
+  int c = DEFAULT_CONST_C;
+  cuvs::cluster::agglomerative::Linkage dist_type =
+    cuvs::cluster::agglomerative::Linkage::KNN_GRAPH;
+};
+
+/** Specialized parameters to build the Mutual Reachability graph */
+struct mutual_reachability_params {
+  int min_samples;
+};
+}  // namespace linkage_graph_params
 /**
- * Given a dataset, builds the KNN graph, connects graph components and builds a linkage (dendrogram).
- * Returns the Minimum Spanning Tree edges sorted by weight and the dendrogram.
+ * Given a dataset, builds the KNN graph, connects graph components and builds a linkage
+ * (dendrogram). Returns the Minimum Spanning Tree edges sorted by weight and the dendrogram.
  * @param[in] handle raft handle for resource reuse
- * @param[in] X data points (size m * n)
+ * @param[in] X data points (size n_rows * d)
+ * @param[in] linkage_graph_params linkage params or mutual reachability params for building the KNN
+ * graph
  * @param[in] metric distance metric to use
- * @param[out] out_mst output MST sorted by edge weights (size m - 1)
+ * @param[out] out_mst output MST sorted by edge weights (size n_rows - 1)
  * @param[out] dendrogram output dendrogram (size [n_rows - 1] * 2)
  * @param[out] out_distances distances for output
  * @param[out] out_sizes cluster sizes of output
- * @param[out] core_dists (optional) core distances (size m). If supplied, the constructed graph will
- * be in mutual reachability space and the core distances will be populated
+ * @param[out] core_dists (optional) core distances (size m). Must be supplied in the Mutual
+ * Reachability space
  */
-void build_linkage(raft::resources const& handle,
-                   raft::device_matrix_view<const float, int, raft::row_major> X,
-                   cuvs::distance::DistanceType metric,
-                   raft::device_coo_matrix_view<float, int, int, int> out_mst,
-                   raft::device_matrix_view<int, int> dendrogram,
-                   raft::device_vector_view<float, int> out_distances,
-                   raft::device_vector_view<int, int> out_sizes,
-                   std::optional<raft::device_vector_view<float, int>> core_dists);
+void build_linkage(
+  raft::resources const& handle,
+  raft::device_matrix_view<const float, int, raft::row_major> X,
+  std::variant<linkage_graph_params::distance_params,
+               linkage_graph_params::mutual_reachability_params> linkage_graph_params,
+  cuvs::distance::DistanceType metric,
+  raft::device_coo_matrix_view<float, int, int, int> out_mst,
+  raft::device_matrix_view<int, int> dendrogram,
+  raft::device_vector_view<float, int> out_distances,
+  raft::device_vector_view<int, int> out_sizes,
+  std::optional<raft::device_vector_view<float, int>> core_dists);
 }  // namespace helpers
 /**
  * @}

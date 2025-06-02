@@ -16,11 +16,13 @@
 
 #pragma once
 
+#include "../../neighbors/detail/reachability.cuh"
 #include "agglomerative.cuh"
 #include "connectivities.cuh"
 #include "mst.cuh"
 #include <cuvs/cluster/agglomerative.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/sparse/coo.hpp>
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/device_uvector.hpp>
@@ -39,29 +41,30 @@ namespace cuvs::cluster::agglomerative::detail {
  * @param[in] min_samples this neighborhood will be selected for core distances
  * @param[out] core_dists core distances (size m)
  * @param[out] out_mst_src output MST (size m - 1)
- * @param[out] dendrogram output dendrogram
+ * @param[out] out_dendrogram output dendrogram
  * @param[out] out_distances distances of output
  * @param[out] out_sizes cluster sizes of output
  */
-template <typename value_idx = int, typename value_t = float, typename nnz_t = size_t>
+template <typename value_t = float, typename value_idx = int, typename nnz_t = int>
 void build_mr_linkage(raft::resources const& handle,
                       raft::device_matrix_view<const value_t, value_idx, raft::row_major> X,
-                      cuvs::distance::DistanceType metric,
                       value_idx min_samples,
+                      cuvs::distance::DistanceType metric,
                       raft::device_vector_view<value_t, value_idx> core_dists,
                       raft::device_coo_matrix_view<value_t, value_idx, value_idx, nnz_t> out_mst,
-                      raft::device_matrix_view<value_idx, value_idx> dendrogram,
+                      raft::device_matrix_view<value_idx, value_idx> out_dendrogram,
                       raft::device_vector_view<value_t, value_idx> out_distances,
                       raft::device_vector_view<value_idx, value_idx> out_sizes)
 {
-  raft::device_vector<value_idx> graph_indptr(m + 1);
-  RAFT_EXPECTS(core_dists != nullptr);
-  raft::sparse::COO<value_t, value_idx, nnz_t> graph;
+  size_t m          = X.extent(0);
+  size_t n          = X.extent(1);
+  auto graph_indptr = raft::make_device_vector<value_idx, value_idx>(handle, m + 1);
+  raft::sparse::COO<value_t, value_idx, nnz_t> graph(raft::resource::get_cuda_stream(handle));
   cuvs::neighbors::detail::reachability::mutual_reachability_graph<value_idx, value_t, nnz_t>(
     handle,
     X.data_handle(),
-    X.extent(0),
-    X.extent(1),
+    m,
+    n,
     metric,
     min_samples,
     1.0,
@@ -71,11 +74,13 @@ void build_mr_linkage(raft::resources const& handle,
 
   auto color = raft::make_device_vector<value_idx, value_idx>(handle, static_cast<value_idx>(m));
   cuvs::sparse::neighbors::MutualReachabilityFixConnectivitiesRedOp<value_idx, value_t>
-    reduction_op(core_dists, m);
+    reduction_op(core_dists.data_handle(), m);
+
+  size_t nnz = m * min_samples;
 
   detail::build_sorted_mst<value_idx, value_t>(handle,
                                                X.data_handle(),
-                                               indptr.data(),
+                                               graph_indptr.data_handle(),
                                                graph.cols(),
                                                graph.vals(),
                                                m,
@@ -84,34 +89,36 @@ void build_mr_linkage(raft::resources const& handle,
                                                out_mst.structure_view().get_cols().data(),
                                                out_mst.get_elements().data(),
                                                color.data_handle(),
-                                               indices.size(),
+                                               nnz,
                                                reduction_op,
                                                metric);
 
+  /**
+   * Perform hierarchical labeling
+   */
   size_t n_edges = m - 1;
 
-  // Create dendrogram
   detail::build_dendrogram_host<value_idx, value_t>(handle,
                                                     out_mst.structure_view().get_rows().data(),
                                                     out_mst.structure_view().get_cols().data(),
                                                     out_mst.get_elements().data(),
                                                     n_edges,
-                                                    dendrogram.data_handle(),
+                                                    out_dendrogram.data_handle(),
                                                     out_distances.data_handle(),
                                                     out_sizes.data_handle());
 }
 
 static const size_t EMPTY = 0;
 
-template <typename value_idx = int, typename value_t = float, typename nnz_t = size_t>
-void build_pw_linkage(raft::resources const& handle,
-                      raft::device_matrix_view<const value_t, value_idx, raft::row_major> X,
-                      cuvs::distance::DistanceType metric,
-                      value_idx c,
-                      raft::device_coo_matrix_view<value_t, value_idx, value_idx, nnz_t> out_mst,
-                      raft::device_matrix_view<value_idx, value_idx> dendrogram,
-                      raft::device_vector_view<value_t, value_idx> out_distances,
-                      raft::device_vector_view<value_idx, value_idx> out_sizes)
+template <typename value_t, typename value_idx, typename nnz_t, Linkage dist_type>
+void build_dist_linkage(raft::resources const& handle,
+                        raft::device_matrix_view<const value_t, value_idx, raft::row_major> X,
+                        int c,
+                        cuvs::distance::DistanceType metric,
+                        raft::device_coo_matrix_view<value_t, value_idx, value_idx, nnz_t> out_mst,
+                        raft::device_matrix_view<value_idx, value_idx> out_dendrogram,
+                        raft::device_vector_view<value_t, value_idx> out_distances,
+                        raft::device_vector_view<value_idx, value_idx> out_sizes)
 {
   size_t m    = X.extent(0);
   size_t n    = X.extent(1);
@@ -124,8 +131,15 @@ void build_pw_linkage(raft::resources const& handle,
   /**
    * 1. Construct distance graph
    */
-  detail::get_distance_graph<value_idx, value_t, dist_type>(
-    handle, X, m, n, metric, indptr, indices, pw_dists, c);
+  detail::get_distance_graph<value_idx, value_t, dist_type>(handle,
+                                                            X.data_handle(),
+                                                            static_cast<value_idx>(m),
+                                                            static_cast<value_idx>(n),
+                                                            metric,
+                                                            indptr,
+                                                            indices,
+                                                            pw_dists,
+                                                            c);
 
   /**
    * 2. Construct MST, sorted by weights
@@ -149,15 +163,17 @@ void build_pw_linkage(raft::resources const& handle,
 
   pw_dists.release();
 
+  /**
+   * Perform hierarchical labeling
+   */
   size_t n_edges = m - 1;
 
-  // Create dendrogram
   detail::build_dendrogram_host<value_idx, value_t>(handle,
                                                     out_mst.structure_view().get_rows().data(),
                                                     out_mst.structure_view().get_cols().data(),
                                                     out_mst.get_elements().data(),
                                                     n_edges,
-                                                    dendrogram.data_handle(),
+                                                    out_dendrogram.data_handle(),
                                                     out_distances.data_handle(),
                                                     out_sizes.data_handle());
 }
@@ -194,22 +210,26 @@ void single_linkage(raft::resources const& handle,
 {
   ASSERT(n_clusters <= m, "n_clusters must be less than or equal to the number of data points");
 
-  auto mst =
-    raft::make_device_coo_matrix<value_t, value_idx, value_idx, value_idx>(handle, m, m, m - 1);
+  {
+    value_idx n_edges = m - 1;
+    auto mst =
+      raft::make_device_coo_matrix<value_t, value_idx, value_idx, value_idx>(handle, m, m, n_edges);
 
-  rmm::device_uvector<value_t> out_delta(n_edges, stream);
-  rmm::device_uvector<value_idx> out_size(n_edges, stream);
+    auto out_delta = raft::make_device_vector<value_t, value_idx>(handle, n_edges);
+    auto out_sizes = raft::make_device_vector<value_idx, value_idx>(handle, n_edges);
 
-  build_pw_linkage(
-    handle,
-    raft::make_device_matrix_view<value_t, value_idx, raft::row_major>(X, m, n),
-    metric,
-    c,
-    mst.view(),
-    raft::make_device_matrix_view<value_idx, value_idx, raft::row_major>(out->children, m - 1, 2),
-    raft::make_device_vector_view<value_t, value_idx>(out_delta.data(), m - 1),
-    raft::make_device_vector_view<value_idx, value_idx>(out_sizes.data(), m - 1));
-
+    build_dist_linkage<value_t, value_idx, value_idx, dist_type>(
+      handle,
+      raft::make_device_matrix_view<const value_t, value_idx, raft::row_major>(
+        X, static_cast<value_idx>(m), static_cast<value_idx>(n)),
+      c,
+      metric,
+      mst.view(),
+      raft::make_device_matrix_view<value_idx, value_idx, raft::row_major>(
+        out->children, n_edges, 2),
+      out_delta.view(),
+      out_sizes.view());
+  }
   detail::extract_flattened_clusters(handle, out->labels, out->children, n_clusters, m);
 
   out->m                      = m;

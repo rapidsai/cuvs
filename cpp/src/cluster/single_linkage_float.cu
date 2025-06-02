@@ -41,35 +41,51 @@ void single_linkage(raft::resources const& handle,
 }
 
 namespace helpers {
-void build_linkage(raft::resources const& handle,
-                   raft::device_matrix_view<const float, int, raft::row_major> X,
-                   cuvs::distance::DistanceType metric,
-                   raft::device_coo_matrix_view<float, int, int, int> out_mst,
-                   raft::device_matrix_view<int, int> dendrogram,
-                   raft::device_vector_view<float, int> out_distances,
-                   raft::device_vector_view<int, int> out_sizes,
-                   std::optional<raft::device_vector_view<float, int>> core_dists)
+void build_linkage(
+  raft::resources const& handle,
+  raft::device_matrix_view<const float, int, raft::row_major> X,
+  std::variant<linkage_graph_params::distance_params,
+               linkage_graph_params::mutual_reachability_params> linkage_graph_params,
+  cuvs::distance::DistanceType metric,
+  raft::device_coo_matrix_view<float, int, int, int> out_mst,
+  raft::device_matrix_view<int, int> out_dendrogram,
+  raft::device_vector_view<float, int> out_distances,
+  raft::device_vector_view<int, int> out_sizes,
+  std::optional<raft::device_vector_view<float, int>> core_dists)
 {
   /**
    * Construct MST sorted by weights
    */
-  if (core_dists.has_value()) {
-    RAFT_EXPECTS(core_dists.extent(0) == static_cast<size_t>(X.extent(0)),
+  if (std::holds_alternative<
+        cuvs::cluster::agglomerative::helpers::linkage_graph_params::mutual_reachability_params>(
+        linkage_graph_params)) {
+    RAFT_EXPECTS(core_dists.has_value(), "core_dists not passed");
+    auto core_dists_mdspan = core_dists.value();
+    RAFT_EXPECTS(core_dists_mdspan.extent(0) == static_cast<size_t>(X.extent(0)),
                  "core_dists doesn't have expected size");
-    RAFT_EXPECTS(indptr.extent(0) == static_cast<size_t>(X.extent(0) + 1),
-                 "indptr doesn't have expected size");
+    auto mr_params = std::get<
+      cuvs::cluster::agglomerative::helpers::linkage_graph_params::mutual_reachability_params>(
+      linkage_graph_params);
     detail::build_mr_linkage<float, int, int>(handle,
                                               X,
+                                              mr_params.min_samples,
                                               metric,
-                                              min_samples,
-                                              core_dists.value(),
+                                              core_dists_mdspan,
                                               out_mst,
-                                              dendrogram,
+                                              out_dendrogram,
                                               out_distances,
-                                              out_sizes)
+                                              out_sizes);
   } else {
-    detail::build_pw_linkage<float, int, int>(
-      handle, X, metric, c, out_mst, dendrogram, out_distances, out_sizes);
+    auto dist_params =
+      std::get<cuvs::cluster::agglomerative::helpers::linkage_graph_params::distance_params>(
+        linkage_graph_params);
+    if (dist_params.dist_type == cuvs::cluster::agglomerative::Linkage::KNN_GRAPH) {
+      detail::build_dist_linkage<float, int, int, cuvs::cluster::agglomerative::Linkage::KNN_GRAPH>(
+        handle, X, dist_params.c, metric, out_mst, out_dendrogram, out_distances, out_sizes);
+    } else {
+      detail::build_dist_linkage<float, int, int, cuvs::cluster::agglomerative::Linkage::PAIRWISE>(
+        handle, X, dist_params.c, metric, out_mst, out_dendrogram, out_distances, out_sizes);
+    }
   }
 }
 }  // namespace helpers
