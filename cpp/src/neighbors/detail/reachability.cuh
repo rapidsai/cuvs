@@ -15,9 +15,6 @@
  */
 
 #pragma once
-#include "../../cluster/detail/agglomerative.cuh"
-#include "../../cluster/detail/mst.cuh"
-#include "../../sparse/neighbors/cross_component_nn.cuh"
 #include "./knn_brute_force.cuh"
 
 #include <raft/linalg/unary_op.cuh>
