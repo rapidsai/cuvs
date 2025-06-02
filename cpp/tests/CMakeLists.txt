@@ -81,14 +81,20 @@ function(ConfigureTest)
                   64_float_pq_pivots.bin 64_float_pq_pivots.bin_rotation_matrix.bin
     )
     foreach(CODEBOOK ${CODEBOOKS})
-      file(DOWNLOAD https://data.rapids.ai/cuvs/tests/data/${CODEBOOK}
-           ${CUVS_BINARY_DIR}/tests/data/neighbors/ann_vamana/randomized_codebooks/${CODEBOOK}
+      file(
+        DOWNLOAD
+        https://data.rapids.ai/cuvs/tests/data/neighbors/ann_vamana/randomized_codebooks/${CODEBOOK}
+        ${CUVS_BINARY_DIR}/tests/data/neighbors/ann_vamana/randomized_codebooks/${CODEBOOK}
+      )
+      install(
+        FILES ${CUVS_BINARY_DIR}/tests/data/neighbors/ann_vamana/randomized_codebooks/${CODEBOOK}
+        DESTINATION test/data/neighbors/ann_vamana/randomized_codebooks/
       )
     endforeach()
     target_compile_definitions(
       ${TEST_NAME}
       PRIVATE
-        CODEBOOKS_DIR="${CUVS_BINARY_DIR}/tests/data/neighbors/ann_vamana/randomized_codebooks/"
+        CODEBOOKS_DIR="${CMAKE_INSTALL_PREFIX}/test/data/neighbors/ann_vamana/randomized_codebooks/"
     )
   endif()
 
