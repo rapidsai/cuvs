@@ -412,7 +412,7 @@ void multi_gpu_batch_build(
   }
 
   if (core_distances.has_value()) {
-    get_core_distances(
+    all_neighbors::reachability::get_core_distances(
       handle,
       raft::make_device_matrix_view<T, IdxT>(global_distances.data_handle(), num_rows, k),
       core_distances.value(),
@@ -445,8 +445,8 @@ void multi_gpu_batch_build(
                           raft::make_const_mdspan(core_distances_d_for_rank.view()));
       }
 
-      auto dist_epilogue =
-        ReachabilityPostProcess<int, T>{core_distances_d_for_rank.data_handle(), alpha, num_rows};
+      auto dist_epilogue = all_neighbors::reachability::ReachabilityPostProcess<int, T>{
+        core_distances_d_for_rank.data_handle(), alpha, num_rows};
 
       auto cluster_sizes_for_this_rank = raft::make_host_vector_view<IdxT, IdxT>(
         cluster_sizes.data_handle() + base_cluster_indices[rank], num_clusters_per_rank[rank]);
@@ -458,14 +458,16 @@ void multi_gpu_batch_build(
       size_t max_cluster_size, min_cluster_size;
       get_min_max_cluster_size(k, max_cluster_size, min_cluster_size, cluster_sizes_for_this_rank);
 
-      auto knn_builder = get_knn_builder<T, IdxT, ReachabilityPostProcess<int, T>>(dev_res,
-                                                                                   params,
-                                                                                   min_cluster_size,
-                                                                                   max_cluster_size,
-                                                                                   k,
-                                                                                   std::nullopt,
-                                                                                   std::nullopt,
-                                                                                   dist_epilogue);
+      auto knn_builder =
+        get_knn_builder<T, IdxT, all_neighbors::reachability::ReachabilityPostProcess<int, T>>(
+          dev_res,
+          params,
+          min_cluster_size,
+          max_cluster_size,
+          k,
+          std::nullopt,
+          std::nullopt,
+          dist_epilogue);
       single_gpu_batch_build(dev_res,
                              dataset,
                              *knn_builder,
@@ -562,7 +564,7 @@ void batch_build(
     if (core_distances.has_value()) {
       size_t k = static_cast<size_t>(indices.extent(1));
 
-      get_core_distances(
+      all_neighbors::reachability::get_core_distances(
         handle,
         raft::make_device_matrix_view<T, IdxT>(global_distances.data_handle(), num_rows, k),
         core_distances.value(),
@@ -579,17 +581,19 @@ void batch_build(
                           raft::make_const_mdspan(core_distances.value()));
       }
 
-      auto dist_epilogue =
-        ReachabilityPostProcess<int, T>{core_distances.value().data_handle(), alpha, num_rows};
+      auto dist_epilogue = all_neighbors::reachability::ReachabilityPostProcess<int, T>{
+        core_distances.value().data_handle(), alpha, num_rows};
 
-      auto knn_builder = get_knn_builder<T, IdxT, ReachabilityPostProcess<int, T>>(handle,
-                                                                                   params,
-                                                                                   min_cluster_size,
-                                                                                   max_cluster_size,
-                                                                                   k,
-                                                                                   std::nullopt,
-                                                                                   std::nullopt,
-                                                                                   dist_epilogue);
+      auto knn_builder =
+        get_knn_builder<T, IdxT, all_neighbors::reachability::ReachabilityPostProcess<int, T>>(
+          handle,
+          params,
+          min_cluster_size,
+          max_cluster_size,
+          k,
+          std::nullopt,
+          std::nullopt,
+          dist_epilogue);
       single_gpu_batch_build(handle,
                              dataset,
                              *knn_builder,

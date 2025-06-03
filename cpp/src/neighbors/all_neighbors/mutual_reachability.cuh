@@ -18,7 +18,7 @@
 #include <raft/matrix/shift.cuh>
 #include <rmm/exec_policy.hpp>
 
-namespace cuvs::neighbors {
+namespace cuvs::neighbors::all_neighbors::reachability {
 
 //  Functor to post-process distances into reachability space
 template <typename value_idx, typename value_t>
@@ -69,4 +69,4 @@ void get_core_distances(const raft::resources& handle,
                                      core_dists.data_handle(),
                                      raft::resource::get_cuda_stream(handle));
 }
-}  // namespace cuvs::neighbors
+}  // namespace cuvs::neighbors::all_neighbors::reachability

@@ -37,7 +37,6 @@
 #include <raft/random/make_blobs.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/itertools.hpp>
-
 #include <rapids_logger/logger.hpp>
 #include <rmm/device_uvector.hpp>
 #include <tuple>
@@ -125,28 +124,31 @@ void get_graphs(raft::resources& handle,
         ps.n_rows,
         core_dists_dev.data(),
         raft::resource::get_cuda_stream(handle));
-      auto epilogue = ReachabilityPostProcess<IdxT, DistanceT>{
+      auto epilogue = all_neighbors::reachability::ReachabilityPostProcess<IdxT, DistanceT>{
         core_dists_dev.data(), 1.0, static_cast<size_t>(ps.n_rows)};
 
-      cuvs::neighbors::detail::
-        tiled_brute_force_knn<DataT, IdxT, DistanceT, ReachabilityPostProcess<IdxT, DistanceT>>(
-          handle,
-          database.data(),
-          database.data(),
-          ps.n_rows,
-          ps.n_rows,
-          ps.dim,
-          ps.k,
-          distances_naive_dev.data(),
-          indices_naive_dev.data(),
-          metric,
-          2.0,
-          0,
-          0,
-          nullptr,
-          nullptr,
-          nullptr,
-          epilogue);
+      cuvs::neighbors::detail::tiled_brute_force_knn<
+        DataT,
+        IdxT,
+        DistanceT,
+        all_neighbors::reachability::ReachabilityPostProcess<IdxT, DistanceT>>(
+        handle,
+        database.data(),
+        database.data(),
+        ps.n_rows,
+        ps.n_rows,
+        ps.dim,
+        ps.k,
+        distances_naive_dev.data(),
+        indices_naive_dev.data(),
+        metric,
+        2.0,
+        0,
+        0,
+        nullptr,
+        nullptr,
+        nullptr,
+        epilogue);
     } else {
       naive_knn<DistanceT, DataT, IdxT>(handle,
                                         distances_naive_dev.data(),
@@ -252,7 +254,6 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
 
  private:
   raft::device_resources_snmg handle_;
-  // raft::device_resources handle_;
   rmm::cuda_stream_view stream_;
   AllNeighborsInputs ps;
   rmm::device_uvector<DataT> database;
@@ -297,7 +298,7 @@ const std::vector<AllNeighborsInputs> mutualReachSingle =
     {std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded, 0.9)},
-    {std::make_tuple(1lu, 2lu)},  // min_recall, n_clusters, overlap_factor
+    {std::make_tuple(1lu, 2lu)},  // n_clusters, overlap_factor
     {5000, 7151},                 // n_rows
     {64, 137},                    // dim
     {16, 23},                     // graph_degree
@@ -314,7 +315,7 @@ const std::vector<AllNeighborsInputs> mutualReachBatch =
       std::make_tuple(4lu, 2lu),
       std::make_tuple(7lu, 2lu),
       std::make_tuple(10lu, 2lu),
-    },             // min_recall, n_clusters, overlap_factor
+    },             // n_clusters, overlap_factor
     {5000, 7151},  // n_rows
     {64, 137},     // dim
     {16, 23},      // graph_degree

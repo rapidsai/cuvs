@@ -153,27 +153,31 @@ void mutual_reachability_knn_l2(const raft::resources& handle,
   // `A type local to a function cannot be used in the template argument of the
   // enclosing parent function (and any parent classes) of an extended __device__
   // or __host__ __device__ lambda`
-  auto epilogue = ReachabilityPostProcess<value_idx, value_t>{core_dists, alpha, m};
+  auto epilogue =
+    all_neighbors::reachability::ReachabilityPostProcess<value_idx, value_t>{core_dists, alpha, m};
 
-  cuvs::neighbors::detail::
-    tiled_brute_force_knn<value_t, value_idx, value_t, ReachabilityPostProcess<value_idx, value_t>>(
-      handle,
-      X,
-      X,
-      m,
-      m,
-      n,
-      k,
-      out_dists,
-      out_inds,
-      cuvs::distance::DistanceType::L2SqrtExpanded,
-      2.0,
-      0,
-      0,
-      nullptr,
-      nullptr,
-      nullptr,
-      epilogue);
+  cuvs::neighbors::detail::tiled_brute_force_knn<
+    value_t,
+    value_idx,
+    value_t,
+    all_neighbors::reachability::ReachabilityPostProcess<value_idx, value_t>>(
+    handle,
+    X,
+    X,
+    m,
+    m,
+    n,
+    k,
+    out_dists,
+    out_inds,
+    cuvs::distance::DistanceType::L2SqrtExpanded,
+    2.0,
+    0,
+    0,
+    nullptr,
+    nullptr,
+    nullptr,
+    epilogue);
 }
 
 template <typename value_idx, typename value_t, typename nnz_t>
