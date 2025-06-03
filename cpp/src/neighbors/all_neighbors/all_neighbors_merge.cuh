@@ -254,6 +254,15 @@ void remap_and_merge_subgraphs(raft::resources const& res,
              num_data_in_cluster * k,
              raft::resource::get_cuda_stream(res));
 
+  // raft::print_device_vector("global neighbors", global_neighbors.data_handle(),k, std::cout);
+  // raft::print_device_vector("global dists", global_distances.data_handle(),k, std::cout);
+  // raft::print_device_vector("global neighbors1", global_neighbors.data_handle()+k,k, std::cout);
+  // raft::print_device_vector("global dists1", global_distances.data_handle()+k,k, std::cout);
+
+  // raft::print_device_vector("\nbatch neighbors", batch_neighbors_d.data_handle(),k, std::cout);
+  // raft::print_device_vector("batch dists", batch_distances_d.data_handle(),k, std::cout);
+  // raft::print_device_vector("batch neighbors1", batch_neighbors_d.data_handle()+k,k, std::cout);
+  // raft::print_device_vector("batch dists1", batch_distances_d.data_handle()+k,k, std::cout);
   merge_subgraphs(res,
                   k,
                   num_data_in_cluster,
@@ -263,6 +272,12 @@ void remap_and_merge_subgraphs(raft::resources const& res,
                   global_neighbors.data_handle(),
                   batch_neighbors_d.data_handle(),
                   select_min);
+
+  // raft::print_device_vector("\nafter merge global neighbors", global_neighbors.data_handle(),k,
+  // std::cout); raft::print_device_vector("after merge global dists",
+  // global_distances.data_handle(),k, std::cout); raft::print_device_vector("after merge global
+  // neighbors1", global_neighbors.data_handle()+k,k, std::cout); raft::print_device_vector("after
+  // merge global dists1", global_distances.data_handle()+k,k, std::cout);
 }
 
 }  // namespace cuvs::neighbors::all_neighbors::detail

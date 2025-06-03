@@ -97,9 +97,10 @@ void single_build(
                           core_distances_modified.value().view(),
                           raft::sq_op{},
                           raft::make_const_mdspan(core_distances.value()));
-        return ReachabilityPostProcess<int, T>{core_distances_modified.value().data_handle(), 1.0};
+        return ReachabilityPostProcess<int, T>{
+          core_distances_modified.value().data_handle(), 1.0, num_rows};
       } else {
-        return ReachabilityPostProcess<int, T>{core_distances.value().data_handle(), 1.0};
+        return ReachabilityPostProcess<int, T>{core_distances.value().data_handle(), 1.0, num_rows};
       }
     }();
 
@@ -136,10 +137,15 @@ void build(
                  "indices matrix and distances matrix has to be the same shape.");
   }
 
+  if (core_distances.has_value()) {
+    RAFT_EXPECTS(distances.has_value(),
+                 "distances matrix should be allocated to get mutual reachability distance.");
+  }
+
   if (params.n_clusters == 1) {
     single_build(handle, params, dataset, indices, distances, core_distances);
   } else {
-    batch_build(handle, params, dataset, indices, distances);
+    batch_build(handle, params, dataset, indices, distances, core_distances);
   }
 }
 
@@ -161,6 +167,11 @@ void build(
     RAFT_EXPECTS(indices.extent(0) == distances.value().extent(0) &&
                    indices.extent(1) == distances.value().extent(1),
                  "indices matrix and distances matrix has to be the same shape.");
+  }
+
+  if (core_distances.has_value()) {
+    RAFT_EXPECTS(distances.has_value(),
+                 "distances matrix should be allocated to get mutual reachability distance.");
   }
 
   if (params.n_clusters > 1) {

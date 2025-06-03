@@ -51,6 +51,7 @@ struct ReachabilityPostProcess {
 
   const value_t* core_dists;
   value_t alpha;
+  size_t n;  // total number of elements
 };
 
 /** Parameters for VPQ compression. */

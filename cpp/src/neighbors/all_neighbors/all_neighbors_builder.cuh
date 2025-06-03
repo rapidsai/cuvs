@@ -27,6 +27,7 @@
 #include <raft/core/managed_mdspan.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/matrix/gather.cuh>
 
 namespace cuvs::neighbors::all_neighbors::detail {
 using namespace cuvs::neighbors;
@@ -67,6 +68,13 @@ struct all_neighbors_builder {
    */
   virtual void prepare_build(raft::host_matrix_view<const T, IdxT, row_major> dataset) {}
   virtual void prepare_build(raft::device_matrix_view<const T, IdxT, row_major> dataset) {}
+
+  /**
+   * Preparing changes for batch-specific operations
+   * Arguments:
+   * - [in] dataset: host_matrix_view or device_matrix_view of the the ENTIRE dataset
+   */
+  virtual void prepare_batch(raft::host_matrix_view<const T, IdxT, row_major> dataset) {}
 
   /**
    * Running the ann algorithm on the given cluster, and merging it into the global result
@@ -344,6 +352,11 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
     nnd_builder.emplace(this->res, build_config);
     int_graph.emplace(raft::make_host_matrix<int, IdxT, row_major>(
       this->max_cluster_size, static_cast<IdxT>(extended_graph_degree)));
+
+    if constexpr (std::is_same_v<DistEpilogueT, ReachabilityPostProcess<int, T>>) {
+      batch_core_distances.emplace(
+        raft::make_device_vector<T, IdxT>(this->res, this->max_cluster_size));
+    }
   }
 
   void prepare_build(raft::device_matrix_view<const T, IdxT, row_major> dataset) override
@@ -372,11 +385,46 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
     if (this->n_clusters > 1) {
       bool return_distances      = true;
       size_t num_data_in_cluster = dataset.extent(0);
-      nnd_builder.value().build(dataset.data_handle(),
-                                static_cast<int>(num_data_in_cluster),
-                                int_graph.value().data_handle(),
-                                return_distances,
-                                this->batch_distances_d.value().data_handle());
+      if constexpr (std::is_same_v<DistEpilogueT, ReachabilityPostProcess<int, T>>) {
+        // gather core dists
+        // raft::print_device_vector("original core distances before calling gather",
+        // dist_epilogue.core_dists, 10, std::cout);
+
+        raft::copy(this->inverted_indices_d.value().data_handle(),
+                   inverted_indices.value().data_handle(),
+                   num_data_in_cluster,
+                   raft::resource::get_cuda_stream(this->res));
+        // raft::print_device_vector("inverted indices",
+        // this->inverted_indices_d.value().data_handle(), 10, std::cout);
+        // raft::matrix::gather(dist_epilogue.core_dists, 1, dist_epilogue.n,
+        // this->inverted_indices_d.value().data_handle(), num_data_in_cluster,
+        // batch_core_distances.value().data_handle(), raft::resource::get_cuda_stream(this->res));
+        raft::matrix::gather(this->res,
+                             raft::make_device_matrix_view<const T, IdxT>(
+                               dist_epilogue.core_dists, dist_epilogue.n, 1),
+                             raft::make_device_vector_view<const IdxT, IdxT>(
+                               this->inverted_indices_d.value().data_handle(), num_data_in_cluster),
+                             raft::make_device_matrix_view<T, IdxT>(
+                               batch_core_distances.value().data_handle(), num_data_in_cluster, 1));
+
+        // raft::print_device_vector("batch core dists", batch_core_distances.value().data_handle(),
+        // 10, std::cout); std::cout << "dist epilogue n " << dist_epilogue.n << std::endl;
+
+        nnd_builder.value().build(
+          dataset.data_handle(),
+          static_cast<int>(num_data_in_cluster),
+          int_graph.value().data_handle(),
+          return_distances,
+          this->batch_distances_d.value().data_handle(),
+          ReachabilityPostProcess<int, T>{
+            batch_core_distances.value().data_handle(), 1.0, num_data_in_cluster});
+      } else {
+        nnd_builder.value().build(dataset.data_handle(),
+                                  static_cast<int>(num_data_in_cluster),
+                                  int_graph.value().data_handle(),
+                                  return_distances,
+                                  this->batch_distances_d.value().data_handle());
+      }
 
       remap_and_merge_subgraphs<T, IdxT, int>(this->res,
                                               this->inverted_indices_d.value().view(),
@@ -442,7 +490,9 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
 
   std::optional<nn_descent::detail::GNND<const T, int>> nnd_builder;
   std::optional<raft::host_matrix<int, IdxT>> int_graph;
+
   DistEpilogueT dist_epilogue;
+  std::optional<raft::device_vector<T, IdxT>> batch_core_distances;
 };
 
 template <typename T, typename IdxT, typename DistEpilogueT = raft::identity_op>

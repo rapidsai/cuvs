@@ -28,6 +28,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/multi_gpu.hpp>
 #include <raft/matrix/sample_rows.cuh>
+#include <raft/matrix/shift.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <variant>
 
@@ -279,6 +280,8 @@ void single_gpu_batch_build(const raft::resources& handle,
   for (size_t cluster_id = 0; cluster_id < n_clusters; cluster_id++) {
     size_t num_data_in_cluster = cluster_sizes(cluster_id);
     size_t offset              = cluster_offsets(cluster_id);
+    std::cout << "[THREAD " << omp_get_thread_num() << "] cluster " << cluster_id + 1 << " / "
+              << n_clusters << "(" << num_data_in_cluster << ")" << std::endl;
     if (num_data_in_cluster < knn_builder.k) {
       // for the unlikely event where clustering was done lopsidedly and this cluster has less than
       // k data
@@ -378,7 +381,8 @@ void batch_build(
   const all_neighbors_params& params,
   raft::host_matrix_view<const T, IdxT, row_major> dataset,
   raft::device_matrix_view<IdxT, IdxT, row_major> indices,
-  std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances = std::nullopt)
+  std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances      = std::nullopt,
+  std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances = std::nullopt)
 {
   if (raft::resource::is_multi_gpu(handle)) {
     // For efficient CPU-computation of omp parallel for regions per GPU
@@ -426,6 +430,7 @@ void batch_build(
             global_distances_fill_value);
 
   if (raft::resource::is_multi_gpu(handle)) {
+    std::cout << "multi gpu batch build\n";
     multi_gpu_batch_build(handle,
                           params,
                           dataset,
@@ -435,6 +440,7 @@ void batch_build(
                           cluster_offsets.view(),
                           inverted_indices.view());
   } else {
+    std::cout << "single gpu batch build\n";
     size_t max_cluster_size, min_cluster_size;
     get_min_max_cluster_size(k, max_cluster_size, min_cluster_size, cluster_sizes.view());
     std::unique_ptr<all_neighbors_builder<T, IdxT>> knn_builder =
@@ -448,6 +454,80 @@ void batch_build(
                            cluster_sizes.view(),
                            cluster_offsets.view(),
                            inverted_indices.view());
+    if (core_distances.has_value()) {
+      // getting mutual reachability distances
+      size_t k = static_cast<size_t>(indices.extent(1));
+      raft::matrix::shift(
+        handle,
+        raft::make_device_matrix_view<T, IdxT>(global_distances.data_handle(), num_rows, k),
+        1,
+        std::make_optional(static_cast<T>(0.0)));
+
+      cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
+        global_distances.data_handle(),
+        k,
+        k,
+        num_rows,
+        core_distances.value().data_handle(),
+        raft::resource::get_cuda_stream(handle));
+
+      // raft::print_device_vector("core distances after singlegpu batch build",
+      // core_distances.value().data_handle(), 10, std::cout);
+
+      // reset global neighbors and distances
+      std::fill(global_neighbors.data_handle(),
+                global_neighbors.data_handle() + num_rows * k,
+                global_neighbors_fill_value);
+      std::fill(global_distances.data_handle(),
+                global_distances.data_handle() + num_rows * k,
+                global_distances_fill_value);
+
+      std::optional<raft::device_vector<T, IdxT>> core_distances_modified;
+      auto dist_epilogue = [&]() {
+        if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+          // comparison within nn descent for L2SqrtExpanded distance metric is done without
+          // applying sqrt.
+          core_distances_modified.emplace(raft::make_device_vector<T, IdxT>(handle, num_rows));
+          raft::linalg::map(handle,
+                            core_distances_modified.value().view(),
+                            raft::sq_op{},
+                            raft::make_const_mdspan(core_distances.value()));
+          return ReachabilityPostProcess<int, T>{
+            core_distances_modified.value().data_handle(), 1.0, num_rows};
+        } else {
+          return ReachabilityPostProcess<int, T>{
+            core_distances.value().data_handle(), 1.0, num_rows};
+        }
+      }();
+
+      auto knn_builder = get_knn_builder<T, IdxT, ReachabilityPostProcess<int, T>>(handle,
+                                                                                   params,
+                                                                                   min_cluster_size,
+                                                                                   max_cluster_size,
+                                                                                   k,
+                                                                                   std::nullopt,
+                                                                                   std::nullopt,
+                                                                                   dist_epilogue);
+      single_gpu_batch_build(handle,
+                             dataset,
+                             *knn_builder,
+                             params.n_clusters,
+                             global_neighbors.view(),
+                             global_distances.view(),
+                             cluster_sizes.view(),
+                             cluster_offsets.view(),
+                             inverted_indices.view());
+
+      raft::matrix::shift(
+        handle,
+        raft::make_device_matrix_view<IdxT, IdxT>(global_neighbors.data_handle(), num_rows, k),
+        1);
+      raft::matrix::shift(
+        handle,
+        raft::make_device_matrix_view<T, IdxT>(global_distances.data_handle(), num_rows, k),
+        raft::make_device_matrix_view<const T, IdxT>(
+          core_distances.value().data_handle(), num_rows, 1));
+    }
   }
 
   raft::copy(indices.data_handle(),
