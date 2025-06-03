@@ -15,6 +15,7 @@
  */
 
 #pragma once
+#include "../all_neighbors/mutual_reachability.cuh"
 #include "./knn_brute_force.cuh"
 
 #include <cuvs/neighbors/common.hpp>

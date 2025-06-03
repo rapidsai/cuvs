@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "./all_neighbors/mutual_reachability.cuh"
 #include "./detail/nn_descent_gnnd.hpp"
 #include "nn_descent.cuh"
 #include <cuvs/neighbors/common.hpp>

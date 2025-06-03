@@ -30,6 +30,8 @@ void check_metric(const all_neighbors_params& params, bool do_mutual_reachabilit
   if (std::holds_alternative<graph_build_params::nn_descent_params>(params.graph_build_params)) {
     bool allowed_metrics = false;
     if (do_mutual_reachability_dist) {
+      // InnerProduct is not supported for mutual reachability distance, because mutual reachability
+      // distance takes "max" of core distances and pairwise distance.
       allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
                         params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                         params.metric == cuvs::distance::DistanceType::CosineExpanded;
@@ -62,7 +64,8 @@ void single_build(
   mdspan<const T, matrix_extent<IdxT>, row_major, Accessor> dataset,
   raft::device_matrix_view<IdxT, IdxT, row_major> indices,
   std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances      = std::nullopt,
-  std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances = std::nullopt)
+  std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances = std::nullopt,
+  T alpha                                                                    = 1.0)
 {
   size_t num_rows = static_cast<size_t>(dataset.extent(0));
   size_t num_cols = static_cast<size_t>(dataset.extent(1));
@@ -75,7 +78,6 @@ void single_build(
 
   if (core_distances.has_value()) {
     // TODO: fix alpha here
-
     size_t k = static_cast<size_t>(indices.extent(1));
     raft::matrix::shift(handle, distances.value(), 1, std::make_optional(static_cast<T>(0.0)));
 
@@ -98,9 +100,10 @@ void single_build(
                           raft::sq_op{},
                           raft::make_const_mdspan(core_distances.value()));
         return ReachabilityPostProcess<int, T>{
-          core_distances_modified.value().data_handle(), 1.0, num_rows};
+          core_distances_modified.value().data_handle(), alpha, num_rows};
       } else {
-        return ReachabilityPostProcess<int, T>{core_distances.value().data_handle(), 1.0, num_rows};
+        return ReachabilityPostProcess<int, T>{
+          core_distances.value().data_handle(), alpha, num_rows};
       }
     }();
 
@@ -124,7 +127,8 @@ void build(
   raft::host_matrix_view<const T, IdxT, row_major> dataset,
   raft::device_matrix_view<IdxT, IdxT, row_major> indices,
   std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances      = std::nullopt,
-  std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances = std::nullopt)
+  std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances = std::nullopt,
+  T alpha                                                                    = 1.0)
 {
   check_metric(params, core_distances.has_value());
 
@@ -143,9 +147,9 @@ void build(
   }
 
   if (params.n_clusters == 1) {
-    single_build(handle, params, dataset, indices, distances, core_distances);
+    single_build(handle, params, dataset, indices, distances, core_distances, alpha);
   } else {
-    batch_build(handle, params, dataset, indices, distances, core_distances);
+    batch_build(handle, params, dataset, indices, distances, core_distances, alpha);
   }
 }
 
@@ -156,7 +160,8 @@ void build(
   raft::device_matrix_view<const T, IdxT, row_major> dataset,
   raft::device_matrix_view<IdxT, IdxT, row_major> indices,
   std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances      = std::nullopt,
-  std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances = std::nullopt)
+  std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances = std::nullopt,
+  T alpha                                                                    = 1.0)
 {
   check_metric(params, core_distances.has_value());
 
@@ -179,7 +184,7 @@ void build(
       "Batched all-neighbors build is not supported with data on device. Put data on host for "
       "batch build.");
   } else {
-    single_build(handle, params, dataset, indices, distances, core_distances);
+    single_build(handle, params, dataset, indices, distances, core_distances, alpha);
   }
 }
 }  // namespace cuvs::neighbors::all_neighbors::detail
