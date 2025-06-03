@@ -15,6 +15,7 @@
 #=============================================================================
 
 function(find_and_configure_faiss)
+  option(CUVS_CPU_ONLY_FAISS_ENABLE_SVE "Enable SVE support for CPU ONLY FAISS" OFF)
   set(oneValueArgs VERSION REPOSITORY PINNED_TAG BUILD_STATIC_LIBS EXCLUDE_FROM_ALL ENABLE_GPU)
   cmake_parse_arguments(PKG "${options}" "${oneValueArgs}"
                         "${multiValueArgs}" ${ARGN} )
