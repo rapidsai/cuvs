@@ -174,7 +174,6 @@ void get_mutual_reachability_graphs(raft::resources& handle,
     nn_descent_params.metric                    = params.metric;
     params.graph_build_params                   = nn_descent_params;
   }
-  std::cout << "calliong mutual reach\n";
   auto metric      = std::get<1>(ps.build_algo_metric_recall);
   auto cuda_stream = raft::resource::get_cuda_stream(handle);
   {
@@ -259,15 +258,6 @@ void get_mutual_reachability_graphs(raft::resources& handle,
     raft::copy(indices_allNN.data(), indices_allNN_dev.data(), queries_size, cuda_stream);
     raft::copy(distances_allNN.data(), distances_allNN_dev.data(), queries_size, cuda_stream);
     raft::resource::sync_stream(handle);
-
-    raft::print_host_vector("naive indices", indices_bf.data(), ps.k, std::cout);
-    raft::print_host_vector("naive distances", distances_bf.data(), ps.k, std::cout);
-    raft::print_host_vector("nnd indices", indices_allNN.data(), ps.k, std::cout);
-    raft::print_host_vector("nnd distances", distances_allNN.data(), ps.k, std::cout);
-    raft::print_host_vector("nnd indices1", indices_allNN.data() + ps.k, ps.k, std::cout);
-    raft::print_host_vector("nnd distances1", distances_allNN.data() + ps.k, ps.k, std::cout);
-    raft::print_host_vector("nnd indices2", indices_allNN.data() + 2 * ps.k, ps.k, std::cout);
-    raft::print_host_vector("nnd distances2", distances_allNN.data() + 2 * ps.k, ps.k, std::cout);
   }
 }
 

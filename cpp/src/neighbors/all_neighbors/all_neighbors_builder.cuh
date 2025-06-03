@@ -70,13 +70,6 @@ struct all_neighbors_builder {
   virtual void prepare_build(raft::device_matrix_view<const T, IdxT, row_major> dataset) {}
 
   /**
-   * Preparing changes for batch-specific operations
-   * Arguments:
-   * - [in] dataset: host_matrix_view or device_matrix_view of the the ENTIRE dataset
-   */
-  virtual void prepare_batch(raft::host_matrix_view<const T, IdxT, row_major> dataset) {}
-
-  /**
    * Running the ann algorithm on the given cluster, and merging it into the global result
    * Arguments:
    * - [in] dataset: host_matrix_view or device_matrix_view of the cluster dataset
@@ -387,16 +380,10 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
       size_t num_data_in_cluster = dataset.extent(0);
       if constexpr (std::is_same_v<DistEpilogueT, ReachabilityPostProcess<int, T>>) {
         // gather core dists
-        // raft::print_device_vector("original core distances before calling gather",
-        // dist_epilogue.core_dists, 10, std::cout);
-        // std::cout << "right before copyuing\n";
         raft::copy(this->inverted_indices_d.value().data_handle(),
                    inverted_indices.value().data_handle(),
                    num_data_in_cluster,
                    raft::resource::get_cuda_stream(this->res));
-        //  std::cout << "right after copyuing\n";
-        raft::print_device_vector(
-          "inverted indices", this->inverted_indices_d.value().data_handle(), 10, std::cout);
 
         raft::matrix::gather(this->res,
                              raft::make_device_matrix_view<const T, IdxT>(
@@ -405,14 +392,6 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
                                this->inverted_indices_d.value().data_handle(), num_data_in_cluster),
                              raft::make_device_matrix_view<T, IdxT>(
                                batch_core_distances.value().data_handle(), num_data_in_cluster, 1));
-
-        // raft::print_device_vector("batch core dists", batch_core_distances.value().data_handle(),
-        // 10, std::cout);
-        // std::cout << "dist epilogue n " << dist_epilogue.n << std::endl;
-        // raft::print_host_vector("dataset", dataset.data_handle(), 10, std::cout);
-        // raft::print_host_vector("int graph", int_graph.value().data_handle(), 10, std::cout);
-        // raft::print_device_vector("batch dists", this->batch_distances_d.value().data_handle(),
-        // 10, std::cout);
 
         nnd_builder.value().build(
           dataset.data_handle(),
