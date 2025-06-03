@@ -141,6 +141,34 @@ RAFT_KERNEL naiveCosineDistanceKernel(OutputType* dist,
 }
 
 template <typename DataType, typename OutputType = DataType>
+RAFT_KERNEL naiveDiceDistanceKernel(
+  OutputType* dist, const DataType* x, const DataType* y, int m, int n, int k, bool isRowMajor)
+{
+  int midx = threadIdx.x + blockIdx.x * blockDim.x;
+  int nidx = threadIdx.y + blockIdx.y * blockDim.y;
+  if (midx >= m || nidx >= n) { return; }
+
+  OutputType acc_a  = OutputType(0);
+  OutputType acc_b  = OutputType(0);
+  OutputType acc_ab = OutputType(0);
+
+  for (int i = 0; i < k; ++i) {
+    int xidx = isRowMajor ? i + midx * k : i * m + midx;
+    int yidx = isRowMajor ? i + nidx * k : i * n + nidx;
+    auto a   = half2float(x[xidx]);
+    auto b   = half2float(y[yidx]);
+    acc_a += a;
+    acc_b += b;
+    acc_ab += a * b;
+  }
+
+  int outidx = isRowMajor ? midx * n + nidx : midx + m * nidx;
+
+  // Use 1.0 - (dice dissimilarity) to calc the distance
+  dist[outidx] = (OutputType)1.0 - (2 * acc_ab / ((acc_a) + (acc_b)));
+}
+
+template <typename DataType, typename OutputType = DataType>
 RAFT_KERNEL naiveInnerProductKernel(OutputType* dist,
                                     const DataType* x,
                                     const DataType* y,
@@ -441,6 +469,10 @@ void naiveDistance(OutputType* dist,
       break;
     case cuvs::distance::DistanceType::CorrelationExpanded:
       naiveCorrelationDistanceKernel<DataType, OutputType>
+        <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
+      break;
+    case cuvs::distance::DistanceType::DiceExpanded:
+      naiveDiceDistanceKernel<DataType, OutputType>
         <<<nblks, TPB, 0, stream>>>(dist, x, y, m, n, k, isRowMajor);
       break;
     default: FAIL() << "should be here\n";
