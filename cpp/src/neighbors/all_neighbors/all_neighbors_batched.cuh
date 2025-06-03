@@ -417,20 +417,6 @@ void multi_gpu_batch_build(
       raft::make_device_matrix_view<T, IdxT>(global_distances.data_handle(), num_rows, k),
       core_distances.value(),
       true);
-    // // getting mutual reachability distances
-    // raft::matrix::shift(
-    //   handle,
-    //   raft::make_device_matrix_view<T, IdxT>(global_distances.data_handle(), num_rows, k),
-    //   1,
-    //   std::make_optional(static_cast<T>(0.0)));
-
-    // cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
-    //   global_distances.data_handle(),
-    //   k,
-    //   k,
-    //   num_rows,
-    //   core_distances.value().data_handle(),
-    //   raft::resource::get_cuda_stream(handle));
 
     // copy to host
     auto core_distances_h = raft::make_host_vector<T, IdxT>(num_rows);
@@ -440,18 +426,6 @@ void multi_gpu_batch_build(
                raft::resource::get_cuda_stream(handle));
 
     reset_global_matrices(handle, params.metric, global_neighbors, global_distances);
-    // bool select_min = cuvs::distance::is_min_close(params.metric);
-    // IdxT global_neighbors_fill_value =
-    //   select_min ? std::numeric_limits<IdxT>::max() : std::numeric_limits<IdxT>::min();
-    // T global_distances_fill_value =
-    //   select_min ? std::numeric_limits<T>::max() : std::numeric_limits<T>::min();
-    // // reset global neighbors and distances
-    // std::fill(global_neighbors.data_handle(),
-    //           global_neighbors.data_handle() + num_rows * k,
-    //           global_neighbors_fill_value);
-    // std::fill(global_distances.data_handle(),
-    //           global_distances.data_handle() + num_rows * k,
-    //           global_distances_fill_value);
 
 #pragma omp parallel for num_threads(num_ranks)
     for (int rank = 0; rank < num_ranks; rank++) {
@@ -463,12 +437,8 @@ void multi_gpu_batch_build(
                  num_rows,
                  raft::resource::get_cuda_stream(dev_res));
 
-      // std::optional<raft::device_vector<T, IdxT>> core_distances_modified;
-
       if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-        // comparison within nn descent for L2SqrtExpanded distance metric is done without
-        // applying sqrt.
-        // core_distances_modified.emplace(raft::make_device_vector<T, IdxT>(dev_res, num_rows));
+        // comparison within nn descent for L2SqrtExpanded is done without applying sqrt.
         raft::linalg::map(dev_res,
                           core_distances_d_for_rank.view(),
                           raft::sq_op{},
@@ -563,17 +533,6 @@ void batch_build(
   auto global_distances = raft::make_managed_matrix<T, IdxT>(handle, num_rows, k);
 
   reset_global_matrices(handle, params.metric, global_neighbors.view(), global_distances.view());
-  // bool select_min = cuvs::distance::is_min_close(params.metric);
-  // IdxT global_neighbors_fill_value =
-  //   select_min ? std::numeric_limits<IdxT>::max() : std::numeric_limits<IdxT>::min();
-  // T global_distances_fill_value =
-  //   select_min ? std::numeric_limits<T>::max() : std::numeric_limits<T>::min();
-  // std::fill(global_neighbors.data_handle(),
-  //           global_neighbors.data_handle() + num_rows * k,
-  //           global_neighbors_fill_value);
-  // std::fill(global_distances.data_handle(),
-  //           global_distances.data_handle() + num_rows * k,
-  //           global_distances_fill_value);
 
   if (raft::resource::is_multi_gpu(handle)) {
     multi_gpu_batch_build(handle,
@@ -610,35 +569,12 @@ void batch_build(
         raft::make_device_matrix_view<T, IdxT>(global_distances.data_handle(), num_rows, k),
         core_distances.value(),
         true);
-      // // getting mutual reachability distances
 
-      // raft::matrix::shift(
-      //   handle,
-      //   raft::make_device_matrix_view<T, IdxT>(global_distances.data_handle(), num_rows, k),
-      //   1,
-      //   std::make_optional(static_cast<T>(0.0)));
-
-      // cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
-      //   global_distances.data_handle(),
-      //   k,
-      //   k,
-      //   num_rows,
-      //   core_distances.value().data_handle(),
-      //   raft::resource::get_cuda_stream(handle));
-
-      // reset global neighbors and distances
-      // std::fill(global_neighbors.data_handle(),
-      //           global_neighbors.data_handle() + num_rows * k,
-      //           global_neighbors_fill_value);
-      // std::fill(global_distances.data_handle(),
-      //           global_distances.data_handle() + num_rows * k,
-      //           global_distances_fill_value);
       reset_global_matrices(
         handle, params.metric, global_neighbors.view(), global_distances.view());
 
       if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-        // comparison within nn descent for L2SqrtExpanded distance metric is done without
-        // applying sqrt.
+        // comparison within nn descent for L2SqrtExpanded is done without applying sqrt.
         raft::linalg::map(handle,
                           core_distances.value(),
                           raft::sq_op{},
