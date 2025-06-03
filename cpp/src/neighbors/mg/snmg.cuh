@@ -483,6 +483,10 @@ void search(const raft::resources& clique,
             raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances)
 {
+  // Making sure that the NCCL comms are instantiated at this stage.
+  // This prevents it being done inside of an OpenMP thread.
+  raft::resource::get_nccl_comms(clique);
+
   int64_t n_rows      = queries.extent(0);
   int64_t n_cols      = queries.extent(1);
   int64_t n_neighbors = neighbors.extent(1);
