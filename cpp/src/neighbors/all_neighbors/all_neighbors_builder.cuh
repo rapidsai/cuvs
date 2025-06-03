@@ -389,16 +389,15 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
         // gather core dists
         // raft::print_device_vector("original core distances before calling gather",
         // dist_epilogue.core_dists, 10, std::cout);
-
+        // std::cout << "right before copyuing\n";
         raft::copy(this->inverted_indices_d.value().data_handle(),
                    inverted_indices.value().data_handle(),
                    num_data_in_cluster,
                    raft::resource::get_cuda_stream(this->res));
-        // raft::print_device_vector("inverted indices",
-        // this->inverted_indices_d.value().data_handle(), 10, std::cout);
-        // raft::matrix::gather(dist_epilogue.core_dists, 1, dist_epilogue.n,
-        // this->inverted_indices_d.value().data_handle(), num_data_in_cluster,
-        // batch_core_distances.value().data_handle(), raft::resource::get_cuda_stream(this->res));
+        //  std::cout << "right after copyuing\n";
+        raft::print_device_vector(
+          "inverted indices", this->inverted_indices_d.value().data_handle(), 10, std::cout);
+
         raft::matrix::gather(this->res,
                              raft::make_device_matrix_view<const T, IdxT>(
                                dist_epilogue.core_dists, dist_epilogue.n, 1),
@@ -408,7 +407,12 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
                                batch_core_distances.value().data_handle(), num_data_in_cluster, 1));
 
         // raft::print_device_vector("batch core dists", batch_core_distances.value().data_handle(),
-        // 10, std::cout); std::cout << "dist epilogue n " << dist_epilogue.n << std::endl;
+        // 10, std::cout);
+        // std::cout << "dist epilogue n " << dist_epilogue.n << std::endl;
+        // raft::print_host_vector("dataset", dataset.data_handle(), 10, std::cout);
+        // raft::print_host_vector("int graph", int_graph.value().data_handle(), 10, std::cout);
+        // raft::print_device_vector("batch dists", this->batch_distances_d.value().data_handle(),
+        // 10, std::cout);
 
         nnd_builder.value().build(
           dataset.data_handle(),

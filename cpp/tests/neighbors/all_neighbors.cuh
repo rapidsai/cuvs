@@ -264,6 +264,10 @@ void get_mutual_reachability_graphs(raft::resources& handle,
     raft::print_host_vector("naive distances", distances_bf.data(), ps.k, std::cout);
     raft::print_host_vector("nnd indices", indices_allNN.data(), ps.k, std::cout);
     raft::print_host_vector("nnd distances", distances_allNN.data(), ps.k, std::cout);
+    raft::print_host_vector("nnd indices1", indices_allNN.data() + ps.k, ps.k, std::cout);
+    raft::print_host_vector("nnd distances1", distances_allNN.data() + ps.k, ps.k, std::cout);
+    raft::print_host_vector("nnd indices2", indices_allNN.data() + 2 * ps.k, ps.k, std::cout);
+    raft::print_host_vector("nnd distances2", distances_allNN.data() + 2 * ps.k, ps.k, std::cout);
   }
 }
 
@@ -328,8 +332,8 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
   }
 
  private:
-  // raft::device_resources_snmg handle_;
-  raft::device_resources handle_;
+  raft::device_resources_snmg handle_;
+  // raft::device_resources handle_;
   rmm::cuda_stream_view stream_;
   AllNeighborsInputs ps;
   rmm::device_uvector<DataT> database;
