@@ -15,6 +15,8 @@
  */
 #pragma once
 #include <raft/core/detail/macros.hpp>
+#include <raft/matrix/shift.cuh>
+#include <rmm/exec_policy.hpp>
 
 namespace cuvs::neighbors {
 
@@ -31,7 +33,7 @@ struct ReachabilityPostProcess {
   size_t n;  // total number of elements
 };
 
-template <typename value_idx, typename value_t, int tpb = 256>
+template <typename value_idx, typename value_t>
 void core_distances(
   value_t* knn_dists, int min_samples, int n_neighbors, size_t n, value_t* out, cudaStream_t stream)
 {
@@ -47,4 +49,24 @@ void core_distances(
   });
 }
 
+template <typename value_idx, typename value_t>
+void get_core_distances(const raft::resources& handle,
+                        raft::device_matrix_view<value_t, value_idx> knn_dists,
+                        raft::device_vector_view<value_t, value_idx> core_dists,
+                        bool need_shift = false)
+{
+  size_t num_rows = static_cast<size_t>(knn_dists.extent(0));
+  size_t k        = static_cast<size_t>(knn_dists.extent(1));
+
+  if (need_shift) {
+    raft::matrix::shift(handle, knn_dists, 1, std::make_optional(static_cast<value_t>(0.0)));
+  }
+
+  core_distances<value_idx, value_t>(knn_dists.data_handle(),
+                                     k,
+                                     k,
+                                     num_rows,
+                                     core_dists.data_handle(),
+                                     raft::resource::get_cuda_stream(handle));
+}
 }  // namespace cuvs::neighbors

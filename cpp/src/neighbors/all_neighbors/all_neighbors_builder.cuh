@@ -17,6 +17,7 @@
 
 #include "../detail/nn_descent_gnnd.hpp"
 #include "all_neighbors_merge.cuh"
+#include "mutual_reachability.cuh"
 #include <cuvs/neighbors/all_neighbors.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>

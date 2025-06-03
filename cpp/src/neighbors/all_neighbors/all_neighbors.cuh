@@ -15,10 +15,8 @@
  */
 
 #pragma once
-#include "../detail/reachability.cuh"
 #include "all_neighbors_batched.cuh"
 #include <cuvs/neighbors/all_neighbors.hpp>
-#include <cuvs/neighbors/common.hpp>
 #include <raft/matrix/shift.cuh>
 #include <raft/util/cudart_utils.hpp>
 
@@ -77,36 +75,19 @@ void single_build(
   knn_builder->build_knn(dataset);
 
   if (core_distances.has_value()) {
-    // TODO: fix alpha here
-    size_t k = static_cast<size_t>(indices.extent(1));
-    raft::matrix::shift(handle, distances.value(), 1, std::make_optional(static_cast<T>(0.0)));
+    get_core_distances(handle, distances.value(), core_distances.value(), true);
 
-    cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
-      distances.value().data_handle(),
-      k,
-      k,
-      num_rows,
-      core_distances.value().data_handle(),
-      raft::resource::get_cuda_stream(handle));
+    if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+      // comparison within nn descent for L2SqrtExpanded distance metric is done without applying
+      // sqrt.
+      raft::linalg::map(handle,
+                        core_distances.value(),
+                        raft::sq_op{},
+                        raft::make_const_mdspan(core_distances.value()));
+    }
 
-    std::optional<raft::device_vector<T, IdxT>> core_distances_modified;
-    auto dist_epilogue = [&]() {
-      if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-        // comparison within nn descent for L2SqrtExpanded distance metric is done without applying
-        // sqrt.
-        core_distances_modified.emplace(raft::make_device_vector<T, IdxT>(handle, num_rows));
-        raft::linalg::map(handle,
-                          core_distances_modified.value().view(),
-                          raft::sq_op{},
-                          raft::make_const_mdspan(core_distances.value()));
-        return ReachabilityPostProcess<int, T>{
-          core_distances_modified.value().data_handle(), alpha, num_rows};
-      } else {
-        return ReachabilityPostProcess<int, T>{
-          core_distances.value().data_handle(), alpha, num_rows};
-      }
-    }();
-
+    auto dist_epilogue =
+      ReachabilityPostProcess<int, T>{core_distances.value().data_handle(), alpha, num_rows};
     auto knn_builder = get_knn_builder<T, IdxT, ReachabilityPostProcess<int, T>>(
       handle, params, num_rows, num_rows, indices.extent(1), indices, distances, dist_epilogue);
     knn_builder->prepare_build(dataset);
