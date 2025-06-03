@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,15 +32,15 @@ namespace cuvs::cluster::agglomerative::detail {
 /**
  * Constructs a linkage by computing the minimum spanning tree and dendrogram in the Mutual
  * Reachability space. Returns mst edges sorted by weight and the dendrogram.
- * @tparam value_idx
  * @tparam value_t
+ * @tparam value_idx
  * @tparam nnz_t
  * @param[in] handle raft handle for resource reuse
  * @param[in] X data points (size m * n)
  * @param[in] metric distance metric to use
  * @param[in] min_samples this neighborhood will be selected for core distances
  * @param[out] core_dists core distances (size m)
- * @param[out] out_mst_src output MST (size m - 1)
+ * @param[out] out_mst output MST sorted by edge weights (size m - 1)
  * @param[out] out_dendrogram output dendrogram
  * @param[out] out_distances distances of output
  * @param[out] out_sizes cluster sizes of output
@@ -110,6 +110,23 @@ void build_mr_linkage(raft::resources const& handle,
 
 static const size_t EMPTY = 0;
 
+/**
+ * Constructs a linkage by computing the minimum spanning tree and dendrogram in the Mutual
+ * Reachability space. Returns mst edges sorted by weight and the dendrogram.
+ * @tparam value_t
+ * @tparam value_idx
+ * @tparam nnz_t
+ * @tparam dist_type method to use for constructing connectivities graph
+ * @param[in] handle raft handle for resource reuse
+ * @param[in] X data points (size m * n)
+ * @param[in] c a constant used when constructing linkage from knn graph. Allows the indirect
+ * control of k. The algorithm will set `k = log(n) + c`
+ * @param[in] metric distance metric to use
+ * @param[out] out_mst output MST sorted by edge weights (size m - 1)
+ * @param[out] out_dendrogram output dendrogram
+ * @param[out] out_distances distances of output
+ * @param[out] out_sizes cluster sizes of output
+ */
 template <typename value_t, typename value_idx, typename nnz_t, Linkage dist_type>
 void build_dist_linkage(raft::resources const& handle,
                         raft::device_matrix_view<const value_t, value_idx, raft::row_major> X,
