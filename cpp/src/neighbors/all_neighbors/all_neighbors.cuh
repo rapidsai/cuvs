@@ -78,8 +78,7 @@ void single_build(
     get_core_distances(handle, distances.value(), core_distances.value(), true);
 
     if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-      // comparison within nn descent for L2SqrtExpanded distance metric is done without applying
-      // sqrt.
+      // comparison within nn descent for L2SqrtExpanded is done without applying sqrt.
       raft::linalg::map(handle,
                         core_distances.value(),
                         raft::sq_op{},

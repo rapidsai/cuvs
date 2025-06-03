@@ -18,8 +18,6 @@
 #include "../all_neighbors/mutual_reachability.cuh"
 #include "./knn_brute_force.cuh"
 
-#include <cuvs/neighbors/common.hpp>
-
 #include <raft/linalg/unary_op.cuh>
 #include <raft/sparse/convert/csr.cuh>
 #include <raft/sparse/linalg/symmetrize.cuh>

@@ -50,7 +50,7 @@ void reset_global_matrices(raft::resources const& res,
     select_min ? std::numeric_limits<IdxT>::max() : std::numeric_limits<IdxT>::min();
   T global_distances_fill_value =
     select_min ? std::numeric_limits<T>::max() : std::numeric_limits<T>::min();
-  // reset global neighbors and distances
+
   std::fill(global_neighbors.data_handle(),
             global_neighbors.data_handle() + num_rows * k,
             global_neighbors_fill_value);
@@ -377,10 +377,10 @@ void multi_gpu_batch_build(
 
     size_t rank_offset = cluster_offsets(base_cluster_idx);
 
-    num_data_per_rank[rank]     = num_data_for_this_rank;
-    base_cluster_indices[rank]  = base_cluster_idx;
     rank_offsets[rank]          = rank_offset;
+    num_data_per_rank[rank]     = num_data_for_this_rank;
     num_clusters_per_rank[rank] = num_clusters_for_this_rank;
+    base_cluster_indices[rank]  = base_cluster_idx;
 
     // remap offsets for each rank
     for (size_t p = 0; p < num_clusters_for_this_rank; p++) {
@@ -548,10 +548,8 @@ void batch_build(
   } else {
     size_t max_cluster_size, min_cluster_size;
     get_min_max_cluster_size(k, max_cluster_size, min_cluster_size, cluster_sizes.view());
-
     std::unique_ptr<all_neighbors_builder<T, IdxT>> knn_builder =
       get_knn_builder<T, IdxT>(handle, params, min_cluster_size, max_cluster_size, k);
-
     single_gpu_batch_build(handle,
                            dataset,
                            *knn_builder,
