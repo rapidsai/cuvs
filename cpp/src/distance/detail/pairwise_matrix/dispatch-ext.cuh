@@ -96,6 +96,8 @@ instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
 instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
   cuvs::distance::detail::ops::cosine_distance_op, int);
 instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
+  cuvs::distance::detail::ops::dice_distance_op, int);
+instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
   cuvs::distance::detail::ops::hamming_distance_op, int);
 instantiate_cuvs_distance_detail_pairwise_matrix_dispatch_by_algo_default(
   cuvs::distance::detail::ops::hellinger_distance_op, int);

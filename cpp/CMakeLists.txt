@@ -344,6 +344,9 @@ if(BUILD_SHARED_LIBS)
     src/distance/detail/pairwise_matrix/dispatch_cosine_float_float_float_int.cu
     src/distance/detail/pairwise_matrix/dispatch_cosine_half_float_float_int.cu
     src/distance/detail/pairwise_matrix/dispatch_cosine_double_double_double_int.cu
+    src/distance/detail/pairwise_matrix/dispatch_dice_float_float_float_int.cu
+    src/distance/detail/pairwise_matrix/dispatch_dice_half_float_float_int.cu
+    src/distance/detail/pairwise_matrix/dispatch_dice_double_double_double_int.cu
     src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_float_float_float_int.cu
     src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_half_float_float_int.cu
     src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_double_double_double_int.cu
