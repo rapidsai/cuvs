@@ -97,6 +97,8 @@ if(BUILD_TESTS)
     neighbors/sparse_brute_force.cu neighbors/refine.cu GPUS 1 PERCENT 100
   )
 
+  ConfigureTest(NAME NEIGHBORS_TIERED_INDEX_TEST PATH neighbors/tiered_index.cu GPUS 1 PERCENT 100)
+
   ConfigureTest(
     NAME CLUSTER_TEST PATH cluster/kmeans.cu cluster/kmeans_balanced.cu cluster/kmeans_find_k.cu
     cluster/linkage.cu GPUS 1 PERCENT 100
