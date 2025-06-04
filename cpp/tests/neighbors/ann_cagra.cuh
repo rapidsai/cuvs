@@ -1012,8 +1012,8 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
             }
             break;
           case graph_build_algo::NN_DESCENT: {
-            index_params.graph_build_params =
-              graph_build_params::nn_descent_params(index_params.intermediate_graph_degree);
+            index_params.graph_build_params = graph_build_params::nn_descent_params(
+              index_params.intermediate_graph_degree, index_params.metric);
             break;
           }
           case graph_build_algo::ITERATIVE_CAGRA_SEARCH: {
@@ -1035,30 +1035,26 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
         auto database1_view = raft::make_device_matrix_view<const DataT, int64_t>(
           (const DataT*)database.data() + database0_view.size(), database1_size, ps.dim);
 
-        cagra::index<DataT, IdxT> index0(handle_);
-        cagra::index<DataT, IdxT> index1(handle_);
+        cagra::index<DataT, IdxT> index0(handle_, index_params.metric);
+        cagra::index<DataT, IdxT> index1(handle_, index_params.metric);
+        std::optional<raft::device_matrix<DataT, int64_t>> database_dev{std::nullopt};
         if (ps.host_dataset) {
+          database_dev = raft::make_device_matrix<DataT, int64_t>(handle_, database0_size, ps.dim);
+          raft::copy(database_dev->data_handle(),
+                     database0_view.data_handle(),
+                     database0_view.size(),
+                     stream_);
           {
-            std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
-            database_host = raft::make_host_matrix<DataT, int64_t>(database0_size, ps.dim);
-            raft::copy(database_host->data_handle(),
-                       database0_view.data_handle(),
-                       database0_view.size(),
-                       stream_);
-            auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
-              (const DataT*)database_host->data_handle(), database0_size, ps.dim);
-            index0 = cagra::build(handle_, index_params, database_host_view);
+            auto database_device_view = raft::make_device_matrix_view<const DataT, int64_t>(
+              (const DataT*)database_dev->data_handle(), database0_size, ps.dim);
+            index0 = cagra::build(handle_, index_params, database_host_viewdatabase_device_view);
           }
           {
-            std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
-            database_host = raft::make_host_matrix<DataT, int64_t>(database1_size, ps.dim);
-            raft::copy(database_host->data_handle(),
-                       database1_view.data_handle(),
-                       database1_view.size(),
-                       stream_);
-            auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
-              (const DataT*)database_host->data_handle(), database1_size, ps.dim);
-            index1 = cagra::build(handle_, index_params, database_host_view);
+            auto database_device_view = raft::make_device_matrix_view<const DataT, int64_t>(
+              (const DataT*)database_dev->data_handle() + database0_size * ps.dim,
+              database1_size,
+              ps.dim);
+            index1 = cagra::build(handle_, index_params, database_device_view);
           }
         } else {
           index0 = cagra::build(handle_, index_params, database0_view);
