@@ -4,8 +4,9 @@ set -e -u -o pipefail
 
 ARGS="$*"
 NUMARGS=$#
+
 CURDIR=$(cd "$(dirname $0)"; pwd)
-VERSION="25.06.0" # Note: The version is updated automatically when ci/release/update-version.sh is invoked
+VERSION="25.08.0" # Note: The version is updated automatically when ci/release/update-version.sh is invoked
 GROUP_ID="com.nvidia.cuvs"
 
 if [ -z "${CMAKE_PREFIX_PATH:=}" ]; then
@@ -20,7 +21,7 @@ cmake --build ./internal/build
 ./panama-bindings/generate-bindings.sh
 
 function hasArg {
-    (( ${NUMARGS} != 0 )) && (echo " ${ARGS} " | grep -q " $1 ")
+    (( NUMARGS != 0 )) && (echo " ${ARGS} " | grep -q " $1 ")
 }
 
 MAVEN_VERIFY_ARGS=()
