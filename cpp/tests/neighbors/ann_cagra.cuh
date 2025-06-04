@@ -1039,11 +1039,8 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
         cagra::index<DataT, IdxT> index1(handle_, index_params.metric);
         std::optional<raft::device_matrix<DataT, int64_t>> database_dev{std::nullopt};
         if (ps.host_dataset) {
-          database_dev = raft::make_device_matrix<DataT, int64_t>(handle_, database0_size, ps.dim);
-          raft::copy(database_dev->data_handle(),
-                     database0_view.data_handle(),
-                     database0_view.size(),
-                     stream_);
+          database_dev = raft::make_device_matrix<DataT, int64_t>(handle_, ps.n_rows, ps.dim);
+          raft::copy(database_dev->data_handle(), database.data(), database.size(), stream_);
           {
             auto database_device_view = raft::make_device_matrix_view<const DataT, int64_t>(
               (const DataT*)database_dev->data_handle(), database0_size, ps.dim);
