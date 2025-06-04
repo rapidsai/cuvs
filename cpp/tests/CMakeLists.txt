@@ -93,6 +93,11 @@ endfunction()
 
 if(BUILD_TESTS)
   ConfigureTest(
+    NAME NEIGHBORS_ANN_CAGRA_FLOAT_UINT32_TEST PATH neighbors/ann_cagra/test_float_uint32_t.cu GPUS
+    1 PERCENT 100
+  )
+
+  ConfigureTest(
     NAME NEIGHBORS_TEST PATH neighbors/brute_force.cu neighbors/brute_force_prefiltered.cu
     neighbors/sparse_brute_force.cu neighbors/refine.cu GPUS 1 PERCENT 100
   )
@@ -139,11 +144,6 @@ if(BUILD_TESTS)
   ConfigureTest(
     NAME NEIGHBORS_ANN_CAGRA_TEST_BUGS PATH neighbors/ann_cagra/bug_extreme_inputs_oob.cu
     neighbors/ann_cagra/bug_multi_cta_crash.cu GPUS 1 PERCENT 100
-  )
-
-  ConfigureTest(
-    NAME NEIGHBORS_ANN_CAGRA_FLOAT_UINT32_TEST PATH neighbors/ann_cagra/test_float_uint32_t.cu GPUS
-    1 PERCENT 100
   )
 
   ConfigureTest(
