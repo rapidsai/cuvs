@@ -149,11 +149,11 @@ public class BruteForceIndexImpl implements BruteForceIndex {
     try (var localArena = Arena.ofConfined()) {
       long rows = dataset != null? dataset.size(): vectors.length;
       long cols = dataset != null? dataset.dimensions(): (rows > 0 ? vectors[0].length : 0);
-  
+
       Arena arena = resources.getArena();
       MemorySegment datasetMemSegment = dataset != null? ((DatasetImpl) dataset).seg:
           Util.buildMemorySegment(resources.getArena(), vectors);
-      
+
       long cuvsResources = resources.getMemorySegment().get(cuvsResources_t, 0);
       MemorySegment stream = arena.allocate(cudaStream_t);
       var returnValue = cuvsStreamGet(cuvsResources, stream);

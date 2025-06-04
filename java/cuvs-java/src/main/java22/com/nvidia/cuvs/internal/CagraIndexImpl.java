@@ -197,7 +197,7 @@ public class CagraIndexImpl implements CagraIndex {
 
       MemorySegment dataSeg = dataset != null? ((DatasetImpl) dataset).seg:
       	Util.buildMemorySegment(resources.getArena(), vectors);
-      
+
       Arena arena = resources.getArena();
       long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
       MemorySegment stream = arena.allocate(cudaStream_t);
@@ -689,7 +689,7 @@ public class CagraIndexImpl implements CagraIndex {
 
     return seg;
   }
-  
+
   /**
    * Builder helps configure and create an instance of {@link CagraIndex}.
    */
