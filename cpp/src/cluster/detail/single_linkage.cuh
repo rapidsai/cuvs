@@ -163,6 +163,13 @@ void build_dist_linkage(raft::resources const& handle,
    */
   rmm::device_uvector<value_idx> color(m, stream);
   cuvs::sparse::neighbors::FixConnectivitiesRedOp<value_idx, value_t> op(m);
+
+  size_t n_edges = m - 1;
+
+  rmm::device_uvector<value_idx> mst_rows(n_edges, stream);
+  rmm::device_uvector<value_idx> mst_cols(n_edges, stream);
+  rmm::device_uvector<value_t> mst_data(n_edges, stream);
+
   detail::build_sorted_mst<value_idx, value_t>(handle,
                                                X.data_handle(),
                                                indptr.data(),
@@ -177,14 +184,11 @@ void build_dist_linkage(raft::resources const& handle,
                                                indices.size(),
                                                op,
                                                metric);
-
   pw_dists.release();
 
   /**
    * Perform hierarchical labeling
    */
-  size_t n_edges = m - 1;
-
   detail::build_dendrogram_host<value_idx, value_t>(handle,
                                                     out_mst.structure_view().get_rows().data(),
                                                     out_mst.structure_view().get_cols().data(),
@@ -227,26 +231,30 @@ void single_linkage(raft::resources const& handle,
 {
   ASSERT(n_clusters <= m, "n_clusters must be less than or equal to the number of data points");
 
-  {
-    value_idx n_edges = m - 1;
-    auto mst =
-      raft::make_device_coo_matrix<value_t, value_idx, value_idx, value_idx>(handle, m, m, n_edges);
+  value_idx n_edges = m - 1;
+  auto mst_rows     = raft::make_device_vector<value_idx, value_idx>(handle, n_edges);
+  auto mst_cols     = raft::make_device_vector<value_idx, value_idx>(handle, n_edges);
+  auto mst_weights  = raft::make_device_vector<value_t, value_idx>(handle, n_edges);
+  auto structure_view =
+    raft::make_device_coordinate_structure_view<value_idx, value_idx, value_idx>(
+      mst_rows.data_handle(), mst_cols.data_handle(), m, m, n_edges);
+  auto mst_view = raft::make_device_coo_matrix_view<value_t, value_idx, value_idx, value_idx>(
+    mst_weights.data_handle(), structure_view);
 
-    auto out_delta = raft::make_device_vector<value_t, value_idx>(handle, n_edges);
-    auto out_sizes = raft::make_device_vector<value_idx, value_idx>(handle, n_edges);
+  auto out_delta = raft::make_device_vector<value_t, value_idx>(handle, n_edges);
+  auto out_sizes = raft::make_device_vector<value_idx, value_idx>(handle, n_edges);
 
-    build_dist_linkage<value_t, value_idx, value_idx, dist_type>(
-      handle,
-      raft::make_device_matrix_view<const value_t, value_idx, raft::row_major>(
-        X, static_cast<value_idx>(m), static_cast<value_idx>(n)),
-      c,
-      metric,
-      mst.view(),
-      raft::make_device_matrix_view<value_idx, value_idx, raft::row_major>(
-        out->children, n_edges, 2),
-      out_delta.view(),
-      out_sizes.view());
-  }
+  build_dist_linkage<value_t, value_idx, value_idx, dist_type>(
+    handle,
+    raft::make_device_matrix_view<const value_t, value_idx, raft::row_major>(
+      X, static_cast<value_idx>(m), static_cast<value_idx>(n)),
+    c,
+    metric,
+    mst_view,
+    raft::make_device_matrix_view<value_idx, value_idx, raft::row_major>(out->children, n_edges, 2),
+    out_delta.view(),
+    out_sizes.view());
+
   detail::extract_flattened_clusters(handle, out->labels, out->children, n_clusters, m);
 
   out->m                      = m;
