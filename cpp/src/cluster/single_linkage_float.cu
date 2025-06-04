@@ -69,6 +69,7 @@ void build_linkage(
     detail::build_mr_linkage<float, int, int>(handle,
                                               X,
                                               mr_params.min_samples,
+                                              mr_params.alpha,
                                               metric,
                                               core_dists_mdspan,
                                               out_mst,

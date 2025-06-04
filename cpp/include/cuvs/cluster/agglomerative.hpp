@@ -126,14 +126,24 @@ namespace helpers {
 namespace linkage_graph_params {
 /** Specialized parameters to build the KNN graph with regular distances */
 struct distance_params {
+  /** a constant used when constructing linkage from knn graph. Allows the indirect control of k.
+   * The algorithm will set `k = log(n) + c` */
   int c = DEFAULT_CONST_C;
+
+  /** strategy for constructing the linkage. PAIRWISE uses more memory but can be faster for smaller
+   * datasets. KNN_GRAPH allows the memory usage to be controlled (using parameter c) */
   cuvs::cluster::agglomerative::Linkage dist_type =
     cuvs::cluster::agglomerative::Linkage::KNN_GRAPH;
 };
 
 /** Specialized parameters to build the Mutual Reachability graph */
 struct mutual_reachability_params {
+  /** this neighborhood will be selected for core distances. */
   int min_samples;
+
+  /** weight applied when internal distance is chosen for mutual reachability (value of 1.0 disables
+   * the weighting) */
+  float alpha = 1.0;
 };
 }  // namespace linkage_graph_params
 /**

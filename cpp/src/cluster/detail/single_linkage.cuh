@@ -39,6 +39,8 @@ namespace cuvs::cluster::agglomerative::detail {
  * @param[in] X data points (size m * n)
  * @param[in] metric distance metric to use
  * @param[in] min_samples this neighborhood will be selected for core distances
+ * @param[in] alpha weight applied when internal distance is chosen for mutual reachability (value
+ * of 1.0 disables the weighting)
  * @param[out] core_dists core distances (size m)
  * @param[out] out_mst output MST sorted by edge weights (size m - 1)
  * @param[out] out_dendrogram output dendrogram
@@ -49,6 +51,7 @@ template <typename value_t = float, typename value_idx = int, typename nnz_t = i
 void build_mr_linkage(raft::resources const& handle,
                       raft::device_matrix_view<const value_t, value_idx, raft::row_major> X,
                       value_idx min_samples,
+                      float alpha,
                       cuvs::distance::DistanceType metric,
                       raft::device_vector_view<value_t, value_idx> core_dists,
                       raft::device_coo_matrix_view<value_t, value_idx, value_idx, nnz_t> out_mst,
@@ -67,7 +70,7 @@ void build_mr_linkage(raft::resources const& handle,
     n,
     metric,
     min_samples,
-    1.0,
+    alpha,
     graph_indptr.data_handle(),
     core_dists.data_handle(),
     graph);
