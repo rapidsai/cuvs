@@ -23,6 +23,7 @@
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <raft/core/device_resources_snmg.hpp>
+#include <raft/core/resource/nccl_comm.hpp>
 
 namespace cuvs::neighbors::mg {
 
@@ -65,8 +66,6 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
     std::vector<T> distances_ref(queries_size);
     std::vector<int64_t> neighbors_snmg_ann(queries_size);
     std::vector<T> distances_snmg_ann(queries_size);
-    std::vector<uint32_t> neighbors_ref_32bits(queries_size);
-    std::vector<uint32_t> neighbors_snmg_ann_32bits(queries_size);
 
     {
       rmm::device_uvector<T> distances_ref_dev(queries_size, resource::get_cuda_stream(clique_));
@@ -236,13 +235,13 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
 
       mg_search_params<cagra::search_params> search_params;
 
-      auto index_dataset = raft::make_host_matrix_view<const DataT, uint32_t, row_major>(
+      auto index_dataset = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
         h_index_dataset.data(), ps.num_db_vecs, ps.dim);
-      auto queries = raft::make_host_matrix_view<const DataT, uint32_t, row_major>(
+      auto queries = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
         h_queries.data(), ps.num_queries, ps.dim);
-      auto neighbors = raft::make_host_matrix_view<uint32_t, uint32_t, row_major>(
-        neighbors_snmg_ann_32bits.data(), ps.num_queries, ps.k);
-      auto distances = raft::make_host_matrix_view<float, uint32_t, row_major>(
+      auto neighbors = raft::make_host_matrix_view<int64_t, int64_t, row_major>(
+        neighbors_snmg_ann.data(), ps.num_queries, ps.k);
+      auto distances = raft::make_host_matrix_view<float, int64_t, row_major>(
         distances_snmg_ann.data(), ps.num_queries, ps.k);
 
       tmp_index_file index_file;
@@ -264,15 +263,15 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       resource::sync_stream(clique_);
 
       double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
-      ASSERT_TRUE(eval_neighbours(neighbors_ref_32bits,
-                                  neighbors_snmg_ann_32bits,
+      ASSERT_TRUE(eval_neighbours(neighbors_ref,
+                                  neighbors_snmg_ann,
                                   distances_ref,
                                   distances_snmg_ann,
                                   ps.num_queries,
                                   ps.k,
                                   0.001,
                                   min_recall));
-      std::fill(neighbors_snmg_ann_32bits.begin(), neighbors_snmg_ann_32bits.end(), 0);
+      std::fill(neighbors_snmg_ann.begin(), neighbors_snmg_ann.end(), 0);
       std::fill(distances_snmg_ann.begin(), distances_snmg_ann.end(), 0);
     }
 
@@ -394,8 +393,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
 
       auto queries = raft::make_host_matrix_view<const DataT, int64_t, row_major>(
         h_queries.data(), ps.num_queries, ps.dim);
-      auto neighbors = raft::make_host_matrix_view<uint32_t, int64_t, row_major>(
-        neighbors_snmg_ann_32bits.data(), ps.num_queries, ps.k);
+      auto neighbors = raft::make_host_matrix_view<int64_t, int64_t, row_major>(
+        neighbors_snmg_ann.data(), ps.num_queries, ps.k);
       auto distances = raft::make_host_matrix_view<float, int64_t, row_major>(
         distances_snmg_ann.data(), ps.num_queries, ps.k);
 
@@ -411,15 +410,15 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
       resource::sync_stream(clique_);
 
       double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
-      ASSERT_TRUE(eval_neighbours(neighbors_ref_32bits,
-                                  neighbors_snmg_ann_32bits,
+      ASSERT_TRUE(eval_neighbours(neighbors_ref,
+                                  neighbors_snmg_ann,
                                   distances_ref,
                                   distances_snmg_ann,
                                   ps.num_queries,
                                   ps.k,
                                   0.001,
                                   min_recall));
-      std::fill(neighbors_snmg_ann_32bits.begin(), neighbors_snmg_ann_32bits.end(), 0);
+      std::fill(neighbors_snmg_ann.begin(), neighbors_snmg_ann.end(), 0);
       std::fill(distances_snmg_ann.begin(), distances_snmg_ann.end(), 0);
     }
 
@@ -453,6 +452,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                                             ps.k);
       std::vector<float> load_balancer_distances_snmg_ann(n_parallel_searches * ps.num_queries *
                                                           ps.k);
+
+      // making sure that the NCCL comms are initialized before OMP section
+      raft::resource::get_nccl_comms(clique_);
+
 #pragma omp parallel for
       for (uint64_t search_idx = 0; search_idx < searches_correctness.size(); search_idx++) {
         uint64_t offset            = search_idx * ps.num_queries * ps.k;
@@ -518,6 +521,10 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                                             ps.k);
       std::vector<float> load_balancer_distances_snmg_ann(n_parallel_searches * ps.num_queries *
                                                           ps.k);
+
+      // making sure that the NCCL comms are initialized before OMP section
+      raft::resource::get_nccl_comms(clique_);
+
 #pragma omp parallel for
       for (uint64_t search_idx = 0; search_idx < searches_correctness.size(); search_idx++) {
         uint64_t offset            = search_idx * ps.num_queries * ps.k;
@@ -574,14 +581,17 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
 
       int n_parallel_searches = 16;
       std::vector<char> searches_correctness(n_parallel_searches);
-      std::vector<uint32_t> load_balancer_neighbors_snmg_ann(n_parallel_searches * ps.num_queries *
-                                                             ps.k);
+      std::vector<int64_t> load_balancer_neighbors_snmg_ann(n_parallel_searches * ps.num_queries *
+                                                            ps.k);
       std::vector<float> load_balancer_distances_snmg_ann(n_parallel_searches * ps.num_queries *
                                                           ps.k);
+
+      // making sure that the NCCL comms are initialized before OMP section
+      raft::resource::get_nccl_comms(clique_);
 #pragma omp parallel for
       for (uint64_t search_idx = 0; search_idx < searches_correctness.size(); search_idx++) {
         uint64_t offset            = search_idx * ps.num_queries * ps.k;
-        auto small_batch_neighbors = raft::make_host_matrix_view<uint32_t, int64_t, row_major>(
+        auto small_batch_neighbors = raft::make_host_matrix_view<int64_t, int64_t, row_major>(
           load_balancer_neighbors_snmg_ann.data() + offset, ps.num_queries, ps.k);
         auto small_batch_distances = raft::make_host_matrix_view<float, int64_t, row_major>(
           load_balancer_distances_snmg_ann.data() + offset, ps.num_queries, ps.k);
@@ -594,13 +604,13 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                        small_batch_neighbors,
                                        small_batch_distances);
 
-        std::vector<uint32_t> small_batch_neighbors_vec(
+        std::vector<int64_t> small_batch_neighbors_vec(
           small_batch_neighbors.data_handle(),
           small_batch_neighbors.data_handle() + small_batch_neighbors.size());
         std::vector<float> small_batch_distances_vec(
           small_batch_distances.data_handle(),
           small_batch_distances.data_handle() + small_batch_distances.size());
-        searches_correctness[search_idx] = eval_neighbours(neighbors_ref_32bits,
+        searches_correctness[search_idx] = eval_neighbours(neighbors_ref,
                                                            small_batch_neighbors_vec,
                                                            distances_ref,
                                                            small_batch_distances_vec,
@@ -677,7 +687,6 @@ const std::vector<AnnMGInputs> inputs = {
    cuvs::distance::DistanceType::L2Expanded,
    true},
 
-  /*
   {7000,
    10000,
    8,
@@ -689,9 +698,7 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-  */
 
-  /*
   {7000,
    10000,
    8,
@@ -759,7 +766,6 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-  */
 
   {7000,
    10000,
@@ -784,7 +790,6 @@ const std::vector<AnnMGInputs> inputs = {
    cuvs::distance::DistanceType::L2Expanded,
    true},
 
-  /*
   {7000,
    10000,
    8,
@@ -796,7 +801,6 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-  */
 
   {3,
    10000,
@@ -821,7 +825,6 @@ const std::vector<AnnMGInputs> inputs = {
    cuvs::distance::DistanceType::L2Expanded,
    true},
 
-  /*
   {3,
    10000,
    8,
@@ -833,6 +836,5 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-  */
 };
 }  // namespace cuvs::neighbors::mg
