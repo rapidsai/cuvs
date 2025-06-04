@@ -32,6 +32,26 @@
 
 #include <fstream>
 
+namespace cuvs::neighbors::ivf_flat {
+void convert_c_index_params(cuvsIvfFlatIndexParams params,
+                            cuvs::neighbors::ivf_flat::index_params* out)
+{
+  out->metric                   = static_cast<cuvs::distance::DistanceType>((int)params.metric),
+  out->metric_arg               = params.metric_arg;
+  out->add_data_on_build        = params.add_data_on_build;
+  out->n_lists                  = params.n_lists;
+  out->kmeans_n_iters           = params.kmeans_n_iters;
+  out->kmeans_trainset_fraction = params.kmeans_trainset_fraction;
+  out->adaptive_centers         = params.adaptive_centers;
+  out->conservative_memory_allocation = params.conservative_memory_allocation;
+}
+void convert_c_search_params(cuvsIvfFlatSearchParams params,
+                             cuvs::neighbors::ivf_flat::search_params* out)
+{
+  out->n_probes = params.n_probes;
+}
+}  // namespace cuvs::neighbors::ivf_flat
+
 namespace {
 
 template <typename T, typename IdxT>
@@ -39,15 +59,8 @@ void* _build(cuvsResources_t res, cuvsIvfFlatIndexParams params, DLManagedTensor
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
 
-  auto build_params              = cuvs::neighbors::ivf_flat::index_params();
-  build_params.metric            = static_cast<cuvs::distance::DistanceType>((int)params.metric),
-  build_params.metric_arg        = params.metric_arg;
-  build_params.add_data_on_build = params.add_data_on_build;
-  build_params.n_lists           = params.n_lists;
-  build_params.kmeans_n_iters    = params.kmeans_n_iters;
-  build_params.kmeans_trainset_fraction       = params.kmeans_trainset_fraction;
-  build_params.adaptive_centers               = params.adaptive_centers;
-  build_params.conservative_memory_allocation = params.conservative_memory_allocation;
+  auto build_params = cuvs::neighbors::ivf_flat::index_params();
+  cuvs::neighbors::ivf_flat::convert_c_index_params(params, &build_params);
 
   auto dataset = dataset_tensor->dl_tensor;
   auto dim     = dataset.shape[1];
@@ -74,8 +87,8 @@ void _search(cuvsResources_t res,
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
   auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_flat::index<T, IdxT>*>(index.addr);
 
-  auto search_params     = cuvs::neighbors::ivf_flat::search_params();
-  search_params.n_probes = params.n_probes;
+  auto search_params = cuvs::neighbors::ivf_flat::search_params();
+  convert_c_search_params(params, &search_params);
 
   using queries_mdspan_type   = raft::device_matrix_view<T const, IdxT, raft::row_major>;
   using neighbors_mdspan_type = raft::device_matrix_view<IdxT, IdxT, raft::row_major>;
