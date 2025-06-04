@@ -122,7 +122,7 @@ TEST_P(DistanceExpDiceXequalYH, Result)
 }
 INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceExpDiceXequalYH, ::testing::ValuesIn(inputsh));
 
-const std::vector<DistanceInputs<float>> inputsd = {
+const std::vector<DistanceInputs<double>> inputsd = {
   {0.001, 1024, 1024, 32, true, 1234ULL},
   {0.001, 1024, 32, 1024, true, 1234ULL},
   {0.001, 32, 1024, 1024, true, 1234ULL},
@@ -132,13 +132,13 @@ const std::vector<DistanceInputs<float>> inputsd = {
   {0.001f, 32, 1024, 1024, false, 1234ULL},
   {0.003f, 1024, 1024, 1024, false, 1234ULL},
 };
-typedef DistanceExpDice<float> DistanceExpDiceD;
+typedef DistanceExpDice<double> DistanceExpDiceD;
 TEST_P(DistanceExpDiceD, Result)
 {
   int m = params.isRowMajor ? params.m : params.n;
   int n = params.isRowMajor ? params.n : params.m;
   ASSERT_TRUE(devArrMatch(
-    dist_ref.data(), dist.data(), m, n, cuvs::CompareApproxNaN<float>(params.tolerance), stream));
+    dist_ref.data(), dist.data(), m, n, cuvs::CompareApproxNaN<double>(params.tolerance), stream));
 }
 INSTANTIATE_TEST_CASE_P(DistanceTests, DistanceExpDiceD, ::testing::ValuesIn(inputsd));
 
