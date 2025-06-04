@@ -1044,13 +1044,59 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
           {
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
               (const DataT*)database_host->data_handle(), database0_size, ps.dim);
+
+            // Debug print - CI compatible
+            if constexpr (std::is_same_v<DataT, float>) {
+              if (ps.n_rows < 100) {
+                std::cout << "[DEBUG] Before cagra::build (IndexMerge index0) - database_host "
+                             "pointer address: "
+                          << static_cast<const void*>(database_host->data_handle()) << std::endl;
+                std::cout << "[DEBUG] database_host data content (by rows):" << std::endl;
+                for (size_t row = 0; row < database0_size; ++row) {
+                  std::cout << "[DEBUG] Row " << row << ": ";
+                  for (size_t col = 0; col < static_cast<size_t>(ps.dim); ++col) {
+                    std::cout << database_host->data_handle()[row * ps.dim + col] << " ";
+                  }
+                  std::cout << std::endl;
+                }
+                std::cout << std::flush;
+              } else {
+                std::cout << "[DEBUG] Before cagra::build (IndexMerge index0) - database_host "
+                             "pointer address: "
+                          << static_cast<const void*>(database_host->data_handle()) << std::endl;
+                std::cout << std::flush;
+              }
+            }
+
             index0 = cagra::build(handle_, index_params, database_host_view);
           }
           {
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
-              (const DataT*)database_host->data_handle() + database0_size * ps.dim,
-              database1_size,
-              ps.dim);
+              (const DataT*)database_host->data_handle(), database1_size, ps.dim);
+
+            // Debug print - CI compatible
+            if constexpr (std::is_same_v<DataT, float>) {
+              if (ps.n_rows < 100) {
+                std::cout << "[DEBUG] Before cagra::build (IndexMerge index1) - database_host "
+                             "pointer address: "
+                          << static_cast<const void*>(database_host->data_handle()) << std::endl;
+                std::cout << "[DEBUG] database_host data content (by rows):" << std::endl;
+                for (size_t row = 0; row < database1_size; ++row) {
+                  std::cout << "[DEBUG] Row " << row << ": ";
+                  for (size_t col = 0; col < static_cast<size_t>(ps.dim); ++col) {
+                    std::cout << database_host->data_handle()[row * ps.dim + col] << " ";
+                  }
+                  std::cout << std::endl;
+                }
+                std::cout << std::flush;
+              } else {
+                std::cout << "[DEBUG] Before cagra::build (IndexMerge index1) - database_host "
+                             "pointer address: "
+                          << static_cast<const void*>(database_host->data_handle()) << std::endl;
+                std::cout << std::flush;
+              }
+            }
+
             index1 = cagra::build(handle_, index_params, database_host_view);
           }
         } else {
