@@ -1044,7 +1044,7 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
           {
             auto database_device_view = raft::make_device_matrix_view<const DataT, int64_t>(
               (const DataT*)database_dev->data_handle(), database0_size, ps.dim);
-            index0 = cagra::build(handle_, index_params, database_host_viewdatabase_device_view);
+            index0 = cagra::build(handle_, index_params, database_device_view);
           }
           {
             auto database_device_view = raft::make_device_matrix_view<const DataT, int64_t>(
