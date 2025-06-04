@@ -55,16 +55,15 @@ struct dice_distance_op {
   template <typename Policy>
   static constexpr size_t shared_mem_size()
   {
-    return Policy::SmemSize + ((Policy::Mblk + Policy::Nblk) * sizeof(DataT));
+    return Policy::SmemSize + ((Policy::Mblk + Policy::Nblk) * sizeof(AccT));
   }
 
   DI void core(AccT& acc, DataT& x, DataT& y) const
   {
     if constexpr ((std::is_same_v<AccT, float> && std::is_same_v<DataT, half>)) {
-      acc += __half2float(x != DataT(0) ? DataT(1) : DataT(0)) *
-             __half2float(y != DataT(0) ? DataT(1) : DataT(0));
+      acc += __half2float(x) * __half2float(y);
     } else {
-      acc += x != DataT(0) ? DataT(1) : DataT(0) * y != DataT(0) ? DataT(1) : DataT(0);
+      acc += x * y;
     }
   };
 

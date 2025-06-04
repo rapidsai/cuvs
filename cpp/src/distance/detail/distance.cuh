@@ -265,8 +265,8 @@ void distance_impl(raft::resources const& handle,
 
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
-  OutT* x_norm = workspace;
-  OutT* y_norm = workspace;
+  AccT* x_norm = workspace;
+  AccT* y_norm = workspace;
   // TODO: Column major case looks to have lower accuracy for X == Y,
   // perhaps the use of stridedSummationKernel could be causing this,
   // need to investigate and fix.
