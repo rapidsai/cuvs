@@ -32,7 +32,7 @@ from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
 
-from cuvs.distance import DISTANCE_TYPES
+from cuvs.distance import DISTANCE_NAMES, DISTANCE_TYPES
 from cuvs.neighbors.common import _check_input_array
 from cuvs.neighbors.filters import no_filter
 
@@ -97,7 +97,6 @@ cdef class IndexParams:
     """
 
     cdef cuvsIvfFlatIndexParams* params
-    cdef object _metric
 
     def __cinit__(self):
         cuvsIvfFlatIndexParamsCreate(&self.params)
@@ -114,7 +113,6 @@ cdef class IndexParams:
                  adaptive_centers=False,
                  add_data_on_build=True,
                  conservative_memory_allocation=False):
-        self._metric = metric
         self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
         self.params.metric_arg = metric_arg
         self.params.add_data_on_build = add_data_on_build
@@ -125,9 +123,12 @@ cdef class IndexParams:
         self.params.conservative_memory_allocation = \
             conservative_memory_allocation
 
+    def get_handle(self):
+        return <size_t> self.params
+
     @property
     def metric(self):
-        return self._metric
+        return DISTANCE_NAMES[self.params.metric]
 
     @property
     def metric_arg(self):
@@ -290,6 +291,9 @@ cdef class SearchParams:
 
     def __init__(self, *, n_probes=20):
         self.params.n_probes = n_probes
+
+    def get_handle(self):
+        return <size_t> self.params
 
     @property
     def n_probes(self):

@@ -30,6 +30,7 @@ cdef extern from "library_types.h":
 
         # uint8 - used to refer to IVF-PQ's fp8 storage type
         CUDA_R_8U "CUDA_R_8U"
+        CUDA_R_8I "CUDA_R_8I"
 
 
 cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
@@ -59,6 +60,8 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
         cudaDataType_t lut_dtype
         cudaDataType_t internal_distance_dtype
         double preferred_shmem_carveout
+        cudaDataType_t coarse_search_dtype
+        uint32_t max_internal_batch_size
 
     ctypedef cuvsIvfPqSearchParams* cuvsIvfPqSearchParams_t
 

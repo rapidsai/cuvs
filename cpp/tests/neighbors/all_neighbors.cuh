@@ -58,7 +58,7 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AllNeighborsInputs& 
   os << "dataset shape=" << p.n_rows << "x" << p.dim << ", k=" << p.k
      << ", metric=" << static_cast<int>(std::get<1>(p.build_algo_metric_recall))
      << ", clusters=" << std::get<0>(p.cluster_nearestcluster)
-     << ", num nearest clusters=" << std::get<1>(p.cluster_nearestcluster) << std::endl;
+     << ", overlap_factor=" << std::get<1>(p.cluster_nearestcluster) << std::endl;
   return os;
 }
 
@@ -73,9 +73,9 @@ void get_graphs(raft::resources& handle,
                 size_t queries_size)
 {
   all_neighbors_params params;
-  params.n_clusters         = std::get<0>(ps.cluster_nearestcluster);
-  params.n_nearest_clusters = std::get<1>(ps.cluster_nearestcluster);
-  params.metric             = std::get<1>(ps.build_algo_metric_recall);
+  params.n_clusters     = std::get<0>(ps.cluster_nearestcluster);
+  params.overlap_factor = std::get<1>(ps.cluster_nearestcluster);
+  params.metric         = std::get<1>(ps.build_algo_metric_recall);
 
   auto build_algo = std::get<0>(ps.build_algo_metric_recall);
 
@@ -91,8 +91,7 @@ void get_graphs(raft::resources& handle,
     ivfq_build_params.build_params.metric = params.metric;
     // heuristically good ivfpq n_lists
     ivfq_build_params.build_params.n_lists = std::max(
-      5u,
-      static_cast<uint32_t>(ps.n_rows * params.n_nearest_clusters / (5000 * params.n_clusters)));
+      5u, static_cast<uint32_t>(ps.n_rows * params.overlap_factor / (5000 * params.n_clusters)));
     params.graph_build_params = ivfq_build_params;
   }
 
@@ -209,7 +208,7 @@ const std::vector<AllNeighborsInputs> inputsSingle =
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::InnerProduct, 0.8)},
-    {std::make_tuple(1lu, 2lu)},  // min_recall, n_clusters, num_nearest_cluster
+    {std::make_tuple(1lu, 2lu)},  // min_recall, n_clusters, overlap_factor
     {5000, 7151},                 // n_rows
     {64, 137},                    // dim
     {16, 23},                     // graph_degree
@@ -227,7 +226,7 @@ const std::vector<AllNeighborsInputs> inputsBatch =
       std::make_tuple(4lu, 2lu),
       std::make_tuple(7lu, 2lu),
       std::make_tuple(10lu, 2lu),
-    },             // min_recall, n_clusters, num_nearest_cluster
+    },             // min_recall, n_clusters, overlap_factor
     {5000, 7151},  // n_rows
     {64, 137},     // dim
     {16, 23},      // graph_degree
