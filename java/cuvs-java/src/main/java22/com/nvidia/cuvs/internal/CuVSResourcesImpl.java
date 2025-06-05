@@ -16,18 +16,16 @@
 
 package com.nvidia.cuvs.internal;
 
-import com.nvidia.cuvs.CuVSResources;
+import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResourcesCreate;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResourcesDestroy;
 
 import java.lang.foreign.Arena;
-import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemorySegment;
-import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
 
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
-import static com.nvidia.cuvs.internal.common.Util.checkError;
-import static java.lang.foreign.ValueLayout.ADDRESS;
+import com.nvidia.cuvs.CuVSResources;
 
 /**
  * Used for allocating resources for cuVS
@@ -35,14 +33,6 @@ import static java.lang.foreign.ValueLayout.ADDRESS;
  * @since 25.02
  */
 public class CuVSResourcesImpl implements CuVSResources {
-
-  static final MethodHandle createResourcesMethodHandle = downcallHandle(
-      "create_resources", FunctionDescriptor.of(ADDRESS, ADDRESS)
-  );
-
-  private static final MethodHandle destroyResourcesMethodHandle = downcallHandle(
-       "destroy_resources", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS)
-  );
 
   private final Path tempDirectory;
   private final Arena arena;
@@ -56,26 +46,18 @@ public class CuVSResourcesImpl implements CuVSResources {
    */
   public CuVSResourcesImpl(Path tempDirectory) throws Throwable {
     this.tempDirectory = tempDirectory;
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment returnValue = localArena.allocate(C_INT);
-      resourcesMemorySegment = (MemorySegment) createResourcesMethodHandle.invokeExact(returnValue);
-      checkError(returnValue.get(C_INT, 0L), "createResourcesMethodHandle");
-    }
     arena = Arena.ofShared();
+    resourcesMemorySegment = arena.allocate(cuvsResources_t);
+    int returnValue = cuvsResourcesCreate(resourcesMemorySegment);
+    checkCuVSError(returnValue, "cuvsResourcesCreate");
   }
 
   @Override
   public void close() {
     checkNotDestroyed();
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment returnValue = localArena.allocate(C_INT);
-      destroyResourcesMethodHandle.invokeExact(resourcesMemorySegment, returnValue);
-      checkError(returnValue.get(C_INT, 0L), "destroyResourcesMethodHandle");
-    } catch (Throwable e) {
-      e.printStackTrace();
-    } finally {
-      destroyed = true;
-    }
+    int returnValue = cuvsResourcesDestroy(resourcesMemorySegment.get(cuvsResources_t, 0));
+    checkCuVSError(returnValue, "cuvsResourcesDestroy");
+    destroyed = true;
     if (!arena.scope().isAlive()) {
       arena.close();
     }
@@ -108,47 +90,5 @@ public class CuVSResourcesImpl implements CuVSResources {
   protected Arena getArena() {
     checkNotDestroyed();
     return arena;
-  }
-
-  /**
-   * Container for GPU information
-   */
-  public class GPUInfo {
-
-    private final int gpuId;
-    private final long freeMemory;
-    private final long totalMemory;
-    private final float computeCapability;
-
-    public GPUInfo(int gpuId, long freeMemory, long totalMemory, float computeCapability) {
-      super();
-      this.gpuId = gpuId;
-      this.freeMemory = freeMemory;
-      this.totalMemory = totalMemory;
-      this.computeCapability = computeCapability;
-    }
-
-    public int getGpuId() {
-      return gpuId;
-    }
-
-    public long getFreeMemory() {
-      return freeMemory;
-    }
-
-    public long getTotalMemory() {
-      return totalMemory;
-    }
-
-    public float getComputeCapability() {
-      return computeCapability;
-    }
-
-    @Override
-    public String toString() {
-      return "GPUInfo [gpuId=" + gpuId + ", freeMemory=" + freeMemory + ", totalMemory=" + totalMemory
-          + ", computeCapability=" + computeCapability + "]";
-    }
-
   }
 }
