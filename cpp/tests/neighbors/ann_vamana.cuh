@@ -41,6 +41,7 @@
 #include <thrust/sequence.h>
 
 #include <cstddef>
+#include <filesystem>
 #include <iostream>
 #include <optional>
 #include <string>
@@ -137,6 +138,13 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
     index_params.visited_size      = ps.visited_size;
     index_params.max_fraction      = ps.max_fraction;
     index_params.reverse_batchsize = ps.reverse_batchsize;
+    // use randomized codebooks to test serialization & quantization code path
+    if (ps.dim == 384 && std::is_same_v<DataT, int8_t>)
+      index_params.codebooks =
+        vamana::deserialize_codebooks(std::string(CODEBOOKS_DIR) + "384_int8", ps.dim);
+    if (ps.dim == 64 && std::is_same_v<DataT, float>)
+      index_params.codebooks =
+        vamana::deserialize_codebooks(std::string(CODEBOOKS_DIR) + "64_float", ps.dim);
 
     auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
       (const DataT*)database.data(), ps.n_rows, ps.dim);
@@ -157,6 +165,14 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
 
     tmp_index_file index_file;
     vamana::serialize(handle_, index_file.filename, index);
+    if (index_params.codebooks) {
+      vamana::serialize(handle_, index_file.filename + "_sector_aligned", index, true, true);
+      EXPECT_TRUE(std::filesystem::file_size(index_file.filename + "_sector_aligned_disk.index") >
+                  0u);
+      EXPECT_TRUE(std::filesystem::file_size(index_file.filename + "_sector_aligned.data") > 0u);
+      EXPECT_TRUE(
+        std::filesystem::file_size(index_file.filename + "_sector_aligned_pq_compressed.bin") > 0u);
+    }
 
     // Test recall by searching with CAGRA search
     if (ps.graph_degree < 256) {  // CAGRA search result buffer cannot support larger graph degree
@@ -267,7 +283,7 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
 {
   std::vector<AnnVamanaInputs> inputs = raft::util::itertools::product<AnnVamanaInputs>(
     {1000},
-    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},
+    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 384, 512, 619, 1024},
     {32},       // graph degree
     {64, 256},  // visited_size
     {0.06, 0.1},
@@ -284,7 +300,7 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
 
   std::vector<AnnVamanaInputs> inputs2 = raft::util::itertools::product<AnnVamanaInputs>(
     {1000},
-    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},
+    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 384, 512, 619, 1024},
     {64},        // graph degree
     {128, 512},  // visited_size
     {0.06},
@@ -302,7 +318,7 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
 
   inputs2 = raft::util::itertools::product<AnnVamanaInputs>(
     {1000},
-    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},
+    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 384, 512, 619, 1024},
     {128},  // graph degree
     {256},  // visited_size
     {0.06},
@@ -320,7 +336,7 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
 
   inputs2 = raft::util::itertools::product<AnnVamanaInputs>(
     {1000},
-    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 619, 1024},
+    {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 384, 512, 619, 1024},
     {256},        // graph degree
     {512, 1024},  // visited_size
     {0.06},

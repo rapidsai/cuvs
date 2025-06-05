@@ -21,7 +21,7 @@ rapids_test_init()
 
 function(ConfigureTest)
 
-  set(options OPTIONAL NOCUDA C_LIB)
+  set(options OPTIONAL NOCUDA C_LIB FETCH_CODEBOOKS)
   set(oneValueArgs NAME GPUS PERCENT ADDITIONAL_DEP)
   set(multiValueArgs PATH TARGETS CONFIGURATIONS)
 
@@ -74,6 +74,28 @@ function(ConfigureTest)
 
   if(_CUVS_TEST_NOCUDA)
     target_compile_definitions(${TEST_NAME} PRIVATE "CUVS_DISABLE_CUDA")
+  endif()
+
+  if(_CUVS_TEST_FETCH_CODEBOOKS)
+    set(CODEBOOKS 384_int8_pq_pivots.bin 384_int8_pq_pivots.bin_rotation_matrix.bin
+                  64_float_pq_pivots.bin 64_float_pq_pivots.bin_rotation_matrix.bin
+    )
+    foreach(CODEBOOK ${CODEBOOKS})
+      file(
+        DOWNLOAD
+        https://data.rapids.ai/cuvs/tests/data/neighbors/ann_vamana/randomized_codebooks/${CODEBOOK}
+        ${CUVS_BINARY_DIR}/tests/data/neighbors/ann_vamana/randomized_codebooks/${CODEBOOK}
+      )
+      install(
+        FILES ${CUVS_BINARY_DIR}/tests/data/neighbors/ann_vamana/randomized_codebooks/${CODEBOOK}
+        DESTINATION test/data/neighbors/ann_vamana/randomized_codebooks/
+      )
+    endforeach()
+    target_compile_definitions(
+      ${TEST_NAME}
+      PRIVATE
+        CODEBOOKS_DIR="${CMAKE_INSTALL_PREFIX}/test/data/neighbors/ann_vamana/randomized_codebooks/"
+    )
   endif()
 
   target_include_directories(${TEST_NAME} PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/tests>")
@@ -185,6 +207,7 @@ if(BUILD_TESTS)
     1
     PERCENT
     100
+    FETCH_CODEBOOKS
   )
 
   ConfigureTest(NAME NEIGHBORS_BALL_COVER_TEST PATH neighbors/ball_cover.cu GPUS 1 PERCENT 100)
