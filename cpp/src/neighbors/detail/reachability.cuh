@@ -228,8 +228,6 @@ void mutual_reachability_graph(const raft::resources& handle,
                     coo_rows.data(),
                     [min_samples] __device__(value_idx c) -> value_idx { return c / min_samples; });
 
-  RAFT_LOG_INFO("symmetrizing now");
-
   raft::sparse::linalg::symmetrize(handle,
                                    coo_rows.data(),
                                    inds.data(),
@@ -238,11 +236,8 @@ void mutual_reachability_graph(const raft::resources& handle,
                                    m,
                                    static_cast<nnz_t>(min_samples * m),
                                    out);
-  RAFT_LOG_INFO("finished symmetrizing");
 
   raft::sparse::convert::sorted_coo_to_csr(out.rows(), out.nnz, indptr, m + 1, stream);
-
-  RAFT_LOG_INFO("finished coo to csr");
 
   // self-loops get max distance
   auto transform_in =

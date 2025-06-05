@@ -167,7 +167,7 @@ void build_linkage(
   std::variant<linkage_graph_params::distance_params,
                linkage_graph_params::mutual_reachability_params> linkage_graph_params,
   cuvs::distance::DistanceType metric,
-  raft::device_coo_matrix_view<float, int, int, int> out_mst,
+  raft::device_coo_matrix_view<float, int, int, size_t> out_mst,
   raft::device_matrix_view<int, int> dendrogram,
   raft::device_vector_view<float, int> out_distances,
   raft::device_vector_view<int, int> out_sizes,
