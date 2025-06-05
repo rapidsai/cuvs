@@ -47,7 +47,7 @@ namespace cuvs::cluster::agglomerative::detail {
  * @param[out] out_distances distances of output
  * @param[out] out_sizes cluster sizes of output
  */
-template <typename value_t = float, typename value_idx = int, typename nnz_t = int>
+template <typename value_t = float, typename value_idx = int, typename nnz_t = size_t>
 void build_mr_linkage(raft::resources const& handle,
                       raft::device_matrix_view<const value_t, value_idx, raft::row_major> X,
                       value_idx min_samples,
@@ -59,10 +59,15 @@ void build_mr_linkage(raft::resources const& handle,
                       raft::device_vector_view<value_t, value_idx> out_distances,
                       raft::device_vector_view<value_idx, value_idx> out_sizes)
 {
-  size_t m          = X.extent(0);
-  size_t n          = X.extent(1);
-  auto graph_indptr = raft::make_device_vector<value_idx, value_idx>(handle, m + 1);
-  raft::sparse::COO<value_t, value_idx, nnz_t> graph(raft::resource::get_cuda_stream(handle));
+  size_t m                        = X.extent(0);
+  size_t n                        = X.extent(1);
+  auto mutual_reachability_indptr = raft::make_device_vector<value_idx, value_idx>(handle, m + 1);
+  raft::sparse::COO<value_t, value_idx, nnz_t> mutual_reachability_coo(
+    raft::resource::get_cuda_stream(handle), min_samples * m * 2);
+  RAFT_LOG_INFO("min_samples %d alpha %f", min_samples, alpha);
+  // raft::sparse::COO<value_t, value_idx, nnz_t>
+  // mutual_reachability_coo(raft::resource::get_cuda_stream(handle));
+
   cuvs::neighbors::detail::reachability::mutual_reachability_graph<value_idx, value_t, nnz_t>(
     handle,
     X.data_handle(),
@@ -71,30 +76,39 @@ void build_mr_linkage(raft::resources const& handle,
     metric,
     min_samples,
     alpha,
-    graph_indptr.data_handle(),
+    mutual_reachability_indptr.data_handle(),
     core_dists.data_handle(),
-    graph);
+    mutual_reachability_coo);
+  cudaDeviceSynchronize();
+  RAFT_LOG_INFO("done mutual_reachability_graph");
 
-  auto color = raft::make_device_vector<value_idx, value_idx>(handle, static_cast<value_idx>(m));
+  // auto color = raft::make_device_vector<value_idx, value_idx>(handle, static_cast<value_idx>(m));
+  rmm::device_uvector<value_idx> color(m, raft::resource::get_cuda_stream(handle));
   cuvs::sparse::neighbors::MutualReachabilityFixConnectivitiesRedOp<value_idx, value_t>
     reduction_op(core_dists.data_handle(), m);
 
+  RAFT_LOG_INFO("m %zu min_samples %d", m, min_samples);
+
   size_t nnz = m * min_samples;
+
+  RAFT_LOG_INFO("build sorted mst nnz %zu", mutual_reachability_coo.nnz);
 
   detail::build_sorted_mst<value_idx, value_t>(handle,
                                                X.data_handle(),
-                                               graph_indptr.data_handle(),
-                                               graph.cols(),
-                                               graph.vals(),
+                                               mutual_reachability_indptr.data_handle(),
+                                               mutual_reachability_coo.cols(),
+                                               mutual_reachability_coo.vals(),
                                                m,
                                                n,
                                                out_mst.structure_view().get_rows().data(),
                                                out_mst.structure_view().get_cols().data(),
                                                out_mst.get_elements().data(),
-                                               color.data_handle(),
-                                               nnz,
+                                               color.data(),
+                                               mutual_reachability_coo.nnz,
                                                reduction_op,
-                                               metric);
+                                               metric,
+                                               20);
+  RAFT_LOG_INFO("done build sorted mst");
 
   /**
    * Perform hierarchical labeling

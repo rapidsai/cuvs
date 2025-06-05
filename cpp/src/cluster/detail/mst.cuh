@@ -159,15 +159,20 @@ void build_sorted_mst(
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded,
   int max_iter                        = 10)
 {
+  RAFT_LOG_INFO("nnz %zu", nnz);
   auto stream = raft::resource::get_cuda_stream(handle);
+  RAFT_LOG_INFO("initialize mst_coo");
 
   // We want to have MST initialize colors on first call.
   auto mst_coo = raft::sparse::solver::mst<value_idx, value_idx, value_t, double>(
     handle, indptr, indices, pw_dists, (value_idx)m, nnz, color, stream, false, true);
 
+  RAFT_LOG_INFO("initialized mst_coo");
+
   int iters        = 1;
   int n_components = cuvs::sparse::neighbors::get_n_components(color, m, stream);
 
+  RAFT_LOG_INFO("doing iterations");
   while (n_components > 1 && iters < max_iter) {
     connect_knn_graph<value_idx, value_t>(handle, X, mst_coo, m, n, color, reduction_op);
 
@@ -175,6 +180,8 @@ void build_sorted_mst(
 
     n_components = cuvs::sparse::neighbors::get_n_components(color, m, stream);
   }
+  cudaDeviceSynchronize();
+  RAFT_LOG_INFO("done iterations");
 
   /**
    * The `max_iter` argument was introduced only to prevent the potential for an infinite loop.
@@ -198,6 +205,8 @@ void build_sorted_mst(
 
   raft::sparse::op::coo_sort_by_weight(
     mst_coo.src.data(), mst_coo.dst.data(), mst_coo.weights.data(), mst_coo.n_edges, stream);
+
+  RAFT_LOG_INFO("mst_coo.n_edges %d", mst_coo.n_edges);
 
   raft::copy_async(mst_src, mst_coo.src.data(), mst_coo.n_edges, stream);
   raft::copy_async(mst_dst, mst_coo.dst.data(), mst_coo.n_edges, stream);
