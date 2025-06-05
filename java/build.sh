@@ -39,4 +39,4 @@ export LD_LIBRARY_PATH=${CURDIR}/../cpp/build:${LD_LIBRARY_PATH}
 cd cuvs-java
 mvn verify "${MAVEN_VERIFY_ARGS[@]}" \
   && mvn install:install-file -Dfile=./target/cuvs-java-$VERSION-jar-with-dependencies.jar -DgroupId=$GROUP_ID -DartifactId=cuvs-java -Dversion=$VERSION -Dpackaging=jar \
-  && cp pom.xml ./target/	
+  && cp pom.xml ./target/
