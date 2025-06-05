@@ -47,7 +47,7 @@ void build_linkage(
   std::variant<linkage_graph_params::distance_params,
                linkage_graph_params::mutual_reachability_params> linkage_graph_params,
   cuvs::distance::DistanceType metric,
-  raft::device_coo_matrix_view<float, int, int, int> out_mst,
+  raft::device_coo_matrix_view<float, int, int, size_t> out_mst,
   raft::device_matrix_view<int, int> out_dendrogram,
   raft::device_vector_view<float, int> out_distances,
   raft::device_vector_view<int, int> out_sizes,
@@ -66,26 +66,28 @@ void build_linkage(
     auto mr_params = std::get<
       cuvs::cluster::agglomerative::helpers::linkage_graph_params::mutual_reachability_params>(
       linkage_graph_params);
-    detail::build_mr_linkage<float, int, int>(handle,
-                                              X,
-                                              mr_params.min_samples,
-                                              mr_params.alpha,
-                                              metric,
-                                              core_dists_mdspan,
-                                              out_mst,
-                                              out_dendrogram,
-                                              out_distances,
-                                              out_sizes);
+    detail::build_mr_linkage<float, int>(handle,
+                                         X,
+                                         mr_params.min_samples,
+                                         mr_params.alpha,
+                                         metric,
+                                         core_dists_mdspan,
+                                         out_mst,
+                                         out_dendrogram,
+                                         out_distances,
+                                         out_sizes);
   } else {
     auto dist_params =
       std::get<cuvs::cluster::agglomerative::helpers::linkage_graph_params::distance_params>(
         linkage_graph_params);
     if (dist_params.dist_type == cuvs::cluster::agglomerative::Linkage::KNN_GRAPH) {
-      detail::build_dist_linkage<float, int, int, cuvs::cluster::agglomerative::Linkage::KNN_GRAPH>(
-        handle, X, dist_params.c, metric, out_mst, out_dendrogram, out_distances, out_sizes);
+      detail::
+        build_dist_linkage<float, int, size_t, cuvs::cluster::agglomerative::Linkage::KNN_GRAPH>(
+          handle, X, dist_params.c, metric, out_mst, out_dendrogram, out_distances, out_sizes);
     } else {
-      detail::build_dist_linkage<float, int, int, cuvs::cluster::agglomerative::Linkage::PAIRWISE>(
-        handle, X, dist_params.c, metric, out_mst, out_dendrogram, out_distances, out_sizes);
+      detail::
+        build_dist_linkage<float, int, size_t, cuvs::cluster::agglomerative::Linkage::PAIRWISE>(
+          handle, X, dist_params.c, metric, out_mst, out_dendrogram, out_distances, out_sizes);
     }
   }
 }
