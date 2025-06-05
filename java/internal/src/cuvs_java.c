@@ -103,6 +103,12 @@ cuvsCagraIndex_t build_cagra_index(float *dataset, long rows, long dimensions, c
   cuvsCagraIndex_t index;
   cuvsCagraIndexCreate(&index);
 
+  if (index_params->build_algo == 1) { // when build algo is IVF_PQ
+    uint32_t n_lists = index_params->graph_build_params->ivf_pq_build_params->n_lists;
+    // As rows cannot be less than n_lists value so trim down.
+    index_params->graph_build_params->ivf_pq_build_params->n_lists = rows < n_lists ? rows : n_lists;
+  }
+
   index_params->compression = compression_params;
   cuvsStreamSync(cuvs_resources);
   *return_value = cuvsCagraBuild(cuvs_resources, index_params, &dataset_tensor, index);
@@ -159,18 +165,30 @@ void deserialize_cagra_index(cuvsResources_t cuvs_resources, cuvsCagraIndex_t in
  * @param[out] distances_h reference to the distance results on the host memory
  * @param[out] return_value return value for cuvsCagraSearch function call
  * @param[in] search_params reference to cuvsCagraSearchParams_t holding the search parameters
+ * @param[in] prefilter_data host pointer to bit-packed filter bitmap (uint32_t array)
+ * @param[in] prefilter_data_length total number of bits in the filter (should be equal to num_docs * num_filters)
  */
-void search_cagra_index(cuvsCagraIndex_t index, float *queries, int topk, long n_queries, int dimensions,
-    cuvsResources_t cuvs_resources, int *neighbors_h, float *distances_h, int *return_value, cuvsCagraSearchParams_t search_params) {
-
+void search_cagra_index(cuvsCagraIndex_t index,
+                        float *queries,
+                        int topk,
+                        long n_queries,
+                        int dimensions,
+                        cuvsResources_t cuvs_resources,
+                        int *neighbors_h,
+                        float *distances_h,
+                        int *return_value,
+                        cuvsCagraSearchParams_t search_params,
+                        uint32_t *prefilter_data,
+                        long prefilter_data_length) {
   cudaStream_t stream;
   cuvsStreamGet(cuvs_resources, &stream);
 
   uint32_t *neighbors;
   float *distances, *queries_d;
-  cuvsRMMAlloc(cuvs_resources, (void**) &queries_d, sizeof(float) * n_queries * dimensions);
-  cuvsRMMAlloc(cuvs_resources, (void**) &neighbors, sizeof(uint32_t) * n_queries * topk);
-  cuvsRMMAlloc(cuvs_resources, (void**) &distances, sizeof(float) * n_queries * topk);
+
+  cuvsRMMAlloc(cuvs_resources, (void **) &queries_d, sizeof(float) * n_queries * dimensions);
+  cuvsRMMAlloc(cuvs_resources, (void **) &neighbors, sizeof(uint32_t) * n_queries * topk);
+  cuvsRMMAlloc(cuvs_resources, (void **) &distances, sizeof(float) * n_queries * topk);
 
   cudaMemcpy(queries_d, queries, sizeof(float) * n_queries * dimensions, cudaMemcpyDefault);
 
@@ -185,12 +203,35 @@ void search_cagra_index(cuvsCagraIndex_t index, float *queries, int topk, long n
 
   cuvsStreamSync(cuvs_resources);
 
-  cuvsFilter filter; // TODO: Implement Cagra Pre-Filtering, but leave it as no-op for now
-  filter.type = NO_FILTER;
-  filter.addr = (uintptr_t)NULL;
+  cuvsFilter filter;
+  uint32_t *prefilter_d = NULL;
+  int64_t prefilter_len = 0;
+  DLManagedTensor *prefilter_tensor_ptr = NULL;
 
-  *return_value = cuvsCagraSearch(cuvs_resources, search_params, index, &queries_tensor, &neighbors_tensor,
-                  &distances_tensor, filter);
+  if (prefilter_data == NULL || prefilter_data_length == 0) {
+    filter.type = NO_FILTER;
+    filter.addr = (uintptr_t) NULL;
+  } else {
+    int64_t prefilter_shape[1] = {(prefilter_data_length + 31) / 32};
+    prefilter_len = prefilter_shape[0];
+
+    cuvsRMMAlloc(cuvs_resources, (void **) &prefilter_d, sizeof(uint32_t) * prefilter_len);
+    cudaMemcpy(prefilter_d, prefilter_data, sizeof(uint32_t) * prefilter_len, cudaMemcpyHostToDevice);
+
+    prefilter_tensor_ptr = (DLManagedTensor *) malloc(sizeof(DLManagedTensor));
+    *prefilter_tensor_ptr = prepare_tensor(prefilter_d, prefilter_shape, kDLUInt, 32, 1, kDLCUDA);
+
+    filter.type = BITSET;
+    filter.addr = (uintptr_t) prefilter_tensor_ptr;
+  }
+
+  *return_value = cuvsCagraSearch(cuvs_resources,
+                                  search_params,
+                                  index,
+                                  &queries_tensor,
+                                  &neighbors_tensor,
+                                  &distances_tensor,
+                                  filter);
 
   cudaMemcpy(neighbors_h, neighbors, sizeof(uint32_t) * n_queries * topk, cudaMemcpyDefault);
   cudaMemcpy(distances_h, distances, sizeof(float) * n_queries * topk, cudaMemcpyDefault);
@@ -198,6 +239,41 @@ void search_cagra_index(cuvsCagraIndex_t index, float *queries, int topk, long n
   cuvsRMMFree(cuvs_resources, distances, sizeof(float) * n_queries * topk);
   cuvsRMMFree(cuvs_resources, neighbors, sizeof(uint32_t) * n_queries * topk);
   cuvsRMMFree(cuvs_resources, queries_d, sizeof(float) * n_queries * dimensions);
+  if (prefilter_d != NULL) {
+    cuvsRMMFree(cuvs_resources, prefilter_d, sizeof(uint32_t) * prefilter_len);
+  }
+  if (prefilter_tensor_ptr != NULL) {
+    free(prefilter_tensor_ptr);
+  }
+}
+
+/**
+ * @brief A function to merge multiple CAGRA indexes into a single index
+ *
+ * @param[in] cuvs_resources Reference to the underlying opaque C handle
+ * @param[in] index_array Array of input CAGRA index handles to be merged
+ * @param[out] merged_index Output handle for the merged CAGRA index
+ * @param[in] num_indices Number of indexes to merge
+ * @param[out] return_value Return value for cuvsCagraMerge function call
+ * @param[in] merge_params Reference to merge parameters, or NULL for defaults
+ */
+void merge_cagra_indexes(cuvsResources_t cuvs_resources,
+                       cuvsCagraIndex_t* index_array,
+                       cuvsCagraIndex_t merged_index,
+                       int num_indices,
+                       int* return_value,
+                       cuvsCagraMergeParams_t merge_params) {
+  // default merge_params when merge_params is null
+  cuvsCagraMergeParams_t local_merge_params = merge_params;
+  if (local_merge_params == NULL) {
+    cuvsCagraMergeParamsCreate(&local_merge_params);
+  }
+
+  *return_value = cuvsCagraMerge(cuvs_resources, local_merge_params, index_array, num_indices, merged_index);
+
+  if (merge_params == NULL && local_merge_params != NULL) {
+    cuvsCagraMergeParamsDestroy(local_merge_params);
+  }
 }
 
 /**

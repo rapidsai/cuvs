@@ -30,7 +30,20 @@ from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
 from cuvs.distance_type cimport cuvsDistanceType
 from cuvs.neighbors.filters.filters cimport cuvsFilter
+from cuvs.neighbors.ivf_pq.ivf_pq cimport (
+    cuvsIvfPqIndexParams_t,
+    cuvsIvfPqSearchParams_t,
+)
 
+
+cdef extern from "library_types.h":
+    ctypedef enum cudaDataType_t:
+        CUDA_R_32F "CUDA_R_32F"  # float
+        CUDA_R_16F "CUDA_R_16F"  # half
+
+        # uint8 - used to refer to IVF-PQ's fp8 storage type
+        CUDA_R_8U "CUDA_R_8U"
+        CUDA_R_8I "CUDA_R_8I"
 
 cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
@@ -49,6 +62,12 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
     ctypedef cuvsCagraCompressionParams* cuvsCagraCompressionParams_t
 
+    ctypedef struct cuvsIvfPqParams:
+        cuvsIvfPqIndexParams_t ivf_pq_build_params
+        cuvsIvfPqSearchParams_t ivf_pq_search_params
+        float refinement_rate
+    ctypedef cuvsIvfPqParams* cuvsIvfPqParams_t
+
     ctypedef struct cuvsCagraIndexParams:
         cuvsDistanceType metric
         size_t intermediate_graph_degree
@@ -56,6 +75,7 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
         cuvsCagraGraphBuildAlgo build_algo
         size_t nn_descent_niter
         cuvsCagraCompressionParams_t compression
+        cuvsIvfPqParams_t graph_build_params
 
     ctypedef cuvsCagraIndexParams* cuvsCagraIndexParams_t
 
@@ -84,6 +104,11 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
         float hashmap_max_fill_rate
         uint32_t num_random_samplings
         uint64_t rand_xor_mask
+        bool persistent
+        float persistent_lifetime
+        float persistent_device_usage
+
+    ctypedef cuvsCagraSearchParams* cuvsCagraSearchParams_t
 
     ctypedef struct cuvsCagraIndex:
         uintptr_t addr
@@ -101,6 +126,10 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
     cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t index)
 
+    cuvsError_t cuvsCagraSearchParamsCreate(cuvsCagraSearchParams_t* params)
+
+    cuvsError_t cuvsCagraSearchParamsDestroy(cuvsCagraSearchParams_t index)
+
     cuvsError_t cuvsCagraIndexCreate(cuvsCagraIndex_t* index)
 
     cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index)
@@ -110,7 +139,7 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
     cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                                cuvsCagraIndexParams* params,
                                DLManagedTensor* dataset,
-                               cuvsCagraIndex_t index) except +
+                               cuvsCagraIndex_t index)
 
     cuvsError_t cuvsCagraSearch(cuvsResources_t res,
                                 cuvsCagraSearchParams* params,
@@ -118,20 +147,20 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
                                 DLManagedTensor* queries,
                                 DLManagedTensor* neighbors,
                                 DLManagedTensor* distances,
-                                cuvsFilter filter) except +
+                                cuvsFilter filter)
 
     cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
                                    const char * filename,
                                    cuvsCagraIndex_t index,
-                                   bool include_dataset) except +
+                                   bool include_dataset)
 
     cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
                                             const char * filename,
-                                            cuvsCagraIndex_t index) except +
+                                            cuvsCagraIndex_t index)
 
     cuvsError_t cuvsCagraDeserialize(cuvsResources_t res,
                                      const char * filename,
-                                     cuvsCagraIndex_t index) except +
+                                     cuvsCagraIndex_t index)
 
 cdef class Index:
     """

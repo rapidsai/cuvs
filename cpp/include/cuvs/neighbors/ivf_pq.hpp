@@ -27,6 +27,11 @@
 #include <raft/core/resources.hpp>
 #include <raft/util/integer_utils.hpp>
 
+#include <optional>
+#include <tuple>
+#include <variant>
+#include <vector>
+
 namespace cuvs::neighbors::ivf_pq {
 
 /**
@@ -127,7 +132,7 @@ struct index_params : cuvs::neighbors::index_params {
    *   // create index_params for a [N. D] dataset and have InnerProduct as the distance metric
    *   auto dataset = raft::make_device_matrix<float, int64_t>(res, N, D);
    *   ivf_pq::index_params index_params =
-   *     ivf_pq::index_params::from_dataset(dataset.extents(), raft::distance::InnerProduct);
+   *     ivf_pq::index_params::from_dataset(dataset.extents(), cuvs::distance::InnerProduct);
    *   // modify/update index_params as needed
    *   index_params.add_data_on_build = true;
    * @endcode
@@ -181,6 +186,22 @@ struct search_params : cuvs::neighbors::search_params {
    * performance if tweaked incorrectly.
    */
   double preferred_shmem_carveout = 1.0;
+  /**
+   * [Experimental] The data type to use as the GEMM element type when searching the clusters to
+   * probe.
+   *
+   * Possible values: [CUDA_R_8I, CUDA_R_16F, CUDA_R_32F].
+   *
+   * - Legacy default: CUDA_R_32F (float)
+   * - Recommended for performance: CUDA_R_16F (half)
+   * - Experimental/low-precision: CUDA_R_8I (int8_t)
+   *    (WARNING: int8_t variant degrades recall unless data is normalized and low-dimensional)
+   */
+  cudaDataType_t coarse_search_dtype = CUDA_R_32F;
+  /**
+   * Set the internal batch size to improve GPU utilization at the cost of larger memory footprint.
+   */
+  uint32_t max_internal_batch_size = 4096;
 };
 /**
  * @}
@@ -427,6 +448,11 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() noexcept;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix() const noexcept;
 
+  raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> rotation_matrix_int8(
+    const raft::resources& res) const;
+  raft::device_matrix_view<const half, uint32_t, raft::row_major> rotation_matrix_half(
+    const raft::resources& res) const;
+
   /**
    * Accumulated list sizes, sorted in descending order [n_lists + 1].
    * The last value contains the total length of the index.
@@ -446,6 +472,11 @@ struct index : cuvs::neighbors::index {
   /** Cluster centers corresponding to the lists in the original space [n_lists, dim_ext] */
   raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept;
+
+  raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> centers_int8(
+    const raft::resources& res) const;
+  raft::device_matrix_view<const half, uint32_t, raft::row_major> centers_half(
+    const raft::resources& res) const;
 
   /** Cluster centers corresponding to the lists in the rotated space [n_lists, rot_dim] */
   raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept;
@@ -484,6 +515,14 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix<float, uint32_t, raft::row_major> centers_;
   raft::device_matrix<float, uint32_t, raft::row_major> centers_rot_;
   raft::device_matrix<float, uint32_t, raft::row_major> rotation_matrix_;
+
+  // Lazy-initialized low-precision variants of index members - for low-precision coarse search.
+  // These are never serialized and not touched during build/extend.
+  mutable std::optional<raft::device_matrix<int8_t, uint32_t, raft::row_major>> centers_int8_;
+  mutable std::optional<raft::device_matrix<half, uint32_t, raft::row_major>> centers_half_;
+  mutable std::optional<raft::device_matrix<int8_t, uint32_t, raft::row_major>>
+    rotation_matrix_int8_;
+  mutable std::optional<raft::device_matrix<half, uint32_t, raft::row_major>> rotation_matrix_half_;
 
   // Computed members for accelerating search.
   raft::device_vector<uint8_t*, uint32_t, raft::row_major> data_ptrs_;
@@ -1728,6 +1767,449 @@ void deserialize(raft::resources const& handle,
  * @}
  */
 
+/// \defgroup mg_cpp_index_build ANN MG index build
+
+/// \ingroup mg_cpp_index_build
+/**
+ * @brief Builds a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index_params configure the index building
+ * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
+ *
+ * @return the constructed IVF-PQ MG index
+ */
+auto build(const raft::resources& clique,
+           const cuvs::neighbors::mg_index_params<ivf_pq::index_params>& index_params,
+           raft::host_matrix_view<const float, int64_t, row_major> index_dataset)
+  -> cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, float, int64_t>;
+
+/// \ingroup mg_cpp_index_build
+/**
+ * @brief Builds a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index_params configure the index building
+ * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
+ *
+ * @return the constructed IVF-PQ MG index
+ */
+auto build(const raft::resources& clique,
+           const cuvs::neighbors::mg_index_params<ivf_pq::index_params>& index_params,
+           raft::host_matrix_view<const half, int64_t, row_major> index_dataset)
+  -> cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, half, int64_t>;
+
+/// \ingroup mg_cpp_index_build
+/**
+ * @brief Builds a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index_params configure the index building
+ * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
+ *
+ * @return the constructed IVF-PQ MG index
+ */
+auto build(const raft::resources& clique,
+           const cuvs::neighbors::mg_index_params<ivf_pq::index_params>& index_params,
+           raft::host_matrix_view<const int8_t, int64_t, row_major> index_dataset)
+  -> cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, int8_t, int64_t>;
+
+/// \ingroup mg_cpp_index_build
+/**
+ * @brief Builds a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index_params configure the index building
+ * @param[in] index_dataset a row-major matrix on host [n_rows, dim]
+ *
+ * @return the constructed IVF-PQ MG index
+ */
+auto build(const raft::resources& clique,
+           const cuvs::neighbors::mg_index_params<ivf_pq::index_params>& index_params,
+           raft::host_matrix_view<const uint8_t, int64_t, row_major> index_dataset)
+  -> cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, uint8_t, int64_t>;
+
+/// \defgroup mg_cpp_index_extend ANN MG index extend
+
+/// \ingroup mg_cpp_index_extend
+/**
+ * @brief Extends a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::ivf_pq::extend(clique, index, new_vectors, std::nullopt);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
+ * @param[in] new_indices optional vector on host [n_rows],
+ * `std::nullopt` means default continuous range `[0...n_rows)`
+ *
+ */
+void extend(const raft::resources& clique,
+            cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, float, int64_t>& index,
+            raft::host_matrix_view<const float, int64_t, row_major> new_vectors,
+            std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
+
+/// \ingroup mg_cpp_index_extend
+/**
+ * @brief Extends a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::ivf_pq::extend(clique, index, new_vectors, std::nullopt);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
+ * @param[in] new_indices optional vector on host [n_rows],
+ * `std::nullopt` means default continuous range `[0...n_rows)`
+ *
+ */
+void extend(const raft::resources& clique,
+            cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, half, int64_t>& index,
+            raft::host_matrix_view<const half, int64_t, row_major> new_vectors,
+            std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
+
+/// \ingroup mg_cpp_index_extend
+/**
+ * @brief Extends a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::ivf_pq::extend(clique, index, new_vectors, std::nullopt);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
+ * @param[in] new_indices optional vector on host [n_rows],
+ * `std::nullopt` means default continuous range `[0...n_rows)`
+ *
+ */
+void extend(const raft::resources& clique,
+            cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
+            raft::host_matrix_view<const int8_t, int64_t, row_major> new_vectors,
+            std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
+
+/// \ingroup mg_cpp_index_extend
+/**
+ * @brief Extends a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::ivf_pq::extend(clique, index, new_vectors, std::nullopt);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] new_vectors a row-major matrix on host [n_rows, dim]
+ * @param[in] new_indices optional vector on host [n_rows],
+ * `std::nullopt` means default continuous range `[0...n_rows)`
+ *
+ */
+void extend(const raft::resources& clique,
+            cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
+            raft::host_matrix_view<const uint8_t, int64_t, row_major> new_vectors,
+            std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices);
+
+/// \defgroup mg_cpp_index_search ANN MG index search
+
+/// \ingroup mg_cpp_index_search
+/**
+ * @brief Searches a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::mg_search_params<ivf_pq::search_params> search_params;
+ * cuvs::neighbors::ivf_pq::search(clique, index, search_params, queries, neighbors,
+ * distances);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] search_params configure the index search
+ * @param[in] queries a row-major matrix on host [n_rows, dim]
+ * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
+ * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
+ *
+ */
+void search(const raft::resources& clique,
+            const cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, float, int64_t>& index,
+            const cuvs::neighbors::mg_search_params<ivf_pq::search_params>& search_params,
+            raft::host_matrix_view<const float, int64_t, row_major> queries,
+            raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
+            raft::host_matrix_view<float, int64_t, row_major> distances);
+
+/// \ingroup mg_cpp_index_search
+/**
+ * @brief Searches a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::mg_search_params<ivf_pq::search_params> search_params;
+ * cuvs::neighbors::ivf_pq::search(clique, index, search_params, queries, neighbors,
+ * distances);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] search_params configure the index search
+ * @param[in] queries a row-major matrix on host [n_rows, dim]
+ * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
+ * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
+ *
+ */
+void search(const raft::resources& clique,
+            const cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, half, int64_t>& index,
+            const cuvs::neighbors::mg_search_params<ivf_pq::search_params>& search_params,
+            raft::host_matrix_view<const half, int64_t, row_major> queries,
+            raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
+            raft::host_matrix_view<float, int64_t, row_major> distances);
+
+/// \ingroup mg_cpp_index_search
+/**
+ * @brief Searches a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::mg_search_params<ivf_pq::search_params> search_params;
+ * cuvs::neighbors::ivf_pq::search(clique, index, search_params, queries, neighbors,
+ * distances);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] search_params configure the index search
+ * @param[in] queries a row-major matrix on host [n_rows, dim]
+ * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
+ * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
+ *
+ */
+void search(const raft::resources& clique,
+            const cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
+            const cuvs::neighbors::mg_search_params<ivf_pq::search_params>& search_params,
+            raft::host_matrix_view<const int8_t, int64_t, row_major> queries,
+            raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
+            raft::host_matrix_view<float, int64_t, row_major> distances);
+
+/// \ingroup mg_cpp_index_search
+/**
+ * @brief Searches a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::mg_search_params<ivf_pq::search_params> search_params;
+ * cuvs::neighbors::ivf_pq::search(clique, index, search_params, queries, neighbors,
+ * distances);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] search_params configure the index search
+ * @param[in] queries a row-major matrix on host [n_rows, dim]
+ * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
+ * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
+ *
+ */
+void search(const raft::resources& clique,
+            const cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
+            const cuvs::neighbors::mg_search_params<ivf_pq::search_params>& search_params,
+            raft::host_matrix_view<const uint8_t, int64_t, row_major> queries,
+            raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
+            raft::host_matrix_view<float, int64_t, row_major> distances);
+
+/// \defgroup mg_cpp_serialize ANN MG index serialization
+
+/// \ingroup mg_cpp_serialize
+/**
+ * @brief Serializes a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::ivf_pq::serialize(clique, index, filename);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] filename path to the file to be serialized
+ *
+ */
+void serialize(const raft::resources& clique,
+               const cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, float, int64_t>& index,
+               const std::string& filename);
+
+/// \ingroup mg_cpp_serialize
+/**
+ * @brief Serializes a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::ivf_pq::serialize(clique, index, filename);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] filename path to the file to be serialized
+ *
+ */
+void serialize(const raft::resources& clique,
+               const cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, half, int64_t>& index,
+               const std::string& filename);
+
+/// \ingroup mg_cpp_serialize
+/**
+ * @brief Serializes a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::ivf_pq::serialize(clique, index, filename);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] filename path to the file to be serialized
+ *
+ */
+void serialize(const raft::resources& clique,
+               const cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, int8_t, int64_t>& index,
+               const std::string& filename);
+
+/// \ingroup mg_cpp_serialize
+/**
+ * @brief Serializes a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::ivf_pq::serialize(clique, index, filename);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] filename path to the file to be serialized
+ *
+ */
+void serialize(const raft::resources& clique,
+               const cuvs::neighbors::mg_index<ivf_pq::index<int64_t>, uint8_t, int64_t>& index,
+               const std::string& filename);
+
+/// \ingroup mg_cpp_deserialize
+/**
+ * @brief Deserializes an IVF-PQ multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<ivf_pq::index_params> index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
+ * const std::string filename = "mg_index.cuvs";
+ * cuvs::neighbors::ivf_pq::serialize(clique, index, filename);
+ * auto new_index = cuvs::neighbors::ivf_pq::deserialize<float, int64_t>(clique, filename);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] filename path to the file to be deserialized
+ *
+ */
+template <typename T, typename IdxT>
+auto deserialize(const raft::resources& clique, const std::string& filename)
+  -> cuvs::neighbors::mg_index<ivf_pq::index<IdxT>, T, IdxT>;
+
+/// \defgroup mg_cpp_distribute ANN MG local index distribution
+
+/// \ingroup mg_cpp_distribute
+/**
+ * @brief Replicates a locally built and serialized IVF-PQ index to all GPUs to form a distributed
+ * multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::ivf_pq::index_params index_params;
+ * auto index = cuvs::neighbors::ivf_pq::build(clique, index_params, index_dataset);
+ * const std::string filename = "local_index.cuvs";
+ * cuvs::neighbors::ivf_pq::serialize(clique, filename, index);
+ * auto new_index = cuvs::neighbors::ivf_pq::distribute<float, int64_t>(clique, filename);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] filename path to the file to be deserialized : a local index
+ *
+ */
+template <typename T, typename IdxT>
+auto distribute(const raft::resources& clique, const std::string& filename)
+  -> cuvs::neighbors::mg_index<ivf_pq::index<IdxT>, T, IdxT>;
+
 namespace helpers {
 /**
  * @defgroup ivf_pq_cpp_helpers IVF-PQ helper methods
@@ -2379,6 +2861,10 @@ void extract_centers(raft::resources const& res,
                      const index<int64_t>& index,
                      raft::device_matrix_view<float, uint32_t, raft::row_major> cluster_centers);
 
+/** @copydoc extract_centers */
+void extract_centers(raft::resources const& res,
+                     const index<int64_t>& index,
+                     raft::host_matrix_view<float, uint32_t, raft::row_major> cluster_centers);
 /**
  * @brief Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
  * modified externally.

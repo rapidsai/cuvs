@@ -32,7 +32,7 @@ from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
 
-from cuvs.distance import DISTANCE_TYPES
+from cuvs.distance import DISTANCE_NAMES, DISTANCE_TYPES
 from cuvs.neighbors.common import _check_input_array
 from cuvs.neighbors.filters import no_filter
 
@@ -97,7 +97,6 @@ cdef class IndexParams:
     """
 
     cdef cuvsIvfFlatIndexParams* params
-    cdef object _metric
 
     def __cinit__(self):
         cuvsIvfFlatIndexParamsCreate(&self.params)
@@ -114,7 +113,6 @@ cdef class IndexParams:
                  adaptive_centers=False,
                  add_data_on_build=True,
                  conservative_memory_allocation=False):
-        self._metric = metric
         self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
         self.params.metric_arg = metric_arg
         self.params.add_data_on_build = add_data_on_build
@@ -125,9 +123,12 @@ cdef class IndexParams:
         self.params.conservative_memory_allocation = \
             conservative_memory_allocation
 
+    def get_handle(self):
+        return <size_t> self.params
+
     @property
     def metric(self):
-        return self._metric
+        return DISTANCE_NAMES[self.params.metric]
 
     @property
     def metric_arg(self):
@@ -181,6 +182,35 @@ cdef class Index:
     def __repr__(self):
         return "Index(type=IvfFlat)"
 
+    @property
+    def n_lists(self):
+        """ The number of inverted lists (clusters) """
+        return cuvsIvfFlatIndexGetNLists(self.index)
+
+    @property
+    def dim(self):
+        """ dimensionality of the cluster centers """
+        return cuvsIvfFlatIndexGetDim(self.index)
+
+    @property
+    def centers(self):
+        """ Get the cluster centers corresponding to the lists in the
+        original space """
+        return self._get_centers()
+
+    @auto_sync_resources
+    def _get_centers(self, resources=None):
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting centers")
+
+        cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+        output = np.empty((self.n_lists, self.dim), dtype='float32')
+        ai = wrap_array(output)
+        cdef cydlpack.DLManagedTensor* output_dlpack = cydlpack.dlpack_c(ai)
+        check_cuvs(cuvsIvfFlatIndexGetCenters(res, self.index, output_dlpack))
+        return output
+
 
 @auto_sync_resources
 def build(IndexParams index_params, dataset, resources=None):
@@ -191,7 +221,7 @@ def build(IndexParams index_params, dataset, resources=None):
     ----------
     index_params : :py:class:`cuvs.neighbors.ivf_flat.IndexParams`
     dataset : CUDA array interface compliant matrix shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
+        Supported dtype [float32, float16, int8, uint8]
     {resources_docstring}
 
     Returns
@@ -219,8 +249,8 @@ def build(IndexParams index_params, dataset, resources=None):
     """
 
     dataset_ai = wrap_array(dataset)
-    _check_input_array(dataset_ai, [np.dtype('float32'), np.dtype('byte'),
-                                    np.dtype('ubyte')])
+    _check_input_array(dataset_ai, [np.dtype('float32'), np.dtype('float16'),
+                                    np.dtype('byte'), np.dtype('ubyte')])
 
     cdef Index idx = Index()
     cdef cydlpack.DLManagedTensor* dataset_dlpack = \
@@ -262,6 +292,9 @@ cdef class SearchParams:
     def __init__(self, *, n_probes=20):
         self.params.n_probes = n_probes
 
+    def get_handle(self):
+        return <size_t> self.params
+
     @property
     def n_probes(self):
         return self.params.n_probes
@@ -286,7 +319,7 @@ def search(SearchParams search_params,
     index : py:class:`cuvs.neighbors.ivf_flat.Index`
         Trained IvfFlat index.
     queries : CUDA array interface compliant matrix shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
+        Supported dtype [float32, float16, int8, uint8]
     k : int
         The number of neighbors.
     neighbors : Optional CUDA array interface compliant matrix shape
@@ -324,8 +357,8 @@ def search(SearchParams search_params,
         raise ValueError("Index needs to be built before calling search.")
 
     queries_cai = wrap_array(queries)
-    _check_input_array(queries_cai, [np.dtype('float32'), np.dtype('byte'),
-                                     np.dtype('ubyte')])
+    _check_input_array(queries_cai, [np.dtype('float32'), np.dtype('float16'),
+                                     np.dtype('byte'), np.dtype('ubyte')])
 
     cdef uint32_t n_queries = queries_cai.shape[0]
 
@@ -454,7 +487,7 @@ def extend(Index index, new_vectors, new_indices, resources=None):
     index : ivf_flat.Index
         Trained ivf_flat object.
     new_vectors : array interface compliant matrix shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
+        Supported dtype [float32, float16, int8, uint8]
     new_indices : array interface compliant vector shape (n_samples)
         Supported dtype [int64]
     {resources_docstring}
@@ -488,8 +521,9 @@ def extend(Index index, new_vectors, new_indices, resources=None):
     """
 
     new_vectors_ai = wrap_array(new_vectors)
-    _check_input_array(new_vectors_ai, [np.dtype('float32'), np.dtype('byte'),
-                                        np.dtype('ubyte')])
+    _check_input_array(new_vectors_ai,
+                       [np.dtype('float32'), np.dtype('float16'),
+                        np.dtype('byte'), np.dtype('ubyte')])
 
     new_indices_ai = wrap_array(new_indices)
     _check_input_array(new_indices_ai, [np.dtype('int64')])

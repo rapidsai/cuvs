@@ -34,7 +34,7 @@ from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
 
-from cuvs.distance import DISTANCE_TYPES
+from cuvs.distance import DISTANCE_NAMES, DISTANCE_TYPES
 from cuvs.neighbors.common import _check_input_array
 
 from libc.stdint cimport (
@@ -48,6 +48,7 @@ from libc.stdint cimport (
 )
 
 from cuvs.common.exceptions import check_cuvs
+from cuvs.neighbors import ivf_pq
 from cuvs.neighbors.filters import no_filter
 
 
@@ -156,17 +157,27 @@ cdef class IndexParams:
     compression: CompressionParams, optional
         If compression is desired should be a CompressionParams object. If None
         compression will be disabled.
+    ivf_pq_build_params: cuvs.neighbors.ivf_pq.IndexParams, optional
+        Parameters for IVF-PQ algorithm. If provided, it will be used for
+        building the graph.
+    ivf_pq_search_params: cuvs.neighbors.ivf_pq.SearchParams, optional
+        Parameters for IVF-PQ search. If provided, it will be used for
+        searching the graph.
+    refinement_rate: float, default = 1.0
     """
 
     cdef cuvsCagraIndexParams* params
-    cdef object _metric
 
     # hold on to a reference to the compression, to keep from being GC'ed
     cdef public object compression
+    cdef public object ivf_pq_build_params
+    cdef public object ivf_pq_search_params
 
     def __cinit__(self):
         check_cuvs(cuvsCagraIndexParamsCreate(&self.params))
         self.compression = None
+        self.ivf_pq_build_params = None
+        self.ivf_pq_search_params = None
 
     def __dealloc__(self):
         check_cuvs(cuvsCagraIndexParamsDestroy(self.params))
@@ -177,9 +188,11 @@ cdef class IndexParams:
                  graph_degree=64,
                  build_algo="ivf_pq",
                  nn_descent_niter=20,
-                 compression=None):
+                 compression=None,
+                 ivf_pq_build_params: ivf_pq.IndexParams = None,
+                 ivf_pq_search_params: ivf_pq.SearchParams = None,
+                 refinement_rate: float = 1.0):
 
-        self._metric = metric
         self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
         self.params.intermediate_graph_degree = intermediate_graph_degree
         self.params.graph_degree = graph_degree
@@ -198,10 +211,26 @@ cdef class IndexParams:
             self.compression = compression
             self.params.compression = \
                 <cuvsCagraCompressionParams_t><size_t>compression.get_handle()
+        if ivf_pq_build_params is not None:
+            if ivf_pq_build_params.metric != self.metric:
+                raise ValueError("Metric mismatch with IVF-PQ build params")
+            self.ivf_pq_build_params = ivf_pq_build_params
+            self.params.graph_build_params.ivf_pq_build_params = \
+                <cuvsIvfPqIndexParams_t><size_t> \
+                ivf_pq_build_params.get_handle()
+        if ivf_pq_search_params is not None:
+            self.ivf_pq_search_params = ivf_pq_search_params
+            self.params.graph_build_params.ivf_pq_search_params = \
+                <cuvsIvfPqSearchParams_t><size_t> \
+                ivf_pq_search_params.get_handle()
+        self.params.graph_build_params.refinement_rate = refinement_rate
+
+    def get_handle(self):
+        return <size_t> self.params
 
     @property
     def metric(self):
-        return self._metric
+        return DISTANCE_NAMES[self.params.metric]
 
     @property
     def intermediate_graph_degree(self):
@@ -218,6 +247,10 @@ cdef class IndexParams:
     @property
     def nn_descent_niter(self):
         return self.params.nn_descent_niter
+
+    @property
+    def refinement_rate(self):
+        return self.params.graph_build_params.refinement_rate
 
 
 cdef class Index:
@@ -375,9 +408,22 @@ cdef class SearchParams:
         more.
     rand_xor_mask: int, default = 0x128394
         Bit mask used for initial random seed node selection.
+    persistent: bool, default = false
+         Whether to use the persistent version of the kernel
+    persistent_lifetime: float
+         Persistent kernel: time in seconds before the kernel stops if no
+         requests are received.
+    persistent_device_usage : float
+        Sets the fraction of maximum grid size used by persistent kernel.
     """
 
-    cdef cuvsCagraSearchParams params
+    cdef cuvsCagraSearchParams * params
+
+    def __cinit__(self):
+        check_cuvs(cuvsCagraSearchParamsCreate(&self.params))
+
+    def __dealloc__(self):
+        check_cuvs(cuvsCagraSearchParamsDestroy(self.params))
 
     def __init__(self, *,
                  max_queries=0,
@@ -392,7 +438,11 @@ cdef class SearchParams:
                  hashmap_min_bitlen=0,
                  hashmap_max_fill_rate=0.5,
                  num_random_samplings=1,
-                 rand_xor_mask=0x128394):
+                 rand_xor_mask=0x128394,
+                 persistent=False,
+                 persistent_lifetime=None,
+                 persistent_device_usage=None
+                 ):
         self.params.max_queries = max_queries
         self.params.itopk_size = itopk_size
         self.params.max_iterations = max_iterations
@@ -424,6 +474,11 @@ cdef class SearchParams:
         self.params.hashmap_max_fill_rate = hashmap_max_fill_rate
         self.params.num_random_samplings = num_random_samplings
         self.params.rand_xor_mask = rand_xor_mask
+        self.params.persistent = persistent
+        if persistent_lifetime is not None:
+            self.params.persistent_lifetime = persistent_lifetime
+        if persistent_device_usage is not None:
+            self.params.persistent_device_usage = persistent_device_usage
 
     def __repr__(self):
         attr_str = [attr + "=" + str(getattr(self, attr))
@@ -434,6 +489,9 @@ cdef class SearchParams:
                         "hashmap_min_bitlen", "hashmap_max_fill_rate",
                         "num_random_samplings", "rand_xor_mask"]]
         return "SearchParams(type=CAGRA, " + (", ".join(attr_str)) + ")"
+
+    def get_handle(self):
+        return <size_t> self.params
 
     @property
     def max_queries(self):
@@ -578,7 +636,7 @@ def search(SearchParams search_params,
     if filter is None:
         filter = no_filter()
 
-    cdef cuvsCagraSearchParams* params = &search_params.params
+    cdef cuvsCagraSearchParams* params = search_params.params
     cdef cydlpack.DLManagedTensor* queries_dlpack = \
         cydlpack.dlpack_c(queries_cai)
     cdef cydlpack.DLManagedTensor* neighbors_dlpack = \
