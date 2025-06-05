@@ -16,17 +16,16 @@
 
 package com.nvidia.cuvs.internal;
 
-import static java.lang.foreign.ValueLayout.ADDRESS;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_POINTER;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
 import static com.nvidia.cuvs.internal.common.Util.buildMemorySegment;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
-import static com.nvidia.cuvs.internal.common.Util.checkCudaError;
 import static com.nvidia.cuvs.internal.common.Util.concatenate;
+import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
+import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.*;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraBuild;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraDeserialize;
@@ -45,7 +44,6 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamGet;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
 import static com.nvidia.cuvs.internal.panama.headers_h.omp_set_num_threads;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemcpy;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaStream_t;
 
 import java.io.FileInputStream;
@@ -53,12 +51,10 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.foreign.Arena;
-import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SequenceLayout;
 import java.lang.foreign.ValueLayout;
-import java.lang.invoke.MethodHandle;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -287,8 +283,7 @@ public class CagraIndexImpl implements CagraIndex {
       MemorySegment prefilterDP = MemorySegment.NULL;
       long prefilterLen = 0;
 
-      returnValue = cudaMemcpy(queriesDP, floatsSeg, queriesBytes, 4);
-      checkCudaError(returnValue, "cudaMemcpy");
+      cudaMemcpy(queriesDP, floatsSeg, queriesBytes, INFER_DIRECTION);
 
       long queriesShape[] = { numQueries, vectorDimension };
       MemorySegment queriesTensor = prepareTensor(arena, queriesDP, queriesShape, 2, 32, 2, 2, 1);
@@ -329,8 +324,7 @@ public class CagraIndexImpl implements CagraIndex {
 
         prefilterDP = prefilterD.get(C_POINTER, 0);
 
-        returnValue = cudaMemcpy(prefilterDP, prefilterDataMemorySegment, prefilterBytes, 1);
-        checkCudaError(returnValue, "cudaMemcpy");
+        cudaMemcpy(prefilterDP, prefilterDataMemorySegment, prefilterBytes, HOST_TO_DEVICE);
 
         prefilterTensor = prepareTensor(arena, prefilterDP, prefilterShape, 1, 32, 1, 2, 1);
 
@@ -348,10 +342,8 @@ public class CagraIndexImpl implements CagraIndex {
       returnValue = cuvsStreamSync(cuvsRes);
       checkCuVSError(returnValue, "cuvsStreamSync");
 
-      returnValue = cudaMemcpy(neighborsMemorySegment, neighborsDP, neighborsBytes, 4);
-      checkCudaError(returnValue, "cudaMemcpy");
-      returnValue = cudaMemcpy(distancesMemorySegment, distancesDP, distancesBytes, 4);
-      checkCudaError(returnValue, "cudaMemcpy");
+      cudaMemcpy(neighborsMemorySegment, neighborsDP, neighborsBytes, INFER_DIRECTION);
+      cudaMemcpy(distancesMemorySegment, distancesDP, distancesBytes, INFER_DIRECTION);
 
       returnValue = cuvsRMMFree(cuvsRes, distancesDP, distancesBytes);
       checkCuVSError(returnValue, "cuvsRMMFree");
