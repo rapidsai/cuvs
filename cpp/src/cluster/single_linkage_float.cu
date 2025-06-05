@@ -61,7 +61,7 @@ void build_linkage(
         linkage_graph_params)) {
     RAFT_EXPECTS(core_dists.has_value(), "core_dists not passed");
     auto core_dists_mdspan = core_dists.value();
-    RAFT_EXPECTS(core_dists_mdspan.extent(0) == static_cast<size_t>(X.extent(0)),
+    RAFT_EXPECTS(core_dists_mdspan.extent(0) == X.extent(0),
                  "core_dists doesn't have expected size");
     auto mr_params = std::get<
       cuvs::cluster::agglomerative::helpers::linkage_graph_params::mutual_reachability_params>(
