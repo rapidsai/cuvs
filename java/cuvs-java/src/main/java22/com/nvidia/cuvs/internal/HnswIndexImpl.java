@@ -27,6 +27,9 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswIndexDestroy;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswSearch;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
+import static com.nvidia.cuvs.internal.panama.headers_h.kDLCPU;
+import static com.nvidia.cuvs.internal.panama.headers_h.kDLFloat;
+import static com.nvidia.cuvs.internal.panama.headers_h.kDLUInt;
 
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -111,11 +114,14 @@ public class HnswIndexImpl implements HnswIndex {
       long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
 
       long queriesShape[] = { numQueries, vectorDimension };
-      MemorySegment queriesTensor = prepareTensor(arena, querySeg, queriesShape, 2, 32, 2, 1, 1);
+      MemorySegment queriesTensor = prepareTensor(arena, querySeg, queriesShape, kDLFloat(), 32, 2, kDLCPU(), 1,
+          MemorySegment.NULL);
       long neighborsShape[] = { numQueries, topK };
-      MemorySegment neighborsTensor = prepareTensor(arena, neighborsMemorySegment, neighborsShape, 1, 64, 2, 1, 1);
+      MemorySegment neighborsTensor = prepareTensor(arena, neighborsMemorySegment, neighborsShape, kDLUInt(), 64, 2,
+          kDLCPU(), 1, MemorySegment.NULL);
       long distancesShape[] = { numQueries, topK };
-      MemorySegment distancesTensor = prepareTensor(arena, distancesMemorySegment, distancesShape, 2, 32, 2, 1, 1);
+      MemorySegment distancesTensor = prepareTensor(arena, distancesMemorySegment, distancesShape, kDLFloat(), 32, 2,
+          kDLCPU(), 1, MemorySegment.NULL);
 
       int returnValue = cuvsStreamSync(cuvsRes);
       checkCuVSError(returnValue, "cuvsStreamSync");
@@ -174,7 +180,7 @@ public class HnswIndexImpl implements HnswIndex {
 
         MemorySegment dtype = DLDataType.allocate(arena);
         DLDataType.bits(dtype, (byte) 32);
-        DLDataType.code(dtype, (byte) 2); // kDLFloat
+        DLDataType.code(dtype, (byte) kDLFloat());
         DLDataType.lanes(dtype, (byte) 1);
 
         cuvsHnswIndex.dtype(hnswIndex, dtype);

@@ -84,7 +84,8 @@ public class Util {
       if (seg.equals(MemorySegment.NULL)) {
         return "no last error text";
       }
-      return seg.reinterpret(MAX_ERROR_TEXT).getString(0);    } catch (Throwable t) {
+      return seg.reinterpret(MAX_ERROR_TEXT).getString(0);
+    } catch (Throwable t) {
       throw new RuntimeException(t);
     }
   }
@@ -244,8 +245,7 @@ public class Util {
    * @return DLManagedTensor
    */
   public static MemorySegment prepareTensor(Arena arena, MemorySegment data, long[] shape, int code, int bits, int ndim,
-      int deviceType, int lanes) {
-
+      int deviceType, int lanes, MemorySegment strides) {
     MemorySegment tensor = DLManagedTensor.allocate(arena);
     MemorySegment dlTensor = DLTensor.allocate(arena);
 
@@ -265,11 +265,9 @@ public class Util {
 
     DLTensor.shape(dlTensor, Util.buildMemorySegment(arena, shape));
 
-    DLTensor.strides(dlTensor, MemorySegment.NULL);
+    DLTensor.strides(dlTensor, strides);
 
     DLManagedTensor.dl_tensor(tensor, dlTensor);
-
     return tensor;
   }
-
 }
