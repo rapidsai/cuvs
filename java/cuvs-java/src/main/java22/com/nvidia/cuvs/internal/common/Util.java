@@ -25,14 +25,11 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cudaGetDeviceProperties_
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemGetInfo;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaSetDevice;
 import static com.nvidia.cuvs.internal.panama.headers_h.size_t;
-import static java.lang.foreign.ValueLayout.ADDRESS;
 
 import java.lang.foreign.Arena;
-import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemoryLayout.PathElement;
 import java.lang.foreign.MemorySegment;
-import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -77,6 +74,48 @@ public class Util {
     if (value != CUDA_SUCCESS) {
       throw new RuntimeException(caller + " returned " + value);
     }
+  }
+
+  /**
+   * Java analog to CUDA's cudaMemcpyKind, used for cudaMemcpy() calls.
+   * @see <a href="https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html">CUDA Runtime API</a>
+   */
+  public enum CudaMemcpyKind {
+    HOST_TO_HOST(0),
+    HOST_TO_DEVICE(1),
+    DEVICE_TO_HOST(2),
+    DEVICE_TO_DEVICE(3),
+    INFER_DIRECTION(4);
+
+    CudaMemcpyKind(int k) {
+      this.kind = k;
+    }
+
+    public final int kind;
+  }
+
+  /**
+   * Helper to invoke cudaMemcpy CUDA runtime function to copy data between host/device memory.
+   * @param dest Destination address for data copy
+   * @param src Source address for data copy
+   * @param numBytes Number of bytes to be copied
+   * @param kind "Direction" of data copy (Host->Device, Device->Host, etc.)
+   * @throws RuntimeException on failure of copy
+   */
+  public static void cudaMemcpy(MemorySegment dest, MemorySegment src, long numBytes, CudaMemcpyKind kind) {
+    int returnValue = com.nvidia.cuvs.internal.panama.headers_h.cudaMemcpy(dest, src, numBytes, kind.kind);
+    checkCudaError(returnValue, "cudaMemcpy");
+  }
+
+  /**
+   * Helper to invoke cudaMemcpy CUDA runtime function to copy data between host/device memory.
+   * @param dest Destination address for data copy
+   * @param src Source address for data copy
+   * @param numBytes Number of bytes to be copied
+   * @throws RuntimeException on failure of copy
+   */
+  public static void cudaMemcpy(MemorySegment dest, MemorySegment src, long numBytes) {
+    Util.cudaMemcpy(dest, src, numBytes, CudaMemcpyKind.INFER_DIRECTION);
   }
 
   static final long MAX_ERROR_TEXT = 1_000_000L;
