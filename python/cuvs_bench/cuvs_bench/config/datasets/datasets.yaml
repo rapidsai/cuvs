@@ -154,4 +154,3 @@
   query_file: Ads_nofilter/ads.query.u8bin
   groundtruth_neighbors_file: Ads_nofilter/ads.groundtruth.neighbors.ibin
   distance: euclidean
-

@@ -22,13 +22,10 @@
 #include <chrono>
 #include <memory>
 
-
-
 #include "../common/ann_types.hpp"
 #include "../diskann/diskann_wrapper.h"
 #include "cuvs_ann_bench_utils.h"
 #include <cuvs/neighbors/vamana.hpp>
-#include "cuvs_ann_bench_utils.h"
 #include <utils.h>
 
 #include <memory>
@@ -40,8 +37,8 @@ namespace cuvs::bench {
 template <typename T, typename IdxT>
 class cuvs_cagra_diskann : public algo<T>, public algo_gpu {
  public:
- using build_param = typename cuvs_cagra<T, IdxT>::build_param;
- using search_param_base = typename algo<T>::search_param;
+  using build_param       = typename cuvs_cagra<T, IdxT>::build_param;
+  using search_param_base = typename algo<T>::search_param;
   using search_param      = typename diskann_memory<T>::search_param;
 
   cuvs_cagra_diskann(Metric metric, int dim, const build_param& param);
@@ -87,13 +84,15 @@ class cuvs_cagra_diskann : public algo<T>, public algo_gpu {
 
 template <typename T, typename IdxT>
 cuvs_cagra_diskann<T, IdxT>::cuvs_cagra_diskann(Metric metric, int dim, const build_param& param)
-    : algo<T>(metric, dim),
-      build_param_{param},
-      cagra_build_{metric, dim, param, 1}
-  {
-    diskann_memory_search_     = std::make_shared<cuvs::bench::diskann_memory<T>>(
-    metric, dim, typename diskann_memory<T>::build_param{static_cast<uint32_t>(param.cagra_params.graph_degree), static_cast<uint32_t>(param.cagra_params.graph_degree)});
-  }
+  : algo<T>(metric, dim), build_param_{param}, cagra_build_{metric, dim, param, 1}
+{
+  diskann_memory_search_ = std::make_shared<cuvs::bench::diskann_memory<T>>(
+    metric,
+    dim,
+    typename diskann_memory<T>::build_param{
+      static_cast<uint32_t>(param.cagra_params.graph_degree),
+      static_cast<uint32_t>(param.cagra_params.graph_degree)});
+}
 
 template <typename T, typename IdxT>
 void cuvs_cagra_diskann<T, IdxT>::build(const T* dataset, size_t nrow)
@@ -103,7 +102,7 @@ void cuvs_cagra_diskann<T, IdxT>::build(const T* dataset, size_t nrow)
 
 template <typename T, typename IdxT>
 void cuvs_cagra_diskann<T, IdxT>::set_search_param(const search_param_base& param,
-                                            const void* filter_bitset)
+                                                   const void* filter_bitset)
 {
   if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
   diskann_memory_search_->set_search_param(param, nullptr);
@@ -118,9 +117,9 @@ void cuvs_cagra_diskann<T, IdxT>::save(const std::string& file) const
 
   size_t file_offset = 0;
   index_of.seekp(file_offset, index_of.beg);
-  uint32_t max_degree          = 0;
-  size_t index_size            = 24;  // Starting metadata
-  uint32_t start               = static_cast<uint32_t>(rand() % (cagra_build_.get_index()->graph().extent(0)));
+  uint32_t max_degree = 0;
+  size_t index_size   = 24;  // Starting metadata
+  uint32_t start = static_cast<uint32_t>(rand() % (cagra_build_.get_index()->graph().extent(0)));
   size_t num_frozen_points     = 0;
   uint32_t max_observed_degree = 0;
 
@@ -177,41 +176,41 @@ void cuvs_cagra_diskann<T, IdxT>::save(const std::string& file) const
   index_of.close();
   if (!index_of) { RAFT_FAIL("Error writing output %s", file.c_str()); }
 
-    // try allocating a buffer for the dataset on host
-    try {
-      const cuvs::neighbors::strided_dataset<T, int64_t>* strided_dataset =
-        dynamic_cast<cuvs::neighbors::strided_dataset<T, int64_t>*>(
-          const_cast<cuvs::neighbors::dataset<int64_t>*>(&cagra_build_.get_index()->data()));
-      if (strided_dataset == nullptr) {
-        RAFT_LOG_DEBUG("dynamic_cast to strided_dataset failed");
-      } else {
-        auto h_dataset =
-          raft::make_host_matrix<T, int64_t>(strided_dataset->n_rows(), strided_dataset->dim());
-        raft::copy(h_dataset.data_handle(),
-                   strided_dataset->view().data_handle(),
-                   strided_dataset->n_rows() * strided_dataset->dim(),
-                   raft::resource::get_cuda_stream(handle_));
-        std::string dataset_base_file = file + ".data";
-        std::ofstream dataset_of(dataset_base_file, std::ios::out | std::ios::binary);
-        if (!dataset_of) { RAFT_FAIL("Cannot open file %s", dataset_base_file.c_str()); }
-        size_t dataset_file_offset = 0;
-        int size                   = static_cast<int>(cagra_build_.get_index()->size());
-        int dim                    = static_cast<int>(cagra_build_.get_index()->dim());
-        dataset_of.seekp(dataset_file_offset, dataset_of.beg);
-        dataset_of.write((char*)&size, sizeof(int));
-        dataset_of.write((char*)&dim, sizeof(int));
-        for (int i = 0; i < size; i++) {
-          dataset_of.write((char*)(h_dataset.data_handle() + i * h_dataset.extent(1)),
-                           dim * sizeof(T));
-        }
-        dataset_of.close();
-        if (!dataset_of) { RAFT_FAIL("Error writing output %s", dataset_base_file.c_str()); }
+  // try allocating a buffer for the dataset on host
+  try {
+    const cuvs::neighbors::strided_dataset<T, int64_t>* strided_dataset =
+      dynamic_cast<cuvs::neighbors::strided_dataset<T, int64_t>*>(
+        const_cast<cuvs::neighbors::dataset<int64_t>*>(&cagra_build_.get_index()->data()));
+    if (strided_dataset == nullptr) {
+      RAFT_LOG_DEBUG("dynamic_cast to strided_dataset failed");
+    } else {
+      auto h_dataset =
+        raft::make_host_matrix<T, int64_t>(strided_dataset->n_rows(), strided_dataset->dim());
+      raft::copy(h_dataset.data_handle(),
+                 strided_dataset->view().data_handle(),
+                 strided_dataset->n_rows() * strided_dataset->dim(),
+                 raft::resource::get_cuda_stream(handle_));
+      std::string dataset_base_file = file + ".data";
+      std::ofstream dataset_of(dataset_base_file, std::ios::out | std::ios::binary);
+      if (!dataset_of) { RAFT_FAIL("Cannot open file %s", dataset_base_file.c_str()); }
+      size_t dataset_file_offset = 0;
+      int size                   = static_cast<int>(cagra_build_.get_index()->size());
+      int dim                    = static_cast<int>(cagra_build_.get_index()->dim());
+      dataset_of.seekp(dataset_file_offset, dataset_of.beg);
+      dataset_of.write((char*)&size, sizeof(int));
+      dataset_of.write((char*)&dim, sizeof(int));
+      for (int i = 0; i < size; i++) {
+        dataset_of.write((char*)(h_dataset.data_handle() + i * h_dataset.extent(1)),
+                         dim * sizeof(T));
       }
-    } catch (std::bad_alloc& e) {
-      RAFT_LOG_INFO("Failed to serialize dataset");
-    } catch (raft::logic_error& e) {
-      RAFT_LOG_INFO("Failed to serialize dataset");
+      dataset_of.close();
+      if (!dataset_of) { RAFT_FAIL("Error writing output %s", dataset_base_file.c_str()); }
     }
+  } catch (std::bad_alloc& e) {
+    RAFT_LOG_INFO("Failed to serialize dataset");
+  } catch (raft::logic_error& e) {
+    RAFT_LOG_INFO("Failed to serialize dataset");
+  }
 }
 
 template <typename T, typename IdxT>

@@ -183,7 +183,8 @@ void bench_build(::benchmark::State& state,
   auto save_start = std::chrono::high_resolution_clock::now();
   algo->save(index.file);
   auto save_end = std::chrono::high_resolution_clock::now();
-  auto save_duration = std::chrono::duration_cast<std::chrono::duration<double>>(save_end - save_start).count();
+  auto save_duration =
+    std::chrono::duration_cast<std::chrono::duration<double>>(save_end - save_start).count();
   std::cout << "save_time " << save_duration << std::endl;
 }
 

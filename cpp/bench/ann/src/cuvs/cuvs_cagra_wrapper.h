@@ -213,7 +213,7 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
   auto dataset_extents = raft::make_extents<IdxT>(nrow, dimension_);
   index_params_.prepare_build_params(dataset_extents);
 
-  auto& params = index_params_.cagra_params;
+  auto& params                  = index_params_.cagra_params;
   params.guarantee_connectivity = true;
   auto dataset_view_host =
     raft::make_mdspan<const T, IdxT, raft::row_major, true, false>(dataset, dataset_extents);

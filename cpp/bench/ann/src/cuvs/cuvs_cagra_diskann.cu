@@ -41,7 +41,8 @@ auto create_algo(const std::string& algo_name,
   [[maybe_unused]] cuvs::bench::Metric metric = parse_metric(distance);
   std::unique_ptr<cuvs::bench::algo<T>> a;
 
-  if constexpr (std::is_same_v<T, float> || std::is_same_v<T, std::uint8_t> || std::is_same_v<T, std::int8_t>) {
+  if constexpr (std::is_same_v<T, float> || std::is_same_v<T, std::uint8_t> ||
+                std::is_same_v<T, std::int8_t>) {
     if (algo_name == "cuvs_cagra_diskann") {
       typename cuvs::bench::cuvs_cagra_diskann<T, uint32_t>::build_param param;
       ::parse_build_param<T, uint32_t>(conf, param);
@@ -59,7 +60,8 @@ auto create_search_param(const std::string& algo_name, const nlohmann::json& con
   -> std::unique_ptr<typename cuvs::bench::algo<T>::search_param>
 {
   if (algo_name == "cuvs_cagra_diskann") {
-    auto param = std::make_unique<typename cuvs::bench::cuvs_cagra_diskann<T, uint32_t>::search_param>();
+    auto param =
+      std::make_unique<typename cuvs::bench::cuvs_cagra_diskann<T, uint32_t>::search_param>();
     parse_search_param<T, uint32_t>(conf, *param);
     return param;
   }
