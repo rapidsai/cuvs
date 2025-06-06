@@ -33,3 +33,8 @@ export LIBCLANG_PATH
 echo "LIBCLANG_PATH=$LIBCLANG_PATH"
 
 bash ./build.sh rust
+
+# Also test out that we can publish cuvs-sys via a dry-run
+pushd ./rust/cuvs-sys
+cargo publish --dry-run
+popd
