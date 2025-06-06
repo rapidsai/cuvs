@@ -27,7 +27,7 @@ extern template class cuvs::bench::cuvs_ivf_flat<uint8_t, int64_t>;
 extern template class cuvs::bench::cuvs_ivf_flat<int8_t, int64_t>;
 #endif
 #if defined(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || \
-  defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
+  defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN)
 #include "cuvs_ivf_pq_wrapper.h"
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
@@ -35,7 +35,7 @@ extern template class cuvs::bench::cuvs_ivf_pq<float, int64_t>;
 extern template class cuvs::bench::cuvs_ivf_pq<uint8_t, int64_t>;
 extern template class cuvs::bench::cuvs_ivf_pq<int8_t, int64_t>;
 #endif
-#if defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
+#if defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN)
 #include "cuvs_cagra_wrapper.h"
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_CAGRA
@@ -95,7 +95,7 @@ void parse_search_param(const nlohmann::json& conf,
 #endif
 
 #if defined(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || \
-  defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB) || defined(CUVS_ANN_BENCH_USE_CUVS_MG)
+  defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB) || defined(CUVS_ANN_BENCH_USE_CUVS_MG) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN)
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
                        typename cuvs::bench::cuvs_ivf_pq<T, IdxT>::build_param& param)
@@ -184,7 +184,7 @@ void parse_search_param(const nlohmann::json& conf,
 #endif
 
 #if defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB) || \
-  defined(CUVS_ANN_BENCH_USE_CUVS_MG)
+  defined(CUVS_ANN_BENCH_USE_CUVS_MG) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN)
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::nn_descent::index_params& param)
 {
@@ -248,13 +248,13 @@ void parse_build_param(const nlohmann::json& conf,
       param.algo = cuvs::bench::CagraBuildAlgo::kAuto;
     }
   }
-  nlohmann::json ivf_pq_build_conf = collect_conf_with_prefix(conf, "ivf_pq_build_");
+  nlohmann::json ivf_pq_build_conf = collect_conf_with_prefix(conf, "b_");
   if (!ivf_pq_build_conf.empty()) {
     cuvs::neighbors::ivf_pq::index_params bparam;
     parse_build_param<T, IdxT>(ivf_pq_build_conf, bparam);
     param.ivf_pq_build_params = bparam;
   }
-  nlohmann::json ivf_pq_search_conf = collect_conf_with_prefix(conf, "ivf_pq_search_");
+  nlohmann::json ivf_pq_search_conf = collect_conf_with_prefix(conf, "s_");
   if (!ivf_pq_search_conf.empty()) {
     typename cuvs::bench::cuvs_ivf_pq<T, IdxT>::search_param sparam;
     parse_search_param<T, IdxT>(ivf_pq_search_conf, sparam);

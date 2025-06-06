@@ -52,13 +52,13 @@ class diskann_memory : public algo<T> {
     uint32_t L_build;
     uint32_t build_pq_bytes = 0;
     float alpha             = 1.2;
-    int num_threads         = omp_get_num_procs();
+    int num_threads         = omp_get_max_threads();
   };
 
   using search_param_base = typename algo<T>::search_param;
   struct search_param : public search_param_base {
     uint32_t L_search;
-    uint32_t num_threads = omp_get_num_procs();
+    uint32_t num_threads = omp_get_max_threads();
     // Mode metric_objective;
   };
 
@@ -118,25 +118,7 @@ diskann_memory<T>::diskann_memory(Metric metric, int dim, const build_param& par
 template <typename T>
 void diskann_memory<T>::initialize_index_(size_t max_points)
 {
-  cuvs::neighbors::cagra::index_params cagra_index_params;
-    cagra_index_params.attach_dataset_on_build = false;
-    cagra_index_params.graph_degree = diskann_index_write_params_->max_degree;
-    cagra_index_params.intermediate_graph_degree = 2 * cagra_index_params.graph_degree;
-    cagra_index_params.guarantee_connectivity = true;
-    cuvs::neighbors::ivf_pq::index_params ivf_pq_index_params;
-    ivf_pq_index_params.kmeans_n_iters = 10;
-    ivf_pq_index_params.n_lists = 1024;
-    ivf_pq_index_params.pq_dim = 384;
-    ivf_pq_index_params.kmeans_trainset_fraction = 0.1;
-    ivf_pq_index_params.pq_bits = 8;
-    cuvs::neighbors::ivf_pq::search_params ivf_pq_search_params;
-    ivf_pq_search_params.lut_dtype = CUDA_R_16F;
-    ivf_pq_search_params.n_probes = 20;
-    cuvs::neighbors::cagra::graph_build_params::ivf_pq_params ivf_pq_params;
-    ivf_pq_params.build_params = ivf_pq_index_params;
-    ivf_pq_params.search_params = ivf_pq_search_params;
-    ivf_pq_params.refinement_rate = 2.0;
-    std::shared_ptr<cuvs::neighbors::cagra::index_params> cagra_params = std::make_shared<cuvs::neighbors::cagra::index_params>(cagra_index_params);
+  std::cout << "sizeof(T) diskann" << sizeof(T) << std::endl;
   this->mem_index_ = std::make_shared<diskann::Index<T>>(parse_metric_to_diskann(this->metric_),
                                                          this->dim_,
                                                          max_points,
@@ -149,9 +131,7 @@ void diskann_memory<T>::initialize_index_(size_t max_points)
                                                          build_pq_bytes_ > 0,
                                                          build_pq_bytes_,
                                                          false,
-                                                         false,
-                                                         true,
-                                                         cagra_params);
+                                                         false);
 }
 template <typename T>
 void diskann_memory<T>::build(const T* dataset, size_t nrow)
@@ -247,7 +227,7 @@ class diskann_ssd : public algo<T> {
   [[nodiscard]] auto get_preference() const -> algo_property override
   {
     algo_property property;
-    property.dataset_memory_type = MemoryType::kHost;
+    property.dataset_memory_type = MemoryType::kHostMmap;
     property.query_memory_type   = MemoryType::kHost;
     return property;
   }

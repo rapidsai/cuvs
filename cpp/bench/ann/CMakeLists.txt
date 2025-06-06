@@ -39,6 +39,7 @@ option(CUVS_ANN_BENCH_USE_HNSWLIB "Include hnsw algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_GGNN "Include ggnn algorithm in benchmark" OFF)
 option(CUVS_ANN_BENCH_USE_DISKANN "Include DISKANN search in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_VAMANA "Include cuVS Vamana with DiskANN search in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN "Include cuVS CAGRA with DISKANN search in benchmark" ON)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "(ARM|arm|aarch64)")
   set(CUVS_ANN_BENCH_USE_DISKANN OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_VAMANA OFF)
@@ -73,7 +74,7 @@ else()
   set(CUVS_FAISS_ENABLE_GPU ON)
 endif()
 
-set(CUVS_ANN_BENCH_USE_CUVS OFF)
+set(CUVS_ANN_BENCH_USE_CUVS ON)
 if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
    OR CUVS_ANN_BENCH_USE_CUVS_BRUTE_FORCE
    OR CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT
@@ -82,6 +83,7 @@ if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
    OR CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE
    OR CUVS_ANN_BENCH_USE_CUVS_MG
    OR CUVS_ANN_BENCH_USE_CUVS_VAMANA
+   OR CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN
 )
   set(CUVS_ANN_BENCH_USE_CUVS ON)
 endif()
@@ -99,7 +101,7 @@ if(CUVS_ANN_BENCH_USE_GGNN)
   include(cmake/thirdparty/get_ggnn)
 endif()
 
-if(CUVS_ANN_BENCH_USE_DISKANN OR CUVS_ANN_BENCH_USE_CUVS_VAMANA)
+if(CUVS_ANN_BENCH_USE_DISKANN OR CUVS_ANN_BENCH_USE_CUVS_VAMANA OR CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN)
   include(cmake/thirdparty/get_diskann)
 endif()
 
@@ -338,7 +340,11 @@ if(CUVS_ANN_BENCH_USE_DISKANN)
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_VAMANA)
-  ConfigureAnnBench(NAME CUVS_VAMANA PATH src/cuvs/cuvs_vamana.cu LINKS cuvs diskann::diskann aio)
+  ConfigureAnnBench(NAME CUVS_VAMANA PATH src/cuvs/cuvs_vamana.cu LINKS diskann::diskann aio cuvs::cuvs)
+endif()
+
+if(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN)
+  ConfigureAnnBench(NAME CUVS_CAGRA_DISKANN PATH src/cuvs/cuvs_cagra_diskann.cu LINKS diskann::diskann aio cuvs::cuvs)
 endif()
 
 # ##################################################################################################
