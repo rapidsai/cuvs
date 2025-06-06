@@ -50,7 +50,7 @@ public class HnswRandomizedIT extends CuVSTestCase {
 
   @Test
   public void testResultsTopKWithRandomValues() throws Throwable {
-	boolean useNativeMemoryDatasets[] = {true, false};
+  boolean useNativeMemoryDatasets[] = {true, false};
     for (int i = 0; i < 10; i++) {
       for (boolean use: useNativeMemoryDatasets) {
         tmpResultsTopKWithRandomValues(use);

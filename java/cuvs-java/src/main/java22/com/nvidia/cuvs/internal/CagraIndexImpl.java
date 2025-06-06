@@ -196,7 +196,7 @@ public class CagraIndexImpl implements CagraIndex {
       omp_set_num_threads(numWriterThreads);
 
       MemorySegment dataSeg = dataset != null? ((DatasetImpl) dataset).seg:
-      	Util.buildMemorySegment(resources.getArena(), vectors);
+        Util.buildMemorySegment(resources.getArena(), vectors);
 
       Arena arena = resources.getArena();
       long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
@@ -632,35 +632,35 @@ public class CagraIndexImpl implements CagraIndex {
    * @throws Throwable if an error occurs during the merge operation
    */
   public static CagraIndex merge(CagraIndex[] indexes, CagraMergeParams mergeParams) throws Throwable {
-	    CuVSResourcesImpl resources = (CuVSResourcesImpl) indexes[0].getCuVSResources();
-	    IndexReference mergedIndexReference = new IndexReference(resources);
-	    long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
+      CuVSResourcesImpl resources = (CuVSResourcesImpl) indexes[0].getCuVSResources();
+      IndexReference mergedIndexReference = new IndexReference(resources);
+      long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
 
-	    try (var arena = Arena.ofConfined()) {
-	      MemorySegment indexesSegment = arena.allocate(indexes.length * ValueLayout.ADDRESS.byteSize());
+      try (var arena = Arena.ofConfined()) {
+        MemorySegment indexesSegment = arena.allocate(indexes.length * ValueLayout.ADDRESS.byteSize());
 
-	      for (int i = 0; i < indexes.length; i++) {
-	        CagraIndexImpl indexImpl = (CagraIndexImpl) indexes[i];
-	        indexesSegment.setAtIndex(ValueLayout.ADDRESS, i, indexImpl.cagraIndexReference.getMemorySegment());
-	      }
+        for (int i = 0; i < indexes.length; i++) {
+          CagraIndexImpl indexImpl = (CagraIndexImpl) indexes[i];
+          indexesSegment.setAtIndex(ValueLayout.ADDRESS, i, indexImpl.cagraIndexReference.getMemorySegment());
+        }
 
-	      MemorySegment mergeParamsSegment = arena.allocate(cuvsCagraMergeParams_t);
-	      int returnValue;
+        MemorySegment mergeParamsSegment = arena.allocate(cuvsCagraMergeParams_t);
+        int returnValue;
 
-	      mergeParamsSegment = createMergeParamsSegment(mergeParams, resources);
+        mergeParamsSegment = createMergeParamsSegment(mergeParams, resources);
 
-	      returnValue = cuvsCagraMerge(
-	          cuvsRes,
-	          mergeParamsSegment,
-	          indexesSegment,
-	          indexes.length,
-	          mergedIndexReference.getMemorySegment());
+        returnValue = cuvsCagraMerge(
+            cuvsRes,
+            mergeParamsSegment,
+            indexesSegment,
+            indexes.length,
+            mergedIndexReference.getMemorySegment());
 
-	      checkCuVSError(returnValue, "cuvsCagraMerge");
+        checkCuVSError(returnValue, "cuvsCagraMerge");
 
-	    }
+      }
 
-	    return new CagraIndexImpl(mergedIndexReference, resources);
+      return new CagraIndexImpl(mergedIndexReference, resources);
   }
 
   /**
@@ -734,9 +734,9 @@ public class CagraIndexImpl implements CagraIndex {
       if (inputStream != null) {
         return new CagraIndexImpl(inputStream, cuvsResources);
       } else {
-    	if (vectors != null && dataset != null) {
-    		throw new IllegalArgumentException("Please specify only one type of dataset (a float[] or a Dataset instance)");
-    	}
+      if (vectors != null && dataset != null) {
+        throw new IllegalArgumentException("Please specify only one type of dataset (a float[] or a Dataset instance)");
+      }
         return new CagraIndexImpl(cagraIndexParams, vectors, dataset, cuvsResources);
       }
     }

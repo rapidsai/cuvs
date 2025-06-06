@@ -45,10 +45,10 @@ public class CagraRandomizedIT extends CuVSTestCase {
   @Test
   public void testResultsTopKWithRandomValues() throws Throwable {
     boolean useNativeMemoryDatasets[] = {true, false};
-	  for (int i = 0; i < 100; i++) {
-	    for (boolean use: useNativeMemoryDatasets) {
-		     tmpResultsTopKWithRandomValues(use);
-	    }
+    for (int i = 0; i < 100; i++) {
+      for (boolean use: useNativeMemoryDatasets) {
+         tmpResultsTopKWithRandomValues(use);
+      }
     }
   }
 
