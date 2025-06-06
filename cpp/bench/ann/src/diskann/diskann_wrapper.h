@@ -118,7 +118,6 @@ diskann_memory<T>::diskann_memory(Metric metric, int dim, const build_param& par
 template <typename T>
 void diskann_memory<T>::initialize_index_(size_t max_points)
 {
-  std::cout << "sizeof(T) diskann" << sizeof(T) << std::endl;
   this->mem_index_ = std::make_shared<diskann::Index<T>>(parse_metric_to_diskann(this->metric_),
                                                          this->dim_,
                                                          max_points,
