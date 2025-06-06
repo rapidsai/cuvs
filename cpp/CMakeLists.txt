@@ -496,6 +496,7 @@ if(BUILD_SHARED_LIBS)
     src/selection/select_k_half_uint32_t.cu
     src/stats/silhouette_score.cu
     src/stats/trustworthiness_score.cu
+    src/util/filters.cu
     ${CUVS_MG_ALGOS}
   )
 
