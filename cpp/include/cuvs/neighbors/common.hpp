@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,6 +95,26 @@ struct index_params {
 };
 
 struct search_params {};
+
+/**
+ * @brief Strategy for merging indices.
+ *
+ * This enum is declared separately to avoid namespace pollution when including common.hpp.
+ * It provides a generic merge strategy that can be used across different index types.
+ */
+enum class MergeStrategy {
+  /** Merge indices physically by combining their data structures */
+  MERGE_STRATEGY_PHYSICAL = 0,
+  /** Merge indices logically by creating a composite wrapper */
+  MERGE_STRATEGY_LOGICAL = 1
+};
+
+/** Base merge parameters with polymorphic interface. */
+struct merge_params {
+  virtual ~merge_params() = default;
+
+  virtual MergeStrategy strategy() const = 0;
+};
 
 /** @} */  // end group neighbors_index
 
@@ -691,8 +711,7 @@ template <typename ListT, class T = void>
 struct enable_if_valid_list {};
 
 template <class T,
-          template <typename, typename...>
-          typename SpecT,
+          template <typename, typename...> typename SpecT,
           typename SizeT,
           typename... SpecExtraArgs>
 struct enable_if_valid_list<list<SpecT, SizeT, SpecExtraArgs...>, T> {
@@ -740,9 +759,7 @@ enable_if_valid_list_t<ListT> deserialize_list(const raft::resources& handle,
                                                const typename ListT::spec_type& store_spec,
                                                const typename ListT::spec_type& device_spec);
 }  // namespace ivf
-}  // namespace cuvs::neighbors
 
-namespace cuvs::neighbors {
 using namespace raft;
 
 template <typename AnnIndexType, typename T, typename IdxT>
@@ -756,40 +773,120 @@ struct iface {
 };
 
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor>
-void build(const raft::device_resources& handle,
+void build(const raft::resources& handle,
            cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
            const cuvs::neighbors::index_params* index_params,
            raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> index_dataset);
 
 template <typename AnnIndexType, typename T, typename IdxT, typename Accessor1, typename Accessor2>
 void extend(
-  const raft::device_resources& handle,
+  const raft::resources& handle,
   cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
   raft::mdspan<const T, matrix_extent<int64_t>, row_major, Accessor1> new_vectors,
   std::optional<raft::mdspan<const IdxT, vector_extent<int64_t>, layout_c_contiguous, Accessor2>>
     new_indices);
 
-template <typename AnnIndexType, typename T, typename IdxT>
-void search(const raft::device_resources& handle,
+template <typename AnnIndexType, typename T, typename IdxT, typename searchIdxT>
+void search(const raft::resources& handle,
             const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
             const cuvs::neighbors::search_params* search_params,
             raft::device_matrix_view<const T, int64_t, row_major> h_queries,
-            raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,
+            raft::device_matrix_view<searchIdxT, int64_t, row_major> d_neighbors,
             raft::device_matrix_view<float, int64_t, row_major> d_distances);
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void serialize(const raft::device_resources& handle,
+void serialize(const raft::resources& handle,
                const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                std::ostream& os);
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void deserialize(const raft::device_resources& handle,
+void deserialize(const raft::resources& handle,
                  cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                  std::istream& is);
 
 template <typename AnnIndexType, typename T, typename IdxT>
-void deserialize(const raft::device_resources& handle,
+void deserialize(const raft::resources& handle,
                  cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
                  const std::string& filename);
 
-};  // namespace cuvs::neighbors
+/// \defgroup mg_cpp_index_params ANN MG index build parameters
+
+/** Distribution mode */
+/// \ingroup mg_cpp_index_params
+enum distribution_mode {
+  /** Index is replicated on each device, favors throughput */
+  REPLICATED,
+  /** Index is split on several devices, favors scaling */
+  SHARDED
+};
+
+/// \defgroup mg_cpp_search_params ANN MG search parameters
+
+/** Search mode when using a replicated index */
+/// \ingroup mg_cpp_search_params
+enum replicated_search_mode {
+  /** Search queries are splited to maintain equal load on GPUs */
+  LOAD_BALANCER,
+  /** Each search query is processed by a single GPU in a round-robin fashion */
+  ROUND_ROBIN
+};
+
+/** Merge mode when using a sharded index */
+/// \ingroup mg_cpp_search_params
+enum sharded_merge_mode {
+  /** Search batches are merged on the root rank */
+  MERGE_ON_ROOT_RANK,
+  /** Search batches are merged in a tree reduction fashion */
+  TREE_MERGE
+};
+
+/** Build parameters */
+/// \ingroup mg_cpp_index_params
+template <typename Upstream>
+struct mg_index_params : public Upstream {
+  mg_index_params() : mode(SHARDED) {}
+
+  mg_index_params(const Upstream& sp) : Upstream(sp), mode(SHARDED) {}
+
+  /** Distribution mode */
+  cuvs::neighbors::distribution_mode mode = SHARDED;
+};
+
+/** Search parameters */
+/// \ingroup mg_cpp_search_params
+template <typename Upstream>
+struct mg_search_params : public Upstream {
+  mg_search_params() : search_mode(LOAD_BALANCER), merge_mode(TREE_MERGE) {}
+
+  mg_search_params(const Upstream& sp)
+    : Upstream(sp), search_mode(LOAD_BALANCER), merge_mode(TREE_MERGE)
+  {
+  }
+
+  /** Replicated search mode */
+  cuvs::neighbors::replicated_search_mode search_mode = LOAD_BALANCER;
+  /** Sharded merge mode */
+  cuvs::neighbors::sharded_merge_mode merge_mode = TREE_MERGE;
+  /** Number of rows per batch */
+  int64_t n_rows_per_batch = 1 << 20;
+};
+
+template <typename AnnIndexType, typename T, typename IdxT>
+struct mg_index {
+  mg_index(const raft::resources& clique, distribution_mode mode);
+  mg_index(const raft::resources& clique, const std::string& filename);
+
+  mg_index(const mg_index&)                    = delete;
+  mg_index(mg_index&&)                         = default;
+  auto operator=(const mg_index&) -> mg_index& = delete;
+  auto operator=(mg_index&&) -> mg_index&      = default;
+
+  distribution_mode mode_;
+  int num_ranks_;
+  std::vector<iface<AnnIndexType, T, IdxT>> ann_interfaces_;
+
+  // for load balancing mechanism
+  std::shared_ptr<std::atomic<int64_t>> round_robin_counter_;
+};
+
+}  // namespace cuvs::neighbors

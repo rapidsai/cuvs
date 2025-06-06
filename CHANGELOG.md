@@ -1,3 +1,147 @@
+# cuvs 25.06.00 (5 Jun 2025)
+
+## 🚨 Breaking Changes
+
+- [Java] Adding support for prefiltering in CAGRA ([#870](https://github.com/rapidsai/cuvs/pull/870)) [@punAhuja](https://github.com/punAhuja)
+
+## 🐛 Bug Fixes
+
+- Fix failing CAGRA merge google tests for 25.06 ([#974](https://github.com/rapidsai/cuvs/pull/974)) [@rhdong](https://github.com/rhdong)
+- Fix for recent NCCL resource update ([#968](https://github.com/rapidsai/cuvs/pull/968)) [@viclafargue](https://github.com/viclafargue)
+- Revert &quot;Fix kmeans::predict argument order ([#915)&quot; (#951](https://github.com/rapidsai/cuvs/pull/915)&quot; (#951)) [@divyegala](https://github.com/divyegala)
+- IVF-PQ tests: fix segfault when accessing empty lists ([#933](https://github.com/rapidsai/cuvs/pull/933)) [@achirkin](https://github.com/achirkin)
+- batch_load_iterator shall copy data located in host memory ([#926](https://github.com/rapidsai/cuvs/pull/926)) [@tfeher](https://github.com/tfeher)
+- Fix kmeans::predict argument order ([#915](https://github.com/rapidsai/cuvs/pull/915)) [@enp1s0](https://github.com/enp1s0)
+- ANN_BENCH: fix the reported core count ([#896](https://github.com/rapidsai/cuvs/pull/896)) [@achirkin](https://github.com/achirkin)
+- CUVS_ANN_BENCH_SINGLE_EXE: find the mg library ([#890](https://github.com/rapidsai/cuvs/pull/890)) [@achirkin](https://github.com/achirkin)
+- [FIX] Revert negated InnerProduct distance for NN Descent ([#859](https://github.com/rapidsai/cuvs/pull/859)) [@jinsolp](https://github.com/jinsolp)
+- IVF-PQ tests: fix segfault when accessing empty lists ([#838](https://github.com/rapidsai/cuvs/pull/838)) [@achirkin](https://github.com/achirkin)
+- [CuVS-Java] Automate panama bindings generation, Include IVF_PQ parameters in CAGRA index parameters and other changes ([#831](https://github.com/rapidsai/cuvs/pull/831)) [@narangvivek10](https://github.com/narangvivek10)
+- Ann-bench: fix unsafe lazy blobs ([#828](https://github.com/rapidsai/cuvs/pull/828)) [@achirkin](https://github.com/achirkin)
+- Fix test_brute_force conversion ([#821](https://github.com/rapidsai/cuvs/pull/821)) [@lowener](https://github.com/lowener)
+- [FEA] New algos and updates/corrections to Faiss cuvs-bench ([#677](https://github.com/rapidsai/cuvs/pull/677)) [@tarang-jain](https://github.com/tarang-jain)
+
+## 📖 Documentation
+
+- All-neighbors API docs ([#944](https://github.com/rapidsai/cuvs/pull/944)) [@jinsolp](https://github.com/jinsolp)
+- cagra.rst: fitered -&gt; filtered ([#866](https://github.com/rapidsai/cuvs/pull/866)) [@eli-b](https://github.com/eli-b)
+- [DOCS] Fix Integration Docs (Faiss) ([#782](https://github.com/rapidsai/cuvs/pull/782)) [@tarang-jain](https://github.com/tarang-jain)
+
+## 🚀 New Features
+
+- Add IVF-PQ support in CAGRA index params in Python ([#918](https://github.com/rapidsai/cuvs/pull/918)) [@lowener](https://github.com/lowener)
+- [Feat] Expose C API for CAGRA `merge` ([#860](https://github.com/rapidsai/cuvs/pull/860)) [@rhdong](https://github.com/rhdong)
+- Use NCCL wheels from PyPI for CUDA 12 builds ([#827](https://github.com/rapidsai/cuvs/pull/827)) [@divyegala](https://github.com/divyegala)
+- Add support for half in CAGRA+HNSW ([#813](https://github.com/rapidsai/cuvs/pull/813)) [@lowener](https://github.com/lowener)
+- [CI] Enable Java test in CI workflow ([#805](https://github.com/rapidsai/cuvs/pull/805)) [@rhdong](https://github.com/rhdong)
+- Wrapper for all-neighbors knn graph building ([#785](https://github.com/rapidsai/cuvs/pull/785)) [@jinsolp](https://github.com/jinsolp)
+- Add support of half dtype in IVF-FLAT ([#730](https://github.com/rapidsai/cuvs/pull/730)) [@lowener](https://github.com/lowener)
+- IVF-PQ: low-precision coarse search ([#715](https://github.com/rapidsai/cuvs/pull/715)) [@achirkin](https://github.com/achirkin)
+- [Feat] Add support of logical merge in Cagra ([#713](https://github.com/rapidsai/cuvs/pull/713)) [@rhdong](https://github.com/rhdong)
+
+## 🛠️ Improvements
+
+- Update score calculation for CAGRA-Q instance selection ([#938](https://github.com/rapidsai/cuvs/pull/938)) [@enp1s0](https://github.com/enp1s0)
+- [FEA] Use Native Brute Force for Sparse Pairwise KNN ([#927](https://github.com/rapidsai/cuvs/pull/927)) [@tarang-jain](https://github.com/tarang-jain)
+- use &#39;rapids-init-pip&#39; in wheel CI, other CI changes ([#917](https://github.com/rapidsai/cuvs/pull/917)) [@jameslamb](https://github.com/jameslamb)
+- ANN_BENCH: Avoid repeated calls to raft::get_device_for_address in CAGRA search ([#908](https://github.com/rapidsai/cuvs/pull/908)) [@achirkin](https://github.com/achirkin)
+- [Java] New off-heap Dataset support for CAGRA and Bruteforce ([#902](https://github.com/rapidsai/cuvs/pull/902)) [@chatman](https://github.com/chatman)
+- Finish CUDA 12.9 migration and use branch-25.06 workflows ([#901](https://github.com/rapidsai/cuvs/pull/901)) [@bdice](https://github.com/bdice)
+- Update to clang 20 ([#898](https://github.com/rapidsai/cuvs/pull/898)) [@bdice](https://github.com/bdice)
+- get Java artifacts from GitHub Actions artifact store ([#893](https://github.com/rapidsai/cuvs/pull/893)) [@jameslamb](https://github.com/jameslamb)
+- Quote head_rev in conda recipes ([#892](https://github.com/rapidsai/cuvs/pull/892)) [@bdice](https://github.com/bdice)
+- [Java] Exposing  merge API for multiple CAGRA indices ([#891](https://github.com/rapidsai/cuvs/pull/891)) [@punAhuja](https://github.com/punAhuja)
+- Expose ivf-flat centers to python/c ([#888](https://github.com/rapidsai/cuvs/pull/888)) [@benfred](https://github.com/benfred)
+- CUDA 12.9 use updated compression flags ([#887](https://github.com/rapidsai/cuvs/pull/887)) [@robertmaynard](https://github.com/robertmaynard)
+- Expose ivf-pq centers to python/c ([#881](https://github.com/rapidsai/cuvs/pull/881)) [@benfred](https://github.com/benfred)
+- Accept host inputs in python for ivf-pq build and extend ([#880](https://github.com/rapidsai/cuvs/pull/880)) [@benfred](https://github.com/benfred)
+- Add tiered_index support ([#879](https://github.com/rapidsai/cuvs/pull/879)) [@benfred](https://github.com/benfred)
+- Exclude librmm.so from auditwheel ([#878](https://github.com/rapidsai/cuvs/pull/878)) [@bdice](https://github.com/bdice)
+- update.version.sh: remove broken reference, skip most CI on PRs that only modify update-version.sh ([#875](https://github.com/rapidsai/cuvs/pull/875)) [@jameslamb](https://github.com/jameslamb)
+- Add support for Python 3.13 ([#874](https://github.com/rapidsai/cuvs/pull/874)) [@gforsyth](https://github.com/gforsyth)
+- chore: lower wheel size threshold ([#872](https://github.com/rapidsai/cuvs/pull/872)) [@gforsyth](https://github.com/gforsyth)
+- [Java] Adding support for prefiltering in CAGRA ([#870](https://github.com/rapidsai/cuvs/pull/870)) [@punAhuja](https://github.com/punAhuja)
+- Change snmg index to use updated multi gpu resource API ([#869](https://github.com/rapidsai/cuvs/pull/869)) [@jinsolp](https://github.com/jinsolp)
+- run shellcheck on all files, other small pre-commit updates ([#865](https://github.com/rapidsai/cuvs/pull/865)) [@jameslamb](https://github.com/jameslamb)
+- Fix IVF PQ build metric for CAGRA ([#862](https://github.com/rapidsai/cuvs/pull/862)) [@lowener](https://github.com/lowener)
+- ANN_BENCH: Expose parallel_mode parameter of FAISS CPU IVF implementation ([#861](https://github.com/rapidsai/cuvs/pull/861)) [@achirkin](https://github.com/achirkin)
+- Specify matplotlib version ([#839](https://github.com/rapidsai/cuvs/pull/839)) [@benfred](https://github.com/benfred)
+- Use random tmp names for index files in tests ([#837](https://github.com/rapidsai/cuvs/pull/837)) [@achirkin](https://github.com/achirkin)
+- Download build artifacts from Github for CI ([#834](https://github.com/rapidsai/cuvs/pull/834)) [@VenkateshJaya](https://github.com/VenkateshJaya)
+- Add NN-Descent return_distances functionality to python/C ([#833](https://github.com/rapidsai/cuvs/pull/833)) [@benfred](https://github.com/benfred)
+- Optimize hnsw::from_cagra&lt;GPU&gt; ([#826](https://github.com/rapidsai/cuvs/pull/826)) [@achirkin](https://github.com/achirkin)
+- Use vendored RAPIDS.cmake in example code. ([#824](https://github.com/rapidsai/cuvs/pull/824)) [@bdice](https://github.com/bdice)
+- refactor(rattler): enable strict channel priority for builds ([#823](https://github.com/rapidsai/cuvs/pull/823)) [@gforsyth](https://github.com/gforsyth)
+- Reduce device memory usage for CAGRA&#39;s graph optimization process (2-hop detour counting) ([#822](https://github.com/rapidsai/cuvs/pull/822)) [@anaruse](https://github.com/anaruse)
+- [cuvs_bench] distinguish search label from build label in data_export.py ([#818](https://github.com/rapidsai/cuvs/pull/818)) [@jiangyinzuo](https://github.com/jiangyinzuo)
+- Vendor RAPIDS.cmake ([#816](https://github.com/rapidsai/cuvs/pull/816)) [@bdice](https://github.com/bdice)
+- Update libcuvs libraft ver to 25.06 in conda env ([#808](https://github.com/rapidsai/cuvs/pull/808)) [@jinsolp](https://github.com/jinsolp)
+- Moving NN Descent class and struct declarations to `nn_descent_gnnd.hpp` ([#803](https://github.com/rapidsai/cuvs/pull/803)) [@jinsolp](https://github.com/jinsolp)
+- Remove `[@rapidsai/cuvs-build-codeowners` ([#783](https://github.com/rapidsai/cuvs/pull/783)) @KyleFromNVIDIA](https://github.com/rapidsai/cuvs-build-codeowners` ([#783](https://github.com/rapidsai/cuvs/pull/783)) @KyleFromNVIDIA)
+- Moving wheel builds to specified location and uploading build artifacts to Github ([#777](https://github.com/rapidsai/cuvs/pull/777)) [@VenkateshJaya](https://github.com/VenkateshJaya)
+- Remove unused raft cagra header in add_nodes.cuh ([#741](https://github.com/rapidsai/cuvs/pull/741)) [@jiangyinzuo](https://github.com/jiangyinzuo)
+- Expose kmeans to python ([#729](https://github.com/rapidsai/cuvs/pull/729)) [@benfred](https://github.com/benfred)
+- Update cuvs to properly create a NCCL::NCCL target ([#720](https://github.com/rapidsai/cuvs/pull/720)) [@robertmaynard](https://github.com/robertmaynard)
+- Optimize euclidean distance in host refine phase ([#689](https://github.com/rapidsai/cuvs/pull/689)) [@anstellaire](https://github.com/anstellaire)
+- Moving MG functions into unified API + `raft::device_resources_snmg` as device resource type for MG functions ([#454](https://github.com/rapidsai/cuvs/pull/454)) [@viclafargue](https://github.com/viclafargue)
+- Moving random ball cover ([#218](https://github.com/rapidsai/cuvs/pull/218)) [@cjnolet](https://github.com/cjnolet)
+
+# cuvs 25.04.00 (9 Apr 2025)
+
+## 🚨 Breaking Changes
+
+- Use new rapids-logger library ([#644](https://github.com/rapidsai/cuvs/pull/644)) [@vyasr](https://github.com/vyasr)
+
+## 🐛 Bug Fixes
+
+- Use new build_patch_only argument ([#780](https://github.com/rapidsai/cuvs/pull/780)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Fix resource import so generate_groundtruth works ([#774](https://github.com/rapidsai/cuvs/pull/774)) [@nvrohanv](https://github.com/nvrohanv)
+- Relax max duplicates in batched NN Descent ([#770](https://github.com/rapidsai/cuvs/pull/770)) [@jinsolp](https://github.com/jinsolp)
+- [BUG] Fix graph index sorting in CAGRA graph build by NN Descent ([#763](https://github.com/rapidsai/cuvs/pull/763)) [@enp1s0](https://github.com/enp1s0)
+- cuvs-bench-cpu: avoid &#39;mkl&#39; dependency on aarch64 ([#750](https://github.com/rapidsai/cuvs/pull/750)) [@jameslamb](https://github.com/jameslamb)
+- ANN_BENCH: Fix segfault in CAGRA wrapper when moving its graph ([#733](https://github.com/rapidsai/cuvs/pull/733)) [@achirkin](https://github.com/achirkin)
+- Fix duplicate indices in batch NN Descent ([#702](https://github.com/rapidsai/cuvs/pull/702)) [@jinsolp](https://github.com/jinsolp)
+
+## 📖 Documentation
+
+- Go module - Usage docs ([#779](https://github.com/rapidsai/cuvs/pull/779)) [@AyodeAwe](https://github.com/AyodeAwe)
+
+## 🚀 New Features
+
+- `L2SqrtExpanded` metric support for NN Descent ([#790](https://github.com/rapidsai/cuvs/pull/790)) [@jinsolp](https://github.com/jinsolp)
+- CAGRA search: int64_t indices in the API ([#769](https://github.com/rapidsai/cuvs/pull/769)) [@achirkin](https://github.com/achirkin)
+- Expose IVF PQ params in CAGRA C API ([#768](https://github.com/rapidsai/cuvs/pull/768)) [@divyegala](https://github.com/divyegala)
+- [Feat] Expose search with bitset C API for Brute Force ([#717](https://github.com/rapidsai/cuvs/pull/717)) [@rhdong](https://github.com/rhdong)
+- Diskann Benchmarking Wrapper ([#260](https://github.com/rapidsai/cuvs/pull/260)) [@tarang-jain](https://github.com/tarang-jain)
+
+## 🛠️ Improvements
+
+- Use L4 instead of V100 ([#797](https://github.com/rapidsai/cuvs/pull/797)) [@bdice](https://github.com/bdice)
+- Rust publishing updates ([#789](https://github.com/rapidsai/cuvs/pull/789)) [@AyodeAwe](https://github.com/AyodeAwe)
+- Removing print statement ([#786](https://github.com/rapidsai/cuvs/pull/786)) [@jinsolp](https://github.com/jinsolp)
+- Support passing a dataset to `FromCagra` ([#767](https://github.com/rapidsai/cuvs/pull/767)) [@ajit283](https://github.com/ajit283)
+- add function to build specific gpu-arches [REVIEW] ([#766](https://github.com/rapidsai/cuvs/pull/766)) [@nvrohanv](https://github.com/nvrohanv)
+- feat(libcuvs): port libcuvs to rattler-build ([#751](https://github.com/rapidsai/cuvs/pull/751)) [@gforsyth](https://github.com/gforsyth)
+- Consolidate Conda environment for Rust ([#745](https://github.com/rapidsai/cuvs/pull/745)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- rename &#39;sklearn&#39; conda dependency to &#39;scikit-learn&#39; ([#743](https://github.com/rapidsai/cuvs/pull/743)) [@jameslamb](https://github.com/jameslamb)
+- Reduce memory consumption of scalar quantizer ([#736](https://github.com/rapidsai/cuvs/pull/736)) [@mfoerste4](https://github.com/mfoerste4)
+- Use conda-build instead of conda-mambabuild ([#723](https://github.com/rapidsai/cuvs/pull/723)) [@bdice](https://github.com/bdice)
+- Expand NVTX annotations in CAGRA build and HNSW ([#711](https://github.com/rapidsai/cuvs/pull/711)) [@achirkin](https://github.com/achirkin)
+- Replace `cub::TransformInputIterator` with `thrust::transform_iterator` ([#707](https://github.com/rapidsai/cuvs/pull/707)) [@miscco](https://github.com/miscco)
+- Consolidate more Conda solves in CI ([#701](https://github.com/rapidsai/cuvs/pull/701)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Require CMake 3.30.4 ([#691](https://github.com/rapidsai/cuvs/pull/691)) [@robertmaynard](https://github.com/robertmaynard)
+- Create Conda CI test env in one step ([#684](https://github.com/rapidsai/cuvs/pull/684)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Use shared-workflows branch-25.04 ([#669](https://github.com/rapidsai/cuvs/pull/669)) [@bdice](https://github.com/bdice)
+- Add `shellcheck` to pre-commit and fix warnings ([#662](https://github.com/rapidsai/cuvs/pull/662)) [@gforsyth](https://github.com/gforsyth)
+- Add build_type input field for test.yaml ([#661](https://github.com/rapidsai/cuvs/pull/661)) [@gforsyth](https://github.com/gforsyth)
+- Use `rapids-pip-retry` in CI jobs that might need retries ([#648](https://github.com/rapidsai/cuvs/pull/648)) [@gforsyth](https://github.com/gforsyth)
+- Use new rapids-logger library ([#644](https://github.com/rapidsai/cuvs/pull/644)) [@vyasr](https://github.com/vyasr)
+- disallow fallback to Make in Python builds ([#636](https://github.com/rapidsai/cuvs/pull/636)) [@jameslamb](https://github.com/jameslamb)
+- Add `verify-codeowners` hook ([#633](https://github.com/rapidsai/cuvs/pull/633)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Forward-merge branch-25.02 into branch-25.04 ([#632](https://github.com/rapidsai/cuvs/pull/632)) [@bdice](https://github.com/bdice)
+- Account for RAFT sparse types updates ([#629](https://github.com/rapidsai/cuvs/pull/629)) [@divyegala](https://github.com/divyegala)
+- Migrate to NVKS for amd64 CI runners ([#627](https://github.com/rapidsai/cuvs/pull/627)) [@bdice](https://github.com/bdice)
+
 # cuvs 25.02.00 (13 Feb 2025)
 
 ## 🚨 Breaking Changes

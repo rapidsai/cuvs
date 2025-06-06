@@ -84,9 +84,9 @@ def force_fallback_to_numpy():
 if rmm is not None:
     gpu_system = True
     try:
-        from pylibraft.common import DeviceResources
         from rmm.allocators.cupy import rmm_cupy_allocator
 
+        from cuvs.common import Resources
         from cuvs.neighbors.brute_force import build, search
     except ImportError:
         # RMM is available, cupy is available, but cuVS is not
@@ -188,7 +188,7 @@ def calc_truth(dataset, queries, k, metric="sqeuclidean"):
     queries = xp.asarray(queries, dtype=xp.float32)
 
     if gpu_system:
-        resources = DeviceResources()
+        resources = Resources()
 
     while i < n_samples:
         print("Step {0}/{1}:".format(i // n, n_samples // n))

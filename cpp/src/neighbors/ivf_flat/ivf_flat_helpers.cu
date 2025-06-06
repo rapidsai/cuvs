@@ -36,6 +36,17 @@ void pack(raft::resources const& res,
 }
 
 void pack(raft::resources const& res,
+          raft::device_matrix_view<const half, uint32_t, raft::row_major> codes,
+          uint32_t veclen,
+          uint32_t offset,
+          raft::device_mdspan<half,
+                              typename list_spec<uint32_t, half, int64_t>::list_extents,
+                              raft::row_major> list_data)
+{
+  detail::pack<half, int64_t>(res, codes, veclen, offset, list_data);
+}
+
+void pack(raft::resources const& res,
           raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> codes,
           uint32_t veclen,
           uint32_t offset,
@@ -69,6 +80,17 @@ void unpack(raft::resources const& res,
 }
 
 void unpack(raft::resources const& res,
+            raft::device_mdspan<const half,
+                                typename list_spec<uint32_t, half, int64_t>::list_extents,
+                                raft::row_major> list_data,
+            uint32_t veclen,
+            uint32_t offset,
+            raft::device_matrix_view<half, uint32_t, raft::row_major> codes)
+{
+  detail::unpack<half, int64_t>(res, list_data, veclen, offset, codes);
+}
+
+void unpack(raft::resources const& res,
             raft::device_mdspan<const int8_t,
                                 typename list_spec<uint32_t, int8_t, int64_t>::list_extents,
                                 raft::row_major> list_data,
@@ -95,6 +117,11 @@ void pack_1(const float* flat_code, float* block, uint32_t dim, uint32_t veclen,
   detail::pack_1<float>(flat_code, block, dim, veclen, offset);
 }
 
+void pack_1(const half* flat_code, half* block, uint32_t dim, uint32_t veclen, uint32_t offset)
+{
+  detail::pack_1<half>(flat_code, block, dim, veclen, offset);
+}
+
 void pack_1(const int8_t* flat_code, int8_t* block, uint32_t dim, uint32_t veclen, uint32_t offset)
 {
   detail::pack_1<int8_t>(flat_code, block, dim, veclen, offset);
@@ -109,6 +136,11 @@ void pack_1(
 void unpack_1(const float* block, float* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset)
 {
   detail::unpack_1<float>(block, flat_code, dim, veclen, offset);
+}
+
+void unpack_1(const half* block, half* flat_code, uint32_t dim, uint32_t veclen, uint32_t offset)
+{
+  detail::unpack_1<half>(block, flat_code, dim, veclen, offset);
 }
 
 void unpack_1(
@@ -149,57 +181,27 @@ void reset_index(const raft::resources& res, index<float, int64_t>* index)
   detail::reset_index<float, int64_t>(res, index);
 }
 
-/**
- * @brief Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
- * externally modifying the index without going through the build stage. The data and indices of the
- * IVF lists will be lost.
- *
- * Usage example:
- * @code{.cpp}
- *   raft::resources res;
- *   using namespace cuvs::neighbors;
- *   // use default index parameters
- *   ivf_flat::index_params index_params;
- *   // initialize an empty index
- *   ivf_flat::index<int8_t, int64_t> index(res, index_params, D);
- *   // reset the index's state and list sizes
- *   ivf_flat::helpers::reset_index(res, &index);
- * @endcode
- *
- * @param[in] res raft resource
- * @param[inout] index pointer to IVF-Flat index
- */
+void reset_index(const raft::resources& res, index<half, int64_t>* index)
+{
+  detail::reset_index<half, int64_t>(res, index);
+}
+
 void reset_index(const raft::resources& res, index<int8_t, int64_t>* index)
 {
   detail::reset_index<int8_t, int64_t>(res, index);
 }
 
-/**
- * @brief Public helper API to reset the data and indices ptrs, and the list sizes. Useful for
- * externally modifying the index without going through the build stage. The data and indices of the
- * IVF lists will be lost.
- *
- * Usage example:
- * @code{.cpp}
- *   raft::resources res;
- *   using namespace cuvs::neighbors;
- *   // use default index parameters
- *   ivf_flat::index_params index_params;
- *   // initialize an empty index
- *   ivf_flat::index<uint8_t, int64_t> index(res, index_params, D);
- *   // reset the index's state and list sizes
- *   ivf_flat::helpers::reset_index(res, &index);
- * @endcode
- *
- * @param[in] res raft resource
- * @param[inout] index pointer to IVF-Flat index
- */
 void reset_index(const raft::resources& res, index<uint8_t, int64_t>* index)
 {
   detail::reset_index<uint8_t, int64_t>(res, index);
 }
 
 void recompute_internal_state(const raft::resources& res, index<float, int64_t>* index)
+{
+  ivf::detail::recompute_internal_state(res, *index);
+}
+
+void recompute_internal_state(const raft::resources& res, index<half, int64_t>* index)
 {
   ivf::detail::recompute_internal_state(res, *index);
 }

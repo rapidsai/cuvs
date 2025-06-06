@@ -54,8 +54,10 @@ namespace cuvs::neighbors::dynamic_batching {
     return index.runner->search(res, params, queries, neighbors, distances);       \
   }
 
+// Brute-force search with 64-bit indices
 CUVS_INST_DYNAMIC_BATCHING_INDEX(float, int64_t, cuvs::neighbors::brute_force, index<float, float>);
 
+// CAGRA build and search with 32-bit indices
 CUVS_INST_DYNAMIC_BATCHING_INDEX(float, uint32_t, cuvs::neighbors::cagra, index<float, uint32_t>);
 CUVS_INST_DYNAMIC_BATCHING_INDEX(half, uint32_t, cuvs::neighbors::cagra, index<half, uint32_t>);
 CUVS_INST_DYNAMIC_BATCHING_INDEX(int8_t, uint32_t, cuvs::neighbors::cagra, index<int8_t, uint32_t>);
@@ -64,11 +66,22 @@ CUVS_INST_DYNAMIC_BATCHING_INDEX(uint8_t,
                                  cuvs::neighbors::cagra,
                                  index<uint8_t, uint32_t>);
 
+// CAGRA build with 32-bit indices, search with 64-bit indices
+CUVS_INST_DYNAMIC_BATCHING_INDEX(float, int64_t, cuvs::neighbors::cagra, index<float, uint32_t>);
+CUVS_INST_DYNAMIC_BATCHING_INDEX(half, int64_t, cuvs::neighbors::cagra, index<half, uint32_t>);
+CUVS_INST_DYNAMIC_BATCHING_INDEX(int8_t, int64_t, cuvs::neighbors::cagra, index<int8_t, uint32_t>);
+CUVS_INST_DYNAMIC_BATCHING_INDEX(uint8_t,
+                                 int64_t,
+                                 cuvs::neighbors::cagra,
+                                 index<uint8_t, uint32_t>);
+
+// IVF-PQ with 64-bit indices
 CUVS_INST_DYNAMIC_BATCHING_INDEX(float, int64_t, cuvs::neighbors::ivf_pq, index<int64_t>);
 CUVS_INST_DYNAMIC_BATCHING_INDEX(half, int64_t, cuvs::neighbors::ivf_pq, index<int64_t>);
 CUVS_INST_DYNAMIC_BATCHING_INDEX(int8_t, int64_t, cuvs::neighbors::ivf_pq, index<int64_t>);
 CUVS_INST_DYNAMIC_BATCHING_INDEX(uint8_t, int64_t, cuvs::neighbors::ivf_pq, index<int64_t>);
 
+// IVF-Flat with 64-bit indices
 CUVS_INST_DYNAMIC_BATCHING_INDEX(float, int64_t, cuvs::neighbors::ivf_flat, index<float, int64_t>);
 CUVS_INST_DYNAMIC_BATCHING_INDEX(int8_t,
                                  int64_t,

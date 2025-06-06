@@ -24,6 +24,7 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.hpp>
+#include <cuvs/neighbors/composite/merge.hpp>
 #include <cuvs/neighbors/dynamic_batching.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
@@ -44,14 +45,17 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <raft/util/integer_utils.hpp>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 namespace cuvs::bench {
 
 enum class AllocatorType { kHostPinned, kHostHugePage, kDevice };
 enum class CagraBuildAlgo { kAuto, kIvfPq, kNnDescent };
+enum class CagraMergeType { kPhysical, kLogical };
 
 template <typename T, typename IdxT>
 class cuvs_cagra : public algo<T>, public algo_gpu {
@@ -80,6 +84,8 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
     std::optional<float> ivf_pq_refine_rate                                    = std::nullopt;
     std::optional<cuvs::neighbors::ivf_pq::index_params> ivf_pq_build_params   = std::nullopt;
     std::optional<cuvs::neighbors::ivf_pq::search_params> ivf_pq_search_params = std::nullopt;
+    size_t num_dataset_splits                                                  = 1;
+    CagraMergeType merge_type = CagraMergeType::kPhysical;
 
     void prepare_build_params(const raft::extent_2d<IdxT>& dataset_extents)
     {
@@ -132,8 +138,7 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
                    int batch_size,
                    int k,
                    algo_base::index_type* neighbors,
-                   float* distances,
-                   IdxT* neighbors_idx_t) const;
+                   float* distances) const;
 
   [[nodiscard]] auto get_sync_stream() const noexcept -> cudaStream_t override
   {
@@ -181,13 +186,15 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   std::shared_ptr<raft::device_matrix<T, int64_t, raft::row_major>> dataset_;
   std::shared_ptr<raft::device_matrix_view<const T, int64_t, raft::row_major>> input_dataset_v_;
 
-  std::shared_ptr<cuvs::neighbors::dynamic_batching::index<T, IdxT>> dynamic_batcher_;
+  std::shared_ptr<cuvs::neighbors::dynamic_batching::index<T, algo_base::index_type>>
+    dynamic_batcher_;
   cuvs::neighbors::dynamic_batching::search_params dynamic_batcher_sp_{};
   int64_t dynamic_batching_max_batch_size_;
   size_t dynamic_batching_n_queues_;
   bool dynamic_batching_conservative_dispatch_;
 
   std::shared_ptr<cuvs::neighbors::filtering::base_filter> filter_;
+  std::vector<std::shared_ptr<cuvs::neighbors::cagra::index<T, IdxT>>> sub_indices_;
 
   inline rmm::device_async_resource_ref get_mr(AllocatorType mem_type)
   {
@@ -211,10 +218,57 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
   auto dataset_view_device =
     raft::make_mdspan<const T, IdxT, raft::row_major, false, true>(dataset, dataset_extents);
   bool dataset_is_on_host = raft::get_device_for_address(dataset) == -1;
+  if (index_params_.num_dataset_splits <= 1) {
+    index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(
+      dataset_is_on_host ? cuvs::neighbors::cagra::build(handle_, params, dataset_view_host)
+                         : cuvs::neighbors::cagra::build(handle_, params, dataset_view_device)));
+  } else {
+    IdxT rows_per_split =
+      raft::ceildiv<IdxT>(nrow, static_cast<IdxT>(index_params_.num_dataset_splits));
+    for (size_t i = 0; i < index_params_.num_dataset_splits; ++i) {
+      IdxT start = static_cast<IdxT>(i * rows_per_split);
+      if (start >= nrow) break;
+      IdxT rows        = std::min(rows_per_split, static_cast<IdxT>(nrow) - start);
+      const T* sub_ptr = dataset + static_cast<size_t>(start) * dimension_;
+      auto sub_host =
+        raft::make_host_matrix_view<const T, int64_t, raft::row_major>(sub_ptr, rows, dimension_);
+      auto sub_dev =
+        raft::make_device_matrix_view<const T, int64_t, raft::row_major>(sub_ptr, rows, dimension_);
 
-  index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(
-    dataset_is_on_host ? cuvs::neighbors::cagra::build(handle_, params, dataset_view_host)
-                       : cuvs::neighbors::cagra::build(handle_, params, dataset_view_device)));
+      auto sub_index =
+        cuvs::neighbors::cagra::index<T, IdxT>(handle_, index_params_.cagra_params.metric);
+      if (index_params_.merge_type == CagraMergeType::kPhysical) {
+        if (dataset_is_on_host) {
+          sub_index.update_dataset(handle_, sub_host);
+        } else {
+          sub_index.update_dataset(handle_, sub_dev);
+        }
+      }
+      if (index_params_.merge_type == CagraMergeType::kLogical) {
+        if (dataset_is_on_host) {
+          sub_index = cuvs::neighbors::cagra::build(handle_, params, sub_host);
+        } else {
+          sub_index = cuvs::neighbors::cagra::build(handle_, params, sub_dev);
+        }
+      }
+      auto sub_index_shared =
+        std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(sub_index));
+      sub_indices_.push_back(std::move(sub_index_shared));
+    }
+    if (index_params_.merge_type == CagraMergeType::kPhysical) {
+      cuvs::neighbors::cagra::merge_params merge_params{index_params_.cagra_params};
+      merge_params.merge_strategy = cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
+
+      std::vector<cuvs::neighbors::cagra::index<T, IdxT>*> indices;
+      indices.reserve(sub_indices_.size());
+      for (auto& ptr : sub_indices_) {
+        indices.push_back(ptr.get());
+      }
+
+      index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(
+        std::move(cuvs::neighbors::cagra::merge(handle_, merge_params, indices)));
+    }
+  }
 }
 
 inline auto allocator_to_string(AllocatorType mem_type) -> std::string
@@ -233,7 +287,7 @@ template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param,
                                            const void* filter_bitset)
 {
-  filter_ = make_cuvs_filter(filter_bitset, index_->size());
+  if (index_) { filter_ = make_cuvs_filter(filter_bitset, index_->size()); }
   auto sp = dynamic_cast<const search_param&>(param);
   bool needs_dynamic_batcher_update =
     (dynamic_batching_max_batch_size_ != sp.dynamic_batching_max_batch_size) ||
@@ -292,16 +346,18 @@ void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param,
   // dynamic batching
   if (sp.dynamic_batching) {
     if (!dynamic_batcher_ || needs_dynamic_batcher_update) {
-      dynamic_batcher_ = std::make_shared<cuvs::neighbors::dynamic_batching::index<T, IdxT>>(
-        handle_,
-        cuvs::neighbors::dynamic_batching::index_params{{},
-                                                        sp.dynamic_batching_k,
-                                                        sp.dynamic_batching_max_batch_size,
-                                                        sp.dynamic_batching_n_queues,
-                                                        sp.dynamic_batching_conservative_dispatch},
-        *index_,
-        search_params_,
-        filter_.get());
+      dynamic_batcher_ =
+        std::make_shared<cuvs::neighbors::dynamic_batching::index<T, algo_base::index_type>>(
+          handle_,
+          cuvs::neighbors::dynamic_batching::index_params{
+            {},
+            sp.dynamic_batching_k,
+            sp.dynamic_batching_max_batch_size,
+            sp.dynamic_batching_n_queues,
+            sp.dynamic_batching_conservative_dispatch},
+          *index_,
+          search_params_,
+          filter_.get());
     }
     dynamic_batcher_sp_.dispatch_timeout_ms = sp.dynamic_batching_dispatch_timeout_ms;
   } else {
@@ -312,44 +368,94 @@ void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param,
 template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
 {
-  using ds_idx_type = decltype(index_->data().n_rows());
-  bool is_vpq =
-    dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(&index_->data()) ||
-    dynamic_cast<const cuvs::neighbors::vpq_dataset<float, ds_idx_type>*>(&index_->data());
-  // It can happen that we are re-using a previous algo object which already has
-  // the dataset set. Check if we need update.
-  if (static_cast<size_t>(input_dataset_v_->extent(0)) != nrow ||
-      input_dataset_v_->data_handle() != dataset) {
-    *input_dataset_v_ = raft::make_device_matrix_view<const T, int64_t>(dataset, nrow, this->dim_);
-    need_dataset_update_ = !is_vpq;  // ignore update if this is a VPQ dataset.
+  if (index_params_.num_dataset_splits > 1 &&
+      index_params_.merge_type == CagraMergeType::kLogical) {
+    bool dataset_is_on_host = raft::get_device_for_address(dataset) == -1;
+    IdxT rows_per_split =
+      raft::ceildiv<IdxT>(nrow, static_cast<IdxT>(index_params_.num_dataset_splits));
+    for (size_t i = 0; i < sub_indices_.size(); ++i) {
+      IdxT start = static_cast<IdxT>(i * rows_per_split);
+      if (start >= nrow) break;
+      IdxT rows        = std::min(rows_per_split, static_cast<IdxT>(nrow) - start);
+      const T* sub_ptr = dataset + static_cast<size_t>(start) * dimension_;
+      auto sub_host =
+        raft::make_host_matrix_view<const T, int64_t, raft::row_major>(sub_ptr, rows, dimension_);
+      auto sub_dev =
+        raft::make_device_matrix_view<const T, int64_t, raft::row_major>(sub_ptr, rows, dimension_);
+      auto sub_index = sub_indices_[i].get();
+      if (index_params_.merge_type == CagraMergeType::kLogical) {
+        if (dataset_is_on_host) {
+          sub_index->update_dataset(handle_, sub_host);
+        } else {
+          sub_index->update_dataset(handle_, sub_dev);
+        }
+      }
+    }
+    need_dataset_update_ = false;
+  } else {
+    using ds_idx_type = decltype(index_->data().n_rows());
+    bool is_vpq =
+      dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(&index_->data()) ||
+      dynamic_cast<const cuvs::neighbors::vpq_dataset<float, ds_idx_type>*>(&index_->data());
+    // It can happen that we are re-using a previous algo object which already has
+    // the dataset set. Check if we need update.
+    if (static_cast<size_t>(input_dataset_v_->extent(0)) != nrow ||
+        input_dataset_v_->data_handle() != dataset) {
+      *input_dataset_v_ =
+        raft::make_device_matrix_view<const T, int64_t>(dataset, nrow, this->dim_);
+      need_dataset_update_ = !is_vpq;  // ignore update if this is a VPQ dataset.
+    }
   }
 }
 
 template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::save(const std::string& file) const
 {
-  using ds_idx_type = decltype(index_->data().n_rows());
-  bool is_vpq =
-    dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(&index_->data()) ||
-    dynamic_cast<const cuvs::neighbors::vpq_dataset<float, ds_idx_type>*>(&index_->data());
-  cuvs::neighbors::cagra::serialize(handle_, file, *index_, is_vpq);
+  if (index_params_.num_dataset_splits > 1 &&
+      index_params_.merge_type == CagraMergeType::kLogical) {
+    for (size_t i = 0; i < sub_indices_.size(); ++i) {
+      std::string subfile = file + (i == 0 ? "" : ".subidx." + std::to_string(i));
+      cuvs::neighbors::cagra::serialize(handle_, subfile, *sub_indices_[i], false);
+    }
+    std::ofstream f(file + ".submeta", std::ios::out);
+    f << sub_indices_.size();
+    f.close();
+  } else {
+    using ds_idx_type = decltype(index_->data().n_rows());
+    bool is_vpq =
+      dynamic_cast<const cuvs::neighbors::vpq_dataset<half, ds_idx_type>*>(&index_->data()) ||
+      dynamic_cast<const cuvs::neighbors::vpq_dataset<float, ds_idx_type>*>(&index_->data());
+    cuvs::neighbors::cagra::serialize(handle_, file, *index_, is_vpq);
+  }
 }
 
 template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::save_to_hnswlib(const std::string& file) const
 {
-  if constexpr (!std::is_same_v<T, half>) {
-    cuvs::neighbors::cagra::serialize_to_hnswlib(handle_, file, *index_);
-  } else {
-    RAFT_FAIL("Cannot save fp16 index to hnswlib format");
-  }
+  cuvs::neighbors::cagra::serialize_to_hnswlib(handle_, file, *index_);
 }
 
 template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::load(const std::string& file)
 {
-  index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(handle_);
-  cuvs::neighbors::cagra::deserialize(handle_, file, index_.get());
+  std::ifstream meta(file + ".submeta", std::ios::in);
+  if (index_params_.num_dataset_splits > 1 &&
+      index_params_.merge_type == CagraMergeType::kLogical && meta.good()) {
+    // Load multiple sub-indices for logical merge
+    size_t count;
+    meta >> count;
+    meta.close();
+    sub_indices_.clear();
+    for (size_t i = 0; i < count; ++i) {
+      std::string subfile = file + (i == 0 ? "" : ".subidx." + std::to_string(i));
+      auto sub_index      = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(handle_);
+      cuvs::neighbors::cagra::deserialize(handle_, subfile, sub_index.get());
+      sub_indices_.push_back(std::move(sub_index));
+    }
+  } else {
+    index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(handle_);
+    cuvs::neighbors::cagra::deserialize(handle_, file, index_.get());
+  }
 }
 
 template <typename T, typename IdxT>
@@ -359,24 +465,16 @@ std::unique_ptr<algo<T>> cuvs_cagra<T, IdxT>::copy()
 }
 
 template <typename T, typename IdxT>
-void cuvs_cagra<T, IdxT>::search_base(const T* queries,
-                                      int batch_size,
-                                      int k,
-                                      algo_base::index_type* neighbors,
-                                      float* distances,
-                                      IdxT* neighbors_idx_t) const
+void cuvs_cagra<T, IdxT>::search_base(
+  const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
   static_assert(std::is_integral_v<algo_base::index_type>);
   static_assert(std::is_integral_v<IdxT>);
 
-  if constexpr (sizeof(IdxT) == sizeof(algo_base::index_type)) {
-    neighbors_idx_t = reinterpret_cast<IdxT*>(neighbors);
-  }
-
   auto queries_view =
     raft::make_device_matrix_view<const T, int64_t>(queries, batch_size, dimension_);
   auto neighbors_view =
-    raft::make_device_matrix_view<IdxT, int64_t>(neighbors_idx_t, batch_size, k);
+    raft::make_device_matrix_view<algo_base::index_type, int64_t>(neighbors, batch_size, k);
   auto distances_view = raft::make_device_matrix_view<float, int64_t>(distances, batch_size, k);
 
   if (dynamic_batcher_) {
@@ -387,27 +485,40 @@ void cuvs_cagra<T, IdxT>::search_base(const T* queries,
                                               neighbors_view,
                                               distances_view);
   } else {
-    cuvs::neighbors::cagra::search(
-      handle_, search_params_, *index_, queries_view, neighbors_view, distances_view, *filter_);
-  }
-
-  if constexpr (sizeof(IdxT) != sizeof(algo_base::index_type)) {
-    if (raft::get_device_for_address(neighbors) < 0 &&
-        raft::get_device_for_address(neighbors_idx_t) < 0) {
-      // Both pointers on the host, let's use host-side mapping
-      if (uses_stream()) {
-        // Need to wait for GPU to finish filling source
-        raft::resource::sync_stream(handle_);
-      }
-      for (int i = 0; i < batch_size * k; i++) {
-        neighbors[i] = algo_base::index_type(neighbors_idx_t[i]);
-      }
+    if (index_params_.num_dataset_splits <= 1 ||
+        index_params_.merge_type == CagraMergeType::kPhysical) {
+      cuvs::neighbors::cagra::search(
+        handle_, search_params_, *index_, queries_view, neighbors_view, distances_view, *filter_);
     } else {
-      raft::linalg::unaryOp(neighbors,
-                            neighbors_idx_t,
-                            batch_size * k,
-                            raft::cast_op<algo_base::index_type>(),
-                            raft::resource::get_cuda_stream(handle_));
+      if (index_params_.merge_type == CagraMergeType::kLogical) {
+        cuvs::neighbors::cagra::merge_params merge_params{index_params_.cagra_params};
+        merge_params.merge_strategy = cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL;
+
+        // Create wrapped indices for composite merge
+        std::vector<std::shared_ptr<cuvs::neighbors::IndexWrapper<T, IdxT, algo_base::index_type>>>
+          wrapped_indices;
+        wrapped_indices.reserve(sub_indices_.size());
+        for (auto& ptr : sub_indices_) {
+          auto index_wrapper =
+            cuvs::neighbors::cagra::make_index_wrapper<T, IdxT, algo_base::index_type>(ptr.get());
+          wrapped_indices.push_back(index_wrapper);
+        }
+
+        raft::resources composite_handle(handle_);
+        size_t n_streams = wrapped_indices.size();
+        raft::resource::set_cuda_stream_pool(composite_handle,
+                                             std::make_shared<rmm::cuda_stream_pool>(n_streams));
+
+        auto merged_index =
+          cuvs::neighbors::composite::merge(composite_handle, merge_params, wrapped_indices);
+        cuvs::neighbors::filtering::none_sample_filter empty_filter;
+        merged_index->search(composite_handle,
+                             search_params_,
+                             queries_view,
+                             neighbors_view,
+                             distances_view,
+                             empty_filter);
+      }
     }
   }
 }
@@ -418,13 +529,22 @@ void cuvs_cagra<T, IdxT>::search(
 {
   static_assert(std::is_integral_v<algo_base::index_type>);
   static_assert(std::is_integral_v<IdxT>);
-  constexpr bool kNeedsIoMapping = sizeof(IdxT) != sizeof(algo_base::index_type);
 
   auto k0                       = static_cast<size_t>(refine_ratio_ * k);
   const bool disable_refinement = k0 <= static_cast<size_t>(k);
   const raft::resources& res    = handle_;
-  auto mem_type =
-    raft::get_device_for_address(neighbors) >= 0 ? MemoryType::kDevice : MemoryType::kHostPinned;
+  // NOTE: caching mem_type to reduce mutex locks
+  // raft::get_device_for_address call cuda API to get the pointer properties,
+  // this means it locks the context mutex for a very small amount of time.
+  // In the event of thread contention (such as thousands threads), this time can actually increase.
+  // Hence we try to bypass this check for repeated search calls.
+  thread_local MemoryType mem_type                   = MemoryType::kDevice;
+  thread_local algo_base::index_type* prev_neighbors = nullptr;
+  if (prev_neighbors != neighbors) {
+    prev_neighbors = neighbors;
+    mem_type =
+      raft::get_device_for_address(neighbors) >= 0 ? MemoryType::kDevice : MemoryType::kHostPinned;
+  }
 
   // If dynamic batching is used and there's no sync between benchmark laps, multiple sequential
   // requests can group together. The data is copied asynchronously, and if the same intermediate
@@ -434,9 +554,8 @@ void cuvs_cagra<T, IdxT>::search(
                                                dynamic_batching_max_batch_size_, batch_size) *
                                                dynamic_batching_n_queues_
                                            : 1;
-  auto tmp_buf_size = ((disable_refinement ? 0 : (sizeof(float) + sizeof(algo_base::index_type))) +
-                       (kNeedsIoMapping ? sizeof(IdxT) : 0)) *
-                      batch_size * k0;
+  auto tmp_buf_size =
+    ((disable_refinement ? 0 : (sizeof(float) + sizeof(algo_base::index_type)))) * batch_size * k0;
   auto& tmp_buf = get_tmp_buffer_from_global_pool(tmp_buf_size * max_dyn_grouping);
   thread_local static int64_t group_id = 0;
   auto* candidates_ptr                 = reinterpret_cast<algo_base::index_type*>(
@@ -444,13 +563,11 @@ void cuvs_cagra<T, IdxT>::search(
   group_id = (group_id + 1) % max_dyn_grouping;
   auto* candidate_dists_ptr =
     reinterpret_cast<float*>(candidates_ptr + (disable_refinement ? 0 : batch_size * k0));
-  auto* neighbors_idx_t =
-    reinterpret_cast<IdxT*>(candidate_dists_ptr + (disable_refinement ? 0 : batch_size * k0));
 
   if (disable_refinement) {
-    search_base(queries, batch_size, k, neighbors, distances, neighbors_idx_t);
+    search_base(queries, batch_size, k, neighbors, distances);
   } else {
-    search_base(queries, batch_size, k0, candidates_ptr, candidate_dists_ptr, neighbors_idx_t);
+    search_base(queries, batch_size, k0, candidates_ptr, candidate_dists_ptr);
 
     if (mem_type == MemoryType::kHostPinned && uses_stream()) {
       // If the algorithm uses a stream to synchronize (non-persistent kernel), but the data is in

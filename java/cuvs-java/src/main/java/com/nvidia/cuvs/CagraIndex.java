@@ -20,8 +20,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.Objects;
-import java.util.UUID;
 
+import com.nvidia.cuvs.BruteForceIndex.Builder;
 import com.nvidia.cuvs.spi.CuVSProvider;
 
 /**
@@ -171,6 +171,40 @@ public interface CagraIndex {
     }
 
     /**
+     * Merges multiple CAGRA indexes into a single index using default merge parameters.
+     *
+     * @param indexes Array of CAGRA indexes to merge
+     * @return A new merged CAGRA index
+     * @throws Throwable if an error occurs during the merge operation
+     */
+    static CagraIndex merge(CagraIndex[] indexes) throws Throwable {
+        return merge(indexes, null);
+    }
+
+    /**
+     * Merges multiple CAGRA indexes into a single index with the specified merge parameters.
+     *
+     * @param indexes Array of CAGRA indexes to merge
+     * @param mergeParams Parameters to control the merge operation, or null to use defaults
+     * @return A new merged CAGRA index
+     * @throws Throwable if an error occurs during the merge operation
+     */
+    static CagraIndex merge(CagraIndex[] indexes, CagraMergeParams mergeParams) throws Throwable {
+        if (indexes == null || indexes.length == 0) {
+            throw new IllegalArgumentException("At least one index must be provided for merging");
+        }
+
+        CuVSResources resources = indexes[0].getCuVSResources();
+        for (int i = 1; i < indexes.length; i++) {
+            if (!resources.equals(indexes[i].getCuVSResources())) {
+                throw new IllegalArgumentException("All indexes must use the same CuVSResources instance");
+            }
+        }
+
+        return CuVSProvider.provider().mergeCagraIndexes(indexes, mergeParams);
+    }
+
+    /**
      * Builder helps configure and create an instance of {@link CagraIndex}.
      */
     interface Builder {
@@ -185,12 +219,20 @@ public interface CagraIndex {
         Builder from(InputStream inputStream);
 
         /**
-         * Sets the dataset for building the {@link CagraIndex}.
+         * Sets the dataset vectors for building the {@link CagraIndex}.
          *
-         * @param dataset a two-dimensional float array
+         * @param vectors a two-dimensional float array
          * @return an instance of this Builder
          */
-        Builder withDataset(float[][] dataset);
+        Builder withDataset(float[][] vectors);
+
+        /**
+         * Sets the dataset for building the {@link CagraIndex}.
+         *
+         * @param dataset a {@link Dataset} object containing the vectors
+         * @return an instance of this Builder
+         */
+        Builder withDataset(Dataset dataset);
 
         /**
          * Registers an instance of configured {@link CagraIndexParams} with this
@@ -200,15 +242,6 @@ public interface CagraIndex {
          * @return An instance of this Builder.
          */
         Builder withIndexParams(CagraIndexParams cagraIndexParameters);
-
-        /**
-         * Registers an instance of configured {@link CagraCompressionParams} with this
-         * Builder.
-         *
-         * @param cagraCompressionParams An instance of CagraCompressionParams.
-         * @return An instance of this Builder.
-         */
-        public Builder withCompressionParams(CagraCompressionParams cagraCompressionParams);
 
         /**
          * Builds and returns an instance of CagraIndex.

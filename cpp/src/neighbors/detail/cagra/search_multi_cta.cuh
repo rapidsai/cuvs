@@ -51,9 +51,13 @@
 namespace cuvs::neighbors::cagra::detail {
 namespace multi_cta_search {
 
-template <typename DataT, typename IndexT, typename DistanceT, typename SAMPLE_FILTER_T>
-struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T> {
-  using base_type  = search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T>;
+template <typename DataT,
+          typename IndexT,
+          typename DistanceT,
+          typename SAMPLE_FILTER_T,
+          typename OutputIndexT = IndexT>
+struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, OutputIndexT> {
+  using base_type  = search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, OutputIndexT>;
   using DATA_T     = typename base_type::DATA_T;
   using INDEX_T    = typename base_type ::INDEX_T;
   using DISTANCE_T = typename base_type::DISTANCE_T;
@@ -91,6 +95,8 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
   using base_type::hashmap;
   using base_type::num_executed_iterations;
   using base_type::num_seeds;
+
+  constexpr static bool kNeedIndexCopy = sizeof(INDEX_T) != sizeof(OutputIndexT);
 
   uint32_t num_cta_per_query;
   lightweight_uvector<INDEX_T> intermediate_indices;
@@ -178,8 +184,9 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
     // Allocate memory for intermediate buffer and workspace.
     //
     uint32_t num_intermediate_results = num_cta_per_query * itopk_size;
-    intermediate_indices.resize(num_intermediate_results * max_queries,
-                                raft::resource::get_cuda_stream(res));
+    intermediate_indices.resize(
+      num_intermediate_results * max_queries + (kNeedIndexCopy ? itopk_size * max_queries : 0),
+      raft::resource::get_cuda_stream(res));
     intermediate_distances.resize(num_intermediate_results * max_queries,
                                   raft::resource::get_cuda_stream(res));
 
@@ -205,7 +212,7 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
 
   void operator()(raft::resources const& res,
                   raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
-                  INDEX_T* const topk_indices_ptr,       // [num_queries, topk]
+                  OutputIndexT* const topk_indices_ptr,  // [num_queries, topk]
                   DISTANCE_T* const topk_distances_ptr,  // [num_queries, topk]
                   const DATA_T* const queries_ptr,       // [num_queries, dataset_dim]
                   const uint32_t num_queries,
@@ -239,6 +246,9 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
 
     // Select the top-k results from the intermediate results
     const uint32_t num_intermediate_results = num_cta_per_query * itopk_size;
+    auto* output_indices_ptr =
+      kNeedIndexCopy ? intermediate_indices.data() + num_intermediate_results * max_queries
+                     : reinterpret_cast<INDEX_T*>(topk_indices_ptr);
     _cuann_find_topk(topk,
                      num_queries,
                      num_intermediate_results,
@@ -248,12 +258,20 @@ struct search : public search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_
                      num_intermediate_results,
                      topk_distances_ptr,
                      topk,
-                     topk_indices_ptr,
+                     output_indices_ptr,
                      topk,
                      topk_workspace.data(),
                      true,
                      NULL,
                      stream);
+    if constexpr (kNeedIndexCopy) {
+      raft::linalg::map(
+        res,
+        raft::make_device_matrix_view<OutputIndexT, int64_t>(topk_indices_ptr, num_queries, topk),
+        raft::cast_op<OutputIndexT>{},
+        raft::make_device_matrix_view<const IndexT, int64_t>(
+          output_indices_ptr, num_queries, topk));
+    }
   }
 };
 

@@ -17,7 +17,7 @@
 #include <omp.h>
 #include <raft/core/logger.hpp>
 
-namespace cuvs::neighbors::mg {
+namespace cuvs::neighbors::snmg {
 
 void check_omp_threads(const int requirements)
 {
@@ -30,4 +30,4 @@ void check_omp_threads(const int requirements)
       requirements);
 }
 
-}  // namespace cuvs::neighbors::mg
+}  // namespace cuvs::neighbors::snmg

@@ -465,6 +465,60 @@ void min_cluster_distance(raft::resources const& handle,
                                                                           workspace);
 }
 
+template <typename DataT, typename IndexT>
+void cluster_cost(raft::resources const& handle,
+                  raft::device_matrix_view<const DataT, IndexT> X,
+                  raft::device_matrix_view<const DataT, IndexT> centroids,
+                  raft::host_scalar_view<DataT> cost)
+{
+  auto stream = raft::resource::get_cuda_stream(handle);
+
+  auto n_clusters = centroids.extent(0);
+  auto n_samples  = X.extent(0);
+  auto n_features = X.extent(1);
+
+  rmm::device_uvector<char> workspace(n_samples * sizeof(IndexT), stream);
+
+  auto x_norms = raft::make_device_vector<DataT>(handle, n_samples);
+
+  raft::linalg::rowNorm(x_norms.data_handle(),
+                        X.data_handle(),
+                        n_features,
+                        n_samples,
+                        raft::linalg::L2Norm,
+                        true,
+                        stream);
+
+  auto min_cluster_distance = raft::make_device_vector<DataT>(handle, n_samples);
+  rmm::device_uvector<DataT> l2_norm_or_distance_buffer(0, stream);
+
+  auto metric = cuvs::distance::DistanceType::L2Expanded;
+
+  cuvs::cluster::kmeans::min_cluster_distance<DataT, IndexT>(
+    handle,
+    X,
+    raft::make_device_matrix_view<DataT, IndexT>(
+      const_cast<DataT*>(centroids.data_handle()), n_clusters, n_features),
+    min_cluster_distance.view(),
+    x_norms.view(),
+    l2_norm_or_distance_buffer,
+    metric,
+    n_samples,
+    n_clusters,
+    workspace);
+
+  rmm::device_scalar<DataT> device_cost(0, stream);
+
+  cuvs::cluster::kmeans::cluster_cost(handle,
+                                      min_cluster_distance.view(),
+                                      workspace,
+                                      raft::make_device_scalar_view<DataT>(device_cost.data()),
+                                      raft::add_op{});
+  raft::update_host(cost.data_handle(), device_cost.data(), 1, stream);
+
+  raft::resource::sync_stream(handle);
+}
+
 /**
  * @brief Calculates a <key, value> pair for every sample in input 'X' where key is an
  * index of one of the 'centroids' (index of the nearest centroid) and 'value'

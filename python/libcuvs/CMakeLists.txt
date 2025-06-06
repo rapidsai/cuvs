@@ -14,7 +14,7 @@
 
 cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
 
-include(../../rapids_config.cmake)
+include(../../cmake/rapids_config.cmake)
 
 include(rapids-cuda)
 rapids_cuda_init_architectures(libcuvs-python)
@@ -24,6 +24,8 @@ project(
   VERSION "${RAPIDS_VERSION}"
   LANGUAGES CXX CUDA
 )
+
+option(USE_NCCL_RUNTIME_WHEEL "Use the NCCL wheel at runtime instead of the system library" OFF)
 
 # Check if cuVS is already available. If so, it is the user's responsibility to ensure that the
 # CMake package is also available at build time of the Python cuvs package.
@@ -57,6 +59,11 @@ set(rpaths
     "$ORIGIN/../../nvidia/cusparse/lib"
     "$ORIGIN/../../nvidia/nvjitlink/lib"
 )
+
+if(USE_NCCL_RUNTIME_WHEEL)
+  list(APPEND rpaths "$ORIGIN/../../nvidia/nccl/lib")
+endif()
+
 set_property(
   TARGET cuvs
   PROPERTY INSTALL_RPATH ${rpaths}

@@ -29,42 +29,45 @@ namespace cuvs::neighbors::cagra::detail {
 template <typename DataT,
           typename IndexT,
           typename DistanceT,
-          typename CagraSampleFilterT = cuvs::neighbors::filtering::none_sample_filter>
+          typename CagraSampleFilterT = cuvs::neighbors::filtering::none_sample_filter,
+          typename OutputIndexT       = IndexT>
 class factory {
  public:
   /**
    * Create a search structure for dataset with dim features.
    */
-  static std::unique_ptr<search_plan_impl<DataT, IndexT, DistanceT, CagraSampleFilterT>> create(
-    raft::resources const& res,
-    search_params const& params,
-    const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
-    int64_t dim,
-    int64_t dataset_size,
-    int64_t graph_degree,
-    uint32_t topk)
+  static std::unique_ptr<
+    search_plan_impl<DataT, IndexT, DistanceT, CagraSampleFilterT, OutputIndexT>>
+  create(raft::resources const& res,
+         search_params const& params,
+         const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
+         int64_t dim,
+         int64_t dataset_size,
+         int64_t graph_degree,
+         uint32_t topk)
   {
     search_plan_impl_base plan(params, dim, dataset_size, graph_degree, topk);
     return dispatch_kernel(res, plan, dataset_desc);
   }
 
  private:
-  static std::unique_ptr<search_plan_impl<DataT, IndexT, DistanceT, CagraSampleFilterT>>
+  static std::unique_ptr<
+    search_plan_impl<DataT, IndexT, DistanceT, CagraSampleFilterT, OutputIndexT>>
   dispatch_kernel(raft::resources const& res,
                   search_plan_impl_base& plan,
                   const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc)
   {
     if (plan.algo == search_algo::SINGLE_CTA) {
       return std::make_unique<
-        single_cta_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT>>(
+        single_cta_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT, OutputIndexT>>(
         res, plan, dataset_desc, plan.dim, plan.dataset_size, plan.graph_degree, plan.topk);
     } else if (plan.algo == search_algo::MULTI_CTA) {
       return std::make_unique<
-        multi_cta_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT>>(
+        multi_cta_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT, OutputIndexT>>(
         res, plan, dataset_desc, plan.dim, plan.dataset_size, plan.graph_degree, plan.topk);
     } else {
       return std::make_unique<
-        multi_kernel_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT>>(
+        multi_kernel_search::search<DataT, IndexT, DistanceT, CagraSampleFilterT, OutputIndexT>>(
         res, plan, dataset_desc, plan.dim, plan.dataset_size, plan.graph_degree, plan.topk);
     }
   }

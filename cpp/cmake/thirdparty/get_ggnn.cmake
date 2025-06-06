@@ -24,10 +24,10 @@ function(find_and_configure_ggnn)
   rapids_cpm_package_details(ggnn version repository tag shallow exclude)
 
   include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
-  rapids_cpm_generate_patch_command(ggnn ${version} patch_command)
+  rapids_cpm_generate_patch_command(ggnn ${version} patch_command build_patch_only)
 
   rapids_cpm_find(
-    ggnn ${version}
+    ggnn ${version} ${build_patch_only}
     GLOBAL_TARGETS ggnn::ggnn
     CPM_ARGS
     GIT_REPOSITORY ${repository}

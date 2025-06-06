@@ -27,9 +27,9 @@ function(find_and_configure_diskann)
   rapids_cpm_package_details(diskann version repository tag shallow exclude)
 
   include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
-  rapids_cpm_generate_patch_command(diskann ${version} patch_command)
+  rapids_cpm_generate_patch_command(diskann ${version} patch_command build_patch_only)
 
-  rapids_cpm_find(diskann ${version}
+  rapids_cpm_find(diskann ${version} ${build_patch_only}
           GLOBAL_TARGETS diskann
           CPM_ARGS
           OPTIONS

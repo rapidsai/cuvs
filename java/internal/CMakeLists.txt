@@ -14,7 +14,7 @@
 
 cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
 
-include(rapids_config.cmake)
+include(../../cmake/rapids_config.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
 include(rapids-export)
@@ -53,10 +53,3 @@ if(NOT cuvs_FOUND)
 endif()
 
 include(get_dlpack.cmake)
-
-ADD_LIBRARY(cuvs_java SHARED src/cuvs_java.c)
-target_include_directories(cuvs_java PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>")
-target_link_libraries(
-  cuvs_java PRIVATE cuvs::c_api $<TARGET_NAME_IF_EXISTS:conda_env> OpenMP::OpenMP_CXX
-                    Threads::Threads
-)
