@@ -26,7 +26,7 @@ option(CUVS_ANN_BENCH_USE_FAISS_GPU_CAGRA_HNSW
 )
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_FLAT "Include faiss' cpu brute-force algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_FLAT "Include faiss' cpu ivf flat algorithm in benchmark"
-       OFF
+       ON
 )
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_PQ "Include faiss' cpu ivf pq algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_HNSW_FLAT "Include faiss' hnsw algorithm in benchmark" ON)
@@ -55,9 +55,9 @@ option(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE "Include cuVS brute force knn in benc
 
 find_package(Threads REQUIRED)
 
-set(CUVS_ANN_BENCH_USE_FAISS OFF)
-set(CUVS_FAISS_ENABLE_GPU OFF)
-set(CUVS_USE_FAISS_STATIC OFF)
+set(CUVS_ANN_BENCH_USE_FAISS ON)
+set(CUVS_FAISS_ENABLE_GPU ON)
+set(CUVS_USE_FAISS_STATIC ON)
 
 if(BUILD_CPU_ONLY)
   set(CUVS_FAISS_ENABLE_GPU OFF)
@@ -332,10 +332,10 @@ endif()
 
 if(CUVS_ANN_BENCH_USE_DISKANN)
   ConfigureAnnBench(
-    NAME DISKANN_MEMORY PATH src/diskann/diskann_benchmark.cpp LINKS diskann::diskann aio cuvs::cuvs
+    NAME DISKANN_MEMORY PATH src/diskann/diskann_benchmark.cpp LINKS diskann::diskann aio
   )
   ConfigureAnnBench(
-    NAME DISKANN_SSD PATH src/diskann/diskann_benchmark.cpp LINKS diskann::diskann aio cuvs::cuvs
+    NAME DISKANN_SSD PATH src/diskann/diskann_benchmark.cpp LINKS diskann::diskann aio
   )
 endif()
 
