@@ -1,1 +1,1 @@
-../../rapids_config.cmake
+../../cmake/rapids_config.cmake
