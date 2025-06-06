@@ -70,6 +70,7 @@ requirements:
       - libboost
       - libcublas
       - mkl
+      - scikit-learn>=1.5
       - if: cuda_major == "11"
         then: cudatoolkit
 
