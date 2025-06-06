@@ -108,13 +108,11 @@ void search_impl(raft::resources const& handle,
     case cuvs::distance::DistanceType::L2SqrtExpanded: {
       alpha = -2.0f;
       beta  = 1.0f;
-      raft::linalg::rowNorm(query_norm_dev.data(),
-                            converted_queries_ptr,
-                            static_cast<IdxT>(index.dim()),
-                            static_cast<IdxT>(n_queries),
-                            raft::linalg::L2Norm,
-                            true,
-                            stream);
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(query_norm_dev.data(),
+                                                        converted_queries_ptr,
+                                                        static_cast<IdxT>(index.dim()),
+                                                        static_cast<IdxT>(n_queries),
+                                                        stream);
       utils::outer_add(query_norm_dev.data(),
                        (IdxT)n_queries,
                        index.center_norms()->data_handle(),
@@ -126,14 +124,12 @@ void search_impl(raft::resources const& handle,
       break;
     }
     case cuvs::distance::DistanceType::CosineExpanded: {
-      raft::linalg::rowNorm(query_norm_dev.data(),
-                            converted_queries_ptr,
-                            static_cast<IdxT>(index.dim()),
-                            static_cast<IdxT>(n_queries),
-                            raft::linalg::L2Norm,
-                            true,
-                            stream,
-                            raft::sqrt_op{});
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(query_norm_dev.data(),
+                                                        converted_queries_ptr,
+                                                        static_cast<IdxT>(index.dim()),
+                                                        static_cast<IdxT>(n_queries),
+                                                        stream,
+                                                        raft::sqrt_op{});
       alpha = -1.0f;
       beta  = 0.0f;
       break;

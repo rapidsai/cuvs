@@ -340,43 +340,32 @@ void extend(raft::resources const& handle,
     index->allocate_center_norms(handle);
     if (index->center_norms().has_value()) {
       if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
-        raft::linalg::rowNorm(index->center_norms()->data_handle(),
-                              index->centers().data_handle(),
-                              dim,
-                              n_lists,
-                              raft::linalg::L2Norm,
-                              true,
-                              stream,
-                              raft::sqrt_op{});
+        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(index->center_norms()->data_handle(),
+                                                          index->centers().data_handle(),
+                                                          dim,
+                                                          n_lists,
+                                                          stream,
+                                                          raft::sqrt_op{});
       } else {
-        raft::linalg::rowNorm(index->center_norms()->data_handle(),
-                              index->centers().data_handle(),
-                              dim,
-                              n_lists,
-                              raft::linalg::L2Norm,
-                              true,
-                              stream);
+        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(index->center_norms()->data_handle(),
+                                                          index->centers().data_handle(),
+                                                          dim,
+                                                          n_lists,
+                                                          stream);
       }
       RAFT_LOG_TRACE_VEC(index->center_norms()->data_handle(), std::min<uint32_t>(dim, 20));
     }
   } else if (index->center_norms().has_value() && index->adaptive_centers()) {
     if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      raft::linalg::rowNorm(index->center_norms()->data_handle(),
-                            index->centers().data_handle(),
-                            dim,
-                            n_lists,
-                            raft::linalg::L2Norm,
-                            true,
-                            stream,
-                            raft::sqrt_op{});
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(index->center_norms()->data_handle(),
+                                                        index->centers().data_handle(),
+                                                        dim,
+                                                        n_lists,
+                                                        stream,
+                                                        raft::sqrt_op{});
     } else {
-      raft::linalg::rowNorm(index->center_norms()->data_handle(),
-                            index->centers().data_handle(),
-                            dim,
-                            n_lists,
-                            raft::linalg::L2Norm,
-                            true,
-                            stream);
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+        index->center_norms()->data_handle(), index->centers().data_handle(), dim, n_lists, stream);
     }
     RAFT_LOG_TRACE_VEC(index->center_norms()->data_handle(), std::min<uint32_t>(dim, 20));
   }

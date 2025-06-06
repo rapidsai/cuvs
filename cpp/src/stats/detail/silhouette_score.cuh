@@ -286,14 +286,12 @@ DataT silhouette_score(
                                stream);
 
   // calculating row-wise minimum
-  raft::linalg::reduce<DataT, DataT, int, raft::identity_op, raft::min_op>(
+  raft::linalg::reduce<true, true, DataT, DataT, int, raft::identity_op, raft::min_op>(
     d_bArray.data(),
     averageDistanceBetweenSampleAndCluster.data(),
     nLabels,
     nRows,
     std::numeric_limits<DataT>::max(),
-    true,
-    true,
     stream,
     false,
     raft::identity_op{},
