@@ -52,13 +52,13 @@ class diskann_memory : public algo<T> {
     uint32_t L_build;
     uint32_t build_pq_bytes = 0;
     float alpha             = 1.2;
-    int num_threads         = omp_get_num_procs();
+    int num_threads         = omp_get_max_threads();
   };
 
   using search_param_base = typename algo<T>::search_param;
   struct search_param : public search_param_base {
     uint32_t L_search;
-    uint32_t num_threads = omp_get_num_procs();
+    uint32_t num_threads = omp_get_max_threads() / 2;
     // Mode metric_objective;
   };
 
@@ -160,7 +160,7 @@ template <typename T>
 void diskann_memory<T>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* indices, float* distances) const
 {
-#pragma omp parallel for schedule(dynamic, 1)
+#pragma omp parallel for if (batch_size > 1) schedule(dynamic, 1) num_threads(num_search_threads_)
   for (int i = 0; i < batch_size; i++) {
     mem_index_->search(queries + i * this->dim_,
                        static_cast<size_t>(k),
@@ -191,7 +191,7 @@ class diskann_ssd : public algo<T> {
     uint32_t L_build;
     uint32_t build_pq_bytes       = 0;
     float alpha                   = 1.2;
-    int num_threads               = omp_get_num_procs();
+    int num_threads               = omp_get_max_threads();
     uint32_t QD                   = 192;
     std::string dataset_base_file = "";
     std::string index_file        = "";
@@ -200,7 +200,7 @@ class diskann_ssd : public algo<T> {
 
   struct search_param : public search_param_base {
     uint32_t L_search;
-    uint32_t num_threads        = omp_get_num_procs() / 2;
+    uint32_t num_threads        = omp_get_max_threads() / 2;
     uint32_t num_nodes_to_cache = 10000;
     int beam_width              = 2;
     // Mode metric_objective;
@@ -241,7 +241,7 @@ class diskann_ssd : public algo<T> {
   uint32_t max_points_;
   // for safe scratch space allocs, set the default to half the number of procs for loading the
   // index. User must ensure that the number of search threads is less than or equal to this value
-  int num_search_threads_ = omp_get_num_procs() / 2;
+  int num_search_threads_ = omp_get_max_threads() / 2;
   // L_search is hardcoded to the maximum visited list size in the search params. This default is
   // for loading the index
   uint32_t L_search_ = 384;
@@ -303,7 +303,7 @@ template <typename T>
 void diskann_ssd<T>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
-#pragma omp parallel for schedule(dynamic, 1)
+#pragma omp parallel for if (batch_size > 1) schedule(dynamic, 1) num_threads(num_search_threads_)
   for (int64_t i = 0; i < (int64_t)batch_size; i++) {
     p_flash_index_->cached_beam_search(queries + (i * this->dim_),
                                        static_cast<size_t>(k),
