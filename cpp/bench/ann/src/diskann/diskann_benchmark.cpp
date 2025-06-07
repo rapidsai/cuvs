@@ -37,7 +37,7 @@ void parse_build_param(const nlohmann::json& conf,
 {
   param.R = conf.at("R");
   if (conf.contains("L_build")) { param.L_build = conf.at("L_build"); }
-  if (conf.contains("alpha")) { param.num_threads = conf.at("alpha"); }
+  if (conf.contains("alpha")) { param.alpha = conf.at("alpha"); }
   if (conf.contains("num_threads")) { param.num_threads = conf.at("num_threads"); }
 }
 
@@ -47,7 +47,7 @@ void parse_build_param(const nlohmann::json& conf,
 {
   param.R = conf.at("R");
   if (conf.contains("L_build")) { param.L_build = conf.at("L_build"); }
-  if (conf.contains("alpha")) { param.num_threads = conf.at("alpha"); }
+  if (conf.contains("alpha")) { param.alpha = conf.at("alpha"); }
   if (conf.contains("num_threads")) { param.num_threads = conf.at("num_threads"); }
   if (conf.contains("QD")) { param.QD = conf.at("QD"); }
   param.dataset_base_file = cuvs::bench::configuration::singleton().get_dataset_conf().base_file;
@@ -132,6 +132,8 @@ std::unique_ptr<typename cuvs::bench::algo<T>::search_param> create_search_param
 };  // namespace cuvs::bench
 
 REGISTER_ALGO_INSTANCE(float);
+REGISTER_ALGO_INSTANCE(std::int8_t);
+REGISTER_ALGO_INSTANCE(std::uint8_t);
 
 #ifdef ANN_BENCH_BUILD_MAIN
 #include "../common/benchmark.hpp"
