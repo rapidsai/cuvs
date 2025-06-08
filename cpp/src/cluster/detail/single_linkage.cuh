@@ -64,9 +64,6 @@ void build_mr_linkage(raft::resources const& handle,
   auto mutual_reachability_indptr = raft::make_device_vector<value_idx, value_idx>(handle, m + 1);
   raft::sparse::COO<value_t, value_idx, nnz_t> mutual_reachability_coo(
     raft::resource::get_cuda_stream(handle), min_samples * m * 2);
-  RAFT_LOG_INFO("min_samples %d alpha %f", min_samples, alpha);
-  // raft::sparse::COO<value_t, value_idx, nnz_t>
-  // mutual_reachability_coo(raft::resource::get_cuda_stream(handle));
 
   cuvs::neighbors::detail::reachability::mutual_reachability_graph<value_idx, value_t, nnz_t>(
     handle,
@@ -79,19 +76,13 @@ void build_mr_linkage(raft::resources const& handle,
     mutual_reachability_indptr.data_handle(),
     core_dists.data_handle(),
     mutual_reachability_coo);
-  cudaDeviceSynchronize();
-  RAFT_LOG_INFO("done mutual_reachability_graph");
 
   // auto color = raft::make_device_vector<value_idx, value_idx>(handle, static_cast<value_idx>(m));
   rmm::device_uvector<value_idx> color(m, raft::resource::get_cuda_stream(handle));
   cuvs::sparse::neighbors::MutualReachabilityFixConnectivitiesRedOp<value_idx, value_t>
     reduction_op(core_dists.data_handle(), m);
 
-  RAFT_LOG_INFO("m %zu min_samples %d", m, min_samples);
-
   size_t nnz = m * min_samples;
-
-  RAFT_LOG_INFO("build sorted mst nnz %zu", mutual_reachability_coo.nnz);
 
   detail::build_sorted_mst<value_idx, value_t>(handle,
                                                X.data_handle(),
@@ -107,8 +98,7 @@ void build_mr_linkage(raft::resources const& handle,
                                                mutual_reachability_coo.nnz,
                                                reduction_op,
                                                metric,
-                                               20);
-  RAFT_LOG_INFO("done build sorted mst");
+                                               10);
 
   /**
    * Perform hierarchical labeling
