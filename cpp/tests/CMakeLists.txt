@@ -96,7 +96,7 @@ function(ConfigureTest)
     else()
       set(CODEBOOKSDIR "test/data/neighbors/ann_vamana/randomized_codebooks/")
     endif()
-    target_compile_definitions(${TEST_NAME} PRIVATE CODEBOOKS_DIR=${CODEBOOKSDIR})
+    target_compile_definitions(${TEST_NAME} PRIVATE CODEBOOKS_DIR="${CODEBOOKSDIR}")
   endif()
 
   target_include_directories(${TEST_NAME} PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/tests>")
