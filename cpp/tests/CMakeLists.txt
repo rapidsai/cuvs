@@ -91,7 +91,7 @@ function(ConfigureTest)
         DESTINATION test/data/neighbors/ann_vamana/randomized_codebooks/
       )
     endforeach()
-    if(ENV{CI} STREQUAL "true")
+    if($ENV{CI} MATCHES "true")
       set(CODEBOOKSDIR "data/neighbors/ann_vamana/randomized_codebooks/")
     else()
       set(CODEBOOKSDIR "test/data/neighbors/ann_vamana/randomized_codebooks/")
