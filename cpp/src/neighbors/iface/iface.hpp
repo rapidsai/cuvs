@@ -78,12 +78,12 @@ void extend(
   resource::sync_stream(handle);
 }
 
-template <typename AnnIndexType, typename T, typename IdxT>
+template <typename AnnIndexType, typename T, typename IdxT, typename searchIdxT>
 void search(const raft::resources& handle,
             const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
             const cuvs::neighbors::search_params* search_params,
             raft::device_matrix_view<const T, int64_t, row_major> queries,
-            raft::device_matrix_view<IdxT, int64_t, row_major> neighbors,
+            raft::device_matrix_view<searchIdxT, int64_t, row_major> neighbors,
             raft::device_matrix_view<float, int64_t, row_major> distances)
 {
   // std::lock_guard(*interface.mutex_);
@@ -114,12 +114,12 @@ void search(const raft::resources& handle,
 }
 
 // for MG ANN only
-template <typename AnnIndexType, typename T, typename IdxT>
+template <typename AnnIndexType, typename T, typename IdxT, typename searchIdxT>
 void search(const raft::resources& handle,
             const cuvs::neighbors::iface<AnnIndexType, T, IdxT>& interface,
             const cuvs::neighbors::search_params* search_params,
             raft::host_matrix_view<const T, int64_t, row_major> h_queries,
-            raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,
+            raft::device_matrix_view<searchIdxT, int64_t, row_major> d_neighbors,
             raft::device_matrix_view<float, int64_t, row_major> d_distances)
 {
   // std::lock_guard(*interface.mutex_);
