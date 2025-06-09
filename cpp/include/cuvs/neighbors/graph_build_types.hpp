@@ -34,7 +34,7 @@ namespace graph_build_params {
 struct ivf_pq_params {
   cuvs::neighbors::ivf_pq::index_params build_params;
   cuvs::neighbors::ivf_pq::search_params search_params;
-  float refinement_rate = 2.0;
+  float refinement_rate = 1.0;
 
   ivf_pq_params() = default;
 
