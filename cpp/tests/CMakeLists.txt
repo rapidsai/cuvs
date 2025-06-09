@@ -91,9 +91,12 @@ function(ConfigureTest)
         DESTINATION test/data/neighbors/ann_vamana/randomized_codebooks/
       )
     endforeach()
-    target_compile_definitions(
-      ${TEST_NAME} PRIVATE CODEBOOKS_DIR="test/data/neighbors/ann_vamana/randomized_codebooks/"
-    )
+    if(ENV{CI} STREQUAL "true")
+      set(CODEBOOKSDIR "data/neighbors/ann_vamana/randomized_codebooks/")
+    else()
+      set(CODEBOOKSDIR "test/data/neighbors/ann_vamana/randomized_codebooks/")
+    endif()
+    target_compile_definitions(${TEST_NAME} PRIVATE CODEBOOKS_DIR=${CODEBOOKSDIR})
   endif()
 
   target_include_directories(${TEST_NAME} PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/tests>")
