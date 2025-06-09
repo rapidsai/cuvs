@@ -173,10 +173,6 @@ void build_dist_linkage(raft::resources const& handle,
 
   size_t n_edges = m - 1;
 
-  rmm::device_uvector<value_idx> mst_rows(n_edges, stream);
-  rmm::device_uvector<value_idx> mst_cols(n_edges, stream);
-  rmm::device_uvector<value_t> mst_data(n_edges, stream);
-
   detail::build_sorted_mst<value_idx, value_t>(handle,
                                                X.data_handle(),
                                                indptr.data(),
