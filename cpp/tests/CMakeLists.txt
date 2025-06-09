@@ -92,9 +92,7 @@ function(ConfigureTest)
       )
     endforeach()
     target_compile_definitions(
-      ${TEST_NAME}
-      PRIVATE
-        CODEBOOKS_DIR="${CMAKE_INSTALL_PREFIX}/test/data/neighbors/ann_vamana/randomized_codebooks/"
+      ${TEST_NAME} PRIVATE CODEBOOKS_DIR="test/data/neighbors/ann_vamana/randomized_codebooks/"
     )
   endif()
 
