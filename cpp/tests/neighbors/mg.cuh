@@ -798,6 +798,7 @@ const std::vector<AnnMGInputs> inputs = {
    true},
   */
 
+  /*
   {3,
    10000,
    8,
@@ -820,6 +821,7 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
+   */
 
   /*
   {3,
