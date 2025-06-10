@@ -21,7 +21,7 @@ rapids_test_init()
 
 function(ConfigureTest)
 
-  set(options OPTIONAL NOCUDA C_LIB FETCH_TEST_DATA)
+  set(options OPTIONAL NOCUDA C_LIB FETCH_CODEBOOKS)
   set(oneValueArgs NAME GPUS PERCENT ADDITIONAL_DEP)
   set(multiValueArgs PATH TARGETS CONFIGURATIONS)
 
@@ -76,16 +76,20 @@ function(ConfigureTest)
     target_compile_definitions(${TEST_NAME} PRIVATE "CUVS_DISABLE_CUDA")
   endif()
 
-  if(_CUVS_TEST_FETCH_TEST_DATA)
-    set(TEST_DATA_DIR ${CUVS_BINARY_DIR}/tests/data)
-    execute_process(COMMAND mkdir -p ${TEST_DATA_DIR} COMMAND_ERROR_IS_FATAL ANY)
-    execute_process(COMMAND pushd ${TEST_DATA_DIR} COMMAND_ERROR_IS_FATAL ANY)
-    execute_process(
-      COMMAND ${CUVS_SOURCE_DIR}/tests/get_test_data.sh --${TEST_NAME} COMMAND_ERROR_IS_FATAL ANY
+  if(_CUVS_TEST_FETCH_CODEBOOKS)
+    set(CODEBOOKS 384_int8_pq_pivots.bin 384_int8_pq_pivots.bin_rotation_matrix.bin
+                  64_float_pq_pivots.bin 64_float_pq_pivots.bin_rotation_matrix.bin
     )
-    execute_process(COMMAND popd COMMAND_ERROR_IS_FATAL ANY)
 
-    target_compile_definitions(${TEST_NAME} PRIVATE TEST_DATA_DIR="${TEST_DATA_DIR}")
+    foreach(CODEBOOK ${CODEBOOKS})
+      file(
+        DOWNLOAD
+        https://data.rapids.ai/cuvs/tests/data/neighbors/ann_vamana/randomized_codebooks/${CODEBOOK}
+        ${CUVS_BINARY_DIR}/tests/data/neighbors/ann_vamana/randomized_codebooks/${CODEBOOK}
+      )
+    endforeach()
+
+    target_compile_definitions(${TEST_NAME} PRIVATE TEST_DATA_DIR="${CUVS_BINARY_DIR}/tests/data/")
   endif()
 
   target_include_directories(${TEST_NAME} PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/tests>")
@@ -197,7 +201,7 @@ if(BUILD_TESTS)
     1
     PERCENT
     100
-    FETCH_TEST_DATA
+    FETCH_CODEBOOKS
   )
 
   ConfigureTest(NAME NEIGHBORS_BALL_COVER_TEST PATH neighbors/ball_cover.cu GPUS 1 PERCENT 100)
