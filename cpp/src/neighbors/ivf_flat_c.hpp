@@ -13,14 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <cuvs/neighbors/ivf_flat.h>
+#include <cuvs/neighbors/ivf_flat.hpp>
 
-/**
- * @brief struct for containing gpu information
- */
-typedef struct gpuInfo {
-    int gpu_id;
-    char name[256];
-    long free_memory;
-    long total_memory;
-    float compute_capability;
-} gpuInfo;
+namespace cuvs::neighbors::ivf_flat {
+/// Converts a cuvsIvfFlatIndexParams struct (c) to a ivf_flat::index_params (C++) struct
+void convert_c_index_params(cuvsIvfFlatIndexParams params,
+                            cuvs::neighbors::ivf_flat::index_params* out);
+void convert_c_search_params(cuvsIvfFlatSearchParams params,
+                             cuvs::neighbors::ivf_flat::search_params* out);
+}  // namespace cuvs::neighbors::ivf_flat
