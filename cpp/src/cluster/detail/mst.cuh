@@ -60,7 +60,7 @@ void merge_msts(raft::sparse::solver::Graph_COO<value_idx, value_idx, value_t>& 
  * @tparam value_idx index type
  * @tparam value_t floating-point value type
  * @param[in] handle raft handle
- * @param[in] X original dense data ond evice memory from which knn grpah was constructed
+ * @param[in] X original dense data on device memory from which knn graph was constructed
  * @param[inout] msf edge list containing the mst result
  * @param[in] m number of rows in X
  * @param[in] n number of columns in X
@@ -124,7 +124,7 @@ void connect_knn_graph(
  * @tparam value_idx index type
  * @tparam value_t floating-point value type
  * @param[in] handle raft handle
- * @param[in] X original dense data on host memory from which knn grpah was constructed
+ * @param[in] X original dense data on host memory from which knn graph was constructed
  * @param[inout] msf edge list containing the mst result
  * @param[in] m number of rows in X
  * @param[in] n number of columns in X
