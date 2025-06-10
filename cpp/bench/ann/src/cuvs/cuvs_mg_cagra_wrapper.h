@@ -159,7 +159,7 @@ void cuvs_mg_cagra<T, IdxT>::search_base(
   auto queries_view =
     raft::make_host_matrix_view<const T, int64_t, raft::row_major>(queries, batch_size, dim_);
   auto neighbors_view =
-    raft::make_host_matrix_view<IdxT, int64_t, raft::row_major>((IdxT*)neighbors, batch_size, k);
+    raft::make_host_matrix_view<int64_t, int64_t, raft::row_major>(neighbors, batch_size, k);
   auto distances_view =
     raft::make_host_matrix_view<float, int64_t, raft::row_major>(distances, batch_size, k);
 

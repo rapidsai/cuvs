@@ -102,12 +102,20 @@ public interface BruteForceIndex {
     Builder from(InputStream inputStream);
 
     /**
-     * Sets the dataset for building the {@link BruteForceIndex}.
+     * Sets the dataset vectors for building the {@link BruteForceIndex}.
      *
-     * @param dataset a two-dimensional float array
+     * @param vectors a two-dimensional float array
      * @return an instance of this Builder
      */
-    Builder withDataset(float[][] dataset);
+    Builder withDataset(float[][] vectors);
+
+    /**
+     * Sets the dataset for building the {@link BruteForceIndex}.
+     *
+     * @param dataset a {@link Dataset} object containing the vectors
+     * @return an instance of this Builder
+     */
+    Builder withDataset(Dataset dataset);
 
     /**
      * Builds and returns an instance of {@link BruteForceIndex}.

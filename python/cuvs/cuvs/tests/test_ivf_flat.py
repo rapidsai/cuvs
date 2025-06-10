@@ -108,6 +108,10 @@ def run_ivf_flat_build_search_test(
     recall = calc_recall(out_idx, skl_idx)
     assert recall > 0.7
 
+    centers = index.centers
+    assert centers.shape[0] == build_params.n_lists
+    assert centers.shape[1] == n_cols
+
 
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("dtype", [np.float32])
