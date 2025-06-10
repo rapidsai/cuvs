@@ -16,8 +16,8 @@
 #pragma once
 
 #include "../detail/nn_descent_gnnd.hpp"
+#include "../detail/reachability_types.cuh"
 #include "all_neighbors_merge.cuh"
-#include "mutual_reachability.cuh"
 #include <cuvs/neighbors/all_neighbors.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
@@ -347,8 +347,9 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
     int_graph.emplace(raft::make_host_matrix<int, IdxT, row_major>(
       this->max_cluster_size, static_cast<IdxT>(extended_graph_degree)));
 
-    if constexpr (std::is_same_v<DistEpilogueT,
-                                 all_neighbors::reachability::ReachabilityPostProcess<int, T>>) {
+    if constexpr (std::is_same_v<
+                    DistEpilogueT,
+                    cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>>) {
       batch_core_distances.emplace(
         raft::make_device_vector<T, IdxT>(this->res, this->max_cluster_size));
     }
@@ -380,8 +381,9 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
     if (this->n_clusters > 1) {
       bool return_distances      = true;
       size_t num_data_in_cluster = dataset.extent(0);
-      if constexpr (std::is_same_v<DistEpilogueT,
-                                   all_neighbors::reachability::ReachabilityPostProcess<int, T>>) {
+      if constexpr (std::is_same_v<
+                      DistEpilogueT,
+                      cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>>) {
         // gather core dists
         raft::copy(this->inverted_indices_d.value().data_handle(),
                    inverted_indices.value().data_handle(),
@@ -402,7 +404,7 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
           int_graph.value().data_handle(),
           return_distances,
           this->batch_distances_d.value().data_handle(),
-          all_neighbors::reachability::ReachabilityPostProcess<int, T>{
+          cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>{
             batch_core_distances.value().data_handle(), 1.0, num_data_in_cluster});
       } else {
         nnd_builder.value().build(dataset.data_handle(),

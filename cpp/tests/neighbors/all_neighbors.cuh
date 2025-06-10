@@ -124,14 +124,15 @@ void get_graphs(raft::resources& handle,
         ps.n_rows,
         core_dists_dev.data(),
         raft::resource::get_cuda_stream(handle));
-      auto epilogue = all_neighbors::reachability::ReachabilityPostProcess<IdxT, DistanceT>{
-        core_dists_dev.data(), 1.0, static_cast<size_t>(ps.n_rows)};
+      auto epilogue =
+        cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, DistanceT>{
+          core_dists_dev.data(), 1.0, static_cast<size_t>(ps.n_rows)};
 
       cuvs::neighbors::detail::tiled_brute_force_knn<
         DataT,
         IdxT,
         DistanceT,
-        all_neighbors::reachability::ReachabilityPostProcess<IdxT, DistanceT>>(
+        cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, DistanceT>>(
         handle,
         database.data(),
         database.data(),

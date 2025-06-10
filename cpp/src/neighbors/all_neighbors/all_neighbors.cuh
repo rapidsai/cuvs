@@ -15,6 +15,7 @@
  */
 
 #pragma once
+#include "../detail/reachability.cuh"
 #include "all_neighbors_batched.cuh"
 #include <cuvs/neighbors/all_neighbors.hpp>
 #include <raft/matrix/shift.cuh>
@@ -75,8 +76,15 @@ void single_build(
   knn_builder->build_knn(dataset);
 
   if (core_distances.has_value()) {
-    all_neighbors::reachability::get_core_distances(
-      handle, distances.value(), core_distances.value(), true);
+    size_t k = indices.extent(1);
+    raft::matrix::shift(handle, distances.value(), 1, std::make_optional(static_cast<T>(0.0)));
+    cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
+      distances.value().data_handle(),
+      k,
+      k,
+      num_rows,
+      core_distances.value().data_handle(),
+      raft::resource::get_cuda_stream(handle));
 
     if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
       // comparison within nn descent for L2SqrtExpanded is done without applying sqrt.
@@ -86,10 +94,12 @@ void single_build(
                         raft::make_const_mdspan(core_distances.value()));
     }
 
-    auto dist_epilogue = all_neighbors::reachability::ReachabilityPostProcess<int, T>{
+    auto dist_epilogue = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>{
       core_distances.value().data_handle(), alpha, num_rows};
     auto knn_builder =
-      get_knn_builder<T, IdxT, all_neighbors::reachability::ReachabilityPostProcess<int, T>>(
+      get_knn_builder<T,
+                      IdxT,
+                      cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>>(
         handle, params, num_rows, num_rows, indices.extent(1), indices, distances, dist_epilogue);
     knn_builder->prepare_build(dataset);
     knn_builder->build_knn(dataset);

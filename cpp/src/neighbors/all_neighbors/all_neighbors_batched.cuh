@@ -15,8 +15,9 @@
  */
 
 #pragma once
+#include "../detail/reachability.cuh"
+#include "../detail/reachability_types.cuh"
 #include "all_neighbors_builder.cuh"
-#include "mutual_reachability.cuh"
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/all_neighbors.hpp>
@@ -412,11 +413,18 @@ void multi_gpu_batch_build(
   }
 
   if (core_distances.has_value()) {
-    all_neighbors::reachability::get_core_distances(
+    raft::matrix::shift(
       handle,
       raft::make_device_matrix_view<T, IdxT>(global_distances.data_handle(), num_rows, k),
-      core_distances.value(),
-      true);
+      1,
+      std::make_optional(static_cast<T>(0.0)));
+    cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
+      global_distances.data_handle(),
+      k,
+      k,
+      num_rows,
+      core_distances.value().data_handle(),
+      raft::resource::get_cuda_stream(handle));
 
     // copy to host
     auto core_distances_h = raft::make_host_vector<T, IdxT>(num_rows);
@@ -445,7 +453,7 @@ void multi_gpu_batch_build(
                           raft::make_const_mdspan(core_distances_d_for_rank.view()));
       }
 
-      auto dist_epilogue = all_neighbors::reachability::ReachabilityPostProcess<int, T>{
+      auto dist_epilogue = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>{
         core_distances_d_for_rank.data_handle(), alpha, num_rows};
 
       auto cluster_sizes_for_this_rank = raft::make_host_vector_view<IdxT, IdxT>(
@@ -459,7 +467,9 @@ void multi_gpu_batch_build(
       get_min_max_cluster_size(k, max_cluster_size, min_cluster_size, cluster_sizes_for_this_rank);
 
       auto knn_builder =
-        get_knn_builder<T, IdxT, all_neighbors::reachability::ReachabilityPostProcess<int, T>>(
+        get_knn_builder<T,
+                        IdxT,
+                        cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>>(
           dev_res,
           params,
           min_cluster_size,
@@ -564,11 +574,18 @@ void batch_build(
     if (core_distances.has_value()) {
       size_t k = static_cast<size_t>(indices.extent(1));
 
-      all_neighbors::reachability::get_core_distances(
+      raft::matrix::shift(
         handle,
         raft::make_device_matrix_view<T, IdxT>(global_distances.data_handle(), num_rows, k),
-        core_distances.value(),
-        true);
+        1,
+        std::make_optional(static_cast<T>(0.0)));
+      cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
+        global_distances.data_handle(),
+        k,
+        k,
+        num_rows,
+        core_distances.value().data_handle(),
+        raft::resource::get_cuda_stream(handle));
 
       reset_global_matrices(
         handle, params.metric, global_neighbors.view(), global_distances.view());
@@ -581,11 +598,13 @@ void batch_build(
                           raft::make_const_mdspan(core_distances.value()));
       }
 
-      auto dist_epilogue = all_neighbors::reachability::ReachabilityPostProcess<int, T>{
+      auto dist_epilogue = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>{
         core_distances.value().data_handle(), alpha, num_rows};
 
       auto knn_builder =
-        get_knn_builder<T, IdxT, all_neighbors::reachability::ReachabilityPostProcess<int, T>>(
+        get_knn_builder<T,
+                        IdxT,
+                        cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>>(
           handle,
           params,
           min_cluster_size,
