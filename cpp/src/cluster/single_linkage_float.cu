@@ -59,7 +59,9 @@ void build_linkage(
   if (std::holds_alternative<
         cuvs::cluster::agglomerative::helpers::linkage_graph_params::mutual_reachability_params>(
         linkage_graph_params)) {
-    RAFT_EXPECTS(core_dists.has_value(), "core_dists not passed");
+    RAFT_EXPECTS(core_dists.has_value(),
+                 "core distances must be pre-allocated to build the linkage with mutual "
+                 "reachability distances");
     auto core_dists_mdspan = core_dists.value();
     RAFT_EXPECTS(core_dists_mdspan.extent(0) == X.extent(0),
                  "core_dists doesn't have expected size");
