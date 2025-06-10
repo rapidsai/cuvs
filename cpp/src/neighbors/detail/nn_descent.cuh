@@ -491,11 +491,12 @@ __device__ __forceinline__ void remove_duplicates(
 template <typename Index_t, typename ID_t = InternalID_t<Index_t>, typename DistEpilogue_t>
 RAFT_KERNEL
 #ifdef __CUDA_ARCH__
-#if (__CUDA_ARCH__) == 750 || ((__CUDA_ARCH__) >= 860 && (__CUDA_ARCH__) <= 890) || \
-  (__CUDA_ARCH__) == 1200
-__launch_bounds__(BLOCK_SIZE)
-#else
+// Use minBlocksPerMultiprocessor = 4 on specific arches
+#if (__CUDA_ARCH__) == 700 || (__CUDA_ARCH__) == 800 || (__CUDA_ARCH__) == 900 || \
+  (__CUDA_ARCH__) == 1000
 __launch_bounds__(BLOCK_SIZE, 4)
+#else
+__launch_bounds__(BLOCK_SIZE)
 #endif
 #endif
   local_join_kernel(const Index_t* graph_new,
@@ -634,6 +635,9 @@ __launch_bounds__(BLOCK_SIZE, 4)
       } else {  // L2Expanded or L2SqrtExpanded
         s_distances[i] =
           l2_norms[new_neighbors[row_id]] + l2_norms[new_neighbors[col_id]] - 2.0 * s_distances[i];
+        // for fp32 vs fp16 precision differences resulting in negative distances when distance
+        // should be 0 related issue: https://github.com/rapidsai/cuvs/issues/991
+        s_distances[i] = s_distances[i] < 0.0f ? 0.0f : s_distances[i];
       }
       s_distances[i] = dist_epilogue(s_distances[i], new_neighbors[row_id], new_neighbors[col_id]);
     } else {
@@ -716,6 +720,9 @@ __launch_bounds__(BLOCK_SIZE, 4)
       } else {  // L2Expanded or L2SqrtExpanded
         s_distances[i] =
           l2_norms[old_neighbors[row_id]] + l2_norms[new_neighbors[col_id]] - 2.0 * s_distances[i];
+        // for fp32 vs fp16 precision differences resulting in negative distances when distance
+        // should be 0 related issue: https://github.com/rapidsai/cuvs/issues/991
+        s_distances[i] = s_distances[i] < 0.0f ? 0.0f : s_distances[i];
       }
       s_distances[i] = dist_epilogue(s_distances[i], old_neighbors[row_id], new_neighbors[col_id]);
     } else {

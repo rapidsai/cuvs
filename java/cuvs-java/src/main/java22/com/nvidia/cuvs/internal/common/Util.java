@@ -20,60 +20,113 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
-import static java.lang.foreign.ValueLayout.ADDRESS;
+import static com.nvidia.cuvs.internal.panama.headers_h.cudaGetDeviceCount;
+import static com.nvidia.cuvs.internal.panama.headers_h.cudaGetDeviceProperties_v2;
+import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemGetInfo;
+import static com.nvidia.cuvs.internal.panama.headers_h.cudaSetDevice;
+import static com.nvidia.cuvs.internal.panama.headers_h.size_t;
 
 import java.lang.foreign.Arena;
-import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemoryLayout.PathElement;
 import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
-import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 
 import com.nvidia.cuvs.GPUInfo;
-import com.nvidia.cuvs.internal.panama.gpuInfo;
+import com.nvidia.cuvs.internal.panama.DLDataType;
+import com.nvidia.cuvs.internal.panama.DLDevice;
+import com.nvidia.cuvs.internal.panama.DLManagedTensor;
+import com.nvidia.cuvs.internal.panama.DLTensor;
+import com.nvidia.cuvs.internal.panama.cudaDeviceProp;
+import com.nvidia.cuvs.internal.panama.headers_h;
 
 public class Util {
 
   public static final int CUVS_SUCCESS = 1;
-
-  private static final MethodHandle getGpuInfoMethodHandle = downcallHandle("get_gpu_info",
-      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS));
-
-  private static final MethodHandle getLastErrorTextMethodHandle = downcallHandle("cuvsGetLastErrorText",
-      FunctionDescriptor.of(ADDRESS));
+  public static final int CUDA_SUCCESS = 0;
 
   private Util() {
   }
 
   /**
-   * Checks the result value of a native method handle call.
+   * Checks the result value of a (CuVS) native method handle call.
    *
    * @param value  the return value
    * @param caller the native method handle that was called
    */
-  public static void checkError(int value, String caller) {
+  public static void checkCuVSError(int value, String caller) {
     if (value != CUVS_SUCCESS) {
       String errorMsg = getLastErrorText();
       throw new RuntimeException(caller + " returned " + value + "[" + errorMsg + "]");
     }
   }
 
+  /**
+   * Checks the result value of a (CUDA) native method handle call.
+   *
+   * @param value  the return value
+   * @param caller the native method handle that was called
+   */
+  public static void checkCudaError(int value, String caller) {
+    if (value != CUDA_SUCCESS) {
+      throw new RuntimeException(caller + " returned " + value);
+    }
+  }
+
+  /**
+   * Java analog to CUDA's cudaMemcpyKind, used for cudaMemcpy() calls.
+   * @see <a href="https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html">CUDA Runtime API</a>
+   */
+  public enum CudaMemcpyKind {
+    HOST_TO_HOST(0),
+    HOST_TO_DEVICE(1),
+    DEVICE_TO_HOST(2),
+    DEVICE_TO_DEVICE(3),
+    INFER_DIRECTION(4);
+
+    CudaMemcpyKind(int k) {
+      this.kind = k;
+    }
+
+    public final int kind;
+  }
+
+  /**
+   * Helper to invoke cudaMemcpy CUDA runtime function to copy data between host/device memory.
+   * @param dest Destination address for data copy
+   * @param src Source address for data copy
+   * @param numBytes Number of bytes to be copied
+   * @param kind "Direction" of data copy (Host->Device, Device->Host, etc.)
+   * @throws RuntimeException on failure of copy
+   */
+  public static void cudaMemcpy(MemorySegment dest, MemorySegment src, long numBytes, CudaMemcpyKind kind) {
+    int returnValue = com.nvidia.cuvs.internal.panama.headers_h.cudaMemcpy(dest, src, numBytes, kind.kind);
+    checkCudaError(returnValue, "cudaMemcpy");
+  }
+
+  /**
+   * Helper to invoke cudaMemcpy CUDA runtime function to copy data between host/device memory.
+   * @param dest Destination address for data copy
+   * @param src Source address for data copy
+   * @param numBytes Number of bytes to be copied
+   * @throws RuntimeException on failure of copy
+   */
+  public static void cudaMemcpy(MemorySegment dest, MemorySegment src, long numBytes) {
+    Util.cudaMemcpy(dest, src, numBytes, CudaMemcpyKind.INFER_DIRECTION);
+  }
+
   static final long MAX_ERROR_TEXT = 1_000_000L;
 
   static String getLastErrorText() {
     try {
-      MemorySegment seg = (MemorySegment) getLastErrorTextMethodHandle.invokeExact();
+      var seg = headers_h.cuvsGetLastErrorText.makeInvoker().apply();
       if (seg.equals(MemorySegment.NULL)) {
         return "no last error text";
       }
-      return seg.reinterpret(MAX_ERROR_TEXT).getString(0L);
-    } catch (Throwable t) {
+      return seg.reinterpret(MAX_ERROR_TEXT).getString(0);    } catch (Throwable t) {
       throw new RuntimeException(t);
     }
   }
@@ -113,43 +166,39 @@ public class Util {
    * @return a list of {@link GPUInfo} objects with GPU details
    */
   public static List<GPUInfo> availableGPUs() throws Throwable {
-    List<GPUInfo> results = new ArrayList<>();
     try (var localArena = Arena.ofConfined()) {
-      MemorySegment returnValueMemorySegment = localArena.allocate(C_INT);
-      MemorySegment numGpuMemorySegment = localArena.allocate(C_INT);
 
-      /*
-       * Setting a value of 1024 because we cannot predict how much memory to allocate
-       * before the function is invoked as cudaGetDeviceCount is inside the
-       * get_gpu_info function.
-       */
-      MemorySegment GpuInfoArrayMemorySegment = gpuInfo.allocateArray(1024, localArena);
-      getGpuInfoMethodHandle.invokeExact(returnValueMemorySegment, numGpuMemorySegment, GpuInfoArrayMemorySegment);
-      int numGPUs = numGpuMemorySegment.get(ValueLayout.JAVA_INT, 0);
-      MemoryLayout ml = MemoryLayout.sequenceLayout(numGPUs, gpuInfo.layout());
-      for (int i = 0; i < numGPUs; i++) {
-        VarHandle gpuIdVarHandle = ml.varHandle(PathElement.sequenceElement(i), PathElement.groupElement("gpu_id"));
-        VarHandle freeMemoryVarHandle = ml.varHandle(PathElement.sequenceElement(i),
-            PathElement.groupElement("free_memory"));
-        VarHandle totalMemoryVarHandle = ml.varHandle(PathElement.sequenceElement(i),
-            PathElement.groupElement("total_memory"));
-        VarHandle ComputeCapabilityVarHandle = ml.varHandle(PathElement.sequenceElement(i),
-            PathElement.groupElement("compute_capability"));
-        StringBuilder gpuName = new StringBuilder();
-        char b = 1;
-        int p = 0;
-        while (b != 0x00) {
-          VarHandle gpuNameVarHandle = ml.varHandle(PathElement.sequenceElement(i), PathElement.groupElement("name"),
-              PathElement.sequenceElement(p++));
-          b = (char) (byte) gpuNameVarHandle.get(GpuInfoArrayMemorySegment, 0L);
-          gpuName.append(b);
-        }
-        results.add(new GPUInfo((int) gpuIdVarHandle.get(GpuInfoArrayMemorySegment, 0L), gpuName.toString().trim(),
-            (long) freeMemoryVarHandle.get(GpuInfoArrayMemorySegment, 0L),
-            (long) totalMemoryVarHandle.get(GpuInfoArrayMemorySegment, 0L),
-            (float) ComputeCapabilityVarHandle.get(GpuInfoArrayMemorySegment, 0L)));
+      MemorySegment numGpus = localArena.allocate(C_INT);
+      int returnValue = cudaGetDeviceCount(numGpus);
+      checkCudaError(returnValue, "cudaGetDeviceCount");
+
+      int numGpuCount = numGpus.get(C_INT, 0);
+      List<GPUInfo> gpuInfoArr = new ArrayList<GPUInfo>();
+
+      MemorySegment free = localArena.allocate(size_t);
+      MemorySegment total = localArena.allocate(size_t);
+      MemorySegment deviceProp = cudaDeviceProp.allocate(localArena);
+
+      for (int i = 0; i < numGpuCount; i++) {
+
+        returnValue = cudaSetDevice(i);
+        checkCudaError(returnValue, "cudaSetDevice");
+
+        returnValue = cudaGetDeviceProperties_v2(deviceProp, i);
+        checkCudaError(returnValue, "cudaGetDeviceProperties_v2");
+
+        returnValue = cudaMemGetInfo(free, total);
+        checkCudaError(returnValue, "cudaMemGetInfo");
+
+        float computeCapability = Float
+            .parseFloat(cudaDeviceProp.major(deviceProp) + "." + cudaDeviceProp.minor(deviceProp));
+
+        GPUInfo gpuInfo = new GPUInfo(i, cudaDeviceProp.name(deviceProp).getString(0), free.get(C_LONG, 0),
+            total.get(C_LONG, 0), computeCapability);
+
+        gpuInfoArr.add(gpuInfo);
       }
-      return results;
+      return gpuInfoArr;
     }
   }
 
@@ -224,6 +273,45 @@ public class Util {
       }
     }
     return ret;
+  }
+
+  /**
+   * @brief Helper function for creating DLManagedTensor instance
+   *
+   * @param[in] data the data pointer points to the allocated data
+   * @param[in] shape the shape of the tensor
+   * @param[in] code the type code of base types
+   * @param[in] bits the shape of the tensor
+   * @param[in] ndim the number of dimensions
+   * @return DLManagedTensor
+   */
+  public static MemorySegment prepareTensor(Arena arena, MemorySegment data, long[] shape, int code, int bits, int ndim,
+      int deviceType, int lanes) {
+
+    MemorySegment tensor = DLManagedTensor.allocate(arena);
+    MemorySegment dlTensor = DLTensor.allocate(arena);
+
+    DLTensor.data(dlTensor, data);
+
+    MemorySegment dlDevice = DLDevice.allocate(arena);
+    DLDevice.device_type(dlDevice, deviceType);
+    DLTensor.device(dlTensor, dlDevice);
+
+    DLTensor.ndim(dlTensor, ndim);
+
+    MemorySegment dtype = DLDataType.allocate(arena);
+    DLDataType.code(dtype, (byte) code);
+    DLDataType.bits(dtype, (byte) bits);
+    DLDataType.lanes(dtype, (short) lanes);
+    DLTensor.dtype(dlTensor, dtype);
+
+    DLTensor.shape(dlTensor, Util.buildMemorySegment(arena, shape));
+
+    DLTensor.strides(dlTensor, MemorySegment.NULL);
+
+    DLManagedTensor.dl_tensor(tensor, dlTensor);
+
+    return tensor;
   }
 
 }

@@ -132,7 +132,7 @@ void cuvs_mg_ivf_flat<T, IdxT>::search(
   auto queries_view = raft::make_host_matrix_view<const T, int64_t, raft::row_major>(
     queries, IdxT(batch_size), IdxT(dim_));
   auto neighbors_view = raft::make_host_matrix_view<IdxT, int64_t, raft::row_major>(
-    (IdxT*)neighbors, IdxT(batch_size), IdxT(k));
+    neighbors, IdxT(batch_size), IdxT(k));
   auto distances_view = raft::make_host_matrix_view<float, int64_t, raft::row_major>(
     distances, IdxT(batch_size), IdxT(k));
 
