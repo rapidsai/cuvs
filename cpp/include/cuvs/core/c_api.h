@@ -21,8 +21,8 @@
 #include <stdint.h>
 
 static const uint16_t CUVS_VERSION_MAJOR = 25;
-static const uint16_t CUVS_VERSION_MINOR = 06;
-static const uint16_t CUVS_VERSION_PATCH = 00;
+static const uint16_t CUVS_VERSION_MINOR = 8;
+static const uint16_t CUVS_VERSION_PATCH = 0;
 
 #ifdef __cplusplus
 extern "C" {

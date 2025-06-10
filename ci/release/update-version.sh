@@ -110,6 +110,8 @@ sed_runner "s|-[[:digit:]]\{2\}\.[[:digit:]]\{2\}\.[[:digit:]]\{1,2\}\.jar|-${NE
 sed_runner "s|/[[:digit:]]\{2\}\.[[:digit:]]\{2\}\.[[:digit:]]\{1,2\}/|/${NEXT_FULL_JAVA_TAG}/|g" java/examples/README.md
 
 # Update C API version.
+C_API_VERSION_MINOR=$((10#$NEXT_MINOR))
+C_API_VERSION_PATCH=$((10#$NEXT_PATCH))
 sed_runner "s|CUVS_VERSION_MAJOR = [0-9][0-9]|CUVS_VERSION_MAJOR = ${NEXT_MAJOR}|g" cpp/include/cuvs/core/c_api.h
-sed_runner "s|CUVS_VERSION_MINOR = [0-9][0-9]|CUVS_VERSION_MINOR = ${NEXT_MINOR}|g" cpp/include/cuvs/core/c_api.h
-sed_runner "s|CUVS_VERSION_PATCH = [0-9][0-9]|CUVS_VERSION_PATCH = ${NEXT_PATCH}|g" cpp/include/cuvs/core/c_api.h
+sed_runner "s|CUVS_VERSION_MINOR = [0-9][0-9]\?|CUVS_VERSION_MINOR = ${C_API_VERSION_MINOR}|g" cpp/include/cuvs/core/c_api.h
+sed_runner "s|CUVS_VERSION_PATCH = [0-9][0-9]\?|CUVS_VERSION_PATCH = ${C_API_VERSION_PATCH}|g" cpp/include/cuvs/core/c_api.h
