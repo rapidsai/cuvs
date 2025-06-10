@@ -30,6 +30,14 @@ rapids-print-env
 rapids-logger "Check GPU usage"
 nvidia-smi
 
+# RAPIDS_DATASET_ROOT_DIR is used by test scripts
+RAPIDS_DATASET_ROOT_DIR=${RAPIDS_TESTS_DIR}/dataset
+mkdir -p "${RAPIDS_DATASET_ROOT_DIR}"
+export RAPIDS_DATASET_ROOT_DIR
+pushd "${RAPIDS_DATASET_ROOT_DIR}"
+"$(dirname "$(realpath "${BASH_SOURCE[0]}")")"/../cpp/tests/get_test_data.sh --NEIGHBORS_ANN_VAMANA_TEST
+popd
+
 EXITCODE=0
 trap "EXITCODE=1" ERR
 set +e

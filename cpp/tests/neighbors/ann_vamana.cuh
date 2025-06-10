@@ -127,9 +127,14 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
       database(0, stream_),
       search_queries(0, stream_)
   {
-    const char* conda_prefix = std::getenv("CONDA_PREFIX");
-    EXPECT_TRUE(conda_prefix);
-    conda_prefix_ = std::string(conda_prefix);
+    const char* ci = std::getenv("CI");
+    if (ci && std::string(ci) == "true") {
+      const char* rapids_dataset_root_dir = std::getenv("RAPIDS_DATASET_ROOT_DIR");
+      EXPECT_TRUE(rapids_dataset_root_dir);
+      test_data_dir_ = std::string(rapids_dataset_root_dir);
+    } else {
+      test_data_dir_ = std::string(TEST_DATA_DIR);
+    }
   }
 
  protected:
@@ -144,10 +149,10 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
     // use randomized codebooks to test serialization & quantization code path
     if (ps.dim == 384 && std::is_same_v<DataT, int8_t>)
       index_params.codebooks = vamana::deserialize_codebooks(
-        conda_prefix_ + "/" + std::string(CODEBOOKS_DIR) + "384_int8", ps.dim);
+        test_data_dir_ + "/neighbors/ann_vamana/randomized_codebooks/384_int8", ps.dim);
     if (ps.dim == 64 && std::is_same_v<DataT, float>)
       index_params.codebooks = vamana::deserialize_codebooks(
-        conda_prefix_ + "/" + std::string(CODEBOOKS_DIR) + "64_float", ps.dim);
+        test_data_dir_ + "/neighbors/ann_vamana/randomized_codebooks/64_float", ps.dim);
 
     auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
       (const DataT*)database.data(), ps.n_rows, ps.dim);
@@ -280,7 +285,7 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
   AnnVamanaInputs ps;
   rmm::device_uvector<DataT> database;
   rmm::device_uvector<DataT> search_queries;
-  std::string conda_prefix_;
+  std::string test_data_dir_;
 };
 
 inline std::vector<AnnVamanaInputs> generate_inputs()
