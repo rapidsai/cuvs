@@ -26,10 +26,12 @@ if hasArg -h || hasArg --help; then
     exit 0
 fi
 
+DEST=${RAPIDS_DATASET_ROOT_DIR:-"$PWD"}
+
 # get test data for NEIGHBORS_ANN_VAMANA_TEST
 if hasArg "--NEIGHBORS_ANN_VAMANA_TEST"; then
     echo "Downloading test data for NEIGHBORS_ANN_VAMANA_TEST"
-    echo "PWD="$PWD
+    echo "Destination: "${DEST}
     URL_PREFIX=https://data.rapids.ai/cuvs/tests/data
     SUBDIR=neighbors/ann_vamana/randomized_codebooks
     FILE_LIST=(
@@ -38,10 +40,7 @@ if hasArg "--NEIGHBORS_ANN_VAMANA_TEST"; then
         64_float_pq_pivots.bin
         64_float_pq_pivots.bin_rotation_matrix.bin
     )
-    mkdir -p ${SUBDIR}
-    pushd ${SUBDIR}
     for f in "${FILE_LIST[@]}"; do
-        wget --no-verbose "${URL_PREFIX}/${SUBDIR}/$f"
+        wget --no-verbose --directory-prefix="${DEST}/${SUBDIR}" "${URL_PREFIX}/${SUBDIR}/$f"
     done
-    popd #${SUBDIR}
 fi
