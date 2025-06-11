@@ -17,7 +17,6 @@
 #include "./detail/nn_descent_gnnd.hpp"
 #include "./detail/reachability_types.cuh"
 #include "nn_descent.cuh"
-#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 
 namespace cuvs::neighbors::nn_descent {

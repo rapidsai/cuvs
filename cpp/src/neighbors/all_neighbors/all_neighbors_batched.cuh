@@ -305,8 +305,7 @@ void single_gpu_batch_build(const raft::resources& handle,
   for (size_t cluster_id = 0; cluster_id < n_clusters; cluster_id++) {
     size_t num_data_in_cluster = cluster_sizes(cluster_id);
     size_t offset              = cluster_offsets(cluster_id);
-    std::cout << "[THREAD " << omp_get_thread_num() << "] cluster " << cluster_id + 1 << " / "
-              << n_clusters << "(" << num_data_in_cluster << ")" << std::endl;
+
     if (num_data_in_cluster < knn_builder.k) {
       // for the unlikely event where clustering was done lopsidedly and this cluster has less than
       // k data
