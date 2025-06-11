@@ -1,10 +1,10 @@
-# CuVS Java API
+# cuVS Java API
 
 
-CuVS Java API provides a Java based simple, efficient, and a robust vector search API.
+cuVS Java API provides a Java based simple, efficient, and a robust vector search API.
 
 > [!CAUTION]
-> CuVS 25.06 contains an experimental version and updates to this API are expected in the coming release.
+> This contains an experimental APIs and may change in upcoming releases.
 
 ## Prerequisites
 
@@ -21,7 +21,11 @@ The libcuvs C and C++ libraries are needed for this API. If libcuvs libraries ha
 Alternatively, if libcuvs libraries are already built and you just want to build this API, please
 do `./build.sh java` in the top level directory or just do `./build.sh` in this directory.
 
+## Testing
+
+Run `./build.sh --run-java-tests` from this directory.
+
 
 ## Examples
 
-A few starter examples of CAGRA, HNSW, and Bruteforce index are provided in the `examples` directory.
+A few starter examples of CAGRA, HNSW, and Bruteforce indexing and searching are provided in the `examples` directory.

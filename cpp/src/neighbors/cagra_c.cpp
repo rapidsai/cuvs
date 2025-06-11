@@ -29,6 +29,7 @@
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.h>
 
+#include "cagra_c.hpp"
 #include <fstream>
 
 namespace {
@@ -104,24 +105,8 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto index   = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr);
 
-  auto index_params   = cuvs::neighbors::cagra::index_params();
-  index_params.metric = static_cast<cuvs::distance::DistanceType>((int)params.metric),
-  index_params.intermediate_graph_degree = params.intermediate_graph_degree;
-  index_params.graph_degree              = params.graph_degree;
-
-  _set_graph_build_params(
-    index_params.graph_build_params, params, params.build_algo, dataset.shape[0], dataset.shape[1]);
-
-  if (auto* cparams = params.compression; cparams != nullptr) {
-    auto compression_params                        = cuvs::neighbors::vpq_params();
-    compression_params.pq_bits                     = cparams->pq_bits;
-    compression_params.pq_dim                      = cparams->pq_dim;
-    compression_params.vq_n_centers                = cparams->vq_n_centers;
-    compression_params.kmeans_n_iters              = cparams->kmeans_n_iters;
-    compression_params.vq_kmeans_trainset_fraction = cparams->vq_kmeans_trainset_fraction;
-    compression_params.pq_kmeans_trainset_fraction = cparams->pq_kmeans_trainset_fraction;
-    index_params.compression.emplace(compression_params);
-  }
+  auto index_params = cuvs::neighbors::cagra::index_params();
+  convert_c_index_params(params, dataset.shape[0], dataset.shape[1], &index_params);
 
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
@@ -184,23 +169,8 @@ void _search(cuvsResources_t res,
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
   auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(index.addr);
 
-  auto search_params              = cuvs::neighbors::cagra::search_params();
-  search_params.max_queries       = params.max_queries;
-  search_params.itopk_size        = params.itopk_size;
-  search_params.max_iterations    = params.max_iterations;
-  search_params.algo              = static_cast<cuvs::neighbors::cagra::search_algo>(params.algo);
-  search_params.team_size         = params.team_size;
-  search_params.search_width      = params.search_width;
-  search_params.min_iterations    = params.min_iterations;
-  search_params.thread_block_size = params.thread_block_size;
-  search_params.hashmap_mode = static_cast<cuvs::neighbors::cagra::hash_mode>(params.hashmap_mode);
-  search_params.hashmap_min_bitlen      = params.hashmap_min_bitlen;
-  search_params.hashmap_max_fill_rate   = params.hashmap_max_fill_rate;
-  search_params.num_random_samplings    = params.num_random_samplings;
-  search_params.rand_xor_mask           = params.rand_xor_mask;
-  search_params.persistent              = params.persistent;
-  search_params.persistent_lifetime     = params.persistent_lifetime;
-  search_params.persistent_device_usage = params.persistent_device_usage;
+  auto search_params = cuvs::neighbors::cagra::search_params();
+  convert_c_search_params(params, &search_params);
 
   using queries_mdspan_type   = raft::device_matrix_view<T const, int64_t, raft::row_major>;
   using neighbors_mdspan_type = raft::device_matrix_view<IdxT, int64_t, raft::row_major>;
@@ -327,9 +297,51 @@ void* _merge(cuvsResources_t res,
 
   return merged_index;
 }
-
 }  // namespace
 
+namespace cuvs::neighbors::cagra {
+void convert_c_index_params(cuvsCagraIndexParams params,
+                            int64_t n_rows,
+                            int64_t dim,
+                            cuvs::neighbors::cagra::index_params* out)
+{
+  out->metric                    = static_cast<cuvs::distance::DistanceType>((int)params.metric);
+  out->intermediate_graph_degree = params.intermediate_graph_degree;
+  out->graph_degree              = params.graph_degree;
+  _set_graph_build_params(out->graph_build_params, params, params.build_algo, n_rows, dim);
+
+  if (auto* cparams = params.compression; cparams != nullptr) {
+    auto compression_params                        = cuvs::neighbors::vpq_params();
+    compression_params.pq_bits                     = cparams->pq_bits;
+    compression_params.pq_dim                      = cparams->pq_dim;
+    compression_params.vq_n_centers                = cparams->vq_n_centers;
+    compression_params.kmeans_n_iters              = cparams->kmeans_n_iters;
+    compression_params.vq_kmeans_trainset_fraction = cparams->vq_kmeans_trainset_fraction;
+    compression_params.pq_kmeans_trainset_fraction = cparams->pq_kmeans_trainset_fraction;
+    out->compression.emplace(compression_params);
+  }
+}
+void convert_c_search_params(cuvsCagraSearchParams params,
+                             cuvs::neighbors::cagra::search_params* out)
+{
+  out->max_queries           = params.max_queries;
+  out->itopk_size            = params.itopk_size;
+  out->max_iterations        = params.max_iterations;
+  out->algo                  = static_cast<cuvs::neighbors::cagra::search_algo>(params.algo);
+  out->team_size             = params.team_size;
+  out->search_width          = params.search_width;
+  out->min_iterations        = params.min_iterations;
+  out->thread_block_size     = params.thread_block_size;
+  out->hashmap_mode          = static_cast<cuvs::neighbors::cagra::hash_mode>(params.hashmap_mode);
+  out->hashmap_min_bitlen    = params.hashmap_min_bitlen;
+  out->hashmap_max_fill_rate = params.hashmap_max_fill_rate;
+  out->num_random_samplings  = params.num_random_samplings;
+  out->rand_xor_mask         = params.rand_xor_mask;
+  out->persistent            = params.persistent;
+  out->persistent_lifetime   = params.persistent_lifetime;
+  out->persistent_device_usage = params.persistent_device_usage;
+}
+}  // namespace cuvs::neighbors::cagra
 extern "C" cuvsError_t cuvsCagraIndexCreate(cuvsCagraIndex_t* index)
 {
   return cuvs::core::translate_exceptions([=] { *index = new cuvsCagraIndex{}; });
