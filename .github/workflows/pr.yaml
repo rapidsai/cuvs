@@ -53,6 +53,7 @@ jobs:
         uses: rapidsai/shared-actions/check_nightly_success/dispatch@main
         with:
           repo: cuvs
+          max_days_without_success: 14
   changed-files:
     needs: telemetry-setup
     secrets: inherit
