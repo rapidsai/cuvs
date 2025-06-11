@@ -58,7 +58,6 @@ public class BruteForceAndSearchIT extends CuVSTestCase{
         { 0.92514056f, 0.4463501f },
         { 0.6673192f, 0.10993068f }
     };
-    List<Integer> map = List.of(0, 1, 2, 3);
     float[][] queries = {
         { 0.48216683f, 0.0428398f },
         { 0.5084142f, 0.6545497f },
@@ -118,13 +117,13 @@ public class BruteForceAndSearchIT extends CuVSTestCase{
         BruteForceQuery cuvsQuery = new BruteForceQuery.Builder()
             .withTopK(3)
             .withQueryVectors(queries)
-            .withMapping(map)
+            .withMapping(SearchResults.IDENTITY_MAPPING)
             .build();
         BruteForceQuery cuvsQueryWithFiltering = new BruteForceQuery.Builder()
             .withTopK(3)
             .withQueryVectors(queries)
             .withPrefilters(new BitSet[] {prefilter, prefilter, prefilter, prefilter}, dataset.length)
-            .withMapping(map)
+            .withMapping(SearchResults.IDENTITY_MAPPING)
             .build();
 
         // search the loaded index

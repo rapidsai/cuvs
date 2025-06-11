@@ -18,7 +18,7 @@ package com.nvidia.cuvs;
 
 import java.util.Arrays;
 import java.util.BitSet;
-import java.util.List;
+import java.util.function.LongToIntFunction;
 
 /**
  * BruteForceQuery holds the query vectors to be used while invoking search.
@@ -27,11 +27,11 @@ import java.util.List;
  */
 public class BruteForceQuery {
 
-  private List<Integer> mapping;
-  private float[][] queryVectors;
-  private BitSet[] prefilters;
+  private final LongToIntFunction mapping;
+  private final float[][] queryVectors;
+  private final BitSet[] prefilters;
   private int numDocs = -1;
-  private int topK;
+  private final int topK;
 
   /**
    * Constructs an instance of {@link BruteForceQuery} using queryVectors,
@@ -45,7 +45,7 @@ public class BruteForceQuery {
    * @param numDocs      Maximum of bits in each prefilter, representing number of documents in this index.
    *                     Used only when prefilter(s) is/are passed.
    */
-  public BruteForceQuery(float[][] queryVectors, List<Integer> mapping, int topK, BitSet[] prefilters, int numDocs) {
+  public BruteForceQuery(float[][] queryVectors, LongToIntFunction mapping, int topK, BitSet[] prefilters, int numDocs) {
     this.queryVectors = queryVectors;
     this.mapping = mapping;
     this.topK = topK;
@@ -67,7 +67,7 @@ public class BruteForceQuery {
    *
    * @return a map of ID mappings
    */
-  public List<Integer> getMapping() {
+  public LongToIntFunction getMapping() {
     return mapping;
   }
 
@@ -112,7 +112,7 @@ public class BruteForceQuery {
     private float[][] queryVectors;
     private BitSet[] prefilters;
     private int numDocs;
-    private List<Integer> mapping;
+    private LongToIntFunction mapping = SearchResults.IDENTITY_MAPPING;
     private int topK = 2;
 
     /**
@@ -132,7 +132,7 @@ public class BruteForceQuery {
      * @param mapping the ID mapping instance
      * @return an instance of this Builder
      */
-    public Builder withMapping(List<Integer> mapping) {
+    public Builder withMapping(LongToIntFunction mapping) {
       this.mapping = mapping;
       return this;
     }

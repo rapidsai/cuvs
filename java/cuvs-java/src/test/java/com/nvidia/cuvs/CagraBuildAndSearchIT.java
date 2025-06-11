@@ -73,7 +73,6 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
         { 0.92514056f, 0.4463501f },
         { 0.6673192f, 0.10993068f }
     };
-    List<Integer> map = List.of(0, 1, 2, 3);
     float[][] queries = {
         { 0.48216683f, 0.0428398f },
         { 0.5084142f, 0.6545497f },
@@ -102,7 +101,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
       ExecutorService parallelExecutor = runConcurrently ? Executors.newFixedThreadPool(numTestsRuns): null;
 
       for (int j = 0; j < numTestsRuns; j++) {
-        Runnable testLogic = indexAndQueryOnce(dataset, map, queries, expectedResults, resources);
+        Runnable testLogic = indexAndQueryOnce(dataset, queries, expectedResults, resources);
         if (runTestInDifferentThreads) {
           if (runConcurrently) {
             parallelExecutor.submit(testLogic);
@@ -200,7 +199,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     }
   }
 
-  private Runnable indexAndQueryOnce(float[][] dataset, List<Integer> map, float[][] queries,
+  private Runnable indexAndQueryOnce(float[][] dataset, float[][] queries,
       List<Map<Integer, Float>> expectedResults, CuVSResources resources) throws Throwable, FileNotFoundException {
 
     Runnable thread = new Runnable() {
@@ -244,7 +243,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
               .withTopK(3)
               .withSearchParams(searchParams)
               .withQueryVectors(queries)
-              .withMapping(map)
+              .withMapping(SearchResults.IDENTITY_MAPPING)
               .build();
 
           // Perform the search
@@ -327,12 +326,11 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             CagraSearchParams searchParams = new CagraSearchParams.Builder(resources)
                 .build();
 
-            List<Integer> mergedMap = Arrays.asList(0, 1, 2, 3);
             CagraQuery query = new CagraQuery.Builder()
                 .withTopK(3)
                 .withSearchParams(searchParams)
                 .withQueryVectors(queries)
-                .withMapping(mergedMap)
+                .withMapping(SearchResults.IDENTITY_MAPPING)
                 .build();
 
                 log.info("Searching merged index...");
@@ -431,12 +429,11 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             CagraSearchParams searchParams = new CagraSearchParams.Builder(resources)
                 .build();
 
-            List<Integer> mergedMap = Arrays.asList(0, 1, 2, 3);
             CagraQuery query = new CagraQuery.Builder()
                 .withTopK(3)
                 .withSearchParams(searchParams)
                 .withQueryVectors(queries)
-                .withMapping(mergedMap)
+                .withMapping(SearchResults.IDENTITY_MAPPING)
                 .build();
 
             log.info("Searching physically merged index...");
