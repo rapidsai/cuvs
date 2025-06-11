@@ -387,3 +387,33 @@ def extend(Index index, new_vectors, resources=None):
         ))
 
     return index
+
+
+@auto_sync_resources
+def compact(Index index, resources=None):
+    """
+    Compact the index
+
+    This function takes any data that has been added incrementally, and ensures
+    that it been added to the ANN index.
+
+    Parameters
+    ----------
+    index : tiered_index.Index
+        Trained tiered_index object.
+    {resources_docstring}
+
+    Returns
+    -------
+    index: py:class:`cuvs.neighbors.tiered_index.Index`
+    """
+
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+    with cuda_interruptible():
+        check_cuvs(cuvsTieredIndexCompact(
+            res,
+            index.index
+        ))
+
+    return index

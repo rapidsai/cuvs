@@ -88,7 +88,8 @@ void tiled_brute_force_knn(const raft::resources& handle,
                            const uint32_t* filter_bits               = nullptr,
                            DistanceEpilogue distance_epilogue        = raft::identity_op(),
                            cuvs::neighbors::filtering::FilterType filter_type =
-                             cuvs::neighbors::filtering::FilterType::Bitmap)
+                             cuvs::neighbors::filtering::FilterType::Bitmap,
+                           size_t filter_col_offset = 0)
 {
   // Figure out the number of rows/cols to tile for
   size_t tile_rows = 0;
@@ -261,9 +262,9 @@ void tiled_brute_force_knn(const raft::resources& handle,
                          count,
                          count + current_query_size * current_centroid_size,
                          [=] __device__(IndexType idx) {
-                           IndexType row      = i + (idx / current_centroid_size);
-                           IndexType col      = j + (idx % current_centroid_size);
-                           IndexType g_idx    = row * n_cols + col;
+                           IndexType row   = i + (idx / current_centroid_size);
+                           IndexType col   = j + (idx % current_centroid_size) + filter_col_offset;
+                           IndexType g_idx = row * n_cols + col;
                            IndexType item_idx = (g_idx) >> 5;
                            uint32_t bit_idx   = (g_idx) & 31;
                            uint32_t filter    = filter_bits[item_idx];
@@ -609,12 +610,12 @@ void brute_force_search_filtered(
                  metric == cuvs::distance::DistanceType::L2Expanded ||
                  metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                  metric == cuvs::distance::DistanceType::CosineExpanded,
-               "Only Euclidean, IP, and Cosine are supported!");
+               "Only Euclidean, IP, and Cosine distance are supported!");
 
   RAFT_EXPECTS(idx.has_norms() || !(metric == cuvs::distance::DistanceType::L2Expanded ||
                                     metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                                     metric == cuvs::distance::DistanceType::CosineExpanded),
-               "Index must has norms when using Euclidean, IP, and Cosine!");
+               "Index must have norms when using Euclidean, IP, or Cosine distance!");
 
   IdxT n_queries                                     = queries.extent(0);
   IdxT n_dataset                                     = idx.dataset().extent(0);

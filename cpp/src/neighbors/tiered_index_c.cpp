@@ -158,6 +158,14 @@ void _extend(cuvsResources_t res, DLManagedTensor* new_vectors, cuvsTieredIndex 
   tiered_index::extend(*res_ptr, vectors_mds, index_ptr);
 }
 
+template <typename UpstreamT>
+void _compact(cuvsResources_t res, cuvsTieredIndex index)
+{
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr = reinterpret_cast<tiered_index::index<UpstreamT>*>(index.addr);
+
+  tiered_index::compact(*res_ptr, index_ptr);
+}
 }  // namespace
 
 extern "C" cuvsError_t cuvsTieredIndexCreate(cuvsTieredIndex_t* index)
@@ -299,6 +307,28 @@ extern "C" cuvsError_t cuvsTieredIndexExtend(cuvsResources_t res,
       }
       case CUVS_TIERED_INDEX_ALGO_IVF_PQ: {
         _extend<ivf_pq::typed_index<float, int64_t>>(res, new_vectors, index);
+        break;
+      }
+      default: RAFT_FAIL("unsupported tiered index algorithm");
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsTieredIndexCompact(cuvsResources_t res, cuvsTieredIndex_t index_c_ptr)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto index = *index_c_ptr;
+    switch (index.algo) {
+      case CUVS_TIERED_INDEX_ALGO_CAGRA: {
+        _compact<cagra::index<float, uint32_t>>(res, index);
+        break;
+      }
+      case CUVS_TIERED_INDEX_ALGO_IVF_FLAT: {
+        _compact<ivf_flat::index<float, int64_t>>(res, index);
+        break;
+      }
+      case CUVS_TIERED_INDEX_ALGO_IVF_PQ: {
+        _compact<ivf_pq::typed_index<float, int64_t>>(res, index);
         break;
       }
       default: RAFT_FAIL("unsupported tiered index algorithm");

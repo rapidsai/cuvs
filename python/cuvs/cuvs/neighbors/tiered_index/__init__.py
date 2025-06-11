@@ -13,12 +13,13 @@
 # limitations under the License.
 
 
-from .tiered_index import Index, IndexParams, build, extend, search
+from .tiered_index import Index, IndexParams, build, compact, extend, search
 
 __all__ = [
     "Index",
     "IndexParams",
     "build",
+    "compact",
     "extend",
     "search",
 ]

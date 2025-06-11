@@ -430,7 +430,7 @@ cuvsError_t cuvsHnswSerialize(cuvsResources_t res, const char* filename, cuvsHns
  * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
  *
  * // create an index with `cuvsCagraBuild`
- * cuvsCagraSerializeHnswlib(res, "/path/to/index", index);
+ * cuvsCagraSerializeToHnswlib(res, "/path/to/index", index);
  *
  * // Load the serialized CAGRA index from file as an hnswlib index
  * // The index should have the same dtype as the one used to build CAGRA the index
