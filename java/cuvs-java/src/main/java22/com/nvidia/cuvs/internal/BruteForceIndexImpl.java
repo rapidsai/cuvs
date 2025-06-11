@@ -24,8 +24,9 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_POINTER;
 import static com.nvidia.cuvs.internal.common.Util.buildMemorySegment;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
-import static com.nvidia.cuvs.internal.common.Util.checkCudaError;
 import static com.nvidia.cuvs.internal.common.Util.concatenate;
+import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
+import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.*;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceBuild;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceDeserialize;
@@ -40,7 +41,6 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamGet;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
 import static com.nvidia.cuvs.internal.panama.headers_h.omp_set_num_threads;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemcpy;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaStream_t;
 
 import java.io.FileInputStream;
@@ -170,8 +170,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       // IMPORTANT: this should only come AFTER cuvsRMMAlloc call
       MemorySegment datasetMemorySegmentP = datasetMemorySegment.get(C_POINTER, 0);
 
-      returnValue = cudaMemcpy(datasetMemorySegmentP, datasetMemSegment, datasetBytes, 4);
-      checkCudaError(returnValue, "cudaMemcpy");
+      cudaMemcpy(datasetMemorySegmentP, datasetMemSegment, datasetBytes, INFER_DIRECTION);
 
       long datasetShape[] = { rows, cols };
       MemorySegment datasetTensor = prepareTensor(arena, datasetMemorySegmentP, datasetShape, 2, 32, 2, 2, 1);
@@ -261,8 +260,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       MemorySegment neighborsDP = neighborsD.get(C_POINTER, 0);
       MemorySegment distancesDP = distancesD.get(C_POINTER, 0);
 
-      returnValue = cudaMemcpy(queriesDP, querySeg, queriesBytes, 4);
-      checkCudaError(returnValue, "cudaMemcpy");
+      cudaMemcpy(queriesDP, querySeg, queriesBytes, INFER_DIRECTION);
 
       long queriesShape[] = { numQueries, vectorDimension };
       MemorySegment queriesTensor = prepareTensor(arena, queriesDP, queriesShape, 2, 32, 2, 2, 1);
@@ -287,8 +285,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
 
         prefilterDP = prefilterD.get(C_POINTER, 0);
 
-        returnValue = cudaMemcpy(prefilterDP, prefilterDataMemorySegment, prefilterBytes, 1);
-        checkCudaError(returnValue, "cudaMemcpy");
+        cudaMemcpy(prefilterDP, prefilterDataMemorySegment, prefilterBytes, HOST_TO_DEVICE);
 
         prefilterTensor = prepareTensor(arena, prefilterDP, prefilterShape, 1, 32, 1, 2, 1);
 
@@ -306,10 +303,8 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       returnValue = cuvsStreamSync(cuvsResources);
       checkCuVSError(returnValue, "cuvsStreamSync");
 
-      returnValue = cudaMemcpy(neighborsMemorySegment, neighborsDP, neighborsBytes, 4);
-      checkCudaError(returnValue, "cudaMemcpy");
-      returnValue = cudaMemcpy(distancesMemorySegment, distancesDP, distanceBytes, 4);
-      checkCudaError(returnValue, "cudaMemcpy");
+      cudaMemcpy(neighborsMemorySegment, neighborsDP, neighborsBytes, INFER_DIRECTION);
+      cudaMemcpy(distancesMemorySegment, distancesDP, distanceBytes, INFER_DIRECTION);
 
       returnValue = cuvsRMMFree(cuvsResources, neighborsDP, neighborsBytes);
       checkCuVSError(returnValue, "cuvsRMMFree");
