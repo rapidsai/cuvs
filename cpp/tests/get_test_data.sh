@@ -41,7 +41,7 @@ if hasArg "--NEIGHBORS_ANN_VAMANA_TEST"; then
     mkdir -p ${SUBDIR}
     pushd ${SUBDIR}
     for f in "${FILE_LIST[@]}"; do
-        wget "${URL_PREFIX}/${SUBDIR}/$f"
+        wget --no-verbose "${URL_PREFIX}/${SUBDIR}/$f"
     done
     popd #${SUBDIR}
 fi
