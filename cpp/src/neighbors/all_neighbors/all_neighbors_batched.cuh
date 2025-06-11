@@ -512,6 +512,9 @@ void batch_build(
   T alpha                                                                    = 1.0)
 {
   if (raft::resource::is_multi_gpu(handle)) {
+    RAFT_EXPECTS(params.n_clusters >= raft::resource::get_num_ranks(handle),
+                 "n_clusters must be larger than or equal to number of GPUs for multi gpu "
+                 "all-neighbors build");
     // For efficient CPU-computation of omp parallel for regions per GPU
     omp_set_nested(1);
   }
