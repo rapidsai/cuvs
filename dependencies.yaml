@@ -19,6 +19,7 @@ files:
       - depends_on_pylibraft
       - depends_on_nccl
       - docs
+      - java
       - rapids_build
       - run_py_cuvs
       - rust
@@ -120,7 +121,6 @@ files:
       - depends_on_libraft
       - depends_on_nccl
       - java
-      - maven
       - rapids_build
   py_build_libcuvs:
     output: pyproject
