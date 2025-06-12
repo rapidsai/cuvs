@@ -233,12 +233,11 @@ void InitDataset(const raft::resources& handle,
                                        raft::sq_op(),
                                        raft::add_op(),
                                        raft::sqrt_op());
-      raft::linalg::matrix_vector_op(
+      raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
         handle,
         raft::make_const_mdspan(dataset_view),
         raft::make_const_mdspan(dev_row_norm.view()),
         dataset_view,
-        raft::Apply::ALONG_COLUMNS,
         [normalized_norm] __device__(DataT elm, ComputeT norm) {
           const ComputeT v           = elm / norm * normalized_norm;
           const ComputeT max_v_range = std::numeric_limits<DataT>::max();

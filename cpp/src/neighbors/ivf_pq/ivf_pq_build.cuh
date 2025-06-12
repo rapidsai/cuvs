@@ -101,12 +101,12 @@ void select_residuals(raft::resources const& handle,
     mapping_itr(dataset, utils::mapping<float>{});
   raft::matrix::gather(mapping_itr, (IdxT)dim, n_rows, row_ids, n_rows, tmp.data(), stream);
 
-  raft::matrix::linewise_op(handle,
-                            raft::make_device_matrix_view<const T, IdxT>(tmp.data(), n_rows, dim),
-                            raft::make_device_matrix_view<T, IdxT>(tmp.data(), n_rows, dim),
-                            true,
-                            raft::sub_op{},
-                            raft::make_device_vector_view<const T, IdxT>(center, dim));
+  raft::matrix::linewise_op<true>(
+    handle,
+    raft::make_device_matrix_view<const T, IdxT>(tmp.data(), n_rows, dim),
+    raft::make_device_matrix_view<T, IdxT>(tmp.data(), n_rows, dim),
+    raft::sub_op{},
+    raft::make_device_vector_view<const T, IdxT>(center, dim));
 
   float alpha = 1.0;
   float beta  = 0.0;

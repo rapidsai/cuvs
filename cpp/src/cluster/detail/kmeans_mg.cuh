@@ -654,14 +654,12 @@ void fit(const raft::resources& handle,
     //   samples in cluster-i.
     // Note - when wtInCluster[i] is 0, newCentroid[i] is reset to 0
 
-    raft::linalg::matrixVectorOp(
+    raft::linalg::matrixVectorOp<true, false>(
       newCentroids.data_handle(),
       newCentroids.data_handle(),
       wtInCluster.data_handle(),
       newCentroids.extent(1),
       newCentroids.extent(0),
-      true,
-      false,
       cuda::proclaim_return_type<DataT>([=] __device__(DataT mat, DataT vec) {
         if (vec == 0)
           return DataT(0);
