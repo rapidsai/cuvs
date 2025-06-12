@@ -22,7 +22,7 @@
     <groupId>com.nvidia.cuvs</groupId>
     <artifactId>cuvs-java</artifactId>
     <!-- NOTE: The version automatically gets updated when ci/release/update-version.sh is invoked. -->
-    <!--CUVS_JAVA#VERSION_UPDATE_MARKER_START--><version>25.06.0</version><!--CUVS_JAVA#VERSION_UPDATE_MARKER_END-->
+    <!--CUVS_JAVA#VERSION_UPDATE_MARKER_START--><version>25.08.0</version><!--CUVS_JAVA#VERSION_UPDATE_MARKER_END-->
     <name>cuvs-java</name>
     <description>
         This project provides Java bindings for cuVS, enabling approximate nearest neighbors search and clustering
@@ -153,35 +153,6 @@
                             <goal>integration-test</goal>
                             <goal>verify</goal>
                         </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <version>2.10</version>
-                <executions>
-                    <execution>
-                        <id>copy</id>
-                        <phase>compile</phase>
-                        <goals>
-                            <goal>copy</goal>
-                        </goals>
-                        <configuration>
-                            <artifactItems>
-                                <artifactItem>
-                                    <groupId>com.nvidia.cuvs</groupId>
-                                    <artifactId>cuvs-java-internal</artifactId>
-                                    <!-- NOTE: The version automatically gets updated when ci/release/update-version.sh is invoked. -->
-                                    <!--CUVS_JAVA#VERSION_UPDATE_MARKER_START--><version>25.06.0</version><!--CUVS_JAVA#VERSION_UPDATE_MARKER_END-->
-                                    <type>so</type>
-                                    <overWrite>false</overWrite>
-                                    <outputDirectory>
-                                        ${project.build.directory}/classes/META-INF/native/linux_x64</outputDirectory>
-                                    <destFileName>libcuvs_java.so</destFileName>
-                                </artifactItem>
-                            </artifactItems>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>
