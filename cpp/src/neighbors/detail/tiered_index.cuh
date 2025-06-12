@@ -22,6 +22,7 @@
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/core/types.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/norm.cuh>
@@ -88,18 +89,11 @@ struct brute_force_storage {
       auto norms_view =
         raft::make_device_vector_view<T>(norms->data() + num_rows_used, new_vectors.extent(0));
       if (metric == cuvs::distance::DistanceType::CosineExpanded) {
-        raft::linalg::norm(res,
-                           new_vectors,
-                           norms_view,
-                           raft::linalg::NormType::L2Norm,
-                           raft::linalg::Apply::ALONG_ROWS,
-                           raft::sqrt_op{});
+        raft::linalg::norm<raft::linalg::NormType::L2Norm, raft::Apply::ALONG_ROWS>(
+          res, new_vectors, norms_view, raft::sqrt_op{});
       } else {
-        raft::linalg::norm(res,
-                           new_vectors,
-                           norms_view,
-                           raft::linalg::NormType::L2Norm,
-                           raft::linalg::Apply::ALONG_ROWS);
+        raft::linalg::norm<raft::linalg::NormType::L2Norm, raft::Apply::ALONG_ROWS>(
+          res, new_vectors, norms_view);
       }
     }
     num_rows_used += new_vectors.extent(0);
