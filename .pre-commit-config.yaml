@@ -115,7 +115,7 @@ repos:
             exclude: |
               (?x)
                   docs/source/sphinxext/github_link\.py|
-                  cpp/cmake/modules/FindAVX\.cmake|
+                  cpp/cmake/modules/FindAVX\.cmake
           - id: verify-alpha-spec
           - id: verify-codeowners
             args: [--fix, --project-prefix=cuvs]

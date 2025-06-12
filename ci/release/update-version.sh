@@ -108,3 +108,8 @@ done
 sed_runner "s| CuVS [[:digit:]]\{2\}\.[[:digit:]]\{2\} | CuVS ${NEXT_SHORT_TAG} |g" java/README.md
 sed_runner "s|-[[:digit:]]\{2\}\.[[:digit:]]\{2\}\.[[:digit:]]\{1,2\}\.jar|-${NEXT_FULL_JAVA_TAG}\.jar|g" java/examples/README.md
 sed_runner "s|/[[:digit:]]\{2\}\.[[:digit:]]\{2\}\.[[:digit:]]\{1,2\}/|/${NEXT_FULL_JAVA_TAG}/|g" java/examples/README.md
+
+# Update C API version.
+sed_runner "s|CUVS_VERSION_MAJOR = [0-9][0-9]|CUVS_VERSION_MAJOR = ${NEXT_MAJOR}|g" cpp/include/cuvs/core/c_api.h
+sed_runner "s|CUVS_VERSION_MINOR = [0-9][0-9]|CUVS_VERSION_MINOR = ${NEXT_MINOR}|g" cpp/include/cuvs/core/c_api.h
+sed_runner "s|CUVS_VERSION_PATCH = [0-9][0-9]|CUVS_VERSION_PATCH = ${NEXT_PATCH}|g" cpp/include/cuvs/core/c_api.h
