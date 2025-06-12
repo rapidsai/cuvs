@@ -115,7 +115,7 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
       BruteForceQuery query = new BruteForceQuery.Builder()
           .withTopK(topK)
           .withQueryVectors(queries)
-          .withPrefilter(prefilters, vectors.length)
+          .withPrefilters(prefilters, vectors.length)
           .build();
 
       BruteForceIndexParams indexParams = new BruteForceIndexParams.Builder()
