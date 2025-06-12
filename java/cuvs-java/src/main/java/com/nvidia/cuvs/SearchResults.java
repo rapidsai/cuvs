@@ -18,8 +18,15 @@ package com.nvidia.cuvs;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.LongToIntFunction;
 
 public interface SearchResults {
+
+    LongToIntFunction IDENTITY_MAPPING = l -> (int) l;
+
+    static LongToIntFunction mappingFromList(List<Integer> mappingAsList) {
+        return l -> mappingAsList.get((int) l);
+    }
 
     /**
      * Gets a list results as a map of neighbor IDs to distances.
