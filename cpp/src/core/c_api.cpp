@@ -154,3 +154,11 @@ extern "C" const char* cuvsGetLastErrorText()
 }
 
 extern "C" void cuvsSetLastErrorText(const char* error) { last_error_text = error ? error : ""; }
+
+extern "C" cuvsError_t cuvsVersionGet(uint16_t* major, uint16_t* minor, uint16_t* patch)
+{
+  *major = CUVS_VERSION_MAJOR;
+  *minor = CUVS_VERSION_MINOR;
+  *patch = CUVS_VERSION_PATCH;
+  return CUVS_SUCCESS;
+}
