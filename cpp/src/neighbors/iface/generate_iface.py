@@ -190,14 +190,28 @@ cagra_macro = """
               const cuvs::neighbors::iface<cagra::index<T, IdxT>, T, IdxT>& interface,                                          \\
               const cuvs::neighbors::search_params* search_params,                                                              \\
               raft::device_matrix_view<const T, int64_t, row_major> queries,                                                    \\
-              raft::device_matrix_view<IdxT, int64_t, row_major> neighbors,                                                     \\
+              raft::device_matrix_view<int64_t, int64_t, row_major> neighbors,                                                  \\
               raft::device_matrix_view<float, int64_t, row_major> distances);                                                   \\
                                                                                                                                 \\
     template void search(const raft::resources& handle,                                                                         \\
               const cuvs::neighbors::iface<cagra::index<T, IdxT>, T, IdxT>& interface,                                          \\
               const cuvs::neighbors::search_params* search_params,                                                              \\
               raft::host_matrix_view<const T, int64_t, row_major> h_queries,                                                    \\
-              raft::device_matrix_view<IdxT, int64_t, row_major> d_neighbors,                                                   \\
+              raft::device_matrix_view<int64_t, int64_t, row_major> d_neighbors,                                                \\
+              raft::device_matrix_view<float, int64_t, row_major> d_distances);                                                 \\
+                                                                                                                                \\
+    template void search(const raft::resources& handle,                                                                         \\
+              const cuvs::neighbors::iface<cagra::index<T, IdxT>, T, IdxT>& interface,                                          \\
+              const cuvs::neighbors::search_params* search_params,                                                              \\
+              raft::device_matrix_view<const T, int64_t, row_major> queries,                                                    \\
+              raft::device_matrix_view<uint32_t, int64_t, row_major> neighbors,                                                 \\
+              raft::device_matrix_view<float, int64_t, row_major> distances);                                                   \\
+                                                                                                                                \\
+    template void search(const raft::resources& handle,                                                                         \\
+              const cuvs::neighbors::iface<cagra::index<T, IdxT>, T, IdxT>& interface,                                          \\
+              const cuvs::neighbors::search_params* search_params,                                                              \\
+              raft::host_matrix_view<const T, int64_t, row_major> h_queries,                                                    \\
+              raft::device_matrix_view<uint32_t, int64_t, row_major> d_neighbors,                                               \\
               raft::device_matrix_view<float, int64_t, row_major> d_distances);                                                 \\
                                                                                                                                 \\
   template void serialize(const raft::resources& handle,                                                                        \\

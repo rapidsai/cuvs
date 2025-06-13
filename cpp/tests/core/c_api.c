@@ -86,5 +86,13 @@ int main()
   error = cuvsResourcesDestroy(res);
   if (error == CUVS_ERROR) { exit(EXIT_FAILURE); }
 
+  // Check version
+  uint16_t major, minor, patch;
+  error = cuvsVersionGet(&major, &minor, &patch);
+  if (error == CUVS_ERROR || major != CUVS_VERSION_MAJOR || minor != CUVS_VERSION_MINOR ||
+      patch != CUVS_VERSION_PATCH) {
+    exit(EXIT_FAILURE);
+  }
+
   return 0;
 }
