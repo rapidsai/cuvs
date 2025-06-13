@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 #pragma once
 #include "./knn_brute_force.cuh"
+#include "./reachability_types.cuh"
 
 #include <raft/linalg/unary_op.cuh>
 #include <raft/sparse/convert/csr.cuh>
@@ -33,6 +34,7 @@
 
 namespace cuvs::neighbors::detail::reachability {
 
+using namespace cuvs::neighbors;
 /**
  * Extract core distances from KNN graph. This is essentially
  * performing a knn_dists[:,min_pts]
@@ -121,18 +123,6 @@ void _compute_core_dists(const raft::resources& handle,
   core_distances<value_idx>(dists.data(), min_samples, min_samples, m, core_dists, stream);
 }
 
-//  Functor to post-process distances into reachability space
-template <typename value_idx, typename value_t>
-struct ReachabilityPostProcess {
-  DI value_t operator()(value_t value, value_idx row, value_idx col) const
-  {
-    return max(core_dists[col], max(core_dists[row], alpha * value));
-  }
-
-  const value_t* core_dists;
-  value_t alpha;
-};
-
 /**
  * Given core distances, Fuses computations of L2 distances between all
  * points, projection into mutual reachability space, and k-selection.
@@ -163,7 +153,7 @@ void mutual_reachability_knn_l2(const raft::resources& handle,
   // `A type local to a function cannot be used in the template argument of the
   // enclosing parent function (and any parent classes) of an extended __device__
   // or __host__ __device__ lambda`
-  auto epilogue = ReachabilityPostProcess<value_idx, value_t>{core_dists, alpha};
+  auto epilogue = ReachabilityPostProcess<value_idx, value_t>{core_dists, alpha, m};
 
   cuvs::neighbors::detail::
     tiled_brute_force_knn<value_t, value_idx, value_t, ReachabilityPostProcess<value_idx, value_t>>(
