@@ -415,7 +415,7 @@ if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg
 
   compile_start=$(date +%s)
   if [[ ${CMAKE_TARGET[*]} != "" ]]; then
-      echo "-- Compiling targets: ${CMAKE_TARGET[*]}, verbose=${VERBOSE_FLAG}"
+      echo "-- Compiling targets: " "${CMAKE_TARGET[@]}" ", verbose=${VERBOSE_FLAG}"
       if [[ ${INSTALL_TARGET} != "" ]]; then
         cmake --build  "${LIBCUVS_BUILD_DIR}" ${VERBOSE_FLAG} -j"${PARALLEL_LEVEL}" --target "${CMAKE_TARGET[@]// /;}" ${INSTALL_TARGET}
       else
