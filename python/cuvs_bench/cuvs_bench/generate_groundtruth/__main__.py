@@ -84,10 +84,9 @@ def force_fallback_to_numpy():
 if rmm is not None:
     gpu_system = True
     try:
-        from rmm.allocators.cupy import rmm_cupy_allocator
-
         from cuvs.common import Resources
         from cuvs.neighbors.brute_force import build, search
+        from rmm.allocators.cupy import rmm_cupy_allocator
     except ImportError:
         # RMM is available, cupy is available, but cuVS is not
         force_fallback_to_numpy()
