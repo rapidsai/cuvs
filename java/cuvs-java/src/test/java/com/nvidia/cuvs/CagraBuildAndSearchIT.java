@@ -17,20 +17,14 @@
 package com.nvidia.cuvs;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
-import java.util.Arrays;
-import java.util.BitSet;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -73,11 +67,19 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
       CompletableFuture.allOf(futures)
         .exceptionally(t -> {
-          fail("Exception while executing runnable: " + t);
+          fail("Exception while executing runnable: " + unwrap(t));
           return null;
         })
         .get(2000, TimeUnit.SECONDS);
     }
+  }
+
+  private static Throwable unwrap(Throwable t) {
+    var root = t;
+    while (root.getCause() != null) {
+      root = root.getCause();
+    }
+    return root;
   }
 
   private static void runInAnotherThread(Runnable runnable) throws ExecutionException, InterruptedException, TimeoutException {
@@ -163,6 +165,40 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
         numTestsRuns,
         () -> () -> indexAndQueryOnce(dataset, SearchResults.IDENTITY_MAPPING, queries, expectedResults, resources)
       );
+    }
+  }
+
+  @Test
+  public void testIndexingAndSearchingFlowWithCustomMappingFunction() throws Throwable {
+    float[][] dataset = createSampleData();
+    float[][] queries = createSampleQueries();
+    var expectedResults = List.of(
+      Map.of(0, 0.038782578f, 3, 0.3590463f, 1, 0.83774555f),
+      Map.of(1, 0.12472608f, 3, 0.21700792f, 2, 0.31918612f),
+      Map.of(0, 0.047766715f, 3, 0.20332818f, 1, 0.48305473f),
+      Map.of(2, 0.15224178f, 1, 0.59063464f, 0, 0.5986642f));
+
+    LongToIntFunction rotate = l -> (int) ((l + 1) % dataset.length);
+    try (CuVSResources resources = CuVSResources.create()) {
+      indexAndQueryOnce(dataset, rotate, queries, expectedResults, resources);
+    }
+  }
+
+  @Test
+  public void testIndexingAndSearchingFlowWithCustomMappingList() throws Throwable {
+    float[][] dataset = createSampleData();
+    float[][] queries = createSampleQueries();
+    var mappings = List.of(4, 3, 2, 1);
+    var expectedResults = List.of(
+      Map.of( 1, 0.038782578f, 2, 0.3590463f, 4, 0.83774555f),
+      Map.of(4, 0.12472608f, 2, 0.21700792f, 3, 0.31918612f),
+      Map.of(1, 0.047766715f, 2, 0.20332818f, 4, 0.48305473f),
+      Map.of(3, 0.15224178f, 4, 0.59063464f, 1, 0.5986642f)
+    );
+
+    LongToIntFunction rotate = SearchResults.mappingsFromList(mappings);
+    try (CuVSResources resources = CuVSResources.create()) {
+      indexAndQueryOnce(dataset, rotate, queries, expectedResults, resources);
     }
   }
 
@@ -284,6 +320,15 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
       // Check results
       log.info(results.getResults().toString());
+      List<Map<Integer, Float>> resultsResults = results.getResults();
+      for (int i = 0; i < resultsResults.size(); i++) {
+        var result = resultsResults.get(i);
+        var expectedResult = expectedResults.get(i);
+        assertEquals(
+          expectedResult.entrySet().stream().sorted(Map.Entry.comparingByKey()).toList(),
+          result.entrySet().stream().sorted(Map.Entry.comparingByKey()).toList()
+        );
+      }
       assertEquals(expectedResults, results.getResults());
 
       // Search from deserialized index

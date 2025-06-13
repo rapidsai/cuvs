@@ -24,7 +24,7 @@ public interface SearchResults {
 
     LongToIntFunction IDENTITY_MAPPING = l -> (int) l;
 
-    static LongToIntFunction mappingFromList(List<Integer> mappingAsList) {
+    static LongToIntFunction mappingsFromList(List<Integer> mappingAsList) {
         return l -> mappingAsList.get((int) l);
     }
 
