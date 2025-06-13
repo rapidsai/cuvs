@@ -228,13 +228,9 @@ void connect_knn_graph(
     handle, raft::make_const_mdspan(pairwise_dist.view()), pairwise_dist_vec.view());
 
   size_t new_nnz = n_components - 1;
-  auto new_rows  = raft::make_device_vector<value_idx, int64_t>(handle, new_nnz);
-  auto new_cols  = raft::make_device_vector<value_idx, int64_t>(handle, new_nnz);
-  raft::copy(new_rows.data_handle(), host_u_indices.data(), new_nnz, stream);
-  raft::copy(new_cols.data_handle(), host_v_indices.data(), new_nnz, stream);
 
-  auto rows_begin = thrust::device_pointer_cast(new_rows.data_handle());
-  auto cols_begin = thrust::device_pointer_cast(new_cols.data_handle());
+  auto rows_begin = thrust::device_pointer_cast(device_u_indices.data_handle());
+  auto cols_begin = thrust::device_pointer_cast(device_v_indices.data_handle());
   auto dist_begin = thrust::device_pointer_cast(pairwise_dist_vec.data_handle());
 
   auto zipped_begin = thrust::make_zip_iterator(thrust::make_tuple(cols_begin, dist_begin));
@@ -242,14 +238,14 @@ void connect_knn_graph(
 
   rmm::device_uvector<value_idx> indptr2(m + 1, stream);
   raft::sparse::convert::sorted_coo_to_csr(
-    new_rows.data_handle(), new_nnz, indptr2.data(), m + 1, stream);
+    device_u_indices.data_handle(), new_nnz, indptr2.data(), m + 1, stream);
 
   // On the second call, we hand the MST the original colors
   // and the new set of edges and let it restart the optimization process
   auto new_mst = raft::sparse::solver::mst<value_idx, value_idx, value_t, double>(
     handle,
     indptr2.data(),
-    new_cols.data_handle(),
+    device_v_indices.data_handle(),
     pairwise_dist_vec.data_handle(),
     m,
     new_nnz,
