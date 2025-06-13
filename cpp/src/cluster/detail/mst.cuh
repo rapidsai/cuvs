@@ -176,9 +176,13 @@ void connect_knn_graph(
   std::mt19937 gen(rd());
   std::uniform_int_distribution<> dis;
 
-  auto pairwise_dist = raft::make_device_matrix<value_t, int64_t>(handle, 1, 1);
-  auto data_u        = raft::make_device_matrix<value_t, int64_t>(handle, 1, n);
-  auto data_v        = raft::make_device_matrix<value_t, int64_t>(handle, 1, n);
+  auto pairwise_dist =
+    raft::make_device_matrix<value_t, int64_t>(handle, n_components - 1, n_components - 1);
+  auto data_u = raft::make_device_matrix<value_t, int64_t>(handle, n_components - 1, n);
+  auto data_v = raft::make_device_matrix<value_t, int64_t>(handle, n_components - 1, n);
+
+  std::vector<value_idx> host_u_indices;
+  std::vector<value_idx> host_v_indices;
 
   // connect i-1 component and i component
   for (int i = 1; i < n_components; ++i) {
@@ -195,68 +199,52 @@ void connect_knn_graph(
     dis.param(std::uniform_int_distribution<>::param_type(0, nodes_b.size() - 1));
     value_idx v = nodes_b[dis(gen)];
 
-    // calculate the distance between the two data vectors
-    raft::copy(data_u.data_handle(), X + u * n, n, stream);
-    raft::copy(data_v.data_handle(), X + v * n, n, stream);
-    cuvs::distance::pairwise_distance(handle,
-                                      raft::make_const_mdspan(data_u.view()),
-                                      raft::make_const_mdspan(data_v.view()),
-                                      pairwise_dist.view(),
-                                      metric);
+    raft::copy(data_u.data_handle() + (i - 1) * n, X + u * n, n, stream);
+    raft::copy(data_v.data_handle() + (i - 1) * n, X + v * n, n, stream);
 
-    value_t h_scalar;  // Host variable
-    raft::copy(&h_scalar, pairwise_dist.data_handle(), 1, stream);
-
-    selected_edges.emplace_back(u, v, h_scalar);
+    host_u_indices.push_back(u);
+    host_v_indices.push_back(v);
   }
+  cuvs::distance::pairwise_distance(handle,
+                                    raft::make_const_mdspan(data_u.view()),
+                                    raft::make_const_mdspan(data_v.view()),
+                                    pairwise_dist.view(),
+                                    metric);
 
-  // sort in order of ascending starting vertex so we can call sorted_coo_to_csr
-  std::sort(selected_edges.begin(),
-            selected_edges.end(),
-            [](const std::tuple<value_idx, value_idx, value_t>& a,
-               const std::tuple<value_idx, value_idx, value_t>& b) {
-              value_idx au = std::get<0>(a);
-              value_idx bu = std::get<0>(b);
-              value_idx av = std::get<1>(a);
-              value_idx bv = std::get<1>(b);
-              return (au < bu) || (au == bu && av < bv);
-            });
+  auto pairwise_dist_vec = raft::make_device_vector<value_t, int64_t>(handle, n_components - 1);
+  raft::matrix::get_diagonal(
+    handle, raft::make_const_mdspan(pairwise_dist.view()), pairwise_dist_vec.view());
 
-  // Upload selected edges to device
-  size_t new_nnz = selected_edges.size();
+  size_t new_nnz = n_components - 1;
+  auto new_rows  = raft::make_device_vector<value_idx, int64_t>(handle, new_nnz);
+  auto new_cols  = raft::make_device_vector<value_idx, int64_t>(handle, new_nnz);
+  raft::copy(new_rows.data_handle(), host_u_indices.data(), new_nnz, stream);
+  raft::copy(new_cols.data_handle(), host_v_indices.data(), new_nnz, stream);
 
-  rmm::device_uvector<value_idx> new_rows(new_nnz, stream);
-  rmm::device_uvector<value_idx> new_cols(new_nnz, stream);
-  rmm::device_uvector<value_t> new_vals(new_nnz, stream);
+  auto rows_begin = thrust::device_pointer_cast(new_rows.data_handle());
+  auto cols_begin = thrust::device_pointer_cast(new_cols.data_handle());
+  auto dist_begin = thrust::device_pointer_cast(pairwise_dist_vec.data_handle());
 
-  std::vector<value_idx> h_rows(new_nnz), h_cols(new_nnz);
-  std::vector<value_t> h_vals(new_nnz);
-  for (size_t i = 0; i < new_nnz; ++i) {
-    auto [u, v, w] = selected_edges[i];
-    h_rows[i]      = u;
-    h_cols[i]      = v;
-    h_vals[i]      = w;
-  }
-
-  raft::copy(new_rows.data(), h_rows.data(), new_nnz, stream);
-  raft::copy(new_cols.data(), h_cols.data(), new_nnz, stream);
-  raft::copy(new_vals.data(), h_vals.data(), new_nnz, stream);
+  auto zipped_begin = thrust::make_zip_iterator(thrust::make_tuple(cols_begin, dist_begin));
+  thrust::sort_by_key(rows_begin, rows_begin + new_nnz, zipped_begin);
 
   rmm::device_uvector<value_idx> indptr2(m + 1, stream);
-  raft::sparse::convert::sorted_coo_to_csr(new_rows.data(), new_nnz, indptr2.data(), m + 1, stream);
+  raft::sparse::convert::sorted_coo_to_csr(
+    new_rows.data_handle(), new_nnz, indptr2.data(), m + 1, stream);
 
   // On the second call, we hand the MST the original colors
   // and the new set of edges and let it restart the optimization process
-  auto new_mst = raft::sparse::solver::mst<value_idx, value_idx, value_t, double>(handle,
-                                                                                  indptr2.data(),
-                                                                                  new_cols.data(),
-                                                                                  new_vals.data(),
-                                                                                  m,
-                                                                                  new_nnz,
-                                                                                  color,
-                                                                                  stream,
-                                                                                  false,
-                                                                                  false);
+  auto new_mst = raft::sparse::solver::mst<value_idx, value_idx, value_t, double>(
+    handle,
+    indptr2.data(),
+    new_cols.data_handle(),
+    pairwise_dist_vec.data_handle(),
+    m,
+    new_nnz,
+    color,
+    stream,
+    false,
+    false);
 
   merge_msts<value_idx, value_t>(msf, new_mst, stream);
 }
