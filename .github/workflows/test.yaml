@@ -47,7 +47,7 @@ jobs:
       sha: ${{ inputs.sha }}
   conda-java-tests:
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.06
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.08
     with:
       build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
