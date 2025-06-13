@@ -258,41 +258,21 @@ void distance_impl(raft::resources const& handle,
   // perhaps the use of stridedSummationKernel could be causing this,
   // need to investigate and fix.
   if (x == y && is_row_major) {
-    raft::linalg::reduce(x_norm,
-                         x,
-                         k,
-                         std::max(m, n),
-                         (AccT)0,
-                         is_row_major,
-                         true,
-                         stream,
-                         false,
-                         raft::identity_op(),
-                         raft::add_op());
+    raft::linalg::reduce<true, true>(
+      x_norm, x, k, std::max(m, n), (AccT)0, stream, false, raft::identity_op(), raft::add_op());
   } else {
     y_norm += m;
-    raft::linalg::reduce(x_norm,
-                         x,
-                         k,
-                         m,
-                         (AccT)0,
-                         is_row_major,
-                         true,
-                         stream,
-                         false,
-                         raft::identity_op(),
-                         raft::add_op());
-    raft::linalg::reduce(y_norm,
-                         y,
-                         k,
-                         n,
-                         (AccT)0,
-                         is_row_major,
-                         true,
-                         stream,
-                         false,
-                         raft::identity_op(),
-                         raft::add_op());
+    if (is_row_major) {
+      raft::linalg::reduce<true, true>(
+        x_norm, x, k, m, (AccT)0, stream, false, raft::identity_op(), raft::add_op());
+      raft::linalg::reduce<true, true>(
+        y_norm, y, k, n, (AccT)0, stream, false, raft::identity_op(), raft::add_op());
+    } else {
+      raft::linalg::reduce<false, true>(
+        x_norm, x, k, m, (AccT)0, stream, false, raft::identity_op(), raft::add_op());
+      raft::linalg::reduce<false, true>(
+        y_norm, y, k, n, (AccT)0, stream, false, raft::identity_op(), raft::add_op());
+    }
   }
 
   ops::dice_distance_op<DataT, AccT, IdxT> distance_op{};
