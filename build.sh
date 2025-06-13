@@ -470,7 +470,7 @@ fi
 
 # Build and (optionally) install the cuvs Python package
 if (( NUMARGS == 0 )) || hasArg python; then
-    SKBUILD_CMAKE_ARGS="${EXTRA_CMAKE_ARGS[*}" \
+    SKBUILD_CMAKE_ARGS="${EXTRA_CMAKE_ARGS[*]}" \
         SKBUILD_BUILD_OPTIONS="-j${PARALLEL_LEVEL}" \
         python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true "${REPODIR}"/python/cuvs
 fi
