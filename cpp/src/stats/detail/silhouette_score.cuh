@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -274,16 +274,14 @@ DataT silhouette_score(
   RAFT_CUDA_TRY(cudaMemsetAsync(
     averageDistanceBetweenSampleAndCluster.data(), 0, nRows * nLabels * sizeof(DataT), stream));
 
-  raft::linalg::matrixVectorOp(averageDistanceBetweenSampleAndCluster.data(),
-                               sampleToClusterSumOfDistances.data(),
-                               binCountArray.data(),
-                               binCountArray.data(),
-                               nLabels,
-                               nRows,
-                               true,
-                               true,
-                               DivOp<DataT>(),
-                               stream);
+  raft::linalg::matrixVectorOp<true, true>(averageDistanceBetweenSampleAndCluster.data(),
+                                           sampleToClusterSumOfDistances.data(),
+                                           binCountArray.data(),
+                                           binCountArray.data(),
+                                           nLabels,
+                                           nRows,
+                                           DivOp<DataT>(),
+                                           stream);
 
   // calculating row-wise minimum
   raft::linalg::reduce<true, true, DataT, DataT, int, raft::identity_op, raft::min_op>(
