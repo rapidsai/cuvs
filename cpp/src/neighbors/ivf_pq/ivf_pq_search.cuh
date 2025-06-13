@@ -151,7 +151,7 @@ void select_clusters(raft::resources const& handle,
     } break;
     default: RAFT_FAIL("Unsupported distance type %d.", int(metric));
   }
-  rmm::device_uvector<float> qc_distances(n_queries * n_lists, stream, mr);
+  rmm::device_uvector<float> qc_distances(size_t(n_queries) * size_t(n_lists), stream, mr);
   raft::linalg::gemm(handle,
                      true,
                      false,
@@ -169,7 +169,7 @@ void select_clusters(raft::resources const& handle,
                      stream);
 
   // Select neighbor clusters for each query.
-  rmm::device_uvector<float> cluster_dists(n_queries * n_probes, stream, mr);
+  rmm::device_uvector<float> cluster_dists(size_t(n_queries) * size_t(n_probes), stream, mr);
   cuvs::selection::select_k(
     handle,
     raft::make_device_matrix_view<const float, int64_t>(qc_distances.data(), n_queries, n_lists),
@@ -237,7 +237,7 @@ void select_clusters(raft::resources const& handle,
     } break;
     default: RAFT_FAIL("Unsupported distance type %d.", int(metric));
   }
-  rmm::device_uvector<dist_type> qc_distances(n_queries * n_lists, stream, mr);
+  rmm::device_uvector<dist_type> qc_distances(size_t(n_queries) * size_t(n_lists), stream, mr);
   raft::linalg::gemm(handle,
                      true,
                      false,
@@ -255,7 +255,7 @@ void select_clusters(raft::resources const& handle,
                      stream);
 
   // Select neighbor clusters for each query.
-  rmm::device_uvector<dist_type> cluster_dists(n_queries * n_probes, stream, mr);
+  rmm::device_uvector<dist_type> cluster_dists(size_t(n_queries) * size_t(n_probes), stream, mr);
   // cuvs::selection::select_k lacks uint32_t-as-a-value support at the moment
   raft::matrix::select_k<dist_type, uint32_t>(
     handle,
@@ -322,7 +322,7 @@ void select_clusters(raft::resources const& handle,
     } break;
     default: RAFT_FAIL("Unsupported distance type %d.", int(metric));
   }
-  rmm::device_uvector<dist_type> qc_distances(n_queries * n_lists, stream, mr);
+  rmm::device_uvector<dist_type> qc_distances(size_t(n_queries) * size_t(n_lists), stream, mr);
   raft::linalg::gemm(handle,
                      true,
                      false,
@@ -340,7 +340,7 @@ void select_clusters(raft::resources const& handle,
                      stream);
 
   // Select neighbor clusters for each query.
-  rmm::device_uvector<dist_type> cluster_dists(n_queries * n_probes, stream, mr);
+  rmm::device_uvector<dist_type> cluster_dists(size_t(n_queries) * size_t(n_probes), stream, mr);
   cuvs::selection::select_k(
     handle,
     raft::make_device_matrix_view<const dist_type, int64_t>(
