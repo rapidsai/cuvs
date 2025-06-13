@@ -34,7 +34,7 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
                             int degree,
                             int visited_size,
                             float max_fraction,
-                            int iters)
+                            float iters)
 {
   using namespace cuvs::neighbors;
 
@@ -100,14 +100,14 @@ int main(int argc, char* argv[])
   int degree             = atoi(argv[4]);
   int max_visited        = atoi(argv[5]);
   float max_fraction     = atof(argv[6]);
-  int iters              = atoi(argv[7]);
+  float iters              = atof(argv[7]);
 
-  if(dtype == "uint8") {
+  if(dtype == "int8") {
     // Read in binary dataset file
-    auto dataset = read_bin_dataset<uint8_t, int64_t>(dev_resources, data_fname, INT_MAX);
+    auto dataset = read_bin_dataset<int8_t, int64_t>(dev_resources, data_fname, INT_MAX);
 
     // Simple build example to create graph and write to a file
-    vamana_build_and_write<uint8_t>(dev_resources,
+    vamana_build_and_write<int8_t>(dev_resources,
                                   raft::make_const_mdspan(dataset.view()),
                                   out_fname,
                                   degree,

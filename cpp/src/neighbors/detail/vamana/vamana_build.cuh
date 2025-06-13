@@ -89,7 +89,6 @@ void batched_insert_vamana(
   raft::host_matrix_view<IdxT, int64_t> graph,
   IdxT* medoid_id,
   cuvs::distance::DistanceType metric)
-//  int dim)
 {
   auto stream = raft::resource::get_cuda_stream(res);
   int N       = dataset.extent(0);
@@ -105,7 +104,7 @@ void batched_insert_vamana(
       "to 1.0");
     max_batchsize = (int)dataset.extent(0);
   }
-  int insert_iters  = (int)(params.vamana_iters);
+  float insert_iters  = (float)(params.vamana_iters);
   double base       = (double)(params.batch_base);
   float alpha       = (float)(params.alpha);
   int visited_size  = params.visited_size;
@@ -198,14 +197,6 @@ void batched_insert_vamana(
 		 search_smem_sort_size,
                  prune_smem_total_size);
 
-  /*
-  if (prune_smem_sort_size == 0) {  // If sizes not supported, smem sizes will be 0
-    RAFT_FAIL("Vamana graph parameters not supported: graph_degree=%d, visited_size:%d\n",
-              degree,
-              visited_size);
-  }
-  */
-
 
     auto end_t   = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = end_t - start_t;
@@ -226,14 +217,13 @@ void batched_insert_vamana(
 
   // size of current batch of inserts, increases logarithmically until max_batchsize
   int step_size = 1;
-  // Number of passes over dataset (default 1)
-  for (int iter = 0; iter < insert_iters; iter++) {
-    // Loop through batches and call the insert and prune kernels
-    for (int start = 0; start < N;) {
-//    for (int start = 0; start < 40;) {
+    // Loop through batches and call the insert and prune kernels - can insert > N times based on iters parameter
+    for (int start = 0; start < (int)(insert_iters*(float)N);) {
 start_t = std::chrono::system_clock::now();
 
-
+      if (start + step_size > (int)(insert_iters*(float)N)) {
+        step_size = (int)(insert_iters*(float)N) - start;
+      }
       if (start + step_size > N) {
         int new_size = N - start;
         step_size    = new_size;
@@ -316,14 +306,14 @@ start_t = std::chrono::system_clock::now();
       raft::copy(&total_edges, d_total_edges.data_handle(), 1, stream);
       RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
 
-      /*
+      
       auto edge_dist_pair = raft::make_device_mdarray<DistPair<IdxT, accT>>(
         res,
         raft::resource::get_large_workspace_resource(res),
         raft::make_extents<int64_t>(total_edges));
-	*/
-      DistPair<IdxT,accT>* edge_dist_pair;
-      cudaMalloc(&edge_dist_pair, total_edges*sizeof(DistPair<IdxT,accT>));
+	
+//      DistPair<IdxT,accT>* edge_dist_pair;
+//      cudaMalloc(&edge_dist_pair, total_edges*sizeof(DistPair<IdxT,accT>));
 //      custom_memory_resource mr;
 //      rmm::device_buffer edge_dist_pair(total_edges*sizeof(int64_t), stream, &s);
 
@@ -342,9 +332,8 @@ start_t = std::chrono::system_clock::now();
                                             step_size,
                                             degree,
                                             edge_src.data_handle(),
-                                            edge_dist_pair);
-                                            //edge_dist_pair.data_handle());
-
+                                            //edge_dist_pair);
+                                            edge_dist_pair.data_handle());
 
       {
       // Sort by dists first so final edge lists are each sorted by dist
@@ -353,8 +342,8 @@ start_t = std::chrono::system_clock::now();
 
       cub::DeviceMergeSort::SortPairs(d_temp_storage,
                                       temp_storage_bytes,
-                                      edge_dist_pair,
-                                      //edge_dist_pair.data_handle(),
+                                      //edge_dist_pair,
+                                      edge_dist_pair.data_handle(),
                                       edge_src.data_handle(),
                                       total_edges,
                                       CmpDist<IdxT,accT>(),
@@ -370,8 +359,8 @@ start_t = std::chrono::system_clock::now();
       // Sort to group reverse edges by destination
       cub::DeviceMergeSort::SortPairs(temp_sort_storage.data_handle(),
                                       temp_storage_bytes,
-                                      edge_dist_pair,
-                                      //edge_dist_pair.data_handle(),
+                                      //edge_dist_pair,
+                                      edge_dist_pair.data_handle(),
                                       edge_src.data_handle(),
                                       total_edges,
                                       CmpDist<IdxT,accT>(),
@@ -379,11 +368,13 @@ start_t = std::chrono::system_clock::now();
 
       }
 
-      DistPair<IdxT,accT>* temp_ptr = edge_dist_pair;
-      //DistPair<IdxT,accT>* temp_ptr = edge_dist_pair.data_handle();
+
+      //DistPair<IdxT,accT>* temp_ptr = edge_dist_pair;
+      DistPair<IdxT,accT>* temp_ptr = edge_dist_pair.data_handle();
       raft::linalg::map_offset(res, edge_dest.view(), [temp_ptr] __device__(size_t i) {
                       return temp_ptr[i].idx;
       });
+      //cudaFree(edge_dist_pair);
 
 
       void* d_temp_storage      = nullptr;
@@ -451,7 +442,8 @@ start_t = std::chrono::system_clock::now();
           raft::make_device_mdarray<IdxT>(res,
                                           raft::resource::get_large_workspace_resource(res),
                                           raft::make_extents<int64_t>(reverse_batch, visited_size));
-        auto rev_dists =
+
+	auto rev_dists =
           raft::make_device_mdarray<accT>(res,
                                           raft::resource::get_large_workspace_resource(res),
                                           raft::make_extents<int64_t>(reverse_batch, visited_size));
@@ -510,13 +502,20 @@ end_t   = std::chrono::system_clock::now();
 elapsed_seconds = end_t - start_t;
 batch_prune += elapsed_seconds.count();      
 
+//print_graph<IdxT><<<1,1>>>(d_graph.view());
+
       start += step_size;
+      if(start >= N) {
+        start = 0;
+	insert_iters -= 1.0;
+	step_size = max_batchsize;
+      }
       step_size *= base;
-      if (step_size > max_batchsize) step_size = max_batchsize;
+      if (step_size > max_batchsize) {
+        step_size = max_batchsize;
+      }
 
     }  // Batch of inserts
-
-  }  // insert iterations
 
   printf("intro:%lf\ngreedy:%lf\nseg_sort:%lf\nprune1:%lf\nwrite1:%lf\nrev:%lf\nbatch_prune:%lf\n", alloc_time, search_time, segment_sort_time, prune1_time, write1_time, rev_time, batch_prune);
 

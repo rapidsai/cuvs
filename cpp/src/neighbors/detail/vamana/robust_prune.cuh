@@ -24,7 +24,7 @@
 #include "macros.cuh"
 #include "vamana_structs.cuh"
 
-#define GRAPH_SLACK_FACTOR 1.05
+//#define GRAPH_SLACK_FACTOR 1.05
 
 namespace cuvs::neighbors::vamana::detail {
 

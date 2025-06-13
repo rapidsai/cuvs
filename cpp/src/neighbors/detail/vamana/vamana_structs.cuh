@@ -51,6 +51,7 @@ struct __align__(16) DistPair {
   accT dist;
   IdxT idx;
 
+/*  
   __device__ __host__ DistPair& operator=(const DistPair& other)
   {
     dist = other.dist;
@@ -64,6 +65,8 @@ struct __align__(16) DistPair {
     idx  = other.idx;
     return *this;
   }
+  */
+  
 };
 
 // Swap the values of two DistPair<SUMTYPE> objects
