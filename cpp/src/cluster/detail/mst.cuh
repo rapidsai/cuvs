@@ -19,6 +19,7 @@
 #include "../../sparse/neighbors/cross_component_nn.cuh"
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/matrix/detail/gather.cuh>
 #include <raft/matrix/diagonal.cuh>
 #include <raft/sparse/op/sort.cuh>
 #include <raft/sparse/solver/mst.cuh>
@@ -177,11 +178,6 @@ void connect_knn_graph(
   std::mt19937 gen(rd());
   std::uniform_int_distribution<> dis;
 
-  auto pairwise_dist =
-    raft::make_device_matrix<value_t, int64_t>(handle, n_components - 1, n_components - 1);
-  auto data_u = raft::make_device_matrix<value_t, int64_t>(handle, n_components - 1, n);
-  auto data_v = raft::make_device_matrix<value_t, int64_t>(handle, n_components - 1, n);
-
   std::vector<value_idx> host_u_indices;
   std::vector<value_idx> host_v_indices;
 
@@ -200,12 +196,27 @@ void connect_knn_graph(
     dis.param(std::uniform_int_distribution<>::param_type(0, nodes_b.size() - 1));
     value_idx v = nodes_b[dis(gen)];
 
-    raft::copy(data_u.data_handle() + (i - 1) * n, X + u * n, n, stream);
-    raft::copy(data_v.data_handle() + (i - 1) * n, X + v * n, n, stream);
-
     host_u_indices.push_back(u);
     host_v_indices.push_back(v);
   }
+
+  auto device_u_indices = raft::make_device_vector<value_idx, int64_t>(handle, n_components - 1);
+  auto device_v_indices = raft::make_device_vector<value_idx, int64_t>(handle, n_components - 1);
+
+  raft::copy(device_u_indices.data_handle(), host_u_indices.data(), n_components - 1, stream);
+  raft::copy(device_v_indices.data_handle(), host_v_indices.data(), n_components - 1, stream);
+
+  auto X_view = raft::make_host_matrix_view<const value_t, int64_t>(X, m, n);
+  auto data_u = raft::make_device_matrix<value_t, int64_t>(handle, n_components - 1, n);
+  auto data_v = raft::make_device_matrix<value_t, int64_t>(handle, n_components - 1, n);
+
+  raft::matrix::detail::gather(
+    handle, X_view, raft::make_const_mdspan(device_u_indices.view()), data_u.view());
+  raft::matrix::detail::gather(
+    handle, X_view, raft::make_const_mdspan(device_v_indices.view()), data_v.view());
+
+  auto pairwise_dist =
+    raft::make_device_matrix<value_t, int64_t>(handle, n_components - 1, n_components - 1);
   cuvs::distance::pairwise_distance(handle,
                                     raft::make_const_mdspan(data_u.view()),
                                     raft::make_const_mdspan(data_v.view()),
