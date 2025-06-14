@@ -36,8 +36,6 @@ function sed_runner() {
     sed -i.bak ''"$1"'' "$2" && rm -f "${2}".bak
 }
 
-sed_runner "s/set(RAPIDS_VERSION .*)/set(RAPIDS_VERSION \"${NEXT_SHORT_TAG}\")/g" examples/cmake/thirdparty/fetch_rapids.cmake
-
 # Centralized version file update
 echo "${NEXT_FULL_TAG}" > VERSION
 

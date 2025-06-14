@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "../detail/knn_merge_parts.cuh"
-#include <raft/core/resource/nccl_clique.hpp>
+#include <raft/core/resource/multi_gpu.hpp>
+#include <raft/core/resource/nccl_comm.hpp>
 #include <raft/core/serialize.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/util/cuda_dev_essentials.cuh>
@@ -26,6 +26,7 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
+#include <cuvs/neighbors/knn_merge_parts.hpp>
 
 #include <fstream>
 
@@ -75,10 +76,10 @@ void deserialize(const raft::resources& clique,
   index.mode_        = (cuvs::neighbors::distribution_mode)deserialize_scalar<int>(handle, is);
   index.num_ranks_   = deserialize_scalar<int>(handle, is);
 
-  if (index.num_ranks_ != raft::resource::get_nccl_num_ranks(clique)) {
+  if (index.num_ranks_ != raft::resource::get_num_ranks(clique)) {
     RAFT_FAIL("Serialized index has %d ranks whereas NCCL clique has %d ranks",
               index.num_ranks_,
-              raft::resource::get_nccl_num_ranks(clique));
+              raft::resource::get_num_ranks(clique));
   }
 
   for (int rank = 0; rank < index.num_ranks_; rank++) {
@@ -215,8 +216,8 @@ void sharded_search_with_direct_merge(const raft::resources& clique,
       const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
       auto& ann_if                   = index.ann_interfaces_[rank];
 
-      if (rank == raft::resource::get_nccl_clique_root_rank(clique)) {  // root rank
-        uint64_t batch_offset = raft::resource::get_nccl_clique_root_rank(clique) * part_size;
+      if (rank == raft::resource::get_root_rank(clique)) {  // root rank
+        uint64_t batch_offset = raft::resource::get_root_rank(clique) * part_size;
         auto d_neighbors      = raft::make_device_matrix_view<IdxT, int64_t, row_major>(
           in_neighbors.data_handle() + batch_offset, n_rows_of_current_batch, n_neighbors);
         auto d_distances = raft::make_device_matrix_view<float, int64_t, row_major>(
@@ -227,20 +228,20 @@ void sharded_search_with_direct_merge(const raft::resources& clique,
         // wait for other ranks
         ncclGroupStart();
         for (int from_rank = 0; from_rank < index.num_ranks_; from_rank++) {
-          if (from_rank == raft::resource::get_nccl_clique_root_rank(clique)) continue;
+          if (from_rank == raft::resource::get_root_rank(clique)) continue;
 
           batch_offset = from_rank * part_size;
           ncclRecv(in_neighbors.data_handle() + batch_offset,
                    part_size * sizeof(IdxT),
                    ncclUint8,
                    from_rank,
-                   raft::resource::get_nccl_comm(dev_res),
+                   raft::resource::get_nccl_comm_for_rank(clique, rank),
                    raft::resource::get_cuda_stream(dev_res));
           ncclRecv(in_distances.data_handle() + batch_offset,
                    part_size * sizeof(float),
                    ncclUint8,
                    from_rank,
-                   raft::resource::get_nccl_comm(dev_res),
+                   raft::resource::get_nccl_comm_for_rank(clique, rank),
                    raft::resource::get_cuda_stream(dev_res));
         }
         ncclGroupEnd();
@@ -258,14 +259,14 @@ void sharded_search_with_direct_merge(const raft::resources& clique,
         ncclSend(d_neighbors.data_handle(),
                  part_size * sizeof(IdxT),
                  ncclUint8,
-                 raft::resource::get_nccl_clique_root_rank(clique),
-                 raft::resource::get_nccl_comm(dev_res),
+                 raft::resource::get_root_rank(clique),
+                 raft::resource::get_nccl_comm_for_rank(clique, rank),
                  raft::resource::get_cuda_stream(dev_res));
         ncclSend(d_distances.data_handle(),
                  part_size * sizeof(float),
                  ncclUint8,
-                 raft::resource::get_nccl_clique_root_rank(clique),
-                 raft::resource::get_nccl_comm(dev_res),
+                 raft::resource::get_root_rank(clique),
+                 raft::resource::get_nccl_comm_for_rank(clique, rank),
                  raft::resource::get_cuda_stream(dev_res));
         ncclGroupEnd();
         resource::sync_stream(dev_res);
@@ -285,15 +286,12 @@ void sharded_search_with_direct_merge(const raft::resources& clique,
                index.num_ranks_,
                raft::resource::get_cuda_stream(root_handle_));
 
-    cuvs::neighbors::detail::knn_merge_parts(in_distances.data_handle(),
-                                             in_neighbors.data_handle(),
-                                             out_distances.data_handle(),
-                                             out_neighbors.data_handle(),
-                                             n_rows_of_current_batch,
-                                             index.num_ranks_,
-                                             n_neighbors,
-                                             raft::resource::get_cuda_stream(root_handle_),
-                                             d_trans.data_handle());
+    knn_merge_parts(root_handle_,
+                    in_distances.view(),
+                    in_neighbors.view(),
+                    out_distances.view(),
+                    out_neighbors.view(),
+                    d_trans.view());
 
     raft::copy(neighbors.data_handle() + output_offset,
                out_neighbors.data_handle(),
@@ -379,13 +377,13 @@ void sharded_search_with_tree_merge(const raft::resources& clique,
                      part_size * sizeof(IdxT),
                      ncclUint8,
                      other_id,
-                     raft::resource::get_nccl_comm(dev_res),
+                     raft::resource::get_nccl_comm_for_rank(clique, rank),
                      raft::resource::get_cuda_stream(dev_res));
             ncclRecv(tmp_distances.data_handle() + part_size,
                      part_size * sizeof(float),
                      ncclUint8,
                      other_id,
-                     raft::resource::get_nccl_comm(dev_res),
+                     raft::resource::get_nccl_comm_for_rank(clique, rank),
                      raft::resource::get_cuda_stream(dev_res));
             received_something = true;
           }
@@ -396,13 +394,13 @@ void sharded_search_with_tree_merge(const raft::resources& clique,
                    part_size * sizeof(IdxT),
                    ncclUint8,
                    other_id,
-                   raft::resource::get_nccl_comm(dev_res),
+                   raft::resource::get_nccl_comm_for_rank(clique, rank),
                    raft::resource::get_cuda_stream(dev_res));
           ncclSend(tmp_distances.data_handle(),
                    part_size * sizeof(float),
                    ncclUint8,
                    other_id,
-                   raft::resource::get_nccl_comm(dev_res),
+                   raft::resource::get_nccl_comm_for_rank(clique, rank),
                    raft::resource::get_cuda_stream(dev_res));
         }
         ncclGroupEnd();
@@ -412,15 +410,12 @@ void sharded_search_with_tree_merge(const raft::resources& clique,
 
         if (received_something) {
           // merge inplace
-          cuvs::neighbors::detail::knn_merge_parts(tmp_distances.data_handle(),
-                                                   tmp_neighbors.data_handle(),
-                                                   tmp_distances.data_handle(),
-                                                   tmp_neighbors.data_handle(),
-                                                   n_rows_of_current_batch,
-                                                   2,
-                                                   n_neighbors,
-                                                   raft::resource::get_cuda_stream(dev_res),
-                                                   d_trans.data_handle());
+          knn_merge_parts(dev_res,
+                          tmp_distances.view(),
+                          tmp_neighbors.view(),
+                          tmp_distances.view(),
+                          tmp_neighbors.view(),
+                          d_trans.view());
 
           // If done, copy the final result
           if (remaining <= 1) {
@@ -488,6 +483,10 @@ void search(const raft::resources& clique,
             raft::host_matrix_view<IdxT, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances)
 {
+  // Making sure that the NCCL comms are instantiated at this stage.
+  // This prevents it being done inside of an OpenMP thread.
+  raft::resource::get_nccl_comms(clique);
+
   int64_t n_rows      = queries.extent(0);
   int64_t n_cols      = queries.extent(1);
   int64_t n_neighbors = neighbors.extent(1);
@@ -655,7 +654,7 @@ template <typename AnnIndexType, typename T, typename IdxT>
 mg_index<AnnIndexType, T, IdxT>::mg_index(const raft::resources& clique, distribution_mode mode)
   : mode_(mode), round_robin_counter_(std::make_shared<std::atomic<int64_t>>(0))
 {
-  num_ranks_ = raft::resource::get_nccl_num_ranks(clique);
+  num_ranks_ = raft::resource::get_num_ranks(clique);
 }
 
 template <typename AnnIndexType, typename T, typename IdxT>

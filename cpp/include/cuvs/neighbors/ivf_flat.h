@@ -164,6 +164,25 @@ cuvsError_t cuvsIvfFlatIndexCreate(cuvsIvfFlatIndex_t* index);
  * @param[in] index cuvsIvfFlatIndex_t to de-allocate
  */
 cuvsError_t cuvsIvfFlatIndexDestroy(cuvsIvfFlatIndex_t index);
+
+/** Get the number of clusters/inverted lists */
+uint32_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index);
+
+/** Get the dimensionality of the data */
+uint32_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index);
+
+/**
+ * @brief Get the cluster centers corresponding to the lists [n_lists, dim]
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] index cuvsIvfFlatIndex_t Built Ivf-Flat Index
+ * @param[out] centers Preallocated array on host or device memory to store output, [n_lists, dim]
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsResources_t res,
+                                       cuvsIvfFlatIndex_t index,
+                                       DLManagedTensor* centers);
+
 /**
  * @}
  */

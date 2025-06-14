@@ -18,6 +18,7 @@ package com.nvidia.cuvs;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -32,6 +33,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.BitSet;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -42,6 +44,7 @@ import org.slf4j.LoggerFactory;
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
+import com.nvidia.cuvs.CagraMergeParams.MergeStrategy;
 
 @RunWith(RandomizedRunner.class)
 public class CagraBuildAndSearchIT extends CuVSTestCase {
@@ -122,6 +125,81 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     }
   }
 
+  /**
+   * A test that checks the pre-filtering feature.
+   *
+   * @throws Throwable
+   */
+  @Test
+  public void testPrefilteringReducesResults() throws Throwable {
+
+    // Sample data and query
+    float[][] dataset = {
+        { 0.74021935f, 0.9209938f },
+        { 0.03902049f, 0.9689629f },
+        { 0.92514056f, 0.4463501f },
+        { 0.6673192f, 0.10993068f }
+       };
+    float[][] queries = {
+        { 0.48216683f, 0.0428398f }
+       };
+
+    // Expected search results
+    List<Map<Integer, Float>> expectedResults = Arrays.asList(
+        Map.of(3, 0.038782578f, 2, 0.3590463f));
+
+    // Expected filtered search results
+    List<Map<Integer, Float>> expectedFilteredResults = Arrays.asList(
+        Map.of(2, 0.3590463f, 0, 0.83774555f));
+
+    CagraIndexParams indexParams = new CagraIndexParams.Builder()
+        .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+        .withGraphDegree(2)
+        .withIntermediateGraphDegree(4)
+        .withNumWriterThreads(2)
+        .withMetric(CuvsDistanceType.L2Expanded)
+        .build();
+
+    try (CuVSResources resources = CuVSResources.create()) {
+      CagraIndex index = CagraIndex.newBuilder(resources)
+          .withDataset(dataset)
+          .withIndexParams(indexParams)
+          .build();
+
+      // No prefilter (all points allowed)
+      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources)
+          .build();
+      CagraQuery fullQuery = new CagraQuery.Builder()
+          .withTopK(2)
+          .withSearchParams(searchParams)
+          .withQueryVectors(queries)
+          .build();
+
+      SearchResults fullSearchResults = index.search(fullQuery);
+      List<Map<Integer, Float>> fullResults = fullSearchResults.getResults();
+      log.info("Full results: {}", fullResults);
+
+      // Apply prefilter: only allow ids 0 and 2 (bitset: 1100)
+      BitSet prefilter = new BitSet(4);
+      prefilter.set(0);
+      prefilter.set(2);
+
+      CagraQuery filteredQuery = new CagraQuery.Builder()
+          .withTopK(2)
+          .withSearchParams(searchParams)
+          .withQueryVectors(queries)
+          .withPrefilter(prefilter, 4)
+          .build();
+
+      SearchResults filteredSearchResults = index.search(filteredQuery);
+      List<Map<Integer, Float>> filteredResults = filteredSearchResults.getResults();
+      log.info("Filtered results: {}", filteredResults);
+
+      assertEquals(expectedResults, fullResults);
+      assertEquals(expectedFilteredResults, filteredResults);
+    }
+  }
+
   private Runnable indexAndQueryOnce(float[][] dataset, List<Integer> map, float[][] queries,
       List<Map<Integer, Float>> expectedResults, CuVSResources resources) throws Throwable, FileNotFoundException {
 
@@ -195,4 +273,199 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     };
     return thread;
   }
+
+  @Test
+    public void testMergingIndexes() throws Throwable {
+        float[][] vector1 = {
+            {0.0f, 0.0f},
+            {1.0f, 1.0f}
+        };
+
+        float[][] vector2 = {
+            {10.0f, 10.0f},
+            {11.0f, 11.0f}
+        };
+
+        float[][] queries = {
+            {1.0f, 1.0f},    // Should be closest to vector1[1] -> index 1
+            {10.5f, 10.5f},  // Should be closest to vector2[0] -> index 2
+            {0.0f, 0.0f}     // Should be closest to vector1[0] -> index 0
+        };
+
+        // Expected search results for each query (nearest neighbor and its distance)
+        List<Map<Integer, Float>> expectedResults = Arrays.asList(
+            Map.of(1, 0.0f, 0, 2.0f, 2, 162.0f),
+            Map.of(2, 0.5f, 3, 0.5f, 1, 180.5f),
+            Map.of(0, 0.0f, 1, 2.0f, 2, 200.0f)
+        );
+
+        try (CuVSResources resources = CuVSResources.create()) {
+            CagraIndexParams indexParams = new CagraIndexParams.Builder()
+                .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+                .withGraphDegree(1)
+                .withIntermediateGraphDegree(2)
+                .withNumWriterThreads(4)
+                .withMetric(CuvsDistanceType.L2Expanded)
+                .build();
+
+            log.info("Building first index...");
+            CagraIndex index1 = CagraIndex.newBuilder(resources)
+                .withDataset(vector1)
+                .withIndexParams(indexParams)
+                .build();
+
+            log.info("Building second index...");
+            CagraIndex index2 = CagraIndex.newBuilder(resources)
+                .withDataset(vector2)
+                .withIndexParams(indexParams)
+                .build();
+
+            log.info("Merging indexes...");
+            CagraIndex mergedIndex = CagraIndex.merge(new CagraIndex[]{index1, index2});
+            log.info("Merge completed successfully");
+
+            CagraSearchParams searchParams = new CagraSearchParams.Builder(resources)
+                .build();
+
+            List<Integer> mergedMap = Arrays.asList(0, 1, 2, 3);
+            CagraQuery query = new CagraQuery.Builder()
+                .withTopK(3)
+                .withSearchParams(searchParams)
+                .withQueryVectors(queries)
+                .withMapping(mergedMap)
+                .build();
+
+                log.info("Searching merged index...");
+                SearchResults results = mergedIndex.search(query);
+                log.info("Search results: " + results.getResults().toString());
+
+                assertEquals(expectedResults, results.getResults());
+
+                // --- Serialization/deserialization check ---
+                String indexFileName = UUID.randomUUID().toString() + ".cag";
+                mergedIndex.serialize(new FileOutputStream(indexFileName));
+
+                File indexFile = new File(indexFileName);
+                InputStream inputStream = new FileInputStream(indexFile);
+                CagraIndex loadedMergedIndex = CagraIndex.newBuilder(resources)
+                    .from(inputStream)
+                    .build();
+
+                SearchResults resultsFromLoaded = loadedMergedIndex.search(query);
+                assertEquals(expectedResults, resultsFromLoaded.getResults());
+
+                if (indexFile.exists()) {
+                    indexFile.delete();
+                }
+                index1.destroyIndex();
+                index2.destroyIndex();
+                mergedIndex.destroyIndex();
+                loadedMergedIndex.destroyIndex();
+
+        }
+    }
+
+    // Commented out test for Logical merge strategy as it is not yet implemented in C yet
+    @Test
+    public void testMergeStrategies() throws Throwable {
+        float[][] vector1 = {
+            {0.0f, 0.0f},
+            {1.0f, 1.0f}
+        };
+
+        float[][] vector2 = {
+            {10.0f, 10.0f},
+            {11.0f, 11.0f}
+        };
+
+        float[][] queries = {
+            {1.0f, 1.0f},
+            {10.5f, 10.5f},
+            {0.0f, 0.0f}
+        };
+
+        List<Map<Integer, Float>> expectedResults = Arrays.asList(
+            Map.of(1, 0.0f, 0, 2.0f, 2, 162.0f),
+            Map.of(2, 0.5f, 3, 0.5f, 1, 180.5f),
+            Map.of(0, 0.0f, 1, 2.0f, 2, 200.0f)
+        );
+
+        try (CuVSResources resources = CuVSResources.create()) {
+            CagraIndexParams indexParams = new CagraIndexParams.Builder()
+                .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+                .withGraphDegree(1)
+                .withIntermediateGraphDegree(2)
+                .withNumWriterThreads(4)
+                .withMetric(CuvsDistanceType.L2Expanded)
+                .build();
+
+            log.info("Building first index...");
+            CagraIndex index1 = CagraIndex.newBuilder(resources)
+                .withDataset(vector1)
+                .withIndexParams(indexParams)
+                .build();
+
+            log.info("Building second index...");
+            CagraIndex index2 = CagraIndex.newBuilder(resources)
+                .withDataset(vector2)
+                .withIndexParams(indexParams)
+                .build();
+
+            CagraIndexParams outputIndexParams = new CagraIndexParams.Builder()
+                .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+                .withGraphDegree(2)
+                .withIntermediateGraphDegree(4)
+                .withNumWriterThreads(4)
+                .withMetric(CuvsDistanceType.L2Expanded)
+                .build();
+
+            CagraMergeParams physicalMergeParams = new CagraMergeParams.Builder()
+                .withOutputIndexParams(outputIndexParams)
+                .withStrategy(MergeStrategy.PHYSICAL)
+                .build();
+
+            log.info("Merging indexes with PHYSICAL strategy...");
+            CagraIndex physicalMergedIndex = CagraIndex.merge(new CagraIndex[]{index1, index2}, physicalMergeParams);
+            log.info("Physical merge completed successfully");
+
+            CagraSearchParams searchParams = new CagraSearchParams.Builder(resources)
+                .build();
+
+            List<Integer> mergedMap = Arrays.asList(0, 1, 2, 3);
+            CagraQuery query = new CagraQuery.Builder()
+                .withTopK(3)
+                .withSearchParams(searchParams)
+                .withQueryVectors(queries)
+                .withMapping(mergedMap)
+                .build();
+
+            log.info("Searching physically merged index...");
+            SearchResults physicalResults = physicalMergedIndex.search(query);
+            assertNotNull("Physical merge search results should not be null", physicalResults);
+            assertEquals("Physical merge search results should match expected", expectedResults, physicalResults.getResults());
+
+            // --- Serialization/deserialization check for both merged indexes ---
+            String physicalIndexFileName = UUID.randomUUID().toString() + ".cag";
+            physicalMergedIndex.serialize(new FileOutputStream(physicalIndexFileName));
+
+            File physicalIndexFile = new File(physicalIndexFileName);
+            InputStream physicalInputStream = new FileInputStream(physicalIndexFile);
+            CagraIndex loadedPhysicalIndex = CagraIndex.newBuilder(resources)
+                .from(physicalInputStream)
+                .build();
+
+            SearchResults resultsFromLoadedPhysical = loadedPhysicalIndex.search(query);
+            assertEquals("Loaded physical index search results should match expected",
+                expectedResults, resultsFromLoadedPhysical.getResults());
+
+            if (physicalIndexFile.exists()) {
+                physicalIndexFile.delete();
+            }
+            index1.destroyIndex();
+            index2.destroyIndex();
+            physicalMergedIndex.destroyIndex();
+            loadedPhysicalIndex.destroyIndex();
+        }
+    }
+
 }

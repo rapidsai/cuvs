@@ -3,8 +3,6 @@
 
 set -euo pipefail
 
-rapids-configure-conda-channels
-
 source rapids-configure-sccache
 
 source rapids-date-string

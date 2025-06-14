@@ -7,6 +7,7 @@ repos:
               - id: check-json
               - id: trailing-whitespace
               - id: end-of-file-fixer
+              - id: check-symlinks
       - repo: https://github.com/PyCQA/isort
         rev: 5.12.0
         hooks:
@@ -48,7 +49,7 @@ repos:
                 additional_dependencies: [toml]
                 args: ["--config=pyproject.toml"]
       - repo: https://github.com/pre-commit/mirrors-clang-format
-        rev: v16.0.6
+        rev: v20.1.4
         hooks:
               - id: clang-format
                 types_or: [c, c++, cuda]
