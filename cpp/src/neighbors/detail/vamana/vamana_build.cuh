@@ -154,7 +154,7 @@ void batched_insert_vamana(
                                                                     visited_dists.data_handle(),
                                                                     (int)max_batchsize,
                                                                     visited_size,
-                                                                    1);
+								    1);
 
   auto topk_pq_mem =
     raft::make_device_mdarray<Node<accT>>(res,

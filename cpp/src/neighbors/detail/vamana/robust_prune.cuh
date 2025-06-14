@@ -24,6 +24,8 @@
 #include "macros.cuh"
 #include "vamana_structs.cuh"
 
+#define GRAPH_SLACK_FACTOR 1.05
+
 namespace cuvs::neighbors::vamana::detail {
 
 // Load candidates (from query) and previous edges (from nbh_list) into registers (tmp) spanning
