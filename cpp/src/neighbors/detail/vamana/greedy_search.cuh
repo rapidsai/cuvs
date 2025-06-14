@@ -16,10 +16,11 @@
 
 #pragma once
 
+#include <cub/cub.cuh>
+
 #include "macros.cuh"
 #include "priority_queue.cuh"
 #include "vamana_structs.cuh"
-#include <cub/cub.cuh>
 #include <cuvs/neighbors/vamana.hpp>
 
 #include <cuvs/distance/distance.hpp>
@@ -52,7 +53,7 @@ __forceinline__ __device__ void sort_visited(
   }
 
   __syncthreads();
-  BlockSortT(*sort_mem).Sort(tmp, CmpDist2());
+  BlockSortT(*sort_mem).Sort(tmp, CmpDist<IdxT, accT>());
   __syncthreads();
 
   for (int i = 0; i < ELTS; i++) {
@@ -69,31 +70,20 @@ template <typename T,
           typename IdxT     = uint32_t,
           typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
                                                          raft::memory_type::host>>
-__global__ void TestSortKernel(void* query_list_ptr, int num_queries, int topk) {
-
+__global__ void SortPairsKernel(void* query_list_ptr, int num_queries, int topk)
+{
   union ShmemLayout {
     typename cub::BlockMergeSort<DistPair<IdxT, accT>, 32, 1>::TempStorage sort_mem;
   };
   extern __shared__ __align__(alignof(ShmemLayout)) char smem[];
-  
+
   QueryCandidates<IdxT, accT>* query_list =
     static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
 
   for (int i = blockIdx.x; i < num_queries; i += gridDim.x) {
     __syncthreads();
     SEARCH_SELECT_SORT(topk);
-/*
-    if(threadIdx.x==0 && i==0) {
-      printf("query:%d, sorted output [", query_list[i].queryId);
-      for(int j=0; j<query_list[i].size; j++) {
-        printf("%d (%0.3f), ", query_list[i].ids[j], query_list[i].dists[j]);
-      }
-      printf("\n");
-    }
-    */
   }
-
-
 }
 
 /********************************************************************************************
@@ -137,9 +127,7 @@ __global__ void GreedySearchKernel(
 
   union ShmemLayout {
     // All blocksort sizes have same alignment (16)
-//    typename cub::BlockMergeSort<DistPair<IdxT, accT>, 32, 1>::TempStorage sort_mem;
     T coords;
-//    Node<accT> topk_pq;
     int neighborhood_arr;
     DistPair<IdxT, accT> candidate_queue;
   };
@@ -149,15 +137,14 @@ __global__ void GreedySearchKernel(
   // Dynamic shared memory used for blocksort, temp vector storage, and neighborhood list
   extern __shared__ __align__(alignof(ShmemLayout)) char smem[];
 
-//  size_t smem_offset = sort_smem_size;  // temp sorting memory takes first chunk
   size_t smem_offset = 0;
 
   T* s_coords = reinterpret_cast<T*>(&smem[smem_offset]);
   smem_offset += (dim + align_padding) * sizeof(T);
 
-  Node<accT>* topk_pq = &topk_pq_mem[blockIdx.x*topk];
-//  Node<accT>* topk_pq = reinterpret_cast<Node<accT>*>(&smem[smem_offset]);
-//  smem_offset += topk * sizeof(Node<accT>);
+  Node<accT>* topk_pq = &topk_pq_mem[blockIdx.x * topk];
+  //  Node<accT>* topk_pq = reinterpret_cast<Node<accT>*>(&smem[smem_offset]); // Used to test
+  //  scenarios using more shared memory smem_offset += topk * sizeof(Node<accT>);
 
   int* neighbor_array = reinterpret_cast<int*>(&smem[smem_offset]);
   smem_offset += degree * sizeof(int);
@@ -279,7 +266,7 @@ __global__ void GreedySearchKernel(
         if (neighbor_array[j] == raft::upper_bound<IdxT>())
           atomicMin(&num_neighbors, (int)j);  // warp-wide min to find the number of neighbors
       }
-      __syncthreads();
+      //      __syncthreads();
 
       // computing distances between the query vector and neighbor vectors then enqueue in priority
       // queue.
@@ -307,8 +294,6 @@ __global__ void GreedySearchKernel(
 
     __syncthreads();
     if (self_found) query_list[i].size--;
-
-//    SEARCH_SELECT_SORT(topk);
   }
 
   return;

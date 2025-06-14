@@ -42,27 +42,6 @@ namespace cuvs::neighbors::vamana::detail {
   COMPUTE_SMEM_SIZES(degree, visited_size, 256, 512); \
   COMPUTE_SMEM_SIZES(degree, visited_size, 256, 1024);
 
-/* Macros to call the CUB BlockSort primitives for supported sizes for ROBUST_PRUNE*/
-#define PRUNE_CALL_SORT(degree, visited_list, DEG, CANDS)                                  \
-  if (degree == DEG && visited_list <= CANDS && visited_list > CANDS / 2) {                \
-    using BlockSortT = cub::BlockMergeSort<DistPair<IdxT, accT>, 32, (DEG + CANDS) / 32>;  \
-    auto& sort_mem   = reinterpret_cast<typename BlockSortT::TempStorage&>(smem);          \
-    sort_edges_and_cands<accT, IdxT, DEG, CANDS>(new_nbh_list, &query_list[i], &sort_mem); \
-  }
-
-#define PRUNE_SELECT_SORT(degree, visited_list)    \
-  PRUNE_CALL_SORT(degree, visited_size, 32, 64);   \
-  PRUNE_CALL_SORT(degree, visited_size, 32, 128);  \
-  PRUNE_CALL_SORT(degree, visited_size, 32, 256);  \
-  PRUNE_CALL_SORT(degree, visited_size, 32, 512);  \
-  PRUNE_CALL_SORT(degree, visited_size, 64, 128);  \
-  PRUNE_CALL_SORT(degree, visited_size, 64, 256);  \
-  PRUNE_CALL_SORT(degree, visited_size, 64, 512);  \
-  PRUNE_CALL_SORT(degree, visited_size, 128, 256); \
-  PRUNE_CALL_SORT(degree, visited_size, 128, 512); \
-  PRUNE_CALL_SORT(degree, visited_size, 256, 512); \
-  PRUNE_CALL_SORT(degree, visited_size, 256, 1024);
-
 /* Macros to call the CUB BlockSort primitives for supported sizes for GREEDY SEARCH */
 #define SEARCH_CALL_SORT(topk, CANDS)                                             \
   if (topk <= CANDS && topk > CANDS / 2) {                                        \

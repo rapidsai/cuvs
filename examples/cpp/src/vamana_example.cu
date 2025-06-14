@@ -28,14 +28,10 @@
 #include "common.cuh"
 
 template <typename T>
-void vamana_build_and_write(raft::device_resources const& dev_resources,
+void vamana_build_and_write(raft::device_resources const &dev_resources,
                             raft::device_matrix_view<const T, int64_t> dataset,
-                            std::string out_fname,
-                            int degree,
-                            int visited_size,
-                            float max_fraction,
-                            float iters)
-{
+                            std::string out_fname, int degree, int visited_size,
+                            float max_fraction, float iters) {
   using namespace cuvs::neighbors;
 
   // use default index parameters
@@ -49,12 +45,13 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
 
   auto start = std::chrono::system_clock::now();
   auto index = vamana::build(dev_resources, index_params, dataset);
-  auto end   = std::chrono::system_clock::now();
+  auto end = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = end - start;
 
   std::cout << "Vamana index has " << index.size() << " vectors" << std::endl;
-  std::cout << "Vamana graph has degree " << index.graph_degree() << ", graph size ["
-            << index.graph().extent(0) << ", " << index.graph().extent(1) << "]" << std::endl;
+  std::cout << "Vamana graph has degree " << index.graph_degree()
+            << ", graph size [" << index.graph().extent(0) << ", "
+            << index.graph().extent(1) << "]" << std::endl;
 
   std::cout << "Time to build index: " << elapsed_seconds.count() << "s\n";
 
@@ -62,11 +59,10 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
   serialize(dev_resources, out_fname, index);
 }
 
-void usage()
-{
-  printf(
-    "Usage: ./vamana_example <data filename> <output filename> <dtype> <graph "
-    "degree> <visited_size> <max_fraction> <iterations> \n");
+void usage() {
+  printf("Usage: ./vamana_example <data filename> <output filename> <dtype> "
+         "<graph "
+         "degree> <visited_size> <max_fraction> <iterations> \n");
   printf("Input file expected to be binary file of fp32 vectors.\n");
   printf("Graph degree sizes supported: 32, 64, 128, 256\n");
   printf("Visited_size must be > degree and a power of 2.\n");
@@ -75,14 +71,13 @@ void usage()
   exit(1);
 }
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char *argv[]) {
   raft::device_resources dev_resources;
 
   // Set pool memory resource with 1 GiB initial pool size. All allocations use
   // the same pool.
   rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource> pool_mr(
-    rmm::mr::get_current_device_resource(), 1024 * 1024 * 1024ull);
+      rmm::mr::get_current_device_resource(), 1024 * 1024 * 1024ull);
   rmm::mr::set_current_device_resource(&pool_mr);
 
   // Alternatively, one could define a pool allocator for temporary arrays (used
@@ -92,43 +87,36 @@ int main(int argc, char* argv[])
   // limit. raft::resource::set_workspace_to_pool_resource(dev_resources, 2 *
   // 1024 * 1024 * 1024ull);
 
-  if (argc != 8) usage();
+  if (argc != 8)
+    usage();
 
-  std::string data_fname = (std::string)(argv[1]);  // Input filename
-  std::string out_fname  = (std::string)argv[2];    // Output index filename
-  std::string dtype      = (std::string)argv[3];
-  int degree             = atoi(argv[4]);
-  int max_visited        = atoi(argv[5]);
-  float max_fraction     = atof(argv[6]);
-  float iters              = atof(argv[7]);
+  std::string data_fname = (std::string)(argv[1]); // Input filename
+  std::string out_fname = (std::string)argv[2];    // Output index filename
+  std::string dtype = (std::string)argv[3];
+  int degree = atoi(argv[4]);
+  int max_visited = atoi(argv[5]);
+  float max_fraction = atof(argv[6]);
+  float iters = atof(argv[7]);
 
-  if(dtype == "int8") {
+  if (dtype == "int8") {
     // Read in binary dataset file
-    auto dataset = read_bin_dataset<int8_t, int64_t>(dev_resources, data_fname, INT_MAX);
+    auto dataset =
+        read_bin_dataset<int8_t, int64_t>(dev_resources, data_fname, INT_MAX);
 
     // Simple build example to create graph and write to a file
-    vamana_build_and_write<int8_t>(dev_resources,
-                                  raft::make_const_mdspan(dataset.view()),
-                                  out_fname,
-                                  degree,
-                                  max_visited,
-                                  max_fraction,
-                                  iters);
-  }
-  else if(dtype == "float") {
+    vamana_build_and_write<int8_t>(
+        dev_resources, raft::make_const_mdspan(dataset.view()), out_fname,
+        degree, max_visited, max_fraction, iters);
+  } else if (dtype == "float") {
     // Read in binary dataset file
-    auto dataset = read_bin_dataset<float, int64_t>(dev_resources, data_fname, INT_MAX);
+    auto dataset =
+        read_bin_dataset<float, int64_t>(dev_resources, data_fname, INT_MAX);
 
     // Simple build example to create graph and write to a file
-    vamana_build_and_write<float>(dev_resources,
-                                  raft::make_const_mdspan(dataset.view()),
-                                  out_fname,
-                                  degree,
-                                  max_visited,
-                                  max_fraction,
-                                  iters);
-  }
-  else {
+    vamana_build_and_write<float>(
+        dev_resources, raft::make_const_mdspan(dataset.view()), out_fname,
+        degree, max_visited, max_fraction, iters);
+  } else {
     usage();
   }
 }

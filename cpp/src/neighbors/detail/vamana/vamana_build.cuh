@@ -72,6 +72,8 @@ void create_insert_permutation(std::vector<IdxT>& insert_order, uint32_t N)
   }
 }
 
+#define KERNEL_TIMING 0
+
 /********************************************************************************************
  * Main Vamana building function - insert vectors into empty graph in batches
  * Pre - dataset contains the vector data, host matrix allocated to store the graph
@@ -104,12 +106,12 @@ void batched_insert_vamana(
       "to 1.0");
     max_batchsize = (int)dataset.extent(0);
   }
-  float insert_iters  = (float)(params.vamana_iters);
-  double base       = (double)(params.batch_base);
-  float alpha       = (float)(params.alpha);
-  int visited_size  = params.visited_size;
-  int queue_size    = params.queue_size;
-  int reverse_batch = params.reverse_batchsize;
+  float insert_iters = (float)(params.vamana_iters);
+  double base        = (double)(params.batch_base);
+  float alpha        = (float)(params.alpha);
+  int visited_size   = params.visited_size;
+  int queue_size     = params.queue_size;
+  int reverse_batch  = params.reverse_batchsize;
 
   if ((visited_size & (visited_size - 1)) != 0) {
     RAFT_LOG_WARN("visited_size must be a power of 2, rounding up.");
@@ -119,8 +121,9 @@ void batched_insert_vamana(
     visited_size = power;
   }
 
+#if KERNEL_TIMING
   auto start_t = std::chrono::system_clock::now();
-
+#endif
 
   // create gpu graph and set to all -1s
   auto d_graph = raft::make_device_matrix<IdxT, int64_t>(res, graph.extent(0), graph.extent(1));
@@ -151,19 +154,17 @@ void batched_insert_vamana(
                                                                     visited_dists.data_handle(),
                                                                     (int)max_batchsize,
                                                                     visited_size,
-								    1);
+                                                                    1);
 
   auto topk_pq_mem =
-        raft::make_device_mdarray<Node<accT>>(res,
-             raft::resource::get_large_workspace_resource(res),
-             raft::make_extents<int64_t>(max_batchsize, visited_size));
+    raft::make_device_mdarray<Node<accT>>(res,
+                                          raft::resource::get_large_workspace_resource(res),
+                                          raft::make_extents<int64_t>(max_batchsize, visited_size));
 
-  auto s_coords_mem =
-	  raft::make_device_mdarray<T>(res,
-			  raft::resource::get_large_workspace_resource(res),
-			  raft::make_extents<int64_t>(min(maxBlocks, max(max_batchsize, reverse_batch)), dim));
-
-
+  auto s_coords_mem = raft::make_device_mdarray<T>(
+    res,
+    raft::resource::get_large_workspace_resource(res),
+    raft::make_extents<int64_t>(min(maxBlocks, max(max_batchsize, reverse_batch)), dim));
 
   // Create random permutation for order of node inserts into graph
   std::vector<IdxT> insert_order;
@@ -173,180 +174,182 @@ void batched_insert_vamana(
   int search_smem_sort_size = 0;
   int prune_smem_sort_size  = 0;
   SELECT_SMEM_SIZES(degree, visited_size);  // Sets above 2 variables to appropriate sizes
-  prune_smem_sort_size=0;
+  prune_smem_sort_size = 0;
 
   // Total dynamic shared memory used by GreedySearch
   int align_padding          = raft::alignTo(dim, 16) - dim;
   int search_smem_total_size = static_cast<int>(
-   // search_smem_sort_size + 
-    (dim + align_padding) * sizeof(T) + //visited_size * sizeof(Node<accT>) +
+    // search_smem_sort_size +
+    (dim + align_padding) * sizeof(T) +  // visited_size * sizeof(Node<accT>) +
     degree * sizeof(int) + queue_size * sizeof(DistPair<IdxT, accT>));
 
   // Total dynamic shared memory size needed by both RobustPrune calls
-  int prune_smem_total_size = prune_smem_sort_size + //(dim + align_padding) * sizeof(T) +
-//                              (degree) * sizeof(DistPair<IdxT, accT>);
-	                      (degree + visited_size) * sizeof(float) + // Occlusion list
-                              (degree + visited_size) * sizeof(DistPair<IdxT, accT>);
+  int prune_smem_total_size =
+    prune_smem_sort_size +  //(dim + align_padding) * sizeof(T) +
+                            //                              (degree) * sizeof(DistPair<IdxT, accT>);
+    (degree + visited_size) * sizeof(float) +  // Occlusion list
+    (degree + visited_size) * sizeof(DistPair<IdxT, accT>);
 
-  RAFT_LOG_DEBUG("Dynamic shared memory usage (bytes): GreedySearch: %d, RobustPrune: %d",
-                 search_smem_total_size,
-                 prune_smem_total_size);
+  RAFT_LOG_DEBUG(
+    "Dynamic shared memory usage (bytes): GreedySearch: %d, Segment Sort: %d, RobustPrune: %d",
+    search_smem_total_size,
+    search_smem_sort_size,
+    prune_smem_total_size);
 
-  printf("Dynamic shared memory usage (bytes): GreedySearch: %d, segment sort: %d, RobustPrune: %d\n",
-                 search_smem_total_size,
-		 search_smem_sort_size,
-                 prune_smem_total_size);
-
-
-    auto end_t   = std::chrono::system_clock::now();
+#if KERNEL_TIMING
+  auto end_t                                    = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = end_t - start_t;
-  double alloc_time = elapsed_seconds.count();
+  double alloc_time                             = elapsed_seconds.count();
 
-  double search_time = 0.0;
+  double search_time       = 0.0;
   double segment_sort_time = 0.0;
-  double prune1_time = 0.0;
-  double write1_time = 0.0;
-  double rev_time =0.0;
-  double batch_prune = 0.0;
+  double prune1_time       = 0.0;
+  double write1_time       = 0.0;
+  double rev_time          = 0.0;
+  double batch_prune       = 0.0;
+#endif
 
   // Random medoid has minor impact on recall
   // TODO: use heuristic for better medoid selection, issue:
   // https://github.com/rapidsai/cuvs/issues/355
-//  *medoid_id = rand() % N;
+  //  *medoid_id = rand() % N;
   *medoid_id = 123742;
 
   // size of current batch of inserts, increases logarithmically until max_batchsize
   int step_size = 1;
-    // Loop through batches and call the insert and prune kernels - can insert > N times based on iters parameter
-    for (int start = 0; start < (int)(insert_iters*(float)N);) {
-start_t = std::chrono::system_clock::now();
+  // Loop through batches and call the insert and prune kernels - can insert > N times based on
+  // iters parameter
+  for (int start = 0; start < (int)(insert_iters * (float)N);) {
+#if KERNEL_TIMING
+    start_t = std::chrono::system_clock::now();
+#endif
 
-      if (start + step_size > (int)(insert_iters*(float)N)) {
-        step_size = (int)(insert_iters*(float)N) - start;
-      }
-      if (start + step_size > N) {
-        int new_size = N - start;
-        step_size    = new_size;
-      }
-      RAFT_LOG_DEBUG("Starting batch of inserts indices_start:%d, batch_size:%d", start, step_size);
+    if (start + step_size > (int)(insert_iters * (float)N)) {
+      step_size = (int)(insert_iters * (float)N) - start;
+    }
+    if (start + step_size > N) {
+      int new_size = N - start;
+      step_size    = new_size;
+    }
+    RAFT_LOG_DEBUG("Starting batch of inserts indices_start:%d, batch_size:%d", start, step_size);
 
-      int num_blocks = min(maxBlocks, step_size);
+    int num_blocks = min(maxBlocks, step_size);
 
-      // Copy ids to be inserted for this batch
-      raft::copy(query_ids.data_handle(), &insert_order.data()[start], step_size, stream);
-      set_query_ids<IdxT, accT><<<num_blocks, blockD, 0, stream>>>(
-        query_list_ptr.data_handle(), query_ids.data_handle(), step_size);
+    // Copy ids to be inserted for this batch
+    raft::copy(query_ids.data_handle(), &insert_order.data()[start], step_size, stream);
+    set_query_ids<IdxT, accT><<<num_blocks, blockD, 0, stream>>>(
+      query_list_ptr.data_handle(), query_ids.data_handle(), step_size);
 
-      // Call greedy search to get candidates for every vector being inserted
-      GreedySearchKernel<T, accT, IdxT, Accessor>
-        <<<num_blocks, blockD, search_smem_total_size, stream>>>(d_graph.view(),
-                                                                 dataset,
-                                                                 query_list_ptr.data_handle(),
-                                                                 step_size,
-                                                                 *medoid_id,
-                                                                 visited_size,
-                                                                 metric,
-                                                                 queue_size,
-								 topk_pq_mem.data_handle());
-                                                                 //search_smem_sort_size);
-cudaDeviceSynchronize();
-end_t   = std::chrono::system_clock::now();
-elapsed_seconds = end_t - start_t;
-search_time += elapsed_seconds.count();
-start_t = std::chrono::system_clock::now();
+    // Call greedy search to get candidates for every vector being inserted
+    GreedySearchKernel<T, accT, IdxT, Accessor>
+      <<<num_blocks, blockD, search_smem_total_size, stream>>>(d_graph.view(),
+                                                               dataset,
+                                                               query_list_ptr.data_handle(),
+                                                               step_size,
+                                                               *medoid_id,
+                                                               visited_size,
+                                                               metric,
+                                                               queue_size,
+                                                               topk_pq_mem.data_handle());
+    // search_smem_sort_size);
+#if KERNEL_TIMING
+    cudaDeviceSynchronize();
+    end_t           = std::chrono::system_clock::now();
+    elapsed_seconds = end_t - start_t;
+    search_time += elapsed_seconds.count();
+    start_t = std::chrono::system_clock::now();
+#endif
 
-// SEGMENTED SORT ON QUERY_LIST
-TestSortKernel<T, accT, IdxT, Accessor>
-	<<<num_blocks, blockD, search_smem_sort_size, stream>>>(query_list_ptr.data_handle(), step_size, visited_size);
-cudaDeviceSynchronize();
+    // SEGMENTED SORT ON QUERY_LIST
+    SortPairsKernel<T, accT, IdxT, Accessor><<<num_blocks, blockD, search_smem_sort_size, stream>>>(
+      query_list_ptr.data_handle(), step_size, visited_size);
 
-end_t   = std::chrono::system_clock::now();
-elapsed_seconds = end_t - start_t;
-segment_sort_time += elapsed_seconds.count();
-start_t = std::chrono::system_clock::now();
+#if KERNEL_TIMING
+    cudaDeviceSynchronize();
+    end_t           = std::chrono::system_clock::now();
+    elapsed_seconds = end_t - start_t;
+    segment_sort_time += elapsed_seconds.count();
+    start_t = std::chrono::system_clock::now();
+#endif
 
-      // Run on candidates of vectors being inserted
-      RobustPruneKernel<T, accT, IdxT>
-        <<<num_blocks, blockD, prune_smem_total_size, stream>>>(d_graph.view(),
-                                                                dataset,
-                                                                query_list_ptr.data_handle(),
-                                                                step_size,
-                                                                visited_size,
-                                                                metric,
-                                                                alpha,
-                                                                prune_smem_sort_size,
-								s_coords_mem.data_handle());
-// SEGMENTED SORT ON QUERY_LIST
-TestSortKernel<T, accT, IdxT, Accessor>
-	<<<num_blocks, blockD, search_smem_sort_size, stream>>>(query_list_ptr.data_handle(), step_size, degree);
+    // Run on candidates of vectors being inserted
+    RobustPruneKernel<T, accT, IdxT>
+      <<<num_blocks, blockD, prune_smem_total_size, stream>>>(d_graph.view(),
+                                                              dataset,
+                                                              query_list_ptr.data_handle(),
+                                                              step_size,
+                                                              visited_size,
+                                                              metric,
+                                                              alpha,
+                                                              prune_smem_sort_size,
+                                                              s_coords_mem.data_handle());
+    // SEGMENTED SORT ON QUERY_LIST
+    SortPairsKernel<T, accT, IdxT, Accessor><<<num_blocks, blockD, search_smem_sort_size, stream>>>(
+      query_list_ptr.data_handle(), step_size, degree);
 
-cudaDeviceSynchronize();
-end_t   = std::chrono::system_clock::now();
-elapsed_seconds = end_t - start_t;
-prune1_time += elapsed_seconds.count();
-start_t = std::chrono::system_clock::now();
+#if KERNEL_TIMING
+    cudaDeviceSynchronize();
+    end_t           = std::chrono::system_clock::now();
+    elapsed_seconds = end_t - start_t;
+    prune1_time += elapsed_seconds.count();
+    start_t = std::chrono::system_clock::now();
+#endif
 
-      // Write results from first prune to graph edge list
-      write_graph_edges_kernel<accT, IdxT><<<num_blocks, blockD, 0, stream>>>(
-        d_graph.view(), query_list_ptr.data_handle(), degree, step_size);
+    // Write results from first prune to graph edge list
+    write_graph_edges_kernel<accT, IdxT><<<num_blocks, blockD, 0, stream>>>(
+      d_graph.view(), query_list_ptr.data_handle(), degree, step_size);
 
-      cudaDeviceSynchronize();
-end_t   = std::chrono::system_clock::now();
-elapsed_seconds = end_t - start_t;
-write1_time += elapsed_seconds.count();
-start_t = std::chrono::system_clock::now();
+#if KERNEL_TIMING
+    cudaDeviceSynchronize();
+    end_t           = std::chrono::system_clock::now();
+    elapsed_seconds = end_t - start_t;
+    write1_time += elapsed_seconds.count();
+    start_t = std::chrono::system_clock::now();
+#endif
 
-      // compute prefix sums of query_list sizes - TODO parallelize prefix sums
-      auto d_total_edges = raft::make_device_mdarray<int>(
-        res, raft::resource::get_workspace_resource(res), raft::make_extents<int64_t>(1));
-      prefix_sums_sizes<accT, IdxT>
-        <<<1, 1, 0, stream>>>(query_list, step_size, d_total_edges.data_handle());
+    // compute prefix sums of query_list sizes - TODO parallelize prefix sums
+    auto d_total_edges = raft::make_device_mdarray<int>(
+      res, raft::resource::get_workspace_resource(res), raft::make_extents<int64_t>(1));
+    prefix_sums_sizes<accT, IdxT>
+      <<<1, 1, 0, stream>>>(query_list, step_size, d_total_edges.data_handle());
 
-      int total_edges;
-      raft::copy(&total_edges, d_total_edges.data_handle(), 1, stream);
-      RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
+    int total_edges;
+    raft::copy(&total_edges, d_total_edges.data_handle(), 1, stream);
+    RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
 
-      
-      auto edge_dist_pair = raft::make_device_mdarray<DistPair<IdxT, accT>>(
-        res,
-        raft::resource::get_large_workspace_resource(res),
-        raft::make_extents<int64_t>(total_edges));
-	
-//      DistPair<IdxT,accT>* edge_dist_pair;
-//      cudaMalloc(&edge_dist_pair, total_edges*sizeof(DistPair<IdxT,accT>));
-//      custom_memory_resource mr;
-//      rmm::device_buffer edge_dist_pair(total_edges*sizeof(int64_t), stream, &s);
+    auto edge_dist_pair = raft::make_device_mdarray<DistPair<IdxT, accT>>(
+      res,
+      raft::resource::get_large_workspace_resource(res),
+      raft::make_extents<int64_t>(total_edges));
 
-      auto edge_dest =
-        raft::make_device_mdarray<IdxT>(res,
-                                        raft::resource::get_large_workspace_resource(res),
-                                        raft::make_extents<int64_t>(total_edges));
-      auto edge_src =
-        raft::make_device_mdarray<IdxT>(res,
-                                        raft::resource::get_large_workspace_resource(res),
-                                        raft::make_extents<int64_t>(total_edges));
+    auto edge_dest =
+      raft::make_device_mdarray<IdxT>(res,
+                                      raft::resource::get_large_workspace_resource(res),
+                                      raft::make_extents<int64_t>(total_edges));
+    auto edge_src =
+      raft::make_device_mdarray<IdxT>(res,
+                                      raft::resource::get_large_workspace_resource(res),
+                                      raft::make_extents<int64_t>(total_edges));
 
-      // Create reverse edge list
-      create_reverse_edge_list<accT, IdxT>
-        <<<num_blocks, blockD, 0, stream>>>(query_list_ptr.data_handle(),
-                                            step_size,
-                                            degree,
-                                            edge_src.data_handle(),
-                                            //edge_dist_pair);
-                                            edge_dist_pair.data_handle());
+    // Create reverse edge list
+    create_reverse_edge_list<accT, IdxT>
+      <<<num_blocks, blockD, 0, stream>>>(query_list_ptr.data_handle(),
+                                          step_size,
+                                          degree,
+                                          edge_src.data_handle(),
+                                          edge_dist_pair.data_handle());
 
-      {
+    {
       // Sort by dists first so final edge lists are each sorted by dist
       void* d_temp_storage      = nullptr;
       size_t temp_storage_bytes = 0;
 
       cub::DeviceMergeSort::SortPairs(d_temp_storage,
                                       temp_storage_bytes,
-                                      //edge_dist_pair,
                                       edge_dist_pair.data_handle(),
                                       edge_src.data_handle(),
                                       total_edges,
-                                      CmpDist<IdxT,accT>(),
+                                      CmpDist<IdxT, accT>(),
                                       stream);
 
       RAFT_LOG_DEBUG("Temp storage needed for sorting dist (bytes): %lu", temp_storage_bytes);
@@ -359,165 +362,167 @@ start_t = std::chrono::system_clock::now();
       // Sort to group reverse edges by destination
       cub::DeviceMergeSort::SortPairs(temp_sort_storage.data_handle(),
                                       temp_storage_bytes,
-                                      //edge_dist_pair,
                                       edge_dist_pair.data_handle(),
                                       edge_src.data_handle(),
                                       total_edges,
-                                      CmpDist<IdxT,accT>(),
+                                      CmpDist<IdxT, accT>(),
                                       stream);
+    }
 
+    DistPair<IdxT, accT>* temp_ptr = edge_dist_pair.data_handle();
+    raft::linalg::map_offset(
+      res, edge_dest.view(), [temp_ptr] __device__(size_t i) { return temp_ptr[i].idx; });
+
+    void* d_temp_storage      = nullptr;
+    size_t temp_storage_bytes = 0;
+
+    cub::DeviceMergeSort::SortPairs(d_temp_storage,
+                                    temp_storage_bytes,
+                                    edge_dest.data_handle(),
+                                    edge_src.data_handle(),
+                                    total_edges,
+                                    CmpEdge<IdxT>(),
+                                    stream);
+
+    RAFT_LOG_DEBUG("Temp storage needed for sorting (bytes): %lu", temp_storage_bytes);
+
+    auto temp_sort_storage = raft::make_device_mdarray<IdxT>(
+      res,
+      raft::resource::get_large_workspace_resource(res),
+      raft::make_extents<int64_t>(temp_storage_bytes / sizeof(IdxT)));
+
+    // Sort to group reverse edges by destination
+    cub::DeviceMergeSort::SortPairs(temp_sort_storage.data_handle(),
+                                    temp_storage_bytes,
+                                    edge_dest.data_handle(),
+                                    edge_src.data_handle(),
+                                    total_edges,
+                                    CmpEdge<IdxT>(),
+                                    stream);
+
+    // Get number of unique node destinations
+    IdxT unique_dests =
+      cuvs::sparse::neighbors::get_n_components(edge_dest.data_handle(), total_edges, stream);
+
+    // Find which node IDs have reverse edges and their indices in the reverse edge list
+    thrust::device_vector<IdxT> edge_dest_vec(edge_dest.data_handle(),
+                                              edge_dest.data_handle() + total_edges);
+    auto unique_indices = raft::make_device_vector<int>(res, total_edges);
+    raft::linalg::map_offset(res, unique_indices.view(), raft::identity_op{});
+
+    thrust::unique_by_key(edge_dest_vec.begin(), edge_dest_vec.end(), unique_indices.data_handle());
+
+    edge_dest_vec.clear();
+    edge_dest_vec.shrink_to_fit();
+
+#if KERNEL_TIMING
+    cudaDeviceSynchronize();
+    end_t           = std::chrono::system_clock::now();
+    elapsed_seconds = end_t - start_t;
+    rev_time += elapsed_seconds.count();
+    start_t = std::chrono::system_clock::now();
+#endif
+
+    // Batch execution of reverse edge creation/application
+    reverse_batch = params.reverse_batchsize;
+    for (int rev_start = 0; rev_start < (int)unique_dests; rev_start += reverse_batch) {
+      if (rev_start + reverse_batch > (int)unique_dests) {
+        reverse_batch = (int)unique_dests - rev_start;
       }
 
-
-      //DistPair<IdxT,accT>* temp_ptr = edge_dist_pair;
-      DistPair<IdxT,accT>* temp_ptr = edge_dist_pair.data_handle();
-      raft::linalg::map_offset(res, edge_dest.view(), [temp_ptr] __device__(size_t i) {
-                      return temp_ptr[i].idx;
-      });
-      //cudaFree(edge_dist_pair);
-
-
-      void* d_temp_storage      = nullptr;
-      size_t temp_storage_bytes = 0;
-
-      cub::DeviceMergeSort::SortPairs(d_temp_storage,
-                                      temp_storage_bytes,
-                                      edge_dest.data_handle(),
-                                      edge_src.data_handle(),
-                                      total_edges,
-                                      CmpEdge<IdxT>(),
-                                      stream);
-
-      RAFT_LOG_DEBUG("Temp storage needed for sorting (bytes): %lu", temp_storage_bytes);
-
-      auto temp_sort_storage = raft::make_device_mdarray<IdxT>(
+      // Allocate reverse QueryCandidate list based on number of unique destinations
+      auto reverse_list_ptr = raft::make_device_mdarray<QueryCandidates<IdxT, accT>>(
         res,
         raft::resource::get_large_workspace_resource(res),
-        raft::make_extents<int64_t>(temp_storage_bytes / sizeof(IdxT)));
+        raft::make_extents<int64_t>(reverse_batch));
+      auto rev_ids =
+        raft::make_device_mdarray<IdxT>(res,
+                                        raft::resource::get_large_workspace_resource(res),
+                                        raft::make_extents<int64_t>(reverse_batch, visited_size));
 
-      // Sort to group reverse edges by destination
-      cub::DeviceMergeSort::SortPairs(temp_sort_storage.data_handle(),
-                                      temp_storage_bytes,
-                                      edge_dest.data_handle(),
-                                      edge_src.data_handle(),
-                                      total_edges,
-                                      CmpEdge<IdxT>(),
-                                      stream);
+      auto rev_dists =
+        raft::make_device_mdarray<accT>(res,
+                                        raft::resource::get_large_workspace_resource(res),
+                                        raft::make_extents<int64_t>(reverse_batch, visited_size));
 
-      // Get number of unique node destinations
-      IdxT unique_dests =
-        cuvs::sparse::neighbors::get_n_components(edge_dest.data_handle(), total_edges, stream);
+      QueryCandidates<IdxT, accT>* reverse_list =
+        static_cast<QueryCandidates<IdxT, accT>*>(reverse_list_ptr.data_handle());
 
-      // Find which node IDs have reverse edges and their indices in the reverse edge list
-      thrust::device_vector<IdxT> edge_dest_vec(edge_dest.data_handle(),
-                                                edge_dest.data_handle() + total_edges);
-      auto unique_indices = raft::make_device_vector<int>(res, total_edges);
-      raft::linalg::map_offset(res, unique_indices.view(), raft::identity_op{});
+      init_query_candidate_list<IdxT, accT><<<256, blockD, 0, stream>>>(reverse_list,
+                                                                        rev_ids.data_handle(),
+                                                                        rev_dists.data_handle(),
+                                                                        (int)reverse_batch,
+                                                                        visited_size);
 
-      thrust::unique_by_key(
-        edge_dest_vec.begin(), edge_dest_vec.end(), unique_indices.data_handle());
+      // May need more blocks for reverse list
+      num_blocks = min(maxBlocks, reverse_batch);
 
-      edge_dest_vec.clear();
-      edge_dest_vec.shrink_to_fit();
+      // Populate reverse list ids and candidate lists from edge_src and edge_dest
+      populate_reverse_list_struct<T, accT, IdxT>
+        <<<num_blocks, blockD, 0, stream>>>(reverse_list,
+                                            edge_src.data_handle(),
+                                            edge_dest.data_handle(),
+                                            unique_indices.data_handle(),
+                                            unique_dests,
+                                            total_edges,
+                                            dataset.extent(0),
+                                            rev_start,
+                                            reverse_batch);
 
-      cudaDeviceSynchronize();
-end_t   = std::chrono::system_clock::now();
-elapsed_seconds = end_t - start_t;
-rev_time += elapsed_seconds.count();
-start_t = std::chrono::system_clock::now();
+      // Recompute distances (avoided keeping it during sorting)
+      recompute_reverse_dists<T, accT, IdxT>
+        <<<num_blocks, blockD, 0, stream>>>(reverse_list, dataset, reverse_batch, metric);
 
-      // Batch execution of reverse edge creation/application
-      reverse_batch = params.reverse_batchsize;
-      for (int rev_start = 0; rev_start < (int)unique_dests; rev_start += reverse_batch) {
-        if (rev_start + reverse_batch > (int)unique_dests) {
-          reverse_batch = (int)unique_dests - rev_start;
-        }
+      // Call 2nd RobustPrune on reverse query_list
+      RobustPruneKernel<T, accT, IdxT>
+        <<<num_blocks, blockD, prune_smem_total_size, stream>>>(d_graph.view(),
+                                                                raft::make_const_mdspan(dataset),
+                                                                reverse_list_ptr.data_handle(),
+                                                                reverse_batch,
+                                                                visited_size,
+                                                                metric,
+                                                                alpha,
+                                                                prune_smem_sort_size,
+                                                                s_coords_mem.data_handle());
 
-        // Allocate reverse QueryCandidate list based on number of unique destinations
-        auto reverse_list_ptr = raft::make_device_mdarray<QueryCandidates<IdxT, accT>>(
-          res,
-          raft::resource::get_large_workspace_resource(res),
-          raft::make_extents<int64_t>(reverse_batch));
-        auto rev_ids =
-          raft::make_device_mdarray<IdxT>(res,
-                                          raft::resource::get_large_workspace_resource(res),
-                                          raft::make_extents<int64_t>(reverse_batch, visited_size));
+      // SEGMENTED SORT ON QUERY_LIST
+      SortPairsKernel<T, accT, IdxT, Accessor>
+        <<<num_blocks, blockD, search_smem_sort_size, stream>>>(
+          reverse_list_ptr.data_handle(), reverse_batch, degree);
 
-	auto rev_dists =
-          raft::make_device_mdarray<accT>(res,
-                                          raft::resource::get_large_workspace_resource(res),
-                                          raft::make_extents<int64_t>(reverse_batch, visited_size));
+      // Write new edge lists to graph
+      write_graph_edges_kernel<accT, IdxT><<<num_blocks, blockD, 0, stream>>>(
+        d_graph.view(), reverse_list_ptr.data_handle(), degree, reverse_batch);
+    }
 
-        QueryCandidates<IdxT, accT>* reverse_list =
-          static_cast<QueryCandidates<IdxT, accT>*>(reverse_list_ptr.data_handle());
+#if KERNEL_TIMING
+    cudaDeviceSynchronize();
+    end_t           = std::chrono::system_clock::now();
+    elapsed_seconds = end_t - start_t;
+    batch_prune += elapsed_seconds.count();
+#endif
 
-        init_query_candidate_list<IdxT, accT><<<256, blockD, 0, stream>>>(reverse_list,
-                                                                          rev_ids.data_handle(),
-                                                                          rev_dists.data_handle(),
-                                                                          (int)reverse_batch,
-                                                                          visited_size);
+    start += step_size;
+    if (start >= N) {
+      start = 0;
+      insert_iters -= 1.0;
+      step_size = max_batchsize;
+    }
+    step_size *= base;
+    if (step_size > max_batchsize) { step_size = max_batchsize; }
 
-        // May need more blocks for reverse list
-        num_blocks = min(maxBlocks, reverse_batch);
+  }  // Batch of inserts
 
-        // Populate reverse list ids and candidate lists from edge_src and edge_dest
-        populate_reverse_list_struct<T, accT, IdxT>
-          <<<num_blocks, blockD, 0, stream>>>(reverse_list,
-                                              edge_src.data_handle(),
-                                              edge_dest.data_handle(),
-                                              unique_indices.data_handle(),
-                                              unique_dests,
-                                              total_edges,
-                                              dataset.extent(0),
-                                              rev_start,
-                                              reverse_batch);
-
-        // Recompute distances (avoided keeping it during sorting)
-        recompute_reverse_dists<T, accT, IdxT>
-          <<<num_blocks, blockD, 0, stream>>>(reverse_list, dataset, reverse_batch, metric);
-
-        // Call 2nd RobustPrune on reverse query_list
-        RobustPruneKernel<T, accT, IdxT>
-          <<<num_blocks, blockD, prune_smem_total_size, stream>>>(d_graph.view(),
-                                                                  raft::make_const_mdspan(dataset),
-                                                                  reverse_list_ptr.data_handle(),
-                                                                  reverse_batch,
-                                                                  visited_size,
-                                                                  metric,
-                                                                  alpha,
-                                                                  prune_smem_sort_size,
-								  s_coords_mem.data_handle());
-
-// SEGMENTED SORT ON QUERY_LIST
-TestSortKernel<T, accT, IdxT, Accessor>
-	<<<num_blocks, blockD, search_smem_sort_size, stream>>>(reverse_list_ptr.data_handle(), reverse_batch, degree);
-
-        // Write new edge lists to graph
-        write_graph_edges_kernel<accT, IdxT><<<num_blocks, blockD, 0, stream>>>(
-          d_graph.view(), reverse_list_ptr.data_handle(), degree, reverse_batch);
-      }
-
-cudaDeviceSynchronize();
-end_t   = std::chrono::system_clock::now();
-elapsed_seconds = end_t - start_t;
-batch_prune += elapsed_seconds.count();      
-
-//print_graph<IdxT><<<1,1>>>(d_graph.view());
-
-      start += step_size;
-      if(start >= N) {
-        start = 0;
-	insert_iters -= 1.0;
-	step_size = max_batchsize;
-      }
-      step_size *= base;
-      if (step_size > max_batchsize) {
-        step_size = max_batchsize;
-      }
-
-    }  // Batch of inserts
-
-  printf("intro:%lf\ngreedy:%lf\nseg_sort:%lf\nprune1:%lf\nwrite1:%lf\nrev:%lf\nbatch_prune:%lf\n", alloc_time, search_time, segment_sort_time, prune1_time, write1_time, rev_time, batch_prune);
+#if KERNEL_TIMING
+  printf("intro:%lf\ngreedy:%lf\nseg_sort:%lf\nprune1:%lf\nwrite1:%lf\nrev:%lf\nbatch_prune:%lf\n",
+         alloc_time,
+         search_time,
+         segment_sort_time,
+         prune1_time,
+         write1_time,
+         rev_time,
+         batch_prune);
+#endif
 
   raft::copy(graph.data_handle(), d_graph.data_handle(), d_graph.size(), stream);
 
