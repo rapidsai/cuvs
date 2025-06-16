@@ -166,25 +166,45 @@ void build_knn_graph(
   const auto num_queries = dataset.extent(0);
 
   // Use the same maximum batch size as the ivf_pq::search to avoid allocating more than needed.
-  const uint32_t max_queries = pq.search_params.max_internal_batch_size;
+  uint32_t max_queries = pq.search_params.max_internal_batch_size;
 
   // Heuristic: the build_knn_graph code should use only a fraction of the workspace memory; the
   // rest should be used by the ivf_pq::search. Here we say that the workspace size should be a good
   // multiple of what is required for the I/O batching below.
   constexpr size_t kMinWorkspaceRatio = 5;
-  auto desired_workspace_size         = max_queries * kMinWorkspaceRatio *
-                                (sizeof(DataT) * dataset.extent(1)  // queries (dataset batch)
-                                 + sizeof(float) * gpu_top_k        // distances
-                                 + sizeof(int64_t) * gpu_top_k      // neighbors
-                                 + sizeof(float) * top_k            // refined_distances
-                                 + sizeof(int64_t) * top_k          // refined_neighbors
-                                );
+  constexpr size_t kMinLargeBatchSize = 512;
+  auto desired_workspace_size =
+    max_queries * (sizeof(DataT) * dataset.extent(1)  // queries (dataset batch)
+                   + sizeof(float) * gpu_top_k        // distances
+                   + sizeof(int64_t) * gpu_top_k      // neighbors
+                   + sizeof(float) * top_k            // refined_distances
+                   + sizeof(int64_t) * top_k          // refined_neighbors
+                  );
+  auto free_space_ratio    = raft::resource::get_workspace_free_bytes(res) / desired_workspace_size;
+  bool use_large_workspace = false;
+  if (free_space_ratio < kMinWorkspaceRatio) {
+    if (max_queries * free_space_ratio >= kMinLargeBatchSize * kMinWorkspaceRatio) {
+      max_queries = static_cast<uint32_t>(max_queries * free_space_ratio / kMinWorkspaceRatio);
+      RAFT_LOG_INFO(
+        "CAGRA graph build: reducing IVF-PQ search max_internal_batch_size from %u -> %u to fit "
+        "the workspace",
+        pq.search_params.max_internal_batch_size,
+        max_queries);
+      pq.search_params.max_internal_batch_size = max_queries;
+    } else {
+      use_large_workspace = true;
+      RAFT_LOG_WARN(
+        "Using large workspace memory for IVF-PQ search during CAGRA graph build. Desired "
+        "workspace size: %zu, free workspace size: %zu",
+        desired_workspace_size * kMinWorkspaceRatio,
+        raft::resource::get_workspace_free_bytes(res));
+    }
+  }
 
   // If the workspace is smaller than desired, put the I/O buffers into the large workspace.
   rmm::device_async_resource_ref workspace_mr =
-    desired_workspace_size <= raft::resource::get_workspace_free_bytes(res)
-      ? raft::resource::get_workspace_resource(res)
-      : raft::resource::get_large_workspace_resource(res);
+    use_large_workspace ? raft::resource::get_large_workspace_resource(res)
+                        : raft::resource::get_workspace_resource(res);
 
   RAFT_LOG_DEBUG(
     "IVF-PQ search node_degree: %d, top_k: %d,  gpu_top_k: %d,  max_batch_size:: %d, n_probes: %u",
