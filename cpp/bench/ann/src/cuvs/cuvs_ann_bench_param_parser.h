@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -250,13 +250,13 @@ void parse_build_param(const nlohmann::json& conf,
       param.algo = cuvs::bench::CagraBuildAlgo::kAuto;
     }
   }
-  nlohmann::json ivf_pq_build_conf = collect_conf_with_prefix(conf, "b_");
+  nlohmann::json ivf_pq_build_conf = collect_conf_with_prefix(conf, "ivf_pq_build_");
   if (!ivf_pq_build_conf.empty()) {
     cuvs::neighbors::ivf_pq::index_params bparam;
     parse_build_param<T, IdxT>(ivf_pq_build_conf, bparam);
     param.ivf_pq_build_params = bparam;
   }
-  nlohmann::json ivf_pq_search_conf = collect_conf_with_prefix(conf, "s_");
+  nlohmann::json ivf_pq_search_conf = collect_conf_with_prefix(conf, "ivf_pq_search_");
   if (!ivf_pq_search_conf.empty()) {
     typename cuvs::bench::cuvs_ivf_pq<T, IdxT>::search_param sparam;
     parse_search_param<T, IdxT>(ivf_pq_search_conf, sparam);
