@@ -17,7 +17,6 @@
 package com.nvidia.cuvs;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
-import static org.junit.Assert.assertEquals;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -27,6 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.LongToIntFunction;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -101,14 +101,14 @@ public class HnswBuildAndSearchIT extends CuVSTestCase {
 
             // Check results
             log.info(results.getResults().toString());
-            assertEquals(expectedResults, results.getResults());
+            checkResults(expectedResults, results.getResults());
 
             // Cleanup
+            index.destroyIndex();
+            hnswIndex.destroyIndex();
             if (hnswIndexFile.exists()) {
                 hnswIndexFile.delete();
             }
-            index.destroyIndex();
-            hnswIndex.destroyIndex();
         }
     }
 
@@ -130,6 +130,55 @@ public class HnswBuildAndSearchIT extends CuVSTestCase {
                 HnswQuery hnswQuery = new HnswQuery.Builder()
                     .withMapping(SearchResults.IDENTITY_MAPPING)
                     .withQueryVectors(queries)
+                    .withSearchParams(new HnswSearchParams.Builder().build())
+                    .withTopK(3)
+                    .build();
+                indexAndQueryOnce(resources, hnswQuery, expectedResults);
+            }
+        }
+    }
+
+    @Test
+    public void testIndexingAndSearchingWithFunctionMapping() throws Throwable {
+        // Expected search results
+        final List<Map<Integer, Float>> expectedResults = Arrays.asList(
+            Map.of(0, 0.038782578f, 3, 0.35904628f, 1, 0.8377455f),
+            Map.of(1, 0.12472608f, 3, 0.21700794f, 2, 0.31918612f),
+            Map.of(0, 0.047766715f, 3, 0.20332818f, 1, 0.48305473f),
+            Map.of(2, 0.15224178f, 1, 0.59063464f, 0, 0.59866416f)
+        );
+        LongToIntFunction rotate = l -> (int) ((l + 1) % dataset.length);
+
+        for (int j = 0; j < 10; j++) {
+            try (CuVSResources resources = CuVSResources.create()) {
+                HnswQuery hnswQuery = new HnswQuery.Builder()
+                    .withQueryVectors(queries)
+                    .withMapping(rotate)
+                    .withSearchParams(new HnswSearchParams.Builder().build())
+                    .withTopK(3)
+                    .build();
+                indexAndQueryOnce(resources, hnswQuery, expectedResults);
+            }
+        }
+    }
+
+    @Test
+    public void testIndexingAndSearchingWithListMapping() throws Throwable {
+        // Expected search results
+        final List<Map<Integer, Float>> expectedResults = Arrays.asList(
+            Map.of(1, 0.038782578f, 2, 0.35904628f, 4, 0.8377455f),
+            Map.of(4, 0.12472608f, 2, 0.21700794f, 3, 0.31918612f),
+            Map.of(1, 0.047766715f, 2, 0.20332818f, 4, 0.48305473f),
+            Map.of(3, 0.15224178f, 4, 0.59063464f, 1, 0.59866416f)
+        );
+        var mappings = List.of(4, 3, 2, 1);
+        LongToIntFunction rotate = SearchResults.mappingsFromList(mappings);
+
+        for (int j = 0; j < 10; j++) {
+            try (CuVSResources resources = CuVSResources.create()) {
+                HnswQuery hnswQuery = new HnswQuery.Builder()
+                    .withQueryVectors(queries)
+                    .withMapping(rotate)
                     .withSearchParams(new HnswSearchParams.Builder().build())
                     .withTopK(3)
                     .build();

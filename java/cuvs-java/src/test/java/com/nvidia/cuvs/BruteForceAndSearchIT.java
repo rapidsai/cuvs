@@ -25,6 +25,7 @@ import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.LongToIntFunction;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -149,6 +150,53 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
                     .withMapping(SearchResults.IDENTITY_MAPPING)
                     .build();
                 indexAndQueryOnce(resources, cuvsQuery, expectedResultsWithFiltering);
+            }
+        }
+    }
+
+    @Test
+    public void testIndexingAndSearchingWithFunctionMapping() throws Throwable {
+        // Expected search results
+        final List<Map<Integer, Float>> expectedResults = List.of(
+            Map.of(0, 0.038782537f, 3, 0.35904616f, 1, 0.83774555f),
+            Map.of(1, 0.12472606f, 3, 0.21700788f, 2, 0.3191862f),
+            Map.of(0, 0.047766685f, 3, 0.20332813f, 1, 0.48305476f),
+            Map.of(2, 0.15224183f, 1, 0.5906347f, 0, 0.5986643f)
+        );
+        LongToIntFunction rotate = l -> (int) ((l + 1) % dataset.length);
+
+        for (int j = 0; j < 10; j++) {
+            try (CuVSResources resources = CuVSResources.create()) {
+                BruteForceQuery cuvsQuery = new BruteForceQuery.Builder()
+                    .withTopK(3)
+                    .withQueryVectors(queries)
+                    .withMapping(rotate)
+                    .build();
+                indexAndQueryOnce(resources, cuvsQuery, expectedResults);
+            }
+        }
+    }
+
+    @Test
+    public void testIndexingAndSearchingWithListMapping() throws Throwable {
+        // Expected search results
+        final List<Map<Integer, Float>> expectedResults = List.of(
+            Map.of(1, 0.038782537f, 2, 0.35904616f, 4, 0.83774555f),
+            Map.of(4, 0.12472606f, 2, 0.21700788f, 3, 0.3191862f),
+            Map.of(1, 0.047766685f, 2, 0.20332813f, 4, 0.48305476f),
+            Map.of(3, 0.15224183f, 4, 0.5906347f, 1, 0.5986643f)
+        );
+        var mappings = List.of(4, 3, 2, 1);
+        LongToIntFunction rotate = SearchResults.mappingsFromList(mappings);
+
+        for (int j = 0; j < 10; j++) {
+            try (CuVSResources resources = CuVSResources.create()) {
+                BruteForceQuery cuvsQuery = new BruteForceQuery.Builder()
+                    .withTopK(3)
+                    .withQueryVectors(queries)
+                    .withMapping(rotate)
+                    .build();
+                indexAndQueryOnce(resources, cuvsQuery, expectedResults);
             }
         }
     }

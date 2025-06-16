@@ -320,23 +320,14 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
       // Check results
       log.info(results.getResults().toString());
-      List<Map<Integer, Float>> resultsResults = results.getResults();
-      for (int i = 0; i < resultsResults.size(); i++) {
-        var result = resultsResults.get(i);
-        var expectedResult = expectedResults.get(i);
-        assertEquals(
-          expectedResult.entrySet().stream().sorted(Map.Entry.comparingByKey()).toList(),
-          result.entrySet().stream().sorted(Map.Entry.comparingByKey()).toList()
-        );
-      }
-      assertEquals(expectedResults, results.getResults());
+      checkResults(expectedResults, results.getResults());
 
       // Search from deserialized index
       results = loadedIndex.search(cuvsQuery);
 
       // Check results
       log.info(results.getResults().toString());
-      assertEquals(expectedResults, results.getResults());
+      checkResults(expectedResults, results.getResults());
 
       // Cleanup
       if (indexFile.exists()) {
