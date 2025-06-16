@@ -24,7 +24,7 @@ import java.lang.foreign.MemorySegment;
 
 import com.nvidia.cuvs.Dataset;
 
-public class DatasetImpl implements Dataset {
+public class DatasetImpl implements Dataset, MemorySegmentProvider {
   private final Arena arena;
   protected final MemorySegment seg;
   private final int size;
@@ -65,4 +65,8 @@ public class DatasetImpl implements Dataset {
     return dimensions;
   }
 
+  @Override
+  public MemorySegment asMemorySegment(Arena arena) {
+      return seg;
+  }
 }

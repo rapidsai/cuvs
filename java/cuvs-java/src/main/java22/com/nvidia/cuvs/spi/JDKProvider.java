@@ -22,6 +22,7 @@ import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
 import com.nvidia.cuvs.CagraMergeParams;
+import com.nvidia.cuvs.internal.ArrayDatasetImpl;
 import com.nvidia.cuvs.internal.BruteForceIndexImpl;
 import com.nvidia.cuvs.internal.CagraIndexImpl;
 import com.nvidia.cuvs.internal.CuVSResourcesImpl;
@@ -80,5 +81,10 @@ final class JDKProvider implements CuVSProvider {
   @Override
   public Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException {
       return new DatasetImpl(size, dimensions);
+  }
+
+  @Override
+  public Dataset newArrayDataset(float[][] vectors) {
+      return new ArrayDatasetImpl(vectors);
   }
 }
