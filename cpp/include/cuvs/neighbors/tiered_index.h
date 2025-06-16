@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,11 +32,11 @@ extern "C" {
 /**
  * @brief Enum to hold which ANN algorithm is being used in the tiered index
  */
-enum cuvsTieredIndexANNAlgo {
+typedef enum {
   CUVS_TIERED_INDEX_ALGO_CAGRA,
   CUVS_TIERED_INDEX_ALGO_IVF_FLAT,
   CUVS_TIERED_INDEX_ALGO_IVF_PQ
-};
+} cuvsTieredIndexANNAlgo;
 
 /**
  * @defgroup tiered_index_c_index Tiered Index
