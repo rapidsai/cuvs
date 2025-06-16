@@ -11,9 +11,10 @@ rust/              @rapidsai/cuvs-rust-codeowners
 docs/              @rapidsai/cuvs-docs-codeowners
 
 #cmake code owners
-CMakeLists.txt     @rapidsai/cuvs-cmake-codeowners
-**/cmake/          @rapidsai/cuvs-cmake-codeowners
-*.cmake            @rapidsai/cuvs-cmake-codeowners
+CMakeLists.txt                  @rapidsai/cuvs-cmake-codeowners
+**/cmake/                       @rapidsai/cuvs-cmake-codeowners
+*.cmake                         @rapidsai/cuvs-cmake-codeowners
+cpp/scripts/run-cmake-format.sh @rapidsai/cuvs-cmake-codeowners
 
 #CI code owners
 /.github/                @rapidsai/ci-codeowners
