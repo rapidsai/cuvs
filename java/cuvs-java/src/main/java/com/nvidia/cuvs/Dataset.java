@@ -33,7 +33,7 @@ public interface Dataset extends AutoCloseable {
    *
    * @since 25.08
    */
-  static Dataset of(float[][] vectors) {
+  static Dataset ofArray(float[][] vectors) {
       return CuVSProvider.provider().newArrayDataset(vectors);
   }
 

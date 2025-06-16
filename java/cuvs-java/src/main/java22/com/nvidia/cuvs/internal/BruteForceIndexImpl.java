@@ -63,7 +63,6 @@ import com.nvidia.cuvs.BruteForceQuery;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.SearchResults;
-import com.nvidia.cuvs.internal.common.Util;
 import com.nvidia.cuvs.internal.panama.cuvsBruteForceIndex;
 import com.nvidia.cuvs.internal.panama.cuvsFilter;
 
@@ -148,6 +147,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       long cols = dataset.dimensions();
 
       Arena arena = resources.getArena();
+      assert dataset instanceof MemorySegmentProvider;
       MemorySegment datasetMemSegment = ((MemorySegmentProvider) dataset).asMemorySegment(arena);
 
       long cuvsResources = resources.getMemorySegment().get(cuvsResources_t, 0);
@@ -427,7 +427,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
      */
     @Override
     public Builder withDataset(float[][] vectors) {
-      this.dataset = Dataset.of(vectors);
+      this.dataset = Dataset.ofArray(vectors);
       return this;
     }
 

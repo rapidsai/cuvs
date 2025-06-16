@@ -72,7 +72,6 @@ import com.nvidia.cuvs.CuVSIvfPqSearchParams;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.SearchResults;
-import com.nvidia.cuvs.internal.common.Util;
 import com.nvidia.cuvs.internal.panama.cuvsCagraCompressionParams;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndex;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndexParams;
@@ -699,7 +698,7 @@ public class CagraIndexImpl implements CagraIndex {
 
     @Override
     public Builder withDataset(float[][] vectors) {
-      this.dataset = Dataset.of(vectors);
+      this.dataset = Dataset.ofArray(vectors);
       return this;
     }
 
