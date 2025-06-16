@@ -28,6 +28,36 @@
 #include <cuvs/neighbors/ivf_pq.h>
 #include <cuvs/neighbors/ivf_pq.hpp>
 
+namespace cuvs::neighbors::ivf_pq {
+void convert_c_index_params(cuvsIvfPqIndexParams params, cuvs::neighbors::ivf_pq::index_params* out)
+{
+  out->metric                   = static_cast<cuvs::distance::DistanceType>((int)params.metric),
+  out->metric_arg               = params.metric_arg;
+  out->add_data_on_build        = params.add_data_on_build;
+  out->n_lists                  = params.n_lists;
+  out->kmeans_n_iters           = params.kmeans_n_iters;
+  out->kmeans_trainset_fraction = params.kmeans_trainset_fraction;
+  out->pq_bits                  = params.pq_bits;
+  out->pq_dim                   = params.pq_dim;
+  out->codebook_kind =
+    static_cast<cuvs::neighbors::ivf_pq::codebook_gen>((int)params.codebook_kind);
+  out->force_random_rotation          = params.force_random_rotation;
+  out->conservative_memory_allocation = params.conservative_memory_allocation;
+  out->max_train_points_per_pq_code   = params.max_train_points_per_pq_code;
+}
+void convert_c_search_params(cuvsIvfPqSearchParams params,
+                             cuvs::neighbors::ivf_pq::search_params* out)
+{
+  out->n_probes                 = params.n_probes;
+  out->lut_dtype                = params.lut_dtype;
+  out->internal_distance_dtype  = params.internal_distance_dtype;
+  out->preferred_shmem_carveout = params.preferred_shmem_carveout;
+  out->coarse_search_dtype      = params.coarse_search_dtype;
+  out->max_internal_batch_size  = params.max_internal_batch_size;
+}
+
+}  // namespace cuvs::neighbors::ivf_pq
+
 namespace {
 
 template <typename T, typename IdxT>
@@ -35,20 +65,8 @@ void* _build(cuvsResources_t res, cuvsIvfPqIndexParams params, DLManagedTensor* 
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
 
-  auto build_params              = cuvs::neighbors::ivf_pq::index_params();
-  build_params.metric            = static_cast<cuvs::distance::DistanceType>((int)params.metric),
-  build_params.metric_arg        = params.metric_arg;
-  build_params.add_data_on_build = params.add_data_on_build;
-  build_params.n_lists           = params.n_lists;
-  build_params.kmeans_n_iters    = params.kmeans_n_iters;
-  build_params.kmeans_trainset_fraction = params.kmeans_trainset_fraction;
-  build_params.pq_bits                  = params.pq_bits;
-  build_params.pq_dim                   = params.pq_dim;
-  build_params.codebook_kind =
-    static_cast<cuvs::neighbors::ivf_pq::codebook_gen>((int)params.codebook_kind);
-  build_params.force_random_rotation          = params.force_random_rotation;
-  build_params.conservative_memory_allocation = params.conservative_memory_allocation;
-  build_params.max_train_points_per_pq_code   = params.max_train_points_per_pq_code;
+  auto build_params = cuvs::neighbors::ivf_pq::index_params();
+  convert_c_index_params(params, &build_params);
 
   auto dataset = dataset_tensor->dl_tensor;
   auto dim     = dataset.shape[1];
@@ -79,13 +97,8 @@ void _search(cuvsResources_t res,
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
   auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
 
-  auto search_params                     = cuvs::neighbors::ivf_pq::search_params();
-  search_params.n_probes                 = params.n_probes;
-  search_params.lut_dtype                = params.lut_dtype;
-  search_params.internal_distance_dtype  = params.internal_distance_dtype;
-  search_params.preferred_shmem_carveout = params.preferred_shmem_carveout;
-  search_params.coarse_search_dtype      = params.coarse_search_dtype;
-  search_params.max_internal_batch_size  = params.max_internal_batch_size;
+  auto search_params = cuvs::neighbors::ivf_pq::search_params();
+  cuvs::neighbors::ivf_pq::convert_c_search_params(params, &search_params);
 
   using queries_mdspan_type   = raft::device_matrix_view<const T, IdxT, raft::row_major>;
   using neighbors_mdspan_type = raft::device_matrix_view<IdxT, IdxT, raft::row_major>;

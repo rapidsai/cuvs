@@ -203,8 +203,8 @@ void InitDataset(const raft::resources& handle,
 
     if (metric == InnerProduct) {
       auto dataset_view = raft::make_device_matrix_view(datatset_ptr, size, dim);
-      raft::linalg::row_normalize(
-        handle, raft::make_const_mdspan(dataset_view), dataset_view, raft::linalg::L2Norm);
+      raft::linalg::row_normalize<raft::linalg::L2Norm>(
+        handle, raft::make_const_mdspan(dataset_view), dataset_view);
     }
   } else if constexpr (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>) {
     if constexpr (std::is_same_v<DataT, std::int8_t>) {
@@ -223,24 +223,22 @@ void InitDataset(const raft::resources& handle,
       const auto normalized_norm =
         (std::is_same_v<DataT, std::uint8_t> ? 40 : 20) * std::sqrt(static_cast<ComputeT>(dim));
 
-      raft::linalg::reduce(dev_row_norm.data_handle(),
-                           datatset_ptr,
-                           dim,
-                           size,
-                           0.f,
-                           true,
-                           true,
-                           raft::resource::get_cuda_stream(handle),
-                           false,
-                           raft::sq_op(),
-                           raft::add_op(),
-                           raft::sqrt_op());
+      raft::linalg::reduce<true, true>(dev_row_norm.data_handle(),
+                                       datatset_ptr,
+                                       dim,
+                                       size,
+                                       0.f,
+                                       raft::resource::get_cuda_stream(handle),
+                                       false,
+                                       raft::sq_op(),
+                                       raft::add_op(),
+                                       raft::sqrt_op());
       raft::linalg::matrix_vector_op(
         handle,
         raft::make_const_mdspan(dataset_view),
         raft::make_const_mdspan(dev_row_norm.view()),
         dataset_view,
-        raft::linalg::Apply::ALONG_COLUMNS,
+        raft::Apply::ALONG_COLUMNS,
         [normalized_norm] __device__(DataT elm, ComputeT norm) {
           const ComputeT v           = elm / norm * normalized_norm;
           const ComputeT max_v_range = std::numeric_limits<DataT>::max();
@@ -1035,29 +1033,22 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
         auto database1_view = raft::make_device_matrix_view<const DataT, int64_t>(
           (const DataT*)database.data() + database0_view.size(), database1_size, ps.dim);
 
-        cagra::index<DataT, IdxT> index0(handle_);
-        cagra::index<DataT, IdxT> index1(handle_);
+        cagra::index<DataT, IdxT> index0(handle_, index_params.metric);
+        cagra::index<DataT, IdxT> index1(handle_, index_params.metric);
+        std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
         if (ps.host_dataset) {
+          database_host = raft::make_host_matrix<DataT, int64_t>(handle_, ps.n_rows, ps.dim);
+          raft::copy(database_host->data_handle(), database.data(), database.size(), stream_);
           {
-            std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
-            database_host = raft::make_host_matrix<DataT, int64_t>(database0_size, ps.dim);
-            raft::copy(database_host->data_handle(),
-                       database0_view.data_handle(),
-                       database0_view.size(),
-                       stream_);
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
               (const DataT*)database_host->data_handle(), database0_size, ps.dim);
             index0 = cagra::build(handle_, index_params, database_host_view);
           }
           {
-            std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
-            database_host = raft::make_host_matrix<DataT, int64_t>(database1_size, ps.dim);
-            raft::copy(database_host->data_handle(),
-                       database1_view.data_handle(),
-                       database1_view.size(),
-                       stream_);
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
-              (const DataT*)database_host->data_handle(), database1_size, ps.dim);
+              (const DataT*)database_host->data_handle() + database0_size * ps.dim,
+              database1_size,
+              ps.dim);
             index1 = cagra::build(handle_, index_params, database_host_view);
           }
         } else {
