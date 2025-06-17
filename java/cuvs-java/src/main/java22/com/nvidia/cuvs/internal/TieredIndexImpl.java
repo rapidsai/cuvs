@@ -85,7 +85,7 @@ public class TieredIndexImpl implements TieredIndex {
     private final IndexReference tieredIndexReference;
     private boolean destroyed;
 
-   
+
 
     /**
      * Constructor for building the index using specified dataset
@@ -225,7 +225,7 @@ public class TieredIndexImpl implements TieredIndex {
             SequenceLayout distancesLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
             MemorySegment neighborsSeg = arena.allocate(neighborsLayout);
             MemorySegment distancesSeg = arena.allocate(distancesLayout);
-            
+
             // Get host query data
             MemorySegment hostQueriesSeg = Util.buildMemorySegment(arena, query.getQueryVectors());
 
@@ -282,7 +282,7 @@ public class TieredIndexImpl implements TieredIndex {
                 BitSet concatenatedFilters = concatenate(prefilters, (int)query.getNumDocs());
                 long filters[] = concatenatedFilters.toLongArray();
                 MemorySegment hostPrefilterSeg = buildMemorySegment(arena, filters);
-                
+
                 long prefilterDataLength = query.getNumDocs() * prefilters.length;
                 long prefilterShape[] = { (prefilterDataLength + 31) / 32 };
                 long prefilterLen = prefilterShape[0];
@@ -443,7 +443,7 @@ public class TieredIndexImpl implements TieredIndex {
                 default -> throw new IllegalArgumentException("Unsupported metric: " + params.getMetric());
             };
         }
-        
+
         cuvsTieredIndexParams.metric(seg, metric);
 
         int algo = 0; // CUVS_TIERED_INDEX_ALGO_CAGRA
@@ -522,8 +522,8 @@ public class TieredIndexImpl implements TieredIndex {
      */
     @Override
     public TieredIndexType getIndexType() {
-        TieredIndexType indexType = tieredIndexParameters != null && tieredIndexParameters.getCagraParams() != null 
-            ? TieredIndexType.CAGRA 
+        TieredIndexType indexType = tieredIndexParameters != null && tieredIndexParameters.getCagraParams() != null
+            ? TieredIndexType.CAGRA
             : TieredIndexType.CAGRA; // Default to CAGRA for now
         return indexType;
     }

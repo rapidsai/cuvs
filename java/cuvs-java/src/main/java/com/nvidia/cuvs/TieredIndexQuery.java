@@ -122,7 +122,7 @@ public class TieredIndexQuery {
 
     /**
      * Creates a new Builder instance.
-     * 
+     *
      * @return a new Builder instance
      */
     public static Builder newBuilder() {

@@ -248,9 +248,9 @@ public class TieredIndexIT extends CuVSTestCase {
 
             SearchResults resultsWithFilter = index.search(queryWithFilter);
             log.info("Results WITH prefilter: {}", resultsWithFilter.getResults());
-            
+
             Map<Integer, Float> result = resultsWithFilter.getResults().get(0);
-            
+
             assertFalse("Index 0 should be filtered out", result.containsKey(0));
             assertTrue("Index 1 or 2 should be present", result.containsKey(1) || result.containsKey(2));
         }
