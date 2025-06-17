@@ -254,13 +254,8 @@ void set_centers(raft::resources const& handle, index<IdxT>* index, const float*
                                   stream));
 
   rmm::device_uvector<float> center_norms(index->n_lists(), stream, device_memory);
-  raft::linalg::rowNorm(center_norms.data(),
-                        cluster_centers,
-                        index->dim(),
-                        index->n_lists(),
-                        raft::linalg::L2Norm,
-                        true,
-                        stream);
+  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+    center_norms.data(), cluster_centers, index->dim(), index->n_lists(), stream);
   RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle() + index->dim(),
                                   sizeof(float) * index->dim_ext(),
                                   center_norms.data(),
@@ -1649,10 +1644,8 @@ void extend(raft::resources const& handle,
     if (index->metric() == CosineExpanded) {
       auto vec_batch_view = raft::make_device_matrix_view<T, internal_extents_t>(
         const_cast<T*>(vec_batch.data()), vec_batch.size(), index->dim());
-      raft::linalg::row_normalize(handle,
-                                  raft::make_const_mdspan(vec_batch_view),
-                                  vec_batch_view,
-                                  raft::linalg::NormType::L2Norm);
+      raft::linalg::row_normalize<raft::linalg::L2Norm>(
+        handle, raft::make_const_mdspan(vec_batch_view), vec_batch_view);
     }
     process_and_fill_codes(handle,
                            *index,
@@ -1789,8 +1782,8 @@ auto build(raft::resources const& handle,
     kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)index.metric());
 
     if (index.metric() == distance::DistanceType::CosineExpanded) {
-      raft::linalg::row_normalize(
-        handle, trainset_const_view, trainset.view(), raft::linalg::NormType::L2Norm);
+      raft::linalg::row_normalize<raft::linalg::L2Norm>(
+        handle, trainset_const_view, trainset.view());
     }
     cuvs::cluster::kmeans_balanced::fit(
       handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
@@ -1800,8 +1793,7 @@ auto build(raft::resources const& handle,
     auto centers_const_view = raft::make_device_matrix_view<const float, internal_extents_t>(
       cluster_centers, index.n_lists(), index.dim());
     if (index.metric() == distance::DistanceType::CosineExpanded) {
-      raft::linalg::row_normalize(
-        handle, centers_const_view, centers_view, raft::linalg::NormType::L2Norm);
+      raft::linalg::row_normalize<raft::linalg::L2Norm>(handle, centers_const_view, centers_view);
     }
     auto labels_view =
       raft::make_device_vector_view<uint32_t, internal_extents_t>(labels.data(), n_rows_train);
@@ -1903,5 +1895,27 @@ void extend(
                   new_vectors.data_handle(),
                   new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
                   n_rows);
+}
+
+template <typename output_mdspan_type>
+inline void extract_centers(raft::resources const& res,
+                            const cuvs::neighbors::ivf_pq::index<int64_t>& index,
+                            output_mdspan_type cluster_centers)
+{
+  RAFT_EXPECTS(cluster_centers.extent(0) == index.n_lists(),
+               "Number of rows in the output buffer for cluster centers must be equal to the "
+               "number of IVF lists");
+  RAFT_EXPECTS(
+    cluster_centers.extent(1) == index.dim(),
+    "Number of columns in the output buffer for cluster centers and index dim are different");
+  auto stream = raft::resource::get_cuda_stream(res);
+  RAFT_CUDA_TRY(cudaMemcpy2DAsync(cluster_centers.data_handle(),
+                                  sizeof(float) * index.dim(),
+                                  index.centers().data_handle(),
+                                  sizeof(float) * index.dim_ext(),
+                                  sizeof(float) * index.dim(),
+                                  index.n_lists(),
+                                  cudaMemcpyDefault,
+                                  stream));
 }
 }  // namespace cuvs::neighbors::ivf_pq::detail

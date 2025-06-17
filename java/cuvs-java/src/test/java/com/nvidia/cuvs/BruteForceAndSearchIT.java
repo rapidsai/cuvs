@@ -123,7 +123,7 @@ public class BruteForceAndSearchIT extends CuVSTestCase{
         BruteForceQuery cuvsQueryWithFiltering = new BruteForceQuery.Builder()
             .withTopK(3)
             .withQueryVectors(queries)
-            .withPrefilter(new BitSet[] {prefilter, prefilter, prefilter, prefilter}, dataset.length)
+            .withPrefilters(new BitSet[] {prefilter, prefilter, prefilter, prefilter}, dataset.length)
             .withMapping(map)
             .build();
 

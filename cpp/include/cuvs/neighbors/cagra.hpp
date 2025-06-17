@@ -18,7 +18,6 @@
 
 #include "common.hpp"
 #include <cuvs/distance/distance.hpp>
-#include <cuvs/neighbors/common.h>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
@@ -276,16 +275,9 @@ struct extend_params {
  */
 
 /**
- * @brief Determines the strategy for merging CAGRA graphs.
- *
- * @note Currently, only the MERGE_STRATEGY_PHYSICAL strategy is supported.
- */
-using MergeStrategy = cuvsMergeStrategy;
-
-/**
  * @brief Parameters for merging CAGRA indexes.
  */
-struct merge_params {
+struct merge_params : cuvs::neighbors::merge_params {
   merge_params() = default;
 
   /**
@@ -298,7 +290,11 @@ struct merge_params {
   cagra::index_params output_index_params;
 
   /// Strategy for merging. Defaults to `MergeStrategy::MERGE_STRATEGY_PHYSICAL`.
-  MergeStrategy strategy = MergeStrategy::MERGE_STRATEGY_PHYSICAL;
+  cuvs::neighbors::MergeStrategy merge_strategy =
+    cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
+
+  /// Implementation of the polymorphic strategy() method
+  cuvs::neighbors::MergeStrategy strategy() const { return merge_strategy; }
 };
 
 /**
@@ -2365,6 +2361,124 @@ void search(const raft::resources& clique,
             const cuvs::neighbors::mg_index<cagra::index<float, uint32_t>, float, uint32_t>& index,
             const cuvs::neighbors::mg_search_params<cagra::search_params>& search_params,
             raft::host_matrix_view<const float, int64_t, row_major> queries,
+            raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
+            raft::host_matrix_view<float, int64_t, row_major> distances);
+
+/// \ingroup mg_cpp_index_search
+/**
+ * @brief Searches a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::mg_search_params<cagra::search_params> search_params;
+ * cuvs::neighbors::cagra::search(clique, index, search_params, queries, neighbors,
+ * distances);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] search_params configure the index search
+ * @param[in] queries a row-major matrix on host [n_rows, dim]
+ * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
+ * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
+ *
+ */
+void search(const raft::resources& clique,
+            const cuvs::neighbors::mg_index<cagra::index<half, uint32_t>, half, uint32_t>& index,
+            const cuvs::neighbors::mg_search_params<cagra::search_params>& search_params,
+            raft::host_matrix_view<const half, int64_t, row_major> queries,
+            raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
+            raft::host_matrix_view<float, int64_t, row_major> distances);
+
+/// \ingroup mg_cpp_index_search
+/**
+ * @brief Searches a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::mg_search_params<cagra::search_params> search_params;
+ * cuvs::neighbors::cagra::search(clique, index, search_params, queries, neighbors,
+ * distances);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] search_params configure the index search
+ * @param[in] queries a row-major matrix on host [n_rows, dim]
+ * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
+ * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
+ *
+ */
+void search(
+  const raft::resources& clique,
+  const cuvs::neighbors::mg_index<cagra::index<int8_t, uint32_t>, int8_t, uint32_t>& index,
+  const cuvs::neighbors::mg_search_params<cagra::search_params>& search_params,
+  raft::host_matrix_view<const int8_t, int64_t, row_major> queries,
+  raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
+  raft::host_matrix_view<float, int64_t, row_major> distances);
+
+/// \ingroup mg_cpp_index_search
+/**
+ * @brief Searches a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::mg_search_params<cagra::search_params> search_params;
+ * cuvs::neighbors::cagra::search(clique, index, search_params, queries, neighbors,
+ * distances);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] search_params configure the index search
+ * @param[in] queries a row-major matrix on host [n_rows, dim]
+ * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
+ * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
+ *
+ */
+void search(
+  const raft::resources& clique,
+  const cuvs::neighbors::mg_index<cagra::index<uint8_t, uint32_t>, uint8_t, uint32_t>& index,
+  const cuvs::neighbors::mg_search_params<cagra::search_params>& search_params,
+  raft::host_matrix_view<const uint8_t, int64_t, row_major> queries,
+  raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,
+  raft::host_matrix_view<float, int64_t, row_major> distances);
+
+/// \ingroup mg_cpp_index_search
+/**
+ * @brief Searches a multi-GPU index
+ *
+ * Usage example:
+ * @code{.cpp}
+ * raft::device_resources_snmg clique;
+ * cuvs::neighbors::mg_index_params<cagra::index_params> index_params;
+ * auto index = cuvs::neighbors::cagra::build(clique, index_params, index_dataset);
+ * cuvs::neighbors::mg_search_params<cagra::search_params> search_params;
+ * cuvs::neighbors::cagra::search(clique, index, search_params, queries, neighbors,
+ * distances);
+ * @endcode
+ *
+ * @param[in] clique a `raft::resources` object specifying the NCCL clique configuration
+ * @param[in] index the pre-built index
+ * @param[in] search_params configure the index search
+ * @param[in] queries a row-major matrix on host [n_rows, dim]
+ * @param[out] neighbors a row-major matrix on host [n_rows, n_neighbors]
+ * @param[out] distances a row-major matrix on host [n_rows, n_neighbors]
+ *
+ */
+void search(const raft::resources& clique,
+            const cuvs::neighbors::mg_index<cagra::index<float, uint32_t>, float, uint32_t>& index,
+            const cuvs::neighbors::mg_search_params<cagra::search_params>& search_params,
+            raft::host_matrix_view<const float, int64_t, row_major> queries,
             raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,
             raft::host_matrix_view<float, int64_t, row_major> distances);
 
@@ -2602,3 +2716,5 @@ auto distribute(const raft::resources& clique, const std::string& filename)
   -> cuvs::neighbors::mg_index<cagra::index<T, IdxT>, T, IdxT>;
 
 }  // namespace cuvs::neighbors::cagra
+
+#include <cuvs/neighbors/cagra_index_wrapper.hpp>
