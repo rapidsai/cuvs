@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2021-2024, NVIDIA CORPORATION.
+# Copyright (c) 2021-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -292,6 +292,9 @@ if(TARGET cuvs::c_api)
   endif()
 
   add_executable(cuvs_c_test core/c_api.c)
+  target_include_directories(
+    cuvs_c_test PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/../include>"
+  )
   target_link_libraries(cuvs_c_test PUBLIC cuvs::c_api)
 
   add_executable(cuvs_c_neighbors_test neighbors/c_api.c)

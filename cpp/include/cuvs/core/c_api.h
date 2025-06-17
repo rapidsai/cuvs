@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,6 @@
 #include <cuda_runtime.h>
 #include <stdbool.h>
 #include <stdint.h>
-
-static const uint16_t CUVS_VERSION_MAJOR = 25;
-static const uint16_t CUVS_VERSION_MINOR = 8;
-static const uint16_t CUVS_VERSION_PATCH = 0;
 
 #ifdef __cplusplus
 extern "C" {
