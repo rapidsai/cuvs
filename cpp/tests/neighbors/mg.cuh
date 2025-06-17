@@ -23,6 +23,7 @@
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <raft/core/device_resources_snmg.hpp>
+#include <raft/core/resource/nccl_comm.hpp>
 
 namespace cuvs::neighbors::mg {
 
@@ -453,6 +454,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                                             ps.k);
       std::vector<float> load_balancer_distances_snmg_ann(n_parallel_searches * ps.num_queries *
                                                           ps.k);
+
+      raft::resource::get_nccl_comms(clique_);
 #pragma omp parallel for
       for (uint64_t search_idx = 0; search_idx < searches_correctness.size(); search_idx++) {
         uint64_t offset            = search_idx * ps.num_queries * ps.k;
@@ -518,6 +521,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                                             ps.k);
       std::vector<float> load_balancer_distances_snmg_ann(n_parallel_searches * ps.num_queries *
                                                           ps.k);
+
+      raft::resource::get_nccl_comms(clique_);
 #pragma omp parallel for
       for (uint64_t search_idx = 0; search_idx < searches_correctness.size(); search_idx++) {
         uint64_t offset            = search_idx * ps.num_queries * ps.k;
@@ -578,6 +583,8 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
                                                              ps.k);
       std::vector<float> load_balancer_distances_snmg_ann(n_parallel_searches * ps.num_queries *
                                                           ps.k);
+
+      raft::resource::get_nccl_comms(clique_);
 #pragma omp parallel for
       for (uint64_t search_idx = 0; search_idx < searches_correctness.size(); search_idx++) {
         uint64_t offset            = search_idx * ps.num_queries * ps.k;
@@ -676,8 +683,6 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-
-  /*
   {7000,
    10000,
    8,
@@ -689,9 +694,6 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-  */
-
-  /*
   {7000,
    10000,
    8,
@@ -725,6 +727,9 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
+  /*
+  Tree merge requires an even number of GPU, but CI only has one. Disabled for now.
+  See https://github.com/rapidsai/cuvs/issues/904
 
   {7000,
    10000,
@@ -760,7 +765,6 @@ const std::vector<AnnMGInputs> inputs = {
    cuvs::distance::DistanceType::L2Expanded,
    true},
   */
-
   {7000,
    10000,
    8,
@@ -783,8 +787,6 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-
-  /*
   {7000,
    10000,
    8,
@@ -796,8 +798,6 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-  */
-
   {3,
    10000,
    8,
@@ -820,8 +820,6 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-
-  /*
   {3,
    10000,
    8,
@@ -833,6 +831,5 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-  */
 };
 }  // namespace cuvs::neighbors::mg
