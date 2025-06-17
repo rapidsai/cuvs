@@ -23,6 +23,8 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
+#include <cuvs/neighbors/composite/merge.hpp>
+#include <cuvs/neighbors/index_wrappers.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/core/host_mdarray.hpp>
@@ -201,8 +203,8 @@ void InitDataset(const raft::resources& handle,
 
     if (metric == InnerProduct) {
       auto dataset_view = raft::make_device_matrix_view(datatset_ptr, size, dim);
-      raft::linalg::row_normalize(
-        handle, raft::make_const_mdspan(dataset_view), dataset_view, raft::linalg::L2Norm);
+      raft::linalg::row_normalize<raft::linalg::L2Norm>(
+        handle, raft::make_const_mdspan(dataset_view), dataset_view);
     }
   } else if constexpr (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>) {
     if constexpr (std::is_same_v<DataT, std::int8_t>) {
@@ -221,24 +223,22 @@ void InitDataset(const raft::resources& handle,
       const auto normalized_norm =
         (std::is_same_v<DataT, std::uint8_t> ? 40 : 20) * std::sqrt(static_cast<ComputeT>(dim));
 
-      raft::linalg::reduce(dev_row_norm.data_handle(),
-                           datatset_ptr,
-                           dim,
-                           size,
-                           0.f,
-                           true,
-                           true,
-                           raft::resource::get_cuda_stream(handle),
-                           false,
-                           raft::sq_op(),
-                           raft::add_op(),
-                           raft::sqrt_op());
+      raft::linalg::reduce<true, true>(dev_row_norm.data_handle(),
+                                       datatset_ptr,
+                                       dim,
+                                       size,
+                                       0.f,
+                                       raft::resource::get_cuda_stream(handle),
+                                       false,
+                                       raft::sq_op(),
+                                       raft::add_op(),
+                                       raft::sqrt_op());
       raft::linalg::matrix_vector_op(
         handle,
         raft::make_const_mdspan(dataset_view),
         raft::make_const_mdspan(dev_row_norm.view()),
         dataset_view,
-        raft::linalg::Apply::ALONG_COLUMNS,
+        raft::Apply::ALONG_COLUMNS,
         [normalized_norm] __device__(DataT elm, ComputeT norm) {
           const ComputeT v           = elm / norm * normalized_norm;
           const ComputeT max_v_range = std::numeric_limits<DataT>::max();
@@ -282,6 +282,8 @@ struct AnnCagraInputs {
   std::optional<vpq_params> compression           = std::nullopt;
 
   std::optional<bool> non_owning_memory_buffer_flag = std::nullopt;
+  cuvs::neighbors::MergeStrategy merge_strategy =
+    cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
 };
 
 inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
@@ -298,11 +300,13 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
 
   std::vector<std::string> algo       = {"single-cta", "multi_cta", "multi_kernel", "auto"};
   std::vector<std::string> build_algo = {"IVF_PQ", "NN_DESCENT", "ITERATIVE_CAGRA_SEARCH", "AUTO"};
+  std::vector<std::string> merge_strategy = {"PHYSICAL", "LOGICAL"};
   os << "{n_queries=" << p.n_queries << ", dataset shape=" << p.n_rows << "x" << p.dim
      << ", k=" << p.k << ", " << algo.at((int)p.algo) << ", max_queries=" << p.max_queries
      << ", itopk_size=" << p.itopk_size << ", search_width=" << p.search_width
      << ", metric=" << metric_str(p.metric) << ", " << (p.host_dataset ? "host" : "device")
-     << ", build_algo=" << build_algo.at((int)p.build_algo);
+     << ", build_algo=" << build_algo.at((int)p.build_algo)
+     << ", merge_logic=" << merge_strategy.at((int)p.merge_strategy);
   if ((int)p.build_algo == 0 && p.ivf_pq_search_refine_ratio) {
     os << "(refine_rate=" << *p.ivf_pq_search_refine_ratio << ')';
   }
@@ -936,6 +940,7 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
   }
 
  protected:
+  template <typename SearchIdxT = IdxT>
   void testCagra()
   {
     // TODO (tarang-jain): remove when NN Descent index building support InnerProduct. Reference
@@ -961,25 +966,25 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.n_rows < 8 && ps.build_algo == graph_build_algo::IVF_PQ) GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
-    std::vector<IdxT> indices_Cagra(queries_size);
-    std::vector<IdxT> indices_naive(queries_size);
+    std::vector<SearchIdxT> indices_Cagra(queries_size);
+    std::vector<SearchIdxT> indices_naive(queries_size);
     std::vector<DistanceT> distances_Cagra(queries_size);
     std::vector<DistanceT> distances_naive(queries_size);
 
     {
       rmm::device_uvector<DistanceT> distances_naive_dev(queries_size, stream_);
-      rmm::device_uvector<IdxT> indices_naive_dev(queries_size, stream_);
+      rmm::device_uvector<SearchIdxT> indices_naive_dev(queries_size, stream_);
 
-      cuvs::neighbors::naive_knn<DistanceT, DataT, IdxT>(handle_,
-                                                         distances_naive_dev.data(),
-                                                         indices_naive_dev.data(),
-                                                         search_queries.data(),
-                                                         database.data(),
-                                                         ps.n_queries,
-                                                         ps.n_rows,
-                                                         ps.dim,
-                                                         ps.k,
-                                                         ps.metric);
+      cuvs::neighbors::naive_knn<DistanceT, DataT, SearchIdxT>(handle_,
+                                                               distances_naive_dev.data(),
+                                                               indices_naive_dev.data(),
+                                                               search_queries.data(),
+                                                               database.data(),
+                                                               ps.n_queries,
+                                                               ps.n_rows,
+                                                               ps.dim,
+                                                               ps.k,
+                                                               ps.metric);
       raft::update_host(distances_naive.data(), distances_naive_dev.data(), queries_size, stream_);
       raft::update_host(indices_naive.data(), indices_naive_dev.data(), queries_size, stream_);
       raft::resource::sync_stream(handle_);
@@ -987,7 +992,7 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
     {
       rmm::device_uvector<DistanceT> distances_dev(queries_size, stream_);
-      rmm::device_uvector<IdxT> indices_dev(queries_size, stream_);
+      rmm::device_uvector<SearchIdxT> indices_dev(queries_size, stream_);
 
       {
         cagra::index_params index_params;
@@ -1028,43 +1033,44 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
         auto database1_view = raft::make_device_matrix_view<const DataT, int64_t>(
           (const DataT*)database.data() + database0_view.size(), database1_size, ps.dim);
 
-        cagra::index<DataT, IdxT> index0(handle_);
-        cagra::index<DataT, IdxT> index1(handle_);
+        cagra::index<DataT, IdxT> index0(handle_, index_params.metric);
+        cagra::index<DataT, IdxT> index1(handle_, index_params.metric);
+        std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
         if (ps.host_dataset) {
+          database_host = raft::make_host_matrix<DataT, int64_t>(handle_, ps.n_rows, ps.dim);
+          raft::copy(database_host->data_handle(), database.data(), database.size(), stream_);
           {
-            std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
-            database_host = raft::make_host_matrix<DataT, int64_t>(database0_size, ps.dim);
-            raft::copy(database_host->data_handle(),
-                       database0_view.data_handle(),
-                       database0_view.size(),
-                       stream_);
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
               (const DataT*)database_host->data_handle(), database0_size, ps.dim);
             index0 = cagra::build(handle_, index_params, database_host_view);
           }
           {
-            std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};
-            database_host = raft::make_host_matrix<DataT, int64_t>(database1_size, ps.dim);
-            raft::copy(database_host->data_handle(),
-                       database1_view.data_handle(),
-                       database1_view.size(),
-                       stream_);
             auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
-              (const DataT*)database_host->data_handle(), database1_size, ps.dim);
+              (const DataT*)database_host->data_handle() + database0_size * ps.dim,
+              database1_size,
+              ps.dim);
             index1 = cagra::build(handle_, index_params, database_host_view);
           }
         } else {
           index0 = cagra::build(handle_, index_params, database0_view);
           index1 = cagra::build(handle_, index_params, database1_view);
         };
-        std::vector<cagra::index<DataT, IdxT>*> indices{&index0, &index1};
+
+        // Convert traditional CAGRA indices to wrappers for polymorphic usage
+        std::vector<std::shared_ptr<cuvs::neighbors::IndexWrapper<DataT, IdxT, SearchIdxT>>>
+          wrapped_indices;
+        wrapped_indices.push_back(
+          std::make_shared<cuvs::neighbors::cagra::IndexWrapper<DataT, IdxT, SearchIdxT>>(&index0));
+        wrapped_indices.push_back(
+          std::make_shared<cuvs::neighbors::cagra::IndexWrapper<DataT, IdxT, SearchIdxT>>(&index1));
+
         cagra::merge_params merge_params{index_params};
-        auto index = cagra::merge(handle_, merge_params, indices);
+        merge_params.merge_strategy = ps.merge_strategy;
 
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
           search_queries.data(), ps.n_queries, ps.dim);
-        auto indices_out_view =
-          raft::make_device_matrix_view<IdxT, int64_t>(indices_dev.data(), ps.n_queries, ps.k);
+        auto indices_out_view = raft::make_device_matrix_view<SearchIdxT, int64_t>(
+          indices_dev.data(), ps.n_queries, ps.k);
         auto dists_out_view = raft::make_device_matrix_view<DistanceT, int64_t>(
           distances_dev.data(), ps.n_queries, ps.k);
 
@@ -1074,8 +1080,11 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
         search_params.team_size   = ps.team_size;
         search_params.itopk_size  = ps.itopk_size;
 
-        cagra::search(
-          handle_, search_params, index, search_queries_view, indices_out_view, dists_out_view);
+        auto index = cuvs::neighbors::composite::merge<DataT, IdxT, SearchIdxT>(
+          handle_, merge_params, wrapped_indices);
+        index->search(
+          handle_, search_params, search_queries_view, indices_out_view, dists_out_view);
+
         raft::update_host(distances_Cagra.data(), distances_dev.data(), queries_size, stream_);
         raft::update_host(indices_Cagra.data(), indices_dev.data(), queries_size, stream_);
         raft::resource::sync_stream(handle_);
@@ -1136,7 +1145,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   std::vector<AnnCagraInputs> inputs = raft::util::itertools::product<AnnCagraInputs>(
     {100},
     {1000},
-    {1, 8, 17},
+    {1, 8, 16},
     {16},  // k
     {graph_build_algo::NN_DESCENT,
      graph_build_algo::ITERATIVE_CAGRA_SEARCH},  // build algo. ITERATIVE_CAGRA_SEARCH is needed to
@@ -1149,7 +1158,12 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false},
     {true},
-    {0.995});
+    {0.995},
+    {std::optional<float>{std::nullopt}},
+    {std::optional<vpq_params>{std::nullopt}},
+    {std::optional<bool>{std::nullopt}},
+    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
 
   // Fixed dim, and changing neighbors and query size (output matrix size)
   auto inputs2 = raft::util::itertools::product<AnnCagraInputs>(
@@ -1172,7 +1186,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   // Corner cases for small datasets
   inputs2 = raft::util::itertools::product<AnnCagraInputs>(
     {2},
-    {3, 5, 31, 32, 64, 101},
+    {3, 6, 31, 32, 64, 101},
     {1, 10},
     {2},  // k
     {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
@@ -1184,7 +1198,12 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded},
     {false},
     {true},
-    {0.995});
+    {0.995},
+    {std::optional<float>{std::nullopt}},
+    {std::optional<vpq_params>{std::nullopt}},
+    {std::optional<bool>{std::nullopt}},
+    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Varying dim and build algo.
@@ -1206,7 +1225,12 @@ inline std::vector<AnnCagraInputs> generate_inputs()
      cuvs::distance::DistanceType::BitwiseHamming},
     {false},
     {true},
-    {0.995});
+    {0.995},
+    {std::optional<float>{std::nullopt}},
+    {std::optional<vpq_params>{std::nullopt}},
+    {std::optional<bool>{std::nullopt}},
+    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Varying team_size, graph_build_algo
@@ -1226,7 +1250,12 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false},
     {false},
-    {0.995});
+    {0.995},
+    {std::optional<float>{std::nullopt}},
+    {std::optional<vpq_params>{std::nullopt}},
+    {std::optional<bool>{std::nullopt}},
+    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Varying graph_build_algo, itopk_size
@@ -1246,7 +1275,12 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false},
     {true},
-    {0.995});
+    {0.995},
+    {std::optional<float>{std::nullopt}},
+    {std::optional<vpq_params>{std::nullopt}},
+    {std::optional<bool>{std::nullopt}},
+    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Varying n_rows, host_dataset
@@ -1264,7 +1298,12 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false, true},
     {false},
-    {0.985});
+    {0.985},
+    {std::optional<float>{std::nullopt}},
+    {std::optional<vpq_params>{std::nullopt}},
+    {std::optional<bool>{std::nullopt}},
+    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // A few PQ configurations.
@@ -1283,8 +1322,14 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded},
     {false},
     {true},
-    {0.6});                      // don't demand high recall without refinement
-  for (uint32_t pq_len : {2}) {  // for now, only pq_len = 2 is supported, more options coming soon
+    {0.6},
+    {std::optional<float>{std::nullopt}},
+    {std::optional<vpq_params>{std::nullopt}},
+    {std::optional<bool>{std::nullopt}},
+    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});  // don't demand high recall
+                                                                // without refinement
+  for (uint32_t pq_len : {2}) {  // for now, only pq_len = 2 is supported, more options coming  soon
     for (uint32_t vq_n_centers : {100, 1000}) {
       for (auto input : inputs2) {
         vpq_params ps{};
@@ -1313,25 +1358,34 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {false, true},
     {false},
     {0.99},
-    {1.0f, 2.0f, 3.0f});
+    {1.0f, 2.0f, 3.0f},
+    {std::optional<vpq_params>{std::nullopt}},
+    {std::optional<bool>{std::nullopt}},
+    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Varying dim, adding non_owning_memory_buffer_flag
-  inputs2 =
-    raft::util::itertools::product<AnnCagraInputs>({100},
-                                                   {1000},
-                                                   {1, 5, 8, 64, 137, 256, 619, 1024},  // dim
-                                                   {10},
-                                                   {graph_build_algo::IVF_PQ},
-                                                   {search_algo::AUTO},
-                                                   {10},
-                                                   {0},  // team_size
-                                                   {64},
-                                                   {1},
-                                                   {cuvs::distance::DistanceType::L2Expanded},
-                                                   {false},
-                                                   {false},
-                                                   {0.995});
+  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
+    {100},
+    {1000},
+    {1, 5, 8, 64, 137, 256, 619, 1024},  // dim
+    {10},
+    {graph_build_algo::IVF_PQ},
+    {search_algo::AUTO},
+    {10},
+    {0},  // team_size
+    {64},
+    {1},
+    {cuvs::distance::DistanceType::L2Expanded},
+    {false},
+    {false},
+    {0.995},
+    {std::optional<float>{std::nullopt}},
+    {std::optional<vpq_params>{std::nullopt}},
+    {std::optional<bool>{std::nullopt}},
+    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+     cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
   for (auto input : inputs2) {
     input.non_owning_memory_buffer_flag = true;
     inputs.push_back(input);

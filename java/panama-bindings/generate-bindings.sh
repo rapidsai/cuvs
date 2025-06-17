@@ -36,7 +36,7 @@ jextract \
  --include-dir ${REPODIR}/cpp/include \
  --output "${REPODIR}/java/cuvs-java/src/main/java22/" \
  --target-package ${TARGET_PACKAGE} \
- --header-class-name PanamaFFMAPI \
+ --library cuvs_c \
  ${CURDIR}/headers.h
 
 echo "Panama FFM API bindings generation done"

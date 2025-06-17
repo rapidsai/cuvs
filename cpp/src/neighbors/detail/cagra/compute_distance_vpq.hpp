@@ -80,7 +80,11 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
     if (dataset.pq_bits() != PqBits) { return -1.0; }
     if (dataset.pq_len() != PqLen) { return -1.0; }
     // Otherwise, favor the closest dataset dimensionality.
-    return 1.0 / (0.1 + std::abs(double(dataset.dim()) - double(DatasetBlockDim)));
+    constexpr std::uint32_t preferred_load_elmes_per_thread =
+      16; /*magic number that is good based on experiments.*/
+    return 1.0 / (0.1 + std::abs(double(dataset.dim()) - double(DatasetBlockDim))) * TeamSize +
+           1.0 / (0.1 + std::abs(double(dataset.dim()) / TeamSize / PqLen -
+                                 preferred_load_elmes_per_thread));
   }
 
  private:

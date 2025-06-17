@@ -491,11 +491,12 @@ __device__ __forceinline__ void remove_duplicates(
 template <typename Index_t, typename ID_t = InternalID_t<Index_t>>
 RAFT_KERNEL
 #ifdef __CUDA_ARCH__
-#if (__CUDA_ARCH__) == 750 || ((__CUDA_ARCH__) >= 860 && (__CUDA_ARCH__) <= 890) || \
-  (__CUDA_ARCH__) == 1200
-__launch_bounds__(BLOCK_SIZE)
-#else
+// Use minBlocksPerMultiprocessor = 4 on specific arches
+#if (__CUDA_ARCH__) == 700 || (__CUDA_ARCH__) == 800 || (__CUDA_ARCH__) == 900 || \
+  (__CUDA_ARCH__) == 1000
 __launch_bounds__(BLOCK_SIZE, 4)
+#else
+__launch_bounds__(BLOCK_SIZE)
 #endif
 #endif
   local_join_kernel(const Index_t* graph_new,
@@ -632,6 +633,9 @@ __launch_bounds__(BLOCK_SIZE, 4)
         s_distances[i] = l2_norms[new_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
                          l2_norms[new_neighbors[i / SKEWED_MAX_NUM_BI_SAMPLES]] -
                          2.0 * s_distances[i];
+        // for fp32 vs fp16 precision differences resulting in negative distances when distance
+        // should be 0 related issue: https://github.com/rapidsai/cuvs/issues/991
+        s_distances[i] = s_distances[i] < 0.0f ? 0.0f : s_distances[i];
       }
     } else {
       s_distances[i] = std::numeric_limits<float>::max();
@@ -713,6 +717,9 @@ __launch_bounds__(BLOCK_SIZE, 4)
         s_distances[i] = l2_norms[old_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
                          l2_norms[new_neighbors[i / SKEWED_MAX_NUM_BI_SAMPLES]] -
                          2.0 * s_distances[i];
+        // for fp32 vs fp16 precision differences resulting in negative distances when distance
+        // should be 0 related issue: https://github.com/rapidsai/cuvs/issues/991
+        s_distances[i] = s_distances[i] < 0.0f ? 0.0f : s_distances[i];
       }
     } else {
       s_distances[i] = std::numeric_limits<float>::max();
@@ -1246,8 +1253,13 @@ void build(raft::resources const& res,
            index<IdxT>& idx)
 {
   size_t extended_graph_degree, graph_degree;
-  auto build_config =
-    get_build_config(res, params, dataset, idx.metric(), extended_graph_degree, graph_degree);
+  auto build_config = get_build_config(res,
+                                       params,
+                                       static_cast<size_t>(dataset.extent(0)),
+                                       static_cast<size_t>(dataset.extent(1)),
+                                       idx.metric(),
+                                       extended_graph_degree,
+                                       graph_degree);
 
   auto int_graph =
     raft::make_host_matrix<int, int64_t, raft::row_major>(dataset.extent(0), extended_graph_degree);

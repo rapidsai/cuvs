@@ -2861,6 +2861,10 @@ void extract_centers(raft::resources const& res,
                      const index<int64_t>& index,
                      raft::device_matrix_view<float, uint32_t, raft::row_major> cluster_centers);
 
+/** @copydoc extract_centers */
+void extract_centers(raft::resources const& res,
+                     const index<int64_t>& index,
+                     raft::host_matrix_view<float, uint32_t, raft::row_major> cluster_centers);
 /**
  * @brief Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
  * modified externally.
