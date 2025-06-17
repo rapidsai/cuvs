@@ -21,12 +21,14 @@ import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
+import com.nvidia.cuvs.TieredIndex;
 import com.nvidia.cuvs.CagraMergeParams;
 import com.nvidia.cuvs.internal.BruteForceIndexImpl;
 import com.nvidia.cuvs.internal.CagraIndexImpl;
 import com.nvidia.cuvs.internal.CuVSResourcesImpl;
 import com.nvidia.cuvs.internal.DatasetImpl;
 import com.nvidia.cuvs.internal.HnswIndexImpl;
+import com.nvidia.cuvs.internal.TieredIndexImpl;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -59,6 +61,11 @@ final class JDKProvider implements CuVSProvider {
   @Override
   public HnswIndex.Builder newHnswIndexBuilder(CuVSResources cuVSResources) {
     return HnswIndexImpl.newBuilder(Objects.requireNonNull(cuVSResources));
+  }
+
+  @Override
+  public TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources) {
+    return TieredIndexImpl.newBuilder(Objects.requireNonNull(cuVSResources));
   }
 
   @Override
