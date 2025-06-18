@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -654,14 +654,12 @@ void fit(const raft::resources& handle,
     //   samples in cluster-i.
     // Note - when wtInCluster[i] is 0, newCentroid[i] is reset to 0
 
-    raft::linalg::matrixVectorOp(
+    raft::linalg::matrixVectorOp<true, false>(
       newCentroids.data_handle(),
       newCentroids.data_handle(),
       wtInCluster.data_handle(),
       newCentroids.extent(1),
       newCentroids.extent(0),
-      true,
-      false,
       cuda::proclaim_return_type<DataT>([=] __device__(DataT mat, DataT vec) {
         if (vec == 0)
           return DataT(0);
