@@ -9,11 +9,12 @@ import java.lang.invoke.VarHandle;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.LongToIntFunction;
 
 public abstract class SearchResultsImpl implements SearchResults {
 
   protected final List<Map<Integer, Float>> results;
-  protected final List<Integer> mapping; // TODO: Is this performant in a user application?
+  protected final LongToIntFunction mapping;
 
   protected final MemorySegment neighboursMemorySegment;
   protected final MemorySegment distancesMemorySegment;
@@ -23,7 +24,7 @@ public abstract class SearchResultsImpl implements SearchResults {
   protected final VarHandle distancesVarHandle;
 
   protected SearchResultsImpl(SequenceLayout neighboursSequenceLayout, SequenceLayout distancesSequenceLayout,
-      MemorySegment neighboursMemorySegment, MemorySegment distancesMemorySegment, int topK, List<Integer> mapping,
+      MemorySegment neighboursMemorySegment, MemorySegment distancesMemorySegment, int topK, LongToIntFunction mapping,
       long numberOfQueries) {
     this.topK = topK;
     this.numberOfQueries = numberOfQueries;

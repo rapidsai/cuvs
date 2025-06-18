@@ -242,7 +242,7 @@ public class CagraIndexImpl implements CagraIndex {
   public SearchResults search(CagraQuery query) throws Throwable {
     try (var localArena = Arena.ofConfined()) {
       checkNotDestroyed();
-      int topK = query.getMapping() != null ? Math.min(query.getMapping().size(), query.getTopK()) : query.getTopK();
+      int topK = query.getTopK();
       long numQueries = query.getQueryVectors().length;
       long numBlocks = topK * numQueries;
       int vectorDimension = numQueries > 0 ? query.getQueryVectors()[0].length : 0;
