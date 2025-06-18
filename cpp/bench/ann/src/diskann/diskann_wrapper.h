@@ -52,13 +52,13 @@ class diskann_memory : public algo<T> {
     uint32_t L_build;
     uint32_t build_pq_bytes = 0;
     float alpha             = 1.2;
-    int num_threads         = omp_get_num_procs();
+    int num_threads         = omp_get_max_threads();
   };
 
   using search_param_base = typename algo<T>::search_param;
   struct search_param : public search_param_base {
     uint32_t L_search;
-    uint32_t num_threads = omp_get_num_procs();
+    uint32_t num_threads = omp_get_max_threads();
     // Mode metric_objective;
   };
 
@@ -226,7 +226,7 @@ class diskann_ssd : public algo<T> {
   [[nodiscard]] auto get_preference() const -> algo_property override
   {
     algo_property property;
-    property.dataset_memory_type = MemoryType::kHost;
+    property.dataset_memory_type = MemoryType::kHostMmap;
     property.query_memory_type   = MemoryType::kHost;
     return property;
   }
