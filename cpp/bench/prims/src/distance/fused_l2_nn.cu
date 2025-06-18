@@ -2,6 +2,7 @@
 #include <iostream>
 #include "common.cuh"
 #include "cublas_sample.cu"
+#include "tensor_core.cu"
 
 #include <raft/core/resource/cuda_stream.hpp>
 

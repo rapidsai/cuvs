@@ -31,6 +31,49 @@
     }                                                                    \
   } while (0)
 
+template <typename DataT, typename AccT, typename OutT, typename IdxT>
+class OutAccessor {
+  public:
+    __device__ __host__ inline void set_value(AccT value) {
+      if constexpr (std::is_same<OutT, double>() || std::is_same<OutT, float>() ||
+                    std::is_same<OutT, half>() || std::is_same<OutT, int8_t>()) {
+        this->out = value;
+      } if constexpr (std::is_same<OutT, raft::KeyValuePair<IdxT, AccT>>()) {
+        this->out.value = value;
+      } else {
+        static_assert(false, "Type of out variable is unsupported");
+      }
+    }
+    __device__ __host__ inline void set_key(IdxT key) {
+      if constexpr (std::is_same<OutT, double>() || std::is_same<OutT, float>() ||
+                    std::is_same<OutT, half>() || std::is_same<OutT, int8_t>()) {
+        // we are not storing key information
+      } if constexpr (std::is_same<OutT, raft::KeyValuePair<IdxT, AccT>>()) {
+        this->out.key= key;
+      } else {
+        static_assert(false, "Type of out variable is unsupported");
+      }
+    }
+    __device__ __host__ inline AccT get_value() {
+      if constexpr (std::is_same<OutT, double>() || std::is_same<OutT, float>() ||
+                    std::is_same<OutT, half>() || std::is_same<OutT, int8_t>()) {
+        return this->out;
+      } if constexpr (std::is_same<OutT, raft::KeyValuePair<IdxT, AccT>>()) {
+        return this->out.value;
+      } else {
+        static_assert(false, "Type of out variable is unsupported");
+      }
+    }
+    __device__ __host__ inline IdxT get_key() {
+      if constexpr (std::is_same<OutT, double>() || std::is_same<OutT, float>() ||
+                    std::is_same<OutT, half>() || std::is_same<OutT, int8_t>()) {
+      } if constexpr (std::is_same<OutT, raft::KeyValuePair<IdxT, AccT>>()) {
+        return this->out.key;
+      } else {
+        static_assert(false, "Type of out variable is unsupported");
+      }
+    }
+
 
 template <typename T>
 __host__ __device__ T max_val() {
