@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -154,7 +154,7 @@ void build_knn_graph(
   }();
 
   RAFT_LOG_DEBUG("# Building IVF-PQ index %s", model_name.c_str());
-  auto index             = cuvs::neighbors::ivf_pq::build(res, pq.build_params, dataset);
+  auto index = cuvs::neighbors::ivf_pq::build(res, pq.build_params, dataset);
 
   //
   // search top (k + 1) neighbors
