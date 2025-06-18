@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2020-2024, NVIDIA CORPORATION.
+# Copyright (c) 2020-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -344,6 +344,9 @@ if(BUILD_SHARED_LIBS)
     src/distance/detail/pairwise_matrix/dispatch_cosine_float_float_float_int.cu
     src/distance/detail/pairwise_matrix/dispatch_cosine_half_float_float_int.cu
     src/distance/detail/pairwise_matrix/dispatch_cosine_double_double_double_int.cu
+    src/distance/detail/pairwise_matrix/dispatch_dice_float_float_float_int.cu
+    src/distance/detail/pairwise_matrix/dispatch_dice_half_float_float_int.cu
+    src/distance/detail/pairwise_matrix/dispatch_dice_double_double_double_int.cu
     src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_float_float_float_int.cu
     src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_half_float_float_int.cu
     src/distance/detail/pairwise_matrix/dispatch_hamming_unexpanded_double_double_double_int.cu

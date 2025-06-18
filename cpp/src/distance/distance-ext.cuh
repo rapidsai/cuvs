@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2018-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -223,6 +223,7 @@ void pairwise_distance(raft::resources const& handle,
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::Canberra);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::CorrelationExpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::CosineExpanded);
+instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::DiceExpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::HammingUnexpanded);
 
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::HellingerExpanded);
@@ -310,6 +311,7 @@ instantiate_cuvs_distance_getWorkspaceSize_by_algo(cuvs::distance::DistanceType:
 instantiate_cuvs_distance_getWorkspaceSize_by_algo(
   cuvs::distance::DistanceType::CorrelationExpanded);
 instantiate_cuvs_distance_getWorkspaceSize_by_algo(cuvs::distance::DistanceType::CosineExpanded);
+instantiate_cuvs_distance_getWorkspaceSize_by_algo(cuvs::distance::DistanceType::DiceExpanded);
 instantiate_cuvs_distance_getWorkspaceSize_by_algo(cuvs::distance::DistanceType::HammingUnexpanded);
 
 instantiate_cuvs_distance_getWorkspaceSize_by_algo(cuvs::distance::DistanceType::HellingerExpanded);
