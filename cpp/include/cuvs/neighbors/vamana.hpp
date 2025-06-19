@@ -237,7 +237,8 @@ struct index : cuvs::neighbors::index {
   /**
    * @brief Replace the current quantized dataset with a new quantized dataset.
    *
-   * Ownership of the new quantized dataset is transferred to the index.
+   * We create a copy of the quantized dataset on the device. The index manages the lifetime of this
+   * copy.
    *
    * @param[in] res
    * @param[in] new_quantized_dataset the new quantized dataset for the index
@@ -245,9 +246,22 @@ struct index : cuvs::neighbors::index {
    */
   void update_quantized_dataset(
     raft::resources const& res,
-    raft::device_matrix<uint8_t, int64_t, raft::row_major>&& new_quantized_dataset)
+    raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> new_quantized_dataset)
   {
-    quantized_dataset_ = new_quantized_dataset;
+    RAFT_LOG_DEBUG("Creating device copy of Vamana quantized dataset");
+    if ((quantized_dataset_.extent(0) != new_quantized_dataset.extent(0)) ||
+        (quantized_dataset_.extent(1) != new_quantized_dataset.extent(1))) {
+      // clear existing memory before allocating to prevent OOM errors on large datasets
+      if (quantized_dataset_.size()) {
+        quantized_dataset_ = raft::make_device_matrix<uint8_t, int64_t>(res, 0, 0);
+      }
+      quantized_dataset_ = raft::make_device_matrix<uint8_t, int64_t>(
+        res, new_quantized_dataset.extent(0), new_quantized_dataset.extent(1));
+    }
+    raft::copy(quantized_dataset_.data_handle(),
+               new_quantized_dataset.data_handle(),
+               new_quantized_dataset.size(),
+               raft::resource::get_cuda_stream(res));
   }
 
  private:

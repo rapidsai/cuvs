@@ -544,7 +544,8 @@ index<T, IdxT> build(
   try {
     auto idx = index<T, IdxT>(
       res, params.metric, dataset, raft::make_const_mdspan(vamana_graph.view()), medoid_id);
-    if (quantized_vectors) idx.update_quantized_dataset(res, std::move(quantized_vectors.value()));
+    if (quantized_vectors)
+      idx.update_quantized_dataset(res, raft::make_const_mdspan(quantized_vectors.value().view()));
     return idx;
   } catch (std::bad_alloc& e) {
     RAFT_LOG_DEBUG("Insufficient GPU memory to construct VAMANA index with dataset on GPU");
