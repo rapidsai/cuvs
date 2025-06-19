@@ -24,7 +24,7 @@ import java.lang.foreign.MemorySegment;
 
 import com.nvidia.cuvs.Dataset;
 
-public class DatasetImpl implements Dataset, MemorySegmentProvider {
+public class DatasetImpl implements Dataset {
   private final Arena arena;
   protected final MemorySegment seg;
   private final int size;
@@ -38,7 +38,7 @@ public class DatasetImpl implements Dataset, MemorySegmentProvider {
     MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout((long)size * dimensions, C_FLOAT);
 
     this.arena = Arena.ofShared();
-    seg = arena.allocate(dataMemoryLayout);
+    this.seg = arena.allocate(dataMemoryLayout);
   }
 
   public DatasetImpl(Arena arena, MemorySegment memorySegment, int size, int dimensions) {
@@ -57,7 +57,7 @@ public class DatasetImpl implements Dataset, MemorySegmentProvider {
 
   @Override
   public void close() {
-    if (arena != null && !arena.scope().isAlive()) {
+    if (arena != null) {
       arena.close();
     }
   }
@@ -72,7 +72,6 @@ public class DatasetImpl implements Dataset, MemorySegmentProvider {
     return dimensions;
   }
 
-  @Override
   public MemorySegment asMemorySegment() {
       return seg;
   }

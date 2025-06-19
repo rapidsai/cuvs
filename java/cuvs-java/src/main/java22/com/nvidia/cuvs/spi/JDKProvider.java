@@ -100,7 +100,6 @@ final class JDKProvider implements CuVSProvider {
       int size = vectors.length;
       int dimensions = vectors[0].length;
 
-      // TODO: should we use the Arena from CuVsResources here instead?
       Arena arena = Arena.ofShared();
       var memorySegment = Util.buildMemorySegment(arena, vectors);
       return new DatasetImpl(arena, memorySegment, size, dimensions);

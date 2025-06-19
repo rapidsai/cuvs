@@ -17,12 +17,15 @@
 package com.nvidia.cuvs;
 
 import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
+import org.openjdk.jmh.annotations.Mode;
+import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
-import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.infra.Blackhole;
 
 import java.lang.foreign.*;
@@ -30,6 +33,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Fork(value = 1, warmups = 0)
 @State(Scope.Benchmark)
@@ -156,6 +160,24 @@ public class CagraIndexBenchmarks {
                 .withIndexParams(indexParams)
                 .build();
             blackhole.consume(index);
+        }
+    }
+
+    @Benchmark
+    @OutputTimeUnit(TimeUnit.NANOSECONDS)
+    @BenchmarkMode(Mode.AverageTime)
+    public void testDatasetFromHeap(Blackhole blackhole) throws Throwable {
+        try (var dataset = Dataset.ofArray(arrayDataset)) {
+            blackhole.consume(dataset);
+        }
+    }
+
+    @Benchmark
+    @OutputTimeUnit(TimeUnit.NANOSECONDS)
+    @BenchmarkMode(Mode.AverageTime)
+    public void testDatasetFromMemorySegment(Blackhole blackhole) throws Throwable {
+        try (var dataset = Dataset.ofMemorySegment(memorySegmentDataset, size, dims)) {
+            blackhole.consume(dataset);
         }
     }
 }
