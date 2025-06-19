@@ -51,19 +51,21 @@ struct __align__(16) DistPair {
   accT dist;
   IdxT idx;
 
-  __device__ __host__ DistPair& operator=(const DistPair& other)
-  {
-    dist = other.dist;
-    idx  = other.idx;
-    return *this;
-  }
+  /*
+    __device__ __host__ DistPair& operator=(const DistPair& other)
+    {
+      dist = other.dist;
+      idx  = other.idx;
+      return *this;
+    }
 
-  __device__ __host__ DistPair& operator=(const volatile DistPair& other)
-  {
-    dist = other.dist;
-    idx  = other.idx;
-    return *this;
-  }
+    __device__ __host__ DistPair& operator=(const volatile DistPair& other)
+    {
+      dist = other.dist;
+      idx  = other.idx;
+      return *this;
+    }
+    */
 };
 
 // Swap the values of two DistPair<SUMTYPE> objects
@@ -80,13 +82,24 @@ __device__ __host__ void swap(DistPair<IdxT, accT>* a, DistPair<IdxT, accT>* b)
 }
 
 // Structure to sort by distance
+template <typename IdxT, typename accT>
 struct CmpDist {
+  __device__ bool operator()(const DistPair<IdxT, accT>& lhs, const DistPair<IdxT, accT>& rhs)
+  {
+    return lhs.dist < rhs.dist;
+  }
+};
+
+// Structure to sort by distance
+/*
+struct CmpDist2 {
   template <typename IdxT, typename accT>
   __device__ bool operator()(const DistPair<IdxT, accT>& lhs, const DistPair<IdxT, accT>& rhs)
   {
     return lhs.dist < rhs.dist;
   }
 };
+*/
 
 // Used to sort reverse edges by destination
 template <typename IdxT>
@@ -309,19 +322,20 @@ __global__ void init_query_candidate_list(QueryCandidates<IdxT, accT>* query_lis
                                           IdxT* visited_id_ptr,
                                           accT* visited_dist_ptr,
                                           int num_queries,
-                                          int maxSize)
+                                          int maxSize,
+                                          int extra_queries_in_list = 0)
 {
   IdxT* ids_ptr  = static_cast<IdxT*>(visited_id_ptr);
   accT* dist_ptr = static_cast<accT*>(visited_dist_ptr);
 
   for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < num_queries * maxSize;
-       i += blockDim.x + gridDim.x) {
+       i += blockDim.x * gridDim.x) {
     ids_ptr[i]  = raft::upper_bound<IdxT>();
     dist_ptr[i] = raft::upper_bound<accT>();
   }
 
-  for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < num_queries;
-       i += blockDim.x + gridDim.x) {
+  for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < num_queries + extra_queries_in_list;
+       i += blockDim.x * gridDim.x) {
     query_list[i].maxSize = maxSize;
     query_list[i].size    = 0;
     query_list[i].ids     = &ids_ptr[i * (size_t)(maxSize)];
@@ -393,7 +407,12 @@ __global__ void write_graph_edges_kernel(raft::device_matrix_view<IdxT, int64_t>
 // Create src and dest edge lists used to sort and create reverse edges
 template <typename accT, typename IdxT = uint32_t>
 __global__ void create_reverse_edge_list(
-  void* query_list_ptr, int num_queries, int degree, IdxT* edge_src, IdxT* edge_dest)
+  //  void* query_list_ptr, int num_queries, int degree, IdxT* edge_src, IdxT* edge_dest)
+  void* query_list_ptr,
+  int num_queries,
+  int degree,
+  IdxT* edge_src,
+  DistPair<IdxT, accT>* edge_dest)
 {
   QueryCandidates<IdxT, accT>* query_list =
     static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
@@ -404,8 +423,9 @@ __global__ void create_reverse_edge_list(
     int cand_count = query_list[i + 1].size - query_list[i].size;
 
     for (int j = 0; j < cand_count; j++) {
-      edge_src[query_list[i].size + j]  = query_list[i].queryId;
-      edge_dest[query_list[i].size + j] = query_list[i].ids[j];
+      edge_src[query_list[i].size + j]       = query_list[i].queryId;
+      edge_dest[query_list[i].size + j].idx  = query_list[i].ids[j];
+      edge_dest[query_list[i].size + j].dist = query_list[i].dists[j];
     }
   }
 }
