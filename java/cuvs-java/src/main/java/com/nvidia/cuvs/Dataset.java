@@ -29,11 +29,24 @@ import com.nvidia.cuvs.spi.CuVSProvider;
 public interface Dataset extends AutoCloseable {
 
   /**
+   * Creates a dataset from a on-heap array of vectors
+   *
+   * @since 25.08
+   */
+  static Dataset ofArray(float[][] vectors) {
+      return CuVSProvider.provider().newArrayDataset(vectors);
+  }
+
+  static Dataset ofMemorySegment(Object memorySegment, int size, int dimensions) {
+      return CuVSProvider.provider().newMemoryDataset(memorySegment, size, dimensions);
+  }
+
+  /**
    * Add a single vector to the dataset.
    *
    * @param vector A float array of as many elements as the dimensions
    */
-  public void addVector(float[] vector);
+  void addVector(float[] vector);
 
   /**
    * Create a new instance of a dataset
@@ -51,12 +64,12 @@ public interface Dataset extends AutoCloseable {
    *
    * @return Size of the dataset
    */
-  public int size();
+  int size();
 
   /**
    * Gets the dimensions of the vectors in this dataset
    *
    * @return Dimensions of the vectors in the dataset
    */
-  public int dimensions();
+  int dimensions();
 }
