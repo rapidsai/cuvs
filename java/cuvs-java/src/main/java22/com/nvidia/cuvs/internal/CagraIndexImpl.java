@@ -187,7 +187,7 @@ public class CagraIndexImpl implements CagraIndex {
 
       Arena arena = resources.getArena();
       assert dataset instanceof MemorySegmentProvider;
-      MemorySegment dataSeg = ((MemorySegmentProvider) dataset).asMemorySegment(arena);
+      MemorySegment dataSeg = ((MemorySegmentProvider) dataset).asMemorySegment();
 
       long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
       MemorySegment stream = arena.allocate(cudaStream_t);

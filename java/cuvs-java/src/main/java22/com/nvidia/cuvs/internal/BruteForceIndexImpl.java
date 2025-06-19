@@ -148,7 +148,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
 
       Arena arena = resources.getArena();
       assert dataset instanceof MemorySegmentProvider;
-      MemorySegment datasetMemSegment = ((MemorySegmentProvider) dataset).asMemorySegment(arena);
+      MemorySegment datasetMemSegment = ((MemorySegmentProvider) dataset).asMemorySegment();
 
       long cuvsResources = resources.getMemorySegment().get(cuvsResources_t, 0);
       MemorySegment stream = arena.allocate(cudaStream_t);

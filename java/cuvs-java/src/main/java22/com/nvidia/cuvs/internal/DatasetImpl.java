@@ -35,14 +35,14 @@ public class DatasetImpl implements Dataset, MemorySegmentProvider {
     this.size = size;
     this.dimensions = dimensions;
 
-    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout(size * dimensions, C_FLOAT);
+    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout((long)size * dimensions, C_FLOAT);
 
     this.arena = Arena.ofShared();
     seg = arena.allocate(dataMemoryLayout);
   }
 
-  public DatasetImpl(MemorySegment memorySegment, int size, int dimensions) {
-    this.arena = null;
+  public DatasetImpl(Arena arena, MemorySegment memorySegment, int size, int dimensions) {
+    this.arena = arena;
     this.seg = memorySegment;
     this.size = size;
     this.dimensions = dimensions;
@@ -52,12 +52,12 @@ public class DatasetImpl implements Dataset, MemorySegmentProvider {
   public void addVector(float[] vector) {
     if (current >= size)
       throw new ArrayIndexOutOfBoundsException();
-    MemorySegment.copy(vector, 0, seg, C_FLOAT, ((current++) * dimensions * C_FLOAT.byteSize()), (int) dimensions);
+    MemorySegment.copy(vector, 0, seg, C_FLOAT, ((current++) * dimensions * C_FLOAT.byteSize()), dimensions);
   }
 
   @Override
   public void close() {
-    if (!arena.scope().isAlive()) {
+    if (arena != null && !arena.scope().isAlive()) {
       arena.close();
     }
   }
@@ -73,7 +73,7 @@ public class DatasetImpl implements Dataset, MemorySegmentProvider {
   }
 
   @Override
-  public MemorySegment asMemorySegment(Arena arena) {
+  public MemorySegment asMemorySegment() {
       return seg;
   }
 }
