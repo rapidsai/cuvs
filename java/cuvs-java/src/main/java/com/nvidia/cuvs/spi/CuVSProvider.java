@@ -55,6 +55,8 @@ public interface CuVSProvider {
   /** Create a {@link Dataset} instance **/
   Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException;
 
+  Dataset newMemoryDataset(Object memorySegment, int size, int dimensions);
+
   /** Create a {@link Dataset} backed by a on-heap array **/
   Dataset newArrayDataset(float[][] vectors);
 

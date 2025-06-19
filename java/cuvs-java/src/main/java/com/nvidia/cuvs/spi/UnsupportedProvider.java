@@ -60,6 +60,11 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
+  public Dataset newMemoryDataset(Object memorySegment, int size, int dimensions) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public Dataset newArrayDataset(float[][] vectors) {
     throw new UnsupportedOperationException();
   }

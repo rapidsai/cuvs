@@ -43,6 +43,10 @@ public class CagraIndexBenchmarks {
 
     private float[][] arrayDataset;
 
+    private Arena arena;
+
+    private MemorySegment memorySegmentDataset;
+
     private static final Random random = new Random();
 
     private static float[][] createSampleData(int size, int dimensions) {
@@ -55,9 +59,31 @@ public class CagraIndexBenchmarks {
         return array;
     }
 
+    private static MemorySegment createSampleDataSegment(Arena arena, float[][] array, int size, int dimensions) {
+        final ValueLayout.OfFloat C_FLOAT = (ValueLayout.OfFloat) Linker.nativeLinker().canonicalLayouts().get("float");
+
+        MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout((long)size * dimensions, C_FLOAT);
+
+        var segment = arena.allocate(dataMemoryLayout);
+        for (int i = 0; i < size; ++i) {
+            var vector = array[i];
+            MemorySegment.copy(vector, 0, segment, C_FLOAT, (i * dimensions * C_FLOAT.byteSize()), dimensions);
+        }
+        return segment;
+    }
+
     @Setup
     public void initialize() {
+        arena = Arena.ofShared();
         arrayDataset = createSampleData(size, dims);
+        memorySegmentDataset = createSampleDataSegment(arena, arrayDataset, size, dims);
+    }
+
+    @TearDown
+    public void cleanUp() {
+        if (arena != null) {
+            arena.close();
+        }
     }
 
     @Benchmark
@@ -106,6 +132,27 @@ public class CagraIndexBenchmarks {
             // Create the index with the dataset
             CagraIndex index = CagraIndex.newBuilder(resources)
                 .withDataset(arrayDataset)
+                .withIndexParams(indexParams)
+                .build();
+            blackhole.consume(index);
+        }
+    }
+
+    @Benchmark
+    public void testIndexingFromMemorySegment(Blackhole blackhole) throws Throwable {
+        try (CuVSResources resources = CuVSResources.create()) {
+            // Configure index parameters
+            CagraIndexParams indexParams = new CagraIndexParams.Builder()
+                .withCagraGraphBuildAlgo(CagraIndexParams.CagraGraphBuildAlgo.NN_DESCENT)
+                .withGraphDegree(1)
+                .withIntermediateGraphDegree(2)
+                .withNumWriterThreads(32)
+                .withMetric(CagraIndexParams.CuvsDistanceType.L2Expanded)
+                .build();
+
+            // Create the index with the dataset
+            CagraIndex index = CagraIndex.newBuilder(resources)
+                .withDataset(Dataset.ofMemorySegment(memorySegmentDataset, size, dims))
                 .withIndexParams(indexParams)
                 .build();
             blackhole.consume(index);

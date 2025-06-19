@@ -41,6 +41,13 @@ public class DatasetImpl implements Dataset, MemorySegmentProvider {
     seg = arena.allocate(dataMemoryLayout);
   }
 
+  public DatasetImpl(MemorySegment memorySegment, int size, int dimensions) {
+    this.arena = null;
+    this.seg = memorySegment;
+    this.size = size;
+    this.dimensions = dimensions;
+  }
+
   @Override
   public void addVector(float[] vector) {
     if (current >= size)

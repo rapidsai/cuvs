@@ -29,6 +29,7 @@ import com.nvidia.cuvs.internal.CuVSResourcesImpl;
 import com.nvidia.cuvs.internal.DatasetImpl;
 import com.nvidia.cuvs.internal.HnswIndexImpl;
 
+import java.lang.foreign.MemorySegment;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -82,6 +83,12 @@ final class JDKProvider implements CuVSProvider {
   public Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException {
       return new DatasetImpl(size, dimensions);
   }
+
+  @Override
+  public Dataset newMemoryDataset(Object memorySegment, int size, int dimensions) {
+      return new DatasetImpl((MemorySegment) memorySegment, size, dimensions);
+  }
+
 
   @Override
   public Dataset newArrayDataset(float[][] vectors) {
