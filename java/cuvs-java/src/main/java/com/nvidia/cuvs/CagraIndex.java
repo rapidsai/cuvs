@@ -100,6 +100,16 @@ public interface CagraIndex {
     void serialize(OutputStream outputStream, Path tempFile, int bufferLength) throws Throwable;
 
     /**
+     * A method to persist a CAGRA index using a {@link java.lang.foreign.MemorySegment}
+     * for writing index bytes.
+     *
+     * @param memoryStream an instance of {@link java.lang.foreign.MemorySegment} to write the index
+     *                     bytes into
+     * @return a MemorySegment containing the serialized data
+     */
+    Object serialize(Object memoryStream);
+
+    /**
      * A method to create and persist HNSW index from CAGRA index using an instance
      * of {@link OutputStream} and path to the intermediate temporary file.
      *
@@ -144,13 +154,6 @@ public interface CagraIndex {
      *                     value is 1024
      */
     void serializeToHNSW(OutputStream outputStream, Path tempFile, int bufferLength) throws Throwable;
-
-    /**
-     * Gets an instance of {@link CagraIndexParams}
-     *
-     * @return an instance of {@link CagraIndexParams}
-     */
-    CagraIndexParams getCagraIndexParameters();
 
     /**
      * Gets an instance of {@link CuVSResources}
