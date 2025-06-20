@@ -27,24 +27,25 @@ import static com.nvidia.cuvs.internal.common.Util.concatenate;
 import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
 import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.*;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
+import static com.nvidia.cuvs.internal.panama.headers_h.cudaStream_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraBuild;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraDeserialize;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndexCreate;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndexDestroy;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndexGetDims;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndex_t;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSearch;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraMerge;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraMergeParams_t;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSearch;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSerialize;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSerializeToHnswlib;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSerializeToMemory;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMAlloc;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamGet;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
 import static com.nvidia.cuvs.internal.panama.headers_h.omp_set_num_threads;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaStream_t;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -347,6 +348,16 @@ public class CagraIndexImpl implements CagraIndex {
       return new CagraSearchResults(neighborsSequenceLayout, distancesSequenceLayout, neighborsMemorySegment,
           distancesMemorySegment, topK, query.getMapping(), numQueries);
     }
+  }
+
+  public void serialize(Object memorySegment) {
+    assert memorySegment instanceof MemorySegment;
+    var buffer = (MemorySegment) memorySegment;
+    checkNotDestroyed();
+    long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
+    var returnValue = cuvsCagraSerializeToMemory(cuvsRes, buffer, buffer.byteSize(),
+        cagraIndexReference.getMemorySegment(), true);
+    checkCuVSError(returnValue, "cuvsCagraSerializeToMemory");
   }
 
   @Override
