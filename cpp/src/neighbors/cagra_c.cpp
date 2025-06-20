@@ -233,6 +233,30 @@ void _serialize(cuvsResources_t res,
   cuvs::neighbors::cagra::serialize(*res_ptr, std::string(filename), *index_ptr, include_dataset);
 }
 
+struct _membuf: std::streambuf
+{
+  _membuf(char* p, size_t size)
+  {
+    setp( p, p + size);
+  }
+};
+
+template <typename T>
+void _serialize(cuvsResources_t res,
+                void* buffer,
+                size_t buffer_size,
+                cuvsCagraIndex_t index,
+                bool include_dataset)
+{
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(index->addr);
+
+  _membuf sbuf((char*)buffer, buffer_size);
+  std::ostream out(&sbuf);
+
+  cuvs::neighbors::cagra::serialize(*res_ptr, out, *index_ptr, include_dataset);
+}
+
 template <typename T>
 void _serialize_to_hnswlib(cuvsResources_t res, const char* filename, cuvsCagraIndex_t index)
 {
@@ -646,6 +670,27 @@ extern "C" cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
       _serialize<int8_t>(res, filename, index, include_dataset);
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
       _serialize<uint8_t>(res, filename, index, include_dataset);
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsCagraSerializeToMemory(cuvsResources_t res,
+                                                  void* buffer,
+                                                  size_t buffer_size,
+                                                  cuvsCagraIndex_t index,
+                                                  bool include_dataset)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
+      _serialize<float>(res, buffer, buffer_size, index, include_dataset);
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      _serialize<half>(res, buffer, buffer_size, index, include_dataset);
+    } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
+      _serialize<int8_t>(res, buffer, buffer_size, index, include_dataset);
+    } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
+      _serialize<uint8_t>(res, buffer, buffer_size, index, include_dataset);
     } else {
       RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
     }

@@ -575,6 +575,43 @@ cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
                                bool include_dataset);
 
 /**
+ * @defgroup cagra_c_serialize CAGRA C-API serialize functions
+ * @{
+ */
+/**
+ * Save the index to file.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.c}
+ * #include <cuvs/neighbors/cagra.h>
+ *
+ * // Create cuvsResources_t
+ * cuvsResources_t res;
+ * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+ *
+ * // create an index with `cuvsCagraBuild`
+ * size_t length = ...;
+ * void* buffer = malloc(sizeof(char) * length);
+ * cuvsCagraSerializeToMemory(res, buffer, length, index, true);
+ *
+ * // read buffer
+ * @endcode
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] buffer pointer to a buffer
+ * @param[in] size_t buffer_size the size of the buffer
+ * @param[in] index CAGRA index
+ * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ *
+ */
+cuvsError_t cuvsCagraSerializeToMemory(cuvsResources_t res,
+                                       void* buffer,
+                                       size_t buffer_size,
+                                       cuvsCagraIndex_t index,
+                                       bool include_dataset);
+
+/**
  * Save the CAGRA index to file in hnswlib format.
  * NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
  *       as the serialization format is not compatible with the original hnswlib.
