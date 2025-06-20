@@ -52,8 +52,8 @@ public interface CuVSProvider {
   CuVSResources newCuVSResources(Path tempDirectory)
       throws Throwable;
 
-  /** Create a {@link Dataset} instance **/
-  Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException;
+  /** Create a {@link Dataset.Builder} instance **/
+  Dataset.Builder newDatasetBuilder(int size, int dimensions);
 
   /** Create a {@link Dataset} backed by a on-heap array **/
   Dataset newArrayDataset(float[][] vectors);

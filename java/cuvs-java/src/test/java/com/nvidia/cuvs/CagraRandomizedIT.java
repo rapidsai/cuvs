@@ -122,10 +122,12 @@ public class CagraRandomizedIT extends CuVSTestCase {
 
       CagraIndex index;
       if (useNativeMemoryDataset) {
-          Dataset dataset = Dataset.create(vectors.length, vectors[0].length);
-          for (float[] v: vectors) dataset.addVector(v);
+          var datasetBuilder = Dataset.builder(vectors.length, vectors[0].length);
+          for (float[] v: vectors) {
+            datasetBuilder.addVector(v);
+          }
           index = CagraIndex.newBuilder(resources)
-              .withDataset(dataset)
+              .withDataset(datasetBuilder.build())
               .withIndexParams(indexParams)
               .build();
       } else {

@@ -30,9 +30,13 @@ import com.nvidia.cuvs.internal.HnswIndexImpl;
 import com.nvidia.cuvs.internal.common.Util;
 
 import java.lang.foreign.Arena;
+import java.lang.foreign.MemoryLayout;
+import java.lang.foreign.MemorySegment;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
+
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 
 final class JDKProvider implements CuVSProvider {
 
@@ -80,8 +84,27 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException {
-      return new DatasetImpl(size, dimensions);
+  public Dataset.Builder newDatasetBuilder(int size, int dimensions) throws UnsupportedOperationException {
+      MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout((long) size * dimensions, C_FLOAT);
+
+      var arena = Arena.ofShared();
+      var seg = arena.allocate(dataMemoryLayout);
+
+      return new Dataset.Builder() {
+          int current = 0;
+
+          @Override
+          public void addVector(float[] vector) {
+            if (current >= size)
+              throw new ArrayIndexOutOfBoundsException();
+            MemorySegment.copy(vector, 0, seg, C_FLOAT, ((current++) * dimensions * C_FLOAT.byteSize()), dimensions);
+          }
+
+          @Override
+          public Dataset build() {
+            return new DatasetImpl(arena, seg, size, dimensions);
+          }
+      };
   }
 
   @Override
