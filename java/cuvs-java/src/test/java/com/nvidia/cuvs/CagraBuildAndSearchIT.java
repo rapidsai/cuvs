@@ -27,6 +27,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandles;
 import java.nio.file.Files;
@@ -274,9 +275,8 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
         byte[] indexFromMemory;
         try (var arena = Arena.ofConfined()) {
           var buffer = arena.allocate(1024 * 1024);
-          index.serialize(buffer);
-          // TODO: reinterpret should happen in serialize, with data from the C call
-          indexFromMemory = buffer.reinterpret(indexFromFile.length).toArray(ValueLayout.JAVA_BYTE);
+          var serialized = (MemorySegment)index.serialize((Object) buffer);
+          indexFromMemory = serialized.toArray(ValueLayout.JAVA_BYTE);
         }
 
         assertNotNull(indexFromFile);

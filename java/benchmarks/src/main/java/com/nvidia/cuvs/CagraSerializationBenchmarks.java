@@ -74,8 +74,6 @@ public class CagraSerializationBenchmarks {
         try (var arena = Arena.ofConfined()) {
             var buffer = arena.allocate(1024 * 1024);
             index.serialize((Object) buffer);
-            // TODO: reinterpret should happen in serialize, with data from the C call
-
         }
     }
 }

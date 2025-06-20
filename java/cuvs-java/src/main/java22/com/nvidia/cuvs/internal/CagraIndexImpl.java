@@ -350,14 +350,19 @@ public class CagraIndexImpl implements CagraIndex {
     }
   }
 
-  public void serialize(Object memorySegment) {
+  @Override
+  public Object serialize(Object memorySegment) {
     assert memorySegment instanceof MemorySegment;
     var buffer = (MemorySegment) memorySegment;
     checkNotDestroyed();
     long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
-    var returnValue = cuvsCagraSerializeToMemory(cuvsRes, buffer, buffer.byteSize(),
-        cagraIndexReference.getMemorySegment(), true);
-    checkCuVSError(returnValue, "cuvsCagraSerializeToMemory");
+    try (var arena = Arena.ofConfined()) {
+      var length = arena.allocateFrom(ValueLayout.JAVA_LONG, buffer.byteSize());
+      var returnValue = cuvsCagraSerializeToMemory(cuvsRes, buffer, length,
+          cagraIndexReference.getMemorySegment(), true);
+      checkCuVSError(returnValue, "cuvsCagraSerializeToMemory");
+      return buffer.reinterpret(length.get(ValueLayout.JAVA_LONG, 0));
+    }
   }
 
   @Override

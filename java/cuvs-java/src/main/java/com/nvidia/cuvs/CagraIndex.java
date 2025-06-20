@@ -105,8 +105,9 @@ public interface CagraIndex {
      *
      * @param memoryStream an instance of {@link java.lang.foreign.MemorySegment} to write the index
      *                     bytes into
+     * @return a MemorySegment containing the serialized data
      */
-    void serialize(Object memoryStream);
+    Object serialize(Object memoryStream);
 
     /**
      * A method to create and persist HNSW index from CAGRA index using an instance

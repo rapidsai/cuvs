@@ -600,14 +600,14 @@ cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] buffer pointer to a buffer
- * @param[in] size_t buffer_size the size of the buffer
+ * @param[in/out] length the size of the buffer; the function will update it with the number of bytes written
  * @param[in] index CAGRA index
  * @param[in] include_dataset Whether or not to write out the dataset to the file.
  *
  */
 cuvsError_t cuvsCagraSerializeToMemory(cuvsResources_t res,
                                        void* buffer,
-                                       size_t buffer_size,
+                                       size_t* length,
                                        cuvsCagraIndex_t index,
                                        bool include_dataset);
 
