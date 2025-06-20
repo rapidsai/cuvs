@@ -72,7 +72,6 @@ import com.nvidia.cuvs.CuVSIvfPqSearchParams;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.SearchResults;
-import com.nvidia.cuvs.internal.common.Util;
 import com.nvidia.cuvs.internal.panama.cuvsCagraCompressionParams;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndex;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndexParams;
@@ -97,10 +96,7 @@ import java.util.BitSet;
  * @since 25.02
  */
 public class CagraIndexImpl implements CagraIndex {
-  private final float[][] vectors;
-  private final Dataset dataset;
   private final CuVSResourcesImpl resources;
-  private final CagraIndexParams cagraIndexParameters;
   private final IndexReference cagraIndexReference;
   private boolean destroyed;
 
@@ -112,13 +108,13 @@ public class CagraIndexImpl implements CagraIndex {
    * @param dataset         the dataset for indexing
    * @param resources       an instance of {@link CuVSResources}
    */
-  private CagraIndexImpl(CagraIndexParams indexParameters, float[][] vectors,
-      Dataset dataset, CuVSResourcesImpl resources) throws Throwable {
-    this.cagraIndexParameters = indexParameters;
-    this.vectors = vectors;
-    this.dataset = dataset;
-    this.resources = resources;
-    this.cagraIndexReference = build();
+  private CagraIndexImpl(CagraIndexParams indexParameters, Dataset dataset, CuVSResourcesImpl resources) throws Exception {
+    Objects.requireNonNull(dataset);
+    try (dataset) {
+      this.resources = resources;
+      assert dataset instanceof DatasetImpl;
+      this.cagraIndexReference = build(indexParameters, (DatasetImpl) dataset);
+    }
   }
 
   /**
@@ -128,9 +124,6 @@ public class CagraIndexImpl implements CagraIndex {
    * @param resources   an instance of {@link CuVSResources}
    */
   private CagraIndexImpl(InputStream inputStream, CuVSResourcesImpl resources) throws Throwable {
-    this.cagraIndexParameters = null;
-    this.vectors = null;
-    this.dataset = null;
     this.resources = resources;
     this.cagraIndexReference = deserialize(inputStream);
   }
@@ -143,9 +136,6 @@ public class CagraIndexImpl implements CagraIndex {
    * @param resources The resources instance
    */
   private CagraIndexImpl(IndexReference indexReference, CuVSResourcesImpl resources) {
-    this.vectors = null;
-    this.cagraIndexParameters = null;
-    this.dataset = null;
     this.resources = resources;
     this.cagraIndexReference = indexReference;
     this.destroyed = false;
@@ -161,7 +151,7 @@ public class CagraIndexImpl implements CagraIndex {
    * Invokes the native destroy_cagra_index to de-allocate the CAGRA index
    */
   @Override
-  public void destroyIndex() throws Throwable {
+  public void destroyIndex() {
     checkNotDestroyed();
     try (var arena = Arena.ofConfined()) {
       int returnValue = cuvsCagraIndexDestroy(cagraIndexReference.getMemorySegment());
@@ -169,7 +159,6 @@ public class CagraIndexImpl implements CagraIndex {
     } finally {
       destroyed = true;
     }
-    if (dataset != null) dataset.close();
   }
 
   /**
@@ -179,28 +168,27 @@ public class CagraIndexImpl implements CagraIndex {
    * @return an instance of {@link IndexReference} that holds the pointer to the
    *         index
    */
-  private IndexReference build() throws Throwable {
+  private IndexReference build(CagraIndexParams indexParameters, DatasetImpl dataset) {
     try (var localArena = Arena.ofConfined()) {
-        long rows = dataset != null? dataset.size(): vectors.length;
-        long cols = dataset != null? dataset.dimensions(): (rows > 0 ? vectors[0].length : 0);
+        long rows = dataset.size();
+        long cols = dataset.dimensions();
 
-      MemorySegment indexParamsMemorySegment = cagraIndexParameters != null
-          ? segmentFromIndexParams(resources, cagraIndexParameters)
+      MemorySegment indexParamsMemorySegment = indexParameters != null
+          ? segmentFromIndexParams(resources, indexParameters)
           : MemorySegment.NULL;
 
-      int numWriterThreads = cagraIndexParameters != null ? cagraIndexParameters.getNumWriterThreads() : 1;
+      int numWriterThreads = indexParameters != null ? indexParameters.getNumWriterThreads() : 1;
       omp_set_num_threads(numWriterThreads);
 
-      MemorySegment dataSeg = dataset != null? ((DatasetImpl) dataset).seg:
-      	Util.buildMemorySegment(resources.getArena(), vectors);
-
       Arena arena = resources.getArena();
+      MemorySegment dataSeg = dataset.asMemorySegment();
+
       long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
       MemorySegment stream = arena.allocate(cudaStream_t);
       var returnValue = cuvsStreamGet(cuvsRes, stream);
       checkCuVSError(returnValue, "cuvsStreamGet");
 
-      long datasetShape[] = { rows, cols };
+      long[] datasetShape = { rows, cols };
       MemorySegment datasetTensor = prepareTensor(arena, dataSeg, datasetShape, 2, 32, 2, 2, 1);
 
       MemorySegment index = arena.allocate(cuvsCagraIndex_t);
@@ -285,11 +273,11 @@ public class CagraIndexImpl implements CagraIndex {
 
       cudaMemcpy(queriesDP, floatsSeg, queriesBytes, INFER_DIRECTION);
 
-      long queriesShape[] = { numQueries, vectorDimension };
+      long[] queriesShape = { numQueries, vectorDimension };
       MemorySegment queriesTensor = prepareTensor(arena, queriesDP, queriesShape, 2, 32, 2, 2, 1);
-      long neighborsShape[] = { numQueries, topK };
+      long[] neighborsShape = { numQueries, topK };
       MemorySegment neighborsTensor = prepareTensor(arena, neighborsDP, neighborsShape, 1, 32, 2, 2, 1);
-      long distancesShape[] = { numQueries, topK };
+      long[] distancesShape = { numQueries, topK };
       MemorySegment distancesTensor = prepareTensor(arena, distancesDP, distancesShape, 2, 32, 2, 2, 1);
 
       returnValue = cuvsStreamSync(cuvsRes);
@@ -303,7 +291,7 @@ public class CagraIndexImpl implements CagraIndex {
       if (query.getPrefilter() != null) {
         prefilters = new BitSet[] {query.getPrefilter()};
         BitSet concatenatedFilters = concatenate(prefilters, query.getNumDocs());
-        long filters[] = concatenatedFilters.toLongArray();
+        long[] filters = concatenatedFilters.toLongArray();
         prefilterDataMemorySegment = buildMemorySegment(arena, filters);
         prefilterDataLength = query.getNumDocs() * prefilters.length;
       }
@@ -315,7 +303,7 @@ public class CagraIndexImpl implements CagraIndex {
         cuvsFilter.type(prefilter, 0); // NO_FILTER
         cuvsFilter.addr(prefilter, 0);
       } else {
-        long prefilterShape[] = { (prefilterDataLength + 31) / 32 };
+        long[] prefilterShape = { (prefilterDataLength + 31) / 32 };
         prefilterLen = prefilterShape[0];
         prefilterBytes = C_INT_BYTE_SIZE * prefilterLen;
 
@@ -466,16 +454,6 @@ public class CagraIndexImpl implements CagraIndex {
       Files.deleteIfExists(tmpIndexFile);
     }
     return indexReference;
-  }
-
-  /**
-   * Gets an instance of {@link CagraIndexParams}
-   *
-   * @return an instance of {@link CagraIndexParams}
-   */
-  @Override
-  public CagraIndexParams getCagraIndexParameters() {
-    return cagraIndexParameters;
   }
 
   /**
@@ -687,10 +665,9 @@ public class CagraIndexImpl implements CagraIndex {
    */
   public static class Builder implements CagraIndex.Builder {
 
-    private float[][] vectors;
     private Dataset dataset;
     private CagraIndexParams cagraIndexParams;
-    private CuVSResourcesImpl cuvsResources;
+    private final CuVSResourcesImpl cuvsResources;
     private InputStream inputStream;
 
     public Builder(CuVSResourcesImpl cuvsResources) {
@@ -705,7 +682,7 @@ public class CagraIndexImpl implements CagraIndex {
 
     @Override
     public Builder withDataset(float[][] vectors) {
-      this.vectors = vectors;
+      this.dataset = Dataset.ofArray(vectors);
       return this;
     }
 
@@ -726,10 +703,7 @@ public class CagraIndexImpl implements CagraIndex {
       if (inputStream != null) {
         return new CagraIndexImpl(inputStream, cuvsResources);
       } else {
-    	if (vectors != null && dataset != null) {
-    		throw new IllegalArgumentException("Please specify only one type of dataset (a float[] or a Dataset instance)");
-    	}
-        return new CagraIndexImpl(cagraIndexParams, vectors, dataset, cuvsResources);
+        return new CagraIndexImpl(cagraIndexParams, dataset, cuvsResources);
       }
     }
   }

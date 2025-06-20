@@ -63,7 +63,6 @@ import com.nvidia.cuvs.BruteForceQuery;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.SearchResults;
-import com.nvidia.cuvs.internal.common.Util;
 import com.nvidia.cuvs.internal.panama.cuvsBruteForceIndex;
 import com.nvidia.cuvs.internal.panama.cuvsFilter;
 
@@ -76,11 +75,8 @@ import com.nvidia.cuvs.internal.panama.cuvsFilter;
  */
 public class BruteForceIndexImpl implements BruteForceIndex {
 
-  private final float[][] vectors;
-  private final Dataset dataset;
   private final CuVSResourcesImpl resources;
   private final IndexReference bruteForceIndexReference;
-  private final BruteForceIndexParams bruteForceIndexParams;
   private boolean destroyed;
 
   /**
@@ -92,14 +88,14 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    * @param bruteForceIndexParams an instance of {@link BruteForceIndexParams}
    *                              holding the index parameters
    */
-  private BruteForceIndexImpl(float[][] vectors, Dataset dataset, CuVSResourcesImpl resources,
-      BruteForceIndexParams bruteForceIndexParams)
-      throws Throwable {
-    this.vectors = vectors;
-    this.dataset = dataset;
-    this.resources = resources;
-    this.bruteForceIndexParams = bruteForceIndexParams;
-    this.bruteForceIndexReference = build();
+  private BruteForceIndexImpl(Dataset dataset, CuVSResourcesImpl resources,
+      BruteForceIndexParams bruteForceIndexParams) throws Exception {
+    Objects.requireNonNull(dataset);
+      try (dataset) {
+          this.resources = resources;
+          assert dataset instanceof DatasetImpl;
+          this.bruteForceIndexReference = build((DatasetImpl) dataset, bruteForceIndexParams);
+      }
   }
 
   /**
@@ -109,9 +105,6 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    * @param resources   an instance of {@link CuVSResourcesImpl}
    */
   private BruteForceIndexImpl(InputStream inputStream, CuVSResourcesImpl resources) throws Throwable {
-    this.bruteForceIndexParams = null;
-    this.vectors = null;
-    this.dataset = null;
     this.resources = resources;
     this.bruteForceIndexReference = deserialize(inputStream);
   }
@@ -135,7 +128,6 @@ public class BruteForceIndexImpl implements BruteForceIndex {
     } finally {
       destroyed = true;
     }
-    if (dataset != null) dataset.close();
   }
 
   /**
@@ -145,14 +137,13 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    * @return an instance of {@link IndexReference} that holds the pointer to the
    *         index
    */
-  private IndexReference build() throws Throwable {
+  private IndexReference build(DatasetImpl dataset, BruteForceIndexParams bruteForceIndexParams) {
     try (var localArena = Arena.ofConfined()) {
-      long rows = dataset != null? dataset.size(): vectors.length;
-      long cols = dataset != null? dataset.dimensions(): (rows > 0 ? vectors[0].length : 0);
+      long rows = dataset.size();
+      long cols = dataset.dimensions();
 
       Arena arena = resources.getArena();
-      MemorySegment datasetMemSegment = dataset != null? ((DatasetImpl) dataset).seg:
-          Util.buildMemorySegment(resources.getArena(), vectors);
+      MemorySegment datasetMemSegment = dataset.asMemorySegment();
 
       long cuvsResources = resources.getMemorySegment().get(cuvsResources_t, 0);
       MemorySegment stream = arena.allocate(cudaStream_t);
@@ -172,7 +163,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
 
       cudaMemcpy(datasetMemorySegmentP, datasetMemSegment, datasetBytes, INFER_DIRECTION);
 
-      long datasetShape[] = { rows, cols };
+      long[] datasetShape = { rows, cols };
       MemorySegment datasetTensor = prepareTensor(arena, datasetMemorySegmentP, datasetShape, 2, 32, 2, 2, 1);
 
       MemorySegment index = arena.allocate(cuvsBruteForceIndex_t);
@@ -223,9 +214,9 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       BitSet[] prefilters = cuvsQuery.getPrefilters();
       if (prefilters != null && prefilters.length > 0) {
         BitSet concatenatedFilters = concatenate(prefilters, cuvsQuery.getNumDocs());
-        long filters[] = concatenatedFilters.toLongArray();
+        long[] filters = concatenatedFilters.toLongArray();
         prefilterDataMemorySegment = buildMemorySegment(arena, filters);
-        prefilterDataLength = cuvsQuery.getNumDocs() * prefilters.length;
+        prefilterDataLength = (long)cuvsQuery.getNumDocs() * prefilters.length;
       }
 
       MemorySegment querySeg = buildMemorySegment(arena, cuvsQuery.getQueryVectors());
@@ -262,11 +253,11 @@ public class BruteForceIndexImpl implements BruteForceIndex {
 
       cudaMemcpy(queriesDP, querySeg, queriesBytes, INFER_DIRECTION);
 
-      long queriesShape[] = { numQueries, vectorDimension };
+      long[] queriesShape = { numQueries, vectorDimension };
       MemorySegment queriesTensor = prepareTensor(arena, queriesDP, queriesShape, 2, 32, 2, 2, 1);
-      long neighborsShape[] = { numQueries, topk };
+      long[] neighborsShape = { numQueries, topk };
       MemorySegment neighborsTensor = prepareTensor(arena, neighborsDP, neighborsShape, 0, 64, 2, 2, 1);
-      long distancesShape[] = { numQueries, topk };
+      long[] distancesShape = { numQueries, topk };
       MemorySegment distancesTensor = prepareTensor(arena, distancesDP, distancesShape, 2, 32, 2, 2, 1);
 
       MemorySegment prefilter = cuvsFilter.allocate(arena);
@@ -276,7 +267,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
         cuvsFilter.type(prefilter, 0); // NO_FILTER
         cuvsFilter.addr(prefilter, 0);
       } else {
-        long prefilterShape[] = { (prefilterDataLength + 31) / 32 };
+        long[] prefilterShape = { (prefilterDataLength + 31) / 32 };
         prefilterLen = prefilterShape[0];
         prefilterBytes = C_INT_BYTE_SIZE * prefilterLen;
 
@@ -383,7 +374,6 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    */
   public static class Builder implements BruteForceIndex.Builder {
 
-    private float[][] vectors;
     private Dataset dataset;
     private final CuVSResourcesImpl cuvsResources;
     private BruteForceIndexParams bruteForceIndexParams;
@@ -432,7 +422,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
      */
     @Override
     public Builder withDataset(float[][] vectors) {
-      this.vectors = vectors;
+      this.dataset = Dataset.ofArray(vectors);
       return this;
     }
 
@@ -458,7 +448,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       if (inputStream != null) {
         return new BruteForceIndexImpl(inputStream, cuvsResources);
       } else {
-        return new BruteForceIndexImpl(vectors, dataset, cuvsResources, bruteForceIndexParams);
+        return new BruteForceIndexImpl(dataset, cuvsResources, bruteForceIndexParams);
       }
     }
   }

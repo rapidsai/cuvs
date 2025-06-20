@@ -27,10 +27,16 @@ import com.nvidia.cuvs.internal.CagraIndexImpl;
 import com.nvidia.cuvs.internal.CuVSResourcesImpl;
 import com.nvidia.cuvs.internal.DatasetImpl;
 import com.nvidia.cuvs.internal.HnswIndexImpl;
+import com.nvidia.cuvs.internal.common.Util;
 
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemoryLayout;
+import java.lang.foreign.MemorySegment;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
+
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 
 final class JDKProvider implements CuVSProvider {
 
@@ -78,7 +84,40 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException {
-      return new DatasetImpl(size, dimensions);
+  public Dataset.Builder newDatasetBuilder(int size, int dimensions) throws UnsupportedOperationException {
+      MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout((long) size * dimensions, C_FLOAT);
+
+      var arena = Arena.ofShared();
+      var seg = arena.allocate(dataMemoryLayout);
+
+      return new Dataset.Builder() {
+          int current = 0;
+
+          @Override
+          public void addVector(float[] vector) {
+            if (current >= size)
+              throw new ArrayIndexOutOfBoundsException();
+            MemorySegment.copy(vector, 0, seg, C_FLOAT, ((current++) * dimensions * C_FLOAT.byteSize()), dimensions);
+          }
+
+          @Override
+          public Dataset build() {
+            return new DatasetImpl(arena, seg, size, dimensions);
+          }
+      };
+  }
+
+  @Override
+  public Dataset newArrayDataset(float[][] vectors) {
+      Objects.requireNonNull(vectors);
+      if (vectors.length == 0) {
+          throw new IllegalArgumentException("vectors should not be empty");
+      }
+      int size = vectors.length;
+      int dimensions = vectors[0].length;
+
+      Arena arena = Arena.ofShared();
+      var memorySegment = Util.buildMemorySegment(arena, vectors);
+      return new DatasetImpl(arena, memorySegment, size, dimensions);
   }
 }
