@@ -22,13 +22,14 @@ import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
 import com.nvidia.cuvs.CagraMergeParams;
-import com.nvidia.cuvs.internal.ArrayDatasetImpl;
 import com.nvidia.cuvs.internal.BruteForceIndexImpl;
 import com.nvidia.cuvs.internal.CagraIndexImpl;
 import com.nvidia.cuvs.internal.CuVSResourcesImpl;
 import com.nvidia.cuvs.internal.DatasetImpl;
 import com.nvidia.cuvs.internal.HnswIndexImpl;
+import com.nvidia.cuvs.internal.common.Util;
 
+import java.lang.foreign.Arena;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -85,6 +86,15 @@ final class JDKProvider implements CuVSProvider {
 
   @Override
   public Dataset newArrayDataset(float[][] vectors) {
-      return new ArrayDatasetImpl(vectors);
+      Objects.requireNonNull(vectors);
+      if (vectors.length == 0) {
+          throw new IllegalArgumentException("vectors should not be empty");
+      }
+      int size = vectors.length;
+      int dimensions = vectors[0].length;
+
+      Arena arena = Arena.ofShared();
+      var memorySegment = Util.buildMemorySegment(arena, vectors);
+      return new DatasetImpl(arena, memorySegment, size, dimensions);
   }
 }

@@ -72,6 +72,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
       CompletableFuture.allOf(futures)
         .exceptionally(t -> {
+          log.error("Exception while executing runnable", t);
           fail("Exception while executing runnable: " + t);
           return null;
         })
