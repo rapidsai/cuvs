@@ -76,3 +76,6 @@ cdef extern from "cuvs/neighbors/tiered_index.h" nogil:
     cuvsError_t cuvsTieredIndexExtend(cuvsResources_t res,
                                       DLManagedTensor* new_vectors,
                                       cuvsTieredIndex_t index)
+
+    cuvsError_t cuvsTieredIndexCompact(cuvsResources_t res,
+                                       cuvsTieredIndex_t index)
