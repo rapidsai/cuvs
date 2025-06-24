@@ -196,15 +196,7 @@ public class CagraIndexImpl implements CagraIndex {
       long datasetShape[] = { rows, cols };
       MemorySegment datasetTensor = prepareTensor(resources.getArena(), dataSeg, datasetShape, 2, 32, 2, 2, 1);
 
-      MemorySegment indexPtrPtr = localArena.allocate(cuvsCagraIndex_t);
-      // cuvsCagraIndexCreate gets a pointer to a cuvsCagraIndex_t, which is defined as a pointer to cuvsCagraIndex.
-      // It's basically a "out" parameter: the C functions will create the index and "return back" a pointer to it:
-      // (*index = new cuvsCagraIndex{};
-      // The "out parameter" pointer is needed only for the duration of the function invocation (it could be a stack
-      // pointer, in C) so we allocate it from our localArena
-      var returnValue = cuvsCagraIndexCreate(indexPtrPtr);
-      checkCuVSError(returnValue, "cuvsCagraIndexCreate");
-      MemorySegment indexPtr = indexPtrPtr.get(cuvsCagraIndex_t, 0);
+      var indexReference = createCagraIndex();
 
       if (cuvsCagraIndexParams.build_algo(indexParamsMemorySegment) == 1) { // when build algo is IVF_PQ
         MemorySegment cuvsIvfPqIndexParamsMS = cuvsIvfPqParams
@@ -214,10 +206,10 @@ public class CagraIndexImpl implements CagraIndex {
         cuvsIvfPqIndexParams.n_lists(cuvsIvfPqIndexParamsMS, (int) (rows < n_lists ? rows : n_lists));
       }
 
-      returnValue = cuvsStreamSync(cuvsRes);
+      var returnValue = cuvsStreamSync(cuvsRes);
       checkCuVSError(returnValue, "cuvsStreamSync");
 
-      returnValue = cuvsCagraBuild(cuvsRes, indexParamsMemorySegment, datasetTensor, indexPtr);
+      returnValue = cuvsCagraBuild(cuvsRes, indexParamsMemorySegment, datasetTensor, indexReference.getMemorySegment());
       checkCuVSError(returnValue, "cuvsCagraBuild");
 
       returnValue = cuvsStreamSync(cuvsRes);
@@ -225,7 +217,21 @@ public class CagraIndexImpl implements CagraIndex {
 
       omp_set_num_threads(1);
 
-      return new IndexReference(indexPtr);
+      return indexReference;
+    }
+  }
+
+  private static IndexReference createCagraIndex() {
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment indexPtrPtr = localArena.allocate(cuvsCagraIndex_t);
+      // cuvsCagraIndexCreate gets a pointer to a cuvsCagraIndex_t, which is defined as a pointer to cuvsCagraIndex.
+      // It's basically a "out" parameter: the C functions will create the index and "return back" a pointer to it:
+      // (*index = new cuvsCagraIndex{};
+      // The "out parameter" pointer is needed only for the duration of the function invocation (it could be a stack
+      // pointer, in C) so we allocate it from our localArena
+      var returnValue = cuvsCagraIndexCreate(indexPtrPtr);
+      checkCuVSError(returnValue, "cuvsCagraIndexCreate");
+      return new IndexReference(indexPtrPtr.get(cuvsCagraIndex_t, 0));
     }
   }
 
@@ -379,11 +385,11 @@ public class CagraIndexImpl implements CagraIndex {
     try (var localArena = Arena.ofConfined()) {
 
       long cuvsRes = resources.getHandle();
-      var returnValue = cuvsCagraSerialize(cuvsRes, resources.getArena().allocateFrom(tempFile.toString()),
+      var returnValue = cuvsCagraSerialize(cuvsRes, localArena.allocateFrom(tempFile.toString()),
           cagraIndexReference.getMemorySegment(), true);
       checkCuVSError(returnValue, "cuvsCagraSerialize");
 
-      try (FileInputStream fileInputStream = new FileInputStream(tempFile.toFile())) {
+      try (var fileInputStream = Files.newInputStream(tempFile)) {
         byte[] chunk = new byte[bufferLength];
         int chunkLength = 0;
         while ((chunkLength = fileInputStream.read(chunk)) != -1) {
@@ -432,32 +438,19 @@ public class CagraIndexImpl implements CagraIndex {
    * Gets an instance of {@link IndexReference} by deserializing a CAGRA index
    * using an {@link InputStream}.
    *
-   * @param inputStream an instance of {@link InputStream}
+   * @param inputStream  an instance of {@link InputStream}
    * @return an instance of {@link IndexReference}.
    */
   private IndexReference deserialize(InputStream inputStream) throws Throwable {
-    return deserialize(inputStream, 1024);
-  }
+    Path tmpIndexFile = Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".cag")
+        .toAbsolutePath();
+    IndexReference indexReference = createCagraIndex();
 
-  /**
-   * Gets an instance of {@link IndexReference} by deserializing a CAGRA index
-   * using an {@link InputStream}.
-   *
-   * @param inputStream  an instance of {@link InputStream}
-   * @param bufferLength the length of the buffer to use while reading the bytes
-   *                     from the stream. Default value is 1024.
-   * @return an instance of {@link IndexReference}.
-   */
-  private IndexReference deserialize(InputStream inputStream, int bufferLength) throws Throwable {
-    Path tmpIndexFile = Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".cag");
-    tmpIndexFile = tmpIndexFile.toAbsolutePath();
-    IndexReference indexReference = new IndexReference(resources);
-
-    try (var in = inputStream; FileOutputStream fileOutputStream = new FileOutputStream(tmpIndexFile.toFile())) {
-      in.transferTo(fileOutputStream);
+    try (inputStream; var outputStream = Files.newOutputStream(tmpIndexFile); var arena = Arena.ofConfined()) {
+      inputStream.transferTo(outputStream);
 
       long cuvsRes = resources.getHandle();
-      var returnValue = cuvsCagraDeserialize(cuvsRes, resources.getArena().allocateFrom(tmpIndexFile.toString()),
+      var returnValue = cuvsCagraDeserialize(cuvsRes, arena.allocateFrom(tmpIndexFile.toString()),
           indexReference.getMemorySegment());
       checkCuVSError(returnValue, "cuvsCagraDeserialize");
 
@@ -623,7 +616,7 @@ public class CagraIndexImpl implements CagraIndex {
    */
   public static CagraIndex merge(CagraIndex[] indexes, CagraMergeParams mergeParams) throws Throwable {
 	    CuVSResourcesImpl resources = (CuVSResourcesImpl) indexes[0].getCuVSResources();
-	    IndexReference mergedIndexReference = new IndexReference(resources);
+	    IndexReference mergedIndexReference = createCagraIndex();
 	    long cuvsRes = resources.getHandle();
 
 	    try (var arena = Arena.ofConfined()) {
@@ -741,20 +734,13 @@ public class CagraIndexImpl implements CagraIndex {
     private final MemorySegment memorySegment;
 
     /**
-     * Constructs CagraIndexReference and allocate the MemorySegment.
-     */
-    protected IndexReference(CuVSResourcesImpl resources) {
-      memorySegment = cuvsCagraIndex.allocate(resources.getArena());
-    }
-
-    /**
      * Constructs CagraIndexReference with an instance of MemorySegment passed as a
      * parameter.
      *
      * @param indexMemorySegment the MemorySegment instance to use for containing
      *                           index reference
      */
-    protected IndexReference(MemorySegment indexMemorySegment) {
+    private IndexReference(MemorySegment indexMemorySegment) {
       this.memorySegment = indexMemorySegment;
     }
 
