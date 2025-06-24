@@ -154,7 +154,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       MemorySegment datasetMemSegment = dataset != null? ((DatasetImpl) dataset).seg:
           Util.buildMemorySegment(resources.getArena(), vectors);
 
-      long cuvsResources = resources.getMemorySegment().get(cuvsResources_t, 0);
+      long cuvsResources = resources.getHandle();
       MemorySegment stream = arena.allocate(cudaStream_t);
       var returnValue = cuvsStreamGet(cuvsResources, stream);
       checkCuVSError(returnValue, "cuvsStreamGet");
@@ -172,7 +172,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
 
       cudaMemcpy(datasetMemorySegmentP, datasetMemSegment, datasetBytes, INFER_DIRECTION);
 
-      long datasetShape[] = { rows, cols };
+      long[] datasetShape = { rows, cols };
       MemorySegment datasetTensor = prepareTensor(arena, datasetMemorySegmentP, datasetShape, 2, 32, 2, 2, 1);
 
       MemorySegment index = arena.allocate(cuvsBruteForceIndex_t);
@@ -223,15 +223,15 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       BitSet[] prefilters = cuvsQuery.getPrefilters();
       if (prefilters != null && prefilters.length > 0) {
         BitSet concatenatedFilters = concatenate(prefilters, cuvsQuery.getNumDocs());
-        long filters[] = concatenatedFilters.toLongArray();
+        long[] filters = concatenatedFilters.toLongArray();
         prefilterDataMemorySegment = buildMemorySegment(arena, filters);
-        prefilterDataLength = cuvsQuery.getNumDocs() * prefilters.length;
+        prefilterDataLength = (long)cuvsQuery.getNumDocs() * prefilters.length;
       }
 
       MemorySegment querySeg = buildMemorySegment(arena, cuvsQuery.getQueryVectors());
 
       int topk = cuvsQuery.getTopK();
-      long cuvsResources = resources.getMemorySegment().get(cuvsResources_t, 0);
+      long cuvsResources = resources.getHandle();
       MemorySegment stream = arena.allocate(cudaStream_t);
       var returnValue = cuvsStreamGet(cuvsResources, stream);
       checkCuVSError(returnValue, "cuvsStreamGet");
@@ -331,7 +331,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
     checkNotDestroyed();
     tempFile = tempFile.toAbsolutePath();
 
-    long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
+    long cuvsRes = resources.getHandle();
     int returnValue = cuvsBruteForceSerialize(cuvsRes, resources.getArena().allocateFrom(tempFile.toString()),
         bruteForceIndexReference.getMemorySegment());
     checkCuVSError(returnValue, "cuvsBruteForceSerialize");
@@ -359,7 +359,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
     try (var in = inputStream; FileOutputStream fileOutputStream = new FileOutputStream(tmpIndexFile.toFile())) {
       in.transferTo(fileOutputStream);
 
-      long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
+      long cuvsRes = resources.getHandle();
       int returnValue = cuvsBruteForceDeserialize(cuvsRes, resources.getArena().allocateFrom(tmpIndexFile.toString()),
           indexReference.getMemorySegment());
       checkCuVSError(returnValue, "cuvsBruteForceDeserialize");

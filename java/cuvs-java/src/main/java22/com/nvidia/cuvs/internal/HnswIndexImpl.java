@@ -108,7 +108,7 @@ public class HnswIndexImpl implements HnswIndex {
       MemorySegment distancesMemorySegment = arena.allocate(distancesSequenceLayout);
       MemorySegment querySeg = buildMemorySegment(arena, queryVectors);
 
-      long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
+      long cuvsRes = resources.getHandle();
 
       long queriesShape[] = { numQueries, vectorDimension };
       MemorySegment queriesTensor = prepareTensor(arena, querySeg, queriesShape, 2, 32, 2, 1, 1);
@@ -167,7 +167,7 @@ public class HnswIndexImpl implements HnswIndex {
         Arena arena = resources.getArena();
         MemorySegment pathSeg = buildMemorySegment(arena, tmpIndexFile.toString());
 
-        long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
+        long cuvsRes = resources.getHandle();
         MemorySegment hnswIndex = cuvsHnswIndex.allocate(arena);
         int returnValue = cuvsHnswIndexCreate(hnswIndex);
         checkCuVSError(returnValue, "cuvsHnswIndexCreate");
