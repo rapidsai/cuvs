@@ -409,13 +409,24 @@ void sharded_search_with_tree_merge(const raft::resources& clique,
         radix *= 2;
 
         if (received_something) {
-          // merge inplace
+          auto neighbors_merge_res = raft::make_device_matrix<IdxT, int64_t, row_major>(
+            dev_res, n_rows_of_current_batch, n_neighbors);
+          auto distances_merge_res = raft::make_device_matrix<float, int64_t, row_major>(
+            dev_res, n_rows_of_current_batch, n_neighbors);
           knn_merge_parts(dev_res,
                           tmp_distances.view(),
                           tmp_neighbors.view(),
-                          tmp_distances.view(),
-                          tmp_neighbors.view(),
+                          distances_merge_res.view(),
+                          neighbors_merge_res.view(),
                           d_trans.view());
+          raft::copy(tmp_neighbors.data_handle(),
+                     neighbors_merge_res.data_handle(),
+                     part_size,
+                     raft::resource::get_cuda_stream(dev_res));
+          raft::copy(tmp_distances.data_handle(),
+                     distances_merge_res.data_handle(),
+                     part_size,
+                     raft::resource::get_cuda_stream(dev_res));
 
           // If done, copy the final result
           if (remaining <= 1) {
@@ -605,6 +616,8 @@ void search(const raft::resources& clique,
                                        n_neighbors,
                                        n_batches);
     } else if (merge_mode == TREE_MERGE) {
+      ASSERT(index.num_ranks_ % 2 == 0,
+             "The number of ranks should be even when running sharded search in TREE_MERGE mode.");
       RAFT_LOG_DEBUG(
         "SHARDED SEARCH WITH TREE_MERGE MERGE MODE %d*%drows", n_batches, n_rows_per_batch);
       sharded_search_with_tree_merge(clique,
