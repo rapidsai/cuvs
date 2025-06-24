@@ -350,7 +350,7 @@ if hasArg --incl-cache-stats; then
     BUILD_REPORT_INCL_CACHE_STATS=ON
 fi
 
-if [[ "${CMAKE_TARGET[*]}" == "" ]]; then
+if [[ ${#CMAKE_TARGET} -eq 0 ]]; then
     CMAKE_TARGET=("all")
 fi
 
