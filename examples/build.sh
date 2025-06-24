@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (c) 2023-2024, NVIDIA CORPORATION.
+# Copyright (c) 2023-2025, NVIDIA CORPORATION.
 
 # cuvs empty project template build script
 
