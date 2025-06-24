@@ -48,10 +48,6 @@ jobs:
       node_type: "gpu-l4-latest-1"
       script: "ci/build_rust.sh"
       sha: ${{ inputs.sha }}
-  rust-publish:
-    needs: rust-build
-    secrets: inherit
-    uses: ./.github/workflows/publish-rust.yaml
   go-build:
     needs: cpp-build
     secrets: inherit
@@ -98,6 +94,10 @@ jobs:
       date: ${{ inputs.date }}
       sha: ${{ inputs.sha }}
       skip_upload_pkgs: libcuvs-template
+  rust-publish:
+    needs: [rust-build, upload-conda]
+    secrets: inherit
+    uses: ./.github/workflows/publish-rust.yaml
   docs-build:
     if: github.ref_type == 'branch'
     needs: python-build
