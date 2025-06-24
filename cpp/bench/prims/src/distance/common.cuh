@@ -31,49 +31,72 @@
     }                                                                    \
   } while (0)
 
+
 template <typename DataT, typename AccT, typename OutT, typename IdxT>
 class OutAccessor {
+    __host__ __device__
+    constexpr static bool is_out_scalar() {
+      return std::is_same<OutT, double>() || std::is_same<OutT, float>() ||
+             std::is_same<OutT, half>() || std::is_same<OutT, int8_t>();
+    }
+
+    constexpr static bool is_out_pair() {
+      return std::is_same<OutT, raft::KeyValuePair<IdxT, AccT>>();
+    }
+
   public:
-    __device__ __host__ inline void set_value(AccT value) {
-      if constexpr (std::is_same<OutT, double>() || std::is_same<OutT, float>() ||
-                    std::is_same<OutT, half>() || std::is_same<OutT, int8_t>()) {
-        this->out = value;
-      } if constexpr (std::is_same<OutT, raft::KeyValuePair<IdxT, AccT>>()) {
-        this->out.value = value;
-      } else {
-        static_assert(false, "Type of out variable is unsupported");
+
+      // Check that the OutT type is either scalar (float, int etc.) or of type raft::KeyValuePair
+      static_assert(is_out_scalar() || is_out_pair(), "Type of out variable is unsupported");
+
+    __host__ __device__
+    inline static IdxT get_key(OutT out) {
+      if constexpr (is_out_scalar()) {
+        return IdxT(0);
       }
-    }
-    __device__ __host__ inline void set_key(IdxT key) {
-      if constexpr (std::is_same<OutT, double>() || std::is_same<OutT, float>() ||
-                    std::is_same<OutT, half>() || std::is_same<OutT, int8_t>()) {
-        // we are not storing key information
-      } if constexpr (std::is_same<OutT, raft::KeyValuePair<IdxT, AccT>>()) {
-        this->out.key= key;
-      } else {
-        static_assert(false, "Type of out variable is unsupported");
-      }
-    }
-    __device__ __host__ inline AccT get_value() {
-      if constexpr (std::is_same<OutT, double>() || std::is_same<OutT, float>() ||
-                    std::is_same<OutT, half>() || std::is_same<OutT, int8_t>()) {
-        return this->out;
-      } if constexpr (std::is_same<OutT, raft::KeyValuePair<IdxT, AccT>>()) {
-        return this->out.value;
-      } else {
-        static_assert(false, "Type of out variable is unsupported");
-      }
-    }
-    __device__ __host__ inline IdxT get_key() {
-      if constexpr (std::is_same<OutT, double>() || std::is_same<OutT, float>() ||
-                    std::is_same<OutT, half>() || std::is_same<OutT, int8_t>()) {
-      } if constexpr (std::is_same<OutT, raft::KeyValuePair<IdxT, AccT>>()) {
-        return this->out.key;
-      } else {
-        static_assert(false, "Type of out variable is unsupported");
+
+      if constexpr (is_out_pair()) {
+        return out.key;
       }
     }
 
+    __host__ __device__
+    inline static void set_key(OutT& out, IdxT key) {
+
+      if constexpr (is_out_scalar()) {
+        // we are not storing key information
+      }
+
+      if constexpr (is_out_pair()) {
+        out.key = key;
+      }
+    }
+
+    __host__ __device__
+    inline static AccT get_value(OutT out) {
+
+      if constexpr (is_out_scalar()) {
+        return out;
+      }
+
+      if constexpr (is_out_pair()) {
+        return out.value;
+      }
+    }
+
+    __host__ __device__
+    inline static void set_value(OutT& out, AccT value) {
+
+      if constexpr (is_out_scalar()) {
+        out = value;
+      }
+
+      if constexpr (is_out_pair()) {
+        out.value = value;
+      }
+    }
+
+};
 
 template <typename T>
 __host__ __device__ T max_val() {
