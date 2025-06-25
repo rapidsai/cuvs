@@ -264,6 +264,12 @@
                 </executions>
                 <configuration>
                     <java>
+                        <includes>
+                            <include>src/**/*.java</include>
+                        </includes>
+                        <excludes>
+                            <exclude>src/**/panama/*.java</exclude>
+                        </excludes>
                         <googleJavaFormat>
                             <version>1.27.0</version>
                             <style>GOOGLE</style>
