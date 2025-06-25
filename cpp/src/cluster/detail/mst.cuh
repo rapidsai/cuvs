@@ -19,6 +19,7 @@
 #include "../../sparse/neighbors/cross_component_nn.cuh"
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/label/classlabels.cuh>
 #include <raft/matrix/detail/gather.cuh>
 #include <raft/matrix/diagonal.cuh>
 #include <raft/sparse/op/sort.cuh>
@@ -147,24 +148,12 @@ void connect_knn_graph(
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  // Copy color array from device to host
+  rmm::device_uvector<value_idx> d_color_remapped(m, stream);
+  raft::label::make_monotonic(d_color_remapped.data(), color, m, stream, true);
+
   std::vector<value_idx> h_color(m);
-  raft::copy(h_color.data(), color, m, stream);
+  raft::copy(h_color.data(), d_color_remapped.data(), m, stream);
   raft::resource::sync_stream(handle, stream);
-
-  std::unordered_map<value_idx, value_idx> color_remap;
-  value_idx new_label = 0;
-
-  // Build remapping table so that colors are compact integers (i.e. consecutive colors)
-  for (size_t i = 0; i < m; ++i) {
-    if (color_remap.find(h_color[i]) == color_remap.end()) {
-      color_remap[h_color[i]] = new_label++;
-    }
-  }
-
-  for (size_t i = 0; i < m; ++i) {
-    h_color[i] = color_remap[h_color[i]];
-  }
 
   // make key (color) : value (vector of ids that have that color)
   std::unordered_map<value_idx, std::vector<value_idx>> component_map;
@@ -229,6 +218,7 @@ void connect_knn_graph(
 
   size_t new_nnz = n_components - 1;
 
+  // sort in order of rows to run sorted_coo_to_csr
   auto rows_begin = thrust::device_pointer_cast(device_u_indices.data_handle());
   auto cols_begin = thrust::device_pointer_cast(device_v_indices.data_handle());
   auto dist_begin = thrust::device_pointer_cast(pairwise_dist_vec.data_handle());
