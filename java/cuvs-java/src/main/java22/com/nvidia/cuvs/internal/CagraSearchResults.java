@@ -13,16 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs.internal;
 
+import com.nvidia.cuvs.internal.common.SearchResultsImpl;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SequenceLayout;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import com.nvidia.cuvs.internal.common.SearchResultsImpl;
 
 /**
  * SearchResult encapsulates the logic for reading and holding search results.
@@ -31,11 +29,22 @@ import com.nvidia.cuvs.internal.common.SearchResultsImpl;
  */
 public class CagraSearchResults extends SearchResultsImpl {
 
-  protected CagraSearchResults(SequenceLayout neighboursSequenceLayout, SequenceLayout distancesSequenceLayout,
-      MemorySegment neighboursMemorySegment, MemorySegment distancesMemorySegment, int topK, List<Integer> mapping,
+  protected CagraSearchResults(
+      SequenceLayout neighboursSequenceLayout,
+      SequenceLayout distancesSequenceLayout,
+      MemorySegment neighboursMemorySegment,
+      MemorySegment distancesMemorySegment,
+      int topK,
+      List<Integer> mapping,
       long numberOfQueries) {
-    super(neighboursSequenceLayout, distancesSequenceLayout, neighboursMemorySegment, distancesMemorySegment, topK,
-        mapping, numberOfQueries);
+    super(
+        neighboursSequenceLayout,
+        distancesSequenceLayout,
+        neighboursMemorySegment,
+        distancesMemorySegment,
+        topK,
+        mapping,
+        numberOfQueries);
     readResultMemorySegments();
   }
 

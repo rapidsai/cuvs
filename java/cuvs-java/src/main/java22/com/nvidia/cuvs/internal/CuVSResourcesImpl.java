@@ -13,19 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs.internal;
 
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResourcesCreate;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResourcesDestroy;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
 
+import com.nvidia.cuvs.CuVSResources;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.nio.file.Path;
-
-import com.nvidia.cuvs.CuVSResources;
 
 /**
  * Used for allocating resources for cuVS
