@@ -101,7 +101,7 @@ void select_residuals(raft::resources const& handle,
     mapping_itr(dataset, utils::mapping<float>{});
   raft::matrix::gather(mapping_itr, (IdxT)dim, n_rows, row_ids, n_rows, tmp.data(), stream);
 
-  raft::matrix::linewise_op<true>(
+  raft::matrix::linewise_op<raft::Apply::ALONG_ROWS>(
     handle,
     raft::make_device_matrix_view<const T, IdxT>(tmp.data(), n_rows, dim),
     raft::make_device_matrix_view<T, IdxT>(tmp.data(), n_rows, dim),
