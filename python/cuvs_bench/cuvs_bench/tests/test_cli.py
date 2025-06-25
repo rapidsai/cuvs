@@ -170,7 +170,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
                 "build time",
                 "build threads",
                 "build cpu_time",
-                "build GPU",
+                "ef_construction",
                 "graph_degree",
                 "intermediate_graph_degree",
                 "label",
