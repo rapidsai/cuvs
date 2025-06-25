@@ -259,7 +259,7 @@
                         <goals>
                             <goal>check</goal>
                         </goals>
-                        <phase>verify</phase>
+                        <phase>validate</phase>
                     </execution>
                 </executions>
                 <configuration>
@@ -277,7 +277,7 @@
                             <formatJavadoc>false</formatJavadoc>
                         </googleJavaFormat>
                         <licenseHeader>
-                            <file>${project.basedir}/license-header.txt</file>
+                            <file>${project.basedir}/../license-header.txt</file>
                         </licenseHeader>
                     </java>
                 </configuration>
