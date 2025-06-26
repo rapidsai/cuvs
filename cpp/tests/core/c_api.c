@@ -15,7 +15,6 @@
  */
 
 #include <cuvs/core/c_api.h>
-#include <cuvs/version_config.hpp>
 
 #include <stdio.h>
 #include <stdlib.h>

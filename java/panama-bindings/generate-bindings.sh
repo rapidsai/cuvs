@@ -36,6 +36,7 @@ jextract \
  --include-dir "${REPODIR}"/java/internal/build/_deps/dlpack-src/include/ \
  --include-dir "${CUDA_INCLUDE_DIR}" \
  --include-dir "${REPODIR}"/cpp/include \
+ --include-dir "${REPODIR}"/cpp/build/include \
  --output "${REPODIR}/java/cuvs-java/src/main/java22/" \
  --target-package ${TARGET_PACKAGE} \
  --library cuvs_c \
