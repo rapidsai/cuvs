@@ -1,0 +1,29 @@
+# Use RAPIDS base image with CUDA support
+FROM rapidsai/rapidsai:25.06-cuda12.0-runtime-ubuntu22.04-py3.11
+
+# Install Rust and Cargo
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install additional build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy the cuVS source code
+COPY . .
+
+# Build the library
+RUN ./build.sh libcuvs rust
+
+# Set environment variables for Rust
+ENV RUST_BACKTRACE=1
+ENV CUDA_VISIBLE_DEVICES=0
+
+# Default command to run the kmeans example
+CMD ["cargo", "run", "--example", "kmeans", "--manifest-path", "rust/cuvs/Cargo.toml"] 
