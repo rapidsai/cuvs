@@ -32,6 +32,23 @@ then
 fi
 
 # Use Jextract utility to generate panama bindings
+
+# TODO: Remove this once we have a working jextract
+# <delete_me>
+echo DEBUGGING: jextract \
+ --include-dir "${REPODIR}"/java/internal/build/_deps/dlpack-src/include/ \
+ --include-dir "${CUDA_INCLUDE_DIR}" \
+ --include-dir "${REPODIR}"/cpp/include \
+ --include-dir "${REPODIR}"/cpp/build/include \
+ --output "${REPODIR}/java/cuvs-java/src/main/java22/" \
+ --target-package ${TARGET_PACKAGE} \
+ --library cuvs_c \
+ "${CURDIR}"/headers.h
+
+ echo Checking where version_config.h is located:
+ find "${REPODIR}" -name "version_config.h"
+# </delete_me>
+
 jextract \
  --include-dir "${REPODIR}"/java/internal/build/_deps/dlpack-src/include/ \
  --include-dir "${CUDA_INCLUDE_DIR}" \
