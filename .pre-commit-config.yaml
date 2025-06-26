@@ -115,7 +115,7 @@ repos:
             exclude: |
               (?x)
                   docs/source/sphinxext/github_link\.py|
-                  cpp/cmake/modules/FindAVX\.cmake|
+                  cpp/cmake/modules/FindAVX\.cmake
           - id: verify-alpha-spec
           - id: verify-codeowners
             args: [--fix, --project-prefix=cuvs]
@@ -128,7 +128,6 @@ repos:
         rev: v0.10.0.1
         hooks:
           - id: shellcheck
-            args: ["--severity=warning"]
 
 default_language_version:
       python: python3
