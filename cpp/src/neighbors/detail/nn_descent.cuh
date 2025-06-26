@@ -1186,23 +1186,23 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
   static_assert(sizeof(decltype(*(graph_.h_dists.data_handle()))) >= sizeof(Index_t));
 
   if (return_distances) {
-    auto graph_d_dists = raft::make_device_matrix<DistData_t, int64_t, raft::row_major>(
-      res, nrow_, build_config_.node_degree);
-    raft::copy(graph_d_dists.data_handle(),
-               graph_.h_dists.data_handle(),
-               nrow_ * build_config_.node_degree,
+    auto graph_h_dists = raft::make_host_matrix<DistData_t, int64_t, raft::row_major>(
+      nrow_, build_config_.output_graph_degree);
+
+// slice on host
+#pragma omp parallel for
+    for (size_t i = 0; i < (size_t)nrow_; i++) {
+      for (size_t j = 0; j < build_config_.output_graph_degree; j++) {
+        graph_h_dists(i, j) = graph_.h_dists(i, j);
+      }
+    }
+    raft::copy(output_distances,
+               graph_h_dists.data_handle(),
+               nrow_ * build_config_.output_graph_degree,
                raft::resource::get_cuda_stream(res));
 
     auto output_dist_view = raft::make_device_matrix_view<DistData_t, int64_t, raft::row_major>(
       output_distances, nrow_, build_config_.output_graph_degree);
-
-    raft::matrix::slice_coordinates coords{static_cast<int64_t>(0),
-                                           static_cast<int64_t>(0),
-                                           static_cast<int64_t>(nrow_),
-                                           static_cast<int64_t>(build_config_.output_graph_degree)};
-    raft::matrix::slice<DistData_t, int64_t, raft::row_major>(
-      res, raft::make_const_mdspan(graph_d_dists.view()), output_dist_view, coords);
-
     // distance post-processing
     if (build_config_.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
       raft::linalg::map(
