@@ -1,12 +1,12 @@
 #!/bin/bash
-# Copyright (c) 2020-2023, NVIDIA CORPORATION.
+# Copyright (c) 2020-2025, NVIDIA CORPORATION.
 ##########################################
 # RAFT black listed function call Tester #
 ##########################################
 
 # PR_TARGET_BRANCH is set by the CI environment
 
-git checkout --quiet $PR_TARGET_BRANCH
+git checkout --quiet "$PR_TARGET_BRANCH"
 
 # Switch back to tip of PR branch
 git checkout --quiet current-pr-branch
