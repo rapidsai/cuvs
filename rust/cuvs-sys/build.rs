@@ -87,9 +87,9 @@ fn main() {
         // generated)
         .must_use_type("cuvsError_t")
         // Only generate bindings for cuvs/cagra types and functions
-        .allowlist_type("(cuvs|bruteForce|cagra|DL).*")
-        .allowlist_function("(cuvs|bruteForce|cagra).*")
-        .rustified_enum("(cuvs|cagra|DL|DistanceType|codebook_gen|cudaDataType_t).*")
+        .allowlist_type("(cuvs|bruteForce|cagra|kmeans|DL).*")
+        .allowlist_function("(cuvs|bruteForce|cagra|kmeans).*")
+        .rustified_enum("(cuvs|cagra|kmeans|DL|DistanceType|codebook_gen|cudaDataType_t).*")
         // also need some basic cuda mem functions for copying data
         .allowlist_function("(cudaMemcpyAsync|cudaMemcpy)")
         .rustified_enum("cudaError")
