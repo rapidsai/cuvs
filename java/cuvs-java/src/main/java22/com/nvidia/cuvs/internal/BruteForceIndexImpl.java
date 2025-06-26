@@ -91,11 +91,9 @@ public class BruteForceIndexImpl implements BruteForceIndex {
   private BruteForceIndexImpl(Dataset dataset, CuVSResourcesImpl resources,
       BruteForceIndexParams bruteForceIndexParams) throws Exception {
     Objects.requireNonNull(dataset);
-      try (dataset) {
-          this.resources = resources;
-          assert dataset instanceof DatasetImpl;
-          this.bruteForceIndexReference = build((DatasetImpl) dataset, bruteForceIndexParams);
-      }
+      this.resources = resources;
+      assert dataset instanceof DatasetImpl;
+      this.bruteForceIndexReference = build((DatasetImpl) dataset, bruteForceIndexParams);
   }
 
   /**
@@ -125,6 +123,9 @@ public class BruteForceIndexImpl implements BruteForceIndex {
     try {
       int returnValue = cuvsBruteForceIndexDestroy(bruteForceIndexReference.getMemorySegment());
       checkCuVSError(returnValue, "cuvsBruteForceIndexDestroy");
+      if (bruteForceIndexReference.dataset != null) {
+        bruteForceIndexReference.dataset.close();
+      }
     } finally {
       destroyed = true;
     }
@@ -182,7 +183,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
 
       omp_set_num_threads(1);
 
-      return new IndexReference(index);
+      return new IndexReference(index, dataset);
     }
   }
 
@@ -459,12 +460,14 @@ public class BruteForceIndexImpl implements BruteForceIndex {
   protected static class IndexReference {
 
     private final MemorySegment memorySegment;
+    private final Dataset dataset;
 
     /**
      * Constructs CagraIndexReference and allocate the MemorySegment.
      */
     protected IndexReference(CuVSResourcesImpl resources) {
       memorySegment = cuvsBruteForceIndex.allocate(resources.getArena());
+      dataset = null;
     }
 
     /**
@@ -473,9 +476,13 @@ public class BruteForceIndexImpl implements BruteForceIndex {
      *
      * @param indexMemorySegment the MemorySegment instance to use for containing
      *                           index reference
+     * @param dataset            the dataset used for indexing; the dataset lifetime
+     *                           matches the lifetime of the index, we need to keep a reference
+     *                           to it so we can close it when the index is closed.
      */
-    protected IndexReference(MemorySegment indexMemorySegment) {
+    protected IndexReference(MemorySegment indexMemorySegment, Dataset dataset) {
       this.memorySegment = indexMemorySegment;
+      this.dataset = dataset;
     }
 
     /**

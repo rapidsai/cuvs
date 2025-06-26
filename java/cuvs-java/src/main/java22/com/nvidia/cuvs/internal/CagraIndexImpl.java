@@ -110,11 +110,9 @@ public class CagraIndexImpl implements CagraIndex {
    */
   private CagraIndexImpl(CagraIndexParams indexParameters, Dataset dataset, CuVSResourcesImpl resources) throws Exception {
     Objects.requireNonNull(dataset);
-    try (dataset) {
-      this.resources = resources;
-      assert dataset instanceof DatasetImpl;
-      this.cagraIndexReference = build(indexParameters, (DatasetImpl) dataset);
-    }
+    this.resources = resources;
+    assert dataset instanceof DatasetImpl;
+    this.cagraIndexReference = build(indexParameters, (DatasetImpl) dataset);
   }
 
   /**
@@ -151,11 +149,14 @@ public class CagraIndexImpl implements CagraIndex {
    * Invokes the native destroy_cagra_index to de-allocate the CAGRA index
    */
   @Override
-  public void destroyIndex() {
+  public void destroyIndex() throws Throwable{
     checkNotDestroyed();
     try (var arena = Arena.ofConfined()) {
       int returnValue = cuvsCagraIndexDestroy(cagraIndexReference.getMemorySegment());
       checkCuVSError(returnValue, "cuvsCagraIndexDestroy");
+      if (cagraIndexReference.dataset != null) {
+        cagraIndexReference.dataset.close();
+      }
     } finally {
       destroyed = true;
     }
@@ -214,7 +215,7 @@ public class CagraIndexImpl implements CagraIndex {
 
       omp_set_num_threads(1);
 
-      return new IndexReference(index);
+      return new IndexReference(index, dataset);
     }
   }
 
@@ -714,12 +715,14 @@ public class CagraIndexImpl implements CagraIndex {
   public static class IndexReference {
 
     private final MemorySegment memorySegment;
+    private final Dataset dataset;
 
     /**
      * Constructs CagraIndexReference and allocate the MemorySegment.
      */
     protected IndexReference(CuVSResourcesImpl resources) {
       memorySegment = cuvsCagraIndex.allocate(resources.getArena());
+      dataset = null;
     }
 
     /**
@@ -728,9 +731,13 @@ public class CagraIndexImpl implements CagraIndex {
      *
      * @param indexMemorySegment the MemorySegment instance to use for containing
      *                           index reference
+     * @param dataset            the dataset used for indexing; the dataset lifetime
+     *                           matches the lifetime of the index, we need to keep a reference
+     *                           to it so we can close it when the index is closed.
      */
-    protected IndexReference(MemorySegment indexMemorySegment) {
+    protected IndexReference(MemorySegment indexMemorySegment, Dataset dataset) {
       this.memorySegment = indexMemorySegment;
+      this.dataset = dataset;
     }
 
     /**
