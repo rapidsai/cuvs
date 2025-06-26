@@ -795,7 +795,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
   endif()
 
   install(
-    FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.hpp
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.h
     COMPONENT cuvs
     DESTINATION include/cuvs
   )
