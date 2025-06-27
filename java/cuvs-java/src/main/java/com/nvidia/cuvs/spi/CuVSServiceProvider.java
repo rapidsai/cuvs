@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs.spi;
 
 import java.lang.invoke.MethodHandles;
@@ -38,9 +37,9 @@ public abstract class CuVSServiceProvider {
     private static CuVSProvider loadProvider() {
       var builtinProvider = builtinProvider();
       return ServiceLoader.load(CuVSServiceProvider.class)
-              .findFirst()
-              .map(p -> p.get(builtinProvider))
-              .orElse(builtinProvider);
+          .findFirst()
+          .map(p -> p.get(builtinProvider))
+          .orElse(builtinProvider);
     }
 
     static CuVSProvider builtinProvider() {

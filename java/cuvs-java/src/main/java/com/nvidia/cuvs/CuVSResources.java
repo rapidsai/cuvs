@@ -13,11 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
 import com.nvidia.cuvs.spi.CuVSProvider;
-
 import java.nio.file.Path;
 
 /**
@@ -32,7 +30,6 @@ public interface CuVSResources extends AutoCloseable {
    */
   @Override
   void close();
-
 
   /**
    * The temporary directory to use for intermediate operations.

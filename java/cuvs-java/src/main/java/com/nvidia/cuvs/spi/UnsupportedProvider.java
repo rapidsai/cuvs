@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs.spi;
 
 import com.nvidia.cuvs.BruteForceIndex;
@@ -21,7 +20,6 @@ import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
-
 import java.nio.file.Path;
 
 /**

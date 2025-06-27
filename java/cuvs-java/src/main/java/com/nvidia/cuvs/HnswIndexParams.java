@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
 /**
@@ -56,8 +55,8 @@ public class HnswIndexParams {
   private int numThreads = 2;
   private int vectorDimension;
 
-  private HnswIndexParams(CuvsHnswHierarchy hierarchy, int efConstruction, int numThreads,
-      int vectorDimension) {
+  private HnswIndexParams(
+      CuvsHnswHierarchy hierarchy, int efConstruction, int numThreads, int vectorDimension) {
     this.hierarchy = hierarchy;
     this.efConstruction = efConstruction;
     this.numThreads = numThreads;
@@ -98,8 +97,15 @@ public class HnswIndexParams {
 
   @Override
   public String toString() {
-    return "HnswIndexParams [hierarchy=" + hierarchy + ", efConstruction=" + efConstruction + ", numThreads="
-        + numThreads + ", vectorDimension=" + vectorDimension + "]";
+    return "HnswIndexParams [hierarchy="
+        + hierarchy
+        + ", efConstruction="
+        + efConstruction
+        + ", numThreads="
+        + numThreads
+        + ", vectorDimension="
+        + vectorDimension
+        + "]";
   }
 
   /**
@@ -115,7 +121,7 @@ public class HnswIndexParams {
     /**
      * Constructs this Builder with an instance of Arena.
      */
-    public Builder() { }
+    public Builder() {}
 
     /**
      * Sets the hierarchy for HNSW index when converting from CAGRA index.

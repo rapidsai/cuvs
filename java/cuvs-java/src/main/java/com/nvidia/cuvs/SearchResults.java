@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
 import java.util.List;
@@ -21,10 +20,10 @@ import java.util.Map;
 
 public interface SearchResults {
 
-    /**
-     * Gets a list results as a map of neighbor IDs to distances.
-     *
-     * @return a list of results for each query as a map of neighbor IDs to distance
-     */
-    List<Map<Integer, Float>> getResults();
+  /**
+   * Gets a list results as a map of neighbor IDs to distances.
+   *
+   * @return a list of results for each query as a map of neighbor IDs to distance
+   */
+  List<Map<Integer, Float>> getResults();
 }

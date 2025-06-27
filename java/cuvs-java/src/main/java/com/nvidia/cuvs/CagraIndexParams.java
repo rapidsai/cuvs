@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
 /**
@@ -157,14 +156,12 @@ public class CagraIndexParams {
     private CuvsDistanceType(int value) {
       this.value = value;
     }
-
   }
 
   /**
    * Enum that denotes codebook gen options.
    */
   public enum CodebookGen {
-
     PER_SUBSPACE(0),
 
     PER_CLUSTER(1);
@@ -183,7 +180,6 @@ public class CagraIndexParams {
    * Enum that denotes cuda datatypes.
    */
   public enum CudaDataType {
-
     CUDA_R_16F(2),
 
     CUDA_C_16F(6),
@@ -251,8 +247,14 @@ public class CagraIndexParams {
     }
   }
 
-  private CagraIndexParams(int intermediateGraphDegree, int graphDegree, CagraGraphBuildAlgo CuvsCagraGraphBuildAlgo,
-      int nnDescentNiter, int writerThreads, CuvsDistanceType cuvsDistanceType, CuVSIvfPqParams cuVSIvfPqParams,
+  private CagraIndexParams(
+      int intermediateGraphDegree,
+      int graphDegree,
+      CagraGraphBuildAlgo CuvsCagraGraphBuildAlgo,
+      int nnDescentNiter,
+      int writerThreads,
+      CuvsDistanceType cuvsDistanceType,
+      CuVSIvfPqParams cuVSIvfPqParams,
       CagraCompressionParams cagraCompressionParams) {
     this.intermediateGraphDegree = intermediateGraphDegree;
     this.graphDegree = graphDegree;
@@ -341,10 +343,23 @@ public class CagraIndexParams {
 
   @Override
   public String toString() {
-    return "CagraIndexParams [cuvsCagraGraphBuildAlgo=" + cuvsCagraGraphBuildAlgo + ", cuvsDistanceType="
-        + cuvsDistanceType + ", intermediateGraphDegree=" + intermediateGraphDegree + ", graphDegree=" + graphDegree
-        + ", nnDescentNiter=" + nnDescentNiter + ", numWriterThreads=" + numWriterThreads + ", cuVSIvfPqParams="
-        + cuVSIvfPqParams + ", cagraCompressionParams=" + cagraCompressionParams + "]";
+    return "CagraIndexParams [cuvsCagraGraphBuildAlgo="
+        + cuvsCagraGraphBuildAlgo
+        + ", cuvsDistanceType="
+        + cuvsDistanceType
+        + ", intermediateGraphDegree="
+        + intermediateGraphDegree
+        + ", graphDegree="
+        + graphDegree
+        + ", nnDescentNiter="
+        + nnDescentNiter
+        + ", numWriterThreads="
+        + numWriterThreads
+        + ", cuVSIvfPqParams="
+        + cuVSIvfPqParams
+        + ", cagraCompressionParams="
+        + cagraCompressionParams
+        + "]";
   }
 
   /**
@@ -361,8 +376,7 @@ public class CagraIndexParams {
     private CuVSIvfPqParams cuVSIvfPqParams = new CuVSIvfPqParams.Builder().build();
     private CagraCompressionParams cagraCompressionParams;
 
-    public Builder() {
-    }
+    public Builder() {}
 
     /**
      * Sets the degree of input graph for pruning.
@@ -461,8 +475,15 @@ public class CagraIndexParams {
      * @return an instance of {@link CagraIndexParams}
      */
     public CagraIndexParams build() {
-      return new CagraIndexParams(intermediateGraphDegree, graphDegree, cuvsCagraGraphBuildAlgo, nnDescentNumIterations,
-          numWriterThreads, cuvsDistanceType, cuVSIvfPqParams, cagraCompressionParams);
+      return new CagraIndexParams(
+          intermediateGraphDegree,
+          graphDegree,
+          cuvsCagraGraphBuildAlgo,
+          nnDescentNumIterations,
+          numWriterThreads,
+          cuvsDistanceType,
+          cuVSIvfPqParams,
+          cagraCompressionParams);
     }
   }
 }

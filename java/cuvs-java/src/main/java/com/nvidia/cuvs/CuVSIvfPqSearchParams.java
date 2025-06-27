@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
 import com.nvidia.cuvs.CagraIndexParams.CudaDataType;
@@ -64,7 +63,10 @@ public class CuVSIvfPqSearchParams {
    */
   private final double preferredShmemCarveout;
 
-  private CuVSIvfPqSearchParams(int nProbes, CudaDataType lutDtype, CudaDataType internalDistanceDtype,
+  private CuVSIvfPqSearchParams(
+      int nProbes,
+      CudaDataType lutDtype,
+      CudaDataType internalDistanceDtype,
       double preferredShmemCarveout) {
     super();
     this.nProbes = nProbes;
@@ -114,8 +116,15 @@ public class CuVSIvfPqSearchParams {
 
   @Override
   public String toString() {
-    return "CuVSIvfPqSearchParams [nProbes=" + nProbes + ", lutDtype=" + lutDtype + ", internalDistanceDtype="
-        + internalDistanceDtype + ", preferredShmemCarveout=" + preferredShmemCarveout + "]";
+    return "CuVSIvfPqSearchParams [nProbes="
+        + nProbes
+        + ", lutDtype="
+        + lutDtype
+        + ", internalDistanceDtype="
+        + internalDistanceDtype
+        + ", preferredShmemCarveout="
+        + preferredShmemCarveout
+        + "]";
   }
 
   /**
@@ -167,8 +176,7 @@ public class CuVSIvfPqSearchParams {
      */
     private double preferredShmemCarveout = 1.0;
 
-    public Builder() {
-    }
+    public Builder() {}
 
     /**
      * Sets the number of clusters to search.
@@ -225,7 +233,8 @@ public class CuVSIvfPqSearchParams {
      * @return an instance of {@link CuVSIvfPqSearchParams}
      */
     public CuVSIvfPqSearchParams build() {
-      return new CuVSIvfPqSearchParams(nProbes, lutDtype, internalDistanceDtype, preferredShmemCarveout);
+      return new CuVSIvfPqSearchParams(
+          nProbes, lutDtype, internalDistanceDtype, preferredShmemCarveout);
     }
   }
 }

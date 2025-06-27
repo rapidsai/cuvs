@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
 public class CuVSIvfPqParams {
@@ -27,7 +26,8 @@ public class CuVSIvfPqParams {
   /** refinement rate */
   private final float refinementRate;
 
-  private CuVSIvfPqParams(CuVSIvfPqIndexParams indexParams, CuVSIvfPqSearchParams searchParams, float refinementRate) {
+  private CuVSIvfPqParams(
+      CuVSIvfPqIndexParams indexParams, CuVSIvfPqSearchParams searchParams, float refinementRate) {
     super();
     this.indexParams = indexParams;
     this.searchParams = searchParams;
@@ -60,8 +60,13 @@ public class CuVSIvfPqParams {
 
   @Override
   public String toString() {
-    return "CuVSIvfPqParams [indexParams=" + indexParams + ", searchParams=" + searchParams + ", refinementRate="
-        + refinementRate + "]";
+    return "CuVSIvfPqParams [indexParams="
+        + indexParams
+        + ", searchParams="
+        + searchParams
+        + ", refinementRate="
+        + refinementRate
+        + "]";
   }
 
   /**
@@ -73,13 +78,13 @@ public class CuVSIvfPqParams {
     private CuVSIvfPqIndexParams cuVSIvfPqIndexParams = new CuVSIvfPqIndexParams.Builder().build();
 
     /** CuVS IVF_PQ search parameters */
-    private CuVSIvfPqSearchParams cuVSIvfPqSearchParams = new CuVSIvfPqSearchParams.Builder().build();
+    private CuVSIvfPqSearchParams cuVSIvfPqSearchParams =
+        new CuVSIvfPqSearchParams.Builder().build();
 
     /** refinement rate */
     private float refinementRate = 2.0f;
 
-    public Builder() {
-    }
+    public Builder() {}
 
     /**
      * Sets the CuVS IVF_PQ index parameters.

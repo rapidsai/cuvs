@@ -1,11 +1,19 @@
+/*
+ * Copyright (c) 2025, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.nvidia.cuvs.examples;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.util.UUID;
-import java.util.logging.Logger;
 
 import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CagraIndexParams;
@@ -20,6 +28,12 @@ import com.nvidia.cuvs.HnswIndexParams;
 import com.nvidia.cuvs.HnswQuery;
 import com.nvidia.cuvs.HnswSearchParams;
 import com.nvidia.cuvs.SearchResults;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.util.UUID;
+import java.util.logging.Logger;
 
 public class HnswExample {
 
@@ -29,71 +43,72 @@ public class HnswExample {
 
     // Sample data and query
     float[][] vectors = {
-        { 0.74021935f, 0.9209938f },
-        { 0.03902049f, 0.9689629f },
-        { 0.92514056f, 0.4463501f },
-        { 0.6673192f, 0.10993068f }
-       };
+      {0.74021935f, 0.9209938f},
+      {0.03902049f, 0.9689629f},
+      {0.92514056f, 0.4463501f},
+      {0.6673192f, 0.10993068f}
+    };
 
     float[][] queries = {
-        { 0.48216683f, 0.0428398f },
-        { 0.5084142f, 0.6545497f },
-        { 0.51260436f, 0.2643005f },
-        { 0.05198065f, 0.5789965f }
-       };
+      {0.48216683f, 0.0428398f},
+      {0.5084142f, 0.6545497f},
+      {0.51260436f, 0.2643005f},
+      {0.05198065f, 0.5789965f}
+    };
 
     try (CuVSResources resources = CuVSResources.create()) {
 
       // Configure IVF_PQ index parameters (optional - default values set when not defined)
-      CuVSIvfPqIndexParams cuVSIvfPqIndexParams = new CuVSIvfPqIndexParams.Builder()
-          .build();
+      CuVSIvfPqIndexParams cuVSIvfPqIndexParams = new CuVSIvfPqIndexParams.Builder().build();
 
       // Configure IVF_PQ search parameters (optional - default values set when not defined)
-      CuVSIvfPqSearchParams cuVSIvfPqSearchParams = new CuVSIvfPqSearchParams.Builder()
-          .build();
+      CuVSIvfPqSearchParams cuVSIvfPqSearchParams = new CuVSIvfPqSearchParams.Builder().build();
 
       // Configure IVF_PQ search parameters (used when build algo is IVF_PQ, optional otherwise)
-      CuVSIvfPqParams cuVSIvfPqParams = new CuVSIvfPqParams.Builder()
-          .withCuVSIvfPqIndexParams(cuVSIvfPqIndexParams)
-          .withCuVSIvfPqSearchParams(cuVSIvfPqSearchParams)
-          .build();
+      CuVSIvfPqParams cuVSIvfPqParams =
+          new CuVSIvfPqParams.Builder()
+              .withCuVSIvfPqIndexParams(cuVSIvfPqIndexParams)
+              .withCuVSIvfPqSearchParams(cuVSIvfPqSearchParams)
+              .build();
 
       // Configure index parameters
-      CagraIndexParams indexParams = new CagraIndexParams.Builder()
-          .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.IVF_PQ)
-          .withMetric(CuvsDistanceType.L2Expanded)
-          .withCuVSIvfPqParams(cuVSIvfPqParams)
-          .build();
+      CagraIndexParams indexParams =
+          new CagraIndexParams.Builder()
+              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.IVF_PQ)
+              .withMetric(CuvsDistanceType.L2Expanded)
+              .withCuVSIvfPqParams(cuVSIvfPqParams)
+              .build();
 
       // Create the index with the dataset
-      CagraIndex index = CagraIndex.newBuilder(resources)
-          .withDataset(vectors)
-          .withIndexParams(indexParams)
-          .build();
+      CagraIndex index =
+          CagraIndex.newBuilder(resources)
+              .withDataset(vectors)
+              .withIndexParams(indexParams)
+              .build();
 
       // Saving the HNSW index on to the disk.
       String hnswIndexFileName = UUID.randomUUID().toString() + ".hnsw";
       index.serializeToHNSW(new FileOutputStream(hnswIndexFileName));
 
-      HnswIndexParams hnswIndexParams = new HnswIndexParams.Builder()
-          .withVectorDimension(2)
-          .build();
+      HnswIndexParams hnswIndexParams =
+          new HnswIndexParams.Builder().withVectorDimension(2).build();
       InputStream inputStreamHNSW = new FileInputStream(hnswIndexFileName);
       File hnswIndexFile = new File(hnswIndexFileName);
 
-      HnswIndex hnswIndex = HnswIndex.newBuilder(resources)
-          .from(inputStreamHNSW)
-          .withIndexParams(hnswIndexParams)
-          .build();
+      HnswIndex hnswIndex =
+          HnswIndex.newBuilder(resources)
+              .from(inputStreamHNSW)
+              .withIndexParams(hnswIndexParams)
+              .build();
 
-      HnswSearchParams hnswSearchParams = new HnswSearchParams.Builder()
-          .build();
+      HnswSearchParams hnswSearchParams = new HnswSearchParams.Builder().build();
 
-      HnswQuery hnswQuery = new HnswQuery.Builder()
-          .withQueryVectors(queries)
-          .withSearchParams(hnswSearchParams)
-          .withTopK(3)
-          .build();
+      HnswQuery hnswQuery =
+          new HnswQuery.Builder()
+              .withQueryVectors(queries)
+              .withSearchParams(hnswSearchParams)
+              .withTopK(3)
+              .build();
 
       SearchResults results = hnswIndex.search(hnswQuery);
 
