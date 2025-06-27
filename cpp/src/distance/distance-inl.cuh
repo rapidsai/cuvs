@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2018-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -306,6 +306,9 @@ void pairwise_distance(raft::resources const& handle,
       break;
     case DistanceType::RusselRaoExpanded:
       dispatch(std::integral_constant<DistanceType, DistanceType::RusselRaoExpanded>{});
+      break;
+    case DistanceType::DiceExpanded:
+      dispatch(std::integral_constant<DistanceType, DistanceType::DiceExpanded>{});
       break;
     default: THROW("Unknown or unsupported distance metric '%d'!", (int)metric);
   };
