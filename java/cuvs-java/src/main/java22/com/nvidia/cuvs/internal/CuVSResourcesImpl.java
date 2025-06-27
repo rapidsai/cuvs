@@ -77,9 +77,9 @@ public class CuVSResourcesImpl implements CuVSResources {
   }
 
   /**
-   * Gets the reference to the cuvsResources MemorySegment.
+   * Gets the opaque CuVSResources handle, to be used whenever we need to pass a cuvsResources_t parameter
    *
-   * @return cuvsResources MemorySegment
+   * @return the CuVSResources handle
    */
   long getHandle() {
     checkNotDestroyed();
