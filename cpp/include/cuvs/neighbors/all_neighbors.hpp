@@ -17,9 +17,6 @@
 #pragma once
 
 #include <cuvs/neighbors/graph_build_types.hpp>
-#include <cuvs/neighbors/ivf_pq.hpp>
-#include <cuvs/neighbors/nn_descent.hpp>
-
 #include <variant>
 
 namespace cuvs::neighbors::all_neighbors {
@@ -28,8 +25,9 @@ namespace cuvs::neighbors::all_neighbors {
  * @{
  */
 
-using GraphBuildParams =
-  std::variant<graph_build_params::ivf_pq_params, graph_build_params::nn_descent_params>;
+using GraphBuildParams = std::variant<graph_build_params::ivf_pq_params,
+                                      graph_build_params::nn_descent_params,
+                                      graph_build_params::brute_force_params>;
 
 /**
  * @brief Parameters used to build an all-neighbors graph (find nearest neighbors for all the

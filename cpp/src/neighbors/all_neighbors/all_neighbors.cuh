@@ -24,7 +24,10 @@ using namespace cuvs::neighbors;
 
 void check_metric(const all_neighbors_params& params)
 {
-  if (std::holds_alternative<graph_build_params::nn_descent_params>(params.graph_build_params)) {
+  if (std::holds_alternative<graph_build_params::brute_force_params>(params.graph_build_params)) {
+    return;
+  } else if (std::holds_alternative<graph_build_params::nn_descent_params>(
+               params.graph_build_params)) {
     auto allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
                            params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                            params.metric == cuvs::distance::DistanceType::CosineExpanded ||
