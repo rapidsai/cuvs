@@ -15,6 +15,8 @@
  */
 
 #pragma once
+#include "../detail/reachability.cuh"
+#include "../detail/reachability_types.cuh"
 #include "all_neighbors_builder.cuh"
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
@@ -28,11 +30,35 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/multi_gpu.hpp>
 #include <raft/matrix/sample_rows.cuh>
+#include <raft/matrix/shift.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <variant>
 
 namespace cuvs::neighbors::all_neighbors::detail {
 using namespace cuvs::neighbors;
+
+template <typename T, typename IdxT>
+void reset_global_matrices(raft::resources const& res,
+                           cuvs::distance::DistanceType metric,
+                           raft::managed_matrix_view<IdxT, IdxT> global_neighbors,
+                           raft::managed_matrix_view<T, IdxT> global_distances)
+{
+  size_t num_rows = static_cast<size_t>(global_neighbors.extent(0));
+  size_t k        = static_cast<size_t>(global_neighbors.extent(1));
+
+  bool select_min = cuvs::distance::is_min_close(metric);
+  IdxT global_neighbors_fill_value =
+    select_min ? std::numeric_limits<IdxT>::max() : std::numeric_limits<IdxT>::min();
+  T global_distances_fill_value =
+    select_min ? std::numeric_limits<T>::max() : std::numeric_limits<T>::min();
+
+  std::fill(global_neighbors.data_handle(),
+            global_neighbors.data_handle() + num_rows * k,
+            global_neighbors_fill_value);
+  std::fill(global_distances.data_handle(),
+            global_distances.data_handle() + num_rows * k,
+            global_distances_fill_value);
+}
 
 /**
  * Run balanced kmeans on a subsample of the dataset to get centroids.
@@ -279,6 +305,7 @@ void single_gpu_batch_build(const raft::resources& handle,
   for (size_t cluster_id = 0; cluster_id < n_clusters; cluster_id++) {
     size_t num_data_in_cluster = cluster_sizes(cluster_id);
     size_t offset              = cluster_offsets(cluster_id);
+
     if (num_data_in_cluster < knn_builder.k) {
       // for the unlikely event where clustering was done lopsidedly and this cluster has less than
       // k data
@@ -307,14 +334,17 @@ void single_gpu_batch_build(const raft::resources& handle,
 }
 
 template <typename T, typename IdxT>
-void multi_gpu_batch_build(const raft::resources& handle,
-                           const all_neighbors_params& params,
-                           raft::host_matrix_view<const T, IdxT, row_major> dataset,
-                           raft::managed_matrix_view<IdxT, IdxT> global_neighbors,
-                           raft::managed_matrix_view<T, IdxT> global_distances,
-                           raft::host_vector_view<IdxT, IdxT, row_major> cluster_sizes,
-                           raft::host_vector_view<IdxT, IdxT, row_major> cluster_offsets,
-                           raft::host_vector_view<IdxT, IdxT, row_major> inverted_indices)
+void multi_gpu_batch_build(
+  const raft::resources& handle,
+  const all_neighbors_params& params,
+  raft::host_matrix_view<const T, IdxT, row_major> dataset,
+  raft::managed_matrix_view<IdxT, IdxT> global_neighbors,
+  raft::managed_matrix_view<T, IdxT> global_distances,
+  raft::host_vector_view<IdxT, IdxT, row_major> cluster_sizes,
+  raft::host_vector_view<IdxT, IdxT, row_major> cluster_offsets,
+  raft::host_vector_view<IdxT, IdxT, row_major> inverted_indices,
+  std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances = std::nullopt,
+  T alpha                                                                    = 1.0)
 {
   size_t num_rows = dataset.extent(0);
   size_t num_cols = dataset.extent(1);
@@ -324,6 +354,11 @@ void multi_gpu_batch_build(const raft::resources& handle,
 
   size_t clusters_per_rank = params.n_clusters / num_ranks;
   size_t rem               = params.n_clusters - clusters_per_rank * num_ranks;
+
+  std::vector<size_t> rank_offsets(num_ranks);
+  std::vector<size_t> num_data_per_rank(num_ranks);
+  std::vector<size_t> num_clusters_per_rank(num_ranks);
+  std::vector<size_t> base_cluster_indices(num_ranks);
 
 #pragma omp parallel for num_threads(num_ranks)
   for (int rank = 0; rank < num_ranks; rank++) {
@@ -341,6 +376,11 @@ void multi_gpu_batch_build(const raft::resources& handle,
     }
 
     size_t rank_offset = cluster_offsets(base_cluster_idx);
+
+    rank_offsets[rank]          = rank_offset;
+    num_data_per_rank[rank]     = num_data_for_this_rank;
+    num_clusters_per_rank[rank] = num_clusters_for_this_rank;
+    base_cluster_indices[rank]  = base_cluster_idx;
 
     // remap offsets for each rank
     for (size_t p = 0; p < num_clusters_for_this_rank; p++) {
@@ -370,6 +410,94 @@ void multi_gpu_batch_build(const raft::resources& handle,
                            cluster_offsets_for_this_rank,
                            inverted_indices_for_this_rank);
   }
+
+  if (core_distances.has_value()) {
+    raft::matrix::shift(
+      handle,
+      raft::make_device_matrix_view<T, IdxT>(global_distances.data_handle(), num_rows, k),
+      1,
+      std::make_optional(static_cast<T>(0.0)));
+    cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
+      global_distances.data_handle(),
+      k,
+      k,
+      num_rows,
+      core_distances.value().data_handle(),
+      raft::resource::get_cuda_stream(handle));
+
+    // copy to host
+    auto core_distances_h = raft::make_host_vector<T, IdxT>(num_rows);
+    raft::copy(core_distances_h.data_handle(),
+               core_distances.value().data_handle(),
+               num_rows,
+               raft::resource::get_cuda_stream(handle));
+
+    reset_global_matrices(handle, params.metric, global_neighbors, global_distances);
+
+#pragma omp parallel for num_threads(num_ranks)
+    for (int rank = 0; rank < num_ranks; rank++) {
+      auto dev_res                   = raft::resource::set_current_device_to_rank(handle, rank);
+      auto core_distances_d_for_rank = raft::make_device_vector<T, IdxT>(dev_res, num_rows);
+
+      raft::copy(core_distances_d_for_rank.data_handle(),
+                 core_distances_h.data_handle(),
+                 num_rows,
+                 raft::resource::get_cuda_stream(dev_res));
+
+      if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+        // comparison within nn descent for L2SqrtExpanded is done without applying sqrt.
+        raft::linalg::map(dev_res,
+                          core_distances_d_for_rank.view(),
+                          raft::sq_op{},
+                          raft::make_const_mdspan(core_distances_d_for_rank.view()));
+      }
+
+      auto dist_epilogue = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>{
+        core_distances_d_for_rank.data_handle(), alpha, num_rows};
+
+      auto cluster_sizes_for_this_rank = raft::make_host_vector_view<IdxT, IdxT>(
+        cluster_sizes.data_handle() + base_cluster_indices[rank], num_clusters_per_rank[rank]);
+      auto cluster_offsets_for_this_rank = raft::make_host_vector_view<IdxT, IdxT>(
+        cluster_offsets.data_handle() + base_cluster_indices[rank], num_clusters_per_rank[rank]);
+      auto inverted_indices_for_this_rank = raft::make_host_vector_view<IdxT, IdxT>(
+        inverted_indices.data_handle() + rank_offsets[rank], num_data_per_rank[rank]);
+
+      size_t max_cluster_size, min_cluster_size;
+      get_min_max_cluster_size(k, max_cluster_size, min_cluster_size, cluster_sizes_for_this_rank);
+
+      auto knn_builder =
+        get_knn_builder<T,
+                        IdxT,
+                        cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>>(
+          dev_res,
+          params,
+          min_cluster_size,
+          max_cluster_size,
+          k,
+          std::nullopt,
+          std::nullopt,
+          dist_epilogue);
+      single_gpu_batch_build(dev_res,
+                             dataset,
+                             *knn_builder,
+                             num_clusters_per_rank[rank],
+                             global_neighbors,
+                             global_distances,
+                             cluster_sizes_for_this_rank,
+                             cluster_offsets_for_this_rank,
+                             inverted_indices_for_this_rank);
+    }
+
+    raft::matrix::shift(
+      handle,
+      raft::make_device_matrix_view<IdxT, IdxT>(global_neighbors.data_handle(), num_rows, k),
+      1);
+    raft::matrix::shift(
+      handle,
+      raft::make_device_matrix_view<T, IdxT>(global_distances.data_handle(), num_rows, k),
+      raft::make_device_matrix_view<const T, IdxT>(
+        core_distances.value().data_handle(), num_rows, 1));
+  }
 }
 
 template <typename T, typename IdxT>
@@ -378,9 +506,14 @@ void batch_build(
   const all_neighbors_params& params,
   raft::host_matrix_view<const T, IdxT, row_major> dataset,
   raft::device_matrix_view<IdxT, IdxT, row_major> indices,
-  std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances = std::nullopt)
+  std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances      = std::nullopt,
+  std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances = std::nullopt,
+  T alpha                                                                    = 1.0)
 {
   if (raft::resource::is_multi_gpu(handle)) {
+    RAFT_EXPECTS(params.n_clusters >= (size_t)raft::resource::get_num_ranks(handle),
+                 "n_clusters must be larger than or equal to number of GPUs for multi gpu "
+                 "all-neighbors build");
     // For efficient CPU-computation of omp parallel for regions per GPU
     omp_set_nested(1);
   }
@@ -413,17 +546,7 @@ void batch_build(
   auto global_neighbors = raft::make_managed_matrix<IdxT, IdxT>(handle, num_rows, k);
   auto global_distances = raft::make_managed_matrix<T, IdxT>(handle, num_rows, k);
 
-  bool select_min = cuvs::distance::is_min_close(params.metric);
-  IdxT global_neighbors_fill_value =
-    select_min ? std::numeric_limits<IdxT>::max() : std::numeric_limits<IdxT>::min();
-  T global_distances_fill_value =
-    select_min ? std::numeric_limits<T>::max() : std::numeric_limits<T>::min();
-  std::fill(global_neighbors.data_handle(),
-            global_neighbors.data_handle() + num_rows * k,
-            global_neighbors_fill_value);
-  std::fill(global_distances.data_handle(),
-            global_distances.data_handle() + num_rows * k,
-            global_distances_fill_value);
+  reset_global_matrices(handle, params.metric, global_neighbors.view(), global_distances.view());
 
   if (raft::resource::is_multi_gpu(handle)) {
     multi_gpu_batch_build(handle,
@@ -433,7 +556,9 @@ void batch_build(
                           global_distances.view(),
                           cluster_sizes.view(),
                           cluster_offsets.view(),
-                          inverted_indices.view());
+                          inverted_indices.view(),
+                          core_distances,
+                          alpha);
   } else {
     size_t max_cluster_size, min_cluster_size;
     get_min_max_cluster_size(k, max_cluster_size, min_cluster_size, cluster_sizes.view());
@@ -448,6 +573,68 @@ void batch_build(
                            cluster_sizes.view(),
                            cluster_offsets.view(),
                            inverted_indices.view());
+    if (core_distances.has_value()) {
+      size_t k = static_cast<size_t>(indices.extent(1));
+
+      raft::matrix::shift(
+        handle,
+        raft::make_device_matrix_view<T, IdxT>(global_distances.data_handle(), num_rows, k),
+        1,
+        std::make_optional(static_cast<T>(0.0)));
+      cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
+        global_distances.data_handle(),
+        k,
+        k,
+        num_rows,
+        core_distances.value().data_handle(),
+        raft::resource::get_cuda_stream(handle));
+
+      reset_global_matrices(
+        handle, params.metric, global_neighbors.view(), global_distances.view());
+
+      if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+        // comparison within nn descent for L2SqrtExpanded is done without applying sqrt.
+        raft::linalg::map(handle,
+                          core_distances.value(),
+                          raft::sq_op{},
+                          raft::make_const_mdspan(core_distances.value()));
+      }
+
+      auto dist_epilogue = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>{
+        core_distances.value().data_handle(), alpha, num_rows};
+
+      auto knn_builder =
+        get_knn_builder<T,
+                        IdxT,
+                        cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>>(
+          handle,
+          params,
+          min_cluster_size,
+          max_cluster_size,
+          k,
+          std::nullopt,
+          std::nullopt,
+          dist_epilogue);
+      single_gpu_batch_build(handle,
+                             dataset,
+                             *knn_builder,
+                             params.n_clusters,
+                             global_neighbors.view(),
+                             global_distances.view(),
+                             cluster_sizes.view(),
+                             cluster_offsets.view(),
+                             inverted_indices.view());
+
+      raft::matrix::shift(
+        handle,
+        raft::make_device_matrix_view<IdxT, IdxT>(global_neighbors.data_handle(), num_rows, k),
+        1);
+      raft::matrix::shift(
+        handle,
+        raft::make_device_matrix_view<T, IdxT>(global_distances.data_handle(), num_rows, k),
+        raft::make_device_matrix_view<const T, IdxT>(
+          core_distances.value().data_handle(), num_rows, 1));
+    }
   }
 
   raft::copy(indices.data_handle(),

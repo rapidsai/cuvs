@@ -15,6 +15,8 @@
  */
 #pragma once
 
+#include "../../src/neighbors/detail/knn_brute_force.cuh"
+#include "../../src/neighbors/detail/reachability.cuh"
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
 #include "naive_knn.cuh"
@@ -51,6 +53,7 @@ struct AllNeighborsInputs {
   int dim;
   int k;
   bool data_on_host;
+  bool mutual_reach;
 };
 
 inline ::std::ostream& operator<<(::std::ostream& os, const AllNeighborsInputs& p)
@@ -96,20 +99,70 @@ void get_graphs(raft::resources& handle,
     params.graph_build_params = ivfpq_build_params;
   }
 
+  auto metric      = std::get<1>(ps.build_algo_metric_recall);
   auto cuda_stream = raft::resource::get_cuda_stream(handle);
   {
     rmm::device_uvector<DistanceT> distances_naive_dev(queries_size, cuda_stream);
     rmm::device_uvector<IdxT> indices_naive_dev(queries_size, cuda_stream);
-    naive_knn<DistanceT, DataT, IdxT>(handle,
-                                      distances_naive_dev.data(),
-                                      indices_naive_dev.data(),
-                                      database.data(),
-                                      database.data(),
-                                      ps.n_rows,
-                                      ps.n_rows,
-                                      ps.dim,
-                                      ps.k,
-                                      std::get<1>(ps.build_algo_metric_recall));
+    if (ps.mutual_reach) {
+      rmm::device_uvector<DistanceT> core_dists_dev(ps.n_rows, cuda_stream);
+
+      cuvs::neighbors::detail::tiled_brute_force_knn(handle,
+                                                     database.data(),
+                                                     database.data(),
+                                                     ps.n_rows,
+                                                     ps.n_rows,
+                                                     ps.dim,
+                                                     ps.k,
+                                                     distances_naive_dev.data(),
+                                                     indices_naive_dev.data(),
+                                                     metric);
+
+      cuvs::neighbors::detail::reachability::core_distances<IdxT, DistanceT>(
+        distances_naive_dev.data(),
+        ps.k,
+        ps.k,
+        ps.n_rows,
+        core_dists_dev.data(),
+        raft::resource::get_cuda_stream(handle));
+      auto epilogue =
+        cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, DistanceT>{
+          core_dists_dev.data(), 1.0, static_cast<size_t>(ps.n_rows)};
+
+      cuvs::neighbors::detail::tiled_brute_force_knn<
+        DataT,
+        IdxT,
+        DistanceT,
+        cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, DistanceT>>(
+        handle,
+        database.data(),
+        database.data(),
+        ps.n_rows,
+        ps.n_rows,
+        ps.dim,
+        ps.k,
+        distances_naive_dev.data(),
+        indices_naive_dev.data(),
+        metric,
+        2.0,
+        0,
+        0,
+        nullptr,
+        nullptr,
+        nullptr,
+        epilogue);
+    } else {
+      naive_knn<DistanceT, DataT, IdxT>(handle,
+                                        distances_naive_dev.data(),
+                                        indices_naive_dev.data(),
+                                        database.data(),
+                                        database.data(),
+                                        ps.n_rows,
+                                        ps.n_rows,
+                                        ps.dim,
+                                        ps.k,
+                                        std::get<1>(ps.build_algo_metric_recall));
+    }
     raft::update_host(indices_bf.data(), indices_naive_dev.data(), queries_size, cuda_stream);
     raft::update_host(distances_bf.data(), distances_naive_dev.data(), queries_size, cuda_stream);
 
@@ -129,7 +182,10 @@ void get_graphs(raft::resources& handle,
         params,
         raft::make_const_mdspan(database_h.view()),
         raft::make_device_matrix_view<IdxT>(indices_allNN_dev.data(), ps.n_rows, ps.k),
-        raft::make_device_matrix_view<DistanceT>(distances_allNN_dev.data(), ps.n_rows, ps.k));
+        raft::make_device_matrix_view<DistanceT>(distances_allNN_dev.data(), ps.n_rows, ps.k),
+        ps.mutual_reach
+          ? std::make_optional(raft::make_device_vector<DistanceT>(handle, ps.n_rows).view())
+          : std::nullopt);
 
     } else {
       all_neighbors::build(
@@ -137,7 +193,10 @@ void get_graphs(raft::resources& handle,
         params,
         raft::make_device_matrix_view<const DataT, IdxT>(database.data(), ps.n_rows, ps.dim),
         raft::make_device_matrix_view<IdxT>(indices_allNN_dev.data(), ps.n_rows, ps.k),
-        raft::make_device_matrix_view<DistanceT>(distances_allNN_dev.data(), ps.n_rows, ps.k));
+        raft::make_device_matrix_view<DistanceT>(distances_allNN_dev.data(), ps.n_rows, ps.k),
+        ps.mutual_reach
+          ? std::make_optional(raft::make_device_vector<DistanceT>(handle, ps.n_rows).view())
+          : std::nullopt);
     }
 
     raft::copy(indices_allNN.data(), indices_allNN_dev.data(), queries_size, cuda_stream);
@@ -213,7 +272,8 @@ const std::vector<AllNeighborsInputs> inputsSingle =
     {5000, 7151},                 // n_rows
     {64, 137},                    // dim
     {16, 23},                     // graph_degree
-    {false, true}                 // data on host
+    {false, true},                // data on host
+    {false}                       // mutual_reach
   );
 
 const std::vector<AllNeighborsInputs> inputsBatch =
@@ -231,7 +291,38 @@ const std::vector<AllNeighborsInputs> inputsBatch =
     {5000, 7151},  // n_rows
     {64, 137},     // dim
     {16, 23},      // graph_degree
-    {true}         // data on host
+    {true},        // data on host
+    {false}        // mutual_reach
+  );
+
+const std::vector<AllNeighborsInputs> mutualReachSingle =
+  raft::util::itertools::product<AllNeighborsInputs>(
+    {std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded, 0.9),
+     std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded, 0.9),
+     std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded, 0.9)},
+    {std::make_tuple(1lu, 2lu)},  // n_clusters, overlap_factor
+    {5000, 7151},                 // n_rows
+    {64, 137},                    // dim
+    {16, 23},                     // graph_degree
+    {false, true},                // data on host
+    {true}                        // mutual_reach
+  );
+
+const std::vector<AllNeighborsInputs> mutualReachBatch =
+  raft::util::itertools::product<AllNeighborsInputs>(
+    {std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded, 0.9),
+     std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded, 0.9),
+     std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded, 0.9)},
+    {
+      std::make_tuple(4lu, 2lu),
+      std::make_tuple(7lu, 2lu),
+      std::make_tuple(10lu, 2lu),
+    },             // n_clusters, overlap_factor
+    {5000, 7151},  // n_rows
+    {64, 137},     // dim
+    {16, 23},      // graph_degree
+    {true},        // data on host
+    {true}         // mutual_reach
   );
 
 }  // namespace cuvs::neighbors::all_neighbors
