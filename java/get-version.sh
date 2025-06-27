@@ -4,6 +4,8 @@
 
 set -euo pipefail
 
+cd "$(dirname "$0")/.."
+
 RAPIDS_VERSION="$(rapids-version)"
 export RAPIDS_VERSION
 RAPIDS_VERSION_MAJOR_MINOR="$(rapids-version-major-minor)"
