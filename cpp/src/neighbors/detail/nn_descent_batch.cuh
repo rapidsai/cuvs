@@ -583,7 +583,7 @@ template <typename T,
             host_device_accessor<std::experimental::default_accessor<float>, memory_type::host>>
 [[deprecated(
   "NN Descent batch build is deprecated and will be removed in a future release. Please use "
-  "all_neighbors::build instead.")]]
+  "cuvs::all_neighbors::build(...) instead.")]]
 void batch_build(raft::resources const& res,
                  const index_params& params,
                  mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> dataset,
@@ -591,7 +591,7 @@ void batch_build(raft::resources const& res,
 {
   RAFT_LOG_WARN(
     "NN Descent batch build is deprecated and will be removed in a future release. Please use "
-    "all_neighbors::build instead.");
+    "cuvs::all_neighbors::build(...) instead.");
   size_t graph_degree        = params.graph_degree;
   size_t intermediate_degree = params.intermediate_graph_degree;
 
