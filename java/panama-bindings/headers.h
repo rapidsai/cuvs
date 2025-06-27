@@ -22,6 +22,7 @@
 #include <cuvs/neighbors/hnsw.h>
 #include <cuvs/neighbors/ivf_pq.h>
 #include <cuvs/neighbors/common.h>
+#include <cuvs/neighbors/tiered_index.h>
 #include <cuda_runtime.h>
 
 /**
