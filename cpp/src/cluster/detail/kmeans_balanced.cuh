@@ -318,7 +318,7 @@ void calc_centers_and_sizes(const raft::resources& handle,
   auto clusterSizesView = raft::make_device_vector_view<const CounterT>(cluster_sizes, n_clusters);
 
   if (!reset_counters) {
-    raft::linalg::matrix_vector_op<raft::Apply::ALONG_ROWS>(
+    raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
       handle, raft::make_const_mdspan(centersView), clusterSizesView, centersView, raft::mul_op{});
   }
 
@@ -353,11 +353,11 @@ void calc_centers_and_sizes(const raft::resources& handle,
     raft::linalg::add(cluster_sizes, cluster_sizes, temp_sizes, n_clusters, stream);
   }
 
-  raft::linalg::matrix_vector_op<raft::Apply::ALONG_ROWS>(handle,
-                                                          raft::make_const_mdspan(centersView),
-                                                          clusterSizesView,
-                                                          centersView,
-                                                          raft::div_checkzero_op{});
+  raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(handle,
+                                                             raft::make_const_mdspan(centersView),
+                                                             clusterSizesView,
+                                                             centersView,
+                                                             raft::div_checkzero_op{});
 }
 
 /** Computes the L2 norm of the dataset, converting to MathT if necessary */

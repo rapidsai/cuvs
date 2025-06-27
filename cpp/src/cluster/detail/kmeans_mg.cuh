@@ -654,7 +654,7 @@ void fit(const raft::resources& handle,
     //   samples in cluster-i.
     // Note - when wtInCluster[i] is 0, newCentroid[i] is reset to 0
 
-    raft::linalg::matrix_vector_op<raft::Apply::ALONG_ROWS>(
+    raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
       handle,
       raft::make_const_mdspan(newCentroids.view()),
       raft::make_const_mdspan(wtInCluster.view()),

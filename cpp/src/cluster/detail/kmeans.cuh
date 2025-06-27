@@ -323,7 +323,7 @@ void update_centroids(raft::resources const& handle,
   //   weight_per_cluster[n_clusters] - 1D array, weight_per_cluster[i] contains sum of weights in
   //   cluster-i.
   // Note - when weight_per_cluster[i] is 0, new_centroids[i] is reset to 0
-  raft::linalg::matrix_vector_op<raft::Apply::ALONG_ROWS>(
+  raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
     handle,
     raft::make_const_mdspan(new_centroids),
     raft::make_const_mdspan(weight_per_cluster),
