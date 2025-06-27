@@ -90,12 +90,13 @@ void get_graphs(raft::resources& handle,
     nn_descent_params.metric                    = params.metric;
     params.graph_build_params                   = nn_descent_params;
   } else if (build_algo == IVF_PQ) {
-    auto ivfq_build_params                = graph_build_params::ivf_pq_params{};
-    ivfq_build_params.build_params.metric = params.metric;
+    auto ivfpq_build_params                = graph_build_params::ivf_pq_params{};
+    ivfpq_build_params.build_params.metric = params.metric;
+    ivfpq_build_params.refinement_rate     = 2.0;
     // heuristically good ivfpq n_lists
-    ivfq_build_params.build_params.n_lists = std::max(
+    ivfpq_build_params.build_params.n_lists = std::max(
       5u, static_cast<uint32_t>(ps.n_rows * params.overlap_factor / (5000 * params.n_clusters)));
-    params.graph_build_params = ivfq_build_params;
+    params.graph_build_params = ivfpq_build_params;
   }
 
   auto metric      = std::get<1>(ps.build_algo_metric_recall);
