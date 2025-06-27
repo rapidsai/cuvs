@@ -42,11 +42,12 @@ using GraphBuildParams = std::variant<graph_build_params::ivf_pq_params,
  */
 struct all_neighbors_params {
   /** Parameters for knn graph building algorithm
-   * Approximate nearest neighbors methods are used to build the knn graph. Currently supported
-   * options are 'IVF-PQ' and 'NN Descent'. IVF-PQ is more accurate, but slower compared to NN
-   * Descent.
+   * Approximate nearest neighbors methods or a brute force approach are supported to build the knn
+   * graph. Currently supported options are 'IVF-PQ', 'NN Descent', or 'Brute Force'. IVF-PQ is more
+   * accurate, but slower compared to NN Descent. Note that 'Brute Force' can also be approximate if
+   * n_clusters > 1.
    *
-   * Set ivf_pq_params, or nn_descent_params to select the graph build
+   * Set ivf_pq_params, nn_descent_params, or brute_force_params to select the graph build
    * algorithm and control their parameters.
    *
    * @code{.cpp}
@@ -56,6 +57,9 @@ struct all_neighbors_params {
    *
    * // 2. Choose NN Descent algorithm for kNN graph construction
    * params.graph_build_params = all_neighbors::graph_build_params::nn_descent_params{};
+   *
+   * // 3. Choose Brute Force algorithm for kNN graph construction
+   * params.graph_build_params = all_neighbors::graph_build_params::brute_force_params{};
    *
    * @endcode
    */
