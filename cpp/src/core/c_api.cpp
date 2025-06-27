@@ -16,6 +16,7 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/core/exceptions.hpp>
+#include <cuvs/version_config.h>
 
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>

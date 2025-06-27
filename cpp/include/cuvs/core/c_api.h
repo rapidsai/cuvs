@@ -16,8 +16,6 @@
 
 #pragma once
 
-#include <cuvs/version_config.h>
-
 #include <cuda_runtime.h>
 #include <stdbool.h>
 #include <stdint.h>
