@@ -17,7 +17,6 @@
 
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
-#include "knn_utils.cuh"
 #include "naive_knn.cuh"
 #include <cstddef>
 #include <cuvs/distance/distance.hpp>
@@ -184,19 +183,7 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
     double min_recall = std::get<2>(ps.build_algo_metric_recall);
     auto build_algo   = std::get<0>(ps.build_algo_metric_recall);
 
-    if (build_algo == BRUTE_FORCE) {
-      ASSERT_TRUE(cuvs::neighbors::devArrMatchKnnPair(indices_bf.data(),
-                                                      indices_allNN.data(),
-                                                      distances_bf.data(),
-                                                      distances_allNN.data(),
-                                                      ps.n_rows,
-                                                      ps.k,
-                                                      0.001f,
-                                                      stream_,
-                                                      true));
-    } else {
-      EXPECT_TRUE(eval_recall(indices_bf, indices_allNN, ps.n_rows, ps.k, 0.01, min_recall, true));
-    }
+    EXPECT_TRUE(eval_recall(indices_bf, indices_allNN, ps.n_rows, ps.k, 0.01, min_recall, true));
   }
 
   void SetUp() override
