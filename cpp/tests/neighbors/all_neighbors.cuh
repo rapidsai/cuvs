@@ -181,7 +181,6 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
                queries_size);
 
     double min_recall = std::get<2>(ps.build_algo_metric_recall);
-    auto build_algo   = std::get<0>(ps.build_algo_metric_recall);
 
     EXPECT_TRUE(eval_recall(indices_bf, indices_allNN, ps.n_rows, ps.k, 0.01, min_recall, true));
   }
