@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -190,11 +190,14 @@ def test_cagra_index_params(params):
     )
 
 
-def test_cagra_vpq_compression():
+@pytest.mark.parametrize("metric", ["euclidean", "inner_product"])
+def test_cagra_vpq_compression(metric):
     dim = 64
     pq_len = 2
     run_cagra_build_search_test(
-        n_cols=dim, compression=cagra.CompressionParams(pq_dim=dim / pq_len)
+        n_cols=dim,
+        metric=metric,
+        compression=cagra.CompressionParams(pq_dim=dim / pq_len),
     )
 
 
