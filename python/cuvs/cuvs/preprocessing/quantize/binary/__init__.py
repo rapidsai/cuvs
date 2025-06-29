@@ -14,4 +14,6 @@
 
 from .binary import transform
 
-__all__ = ["transform"]
+__all__ = [
+    "transform",
+]
