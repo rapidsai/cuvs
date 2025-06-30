@@ -4,6 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.nvidia.cuvs.examples</groupId>
   <artifactId>cuvs-java-examples</artifactId>
+  <version>${version}</version>
   <name>cuvs-java-examples</name>
 
   <properties>

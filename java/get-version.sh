@@ -7,7 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 RAPIDS_VERSION="$(rapids-version)"
-export RAPIDS_VERSION
 RAPIDS_VERSION_MAJOR_MINOR="$(rapids-version-major-minor)"
+RAPIDS_VERSION_PATCH="$(echo "$RAPIDS_VERSION" | awk -F. '{ print $3 }' | sed -E 's/^0*(.)$/\1/')"
 
-echo "$RAPIDS_VERSION_MAJOR_MINOR.$(python3 -c "from packaging.version import Version; import os; print(Version(os.getenv('RAPIDS_VERSION')).micro)")"
+echo "$RAPIDS_VERSION_MAJOR_MINOR.$RAPIDS_VERSION_PATCH"

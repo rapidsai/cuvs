@@ -21,6 +21,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.nvidia.cuvs</groupId>
     <artifactId>cuvs-java</artifactId>
+    <version>${version}</version>
     <name>cuvs-java</name>
     <description>
         This project provides Java bindings for cuVS, enabling approximate nearest neighbors search and clustering
