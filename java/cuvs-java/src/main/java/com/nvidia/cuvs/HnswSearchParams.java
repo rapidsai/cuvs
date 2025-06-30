@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
 /**
@@ -24,16 +23,16 @@ package com.nvidia.cuvs;
  * @param numThreads the number of threads
  * @since 25.02
  */
-public record HnswSearchParams (int ef, int numThreads) {
+public record HnswSearchParams(int ef, int numThreads) {
 
-    public HnswSearchParams {
-      if (ef < 0) {
-        throw new IllegalArgumentException();
-      }
-      if (numThreads < 0) {
-        throw new IllegalArgumentException();
-      }
+  public HnswSearchParams {
+    if (ef < 0) {
+      throw new IllegalArgumentException();
     }
+    if (numThreads < 0) {
+      throw new IllegalArgumentException();
+    }
+  }
 
   /**
    * Builder configures and creates an instance of HnswSearchParams.
@@ -49,7 +48,7 @@ public record HnswSearchParams (int ef, int numThreads) {
     /**
      * Constructs this Builder with an instance of Arena.
      */
-    public Builder() { }
+    public Builder() {}
 
     /**
      * Sets the ef value
