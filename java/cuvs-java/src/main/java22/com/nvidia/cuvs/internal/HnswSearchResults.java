@@ -16,9 +16,13 @@
 
 package com.nvidia.cuvs.internal;
 
+import com.nvidia.cuvs.SearchResults;
+
+import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SequenceLayout;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -27,22 +31,16 @@ import java.util.Map;
  *
  * @since 25.02
  */
-public class HnswSearchResults extends SearchResultsImpl {
+class HnswSearchResults {
 
-  protected HnswSearchResults(SequenceLayout neighboursSequenceLayout, SequenceLayout distancesSequenceLayout,
-      MemorySegment neighboursMemorySegment, MemorySegment distancesMemorySegment, int topK, List<Integer> mapping,
-      long numberOfQueries) {
-    super(neighboursSequenceLayout, distancesSequenceLayout, neighboursMemorySegment, distancesMemorySegment, topK,
-        mapping, numberOfQueries);
-    readResultMemorySegments();
-  }
+  static SearchResults create(SequenceLayout neighboursSequenceLayout, SequenceLayout distancesSequenceLayout,
+                              MemorySegment neighboursMemorySegment, MemorySegment distancesMemorySegment, int topK, List<Integer> mapping,
+                              long numberOfQueries) {
+    List<Map<Integer, Float>> results = new LinkedList<>();
+    Map<Integer, Float> intermediateResultMap = new LinkedHashMap<>();
+    var neighboursVarHandle = neighboursSequenceLayout.varHandle(MemoryLayout.PathElement.sequenceElement());
+    var distancesVarHandle = distancesSequenceLayout.varHandle(MemoryLayout.PathElement.sequenceElement());
 
-  /**
-   * Reads neighbors and distances {@link MemorySegment} and loads the values
-   * internally
-   */
-  protected void readResultMemorySegments() {
-    Map<Integer, Float> intermediateResultMap = new LinkedHashMap<Integer, Float>();
     int count = 0;
     for (long i = 0; i < topK * numberOfQueries; i++) {
       long id = (long) neighboursVarHandle.get(neighboursMemorySegment, 0L, i);
@@ -55,5 +53,6 @@ public class HnswSearchResults extends SearchResultsImpl {
         count = 0;
       }
     }
+    return new SearchResultsImpl(results);
   }
 }
