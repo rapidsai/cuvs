@@ -23,6 +23,8 @@
 #include <variant>
 
 namespace cuvs::neighbors::all_neighbors {
+// For re-exporting into all_neighbors namespace
+namespace graph_build_params = cuvs::neighbors::graph_build_params;
 /**
  * @defgroup all_neighbors_cpp_params The all-neighbors algorithm parameters.
  * @{

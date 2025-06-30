@@ -37,7 +37,7 @@ project(
 set(CMAKE_INSTALL_MESSAGE LAZY)
 
 # Write the version header
-rapids_cmake_write_version_file(include/cuvs/version_config.hpp)
+rapids_cmake_write_version_file(include/cuvs/version_config.h)
 
 # ##################################################################################################
 # * build type ---------------------------------------------------------------
@@ -746,6 +746,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     target_include_directories(
       cuvs_c
       PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
+             "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
       INTERFACE "$<INSTALL_INTERFACE:include>"
     )
 
@@ -793,7 +794,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
   endif()
 
   install(
-    FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.hpp
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.h
     COMPONENT cuvs
     DESTINATION include/cuvs
   )
