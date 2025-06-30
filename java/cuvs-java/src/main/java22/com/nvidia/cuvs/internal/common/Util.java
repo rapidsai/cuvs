@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs.internal.common;
 
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
@@ -26,6 +25,13 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemGetInfo;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaSetDevice;
 import static com.nvidia.cuvs.internal.panama.headers_h.size_t;
 
+import com.nvidia.cuvs.GPUInfo;
+import com.nvidia.cuvs.internal.panama.DLDataType;
+import com.nvidia.cuvs.internal.panama.DLDevice;
+import com.nvidia.cuvs.internal.panama.DLManagedTensor;
+import com.nvidia.cuvs.internal.panama.DLTensor;
+import com.nvidia.cuvs.internal.panama.cudaDeviceProp;
+import com.nvidia.cuvs.internal.panama.headers_h;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemoryLayout.PathElement;
@@ -35,21 +41,12 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 
-import com.nvidia.cuvs.GPUInfo;
-import com.nvidia.cuvs.internal.panama.DLDataType;
-import com.nvidia.cuvs.internal.panama.DLDevice;
-import com.nvidia.cuvs.internal.panama.DLManagedTensor;
-import com.nvidia.cuvs.internal.panama.DLTensor;
-import com.nvidia.cuvs.internal.panama.cudaDeviceProp;
-import com.nvidia.cuvs.internal.panama.headers_h;
-
 public class Util {
 
   public static final int CUVS_SUCCESS = 1;
   public static final int CUDA_SUCCESS = 0;
 
-  private Util() {
-  }
+  private Util() {}
 
   /**
    * Checks the result value of a (CuVS) native method handle call.
@@ -102,8 +99,10 @@ public class Util {
    * @param kind "Direction" of data copy (Host->Device, Device->Host, etc.)
    * @throws RuntimeException on failure of copy
    */
-  public static void cudaMemcpy(MemorySegment dest, MemorySegment src, long numBytes, CudaMemcpyKind kind) {
-    int returnValue = com.nvidia.cuvs.internal.panama.headers_h.cudaMemcpy(dest, src, numBytes, kind.kind);
+  public static void cudaMemcpy(
+      MemorySegment dest, MemorySegment src, long numBytes, CudaMemcpyKind kind) {
+    int returnValue =
+        com.nvidia.cuvs.internal.panama.headers_h.cudaMemcpy(dest, src, numBytes, kind.kind);
     checkCudaError(returnValue, "cudaMemcpy");
   }
 
@@ -126,7 +125,8 @@ public class Util {
       if (seg.equals(MemorySegment.NULL)) {
         return "no last error text";
       }
-      return seg.reinterpret(MAX_ERROR_TEXT).getString(0);    } catch (Throwable t) {
+      return seg.reinterpret(MAX_ERROR_TEXT).getString(0);
+    } catch (Throwable t) {
       throw new RuntimeException(t);
     }
   }
@@ -149,11 +149,13 @@ public class Util {
    * @param minDeviceMemoryMB    the minimum total available memory in MB
    * @return a list of compatible GPUs. See {@link GPUInfo}
    */
-  public static List<GPUInfo> compatibleGPUs(double minComputeCapability, int minDeviceMemoryMB) throws Throwable {
+  public static List<GPUInfo> compatibleGPUs(double minComputeCapability, int minDeviceMemoryMB)
+      throws Throwable {
     List<GPUInfo> compatibleGPUs = new ArrayList<GPUInfo>();
     double minDeviceMemoryB = Math.pow(2, 20) * minDeviceMemoryMB;
     for (GPUInfo gpuInfo : availableGPUs()) {
-      if (gpuInfo.computeCapability() >= minComputeCapability && gpuInfo.totalMemory() >= minDeviceMemoryB) {
+      if (gpuInfo.computeCapability() >= minComputeCapability
+          && gpuInfo.totalMemory() >= minDeviceMemoryB) {
         compatibleGPUs.add(gpuInfo);
       }
     }
@@ -190,11 +192,17 @@ public class Util {
         returnValue = cudaMemGetInfo(free, total);
         checkCudaError(returnValue, "cudaMemGetInfo");
 
-        float computeCapability = Float
-            .parseFloat(cudaDeviceProp.major(deviceProp) + "." + cudaDeviceProp.minor(deviceProp));
+        float computeCapability =
+            Float.parseFloat(
+                cudaDeviceProp.major(deviceProp) + "." + cudaDeviceProp.minor(deviceProp));
 
-        GPUInfo gpuInfo = new GPUInfo(i, cudaDeviceProp.name(deviceProp).getString(0), free.get(C_LONG, 0),
-            total.get(C_LONG, 0), computeCapability);
+        GPUInfo gpuInfo =
+            new GPUInfo(
+                i,
+                cudaDeviceProp.name(deviceProp).getString(0),
+                free.get(C_LONG, 0),
+                total.get(C_LONG, 0),
+                computeCapability);
 
         gpuInfoArr.add(gpuInfo);
       }
@@ -255,7 +263,8 @@ public class Util {
     MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout(rows * cols, C_FLOAT);
     MemorySegment dataMemorySegment = arena.allocate(dataMemoryLayout);
     for (int r = 0; r < rows; r++) {
-      MemorySegment.copy(data[r], 0, dataMemorySegment, C_FLOAT, (r * cols * C_FLOAT.byteSize()), (int) cols);
+      MemorySegment.copy(
+          data[r], 0, dataMemorySegment, C_FLOAT, (r * cols * C_FLOAT.byteSize()), (int) cols);
     }
     return dataMemorySegment;
   }
@@ -285,8 +294,15 @@ public class Util {
    * @param[in] ndim the number of dimensions
    * @return DLManagedTensor
    */
-  public static MemorySegment prepareTensor(Arena arena, MemorySegment data, long[] shape, int code, int bits, int ndim,
-      int deviceType, int lanes) {
+  public static MemorySegment prepareTensor(
+      Arena arena,
+      MemorySegment data,
+      long[] shape,
+      int code,
+      int bits,
+      int ndim,
+      int deviceType,
+      int lanes) {
 
     MemorySegment tensor = DLManagedTensor.allocate(arena);
     MemorySegment dlTensor = DLTensor.allocate(arena);
@@ -313,5 +329,4 @@ public class Util {
 
     return tensor;
   }
-
 }
