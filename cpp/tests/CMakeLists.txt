@@ -292,10 +292,10 @@ if(TARGET cuvs::c_api)
   endif()
 
   add_executable(cuvs_c_test core/c_api.c)
-  target_link_libraries(cuvs_c_test PUBLIC cuvs::c_api)
+  target_link_libraries(cuvs_c_test PUBLIC cuvs::c_api PRIVATE stdc++ OpenMP::OpenMP_CXX NCCL::NCCL)
 
   add_executable(cuvs_c_neighbors_test neighbors/c_api.c)
-  target_link_libraries(cuvs_c_neighbors_test PUBLIC cuvs::c_api)
+  target_link_libraries(cuvs_c_neighbors_test PUBLIC cuvs::c_api PRIVATE stdc++ OpenMP::OpenMP_CXX NCCL::NCCL)
 
   set_target_properties(
     cuvs_c_test cuvs_c_neighbors_test
