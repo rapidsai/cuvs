@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -151,7 +151,7 @@ void select_clusters(raft::resources const& handle,
     } break;
     default: RAFT_FAIL("Unsupported distance type %d.", int(metric));
   }
-  rmm::device_uvector<float> qc_distances(n_queries * n_lists, stream, mr);
+  rmm::device_uvector<float> qc_distances(size_t(n_queries) * size_t(n_lists), stream, mr);
   raft::linalg::gemm(handle,
                      true,
                      false,
@@ -169,7 +169,7 @@ void select_clusters(raft::resources const& handle,
                      stream);
 
   // Select neighbor clusters for each query.
-  rmm::device_uvector<float> cluster_dists(n_queries * n_probes, stream, mr);
+  rmm::device_uvector<float> cluster_dists(size_t(n_queries) * size_t(n_probes), stream, mr);
   cuvs::selection::select_k(
     handle,
     raft::make_device_matrix_view<const float, int64_t>(qc_distances.data(), n_queries, n_lists),
@@ -237,7 +237,7 @@ void select_clusters(raft::resources const& handle,
     } break;
     default: RAFT_FAIL("Unsupported distance type %d.", int(metric));
   }
-  rmm::device_uvector<dist_type> qc_distances(n_queries * n_lists, stream, mr);
+  rmm::device_uvector<dist_type> qc_distances(size_t(n_queries) * size_t(n_lists), stream, mr);
   raft::linalg::gemm(handle,
                      true,
                      false,
@@ -255,7 +255,7 @@ void select_clusters(raft::resources const& handle,
                      stream);
 
   // Select neighbor clusters for each query.
-  rmm::device_uvector<dist_type> cluster_dists(n_queries * n_probes, stream, mr);
+  rmm::device_uvector<dist_type> cluster_dists(size_t(n_queries) * size_t(n_probes), stream, mr);
   // cuvs::selection::select_k lacks uint32_t-as-a-value support at the moment
   raft::matrix::select_k<dist_type, uint32_t>(
     handle,
@@ -322,7 +322,7 @@ void select_clusters(raft::resources const& handle,
     } break;
     default: RAFT_FAIL("Unsupported distance type %d.", int(metric));
   }
-  rmm::device_uvector<dist_type> qc_distances(n_queries * n_lists, stream, mr);
+  rmm::device_uvector<dist_type> qc_distances(size_t(n_queries) * size_t(n_lists), stream, mr);
   raft::linalg::gemm(handle,
                      true,
                      false,
@@ -340,7 +340,7 @@ void select_clusters(raft::resources const& handle,
                      stream);
 
   // Select neighbor clusters for each query.
-  rmm::device_uvector<dist_type> cluster_dists(n_queries * n_probes, stream, mr);
+  rmm::device_uvector<dist_type> cluster_dists(size_t(n_queries) * size_t(n_probes), stream, mr);
   cuvs::selection::select_k(
     handle,
     raft::make_device_matrix_view<const dist_type, int64_t>(
@@ -778,6 +778,44 @@ inline auto get_max_batch_size(raft::resources const& res,
   return max_batch_size;
 }
 
+/**
+ * A heuristic for bounding the number of queries per batch for the outer loop of the search,
+ * to improve GPU utilization and memory usage.
+ *
+ * @param res is used to query the workspace size
+ * @param data_size size of each data element in bytes
+ * @param n_probes number of selected clusters per query
+ * @param n_lists total number of clusters
+ * @param n_queries number of queries to process
+ * @param max_queries maximum number of queries that can be processed at once
+ *
+ * @return maximum recommended batch size for the outer loop
+ */
+inline auto get_max_queries(raft::resources const& res,
+                            const search_params& params,
+                            uint32_t n_probes,
+                            uint32_t n_lists,
+                            uint32_t n_queries) -> uint32_t
+{
+  size_t data_size = 4;
+  switch (params.coarse_search_dtype) {
+    case CUDA_R_32F: data_size = 4; break;
+    case CUDA_R_16F: data_size = 2; break;
+    case CUDA_R_8I: data_size = 1; break;
+    default: RAFT_FAIL("Unexpected coarse_search_dtype (%d)", int(params.coarse_search_dtype));
+  }
+  // How much data we allocate for coarse GEMM.
+  // This is NOT all memory we need, as a rule of thums max it out to half of the workspace.
+  // We don't reach this limit by default, but only when we increase the max_internal_batch_size by
+  // a lot.
+  auto bytes_per_query = static_cast<size_t>(n_probes + n_lists) * data_size;
+  auto max_per_ws      = raft::resource::get_workspace_free_bytes(res) / bytes_per_query;
+  return std::max<uint32_t>(
+    1,
+    std::min<uint32_t>(max_per_ws / 2,
+                       std::min<uint32_t>(params.max_internal_batch_size, n_queries)));
+}
+
 template <typename T, typename IdxT>
 inline auto get_rotation_matrix(const raft::resources& res, const index<IdxT>& index)
   -> raft::device_matrix_view<const T, uint32_t, raft::row_major>
@@ -867,9 +905,8 @@ inline void search(raft::resources const& handle,
   auto mr = raft::resource::get_workspace_resource(handle);
 
   // Maximum number of query vectors to search at the same time.
-  const auto max_queries =
-    std::min<uint32_t>(std::max<uint32_t>(n_queries, 1), params.max_internal_batch_size);
-  auto max_batch_size = get_max_batch_size(handle, k, n_probes, max_queries, max_samples);
+  const auto max_queries = get_max_queries(handle, params, n_probes, index.n_lists(), n_queries);
+  auto max_batch_size    = get_max_batch_size(handle, k, n_probes, max_queries, max_samples);
 
   using some_query_t = std::
     variant<rmm::device_uvector<float>, rmm::device_uvector<half>, rmm::device_uvector<int8_t>>;
