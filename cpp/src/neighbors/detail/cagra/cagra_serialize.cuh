@@ -85,9 +85,17 @@ template <typename T, typename IdxT>
 void serialize(raft::resources const& res,
                const std::string& filename,
                const index<T, IdxT>& index_,
-               bool include_dataset)
+               bool include_dataset,
+               char file_mode = 'w')
 {
-  std::ofstream of(filename, std::ios::out | std::ios::binary);
+  std::ios_base::openmode mode = std::ios::binary;
+  if (file_mode == 'a') {
+    mode |= std::ios::app;
+  } else {
+    mode |= std::ios::out;
+  }
+  
+  std::ofstream of(filename, mode);
   if (!of) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
   detail::serialize(res, of, index_, include_dataset);

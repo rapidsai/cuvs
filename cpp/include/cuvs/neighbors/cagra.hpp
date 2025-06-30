@@ -1294,12 +1294,14 @@ void search(raft::resources const& res,
  * @param[in] filename the file name for saving the index
  * @param[in] index CAGRA index
  * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ * @param[in] file_mode File mode: 'w' for write (ios::out), 'a' for append (ios::app)
  *
  */
 void serialize(raft::resources const& handle,
                const std::string& filename,
                const cuvs::neighbors::cagra::index<float, uint32_t>& index,
-               bool include_dataset = true);
+               bool include_dataset = true,
+               char file_mode = 'w');
 
 /**
  * Load index from file.
@@ -1399,12 +1401,14 @@ void deserialize(raft::resources const& handle,
  * @param[in] filename the file name for saving the index
  * @param[in] index CAGRA index
  * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ * @param[in] file_mode File mode: 'w' for write (ios::out), 'a' for append (ios::app)
  *
  */
 void serialize(raft::resources const& handle,
                const std::string& filename,
                const cuvs::neighbors::cagra::index<half, uint32_t>& index,
-               bool include_dataset = true);
+               bool include_dataset = true,
+               char file_mode = 'w');
 
 /**
  * Load index from file.
@@ -1505,11 +1509,13 @@ void deserialize(raft::resources const& handle,
  * @param[in] filename the file name for saving the index
  * @param[in] index CAGRA index
  * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ * @param[in] file_mode File mode: 'w' for write (ios::out), 'a' for append (ios::app)
  */
 void serialize(raft::resources const& handle,
                const std::string& filename,
                const cuvs::neighbors::cagra::index<int8_t, uint32_t>& index,
-               bool include_dataset = true);
+               bool include_dataset = true,
+               char file_mode = 'w');
 
 /**
  * Load index from file.
@@ -1610,11 +1616,13 @@ void deserialize(raft::resources const& handle,
  * @param[in] filename the file name for saving the index
  * @param[in] index CAGRA index
  * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ * @param[in] file_mode File mode: 'w' for write (ios::out), 'a' for append (ios::app)
  */
 void serialize(raft::resources const& handle,
                const std::string& filename,
                const cuvs::neighbors::cagra::index<uint8_t, uint32_t>& index,
-               bool include_dataset = true);
+               bool include_dataset = true,
+               char file_mode = 'w');
 
 /**
  * Load index from file.

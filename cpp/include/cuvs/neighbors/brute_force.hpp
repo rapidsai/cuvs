@@ -731,11 +731,13 @@ void search(raft::resources const& handle,
  * @param[in] index brute force index
  * @param[in] include_dataset whether to include the dataset in the serialized
  * output
+ * @param[in] file_mode File mode: 'w' for write (ios::out), 'a' for append (ios::app)
  */
 void serialize(raft::resources const& handle,
                const std::string& filename,
                const cuvs::neighbors::brute_force::index<half, float>& index,
-               bool include_dataset = true);
+               bool include_dataset = true,
+               char file_mode = 'w');
 /**
  * Save the index to file.
  * The serialization format can be subject to changes, therefore loading
@@ -761,12 +763,14 @@ void serialize(raft::resources const& handle,
  * @param[in] index brute force index
  * @param[in] include_dataset whether to include the dataset in the serialized
  * output
+ * @param[in] file_mode File mode: 'w' for write (ios::out), 'a' for append (ios::app)
  *
  */
 void serialize(raft::resources const& handle,
                const std::string& filename,
                const cuvs::neighbors::brute_force::index<float, float>& index,
-               bool include_dataset = true);
+               bool include_dataset = true,
+               char file_mode = 'w');
 
 /**
  * Write the index to an output stream

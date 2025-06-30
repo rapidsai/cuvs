@@ -107,11 +107,11 @@ void _search(cuvsResources_t res,
 }
 
 template <typename T, typename DistT = float>
-void _serialize(cuvsResources_t res, const char* filename, cuvsBruteForceIndex index)
+void _serialize(cuvsResources_t res, const char* filename, cuvsBruteForceIndex index, char file_mode)
 {
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
   auto index_ptr = reinterpret_cast<cuvs::neighbors::brute_force::index<T, DistT>*>(index.addr);
-  cuvs::neighbors::brute_force::serialize(*res_ptr, std::string(filename), *index_ptr);
+  cuvs::neighbors::brute_force::serialize(*res_ptr, std::string(filename), *index_ptr, true, file_mode);
 }
 
 template <typename T, typename DistT = float>
@@ -263,17 +263,25 @@ extern "C" cuvsError_t cuvsBruteForceDeserialize(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsBruteForceSerialize(cuvsResources_t res,
-                                               const char* filename,
-                                               cuvsBruteForceIndex_t index)
+extern "C" cuvsError_t cuvsBruteForceSerializeWithMode(cuvsResources_t res,
+                                                        const char* filename,
+                                                        cuvsBruteForceIndex_t index,
+                                                        char file_mode)
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
-      _serialize<float>(res, filename, *index);
+      _serialize<float>(res, filename, *index, file_mode);
     } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
-      _serialize<half>(res, filename, *index);
+      _serialize<half>(res, filename, *index, file_mode);
     } else {
       RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
     }
   });
+}
+
+extern "C" cuvsError_t cuvsBruteForceSerialize(cuvsResources_t res,
+                                               const char* filename,
+                                               cuvsBruteForceIndex_t index)
+{
+  return cuvsBruteForceSerializeWithMode(res, filename, index, 'w');
 }

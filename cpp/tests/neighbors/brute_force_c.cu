@@ -25,6 +25,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <limits>
 #include <optional>
 #include <queue>
@@ -530,4 +531,82 @@ TEST(BruteForceC, BuildSearchWithBitsetFilter)
   uint32_t n_neighbors = 100;
 
   run_test_with_filter(n_rows, n_queries, n_dim, n_neighbors, BITSET);
+}
+
+TEST(BruteForceC, SerializeWithModes)
+{
+  int64_t n_rows = 1000;
+  int64_t n_dim  = 32;
+
+  // Create resources
+  cuvsResources_t res;
+  ASSERT_EQ(cuvsResourcesCreate(&res), CUVS_SUCCESS);
+
+  // Create GPU data using RAFT handle
+  raft::handle_t handle;
+  auto stream = raft::resource::get_cuda_stream(handle);
+  rmm::device_uvector<float> data(n_rows * n_dim, stream);
+  generate_random_data(data.data(), n_rows * n_dim);
+
+  // Create DLManagedTensor for dataset
+  DLManagedTensor dataset_tensor;
+  dataset_tensor.dl_tensor.data               = data.data();
+  dataset_tensor.dl_tensor.device.device_type = kDLCUDA;
+  dataset_tensor.dl_tensor.device.device_id   = 0;
+  dataset_tensor.dl_tensor.ndim               = 2;
+  dataset_tensor.dl_tensor.dtype.code         = kDLFloat;
+  dataset_tensor.dl_tensor.dtype.bits         = 32;
+  dataset_tensor.dl_tensor.dtype.lanes        = 1;
+  dataset_tensor.dl_tensor.byte_offset        = 0;
+  int64_t shape[2] = {n_rows, n_dim};
+  dataset_tensor.dl_tensor.shape              = shape;
+  dataset_tensor.dl_tensor.strides            = nullptr;
+
+  // Build index
+  cuvsBruteForceIndex_t index;
+  ASSERT_EQ(cuvsBruteForceIndexCreate(&index), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsBruteForceBuild(res, &dataset_tensor, L2Expanded, 0.0f, index), CUVS_SUCCESS);
+
+  // Test serialization with 'w' mode
+  const char* filename_w = "/tmp/test_brute_force_w.index";
+  ASSERT_EQ(cuvsBruteForceSerializeWithMode(res, filename_w, index, 'w'), CUVS_SUCCESS);
+
+  // Test serialization with 'a' mode  
+  const char* filename_a = "/tmp/test_brute_force_a.index";
+  ASSERT_EQ(cuvsBruteForceSerializeWithMode(res, filename_a, index, 'a'), CUVS_SUCCESS);
+
+  // Test backward compatibility (should use 'w' mode by default)
+  const char* filename_compat = "/tmp/test_brute_force_compat.index";
+  ASSERT_EQ(cuvsBruteForceSerialize(res, filename_compat, index), CUVS_SUCCESS);
+
+  // Verify files exist
+  std::ifstream file_w(filename_w, std::ios::binary);
+  ASSERT_TRUE(file_w.good());
+  file_w.close();
+
+  std::ifstream file_a(filename_a, std::ios::binary);
+  ASSERT_TRUE(file_a.good());
+  file_a.close();
+
+  std::ifstream file_compat(filename_compat, std::ios::binary);
+  ASSERT_TRUE(file_compat.good());
+  file_compat.close();
+
+  // Test deserialization works with both files
+  cuvsBruteForceIndex_t index_loaded_w, index_loaded_compat;
+  ASSERT_EQ(cuvsBruteForceIndexCreate(&index_loaded_w), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsBruteForceIndexCreate(&index_loaded_compat), CUVS_SUCCESS);
+
+  ASSERT_EQ(cuvsBruteForceDeserialize(res, filename_w, index_loaded_w), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsBruteForceDeserialize(res, filename_compat, index_loaded_compat), CUVS_SUCCESS);
+
+  // Clean up
+  std::remove(filename_w);
+  std::remove(filename_a);
+  std::remove(filename_compat);
+
+  ASSERT_EQ(cuvsBruteForceIndexDestroy(index), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsBruteForceIndexDestroy(index_loaded_w), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsBruteForceIndexDestroy(index_loaded_compat), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsResourcesDestroy(res), CUVS_SUCCESS);
 }

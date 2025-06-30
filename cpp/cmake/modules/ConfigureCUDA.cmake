@@ -45,6 +45,7 @@ if(CUDA_LOG_COMPILE_TIME)
 endif()
 
 list(APPEND CUVS_CUDA_FLAGS --expt-extended-lambda --expt-relaxed-constexpr)
+list(APPEND CUVS_CUDA_FLAGS -allow-unsupported-compiler)
 list(APPEND CUVS_CXX_FLAGS "-DCUDA_API_PER_THREAD_DEFAULT_STREAM")
 list(APPEND CUVS_CUDA_FLAGS "-DCUDA_API_PER_THREAD_DEFAULT_STREAM")
 # make sure we produce smallest binary size

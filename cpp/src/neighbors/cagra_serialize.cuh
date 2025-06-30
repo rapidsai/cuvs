@@ -24,10 +24,19 @@ namespace cuvs::neighbors::cagra {
   void serialize(raft::resources const& handle,                                            \
                  const std::string& filename,                                              \
                  const cuvs::neighbors::cagra::index<DTYPE, uint32_t>& index,              \
+                 bool include_dataset,                                                     \
+                 char file_mode)                                                          \
+  {                                                                                        \
+    cuvs::neighbors::cagra::detail::serialize<DTYPE, uint32_t>(                            \
+      handle, filename, index, include_dataset, file_mode);                                \
+  };                                                                                       \
+  void serialize(raft::resources const& handle,                                            \
+                 const std::string& filename,                                              \
+                 const cuvs::neighbors::cagra::index<DTYPE, uint32_t>& index,              \
                  bool include_dataset)                                                     \
   {                                                                                        \
     cuvs::neighbors::cagra::detail::serialize<DTYPE, uint32_t>(                            \
-      handle, filename, index, include_dataset);                                           \
+      handle, filename, index, include_dataset, 'w');                                      \
   };                                                                                       \
                                                                                            \
   void deserialize(raft::resources const& handle,                                          \
