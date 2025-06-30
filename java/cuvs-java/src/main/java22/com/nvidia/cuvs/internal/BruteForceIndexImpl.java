@@ -21,12 +21,13 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG_BYTE_SIZE;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_POINTER;
+import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.HOST_TO_DEVICE;
+import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.INFER_DIRECTION;
+import static com.nvidia.cuvs.internal.common.Util.allocateRMMSegment;
 import static com.nvidia.cuvs.internal.common.Util.buildMemorySegment;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.concatenate;
 import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
-import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.*;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceBuild;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceDeserialize;
@@ -35,7 +36,6 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceIndexDestr
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceIndex_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceSearch;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceSerialize;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMAlloc;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamGet;
@@ -43,8 +43,6 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
 import static com.nvidia.cuvs.internal.panama.headers_h.omp_set_num_threads;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaStream_t;
 
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.foreign.Arena;
@@ -134,7 +132,8 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       checkCuVSError(returnValue, "cuvsBruteForceIndexDestroy");
 
       if (bruteForceIndexReference.datasetBytes > 0) {
-        returnValue = cuvsRMMFree(resources.getHandle(), bruteForceIndexReference.datasetPtr, bruteForceIndexReference.datasetBytes);
+        long cuvsResources = resources.getMemorySegment().get(cuvsResources_t, 0);
+        returnValue = cuvsRMMFree(cuvsResources, bruteForceIndexReference.datasetPtr, bruteForceIndexReference.datasetBytes);
         checkCuVSError(returnValue, "cuvsRMMFree");
       }
       if (bruteForceIndexReference.tensorDataArena != null) {
@@ -162,7 +161,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
           Util.buildMemorySegment(resources.getArena(), vectors);
 
       long cuvsResources = resources.getMemorySegment().get(cuvsResources_t, 0);
-      MemorySegment stream = arena.allocate(cudaStream_t);
+      MemorySegment stream = resources.getArena().allocate(cudaStream_t);
       var returnValue = cuvsStreamGet(cuvsResources, stream);
       checkCuVSError(returnValue, "cuvsStreamGet");
 
@@ -176,7 +175,11 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       var tensorDataArena = Arena.ofShared();
       MemorySegment datasetTensor = prepareTensor(tensorDataArena, datasetMemorySegmentP, datasetShape, 2, 32, 2, 2, 1);
 
-      var indexReference = new IndexReference(datasetMemorySegmentP, datasetBytes, tensorDataArena, createBruteForceIndex());
+      MemorySegment index = resources.getArena().allocate(cuvsBruteForceIndex_t);
+      returnValue = cuvsBruteForceIndexCreate(index);
+      checkCuVSError(returnValue, "cuvsBruteForceIndexCreate");
+
+      var indexReference = new IndexReference(datasetMemorySegmentP, datasetBytes, tensorDataArena, index);
 
       returnValue = cuvsStreamSync(cuvsResources);
       checkCuVSError(returnValue, "cuvsStreamSync");
@@ -228,7 +231,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
 
       int topk = cuvsQuery.getTopK();
       long cuvsResources = resources.getMemorySegment().get(cuvsResources_t, 0);
-      MemorySegment stream = arena.allocate(cudaStream_t);
+      MemorySegment stream = localArena.allocate(cudaStream_t);
       var returnValue = cuvsStreamGet(cuvsResources, stream);
       checkCuVSError(returnValue, "cuvsStreamGet");
 
@@ -457,6 +460,13 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       private final Arena tensorDataArena;
       private final MemorySegment indexPtr;
 
+    /**
+     * Constructs CagraIndexReference and allocate the MemorySegment.
+     */
+    protected IndexReference(CuVSResourcesImpl resources) {
+      this(cuvsBruteForceIndex.allocate(resources.getArena()));
+    }
+
     private IndexReference(MemorySegment datasetPtr, long datasetBytes, Arena tensorDataArena, MemorySegment indexPtr) {
         this.datasetPtr = datasetPtr;
         this.datasetBytes = datasetBytes;
@@ -469,6 +479,10 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       this.datasetBytes = 0;
       this.tensorDataArena = null;
       this.indexPtr = indexPtr;
+    }
+
+    private MemorySegment getMemorySegment() {
+      return indexPtr;
     }
   }
 }

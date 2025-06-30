@@ -20,12 +20,13 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT_BYTE_SIZE;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_POINTER;
+import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.HOST_TO_DEVICE;
+import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.INFER_DIRECTION;
+import static com.nvidia.cuvs.internal.common.Util.allocateRMMSegment;
 import static com.nvidia.cuvs.internal.common.Util.buildMemorySegment;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.concatenate;
 import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
-import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.*;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraBuild;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraDeserialize;
@@ -35,10 +36,8 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndexGetDims;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndex_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSearch;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraMerge;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraMergeParams_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSerialize;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSerializeToHnswlib;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMAlloc;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamGet;
@@ -47,7 +46,6 @@ import static com.nvidia.cuvs.internal.panama.headers_h.omp_set_num_threads;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaStream_t;
 
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.foreign.Arena;
@@ -192,14 +190,14 @@ public class CagraIndexImpl implements CagraIndex {
       	Util.buildMemorySegment(resources.getArena(), vectors);
 
       long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
-      MemorySegment stream = arena.allocate(cudaStream_t);
+      MemorySegment stream = localArena.allocate(cudaStream_t);
       var returnValue = cuvsStreamGet(cuvsRes, stream);
       checkCuVSError(returnValue, "cuvsStreamGet");
 
       long datasetShape[] = { rows, cols };
       MemorySegment datasetTensor = prepareTensor(localArena, dataSeg, datasetShape, 2, 32, 2, 2, 1);
 
-      MemorySegment index = arena.allocate(cuvsCagraIndex_t);
+      MemorySegment index = localArena.allocate(cuvsCagraIndex_t);
       returnValue = cuvsCagraIndexCreate(index);
       checkCuVSError(returnValue, "cuvsCagraIndexCreate");
 
@@ -250,7 +248,7 @@ public class CagraIndexImpl implements CagraIndex {
       MemorySegment floatsSeg = buildMemorySegment(localArena, query.getQueryVectors());
 
       long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
-      MemorySegment stream = arena.allocate(cudaStream_t);
+      MemorySegment stream = localArena.allocate(cudaStream_t);
       int returnValue = cuvsStreamGet(cuvsRes, stream);
       checkCuVSError(returnValue, "cuvsStreamGet");
 
@@ -289,7 +287,7 @@ public class CagraIndexImpl implements CagraIndex {
         prefilterDataLength = query.getNumDocs() * prefilters.length;
       }
 
-      MemorySegment prefilter = cuvsFilter.allocate(arena);
+      MemorySegment prefilter = cuvsFilter.allocate(localArena);
       MemorySegment prefilterTensor;
 
       if (prefilterDataMemorySegment == MemorySegment.NULL) {
@@ -422,7 +420,7 @@ public class CagraIndexImpl implements CagraIndex {
   private IndexReference deserialize(InputStream inputStream) throws Throwable {
     Path tmpIndexFile = Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".cag")
         .toAbsolutePath();
-    IndexReference indexReference = createCagraIndex();
+    IndexReference indexReference = new IndexReference(resources);
 
     try (inputStream; var outputStream = Files.newOutputStream(tmpIndexFile); var arena = Arena.ofConfined()) {
       inputStream.transferTo(outputStream);
@@ -707,6 +705,13 @@ public class CagraIndexImpl implements CagraIndex {
   public static class IndexReference {
 
     private final MemorySegment memorySegment;
+
+    /**
+     * Constructs CagraIndexReference and allocate the MemorySegment.
+     */
+    protected IndexReference(CuVSResourcesImpl resources) {
+      memorySegment = cuvsCagraIndex.allocate(resources.getArena());
+    }
 
     /**
      * Constructs CagraIndexReference with an instance of MemorySegment passed as a

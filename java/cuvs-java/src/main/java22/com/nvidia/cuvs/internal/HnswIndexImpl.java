@@ -21,12 +21,7 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
 import static com.nvidia.cuvs.internal.common.Util.buildMemorySegment;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswDeserialize;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswIndexCreate;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswIndexDestroy;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswIndex_t;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswSearch;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import java.io.InputStream;
 import java.lang.foreign.Arena;
@@ -146,7 +141,7 @@ public class HnswIndexImpl implements HnswIndex {
         MemorySegment pathSeg = buildMemorySegment(localArena, tmpIndexFile.toString());
 
         long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
-        MemorySegment hnswIndex = cuvsHnswIndex.allocate(arena);
+        MemorySegment hnswIndex = cuvsHnswIndex.allocate(localArena);
         int returnValue = cuvsHnswIndexCreate(hnswIndex);
         checkCuVSError(returnValue, "cuvsHnswIndexCreate");
 
@@ -157,7 +152,7 @@ public class HnswIndexImpl implements HnswIndex {
 
         cuvsHnswIndex.dtype(hnswIndex, dtype);
 
-        returnValue = cuvsHnswDeserialize(cuvsRes, segmentFromIndexParams(hnswIndexParams), pathSeg,
+        returnValue = cuvsHnswDeserialize(cuvsRes, segmentFromIndexParams(localArena, hnswIndexParams), pathSeg,
             hnswIndexParams.getVectorDimension(), 0, hnswIndex);
         checkCuVSError(returnValue, "cuvsHnswDeserialize");
 
@@ -167,7 +162,6 @@ public class HnswIndexImpl implements HnswIndex {
         Files.deleteIfExists(tmpIndexFile);
       }
     }
-  }
 
   /**
    * Allocates the configured search parameters in the MemorySegment.
