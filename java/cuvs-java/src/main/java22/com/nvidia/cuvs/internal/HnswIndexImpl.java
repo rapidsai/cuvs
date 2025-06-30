@@ -21,7 +21,12 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
 import static com.nvidia.cuvs.internal.common.Util.buildMemorySegment;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
-import static com.nvidia.cuvs.internal.panama.headers_h.*;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswDeserialize;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswIndexCreate;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswIndexDestroy;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswSearch;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
 
 import java.io.InputStream;
 import java.lang.foreign.Arena;

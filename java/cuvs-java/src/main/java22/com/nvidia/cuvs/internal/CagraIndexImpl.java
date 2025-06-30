@@ -710,7 +710,7 @@ public class CagraIndexImpl implements CagraIndex {
      * Constructs CagraIndexReference and allocate the MemorySegment.
      */
     protected IndexReference(CuVSResourcesImpl resources) {
-      memorySegment = cuvsCagraIndex.allocate(resources.getArena());
+      this(cuvsCagraIndex.allocate(resources.getArena()));
     }
 
     /**
