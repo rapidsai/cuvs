@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,4 +39,59 @@ void single_linkage(raft::resources const& handle,
       handle, X, dendrogram, labels, metric, n_clusters, c);
   }
 }
+
+namespace helpers {
+void build_linkage(
+  raft::resources const& handle,
+  raft::device_matrix_view<const float, int, raft::row_major> X,
+  std::variant<linkage_graph_params::distance_params,
+               linkage_graph_params::mutual_reachability_params> linkage_graph_params,
+  cuvs::distance::DistanceType metric,
+  raft::device_coo_matrix_view<float, int, int, size_t> out_mst,
+  raft::device_matrix_view<int, int> out_dendrogram,
+  raft::device_vector_view<float, int> out_distances,
+  raft::device_vector_view<int, int> out_sizes,
+  std::optional<raft::device_vector_view<float, int>> core_dists)
+{
+  /**
+   * Construct MST sorted by weights
+   */
+  if (std::holds_alternative<
+        cuvs::cluster::agglomerative::helpers::linkage_graph_params::mutual_reachability_params>(
+        linkage_graph_params)) {
+    RAFT_EXPECTS(core_dists.has_value(),
+                 "core distances must be pre-allocated to build the linkage with mutual "
+                 "reachability distances");
+    auto core_dists_mdspan = core_dists.value();
+    RAFT_EXPECTS(core_dists_mdspan.extent(0) == X.extent(0),
+                 "core_dists doesn't have expected size");
+    auto mr_params = std::get<
+      cuvs::cluster::agglomerative::helpers::linkage_graph_params::mutual_reachability_params>(
+      linkage_graph_params);
+    detail::build_mr_linkage<float, int>(handle,
+                                         X,
+                                         mr_params.min_samples,
+                                         mr_params.alpha,
+                                         metric,
+                                         core_dists_mdspan,
+                                         out_mst,
+                                         out_dendrogram,
+                                         out_distances,
+                                         out_sizes);
+  } else {
+    auto dist_params =
+      std::get<cuvs::cluster::agglomerative::helpers::linkage_graph_params::distance_params>(
+        linkage_graph_params);
+    if (dist_params.dist_type == cuvs::cluster::agglomerative::Linkage::KNN_GRAPH) {
+      detail::
+        build_dist_linkage<float, int, size_t, cuvs::cluster::agglomerative::Linkage::KNN_GRAPH>(
+          handle, X, dist_params.c, metric, out_mst, out_dendrogram, out_distances, out_sizes);
+    } else {
+      detail::
+        build_dist_linkage<float, int, size_t, cuvs::cluster::agglomerative::Linkage::PAIRWISE>(
+          handle, X, dist_params.c, metric, out_mst, out_dendrogram, out_distances, out_sizes);
+    }
+  }
+}
+}  // namespace helpers
 }  // namespace cuvs::cluster::agglomerative
