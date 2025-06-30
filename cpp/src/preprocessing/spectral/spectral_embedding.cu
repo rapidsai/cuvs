@@ -98,9 +98,6 @@ auto transform(raft::resources const& handle,
   // binarize to 1s
   raft::matrix::fill(handle, raft::make_device_vector_view(d_distances.data_handle(), nnz), 1.0f);
 
-  // Create output COO for symmetrized result - create unallocated COO
-  // raft::sparse::COO<float> sym_coo1(stream);  // Don't pre-allocate dimensions
-
   // // Define the reduction function with the correct signature
   auto reduction_op = [] __device__(int row, int col, float a, float b) {
     // Only use the values, ignore row/col indices
