@@ -3,9 +3,7 @@
 channels:
 - rapidsai
 - rapidsai-nightly
-- dask/label/dev
 - conda-forge
-- nvidia
 dependencies:
 - c-compiler
 - clang-tools==20.1.4
