@@ -18,6 +18,10 @@ class SearchResultsImpl implements SearchResults {
     this.results = results;
   }
 
+  /**
+   * Factory method to create an on-heap SearchResults (backed by standard Java data types and containers) from
+   * native/off-heap memory data structures.
+   */
   static SearchResults create(SequenceLayout neighboursSequenceLayout, SequenceLayout distancesSequenceLayout,
                               MemorySegment neighboursMemorySegment, MemorySegment distancesMemorySegment, int topK, List<Integer> mapping,
                               long numberOfQueries) {

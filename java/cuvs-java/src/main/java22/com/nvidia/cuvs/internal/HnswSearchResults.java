@@ -18,13 +18,9 @@ package com.nvidia.cuvs.internal;
 
 import com.nvidia.cuvs.SearchResults;
 
-import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SequenceLayout;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * SearchResult encapsulates the logic for reading and holding search results.

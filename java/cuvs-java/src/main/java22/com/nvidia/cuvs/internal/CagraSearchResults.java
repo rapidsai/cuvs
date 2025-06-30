@@ -33,9 +33,15 @@ import com.nvidia.cuvs.SearchResults;
  */
 class CagraSearchResults {
 
+  /**
+   * Factory method to create an on-heap SearchResults (backed by standard Java data types and containers) from
+   * native/off-heap memory data structures.
+   * This class provides its own implementation for reading from native memory instead of reling on
+   * {@link SearchResultsImpl#create} because it requires special handling of neighbours IDs.
+   */
   static SearchResults create(SequenceLayout neighboursSequenceLayout, SequenceLayout distancesSequenceLayout,
-                                   MemorySegment neighboursMemorySegment, MemorySegment distancesMemorySegment, int topK, List<Integer> mapping,
-                                   long numberOfQueries) {
+                              MemorySegment neighboursMemorySegment, MemorySegment distancesMemorySegment, int topK, List<Integer> mapping,
+                              long numberOfQueries) {
 
     List<Map<Integer, Float>> results = new LinkedList<>();
     Map<Integer, Float> intermediateResultMap = new LinkedHashMap<>();

@@ -21,7 +21,6 @@ import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.Objects;
 
-import com.nvidia.cuvs.BruteForceIndex.Builder;
 import com.nvidia.cuvs.spi.CuVSProvider;
 
 /**
