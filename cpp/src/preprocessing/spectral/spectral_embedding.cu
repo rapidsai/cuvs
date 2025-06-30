@@ -210,7 +210,7 @@ auto transform(raft::resources const& handle,
 
   // std::cout << "sym_coo1.n_rows: " << sym_coo1.n_rows << std::endl;
 
-  raft::sparse::linalg::coo_symmetrize(&coo_no_zeros, &sym_coo1, reduction_op, stream);
+  // raft::sparse::linalg::coo_symmetrize(&coo_no_zeros, &sym_coo1, reduction_op, stream);
 
   std::cout << "sym_coo1.n_rows: " << sym_coo1_matrix_view.structure_view().get_n_rows()
             << std::endl;
@@ -218,9 +218,9 @@ auto transform(raft::resources const& handle,
             << std::endl;
   std::cout << "sym_coo1.nnz: " << sym_coo1_matrix_view.structure_view().get_nnz() << std::endl;
 
-  std::cout << "sym_coo1.n_rows: " << sym_coo1.n_rows << std::endl;
-  std::cout << "sym_coo1.n_cols: " << sym_coo1.n_cols << std::endl;
-  std::cout << "sym_coo1.nnz: " << sym_coo1.nnz << std::endl;
+  // std::cout << "sym_coo1.n_rows: " << sym_coo1.n_rows << std::endl;
+  // std::cout << "sym_coo1.n_cols: " << sym_coo1.n_cols << std::endl;
+  // std::cout << "sym_coo1.nnz: " << sym_coo1.nnz << std::endl;
 
   // raft::print_device_vector("sym_coo1_rows",
   // sym_coo1_matrix_view.structure_view().get_rows().data(),
@@ -307,7 +307,7 @@ auto transform(raft::resources const& handle,
   // sym_coo1_vals.data(), coo_no_zeros.nnz, sym_coo_rows.data(), sym_coo_cols.data(),
   // sym_coo_vals.data(), 0.0F, coo_no_zeros.n_rows, stream);
 
-  raft::sparse::op::coo_sort<float>(&sym_coo1, stream);
+  // raft::sparse::op::coo_sort<float>(&sym_coo1, stream);
 
   // std::cout << "sym_coo1_rows.size(): " << sym_coo1_rows.size() << std::endl;
   // std::cout << "sym_coo1.n_rows: " << sym_coo1_matrix_view.structure_view().get_n_rows() <<
@@ -351,14 +351,14 @@ auto transform(raft::resources const& handle,
   std::cout << "sym_coo_matrix.nnz: " << sym_coo_matrix.structure_view().get_nnz() << std::endl;
 
   // could use new coo_matrix here
-  raft::sparse::COO<float> sym_coo(stream);  // Don't pre-allocate dimensions
-  raft::sparse::op::coo_remove_zeros<float>(&sym_coo1, &sym_coo, stream);
+  // raft::sparse::COO<float> sym_coo(stream);  // Don't pre-allocate dimensions
+  // raft::sparse::op::coo_remove_zeros<float>(&sym_coo1, &sym_coo, stream);
 
   raft::resource::sync_stream(handle, stream);
 
-  std::cout << "sym_coo.nnz: " << sym_coo.nnz << std::endl;
+  // std::cout << "sym_coo.nnz: " << sym_coo.nnz << std::endl;
 
-  nnz = sym_coo.nnz;
+  // nnz = sym_coo.nnz;
 
   using value_idx = int;
   using value_t   = float;
@@ -379,25 +379,25 @@ auto transform(raft::resources const& handle,
   auto sym_coo_row_ind = raft::make_device_vector<int>(handle, sym_coo_n_rows + 1);
   raft::sparse::convert::sorted_coo_to_csr(
     sym_coo_rows, sym_coo_nnz, sym_coo_row_ind.data_handle(), sym_coo_n_rows, stream);
-  const int test_one = sym_coo.nnz;
+  const int test_one = sym_coo_nnz;
   raft::copy(sym_coo_row_ind.data_handle() + sym_coo_row_ind.size() - 1, &test_one, 1, stream);
 
   // raft::print_device_vector("sym_coo_row_ind", sym_coo_row_ind.data(), sym_coo_row_ind.size(),
   // std::cout);
 
   // could use new coo_matrix here
-  raft::sparse::op::coo_sort<float>(&sym_coo, stream);
+  // raft::sparse::op::coo_sort<float>(&sym_coo, stream);
 
   // std::cout << "sym_coo.nnz: " << sym_coo.nnz << std::endl;
   // std::cout << "sym_coo.n_rows: " << sym_coo.n_rows << std::endl;
   // std::cout << "sym_coo.n_cols: " << sym_coo.n_cols << std::endl;
   // raft::print_device_vector("sym_coo.rows", sym_coo.rows(), sym_coo.nnz, std::cout);
 
-  auto row_ind = raft::make_device_vector<int>(handle, sym_coo.n_rows + 1);
-  raft::sparse::convert::sorted_coo_to_csr(&sym_coo, row_ind.data_handle(), stream);
+  // auto row_ind = raft::make_device_vector<int>(handle, sym_coo.n_rows + 1);
+  // raft::sparse::convert::sorted_coo_to_csr(&sym_coo, row_ind.data_handle(), stream);
 
-  const int one = sym_coo.nnz;
-  raft::copy(row_ind.data_handle() + row_ind.size() - 1, &one, 1, stream);
+  // const int one = sym_coo.nnz;
+  // raft::copy(row_ind.data_handle() + row_ind.size() - 1, &one, 1, stream);
 
   // raft::print_device_vector("row_ind", row_ind.data_handle(), row_ind.size(), std::cout);
 
