@@ -191,6 +191,9 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
   rmm::device_uvector<DataT> database;
 };
 
+// getting mutual reachability using nn descent should be done through all_neighbors
+// API. this is just a simple check that the feature works well before integrating into
+// all_neighbors API.
 template <typename DistanceT, typename DataT, typename IdxT>
 class AnnNNDescentDIstEpiTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
  public:
@@ -276,7 +279,6 @@ class AnnNNDescentDIstEpiTest : public ::testing::TestWithParam<AnnNNDescentInpu
       auto database_host_view = raft::make_host_matrix_view<const DataT, int64_t>(
         (const DataT*)database_host.data_handle(), ps.n_rows, ps.dim);
       auto index = nn_descent::build(handle_, index_params, database_host_view);
-      // raft::copy(indices_NNDescent.data(), index.graph().data_handle(), queries_size, stream_);
 
       rmm::device_uvector<DistanceT> core_dists_dev(ps.n_rows, stream_);
       cuvs::neighbors::detail::reachability::core_distances<IdxT, DistanceT>(
@@ -287,9 +289,6 @@ class AnnNNDescentDIstEpiTest : public ::testing::TestWithParam<AnnNNDescentInpu
         core_dists_dev.data(),
         stream_);
 
-      // getting mutual reachability using nn descent should be done through all_neighbors
-      // API. this is just a simple check that the feature works well before integrating into
-      // all_neighbors API.
       size_t extended_graph_degree, graph_degree;
       auto build_config = nn_descent::detail::get_build_config(
         handle_, index_params, ps.n_rows, ps.dim, ps.metric, extended_graph_degree, graph_degree);
