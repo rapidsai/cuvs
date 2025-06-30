@@ -16,8 +16,6 @@
 
 package com.nvidia.cuvs.internal;
 
-import com.nvidia.cuvs.internal.common.SearchResultsImpl;
-
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SequenceLayout;
 import java.util.LinkedHashMap;

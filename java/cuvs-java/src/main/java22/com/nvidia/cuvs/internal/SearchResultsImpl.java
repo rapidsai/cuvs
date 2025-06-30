@@ -1,4 +1,4 @@
-package com.nvidia.cuvs.internal.common;
+package com.nvidia.cuvs.internal;
 
 import com.nvidia.cuvs.SearchResults;
 

@@ -22,8 +22,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.nvidia.cuvs.internal.common.SearchResultsImpl;
-
 /**
  * SearchResult encapsulates the logic for reading and holding search results.
  *
