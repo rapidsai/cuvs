@@ -31,7 +31,7 @@ struct ReachabilityPostProcess {
 
   const value_t* core_dists;
   value_t alpha;
-  size_t n;  // total number of elements
+  size_t n;  // size of core_dists array
 };
 
 }  // namespace cuvs::neighbors::detail::reachability
