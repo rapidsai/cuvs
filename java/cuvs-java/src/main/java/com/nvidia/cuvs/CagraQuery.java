@@ -17,7 +17,6 @@
 package com.nvidia.cuvs;
 
 import java.util.Arrays;
-import java.util.List;
 import java.util.BitSet;
 import java.util.function.LongToIntFunction;
 
