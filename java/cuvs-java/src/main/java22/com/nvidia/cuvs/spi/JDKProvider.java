@@ -13,21 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs.spi;
 
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.CagraIndex;
+import com.nvidia.cuvs.CagraMergeParams;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
-import com.nvidia.cuvs.CagraMergeParams;
 import com.nvidia.cuvs.internal.BruteForceIndexImpl;
 import com.nvidia.cuvs.internal.CagraIndexImpl;
 import com.nvidia.cuvs.internal.CuVSResourcesImpl;
 import com.nvidia.cuvs.internal.DatasetImpl;
 import com.nvidia.cuvs.internal.HnswIndexImpl;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -70,7 +68,8 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraMergeParams mergeParams) throws Throwable {
+  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraMergeParams mergeParams)
+      throws Throwable {
     if (indexes == null || indexes.length == 0) {
       throw new IllegalArgumentException("At least one index must be provided for merging");
     }
@@ -79,6 +78,6 @@ final class JDKProvider implements CuVSProvider {
 
   @Override
   public Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException {
-      return new DatasetImpl(size, dimensions);
+    return new DatasetImpl(size, dimensions);
   }
 }
