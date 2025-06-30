@@ -20,6 +20,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/handle.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/core/device_coo_matrix.hpp>
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/matrix/init.cuh>
@@ -30,6 +31,8 @@
 #include <raft/sparse/solver/lanczos.cuh>
 #include <raft/sparse/solver/lanczos_types.hpp>
 #include <raft/util/cudart_utils.hpp>
+
+#include <rmm/device_uvector.hpp>
 
 #include <thrust/sequence.h>
 
@@ -49,7 +52,7 @@ auto transform(raft::resources const& handle,
   const int n_samples     = dataset.extent(0);
   const int n_features    = dataset.extent(1);
   const int k             = spectral_embedding_config.n_neighbors;  // Number of neighbors
-  const bool include_self = false;  // Set to false to exclude self-connections
+  const bool include_self = true;  // Set to false to exclude self-connections
   const bool drop_first   = spectral_embedding_config.drop_first;
 
   auto stream = raft::resource::get_cuda_stream(handle);
@@ -102,8 +105,10 @@ auto transform(raft::resources const& handle,
   raft::copy(knn_coo.cols(), knn_cols.data_handle(), nnz, stream);
   raft::copy(knn_coo.vals(), d_distances.data_handle(), nnz, stream);
 
-  raft::sparse::COO<float> coo_no_zeros(stream);  // Don't pre-allocate dimensions
-  raft::sparse::op::coo_remove_zeros<float>(&knn_coo, &coo_no_zeros, stream);
+  // raft::sparse::COO<float> coo_no_zeros(stream);  // Don't pre-allocate dimensions
+  // raft::sparse::op::coo_remove_zeros<float>(&knn_coo, &coo_no_zeros, stream);
+
+  auto& coo_no_zeros = knn_coo;
 
   // binarize to 1s
   raft::matrix::fill(
@@ -119,12 +124,211 @@ auto transform(raft::resources const& handle,
   };
 
   // Symmetrize the matrix
+  // rewrite coo_symmetrize to use new coo_matrix
+
+  auto test_coo_rows = raft::make_device_vector<int>(handle, coo_no_zeros.nnz);
+  auto test_coo_cols = raft::make_device_vector<int>(handle, coo_no_zeros.nnz);
+  auto test_coo_vals = raft::make_device_vector<float>(handle, coo_no_zeros.nnz);
+
+  raft::copy(test_coo_rows.data_handle(), coo_no_zeros.rows(), coo_no_zeros.nnz, stream);
+  raft::copy(test_coo_cols.data_handle(), coo_no_zeros.cols(), coo_no_zeros.nnz, stream);
+  raft::copy(test_coo_vals.data_handle(), coo_no_zeros.vals(), coo_no_zeros.nnz, stream);
+
+  // raft::print_device_vector("test_coo_rows", test_coo_rows.data_handle(), coo_no_zeros.nnz, std::cout);
+  // raft::print_device_vector("test_coo_cols", test_coo_cols.data_handle(), coo_no_zeros.nnz, std::cout);
+  // raft::print_device_vector("test_coo_vals", test_coo_vals.data_handle(), coo_no_zeros.nnz, std::cout);
+
+  raft::resource::sync_stream(handle, stream);
+
+
+  auto coo_structure_view = raft::make_device_coordinate_structure_view<int, int, int>(test_coo_rows.data_handle(), test_coo_cols.data_handle(), coo_no_zeros.n_rows, coo_no_zeros.n_cols, coo_no_zeros.nnz);
+  auto coo_matrix_view = raft::make_device_coo_matrix_view<const float, int, int, int>(
+    test_coo_vals.data_handle(), coo_structure_view);
+  
+  
+  // auto sym_coo1_rows = raft::make_device_vector<int>(handle, coo_no_zeros.nnz * 2);
+  // auto sym_coo1_cols = raft::make_device_vector<int>(handle, coo_no_zeros.nnz * 2);
+  // auto sym_coo1_vals = raft::make_device_vector<float>(handle, coo_no_zeros.nnz * 2);
+
+  // raft::matrix::fill(handle, sym_coo1_rows.view(), 0);
+  // raft::matrix::fill(handle, sym_coo1_cols.view(), 0);
+  // raft::matrix::fill(handle, sym_coo1_vals.view(), 0.0F);
+
+  
+  // auto sym_coo1_structure_view = raft::make_device_coordinate_structure_view<int, int, int>(sym_coo1_rows.data_handle(), sym_coo1_cols.data_handle(), coo_no_zeros.n_rows, coo_no_zeros.n_cols, coo_no_zeros.nnz * 2);
+  // auto sym_coo1_matrix_view = raft::make_device_coo_matrix_view<float, int, int, int>(
+  //   sym_coo1_vals.data_handle(), sym_coo1_structure_view);
+
+  // std::cout << "coo_matrix_view.n_rows: " << coo_matrix_view.structure_view().get_n_rows() << std::endl;
+  // std::cout << "sym_coo1_matrix_view.n_rows: " << sym_coo1_matrix_view.structure_view().get_n_rows() << std::endl;
+
+  // raft::print_device_vector("coo_no_zeros.rows", coo_no_zeros.rows(), coo_no_zeros.n_rows, std::cout);
+  // raft::print_device_vector("coo_no_zeros.cols", coo_no_zeros.cols(), coo_no_zeros.n_cols, std::cout);
+  // raft::print_device_vector("coo_no_zeros.vals", coo_no_zeros.vals(), coo_no_zeros.nnz, std::cout);
+
+  raft::resource::sync_stream(handle, stream);
+
+  
+
+
+  auto sym_coo1_matrix = raft::make_device_coo_matrix<float, int, int, int>(handle, coo_no_zeros.n_rows, coo_no_zeros.n_cols);
+  raft::sparse::linalg::coo_symmetrize<128, float, int, int>(handle, coo_matrix_view, sym_coo1_matrix, reduction_op);
+  
+  raft::resource::sync_stream(handle, stream);
+  auto sym_coo1_matrix_view = sym_coo1_matrix.view();
+  auto sym_coo1_structure = sym_coo1_matrix.structure_view();
+  auto sym_coo1_n_rows = sym_coo1_structure.get_n_rows();
+  auto sym_coo1_n_cols = sym_coo1_structure.get_n_cols();
+  auto sym_coo1_nnz = sym_coo1_structure.get_nnz();
+  
+  auto sym_coo1_rows = sym_coo1_structure.get_rows().data();
+  auto sym_coo1_cols = sym_coo1_structure.get_cols().data();
+  auto sym_coo1_vals = sym_coo1_matrix.get_elements().data();
+
+  // raft::print_device_vector("sym_coo1_rows", sym_coo1_rows, sym_coo1_nnz, std::cout);
+  // raft::print_device_vector("sym_coo1_cols", sym_coo1_cols, sym_coo1_nnz, std::cout);
+  // raft::print_device_vector("sym_coo1_vals", sym_coo1_vals, sym_coo1_nnz, std::cout);
+
+  // raft::sparse::linalg::detail::coo_symmetrize_mytest<128, float, int, int>(coo_matrix_view, sym_coo1_matrix_view, reduction_op, stream);
+
+  raft::resource::sync_stream(handle, stream);
+
+  // raft::sparse::COO<float> sym_coo1(sym_coo1_rows, sym_coo1_cols, sym_coo1_vals, coo_no_zeros.nnz * 2, coo_no_zeros.n_rows, coo_no_zeros.n_cols);  // Don't pre-allocate dimensions
+
+  // raft::print_device_vector("coo_no_zeros.rows", coo_no_zeros.rows(), coo_no_zeros.n_rows, std::cout);
+  // raft::print_device_vector("coo_no_zeros.cols", coo_no_zeros.cols(), coo_no_zeros.n_cols, std::cout);
+  // raft::print_device_vector("coo_no_zeros.vals", coo_no_zeros.vals(), coo_no_zeros.nnz, std::cout);
+
+
+  // std::cout << "sym_coo1.n_rows: " << sym_coo1.n_rows << std::endl;
+
+
   raft::sparse::linalg::coo_symmetrize(&coo_no_zeros, &sym_coo1, reduction_op, stream);
+
+  std::cout << "sym_coo1.n_rows: " << sym_coo1_matrix_view.structure_view().get_n_rows() << std::endl;
+  std::cout << "sym_coo1.n_cols: " << sym_coo1_matrix_view.structure_view().get_n_cols() << std::endl;
+  std::cout << "sym_coo1.nnz: " << sym_coo1_matrix_view.structure_view().get_nnz() << std::endl;
+
+  
+  std::cout << "sym_coo1.n_rows: " << sym_coo1.n_rows << std::endl;
+  std::cout << "sym_coo1.n_cols: " << sym_coo1.n_cols << std::endl;
+  std::cout << "sym_coo1.nnz: " << sym_coo1.nnz << std::endl;
+
+
+  // raft::print_device_vector("sym_coo1_rows", sym_coo1_matrix_view.structure_view().get_rows().data(), sym_coo1_matrix_view.structure_view().get_nnz(), std::cout);
+  // raft::print_device_vector("sym_coo1.rows", sym_coo1.rows(), sym_coo1.nnz, std::cout);
+
+  // raft::print_device_vector("sym_coo1_cols", sym_coo1_matrix_view.structure_view().get_cols().data(), sym_coo1_matrix_view.structure_view().get_nnz(), std::cout);
+  // raft::print_device_vector("sym_coo1.cols", sym_coo1.cols(), sym_coo1.nnz, std::cout);
+
+  // raft::print_device_vector("sym_coo1_vals", sym_coo1_matrix_view.get_elements().data(), sym_coo1_matrix_view.structure_view().get_nnz(), std::cout);
+  // raft::print_device_vector("sym_coo1.vals", sym_coo1.vals(), sym_coo1.nnz, std::cout);
+
+
+
+  // raft::print_device_vector("coo_no_zeros.rows", coo_no_zeros.rows(), coo_no_zeros.n_rows, std::cout);
+  // raft::print_device_vector("coo_no_zeros.cols", coo_no_zeros.cols(), coo_no_zeros.n_cols, std::cout);
+  // raft::print_device_vector("coo_no_zeros.vals", coo_no_zeros.vals(), coo_no_zeros.nnz, std::cout);
+
+
+  // std::cout << "sym_coo1.n_rows: " << sym_coo1.n_rows << std::endl;
+
+  // std::cout << "sym_coo1_rows.size(): " << sym_coo1_rows.size() << std::endl;
+  // std::cout << "sym_coo1.nnz: " << sym_coo1.nnz << std::endl;
+
+
+  // raft::print_device_vector("sym_coo1_rows", sym_coo1_matrix_view.structure_view().get_rows().data(), sym_coo1_matrix_view.structure_view().get_nnz(), std::cout);
+  // raft::print_device_vector("sym_coo1.rows", sym_coo1.rows(), sym_coo1.nnz, std::cout);
+
+  // raft::print_device_vector("sym_coo1_cols", sym_coo1_matrix_view.structure_view().get_cols().data(), sym_coo1_matrix_view.structure_view().get_nnz(), std::cout);
+  // raft::print_device_vector("sym_coo1.cols", sym_coo1.cols(), sym_coo1.nnz, std::cout);
+
+  // raft::print_device_vector("sym_coo1_vals", sym_coo1_matrix_view.get_elements().data(), sym_coo1_matrix_view.structure_view().get_nnz(), std::cout);
+  // raft::print_device_vector("sym_coo1.vals", sym_coo1.vals(), sym_coo1.nnz, std::cout);
+
+  
+  raft::sparse::op::coo_sort<float>(coo_no_zeros.n_rows, coo_no_zeros.n_cols, sym_coo1_nnz, sym_coo1_rows, sym_coo1_cols, sym_coo1_vals, stream);
+
+  // auto sym_coo_structure = raft::make_device_coordinate_structure(handle, coo_no_zeros.n_rows, coo_no_zeros.n_cols, coo_no_zeros.nnz);
+  // auto sym_coo_matrix = raft::make_device_coo_matrix<float, int, int, int>(handle, coo_no_zeros.n_rows, coo_no_zeros.n_cols);
+  // raft::sparse::op::detail::coo_remove_scalar_mytest<128, float, int, int>(sym_coo1_matrix_view, sym_coo_matrix, 0.0F, stream);
+  
+  // raft::resource::sync_stream(handle, stream);
+  // auto sym_coo_structure = sym_coo_matrix.structure_view();
+  // std::cout << "sym_coo_structure nnz: " << sym_coo_structure.get_nnz() << std::endl;
+  
+  // auto sym_coo_n_rows = sym_coo_structure.get_n_rows();
+  // auto sym_coo_n_cols = sym_coo_structure.get_n_cols();
+  // auto sym_coo_nnz = sym_coo_structure.get_nnz();
+  
+  // auto sym_coo_rows = sym_coo_structure.get_rows().data();
+  // auto sym_coo_cols = sym_coo_structure.get_cols().data();
+  // auto sym_coo_vals = sym_coo_matrix.get_elements().data();
+
+  // raft::sparse::op::coo_sort<float>(sym_coo_n_rows, sym_coo_n_cols, sym_coo_nnz, sym_coo_rows, sym_coo_cols, sym_coo_vals, stream);
+  
+  // std::cout << "sym_coo_nnz: " << sym_coo_nnz << std::endl;
+  // std::cout << "sym_coo_n_rows: " << sym_coo_n_rows << std::endl;
+  // std::cout << "sym_coo_n_cols: " << sym_coo_n_cols << std::endl;
+  // raft::print_device_vector("sym_coo_rows", sym_coo_rows, sym_coo_nnz, std::cout);
+  
+  // auto sym_coo_row_ind = rmm::device_uvector<int>(sym_coo_n_rows, stream);
+  // raft::resource::sync_stream(handle, stream);
+  // raft::sparse::convert::sorted_coo_to_csr(sym_coo_rows, sym_coo_nnz, sym_coo_row_ind.data(), sym_coo_n_rows, stream);
+  
+  // auto sym_coo_rows = rmm::device_uvector<int>(coo_no_zeros.nnz, stream);
+  // auto sym_coo_cols = rmm::device_uvector<int>(coo_no_zeros.nnz, stream);
+  // auto sym_coo_vals = rmm::device_uvector<float>(coo_no_zeros.nnz, stream);
+
+  // raft::sparse::op::coo_remove_scalar<float>(sym_coo1_rows.data(), sym_coo1_cols.data(), sym_coo1_vals.data(), coo_no_zeros.nnz, sym_coo_rows.data(), sym_coo_cols.data(), sym_coo_vals.data(), 0.0F, coo_no_zeros.n_rows, stream);
+  
 
   raft::sparse::op::coo_sort<float>(&sym_coo1, stream);
 
+  
+  // std::cout << "sym_coo1_rows.size(): " << sym_coo1_rows.size() << std::endl;
+  // std::cout << "sym_coo1.n_rows: " << sym_coo1_matrix_view.structure_view().get_n_rows() << std::endl;
+  // std::cout << "sym_coo1.n_cols: " << sym_coo1_matrix_view.structure_view().get_n_cols() << std::endl;
+  // std::cout << "sym_coo1.nnz: " << sym_coo1_matrix_view.structure_view().get_nnz() << std::endl;
+
+  
+  // std::cout << "sym_coo1.n_rows: " << sym_coo1.n_rows << std::endl;
+  // std::cout << "sym_coo1.n_cols: " << sym_coo1.n_cols << std::endl;
+  // std::cout << "sym_coo1.nnz: " << sym_coo1.nnz << std::endl;
+
+
+  // raft::print_device_vector("sym_coo1_rows", sym_coo1_matrix_view.structure_view().get_rows().data(), sym_coo1_matrix_view.structure_view().get_nnz(), std::cout);
+  // raft::print_device_vector("sym_coo1.rows", sym_coo1.rows(), sym_coo1.nnz, std::cout);
+
+  // raft::print_device_vector("sym_coo1_cols", sym_coo1_matrix_view.structure_view().get_cols().data(), sym_coo1_matrix_view.structure_view().get_nnz(), std::cout);
+  // raft::print_device_vector("sym_coo1.cols", sym_coo1.cols(), sym_coo1.nnz, std::cout);
+
+  // raft::print_device_vector("sym_coo1_vals", sym_coo1_matrix_view.get_elements().data(), sym_coo1_matrix_view.structure_view().get_nnz(), std::cout);
+  // raft::print_device_vector("sym_coo1.vals", sym_coo1.vals(), sym_coo1.nnz, std::cout);
+
+
+  // std::cout << "sym_coo1_rows.size(): " << sym_coo1_rows.size() << std::endl;
+  // std::cout << "sym_coo1.nnz: " << sym_coo1.nnz << std::endl;
+
+  // raft::print_device_vector("sym_coo1_rows", sym_coo1_rows.data(), sym_coo1_rows.size(), std::cout);
+  // raft::print_device_vector("sym_coo1.rows", sym_coo1.rows(), sym_coo1.nnz, std::cout);
+  auto zero_scalar = raft::make_host_scalar<float>(0.0f);
+
+  auto sym_coo_matrix = raft::make_device_coo_matrix<float, int, int, int>(handle, coo_no_zeros.n_rows, coo_no_zeros.n_cols);
+  raft::sparse::op::coo_remove_scalar<1, float, int, int>(zero_scalar.view(), sym_coo1_matrix_view, sym_coo_matrix, stream);
+
+  raft::resource::sync_stream(handle, stream);
+  
+  std::cout << "sym_coo_matrix.nnz: " << sym_coo_matrix.structure_view().get_nnz() << std::endl;
+
+  // could use new coo_matrix here
   raft::sparse::COO<float> sym_coo(stream);  // Don't pre-allocate dimensions
   raft::sparse::op::coo_remove_zeros<float>(&sym_coo1, &sym_coo, stream);
+
+  raft::resource::sync_stream(handle, stream);
+
+
+  std::cout << "sym_coo.nnz: " << sym_coo.nnz << std::endl;
 
   nnz = sym_coo.nnz;
 
@@ -132,26 +336,68 @@ auto transform(raft::resources const& handle,
   using value_t   = float;
   using size_type = size_t;
 
+
+
+  auto sym_coo_structure = sym_coo_matrix.structure_view();
+  auto sym_coo_n_rows = sym_coo_structure.get_n_rows();
+  auto sym_coo_n_cols = sym_coo_structure.get_n_cols();
+  auto sym_coo_nnz = sym_coo_structure.get_nnz();
+  
+  auto sym_coo_rows = sym_coo_structure.get_rows().data();
+  auto sym_coo_cols = sym_coo_structure.get_cols().data();
+  auto sym_coo_vals = sym_coo_matrix.get_elements().data();
+
+  raft::sparse::op::coo_sort<float>(sym_coo_n_rows, sym_coo_n_cols, sym_coo_nnz, sym_coo_rows, sym_coo_cols, sym_coo_vals, stream);
+  
+  auto sym_coo_row_ind = raft::make_device_vector<int>(handle, sym_coo_n_rows + 1);
+  raft::sparse::convert::sorted_coo_to_csr(sym_coo_rows, sym_coo_nnz, sym_coo_row_ind.data_handle(), sym_coo_n_rows, stream);
+  const int test_one = sym_coo.nnz;
+  raft::copy(sym_coo_row_ind.data_handle() + sym_coo_row_ind.size() - 1, &test_one, 1, stream);
+
+  // raft::print_device_vector("sym_coo_row_ind", sym_coo_row_ind.data(), sym_coo_row_ind.size(), std::cout);
+
+
+  // could use new coo_matrix here
   raft::sparse::op::coo_sort<float>(&sym_coo, stream);
+
+  // std::cout << "sym_coo.nnz: " << sym_coo.nnz << std::endl;
+  // std::cout << "sym_coo.n_rows: " << sym_coo.n_rows << std::endl;
+  // std::cout << "sym_coo.n_cols: " << sym_coo.n_cols << std::endl;
+  // raft::print_device_vector("sym_coo.rows", sym_coo.rows(), sym_coo.nnz, std::cout);
+
   auto row_ind = raft::make_device_vector<int>(handle, sym_coo.n_rows + 1);
   raft::sparse::convert::sorted_coo_to_csr(&sym_coo, row_ind.data_handle(), stream);
 
   const int one = sym_coo.nnz;
   raft::copy(row_ind.data_handle() + row_ind.size() - 1, &one, 1, stream);
 
+  // raft::print_device_vector("row_ind", row_ind.data_handle(), row_ind.size(), std::cout);
+  
+
+  // auto csr_structure = raft::make_device_compressed_structure_view<int, int, int>(
+  //   const_cast<int*>(row_ind.data_handle()),
+  //   const_cast<int*>(sym_coo.cols()),
+  //   sym_coo.n_rows,
+  //   sym_coo.n_cols,
+  //   sym_coo.nnz);
+
+
   auto csr_structure = raft::make_device_compressed_structure_view<int, int, int>(
-    const_cast<int*>(row_ind.data_handle()),
-    const_cast<int*>(sym_coo.cols()),
-    sym_coo.n_rows,
-    sym_coo.n_cols,
-    sym_coo.nnz);
+    const_cast<int*>(sym_coo_row_ind.data_handle()),
+    const_cast<int*>(sym_coo_cols),
+    sym_coo_n_rows,
+    sym_coo_n_cols,
+    sym_coo_nnz);
+
+  // auto csr_matrix_view = raft::make_device_csr_matrix_view<float, int, int, int>(
+  //   const_cast<float*>(sym_coo.vals()), csr_structure);
 
   auto csr_matrix_view = raft::make_device_csr_matrix_view<float, int, int, int>(
-    const_cast<float*>(sym_coo.vals()), csr_structure);
+    const_cast<float*>(sym_coo_vals), csr_structure);
 
   auto diagonal            = raft::make_device_vector<float>(handle, csr_structure.get_n_rows());
   auto laplacian           = spectral_embedding_config.norm_laplacian
-                               ? raft::sparse::linalg::compute_graph_laplacian_normalized(
+                               ? raft::sparse::linalg::laplacian_normalized(
                          handle, csr_matrix_view, diagonal.view())
                                : raft::sparse::linalg::compute_graph_laplacian(handle, csr_matrix_view);
   auto laplacian_structure = laplacian.structure_view();
@@ -195,7 +441,7 @@ auto transform(raft::resources const& handle,
       raft::make_const_mdspan(eigenvectors.view()),  // input matrix view
       raft::make_const_mdspan(diagonal.view()),      // input vector view
       eigenvectors.view(),                           // output matrix view (in-place)
-      raft::linalg::Apply::ALONG_COLUMNS,  // divide each row by corresponding diagonal element
+      raft::Apply::ALONG_COLUMNS,  // divide each row by corresponding diagonal element
       [] __device__(float elem, float diag) { return elem / diag; });
   }
 
