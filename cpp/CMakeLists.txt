@@ -37,7 +37,7 @@ project(
 set(CMAKE_INSTALL_MESSAGE LAZY)
 
 # Write the version header
-rapids_cmake_write_version_file(include/cuvs/version_config.hpp)
+rapids_cmake_write_version_file(include/cuvs/version_config.h)
 
 # ##################################################################################################
 # * build type ---------------------------------------------------------------
@@ -402,7 +402,6 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/iface/iface_pq_half_int64_t.cu
     src/neighbors/iface/iface_pq_int8_t_int64_t.cu
     src/neighbors/iface/iface_pq_uint8_t_int64_t.cu
-    src/neighbors/detail/cagra/cagra_build.cpp
     src/neighbors/detail/cagra/topk_for_cagra/topk.cu
     src/neighbors/dynamic_batching.cu
     src/neighbors/cagra_index_wrapper.cu
@@ -733,6 +732,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     target_include_directories(
       cuvs_c
       PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
+             "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
       INTERFACE "$<INSTALL_INTERFACE:include>"
     )
 
@@ -780,7 +780,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
   endif()
 
   install(
-    FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.hpp
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.h
     COMPONENT cuvs
     DESTINATION include/cuvs
   )
