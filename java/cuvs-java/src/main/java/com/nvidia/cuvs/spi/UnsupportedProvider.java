@@ -21,7 +21,6 @@ import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
 import com.nvidia.cuvs.TieredIndex;
-
 import java.nio.file.Path;
 
 /**

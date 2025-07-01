@@ -13,13 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
+import com.nvidia.cuvs.spi.CuVSProvider;
 import java.io.InputStream;
 import java.util.Objects;
-
-import com.nvidia.cuvs.spi.CuVSProvider;
 
 /**
  * {@link TieredIndex} encapsulates a Tiered index, along with methods to
