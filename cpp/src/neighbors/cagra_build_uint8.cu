@@ -29,9 +29,10 @@ auto build(raft::resources const& handle,
   uint8_t* dataset_ptr_uint8 = const_cast<uint8_t*>(dataset.data_handle());
   auto dataset_int8          = raft::make_device_matrix_view<int8_t, int64_t, raft::row_major>(
     reinterpret_cast<int8_t*>(dataset_ptr_uint8), dataset.extent(0), dataset.extent(1));
-  cuvs::spatial::knn::detail::utils::offset_mapping map;
+  cuvs::spatial::knn::detail::utils::mapping<int8_t> map_i8;
+  cuvs::spatial::knn::detail::utils::mapping<uint8_t> map_u8;
   if (params.metric != cuvs::distance::DistanceType::BitwiseHamming) {
-    raft::linalg::map(handle, dataset_int8, map, dataset);
+    raft::linalg::map(handle, dataset_int8, map_i8, dataset);
   }
   auto index_int8 =
     cuvs::neighbors::cagra::build(handle, params, raft::make_const_mdspan(dataset_int8));
@@ -43,7 +44,7 @@ auto build(raft::resources const& handle,
   if (params.metric != cuvs::distance::DistanceType::BitwiseHamming) {
     auto dataset_uint8 = raft::make_device_matrix_view<uint8_t, int64_t, raft::row_major>(
       dataset_ptr_uint8, dataset.extent(0), dataset.extent(1));
-    raft::linalg::map(handle, dataset_uint8, map, raft::make_const_mdspan(dataset_int8));
+    raft::linalg::map(handle, dataset_uint8, map_u8, raft::make_const_mdspan(dataset_int8));
   }
   return index_uint8;
 }
