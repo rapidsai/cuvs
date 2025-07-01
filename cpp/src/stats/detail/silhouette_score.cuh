@@ -286,7 +286,7 @@ DataT silhouette_score(
     sampleToClusterSumOfDistancesView,
     binCountArrayView,
     averageDistanceBetweenSampleAndClusterView,
-    raft::div_checkzero_op{});
+    DivOp<DataT>());
 
   // calculating row-wise minimum
   raft::linalg::reduce<true, true, DataT, DataT, int, raft::identity_op, raft::min_op>(
