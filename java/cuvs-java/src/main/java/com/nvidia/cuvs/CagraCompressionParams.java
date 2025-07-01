@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
 /**
@@ -47,8 +46,13 @@ public class CagraCompressionParams {
    * @param pqKmeansTrainsetFraction the fraction of data to use during iterative
    *                                 kmeans building (PQ phase)
    */
-  private CagraCompressionParams(int pqBits, int pqDim, int vqNCenters, int kmeansNIters,
-      double vqKmeansTrainsetFraction, double pqKmeansTrainsetFraction) {
+  private CagraCompressionParams(
+      int pqBits,
+      int pqDim,
+      int vqNCenters,
+      int kmeansNIters,
+      double vqKmeansTrainsetFraction,
+      double pqKmeansTrainsetFraction) {
     this.pqBits = pqBits;
     this.pqDim = pqDim;
     this.vqNCenters = vqNCenters;
@@ -119,9 +123,19 @@ public class CagraCompressionParams {
 
   @Override
   public String toString() {
-    return "CagraCompressionParams [pqBits=" + pqBits + ", pqDim=" + pqDim + ", vqNCenters=" + vqNCenters
-        + ", kmeansNIters=" + kmeansNIters + ", vqKmeansTrainsetFraction=" + vqKmeansTrainsetFraction
-        + ", pqKmeansTrainsetFraction=" + pqKmeansTrainsetFraction + "]";
+    return "CagraCompressionParams [pqBits="
+        + pqBits
+        + ", pqDim="
+        + pqDim
+        + ", vqNCenters="
+        + vqNCenters
+        + ", kmeansNIters="
+        + kmeansNIters
+        + ", vqKmeansTrainsetFraction="
+        + vqKmeansTrainsetFraction
+        + ", pqKmeansTrainsetFraction="
+        + pqKmeansTrainsetFraction
+        + "]";
   }
 
   /**
@@ -136,8 +150,7 @@ public class CagraCompressionParams {
     private double vqKmeansTrainsetFraction = 0;
     private double pqKmeansTrainsetFraction = 0;
 
-    public Builder() {
-    }
+    public Builder() {}
 
     /**
      * Sets the bit length of the vector element after compression by PQ.
@@ -225,7 +238,12 @@ public class CagraCompressionParams {
      * @return an instance of {@link CagraCompressionParams}
      */
     public CagraCompressionParams build() {
-      return new CagraCompressionParams(pqBits, pqDim, vqNCenters, kmeansNIters, vqKmeansTrainsetFraction,
+      return new CagraCompressionParams(
+          pqBits,
+          pqDim,
+          vqNCenters,
+          kmeansNIters,
+          vqKmeansTrainsetFraction,
           pqKmeansTrainsetFraction);
     }
   }
