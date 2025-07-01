@@ -31,7 +31,6 @@ jobs:
       branch: ${{ inputs.branch }}
       date: ${{ inputs.date }}
       sha: ${{ inputs.sha }}
-      enable_check_symbols: true
       symbol_exclusions: (void (thrust::|cub::))
   conda-cpp-tests:
     secrets: inherit
