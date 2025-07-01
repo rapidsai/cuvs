@@ -31,7 +31,7 @@ DEST=${RAPIDS_DATASET_ROOT_DIR:-"$PWD"}
 # get test data for NEIGHBORS_ANN_VAMANA_TEST
 if hasArg "--NEIGHBORS_ANN_VAMANA_TEST"; then
     echo "Downloading test data for NEIGHBORS_ANN_VAMANA_TEST"
-    echo "Destination: "${DEST}
+    echo "Destination: ${DEST}"
     URL_PREFIX=https://data.rapids.ai/cuvs/tests/data
     SUBDIR=neighbors/ann_vamana/randomized_codebooks
     FILE_LIST=(
