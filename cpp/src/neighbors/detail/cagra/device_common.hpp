@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -308,6 +308,20 @@ RAFT_DEVICE_INLINE_FUNCTION void lds(uint4& x, uint32_t addr)
 RAFT_DEVICE_INLINE_FUNCTION void lds(uint4& x, const uint4* addr)
 {
   lds(x, uint32_t(__cvta_generic_to_shared(addr)));
+}
+
+RAFT_DEVICE_INLINE_FUNCTION void lds(int8_t& x, uint32_t addr)
+{
+  int32_t res;
+  asm volatile("ld.shared.s8 {%0}, [%1];" : "=r"(res) : "r"(addr));
+  x = static_cast<int8_t>(res);
+}
+
+RAFT_DEVICE_INLINE_FUNCTION void lds(int4& x, uint32_t addr)
+{
+  asm volatile("ld.shared.v4.s32 {%0, %1, %2, %3}, [%4];"
+               : "=r"(x.x), "=r"(x.y), "=r"(x.z), "=r"(x.w)
+               : "r"(addr));
 }
 
 RAFT_DEVICE_INLINE_FUNCTION void sts(uint32_t addr, const half2& x)
