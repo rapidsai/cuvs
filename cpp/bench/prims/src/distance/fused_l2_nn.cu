@@ -1,12 +1,12 @@
 #include <benchmark/benchmark.h>
 #include <iostream>
 #include "common.cuh"
-//#include "cublas_sample.cu"
+#include "cublas_sample.cu"
 #include "tensor_core.cu"
 
 #include <raft/core/resource/cuda_stream.hpp>
 
-//#include "../../../../src/distance/fused_distance_nn.cuh"
+#include "../../../../src/distance/fused_distance_nn.cuh"
 
 #include <raft/linalg/norm_types.hpp>
 #include <raft/linalg/norm.cuh>
@@ -124,16 +124,16 @@ void launch_memcpy() {
     cublasHandle_t cublas_handle;
     CHECK_CUBLAS(cublasCreate(&cublas_handle));
     CHECK_CUBLAS(cublasSetStream(cublas_handle, stream));
-    //ref_l2nn_api<DataT, AccT, OutT, IdxT>(out_ref.data_handle(), x.data_handle(), y.data_handle(), m, n, k, stream);
+    ref_l2nn_api<DataT, AccT, OutT, IdxT>(out_ref.data_handle(), x.data_handle(), y.data_handle(), m, n, k, stream);
     // Warm up
-    //cublas_l2nn<DataT, AccT, OutT, IdxT, false, false>(out.data_handle(), x.data_handle(),
-     //     y.data_handle(), m, n, k, x_norm.data_handle(), y_norm.data_handle(), workspace_blas.data_handle(), cublas_handle, stream);
+    cublas_l2nn<DataT, AccT, OutT, IdxT, false, false>(out.data_handle(), x.data_handle(),
+          y.data_handle(), m, n, k, x_norm.data_handle(), y_norm.data_handle(), workspace_blas.data_handle(), cublas_handle, stream);
     CHECK_CUDA(cudaStreamSynchronize(stream));
 
     //launch_memcpy();
     timer.start();
     for (auto _ : state) {
-      /*if constexpr (algo == AlgorithmType::fused) {
+      if constexpr (algo == AlgorithmType::fused) {
         cuvs::distance::fusedDistanceNNMinReduce<DataT, OutT, IdxT>(out.data_handle(),
                                                                     x.data_handle(),
                                                                     y.data_handle(),
@@ -157,23 +157,23 @@ void launch_memcpy() {
       if constexpr (algo == AlgorithmType::gemm) {
         cublas_l2nn<DataT, AccT, OutT, IdxT, false, true>(out.data_handle(), x.data_handle(),
           y.data_handle(), m, n, k, x_norm.data_handle(), y_norm.data_handle(), workspace_blas.data_handle(), cublas_handle, stream);
-      }*/
+      }
 
       if constexpr (algo == AlgorithmType::tensor) {
-        tensor_l2nn<DataT, AccT, OutT, IdxT>(out.data_handle(), x.data_handle(),
-          y.data_handle(), m, n, k, x_norm.data_handle(), y_norm.data_handle());
+        tensor_l2nn<DataT, AccT, DataT, IdxT>(workspace_blas.data_handle(), x.data_handle(),
+          y.data_handle(), m, n, k, x_norm.data_handle(), y_norm.data_handle(), stream);
       }
     }
     timer.stop();
     CHECK_CUDA(cudaStreamSynchronize(stream));
-    /*if constexpr (algo == AlgorithmType::gemm) {
+    if constexpr (algo == AlgorithmType::gemm) {
       reduce_min<DataT, AccT, OutT, IdxT>(out.data_handle(),
                                     workspace_blas.data_handle(),
                                     x_norm.data_handle(),
                                     y_norm.data_handle(),
                                     m, n, stream);
-    }*/
-    vector_compare(out_ref.data_handle(), out.data_handle(), m, 1e-1, stream);
+    }
+    vector_compare(out_ref.data_handle(), out.data_handle(), m, 5e-1, stream);
     state.counters["M"] = m;
     state.counters["N"] = n;
     state.counters["K"] = k;
@@ -215,7 +215,7 @@ static void CustomArguments(benchmark::internal::Benchmark* b) {
       }
     }
   }*/
-  b->Args({16, 8, 8});
+  b->Args({16*128, 8*128, 8*16});
 }
 
 
@@ -227,15 +227,16 @@ static void CustomArguments(benchmark::internal::Benchmark* b) {
 //                                          benchmark_fusedl2nn<float, int, raft::KeyValuePair<int, float>, AlgorithmType::fused>);
 //     bench->Apply(CustomArguments<int>);
 
-     /*bench = benchmark::RegisterBenchmark("gemm_reduce/half/int/<int, float>",
-                                          benchmark_fusedl2nn<half, float, raft::KeyValuePair<int, float>, int, AlgorithmType::gemm_reduce>);
+     bench = benchmark::RegisterBenchmark("gemm_reduce/half/int/<int, half>",
+                                          benchmark_fusedl2nn<half, half, raft::KeyValuePair<int, half>, int, AlgorithmType::gemm_reduce>);
      bench->Apply(CustomArguments<int>);
 
-     bench = benchmark::RegisterBenchmark("gemm/half/int/<int, float>",
-                                          benchmark_fusedl2nn<half, float, raft::KeyValuePair<int, float>, int, AlgorithmType::gemm>);*/
+     bench = benchmark::RegisterBenchmark("gemm/half/int/<int, half>",
+                                          benchmark_fusedl2nn<half, half, raft::KeyValuePair<int, half>, int, AlgorithmType::gemm>);
 
-     bench = benchmark::RegisterBenchmark("tensor/half/int/<int, float>",
-                                          benchmark_fusedl2nn<half, float, raft::KeyValuePair<int, float>, int, AlgorithmType::tensor>);
+     bench->Apply(CustomArguments<int>);
+     bench = benchmark::RegisterBenchmark("tensor/half/int/<int, half>",
+                                          benchmark_fusedl2nn<half, half, raft::KeyValuePair<int, half>, int, AlgorithmType::tensor>);
      bench->Apply(CustomArguments<int>);
 
      // Initialize benchmark
