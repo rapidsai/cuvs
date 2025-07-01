@@ -1,11 +1,13 @@
 #!/bin/bash
 
+# Copyright (c) 2025, NVIDIA CORPORATION.
+
 set -e -u -o pipefail
 
 ARGS="$*"
 NUMARGS=$#
 
-CURDIR=$(cd "$(dirname $0)"; pwd)
+CURDIR=$(cd "$(dirname "$0")"; pwd)
 VERSION="25.08.0" # Note: The version is updated automatically when ci/release/update-version.sh is invoked
 GROUP_ID="com.nvidia.cuvs"
 

@@ -116,7 +116,7 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
     size_t min_cluster_size,
     size_t max_cluster_size,
     size_t k,
-    all_neighbors::graph_build_params::ivf_pq_params& params,
+    graph_build_params::ivf_pq_params& params,
     std::optional<raft::device_matrix_view<IdxT, IdxT, row_major>> indices = std::nullopt,
     std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances  = std::nullopt)
     : all_neighbors_builder<T, IdxT>(
@@ -287,7 +287,7 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
                        dataset_h.data_handle(), dataset.extent(0), dataset.extent(1)));
   }
 
-  all_neighbors::graph_build_params::ivf_pq_params all_ivf_pq_params;
+  graph_build_params::ivf_pq_params all_ivf_pq_params;
   size_t candidate_k;
 
   std::optional<raft::device_matrix<T, IdxT>> data_d;
@@ -308,7 +308,7 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
     size_t min_cluster_size,
     size_t max_cluster_size,
     size_t k,
-    all_neighbors::graph_build_params::nn_descent_params& params,
+    graph_build_params::nn_descent_params& params,
     std::optional<raft::device_matrix_view<IdxT, IdxT, row_major>> indices = std::nullopt,
     std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances  = std::nullopt)
     : all_neighbors_builder<T, IdxT>(
