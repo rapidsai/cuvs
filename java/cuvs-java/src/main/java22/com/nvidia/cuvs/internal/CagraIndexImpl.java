@@ -110,11 +110,9 @@ public class CagraIndexImpl implements CagraIndex {
       CagraIndexParams indexParameters, Dataset dataset, CuVSResourcesImpl resources)
       throws Exception {
     Objects.requireNonNull(dataset);
-    try (dataset) {
-      this.resources = resources;
-      assert dataset instanceof DatasetImpl;
-      this.cagraIndexReference = build(indexParameters, (DatasetImpl) dataset);
-    }
+    this.resources = resources;
+    assert dataset instanceof DatasetImpl;
+    this.cagraIndexReference = build(indexParameters, (DatasetImpl) dataset);
   }
 
   /**
@@ -151,11 +149,14 @@ public class CagraIndexImpl implements CagraIndex {
    * Invokes the native destroy_cagra_index to de-allocate the CAGRA index
    */
   @Override
-  public void destroyIndex() {
+  public void destroyIndex() throws Throwable {
     checkNotDestroyed();
     try (var arena = Arena.ofConfined()) {
       int returnValue = cuvsCagraIndexDestroy(cagraIndexReference.getMemorySegment());
       checkCuVSError(returnValue, "cuvsCagraIndexDestroy");
+      if (cagraIndexReference.dataset != null) {
+        cagraIndexReference.dataset.close();
+      }
     } finally {
       destroyed = true;
     }
@@ -189,7 +190,7 @@ public class CagraIndexImpl implements CagraIndex {
       var returnValue = cuvsStreamGet(cuvsRes, stream);
       checkCuVSError(returnValue, "cuvsStreamGet");
 
-      long datasetShape[] = {rows, cols};
+      long[] datasetShape = {rows, cols};
       MemorySegment datasetTensor = prepareTensor(arena, dataSeg, datasetShape, 2, 32, 2, 2, 1);
 
       MemorySegment index = arena.allocate(cuvsCagraIndex_t);
@@ -218,7 +219,7 @@ public class CagraIndexImpl implements CagraIndex {
 
       omp_set_num_threads(1);
 
-      return new IndexReference(index);
+      return new IndexReference(index, dataset);
     }
   }
 
@@ -280,12 +281,12 @@ public class CagraIndexImpl implements CagraIndex {
 
       cudaMemcpy(queriesDP, floatsSeg, queriesBytes, INFER_DIRECTION);
 
-      long queriesShape[] = {numQueries, vectorDimension};
+      long[] queriesShape = {numQueries, vectorDimension};
       MemorySegment queriesTensor = prepareTensor(arena, queriesDP, queriesShape, 2, 32, 2, 2, 1);
-      long neighborsShape[] = {numQueries, topK};
+      long[] neighborsShape = {numQueries, topK};
       MemorySegment neighborsTensor =
           prepareTensor(arena, neighborsDP, neighborsShape, 1, 32, 2, 2, 1);
-      long distancesShape[] = {numQueries, topK};
+      long[] distancesShape = {numQueries, topK};
       MemorySegment distancesTensor =
           prepareTensor(arena, distancesDP, distancesShape, 2, 32, 2, 2, 1);
 
@@ -299,7 +300,7 @@ public class CagraIndexImpl implements CagraIndex {
       if (query.getPrefilter() != null) {
         prefilters = new BitSet[] {query.getPrefilter()};
         BitSet concatenatedFilters = concatenate(prefilters, query.getNumDocs());
-        long filters[] = concatenatedFilters.toLongArray();
+        long[] filters = concatenatedFilters.toLongArray();
         prefilterDataMemorySegment = buildMemorySegment(arena, filters);
         prefilterDataLength = query.getNumDocs() * prefilters.length;
       }
@@ -311,7 +312,7 @@ public class CagraIndexImpl implements CagraIndex {
         cuvsFilter.type(prefilter, 0); // NO_FILTER
         cuvsFilter.addr(prefilter, 0);
       } else {
-        long prefilterShape[] = {(prefilterDataLength + 31) / 32};
+        long[] prefilterShape = {(prefilterDataLength + 31) / 32};
         prefilterLen = prefilterShape[0];
         prefilterBytes = C_INT_BYTE_SIZE * prefilterLen;
 
@@ -726,7 +727,7 @@ public class CagraIndexImpl implements CagraIndex {
 
     private Dataset dataset;
     private CagraIndexParams cagraIndexParams;
-    private CuVSResourcesImpl cuvsResources;
+    private final CuVSResourcesImpl cuvsResources;
     private InputStream inputStream;
 
     public Builder(CuVSResourcesImpl cuvsResources) {
@@ -773,12 +774,14 @@ public class CagraIndexImpl implements CagraIndex {
   public static class IndexReference {
 
     private final MemorySegment memorySegment;
+    private final Dataset dataset;
 
     /**
      * Constructs CagraIndexReference and allocate the MemorySegment.
      */
     protected IndexReference(CuVSResourcesImpl resources) {
       memorySegment = cuvsCagraIndex.allocate(resources.getArena());
+      dataset = null;
     }
 
     /**
@@ -787,9 +790,13 @@ public class CagraIndexImpl implements CagraIndex {
      *
      * @param indexMemorySegment the MemorySegment instance to use for containing
      *                           index reference
+     * @param dataset            the dataset used for indexing; the dataset lifetime
+     *                           matches the lifetime of the index, we need to keep a reference
+     *                           to it so we can close it when the index is closed.
      */
-    protected IndexReference(MemorySegment indexMemorySegment) {
+    protected IndexReference(MemorySegment indexMemorySegment, Dataset dataset) {
       this.memorySegment = indexMemorySegment;
+      this.dataset = dataset;
     }
 
     /**

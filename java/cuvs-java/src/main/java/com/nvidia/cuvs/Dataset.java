@@ -36,26 +36,30 @@ public interface Dataset extends AutoCloseable {
     return CuVSProvider.provider().newArrayDataset(vectors);
   }
 
-  static Dataset ofMemorySegment(Object memorySegment, int size, int dimensions) {
-    return CuVSProvider.provider().newMemoryDataset(memorySegment, size, dimensions);
+  interface Builder {
+    /**
+     * Add a single vector to the dataset.
+     *
+     * @param vector A float array of as many elements as the dimensions
+     */
+    void addVector(float[] vector);
+
+    Dataset build();
   }
 
-  /**
-   * Add a single vector to the dataset.
-   *
-   * @param vector A float array of as many elements as the dimensions
-   */
-  void addVector(float[] vector);
+    static Dataset ofMemorySegment(Object memorySegment, int size, int dimensions) {
+        return CuVSProvider.provider().newMemoryDataset(memorySegment, size, dimensions);
+    }
 
   /**
-   * Create a new instance of a dataset
+   * Returns a builder to create a new instance of a dataset
    *
    * @param size       Number of vectors in the dataset
    * @param dimensions Size of each vector in the dataset
    * @return new instance of {@link Dataset}
    */
-  static Dataset create(int size, int dimensions) {
-    return CuVSProvider.provider().newDataset(size, dimensions);
+  static Dataset.Builder builder(int size, int dimensions) {
+    return CuVSProvider.provider().newDatasetBuilder(size, dimensions);
   }
 
   /**

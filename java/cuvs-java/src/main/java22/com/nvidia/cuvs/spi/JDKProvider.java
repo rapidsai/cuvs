@@ -15,6 +15,8 @@
  */
 package com.nvidia.cuvs.spi;
 
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
+
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CagraMergeParams;
@@ -28,6 +30,7 @@ import com.nvidia.cuvs.internal.DatasetImpl;
 import com.nvidia.cuvs.internal.HnswIndexImpl;
 import com.nvidia.cuvs.internal.common.Util;
 import java.lang.foreign.Arena;
+import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -80,13 +83,28 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException {
-    return new DatasetImpl(size, dimensions);
-  }
+  public Dataset.Builder newDatasetBuilder(int size, int dimensions)
+      throws UnsupportedOperationException {
+    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout((long) size * dimensions, C_FLOAT);
 
-  @Override
-  public Dataset newMemoryDataset(Object memorySegment, int size, int dimensions) {
-    return new DatasetImpl(null, (MemorySegment) memorySegment, size, dimensions);
+    var arena = Arena.ofShared();
+    var seg = arena.allocate(dataMemoryLayout);
+
+    return new Dataset.Builder() {
+      int current = 0;
+
+      @Override
+      public void addVector(float[] vector) {
+        if (current >= size) throw new ArrayIndexOutOfBoundsException();
+        MemorySegment.copy(
+            vector, 0, seg, C_FLOAT, ((current++) * dimensions * C_FLOAT.byteSize()), dimensions);
+      }
+
+      @Override
+      public Dataset build() {
+        return new DatasetImpl(arena, seg, size, dimensions);
+      }
+    };
   }
 
   @Override
@@ -101,5 +119,10 @@ final class JDKProvider implements CuVSProvider {
     Arena arena = Arena.ofShared();
     var memorySegment = Util.buildMemorySegment(arena, vectors);
     return new DatasetImpl(arena, memorySegment, size, dimensions);
+  }
+
+  @Override
+  public Dataset newMemoryDataset(Object memorySegment, int size, int dimensions) {
+    return new DatasetImpl(null, (MemorySegment) memorySegment, size, dimensions);
   }
 }
