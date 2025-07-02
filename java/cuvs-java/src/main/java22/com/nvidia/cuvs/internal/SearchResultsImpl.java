@@ -1,7 +1,21 @@
+/*
+ * Copyright (c) 2025, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.nvidia.cuvs.internal;
 
 import com.nvidia.cuvs.SearchResults;
-
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SequenceLayout;
@@ -22,13 +36,20 @@ class SearchResultsImpl implements SearchResults {
    * Factory method to create an on-heap SearchResults (backed by standard Java data types and containers) from
    * native/off-heap memory data structures.
    */
-  static SearchResults create(SequenceLayout neighboursSequenceLayout, SequenceLayout distancesSequenceLayout,
-                              MemorySegment neighboursMemorySegment, MemorySegment distancesMemorySegment, int topK, List<Integer> mapping,
-                              long numberOfQueries) {
+  static SearchResults create(
+      SequenceLayout neighboursSequenceLayout,
+      SequenceLayout distancesSequenceLayout,
+      MemorySegment neighboursMemorySegment,
+      MemorySegment distancesMemorySegment,
+      int topK,
+      List<Integer> mapping,
+      long numberOfQueries) {
     List<Map<Integer, Float>> results = new LinkedList<>();
     Map<Integer, Float> intermediateResultMap = new LinkedHashMap<>();
-    var neighboursVarHandle = neighboursSequenceLayout.varHandle(MemoryLayout.PathElement.sequenceElement());
-    var distancesVarHandle = distancesSequenceLayout.varHandle(MemoryLayout.PathElement.sequenceElement());
+    var neighboursVarHandle =
+        neighboursSequenceLayout.varHandle(MemoryLayout.PathElement.sequenceElement());
+    var distancesVarHandle =
+        distancesSequenceLayout.varHandle(MemoryLayout.PathElement.sequenceElement());
 
     int count = 0;
     for (long i = 0; i < topK * numberOfQueries; i++) {

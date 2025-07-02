@@ -13,11 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs.internal;
 
 import com.nvidia.cuvs.SearchResults;
-
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SequenceLayout;
 import java.util.List;
@@ -29,10 +27,21 @@ import java.util.List;
  */
 class BruteForceSearchResults {
 
-   static SearchResults create(SequenceLayout neighboursSequenceLayout, SequenceLayout distancesSequenceLayout,
-                               MemorySegment neighboursMemorySegment, MemorySegment distancesMemorySegment, int topK, List<Integer> mapping,
-                               long numberOfQueries) {
-     return SearchResultsImpl.create(neighboursSequenceLayout, distancesSequenceLayout, neighboursMemorySegment,
-             distancesMemorySegment, topK, mapping, numberOfQueries);
+  static SearchResults create(
+      SequenceLayout neighboursSequenceLayout,
+      SequenceLayout distancesSequenceLayout,
+      MemorySegment neighboursMemorySegment,
+      MemorySegment distancesMemorySegment,
+      int topK,
+      List<Integer> mapping,
+      long numberOfQueries) {
+    return SearchResultsImpl.create(
+        neighboursSequenceLayout,
+        distancesSequenceLayout,
+        neighboursMemorySegment,
+        distancesMemorySegment,
+        topK,
+        mapping,
+        numberOfQueries);
   }
 }
