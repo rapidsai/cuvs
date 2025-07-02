@@ -13,11 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs.internal;
 
 import com.nvidia.cuvs.internal.common.SearchResultsImpl;
-
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SequenceLayout;
 import java.util.LinkedHashMap;
@@ -31,11 +29,22 @@ import java.util.function.LongToIntFunction;
  */
 public class BruteForceSearchResults extends SearchResultsImpl {
 
-  protected BruteForceSearchResults(SequenceLayout neighboursSequenceLayout, SequenceLayout distancesSequenceLayout,
-      MemorySegment neighboursMemorySegment, MemorySegment distancesMemorySegment, int topK, LongToIntFunction mapping,
+  protected BruteForceSearchResults(
+      SequenceLayout neighboursSequenceLayout,
+      SequenceLayout distancesSequenceLayout,
+      MemorySegment neighboursMemorySegment,
+      MemorySegment distancesMemorySegment,
+      int topK,
+      LongToIntFunction mapping,
       long numberOfQueries) {
-    super(neighboursSequenceLayout, distancesSequenceLayout, neighboursMemorySegment, distancesMemorySegment, topK,
-        mapping, numberOfQueries);
+    super(
+        neighboursSequenceLayout,
+        distancesSequenceLayout,
+        neighboursMemorySegment,
+        distancesMemorySegment,
+        topK,
+        mapping,
+        numberOfQueries);
     readResultMemorySegments();
   }
 

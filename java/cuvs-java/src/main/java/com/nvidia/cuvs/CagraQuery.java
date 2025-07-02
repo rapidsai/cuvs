@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
 import java.util.Arrays;
@@ -47,7 +46,13 @@ public class CagraQuery {
    * @param prefilter             A single BitSet to use as filter while searching the CAGRA index
    * @param numDocs               Total number of dataset vectors; used to align the prefilter correctly
    */
-  public CagraQuery(CagraSearchParams cagraSearchParameters, float[][] queryVectors, LongToIntFunction mapping, int topK, BitSet prefilter, int numDocs) {
+  public CagraQuery(
+      CagraSearchParams cagraSearchParameters,
+      float[][] queryVectors,
+      LongToIntFunction mapping,
+      int topK,
+      BitSet prefilter,
+      int numDocs) {
     super();
     this.cagraSearchParameters = cagraSearchParameters;
     this.queryVectors = queryVectors;
@@ -111,8 +116,15 @@ public class CagraQuery {
 
   @Override
   public String toString() {
-    return "CuVSQuery [cagraSearchParameters=" + cagraSearchParameters + ", queryVectors="
-        + Arrays.toString(queryVectors) + ", mapping=" + mapping + ", topK=" + topK + "]";
+    return "CuVSQuery [cagraSearchParameters="
+        + cagraSearchParameters
+        + ", queryVectors="
+        + Arrays.toString(queryVectors)
+        + ", mapping="
+        + mapping
+        + ", topK="
+        + topK
+        + "]";
   }
 
   /**
@@ -130,8 +142,7 @@ public class CagraQuery {
     /**
      * Default constructor.
      */
-    public Builder() {
-    }
+    public Builder() {}
 
     /**
      * Sets the instance of configured CagraSearchParams to be passed for search.
@@ -192,7 +203,7 @@ public class CagraQuery {
       this.prefilter = prefilter;
       this.numDocs = numDocs;
       return this;
-  }
+    }
 
     /**
      * Builds an instance of CuVSQuery.

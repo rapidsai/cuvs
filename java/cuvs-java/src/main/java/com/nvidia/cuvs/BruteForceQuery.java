@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
 import java.util.Arrays;
@@ -45,7 +44,12 @@ public class BruteForceQuery {
    * @param numDocs      Maximum of bits in each prefilter, representing number of documents in this index.
    *                     Used only when prefilter(s) is/are passed.
    */
-  public BruteForceQuery(float[][] queryVectors, LongToIntFunction mapping, int topK, BitSet[] prefilters, int numDocs) {
+  public BruteForceQuery(
+      float[][] queryVectors,
+      LongToIntFunction mapping,
+      int topK,
+      BitSet[] prefilters,
+      int numDocs) {
     this.queryVectors = queryVectors;
     this.mapping = mapping;
     this.topK = topK;
@@ -98,8 +102,15 @@ public class BruteForceQuery {
 
   @Override
   public String toString() {
-    return "BruteForceQuery [mapping=" + mapping + ", queryVectors=" + Arrays.toString(queryVectors) + ", prefilter="
-        + Arrays.toString(prefilters) + ", topK=" + topK + "]";
+    return "BruteForceQuery [mapping="
+        + mapping
+        + ", queryVectors="
+        + Arrays.toString(queryVectors)
+        + ", prefilter="
+        + Arrays.toString(prefilters)
+        + ", topK="
+        + topK
+        + "]";
   }
 
   /**

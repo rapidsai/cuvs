@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
 /**
@@ -120,9 +119,20 @@ public class CagraSearchParams {
    * @param randXORMask        the bit mask used for initial random seed node
    *                           selection
    */
-  private CagraSearchParams(CuVSResources resources, int maxQueries, int iTopKSize, int maxIterations,
-      SearchAlgo searchAlgo, int teamSize, int searchWidth, int minIterations, int threadBlockSize,
-      HashMapMode hashmapMode, int hashmapMinBitlen, float hashmapMaxFillRate, int numRandomSamplings,
+  private CagraSearchParams(
+      CuVSResources resources,
+      int maxQueries,
+      int iTopKSize,
+      int maxIterations,
+      SearchAlgo searchAlgo,
+      int teamSize,
+      int searchWidth,
+      int minIterations,
+      int threadBlockSize,
+      HashMapMode hashmapMode,
+      int hashmapMinBitlen,
+      float hashmapMaxFillRate,
+      int numRandomSamplings,
       long randXORMask) {
     this.maxQueries = maxQueries;
     this.iTopKSize = iTopKSize;
@@ -259,11 +269,32 @@ public class CagraSearchParams {
 
   @Override
   public String toString() {
-    return "CagraSearchParams [maxQueries=" + maxQueries + ", itopkSize=" + iTopKSize
-        + ", maxIterations=" + maxIterations + ", cuvsCagraSearchAlgo=" + searchAlgo + ", teamSize=" + teamSize
-        + ", searchWidth=" + searchWidth + ", minIterations=" + minIterations + ", threadBlockSize=" + threadBlockSize
-        + ", hashMapMode=" + hashMapMode + ", hashMapMinBitlen=" + hashmapMinBitlen + ", hashMapMaxFillRate="
-        + hashMapMaxFillRate + ", numRandomSamplings=" + numRandomSamplings + ", randXORMask=" + randXORMask
+    return "CagraSearchParams [maxQueries="
+        + maxQueries
+        + ", itopkSize="
+        + iTopKSize
+        + ", maxIterations="
+        + maxIterations
+        + ", cuvsCagraSearchAlgo="
+        + searchAlgo
+        + ", teamSize="
+        + teamSize
+        + ", searchWidth="
+        + searchWidth
+        + ", minIterations="
+        + minIterations
+        + ", threadBlockSize="
+        + threadBlockSize
+        + ", hashMapMode="
+        + hashMapMode
+        + ", hashMapMinBitlen="
+        + hashmapMinBitlen
+        + ", hashMapMaxFillRate="
+        + hashMapMaxFillRate
+        + ", numRandomSamplings="
+        + numRandomSamplings
+        + ", randXORMask="
+        + randXORMask
         + "]";
   }
 
@@ -454,8 +485,20 @@ public class CagraSearchParams {
      * @return an instance of CagraSearchParams
      */
     public CagraSearchParams build() {
-      return new CagraSearchParams(resources, maxQueries, iTopKSize, maxIterations, searchAlgo, teamSize, searchWidth,
-          minIterations, threadBlockSize, hashMapMode, hashMapMinBitlen, hashMapMaxFillRate, numRandomSamplings,
+      return new CagraSearchParams(
+          resources,
+          maxQueries,
+          iTopKSize,
+          maxIterations,
+          searchAlgo,
+          teamSize,
+          searchWidth,
+          minIterations,
+          threadBlockSize,
+          hashMapMode,
+          hashMapMinBitlen,
+          hashMapMaxFillRate,
+          numRandomSamplings,
           randXORMask);
     }
   }
