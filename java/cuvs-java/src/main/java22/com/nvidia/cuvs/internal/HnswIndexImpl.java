@@ -37,7 +37,6 @@ import com.nvidia.cuvs.internal.panama.DLDataType;
 import com.nvidia.cuvs.internal.panama.cuvsHnswIndex;
 import com.nvidia.cuvs.internal.panama.cuvsHnswIndexParams;
 import com.nvidia.cuvs.internal.panama.cuvsHnswSearchParams;
-import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemoryLayout;
@@ -78,7 +77,7 @@ public class HnswIndexImpl implements HnswIndex {
    * Invokes the native destroy_hnsw_index to de-allocate the HNSW index
    */
   @Override
-  public void destroyIndex() throws Throwable {
+  public void destroyIndex() {
     int returnValue = cuvsHnswIndexDestroy(hnswIndexReference.getMemorySegment());
     checkCuVSError(returnValue, "cuvsHnswIndexDestroy");
   }
@@ -97,26 +96,26 @@ public class HnswIndexImpl implements HnswIndex {
       int topK = query.getTopK();
       float[][] queryVectors = query.getQueryVectors();
       int numQueries = queryVectors.length;
-      long numBlocks = topK * numQueries;
+      long numBlocks = (long) topK * numQueries;
       int vectorDimension = numQueries > 0 ? queryVectors[0].length : 0;
-      Arena arena = resources.getArena();
 
       SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_LONG);
       SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
-      MemorySegment neighborsMemorySegment = arena.allocate(neighborsSequenceLayout);
-      MemorySegment distancesMemorySegment = arena.allocate(distancesSequenceLayout);
-      MemorySegment querySeg = buildMemorySegment(arena, queryVectors);
+      MemorySegment neighborsMemorySegment = localArena.allocate(neighborsSequenceLayout);
+      MemorySegment distancesMemorySegment = localArena.allocate(distancesSequenceLayout);
+      MemorySegment querySeg = buildMemorySegment(localArena, queryVectors);
 
       long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
 
-      long queriesShape[] = {numQueries, vectorDimension};
-      MemorySegment queriesTensor = prepareTensor(arena, querySeg, queriesShape, 2, 32, 2, 1, 1);
-      long neighborsShape[] = {numQueries, topK};
+      long[] queriesShape = {numQueries, vectorDimension};
+      MemorySegment queriesTensor =
+          prepareTensor(localArena, querySeg, queriesShape, 2, 32, 2, 1, 1);
+      long[] neighborsShape = {numQueries, topK};
       MemorySegment neighborsTensor =
-          prepareTensor(arena, neighborsMemorySegment, neighborsShape, 1, 64, 2, 1, 1);
-      long distancesShape[] = {numQueries, topK};
+          prepareTensor(localArena, neighborsMemorySegment, neighborsShape, 1, 64, 2, 1, 1);
+      long[] distancesShape = {numQueries, topK};
       MemorySegment distancesTensor =
-          prepareTensor(arena, distancesMemorySegment, distancesShape, 2, 32, 2, 1, 1);
+          prepareTensor(localArena, distancesMemorySegment, distancesShape, 2, 32, 2, 1, 1);
 
       int returnValue = cuvsStreamSync(cuvsRes);
       checkCuVSError(returnValue, "cuvsStreamSync");
@@ -124,7 +123,7 @@ public class HnswIndexImpl implements HnswIndex {
       returnValue =
           cuvsHnswSearch(
               cuvsRes,
-              segmentFromSearchParams(query.getHnswSearchParams()),
+              segmentFromSearchParams(localArena, query.getHnswSearchParams()),
               hnswIndexReference.getMemorySegment(),
               queriesTensor,
               neighborsTensor,
@@ -153,70 +152,50 @@ public class HnswIndexImpl implements HnswIndex {
    * @return an instance of {@link IndexReference}.
    */
   private IndexReference deserialize(InputStream inputStream) throws Throwable {
-    return deserialize(inputStream, 1024);
-  }
+    Path tmpIndexFile =
+        Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".hnsw")
+            .toAbsolutePath();
 
-  /**
-   * Gets an instance of {@link IndexReference} by deserializing a HNSW index
-   * using an {@link InputStream}.
-   *
-   * @param inputStream  an instance of {@link InputStream}
-   * @param bufferLength the length of the buffer to use while reading the bytes
-   *                     from the stream. Default value is 1024.
-   * @return an instance of {@link IndexReference}.
-   */
-  private IndexReference deserialize(InputStream inputStream, int bufferLength) throws Throwable {
-    try (var localArena = Arena.ofConfined()) {
-      Path tmpIndexFile =
-          Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".hnsw");
-      tmpIndexFile = tmpIndexFile.toAbsolutePath();
+    try (inputStream;
+        var outputStream = Files.newOutputStream(tmpIndexFile);
+        var localArena = Arena.ofConfined()) {
+      inputStream.transferTo(outputStream);
+      MemorySegment pathSeg = buildMemorySegment(localArena, tmpIndexFile.toString());
 
-      try (var in = inputStream;
-          FileOutputStream fileOutputStream = new FileOutputStream(tmpIndexFile.toFile())) {
-        byte[] chunk = new byte[bufferLength];
-        int chunkLength;
-        while ((chunkLength = in.read(chunk)) != -1) {
-          fileOutputStream.write(chunk, 0, chunkLength);
-        }
+      long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
+      MemorySegment hnswIndex = cuvsHnswIndex.allocate(localArena);
+      int returnValue = cuvsHnswIndexCreate(hnswIndex);
+      checkCuVSError(returnValue, "cuvsHnswIndexCreate");
 
-        Arena arena = resources.getArena();
-        MemorySegment pathSeg = buildMemorySegment(arena, tmpIndexFile.toString());
+      MemorySegment dtype = DLDataType.allocate(localArena);
+      DLDataType.bits(dtype, (byte) 32);
+      DLDataType.code(dtype, (byte) 2); // kDLFloat
+      DLDataType.lanes(dtype, (byte) 1);
 
-        long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
-        MemorySegment hnswIndex = cuvsHnswIndex.allocate(arena);
-        int returnValue = cuvsHnswIndexCreate(hnswIndex);
-        checkCuVSError(returnValue, "cuvsHnswIndexCreate");
+      cuvsHnswIndex.dtype(hnswIndex, dtype);
 
-        MemorySegment dtype = DLDataType.allocate(arena);
-        DLDataType.bits(dtype, (byte) 32);
-        DLDataType.code(dtype, (byte) 2); // kDLFloat
-        DLDataType.lanes(dtype, (byte) 1);
+      returnValue =
+          cuvsHnswDeserialize(
+              cuvsRes,
+              segmentFromIndexParams(localArena, hnswIndexParams),
+              pathSeg,
+              hnswIndexParams.getVectorDimension(),
+              0,
+              hnswIndex);
+      checkCuVSError(returnValue, "cuvsHnswDeserialize");
 
-        cuvsHnswIndex.dtype(hnswIndex, dtype);
+      return new IndexReference(hnswIndex);
 
-        returnValue =
-            cuvsHnswDeserialize(
-                cuvsRes,
-                segmentFromIndexParams(hnswIndexParams),
-                pathSeg,
-                hnswIndexParams.getVectorDimension(),
-                0,
-                hnswIndex);
-        checkCuVSError(returnValue, "cuvsHnswDeserialize");
-
-        return new IndexReference(hnswIndex);
-
-      } finally {
-        Files.deleteIfExists(tmpIndexFile);
-      }
+    } finally {
+      Files.deleteIfExists(tmpIndexFile);
     }
   }
 
   /**
    * Allocates the configured search parameters in the MemorySegment.
    */
-  private MemorySegment segmentFromIndexParams(HnswIndexParams params) {
-    MemorySegment seg = cuvsHnswIndexParams.allocate(resources.getArena());
+  private static MemorySegment segmentFromIndexParams(Arena arena, HnswIndexParams params) {
+    MemorySegment seg = cuvsHnswIndexParams.allocate(arena);
     cuvsHnswIndexParams.ef_construction(seg, params.getEfConstruction());
     cuvsHnswIndexParams.num_threads(seg, params.getNumThreads());
     return seg;
@@ -225,8 +204,8 @@ public class HnswIndexImpl implements HnswIndex {
   /**
    * Allocates the configured search parameters in the MemorySegment.
    */
-  private MemorySegment segmentFromSearchParams(HnswSearchParams params) {
-    MemorySegment seg = cuvsHnswSearchParams.allocate(resources.getArena());
+  private static MemorySegment segmentFromSearchParams(Arena arena, HnswSearchParams params) {
+    MemorySegment seg = cuvsHnswSearchParams.allocate(arena);
     cuvsHnswSearchParams.ef(seg, params.ef());
     cuvsHnswSearchParams.num_threads(seg, params.numThreads());
     return seg;
@@ -301,13 +280,6 @@ public class HnswIndexImpl implements HnswIndex {
   protected static class IndexReference {
 
     private final MemorySegment memorySegment;
-
-    /**
-     * Constructs CagraIndexReference and allocate the MemorySegment.
-     */
-    protected IndexReference(CuVSResourcesImpl resources) {
-      memorySegment = cuvsHnswIndex.allocate(resources.getArena());
-    }
 
     /**
      * Constructs CagraIndexReference with an instance of MemorySegment passed as a
