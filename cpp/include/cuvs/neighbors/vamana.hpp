@@ -60,7 +60,7 @@ struct index_params : cuvs::neighbors::index_params {
    * literature **/
   uint32_t visited_size = 64;
   /** Number of Vamana vector insertion iterations (each iteration inserts all vectors). */
-  uint32_t vamana_iters = 1;
+  float vamana_iters = 1.0;
   /** Alpha for pruning parameter */
   float alpha = 1.2;
   /** Maximum fraction of dataset inserted per batch.              *
@@ -72,6 +72,7 @@ struct index_params : cuvs::neighbors::index_params {
   uint32_t queue_size = 127;
   /** Max batchsize of reverse edge processing (reduces memory footprint) */
   uint32_t reverse_batchsize = 1000000;
+
 };
 
 /**
