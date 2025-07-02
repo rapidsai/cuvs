@@ -19,10 +19,9 @@ import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.lang.invoke.MethodHandles;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -76,32 +75,33 @@ public class HnswBuildAndSearchIT extends CuVSTestCase {
 
     // Saving the HNSW index on to the disk.
     String hnswIndexFileName = UUID.randomUUID() + ".hnsw";
-    try (var outputStream = new FileOutputStream(hnswIndexFileName)) {
-      index.serializeToHNSW(outputStream);
-    }
-
-    HnswIndexParams hnswIndexParams = new HnswIndexParams.Builder().withVectorDimension(2).build();
-    try (var inputStreamHNSW = new FileInputStream(hnswIndexFileName)) {
-      var hnswIndexFile = new File(hnswIndexFileName);
-
-      var hnswIndex =
-          HnswIndex.newBuilder(resources)
-              .from(inputStreamHNSW)
-              .withIndexParams(hnswIndexParams)
-              .build();
-
-      SearchResults results = hnswIndex.search(hnswQuery);
-
-      // Check results
-      log.info(results.getResults().toString());
-      checkResults(expectedResults, results.getResults());
-
-      // Cleanup
-      index.destroyIndex();
-      hnswIndex.destroyIndex();
-      if (hnswIndexFile.exists()) {
-        hnswIndexFile.delete();
+    var hnswIndexPath = Path.of(hnswIndexFileName);
+    try {
+      try (var outputStream = Files.newOutputStream(hnswIndexPath)) {
+        index.serializeToHNSW(outputStream);
       }
+
+      HnswIndexParams hnswIndexParams =
+          new HnswIndexParams.Builder().withVectorDimension(2).build();
+      try (var inputStreamHNSW = Files.newInputStream(hnswIndexPath)) {
+        var hnswIndex =
+            HnswIndex.newBuilder(resources)
+                .from(inputStreamHNSW)
+                .withIndexParams(hnswIndexParams)
+                .build();
+
+        SearchResults results = hnswIndex.search(hnswQuery);
+
+        // Check results
+        log.info(results.getResults().toString());
+        checkResults(expectedResults, results.getResults());
+
+        // Cleanup
+        hnswIndex.destroyIndex();
+      }
+    } finally {
+      index.destroyIndex();
+      Files.deleteIfExists(hnswIndexPath);
     }
   }
 
