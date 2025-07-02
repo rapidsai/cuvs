@@ -13,16 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs.spi;
 
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.CagraIndex;
+import com.nvidia.cuvs.CagraMergeParams;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
-import com.nvidia.cuvs.CagraMergeParams;
-
 import java.nio.file.Path;
 
 /**
@@ -49,8 +47,7 @@ public interface CuVSProvider {
   }
 
   /** Creates a new CuVSResources. */
-  CuVSResources newCuVSResources(Path tempDirectory)
-      throws Throwable;
+  CuVSResources newCuVSResources(Path tempDirectory) throws Throwable;
 
   /** Create a {@link Dataset} instance **/
   Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException;
@@ -87,7 +84,8 @@ public interface CuVSProvider {
    * @return A new merged CAGRA index
    * @throws Throwable if an error occurs during the merge operation
    */
-  default CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraMergeParams mergeParams) throws Throwable {
+  default CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraMergeParams mergeParams)
+      throws Throwable {
     // Default implementation falls back to the method without parameters
     return mergeCagraIndexes(indexes);
   }
