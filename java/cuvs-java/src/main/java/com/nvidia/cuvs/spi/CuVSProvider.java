@@ -52,7 +52,7 @@ public interface CuVSProvider {
   /** Create a {@link Dataset.Builder} instance **/
   Dataset.Builder newDatasetBuilder(int size, int dimensions);
 
-  Dataset newMemoryDataset(Object memorySegment, int size, int dimensions);
+  Dataset.NativeBuilder newNativeDatasetBuilder();
 
   /** Create a {@link Dataset} backed by a on-heap array **/
   Dataset newArrayDataset(float[][] vectors);

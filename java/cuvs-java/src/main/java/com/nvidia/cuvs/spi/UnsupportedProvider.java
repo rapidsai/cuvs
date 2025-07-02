@@ -58,7 +58,7 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
-  public Dataset newMemoryDataset(Object memorySegment, int size, int dimensions) {
+  public Dataset.NativeBuilder newNativeDatasetBuilder() {
     throw new UnsupportedOperationException();
   }
 

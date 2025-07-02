@@ -32,6 +32,8 @@ import com.nvidia.cuvs.internal.common.Util;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -108,6 +110,29 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
+  public Dataset.NativeBuilder newNativeDatasetBuilder() {
+    return NATIVE_BUILDER;
+  }
+
+  private static final Dataset.NativeBuilder NATIVE_BUILDER = createNativeDatasetBuilder();
+
+  static Dataset.NativeBuilder createNativeDatasetBuilder() {
+    try {
+      var lookup = MethodHandles.lookup();
+      var mt = MethodType.methodType(Dataset.class, MemorySegment.class, int.class, int.class);
+      final var createNativeDataset$mh =
+          lookup.findStatic(JDKProvider.class, "createNativeDataset", mt);
+      return () -> createNativeDataset$mh;
+    } catch (NoSuchMethodException | IllegalAccessException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  static Dataset createNativeDataset(MemorySegment memorySegment, int size, int dimensions) {
+    return new DatasetImpl(null, memorySegment, size, dimensions);
+  }
+
+  @Override
   public Dataset newArrayDataset(float[][] vectors) {
     Objects.requireNonNull(vectors);
     if (vectors.length == 0) {
@@ -119,10 +144,5 @@ final class JDKProvider implements CuVSProvider {
     Arena arena = Arena.ofShared();
     var memorySegment = Util.buildMemorySegment(arena, vectors);
     return new DatasetImpl(arena, memorySegment, size, dimensions);
-  }
-
-  @Override
-  public Dataset newMemoryDataset(Object memorySegment, int size, int dimensions) {
-    return new DatasetImpl(null, (MemorySegment) memorySegment, size, dimensions);
   }
 }
