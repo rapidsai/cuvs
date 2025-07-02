@@ -28,6 +28,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.lang.foreign.Arena;
+import java.lang.foreign.Linker;
+import java.lang.foreign.MemoryLayout;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.BitSet;
@@ -116,7 +121,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
    */
   @Test
   public void testIndexingAndSearchingFlow() throws Throwable {
-    float[][] dataset = createSampleData();
+    var dataset = Dataset.ofArray(createSampleData());
     float[][] queries = createSampleQueries();
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
 
@@ -135,7 +140,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
    */
   @Test
   public void testIndexingAndSearchingFlowInDifferentThreads() throws Throwable {
-    float[][] dataset = createSampleData();
+    var dataset = Dataset.ofArray(createSampleData());
     float[][] queries = createSampleQueries();
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
 
@@ -155,7 +160,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
    */
   @Test
   public void testIndexingAndSearchingFlowConcurrently() throws Throwable {
-    float[][] dataset = createSampleData();
+    var dataset = Dataset.ofArray(createSampleData());
     float[][] queries = createSampleQueries();
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
 
@@ -240,7 +245,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
   }
 
   private void indexAndQueryOnce(
-      float[][] dataset,
+      Dataset dataset,
       List<Integer> map,
       float[][] queries,
       List<Map<Integer, Float>> expectedResults,
@@ -307,6 +312,39 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
       index.destroyIndex();
     } catch (Throwable ex) {
       throw new RuntimeException("Exception during indexing/querying", ex);
+    }
+  }
+
+  @Test
+  public void testNativeDatasetEquivalent() throws Throwable {
+    float[][] sampleData = createSampleData();
+    float[][] queries = createSampleQueries();
+    List<Map<Integer, Float>> expectedResults = getExpectedResults();
+
+    List<Integer> map = List.of(0, 1, 2, 3);
+
+    ValueLayout.OfFloat C_FLOAT =
+        (ValueLayout.OfFloat) Linker.nativeLinker().canonicalLayouts().get("float");
+
+    int rows = sampleData.length;
+    int cols = sampleData[0].length;
+    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout((long) rows * cols, C_FLOAT);
+
+    try (Arena arena = Arena.ofShared()) {
+      MemorySegment dataMemorySegment = arena.allocate(dataMemoryLayout);
+      for (int r = 0; r < rows; r++) {
+        MemorySegment.copy(
+            sampleData[r], 0, dataMemorySegment, C_FLOAT, (r * cols * C_FLOAT.byteSize()), cols);
+      }
+
+      try (var resources = CuVSResources.create();
+          var javaDataset = Dataset.ofArray(sampleData);
+          var nativeDataset = DatasetHelper.fromMemorySegment(dataMemorySegment, rows, cols)) {
+
+        // Indexing with a on-heap and native datasets produce the same results
+        indexAndQueryOnce(javaDataset, map, queries, expectedResults, resources);
+        indexAndQueryOnce(nativeDataset, map, queries, expectedResults, resources);
+      }
     }
   }
 
