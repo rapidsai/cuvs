@@ -53,7 +53,17 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
-  public Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException {
+  public Dataset.Builder newDatasetBuilder(int size, int dimensions) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Dataset.NativeBuilder newNativeDatasetBuilder() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Dataset newArrayDataset(float[][] vectors) {
     throw new UnsupportedOperationException();
   }
 }

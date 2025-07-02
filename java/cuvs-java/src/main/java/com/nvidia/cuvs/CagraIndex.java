@@ -144,13 +144,6 @@ public interface CagraIndex {
   void serializeToHNSW(OutputStream outputStream, Path tempFile, int bufferLength) throws Throwable;
 
   /**
-   * Gets an instance of {@link CagraIndexParams}
-   *
-   * @return an instance of {@link CagraIndexParams}
-   */
-  CagraIndexParams getCagraIndexParameters();
-
-  /**
    * Gets an instance of {@link CuVSResources}
    *
    * @return an instance of {@link CuVSResources}
