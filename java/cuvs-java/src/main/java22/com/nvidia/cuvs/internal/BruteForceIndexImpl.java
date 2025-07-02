@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs.internal;
 
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
@@ -22,12 +21,13 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_POINTER;
+import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.*;
 import static com.nvidia.cuvs.internal.common.Util.buildMemorySegment;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.concatenate;
 import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
-import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.*;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
+import static com.nvidia.cuvs.internal.panama.headers_h.cudaStream_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceBuild;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceDeserialize;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceIndexCreate;
@@ -41,8 +41,15 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamGet;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
 import static com.nvidia.cuvs.internal.panama.headers_h.omp_set_num_threads;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaStream_t;
 
+import com.nvidia.cuvs.BruteForceIndex;
+import com.nvidia.cuvs.BruteForceIndexParams;
+import com.nvidia.cuvs.BruteForceQuery;
+import com.nvidia.cuvs.CuVSResources;
+import com.nvidia.cuvs.Dataset;
+import com.nvidia.cuvs.SearchResults;
+import com.nvidia.cuvs.internal.panama.cuvsBruteForceIndex;
+import com.nvidia.cuvs.internal.panama.cuvsFilter;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -56,15 +63,6 @@ import java.nio.file.Path;
 import java.util.BitSet;
 import java.util.Objects;
 import java.util.UUID;
-
-import com.nvidia.cuvs.BruteForceIndex;
-import com.nvidia.cuvs.BruteForceIndexParams;
-import com.nvidia.cuvs.BruteForceQuery;
-import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.Dataset;
-import com.nvidia.cuvs.SearchResults;
-import com.nvidia.cuvs.internal.panama.cuvsBruteForceIndex;
-import com.nvidia.cuvs.internal.panama.cuvsFilter;
 
 /**
  *
@@ -88,14 +86,15 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    * @param bruteForceIndexParams an instance of {@link BruteForceIndexParams}
    *                              holding the index parameters
    */
-  private BruteForceIndexImpl(Dataset dataset, CuVSResourcesImpl resources,
-      BruteForceIndexParams bruteForceIndexParams) throws Exception {
+  private BruteForceIndexImpl(
+      Dataset dataset, CuVSResourcesImpl resources, BruteForceIndexParams bruteForceIndexParams)
+      throws Exception {
     Objects.requireNonNull(dataset);
-      try (dataset) {
-          this.resources = resources;
-          assert dataset instanceof DatasetImpl;
-          this.bruteForceIndexReference = build((DatasetImpl) dataset, bruteForceIndexParams);
-      }
+    try (dataset) {
+      this.resources = resources;
+      assert dataset instanceof DatasetImpl;
+      this.bruteForceIndexReference = build((DatasetImpl) dataset, bruteForceIndexParams);
+    }
   }
 
   /**
@@ -104,7 +103,8 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    * @param inputStream an instance of stream to read the index bytes from
    * @param resources   an instance of {@link CuVSResourcesImpl}
    */
-  private BruteForceIndexImpl(InputStream inputStream, CuVSResourcesImpl resources) throws Throwable {
+  private BruteForceIndexImpl(InputStream inputStream, CuVSResourcesImpl resources)
+      throws Throwable {
     this.resources = resources;
     this.bruteForceIndexReference = deserialize(inputStream);
   }
@@ -163,8 +163,9 @@ public class BruteForceIndexImpl implements BruteForceIndex {
 
       cudaMemcpy(datasetMemorySegmentP, datasetMemSegment, datasetBytes, INFER_DIRECTION);
 
-      long[] datasetShape = { rows, cols };
-      MemorySegment datasetTensor = prepareTensor(arena, datasetMemorySegmentP, datasetShape, 2, 32, 2, 2, 1);
+      long[] datasetShape = {rows, cols};
+      MemorySegment datasetTensor =
+          prepareTensor(arena, datasetMemorySegmentP, datasetShape, 2, 32, 2, 2, 1);
 
       MemorySegment index = arena.allocate(cuvsBruteForceIndex_t);
 
@@ -216,7 +217,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
         BitSet concatenatedFilters = concatenate(prefilters, cuvsQuery.getNumDocs());
         long[] filters = concatenatedFilters.toLongArray();
         prefilterDataMemorySegment = buildMemorySegment(arena, filters);
-        prefilterDataLength = (long)cuvsQuery.getNumDocs() * prefilters.length;
+        prefilterDataLength = (long) cuvsQuery.getNumDocs() * prefilters.length;
       }
 
       MemorySegment querySeg = buildMemorySegment(arena, cuvsQuery.getQueryVectors());
@@ -253,12 +254,14 @@ public class BruteForceIndexImpl implements BruteForceIndex {
 
       cudaMemcpy(queriesDP, querySeg, queriesBytes, INFER_DIRECTION);
 
-      long[] queriesShape = { numQueries, vectorDimension };
+      long[] queriesShape = {numQueries, vectorDimension};
       MemorySegment queriesTensor = prepareTensor(arena, queriesDP, queriesShape, 2, 32, 2, 2, 1);
-      long[] neighborsShape = { numQueries, topk };
-      MemorySegment neighborsTensor = prepareTensor(arena, neighborsDP, neighborsShape, 0, 64, 2, 2, 1);
-      long[] distancesShape = { numQueries, topk };
-      MemorySegment distancesTensor = prepareTensor(arena, distancesDP, distancesShape, 2, 32, 2, 2, 1);
+      long[] neighborsShape = {numQueries, topk};
+      MemorySegment neighborsTensor =
+          prepareTensor(arena, neighborsDP, neighborsShape, 0, 64, 2, 2, 1);
+      long[] distancesShape = {numQueries, topk};
+      MemorySegment distancesTensor =
+          prepareTensor(arena, distancesDP, distancesShape, 2, 32, 2, 2, 1);
 
       MemorySegment prefilter = cuvsFilter.allocate(arena);
       MemorySegment prefilterTensor;
@@ -267,7 +270,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
         cuvsFilter.type(prefilter, 0); // NO_FILTER
         cuvsFilter.addr(prefilter, 0);
       } else {
-        long[] prefilterShape = { (prefilterDataLength + 31) / 32 };
+        long[] prefilterShape = {(prefilterDataLength + 31) / 32};
         prefilterLen = prefilterShape[0];
         prefilterBytes = C_INT_BYTE_SIZE * prefilterLen;
 
@@ -287,8 +290,14 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       returnValue = cuvsStreamSync(cuvsResources);
       checkCuVSError(returnValue, "cuvsStreamSync");
 
-      returnValue = cuvsBruteForceSearch(cuvsResources, bruteForceIndexReference.getMemorySegment(), queriesTensor,
-          neighborsTensor, distancesTensor, prefilter);
+      returnValue =
+          cuvsBruteForceSearch(
+              cuvsResources,
+              bruteForceIndexReference.getMemorySegment(),
+              queriesTensor,
+              neighborsTensor,
+              distancesTensor,
+              prefilter);
       checkCuVSError(returnValue, "cuvsBruteForceSearch");
 
       returnValue = cuvsStreamSync(cuvsResources);
@@ -306,14 +315,21 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       returnValue = cuvsRMMFree(cuvsResources, prefilterDP, prefilterBytes);
       checkCuVSError(returnValue, "cuvsRMMFree");
 
-      return new BruteForceSearchResults(neighborsSequenceLayout, distancesSequenceLayout, neighborsMemorySegment,
-          distancesMemorySegment, cuvsQuery.getTopK(), cuvsQuery.getMapping(), numQueries);
+      return new BruteForceSearchResults(
+          neighborsSequenceLayout,
+          distancesSequenceLayout,
+          neighborsMemorySegment,
+          distancesMemorySegment,
+          cuvsQuery.getTopK(),
+          cuvsQuery.getMapping(),
+          numQueries);
     }
   }
 
   @Override
   public void serialize(OutputStream outputStream) throws Throwable {
-    Path path = Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".bf");
+    Path path =
+        Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".bf");
     serialize(outputStream, path);
   }
 
@@ -323,8 +339,11 @@ public class BruteForceIndexImpl implements BruteForceIndex {
     tempFile = tempFile.toAbsolutePath();
 
     long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
-    int returnValue = cuvsBruteForceSerialize(cuvsRes, resources.getArena().allocateFrom(tempFile.toString()),
-        bruteForceIndexReference.getMemorySegment());
+    int returnValue =
+        cuvsBruteForceSerialize(
+            cuvsRes,
+            resources.getArena().allocateFrom(tempFile.toString()),
+            bruteForceIndexReference.getMemorySegment());
     checkCuVSError(returnValue, "cuvsBruteForceSerialize");
 
     try (FileInputStream fileInputStream = new FileInputStream(tempFile.toFile())) {
@@ -343,16 +362,21 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    */
   private IndexReference deserialize(InputStream inputStream) throws Throwable {
     checkNotDestroyed();
-    Path tmpIndexFile = Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".bf");
+    Path tmpIndexFile =
+        Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".bf");
     tmpIndexFile = tmpIndexFile.toAbsolutePath();
     IndexReference indexReference = new IndexReference(resources);
 
-    try (var in = inputStream; FileOutputStream fileOutputStream = new FileOutputStream(tmpIndexFile.toFile())) {
+    try (var in = inputStream;
+        FileOutputStream fileOutputStream = new FileOutputStream(tmpIndexFile.toFile())) {
       in.transferTo(fileOutputStream);
 
       long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
-      int returnValue = cuvsBruteForceDeserialize(cuvsRes, resources.getArena().allocateFrom(tmpIndexFile.toString()),
-          indexReference.getMemorySegment());
+      int returnValue =
+          cuvsBruteForceDeserialize(
+              cuvsRes,
+              resources.getArena().allocateFrom(tmpIndexFile.toString()),
+              indexReference.getMemorySegment());
       checkCuVSError(returnValue, "cuvsBruteForceDeserialize");
 
     } finally {

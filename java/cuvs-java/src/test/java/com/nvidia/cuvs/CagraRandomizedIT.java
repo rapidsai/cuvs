@@ -13,22 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
+import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
+
+import com.carrotsearch.randomizedtesting.RandomizedRunner;
+import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import java.lang.invoke.MethodHandles;
-import java.util.List;
 import java.util.BitSet;
+import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.carrotsearch.randomizedtesting.RandomizedRunner;
-import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
-
-import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 
 @RunWith(RandomizedRunner.class)
 public class CagraRandomizedIT extends CuVSTestCase {
@@ -45,10 +43,10 @@ public class CagraRandomizedIT extends CuVSTestCase {
   @Test
   public void testResultsTopKWithRandomValues() throws Throwable {
     boolean useNativeMemoryDatasets[] = {true, false};
-	  for (int i = 0; i < 100; i++) {
-	    for (boolean use: useNativeMemoryDatasets) {
-		     tmpResultsTopKWithRandomValues(use);
-	    }
+    for (int i = 0; i < 100; i++) {
+      for (boolean use : useNativeMemoryDatasets) {
+        tmpResultsTopKWithRandomValues(use);
+      }
     }
   }
 
@@ -58,14 +56,15 @@ public class CagraRandomizedIT extends CuVSTestCase {
     int NUM_QUERIES_LIMIT = 10;
     int TOP_K_LIMIT = 64; // nocommit This fails beyond 64
 
-    int datasetSize = random.nextInt(DATASET_SIZE_LIMIT) + 2; // datasetSize of 1 fails/crashed due to a bug, hence adding 2 here.
+    int datasetSize =
+        random.nextInt(DATASET_SIZE_LIMIT)
+            + 2; // datasetSize of 1 fails/crashed due to a bug, hence adding 2 here.
     int dimensions = random.nextInt(DIMENSIONS_LIMIT) + 1;
     int numQueries = random.nextInt(NUM_QUERIES_LIMIT) + 1;
     int topK = Math.min(random.nextInt(TOP_K_LIMIT) + 1, datasetSize);
     boolean usePrefilter = random.nextBoolean();
 
-    if (datasetSize < topK)
-      datasetSize = topK;
+    if (datasetSize < topK) datasetSize = topK;
 
     BitSet sharedPrefilter = null;
     if (usePrefilter) {
@@ -116,22 +115,25 @@ public class CagraRandomizedIT extends CuVSTestCase {
 
     // Create CuVS index and query
     try (CuVSResources resources = CuVSResources.create()) {
-      CagraIndexParams indexParams = new CagraIndexParams.Builder()
-          .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
-          .build();
+      CagraIndexParams indexParams =
+          new CagraIndexParams.Builder()
+              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+              .build();
 
       CagraIndex index;
       if (useNativeMemoryDataset) {
-          var datasetBuilder = Dataset.builder(vectors.length, vectors[0].length);
-          for (float[] v: vectors) {
-            datasetBuilder.addVector(v);
-          }
-          index = CagraIndex.newBuilder(resources)
-              .withDataset(datasetBuilder.build())
-              .withIndexParams(indexParams)
-              .build();
+        var datasetBuilder = Dataset.builder(vectors.length, vectors[0].length);
+        for (float[] v : vectors) {
+          datasetBuilder.addVector(v);
+        }
+        index =
+            CagraIndex.newBuilder(resources)
+                .withDataset(datasetBuilder.build())
+                .withIndexParams(indexParams)
+                .build();
       } else {
-        index = CagraIndex.newBuilder(resources)
+        index =
+            CagraIndex.newBuilder(resources)
                 .withDataset(vectors)
                 .withIndexParams(indexParams)
                 .build();
@@ -140,11 +142,11 @@ public class CagraRandomizedIT extends CuVSTestCase {
 
       try {
         // Execute search and retrieve results
-        CagraQuery.Builder queryBuilder = new CagraQuery.Builder()
+        CagraQuery.Builder queryBuilder =
+            new CagraQuery.Builder()
                 .withQueryVectors(queries)
                 .withTopK(topK)
-                .withSearchParams(new CagraSearchParams.Builder(resources)
-                        .build());
+                .withSearchParams(new CagraSearchParams.Builder(resources).build());
 
         if (sharedPrefilter != null) {
           queryBuilder.withPrefilter(sharedPrefilter, datasetSize);

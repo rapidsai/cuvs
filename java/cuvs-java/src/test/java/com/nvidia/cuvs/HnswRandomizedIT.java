@@ -13,9 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
+import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
+
+import com.carrotsearch.randomizedtesting.RandomizedRunner;
+import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
+import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -23,18 +27,11 @@ import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
 import java.util.List;
 import java.util.UUID;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.carrotsearch.randomizedtesting.RandomizedRunner;
-import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
-import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
-
-import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 
 @RunWith(RandomizedRunner.class)
 public class HnswRandomizedIT extends CuVSTestCase {
@@ -50,9 +47,9 @@ public class HnswRandomizedIT extends CuVSTestCase {
 
   @Test
   public void testResultsTopKWithRandomValues() throws Throwable {
-	boolean useNativeMemoryDatasets[] = {true, false};
+    boolean useNativeMemoryDatasets[] = {true, false};
     for (int i = 0; i < 10; i++) {
-      for (boolean use: useNativeMemoryDatasets) {
+      for (boolean use : useNativeMemoryDatasets) {
         tmpResultsTopKWithRandomValues(use);
       }
     }
@@ -69,8 +66,7 @@ public class HnswRandomizedIT extends CuVSTestCase {
     int numQueries = random.nextInt(NUM_QUERIES_LIMIT) + 1;
     int topK = Math.min(random.nextInt(TOP_K_LIMIT) + 1, datasetSize);
 
-    if (datasetSize < topK)
-      datasetSize = topK;
+    if (datasetSize < topK) datasetSize = topK;
 
     // Generate a random dataset
     float[][] vectors = generateData(random, datasetSize, dimensions);
@@ -107,56 +103,58 @@ public class HnswRandomizedIT extends CuVSTestCase {
     try (CuVSResources resources = CuVSResources.create()) {
 
       // Configure index parameters
-      CagraIndexParams indexParams = new CagraIndexParams.Builder()
-          .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
-          .withGraphDegree(64)
-          .withIntermediateGraphDegree(128)
-          .withNumWriterThreads(32)
-          .withMetric(CuvsDistanceType.L2Expanded)
-          .build();
+      CagraIndexParams indexParams =
+          new CagraIndexParams.Builder()
+              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+              .withGraphDegree(64)
+              .withIntermediateGraphDegree(128)
+              .withNumWriterThreads(32)
+              .withMetric(CuvsDistanceType.L2Expanded)
+              .build();
 
       // Create the index with the dataset
       CagraIndex index;
       if (useNativeMemoryDataset) {
         var datasetBuilder = Dataset.builder(vectors.length, vectors[0].length);
-        for (float[] v: vectors) {
+        for (float[] v : vectors) {
           datasetBuilder.addVector(v);
         }
-        index = CagraIndex.newBuilder(resources)
-            .withDataset(datasetBuilder.build())
-            .withIndexParams(indexParams)
-            .build();
+        index =
+            CagraIndex.newBuilder(resources)
+                .withDataset(datasetBuilder.build())
+                .withIndexParams(indexParams)
+                .build();
       } else {
-        index = CagraIndex.newBuilder(resources)
-             .withDataset(vectors)
-             .withIndexParams(indexParams)
-             .build();
+        index =
+            CagraIndex.newBuilder(resources)
+                .withDataset(vectors)
+                .withIndexParams(indexParams)
+                .build();
       }
 
       // Saving the HNSW index on to the disk.
       String hnswIndexFileName = UUID.randomUUID().toString() + ".hnsw";
-      index.serializeToHNSW(new FileOutputStream(hnswIndexFileName));   // fails here
+      index.serializeToHNSW(new FileOutputStream(hnswIndexFileName)); // fails here
 
-      HnswIndexParams hnswIndexParams = new HnswIndexParams.Builder()
-          .withVectorDimension(dimensions)
-          .build();
+      HnswIndexParams hnswIndexParams =
+          new HnswIndexParams.Builder().withVectorDimension(dimensions).build();
       InputStream inputStreamHNSW = new FileInputStream(hnswIndexFileName);
       File hnswIndexFile = new File(hnswIndexFileName);
 
-      HnswIndex hnswIndex = HnswIndex.newBuilder(resources)
-          .from(inputStreamHNSW)
-          .withIndexParams(hnswIndexParams)
-          .build();
+      HnswIndex hnswIndex =
+          HnswIndex.newBuilder(resources)
+              .from(inputStreamHNSW)
+              .withIndexParams(hnswIndexParams)
+              .build();
 
-      HnswSearchParams hnswSearchParams = new HnswSearchParams.Builder()
-          .withNumThreads(32)
-          .build();
+      HnswSearchParams hnswSearchParams = new HnswSearchParams.Builder().withNumThreads(32).build();
 
-      HnswQuery hnswQuery = new HnswQuery.Builder()
-          .withQueryVectors(queries)
-          .withSearchParams(hnswSearchParams)
-          .withTopK(topK)
-          .build();
+      HnswQuery hnswQuery =
+          new HnswQuery.Builder()
+              .withQueryVectors(queries)
+              .withSearchParams(hnswSearchParams)
+              .withTopK(topK)
+              .build();
 
       log.info("Index built successfully. Executing search...");
       SearchResults results = hnswIndex.search(hnswQuery);

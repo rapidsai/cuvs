@@ -13,13 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs.internal;
 
+import com.nvidia.cuvs.Dataset;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
-
-import com.nvidia.cuvs.Dataset;
 
 public class DatasetImpl implements Dataset {
   private final Arena arena;
@@ -52,6 +50,6 @@ public class DatasetImpl implements Dataset {
   }
 
   public MemorySegment asMemorySegment() {
-      return seg;
+    return seg;
   }
 }
