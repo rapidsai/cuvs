@@ -13,16 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs.internal;
 
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 
+import com.nvidia.cuvs.Dataset;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
-
-import com.nvidia.cuvs.Dataset;
 
 public class DatasetImpl implements Dataset {
   private final Arena arena;
@@ -35,7 +33,7 @@ public class DatasetImpl implements Dataset {
     this.size = size;
     this.dimensions = dimensions;
 
-    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout((long)size * dimensions, C_FLOAT);
+    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout((long) size * dimensions, C_FLOAT);
 
     this.arena = Arena.ofShared();
     this.seg = arena.allocate(dataMemoryLayout);
@@ -50,9 +48,9 @@ public class DatasetImpl implements Dataset {
 
   @Override
   public void addVector(float[] vector) {
-    if (current >= size)
-      throw new ArrayIndexOutOfBoundsException();
-    MemorySegment.copy(vector, 0, seg, C_FLOAT, ((current++) * dimensions * C_FLOAT.byteSize()), dimensions);
+    if (current >= size) throw new ArrayIndexOutOfBoundsException();
+    MemorySegment.copy(
+        vector, 0, seg, C_FLOAT, ((current++) * dimensions * C_FLOAT.byteSize()), dimensions);
   }
 
   @Override
@@ -73,6 +71,6 @@ public class DatasetImpl implements Dataset {
   }
 
   public MemorySegment asMemorySegment() {
-      return seg;
+    return seg;
   }
 }
