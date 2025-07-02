@@ -55,9 +55,16 @@ void serialize(raft::resources const& handle,
 void serialize(raft::resources const& handle,
                const std::string& filename,
                const index<half, float>& index,
-               bool include_dataset)
+               bool include_dataset,
+               char file_mode)
 {
-  auto os = std::ofstream{filename, std::ios::out | std::ios::binary};
+  std::ios::openmode mode = std::ios::binary;
+  if (file_mode == 'a') {
+    mode |= std::ios::app;
+  } else {
+    mode |= std::ios::out;
+  }
+  auto os = std::ofstream{filename, mode};
   RAFT_EXPECTS(os, "Cannot open file %s", filename.c_str());
   serialize<half, float>(handle, os, index, include_dataset);
 }
@@ -65,9 +72,16 @@ void serialize(raft::resources const& handle,
 void serialize(raft::resources const& handle,
                const std::string& filename,
                const index<float, float>& index,
-               bool include_dataset)
+               bool include_dataset,
+               char file_mode)
 {
-  auto os = std::ofstream{filename, std::ios::out | std::ios::binary};
+  std::ios::openmode mode = std::ios::binary;
+  if (file_mode == 'a') {
+    mode |= std::ios::app;
+  } else {
+    mode |= std::ios::out;
+  }
+  auto os = std::ofstream{filename, mode};
   RAFT_EXPECTS(os, "Cannot open file %s", filename.c_str());
   serialize<float, float>(handle, os, index, include_dataset);
 }
@@ -86,6 +100,23 @@ void serialize(raft::resources const& handle,
                bool include_dataset)
 {
   serialize<float, float>(handle, os, index, include_dataset);
+}
+
+// Backward compatibility functions - use default 'w' mode
+void serialize(raft::resources const& handle,
+               const std::string& filename,
+               const index<half, float>& index,
+               bool include_dataset)
+{
+  serialize(handle, filename, index, include_dataset, 'w');
+}
+
+void serialize(raft::resources const& handle,
+               const std::string& filename,
+               const index<float, float>& index,
+               bool include_dataset)
+{
+  serialize(handle, filename, index, include_dataset, 'w');
 }
 
 template <typename T, typename DistT>

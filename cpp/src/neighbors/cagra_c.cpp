@@ -226,11 +226,12 @@ template <typename T>
 void _serialize(cuvsResources_t res,
                 const char* filename,
                 cuvsCagraIndex_t index,
-                bool include_dataset)
+                bool include_dataset,
+                char file_mode)
 {
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
   auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(index->addr);
-  cuvs::neighbors::cagra::serialize(*res_ptr, std::string(filename), *index_ptr, include_dataset);
+  cuvs::neighbors::cagra::serialize(*res_ptr, std::string(filename), *index_ptr, include_dataset, file_mode);
 }
 
 template <typename T>
@@ -632,20 +633,66 @@ extern "C" cuvsError_t cuvsCagraDeserialize(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
-                                          const char* filename,
-                                          cuvsCagraIndex_t index,
-                                          bool include_dataset)
+extern "C" cuvsError_t cuvsCagraSerializeWithMode(cuvsResources_t res,
+                                                  const char* filename,
+                                                  cuvsCagraIndex_t index,
+                                                  bool include_dataset,
+                                                  char file_mode)
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
-      _serialize<float>(res, filename, index, include_dataset);
+      _serialize<float>(res, filename, index, include_dataset, file_mode);
     } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
-      _serialize<half>(res, filename, index, include_dataset);
+      _serialize<half>(res, filename, index, include_dataset, file_mode);
     } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
-      _serialize<int8_t>(res, filename, index, include_dataset);
+      _serialize<int8_t>(res, filename, index, include_dataset, file_mode);
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
-      _serialize<uint8_t>(res, filename, index, include_dataset);
+      _serialize<uint8_t>(res, filename, index, include_dataset, file_mode);
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
+    }
+  });
+}
+
+template <typename T>
+void _serialize_to_hnswlib_with_mode(cuvsResources_t res, const char* filename, cuvsCagraIndex_t index, char file_mode)
+{
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(index->addr);
+  
+  // Convert file mode to std::ios flags
+  std::ios_base::openmode mode = std::ios::binary;
+  if (file_mode == 'w') {
+    mode |= std::ios::out;
+  } else if (file_mode == 'a') {
+    mode |= std::ios::app;
+  } else {
+    RAFT_FAIL("Invalid file mode '%c'. Only 'w' (write) and 'a' (append) are supported.", file_mode);
+  }
+  
+  std::ofstream of(filename, mode);
+  if (!of) { RAFT_FAIL("Cannot open file %s", filename); }
+
+  cuvs::neighbors::cagra::serialize_to_hnswlib(*res_ptr, of, *index_ptr);
+
+  of.close();
+  if (!of) { RAFT_FAIL("Error writing output %s", filename); }
+}
+
+extern "C" cuvsError_t cuvsCagraSerializeToHnswlibWithMode(cuvsResources_t res,
+                                                           const char* filename,
+                                                           cuvsCagraIndex_t index,
+                                                           char file_mode)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
+      _serialize_to_hnswlib_with_mode<float>(res, filename, index, file_mode);
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      _serialize_to_hnswlib_with_mode<half>(res, filename, index, file_mode);
+    } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
+      _serialize_to_hnswlib_with_mode<int8_t>(res, filename, index, file_mode);
+    } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
+      _serialize_to_hnswlib_with_mode<uint8_t>(res, filename, index, file_mode);
     } else {
       RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
     }
@@ -656,17 +703,13 @@ extern "C" cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
                                                    const char* filename,
                                                    cuvsCagraIndex_t index)
 {
-  return cuvs::core::translate_exceptions([=] {
-    if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
-      _serialize_to_hnswlib<float>(res, filename, index);
-    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
-      _serialize_to_hnswlib<half>(res, filename, index);
-    } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
-      _serialize_to_hnswlib<int8_t>(res, filename, index);
-    } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
-      _serialize_to_hnswlib<uint8_t>(res, filename, index);
-    } else {
-      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
-    }
-  });
+  return cuvsCagraSerializeToHnswlibWithMode(res, filename, index, 'w');
+}
+
+extern "C" cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
+                                          const char* filename,
+                                          cuvsCagraIndex_t index,
+                                          bool include_dataset)
+{
+  return cuvsCagraSerializeWithMode(res, filename, index, include_dataset, 'w');
 }

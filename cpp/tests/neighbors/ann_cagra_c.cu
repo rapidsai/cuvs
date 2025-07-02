@@ -19,6 +19,8 @@
 #include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.hpp>
 #include <dlpack/dlpack.h>
+#include <fstream>
+#include <random>
 
 #include <cstdint>
 #include <cuvs/neighbors/cagra.h>
@@ -599,4 +601,162 @@ TEST(CagraC, BuildMergeSearch)
   cuvsCagraIndexDestroy(index_add);
   cuvsCagraIndexDestroy(index_main);
   cuvsResourcesDestroy(res);
+}
+
+TEST(CagraC, SerializeWithModes)
+{
+  int64_t n_rows = 100;
+  int64_t n_dim  = 10;
+
+  // Create resources
+  cuvsResources_t res;
+  ASSERT_EQ(cuvsResourcesCreate(&res), CUVS_SUCCESS);
+
+  // Create GPU data using RAFT handle
+  raft::handle_t handle;
+  auto stream = raft::resource::get_cuda_stream(handle);
+  rmm::device_uvector<float> data(n_rows * n_dim, stream);
+  raft::random::RngState r(1234ULL);
+  raft::random::uniform(handle, r, data.data(), n_rows * n_dim, 0.1f, 2.0f);
+
+  // Create DLManagedTensor for dataset
+  DLManagedTensor dataset_tensor;
+  dataset_tensor.dl_tensor.data               = data.data();
+  dataset_tensor.dl_tensor.device.device_type = kDLCUDA;
+  dataset_tensor.dl_tensor.device.device_id   = 0;
+  dataset_tensor.dl_tensor.ndim               = 2;
+  dataset_tensor.dl_tensor.dtype.code         = kDLFloat;
+  dataset_tensor.dl_tensor.dtype.bits         = 32;
+  dataset_tensor.dl_tensor.dtype.lanes        = 1;
+  dataset_tensor.dl_tensor.byte_offset        = 0;
+  int64_t shape[2] = {n_rows, n_dim};
+  dataset_tensor.dl_tensor.shape              = shape;
+  dataset_tensor.dl_tensor.strides            = nullptr;
+
+  // Create index parameters
+  cuvsCagraIndexParams_t params;
+  ASSERT_EQ(cuvsCagraIndexParamsCreate(&params), CUVS_SUCCESS);
+
+  // Build index
+  cuvsCagraIndex_t index;
+  ASSERT_EQ(cuvsCagraIndexCreate(&index), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsCagraBuild(res, params, &dataset_tensor, index), CUVS_SUCCESS);
+
+  // Test serialization with 'w' mode
+  const char* filename_w = "/tmp/test_cagra_w.index";
+  ASSERT_EQ(cuvsCagraSerializeWithMode(res, filename_w, index, true, 'w'), CUVS_SUCCESS);
+
+  // Test serialization with 'a' mode  
+  const char* filename_a = "/tmp/test_cagra_a.index";
+  ASSERT_EQ(cuvsCagraSerializeWithMode(res, filename_a, index, true, 'a'), CUVS_SUCCESS);
+
+  // Test backward compatibility (should use 'w' mode by default)
+  const char* filename_compat = "/tmp/test_cagra_compat.index";
+  ASSERT_EQ(cuvsCagraSerialize(res, filename_compat, index, true), CUVS_SUCCESS);
+
+  // Verify files exist
+  std::ifstream file_w(filename_w, std::ios::binary);
+  ASSERT_TRUE(file_w.good());
+  file_w.close();
+
+  std::ifstream file_a(filename_a, std::ios::binary);
+  ASSERT_TRUE(file_a.good());
+  file_a.close();
+
+  std::ifstream file_compat(filename_compat, std::ios::binary);
+  ASSERT_TRUE(file_compat.good());
+  file_compat.close();
+
+  // Test deserialization works with both files
+  cuvsCagraIndex_t index_loaded_w, index_loaded_compat;
+  ASSERT_EQ(cuvsCagraIndexCreate(&index_loaded_w), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsCagraIndexCreate(&index_loaded_compat), CUVS_SUCCESS);
+
+  ASSERT_EQ(cuvsCagraDeserialize(res, filename_w, index_loaded_w), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsCagraDeserialize(res, filename_compat, index_loaded_compat), CUVS_SUCCESS);
+
+  // Clean up
+  std::remove(filename_w);
+  std::remove(filename_a);
+  std::remove(filename_compat);
+
+  ASSERT_EQ(cuvsCagraIndexDestroy(index), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsCagraIndexDestroy(index_loaded_w), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsCagraIndexDestroy(index_loaded_compat), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsCagraIndexParamsDestroy(params), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsResourcesDestroy(res), CUVS_SUCCESS);
+}
+
+TEST(CagraC, SerializeToHnswlibWithModes)
+{
+  int64_t n_rows = 100;
+  int64_t n_dim  = 10;
+
+  // Create resources
+  cuvsResources_t res;
+  ASSERT_EQ(cuvsResourcesCreate(&res), CUVS_SUCCESS);
+
+  // Create GPU data using RAFT handle
+  raft::handle_t handle;
+  auto stream = raft::resource::get_cuda_stream(handle);
+  rmm::device_uvector<float> data(n_rows * n_dim, stream);
+  raft::random::RngState r(1234ULL);
+  raft::random::uniform(handle, r, data.data(), n_rows * n_dim, 0.1f, 2.0f);
+
+  // Create DLManagedTensor for dataset
+  DLManagedTensor dataset_tensor;
+  dataset_tensor.dl_tensor.data               = data.data();
+  dataset_tensor.dl_tensor.device.device_type = kDLCUDA;
+  dataset_tensor.dl_tensor.device.device_id   = 0;
+  dataset_tensor.dl_tensor.ndim               = 2;
+  dataset_tensor.dl_tensor.dtype.code         = kDLFloat;
+  dataset_tensor.dl_tensor.dtype.bits         = 32;
+  dataset_tensor.dl_tensor.dtype.lanes        = 1;
+  dataset_tensor.dl_tensor.byte_offset        = 0;
+  int64_t shape[2] = {n_rows, n_dim};
+  dataset_tensor.dl_tensor.shape              = shape;
+  dataset_tensor.dl_tensor.strides            = nullptr;
+
+  // Create index parameters
+  cuvsCagraIndexParams_t params;
+  ASSERT_EQ(cuvsCagraIndexParamsCreate(&params), CUVS_SUCCESS);
+
+  // Build index
+  cuvsCagraIndex_t index;
+  ASSERT_EQ(cuvsCagraIndexCreate(&index), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsCagraBuild(res, params, &dataset_tensor, index), CUVS_SUCCESS);
+
+  // Test serialization to HNSWLIB with 'w' mode
+  const char* filename_w = "/tmp/test_cagra_hnswlib_w.index";
+  ASSERT_EQ(cuvsCagraSerializeToHnswlibWithMode(res, filename_w, index, 'w'), CUVS_SUCCESS);
+
+  // Test serialization to HNSWLIB with 'a' mode  
+  const char* filename_a = "/tmp/test_cagra_hnswlib_a.index";
+  ASSERT_EQ(cuvsCagraSerializeToHnswlibWithMode(res, filename_a, index, 'a'), CUVS_SUCCESS);
+
+  // Test backward compatibility (should use 'w' mode by default)
+  const char* filename_compat = "/tmp/test_cagra_hnswlib_compat.index";
+  ASSERT_EQ(cuvsCagraSerializeToHnswlib(res, filename_compat, index), CUVS_SUCCESS);
+
+  // Verify files exist
+  std::ifstream file_w(filename_w, std::ios::binary);
+  ASSERT_TRUE(file_w.good());
+  file_w.close();
+
+  std::ifstream file_a(filename_a, std::ios::binary);
+  ASSERT_TRUE(file_a.good());
+  file_a.close();
+
+  std::ifstream file_compat(filename_compat, std::ios::binary);
+  ASSERT_TRUE(file_compat.good());
+  file_compat.close();
+
+  // Clean up
+  std::remove(filename_w);
+  std::remove(filename_a);
+  std::remove(filename_compat);
+
+  ASSERT_EQ(cuvsCagraIndexDestroy(index), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsCagraIndexParamsDestroy(params), CUVS_SUCCESS);
+  ASSERT_EQ(cuvsResourcesDestroy(res), CUVS_SUCCESS);
 }

@@ -560,6 +560,35 @@ cuvsError_t cuvsCagraSearch(cuvsResources_t res,
  * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
  *
  * // create an index with `cuvsCagraBuild`
+ * cuvsCagraSerializeWithMode(res, "/path/to/index", index, true, 'w');
+ * @endcode
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] filename the file name for saving the index
+ * @param[in] index CAGRA index
+ * @param[in] include_dataset Whether or not to write out the dataset to the file.
+ * @param[in] file_mode File mode: 'w' for write (ios::out), 'a' for append (ios::app)
+ *
+ */
+cuvsError_t cuvsCagraSerializeWithMode(cuvsResources_t res,
+                                        const char* filename,
+                                        cuvsCagraIndex_t index,
+                                        bool include_dataset,
+                                        char file_mode);
+
+/**
+ * Save the index to file (backward compatibility version - writes to file).
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.c}
+ * #include <cuvs/neighbors/cagra.h>
+ *
+ * // Create cuvsResources_t
+ * cuvsResources_t res;
+ * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+ *
+ * // create an index with `cuvsCagraBuild`
  * cuvsCagraSerialize(res, "/path/to/index", index, true);
  * @endcode
  *
@@ -590,7 +619,7 @@ cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
  * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
  *
  * // create an index with `cuvsCagraBuild`
- * cuvsCagraSerializeHnswlib(res, "/path/to/index", index);
+ * cuvsCagraSerializeToHnswlib(res, "/path/to/index", index);
  * @endcode
  *
  * @param[in] res cuvsResources_t opaque C handle
@@ -601,6 +630,36 @@ cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
 cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
                                         const char* filename,
                                         cuvsCagraIndex_t index);
+
+/**
+ * Save the CAGRA index to file in hnswlib format with file mode control.
+ * NOTE: The saved index can only be read by the hnswlib wrapper in cuVS,
+ *       as the serialization format is not compatible with the original hnswlib.
+ *
+ * Experimental, both the API and the serialization format are subject to change.
+ *
+ * @code{.c}
+ * #include <cuvs/core/c_api.h>
+ * #include <cuvs/neighbors/cagra.h>
+ *
+ * // Create cuvsResources_t
+ * cuvsResources_t res;
+ * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+ *
+ * // create an index with `cuvsCagraBuild`
+ * cuvsCagraSerializeToHnswlibWithMode(res, "/path/to/index", index, 'w');
+ * @endcode
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] filename the file name for saving the index
+ * @param[in] index CAGRA index
+ * @param[in] file_mode File mode: 'w' for write (ios::out), 'a' for append (ios::app)
+ *
+ */
+cuvsError_t cuvsCagraSerializeToHnswlibWithMode(cuvsResources_t res,
+                                                const char* filename,
+                                                cuvsCagraIndex_t index,
+                                                char file_mode);
 
 /**
  * Load index from file.
