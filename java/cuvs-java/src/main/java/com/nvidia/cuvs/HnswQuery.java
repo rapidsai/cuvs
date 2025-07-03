@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
 import java.util.Arrays;
@@ -41,7 +40,8 @@ public class HnswQuery {
    * @param mapping          an instance of ID mapping
    * @param topK             the top k results to return
    */
-  private HnswQuery(HnswSearchParams hnswSearchParams, float[][] queryVectors, List<Integer> mapping, int topK) {
+  private HnswQuery(
+      HnswSearchParams hnswSearchParams, float[][] queryVectors, List<Integer> mapping, int topK) {
     this.hnswSearchParams = hnswSearchParams;
     this.queryVectors = queryVectors;
     this.mapping = mapping;
@@ -86,7 +86,13 @@ public class HnswQuery {
 
   @Override
   public String toString() {
-    return "HnswQuery [mapping=" + mapping + ", queryVectors=" + Arrays.toString(queryVectors) + ", topK=" + topK + "]";
+    return "HnswQuery [mapping="
+        + mapping
+        + ", queryVectors="
+        + Arrays.toString(queryVectors)
+        + ", topK="
+        + topK
+        + "]";
   }
 
   /**
