@@ -22,7 +22,7 @@ import java.lang.foreign.Arena;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 
-public class DatasetImpl implements Dataset {
+public class DatasetImpl implements Dataset, MemorySegmentProvider {
   private final Arena arena;
   protected final MemorySegment seg;
   private final int size;
@@ -61,5 +61,10 @@ public class DatasetImpl implements Dataset {
   @Override
   public int dimensions() {
     return dimensions;
+  }
+
+  @Override
+  public MemorySegment asMemorySegment(Arena arena) {
+    return seg;
   }
 }
