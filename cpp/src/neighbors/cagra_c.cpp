@@ -233,24 +233,14 @@ void _serialize(cuvsResources_t res,
   cuvs::neighbors::cagra::serialize(*res_ptr, std::string(filename), *index_ptr, include_dataset);
 }
 
-struct _membuf: std::streambuf
-{
-  _membuf(char* p, size_t size)
-  {
-    setp( p, p + size);
-  }
-  size_t written()
-  {
-    return pptr()-pbase();
-  }
+struct _membuf : std::streambuf {
+  _membuf(char* p, size_t size) { setp(p, p + size); }
+  size_t written() { return pptr() - pbase(); }
 };
 
 template <typename T>
-void _serialize(cuvsResources_t res,
-                void* buffer,
-                size_t* length,
-                cuvsCagraIndex_t index,
-                bool include_dataset)
+void _serialize(
+  cuvsResources_t res, void* buffer, size_t* length, cuvsCagraIndex_t index, bool include_dataset)
 {
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
   auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(index->addr);
@@ -681,11 +671,8 @@ extern "C" cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsCagraSerializeToMemory(cuvsResources_t res,
-                                                  void* buffer,
-                                                  size_t* length,
-                                                  cuvsCagraIndex_t index,
-                                                  bool include_dataset)
+extern "C" cuvsError_t cuvsCagraSerializeToMemory(
+  cuvsResources_t res, void* buffer, size_t* length, cuvsCagraIndex_t index, bool include_dataset)
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
