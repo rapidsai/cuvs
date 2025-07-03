@@ -43,27 +43,21 @@ C/C++ Package
 
 .. code-block:: bash
 
-   conda install -c rapidsai -c conda-forge -c nvidia libcuvs cuda-version=12.8
+   conda install -c rapidsai -c conda-forge libcuvs cuda-version=12.9
 
 Python Package
 ~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-   conda install -c rapidsai -c conda-forge -c nvidia cuvs cuda-version=12.8
+   conda install -c rapidsai -c conda-forge cuvs cuda-version=12.9
 
 Python through Pip
 ^^^^^^^^^^^^^^^^^^
 
 The cuVS Python package can also be `installed through pip <https://docs.rapids.ai/install#pip>`_.
 
-For CUDA 11 packages:
-
-.. code-block:: bash
-
-    pip install cuvs-cu11 --extra-index-url=https://pypi.nvidia.com
-
-And CUDA 12 packages:
+For CUDA 12 packages:
 
 .. code-block:: bash
 

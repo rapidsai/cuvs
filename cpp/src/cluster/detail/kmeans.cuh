@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2020-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@
 #include <raft/core/kvp.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
+#include <raft/core/mdspan.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
@@ -143,13 +144,8 @@ void kmeansPlusPlus(raft::resources const& handle,
 
   if (metric == cuvs::distance::DistanceType::L2Expanded ||
       metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-    raft::linalg::rowNorm(L2NormX.data_handle(),
-                          X.data_handle(),
-                          X.extent(1),
-                          X.extent(0),
-                          raft::linalg::L2Norm,
-                          true,
-                          stream);
+    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+      L2NormX.data_handle(), X.data_handle(), X.extent(1), X.extent(0), stream);
   }
 
   raft::random::RngState rng(params.rng_state.seed, params.rng_state.type);
@@ -204,26 +200,21 @@ void kmeansPlusPlus(raft::resources const& handle,
     // Outputs minDistanceBuf[n_trials x n_samples] where minDistance[i, :] contains updated
     // minClusterDistance that includes candidate-i
     auto minDistBuf = distBuffer.view();
-    raft::linalg::matrixVectorOp(minDistBuf.data_handle(),
-                                 pwd.data_handle(),
-                                 minClusterDistance.data_handle(),
-                                 pwd.extent(1),
-                                 pwd.extent(0),
-                                 true,
-                                 true,
-                                 raft::min_op{},
-                                 stream);
+    raft::linalg::matrix_vector_op<raft::Apply::ALONG_ROWS>(
+      handle,
+      raft::make_const_mdspan(pwd),
+      raft::make_const_mdspan(minClusterDistance.view()),
+      minDistBuf,
+      raft::min_op{});
 
     // Calculate costPerCandidate[n_trials] where costPerCandidate[i] is the cluster cost when using
     // centroid candidate-i
-    raft::linalg::reduce(costPerCandidate.data_handle(),
-                         minDistBuf.data_handle(),
-                         minDistBuf.extent(1),
-                         minDistBuf.extent(0),
-                         static_cast<DataT>(0),
-                         true,
-                         true,
-                         stream);
+    raft::linalg::reduce<true, true>(costPerCandidate.data_handle(),
+                                     minDistBuf.data_handle(),
+                                     minDistBuf.extent(1),
+                                     minDistBuf.extent(0),
+                                     static_cast<DataT>(0),
+                                     stream);
 
     // Greedy Choice - Choose the candidate that has minimum cluster cost
     // ArgMin operation below identifies the index of minimum cost in costPerCandidate
@@ -332,15 +323,12 @@ void update_centroids(raft::resources const& handle,
   //   weight_per_cluster[n_clusters] - 1D array, weight_per_cluster[i] contains sum of weights in
   //   cluster-i.
   // Note - when weight_per_cluster[i] is 0, new_centroids[i] is reset to 0
-  raft::linalg::matrixVectorOp(new_centroids.data_handle(),
-                               new_centroids.data_handle(),
-                               weight_per_cluster.data_handle(),
-                               new_centroids.extent(1),
-                               new_centroids.extent(0),
-                               true,
-                               false,
-                               raft::div_checkzero_op{},
-                               raft::resource::get_cuda_stream(handle));
+  raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
+    handle,
+    raft::make_const_mdspan(new_centroids),
+    raft::make_const_mdspan(weight_per_cluster),
+    new_centroids,
+    raft::div_checkzero_op{});
 
   // copy centroids[i] to new_centroids[i] when weight_per_cluster[i] is 0
   cub::ArgIndexInputIterator<DataT*> itr_wt(weight_per_cluster.data_handle());
@@ -406,13 +394,8 @@ void kmeans_fit_main(raft::resources const& handle,
 
   if (metric == cuvs::distance::DistanceType::L2Expanded ||
       metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-    raft::linalg::rowNorm(L2NormX.data_handle(),
-                          X.data_handle(),
-                          X.extent(1),
-                          X.extent(0),
-                          raft::linalg::L2Norm,
-                          true,
-                          stream);
+    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+      L2NormX.data_handle(), X.data_handle(), X.extent(1), X.extent(0), stream);
   }
 
   RAFT_LOG_DEBUG(
@@ -634,13 +617,8 @@ void initScalableKMeansPlusPlus(raft::resources const& handle,
   auto L2NormX = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
   if (metric == cuvs::distance::DistanceType::L2Expanded ||
       metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-    raft::linalg::rowNorm(L2NormX.data_handle(),
-                          X.data_handle(),
-                          X.extent(1),
-                          X.extent(0),
-                          raft::linalg::L2Norm,
-                          true,
-                          stream);
+    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+      L2NormX.data_handle(), X.data_handle(), X.extent(1), X.extent(0), stream);
   }
 
   auto minClusterDistanceVec = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
@@ -1049,13 +1027,8 @@ void kmeans_predict(raft::resources const& handle,
   auto L2NormX = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
   if (metric == cuvs::distance::DistanceType::L2Expanded ||
       metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
-    raft::linalg::rowNorm(L2NormX.data_handle(),
-                          X.data_handle(),
-                          X.extent(1),
-                          X.extent(0),
-                          raft::linalg::L2Norm,
-                          true,
-                          stream);
+    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+      L2NormX.data_handle(), X.data_handle(), X.extent(1), X.extent(0), stream);
   }
 
   // computes minClusterAndDistance[0:n_samples) where  minClusterAndDistance[i]
