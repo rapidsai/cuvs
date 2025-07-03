@@ -15,7 +15,7 @@
  */
 
 #include "./detail/nn_descent_gnnd.hpp"
-#include "./detail/reachability_types.cuh"
+#include "./detail/reachability.cuh"
 #include "nn_descent.cuh"
 #include <cuvs/neighbors/nn_descent.hpp>
 
