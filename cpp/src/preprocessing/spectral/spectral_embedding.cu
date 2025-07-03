@@ -144,7 +144,7 @@ auto transform(raft::resources const& handle,
   auto sym_coo_matrix =
     raft::make_device_coo_matrix<float, int, int, int>(handle, sym_coo1_n_rows, sym_coo1_n_cols);
   raft::sparse::op::coo_remove_scalar<1, float, int, int>(
-    zero_scalar.view(), sym_coo1_matrix_view, sym_coo_matrix, stream);
+    handle, sym_coo1_matrix_view, zero_scalar.view(), sym_coo_matrix);
 
   raft::resource::sync_stream(handle, stream);
 
@@ -221,12 +221,11 @@ auto transform(raft::resources const& handle,
     eigenvectors.view());
 
   if (spectral_embedding_config.norm_laplacian) {
-    raft::linalg::matrix_vector_op(
+    raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
       handle,
       raft::make_const_mdspan(eigenvectors.view()),  // input matrix view
       raft::make_const_mdspan(diagonal.view()),      // input vector view
       eigenvectors.view(),                           // output matrix view (in-place)
-      raft::Apply::ALONG_COLUMNS,  // divide each row by corresponding diagonal element
       [] __device__(float elem, float diag) { return elem / diag; });
   }
 
