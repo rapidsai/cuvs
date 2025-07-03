@@ -16,6 +16,7 @@
 package com.nvidia.cuvs;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
@@ -28,7 +29,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandles;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
@@ -70,6 +76,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
       CompletableFuture.allOf(futures)
           .exceptionally(
               t -> {
+                log.error("Exception while executing runnable", t);
                 fail("Exception while executing runnable: " + t);
                 return null;
               })
@@ -235,6 +242,55 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
       assertEquals(expectedResults, fullResults);
       assertEquals(expectedFilteredResults, filteredResults);
+    }
+  }
+
+  @Test
+  public void testIndexSerialization() throws Throwable {
+    float[][] dataset = createSampleData();
+
+    try (CuVSResources resources = CuVSResources.create()) {
+
+      // Configure index parameters
+      CagraIndexParams indexParams =
+          new CagraIndexParams.Builder()
+              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+              .withGraphDegree(1)
+              .withIntermediateGraphDegree(2)
+              .withNumWriterThreads(32)
+              .withMetric(CuvsDistanceType.L2Expanded)
+              .build();
+
+      // Create the index with the dataset
+      CagraIndex index =
+          CagraIndex.newBuilder(resources)
+              .withDataset(dataset)
+              .withIndexParams(indexParams)
+              .build();
+
+      var indexFile = Path.of(UUID.randomUUID() + ".cag");
+      try {
+        // Saving the index on to the disk.
+        try (var output = Files.newOutputStream(indexFile)) {
+          index.serialize(output);
+        }
+
+        var indexFromFile = Files.readAllBytes(indexFile);
+        byte[] indexFromMemory;
+        try (var arena = Arena.ofConfined()) {
+          var buffer = arena.allocate(1024 * 1024);
+          var serialized = (MemorySegment) index.serialize((Object) buffer);
+          indexFromMemory = serialized.toArray(ValueLayout.JAVA_BYTE);
+        }
+
+        assertNotNull(indexFromFile);
+        assertNotNull(indexFromMemory);
+        assertArrayEquals(indexFromFile, indexFromMemory);
+
+      } finally {
+        Files.deleteIfExists(indexFile);
+        index.destroyIndex();
+      }
     }
   }
 
