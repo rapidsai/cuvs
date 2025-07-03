@@ -21,17 +21,16 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_POINTER;
+import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.*;
 import static com.nvidia.cuvs.internal.common.Util.buildMemorySegment;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.checkCudaError;
 import static com.nvidia.cuvs.internal.common.Util.concatenate;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemcpy;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaStream_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMAlloc;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamGet;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsTieredIndexBuild;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsTieredIndexCreate;
@@ -162,24 +161,20 @@ public class TieredIndexImpl implements TieredIndex {
 
       Arena arena = resources.getArena();
       long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
-      MemorySegment stream = arena.allocate(cudaStream_t);
-      var returnValue = cuvsStreamGet(cuvsRes, stream);
-      checkCuVSError(returnValue, "cuvsStreamGet");
 
       // TieredIndex REQUIRES device memory - allocate it
-      MemorySegment datasetD = arena.allocate(C_POINTER);
+      MemorySegment datasetD = localArena.allocate(C_POINTER);
       long datasetSize = C_FLOAT_BYTE_SIZE * rows * cols;
-      returnValue = cuvsRMMAlloc(cuvsRes, datasetD, datasetSize);
+      int returnValue = cuvsRMMAlloc(cuvsRes, datasetD, datasetSize);
       checkCuVSError(returnValue, "cuvsRMMAlloc");
 
       MemorySegment datasetDP = datasetD.get(C_POINTER, 0);
 
       // Copy host to device
-      returnValue = cudaMemcpy(datasetDP, hostDataSeg, datasetSize, 1); // cudaMemcpyHostToDevice
-      checkCudaError(returnValue, "cudaMemcpy");
+      Util.cudaMemcpy(datasetDP, hostDataSeg, datasetSize, HOST_TO_DEVICE);
 
       // Create tensor from device memory
-      long datasetShape[] = {rows, cols};
+      long[] datasetShape = {rows, cols};
       MemorySegment datasetTensor = prepareTensor(arena, datasetDP, datasetShape, 2, 32, 2, 2, 1);
 
       MemorySegment index = arena.allocate(cuvsTieredIndex_t);
@@ -232,9 +227,6 @@ public class TieredIndexImpl implements TieredIndex {
       MemorySegment hostQueriesSeg = Util.buildMemorySegment(arena, query.getQueryVectors());
 
       long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
-      MemorySegment stream = arena.allocate(cudaStream_t);
-      int returnValue = cuvsStreamGet(cuvsRes, stream);
-      checkCuVSError(returnValue, "cuvsStreamGet");
 
       // Allocate DEVICE memory for all data
       MemorySegment queriesD = arena.allocate(C_POINTER);
@@ -245,7 +237,7 @@ public class TieredIndexImpl implements TieredIndex {
       long neighborsBytes = C_LONG_BYTE_SIZE * numQueries * topK; // 64-bit for tiered index
       long distancesBytes = C_FLOAT_BYTE_SIZE * numQueries * topK;
 
-      returnValue = cuvsRMMAlloc(cuvsRes, queriesD, queriesBytes);
+      int returnValue = cuvsRMMAlloc(cuvsRes, queriesD, queriesBytes);
       checkCuVSError(returnValue, "cuvsRMMAlloc");
       returnValue = cuvsRMMAlloc(cuvsRes, neighborsD, neighborsBytes);
       checkCuVSError(returnValue, "cuvsRMMAlloc");
@@ -377,14 +369,11 @@ public class TieredIndexImpl implements TieredIndex {
 
     Arena arena = resources.getArena();
     long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
-    MemorySegment stream = arena.allocate(cudaStream_t);
-    int returnValue = cuvsStreamGet(cuvsRes, stream);
-    checkCuVSError(returnValue, "cuvsStreamGet");
 
     // Allocate device memory for extend data
     MemorySegment datasetD = arena.allocate(C_POINTER);
     long dataSize = C_FLOAT_BYTE_SIZE * rows * cols;
-    returnValue = cuvsRMMAlloc(cuvsRes, datasetD, dataSize);
+    int returnValue = cuvsRMMAlloc(cuvsRes, datasetD, dataSize);
     checkCuVSError(returnValue, "cuvsRMMAlloc");
 
     MemorySegment datasetDP = datasetD.get(C_POINTER, 0);

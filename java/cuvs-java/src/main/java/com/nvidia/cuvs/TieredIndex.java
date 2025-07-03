@@ -22,7 +22,6 @@ import java.util.Objects;
 /**
  * {@link TieredIndex} encapsulates a Tiered index, along with methods to
  * interact with it.
- *
  */
 public interface TieredIndex {
 
