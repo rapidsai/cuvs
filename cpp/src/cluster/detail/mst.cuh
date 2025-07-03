@@ -299,12 +299,12 @@ void build_sorted_mst(
   int iters        = 1;
   int n_components = cuvs::sparse::neighbors::get_n_components(color, m, stream);
 
-  cudaPointerAttributes attr;
-  RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, X));
-  bool data_on_device = attr.type == cudaMemoryTypeDevice;
+  cudaPointerAttributes ptr_attrs;
+  RAFT_CUDA_TRY(cudaPointerGetAttributes(&ptr_attrs, X));
+  const bool device_accessible = ptr_attrs.devicePointer != nullptr;
 
   while (n_components > 1 && iters < max_iter) {
-    if (data_on_device) {
+    if (device_accessible) {
       connect_knn_graph<value_idx, value_t>(handle, X, mst_coo, m, n, color, reduction_op);
     } else {
       connect_knn_graph<value_idx, value_t>(handle, X, mst_coo, m, n, n_components, color, metric);
