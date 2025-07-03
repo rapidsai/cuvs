@@ -23,7 +23,7 @@ namespace cuvs::neighbors::nn_descent {
 typedef AnnNNDescentTest<float, float, std::uint32_t> AnnNNDescentTestF_U32;
 TEST_P(AnnNNDescentTestF_U32, AnnNNDescent) { this->testNNDescent(); }
 
-typedef AnnNNDescentDIstEpiTest<float, float, std::uint32_t> AnnNNDescentTestDistEpiF_U32;
+typedef AnnNNDescentDistEpiTest<float, float, std::uint32_t> AnnNNDescentTestDistEpiF_U32;
 TEST_P(AnnNNDescentTestDistEpiF_U32, AnnNNDescentDistEpi) { this->testNNDescent(); }
 
 typedef AnnNNDescentBatchTest<float, float, std::uint32_t> AnnNNDescentBatchTestF_U32;

@@ -197,9 +197,9 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
 // API. this is just a simple check that the feature works well before integrating into
 // all_neighbors API.
 template <typename DistanceT, typename DataT, typename IdxT>
-class AnnNNDescentDIstEpiTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
+class AnnNNDescentDistEpiTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
  public:
-  AnnNNDescentDIstEpiTest()
+  AnnNNDescentDistEpiTest()
     : stream_(raft::resource::get_cuda_stream(handle_)),
       ps(::testing::TestWithParam<AnnNNDescentInputs>::GetParam()),
       database(0, stream_)
