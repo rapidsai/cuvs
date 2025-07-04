@@ -18,15 +18,16 @@ package com.nvidia.cuvs.internal;
 import com.nvidia.cuvs.Dataset;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class DatasetImpl implements Dataset {
-  private final Arena arena;
+  private final AtomicReference<Arena> arenaReference;
   private final MemorySegment seg;
   private final int size;
   private final int dimensions;
 
   public DatasetImpl(Arena arena, MemorySegment memorySegment, int size, int dimensions) {
-    this.arena = arena;
+    this.arenaReference = new AtomicReference<>(arena);
     this.seg = memorySegment;
     this.size = size;
     this.dimensions = dimensions;
@@ -34,6 +35,7 @@ public class DatasetImpl implements Dataset {
 
   @Override
   public void close() {
+    var arena = arenaReference.getAndSet(null);
     if (arena != null) {
       arena.close();
     }
