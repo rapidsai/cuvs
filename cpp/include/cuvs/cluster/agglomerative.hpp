@@ -110,6 +110,8 @@ class single_linkage_output {
  *                    at the expense of potentially additional minimum spanning tree iterations.
  * @param[in] c a constant used when constructing linkage from knn graph. Allows the indirect
  control of k. The algorithm will set `k = log(n) + c`
+  * @param[in] connect_knn_on_device boolean indicating whether to connect KNN graph components on
+ device
  */
 void single_linkage(
   raft::resources const& handle,
@@ -161,6 +163,9 @@ struct mutual_reachability_params {
  * @param[out] out_sizes cluster sizes of output
  * @param[out] core_dists (optional) core distances (size m). Must be supplied in the Mutual
  * Reachability space
+ * * @param[in] connect_knn_on_device boolean indicating whether to connect KNN graph components on
+ device
+
  */
 void build_linkage(
   raft::resources const& handle,

@@ -74,13 +74,13 @@ void build_linkage(
                                          X,
                                          mr_params.min_samples,
                                          mr_params.alpha,
+                                         connect_knn_on_device,
                                          metric,
                                          core_dists_mdspan,
                                          out_mst,
                                          out_dendrogram,
                                          out_distances,
-                                         out_sizes,
-                                         connect_knn_on_device);
+                                         out_sizes);
   } else {
     auto dist_params =
       std::get<cuvs::cluster::agglomerative::helpers::linkage_graph_params::distance_params>(
@@ -91,24 +91,24 @@ void build_linkage(
           handle,
           X,
           dist_params.c,
+          connect_knn_on_device,
           metric,
           out_mst,
           out_dendrogram,
           out_distances,
-          out_sizes,
-          connect_knn_on_device);
+          out_sizes);
     } else {
       detail::
         build_dist_linkage<float, int, size_t, cuvs::cluster::agglomerative::Linkage::PAIRWISE>(
           handle,
           X,
           dist_params.c,
+          connect_knn_on_device,
           metric,
           out_mst,
           out_dendrogram,
           out_distances,
-          out_sizes,
-          connect_knn_on_device);
+          out_sizes);
     }
   }
 }
