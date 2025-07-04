@@ -53,7 +53,8 @@ final class JDKProvider implements CuVSProvider {
     }
   }
 
-  private static Dataset createNativeDataset(MemorySegment memorySegment, int size, int dimensions) {
+  private static Dataset createNativeDataset(
+      MemorySegment memorySegment, int size, int dimensions) {
     return new DatasetImpl(null, memorySegment, size, dimensions);
   }
 
