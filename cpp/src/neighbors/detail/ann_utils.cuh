@@ -148,7 +148,7 @@ struct config<float> {
 };
 template <>
 struct config<half> {
-  using value_t                    = half;
+  using value_t                    = float;
   static constexpr double kDivisor = 1.0;
 };
 template <>
