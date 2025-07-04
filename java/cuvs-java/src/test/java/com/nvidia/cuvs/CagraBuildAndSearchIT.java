@@ -16,7 +16,9 @@
 package com.nvidia.cuvs;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.fail;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
@@ -27,7 +29,13 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
-import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.BitSet;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -65,6 +73,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
       CompletableFuture.allOf(futures)
           .exceptionally(
               t -> {
+                log.error("Exception while executing runnable", t);
                 fail("Exception while executing runnable: " + unwrap(t));
                 return null;
               })
@@ -125,8 +134,17 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     int numTestsRuns = 5;
     try (CuVSResources resources = CuVSResources.create()) {
       for (int j = 0; j < numTestsRuns; j++) {
-        indexAndQueryOnce(
-            dataset, SearchResults.IDENTITY_MAPPING, queries, expectedResults, resources);
+        var index = indexOnce(dataset, resources);
+        var indexPath = serializeOnce(index);
+        var loadedIndex = deserializeOnce(indexPath, resources);
+        queryOnce(
+            index,
+            loadedIndex,
+            SearchResults.IDENTITY_MAPPING,
+            queries,
+            expectedResults,
+            resources);
+        cleanup(indexPath, index, loadedIndex);
       }
     }
   }
@@ -144,9 +162,23 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     try (CuVSResources resources = CuVSResources.create()) {
       for (int j = 0; j < numTestsRuns; j++) {
         runInAnotherThread(
-            () ->
-                indexAndQueryOnce(
-                    dataset, SearchResults.IDENTITY_MAPPING, queries, expectedResults, resources));
+            () -> {
+              try {
+                var index = indexOnce(dataset, resources);
+                var indexPath = serializeOnce(index);
+                var loadedIndex = deserializeOnce(indexPath, resources);
+                queryOnce(
+                    index,
+                    loadedIndex,
+                    SearchResults.IDENTITY_MAPPING,
+                    queries,
+                    expectedResults,
+                    resources);
+                cleanup(indexPath, index, loadedIndex);
+              } catch (Throwable e) {
+                throw new RuntimeException(e);
+              }
+            });
       }
     }
   }
@@ -165,13 +197,87 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
       runConcurrently(
           numTestsRuns,
           () ->
-              () ->
-                  indexAndQueryOnce(
-                      dataset,
+              () -> {
+                try {
+                  var index = indexOnce(dataset, resources);
+                  var indexPath = serializeOnce(index);
+                  var loadedIndex = deserializeOnce(indexPath, resources);
+                  queryOnce(
+                      index,
+                      loadedIndex,
                       SearchResults.IDENTITY_MAPPING,
                       queries,
                       expectedResults,
-                      resources));
+                      resources);
+                  cleanup(indexPath, index, loadedIndex);
+                } catch (Throwable e) {
+                  throw new RuntimeException(e);
+                }
+              });
+    }
+  }
+
+  @Test
+  public void testIndexing() throws Throwable {
+    for (int i = 0; i < 100; ++i) {
+      float[][] dataset = createSampleData();
+      int numTestsRuns = 10;
+      runConcurrently(
+          numTestsRuns,
+          () ->
+              () -> {
+                try (CuVSResources resources = CuVSResources.create()) {
+                  var index = indexOnce(dataset, resources);
+                  index.destroyIndex();
+                } catch (Throwable e) {
+                  throw new RuntimeException(e);
+                }
+              });
+    }
+  }
+
+  @Test
+  public void testSerialization() throws Throwable {
+    for (int i = 0; i < 100; ++i) {
+      float[][] dataset = createSampleData();
+      int numTestsRuns = 10;
+      runConcurrently(
+          numTestsRuns,
+          () ->
+              () -> {
+                try (CuVSResources resources = CuVSResources.create()) {
+                  var index = indexOnce(dataset, resources);
+                  var indexPath = serializeOnce(index);
+                  Files.deleteIfExists(indexPath);
+                  index.destroyIndex();
+                } catch (Throwable e) {
+                  throw new RuntimeException(e);
+                }
+              });
+    }
+  }
+
+  @Test
+  public void testDeserialization() throws Throwable {
+    float[][] dataset = createSampleData();
+    try (CuVSResources resources = CuVSResources.create()) {
+      var index = indexOnce(dataset, resources);
+      var indexPath = serializeOnce(index);
+      for (int i = 0; i < 100; ++i) {
+        int numTestsRuns = 10;
+        runConcurrently(
+            numTestsRuns,
+            () ->
+                () -> {
+                  try {
+                    deserializeOnce(indexPath, resources).destroyIndex();
+                  } catch (Throwable e) {
+                    throw new RuntimeException(e);
+                  }
+                });
+      }
+      Files.deleteIfExists(indexPath);
+      index.destroyIndex();
     }
   }
 
@@ -188,7 +294,11 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
     LongToIntFunction rotate = l -> (int) ((l + 1) % dataset.length);
     try (CuVSResources resources = CuVSResources.create()) {
-      indexAndQueryOnce(dataset, rotate, queries, expectedResults, resources);
+      var index = indexOnce(dataset, resources);
+      var indexPath = serializeOnce(index);
+      var loadedIndex = deserializeOnce(indexPath, resources);
+      queryOnce(index, loadedIndex, rotate, queries, expectedResults, resources);
+      cleanup(indexPath, index, loadedIndex);
     }
   }
 
@@ -206,14 +316,16 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
     LongToIntFunction rotate = SearchResults.mappingsFromList(mappings);
     try (CuVSResources resources = CuVSResources.create()) {
-      indexAndQueryOnce(dataset, rotate, queries, expectedResults, resources);
+      var index = indexOnce(dataset, resources);
+      var indexPath = serializeOnce(index);
+      var loadedIndex = deserializeOnce(indexPath, resources);
+      queryOnce(index, loadedIndex, rotate, queries, expectedResults, resources);
+      cleanup(indexPath, index, loadedIndex);
     }
   }
 
   /**
    * A test that checks the pre-filtering feature.
-   *
-   * @throws Throwable
    */
   @Test
   public void testPrefilteringReducesResults() throws Throwable {
@@ -280,75 +392,81 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     }
   }
 
-  private void indexAndQueryOnce(
-      float[][] dataset,
+  private CagraIndex indexOnce(float[][] dataset, CuVSResources resources) throws Throwable {
+    // Configure index parameters
+    CagraIndexParams indexParams =
+        new CagraIndexParams.Builder()
+            .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+            .withGraphDegree(1)
+            .withIntermediateGraphDegree(2)
+            .withNumWriterThreads(32)
+            .withMetric(CuvsDistanceType.L2Expanded)
+            .build();
+
+    // Create the index with the dataset
+    return CagraIndex.newBuilder(resources)
+        .withDataset(dataset)
+        .withIndexParams(indexParams)
+        .build();
+  }
+
+  private Path serializeOnce(CagraIndex index) throws Throwable {
+    // Saving the index on to the disk.
+    var indexFilePath = Path.of(UUID.randomUUID() + ".cag");
+    try (var outputStream = Files.newOutputStream(indexFilePath)) {
+      index.serialize(outputStream);
+    }
+    return indexFilePath;
+  }
+
+  private CagraIndex deserializeOnce(Path indexFilePath, CuVSResources resources) throws Throwable {
+    // Loading a CAGRA index from disk.
+    try (var inputStream = Files.newInputStream(indexFilePath)) {
+      return CagraIndex.newBuilder(resources).from(inputStream).build();
+    }
+  }
+
+  private void queryOnce(
+      CagraIndex index,
+      CagraIndex loadedIndex,
       LongToIntFunction mapping,
       float[][] queries,
       List<Map<Integer, Float>> expectedResults,
-      CuVSResources resources) {
+      CuVSResources resources)
+      throws Throwable {
+    // Configure search parameters
+    CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
 
-    try {
+    // Create a query object with the query vectors
+    CagraQuery cuvsQuery =
+        new CagraQuery.Builder()
+            .withTopK(3)
+            .withSearchParams(searchParams)
+            .withQueryVectors(queries)
+            .withMapping(mapping)
+            .build();
 
-      // Configure index parameters
-      CagraIndexParams indexParams =
-          new CagraIndexParams.Builder()
-              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
-              .withGraphDegree(1)
-              .withIntermediateGraphDegree(2)
-              .withNumWriterThreads(32)
-              .withMetric(CuvsDistanceType.L2Expanded)
-              .build();
+    // Perform the search
+    SearchResults results = index.search(cuvsQuery);
 
-      // Create the index with the dataset
-      CagraIndex index =
-          CagraIndex.newBuilder(resources)
-              .withDataset(dataset)
-              .withIndexParams(indexParams)
-              .build();
+    // Check results
+    log.info(results.getResults().toString());
+    checkResults(expectedResults, results.getResults());
 
-      // Saving the index on to the disk.
-      String indexFileName = UUID.randomUUID() + ".cag";
-      index.serialize(new FileOutputStream(indexFileName));
+    // Search from deserialized index
+    results = loadedIndex.search(cuvsQuery);
 
-      // Loading a CAGRA index from disk.
-      File indexFile = new File(indexFileName);
-      InputStream inputStream = new FileInputStream(indexFile);
-      CagraIndex loadedIndex = CagraIndex.newBuilder(resources).from(inputStream).build();
+    // Check results
+    log.info(results.getResults().toString());
+    checkResults(expectedResults, results.getResults());
+  }
 
-      // Configure search parameters
-      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
-
-      // Create a query object with the query vectors
-      CagraQuery cuvsQuery =
-          new CagraQuery.Builder()
-              .withTopK(3)
-              .withSearchParams(searchParams)
-              .withQueryVectors(queries)
-              .withMapping(mapping)
-              .build();
-
-      // Perform the search
-      SearchResults results = index.search(cuvsQuery);
-
-      // Check results
-      log.info(results.getResults().toString());
-      checkResults(expectedResults, results.getResults());
-
-      // Search from deserialized index
-      results = loadedIndex.search(cuvsQuery);
-
-      // Check results
-      log.info(results.getResults().toString());
-      checkResults(expectedResults, results.getResults());
-
-      // Cleanup
-      if (indexFile.exists()) {
-        indexFile.delete();
-      }
-      index.destroyIndex();
-    } catch (Throwable ex) {
-      throw new RuntimeException("Exception during indexing/querying", ex);
-    }
+  private void cleanup(Path indexFilePath, CagraIndex index, CagraIndex loadedIndex)
+      throws Throwable {
+    // Cleanup
+    Files.deleteIfExists(indexFilePath);
+    index.destroyIndex();
+    loadedIndex.destroyIndex();
   }
 
   @Test
