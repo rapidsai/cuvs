@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
 /**
@@ -25,4 +24,5 @@ package com.nvidia.cuvs;
  * @param totalMemory       returned total memory in bytes
  * @param computeCapability the compute capability of the device
  */
-public record GPUInfo(int gpuId, String name, long freeMemory, long totalMemory, float computeCapability) { }
+public record GPUInfo(
+    int gpuId, String name, long freeMemory, long totalMemory, float computeCapability) {}
