@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,10 +28,10 @@
 namespace cuvs::neighbors::cagra::detail {
 
 using namespace cuvs::distance;
-template struct standard_descriptor_spec<DistanceType::L2Expanded,
-                                         16,
-                                         256,
-                                         uint8_t,
+template struct standard_descriptor_spec<DistanceType::BitwiseHamming,
+                                         8,
+                                         128,
+                                         int8_t,
                                          uint32_t,
                                          float>;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,7 +66,7 @@ RAFT_KERNEL naive_distance_kernel(EvalT* dist,
           acc += diff * diff;
         } break;
         case cuvs::distance::DistanceType::BitwiseHamming: {
-          if constexpr (std::is_same_v<uint8_t, DataT>) {
+          if constexpr (std::is_same_v<uint8_t, DataT> || std::is_same_v<int8_t, DataT>) {
             acc += __popc(static_cast<uint32_t>(xv ^ yv) & 0xff);
           }
         } break;

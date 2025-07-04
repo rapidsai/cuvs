@@ -335,7 +335,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
   {
     // IVF_PQ and NN_DESCENT graph builds do not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
-        ((!std::is_same_v<DataT, uint8_t>) ||
+        ((!std::is_same_v<DataT, uint8_t> && !std::is_same_v<DataT, int8_t>) ||
          (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
       GTEST_SKIP();
     // If the dataset dimension is small and the dataset size is large, there can be a lot of
@@ -527,7 +527,7 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.compression != std::nullopt) GTEST_SKIP();
     // IVF_PQ and NN_DESCENT graph builds do not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
-        ((!std::is_same_v<DataT, uint8_t>) ||
+        ((!std::is_same_v<DataT, uint8_t> && !std::is_same_v<DataT, int8_t>) ||
          (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
       GTEST_SKIP();
     // If the dataset dimension is small and the dataset size is large, there can be a lot of
@@ -737,7 +737,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
       GTEST_SKIP();
     // IVF_PQ and NN_DESCENT graph builds do not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
-        ((!std::is_same_v<DataT, uint8_t>) ||
+        ((!std::is_same_v<DataT, uint8_t> && !std::is_same_v<DataT, int8_t>) ||
          (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
       GTEST_SKIP();
     // If the dataset dimension is small and the dataset size is large, there can be a lot of
@@ -948,7 +948,7 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.compression != std::nullopt) GTEST_SKIP();
     // IVF_PQ and NN_DESCENT graph builds do not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
-        ((!std::is_same_v<DataT, uint8_t>) ||
+        ((!std::is_same_v<DataT, uint8_t> && !std::is_same_v<DataT, int8_t>) ||
          (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
       GTEST_SKIP();
     // If the dataset dimension is small and the dataset size is large, there can be a lot of
