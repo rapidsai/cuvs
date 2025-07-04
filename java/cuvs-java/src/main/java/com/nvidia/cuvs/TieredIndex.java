@@ -53,14 +53,6 @@ public interface TieredIndex {
   TieredIndexType getIndexType();
 
   /**
-   * Returns the configuration parameters used to build this TieredIndex.
-   *
-   * @return An instance of {@link TieredIndexParams} containing the index
-   *         configuration
-   */
-  TieredIndexParams getIndexParameters();
-
-  /**
    * Returns the resources handle associated with this TieredIndex.
    *
    * @return The {@link CuVSResources} instance used by this index

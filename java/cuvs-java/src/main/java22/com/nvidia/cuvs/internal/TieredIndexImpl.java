@@ -513,16 +513,6 @@ public class TieredIndexImpl implements TieredIndex {
   }
 
   /**
-   * Gets an instance of {@link TieredIndexParams}
-   *
-   * @return an instance of {@link TieredIndexParams}
-   */
-  @Override
-  public TieredIndexParams getIndexParameters() {
-    return tieredIndexParameters;
-  }
-
-  /**
    * Gets an instance of {@link CuVSResources}
    *
    * @return an instance of {@link CuVSResources}
