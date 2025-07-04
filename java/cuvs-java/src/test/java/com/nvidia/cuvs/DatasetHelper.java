@@ -25,7 +25,6 @@ public class DatasetHelper {
       return (Dataset)
           CuVSProvider.provider()
               .newNativeDatasetBuilder()
-              .builderHandle()
               .invokeExact(memorySegment, size, dimensions);
     } catch (Throwable e) {
       if (e instanceof Error err) {

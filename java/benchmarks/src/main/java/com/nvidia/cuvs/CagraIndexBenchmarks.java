@@ -16,6 +16,7 @@
 
 package com.nvidia.cuvs;
 
+import com.nvidia.cuvs.spi.CuVSProvider;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -74,6 +75,23 @@ public class CagraIndexBenchmarks {
             MemorySegment.copy(vector, 0, segment, C_FLOAT, (i * dimensions * C_FLOAT.byteSize()), dimensions);
         }
         return segment;
+    }
+
+    private static Dataset fromMemorySegment(MemorySegment memorySegment, int size, int dimensions) {
+        try {
+            return (Dataset)
+                    CuVSProvider.provider()
+                            .newNativeDatasetBuilder()
+                            .invokeExact(memorySegment, size, dimensions);
+        } catch (Throwable e) {
+            if (e instanceof Error err) {
+                throw err;
+            } else if (e instanceof RuntimeException re) {
+                throw re;
+            } else {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
     @Setup
@@ -156,7 +174,7 @@ public class CagraIndexBenchmarks {
 
             // Create the index with the dataset
             CagraIndex index = CagraIndex.newBuilder(resources)
-                .withDataset(Dataset.ofMemorySegment(memorySegmentDataset, size, dims))
+                .withDataset(fromMemorySegment(memorySegmentDataset, size, dims))
                 .withIndexParams(indexParams)
                 .build();
             blackhole.consume(index);
@@ -176,7 +194,7 @@ public class CagraIndexBenchmarks {
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     @BenchmarkMode(Mode.AverageTime)
     public void testDatasetFromMemorySegment(Blackhole blackhole) throws Throwable {
-        try (var dataset = Dataset.ofMemorySegment(memorySegmentDataset, size, dims)) {
+        try (var dataset = fromMemorySegment(memorySegmentDataset, size, dims)) {
             blackhole.consume(dataset);
         }
     }

@@ -21,6 +21,7 @@ import com.nvidia.cuvs.CagraMergeParams;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
+import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
 
 /**
@@ -52,7 +53,7 @@ public interface CuVSProvider {
   /** Create a {@link Dataset.Builder} instance **/
   Dataset.Builder newDatasetBuilder(int size, int dimensions);
 
-  Dataset.NativeBuilder newNativeDatasetBuilder();
+  MethodHandle newNativeDatasetBuilder();
 
   /** Create a {@link Dataset} backed by a on-heap array **/
   Dataset newArrayDataset(float[][] vectors);

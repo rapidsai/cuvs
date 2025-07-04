@@ -20,6 +20,7 @@ import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
+import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
 
 /**
@@ -58,7 +59,7 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
-  public Dataset.NativeBuilder newNativeDatasetBuilder() {
+  public MethodHandle newNativeDatasetBuilder() {
     throw new UnsupportedOperationException();
   }
 

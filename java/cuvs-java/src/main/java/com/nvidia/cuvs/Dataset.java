@@ -16,7 +16,6 @@
 package com.nvidia.cuvs;
 
 import com.nvidia.cuvs.spi.CuVSProvider;
-import java.lang.invoke.MethodHandle;
 
 /**
  * This represents a wrapper for a dataset to be used for index construction.
@@ -29,7 +28,7 @@ import java.lang.invoke.MethodHandle;
 public interface Dataset extends AutoCloseable {
 
   /**
-   * Creates a dataset from a on-heap array of vectors
+   * Creates a dataset from an on-heap array of vectors
    *
    * @since 25.08
    */
@@ -46,14 +45,6 @@ public interface Dataset extends AutoCloseable {
     void addVector(float[] vector);
 
     Dataset build();
-  }
-
-  interface NativeBuilder {
-    MethodHandle builderHandle();
-  }
-
-  static Dataset.NativeBuilder nativeBuilder() {
-    return CuVSProvider.provider().newNativeDatasetBuilder();
   }
 
   /**
