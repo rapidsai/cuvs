@@ -34,7 +34,7 @@ void single_linkage(raft::resources const& handle,
 {
   if (linkage == Linkage::KNN_GRAPH) {
     single_linkage<float, int, Linkage::KNN_GRAPH>(
-      handle, X, dendrogram, labels, metric, n_clusters, c.connect_knn_on_device);
+      handle, X, dendrogram, labels, metric, n_clusters, c, connect_knn_on_device);
   } else {
     single_linkage<float, int, Linkage::PAIRWISE>(
       handle, X, dendrogram, labels, metric, n_clusters, c, connect_knn_on_device);
