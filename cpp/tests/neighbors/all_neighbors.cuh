@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/all_neighbors.hpp>
+#include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <gtest/gtest.h>
@@ -42,7 +43,7 @@
 
 namespace cuvs::neighbors::all_neighbors {
 
-enum knn_build_algo { NN_DESCENT, IVF_PQ };
+enum knn_build_algo { BRUTE_FORCE, NN_DESCENT, IVF_PQ };
 
 struct AllNeighborsInputs {
   std::tuple<knn_build_algo, cuvs::distance::DistanceType, double> build_algo_metric_recall;
@@ -79,7 +80,11 @@ void get_graphs(raft::resources& handle,
 
   auto build_algo = std::get<0>(ps.build_algo_metric_recall);
 
-  if (build_algo == NN_DESCENT) {
+  if (build_algo == BRUTE_FORCE) {
+    auto brute_force_params                = graph_build_params::brute_force_params{};
+    brute_force_params.build_params.metric = params.metric;
+    params.graph_build_params              = brute_force_params;
+  } else if (build_algo == NN_DESCENT) {
     auto nn_descent_params                      = graph_build_params::nn_descent_params{};
     nn_descent_params.max_iterations            = 100;
     nn_descent_params.graph_degree              = ps.k;
@@ -176,6 +181,7 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
                queries_size);
 
     double min_recall = std::get<2>(ps.build_algo_metric_recall);
+
     EXPECT_TRUE(eval_recall(indices_bf, indices_allNN, ps.n_rows, ps.k, 0.01, min_recall, true));
   }
 
@@ -204,7 +210,11 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
 
 const std::vector<AllNeighborsInputs> inputsSingle =
   raft::util::itertools::product<AllNeighborsInputs>(
-    {std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::L2Expanded, 0.9),
+    {std::make_tuple(BRUTE_FORCE, cuvs::distance::DistanceType::L2Expanded, 0.9),
+     std::make_tuple(BRUTE_FORCE, cuvs::distance::DistanceType::L2SqrtExpanded, 0.9),
+     std::make_tuple(BRUTE_FORCE, cuvs::distance::DistanceType::InnerProduct, 0.9),
+     std::make_tuple(BRUTE_FORCE, cuvs::distance::DistanceType::CosineExpanded, 0.9),
+     std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::L2Expanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded, 0.9),
@@ -218,7 +228,9 @@ const std::vector<AllNeighborsInputs> inputsSingle =
 
 const std::vector<AllNeighborsInputs> inputsBatch =
   raft::util::itertools::product<AllNeighborsInputs>(
-    {std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::L2Expanded, 0.9),
+    {std::make_tuple(BRUTE_FORCE, cuvs::distance::DistanceType::L2Expanded, 0.9),
+     std::make_tuple(BRUTE_FORCE, cuvs::distance::DistanceType::L2SqrtExpanded, 0.9),
+     std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::L2Expanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded, 0.9),

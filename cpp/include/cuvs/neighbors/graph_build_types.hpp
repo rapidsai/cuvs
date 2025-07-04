@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 
@@ -69,6 +70,11 @@ struct ivf_pq_params {
 };
 
 using nn_descent_params = cuvs::neighbors::nn_descent::index_params;
+
+struct brute_force_params {
+  cuvs::neighbors::brute_force::index_params build_params;
+  cuvs::neighbors::brute_force::search_params search_params;
+};
 
 // **** Experimental ****
 using iterative_search_params = cuvs::neighbors::search_params;
