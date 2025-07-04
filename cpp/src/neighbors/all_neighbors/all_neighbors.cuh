@@ -26,7 +26,27 @@ using namespace cuvs::neighbors;
 
 void check_metric(const all_neighbors_params& params, bool do_mutual_reachability_dist)
 {
-  if (std::holds_alternative<graph_build_params::nn_descent_params>(params.graph_build_params)) {
+  if (std::holds_alternative<graph_build_params::brute_force_params>(params.graph_build_params)) {
+    if (do_mutual_reachability_dist) {
+      // TODO raft expects for this!
+      auto allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
+                             params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+                             params.metric == cuvs::distance::DistanceType::CosineExpanded;
+    } else {
+      auto allowed_metrics_batch = params.metric == cuvs::distance::DistanceType::L2Expanded ||
+                                   params.metric == cuvs::distance::DistanceType::L2SqrtExpanded;
+      auto allowed_metrics_single = allowed_metrics_batch ||
+                                    params.metric == cuvs::distance::DistanceType::CosineExpanded ||
+                                    params.metric == cuvs::distance::DistanceType::InnerProduct;
+      // related issue: https://github.com/rapidsai/cuvs/issues/1056
+      RAFT_EXPECTS((params.n_clusters <= 1 && allowed_metrics_single) || allowed_metrics_batch,
+                   "Distance metric supported for for all-neighbors build with brute force depends "
+                   "on params.n_clusters. When params.n_clusters <= 1, supported metrics are "
+                   "L2Expanded, L2SqrtExpanded, CosineExpanded, or InnerProduct. When "
+                   "params.n_clusters > 1, supported metrics are L2Expanded, L2SqrtExpanded.");
+    }
+  } else if (std::holds_alternative<graph_build_params::nn_descent_params>(
+               params.graph_build_params)) {
     bool allowed_metrics = false;
     if (do_mutual_reachability_dist) {
       // InnerProduct is not supported for mutual reachability distance, because mutual reachability

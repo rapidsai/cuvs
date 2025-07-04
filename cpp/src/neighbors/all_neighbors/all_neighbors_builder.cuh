@@ -18,7 +18,11 @@
 #include "../detail/nn_descent_gnnd.hpp"
 #include "../detail/reachability_types.cuh"
 #include "all_neighbors_merge.cuh"
+#include "raft/core/device_mdarray.hpp"
+#include "raft/core/mdspan.hpp"
+#include "raft/util/cudart_utils.hpp"
 #include <cuvs/neighbors/all_neighbors.hpp>
+#include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <cuvs/neighbors/refine.hpp>
@@ -483,6 +487,242 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
   std::optional<raft::device_vector<T, IdxT>> batch_core_distances;
 };
 
+template <typename T, typename IdxT = int64_t>
+struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT> {
+  all_neighbors_builder_brute_force(
+    raft::resources const& res,
+    size_t n_clusters,
+    size_t min_cluster_size,
+    size_t max_cluster_size,
+    size_t k,
+    graph_build_params::brute_force_params& params,
+    std::optional<raft::device_matrix_view<IdxT, IdxT, row_major>> indices = std::nullopt,
+    std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances  = std::nullopt)
+    : all_neighbors_builder<T, IdxT>(
+        res, n_clusters, min_cluster_size, max_cluster_size, k, indices, distances),
+      bf_params{params}
+  {
+  }
+
+  void prepare_build(raft::device_matrix_view<const T, IdxT, row_major> dataset) override {}
+
+  void prepare_build(raft::host_matrix_view<const T, IdxT, row_major> dataset) override
+  {
+    // data needs to be on device for build - search
+    size_t num_cols = dataset.extent(1);
+    data_d.emplace(
+      raft::make_device_matrix<T, IdxT, row_major>(this->res, this->max_cluster_size, num_cols));
+  }
+
+  void build_knn_common(
+    raft::device_matrix_view<const T, IdxT> dataset,
+    std::optional<raft::host_vector_view<IdxT, IdxT>> inverted_indices    = std::nullopt,
+    std::optional<raft::managed_matrix_view<IdxT, IdxT>> global_neighbors = std::nullopt,
+    std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt)
+  {
+    RAFT_EXPECTS(
+      this->n_clusters <= 1 || (inverted_indices.has_value() && global_neighbors.has_value() &&
+                                global_distances.has_value()),
+      "need valid inverted_indices, global_neighbors, and global_distances for "
+      "build_knn if doing batching.");
+
+    if (this->n_clusters > 1) {
+      auto idx = cuvs::neighbors::brute_force::build(this->res, bf_params.build_params, dataset);
+
+      size_t num_data_in_cluster = dataset.extent(0);
+
+      cuvs::neighbors::brute_force::search(
+        this->res,
+        bf_params.search_params,
+        idx,
+        dataset,
+        raft::make_device_matrix_view<IdxT, IdxT>(
+          this->batch_neighbors_d.value().data_handle(), num_data_in_cluster, this->k),
+        raft::make_device_matrix_view<T, IdxT>(
+          this->batch_distances_d.value().data_handle(), num_data_in_cluster, this->k));
+
+      raft::copy(this->batch_neighbors_h.value().data_handle(),
+                 this->batch_neighbors_d.value().data_handle(),
+                 num_data_in_cluster * this->k,
+                 raft::resource::get_cuda_stream(this->res));
+
+      remap_and_merge_subgraphs<T, IdxT, IdxT>(
+        this->res,
+        this->inverted_indices_d.value().view(),
+        inverted_indices.value(),
+        this->batch_neighbors_h.value().view(),
+        this->batch_neighbors_h.value().view(),
+        this->batch_neighbors_d.value().view(),
+        this->batch_distances_d.value().view(),
+        global_neighbors.value(),
+        global_distances.value(),
+        num_data_in_cluster,
+        this->k,
+        cuvs::distance::is_min_close(bf_params.build_params.metric));
+    } else {
+      auto idx = cuvs::neighbors::brute_force::build(this->res, bf_params.build_params, dataset);
+
+      cuvs::neighbors::brute_force::search(
+        this->res,
+        bf_params.search_params,
+        idx,
+        dataset,
+        this->indices_.value(),
+        this->distances_.has_value()
+          ? this->distances_.value()
+          : raft::make_device_matrix<T, IdxT>(this->res, dataset.extent(0), this->k).view());
+    }
+  }
+
+  void build_knn(
+    raft::host_matrix_view<const T, IdxT> dataset,
+    std::optional<raft::host_vector_view<IdxT, IdxT>> inverted_indices    = std::nullopt,
+    std::optional<raft::managed_matrix_view<IdxT, IdxT>> global_neighbors = std::nullopt,
+    std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt) override
+  {
+    raft::copy(data_d.value().data_handle(),
+               dataset.data_handle(),
+               dataset.size(),
+               raft::resource::get_cuda_stream(this->res));
+
+    build_knn_common(raft::make_device_matrix_view<const T, IdxT, row_major>(
+                       data_d.value().data_handle(), dataset.extent(0), dataset.extent(1)),
+                     inverted_indices,
+                     global_neighbors,
+                     global_distances);
+  }
+
+  void build_knn(raft::device_matrix_view<const T, IdxT> dataset) override
+  {
+    RAFT_EXPECTS(this->n_clusters <= 1,
+                 "building all-neighbors knn graph with dataset on device is not supported with "
+                 "batching (n_clusters > 1)");
+    build_knn_common(dataset);
+  }
+
+  graph_build_params::brute_force_params bf_params;
+
+  std::optional<raft::device_matrix<T, IdxT, row_major>> data_d;
+};
+
+template <typename T, typename IdxT = int64_t>
+struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT> {
+  all_neighbors_builder_brute_force(
+    raft::resources const& res,
+    size_t n_clusters,
+    size_t min_cluster_size,
+    size_t max_cluster_size,
+    size_t k,
+    graph_build_params::brute_force_params& params,
+    std::optional<raft::device_matrix_view<IdxT, IdxT, row_major>> indices = std::nullopt,
+    std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances  = std::nullopt)
+    : all_neighbors_builder<T, IdxT>(
+        res, n_clusters, min_cluster_size, max_cluster_size, k, indices, distances),
+      bf_params{params}
+  {
+  }
+
+  void prepare_build(raft::device_matrix_view<const T, IdxT, row_major> dataset) override {}
+
+  void prepare_build(raft::host_matrix_view<const T, IdxT, row_major> dataset) override
+  {
+    // data needs to be on device for build - search
+    size_t num_cols = dataset.extent(1);
+    data_d.emplace(
+      raft::make_device_matrix<T, IdxT, row_major>(this->res, this->max_cluster_size, num_cols));
+  }
+
+  void build_knn_common(
+    raft::device_matrix_view<const T, IdxT> dataset,
+    std::optional<raft::host_vector_view<IdxT, IdxT>> inverted_indices    = std::nullopt,
+    std::optional<raft::managed_matrix_view<IdxT, IdxT>> global_neighbors = std::nullopt,
+    std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt)
+  {
+    RAFT_EXPECTS(
+      this->n_clusters <= 1 || (inverted_indices.has_value() && global_neighbors.has_value() &&
+                                global_distances.has_value()),
+      "need valid inverted_indices, global_neighbors, and global_distances for "
+      "build_knn if doing batching.");
+
+    if (this->n_clusters > 1) {
+      auto idx = cuvs::neighbors::brute_force::build(this->res, bf_params.build_params, dataset);
+
+      size_t num_data_in_cluster = dataset.extent(0);
+
+      cuvs::neighbors::brute_force::search(
+        this->res,
+        bf_params.search_params,
+        idx,
+        dataset,
+        raft::make_device_matrix_view<IdxT, IdxT>(
+          this->batch_neighbors_d.value().data_handle(), num_data_in_cluster, this->k),
+        raft::make_device_matrix_view<T, IdxT>(
+          this->batch_distances_d.value().data_handle(), num_data_in_cluster, this->k));
+
+      raft::copy(this->batch_neighbors_h.value().data_handle(),
+                 this->batch_neighbors_d.value().data_handle(),
+                 num_data_in_cluster * this->k,
+                 raft::resource::get_cuda_stream(this->res));
+
+      remap_and_merge_subgraphs<T, IdxT, IdxT>(
+        this->res,
+        this->inverted_indices_d.value().view(),
+        inverted_indices.value(),
+        this->batch_neighbors_h.value().view(),
+        this->batch_neighbors_h.value().view(),
+        this->batch_neighbors_d.value().view(),
+        this->batch_distances_d.value().view(),
+        global_neighbors.value(),
+        global_distances.value(),
+        num_data_in_cluster,
+        this->k,
+        cuvs::distance::is_min_close(bf_params.build_params.metric));
+    } else {
+      auto idx = cuvs::neighbors::brute_force::build(this->res, bf_params.build_params, dataset);
+
+      cuvs::neighbors::brute_force::search(
+        this->res,
+        bf_params.search_params,
+        idx,
+        dataset,
+        this->indices_.value(),
+        this->distances_.has_value()
+          ? this->distances_.value()
+          : raft::make_device_matrix<T, IdxT>(this->res, dataset.extent(0), this->k).view());
+    }
+  }
+
+  void build_knn(
+    raft::host_matrix_view<const T, IdxT> dataset,
+    std::optional<raft::host_vector_view<IdxT, IdxT>> inverted_indices    = std::nullopt,
+    std::optional<raft::managed_matrix_view<IdxT, IdxT>> global_neighbors = std::nullopt,
+    std::optional<raft::managed_matrix_view<T, IdxT>> global_distances    = std::nullopt) override
+  {
+    raft::copy(data_d.value().data_handle(),
+               dataset.data_handle(),
+               dataset.size(),
+               raft::resource::get_cuda_stream(this->res));
+
+    build_knn_common(raft::make_device_matrix_view<const T, IdxT, row_major>(
+                       data_d.value().data_handle(), dataset.extent(0), dataset.extent(1)),
+                     inverted_indices,
+                     global_neighbors,
+                     global_distances);
+  }
+
+  void build_knn(raft::device_matrix_view<const T, IdxT> dataset) override
+  {
+    RAFT_EXPECTS(this->n_clusters <= 1,
+                 "building all-neighbors knn graph with dataset on device is not supported with "
+                 "batching (n_clusters > 1)");
+    build_knn_common(dataset);
+  }
+
+  graph_build_params::brute_force_params bf_params;
+
+  std::optional<raft::device_matrix<T, IdxT, row_major>> data_d;
+};
+
 template <typename T, typename IdxT, typename DistEpilogueT = raft::identity_op>
 std::unique_ptr<all_neighbors_builder<T, IdxT>> get_knn_builder(
   const raft::resources& handle,
@@ -494,7 +734,23 @@ std::unique_ptr<all_neighbors_builder<T, IdxT>> get_knn_builder(
   std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances  = std::nullopt,
   DistEpilogueT dist_epilogue                                            = DistEpilogueT{})
 {
-  if (std::holds_alternative<graph_build_params::nn_descent_params>(params.graph_build_params)) {
+  if (std::holds_alternative<graph_build_params::brute_force_params>(params.graph_build_params)) {
+    auto brute_force_params =
+      std::get<graph_build_params::brute_force_params>(params.graph_build_params);
+    if (brute_force_params.build_params.metric != params.metric) {
+      RAFT_LOG_WARN("Setting brute_force_params metric to metric given for batching algorithm");
+      brute_force_params.build_params.metric = params.metric;
+    }
+    return std::make_unique<all_neighbors_builder_brute_force<T, IdxT>>(handle,
+                                                                        params.n_clusters,
+                                                                        min_cluster_size,
+                                                                        max_cluster_size,
+                                                                        k,
+                                                                        brute_force_params,
+                                                                        indices,
+                                                                        distances);
+  } else if (std::holds_alternative<graph_build_params::nn_descent_params>(
+               params.graph_build_params)) {
     auto nn_descent_params =
       std::get<graph_build_params::nn_descent_params>(params.graph_build_params);
     if (nn_descent_params.metric != params.metric) {
@@ -526,7 +782,7 @@ std::unique_ptr<all_neighbors_builder<T, IdxT>> get_knn_builder(
                                                                   indices,
                                                                   distances);
   } else {
-    RAFT_FAIL("Batch KNN build algos only supporting NN Descent and IVFPQ");
+    RAFT_FAIL("Batch KNN build algos only supporting Brute Force, NN Descent, and IVFPQ");
   }
 }
 
