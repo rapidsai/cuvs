@@ -121,6 +121,46 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
 }
 
 template <typename T>
+void* _from_graph(cuvsResources_t res,
+                  cuvsDistanceType _metric,
+                  DLManagedTensor* graph_tensor,
+                  DLManagedTensor* dataset_tensor)
+{
+  auto metric  = static_cast<cuvs::distance::DistanceType>((int)_metric);
+  auto dataset = dataset_tensor->dl_tensor;
+  auto graph   = graph_tensor->dl_tensor;
+  auto res_ptr = reinterpret_cast<raft::resources*>(res);
+
+  void* index = NULL;
+  if (cuvs::core::is_dlpack_device_compatible(dataset)) {
+    using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
+    auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
+    if (cuvs::core::is_dlpack_device_compatible(graph)) {
+      using graph_mdspan_type = raft::device_matrix_view<uint32_t const, int64_t, raft::row_major>;
+      auto graph_mds          = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
+      index = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric, mds, graph_mds);
+    } else {
+      using graph_mdspan_type = raft::host_matrix_view<uint32_t const, int64_t, raft::row_major>;
+      auto graph_mds          = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
+      index = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric, mds, graph_mds);
+    }
+  } else if (cuvs::core::is_dlpack_host_compatible(dataset)) {
+    using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
+    auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
+    if (cuvs::core::is_dlpack_device_compatible(graph)) {
+      using graph_mdspan_type = raft::device_matrix_view<uint32_t const, int64_t, raft::row_major>;
+      auto graph_mds          = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
+      index = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric, mds, graph_mds);
+    } else {
+      using graph_mdspan_type = raft::host_matrix_view<uint32_t const, int64_t, raft::row_major>;
+      auto graph_mds          = cuvs::core::from_dlpack<graph_mdspan_type>(graph_tensor);
+      index = new cuvs::neighbors::cagra::index<T, uint32_t>(*res_ptr, metric, mds, graph_mds);
+    }
+  }
+  return index;
+}
+
+template <typename T>
 void _extend(cuvsResources_t res,
              cuvsCagraExtendParams params,
              cuvsCagraIndex index,
@@ -297,6 +337,68 @@ void* _merge(cuvsResources_t res,
 
   return merged_index;
 }
+
+template <typename output_mdspan_type, typename T, typename IdxT>
+void _get_dataset(cuvsResources_t res, cuvsCagraIndex_t index, DLManagedTensor* dataset)
+{
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, IdxT>*>(index->addr);
+  auto dst       = cuvs::core::from_dlpack<output_mdspan_type>(dataset);
+  auto src       = index_ptr->dataset();
+
+  RAFT_EXPECTS(src.extent(0) == dst.extent(0), "Output dataset has incorrect number of rows");
+  RAFT_EXPECTS(src.extent(1) == dst.extent(1), "Output dataset has incorrect number of cols");
+
+  // dataset from cagra could be strided, account for that when copying over
+  raft::copy_matrix(dst.data_handle(),
+                    dst.extent(1),
+                    src.data_handle(),
+                    src.stride(0),
+                    src.extent(1),
+                    src.extent(0),
+                    raft::resource::get_cuda_stream(*res_ptr));
+}
+
+template <typename T, typename IdxT>
+void get_dataset(cuvsResources_t res, cuvsCagraIndex_t index, DLManagedTensor* dataset)
+{
+  if (cuvs::core::is_dlpack_device_compatible(dataset->dl_tensor)) {
+    using output_mdspan_type = raft::device_matrix_view<T, int64_t, raft::row_major>;
+    _get_dataset<output_mdspan_type, T, IdxT>(res, index, dataset);
+  } else {
+    using output_mdspan_type = raft::host_matrix_view<T, int64_t, raft::row_major>;
+    _get_dataset<output_mdspan_type, T, IdxT>(res, index, dataset);
+  }
+}
+
+template <typename output_mdspan_type, typename T, typename IdxT>
+void _get_graph(cuvsResources_t res, cuvsCagraIndex_t index, DLManagedTensor* graph)
+{
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, IdxT>*>(index->addr);
+  auto dst       = cuvs::core::from_dlpack<output_mdspan_type>(graph);
+  auto src       = index_ptr->graph();
+
+  RAFT_EXPECTS(src.extent(0) == dst.extent(0), "Output graph has incorrect number of rows");
+  RAFT_EXPECTS(src.extent(1) == dst.extent(1), "Output graph has incorrect number of cols");
+
+  raft::copy(dst.data_handle(),
+             src.data_handle(),
+             dst.extent(0) * dst.extent(1),
+             raft::resource::get_cuda_stream(*res_ptr));
+}
+
+template <typename T, typename IdxT>
+void get_graph(cuvsResources_t res, cuvsCagraIndex_t index, DLManagedTensor* graph)
+{
+  if (cuvs::core::is_dlpack_device_compatible(graph->dl_tensor)) {
+    using output_mdspan_type = raft::device_matrix_view<IdxT, int64_t, raft::row_major>;
+    _get_graph<output_mdspan_type, T, IdxT>(res, index, graph);
+  } else {
+    using output_mdspan_type = raft::host_matrix_view<IdxT, int64_t, raft::row_major>;
+    _get_graph<output_mdspan_type, T, IdxT>(res, index, graph);
+  }
+}
 }  // namespace
 
 namespace cuvs::neighbors::cagra {
@@ -380,6 +482,60 @@ extern "C" cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int* dim)
   });
 }
 
+extern "C" cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, uint32_t* size)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index->addr);
+    *size          = index_ptr->size();
+  });
+}
+
+extern "C" cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, uint32_t* graph_degree)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index->addr);
+    *graph_degree  = index_ptr->graph_degree();
+  });
+}
+
+extern "C" cuvsError_t cuvsCagraIndexGetDataset(cuvsResources_t res,
+                                                cuvsCagraIndex_t index,
+                                                DLManagedTensor* dataset)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
+      get_dataset<float, uint32_t>(res, index, dataset);
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      get_dataset<half, uint32_t>(res, index, dataset);
+    } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
+      get_dataset<int8_t, uint32_t>(res, index, dataset);
+    } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
+      get_dataset<uint8_t, uint32_t>(res, index, dataset);
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsCagraIndexGetGraph(cuvsResources_t res,
+                                              cuvsCagraIndex_t index,
+                                              DLManagedTensor* graph)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
+      get_graph<float, uint32_t>(res, index, graph);
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      get_graph<half, uint32_t>(res, index, graph);
+    } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
+      get_graph<int8_t, uint32_t>(res, index, graph);
+    } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
+      get_graph<uint8_t, uint32_t>(res, index, graph);
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
+    }
+  });
+}
+
 extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                                       cuvsCagraIndexParams_t params,
                                       DLManagedTensor* dataset_tensor,
@@ -396,6 +552,35 @@ extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
       index->addr = reinterpret_cast<uintptr_t>(_build<int8_t>(res, *params, dataset_tensor));
     } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
       index->addr = reinterpret_cast<uintptr_t>(_build<uint8_t>(res, *params, dataset_tensor));
+    } else {
+      RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
+                dataset.dtype.code,
+                dataset.dtype.bits);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsCagraIndexFromGraph(cuvsResources_t res,
+                                               cuvsDistanceType metric,
+                                               DLManagedTensor* graph_tensor,
+                                               DLManagedTensor* dataset_tensor,
+                                               cuvsCagraIndex_t index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto dataset = dataset_tensor->dl_tensor;
+    index->dtype = dataset.dtype;
+    if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
+      index->addr =
+        reinterpret_cast<uintptr_t>(_from_graph<float>(res, metric, graph_tensor, dataset_tensor));
+    } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
+      index->addr =
+        reinterpret_cast<uintptr_t>(_from_graph<half>(res, metric, graph_tensor, dataset_tensor));
+    } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
+      index->addr =
+        reinterpret_cast<uintptr_t>(_from_graph<int8_t>(res, metric, graph_tensor, dataset_tensor));
+    } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
+      index->addr = reinterpret_cast<uintptr_t>(
+        _from_graph<uint8_t>(res, metric, graph_tensor, dataset_tensor));
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,

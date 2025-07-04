@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -122,6 +122,25 @@ def run_cagra_build_search_test(
 
     recall = calc_recall(out_idx, skl_idx)
     assert recall > 0.7
+
+    # test that we can get the cagra graph from the index
+    graph = index.graph
+    assert index.graph.shape[0] == n_rows
+    assert index.graph.shape[1] == graph_degree
+
+    if compression is None:
+        # make sure we can get the dataset from the cagra index
+        dataset_from_index = index.dataset
+        assert np.allclose(dataset, dataset_from_index)
+
+        # also make sure we can reconstruct the index from the graph/dataset
+        reloaded_index = cagra.from_graph(graph, dataset, metric=metric)
+
+        dist_device, idx_device = cagra.search(
+            search_params, reloaded_index, queries_device, k
+        )
+        recall = calc_recall(idx_device.copy_to_host(), skl_idx)
+        assert recall > 0.7
 
 
 @pytest.mark.parametrize("inplace", [True, False])
