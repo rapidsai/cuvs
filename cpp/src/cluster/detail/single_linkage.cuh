@@ -41,6 +41,8 @@ namespace cuvs::cluster::agglomerative::detail {
  * @param[in] min_samples this neighborhood will be selected for core distances
  * @param[in] alpha weight applied when internal distance is chosen for mutual reachability (value
  * of 1.0 disables the weighting)
+ * @param[in] connect_knn_on_device boolean to indicate whether to connect KNN graph components on
+ * device
  * @param[out] core_dists core distances (size m)
  * @param[out] out_mst output MST sorted by edge weights (size m - 1)
  * @param[out] out_dendrogram output dendrogram
@@ -52,6 +54,7 @@ void build_mr_linkage(raft::resources const& handle,
                       raft::device_matrix_view<const value_t, value_idx, raft::row_major> X,
                       value_idx min_samples,
                       float alpha,
+                      bool connect_knn_on_device,
                       cuvs::distance::DistanceType metric,
                       raft::device_vector_view<value_t, value_idx> core_dists,
                       raft::device_coo_matrix_view<value_t, value_idx, value_idx, nnz_t> out_mst,
@@ -100,7 +103,8 @@ void build_mr_linkage(raft::resources const& handle,
                                                mutual_reachability_coo.nnz,
                                                reduction_op,
                                                metric,
-                                               10);
+                                               10,
+                                               connect_knn_on_device);
 
   /**
    * Perform hierarchical labeling
@@ -130,6 +134,8 @@ static const size_t EMPTY = 0;
  * @param[in] X data points (size m * n)
  * @param[in] c a constant used when constructing linkage from knn graph. Allows the indirect
  * control of k. The algorithm will set `k = log(n) + c`
+ * @param[in] connect_knn_on_device boolean to indicate whether to connect KNN graph components on
+ * device
  * @param[in] metric distance metric to use
  * @param[out] out_mst output MST sorted by edge weights (size m - 1)
  * @param[out] out_dendrogram output dendrogram
@@ -140,6 +146,7 @@ template <typename value_t, typename value_idx, typename nnz_t, Linkage dist_typ
 void build_dist_linkage(raft::resources const& handle,
                         raft::device_matrix_view<const value_t, value_idx, raft::row_major> X,
                         int c,
+                        bool connect_knn_on_device,
                         cuvs::distance::DistanceType metric,
                         raft::device_coo_matrix_view<value_t, value_idx, value_idx, nnz_t> out_mst,
                         raft::device_matrix_view<value_idx, value_idx> out_dendrogram,
@@ -188,7 +195,8 @@ void build_dist_linkage(raft::resources const& handle,
                                                color.data(),
                                                indices.size(),
                                                op,
-                                               metric);
+                                               metric,
+                                               connect_knn_on_device);
   pw_dists.release();
 
   /**
@@ -232,7 +240,8 @@ void single_linkage(raft::resources const& handle,
                     cuvs::distance::DistanceType metric,
                     single_linkage_output<value_idx>* out,
                     int c,
-                    size_t n_clusters)
+                    size_t n_clusters,
+                    bool connect_knn_on_device)
 {
   ASSERT(n_clusters <= m, "n_clusters must be less than or equal to the number of data points");
 
@@ -254,6 +263,7 @@ void single_linkage(raft::resources const& handle,
     raft::make_device_matrix_view<const value_t, value_idx, raft::row_major>(
       X, static_cast<value_idx>(m), static_cast<value_idx>(n)),
     c,
+    connect_knn_on_device,
     metric,
     mst_view,
     raft::make_device_matrix_view<value_idx, value_idx, raft::row_major>(out->children, n_edges, 2),

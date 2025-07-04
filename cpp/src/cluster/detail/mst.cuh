@@ -271,6 +271,7 @@ void connect_knn_graph(
  * @param[out] mst_weight output weights (distances)
  * @param[in] max_iter maximum iterations to run knn graph connection. This
  *  argument is really just a safeguard against the potential for infinite loops.
+ * @param[in] connect_knn_on_device boolean to specify whether to connect KNN components on device
  */
 template <typename value_idx, typename value_t, typename red_op>
 void build_sorted_mst(
@@ -288,7 +289,8 @@ void build_sorted_mst(
   size_t nnz,
   red_op reduction_op,
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded,
-  int max_iter                        = 10)
+  int max_iter                        = 10,
+  bool connect_knn_on_device          = true)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
@@ -299,12 +301,13 @@ void build_sorted_mst(
   int iters        = 1;
   int n_components = cuvs::sparse::neighbors::get_n_components(color, m, stream);
 
-  cudaPointerAttributes attr;
-  RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, X));
-  bool data_on_device = attr.type == cudaMemoryTypeDevice;
+  cudaPointerAttributes ptr_attrs;
+  RAFT_CUDA_TRY(cudaPointerGetAttributes(&ptr_attrs, X));
+  const bool device_accessible = ptr_attrs.devicePointer != nullptr;
+  const bool device_only       = ptr_attrs.type == cudaMemoryTypeDevice;
 
   while (n_components > 1 && iters < max_iter) {
-    if (data_on_device) {
+    if (device_only || (device_accessible && connect_knn_on_device)) {
       connect_knn_graph<value_idx, value_t>(handle, X, mst_coo, m, n, color, reduction_op);
     } else {
       connect_knn_graph<value_idx, value_t>(handle, X, mst_coo, m, n, n_components, color, metric);

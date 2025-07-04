@@ -110,6 +110,8 @@ class single_linkage_output {
  *                    at the expense of potentially additional minimum spanning tree iterations.
  * @param[in] c a constant used when constructing linkage from knn graph. Allows the indirect
  control of k. The algorithm will set `k = log(n) + c`
+  * @param[in] connect_knn_on_device boolean indicating whether to connect KNN graph components on
+ device
  */
 void single_linkage(
   raft::resources const& handle,
@@ -119,7 +121,8 @@ void single_linkage(
   cuvs::distance::DistanceType metric,
   size_t n_clusters,
   cuvs::cluster::agglomerative::Linkage linkage = cuvs::cluster::agglomerative::Linkage::KNN_GRAPH,
-  std::optional<int> c                          = std::make_optional<int>(DEFAULT_CONST_C));
+  std::optional<int> c                          = std::make_optional<int>(DEFAULT_CONST_C),
+  bool connect_knn_on_device                    = true);
 
 namespace helpers {
 
@@ -160,6 +163,9 @@ struct mutual_reachability_params {
  * @param[out] out_sizes cluster sizes of output
  * @param[out] core_dists (optional) core distances (size m). Must be supplied in the Mutual
  * Reachability space
+ * * @param[in] connect_knn_on_device boolean indicating whether to connect KNN graph components on
+ device
+
  */
 void build_linkage(
   raft::resources const& handle,
@@ -171,7 +177,8 @@ void build_linkage(
   raft::device_matrix_view<int, int> dendrogram,
   raft::device_vector_view<float, int> out_distances,
   raft::device_vector_view<int, int> out_sizes,
-  std::optional<raft::device_vector_view<float, int>> core_dists);
+  std::optional<raft::device_vector_view<float, int>> core_dists,
+  bool connect_knn_on_device = true);
 }  // namespace helpers
 /**
  * @}

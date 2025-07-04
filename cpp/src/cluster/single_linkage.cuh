@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2023, NVIDIA CORPORATION.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,10 +55,11 @@ void single_linkage(raft::resources const& handle,
                     cuvs::distance::DistanceType metric,
                     single_linkage_output<value_idx>* out,
                     int c,
-                    size_t n_clusters)
+                    size_t n_clusters,
+                    bool connect_knn_on_device)
 {
   detail::single_linkage<value_idx, value_t, dist_type>(
-    handle, X, m, n, metric, out, c, n_clusters);
+    handle, X, m, n, metric, out, c, n_clusters, connect_knn_on_device);
 }
 
 /**
@@ -86,7 +87,8 @@ void single_linkage(raft::resources const& handle,
                     raft::device_vector_view<idx_t, idx_t> labels,
                     cuvs::distance::DistanceType metric,
                     size_t n_clusters,
-                    std::optional<int> c = std::make_optional<int>(DEFAULT_CONST_C))
+                    std::optional<int> c       = std::make_optional<int>(DEFAULT_CONST_C),
+                    bool connect_knn_on_device = true)
 {
   single_linkage_output<idx_t> out_arrs;
   out_arrs.children = dendrogram.data_handle();
@@ -99,6 +101,7 @@ void single_linkage(raft::resources const& handle,
                                             metric,
                                             &out_arrs,
                                             c.has_value() ? c.value() : DEFAULT_CONST_C,
-                                            n_clusters);
+                                            n_clusters,
+                                            connect_knn_on_device);
 }
 };  // namespace   cuvs::cluster::agglomerative

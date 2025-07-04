@@ -29,14 +29,15 @@ void single_linkage(raft::resources const& handle,
                     cuvs::distance::DistanceType metric,
                     size_t n_clusters,
                     cuvs::cluster::agglomerative::Linkage linkage,
-                    std::optional<int> c)
+                    std::optional<int> c,
+                    bool connect_knn_on_device)
 {
   if (linkage == Linkage::KNN_GRAPH) {
     single_linkage<float, int, Linkage::KNN_GRAPH>(
-      handle, X, dendrogram, labels, metric, n_clusters, c);
+      handle, X, dendrogram, labels, metric, n_clusters, c, connect_knn_on_device);
   } else {
     single_linkage<float, int, Linkage::PAIRWISE>(
-      handle, X, dendrogram, labels, metric, n_clusters, c);
+      handle, X, dendrogram, labels, metric, n_clusters, c, connect_knn_on_device);
   }
 }
 
@@ -51,7 +52,8 @@ void build_linkage(
   raft::device_matrix_view<int, int> out_dendrogram,
   raft::device_vector_view<float, int> out_distances,
   raft::device_vector_view<int, int> out_sizes,
-  std::optional<raft::device_vector_view<float, int>> core_dists)
+  std::optional<raft::device_vector_view<float, int>> core_dists,
+  bool connect_knn_on_device)
 {
   /**
    * Construct MST sorted by weights
@@ -72,6 +74,7 @@ void build_linkage(
                                          X,
                                          mr_params.min_samples,
                                          mr_params.alpha,
+                                         connect_knn_on_device,
                                          metric,
                                          core_dists_mdspan,
                                          out_mst,
@@ -85,11 +88,27 @@ void build_linkage(
     if (dist_params.dist_type == cuvs::cluster::agglomerative::Linkage::KNN_GRAPH) {
       detail::
         build_dist_linkage<float, int, size_t, cuvs::cluster::agglomerative::Linkage::KNN_GRAPH>(
-          handle, X, dist_params.c, metric, out_mst, out_dendrogram, out_distances, out_sizes);
+          handle,
+          X,
+          dist_params.c,
+          connect_knn_on_device,
+          metric,
+          out_mst,
+          out_dendrogram,
+          out_distances,
+          out_sizes);
     } else {
       detail::
         build_dist_linkage<float, int, size_t, cuvs::cluster::agglomerative::Linkage::PAIRWISE>(
-          handle, X, dist_params.c, metric, out_mst, out_dendrogram, out_distances, out_sizes);
+          handle,
+          X,
+          dist_params.c,
+          connect_knn_on_device,
+          metric,
+          out_mst,
+          out_dendrogram,
+          out_distances,
+          out_sizes);
     }
   }
 }
