@@ -57,7 +57,8 @@ void build_mr_linkage(raft::resources const& handle,
                       raft::device_coo_matrix_view<value_t, value_idx, value_idx, nnz_t> out_mst,
                       raft::device_matrix_view<value_idx, value_idx> out_dendrogram,
                       raft::device_vector_view<value_t, value_idx> out_distances,
-                      raft::device_vector_view<value_idx, value_idx> out_sizes)
+                      raft::device_vector_view<value_idx, value_idx> out_sizes,
+                      bool connect_knn_on_device)
 {
   size_t m                        = X.extent(0);
   size_t n                        = X.extent(1);
@@ -100,7 +101,8 @@ void build_mr_linkage(raft::resources const& handle,
                                                mutual_reachability_coo.nnz,
                                                reduction_op,
                                                metric,
-                                               10);
+                                               10,
+                                               connect_knn_on_device);
 
   /**
    * Perform hierarchical labeling
@@ -137,14 +139,15 @@ static const size_t EMPTY = 0;
  * @param[out] out_sizes cluster sizes of output
  */
 template <typename value_t, typename value_idx, typename nnz_t, Linkage dist_type>
-void build_dist_linkage(raft::resources const& handle,
-                        raft::device_matrix_view<const value_t, value_idx, raft::row_major> X,
-                        int c,
-                        cuvs::distance::DistanceType metric,
-                        raft::device_coo_matrix_view<value_t, value_idx, value_idx, nnz_t> out_mst,
-                        raft::device_matrix_view<value_idx, value_idx> out_dendrogram,
-                        raft::device_vector_view<value_t, value_idx> out_distances,
-                        raft::device_vector_view<value_idx, value_idx> out_sizes)
+void build_dist_linkage(
+  raft::resources const& handle,
+  raft::device_matrix_view<const value_t, value_idx, raft::row_major> X,
+  int c,
+  cuvs::distance::DistanceType metric,
+  raft::device_coo_matrix_view<value_t, value_idx, value_idx, nnz_t> out_mst,
+  raft::device_matrix_view<value_idx, value_idx> out_dendrogram,
+  raft::device_vector_view<value_t, value_idx> out_distances,
+  raft::device_vector_view<value_idx, value_idx> out_sizesm bool connect_knn_on_device)
 {
   size_t m    = X.extent(0);
   size_t n    = X.extent(1);
@@ -188,7 +191,8 @@ void build_dist_linkage(raft::resources const& handle,
                                                color.data(),
                                                indices.size(),
                                                op,
-                                               metric);
+                                               metric,
+                                               connect_knn_on_device);
   pw_dists.release();
 
   /**
@@ -232,7 +236,8 @@ void single_linkage(raft::resources const& handle,
                     cuvs::distance::DistanceType metric,
                     single_linkage_output<value_idx>* out,
                     int c,
-                    size_t n_clusters)
+                    size_t n_clusters,
+                    bool connect_knn_on_device)
 {
   ASSERT(n_clusters <= m, "n_clusters must be less than or equal to the number of data points");
 
@@ -258,7 +263,8 @@ void single_linkage(raft::resources const& handle,
     mst_view,
     raft::make_device_matrix_view<value_idx, value_idx, raft::row_major>(out->children, n_edges, 2),
     out_delta.view(),
-    out_sizes.view());
+    out_sizes.view(),
+    connect_knn_on_device);
 
   detail::extract_flattened_clusters(handle, out->labels, out->children, n_clusters, m);
 
