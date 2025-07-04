@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -359,6 +359,48 @@ cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index);
 cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int* dim);
 
 /**
+ * @brief Get size of the CAGRA index
+ *
+ * @param[in] index CAGRA index
+ * @param[out] size return number of vectors in the index
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, uint32_t* size);
+
+/**
+ * @brief Get graph degree of the CAGRA index
+ *
+ * @param[in] index CAGRA index
+ * @param[out] graph_degree return graph degree
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, uint32_t* graph_degree);
+
+/**
+ * @brief Get the CAGRA dataset
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] index CAGRA index
+ * @param[out] dataset output dataset, with shape (size, dim)
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexGetDataset(cuvsResources_t res,
+                                     cuvsCagraIndex_t index,
+                                     DLManagedTensor* dataset);
+
+/**
+ * @brief Get the CAGRA graph
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] index CAGRA index
+ * @param[out] graph the output knn graph, with shape (size, graph_degree)
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexGetGraph(cuvsResources_t res,
+                                   cuvsCagraIndex_t index,
+                                   DLManagedTensor* graph);
+
+/**
  * @}
  */
 
@@ -612,6 +654,21 @@ cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
  * @param[out] index CAGRA index loaded disk
  */
 cuvsError_t cuvsCagraDeserialize(cuvsResources_t res, const char* filename, cuvsCagraIndex_t index);
+
+/**
+ * Load index from a dataset and graph
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] metric cuvsDistanceType to use in the index
+ * @params[in] graph the knn graph to use , shape (size, graph_degree)
+ * @params[in] dataset the dataset to use , shape (size, dim)
+ * @param[out] index CAGRA index constructed from the graph and dataset
+ */
+cuvsError_t cuvsCagraIndexFromGraph(cuvsResources_t res,
+                                    cuvsDistanceType metric,
+                                    DLManagedTensor* graph,
+                                    DLManagedTensor* dataset,
+                                    cuvsCagraIndex_t index);
 
 /**
  * @brief Merge multiple CAGRA indices into a single CAGRA index.
