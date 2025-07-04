@@ -72,30 +72,11 @@ public interface CagraIndex {
   void serialize(OutputStream outputStream, int bufferLength) throws Throwable;
 
   /**
-   * A method to persist a CAGRA index using an instance of {@link OutputStream}
-   * for writing index bytes.
+   * A method to persist a CAGRA index to a file.
    *
-   * @param outputStream an instance of {@link OutputStream} to write the index
-   *                     bytes into
-   * @param tempFile     an intermediate {@link Path} where CAGRA index is written
-   *                     temporarily
+   * @param tempFile     a {@link Path} where the CAGRA index is written
    */
-  default void serialize(OutputStream outputStream, Path tempFile) throws Throwable {
-    serialize(outputStream, tempFile, 1024);
-  }
-
-  /**
-   * A method to persist a CAGRA index using an instance of {@link OutputStream}
-   * and path to the intermediate temporary file.
-   *
-   * @param outputStream an instance of {@link OutputStream} to write the index
-   *                     bytes to
-   * @param tempFile     an intermediate {@link Path} where CAGRA index is written
-   *                     temporarily
-   * @param bufferLength the length of buffer to use for writing bytes. Default
-   *                     value is 1024
-   */
-  void serialize(OutputStream outputStream, Path tempFile, int bufferLength) throws Throwable;
+  void serialize(Path tempFile) throws Throwable;
 
   /**
    * A method to create and persist HNSW index from CAGRA index using an instance

@@ -233,6 +233,87 @@ void _serialize(cuvsResources_t res,
   cuvs::neighbors::cagra::serialize(*res_ptr, std::string(filename), *index_ptr, include_dataset);
 }
 
+struct _direct_write_buf : public std::streambuf {
+  _direct_write_buf(void (*writer)(int)) : _writer(writer) {}
+
+ protected:
+  int_type overflow(int_type ch) override
+  {
+    if (ch == EOF) { return 0; }
+    _writer(ch);
+    return (char_type)ch;
+  }
+
+ private:
+  std::function<void(int)> _writer;
+};
+
+template <typename T>
+void _serialize(cuvsResources_t res,
+                void (*writer)(int),
+                cuvsCagraIndex_t index,
+                bool include_dataset)
+{
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(index->addr);
+
+  _direct_write_buf write_buffer(writer);
+  std::ostream out(&write_buffer);
+
+  cuvs::neighbors::cagra::serialize(*res_ptr, out, *index_ptr, include_dataset);
+}
+
+struct _write_buf : public std::streambuf {
+  _write_buf(size_t (*writer)(void*, size_t), size_t buffer_size)
+    : _writer(writer), _buffer(buffer_size)
+  {
+    // save 1 char space for overflows
+    setp(_buffer.data(), _buffer.data() + buffer_size - 1);
+  }
+
+ protected:
+  int_type overflow(int_type ch) override
+  {
+    int_type eof          = traits_type::eof();
+    size_t bytes_to_write = pptr() - pbase();
+    if (_writer(pbase(), bytes_to_write) != bytes_to_write) {
+      ch = eof;  // returning eof represents an error
+    } else if (traits_type::eq_int_type(ch, eof)) {
+      ch = 0;  // we are done
+    }
+    setp(_buffer.data(), _buffer.data() + buffer_size - 1);
+  }
+  return ch;
+}
+
+int sync()
+{
+  size_t bytes_to_write = pptr() - pbase();
+  if (bytes_to_write == 0 || _writer(pbase(), bytes_to_write) == bytes_to_write) { return 0; }
+  return -1;
+}
+
+private:
+std::function<size_t(void*, size_t)> _writer;
+std::vector<char_type> _buffer;
+};
+
+template <typename T>
+void _serialize(cuvsResources_t res,
+                size_t (*writer)(void*, size_t),
+                size_t buffer_size,
+                cuvsCagraIndex_t index,
+                bool include_dataset)
+{
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, uint32_t>*>(index->addr);
+
+  _write_buf write_buffer(writer, buffer_size);
+  std::ostream out(&write_buffer);
+
+  cuvs::neighbors::cagra::serialize(*res_ptr, out, *index_ptr, include_dataset);
+}
+
 template <typename T>
 void _serialize_to_hnswlib(cuvsResources_t res, const char* filename, cuvsCagraIndex_t index)
 {
@@ -646,6 +727,47 @@ extern "C" cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
       _serialize<int8_t>(res, filename, index, include_dataset);
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
       _serialize<uint8_t>(res, filename, index, include_dataset);
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsCagraSerializeWithWriter(cuvsResources_t res,
+                                                    void (*writer)(int),
+                                                    cuvsCagraIndex_t index,
+                                                    bool include_dataset)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
+      _serialize<float>(res, writer, index, include_dataset);
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      _serialize<half>(res, writer, index, include_dataset);
+    } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
+      _serialize<int8_t>(res, writer, index, include_dataset);
+    } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
+      _serialize<uint8_t>(res, writer, index, include_dataset);
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsCagraSerializeWithBufferedWriter(cuvsResources_t res,
+                                                            size_t (*writer)(void*, size_t),
+                                                            size_t buffer_size,
+                                                            cuvsCagraIndex_t index,
+                                                            bool include_dataset)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
+      _serialize<float>(res, writer, index, include_dataset);
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      _serialize<half>(res, writer, index, include_dataset);
+    } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
+      _serialize<int8_t>(res, writer, index, include_dataset);
+    } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
+      _serialize<uint8_t>(res, writer, index, include_dataset);
     } else {
       RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
     }

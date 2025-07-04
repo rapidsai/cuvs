@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -573,6 +573,17 @@ cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
                                const char* filename,
                                cuvsCagraIndex_t index,
                                bool include_dataset);
+
+cuvsError_t cuvsCagraSerializeWithWriter(cuvsResources_t res,
+                                         void (*writer)(int),
+                                         cuvsCagraIndex_t index,
+                                         bool include_dataset);
+
+cuvsError_t cuvsCagraSerializeWithBufferedWriter(cuvsResources_t res,
+                                                 size_t (*writer)(void*, size_t),
+                                                 size_t buffer_size,
+                                                 cuvsCagraIndex_t index,
+                                                 bool include_dataset);
 
 /**
  * Save the CAGRA index to file in hnswlib format.

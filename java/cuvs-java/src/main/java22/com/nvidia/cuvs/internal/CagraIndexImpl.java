@@ -26,23 +26,7 @@ import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.concatenate;
 import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaStream_t;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraBuild;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraDeserialize;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndexCreate;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndexDestroy;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndexGetDims;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndex_t;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraMerge;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraMergeParams_t;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSearch;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSerialize;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSerializeToHnswlib;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMAlloc;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamGet;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
-import static com.nvidia.cuvs.internal.panama.headers_h.omp_set_num_threads;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.CagraCompressionParams;
 import com.nvidia.cuvs.CagraIndex;
@@ -66,13 +50,13 @@ import com.nvidia.cuvs.internal.panama.cuvsIvfPqIndexParams;
 import com.nvidia.cuvs.internal.panama.cuvsIvfPqParams;
 import com.nvidia.cuvs.internal.panama.cuvsIvfPqSearchParams;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.lang.foreign.Arena;
-import java.lang.foreign.MemoryLayout;
-import java.lang.foreign.MemorySegment;
-import java.lang.foreign.SequenceLayout;
-import java.lang.foreign.ValueLayout;
+import java.lang.foreign.*;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.BitSet;
@@ -394,23 +378,118 @@ public class CagraIndexImpl implements CagraIndex {
     }
   }
 
-  @Override
-  public void serialize(OutputStream outputStream) throws Throwable {
-    Path path =
-        Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".cag");
-    serialize(outputStream, path, 1024);
+  private static class BufferedOutputStreamWrapper {
+    private final byte[] buffer;
+    private final OutputStream out;
+    private final MemorySegment bufferPtr;
+
+    BufferedOutputStreamWrapper(int bufferSize, OutputStream out) {
+      buffer = new byte[bufferSize];
+      this.out = out;
+      bufferPtr = MemorySegment.ofArray(buffer);
+    }
+
+    long write(MemorySegment buf, long size) throws IOException {
+      if (size <= buffer.length) {
+        MemorySegment.copy(buf, 0, bufferPtr, 0, size);
+        out.write(buffer, 0, (int) size);
+        return size;
+      }
+      return -1;
+    }
+
+    static long exceptionHandler(Throwable t, MemorySegment buf, long size) {
+      // TODO: log exception or rethrow?
+      return -1;
+    }
+  }
+
+  private static final MethodHandle writeSingleChar$mh;
+  private static final MethodHandle writeSingleCharErrorHandler$mh;
+
+  private static final MethodHandle writeBuffered$mh;
+  private static final MethodHandle writeBufferedErrorHandler$mh;
+
+  static {
+    try {
+      writeSingleChar$mh =
+          MethodHandles.lookup()
+              .findVirtual(
+                  OutputStream.class, "write", MethodType.methodType(void.class, int.class));
+      writeSingleCharErrorHandler$mh =
+          MethodHandles.lookup()
+              .findStatic(
+                  CagraIndexImpl.class,
+                  "exceptionHandler",
+                  MethodType.methodType(void.class, Throwable.class, int.class));
+      writeBuffered$mh =
+          MethodHandles.lookup()
+              .findVirtual(
+                  BufferedOutputStreamWrapper.class,
+                  "write",
+                  MethodType.methodType(long.class, MemorySegment.class, long.class));
+      writeBufferedErrorHandler$mh =
+          MethodHandles.lookup()
+              .findStatic(
+                  BufferedOutputStreamWrapper.class,
+                  "exceptionHandler",
+                  MethodType.methodType(
+                      long.class, Throwable.class, MemorySegment.class, long.class));
+
+    } catch (NoSuchMethodException | IllegalAccessException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static void exceptionHandler(Throwable e, int argument) {
+    // TODO: log exception or rethrow?
   }
 
   @Override
-  public void serialize(OutputStream outputStream, int bufferLength) throws Throwable {
-    Path path =
-        Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".cag");
-    serialize(outputStream, path, bufferLength);
+  public void serialize(OutputStream outputStream) {
+    // Create a stub as a native symbol to be passed into native function.
+    try (var arena = Arena.ofConfined()) {
+      MethodHandle outWrite =
+          MethodHandles.catchException(
+              writeSingleChar$mh.bindTo(outputStream),
+              Throwable.class,
+              writeSingleCharErrorHandler$mh);
+
+      MemorySegment outWriteNativeSymbol =
+          Linker.nativeLinker()
+              .upcallStub(outWrite, FunctionDescriptor.ofVoid(ValueLayout.JAVA_INT), arena);
+
+      var index = cagraIndexReference.getMemorySegment();
+      var returnValue =
+          cuvsCagraSerializeWithWriter(resources.getHandle(), outWriteNativeSymbol, index, true);
+      checkCuVSError(returnValue, "cuvsCagraSerializeWithWriter");
+    }
   }
 
   @Override
-  public void serialize(OutputStream outputStream, Path tempFile, int bufferLength)
-      throws Throwable {
+  public void serialize(OutputStream outputStream, int bufferLength) {
+    // Create a stub as a native symbol to be passed into native function.
+    try (var arena = Arena.ofConfined()) {
+      MethodHandle outWrite =
+          MethodHandles.catchException(
+              writeBuffered$mh.bindTo(new BufferedOutputStreamWrapper(bufferLength, outputStream)),
+              Throwable.class,
+              writeBufferedErrorHandler$mh);
+
+      MemorySegment outWriteNativeSymbol =
+          Linker.nativeLinker()
+              .upcallStub(outWrite, FunctionDescriptor.of(C_LONG, C_POINTER, C_LONG), arena);
+
+      var index = cagraIndexReference.getMemorySegment();
+      var returnValue =
+          cuvsCagraSerializeWithBufferedWriter(
+              resources.getHandle(), outWriteNativeSymbol, bufferLength, index, true);
+      checkCuVSError(returnValue, "cuvsCagraSerializeWithWriter");
+    }
+  }
+
+  @Override
+  public void serialize(Path tempFile) {
     checkNotDestroyed();
     tempFile = tempFile.toAbsolutePath();
     try (var localArena = Arena.ofConfined()) {
@@ -423,16 +502,6 @@ public class CagraIndexImpl implements CagraIndex {
               cagraIndexReference.getMemorySegment(),
               true);
       checkCuVSError(returnValue, "cuvsCagraSerialize");
-
-      try (var fileInputStream = Files.newInputStream(tempFile)) {
-        byte[] chunk = new byte[bufferLength];
-        int chunkLength = 0;
-        while ((chunkLength = fileInputStream.read(chunk)) != -1) {
-          outputStream.write(chunk, 0, chunkLength);
-        }
-      } finally {
-        Files.deleteIfExists(tempFile);
-      }
     }
   }
 
