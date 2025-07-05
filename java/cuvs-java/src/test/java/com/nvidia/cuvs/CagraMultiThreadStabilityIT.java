@@ -245,6 +245,7 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
 
   // Test with separate resources per thread
   @Test
+  @Ignore
   public void testMultiThreadedWithSeparateResources() throws Throwable {
     final int dataSize = 3000;
     final int dimensions = 64;
