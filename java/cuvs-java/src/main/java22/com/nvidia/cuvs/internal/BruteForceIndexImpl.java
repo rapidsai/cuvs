@@ -47,7 +47,6 @@ import com.nvidia.cuvs.BruteForceQuery;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.SearchResults;
-import com.nvidia.cuvs.internal.common.Util;
 import com.nvidia.cuvs.internal.panama.cuvsFilter;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -70,11 +69,8 @@ import java.util.UUID;
  */
 public class BruteForceIndexImpl implements BruteForceIndex {
 
-  private final float[][] vectors;
-  private final Dataset dataset;
   private final CuVSResourcesImpl resources;
   private final IndexReference bruteForceIndexReference;
-  private final BruteForceIndexParams bruteForceIndexParams;
   private boolean destroyed;
 
   /**
@@ -87,15 +83,14 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    *                              holding the index parameters
    */
   private BruteForceIndexImpl(
-      float[][] vectors,
-      Dataset dataset,
-      CuVSResourcesImpl resources,
-      BruteForceIndexParams bruteForceIndexParams) {
-    this.vectors = vectors;
-    this.dataset = dataset;
-    this.resources = resources;
-    this.bruteForceIndexParams = bruteForceIndexParams;
-    this.bruteForceIndexReference = build();
+      Dataset dataset, CuVSResourcesImpl resources, BruteForceIndexParams bruteForceIndexParams)
+      throws Exception {
+    Objects.requireNonNull(dataset);
+    try (dataset) {
+      this.resources = resources;
+      assert dataset instanceof DatasetImpl;
+      this.bruteForceIndexReference = build((DatasetImpl) dataset, bruteForceIndexParams);
+    }
   }
 
   /**
@@ -106,9 +101,6 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    */
   private BruteForceIndexImpl(InputStream inputStream, CuVSResourcesImpl resources)
       throws Throwable {
-    this.bruteForceIndexParams = null;
-    this.vectors = null;
-    this.dataset = null;
     this.resources = resources;
     this.bruteForceIndexReference = deserialize(inputStream);
   }
@@ -124,7 +116,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    * BRUTEFORCE index
    */
   @Override
-  public void destroyIndex() throws Throwable {
+  public void destroyIndex() {
     checkNotDestroyed();
     try {
       int returnValue = cuvsBruteForceIndexDestroy(bruteForceIndexReference.indexPtr);
@@ -141,7 +133,6 @@ public class BruteForceIndexImpl implements BruteForceIndex {
     } finally {
       destroyed = true;
     }
-    if (dataset != null) dataset.close();
   }
 
   /**
@@ -151,16 +142,13 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    * @return an instance of {@link IndexReference} that holds the pointer to the
    *         index
    */
-  private IndexReference build() {
+  private IndexReference build(DatasetImpl dataset, BruteForceIndexParams bruteForceIndexParams) {
     try (var localArena = Arena.ofConfined()) {
-      long rows = dataset != null ? dataset.size() : vectors.length;
-      long cols = dataset != null ? dataset.dimensions() : (rows > 0 ? vectors[0].length : 0);
+      long rows = dataset.size();
+      long cols = dataset.dimensions();
 
       Arena arena = resources.getArena();
-      MemorySegment datasetMemSegment =
-          dataset != null
-              ? ((DatasetImpl) dataset).seg
-              : Util.buildMemorySegment(resources.getArena(), vectors);
+      MemorySegment datasetMemSegment = dataset.asMemorySegment();
 
       long cuvsResources = resources.getHandle();
 
@@ -248,7 +236,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       long queriesBytes = C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
       long neighborsBytes = C_LONG_BYTE_SIZE * numQueries * topk;
       long distanceBytes = C_FLOAT_BYTE_SIZE * numQueries * topk;
-      long prefilterBytes = 0;
+      long prefilterBytes = 0; // size assigned later
 
       returnValue = cuvsRMMAlloc(cuvsResources, queriesD, queriesBytes);
       checkCuVSError(returnValue, "cuvsRMMAlloc");
@@ -430,7 +418,6 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    */
   public static class Builder implements BruteForceIndex.Builder {
 
-    private float[][] vectors;
     private Dataset dataset;
     private final CuVSResourcesImpl cuvsResources;
     private BruteForceIndexParams bruteForceIndexParams;
@@ -479,7 +466,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
      */
     @Override
     public Builder withDataset(float[][] vectors) {
-      this.vectors = vectors;
+      this.dataset = Dataset.ofArray(vectors);
       return this;
     }
 
@@ -505,7 +492,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       if (inputStream != null) {
         return new BruteForceIndexImpl(inputStream, cuvsResources);
       } else {
-        return new BruteForceIndexImpl(vectors, dataset, cuvsResources, bruteForceIndexParams);
+        return new BruteForceIndexImpl(dataset, cuvsResources, bruteForceIndexParams);
       }
     }
   }
