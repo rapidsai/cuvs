@@ -28,7 +28,7 @@ Run `./build.sh --run-java-tests` from this directory.
 To run a single test:
 ```sh
 cd cuvs-java/
-mvn verify -Dintegration-test=com.nvidia.cuvs.CagraBuildAndSearchIT
+mvn verify -Dit.test=com.nvidia.cuvs.CagraBuildAndSearchIT
 ```
 Be sure to set (manually, if needed) your `LD_LIBRARY_PATH` to include the directory with the appropriate (matching)
 version of `libcuvs.so`.
