@@ -17,15 +17,16 @@ package com.nvidia.cuvs;
 
 import com.nvidia.cuvs.spi.CuVSProvider;
 import java.lang.foreign.MemorySegment;
+import java.lang.invoke.MethodHandle;
 
 public class DatasetHelper {
 
+  private static final MethodHandle createDataset$mh =
+      CuVSProvider.provider().newNativeDatasetBuilder();
+
   public static Dataset fromMemorySegment(MemorySegment memorySegment, int size, int dimensions) {
     try {
-      return (Dataset)
-          CuVSProvider.provider()
-              .newNativeDatasetBuilder()
-              .invokeExact(memorySegment, size, dimensions);
+      return (Dataset) createDataset$mh.invokeExact(memorySegment, size, dimensions);
     } catch (Throwable e) {
       if (e instanceof Error err) {
         throw err;
