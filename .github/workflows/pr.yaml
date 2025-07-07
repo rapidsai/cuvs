@@ -135,7 +135,6 @@ jobs:
     uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-post-build-checks.yaml@branch-25.08
     with:
       build_type: pull-request
-      enable_check_symbols: true
       symbol_exclusions: (void (thrust::|cub::))
   conda-python-build:
     needs: conda-cpp-build
