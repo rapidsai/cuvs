@@ -175,7 +175,8 @@ public class TieredIndexImpl implements TieredIndex {
 
       // Create tensor from device memory
       long[] datasetShape = {rows, cols};
-      MemorySegment datasetTensor = prepareTensor(arena, datasetDP, datasetShape, 2, 32, 2, 2, 1);
+      MemorySegment datasetTensor =
+          prepareTensor(localArena, datasetDP, datasetShape, 2, 32, 2, 2, 1);
 
       MemorySegment index = arena.allocate(cuvsTieredIndex_t);
       returnValue = cuvsTieredIndexCreate(index);
@@ -220,18 +221,18 @@ public class TieredIndexImpl implements TieredIndex {
       // Allocate HOST memory for results
       SequenceLayout neighborsLayout = MemoryLayout.sequenceLayout(numBlocks, C_LONG);
       SequenceLayout distancesLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
-      MemorySegment neighborsSeg = arena.allocate(neighborsLayout);
-      MemorySegment distancesSeg = arena.allocate(distancesLayout);
+      MemorySegment neighborsSeg = localArena.allocate(neighborsLayout);
+      MemorySegment distancesSeg = localArena.allocate(distancesLayout);
 
       // Get host query data
-      MemorySegment hostQueriesSeg = Util.buildMemorySegment(arena, query.getQueryVectors());
+      MemorySegment hostQueriesSeg = Util.buildMemorySegment(localArena, query.getQueryVectors());
 
       long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
 
       // Allocate DEVICE memory for all data
-      MemorySegment queriesD = arena.allocate(C_POINTER);
-      MemorySegment neighborsD = arena.allocate(C_POINTER);
-      MemorySegment distancesD = arena.allocate(C_POINTER);
+      MemorySegment queriesD = localArena.allocate(C_POINTER);
+      MemorySegment neighborsD = localArena.allocate(C_POINTER);
+      MemorySegment distancesD = localArena.allocate(C_POINTER);
 
       long queriesBytes = C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
       long neighborsBytes = C_LONG_BYTE_SIZE * numQueries * topK; // 64-bit for tiered index
@@ -256,21 +257,22 @@ public class TieredIndexImpl implements TieredIndex {
 
       // Create tensors from device memory
       long queriesShape[] = {numQueries, vectorDimension};
-      MemorySegment queriesTensor = prepareTensor(arena, queriesDP, queriesShape, 2, 32, 2, 2, 1);
+      MemorySegment queriesTensor =
+          prepareTensor(localArena, queriesDP, queriesShape, 2, 32, 2, 2, 1);
       long neighborsShape[] = {numQueries, topK};
       MemorySegment neighborsTensor =
-          prepareTensor(arena, neighborsDP, neighborsShape, 0, 64, 2, 2, 1); // 64-bit int
+          prepareTensor(localArena, neighborsDP, neighborsShape, 0, 64, 2, 2, 1); // 64-bit int
       long distancesShape[] = {numQueries, topK};
       MemorySegment distancesTensor =
-          prepareTensor(arena, distancesDP, distancesShape, 2, 32, 2, 2, 1);
+          prepareTensor(localArena, distancesDP, distancesShape, 2, 32, 2, 2, 1);
 
       // Sync before prefilter setup
       returnValue = cuvsStreamSync(cuvsRes);
       checkCuVSError(returnValue, "cuvsStreamSync");
 
       // Handle prefilter
-      MemorySegment prefilter = cuvsFilter.allocate(arena);
-      MemorySegment prefilterD = arena.allocate(C_POINTER);
+      MemorySegment prefilter = cuvsFilter.allocate(localArena);
+      MemorySegment prefilterD = localArena.allocate(C_POINTER);
       MemorySegment prefilterDP = MemorySegment.NULL;
       long prefilterBytes = 0;
 
@@ -278,7 +280,7 @@ public class TieredIndexImpl implements TieredIndex {
         BitSet[] prefilters = new BitSet[] {query.getPrefilter()};
         BitSet concatenatedFilters = concatenate(prefilters, (int) query.getNumDocs());
         long filters[] = concatenatedFilters.toLongArray();
-        MemorySegment hostPrefilterSeg = buildMemorySegment(arena, filters);
+        MemorySegment hostPrefilterSeg = buildMemorySegment(localArena, filters);
 
         long prefilterDataLength = query.getNumDocs() * prefilters.length;
         long prefilterShape[] = {(prefilterDataLength + 31) / 32};
@@ -296,7 +298,7 @@ public class TieredIndexImpl implements TieredIndex {
         checkCudaError(returnValue, "cudaMemcpy");
 
         MemorySegment prefilterTensor =
-            prepareTensor(arena, prefilterDP, prefilterShape, 1, 32, 1, 2, 1);
+            prepareTensor(localArena, prefilterDP, prefilterShape, 1, 32, 1, 2, 1);
 
         cuvsFilter.type(prefilter, 1); // BITSET
         cuvsFilter.addr(prefilter, prefilterTensor.address());
@@ -309,7 +311,7 @@ public class TieredIndexImpl implements TieredIndex {
       returnValue =
           cuvsTieredIndexSearch(
               cuvsRes,
-              segmentFromSearchParams(query.getCagraSearchParameters()),
+              segmentFromSearchParams(query.getCagraSearchParameters(), localArena),
               tieredIndexReference.getMemorySegment(),
               queriesTensor,
               neighborsTensor,
@@ -358,44 +360,47 @@ public class TieredIndexImpl implements TieredIndex {
    * Performs the actual extend operation
    */
   private void performExtend(float[][] extendVectors, Dataset extendDataset) throws Throwable {
-    long rows = extendDataset != null ? extendDataset.size() : extendVectors.length;
-    long cols = extendDataset != null ? extendDataset.dimensions() : extendVectors[0].length;
+    try (var localArena = Arena.ofConfined()) {
+      long rows = extendDataset != null ? extendDataset.size() : extendVectors.length;
+      long cols = extendDataset != null ? extendDataset.dimensions() : extendVectors[0].length;
 
-    // Get host data
-    MemorySegment hostDataSeg =
-        extendDataset != null
-            ? ((DatasetImpl) extendDataset).seg
-            : Util.buildMemorySegment(resources.getArena(), extendVectors);
+      // Get host data
+      MemorySegment hostDataSeg =
+          extendDataset != null
+              ? ((DatasetImpl) extendDataset).seg
+              : Util.buildMemorySegment(localArena, extendVectors);
 
-    Arena arena = resources.getArena();
-    long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
+      Arena arena = resources.getArena();
+      long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
 
-    // Allocate device memory for extend data
-    MemorySegment datasetD = arena.allocate(C_POINTER);
-    long dataSize = C_FLOAT_BYTE_SIZE * rows * cols;
-    int returnValue = cuvsRMMAlloc(cuvsRes, datasetD, dataSize);
-    checkCuVSError(returnValue, "cuvsRMMAlloc");
+      // Allocate device memory for extend data
+      MemorySegment datasetD = localArena.allocate(C_POINTER);
+      long dataSize = C_FLOAT_BYTE_SIZE * rows * cols;
+      int returnValue = cuvsRMMAlloc(cuvsRes, datasetD, dataSize);
+      checkCuVSError(returnValue, "cuvsRMMAlloc");
 
-    MemorySegment datasetDP = datasetD.get(C_POINTER, 0);
+      MemorySegment datasetDP = datasetD.get(C_POINTER, 0);
 
-    // Copy host to device
-    returnValue = cudaMemcpy(datasetDP, hostDataSeg, dataSize, 1); // cudaMemcpyHostToDevice
-    checkCudaError(returnValue, "cudaMemcpy");
+      // Copy host to device
+      returnValue = cudaMemcpy(datasetDP, hostDataSeg, dataSize, 1); // cudaMemcpyHostToDevice
+      checkCudaError(returnValue, "cudaMemcpy");
 
-    // Create tensor from device memory
-    long datasetShape[] = {rows, cols};
-    MemorySegment datasetTensor = prepareTensor(arena, datasetDP, datasetShape, 2, 32, 2, 2, 1);
+      // Create tensor from device memory
+      long datasetShape[] = {rows, cols};
+      MemorySegment datasetTensor =
+          prepareTensor(localArena, datasetDP, datasetShape, 2, 32, 2, 2, 1);
 
-    returnValue = cuvsStreamSync(cuvsRes);
-    checkCuVSError(returnValue, "cuvsStreamSync");
+      returnValue = cuvsStreamSync(cuvsRes);
+      checkCuVSError(returnValue, "cuvsStreamSync");
 
-    returnValue =
-        cuvsTieredIndexExtend(cuvsRes, datasetTensor, tieredIndexReference.getMemorySegment());
-    checkCuVSError(returnValue, "cuvsTieredIndexExtend");
+      returnValue =
+          cuvsTieredIndexExtend(cuvsRes, datasetTensor, tieredIndexReference.getMemorySegment());
+      checkCuVSError(returnValue, "cuvsTieredIndexExtend");
 
-    // Clean up device memory
-    returnValue = cuvsRMMFree(cuvsRes, datasetDP, dataSize);
-    checkCuVSError(returnValue, "cuvsRMMFree");
+      // Clean up device memory
+      returnValue = cuvsRMMFree(cuvsRes, datasetDP, dataSize);
+      checkCuVSError(returnValue, "cuvsRMMFree");
+    }
   }
 
   /**
@@ -491,8 +496,8 @@ public class TieredIndexImpl implements TieredIndex {
   /**
    * Allocates the configured search parameters in the MemorySegment.
    */
-  private MemorySegment segmentFromSearchParams(CagraSearchParams params) {
-    MemorySegment seg = cuvsCagraSearchParams.allocate(resources.getArena());
+  private MemorySegment segmentFromSearchParams(CagraSearchParams params, Arena arena) {
+    MemorySegment seg = cuvsCagraSearchParams.allocate(arena);
     cuvsCagraSearchParams.max_queries(seg, params.getMaxQueries());
     cuvsCagraSearchParams.itopk_size(seg, params.getITopKSize());
     cuvsCagraSearchParams.max_iterations(seg, params.getMaxIterations());
