@@ -27,11 +27,24 @@ using namespace cuvs::neighbors;
 void check_metric(const all_neighbors_params& params, bool do_mutual_reachability_dist)
 {
   if (std::holds_alternative<graph_build_params::brute_force_params>(params.graph_build_params)) {
+    /* There are issues with tiled_brute_force_knn (mainly the pairwise_distances functions being
+     * used). pairwise_distances returns different distance for different input shapes, making it
+     * difficult to use for batched all-neighbors which depend on distance comparison to rule out
+     * duplicate indices when merging. out of the configurations [single, batched] x [normal
+     * distance, mutual reach distance] batched, mutual reach distance uses tiled_brute_force_knn,
+     * and therefore is not supported. Note that when k > 64, the brute_force API also ends up using
+     * tiled_brute_force_knn, which may result in issues. related issue:
+     * https://github.com/rapidsai/cuvs/issues/1056
+     */
     if (do_mutual_reachability_dist) {
-      // TODO raft expects for this!
+      // related issue: https://github.com/rapidsai/cuvs/issues/1056
+      RAFT_EXPECTS(params.n_clusters <= 1,
+                   "Batched all-neighbors build with brute force for getting mutual reachability "
+                   "distances is not supported.");
       auto allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
-                             params.metric == cuvs::distance::DistanceType::L2SqrtExpanded;
-      RAFT_EXPECTS(allowed_metrics, "error message comes here");
+                             params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+                             params.metric == cuvs::distance::DistanceType::CosineExpanded;
+      RAFT_EXPECTS(allowed_metrics, "Distance metric information...");
     } else {
       auto allowed_metrics_batch = params.metric == cuvs::distance::DistanceType::L2Expanded ||
                                    params.metric == cuvs::distance::DistanceType::L2SqrtExpanded;
