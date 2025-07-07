@@ -18,7 +18,7 @@ package com.nvidia.cuvs.internal;
 import com.nvidia.cuvs.SearchResults;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SequenceLayout;
-import java.util.List;
+import java.util.function.LongToIntFunction;
 
 /**
  * SearchResult encapsulates the logic for reading and holding search results.
@@ -33,7 +33,7 @@ class HnswSearchResults {
       MemorySegment neighboursMemorySegment,
       MemorySegment distancesMemorySegment,
       int topK,
-      List<Integer> mapping,
+      LongToIntFunction mapping,
       long numberOfQueries) {
     return SearchResultsImpl.create(
         neighboursSequenceLayout,

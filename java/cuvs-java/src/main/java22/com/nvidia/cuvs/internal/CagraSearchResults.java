@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.LongToIntFunction;
 
 /**
  * SearchResult encapsulates the logic for reading and holding search results.
@@ -43,7 +44,7 @@ class CagraSearchResults {
       MemorySegment neighboursMemorySegment,
       MemorySegment distancesMemorySegment,
       int topK,
-      List<Integer> mapping,
+      LongToIntFunction mapping,
       long numberOfQueries) {
 
     List<Map<Integer, Float>> results = new LinkedList<>();
@@ -55,10 +56,10 @@ class CagraSearchResults {
 
     int count = 0;
     for (long i = 0; i < topK * numberOfQueries; i++) {
-      int id = (int) neighboursVarHandle.get(neighboursMemorySegment, 0, i);
+      long id = (long) neighboursVarHandle.get(neighboursMemorySegment, 0, i);
       float dst = (float) distancesVarHandle.get(distancesMemorySegment, 0L, i);
       if (id != Integer.MAX_VALUE) {
-        intermediateResultMap.put(mapping != null ? mapping.get(id) : id, dst);
+        intermediateResultMap.put(mapping.applyAsInt(id), dst);
       }
       count += 1;
       if (count == topK) {
