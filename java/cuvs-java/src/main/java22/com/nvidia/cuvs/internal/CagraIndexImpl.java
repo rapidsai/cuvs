@@ -218,12 +218,9 @@ public class CagraIndexImpl implements CagraIndex {
       // cuvsCagraIndexCreate gets a pointer to a cuvsCagraIndex_t, which is defined as a pointer to
       // cuvsCagraIndex.
       // It's basically an "out" parameter: the C functions will create the index and "return back"
-      // a
-      // pointer to it:
-      // (*index = new cuvsCagraIndex{};
+      // a pointer to it: (*index = new cuvsCagraIndex{};
       // The "out parameter" pointer is needed only for the duration of the function invocation (it
-      // could be a stack
-      // pointer, in C) so we allocate it from our localArena
+      // could be a stack pointer, in C) so we allocate it from our localArena
       var returnValue = cuvsCagraIndexCreate(indexPtrPtr);
       checkCuVSError(returnValue, "cuvsCagraIndexCreate");
       return indexPtrPtr.get(cuvsCagraIndex_t, 0);
@@ -242,10 +239,7 @@ public class CagraIndexImpl implements CagraIndex {
   public SearchResults search(CagraQuery query) throws Throwable {
     try (var localArena = Arena.ofConfined()) {
       checkNotDestroyed();
-      int topK =
-          query.getMapping() != null
-              ? Math.min(query.getMapping().size(), query.getTopK())
-              : query.getTopK();
+      int topK = query.getTopK();
       long numQueries = query.getQueryVectors().length;
       long numBlocks = topK * numQueries;
       int vectorDimension = numQueries > 0 ? query.getQueryVectors()[0].length : 0;
@@ -646,6 +640,7 @@ public class CagraIndexImpl implements CagraIndex {
       MemorySegment mergeParamsSegment = createMergeParamsSegment(mergeParams, resources);
       int returnValue =
           cuvsCagraMerge(cuvsRes, mergeParamsSegment, indexesSegment, indexes.length, mergedIndex);
+
       checkCuVSError(returnValue, "cuvsCagraMerge");
     }
 
@@ -748,6 +743,7 @@ public class CagraIndexImpl implements CagraIndex {
      * @param dataset            the dataset used for indexing; the dataset lifetime
      *                           matches the lifetime of the index, we need to keep a reference
      *                           to it so we can close it when the index is closed.
+     *                           Can be null (e.g. from deserialization or merging)
      */
     private IndexReference(MemorySegment indexMemorySegment, Dataset dataset) {
       this.memorySegment = indexMemorySegment;
