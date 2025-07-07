@@ -28,7 +28,6 @@ import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.concatenate;
 import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaStream_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceBuild;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceDeserialize;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceIndexCreate;
@@ -37,7 +36,6 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceIndex_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceSearch;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceSerialize;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamGet;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
 import static com.nvidia.cuvs.internal.panama.headers_h.omp_set_num_threads;
 
@@ -219,9 +217,6 @@ public class BruteForceIndexImpl implements BruteForceIndex {
 
       int topk = cuvsQuery.getTopK();
       long cuvsResources = resources.getHandle();
-      MemorySegment stream = localArena.allocate(cudaStream_t);
-      var returnValue = cuvsStreamGet(cuvsResources, stream);
-      checkCuVSError(returnValue, "cuvsStreamGet");
 
       long queriesBytes = C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
       long neighborsBytes = C_LONG_BYTE_SIZE * numQueries * topk;
@@ -266,7 +261,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
         cuvsFilter.addr(prefilter, prefilterTensor.address());
       }
 
-      returnValue = cuvsStreamSync(cuvsResources);
+      var returnValue = cuvsStreamSync(cuvsResources);
       checkCuVSError(returnValue, "cuvsStreamSync");
 
       returnValue =

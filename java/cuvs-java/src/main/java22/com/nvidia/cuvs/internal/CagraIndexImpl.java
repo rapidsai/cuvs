@@ -27,7 +27,6 @@ import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.concatenate;
 import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaStream_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraBuild;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraDeserialize;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndexCreate;
@@ -38,7 +37,6 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSearch;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSerialize;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSerializeToHnswlib;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamGet;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
 import static com.nvidia.cuvs.internal.panama.headers_h.omp_set_num_threads;
 
@@ -251,9 +249,6 @@ public class CagraIndexImpl implements CagraIndex {
       MemorySegment floatsSeg = buildMemorySegment(localArena, query.getQueryVectors());
 
       long cuvsRes = resources.getHandle();
-      MemorySegment stream = localArena.allocate(cudaStream_t);
-      int returnValue = cuvsStreamGet(cuvsRes, stream);
-      checkCuVSError(returnValue, "cuvsStreamGet");
 
       long queriesBytes = C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
       long neighborsBytes = C_INT_BYTE_SIZE * numQueries * topK;
@@ -278,7 +273,7 @@ public class CagraIndexImpl implements CagraIndex {
       MemorySegment distancesTensor =
           prepareTensor(localArena, distancesDP, distancesShape, 2, 32, 2, 2, 1);
 
-      returnValue = cuvsStreamSync(cuvsRes);
+      var returnValue = cuvsStreamSync(cuvsRes);
       checkCuVSError(returnValue, "cuvsStreamSync");
 
       // prepare the prefiltering data
