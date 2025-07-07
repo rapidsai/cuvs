@@ -105,15 +105,7 @@ class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingI
   void testSpectralEmbedding()
   {
     // Call the spectral embedding function
-    // raft::print_device_vector("input_", input_.data_handle(), input_.extent(0) *
-    // input_.extent(1), std::cout);
-
     int result = transform(handle, config_, input_.view(), embedding_.view());
-
-    // raft::print_device_vector("input_", input_.data_handle(), input_.extent(0) *
-    // input_.extent(1), std::cout);
-
-    result = transform(handle, config_, input_.view(), embedding_.view());
 
     // Check that the function executed successfully
     ASSERT_EQ(result, 0);
