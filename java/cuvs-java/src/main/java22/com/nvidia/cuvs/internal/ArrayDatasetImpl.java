@@ -32,9 +32,6 @@ public class ArrayDatasetImpl implements Dataset, MemorySegmentProvider {
   }
 
   @Override
-  public void addVector(float[] vector) {}
-
-  @Override
   public int size() {
     return vectors.length;
   }

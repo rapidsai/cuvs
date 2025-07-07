@@ -32,26 +32,30 @@ public interface Dataset extends AutoCloseable {
    *
    * @since 25.08
    */
-  static Dataset of(float[][] vectors) {
+  static Dataset ofArray(float[][] vectors) {
     return CuVSProvider.provider().newArrayDataset(vectors);
   }
 
-  /**
-   * Add a single vector to the dataset.
-   *
-   * @param vector A float array of as many elements as the dimensions
-   */
-  void addVector(float[] vector);
+  interface Builder {
+    /**
+     * Add a single vector to the dataset.
+     *
+     * @param vector A float array of as many elements as the dimensions
+     */
+    void addVector(float[] vector);
+
+    Dataset build();
+  }
 
   /**
-   * Create a new instance of a dataset
+   * Returns a builder to create a new instance of a dataset
    *
    * @param size       Number of vectors in the dataset
    * @param dimensions Size of each vector in the dataset
    * @return new instance of {@link Dataset}
    */
-  static Dataset create(int size, int dimensions) {
-    return CuVSProvider.provider().newDataset(size, dimensions);
+  static Dataset.Builder builder(int size, int dimensions) {
+    return CuVSProvider.provider().newDatasetBuilder(size, dimensions);
   }
 
   /**
