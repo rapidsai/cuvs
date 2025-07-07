@@ -340,13 +340,12 @@ public class BruteForceIndexImpl implements BruteForceIndex {
     try (var localArena = Arena.ofConfined()) {
       MemorySegment indexPtrPtr = localArena.allocate(cuvsBruteForceIndex_t);
       // cuvsBruteForceIndexCreate gets a pointer to a cuvsBruteForceIndex_t, which is defined as a
-      // pointer to
-      // cuvsBruteForceIndex.
-      // It's basically a "out" parameter: the C functions will create the index and "return back" a
-      // pointer to it.
+      // pointer to cuvsBruteForceIndex.
+      // It's basically an "out" parameter: the C functions will create the index and "return back"
+      // a pointer to it.
       // The "out parameter" pointer is needed only for the duration of the function invocation (it
-      // could be a stack
-      // pointer, in C) so we allocate it from our localArena, unwrap it and return it.
+      // could be a stack pointer, in C) so we allocate it from our localArena, unwrap it and return
+      // it.
       var returnValue = cuvsBruteForceIndexCreate(indexPtrPtr);
       checkCuVSError(returnValue, "cuvsBruteForceIndexCreate");
       return indexPtrPtr.get(cuvsBruteForceIndex_t, 0);
