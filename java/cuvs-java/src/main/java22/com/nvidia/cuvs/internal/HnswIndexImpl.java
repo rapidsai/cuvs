@@ -23,8 +23,8 @@ import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswDeserialize;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswIndexCreate;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswIndexDestroy;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswIndex_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswSearch;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
 
 import com.nvidia.cuvs.CuVSResources;
@@ -105,7 +105,7 @@ public class HnswIndexImpl implements HnswIndex {
       MemorySegment distancesMemorySegment = localArena.allocate(distancesSequenceLayout);
       MemorySegment querySeg = buildMemorySegment(localArena, queryVectors);
 
-      long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
+      long cuvsRes = resources.getHandle();
 
       long[] queriesShape = {numQueries, vectorDimension};
       MemorySegment queriesTensor =
@@ -144,6 +144,22 @@ public class HnswIndexImpl implements HnswIndex {
     }
   }
 
+  private static IndexReference createHnswIndex() {
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment indexPtrPtr = localArena.allocate(cuvsHnswIndex_t);
+      // cuvsHnswIndexCreate gets a pointer to a cuvsHnswIndex_t, which is defined as a pointer to
+      // cuvsHnswIndex.
+      // It's basically a "out" parameter: the C functions will create the index and "return back" a
+      // pointer to it.
+      // The "out parameter" pointer is needed only for the duration of the function invocation (it
+      // could be a stack
+      // pointer, in C) so we allocate it from our localArena.
+      var returnValue = cuvsHnswIndexCreate(indexPtrPtr);
+      checkCuVSError(returnValue, "cuvsHnswIndexCreate");
+      return new IndexReference(indexPtrPtr.get(cuvsHnswIndex_t, 0));
+    }
+  }
+
   /**
    * Gets an instance of {@link IndexReference} by deserializing a HNSW index
    * using an {@link InputStream}.
@@ -162,29 +178,28 @@ public class HnswIndexImpl implements HnswIndex {
       inputStream.transferTo(outputStream);
       MemorySegment pathSeg = buildMemorySegment(localArena, tmpIndexFile.toString());
 
-      long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
-      MemorySegment hnswIndex = cuvsHnswIndex.allocate(localArena);
-      int returnValue = cuvsHnswIndexCreate(hnswIndex);
-      checkCuVSError(returnValue, "cuvsHnswIndexCreate");
+      long cuvsRes = resources.getHandle();
+
+      var indexReference = createHnswIndex();
 
       MemorySegment dtype = DLDataType.allocate(localArena);
       DLDataType.bits(dtype, (byte) 32);
       DLDataType.code(dtype, (byte) 2); // kDLFloat
       DLDataType.lanes(dtype, (byte) 1);
 
-      cuvsHnswIndex.dtype(hnswIndex, dtype);
+      cuvsHnswIndex.dtype(indexReference.memorySegment, dtype);
 
-      returnValue =
+      var returnValue =
           cuvsHnswDeserialize(
               cuvsRes,
               segmentFromIndexParams(localArena, hnswIndexParams),
               pathSeg,
               hnswIndexParams.getVectorDimension(),
               0,
-              hnswIndex);
+              indexReference.memorySegment);
       checkCuVSError(returnValue, "cuvsHnswDeserialize");
 
-      return new IndexReference(hnswIndex);
+      return indexReference;
 
     } finally {
       Files.deleteIfExists(tmpIndexFile);
