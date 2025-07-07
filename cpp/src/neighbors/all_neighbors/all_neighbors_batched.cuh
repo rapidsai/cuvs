@@ -444,7 +444,9 @@ void multi_gpu_batch_build(
                  num_rows,
                  raft::resource::get_cuda_stream(dev_res));
 
-      if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+      if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded &&
+          std::holds_alternative<graph_build_params::nn_descent_params>(
+            params.graph_build_params)) {
         // comparison within nn descent for L2SqrtExpanded is done without applying sqrt.
         raft::linalg::map(dev_res,
                           core_distances_d_for_rank.view(),
@@ -589,7 +591,9 @@ void batch_build(
       reset_global_matrices(
         handle, params.metric, global_neighbors.view(), global_distances.view());
 
-      if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+      if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded &&
+          std::holds_alternative<graph_build_params::nn_descent_params>(
+            params.graph_build_params)) {
         // comparison within nn descent for L2SqrtExpanded is done without applying sqrt.
         raft::linalg::map(handle,
                           core_distances.value(),

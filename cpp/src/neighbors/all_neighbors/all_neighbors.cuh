@@ -30,8 +30,8 @@ void check_metric(const all_neighbors_params& params, bool do_mutual_reachabilit
     if (do_mutual_reachability_dist) {
       // TODO raft expects for this!
       auto allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
-                             params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
-                             params.metric == cuvs::distance::DistanceType::CosineExpanded;
+                             params.metric == cuvs::distance::DistanceType::L2SqrtExpanded;
+      RAFT_EXPECTS(allowed_metrics, "error message comes here");
     } else {
       auto allowed_metrics_batch = params.metric == cuvs::distance::DistanceType::L2Expanded ||
                                    params.metric == cuvs::distance::DistanceType::L2SqrtExpanded;
@@ -84,7 +84,8 @@ void single_build(
   raft::device_matrix_view<IdxT, IdxT, row_major> indices,
   std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances      = std::nullopt,
   std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances = std::nullopt,
-  T alpha                                                                    = 1.0)
+  T alpha                                                                    = 1.0,
+  bool include_self                                                          = false)
 {
   size_t num_rows = static_cast<size_t>(dataset.extent(0));
   size_t num_cols = static_cast<size_t>(dataset.extent(1));
@@ -94,10 +95,16 @@ void single_build(
 
   knn_builder->prepare_build(dataset);
   knn_builder->build_knn(dataset);
+  raft::print_device_vector("indices", indices.data_handle(), indices.extent(1), std::cout);
+
+  if (include_self) {
+    raft::matrix::shift(handle, indices, 1);
+    ;
+    raft::matrix::shift(handle, distances.value(), 1, std::make_optional(static_cast<T>(0.0)));
+  }
 
   if (core_distances.has_value()) {
     size_t k = indices.extent(1);
-    raft::matrix::shift(handle, distances.value(), 1, std::make_optional(static_cast<T>(0.0)));
     cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
       distances.value().data_handle(),
       k,
@@ -106,7 +113,8 @@ void single_build(
       core_distances.value().data_handle(),
       raft::resource::get_cuda_stream(handle));
 
-    if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+    if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded &&
+        std::holds_alternative<graph_build_params::nn_descent_params>(params.graph_build_params)) {
       // comparison within nn descent for L2SqrtExpanded is done without applying sqrt.
       raft::linalg::map(handle,
                         core_distances.value(),
@@ -114,21 +122,20 @@ void single_build(
                         raft::make_const_mdspan(core_distances.value()));
     }
 
-    auto dist_epilogue = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>{
-      core_distances.value().data_handle(), alpha, num_rows};
-    auto knn_builder =
-      get_knn_builder<T,
-                      IdxT,
-                      cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>>(
-        handle, params, num_rows, num_rows, indices.extent(1), indices, distances, dist_epilogue);
+    using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>;
+    auto dist_epilogue   = ReachabilityPP{core_distances.value().data_handle(), alpha, num_rows};
+    auto knn_builder     = get_knn_builder<T, IdxT, ReachabilityPP>(
+      handle, params, num_rows, num_rows, indices.extent(1), indices, distances, dist_epilogue);
     knn_builder->prepare_build(dataset);
     knn_builder->build_knn(dataset);
 
-    raft::matrix::shift(handle, indices, 1);
-    raft::matrix::shift(handle,
-                        distances.value(),
-                        raft::make_device_matrix_view<const T, IdxT>(
-                          core_distances.value().data_handle(), num_rows, 1));
+    if (include_self) {
+      raft::matrix::shift(handle, indices, 1);
+      raft::matrix::shift(handle,
+                          distances.value(),
+                          raft::make_device_matrix_view<const T, IdxT>(
+                            core_distances.value().data_handle(), num_rows, 1));
+    }
   }
 }
 
