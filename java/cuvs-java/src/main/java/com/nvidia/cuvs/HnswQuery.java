@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
 import java.util.Arrays;
-import java.util.List;
+import java.util.function.LongToIntFunction;
 
 /**
  * HnswQuery holds the query vectors to be used while invoking search on the
@@ -27,10 +26,10 @@ import java.util.List;
  */
 public class HnswQuery {
 
-  private HnswSearchParams hnswSearchParams;
-  private List<Integer> mapping;
-  private float[][] queryVectors;
-  private int topK;
+  private final HnswSearchParams hnswSearchParams;
+  private final LongToIntFunction mapping;
+  private final float[][] queryVectors;
+  private final int topK;
 
   /**
    * Constructs an instance of {@link HnswQuery} using queryVectors, mapping, and
@@ -38,10 +37,14 @@ public class HnswQuery {
    *
    * @param hnswSearchParams the search parameters to use
    * @param queryVectors     2D float query vector array
-   * @param mapping          an instance of ID mapping
+   * @param mapping          a function mapping ordinals (neighbor IDs) to custom user IDs
    * @param topK             the top k results to return
    */
-  private HnswQuery(HnswSearchParams hnswSearchParams, float[][] queryVectors, List<Integer> mapping, int topK) {
+  private HnswQuery(
+      HnswSearchParams hnswSearchParams,
+      float[][] queryVectors,
+      LongToIntFunction mapping,
+      int topK) {
     this.hnswSearchParams = hnswSearchParams;
     this.queryVectors = queryVectors;
     this.mapping = mapping;
@@ -67,11 +70,9 @@ public class HnswQuery {
   }
 
   /**
-   * Gets the passed map instance.
-   *
-   * @return a map of ID mappings
+   * Gets the function mapping ordinals (neighbor IDs) to custom user IDs
    */
-  public List<Integer> getMapping() {
+  public LongToIntFunction getMapping() {
     return mapping;
   }
 
@@ -86,7 +87,13 @@ public class HnswQuery {
 
   @Override
   public String toString() {
-    return "HnswQuery [mapping=" + mapping + ", queryVectors=" + Arrays.toString(queryVectors) + ", topK=" + topK + "]";
+    return "HnswQuery [mapping="
+        + mapping
+        + ", queryVectors="
+        + Arrays.toString(queryVectors)
+        + ", topK="
+        + topK
+        + "]";
   }
 
   /**
@@ -96,7 +103,7 @@ public class HnswQuery {
 
     private HnswSearchParams hnswSearchParams;
     private float[][] queryVectors;
-    private List<Integer> mapping;
+    private LongToIntFunction mapping = SearchResults.IDENTITY_MAPPING;
     private int topK = 2;
 
     /**
@@ -123,12 +130,12 @@ public class HnswQuery {
     }
 
     /**
-     * Sets the instance of mapping to be used for ID mapping.
+     * Sets the function used to map ordinals (neighbor IDs) to custom user IDs
      *
-     * @param mapping the ID mapping instance
+     * @param mapping a function mapping ordinals (neighbor IDs) to custom user IDs
      * @return an instance of this Builder
      */
-    public Builder withMapping(List<Integer> mapping) {
+    public Builder withMapping(LongToIntFunction mapping) {
       this.mapping = mapping;
       return this;
     }
