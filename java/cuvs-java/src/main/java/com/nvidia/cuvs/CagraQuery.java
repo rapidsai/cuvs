@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
 import java.util.Arrays;
-import java.util.List;
 import java.util.BitSet;
+import java.util.function.LongToIntFunction;
 
 /**
  * CagraQuery holds the CagraSearchParams and the query vectors to be used while
@@ -28,12 +27,12 @@ import java.util.BitSet;
  */
 public class CagraQuery {
 
-  private CagraSearchParams cagraSearchParameters;
-  private List<Integer> mapping;
-  private float[][] queryVectors;
-  private int topK;
-  private BitSet prefilter;
-  private int numDocs;
+  private final CagraSearchParams cagraSearchParameters;
+  private final LongToIntFunction mapping;
+  private final float[][] queryVectors;
+  private final int topK;
+  private final BitSet prefilter;
+  private final int numDocs;
 
   /**
    * Constructs an instance of {@link CagraQuery} using cagraSearchParameters,
@@ -42,12 +41,18 @@ public class CagraQuery {
    * @param cagraSearchParameters an instance of {@link CagraSearchParams} holding
    *                              the search parameters
    * @param queryVectors          2D float query vector array
-   * @param mapping               an instance of ID mapping
+   * @param mapping               a function mapping ordinals (neighbor IDs) to custom user IDs
    * @param topK                  the top k results to return
    * @param prefilter             A single BitSet to use as filter while searching the CAGRA index
    * @param numDocs               Total number of dataset vectors; used to align the prefilter correctly
    */
-  public CagraQuery(CagraSearchParams cagraSearchParameters, float[][] queryVectors, List<Integer> mapping, int topK, BitSet prefilter, int numDocs) {
+  public CagraQuery(
+      CagraSearchParams cagraSearchParameters,
+      float[][] queryVectors,
+      LongToIntFunction mapping,
+      int topK,
+      BitSet prefilter,
+      int numDocs) {
     super();
     this.cagraSearchParameters = cagraSearchParameters;
     this.queryVectors = queryVectors;
@@ -76,11 +81,9 @@ public class CagraQuery {
   }
 
   /**
-   * Gets the passed map instance.
-   *
-   * @return a map of ID mappings
+   * Gets the function mapping ordinals (neighbor IDs) to custom user IDs
    */
-  public List<Integer> getMapping() {
+  public LongToIntFunction getMapping() {
     return mapping;
   }
 
@@ -113,8 +116,15 @@ public class CagraQuery {
 
   @Override
   public String toString() {
-    return "CuVSQuery [cagraSearchParameters=" + cagraSearchParameters + ", queryVectors="
-        + Arrays.toString(queryVectors) + ", mapping=" + mapping + ", topK=" + topK + "]";
+    return "CuVSQuery [cagraSearchParameters="
+        + cagraSearchParameters
+        + ", queryVectors="
+        + Arrays.toString(queryVectors)
+        + ", mapping="
+        + mapping
+        + ", topK="
+        + topK
+        + "]";
   }
 
   /**
@@ -124,7 +134,7 @@ public class CagraQuery {
 
     private CagraSearchParams cagraSearchParams;
     private float[][] queryVectors;
-    private List<Integer> mapping;
+    private LongToIntFunction mapping = SearchResults.IDENTITY_MAPPING;
     private int topK = 2;
     private BitSet prefilter;
     private int numDocs;
@@ -132,8 +142,7 @@ public class CagraQuery {
     /**
      * Default constructor.
      */
-    public Builder() {
-    }
+    public Builder() {}
 
     /**
      * Sets the instance of configured CagraSearchParams to be passed for search.
@@ -159,12 +168,12 @@ public class CagraQuery {
     }
 
     /**
-     * Sets the instance of mapping to be used for ID mapping.
+     * Sets the function used to map ordinals (neighbor IDs) to custom user IDs
      *
-     * @param mapping the ID mapping instance
+     * @param mapping a function mapping ordinals (neighbor IDs) to custom user IDs
      * @return an instance of this Builder
      */
-    public Builder withMapping(List<Integer> mapping) {
+    public Builder withMapping(LongToIntFunction mapping) {
       this.mapping = mapping;
       return this;
     }
@@ -194,7 +203,7 @@ public class CagraQuery {
       this.prefilter = prefilter;
       this.numDocs = numDocs;
       return this;
-  }
+    }
 
     /**
      * Builds an instance of CuVSQuery.

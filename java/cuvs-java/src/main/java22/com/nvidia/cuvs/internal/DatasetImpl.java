@@ -13,44 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs.internal;
 
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
-
-import java.lang.foreign.Arena;
-import java.lang.foreign.MemoryLayout;
-import java.lang.foreign.MemorySegment;
-
 import com.nvidia.cuvs.Dataset;
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class DatasetImpl implements Dataset {
-  private final Arena arena;
-  protected final MemorySegment seg;
+  private final AtomicReference<Arena> arenaReference;
+  private final MemorySegment seg;
   private final int size;
   private final int dimensions;
-  private int current = 0;
 
-  public DatasetImpl(int size, int dimensions) {
+  public DatasetImpl(Arena arena, MemorySegment memorySegment, int size, int dimensions) {
+    this.arenaReference = new AtomicReference<>(arena);
+    this.seg = memorySegment;
     this.size = size;
     this.dimensions = dimensions;
-
-    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout(size * dimensions, C_FLOAT);
-
-    this.arena = Arena.ofShared();
-    seg = arena.allocate(dataMemoryLayout);
-  }
-
-  @Override
-  public void addVector(float[] vector) {
-    if (current >= size)
-      throw new ArrayIndexOutOfBoundsException();
-    MemorySegment.copy(vector, 0, seg, C_FLOAT, ((current++) * dimensions * C_FLOAT.byteSize()), (int) dimensions);
   }
 
   @Override
   public void close() {
-    if (!arena.scope().isAlive()) {
+    var arena = arenaReference.getAndSet(null);
+    if (arena != null) {
       arena.close();
     }
   }
@@ -65,4 +51,7 @@ public class DatasetImpl implements Dataset {
     return dimensions;
   }
 
+  public MemorySegment asMemorySegment() {
+    return seg;
+  }
 }
