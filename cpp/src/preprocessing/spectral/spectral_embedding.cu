@@ -47,7 +47,6 @@ auto transform(raft::resources const& handle,
                raft::device_matrix_view<float, int, raft::row_major> dataset,
                raft::device_matrix_view<float, int, raft::col_major> embedding) -> int
 {
-  // Define our sample data (similar to the Python example)
   const int n_samples     = dataset.extent(0);
   const int n_features    = dataset.extent(1);
   const int k             = spectral_embedding_config.n_neighbors;  // Number of neighbors
