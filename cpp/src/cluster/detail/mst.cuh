@@ -299,6 +299,8 @@ void build_sorted_mst(
   int iters        = 1;
   int n_components = cuvs::sparse::neighbors::get_n_components(color, m, stream);
 
+  // TODO: Think about how to handle this for G+H. C-style malloc'd arrays can still lead to the
+  // device route being taken.
   cudaPointerAttributes ptr_attrs;
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&ptr_attrs, X));
   const bool device_accessible = ptr_attrs.devicePointer != nullptr;
