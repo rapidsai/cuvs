@@ -23,7 +23,6 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
 import com.nvidia.cuvs.CuVSResources;
 import java.lang.foreign.Arena;
 import java.nio.file.Path;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Used for allocating resources for cuVS
@@ -35,7 +34,6 @@ public class CuVSResourcesImpl implements CuVSResources {
   private final Path tempDirectory;
   private final Arena arena;
   private final long resourceHandle;
-  private final ScopedAccess access;
 
   /**
    * Constructor that allocates the resources needed for cuVS
@@ -50,23 +48,12 @@ public class CuVSResourcesImpl implements CuVSResources {
       int returnValue = cuvsResourcesCreate(resourcesMemorySegment);
       checkCuVSError(returnValue, "cuvsResourcesCreate");
       this.resourceHandle = resourcesMemorySegment.get(cuvsResources_t, 0);
-      this.access = new ScopedAccess() {
-        @Override
-        public long handle() {
-          return resourceHandle;
-        }
-
-        @Override
-        public void close() {
-
-        }
-      };
     }
   }
 
   @Override
-  public ScopedAccess access() {
-    return this.access;
+  public void access(ScopedAccessor accessor) {
+    accessor.handle(resourceHandle);
   }
 
   @Override
@@ -82,7 +69,6 @@ public class CuVSResourcesImpl implements CuVSResources {
   public Path tempDirectory() {
     return tempDirectory;
   }
-
 
   /**
    * The allocation arena used by this resources.

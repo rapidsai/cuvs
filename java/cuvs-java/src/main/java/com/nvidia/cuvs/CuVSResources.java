@@ -25,26 +25,20 @@ import java.nio.file.Path;
  */
 public interface CuVSResources extends AutoCloseable {
 
-
-  /**
-   * Provide scoped access to the resources object
-   */
-  interface ScopedAccess extends AutoCloseable {
+  @FunctionalInterface
+  interface ScopedAccessor {
     /**
-     * Gets the opaque CuVSResources handle, to be used whenever we need to pass a cuvsResources_t parameter
-     *
-     * @return the CuVSResources handle
+     * Callback receiving the opaque CuVSResources handle, to be used whenever we need to pass a
+     * cuvsResources_t parameter
      */
-    long handle();
-
-    @Override
-    void close();
+    void handle(long handle);
   }
 
   /**
-   * Gets scoped access to the CuVSResources handle
+   * Provide scoped access to the resources object.
+   * The
    */
-  ScopedAccess access();
+  void access(ScopedAccessor accessor);
 
   /**
    * Closes this CuVSResources object and releases any resources associated with it.

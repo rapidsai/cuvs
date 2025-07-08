@@ -27,19 +27,7 @@ import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.concatenate;
 import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaStream_t;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceBuild;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceDeserialize;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceIndexCreate;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceIndexDestroy;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceIndex_t;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceSearch;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceSerialize;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMAlloc;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamGet;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
-import static com.nvidia.cuvs.internal.panama.headers_h.omp_set_num_threads;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.BruteForceIndexParams;
@@ -123,14 +111,14 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       checkCuVSError(returnValue, "cuvsBruteForceIndexDestroy");
 
       if (bruteForceIndexReference.datasetBytes > 0) {
-        try (var resourcesAccessor = resources.access()) {
-          returnValue =
-                  cuvsRMMFree(
-                          resourcesAccessor.handle(),
-                          bruteForceIndexReference.datasetPtr,
-                          bruteForceIndexReference.datasetBytes);
-          checkCuVSError(returnValue, "cuvsRMMFree");
-        }
+        resources.access(
+            handle ->
+                checkCuVSError(
+                    cuvsRMMFree(
+                        handle,
+                        bruteForceIndexReference.datasetPtr,
+                        bruteForceIndexReference.datasetBytes),
+                    "cuvsRMMFree"));
       }
     } finally {
       destroyed = true;
@@ -152,43 +140,39 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       Arena arena = resources.getArena();
       MemorySegment datasetMemSegment = dataset.asMemorySegment();
 
-      try (var resourcesAccessor = resources.access()) {
-        long cuvsResources = resourcesAccessor.handle();
+      omp_set_num_threads(bruteForceIndexParams.getNumWriterThreads());
 
-        omp_set_num_threads(bruteForceIndexParams.getNumWriterThreads());
+      MemorySegment datasetMemorySegment = localArena.allocate(C_POINTER);
+      long datasetBytes = C_FLOAT_BYTE_SIZE * rows * cols;
+      var index = createBruteForceIndex();
 
-        MemorySegment datasetMemorySegment = localArena.allocate(C_POINTER);
+      resources.access(
+          cuvsResources -> {
+            var returnValue = cuvsRMMAlloc(cuvsResources, datasetMemorySegment, datasetBytes);
+            checkCuVSError(returnValue, "cuvsRMMAlloc");
 
-        long datasetBytes = C_FLOAT_BYTE_SIZE * rows * cols;
-        var returnValue = cuvsRMMAlloc(cuvsResources, datasetMemorySegment, datasetBytes);
-        checkCuVSError(returnValue, "cuvsRMMAlloc");
+            // IMPORTANT: this should only come AFTER cuvsRMMAlloc call
+            MemorySegment datasetMemorySegmentP = datasetMemorySegment.get(C_POINTER, 0);
 
-        // IMPORTANT: this should only come AFTER cuvsRMMAlloc call
-        MemorySegment datasetMemorySegmentP = datasetMemorySegment.get(C_POINTER, 0);
+            cudaMemcpy(datasetMemorySegmentP, datasetMemSegment, datasetBytes, INFER_DIRECTION);
 
-        cudaMemcpy(datasetMemorySegmentP, datasetMemSegment, datasetBytes, INFER_DIRECTION);
-
-        long[] datasetShape = {rows, cols};
-        MemorySegment datasetTensor =
+            long[] datasetShape = {rows, cols};
+            MemorySegment datasetTensor =
                 prepareTensor(arena, datasetMemorySegmentP, datasetShape, 2, 32, 2, 2, 1);
 
-        var indexReference =
-                new IndexReference(datasetMemorySegmentP, datasetBytes, createBruteForceIndex());
+            returnValue = cuvsStreamSync(cuvsResources);
+            checkCuVSError(returnValue, "cuvsStreamSync");
 
-        returnValue = cuvsStreamSync(cuvsResources);
-        checkCuVSError(returnValue, "cuvsStreamSync");
+            returnValue = cuvsBruteForceBuild(cuvsResources, datasetTensor, 0, 0.0f, index);
+            checkCuVSError(returnValue, "cuvsBruteForceBuild");
 
-        returnValue =
-                cuvsBruteForceBuild(cuvsResources, datasetTensor, 0, 0.0f, indexReference.indexPtr);
-        checkCuVSError(returnValue, "cuvsBruteForceBuild");
+            returnValue = cuvsStreamSync(cuvsResources);
+            checkCuVSError(returnValue, "cuvsStreamSync");
+          });
+      omp_set_num_threads(1);
+      MemorySegment datasetMemorySegmentP = datasetMemorySegment.get(C_POINTER, 0);
 
-        returnValue = cuvsStreamSync(cuvsResources);
-        checkCuVSError(returnValue, "cuvsStreamSync");
-
-        omp_set_num_threads(1);
-
-        return indexReference;
-      }
+      return new IndexReference(datasetMemorySegmentP, datasetBytes, index);
     }
   }
 
@@ -215,122 +199,126 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       MemorySegment distancesMemorySegment = arena.allocate(distancesSequenceLayout);
 
       // prepare the prefiltering data
-      long prefilterDataLength = 0;
-      MemorySegment prefilterDataMemorySegment = MemorySegment.NULL;
+      final long prefilterDataLength;
+      final MemorySegment prefilterDataMemorySegment;
       BitSet[] prefilters = cuvsQuery.getPrefilters();
       if (prefilters != null && prefilters.length > 0) {
         BitSet concatenatedFilters = concatenate(prefilters, cuvsQuery.getNumDocs());
         long[] filters = concatenatedFilters.toLongArray();
         prefilterDataMemorySegment = buildMemorySegment(arena, filters);
         prefilterDataLength = (long) cuvsQuery.getNumDocs() * prefilters.length;
+      } else {
+        prefilterDataLength = 0;
+        prefilterDataMemorySegment = MemorySegment.NULL;
       }
 
       MemorySegment querySeg = buildMemorySegment(arena, cuvsQuery.getQueryVectors());
 
       int topk = cuvsQuery.getTopK();
-      try (var resourcesAccessor = resources.access()) {
-        long cuvsResources = resourcesAccessor.handle();
-        MemorySegment stream = arena.allocate(cudaStream_t);
-        var returnValue = cuvsStreamGet(cuvsResources, stream);
-        checkCuVSError(returnValue, "cuvsStreamGet");
+      resources.access(
+          cuvsResources -> {
+            MemorySegment stream = arena.allocate(cudaStream_t);
+            var returnValue = cuvsStreamGet(cuvsResources, stream);
+            checkCuVSError(returnValue, "cuvsStreamGet");
 
-        MemorySegment queriesD = localArena.allocate(C_POINTER);
-        MemorySegment neighborsD = localArena.allocate(C_POINTER);
-        MemorySegment distancesD = localArena.allocate(C_POINTER);
+            MemorySegment queriesD = localArena.allocate(C_POINTER);
+            MemorySegment neighborsD = localArena.allocate(C_POINTER);
+            MemorySegment distancesD = localArena.allocate(C_POINTER);
 
-        long queriesBytes = C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
-        long neighborsBytes = C_LONG_BYTE_SIZE * numQueries * topk;
-        long distanceBytes = C_FLOAT_BYTE_SIZE * numQueries * topk;
-        long prefilterBytes = 0; // size assigned later
+            long queriesBytes = C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
+            long neighborsBytes = C_LONG_BYTE_SIZE * numQueries * topk;
+            long distanceBytes = C_FLOAT_BYTE_SIZE * numQueries * topk;
+            long prefilterBytes = 0; // size assigned later
 
-        returnValue = cuvsRMMAlloc(cuvsResources, queriesD, queriesBytes);
-        checkCuVSError(returnValue, "cuvsRMMAlloc");
-        returnValue = cuvsRMMAlloc(cuvsResources, neighborsD, neighborsBytes);
-        checkCuVSError(returnValue, "cuvsRMMAlloc");
-        returnValue = cuvsRMMAlloc(cuvsResources, distancesD, distanceBytes);
-        checkCuVSError(returnValue, "cuvsRMMAlloc");
+            returnValue = cuvsRMMAlloc(cuvsResources, queriesD, queriesBytes);
+            checkCuVSError(returnValue, "cuvsRMMAlloc");
+            returnValue = cuvsRMMAlloc(cuvsResources, neighborsD, neighborsBytes);
+            checkCuVSError(returnValue, "cuvsRMMAlloc");
+            returnValue = cuvsRMMAlloc(cuvsResources, distancesD, distanceBytes);
+            checkCuVSError(returnValue, "cuvsRMMAlloc");
 
-        // IMPORTANT: these three should only come AFTER cuvsRMMAlloc calls
-        MemorySegment queriesDP = queriesD.get(C_POINTER, 0);
-        MemorySegment neighborsDP = neighborsD.get(C_POINTER, 0);
-        MemorySegment distancesDP = distancesD.get(C_POINTER, 0);
-        MemorySegment prefilterDP = MemorySegment.NULL;
+            // IMPORTANT: these three should only come AFTER cuvsRMMAlloc calls
+            MemorySegment queriesDP = queriesD.get(C_POINTER, 0);
+            MemorySegment neighborsDP = neighborsD.get(C_POINTER, 0);
+            MemorySegment distancesDP = distancesD.get(C_POINTER, 0);
+            MemorySegment prefilterDP = MemorySegment.NULL;
 
-        cudaMemcpy(queriesDP, querySeg, queriesBytes, INFER_DIRECTION);
+            cudaMemcpy(queriesDP, querySeg, queriesBytes, INFER_DIRECTION);
 
-        long[] queriesShape = {numQueries, vectorDimension};
-        MemorySegment queriesTensor = prepareTensor(arena, queriesDP, queriesShape, 2, 32, 2, 2, 1);
-        long[] neighborsShape = {numQueries, topk};
-        MemorySegment neighborsTensor =
+            long[] queriesShape = {numQueries, vectorDimension};
+            MemorySegment queriesTensor =
+                prepareTensor(arena, queriesDP, queriesShape, 2, 32, 2, 2, 1);
+            long[] neighborsShape = {numQueries, topk};
+            MemorySegment neighborsTensor =
                 prepareTensor(arena, neighborsDP, neighborsShape, 0, 64, 2, 2, 1);
-        long[] distancesShape = {numQueries, topk};
-        MemorySegment distancesTensor =
+            long[] distancesShape = {numQueries, topk};
+            MemorySegment distancesTensor =
                 prepareTensor(arena, distancesDP, distancesShape, 2, 32, 2, 2, 1);
 
-        MemorySegment prefilter = cuvsFilter.allocate(arena);
-        MemorySegment prefilterTensor;
+            MemorySegment prefilter = cuvsFilter.allocate(arena);
+            MemorySegment prefilterTensor;
 
-        if (prefilterDataMemorySegment == MemorySegment.NULL) {
-          cuvsFilter.type(prefilter, 0); // NO_FILTER
-          cuvsFilter.addr(prefilter, 0);
-        } else {
-          long[] prefilterShape = {(prefilterDataLength + 31) / 32};
+            if (prefilterDataMemorySegment == MemorySegment.NULL) {
+              cuvsFilter.type(prefilter, 0); // NO_FILTER
+              cuvsFilter.addr(prefilter, 0);
+            } else {
+              long[] prefilterShape = {(prefilterDataLength + 31) / 32};
 
-          MemorySegment prefilterD = localArena.allocate(C_POINTER);
-          long prefilterLen = prefilterShape[0];
-          prefilterBytes = C_INT_BYTE_SIZE * prefilterLen;
+              MemorySegment prefilterD = localArena.allocate(C_POINTER);
+              long prefilterLen = prefilterShape[0];
+              prefilterBytes = C_INT_BYTE_SIZE * prefilterLen;
 
-          returnValue = cuvsRMMAlloc(cuvsResources, prefilterD, prefilterBytes);
-          checkCuVSError(returnValue, "cuvsRMMAlloc");
-          prefilterDP = prefilterD.get(C_POINTER, 0);
+              returnValue = cuvsRMMAlloc(cuvsResources, prefilterD, prefilterBytes);
+              checkCuVSError(returnValue, "cuvsRMMAlloc");
+              prefilterDP = prefilterD.get(C_POINTER, 0);
 
-          cudaMemcpy(prefilterDP, prefilterDataMemorySegment, prefilterBytes, HOST_TO_DEVICE);
+              cudaMemcpy(prefilterDP, prefilterDataMemorySegment, prefilterBytes, HOST_TO_DEVICE);
 
-          prefilterTensor = prepareTensor(arena, prefilterDP, prefilterShape, 1, 32, 1, 2, 1);
+              prefilterTensor = prepareTensor(arena, prefilterDP, prefilterShape, 1, 32, 1, 2, 1);
 
-          cuvsFilter.type(prefilter, 2);
-          cuvsFilter.addr(prefilter, prefilterTensor.address());
-        }
+              cuvsFilter.type(prefilter, 2);
+              cuvsFilter.addr(prefilter, prefilterTensor.address());
+            }
 
-        returnValue = cuvsStreamSync(cuvsResources);
-        checkCuVSError(returnValue, "cuvsStreamSync");
+            returnValue = cuvsStreamSync(cuvsResources);
+            checkCuVSError(returnValue, "cuvsStreamSync");
 
-        returnValue =
+            returnValue =
                 cuvsBruteForceSearch(
-                        cuvsResources,
-                        bruteForceIndexReference.indexPtr,
-                        queriesTensor,
-                        neighborsTensor,
-                        distancesTensor,
-                        prefilter);
-        checkCuVSError(returnValue, "cuvsBruteForceSearch");
+                    cuvsResources,
+                    bruteForceIndexReference.indexPtr,
+                    queriesTensor,
+                    neighborsTensor,
+                    distancesTensor,
+                    prefilter);
+            checkCuVSError(returnValue, "cuvsBruteForceSearch");
 
-        returnValue = cuvsStreamSync(cuvsResources);
-        checkCuVSError(returnValue, "cuvsStreamSync");
+            returnValue = cuvsStreamSync(cuvsResources);
+            checkCuVSError(returnValue, "cuvsStreamSync");
 
-        cudaMemcpy(neighborsMemorySegment, neighborsDP, neighborsBytes, INFER_DIRECTION);
-        cudaMemcpy(distancesMemorySegment, distancesDP, distanceBytes, INFER_DIRECTION);
+            cudaMemcpy(neighborsMemorySegment, neighborsDP, neighborsBytes, INFER_DIRECTION);
+            cudaMemcpy(distancesMemorySegment, distancesDP, distanceBytes, INFER_DIRECTION);
 
-        returnValue = cuvsRMMFree(cuvsResources, neighborsDP, neighborsBytes);
-        checkCuVSError(returnValue, "cuvsRMMFree");
-        returnValue = cuvsRMMFree(cuvsResources, distancesDP, distanceBytes);
-        checkCuVSError(returnValue, "cuvsRMMFree");
-        returnValue = cuvsRMMFree(cuvsResources, queriesDP, queriesBytes);
-        checkCuVSError(returnValue, "cuvsRMMFree");
-        if (prefilterBytes > 0) {
-          returnValue = cuvsRMMFree(cuvsResources, prefilterDP, prefilterBytes);
-          checkCuVSError(returnValue, "cuvsRMMFree");
-        }
+            returnValue = cuvsRMMFree(cuvsResources, neighborsDP, neighborsBytes);
+            checkCuVSError(returnValue, "cuvsRMMFree");
+            returnValue = cuvsRMMFree(cuvsResources, distancesDP, distanceBytes);
+            checkCuVSError(returnValue, "cuvsRMMFree");
+            returnValue = cuvsRMMFree(cuvsResources, queriesDP, queriesBytes);
+            checkCuVSError(returnValue, "cuvsRMMFree");
+            if (prefilterBytes > 0) {
+              returnValue = cuvsRMMFree(cuvsResources, prefilterDP, prefilterBytes);
+              checkCuVSError(returnValue, "cuvsRMMFree");
+            }
+          });
 
-        return new BruteForceSearchResults(
-                neighborsSequenceLayout,
-                distancesSequenceLayout,
-                neighborsMemorySegment,
-                distancesMemorySegment,
-                cuvsQuery.getTopK(),
-                cuvsQuery.getMapping(),
-                numQueries);
-      }
+      return new BruteForceSearchResults(
+          neighborsSequenceLayout,
+          distancesSequenceLayout,
+          neighborsMemorySegment,
+          distancesMemorySegment,
+          cuvsQuery.getTopK(),
+          cuvsQuery.getMapping(),
+          numQueries);
     }
   }
 
@@ -344,18 +332,21 @@ public class BruteForceIndexImpl implements BruteForceIndex {
   @Override
   public void serialize(OutputStream outputStream, Path tempFile) throws Throwable {
     checkNotDestroyed();
-    tempFile = tempFile.toAbsolutePath();
+    var tempFilePath = tempFile.toAbsolutePath();
 
-    try (var localArena = Arena.ofConfined(); var resourcesAccessor = resources.access()) {
-      int returnValue =
-          cuvsBruteForceSerialize(
-                  resourcesAccessor.handle(),
-              localArena.allocateFrom(tempFile.toString()),
-              bruteForceIndexReference.indexPtr);
-      checkCuVSError(returnValue, "cuvsBruteForceSerialize");
+    try (var localArena = Arena.ofConfined()) {
+      resources.access(
+          handle -> {
+            int returnValue =
+                cuvsBruteForceSerialize(
+                    handle,
+                    localArena.allocateFrom(tempFilePath.toString()),
+                    bruteForceIndexReference.indexPtr);
+            checkCuVSError(returnValue, "cuvsBruteForceSerialize");
+          });
     }
 
-    try (var inputStream = Files.newInputStream(tempFile)) {
+    try (var inputStream = Files.newInputStream(tempFilePath)) {
       inputStream.transferTo(outputStream);
     } finally {
       Files.deleteIfExists(tempFile);
@@ -395,14 +386,16 @@ public class BruteForceIndexImpl implements BruteForceIndex {
 
     try (inputStream;
         var outputStream = Files.newOutputStream(tmpIndexFile);
-        var arena = Arena.ofConfined();
-        var resourcesAccessor = resources.access()) {
+        var arena = Arena.ofConfined()) {
       inputStream.transferTo(outputStream);
 
-      int returnValue =
-          cuvsBruteForceDeserialize(
-                  resourcesAccessor.handle(), arena.allocateFrom(tmpIndexFile.toString()), indexReference.indexPtr);
-      checkCuVSError(returnValue, "cuvsBruteForceDeserialize");
+      resources.access(
+          handle -> {
+            int returnValue =
+                cuvsBruteForceDeserialize(
+                    handle, arena.allocateFrom(tmpIndexFile.toString()), indexReference.indexPtr);
+            checkCuVSError(returnValue, "cuvsBruteForceDeserialize");
+          });
 
     } finally {
       Files.deleteIfExists(tmpIndexFile);
