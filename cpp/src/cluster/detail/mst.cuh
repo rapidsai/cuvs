@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include "../../neighbors/detail/ann_utils.cuh"
 #include "../../sparse/neighbors/cross_component_nn.cuh"
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/memory_type.hpp>
