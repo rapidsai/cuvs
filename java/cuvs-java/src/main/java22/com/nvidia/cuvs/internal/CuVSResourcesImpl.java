@@ -34,6 +34,7 @@ public class CuVSResourcesImpl implements CuVSResources {
   private final Path tempDirectory;
   private final Arena arena;
   private final long resourceHandle;
+  private final ScopedAccess access;
 
   /**
    * Constructor that allocates the resources needed for cuVS
@@ -48,12 +49,22 @@ public class CuVSResourcesImpl implements CuVSResources {
       int returnValue = cuvsResourcesCreate(resourcesMemorySegment);
       checkCuVSError(returnValue, "cuvsResourcesCreate");
       this.resourceHandle = resourcesMemorySegment.get(cuvsResources_t, 0);
+      this.access =
+          new ScopedAccess() {
+            @Override
+            public long handle() {
+              return resourceHandle;
+            }
+
+            @Override
+            public void close() {}
+          };
     }
   }
 
   @Override
-  public void access(ScopedAccessor accessor) {
-    accessor.handle(resourceHandle);
+  public ScopedAccess access() {
+    return this.access;
   }
 
   @Override

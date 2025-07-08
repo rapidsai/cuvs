@@ -193,28 +193,26 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
 
     int numTestsRuns = 10;
-    try (CuVSResources resources = CheckedCuVSResources.create()) {
-      runConcurrently(
-          numTestsRuns,
-          () ->
-              () -> {
-                try {
-                  var index = indexOnce(dataset, resources);
-                  var indexPath = serializeOnce(index);
-                  var loadedIndex = deserializeOnce(indexPath, resources);
-                  queryOnce(
-                      index,
-                      loadedIndex,
-                      SearchResults.IDENTITY_MAPPING,
-                      queries,
-                      expectedResults,
-                      resources);
-                  cleanup(indexPath, index, loadedIndex);
-                } catch (Throwable e) {
-                  throw new RuntimeException(e);
-                }
-              });
-    }
+    runConcurrently(
+        numTestsRuns,
+        () ->
+            () -> {
+              try (CuVSResources resources = CheckedCuVSResources.create()) {
+                var index = indexOnce(dataset, resources);
+                var indexPath = serializeOnce(index);
+                var loadedIndex = deserializeOnce(indexPath, resources);
+                queryOnce(
+                    index,
+                    loadedIndex,
+                    SearchResults.IDENTITY_MAPPING,
+                    queries,
+                    expectedResults,
+                    resources);
+                cleanup(indexPath, index, loadedIndex);
+              } catch (Throwable e) {
+                throw new RuntimeException(e);
+              }
+            });
   }
 
   @Test
@@ -260,24 +258,29 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
   @Test
   public void testDeserialization() throws Throwable {
     float[][] dataset = createSampleData();
+    var indexPath = createSerializedIndex(dataset);
+    for (int i = 0; i < 100; ++i) {
+      int numTestsRuns = 10;
+      runConcurrently(
+          numTestsRuns,
+          () ->
+              () -> {
+                try (CuVSResources resources = CheckedCuVSResources.create()) {
+                  deserializeOnce(indexPath, resources).destroyIndex();
+                } catch (Throwable e) {
+                  throw new RuntimeException(e);
+                }
+              });
+    }
+    Files.deleteIfExists(indexPath);
+  }
+
+  private Path createSerializedIndex(float[][] dataset) throws Throwable {
     try (CuVSResources resources = CheckedCuVSResources.create()) {
       var index = indexOnce(dataset, resources);
       var indexPath = serializeOnce(index);
-      for (int i = 0; i < 100; ++i) {
-        int numTestsRuns = 10;
-        runConcurrently(
-            numTestsRuns,
-            () ->
-                () -> {
-                  try {
-                    deserializeOnce(indexPath, resources).destroyIndex();
-                  } catch (Throwable e) {
-                    throw new RuntimeException(e);
-                  }
-                });
-      }
-      Files.deleteIfExists(indexPath);
       index.destroyIndex();
+      return indexPath;
     }
   }
 

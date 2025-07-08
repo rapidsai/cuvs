@@ -40,18 +40,25 @@ public class CheckedCuVSResources implements CuVSResources {
   }
 
   @Override
-  public void access(ScopedAccessor accessor) {
+  public ScopedAccess access() {
     checkNotDestroyed();
     var previousThreadId = currentThreadId.compareAndExchange(0, Thread.currentThread().threadId());
     if (previousThreadId != 0) {
       throw new IllegalStateException(
           "This resource is already accessed by thread [" + previousThreadId + "]");
     }
-    try {
-      inner.access(accessor);
-    } finally {
-      currentThreadId.set(0);
-    }
+    return new ScopedAccess() {
+      @Override
+      public long handle() {
+        checkNotDestroyed();
+        return inner.access().handle();
+      }
+
+      @Override
+      public void close() {
+        currentThreadId.set(0);
+      }
+    };
   }
 
   @Override
