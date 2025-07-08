@@ -123,10 +123,10 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       checkCuVSError(returnValue, "cuvsBruteForceIndexDestroy");
 
       if (bruteForceIndexReference.datasetBytes > 0) {
-        try (var resource = resources.getAccess()) {
+        try (var resourcesAccessor = resources.access()) {
           returnValue =
                   cuvsRMMFree(
-                          resource.handle(),
+                          resourcesAccessor.handle(),
                           bruteForceIndexReference.datasetPtr,
                           bruteForceIndexReference.datasetBytes);
           checkCuVSError(returnValue, "cuvsRMMFree");
@@ -152,8 +152,8 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       Arena arena = resources.getArena();
       MemorySegment datasetMemSegment = dataset.asMemorySegment();
 
-      try (var resource = resources.getAccess()) {
-        long cuvsResources = resource.handle();
+      try (var resourcesAccessor = resources.access()) {
+        long cuvsResources = resourcesAccessor.handle();
 
         omp_set_num_threads(bruteForceIndexParams.getNumWriterThreads());
 
@@ -228,8 +228,8 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       MemorySegment querySeg = buildMemorySegment(arena, cuvsQuery.getQueryVectors());
 
       int topk = cuvsQuery.getTopK();
-      try (var resource = resources.getAccess()) {
-        long cuvsResources = resource.handle();
+      try (var resourcesAccessor = resources.access()) {
+        long cuvsResources = resourcesAccessor.handle();
         MemorySegment stream = arena.allocate(cudaStream_t);
         var returnValue = cuvsStreamGet(cuvsResources, stream);
         checkCuVSError(returnValue, "cuvsStreamGet");
@@ -346,10 +346,10 @@ public class BruteForceIndexImpl implements BruteForceIndex {
     checkNotDestroyed();
     tempFile = tempFile.toAbsolutePath();
 
-    try (var localArena = Arena.ofConfined(); var resource = resources.getAccess()) {
+    try (var localArena = Arena.ofConfined(); var resourcesAccessor = resources.access()) {
       int returnValue =
           cuvsBruteForceSerialize(
-              resource.handle(),
+                  resourcesAccessor.handle(),
               localArena.allocateFrom(tempFile.toString()),
               bruteForceIndexReference.indexPtr);
       checkCuVSError(returnValue, "cuvsBruteForceSerialize");
@@ -396,12 +396,12 @@ public class BruteForceIndexImpl implements BruteForceIndex {
     try (inputStream;
         var outputStream = Files.newOutputStream(tmpIndexFile);
         var arena = Arena.ofConfined();
-        var resource = resources.getAccess()) {
+        var resourcesAccessor = resources.access()) {
       inputStream.transferTo(outputStream);
 
       int returnValue =
           cuvsBruteForceDeserialize(
-              resource.handle(), arena.allocateFrom(tmpIndexFile.toString()), indexReference.indexPtr);
+                  resourcesAccessor.handle(), arena.allocateFrom(tmpIndexFile.toString()), indexReference.indexPtr);
       checkCuVSError(returnValue, "cuvsBruteForceDeserialize");
 
     } finally {
