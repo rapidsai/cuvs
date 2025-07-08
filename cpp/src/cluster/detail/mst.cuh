@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "../../neighbors/detail/ann_utils.cuh"
 #include "../../sparse/neighbors/cross_component_nn.cuh"
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -299,11 +300,11 @@ void build_sorted_mst(
   int iters        = 1;
   int n_components = cuvs::sparse::neighbors::get_n_components(color, m, stream);
 
-  // TODO: Think about how to handle this for G+H. C-style malloc'd arrays can still lead to the
-  // device route being taken.
-  cudaPointerAttributes ptr_attrs;
-  RAFT_CUDA_TRY(cudaPointerGetAttributes(&ptr_attrs, X));
-  const bool device_accessible = ptr_attrs.devicePointer != nullptr;
+  bool device_accessible = true;
+  if (cuvs::spatial::knn::detail::utils::check_pointer_residency(X) ==
+      cuvs::spatial::knn::detail::utils::pointer_residency::host_only) {
+    device_accessible = false;
+  }
 
   while (n_components > 1 && iters < max_iter) {
     if (device_accessible) {
