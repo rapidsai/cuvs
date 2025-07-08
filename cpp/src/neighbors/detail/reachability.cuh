@@ -123,6 +123,19 @@ void _compute_core_dists(const raft::resources& handle,
   core_distances<value_idx>(dists.data(), min_samples, min_samples, m, core_dists, stream);
 }
 
+//  Functor to post-process distances into reachability space
+template <typename value_idx, typename value_t>
+struct ReachabilityPostProcess {
+  DI value_t operator()(value_t value, value_idx row, value_idx col) const
+  {
+    return max(core_dists[col], max(core_dists[row], alpha * value));
+  }
+
+  const value_t* core_dists;
+  value_t alpha;
+  size_t n;  // size of core_dists array
+};
+
 /**
  * Given core distances, Fuses computations of L2 distances between all
  * points, projection into mutual reachability space, and k-selection.

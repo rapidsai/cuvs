@@ -564,6 +564,7 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
           nullptr,
           dist_epilogue);
       }
+
       raft::copy(this->batch_neighbors_h.value().data_handle(),
                  this->batch_neighbors_d.value().data_handle(),
                  num_data_in_cluster * this->k,
@@ -654,6 +655,7 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
 };
 
 template <typename T, typename IdxT, typename DistEpilogueT = raft::identity_op>
+
 std::unique_ptr<all_neighbors_builder<T, IdxT>> get_knn_builder(
   const raft::resources& handle,
   const all_neighbors_params& params,
@@ -681,6 +683,7 @@ std::unique_ptr<all_neighbors_builder<T, IdxT>> get_knn_builder(
       indices,
       distances,
       dist_epilogue);
+
   } else if (std::holds_alternative<graph_build_params::nn_descent_params>(
                params.graph_build_params)) {
     auto nn_descent_params =
