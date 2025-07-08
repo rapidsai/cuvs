@@ -15,7 +15,7 @@
  */
 
 #include "../test_utils.cuh"
-#include <cuvs/preprocessing/spectral/spectral_embedding.hpp>
+#include <cuvs/preprocessing/spectral_embedding.hpp>
 #include <cuvs/stats/trustworthiness_score.hpp>  // Add trustworthiness header
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>

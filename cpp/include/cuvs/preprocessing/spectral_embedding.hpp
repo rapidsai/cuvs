@@ -41,7 +41,6 @@ struct params {
   uint64_t seed;
 };
 
-// template <typename IndexTypeT, typename ValueTypeT>
 auto transform(raft::resources const& handle,
                params config,
                raft::device_matrix_view<float, int, raft::row_major> dataset,
