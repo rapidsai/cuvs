@@ -16,10 +16,11 @@
 #pragma once
 
 #include "../common/ann_types.hpp"
-#include "../common/thread_pool.hpp"
 #include "../common/util.hpp"
 
 #include <hnswlib/hnswlib.h>
+
+#include <omp.h>
 
 #include <algorithm>
 #include <atomic>
@@ -71,13 +72,13 @@ class hnsw_lib : public algo<T> {
   struct build_param {
     int m;
     int ef_construction;
-    int num_threads = omp_get_num_procs();
+    int num_threads = omp_get_max_threads();
   };
 
   using search_param_base = typename algo<T>::search_param;
   struct search_param : public search_param_base {
     int ef;
-    int num_threads = 1;
+    int num_threads = omp_get_max_threads();
   };
 
   hnsw_lib(Metric metric, int dim, const build_param& param);
@@ -119,7 +120,6 @@ class hnsw_lib : public algo<T> {
   int ef_construction_;
   int m_;
   int num_threads_;
-  std::shared_ptr<fixed_thread_pool> thread_pool_;
   Mode bench_mode_;
 };
 
@@ -155,22 +155,10 @@ void hnsw_lib<T>::build(const T* dataset, size_t nrow)
   appr_alg_ = std::make_shared<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
     space_.get(), nrow, m_, ef_construction_);
 
-  thread_pool_                  = std::make_shared<fixed_thread_pool>(num_threads_);
-  const size_t items_per_thread = nrow / (num_threads_ + 1);
-
-  thread_pool_->submit(
-    [&](size_t i) {
-      if (i < items_per_thread && i % 10000 == 0) {
-        char buf[20];
-        std::time_t now = std::time(nullptr);
-        std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
-        printf("%s building %zu / %zu\n", buf, i, items_per_thread);
-        fflush(stdout);
-      }
-
-      appr_alg_->addPoint(dataset + i * dim_, i);
-    },
-    nrow);
+#pragma omp parallel for num_threads(num_threads_)
+  for (size_t i = 0; i < nrow; i++) {
+    appr_alg_->addPoint(dataset + i * dim_, i);
+  }
 }
 
 template <typename T>
@@ -180,12 +168,7 @@ void hnsw_lib<T>::set_search_param(const search_param_base& param_, const void* 
   auto param     = dynamic_cast<const search_param&>(param_);
   appr_alg_->ef_ = param.ef;
   num_threads_   = param.num_threads;
-  // bench_mode_ = param.metric_objective;
   bench_mode_ = Mode::kLatency;  // TODO(achirkin): pass the benchmark mode in the algo parameters
-
-  // Create a pool if multiple query threads have been set and the pool hasn't been created already
-  bool create_pool = (bench_mode_ == Mode::kLatency && num_threads_ > 1 && !thread_pool_);
-  if (create_pool) { thread_pool_ = std::make_shared<fixed_thread_pool>(num_threads_); }
 }
 
 template <typename T>
@@ -197,7 +180,10 @@ void hnsw_lib<T>::search(
     get_search_knn_results(query + i * dim_, k, indices + i * k, distances + i * k);
   };
   if (bench_mode_ == Mode::kLatency && num_threads_ > 1) {
-    thread_pool_->submit(f, batch_size);
+#pragma omp parallel for num_threads(num_threads_)
+    for (int i = 0; i < batch_size; i++) {
+      f(i);
+    }
   } else {
     for (int i = 0; i < batch_size; i++) {
       f(i);
