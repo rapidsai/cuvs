@@ -17,7 +17,7 @@
 
 #include "../detail/knn_brute_force.cuh"
 #include "../detail/nn_descent_gnnd.hpp"
-#include "../detail/reachability_types.cuh"
+#include "../detail/reachability.cuh"
 #include "all_neighbors_merge.cuh"
 #include "raft/core/device_mdarray.hpp"
 #include "raft/core/mdspan.hpp"

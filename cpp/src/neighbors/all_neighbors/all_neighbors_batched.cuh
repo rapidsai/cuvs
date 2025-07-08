@@ -16,7 +16,6 @@
 
 #pragma once
 #include "../detail/reachability.cuh"
-#include "../detail/reachability_types.cuh"
 #include "all_neighbors_builder.cuh"
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>

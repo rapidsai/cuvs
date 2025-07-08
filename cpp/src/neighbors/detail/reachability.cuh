@@ -16,7 +16,6 @@
 
 #pragma once
 #include "./knn_brute_force.cuh"
-#include "./reachability_types.cuh"
 
 #include <raft/linalg/unary_op.cuh>
 #include <raft/sparse/convert/csr.cuh>
