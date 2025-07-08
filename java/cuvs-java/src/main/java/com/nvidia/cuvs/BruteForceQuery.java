@@ -40,7 +40,7 @@ public class BruteForceQuery {
    * @param queryVectors 2D float query vector array
    * @param mapping      an instance of ID mapping
    * @param topK         the top k results to return
-   * @param prefilter    the prefilter data to use while searching the BRUTEFORCE
+   * @param prefilters   the prefilters data to use while searching the BRUTEFORCE
    *                     index
    * @param numDocs      Maximum of bits in each prefilter, representing number of documents in this index.
    *                     Used only when prefilter(s) is/are passed.
@@ -155,7 +155,7 @@ public class BruteForceQuery {
      *        many bits as there are vectors in the index
      * @return an instance of this Builder
      */
-    public Builder withPrefilter(BitSet[] prefilters, int numDocs) {
+    public Builder withPrefilters(BitSet[] prefilters, int numDocs) {
       this.prefilters = prefilters;
       this.numDocs = numDocs;
       return this;

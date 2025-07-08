@@ -53,8 +53,13 @@ cdef extern from "cuvs/neighbors/nn_descent.h" nogil:
 
     cuvsError_t cuvsNNDescentIndexDestroy(cuvsNNDescentIndex_t index)
 
-    cuvsError_t cuvsNNDescentIndexGetGraph(cuvsNNDescentIndex_t index,
+    cuvsError_t cuvsNNDescentIndexGetGraph(cuvsResources_t res,
+                                           cuvsNNDescentIndex_t index,
                                            DLManagedTensor * output)
+
+    cuvsError_t cuvsNNDescentIndexGetDistances(cuvsResources_t res,
+                                               cuvsNNDescentIndex_t index,
+                                               DLManagedTensor * output)
 
     cuvsError_t cuvsNNDescentBuild(cuvsResources_t res,
                                    cuvsNNDescentIndexParams* params,

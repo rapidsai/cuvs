@@ -68,7 +68,7 @@ inline bool is_c_contiguous(DLManagedTensor* tensor) { return detail::is_c_conti
 inline bool is_f_contiguous(DLManagedTensor* tensor) { return detail::is_f_contiguous(tensor); }
 
 /**
- * @brief Convert a DLManagedTensor to an mdspan
+ * @brief Convert a DLManagedTensor to a mdspan
  * NOTE: This function only supports compact row-major and col-major layouts.
  *
  * @code {.cpp}
@@ -91,6 +91,19 @@ template <typename MdspanType, typename = raft::is_mdspan_t<MdspanType>>
 inline MdspanType from_dlpack(DLManagedTensor* managed_tensor)
 {
   return detail::from_dlpack<MdspanType>(managed_tensor);
+}
+
+/**
+ * @brief Convert a mdspan to a DLManagedTensor
+ *
+ * Converts a mdspan to a DLManagedTensor object. This lets us pass non-owning
+ * views from C++ to C code without copying.  Note that returned DLManagedTensor
+ * is a non-owning view, and doesn't ensure that the underlying memory stays valid.
+ */
+template <typename MdspanType, typename = raft::is_mdspan_t<MdspanType>>
+void to_dlpack(MdspanType src, DLManagedTensor* dst)
+{
+  return detail::to_dlpack(src, dst);
 }
 
 /**

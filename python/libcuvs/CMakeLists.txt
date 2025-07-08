@@ -25,6 +25,8 @@ project(
   LANGUAGES CXX CUDA
 )
 
+option(USE_NCCL_RUNTIME_WHEEL "Use the NCCL wheel at runtime instead of the system library" OFF)
+
 # Check if cuVS is already available. If so, it is the user's responsibility to ensure that the
 # CMake package is also available at build time of the Python cuvs package.
 find_package(cuvs "${RAPIDS_VERSION}")
@@ -57,6 +59,11 @@ set(rpaths
     "$ORIGIN/../../nvidia/cusparse/lib"
     "$ORIGIN/../../nvidia/nvjitlink/lib"
 )
+
+if(USE_NCCL_RUNTIME_WHEEL)
+  list(APPEND rpaths "$ORIGIN/../../nvidia/nccl/lib")
+endif()
+
 set_property(
   TARGET cuvs
   PROPERTY INSTALL_RPATH ${rpaths}

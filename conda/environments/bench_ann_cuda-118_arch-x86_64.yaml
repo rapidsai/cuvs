@@ -9,8 +9,8 @@ channels:
 dependencies:
 - benchmark>=1.8.2
 - c-compiler
-- clang-tools==16.0.6
-- clang==16.0.6
+- clang-tools==20.1.4
+- clang==20.1.4
 - click
 - cmake>=3.30.4
 - cuda-nvtx=11.8
@@ -28,7 +28,7 @@ dependencies:
 - h5py>=3.8.0
 - libaio
 - libboost-devel=1.87
-- libclang==16.0.6
+- libclang==20.1.4
 - libcublas-dev=11.11.3.6
 - libcublas=11.11.3.6
 - libcurand-dev=10.3.0.86
@@ -39,7 +39,7 @@ dependencies:
 - libcusparse=11.7.5.86
 - libcuvs==25.6.*,>=0.0.0a0
 - librmm==25.6.*,>=0.0.0a0
-- matplotlib-base
+- matplotlib-base>=3.9
 - mkl-devel=2023
 - nccl>=2.19
 - ninja

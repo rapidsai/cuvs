@@ -33,6 +33,7 @@ jobs:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
       date: ${{ inputs.date }}
+      script: ci/build_cpp.sh
       sha: ${{ inputs.sha }}
   rust-build:
     needs: cpp-build
@@ -45,7 +46,7 @@ jobs:
       date: ${{ inputs.date }}
       container_image: "rapidsai/ci-conda:latest"
       node_type: "gpu-l4-latest-1"
-      run_script: "ci/build_rust.sh"
+      script: "ci/build_rust.sh"
       sha: ${{ inputs.sha }}
   rust-publish:
     needs: rust-build
@@ -62,7 +63,20 @@ jobs:
       date: ${{ inputs.date }}
       container_image: "rapidsai/ci-conda:latest"
       node_type: "gpu-l4-latest-1"
-      run_script: "ci/build_go.sh"
+      script: "ci/build_go.sh"
+      sha: ${{ inputs.sha }}
+  java-build:
+    needs: cpp-build
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.06
+    with:
+      build_type: ${{ inputs.build_type || 'branch' }}
+      branch: ${{ inputs.branch }}
+      arch: "amd64"
+      date: ${{ inputs.date }}
+      container_image: "rapidsai/ci-conda:latest"
+      script: "ci/build_java.sh"
+      file_to_upload: "java/cuvs-java/target/"
       sha: ${{ inputs.sha }}
   python-build:
     needs: [cpp-build]
@@ -72,6 +86,7 @@ jobs:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
       date: ${{ inputs.date }}
+      script: ci/build_python.sh
       sha: ${{ inputs.sha }}
   upload-conda:
     needs: [cpp-build, python-build]
@@ -95,7 +110,7 @@ jobs:
       container_image: "rapidsai/ci-conda:latest"
       date: ${{ inputs.date }}
       node_type: "gpu-l4-latest-1"
-      run_script: "ci/build_docs.sh"
+      script: "ci/build_docs.sh"
       sha: ${{ inputs.sha }}
   wheel-build-libcuvs:
     secrets: inherit
@@ -108,8 +123,8 @@ jobs:
       script: ci/build_wheel_libcuvs.sh
       # build for every combination of arch and CUDA version, but only for the latest Python
       matrix_filter: group_by([.ARCH, (.CUDA_VER|split(".")|map(tonumber)|.[0])]) | map(max_by(.PY_VER|split(".")|map(tonumber)))
+      package-name: libcuvs
       package-type: cpp
-      wheel-name: libcuvs
   wheel-publish-libcuvs:
     needs: wheel-build-libcuvs
     secrets: inherit
@@ -131,8 +146,8 @@ jobs:
       sha: ${{ inputs.sha }}
       date: ${{ inputs.date }}
       script: ci/build_wheel_cuvs.sh
+      package-name: cuvs
       package-type: python
-      wheel-name: cuvs
   wheel-publish-cuvs:
     needs: wheel-build-cuvs
     secrets: inherit

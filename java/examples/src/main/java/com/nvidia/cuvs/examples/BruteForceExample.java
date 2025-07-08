@@ -4,26 +4,23 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.lang.invoke.MethodHandles;
 import java.util.UUID;
-
-import com.nvidia.cuvs.SearchResults;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.logging.Logger;
 
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.BruteForceIndexParams;
 import com.nvidia.cuvs.BruteForceQuery;
 import com.nvidia.cuvs.CuVSResources;
+import com.nvidia.cuvs.SearchResults;
 
 public class BruteForceExample {
 
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  private static final Logger log = Logger.getLogger(BruteForceExample.class.getName());
 
   public static void main(String[] args) throws Throwable {
 
     // Sample data and query
-    float[][] dataset = {
+    float[][] vectors = {
         { 0.74021935f, 0.9209938f },
         { 0.03902049f, 0.9689629f },
         { 0.92514056f, 0.4463501f },
@@ -51,7 +48,7 @@ public class BruteForceExample {
 
       // Create the index with the dataset
       BruteForceIndex index = BruteForceIndex.newBuilder(resources)
-          .withDataset(dataset)
+          .withDataset(vectors)
           .withIndexParams(indexParams)
           .build();
 

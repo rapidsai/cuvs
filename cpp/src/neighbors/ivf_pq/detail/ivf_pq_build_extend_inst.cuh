@@ -29,7 +29,7 @@ namespace cuvs::neighbors::ivf_pq {
   auto build(raft::resources const& handle,                                                       \
              const cuvs::neighbors::ivf_pq::index_params& params,                                 \
              raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)                 \
-    ->cuvs::neighbors::ivf_pq::index<IdxT>                                                        \
+    -> cuvs::neighbors::ivf_pq::index<IdxT>                                                       \
   {                                                                                               \
     return cuvs::neighbors::ivf_pq::detail::build(handle, params, dataset);                       \
   }                                                                                               \
@@ -45,7 +45,7 @@ namespace cuvs::neighbors::ivf_pq {
   auto build(raft::resources const& handle,                                                       \
              const cuvs::neighbors::ivf_pq::index_params& params,                                 \
              raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)                   \
-    ->cuvs::neighbors::ivf_pq::index<IdxT>                                                        \
+    -> cuvs::neighbors::ivf_pq::index<IdxT>                                                       \
   {                                                                                               \
     return cuvs::neighbors::ivf_pq::detail::build(handle, params, dataset);                       \
   }                                                                                               \
@@ -62,7 +62,7 @@ namespace cuvs::neighbors::ivf_pq {
     raft::device_matrix_view<const T, int64_t, raft::row_major> new_vectors,                      \
     std::optional<raft::device_vector_view<const IdxT, int64_t, raft::row_major>> new_indices,    \
     const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index)                                       \
-    ->cuvs::neighbors::ivf_pq::index<IdxT>                                                        \
+    -> cuvs::neighbors::ivf_pq::index<IdxT>                                                       \
   {                                                                                               \
     return cuvs::neighbors::ivf_pq::detail::extend(handle, new_vectors, new_indices, orig_index); \
   }                                                                                               \
@@ -77,7 +77,7 @@ namespace cuvs::neighbors::ivf_pq {
               raft::host_matrix_view<const T, int64_t, raft::row_major> new_vectors,              \
               std::optional<raft::host_vector_view<const IdxT, int64_t>> new_indices,             \
               const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index)                             \
-    ->cuvs::neighbors::ivf_pq::index<IdxT>                                                        \
+    -> cuvs::neighbors::ivf_pq::index<IdxT>                                                       \
   {                                                                                               \
     return cuvs::neighbors::ivf_pq::detail::extend(handle, new_vectors, new_indices, orig_index); \
   }                                                                                               \

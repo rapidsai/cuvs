@@ -1,0 +1,12 @@
+name: faiss_gpu_cagra_hnsw
+constraints:
+  build: cuvs_bench.config.algos.constraints.cuvs_cagra_build
+groups:
+  base:
+    build:
+      graph_degree: [32, 64]
+      intermediate_graph_degree: [64, 128]
+      cagra_build_algo: ["NN_DESCENT"]
+      base_level_only: [False, True]
+    search:
+      efSearch: [16, 32, 64, 128, 256, 512, 768, 1024]

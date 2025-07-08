@@ -141,4 +141,30 @@ inline bool is_c_contiguous(DLManagedTensor* managed_tensor)
   return true;
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+static void free_dlmanaged_tensor_shape(DLManagedTensor* tensor)
+{
+  delete[] tensor->dl_tensor.shape;
+}
+#pragma GCC diagnostic pop
+
+template <typename MdspanType, typename = raft::is_mdspan_t<MdspanType>>
+static void to_dlpack(MdspanType src, DLManagedTensor* dst)
+{
+  auto tensor = &dst->dl_tensor;
+
+  tensor->dtype  = data_type_to_DLDataType<typename MdspanType::value_type>();
+  tensor->device = accessor_type_to_DLDevice<typename MdspanType::accessor_type>();
+  tensor->ndim   = MdspanType::extents_type::rank();
+  tensor->data   = src.data_handle();
+
+  tensor->shape = new int64_t[tensor->ndim];
+  dst->deleter  = free_dlmanaged_tensor_shape;
+
+  for (int64_t i = 0; i < tensor->ndim; ++i) {
+    tensor->shape[i] = src.extent(i);
+  }
+}
+
 }  // namespace cuvs::core::detail

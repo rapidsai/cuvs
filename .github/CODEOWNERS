@@ -15,11 +15,6 @@ CMakeLists.txt     @rapidsai/cuvs-cmake-codeowners
 **/cmake/          @rapidsai/cuvs-cmake-codeowners
 *.cmake            @rapidsai/cuvs-cmake-codeowners
 
-#build code owners
-python/setup.py    @rapidsai/cuvs-build-codeowners
-build.sh           @rapidsai/cuvs-build-codeowners
-**/build.sh        @rapidsai/cuvs-build-codeowners
-
 #CI code owners
 /.github/                @rapidsai/ci-codeowners
 /ci/                     @rapidsai/ci-codeowners
@@ -31,3 +26,6 @@ build.sh           @rapidsai/cuvs-build-codeowners
 dependencies.yaml        @rapidsai/packaging-codeowners
 /build.sh                @rapidsai/packaging-codeowners
 pyproject.toml           @rapidsai/packaging-codeowners
+python/setup.py          @rapidsai/packaging-codeowners
+build.sh                 @rapidsai/packaging-codeowners
+**/build.sh              @rapidsai/packaging-codeowners

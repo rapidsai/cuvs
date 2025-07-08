@@ -179,6 +179,21 @@ struct cuvsIvfPqSearchParams {
    */
   cudaDataType_t internal_distance_dtype;
   /**
+   * The data type to use as the GEMM element type when searching the clusters to probe.
+   *
+   * Possible values: [CUDA_R_8I, CUDA_R_16F, CUDA_R_32F].
+   *
+   * - Legacy default: CUDA_R_32F (float)
+   * - Recommended for performance: CUDA_R_16F (half)
+   * - Experimental/low-precision: CUDA_R_8I (int8_t)
+   *    (WARNING: int8_t variant degrades recall unless data is normalized and low-dimensional)
+   */
+  cudaDataType_t coarse_search_dtype;
+  /**
+   * Set the internal batch size to improve GPU utilization at the cost of larger memory footprint.
+   */
+  uint32_t max_internal_batch_size;
+  /**
    * Preferred fraction of SM's unified memory / L1 cache to be used as shared memory.
    *
    * Possible values: [0.0 - 1.0] as a fraction of the `sharedMemPerMultiprocessor`.
@@ -245,6 +260,25 @@ cuvsError_t cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index);
  * @param[in] index cuvsIvfPqIndex_t to de-allocate
  */
 cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index);
+
+/** Get the number of clusters/inverted lists */
+uint32_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index);
+
+/** Get the dimensionality */
+uint32_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index);
+
+/**
+ * @brief Get the cluster centers corresponding to the lists in the original space
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
+ * @param[out] centers Preallocated array on host or device memory to store output,
+ * dimensions [n_lists, dim]
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqIndexGetCenters(cuvsResources_t res,
+                                     cuvsIvfPqIndex_t index,
+                                     DLManagedTensor* centers);
 /**
  * @}
  */

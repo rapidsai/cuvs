@@ -239,6 +239,10 @@ void set_centers(raft::resources const& handle, index<IdxT>* index, const float*
   auto stream         = raft::resource::get_cuda_stream(handle);
   auto* device_memory = raft::resource::get_workspace_resource(handle);
 
+  // Make sure to have trailing zeroes between dim and dim_ext;
+  // We rely on this to enable padded tensor gemm kernels during coarse search.
+  cuvs::spatial::knn::detail::utils::memzero(
+    index->centers().data_handle(), index->centers().size(), stream);
   // combine cluster_centers and their norms
   RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle(),
                                   sizeof(float) * index->dim_ext(),
@@ -1899,5 +1903,27 @@ void extend(
                   new_vectors.data_handle(),
                   new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
                   n_rows);
+}
+
+template <typename output_mdspan_type>
+inline void extract_centers(raft::resources const& res,
+                            const cuvs::neighbors::ivf_pq::index<int64_t>& index,
+                            output_mdspan_type cluster_centers)
+{
+  RAFT_EXPECTS(cluster_centers.extent(0) == index.n_lists(),
+               "Number of rows in the output buffer for cluster centers must be equal to the "
+               "number of IVF lists");
+  RAFT_EXPECTS(
+    cluster_centers.extent(1) == index.dim(),
+    "Number of columns in the output buffer for cluster centers and index dim are different");
+  auto stream = raft::resource::get_cuda_stream(res);
+  RAFT_CUDA_TRY(cudaMemcpy2DAsync(cluster_centers.data_handle(),
+                                  sizeof(float) * index.dim(),
+                                  index.centers().data_handle(),
+                                  sizeof(float) * index.dim_ext(),
+                                  sizeof(float) * index.dim(),
+                                  index.n_lists(),
+                                  cudaMemcpyDefault,
+                                  stream));
 }
 }  // namespace cuvs::neighbors::ivf_pq::detail
