@@ -15,7 +15,9 @@ dependencies:
 - cuda-profiler-api
 - cuda-version=12.9
 - cxx-compiler
-- gcc_linux-64=13.*
+- dlpack>=0.8,<1.0
+- gcc_linux-aarch64=13.*
+- go
 - libclang==20.1.4
 - libcublas-dev
 - libcurand-dev
@@ -23,9 +25,7 @@ dependencies:
 - libcusparse-dev
 - libcuvs==25.8.*,>=0.0.0a0
 - libraft==25.8.*,>=0.0.0a0
-- make
 - nccl>=2.19
 - ninja
-- rust
-- sysroot_linux-64==2.28
-name: rust_cuda-129_arch-x86_64
+- sysroot_linux-aarch64==2.28
+name: go_cuda-129_arch-aarch64
