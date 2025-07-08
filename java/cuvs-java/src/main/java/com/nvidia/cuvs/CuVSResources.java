@@ -26,7 +26,7 @@ import java.nio.file.Path;
 public interface CuVSResources extends AutoCloseable {
 
   /**
-   * Provide scoped access to the resources object
+   * Provide scoped access to the native resources object.
    */
   interface ScopedAccess extends AutoCloseable {
     /**
@@ -41,7 +41,11 @@ public interface CuVSResources extends AutoCloseable {
   }
 
   /**
-   * Gets scoped access to the CuVSResources handle
+   * Gets scoped access to the native resources object.
+   * The native resource object is not thread safe: only a single thread at every time should access
+   * concurrently the same native resources. Calling this method from multiple thread is OK, but the
+   * returned {@link ScopedAccess} object must be closed before calling {@code access()} again from a
+   * different thread.
    */
   ScopedAccess access();
 
