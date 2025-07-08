@@ -126,13 +126,15 @@ struct all_neighbors_params {
  *                in host memory
  * @param[out] indices nearest neighbor indices of shape [n_row x k]
  * @param[out] distances nearest neighbor distances [n_row x k]
+ * @param[in] self_loop whether to include self loops in resulting knn graph
  */
 void build(
   const raft::resources& handle,
   const all_neighbors_params& params,
   raft::host_matrix_view<const float, int64_t, row_major> dataset,
   raft::device_matrix_view<int64_t, int64_t, row_major> indices,
-  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances = std::nullopt);
+  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances = std::nullopt,
+  bool self_loop                                                               = true);
 
 /**
  * @brief Builds an approximate all-neighbors knn graph (find nearest neighbors for all the training
@@ -156,13 +158,15 @@ void build(
  *                in device memory
  * @param[out] indices nearest neighbor indices of shape [n_row x k]
  * @param[out] distances nearest neighbor distances [n_row x k]
+ * @param[in] self_loop whether to include self loops in resulting knn graph
  */
 void build(
   const raft::resources& handle,
   const all_neighbors_params& params,
   raft::device_matrix_view<const float, int64_t, row_major> dataset,
   raft::device_matrix_view<int64_t, int64_t, row_major> indices,
-  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances = std::nullopt);
+  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances = std::nullopt,
+  bool self_loop                                                               = true);
 
 /** @} */
 }  // namespace cuvs::neighbors::all_neighbors
