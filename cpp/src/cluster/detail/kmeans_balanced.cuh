@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -314,9 +314,12 @@ void calc_centers_and_sizes(const raft::resources& handle,
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
+  auto centersView      = raft::make_device_matrix_view<MathT>(centers, n_clusters, dim);
+  auto clusterSizesView = raft::make_device_vector_view<const CounterT>(cluster_sizes, n_clusters);
+
   if (!reset_counters) {
-    raft::linalg::matrixVectorOp(
-      centers, centers, cluster_sizes, dim, n_clusters, true, false, raft::mul_op(), stream);
+    raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
+      handle, raft::make_const_mdspan(centersView), clusterSizesView, centersView, raft::mul_op{});
   }
 
   rmm::device_uvector<char> workspace(0, stream, mr);
@@ -350,15 +353,11 @@ void calc_centers_and_sizes(const raft::resources& handle,
     raft::linalg::add(cluster_sizes, cluster_sizes, temp_sizes, n_clusters, stream);
   }
 
-  raft::linalg::matrixVectorOp(centers,
-                               centers,
-                               cluster_sizes,
-                               dim,
-                               n_clusters,
-                               true,
-                               false,
-                               raft::div_checkzero_op(),
-                               stream);
+  raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(handle,
+                                                             raft::make_const_mdspan(centersView),
+                                                             clusterSizesView,
+                                                             centersView,
+                                                             raft::div_checkzero_op{});
 }
 
 /** Computes the L2 norm of the dataset, converting to MathT if necessary */

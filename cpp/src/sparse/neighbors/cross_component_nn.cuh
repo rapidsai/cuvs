@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2023, NVIDIA CORPORATION.
+ * Copyright (c) 2018-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,10 @@ namespace cuvs::sparse::neighbors {
 
 template <typename value_idx, typename value_t>
 using FixConnectivitiesRedOp = detail::FixConnectivitiesRedOp<value_idx, value_t>;
+
+template <typename value_idx, typename value_t>
+using MutualReachabilityFixConnectivitiesRedOp =
+  detail::MutualReachabilityFixConnectivitiesRedOp<value_idx, value_t>;
 
 /**
  * Gets the number of unique components from array of
