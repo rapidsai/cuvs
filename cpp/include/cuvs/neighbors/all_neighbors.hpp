@@ -130,6 +130,7 @@ struct all_neighbors_params {
  * compute core_distances. If core_distances is given, the resulting indices and distances will be
  * mutual reachability space.
  * @param[in] alpha distance scaling parameter as used in robust single linkage.
+ * @param[in] self_loop whether to include self loops in resulting knn graph
  */
 void build(
   const raft::resources& handle,
@@ -138,7 +139,7 @@ void build(
   raft::device_matrix_view<int64_t, int64_t, row_major> indices,
   std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances      = std::nullopt,
   std::optional<raft::device_vector_view<float, int64_t, row_major>> core_distances = std::nullopt,
-  float alpha                                                                       = 1.0);
+  float alpha = 1.0 bool self_loop = true);
 
 /**
  * @brief Builds an approximate all-neighbors knn graph (find nearest neighbors for all the training
@@ -166,6 +167,7 @@ void build(
  * compute core_distances. If core_distances is given, the resulting indices and distances will be
  * mutual reachability space.
  * @param[in] alpha distance scaling parameter as used in robust single linkage.
+ * @param[in] self_loop whether to include self loops in resulting knn graph
  */
 void build(
   const raft::resources& handle,
@@ -174,7 +176,7 @@ void build(
   raft::device_matrix_view<int64_t, int64_t, row_major> indices,
   std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances      = std::nullopt,
   std::optional<raft::device_vector_view<float, int64_t, row_major>> core_distances = std::nullopt,
-  float alpha                                                                       = 1.0);
+  float alpha = 1.0 bool self_loop = true);
 
 /** @} */
 }  // namespace cuvs::neighbors::all_neighbors

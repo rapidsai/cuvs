@@ -24,9 +24,19 @@
 namespace cuvs::neighbors::all_neighbors::detail {
 using namespace cuvs::neighbors;
 
-void check_metric(const all_neighbors_params& params, bool do_mutual_reachability_dist)
+void check_metric(const all_neighbors_params& params,
+                  bool do_mutual_reachability_dist,
+                  bool self_loop)
 {
   if (std::holds_alternative<graph_build_params::brute_force_params>(params.graph_build_params)) {
+    // result of brute force build and search always includes self loops
+    RAFT_EXPECTS(
+      self_loop,
+      "all-neighbors build with brute force does not support self_loop=false. To build a knn graph "
+      "without self loops using the brute force method, please build with k+1 neighbors and remove "
+      "the first column. "
+      "Another option is to use cuvs::neighbors::all_neighbors::build(...) with NN Descent or "
+      "IVFPQ as the graph build algorithm for support with self_loop=false.");
     /* There are issues with tiled_brute_force_knn (mainly the pairwise_distances functions being
      * used). pairwise_distances returns different distance for different input shapes, making it
      * difficult to use for batched all-neighbors which depend on distance comparison to rule out
@@ -160,9 +170,10 @@ void build(
   raft::device_matrix_view<IdxT, IdxT, row_major> indices,
   std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances      = std::nullopt,
   std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances = std::nullopt,
-  T alpha                                                                    = 1.0)
+  T alpha                                                                    = 1.0,
+  bool self_loop                                                             = true)
 {
-  check_metric(params, core_distances.has_value());
+  check_metric(params, core_distances.has_value(), self_loop);
 
   RAFT_EXPECTS(dataset.extent(0) == indices.extent(0),
                "number of rows in dataset should be the same as number of rows in indices matrix");
@@ -183,6 +194,14 @@ void build(
   } else {
     batch_build(handle, params, dataset, indices, distances, core_distances, alpha);
   }
+
+  if (self_loop) {
+    raft::matrix::shift(handle, indices, 1);
+    if (distances.has_value()) {
+      // TODO: handle innerproduct metric
+      raft::matrix::shift(handle, distances.value(), 1, std::make_optional<T>(0.0));
+    }
+  }
 }
 
 template <typename T, typename IdxT>
@@ -195,7 +214,7 @@ void build(
   std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances = std::nullopt,
   T alpha                                                                    = 1.0)
 {
-  check_metric(params, core_distances.has_value());
+  check_metric(params, core_distances.has_value(), self_loop);
 
   RAFT_EXPECTS(dataset.extent(0) == indices.extent(0),
                "number of rows in dataset should be the same as number of rows in indices matrix");
@@ -217,6 +236,14 @@ void build(
       "batch build.");
   } else {
     single_build(handle, params, dataset, indices, distances, core_distances, alpha);
+  }
+
+  if (self_loop) {
+    raft::matrix::shift(handle, indices, 1);
+    if (distances.has_value()) {
+      // TODO: handle innerproduct metric
+      raft::matrix::shift(handle, distances.value(), 1, std::make_optional<T>(0.0));
+    }
   }
 }
 }  // namespace cuvs::neighbors::all_neighbors::detail
