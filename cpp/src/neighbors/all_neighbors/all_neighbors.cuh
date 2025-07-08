@@ -29,8 +29,8 @@ void check_metric(const all_neighbors_params& params, bool self_loop)
     RAFT_EXPECTS(
       self_loop,
       "all-neighbors build with brute force does not support self_loop=false. To build a knn graph "
-      "without self loops "
-      "using the brute force method, please build with k+1 neighbors and remove the first column. "
+      "without self loops using the brute force method, please build with k+1 neighbors and remove "
+      "the first column. "
       "Another option is to use cuvs::neighbors::all_neighbors::build(...) with NN Descent or "
       "IVFPQ as the graph build algorithm for support with self_loop=false.");
     auto allowed_metrics_batch = params.metric == cuvs::distance::DistanceType::L2Expanded ||
@@ -104,9 +104,11 @@ void build(const raft::resources& handle,
   } else {
     batch_build(handle, params, dataset, indices, distances);
   }
+
   if (self_loop) {
     raft::matrix::shift(handle, indices, 1);
     if (distances.has_value()) {
+      // TODO: handle innerproduct metric
       raft::matrix::shift(handle, distances.value(), 1, std::make_optional<T>(0.0));
     }
   }
@@ -141,6 +143,7 @@ void build(const raft::resources& handle,
   if (self_loop) {
     raft::matrix::shift(handle, indices, 1);
     if (distances.has_value()) {
+      // TODO: handle innerproduct metric
       raft::matrix::shift(handle, distances.value(), 1, std::make_optional<T>(0.0));
     }
   }
