@@ -97,11 +97,7 @@ auto transform(raft::resources const& handle,
   // binarize to 1s
   raft::matrix::fill(handle, raft::make_device_vector_view(d_distances.data_handle(), nnz), 1.0f);
 
-  // // Define the reduction function with the correct signature
-  auto reduction_op = [] __device__(int row, int col, float a, float b) {
-    // Only use the values, ignore row/col indices
-    return 0.5f * (a + b);
-  };
+  auto reduction_op = [] __device__(int row, int col, float a, float b) { return 0.5f * (a + b); };
 
   raft::resource::sync_stream(handle, stream);
 
@@ -118,7 +114,6 @@ auto transform(raft::resources const& handle,
     handle, coo_matrix_view, sym_coo1_matrix, reduction_op);
 
   raft::resource::sync_stream(handle, stream);
-  // auto sym_coo1_matrix_view = sym_coo1_matrix.view();
   auto sym_coo1_structure = sym_coo1_matrix.structure_view();
   auto sym_coo1_n_rows    = sym_coo1_structure.get_n_rows();
   auto sym_coo1_n_cols    = sym_coo1_structure.get_n_cols();
