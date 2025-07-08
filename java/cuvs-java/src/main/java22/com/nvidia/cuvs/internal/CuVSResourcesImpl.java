@@ -23,6 +23,7 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
 import com.nvidia.cuvs.CuVSResources;
 import java.lang.foreign.Arena;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Used for allocating resources for cuVS
@@ -74,14 +75,37 @@ public class CuVSResourcesImpl implements CuVSResources {
     }
   }
 
-  /**
-   * Gets the opaque CuVSResources handle, to be used whenever we need to pass a cuvsResources_t parameter
-   *
-   * @return the CuVSResources handle
-   */
-  long getHandle() {
+  interface ResourceAccess extends AutoCloseable {
+    /**
+     * Gets the opaque CuVSResources handle, to be used whenever we need to pass a cuvsResources_t parameter
+     *
+     * @return the CuVSResources handle
+     */
+    long handle();
+    void close();
+  }
+
+  private final AtomicLong currentThreadId = new AtomicLong(0);
+
+  ResourceAccess getAccess() {
     checkNotDestroyed();
-    return resourceHandle;
+    var previousThreadId = currentThreadId.compareAndExchange(0, Thread.currentThread().threadId());
+    if (previousThreadId != 0) {
+      throw new IllegalStateException(
+          "This resource is already accessed by thread [" + previousThreadId + "]");
+    }
+    return new ResourceAccess() {
+      @Override
+      public long handle() {
+        checkNotDestroyed();
+        return resourceHandle;
+      }
+
+      @Override
+      public void close() {
+        currentThreadId.set(0);
+      }
+    };
   }
 
   /**
