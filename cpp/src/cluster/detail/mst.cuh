@@ -19,6 +19,7 @@
 #include "../../neighbors/detail/ann_utils.cuh"
 #include "../../sparse/neighbors/cross_component_nn.cuh"
 #include <cuvs/distance/distance.hpp>
+#include <raft/core/memory_type.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/label/classlabels.cuh>
 #include <raft/matrix/detail/gather.cuh>
@@ -300,14 +301,10 @@ void build_sorted_mst(
   int iters        = 1;
   int n_components = cuvs::sparse::neighbors::get_n_components(color, m, stream);
 
-  bool device_accessible = true;
-  if (cuvs::spatial::knn::detail::utils::check_pointer_residency(X) ==
-      cuvs::spatial::knn::detail::utils::pointer_residency::host_only) {
-    device_accessible = false;
-  }
+  bool data_on_device = raft::memory_type_from_pointer(X) != raft::memory_type::host;
 
   while (n_components > 1 && iters < max_iter) {
-    if (device_accessible) {
+    if (data_on_device) {
       connect_knn_graph<value_idx, value_t>(handle, X, mst_coo, m, n, color, reduction_op);
     } else {
       connect_knn_graph<value_idx, value_t>(handle, X, mst_coo, m, n, n_components, color, metric);
