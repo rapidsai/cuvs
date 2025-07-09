@@ -25,10 +25,14 @@ do `./build.sh java` in the top level directory or just do `./build.sh` in this 
 
 Run `./build.sh --run-java-tests` from this directory.
 
-To run a single test:
+To run a single test suite:
 ```sh
 cd cuvs-java/
-mvn verify -Dit.test=com.nvidia.cuvs.CagraBuildAndSearchIT
+mvn clean integration-test -Dit.test=com.nvidia.cuvs.CagraBuildAndSearchIT
+```
+or, for a single test:
+```sh
+mvn clean integration-test -Dit.test=com.nvidia.cuvs.CagraBuildAndSearchIT#testMergeStrategies
 ```
 Be sure to set (manually, if needed) your `LD_LIBRARY_PATH` to include the directory with the appropriate (matching)
 version of `libcuvs.so`.
