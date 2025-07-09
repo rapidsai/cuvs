@@ -84,7 +84,6 @@ from .run import run_benchmark
     "--executable-dir",
     default=None,
     show_default=True,
-    prompt="Enter the name of the folder that contains the executables",
     help="Path to executable folder, by default we will look in the "
     "devcontainer folder (/home/coder/cuvs/cpp/build/latest/bench/ann), in"
     "$CUVS_HOME/cpp/build/release and in $CONDA_PREFIX/bin/ann (in this "
