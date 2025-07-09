@@ -17,6 +17,7 @@
 #pragma once
 #include "../detail/reachability.cuh"
 #include "all_neighbors_batched.cuh"
+#include "cuvs/neighbors/graph_build_types.hpp"
 #include <cuvs/neighbors/all_neighbors.hpp>
 #include <raft/matrix/shift.cuh>
 #include <raft/util/cudart_utils.hpp>
@@ -24,9 +25,9 @@
 namespace cuvs::neighbors::all_neighbors::detail {
 using namespace cuvs::neighbors;
 
-void check_metric(const all_neighbors_params& params,
-                  bool do_mutual_reachability_dist,
-                  bool self_loop)
+GRAPH_BUILD_ALGO check_metric(const all_neighbors_params& params,
+                              bool do_mutual_reachability_dist,
+                              bool self_loop)
 {
   if (std::holds_alternative<graph_build_params::brute_force_params>(params.graph_build_params)) {
     // result of brute force build and search always includes self loops
@@ -68,6 +69,7 @@ void check_metric(const all_neighbors_params& params,
                    "L2Expanded, L2SqrtExpanded, CosineExpanded, or InnerProduct. When "
                    "params.n_clusters > 1, supported metrics are L2Expanded, L2SqrtExpanded.");
     }
+    return GRAPH_BUILD_ALGO::BRUTE_FORCE;
   } else if (std::holds_alternative<graph_build_params::nn_descent_params>(
                params.graph_build_params)) {
     bool allowed_metrics = false;
@@ -88,78 +90,36 @@ void check_metric(const all_neighbors_params& params,
                  "Distance metric for all-neighbors build with NN Descent should be L2Expanded, "
                  "L2SqrtExpanded, CosineExpanded, or InnerProduct. For mutual reachability "
                  "distance calculation, InnerProduct metric is not supported.");
+    return GRAPH_BUILD_ALGO::NN_DESCENT;
   } else if (std::holds_alternative<graph_build_params::ivf_pq_params>(params.graph_build_params)) {
     RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded,
                  "Distance metric for all-neighbors build with IVFPQ should be L2Expanded");
     RAFT_EXPECTS(!do_mutual_reachability_dist,
                  "mutual reachability distance cannot be calculated using IVFPQ");
+    return GRAPH_BUILD_ALGO::IVF_PQ;
   } else {
     RAFT_FAIL("Invalid all-neighbors build algo");
   }
 }
 
 // Single build (i.e. no batching) supports both host and device datasets
-template <typename T, typename IdxT, typename Accessor>
+template <typename T, typename IdxT, typename Accessor, typename DistEpilogueT = raft::identity_op>
 void single_build(
   const raft::resources& handle,
   const all_neighbors_params& params,
   mdspan<const T, matrix_extent<IdxT>, row_major, Accessor> dataset,
   raft::device_matrix_view<IdxT, IdxT, row_major> indices,
-  std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances      = std::nullopt,
-  std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances = std::nullopt,
-  T alpha                                                                    = 1.0,
-  bool include_self                                                          = false)
+  std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances = std::nullopt,
+  DistEpilogueT dist_epilogue                                           = DistEpilogueT{})
 {
   size_t num_rows = static_cast<size_t>(dataset.extent(0));
   size_t num_cols = static_cast<size_t>(dataset.extent(1));
 
   auto knn_builder = get_knn_builder<T, IdxT>(
-    handle, params, num_rows, num_rows, indices.extent(1), indices, distances);
+    handle, params, num_rows, num_rows, indices.extent(1), indices, distances, dist_epilogue);
 
   knn_builder->prepare_build(dataset);
   knn_builder->build_knn(dataset);
-  raft::print_device_vector("indices", indices.data_handle(), indices.extent(1), std::cout);
-
-  if (include_self) {
-    raft::matrix::shift(handle, indices, 1);
-    ;
-    raft::matrix::shift(handle, distances.value(), 1, std::make_optional(static_cast<T>(0.0)));
-  }
-
-  if (core_distances.has_value()) {
-    size_t k = indices.extent(1);
-    cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
-      distances.value().data_handle(),
-      k,
-      k,
-      num_rows,
-      core_distances.value().data_handle(),
-      raft::resource::get_cuda_stream(handle));
-
-    if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded &&
-        std::holds_alternative<graph_build_params::nn_descent_params>(params.graph_build_params)) {
-      // comparison within nn descent for L2SqrtExpanded is done without applying sqrt.
-      raft::linalg::map(handle,
-                        core_distances.value(),
-                        raft::sq_op{},
-                        raft::make_const_mdspan(core_distances.value()));
-    }
-
-    using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>;
-    auto dist_epilogue   = ReachabilityPP{core_distances.value().data_handle(), alpha, num_rows};
-    auto knn_builder     = get_knn_builder<T, IdxT, ReachabilityPP>(
-      handle, params, num_rows, num_rows, indices.extent(1), indices, distances, dist_epilogue);
-    knn_builder->prepare_build(dataset);
-    knn_builder->build_knn(dataset);
-
-    if (include_self) {
-      raft::matrix::shift(handle, indices, 1);
-      raft::matrix::shift(handle,
-                          distances.value(),
-                          raft::make_device_matrix_view<const T, IdxT>(
-                            core_distances.value().data_handle(), num_rows, 1));
-    }
-  }
 }
 
 template <typename T, typename IdxT>
@@ -173,7 +133,7 @@ void build(
   T alpha                                                                    = 1.0,
   bool self_loop                                                             = true)
 {
-  check_metric(params, core_distances.has_value(), self_loop);
+  auto build_algo = check_metric(params, core_distances.has_value(), self_loop);
 
   RAFT_EXPECTS(dataset.extent(0) == indices.extent(0),
                "number of rows in dataset should be the same as number of rows in indices matrix");
@@ -190,16 +150,54 @@ void build(
   }
 
   if (params.n_clusters == 1) {
-    single_build(handle, params, dataset, indices, distances, core_distances, alpha);
+    single_build(handle, params, dataset, indices, distances);
   } else {
-    batch_build(handle, params, dataset, indices, distances, core_distances, alpha);
+    batch_build(handle, params, dataset, indices, distances);
   }
 
-  if (self_loop) {
+  if (self_loop && build_algo != GRAPH_BUILD_ALGO::BRUTE_FORCE) {
     raft::matrix::shift(handle, indices, 1);
     if (distances.has_value()) {
       // TODO: handle innerproduct metric
       raft::matrix::shift(handle, distances.value(), 1, std::make_optional<T>(0.0));
+    }
+  }
+
+  if (core_distances.has_value()) {
+    size_t k        = indices.extent(1);
+    size_t num_rows = core_distances.value().size();
+    cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
+      distances.value().data_handle(),
+      k,
+      k,
+      num_rows,
+      core_distances.value().data_handle(),
+      raft::resource::get_cuda_stream(handle));
+
+    // TODO need to do something about this
+    if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded &&
+        std::holds_alternative<graph_build_params::nn_descent_params>(params.graph_build_params)) {
+      // comparison within nn descent for L2SqrtExpanded is done without applying sqrt.
+      raft::linalg::map(handle,
+                        core_distances.value(),
+                        raft::sq_op{},
+                        raft::make_const_mdspan(core_distances.value()));
+    }
+
+    using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>;
+    auto dist_epilogue   = ReachabilityPP{core_distances.value().data_handle(), alpha, num_rows};
+    if (params.n_clusters == 1) {
+      single_build(handle, params, dataset, indices, distances, dist_epilogue);
+    } else {
+      batch_build(handle, params, dataset, indices, distances);
+    }
+
+    if (self_loop && build_algo != GRAPH_BUILD_ALGO::BRUTE_FORCE) {
+      raft::matrix::shift(handle, indices, 1);
+      raft::matrix::shift(handle,
+                          distances.value(),
+                          raft::make_device_matrix_view<const T, IdxT>(
+                            core_distances.value().data_handle(), num_rows, 1));
     }
   }
 }
@@ -212,9 +210,10 @@ void build(
   raft::device_matrix_view<IdxT, IdxT, row_major> indices,
   std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances      = std::nullopt,
   std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances = std::nullopt,
-  T alpha                                                                    = 1.0)
+  T alpha                                                                    = 1.0,
+  bool self_loop                                                             = true)
 {
-  check_metric(params, core_distances.has_value(), self_loop);
+  auto build_algo = check_metric(params, core_distances.has_value(), self_loop);
 
   RAFT_EXPECTS(dataset.extent(0) == indices.extent(0),
                "number of rows in dataset should be the same as number of rows in indices matrix");
@@ -235,10 +234,10 @@ void build(
       "Batched all-neighbors build is not supported with data on device. Put data on host for "
       "batch build.");
   } else {
-    single_build(handle, params, dataset, indices, distances, core_distances, alpha);
+    single_build(handle, params, dataset, indices, distances);
   }
 
-  if (self_loop) {
+  if (self_loop && build_algo != GRAPH_BUILD_ALGO::BRUTE_FORCE) {
     raft::matrix::shift(handle, indices, 1);
     if (distances.has_value()) {
       // TODO: handle innerproduct metric

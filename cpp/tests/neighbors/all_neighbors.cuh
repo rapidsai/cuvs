@@ -109,19 +109,19 @@ void get_graphs(raft::resources& handle,
   {
     rmm::device_uvector<DistanceT> distances_naive_dev(queries_size, cuda_stream);
     rmm::device_uvector<IdxT> indices_naive_dev(queries_size, cuda_stream);
+    naive_knn<DistanceT, DataT, IdxT>(handle,
+                                      distances_naive_dev.data(),
+                                      indices_naive_dev.data(),
+                                      database.data(),
+                                      database.data(),
+                                      ps.n_rows,
+                                      ps.n_rows,
+                                      ps.dim,
+                                      ps.k,
+                                      std::get<1>(ps.build_algo_metric_recall));
+
     if (ps.mutual_reach) {
       rmm::device_uvector<DistanceT> core_dists_dev(ps.n_rows, cuda_stream);
-
-      cuvs::neighbors::detail::tiled_brute_force_knn(handle,
-                                                     database.data(),
-                                                     database.data(),
-                                                     ps.n_rows,
-                                                     ps.n_rows,
-                                                     ps.dim,
-                                                     ps.k,
-                                                     distances_naive_dev.data(),
-                                                     indices_naive_dev.data(),
-                                                     metric);
 
       cuvs::neighbors::detail::reachability::core_distances<IdxT, DistanceT>(
         distances_naive_dev.data(),
@@ -156,18 +156,8 @@ void get_graphs(raft::resources& handle,
         nullptr,
         nullptr,
         epilogue);
-    } else {
-      naive_knn<DistanceT, DataT, IdxT>(handle,
-                                        distances_naive_dev.data(),
-                                        indices_naive_dev.data(),
-                                        database.data(),
-                                        database.data(),
-                                        ps.n_rows,
-                                        ps.n_rows,
-                                        ps.dim,
-                                        ps.k,
-                                        std::get<1>(ps.build_algo_metric_recall));
     }
+
     raft::update_host(indices_bf.data(), indices_naive_dev.data(), queries_size, cuda_stream);
     raft::update_host(distances_bf.data(), distances_naive_dev.data(), queries_size, cuda_stream);
 
@@ -319,7 +309,7 @@ const std::vector<AllNeighborsInputs> mutualReachSingle =
     {5000, 7151},                 // n_rows
     {64, 137},                    // dim
     {16, 23},                     // graph_degree
-    {false, true},                // data on host
+    {true},                       // data on host
     {true}                        // mutual_reach
   );
 
