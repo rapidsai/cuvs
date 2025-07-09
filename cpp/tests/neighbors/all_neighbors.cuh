@@ -309,7 +309,7 @@ const std::vector<AllNeighborsInputs> mutualReachSingle =
     {5000, 7151},                 // n_rows
     {64, 137},                    // dim
     {16, 23},                     // graph_degree
-    {true},                       // data on host
+    {false, true},                // data on host
     {true}                        // mutual_reach
   );
 

@@ -244,5 +244,39 @@ void build(
       raft::matrix::shift(handle, distances.value(), 1, std::make_optional<T>(0.0));
     }
   }
+
+  if (core_distances.has_value()) {
+    size_t k        = indices.extent(1);
+    size_t num_rows = core_distances.value().size();
+    cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
+      distances.value().data_handle(),
+      k,
+      k,
+      num_rows,
+      core_distances.value().data_handle(),
+      raft::resource::get_cuda_stream(handle));
+
+    // TODO need to do something about this
+    if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded &&
+        std::holds_alternative<graph_build_params::nn_descent_params>(params.graph_build_params)) {
+      // comparison within nn descent for L2SqrtExpanded is done without applying sqrt.
+      raft::linalg::map(handle,
+                        core_distances.value(),
+                        raft::sq_op{},
+                        raft::make_const_mdspan(core_distances.value()));
+    }
+
+    using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>;
+    auto dist_epilogue   = ReachabilityPP{core_distances.value().data_handle(), alpha, num_rows};
+    single_build(handle, params, dataset, indices, distances, dist_epilogue);
+
+    if (self_loop && build_algo != GRAPH_BUILD_ALGO::BRUTE_FORCE) {
+      raft::matrix::shift(handle, indices, 1);
+      raft::matrix::shift(handle,
+                          distances.value(),
+                          raft::make_device_matrix_view<const T, IdxT>(
+                            core_distances.value().data_handle(), num_rows, 1));
+    }
+  }
 }
 }  // namespace cuvs::neighbors::all_neighbors::detail
