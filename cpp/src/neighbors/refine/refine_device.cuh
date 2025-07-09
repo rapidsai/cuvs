@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 #include "../../core/nvtx.hpp"
 #include "../detail/ann_utils.cuh"
 #include "../ivf_flat/ivf_flat_build.cuh"
-#include "../ivf_flat/ivf_flat_interleaved_scan.cuh"
+#include "../ivf_flat/ivf_flat_interleaved_scan_ext.cuh"
 #include "refine_common.hpp"
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
