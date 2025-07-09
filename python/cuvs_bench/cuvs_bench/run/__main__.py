@@ -121,6 +121,7 @@ from .run import run_benchmark
 @click.option(
     "-m",
     "--search-mode",
+    type=click.Choice(["latency", "throughput"], case_sensitive=False),
     default="latency",
     show_default=True,
     prompt='Enter the search mode ("latency" or "throughput")',
@@ -144,7 +145,7 @@ from .run import run_benchmark
     "--dry-run",
     is_flag=True,
     help="Dry-run mode will convert the yaml config for the specified "
-    "algorithms and datasets to the json format that’s consumed "
+    "algorithms and datasets to the json format that's consumed "
     "by the lower-level c++ binaries and then print the command to "
     "run execute the benchmarks but will not actually execute "
     "the command.",
