@@ -174,6 +174,9 @@ void build(
       core_distances.value().data_handle(),
       raft::resource::get_cuda_stream(handle));
 
+    raft::print_device_vector(
+      "core dist in allNN", core_distances.value().data_handle(), 10, std::cout);
+
     // TODO need to do something about this
     if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded &&
         std::holds_alternative<graph_build_params::nn_descent_params>(params.graph_build_params)) {
@@ -184,12 +187,12 @@ void build(
                         raft::make_const_mdspan(core_distances.value()));
     }
 
-    using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>;
+    using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>;
     auto dist_epilogue   = ReachabilityPP{core_distances.value().data_handle(), alpha, num_rows};
     if (params.n_clusters == 1) {
       single_build(handle, params, dataset, indices, distances, dist_epilogue);
     } else {
-      batch_build(handle, params, dataset, indices, distances);
+      batch_build(handle, params, dataset, indices, distances, dist_epilogue);
     }
 
     if (self_loop && build_algo != GRAPH_BUILD_ALGO::BRUTE_FORCE) {
@@ -266,7 +269,7 @@ void build(
                         raft::make_const_mdspan(core_distances.value()));
     }
 
-    using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>;
+    using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>;
     auto dist_epilogue   = ReachabilityPP{core_distances.value().data_handle(), alpha, num_rows};
     single_build(handle, params, dataset, indices, distances, dist_epilogue);
 

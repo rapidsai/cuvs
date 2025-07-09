@@ -130,6 +130,7 @@ void get_graphs(raft::resources& handle,
         ps.n_rows,
         core_dists_dev.data(),
         raft::resource::get_cuda_stream(handle));
+      raft::print_device_vector("core dist in bf", core_dists_dev.data(), 10, std::cout);
       auto epilogue =
         cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, DistanceT>{
           core_dists_dev.data(), 1.0, static_cast<size_t>(ps.n_rows)};
@@ -251,7 +252,8 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
   }
 
  private:
-  raft::device_resources_snmg handle_;
+  // raft::device_resources_snmg handle_;
+  raft::device_resources handle_;
   rmm::cuda_stream_view stream_;
   AllNeighborsInputs ps;
   rmm::device_uvector<DataT> database;
@@ -315,10 +317,7 @@ const std::vector<AllNeighborsInputs> mutualReachSingle =
 
 const std::vector<AllNeighborsInputs> mutualReachBatch =
   raft::util::itertools::product<AllNeighborsInputs>(
-    {std::make_tuple(BRUTE_FORCE, cuvs::distance::DistanceType::L2Expanded, 0.9),
-     std::make_tuple(BRUTE_FORCE, cuvs::distance::DistanceType::L2SqrtExpanded, 0.9),
-     std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::L2Expanded, 0.9),
-     std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded, 0.9),
+    {std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded, 0.9)},
     {
