@@ -16,6 +16,9 @@
 
 #pragma once
 
+#include <cstdint>
+#include <cuda_fp16.h>
+
 #include <cuvs/neighbors/common.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
