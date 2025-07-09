@@ -252,8 +252,7 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
   }
 
  private:
-  // raft::device_resources_snmg handle_;
-  raft::device_resources handle_;
+  raft::device_resources_snmg handle_;
   rmm::cuda_stream_view stream_;
   AllNeighborsInputs ps;
   rmm::device_uvector<DataT> database;
