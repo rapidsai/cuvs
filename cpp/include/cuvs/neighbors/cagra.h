@@ -660,8 +660,8 @@ cuvsError_t cuvsCagraDeserialize(cuvsResources_t res, const char* filename, cuvs
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] metric cuvsDistanceType to use in the index
- * @params[in] graph the knn graph to use , shape (size, graph_degree)
- * @params[in] dataset the dataset to use , shape (size, dim)
+ * @param[in] graph the knn graph to use, shape (size, graph_degree)
+ * @param[in] dataset the dataset to use, shape (size, dim)
  * @param[out] index CAGRA index constructed from the graph and dataset
  */
 cuvsError_t cuvsCagraIndexFromGraph(cuvsResources_t res,
