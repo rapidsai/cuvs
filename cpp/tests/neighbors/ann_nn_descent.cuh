@@ -31,9 +31,9 @@
 #include <raft/util/itertools.hpp>
 #include <rmm/device_uvector.hpp>
 
-#include <bitset>
-#include <cstddef>
 #include <gtest/gtest.h>
+
+#include <cstddef>
 #include <iostream>
 #include <string>
 #include <vector>
