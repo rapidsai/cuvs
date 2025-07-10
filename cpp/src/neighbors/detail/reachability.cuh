@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -131,6 +131,7 @@ struct ReachabilityPostProcess {
 
   const value_t* core_dists;
   value_t alpha;
+  size_t n;  // size of core_dists array
 };
 
 /**
@@ -163,7 +164,7 @@ void mutual_reachability_knn_l2(const raft::resources& handle,
   // `A type local to a function cannot be used in the template argument of the
   // enclosing parent function (and any parent classes) of an extended __device__
   // or __host__ __device__ lambda`
-  auto epilogue = ReachabilityPostProcess<value_idx, value_t>{core_dists, alpha};
+  auto epilogue = ReachabilityPostProcess<value_idx, value_t>{core_dists, alpha, m};
 
   cuvs::neighbors::detail::
     tiled_brute_force_knn<value_t, value_idx, value_t, ReachabilityPostProcess<value_idx, value_t>>(
