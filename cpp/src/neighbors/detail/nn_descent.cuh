@@ -1107,11 +1107,11 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
 {
   using input_t = typename std::remove_const<Data_t>::type;
 
-  // if (build_config_.metric == cuvsDistanceType::BitwiseHamming && !(std::is_same_v<Data_t,
-  // uint8_t> || std::is_same_v<Data_t, int8_t>)) {
-  //   RAFT_FAIL("Data type needs to be int8 or uint8 for NN Descent to run with BitwiseHamming
-  //   distance.");
-  // }
+  if (build_config_.metric == cuvsDistanceType::BitwiseHamming &&
+      !(std::is_same_v<input_t, uint8_t> || std::is_same_v<input_t, int8_t>)) {
+    RAFT_FAIL(
+      "Data type needs to be int8 or uint8 for NN Descent to run with BitwiseHammingdistance.");
+  }
 
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
   nrow_               = nrow;
