@@ -26,11 +26,15 @@ import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.concatenate;
 import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
+import static com.nvidia.cuvs.internal.panama.headers_h.__uint32_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaStream_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraBuild;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraDeserialize;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndexCreate;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndexDestroy;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndexGetGraph;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndexGetGraphDegree;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndexGetSize;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndex_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraMerge;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSearch;
@@ -40,6 +44,8 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMAlloc;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamGet;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
+import static com.nvidia.cuvs.internal.panama.headers_h.kDLCPU;
+import static com.nvidia.cuvs.internal.panama.headers_h.kDLUInt;
 import static com.nvidia.cuvs.internal.panama.headers_h.omp_set_num_threads;
 
 import com.nvidia.cuvs.CagraCompressionParams;
@@ -53,6 +59,7 @@ import com.nvidia.cuvs.CuVSIvfPqIndexParams;
 import com.nvidia.cuvs.CuVSIvfPqSearchParams;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
+import com.nvidia.cuvs.CagraGraph;
 import com.nvidia.cuvs.SearchResults;
 import com.nvidia.cuvs.internal.panama.cuvsCagraCompressionParams;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndexParams;
@@ -62,6 +69,7 @@ import com.nvidia.cuvs.internal.panama.cuvsFilter;
 import com.nvidia.cuvs.internal.panama.cuvsIvfPqIndexParams;
 import com.nvidia.cuvs.internal.panama.cuvsIvfPqParams;
 import com.nvidia.cuvs.internal.panama.cuvsIvfPqSearchParams;
+
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -182,7 +190,7 @@ public class CagraIndexImpl implements CagraIndex {
 
       long[] datasetShape = {rows, cols};
       MemorySegment datasetTensor =
-          prepareTensor(resources.getArena(), dataSeg, datasetShape, 2, 32, 2, 2, 1);
+          prepareTensor(resources.getArena(), dataSeg, datasetShape, 2, 32, 2, 1);
 
       var index = createCagraIndex();
 
@@ -283,13 +291,13 @@ public class CagraIndexImpl implements CagraIndex {
       cudaMemcpy(queriesDP, floatsSeg, queriesBytes, INFER_DIRECTION);
 
       long[] queriesShape = {numQueries, vectorDimension};
-      MemorySegment queriesTensor = prepareTensor(arena, queriesDP, queriesShape, 2, 32, 2, 2, 1);
+      MemorySegment queriesTensor = prepareTensor(arena, queriesDP, queriesShape, 2, 32, 2, 1);
       long[] neighborsShape = {numQueries, topK};
       MemorySegment neighborsTensor =
-          prepareTensor(arena, neighborsDP, neighborsShape, 1, 32, 2, 2, 1);
+          prepareTensor(arena, neighborsDP, neighborsShape, 1, 32, 2, 1);
       long[] distancesShape = {numQueries, topK};
       MemorySegment distancesTensor =
-          prepareTensor(arena, distancesDP, distancesShape, 2, 32, 2, 2, 1);
+          prepareTensor(arena, distancesDP, distancesShape, 2, 32, 2, 1);
 
       returnValue = cuvsStreamSync(cuvsRes);
       checkCuVSError(returnValue, "cuvsStreamSync");
@@ -324,7 +332,7 @@ public class CagraIndexImpl implements CagraIndex {
 
         cudaMemcpy(prefilterDP, prefilterDataMemorySegment, prefilterBytes, HOST_TO_DEVICE);
 
-        prefilterTensor = prepareTensor(arena, prefilterDP, prefilterShape, 1, 32, 1, 2, 1);
+        prefilterTensor = prepareTensor(arena, prefilterDP, prefilterShape, 1, 32, 2, 1);
 
         cuvsFilter.type(prefilter, 1);
         cuvsFilter.addr(prefilter, prefilterTensor.address());
@@ -410,6 +418,41 @@ public class CagraIndexImpl implements CagraIndex {
       } finally {
         Files.deleteIfExists(tempFile);
       }
+    }
+  }
+
+  @Override
+  public CagraGraph getGraph() {
+    try (var localArena = Arena.ofConfined()) {
+      var outPtr = localArena.allocate(__uint32_t);
+      checkCuVSError(
+          cuvsCagraIndexGetGraphDegree(cagraIndexReference.getMemorySegment(), outPtr),
+          "cuvsCagraIndexGetGraphDegree");
+      int graphDegree = outPtr.get(__uint32_t, 0);
+
+      checkCuVSError(
+          cuvsCagraIndexGetSize(cagraIndexReference.getMemorySegment(), outPtr),
+          "cuvsCagraIndexGetGraphDegree");
+      int size = outPtr.get(__uint32_t, 0);
+
+      var graph = new CagraGraphImpl(graphDegree, size);
+
+      MemorySegment dlManagedTensor =
+          prepareTensor(
+              localArena,
+              graph.memorySegment(),
+              new long[] {size, graphDegree},
+              kDLUInt(),
+              32,
+              kDLCPU(),
+              1);
+
+      checkCuVSError(
+          cuvsCagraIndexGetGraph(
+              resources.getHandle(), cagraIndexReference.getMemorySegment(), dlManagedTensor),
+          "cuvsCagraIndexGetGraphDegree");
+
+      return graph;
     }
   }
 

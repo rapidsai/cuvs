@@ -291,7 +291,6 @@ public class Util {
    * @param[in] shape the shape of the tensor
    * @param[in] code the type code of base types
    * @param[in] bits the shape of the tensor
-   * @param[in] ndim the number of dimensions
    * @return DLManagedTensor
    */
   public static MemorySegment prepareTensor(
@@ -300,7 +299,6 @@ public class Util {
       long[] shape,
       int code,
       int bits,
-      int ndim,
       int deviceType,
       int lanes) {
 
@@ -313,6 +311,7 @@ public class Util {
     DLDevice.device_type(dlDevice, deviceType);
     DLTensor.device(dlTensor, dlDevice);
 
+    var ndim = shape.length;
     DLTensor.ndim(dlTensor, ndim);
 
     MemorySegment dtype = DLDataType.allocate(arena);

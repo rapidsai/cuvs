@@ -50,6 +50,13 @@ public interface CagraIndex {
    */
   SearchResults search(CagraQuery query) throws Throwable;
 
+  /** Returns the CAGRA graph
+   *
+   * @return an object encapsulating the native int (uint32_t) array used to represent
+   * the cagra graph
+   */
+  CagraGraph getGraph();
+
   /**
    * A method to persist a CAGRA index using an instance of {@link OutputStream}
    * for writing index bytes.
