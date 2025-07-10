@@ -488,7 +488,7 @@ __device__ __forceinline__ void remove_duplicates(
 // MAX_RESIDENT_THREAD_PER_SM = BLOCK_SIZE * BLOCKS_PER_SM = 2048
 // For architectures 750 and 860 (890), the values for MAX_RESIDENT_THREAD_PER_SM
 // is 1024 and 1536 respectively, which means the bounds don't work anymore
-template <typename Index_t, typename ID_t = InternalID_t<Index_t>>
+template <typename Index_t, typename ID_t = InternalID_t<Index_t>, typename DistEpilogue_t>
 RAFT_KERNEL
 #ifdef __CUDA_ARCH__
 // Use minBlocksPerMultiprocessor = 4 on specific arches
@@ -513,7 +513,8 @@ __launch_bounds__(BLOCK_SIZE)
                     int graph_width,
                     int* locks,
                     DistData_t* l2_norms,
-                    cuvs::distance::DistanceType metric)
+                    cuvs::distance::DistanceType metric,
+                    DistEpilogue_t dist_epilogue)
 {
 #if (__CUDA_ARCH__ >= 700)
   using namespace nvcuda;
@@ -623,20 +624,22 @@ __launch_bounds__(BLOCK_SIZE)
   __syncthreads();
 
   for (int i = threadIdx.x; i < MAX_NUM_BI_SAMPLES * SKEWED_MAX_NUM_BI_SAMPLES; i += blockDim.x) {
-    if (i % SKEWED_MAX_NUM_BI_SAMPLES < list_new_size &&
-        i / SKEWED_MAX_NUM_BI_SAMPLES < list_new_size) {
+    int row_id = i % SKEWED_MAX_NUM_BI_SAMPLES;
+    int col_id = i / SKEWED_MAX_NUM_BI_SAMPLES;
+
+    if (row_id < list_new_size && col_id < list_new_size) {
       if (metric == cuvs::distance::DistanceType::InnerProduct) {
         s_distances[i] = -s_distances[i];
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         s_distances[i] = 1.0 - s_distances[i];
       } else {  // L2Expanded or L2SqrtExpanded
-        s_distances[i] = l2_norms[new_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
-                         l2_norms[new_neighbors[i / SKEWED_MAX_NUM_BI_SAMPLES]] -
-                         2.0 * s_distances[i];
+        s_distances[i] =
+          l2_norms[new_neighbors[row_id]] + l2_norms[new_neighbors[col_id]] - 2.0 * s_distances[i];
         // for fp32 vs fp16 precision differences resulting in negative distances when distance
         // should be 0 related issue: https://github.com/rapidsai/cuvs/issues/991
         s_distances[i] = s_distances[i] < 0.0f ? 0.0f : s_distances[i];
       }
+      s_distances[i] = dist_epilogue(s_distances[i], new_neighbors[row_id], new_neighbors[col_id]);
     } else {
       s_distances[i] = std::numeric_limits<float>::max();
     }
@@ -707,20 +710,21 @@ __launch_bounds__(BLOCK_SIZE)
   __syncthreads();
 
   for (int i = threadIdx.x; i < MAX_NUM_BI_SAMPLES * SKEWED_MAX_NUM_BI_SAMPLES; i += blockDim.x) {
-    if (i % SKEWED_MAX_NUM_BI_SAMPLES < list_old_size &&
-        i / SKEWED_MAX_NUM_BI_SAMPLES < list_new_size) {
+    int row_id = i % SKEWED_MAX_NUM_BI_SAMPLES;
+    int col_id = i / SKEWED_MAX_NUM_BI_SAMPLES;
+    if (row_id < list_old_size && col_id < list_new_size) {
       if (metric == cuvs::distance::DistanceType::InnerProduct) {
         s_distances[i] = -s_distances[i];
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         s_distances[i] = 1.0 - s_distances[i];
       } else {  // L2Expanded or L2SqrtExpanded
-        s_distances[i] = l2_norms[old_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
-                         l2_norms[new_neighbors[i / SKEWED_MAX_NUM_BI_SAMPLES]] -
-                         2.0 * s_distances[i];
+        s_distances[i] =
+          l2_norms[old_neighbors[row_id]] + l2_norms[new_neighbors[col_id]] - 2.0 * s_distances[i];
         // for fp32 vs fp16 precision differences resulting in negative distances when distance
         // should be 0 related issue: https://github.com/rapidsai/cuvs/issues/991
         s_distances[i] = s_distances[i] < 0.0f ? 0.0f : s_distances[i];
       }
+      s_distances[i] = dist_epilogue(s_distances[i], old_neighbors[row_id], new_neighbors[col_id]);
     } else {
       s_distances[i] = std::numeric_limits<float>::max();
     }
@@ -1034,7 +1038,8 @@ void GNND<Data_t, Index_t>::add_reverse_edges(Index_t* graph_ptr,
 }
 
 template <typename Data_t, typename Index_t>
-void GNND<Data_t, Index_t>::local_join(cudaStream_t stream)
+template <typename DistEpilogue_t>
+void GNND<Data_t, Index_t>::local_join(cudaStream_t stream, DistEpilogue_t dist_epilogue)
 {
   raft::matrix::fill(res, dists_buffer_.view(), std::numeric_limits<float>::max());
   local_join_kernel<<<nrow_, BLOCK_SIZE, 0, stream>>>(graph_.h_graph_new.data_handle(),
@@ -1051,15 +1056,18 @@ void GNND<Data_t, Index_t>::local_join(cudaStream_t stream)
                                                       DEGREE_ON_DEVICE,
                                                       d_locks_.data_handle(),
                                                       l2_norms_.data_handle(),
-                                                      build_config_.metric);
+                                                      build_config_.metric,
+                                                      dist_epilogue);
 }
 
 template <typename Data_t, typename Index_t>
+template <typename DistEpilogue_t>
 void GNND<Data_t, Index_t>::build(Data_t* data,
                                   const Index_t nrow,
                                   Index_t* output_graph,
                                   bool return_distances,
-                                  DistData_t* output_distances)
+                                  DistData_t* output_distances,
+                                  DistEpilogue_t dist_epilogue)
 {
   using input_t = typename std::remove_const<Data_t>::type;
 
@@ -1154,7 +1162,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
       raft::util::arch::SM_range(raft::util::arch::SM_70(), raft::util::arch::SM_future());
 
     if (wmma_range.contains(runtime_arch)) {
-      local_join(stream);
+      local_join(stream, dist_epilogue);
     } else {
       THROW("NN_DESCENT cannot be run for __CUDA_ARCH__ < 700");
     }
@@ -1186,23 +1194,23 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
   static_assert(sizeof(decltype(*(graph_.h_dists.data_handle()))) >= sizeof(Index_t));
 
   if (return_distances) {
-    auto graph_d_dists = raft::make_device_matrix<DistData_t, int64_t, raft::row_major>(
-      res, nrow_, build_config_.node_degree);
-    raft::copy(graph_d_dists.data_handle(),
-               graph_.h_dists.data_handle(),
-               nrow_ * build_config_.node_degree,
+    auto graph_h_dists = raft::make_host_matrix<DistData_t, int64_t, raft::row_major>(
+      nrow_, build_config_.output_graph_degree);
+
+// slice on host
+#pragma omp parallel for
+    for (size_t i = 0; i < (size_t)nrow_; i++) {
+      for (size_t j = 0; j < build_config_.output_graph_degree; j++) {
+        graph_h_dists(i, j) = graph_.h_dists(i, j);
+      }
+    }
+    raft::copy(output_distances,
+               graph_h_dists.data_handle(),
+               nrow_ * build_config_.output_graph_degree,
                raft::resource::get_cuda_stream(res));
 
     auto output_dist_view = raft::make_device_matrix_view<DistData_t, int64_t, raft::row_major>(
       output_distances, nrow_, build_config_.output_graph_degree);
-
-    raft::matrix::slice_coordinates coords{static_cast<int64_t>(0),
-                                           static_cast<int64_t>(0),
-                                           static_cast<int64_t>(nrow_),
-                                           static_cast<int64_t>(build_config_.output_graph_degree)};
-    raft::matrix::slice<DistData_t, int64_t, raft::row_major>(
-      res, raft::make_const_mdspan(graph_d_dists.view()), output_dist_view, coords);
-
     // distance post-processing
     if (build_config_.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
       raft::linalg::map(
