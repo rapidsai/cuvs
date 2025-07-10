@@ -216,6 +216,12 @@ public interface CagraIndex {
     Builder from(InputStream inputStream);
 
     /**
+     * Sets a CAGRA graph instance to re-create an index from a
+     * previously built graph.
+     */
+    Builder from(CagraGraph graph);
+
+    /**
      * Sets the dataset vectors for building the {@link CagraIndex}.
      *
      * @param vectors a two-dimensional float array

@@ -15,7 +15,20 @@
  */
 package com.nvidia.cuvs;
 
+import com.nvidia.cuvs.spi.CuVSProvider;
+
 public interface CagraGraph extends AutoCloseable {
+
+  /**
+   * Creates a graph from an on-heap array of neighbours.
+   * This method is mainly for testing purposes, as it will
+   * allocate an additional MemorySegment to hold the graph data.
+   *
+   * @since 25.08
+   */
+  static CagraGraph ofArray(int[][] graph) {
+    return CuVSProvider.provider().newArrayGraph(graph);
+  }
 
   int graphDegree();
 

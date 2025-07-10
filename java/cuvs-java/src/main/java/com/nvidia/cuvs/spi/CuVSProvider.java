@@ -16,6 +16,7 @@
 package com.nvidia.cuvs.spi;
 
 import com.nvidia.cuvs.BruteForceIndex;
+import com.nvidia.cuvs.CagraGraph;
 import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CagraMergeParams;
 import com.nvidia.cuvs.CuVSResources;
@@ -52,8 +53,11 @@ public interface CuVSProvider {
   /** Create a {@link Dataset.Builder} instance **/
   Dataset.Builder newDatasetBuilder(int size, int dimensions);
 
-  /** Create a {@link Dataset} backed by a on-heap array **/
+  /** Create a {@link Dataset} from an on-heap array **/
   Dataset newArrayDataset(float[][] vectors);
+
+  /** Create a {@link CagraGraph} from an on-heap array **/
+  CagraGraph newArrayGraph(int[][] graph);
 
   /** Creates a new BruteForceIndex Builder. */
   BruteForceIndex.Builder newBruteForceIndexBuilder(CuVSResources cuVSResources)

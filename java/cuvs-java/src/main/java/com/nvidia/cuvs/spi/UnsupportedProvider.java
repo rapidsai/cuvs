@@ -16,6 +16,7 @@
 package com.nvidia.cuvs.spi;
 
 import com.nvidia.cuvs.BruteForceIndex;
+import com.nvidia.cuvs.CagraGraph;
 import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
@@ -59,6 +60,11 @@ final class UnsupportedProvider implements CuVSProvider {
 
   @Override
   public Dataset newArrayDataset(float[][] vectors) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public CagraGraph newArrayGraph(int[][] graph) {
     throw new UnsupportedOperationException();
   }
 }

@@ -26,29 +26,10 @@ import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.concatenate;
 import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
-import static com.nvidia.cuvs.internal.panama.headers_h.__uint32_t;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaStream_t;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraBuild;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraDeserialize;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndexCreate;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndexDestroy;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndexGetGraph;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndexGetGraphDegree;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndexGetSize;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraIndex_t;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraMerge;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSearch;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSerialize;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSerializeToHnswlib;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMAlloc;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamGet;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
-import static com.nvidia.cuvs.internal.panama.headers_h.kDLCPU;
-import static com.nvidia.cuvs.internal.panama.headers_h.kDLUInt;
-import static com.nvidia.cuvs.internal.panama.headers_h.omp_set_num_threads;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.CagraCompressionParams;
+import com.nvidia.cuvs.CagraGraph;
 import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CagraIndexParams;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
@@ -59,7 +40,6 @@ import com.nvidia.cuvs.CuVSIvfPqIndexParams;
 import com.nvidia.cuvs.CuVSIvfPqSearchParams;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
-import com.nvidia.cuvs.CagraGraph;
 import com.nvidia.cuvs.SearchResults;
 import com.nvidia.cuvs.internal.panama.cuvsCagraCompressionParams;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndexParams;
@@ -69,7 +49,6 @@ import com.nvidia.cuvs.internal.panama.cuvsFilter;
 import com.nvidia.cuvs.internal.panama.cuvsIvfPqIndexParams;
 import com.nvidia.cuvs.internal.panama.cuvsIvfPqParams;
 import com.nvidia.cuvs.internal.panama.cuvsIvfPqSearchParams;
-
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -115,6 +94,30 @@ public class CagraIndexImpl implements CagraIndex {
     this.resources = resources;
     assert dataset instanceof DatasetImpl;
     this.cagraIndexReference = build(indexParameters, (DatasetImpl) dataset);
+  }
+
+  /**
+   * Constructor for creating an index from a pre-build {@link CagraGraph}
+   *
+   * @param metric      the distance type used
+   * @param graph       a previously built CAGRA graph
+   * @param dataset     the dataset used for indexing
+   * @param resources   an instance of {@link CuVSResources}
+   */
+  private CagraIndexImpl(
+      CagraIndexParams.CuvsDistanceType metric,
+      CagraGraph graph,
+      Dataset dataset,
+      CuVSResourcesImpl resources) {
+    Objects.requireNonNull(graph);
+    Objects.requireNonNull(dataset);
+
+    this.resources = resources;
+
+    assert graph instanceof CagraGraphImpl;
+    assert dataset instanceof DatasetImpl;
+
+    this.cagraIndexReference = fromGraph(metric, (CagraGraphImpl) graph, (DatasetImpl) dataset);
   }
 
   /**
@@ -456,6 +459,32 @@ public class CagraIndexImpl implements CagraIndex {
     }
   }
 
+  private IndexReference fromGraph(
+      CagraIndexParams.CuvsDistanceType metric, CagraGraphImpl graph, DatasetImpl dataset) {
+    try (var localArena = Arena.ofConfined()) {
+      long rows = dataset.size();
+      long cols = dataset.dimensions();
+
+      long cuvsRes = resources.getHandle();
+
+      long[] datasetShape = {rows, cols};
+      MemorySegment datasetTensor =
+          prepareTensor(
+              localArena, dataset.asMemorySegment(), datasetShape, kDLFloat(), 32, kDLCPU(), 1);
+
+      long[] graphShape = {graph.size(), graph.graphDegree()};
+      MemorySegment graphTensor =
+          prepareTensor(localArena, graph.memorySegment(), graphShape, kDLUInt(), 32, kDLCPU(), 1);
+
+      var index = createCagraIndex();
+      checkCuVSError(
+          cuvsCagraIndexFromGraph(cuvsRes, metric.value, graphTensor, datasetTensor, index),
+          "cuvsCagraIndexFromGraph");
+
+      return new IndexReference(index, dataset);
+    }
+  }
+
   @Override
   public void serializeToHNSW(OutputStream outputStream) throws Throwable {
     Path path =
@@ -730,6 +759,7 @@ public class CagraIndexImpl implements CagraIndex {
     private CagraIndexParams cagraIndexParams;
     private final CuVSResourcesImpl cuvsResources;
     private InputStream inputStream;
+    private CagraGraph graph;
 
     public Builder(CuVSResourcesImpl cuvsResources) {
       this.cuvsResources = cuvsResources;
@@ -738,6 +768,12 @@ public class CagraIndexImpl implements CagraIndex {
     @Override
     public Builder from(InputStream inputStream) {
       this.inputStream = inputStream;
+      return this;
+    }
+
+    @Override
+    public Builder from(CagraGraph graph) {
+      this.graph = graph;
       return this;
     }
 
@@ -764,7 +800,17 @@ public class CagraIndexImpl implements CagraIndex {
       if (inputStream != null) {
         return new CagraIndexImpl(inputStream, cuvsResources);
       } else {
-        return new CagraIndexImpl(cagraIndexParams, dataset, cuvsResources);
+        if (graph != null) {
+          if (cagraIndexParams == null || dataset == null) {
+            throw new IllegalArgumentException(
+                "In order to reconstruct a CAGRA index from a graph, "
+                    + "you must specify the original dataset and the metric used.");
+          }
+          return new CagraIndexImpl(
+              cagraIndexParams.getCuvsDistanceType(), graph, dataset, cuvsResources);
+        } else {
+          return new CagraIndexImpl(cagraIndexParams, dataset, cuvsResources);
+        }
       }
     }
   }

@@ -16,18 +16,10 @@
 package com.nvidia.cuvs.spi;
 
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 
-import com.nvidia.cuvs.BruteForceIndex;
-import com.nvidia.cuvs.CagraIndex;
-import com.nvidia.cuvs.CagraMergeParams;
-import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.Dataset;
-import com.nvidia.cuvs.HnswIndex;
-import com.nvidia.cuvs.internal.BruteForceIndexImpl;
-import com.nvidia.cuvs.internal.CagraIndexImpl;
-import com.nvidia.cuvs.internal.CuVSResourcesImpl;
-import com.nvidia.cuvs.internal.DatasetImpl;
-import com.nvidia.cuvs.internal.HnswIndexImpl;
+import com.nvidia.cuvs.*;
+import com.nvidia.cuvs.internal.*;
 import com.nvidia.cuvs.internal.common.Util;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemoryLayout;
@@ -119,5 +111,29 @@ final class JDKProvider implements CuVSProvider {
     Arena arena = Arena.ofShared();
     var memorySegment = Util.buildMemorySegment(arena, vectors);
     return new DatasetImpl(arena, memorySegment, size, dimensions);
+  }
+
+  @Override
+  public CagraGraph newArrayGraph(int[][] graph) {
+    Objects.requireNonNull(graph);
+    if (graph.length == 0) {
+      throw new IllegalArgumentException("graph should not be empty");
+    }
+    long nodeSize = graph.length;
+    int graphDegree = graph[0].length;
+
+    var cagraGraph = new CagraGraphImpl(graphDegree, nodeSize);
+
+    for (int r = 0; r < nodeSize; r++) {
+      MemorySegment.copy(
+          graph[r],
+          0,
+          cagraGraph.memorySegment(),
+          C_INT,
+          (r * graphDegree * C_INT.byteSize()),
+          graphDegree);
+    }
+
+    return cagraGraph;
   }
 }

@@ -29,20 +29,20 @@ public class CagraGraphImpl implements CagraGraph {
   private final VarHandle graph$vh;
 
   private final Arena arena;
-    private final int graphDegree;
-    private final long size;
+  private final int graphDegree;
+  private final long size;
 
-    public CagraGraphImpl(int graphDegree, long size) {
-        this.graphDegree = graphDegree;
-        this.size = size;
-        this.arena = Arena.ofShared();
+  public CagraGraphImpl(int graphDegree, long size) {
+    this.graphDegree = graphDegree;
+    this.size = size;
+    this.arena = Arena.ofShared();
     var graphLayout = MemoryLayout.sequenceLayout(size * graphDegree, C_INT).withByteAlignment(32);
 
     this.memorySegment = arena.allocate(graphLayout);
     this.graph$vh = graphLayout.varHandle(MemoryLayout.PathElement.sequenceElement());
   }
 
-  MemorySegment memorySegment() {
+  public MemorySegment memorySegment() {
     return memorySegment;
   }
 

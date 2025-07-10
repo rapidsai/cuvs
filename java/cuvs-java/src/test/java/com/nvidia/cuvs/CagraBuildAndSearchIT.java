@@ -16,9 +16,7 @@
 package com.nvidia.cuvs;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
@@ -278,6 +276,47 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
       }
       Files.deleteIfExists(indexPath);
       index.destroyIndex();
+    }
+  }
+
+  @Test
+  public void testReconstructIndexFromGraph() throws Throwable {
+    float[][] dataset = createSampleData();
+    float[][] queries = createSampleQueries();
+    List<Map<Integer, Float>> expectedResults = getExpectedResults();
+
+    try (CuVSResources resources = CuVSResources.create()) {
+      var index = indexOnce(dataset, resources);
+      var graph = index.getGraph();
+
+      var reconstructedIndex =
+          CagraIndex.newBuilder(resources)
+              .from(graph)
+              .withDataset(dataset)
+              .withIndexParams(
+                  new CagraIndexParams.Builder().withMetric(CuvsDistanceType.L2Expanded).build())
+              .build();
+      queryOnce(
+          index,
+          reconstructedIndex,
+          SearchResults.IDENTITY_MAPPING,
+          queries,
+          expectedResults,
+          resources);
+
+      var originalIndexPath = serializeOnce(index);
+      var reconstructedIndexPath = serializeOnce(reconstructedIndex);
+
+      var originalBytes = Files.readAllBytes(originalIndexPath);
+      var reconstructedBytes = Files.readAllBytes(reconstructedIndexPath);
+
+      assertArrayEquals(originalBytes, reconstructedBytes);
+
+      index.destroyIndex();
+      reconstructedIndex.destroyIndex();
+
+      Files.deleteIfExists(originalIndexPath);
+      Files.deleteIfExists(reconstructedIndexPath);
     }
   }
 
