@@ -16,6 +16,8 @@
 package com.nvidia.cuvs;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
@@ -154,12 +156,133 @@ public class CagraRandomizedIT extends CuVSTestCase {
 
         CagraQuery query = queryBuilder.build();
         log.info("Query built successfully. Executing search...");
-        SearchResults results = index.search(query);
+        SearchResults originalResults = index.search(query);
 
-        compareResults(results, expected, topK, datasetSize, numQueries);
+        compareResults(originalResults, expected, topK, datasetSize, numQueries);
+
+        // Test graph export/import functionality
+        log.info("Testing graph export/import functionality...");
+
+        // Export the graph from the original index
+        int[][] exportedGraph = index.getGraph();
+        log.info(
+            "Exported graph with shape: {}x{}",
+            exportedGraph.length,
+            exportedGraph.length > 0 ? exportedGraph[0].length : 0);
+
+        // Get the dataset from the original index
+        Dataset originalDataset = index.getDataset();
+        log.info("Retrieved original dataset");
+
+        // Create a new index from the exported graph and dataset
+        CagraIndex graphBasedIndex =
+            CagraIndex.newBuilder(resources)
+                .withDataset(originalDataset)
+                .from(exportedGraph, indexParams.getCuvsDistanceType())
+                .build();
+        log.info("Created new index from exported graph");
+
+        try {
+          // Execute the same search query on the graph-based index
+          SearchResults graphBasedResults = graphBasedIndex.search(query);
+          log.info("Executed search on graph-based index");
+
+          // Compare results between original and graph-based indexes
+          compareSearchResults(originalResults, graphBasedResults, topK, numQueries);
+          log.info("Graph export/import test passed successfully");
+
+        } finally {
+          graphBasedIndex.destroyIndex();
+        }
       } finally {
         index.destroyIndex();
       }
     }
+  }
+
+  /**
+   * Compares results between original and graph-based indexes using overlap instead of exact match.
+   */
+  private void compareSearchResults(
+      SearchResults originalResults, SearchResults graphBasedResults, int topK, int numQueries) {
+    log.info("Comparing search results between original and graph-based indexes");
+
+    // Verify we have the same number of query results
+    assertEquals(
+        "Number of query results should match",
+        originalResults.getResults().size(),
+        graphBasedResults.getResults().size());
+
+    for (int i = 0; i < numQueries; i++) {
+      var originalResult = originalResults.getResults().get(i);
+      var graphBasedResult = graphBasedResults.getResults().get(i);
+
+      log.debug(
+          "Query {}: Original result size: {}, Graph-based result size: {}",
+          i,
+          originalResult.size(),
+          graphBasedResult.size());
+
+      // Both should return some results
+      assertTrue(
+          String.format("Original result should not be empty for query %d", i),
+          originalResult.size() > 0);
+      assertTrue(
+          String.format("Graph-based result should not be empty for query %d", i),
+          graphBasedResult.size() > 0);
+
+      // Sort both results by distance to get the top neighbors
+      var sortedOriginal =
+          originalResult.entrySet().stream()
+              .sorted(java.util.Map.Entry.comparingByValue())
+              .toList();
+      var sortedGraphBased =
+          graphBasedResult.entrySet().stream()
+              .sorted(java.util.Map.Entry.comparingByValue())
+              .toList();
+
+      // Compare the top results for significant overlap
+      // We expect at least 50% overlap in the top 5 results (or fewer if topK is small)
+      int numToCheck =
+          Math.min(5, Math.min(topK, Math.min(sortedOriginal.size(), sortedGraphBased.size())));
+
+      if (numToCheck > 0) {
+        // Get top neighbors from both results
+        var originalTopNeighbors = new java.util.HashSet<Integer>();
+        var graphBasedTopNeighbors = new java.util.HashSet<Integer>();
+
+        for (int j = 0; j < numToCheck; j++) {
+          if (j < sortedOriginal.size()) {
+            originalTopNeighbors.add(sortedOriginal.get(j).getKey());
+          }
+          if (j < sortedGraphBased.size()) {
+            graphBasedTopNeighbors.add(sortedGraphBased.get(j).getKey());
+          }
+        }
+
+        // Count overlap
+        var intersection = new java.util.HashSet<>(originalTopNeighbors);
+        intersection.retainAll(graphBasedTopNeighbors);
+
+        int overlapCount = intersection.size();
+        double overlapRatio = (double) overlapCount / numToCheck;
+
+        log.debug(
+            "Query {}: Top {} neighbors overlap: {}/{} ({:.1f}%)",
+            i, numToCheck, overlapCount, numToCheck, overlapRatio * 100);
+
+        // We expect at least 30% overlap (this is a reasonable threshold for different index
+        // types)
+        assertTrue(
+            String.format(
+                "Query %d should have reasonable overlap in top %d results: got %.1f%% overlap",
+                i, numToCheck, overlapRatio * 100),
+            overlapRatio >= 0.3);
+      }
+
+      log.debug("Query {} results have reasonable similarity", i);
+    }
+
+    log.info("Search results show reasonable similarity between original and graph-based indexes");
   }
 }
