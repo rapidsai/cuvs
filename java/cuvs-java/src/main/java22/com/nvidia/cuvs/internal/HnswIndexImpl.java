@@ -133,7 +133,7 @@ public class HnswIndexImpl implements HnswIndex {
       returnValue = cuvsStreamSync(cuvsRes);
       checkCuVSError(returnValue, "cuvsStreamSync");
 
-      return new HnswSearchResults(
+      return HnswSearchResults.create(
           neighborsSequenceLayout,
           distancesSequenceLayout,
           neighborsMemorySegment,

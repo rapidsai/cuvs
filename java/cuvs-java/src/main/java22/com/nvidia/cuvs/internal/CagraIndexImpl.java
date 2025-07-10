@@ -341,7 +341,7 @@ public class CagraIndexImpl implements CagraIndex {
         checkCuVSError(returnValue, "cuvsRMMFree");
       }
 
-      return new CagraSearchResults(
+      return CagraSearchResults.create(
           neighborsSequenceLayout,
           distancesSequenceLayout,
           neighborsMemorySegment,
