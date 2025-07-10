@@ -317,7 +317,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
         checkCuVSError(returnValue, "cuvsRMMFree");
       }
 
-      return new BruteForceSearchResults(
+      return BruteForceSearchResults.create(
           neighborsSequenceLayout,
           distancesSequenceLayout,
           neighborsMemorySegment,
