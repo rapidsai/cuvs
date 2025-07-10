@@ -207,11 +207,13 @@ class GNND {
   GNND(const GNND&)            = delete;
   GNND& operator=(const GNND&) = delete;
 
+  template <typename DistEpilogue_t = raft::identity_op>
   void build(Data_t* data,
              const Index_t nrow,
              Index_t* output_graph,
              bool return_distances,
-             DistData_t* output_distances);
+             DistData_t* output_distances,
+             DistEpilogue_t dist_epilogue = DistEpilogue_t{});
   ~GNND()    = default;
   using ID_t = InternalID_t<Index_t>;
   void reset(raft::resources const& res);
@@ -222,7 +224,9 @@ class GNND {
                          Index_t* d_rev_graph_ptr,
                          int2* list_sizes,
                          cudaStream_t stream = 0);
-  void local_join(cudaStream_t stream = 0);
+
+  template <typename DistEpilogue_t = raft::identity_op>
+  void local_join(cudaStream_t stream = 0, DistEpilogue_t dist_epilogue = DistEpilogue_t{});
 
   raft::resources const& res;
 

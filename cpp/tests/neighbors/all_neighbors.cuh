@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/all_neighbors.hpp>
+#include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <gtest/gtest.h>
@@ -42,7 +43,7 @@
 
 namespace cuvs::neighbors::all_neighbors {
 
-enum knn_build_algo { NN_DESCENT, IVF_PQ };
+enum knn_build_algo { BRUTE_FORCE, NN_DESCENT, IVF_PQ };
 
 struct AllNeighborsInputs {
   std::tuple<knn_build_algo, cuvs::distance::DistanceType, double> build_algo_metric_recall;
@@ -79,7 +80,11 @@ void get_graphs(raft::resources& handle,
 
   auto build_algo = std::get<0>(ps.build_algo_metric_recall);
 
-  if (build_algo == NN_DESCENT) {
+  if (build_algo == BRUTE_FORCE) {
+    auto brute_force_params                = graph_build_params::brute_force_params{};
+    brute_force_params.build_params.metric = params.metric;
+    params.graph_build_params              = brute_force_params;
+  } else if (build_algo == NN_DESCENT) {
     auto nn_descent_params                      = graph_build_params::nn_descent_params{};
     nn_descent_params.max_iterations            = 100;
     nn_descent_params.graph_degree              = ps.k;
@@ -87,12 +92,13 @@ void get_graphs(raft::resources& handle,
     nn_descent_params.metric                    = params.metric;
     params.graph_build_params                   = nn_descent_params;
   } else if (build_algo == IVF_PQ) {
-    auto ivfq_build_params                = graph_build_params::ivf_pq_params{};
-    ivfq_build_params.build_params.metric = params.metric;
+    auto ivfpq_build_params                = graph_build_params::ivf_pq_params{};
+    ivfpq_build_params.build_params.metric = params.metric;
+    ivfpq_build_params.refinement_rate     = 2.0;
     // heuristically good ivfpq n_lists
-    ivfq_build_params.build_params.n_lists = std::max(
+    ivfpq_build_params.build_params.n_lists = std::max(
       5u, static_cast<uint32_t>(ps.n_rows * params.overlap_factor / (5000 * params.n_clusters)));
-    params.graph_build_params = ivfq_build_params;
+    params.graph_build_params = ivfpq_build_params;
   }
 
   auto cuda_stream = raft::resource::get_cuda_stream(handle);
@@ -175,6 +181,7 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
                queries_size);
 
     double min_recall = std::get<2>(ps.build_algo_metric_recall);
+
     EXPECT_TRUE(eval_recall(indices_bf, indices_allNN, ps.n_rows, ps.k, 0.01, min_recall, true));
   }
 
@@ -203,7 +210,11 @@ class AllNeighborsTest : public ::testing::TestWithParam<AllNeighborsInputs> {
 
 const std::vector<AllNeighborsInputs> inputsSingle =
   raft::util::itertools::product<AllNeighborsInputs>(
-    {std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::L2Expanded, 0.9),
+    {std::make_tuple(BRUTE_FORCE, cuvs::distance::DistanceType::L2Expanded, 0.9),
+     std::make_tuple(BRUTE_FORCE, cuvs::distance::DistanceType::L2SqrtExpanded, 0.9),
+     std::make_tuple(BRUTE_FORCE, cuvs::distance::DistanceType::InnerProduct, 0.9),
+     std::make_tuple(BRUTE_FORCE, cuvs::distance::DistanceType::CosineExpanded, 0.9),
+     std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::L2Expanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded, 0.9),
@@ -217,7 +228,9 @@ const std::vector<AllNeighborsInputs> inputsSingle =
 
 const std::vector<AllNeighborsInputs> inputsBatch =
   raft::util::itertools::product<AllNeighborsInputs>(
-    {std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::L2Expanded, 0.9),
+    {std::make_tuple(BRUTE_FORCE, cuvs::distance::DistanceType::L2Expanded, 0.9),
+     std::make_tuple(BRUTE_FORCE, cuvs::distance::DistanceType::L2SqrtExpanded, 0.9),
+     std::make_tuple(IVF_PQ, cuvs::distance::DistanceType::L2Expanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2Expanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::L2SqrtExpanded, 0.9),
      std::make_tuple(NN_DESCENT, cuvs::distance::DistanceType::CosineExpanded, 0.9),
