@@ -472,7 +472,7 @@ public class CagraIndexImpl implements CagraIndex {
           prepareTensor(
               localArena, dataset.asMemorySegment(), datasetShape, kDLFloat(), 32, kDLCPU(), 1);
 
-      long[] graphShape = {graph.size(), graph.graphDegree()};
+      long[] graphShape = {graph.size(), graph.degree()};
       MemorySegment graphTensor =
           prepareTensor(localArena, graph.memorySegment(), graphShape, kDLUInt(), 32, kDLCPU(), 1);
 

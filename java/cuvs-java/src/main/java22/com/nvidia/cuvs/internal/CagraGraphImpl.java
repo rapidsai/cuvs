@@ -16,8 +16,10 @@
 package com.nvidia.cuvs.internal;
 
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT_BYTE_SIZE;
 
 import com.nvidia.cuvs.CagraGraph;
+import com.nvidia.cuvs.IntList;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
@@ -47,13 +49,21 @@ public class CagraGraphImpl implements CagraGraph {
   }
 
   @Override
-  public int graphDegree() {
+  public int degree() {
     return graphDegree;
   }
 
   @Override
   public long size() {
     return size;
+  }
+
+  @Override
+  public IntList getNeighbours(long nodeIndex) {
+    return new SliceIntList(
+        memorySegment()
+            .asSlice(nodeIndex * graphDegree * C_INT_BYTE_SIZE, graphDegree * C_INT_BYTE_SIZE),
+        graphDegree);
   }
 
   @Override
@@ -64,5 +74,31 @@ public class CagraGraphImpl implements CagraGraph {
   @Override
   public void close() {
     arena.close();
+  }
+
+  private static class SliceIntList implements IntList {
+    private final MemorySegment memorySegment;
+    private final int size;
+
+    public SliceIntList(MemorySegment slice, int size) {
+      this.memorySegment = slice;
+      this.size = size;
+    }
+
+    @Override
+    public long size() {
+      return size;
+    }
+
+    @Override
+    public int get(long index) {
+      return memorySegment.get(C_INT, index);
+    }
+
+    @Override
+    public void toArray(int[] array) {
+      assert (array.length >= size) : "Input array is not large enough";
+      MemorySegment.copy(memorySegment, C_INT, 0, array, 0, size);
+    }
   }
 }
