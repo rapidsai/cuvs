@@ -789,7 +789,7 @@ def load(filename, resources=None):
 @auto_sync_resources
 def from_graph(graph, dataset, metric="sqeuclidean", resources=None):
     """
-    Construct a cagra index from an existing graph nad dataset
+    Construct a cagra index from an existing graph and dataset
 
     Parameters
     ----------

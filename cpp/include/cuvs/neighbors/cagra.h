@@ -476,7 +476,8 @@ cuvsError_t cuvsCagraMergeParamsDestroy(cuvsCagraMergeParams_t params);
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] params cuvsCagraIndexParams_t used to build CAGRA index
  * @param[in] dataset DLManagedTensor* training dataset
- * @param[out] index cuvsCagraIndex_t Newly built CAGRA index
+ * @param[inout] index cuvsCagraIndex_t Newly built CAGRA index. This index needs to be already
+ *                                      created with cuvsCagraIndexCreate.
  * @return cuvsError_t
  */
 cuvsError_t cuvsCagraBuild(cuvsResources_t res,
@@ -651,7 +652,8 @@ cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] filename the name of the file that stores the index
- * @param[out] index CAGRA index loaded disk
+ * @param[inout] index cuvsCagraIndex_t CAGRA index loaded from disk. This index needs to be already
+ *                                      created with cuvsCagraIndexCreate.
  */
 cuvsError_t cuvsCagraDeserialize(cuvsResources_t res, const char* filename, cuvsCagraIndex_t index);
 
@@ -662,7 +664,32 @@ cuvsError_t cuvsCagraDeserialize(cuvsResources_t res, const char* filename, cuvs
  * @param[in] metric cuvsDistanceType to use in the index
  * @param[in] graph the knn graph to use, shape (size, graph_degree)
  * @param[in] dataset the dataset to use, shape (size, dim)
- * @param[out] index CAGRA index constructed from the graph and dataset
+ * @param[inout] index cuvsCagraIndex_t CAGRA index populated with the graph and dataset.
+ *                                      This index needs to be already created with
+ *                                      cuvsCagraIndexCreate.
+ *
+ * @code {.c}
+ * #include <cuvs/core/c_api.h>
+ * #include <cuvs/neighbors/cagra.h>
+ *
+ * // Create cuvsResources_t
+ * cuvsResources_t res;
+ * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+ *
+ * // Create CAGRA index
+ * cuvsCagraIndex_t index;
+ * cuvsError_t index_create_status = cuvsCagraIndexCreate(&index);
+ *
+ * // Assume a populated `DLManagedTensor` type here for the graph and dataset
+ * DLManagedTensor dataset;
+ * DLManagedTensor graph;
+ *
+ * cuvsDistanceType metric = L2Expanded;
+ *
+ * // Build the CAGRA Index from the graph/dataset
+ * cuvsError_t status = cuvsCagraIndexFromGraph(res, metric, &graph, &dataset, index);
+ *
+ * @endcode
  */
 cuvsError_t cuvsCagraIndexFromGraph(cuvsResources_t res,
                                     cuvsDistanceType metric,
