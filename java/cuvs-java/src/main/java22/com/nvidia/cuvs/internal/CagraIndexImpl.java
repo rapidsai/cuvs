@@ -588,13 +588,7 @@ public class CagraIndexImpl implements CagraIndex {
   }
 
   /**
-   * Gets the CAGRA graph from the index.
-   * <p>
-   * The graph represents the k-nearest neighbor connectivity between vectors in the index.
-   * Each row i contains the indices of the k nearest neighbors of vector i.
-   *
-   * @return a 2D int array where array[i][j] represents the j-th nearest neighbor of vector i
-   * @throws Throwable if an error occurs while retrieving the graph
+   * Gets the kNN graph from the index.
    */
   @Override
   public int[][] getGraph() throws Throwable {
@@ -663,13 +657,7 @@ public class CagraIndexImpl implements CagraIndex {
   }
 
   /**
-   * Gets the dataset from the index.
-   * <p>
-   * The dataset contains the original vectors that were used to build the index.
-   * Each row represents a vector in the dataset.
-   *
-   * @return the dataset containing the original vectors
-   * @throws Throwable if an error occurs while retrieving the dataset
+   * Gets the dataset used to build the index.
    */
   @Override
   public Dataset getDataset() throws Throwable {

@@ -150,24 +150,12 @@ public interface CagraIndex {
   CuVSResources getCuVSResources();
 
   /**
-   * Gets the CAGRA graph from the index.
-   * <p>
-   * The graph represents the k-nearest neighbor connectivity between vectors in the index.
-   * Each row i contains the indices of the k nearest neighbors of vector i.
-   *
-   * @return a 2D int array where array[i][j] represents the j-th nearest neighbor of vector i
-   * @throws Throwable if an error occurs while retrieving the graph
+   * Gets the kNN graph from the index.
    */
   int[][] getGraph() throws Throwable;
 
   /**
-   * Gets the dataset from the index.
-   * <p>
-   * The dataset contains the original vectors that were used to build the index.
-   * Each row represents a vector in the dataset.
-   *
-   * @return the dataset containing the original vectors
-   * @throws Throwable if an error occurs while retrieving the dataset
+   * Gets the dataset used to build the index.
    */
   Dataset getDataset() throws Throwable;
 
@@ -256,12 +244,7 @@ public interface CagraIndex {
     Builder withIndexParams(CagraIndexParams cagraIndexParameters);
 
     /**
-     * Sets the graph and distance type for creating the {@link CagraIndex}.
-     * This method allows creating a CAGRA index from a pre-computed k-nearest neighbor graph.
-     *
-     * @param graph a two-dimensional int array representing the kNN graph where graph[i][j] is the j-th nearest neighbor of vector i
-     * @param distanceType the distance metric to use in the index
-     * @return an instance of this Builder
+     * Creates index from pre-computed kNN graph.
      */
     Builder from(int[][] graph, CagraIndexParams.CuvsDistanceType distanceType);
 
