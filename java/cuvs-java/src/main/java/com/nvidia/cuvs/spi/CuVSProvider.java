@@ -21,6 +21,7 @@ import com.nvidia.cuvs.CagraMergeParams;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
+import com.nvidia.cuvs.ScalarQuantizer;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 import java.nio.file.Path;
@@ -107,6 +108,17 @@ public interface CuVSProvider {
     // Default implementation falls back to the method without parameters
     return mergeCagraIndexes(indexes);
   }
+
+  /** Creates a new ScalarQuantizer Builder. */
+  ScalarQuantizer.Builder newScalarQuantizerBuilder(CuVSResources cuVSResources)
+      throws UnsupportedOperationException;
+
+  /** Applies binary quantization transform to the given dataset. */
+  byte[][] binaryQuantizerTransform(CuVSResources cuVSResources, float[][] dataset)
+      throws Throwable;
+
+  /** Applies binary quantization transform to the given dataset. */
+  byte[][] binaryQuantizerTransform(CuVSResources cuVSResources, Dataset dataset) throws Throwable;
 
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {

@@ -23,6 +23,8 @@ import com.nvidia.cuvs.CagraMergeParams;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
+import com.nvidia.cuvs.ScalarQuantizer;
+import com.nvidia.cuvs.internal.BinaryQuantizerImpl;
 import com.nvidia.cuvs.internal.BruteForceIndexImpl;
 import com.nvidia.cuvs.internal.CagraIndexImpl;
 import com.nvidia.cuvs.internal.CuVSResourcesImpl;
@@ -35,6 +37,7 @@ import java.lang.foreign.MemorySegment;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import com.nvidia.cuvs.internal.ScalarQuantizerImpl;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -144,5 +147,24 @@ final class JDKProvider implements CuVSProvider {
     Arena arena = Arena.ofShared();
     var memorySegment = Util.buildMemorySegment(arena, vectors);
     return new DatasetImpl(arena, memorySegment, size, dimensions);
+  }
+
+  @Override
+  public ScalarQuantizer.Builder newScalarQuantizerBuilder(CuVSResources cuVSResources) {
+    return ScalarQuantizerImpl.newBuilder(Objects.requireNonNull(cuVSResources));
+  }
+
+  @Override
+  public byte[][] binaryQuantizerTransform(CuVSResources cuVSResources, float[][] dataset)
+      throws Throwable {
+    return BinaryQuantizerImpl.transform(
+        Objects.requireNonNull(cuVSResources), Objects.requireNonNull(dataset));
+  }
+
+  @Override
+  public byte[][] binaryQuantizerTransform(CuVSResources cuVSResources, Dataset dataset)
+      throws Throwable {
+    return BinaryQuantizerImpl.transform(
+        Objects.requireNonNull(cuVSResources), Objects.requireNonNull(dataset));
   }
 }

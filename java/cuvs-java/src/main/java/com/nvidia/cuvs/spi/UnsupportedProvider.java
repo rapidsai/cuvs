@@ -20,6 +20,7 @@ import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
+import com.nvidia.cuvs.ScalarQuantizer;
 import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
 
@@ -65,6 +66,21 @@ final class UnsupportedProvider implements CuVSProvider {
 
   @Override
   public Dataset newArrayDataset(float[][] vectors) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public ScalarQuantizer.Builder newScalarQuantizerBuilder(CuVSResources cuVSResources) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public byte[][] binaryQuantizerTransform(CuVSResources cuVSResources, float[][] dataset) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public byte[][] binaryQuantizerTransform(CuVSResources cuVSResources, Dataset dataset) {
     throw new UnsupportedOperationException();
   }
 }
