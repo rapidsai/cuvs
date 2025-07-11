@@ -630,9 +630,8 @@ __launch_bounds__(BLOCK_SIZE)
       c_frag,
       SKEWED_MAX_NUM_BI_SAMPLES,
       wmma::mem_row_major);
-
-    __syncthreads();
   }
+  __syncthreads();
 
   for (int i = threadIdx.x; i < MAX_NUM_BI_SAMPLES * SKEWED_MAX_NUM_BI_SAMPLES; i += blockDim.x) {
     int row_id = i % SKEWED_MAX_NUM_BI_SAMPLES;
@@ -742,6 +741,7 @@ __launch_bounds__(BLOCK_SIZE)
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         s_distances[i] = 1.0 - s_distances[i];
       } else if (metric == cuvs::distance::DistanceType::BitwiseHamming) {
+        s_distances[i]         = 0.0;
         int n1                 = old_neighbors[row_id];
         int n2                 = new_neighbors[col_id];
         const uint8_t* data_n1 = reinterpret_cast<const uint8_t*>(data) + n1 * data_dim;
