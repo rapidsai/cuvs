@@ -15,7 +15,6 @@
  */
 package com.nvidia.cuvs;
 
-import com.nvidia.cuvs.BruteForceIndex.Builder;
 import com.nvidia.cuvs.spi.CuVSProvider;
 import java.io.InputStream;
 import java.io.OutputStream;
