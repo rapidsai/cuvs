@@ -365,6 +365,7 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
 
         // Create scalar quantizer params
         MemorySegment paramsSegment = localArena.allocate(cuvsScalarQuantizerParams_t);
+
         int returnValue = cuvsScalarQuantizerParamsCreate(paramsSegment);
         checkCuVSError(returnValue, "cuvsScalarQuantizerParamsCreate");
 
