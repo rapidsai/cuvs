@@ -132,14 +132,14 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
    */
   @Test
   public void testIndexingAndSearchingFlow() throws Throwable {
-    var dataset = Dataset.ofArray(createSampleData());
+    float[][] dataset = createSampleData();
     float[][] queries = createSampleQueries();
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
 
     int numTestsRuns = 5;
     try (CuVSResources resources = CuVSResources.create()) {
       for (int j = 0; j < numTestsRuns; j++) {
-        var index = indexOnce(dataset, resources);
+        var index = indexOnce(Dataset.ofArray(dataset), resources);
         var indexPath = serializeOnce(index);
         var loadedIndex = deserializeOnce(indexPath, resources);
         queryAndCompare(
@@ -160,7 +160,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
    */
   @Test
   public void testIndexingAndSearchingFlowInDifferentThreads() throws Throwable {
-    var dataset = Dataset.ofArray(createSampleData());
+    float[][] dataset = createSampleData();
     float[][] queries = createSampleQueries();
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
 
@@ -170,7 +170,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
         runInAnotherThread(
             () -> {
               try {
-                var index = indexOnce(dataset, resources);
+                var index = indexOnce(Dataset.ofArray(dataset), resources);
                 var indexPath = serializeOnce(index);
                 var loadedIndex = deserializeOnce(indexPath, resources);
                 queryAndCompare(
@@ -195,7 +195,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
    */
   @Test
   public void testIndexingAndSearchingFlowConcurrently() throws Throwable {
-    var dataset = Dataset.ofArray(createSampleData());
+    final float[][] dataset = createSampleData();
     float[][] queries = createSampleQueries();
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
 
@@ -205,7 +205,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
         () ->
             () -> {
               try (CuVSResources resources = CuVSResources.create()) {
-                var index = indexOnce(dataset, resources);
+                var index = indexOnce(Dataset.ofArray(dataset), resources);
                 var indexPath = serializeOnce(index);
                 var loadedIndex = deserializeOnce(indexPath, resources);
                 queryAndCompare(
@@ -226,14 +226,14 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
   @Test
   public void testIndexing() throws Throwable {
     for (int i = 0; i < 100; ++i) {
-      var dataset = Dataset.ofArray(createSampleData());
+      final float[][] dataset = createSampleData();
       int numTestsRuns = 10;
       runConcurrently(
           numTestsRuns,
           () ->
               () -> {
                 try (CuVSResources resources = CuVSResources.create()) {
-                  var index = indexOnce(dataset, resources);
+                  var index = indexOnce(Dataset.ofArray(dataset), resources);
                   index.destroyIndex();
                 } catch (Throwable e) {
                   throw new RuntimeException(e);
@@ -245,14 +245,14 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
   @Test
   public void testSerialization() throws Throwable {
     for (int i = 0; i < 100; ++i) {
-      var dataset = Dataset.ofArray(createSampleData());
+      final float[][] dataset = createSampleData();
       int numTestsRuns = 10;
       runConcurrently(
           numTestsRuns,
           () ->
               () -> {
                 try (CuVSResources resources = CuVSResources.create()) {
-                  var index = indexOnce(dataset, resources);
+                  var index = indexOnce(Dataset.ofArray(dataset), resources);
                   var indexPath = serializeOnce(index);
                   Files.deleteIfExists(indexPath);
                   index.destroyIndex();
@@ -265,8 +265,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
   @Test
   public void testDeserialization() throws Throwable {
-    var dataset = Dataset.ofArray(createSampleData());
-    var indexPath = createSerializedIndex(dataset);
+    var indexPath = createSerializedIndex(Dataset.ofArray(createSampleData()));
     for (int i = 0; i < 100; ++i) {
       int numTestsRuns = 10;
       runConcurrently(
@@ -485,8 +484,6 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     float[][] sampleData = createSampleData();
     float[][] queries = createSampleQueries();
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
-
-    List<Integer> map = List.of(0, 1, 2, 3);
 
     ValueLayout.OfFloat C_FLOAT =
         (ValueLayout.OfFloat) Linker.nativeLinker().canonicalLayouts().get("float");
