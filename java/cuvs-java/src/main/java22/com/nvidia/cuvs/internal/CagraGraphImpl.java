@@ -92,7 +92,7 @@ public class CagraGraphImpl implements CagraGraph {
 
     @Override
     public int get(long index) {
-      return memorySegment.get(C_INT, index);
+      return memorySegment.get(C_INT, index * C_INT_BYTE_SIZE);
     }
 
     @Override
