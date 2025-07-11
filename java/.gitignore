@@ -1,9 +1,8 @@
+*.iml
+target/
+jextract-22/
+openjdk-22-jextract*
 # cuvs-java
-/cuvs-java/target/
 /cuvs-java/bin/
 /cuvs-java/src/main/java22/com/nvidia/cuvs/internal/panama/
 /cuvs-java/*.cag
-jextract-22/
-openjdk-22-jextract*
-# examples
-/examples/target/
