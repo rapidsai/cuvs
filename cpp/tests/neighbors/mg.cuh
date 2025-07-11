@@ -730,10 +730,6 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-  /*
-  Tree merge requires an even number of GPU, but CI only has one. Disabled for now.
-  See https://github.com/rapidsai/cuvs/issues/904
-
   {7000,
    10000,
    8,
@@ -767,7 +763,6 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-   */
   {7000,
    10000,
    8,
