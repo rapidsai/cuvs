@@ -196,17 +196,17 @@ struct mapping {
 };
 
 template <typename IdxT>
-struct binary_to_float_decode_op {
-  binary_to_float_decode_op(const uint8_t* const binary_vecs, IdxT float_dim) : binary_vecs(binary_vecs), float_dim(float_dim) {binary_dim = float_dim >> 3;}
+struct bitwise_decode_op{
+  bitwise_decode_op(const uint8_t* const binary_vecs, IdxT compressed_dim) : binary_vecs(binary_vecs), dim(dim) {uncompressed_dim = compressed_dim << 3;}
   const uint8_t* binary_vecs;
-  IdxT float_dim;
-  IdxT binary_dim;
+  IdxT compressed_dim;
+  IdxT uncompressed_dim;
 
   HDI constexpr auto operator()(const IdxT& i)
   {
-    IdxT row_id = i / float_dim;
-    IdxT col_id = i % float_dim;
-    -1 + 2 * (binary_vecs[(row_id * binary_dim + col_id) >> 3] >> (col_id & 7)) & 1;
+    IdxT row_id = i / uncompressed_dim;
+    IdxT col_id = i % uncompressed_dim;
+    -1 + 2 * (binary_vecs[(row_id * compressed_dim + col_id) >> 3] >> (col_id & 7)) & 1;
   };
 };
 

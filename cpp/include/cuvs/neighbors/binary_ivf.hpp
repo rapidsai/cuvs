@@ -31,6 +31,8 @@ namespace cuvs::neighbors::binary_ivf {
 
 /** Size of the interleaved group (see `index::data` description). */
 constexpr static uint32_t kIndexGroupSize = 32;
+/** Stride of the interleaved group for vectorized loads. */
+constexpr static uint32_t kIndexGroupVecLen = 16;
 
 using index_params = cuvs::neighbors::ivf_flat::index_params;
 /**
@@ -46,39 +48,65 @@ using search_params = cuvs::neighbors::ivf_flat::search_params;
 static_assert(std::is_aggregate_v<index_params>);
 static_assert(std::is_aggregate_v<search_params>);
 
-template <typename SizeT, typename ValueT, typename IdxT>
+template <typename SizeT, typename IdxT>
 struct list_spec {
-  using value_type   = ValueT;
-  using list_extents = raft::matrix_extent<SizeT>;
-  using index_type   = IdxT;
+  using value_type = uint8_t;
+  using index_type = IdxT;
+  /** data stored in the interleaved format:
+   *
+   *    [ ceildiv(list_size, kIndexGroupSize)
+   *    , ceildiv(dim, (kIndexGroupVecLen))
+   *    , kIndexGroupSize
+   *    , kIndexGroupVecLen
+   *    ].
+   */
+  using list_extents = raft::
+    extents<SizeT, raft::dynamic_extent, raft::dynamic_extent, kIndexGroupSize, kIndexGroupVecLen>;
 
   SizeT align_max;
   SizeT align_min;
   uint32_t dim;
 
-  constexpr list_spec(uint32_t dim, bool conservative_memory_allocation)
-    : dim(dim),
-      align_min(kIndexGroupSize),
-      align_max(conservative_memory_allocation ? kIndexGroupSize : 1024)
-  {
-  }
+  constexpr list_spec(uint32_t dim, bool conservative_memory_allocation);
 
   // Allow casting between different size-types (for safer size and offset calculations)
   template <typename OtherSizeT>
-  constexpr explicit list_spec(const list_spec<OtherSizeT, ValueT, IdxT>& other_spec)
-    : dim{other_spec.dim}, align_min{other_spec.align_min}, align_max{other_spec.align_max}
-  {
-  }
+  constexpr explicit list_spec(const list_spec<OtherSizeT, IdxT>& other_spec);
 
   /** Determine the extents of an array enough to hold a given amount of data. */
-  constexpr auto make_list_extents(SizeT n_rows) const -> list_extents
-  {
-    return raft::make_extents<SizeT>(n_rows, dim);
-  }
+  constexpr list_extents make_list_extents(SizeT n_rows) const;
 };
 
-template <typename ValueT, typename IdxT, typename SizeT = uint32_t>
-using list_data = ivf::list<list_spec, SizeT, ValueT, IdxT>;
+template <typename SizeT, typename IdxT>
+constexpr list_spec<SizeT, IdxT>::list_spec(uint32_t dim,
+                                            bool conservative_memory_allocation)
+  : dim(dim),
+    align_min(kIndexGroupSize),
+    align_max(conservative_memory_allocation ? kIndexGroupSize : 1024)
+{
+}
+
+template <typename SizeT, typename IdxT>
+template <typename OtherSizeT>
+constexpr list_spec<SizeT, IdxT>::list_spec(const list_spec<OtherSizeT, IdxT>& other_spec)
+  : dim{other_spec.dim},
+    align_min{other_spec.align_min},
+    align_max{other_spec.align_max}
+{
+}
+
+template <typename SizeT, typename IdxT>
+constexpr typename list_spec<SizeT, IdxT>::list_extents list_spec<SizeT, IdxT>::make_list_extents(
+  SizeT n_rows) const
+{
+  return raft::make_extents<SizeT>(raft::div_rounding_up_safe<SizeT>(n_rows, kIndexGroupSize),
+                                   raft::div_rounding_up_safe<SizeT>(dim, kIndexGroupVecLen),
+                                   kIndexGroupSize,
+                                   kIndexGroupVecLen);
+}
+
+template <typename IdxT, typename SizeT = uint32_t>
+using list_data = ivf::list<list_spec, SizeT, IdxT>;
 
 /**
  * @}
@@ -126,14 +154,6 @@ struct index : cuvs::neighbors::index {
         bool conservative_memory_allocation,
         uint32_t dim);
 
-  /**
-   * Vectorized load/store size in elements, determines the size of interleaved data chunks.
-   */
-  uint32_t veclen() const noexcept;
-
-  /** Distance metric used for clustering. */
-  cuvs::distance::DistanceType metric() const noexcept;
-
   /** Whether `centers()` change upon extending the index (binary_ivf::extend). */
   bool adaptive_centers() const noexcept;
 
@@ -168,17 +188,8 @@ struct index : cuvs::neighbors::index {
   raft::device_vector_view<const uint32_t, uint32_t> list_sizes() const noexcept;
 
   /** k-means cluster centers corresponding to the lists [n_lists, dim] */
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept;
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept;
-
-  /**
-   * (Optional) Precomputed norms of the `centers` w.r.t. the chosen distance metric [n_lists].
-   *
-   * NB: this may be empty if the index is empty or if the metric does not require the center norms
-   * calculation.
-   */
-  std::optional<raft::device_vector_view<float, uint32_t>> center_norms() noexcept;
-  std::optional<raft::device_vector_view<const float, uint32_t>> center_norms() const noexcept;
+  raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> centers() noexcept;
+  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> centers() const noexcept;
 
   /**
    * Accumulated list sizes, sorted in descending order [n_lists + 1].
@@ -217,8 +228,8 @@ struct index : cuvs::neighbors::index {
   void allocate_center_norms(raft::resources const& res);
 
   /** Lists' data and indices. */
-  std::vector<std::shared_ptr<list_data<uint8_t, IdxT>>>& lists() noexcept;
-  const std::vector<std::shared_ptr<list_data<uint8_t, IdxT>>>& lists() const noexcept;
+  std::vector<std::shared_ptr<list_data<IdxT>>>& lists() noexcept;
+  const std::vector<std::shared_ptr<list_data<IdxT>>>& lists() const noexcept;
 
   void check_consistency();
 
@@ -227,31 +238,17 @@ struct index : cuvs::neighbors::index {
    * TODO: in theory, we can lift this to the template parameter and keep it at hardware maximum
    * possible value by padding the `dim` of the data https://github.com/rapidsai/raft/issues/711
    */
-  uint32_t veclen_;
-  cuvs::distance::DistanceType metric_;
   bool adaptive_centers_;
   bool conservative_memory_allocation_;
-  std::vector<std::shared_ptr<list_data<uint8_t, IdxT>>> lists_;
+  std::vector<std::shared_ptr<list_data<IdxT>>> lists_;
   raft::device_vector<uint32_t, uint32_t> list_sizes_;
-  raft::device_matrix<float, uint32_t, raft::row_major> centers_;
+  raft::device_matrix<uint8_t, uint32_t, raft::row_major> centers_;
   std::optional<raft::device_vector<float, uint32_t>> center_norms_;
 
   // Computed members
   raft::device_vector<uint8_t*, uint32_t> data_ptrs_;
   raft::device_vector<IdxT*, uint32_t> inds_ptrs_;
   raft::host_vector<IdxT, uint32_t> accum_sorted_sizes_;
-
-  static auto calculate_veclen(uint32_t dim) -> uint32_t
-  {
-    // TODO: consider padding the dimensions and fixing veclen to its maximum possible value as a
-    // template parameter (https://github.com/rapidsai/raft/issues/711)
-
-    // NOTE: keep this consistent with the select_interleaved_scan_kernel logic
-    // in detail/binary_ivf_interleaved_scan-inl.cuh.
-    uint32_t veclen = std::max<uint32_t>(1, 16);
-    if (dim % veclen != 0) { veclen = 1; }
-    return veclen;
-  }
 };
 /**
  * @}
@@ -287,12 +284,6 @@ auto build(raft::resources const& handle,
 /**
  * @brief Build the index from the dataset for efficient search.
  *
- * NB: Currently, the following distance metrics are supported:
- * - L2Expanded
- * - L2Unexpanded
- * - InnerProduct
- * - CosineExpanded
- *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -316,12 +307,6 @@ void build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
- *
- * NB: Currently, the following distance metrics are supported:
- * - L2Expanded
- * - L2Unexpanded
- * - InnerProduct
- * - CosineExpanded
  *
  * Note, if index_params.add_data_on_build is set to true, the user can set a
  * stream pool in the input raft::resource with at least one stream to enable kernel and copy
@@ -352,12 +337,6 @@ auto build(raft::resources const& handle,
 
 /**
  * @brief Build the index from the dataset for efficient search.
- *
- * NB: Currently, the following distance metrics are supported:
- * - L2Expanded
- * - L2Unexpanded
- * - InnerProduct
- * - CosineExpanded
  *
  * Note, if index_params.add_data_on_build is set to true, the user can set a
  * stream pool in the input raft::resource with at least one stream to enable kernel and copy
@@ -954,7 +933,7 @@ auto extend(raft::resources const& handle,
 void extend(raft::resources const& handle,
             raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
-            cuvs::neighbors::binary_ivf::index<uint8_t, int64_t>* idx);
+            cuvs::neighbors::binary_ivf::index<int64_t>* idx);
 /**
  * @}
  */

@@ -215,6 +215,10 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept;
 
+  /** k-means cluster centers corresponding to the lists [n_lists, dim] */
+  raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> binary_centers() noexcept;
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> binary_centers() const noexcept;
+
   /**
    * (Optional) Precomputed norms of the `centers` w.r.t. the chosen distance metric [n_lists].
    *
@@ -278,6 +282,7 @@ struct index : cuvs::neighbors::index {
   std::vector<std::shared_ptr<list_data<T, IdxT>>> lists_;
   raft::device_vector<uint32_t, uint32_t> list_sizes_;
   raft::device_matrix<float, uint32_t, raft::row_major> centers_;
+  raft::device_matrix<uint8_t, uint32_t, raft::row_major> binary_centers_;
   std::optional<raft::device_vector<float, uint32_t>> center_norms_;
 
   // Computed members

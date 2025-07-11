@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <cstdint>
+#include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 
 namespace cuvs::neighbors::ivf_flat {
@@ -49,7 +51,8 @@ index<T, IdxT>::index(raft::resources const& res,
     conservative_memory_allocation_{conservative_memory_allocation},
     lists_{n_lists},
     list_sizes_{raft::make_device_vector<uint32_t, uint32_t>(res, n_lists)},
-    centers_(raft::make_device_matrix<float, uint32_t>(res, n_lists, dim)),
+    centers_(metric != cuvs::distance::DistanceType::BitwiseHamming ? raft::make_device_matrix<float, uint32_t>(res, n_lists, dim) : raft::make_device_matrix<float, uint32_t>(res, 0, 0)),
+    binary_centers_(metric != cuvs::distance::DistanceType::BitwiseHamming ? raft::make_device_matrix<uint8_t, uint32_t>(res, 0, 0) : raft::make_device_matrix<uint8_t, uint32_t>(res, n_lists, dim)),
     center_norms_(std::nullopt),
     data_ptrs_{raft::make_device_vector<T*, uint32_t>(res, n_lists)},
     inds_ptrs_{raft::make_device_vector<IdxT*, uint32_t>(res, n_lists)},
@@ -102,6 +105,18 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> index<T, IdxT>:
   return centers_.view();
 }
 
+template <typename T, typename IdxT>
+raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> index<T, IdxT>::binary_centers() noexcept
+{
+  return binary_centers_.view();
+}
+
+template <typename T, typename IdxT>
+raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> index<T, IdxT>::binary_centers()
+  const noexcept
+{
+  return binary_centers_.view();
+}
 template <typename T, typename IdxT>
 std::optional<raft::device_vector_view<float, uint32_t>> index<T, IdxT>::center_norms() noexcept
 {

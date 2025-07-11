@@ -23,6 +23,7 @@
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
+#include <cuvs/preprocessing/quantize/binary.hpp>
 
 #include "../../cluster/kmeans_balanced.cuh"
 #include "../detail/ann_utils.cuh"
@@ -70,6 +71,10 @@ auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T,
   raft::copy(target.centers().data_handle(),
              source.centers().data_handle(),
              source.centers().size(),
+             stream);
+  raft::copy(target.binary_centers().data_handle(),
+             source.binary_centers().data_handle(),
+             source.binary_centers().size(),
              stream);
   if (source.center_norms().has_value()) {
     target.allocate_center_norms(res);
@@ -409,6 +414,7 @@ inline auto build(raft::resources const& handle,
   utils::memzero(index.data_ptrs().data_handle(), index.data_ptrs().size(), stream);
   utils::memzero(index.inds_ptrs().data_handle(), index.inds_ptrs().size(), stream);
 
+  bool binary_index = params.metric == cuvs::distance::DistanceType::BitwiseHamming;
   // Train the kmeans clustering
   {
     auto trainset_ratio = std::max<size_t>(
@@ -427,14 +433,19 @@ inline auto build(raft::resources const& handle,
                                     stream));
     auto trainset_const_view =
       raft::make_device_matrix_view<const T, IdxT>(trainset.data(), n_rows_train, index.dim());
+    if (binary_index) {
+      const uint8_t* trainset_ptr = reinterpret_cast<const uint8_t*>(trainset.data());
+      static constexpr uint32_t byte_dim = index.dim() * sizeof(T);
+    }
     auto centers_view = raft::make_device_matrix_view<float, IdxT>(
       index.centers().data_handle(), index.n_lists(), index.dim());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = index.metric();
+    kmeans_params.metric  = binary_index ? cuvs::distance::DistanceType::L2Expanded : index.metric();
     cuvs::cluster::kmeans_balanced::fit(
       handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
   }
+  cuvs::preprocessing::quantize::binary::transform(handle, centers, index.centers);
 
   // add the data if necessary
   if (params.add_data_on_build) {
