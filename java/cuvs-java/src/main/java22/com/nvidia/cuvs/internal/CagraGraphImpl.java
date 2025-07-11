@@ -67,8 +67,8 @@ public class CagraGraphImpl implements CagraGraph {
   }
 
   @Override
-  public int get(long index) {
-    return (int) graph$vh.get(memorySegment, 0L, index);
+  public int get(int row, int col) {
+    return (int) graph$vh.get(memorySegment, 0L, (long) row * graphDegree + col);
   }
 
   @Override

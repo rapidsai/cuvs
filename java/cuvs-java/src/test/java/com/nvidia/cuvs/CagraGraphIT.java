@@ -64,4 +64,15 @@ public class CagraGraphIT extends CuVSTestCase {
       }
     }
   }
+
+  @Test
+  public void testGraphGetAccess() {
+    try (var graph = CagraGraph.ofArray(graphData)) {
+      for (int n = 0; n < graph.size(); ++n) {
+        for (int i = 0; i < graph.degree(); ++i) {
+          assertEquals(graphData[n][i], graph.get(n, i));
+        }
+      }
+    }
+  }
 }

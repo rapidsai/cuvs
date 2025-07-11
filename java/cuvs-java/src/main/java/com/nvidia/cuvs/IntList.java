@@ -15,11 +15,21 @@
  */
 package com.nvidia.cuvs;
 
+/**
+ * Represent a contiguous list of integers (32-bit) backed by off-heap memory.
+ *
+ * @since 25.08
+ */
 public interface IntList {
 
   long size();
 
   int get(long index);
 
+  /**
+   * Copies the content of this int list to an on-heap Java array.
+   *
+   * @param array the destination array. Must be of length {@link IntList#size()} or bigger.
+   */
   void toArray(int[] array);
 }

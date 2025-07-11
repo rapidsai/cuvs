@@ -17,25 +17,44 @@ package com.nvidia.cuvs;
 
 import com.nvidia.cuvs.spi.CuVSProvider;
 
+/**
+ * Represent a CAGRA graph backed by off-heap memory.
+ *
+ * @since 25.08
+ */
 public interface CagraGraph extends AutoCloseable {
 
   /**
    * Creates a graph from an on-heap array of neighbours.
-   * This method is mainly for testing purposes, as it will
-   * allocate an additional MemorySegment to hold the graph data.
-   *
-   * @since 25.08
+   * This method will allocate an additional MemorySegment to hold the graph data.
    */
   static CagraGraph ofArray(int[][] graph) {
     return CuVSProvider.provider().newArrayGraph(graph);
   }
 
+  /**
+   * The degree of the graph, aka the length of the neighbour list for each node
+   */
   int degree();
 
+  /**
+   * The size of the graph, aka the number of nodes
+   */
   long size();
 
-  int get(long index);
+  /**
+   * Access a single element of the matrix backing the CAGRA graph.
+   *
+   * @param row the matrix row, i.e. the node index
+   * @param col the matrix column, i.e. the i-th neighbour of the {@code row}-th node
+   */
+  int get(int row, int col);
 
+  /**
+   * Get a view (0-copy) of the neighbour data of a node.
+   *
+   * @param nodeIndex the node for which to return the list of neighbours
+   */
   IntList getNeighbours(long nodeIndex);
 
   @Override
