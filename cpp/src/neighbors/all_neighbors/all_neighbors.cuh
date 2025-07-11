@@ -17,17 +17,17 @@
 #pragma once
 #include "../detail/reachability.cuh"
 #include "all_neighbors_batched.cuh"
-#include "cuvs/neighbors/graph_build_types.hpp"
 #include <cuvs/neighbors/all_neighbors.hpp>
+#include <cuvs/neighbors/graph_build_types.hpp>
 #include <raft/matrix/shift.cuh>
 #include <raft/util/cudart_utils.hpp>
 
 namespace cuvs::neighbors::all_neighbors::detail {
 using namespace cuvs::neighbors;
 
-GRAPH_BUILD_ALGO check_metric(const all_neighbors_params& params,
-                              bool do_mutual_reachability_dist,
-                              bool self_loop)
+GRAPH_BUILD_ALGO check_params_validity(const all_neighbors_params& params,
+                                       bool do_mutual_reachability_dist,
+                                       bool self_loop)
 {
   if (std::holds_alternative<graph_build_params::brute_force_params>(params.graph_build_params)) {
     // result of brute force build and search always includes self loops
@@ -36,33 +36,37 @@ GRAPH_BUILD_ALGO check_metric(const all_neighbors_params& params,
       "all-neighbors build with brute force does not support self_loop=false. To build a knn graph "
       "without self loops using the brute force method, please build with k+1 neighbors and remove "
       "the first column. "
-      "Another option is to use cuvs::neighbors::all_neighbors::build(...) with NN Descent or "
-      "IVFPQ as the graph build algorithm for support with self_loop=false.");
+      "For support with self_loop=false, please use cuvs::neighbors::all_neighbors::build(...) "
+      "with NN Descent or "
+      "IVFPQ as the graph build algorithm.");
     /* There are issues with tiled_brute_force_knn (mainly the pairwise_distances functions being
      * used). pairwise_distances returns different distance for different input shapes, making it
      * difficult to use for batched all-neighbors which depend on distance comparison to rule out
-     * duplicate indices when merging. out of the configurations [single, batched] x [normal
+     * duplicate indices when merging. among configurations [single, batched] x [normal
      * distance, mutual reach distance] batched, mutual reach distance uses tiled_brute_force_knn,
      * and therefore is not supported. Note that when k > 64, the brute_force API also ends up using
      * tiled_brute_force_knn, which may result in issues. related issue:
      * https://github.com/rapidsai/cuvs/issues/1056
      */
     if (do_mutual_reachability_dist) {
-      // related issue: https://github.com/rapidsai/cuvs/issues/1056
       RAFT_EXPECTS(params.n_clusters <= 1,
                    "Batched all-neighbors build with brute force for getting mutual reachability "
                    "distances is not supported.");
+      // InnerProduct is not supported for mutual reachability distance, because mutual reachability
+      // distance takes "max" of core distances and pairwise distance.
       auto allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
                              params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                              params.metric == cuvs::distance::DistanceType::CosineExpanded;
-      RAFT_EXPECTS(allowed_metrics, "Distance metric information...");
+      RAFT_EXPECTS(
+        allowed_metrics,
+        "Distance metric for all-neighbors build with brute force for computing mutual "
+        "reachability distance should be L2Expanded, L2SqrtExpanded, or CosineExpanded.");
     } else {
       auto allowed_metrics_batch = params.metric == cuvs::distance::DistanceType::L2Expanded ||
                                    params.metric == cuvs::distance::DistanceType::L2SqrtExpanded;
       auto allowed_metrics_single = allowed_metrics_batch ||
                                     params.metric == cuvs::distance::DistanceType::CosineExpanded ||
                                     params.metric == cuvs::distance::DistanceType::InnerProduct;
-      // related issue: https://github.com/rapidsai/cuvs/issues/1056
       RAFT_EXPECTS((params.n_clusters <= 1 && allowed_metrics_single) || allowed_metrics_batch,
                    "Distance metric supported for for all-neighbors build with brute force depends "
                    "on params.n_clusters. When params.n_clusters <= 1, supported metrics are "
@@ -79,17 +83,19 @@ GRAPH_BUILD_ALGO check_metric(const all_neighbors_params& params,
       allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
                         params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                         params.metric == cuvs::distance::DistanceType::CosineExpanded;
+      RAFT_EXPECTS(
+        allowed_metrics,
+        "Distance metric for all-neighbors build with NN Descent for computing mutual reachability "
+        "distance should be L2Expanded, L2SqrtExpanded, or CosineExpanded.");
     } else {
       allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
                         params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                         params.metric == cuvs::distance::DistanceType::CosineExpanded ||
                         params.metric == cuvs::distance::DistanceType::InnerProduct;
+      RAFT_EXPECTS(allowed_metrics,
+                   "Distance metric for all-neighbors build with NN Descent should be L2Expanded, "
+                   "L2SqrtExpanded, CosineExpanded, or InnerProduct.");
     }
-
-    RAFT_EXPECTS(allowed_metrics,
-                 "Distance metric for all-neighbors build with NN Descent should be L2Expanded, "
-                 "L2SqrtExpanded, CosineExpanded, or InnerProduct. For mutual reachability "
-                 "distance calculation, InnerProduct metric is not supported.");
     return GRAPH_BUILD_ALGO::NN_DESCENT;
   } else if (std::holds_alternative<graph_build_params::ivf_pq_params>(params.graph_build_params)) {
     RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::L2Expanded,
@@ -133,7 +139,7 @@ void build(
   T alpha                                                                    = 1.0,
   bool self_loop                                                             = true)
 {
-  auto build_algo = check_metric(params, core_distances.has_value(), self_loop);
+  auto build_algo = check_params_validity(params, core_distances.has_value(), self_loop);
 
   RAFT_EXPECTS(dataset.extent(0) == indices.extent(0),
                "number of rows in dataset should be the same as number of rows in indices matrix");
@@ -174,9 +180,6 @@ void build(
       core_distances.value().data_handle(),
       raft::resource::get_cuda_stream(handle));
 
-    raft::print_device_vector(
-      "core dist in allNN", core_distances.value().data_handle(), 10, std::cout);
-
     // TODO need to do something about this
     if (params.metric == cuvs::distance::DistanceType::L2SqrtExpanded &&
         std::holds_alternative<graph_build_params::nn_descent_params>(params.graph_build_params)) {
@@ -216,7 +219,7 @@ void build(
   T alpha                                                                    = 1.0,
   bool self_loop                                                             = true)
 {
-  auto build_algo = check_metric(params, core_distances.has_value(), self_loop);
+  auto build_algo = check_params_validity(params, core_distances.has_value(), self_loop);
 
   RAFT_EXPECTS(dataset.extent(0) == indices.extent(0),
                "number of rows in dataset should be the same as number of rows in indices matrix");
