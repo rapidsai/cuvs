@@ -86,6 +86,8 @@ auto transform(raft::resources const& handle,
   auto counting_vector = raft::make_device_vector<int>(handle, nnz);
   auto counting_vector_view_const =
     raft::make_device_vector_view<const int, int>(counting_vector.data_handle(), nnz);
+
+  // TODO: https://github.com/rapidsai/raft/issues/2661
   thrust::sequence(
     thrust::device, counting_vector.data_handle(), counting_vector.data_handle() + nnz, 0, 1);
 
@@ -233,6 +235,8 @@ auto transform(raft::resources const& handle,
   // Create a sequence of reversed column indices
   config.n_components = drop_first ? config.n_components - 1 : config.n_components;
   auto col_indices    = raft::make_device_vector<int>(handle, config.n_components);
+
+  // TODO: https://github.com/rapidsai/raft/issues/2661
   thrust::sequence(thrust::device,
                    col_indices.data_handle(),
                    col_indices.data_handle() + config.n_components,
