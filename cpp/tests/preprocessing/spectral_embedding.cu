@@ -105,10 +105,7 @@ class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingI
   void testSpectralEmbedding()
   {
     // Call the spectral embedding function
-    int result = transform(handle, config_, input_.view(), embedding_.view());
-
-    // Check that the function executed successfully
-    ASSERT_EQ(result, 0);
+    transform(handle, config_, input_.view(), embedding_.view());
 
     // Basic sanity checks on the output embedding
 

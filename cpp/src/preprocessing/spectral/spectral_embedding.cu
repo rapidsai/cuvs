@@ -42,10 +42,10 @@
 
 namespace cuvs::preprocessing::spectral_embedding {
 
-auto transform(raft::resources const& handle,
+void transform(raft::resources const& handle,
                params spectral_embedding_config,
                raft::device_matrix_view<float, int, raft::row_major> dataset,
-               raft::device_matrix_view<float, int, raft::col_major> embedding) -> int
+               raft::device_matrix_view<float, int, raft::col_major> embedding)
 {
   const int n_samples     = dataset.extent(0);
   const int n_features    = dataset.extent(1);
@@ -262,8 +262,6 @@ auto transform(raft::resources const& handle,
     raft::make_const_mdspan(col_indices.view()),     // Column indices to gather
     embedding_row_view                               // Destination matrix (as row-major view)
   );
-
-  return 0;
 }
 
 }  // namespace cuvs::preprocessing::spectral_embedding
