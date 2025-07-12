@@ -24,6 +24,7 @@
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <cuvs/preprocessing/quantize/binary.hpp>
+#include <raft/linalg/map.cuh>
 
 #include "../../cluster/kmeans_balanced.cuh"
 #include "../detail/ann_utils.cuh"
@@ -49,6 +50,30 @@ namespace cuvs::neighbors::ivf_flat {
 using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 namespace detail {
+
+/**
+ * @brief Bitwise decode operation for binary data
+ * Expands each bit to -1 or +1 for better clustering
+ */
+template <typename IdxT>
+struct bitwise_decode_op {
+  const uint8_t* binary_data;
+  uint32_t dim;
+  
+  __host__ __device__ bitwise_decode_op(const uint8_t* data, uint32_t d) : binary_data(data), dim(d) {}
+  
+  __device__ int8_t operator()(IdxT idx) const {
+    IdxT row = idx / (dim * 8);
+    IdxT col = idx % (dim * 8);
+    IdxT byte_idx = row * dim + col / 8;
+    IdxT bit_idx = col % 8;
+    
+    uint8_t byte_val = binary_data[byte_idx];
+    bool bit_val = (byte_val >> (7 - bit_idx)) & 1;
+    
+    return bit_val ? int8_t(1) : int8_t(-1);
+  }
+};
 
 template <typename T, typename IdxT>
 auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T, IdxT>
@@ -433,19 +458,42 @@ inline auto build(raft::resources const& handle,
                                     stream));
     auto trainset_const_view =
       raft::make_device_matrix_view<const T, IdxT>(trainset.data(), n_rows_train, index.dim());
-    if (binary_index) {
-      const uint8_t* trainset_ptr = reinterpret_cast<const uint8_t*>(trainset.data());
-      static constexpr uint32_t byte_dim = index.dim() * sizeof(T);
-    }
-    auto centers_view = raft::make_device_matrix_view<float, IdxT>(
-      index.centers().data_handle(), index.n_lists(), index.dim());
+    
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = binary_index ? cuvs::distance::DistanceType::L2Expanded : index.metric();
-    cuvs::cluster::kmeans_balanced::fit(
-      handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
+    
+    if (binary_index) {
+      // For binary data, we need to decode to expanded representation for clustering
+      rmm::device_uvector<int8_t> decoded_trainset(
+        n_rows_train * index.dim() * 8, stream, raft::resource::get_large_workspace_resource(handle));
+      auto decoded_trainset_view = raft::make_device_matrix_view<int8_t, IdxT>(
+        reinterpret_cast<int8_t*>(decoded_trainset.data()), n_rows_train, index.dim() * 8);
+      
+      // Decode binary trainset to expanded representation
+      raft::linalg::map_offset(handle, decoded_trainset_view, bitwise_decode_op<IdxT>(trainset.data(), index.dim()));
+      trainset.clear();
+      
+      // Create decoded centers for clustering
+      rmm::device_uvector<float> decoded_centers(
+        index.n_lists() * index.dim() * 8, stream, raft::resource::get_workspace_resource(handle));
+      auto decoded_centers_view = raft::make_device_matrix_view<float, IdxT>(
+        decoded_centers.data(), index.n_lists(), index.dim() * 8);
+      
+      // Fit k-means on decoded data
+      cuvs::cluster::kmeans_balanced::fit(
+        handle, kmeans_params, raft::make_const_mdspan(decoded_trainset_view), decoded_centers_view);
+      
+      // Transform decoded centers back to binary format
+      cuvs::preprocessing::quantize::binary::transform(handle, decoded_centers_view, index.centers());
+    } else {
+      // For non-binary data, use standard clustering
+      auto centers_view = raft::make_device_matrix_view<float, IdxT>(
+        index.centers().data_handle(), index.n_lists(), index.dim());
+      cuvs::cluster::kmeans_balanced::fit(
+        handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
+    }
   }
-  cuvs::preprocessing::quantize::binary::transform(handle, centers, index.centers);
 
   // add the data if necessary
   if (params.add_data_on_build) {
