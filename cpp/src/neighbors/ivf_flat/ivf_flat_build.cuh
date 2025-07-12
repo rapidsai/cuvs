@@ -484,8 +484,10 @@ inline auto build(raft::resources const& handle,
       cuvs::cluster::kmeans_balanced::fit(
         handle, kmeans_params, raft::make_const_mdspan(decoded_trainset_view), decoded_centers_view);
       
-      // Transform decoded centers back to binary format
-      cuvs::preprocessing::quantize::binary::transform(handle, decoded_centers_view, index.centers());
+             // Transform decoded centers back to binary format
+       cuvs::preprocessing::quantize::binary::params binary_params;
+       auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, binary_params, decoded_centers_view);
+       cuvs::preprocessing::quantize::binary::transform(handle, quantizer, decoded_centers_view, index.binary_centers());
     } else {
       // For non-binary data, use standard clustering
       auto centers_view = raft::make_device_matrix_view<float, IdxT>(

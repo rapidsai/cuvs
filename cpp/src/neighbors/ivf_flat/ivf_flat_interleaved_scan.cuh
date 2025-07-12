@@ -1242,6 +1242,7 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
         std::forward<Args>(args)...);  // NB: update the description of `knn::ivf_flat::build` when
                                        // adding here a new metric.
     case cuvs::distance::DistanceType::Hamming:
+    case cuvs::distance::DistanceType::BitwiseHamming:
       return launch_kernel<Capacity,
                            Veclen,
                            Ascending,

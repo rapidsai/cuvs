@@ -316,7 +316,9 @@ inline auto build(raft::resources const& handle,
     auto decoded_centers_view = raft::make_device_matrix_view<float, IdxT>(decoded_centers.data(), index.n_lists(), index.dim() * 8);
     cuvs::cluster::kmeans_balanced::fit(
       handle, kmeans_params, raft::make_const_mdspan(decoded_trainset_view), decoded_centers_view);
-    cuvs::preprocess::binary::transform(handle, decoded_centers_view, index.centers());
+    cuvs::preprocessing::quantize::binary::params binary_params;
+    auto quantizer = cuvs::preprocessing::quantize::binary::train(handle, binary_params, decoded_centers_view);
+    cuvs::preprocessing::quantize::binary::transform(handle, quantizer, decoded_centers_view, index.centers());
   }
 
   // add the data if necessary
