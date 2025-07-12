@@ -195,21 +195,6 @@ struct mapping {
   /** @} */
 };
 
-template <typename IdxT>
-struct bitwise_decode_op{
-  bitwise_decode_op(const uint8_t* const binary_vecs, IdxT compressed_dim) : binary_vecs(binary_vecs), dim(dim) {uncompressed_dim = compressed_dim << 3;}
-  const uint8_t* binary_vecs;
-  IdxT compressed_dim;
-  IdxT uncompressed_dim;
-
-  HDI constexpr auto operator()(const IdxT& i)
-  {
-    IdxT row_id = i / uncompressed_dim;
-    IdxT col_id = i % uncompressed_dim;
-    -1 + 2 * (binary_vecs[(row_id * compressed_dim + col_id) >> 3] >> (col_id & 7)) & 1;
-  };
-};
-
 template <>
 template <>
 HDI constexpr auto mapping<int8_t>::operator()(const uint8_t& x) const -> int8_t
@@ -228,7 +213,7 @@ HDI constexpr auto mapping<int8_t>::operator()(const float& x) const -> int8_t
 
 template <typename IdxT>
 struct bitwise_decode_op{
-  bitwise_decode_op(const uint8_t* const binary_vecs, IdxT compressed_dim) : binary_vecs(binary_vecs), dim(dim) {uncompressed_dim = compressed_dim * 8;}
+  bitwise_decode_op(const uint8_t* const binary_vecs, IdxT compressed_dim) : binary_vecs(binary_vecs), dim(dim) {uncompressed_dim = compressed_dim << 3;}
   const uint8_t* binary_vecs;
   IdxT compressed_dim;
   IdxT uncompressed_dim;

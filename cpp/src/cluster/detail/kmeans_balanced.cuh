@@ -212,9 +212,6 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
       raft::matrix::argmin(handle, distances_const_view, labels_view);
       break;
     }
-    case cuvs::distance::DistanceType::BitwiseHamming: {
-      pairwise_distance_kmeans<typename DataT, typename IndexT>(const raft::resources &handle, int X, int centroids, int pairwiseDistance, cuvs::distance::DistanceType metric)
-    }
     default: {
       RAFT_FAIL("The chosen distance metric is not supported (%d)", int(params.metric));
     }
