@@ -35,6 +35,7 @@
 #include <rmm/device_uvector.hpp>
 
 #include <thrust/sequence.h>
+#include <thrust/tabulate.h>
 
 #include <cuvs/neighbors/brute_force.hpp>
 
@@ -83,17 +84,10 @@ void transform(raft::resources const& handle,
       return static_cast<int>(x);
     });
 
-  auto counting_vector = raft::make_device_vector<int>(handle, nnz);
-  auto counting_vector_view_const =
-    raft::make_device_vector_view<const int, int>(counting_vector.data_handle(), nnz);
-
-  // TODO: https://github.com/rapidsai/raft/issues/2661
-  thrust::sequence(
-    thrust::device, counting_vector.data_handle(), counting_vector.data_handle() + nnz, 0, 1);
-
-  raft::linalg::unary_op(
-    handle, counting_vector_view_const, knn_rows.view(), [k_search = k_search] __device__(int x) {
-      return x / k_search;
+  auto policy = raft::resource::get_thrust_policy(handle);
+  thrust::tabulate(
+    policy, knn_rows.data_handle(), knn_rows.data_handle() + nnz, [k_search] __device__(int idx) {
+      return idx / k_search;
     });
 
   // binarize to 1s
@@ -149,10 +143,6 @@ void transform(raft::resources const& handle,
 
   raft::resource::sync_stream(handle, stream);
 
-  using value_idx = int;
-  using value_t   = float;
-  using size_type = size_t;
-
   auto sym_coo_structure = sym_coo_matrix.structure_view();
   auto sym_coo_n_rows    = sym_coo_structure.get_n_rows();
   auto sym_coo_n_cols    = sym_coo_structure.get_n_cols();
@@ -188,15 +178,13 @@ void transform(raft::resources const& handle,
       : raft::sparse::linalg::compute_graph_laplacian(handle, csr_matrix_view);
   auto laplacian_structure = laplacian.structure_view();
 
-  auto laplacian_elements_view_const = raft::make_device_vector_view<const float, int>(
-    laplacian.get_elements().data(), laplacian_structure.get_nnz());
   auto laplacian_elements_view = raft::make_device_vector_view<float, int>(
     laplacian.get_elements().data(), laplacian_structure.get_nnz());
 
-  raft::linalg::unary_op(
-    handle, laplacian_elements_view_const, laplacian_elements_view, [] __device__(float x) {
-      return -x;
-    });
+  raft::linalg::unary_op(handle,
+                         raft::make_const_mdspan(laplacian_elements_view),
+                         laplacian_elements_view,
+                         [] __device__(float x) { return -x; });
 
   auto config           = raft::sparse::solver::lanczos_solver_config<float>();
   config.n_components   = spectral_embedding_config.n_components;
@@ -229,8 +217,6 @@ void transform(raft::resources const& handle,
       eigenvectors.view(),                           // output matrix view (in-place)
       [] __device__(float elem, float diag) { return elem / diag; });
   }
-
-  // Replace the direct copy with a gather operation that reverses columns
 
   // Create a sequence of reversed column indices
   config.n_components = drop_first ? config.n_components - 1 : config.n_components;
