@@ -414,8 +414,8 @@ public class CagraIndexImpl implements CagraIndex {
     checkNotDestroyed();
     tempFile = tempFile.toAbsolutePath();
 
-    try (var arena = Arena.ofConfined()) {
-      MemorySegment pathSeg = buildMemorySegment(arena, tempFile.toString());
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment pathSeg = buildMemorySegment(localArena, tempFile.toString());
 
       long cuvsRes = resources.getHandle();
       int returnValue =
@@ -611,9 +611,9 @@ public class CagraIndexImpl implements CagraIndex {
     var mergedIndex = createCagraIndex();
     long cuvsRes = resources.getHandle();
 
-    try (var arena = Arena.ofConfined()) {
+    try (var localArena = Arena.ofConfined()) {
       MemorySegment indexesSegment =
-          arena.allocate(indexes.length * ValueLayout.ADDRESS.byteSize());
+          localArena.allocate(indexes.length * ValueLayout.ADDRESS.byteSize());
 
       for (int i = 0; i < indexes.length; i++) {
         CagraIndexImpl indexImpl = (CagraIndexImpl) indexes[i];
@@ -621,8 +621,9 @@ public class CagraIndexImpl implements CagraIndex {
             ValueLayout.ADDRESS, i, indexImpl.cagraIndexReference.getMemorySegment());
       }
 
-      // TODO: IMO we should call cuvsCreateMergeParams here, instead of allocating this ourselves
-      var mergeParamsSegment = createMergeParamsSegment(arena, mergeParams);
+      // TODO: we should call cuvsCreateMergeParams here, instead of allocating this ourselves
+      // See https://github.com/rapidsai/cuvs/pull/1109
+      var mergeParamsSegment = createMergeParamsSegment(localArena, mergeParams);
 
       var returnValue =
           cuvsCagraMerge(cuvsRes, mergeParamsSegment, indexesSegment, indexes.length, mergedIndex);
