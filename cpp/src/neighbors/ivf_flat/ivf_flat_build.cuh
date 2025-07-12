@@ -205,21 +205,13 @@ void extend(raft::resources const& handle,
   // Create a view of the appropriate centroids based on the metric
   raft::device_matrix_view<const float, IdxT> centroids_view_for_prediction;
   rmm::device_uvector<float> temp_float_centroids;
-  
+
+  auto orig_centroids_view =
+    raft::make_device_matrix_view<const float, IdxT>(index->centers().data_handle(), n_lists, dim);
   if (index->metric() == cuvs::distance::DistanceType::BitwiseHamming) {
-    // For binary data, convert binary centroids back to float for prediction
-    temp_float_centroids = rmm::device_uvector<float>(
-      n_lists * dim * 8, stream, raft::resource::get_workspace_resource(handle));
-    auto temp_centroids_view = raft::make_device_matrix_view<float, IdxT>(
-      temp_float_centroids.data(), n_lists, dim * 8);
-    auto binary_centroids_view = raft::make_device_matrix_view<const uint8_t, IdxT>(
-      index->binary_centers().data_handle(), n_lists, dim * 8);
-    raft::linalg::map(handle, temp_centroids_view, binary_centroids_view,
-      [] __device__ (uint8_t x) -> float { return x == 1 ? 1.0f : -1.0f; });
-    centroids_view_for_prediction = temp_centroids_view;
+    centroids_view_for_prediction = index->binary_centers();
   } else {
-    centroids_view_for_prediction = raft::make_device_matrix_view<const float, IdxT>(
-      index->centers().data_handle(), n_lists, dim);
+    centroids_view_for_prediction = orig_centroids_view;
   }
   // Calculate the batch size for the input data if it's not accessible directly from the device
   constexpr size_t kReasonableMaxBatchSize = 65536;
@@ -250,36 +242,13 @@ void extend(raft::resources const& handle,
       new_labels.data_handle() + batch.offset(), batch.size());
     
     if (index->metric() == cuvs::distance::DistanceType::BitwiseHamming) {
-      // For binary data, we need packed centroids for efficient bitwise Hamming prediction
-      // Convert expanded centroids to packed format using quantize::binary API
-      rmm::device_uvector<uint8_t> packed_centroids(
-        n_lists * dim, stream, raft::resource::get_workspace_resource(handle));
-      auto packed_centroids_view = raft::make_device_matrix_view<uint8_t, IdxT>(
-        packed_centroids.data(), n_lists, dim);
-      
-      // Convert expanded binary centroids to float for binary quantization
-      rmm::device_uvector<float> temp_float_centroids(
-        n_lists * dim * 8, stream, raft::resource::get_workspace_resource(handle));
-      auto temp_centroids_view = raft::make_device_matrix_view<float, IdxT>(
-        temp_float_centroids.data(), n_lists, dim * 8);
-      auto binary_centroids_view = raft::make_device_matrix_view<const uint8_t, IdxT>(
-        index->binary_centers().data_handle(), n_lists, dim * 8);
-      
-      // Map binary values (0,1) to float values (-1,1) for quantization
-      raft::linalg::map(handle, temp_centroids_view, binary_centroids_view,
-        [] __device__ (uint8_t x) -> float { return x == 1 ? 1.0f : -1.0f; });
-      
-      // Use binary quantization transform to pack the centroids
-      cuvs::preprocessing::quantize::binary::quantizer<float> temp_quantizer(handle);
-      // No threshold needed as we're already in binary format
-      cuvs::preprocessing::quantize::binary::transform(handle, temp_quantizer, temp_centroids_view, packed_centroids_view);
       
       // Use the efficient binary k-means prediction
       auto batch_data_view = raft::make_device_matrix_view<const uint8_t, IdxT>(
         reinterpret_cast<const uint8_t*>(batch.data()), batch.size(), dim);
       cuvs::cluster::kmeans_balanced::detail::predict_bitwise_hamming(handle,
                                                                       batch_data_view,
-                                                                      packed_centroids_view,
+                                                                      centroids_view_for_prediction,
                                                                       batch_labels_view);
     } else {
       auto batch_data_view =
@@ -310,16 +279,14 @@ void extend(raft::resources const& handle,
     
     if (index->metric() == cuvs::distance::DistanceType::BitwiseHamming) {
       // For binary data, we need to work in the expanded space and then convert back
-      rmm::device_uvector<float> temp_expanded_centroids(
+      rmm::device_uvector<float> temp_expanded_centers(
         n_lists * dim * 8, stream, raft::resource::get_workspace_resource(handle));
-      auto expanded_centroids_view = raft::make_device_matrix_view<float, IdxT>(
-        temp_expanded_centroids.data(), n_lists, dim * 8);
+      auto expanded_centers_view = raft::make_device_matrix_view<float, IdxT>(
+        temp_expanded_centers.data(), n_lists, dim * 8);
       
-      // Initialize with current binary centroids converted to float
-      auto current_binary_centroids_view = raft::make_device_matrix_view<const uint8_t, IdxT>(
-        index->binary_centers().data_handle(), n_lists, dim * 8);
-      raft::linalg::map(handle, expanded_centroids_view, current_binary_centroids_view,
-        [] __device__ (uint8_t x) -> float { return x == 1 ? 1.0f : -1.0f; });
+      // Initialize with decoded version of current centers
+      raft::linalg::map_offset(handle, expanded_centers_view, 
+        bitwise_decode_op<IdxT>(index->binary_centers().data_handle(), dim));
       
       vec_batches.reset();  // Reset for second pass through the data
       for (const auto& batch : vec_batches) {
@@ -337,17 +304,15 @@ void extend(raft::resources const& handle,
         cuvs::cluster::kmeans_balanced::helpers::calc_centers_and_sizes(handle,
                                                                         decoded_batch_view,
                                                                         batch_labels_view,
-                                                                        expanded_centroids_view,
+                                                                        expanded_centers_view,
                                                                         list_sizes_view,
                                                                         false,
                                                                         utils::mapping<float>{});
       }
       
       // Convert updated centroids back to binary format
-      auto updated_binary_centroids_view = raft::make_device_matrix_view<uint8_t, IdxT>(
-        index->binary_centers().data_handle(), n_lists, dim * 8);
-      raft::linalg::map(handle, updated_binary_centroids_view, expanded_centroids_view,
-        [] __device__ (float x) -> uint8_t { return x > 0.0f ? uint8_t(1) : uint8_t(0); });
+      cuvs::preprocessing::quantize::binary::quantizer<float> temp_quantizer(handle);
+      cuvs::preprocessing::quantize::binary::transform(handle, temp_quantizer, expanded_centers_view, index->binary_centers());
     } else {
       auto centroids_view = raft::make_device_matrix_view<float, IdxT>(
         index->centers().data_handle(), index->centers().extent(0), index->centers().extent(1));

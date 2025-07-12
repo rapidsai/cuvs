@@ -215,7 +215,7 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept;
 
-  /** k-means cluster centers corresponding to the lists [n_lists, dim * 8] for binary data */
+  /** k-means cluster centers corresponding to the lists [n_lists, dim] for binary data (packed format) */
   raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> binary_centers() noexcept;
   raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> binary_centers() const noexcept;
 

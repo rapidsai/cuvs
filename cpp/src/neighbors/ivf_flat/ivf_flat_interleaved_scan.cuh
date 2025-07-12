@@ -1146,12 +1146,6 @@ struct inner_prod_dist {
   }
 };
 
-/**
- * @brief Compute Hamming distance between two 128-bit packed values
- * @param x First 128-bit packed value
- * @param y Second 128-bit packed value
- * @return Number of differing bits between x and y
- */
 template <typename T>
 __device__ __forceinline__ uint32_t compute_hamming_128bit_packed(T x, T y)
 {
@@ -1174,7 +1168,7 @@ struct hamming_dist {
     } else if constexpr (Veclen > 1) {
       acc += __popc(x ^ y);
     } else {
-      acc += __popc(static_cast<uint32_t>(x ^ y));
+      acc += __popc(static_cast<uint32_t>(xv ^ yv) & 0xff);
     }
   }
 };
@@ -1241,7 +1235,6 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
         raft::compose_op(raft::add_const_op<float>{1.0f}, raft::mul_const_op<float>{-1.0f}),
         std::forward<Args>(args)...);  // NB: update the description of `knn::ivf_flat::build` when
                                        // adding here a new metric.
-    case cuvs::distance::DistanceType::Hamming:
     case cuvs::distance::DistanceType::BitwiseHamming:
       return launch_kernel<Capacity,
                            Veclen,
