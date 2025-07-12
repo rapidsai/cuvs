@@ -52,60 +52,6 @@ using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 namespace detail {
 
-/**
- * @brief Bitwise decode operation for binary data
- * Expands each bit to -1 or +1 for better clustering
- */
-template <typename IdxT>
-struct bitwise_decode_op {
-  const uint8_t* binary_data;
-  uint32_t dim;
-  
-  __host__ __device__ bitwise_decode_op(const uint8_t* data, uint32_t d) : binary_data(data), dim(d) {}
-  
-  __device__ int8_t operator()(IdxT idx) const {
-    IdxT row = idx / (dim * 8);
-    IdxT col = idx % (dim * 8);
-    IdxT byte_idx = row * dim + col / 8;
-    IdxT bit_idx = col % 8;
-    
-    uint8_t byte_val = binary_data[byte_idx];
-    bool bit_val = (byte_val >> (7 - bit_idx)) & 1;
-    
-    return bit_val ? int8_t(1) : int8_t(-1);
-  }
-};
-
-/**
- * @brief Kernel to pack expanded binary centroids (dim * 8) into compact format (dim)
- * Each 8 consecutive uint8_t values (0 or 1) are packed into a single byte
- */
-__global__ void pack_centroids_kernel(const uint8_t* expanded_centroids,
-                                     uint8_t* packed_centroids,
-                                     uint32_t n_centroids,
-                                     uint32_t dim_bytes)
-{
-  uint32_t centroid_idx = blockIdx.x * blockDim.x + threadIdx.x;
-  uint32_t byte_idx = blockIdx.y * blockDim.y + threadIdx.y;
-  
-  if (centroid_idx >= n_centroids || byte_idx >= dim_bytes) return;
-  
-  uint8_t packed_byte = 0;
-  
-  // Pack 8 bits into one byte
-  for (uint32_t bit_idx = 0; bit_idx < 8; ++bit_idx) {
-    uint32_t expanded_idx = centroid_idx * dim_bytes * 8 + byte_idx * 8 + bit_idx;
-    uint8_t bit_val = expanded_centroids[expanded_idx];
-    
-    // Set the bit in the packed byte (MSB first)
-    if (bit_val > 0) {
-      packed_byte |= (1u << (7 - bit_idx));
-    }
-  }
-  
-  packed_centroids[centroid_idx * dim_bytes + byte_idx] = packed_byte;
-}
-
 template <typename T, typename IdxT>
 auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T, IdxT>
 {
@@ -305,22 +251,28 @@ void extend(raft::resources const& handle,
     
     if (index->metric() == cuvs::distance::DistanceType::BitwiseHamming) {
       // For binary data, we need packed centroids for efficient bitwise Hamming prediction
-      // Convert expanded centroids to packed format
+      // Convert expanded centroids to packed format using quantize::binary API
       rmm::device_uvector<uint8_t> packed_centroids(
         n_lists * dim, stream, raft::resource::get_workspace_resource(handle));
       auto packed_centroids_view = raft::make_device_matrix_view<uint8_t, IdxT>(
         packed_centroids.data(), n_lists, dim);
       
-      // Pack the expanded centroids (each 8 consecutive bits become 1 byte)
-      const dim3 pack_block_dim(16, 16);
-      const dim3 pack_grid_dim(raft::ceildiv<uint32_t>(n_lists, pack_block_dim.x),
-                               raft::ceildiv<uint32_t>(dim, pack_block_dim.y));
+      // Convert expanded binary centroids to float for binary quantization
+      rmm::device_uvector<float> temp_float_centroids(
+        n_lists * dim * 8, stream, raft::resource::get_workspace_resource(handle));
+      auto temp_centroids_view = raft::make_device_matrix_view<float, IdxT>(
+        temp_float_centroids.data(), n_lists, dim * 8);
+      auto binary_centroids_view = raft::make_device_matrix_view<const uint8_t, IdxT>(
+        index->binary_centers().data_handle(), n_lists, dim * 8);
       
-      pack_centroids_kernel<<<pack_grid_dim, pack_block_dim, 0, stream>>>(
-        index->binary_centers().data_handle(),
-        packed_centroids.data(),
-        n_lists,
-        dim);
+      // Map binary values (0,1) to float values (-1,1) for quantization
+      raft::linalg::map(handle, temp_centroids_view, binary_centroids_view,
+        [] __device__ (uint8_t x) -> float { return x == 1 ? 1.0f : -1.0f; });
+      
+      // Use binary quantization transform to pack the centroids
+      cuvs::preprocessing::quantize::binary::quantizer<float> temp_quantizer(handle);
+      // No threshold needed as we're already in binary format
+      cuvs::preprocessing::quantize::binary::transform(handle, temp_quantizer, temp_centroids_view, packed_centroids_view);
       
       // Use the efficient binary k-means prediction
       auto batch_data_view = raft::make_device_matrix_view<const uint8_t, IdxT>(
