@@ -15,17 +15,13 @@
  */
 package com.nvidia.cuvs.internal;
 
+import static com.nvidia.cuvs.internal.CuVSParamsHelper.createHnswIndexParams;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
 import static com.nvidia.cuvs.internal.common.Util.buildMemorySegment;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswDeserialize;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswIndexCreate;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswIndexDestroy;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswIndex_t;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswSearch;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.HnswIndex;
@@ -33,6 +29,7 @@ import com.nvidia.cuvs.HnswIndexParams;
 import com.nvidia.cuvs.HnswQuery;
 import com.nvidia.cuvs.HnswSearchParams;
 import com.nvidia.cuvs.SearchResults;
+import com.nvidia.cuvs.internal.common.CloseableHandle;
 import com.nvidia.cuvs.internal.panama.DLDataType;
 import com.nvidia.cuvs.internal.panama.cuvsHnswIndex;
 import com.nvidia.cuvs.internal.panama.cuvsHnswIndexParams;
@@ -177,30 +174,30 @@ public class HnswIndexImpl implements HnswIndex {
         var localArena = Arena.ofConfined()) {
       inputStream.transferTo(outputStream);
 
-      Arena arena = resources.getArena();
       MemorySegment pathSeg = buildMemorySegment(localArena, tmpIndexFile.toString());
 
       long cuvsRes = resources.getHandle();
 
       var indexReference = createHnswIndex();
 
-      MemorySegment dtype = DLDataType.allocate(arena);
+      MemorySegment dtype = DLDataType.allocate(localArena);
       DLDataType.bits(dtype, (byte) 32);
-      DLDataType.code(dtype, (byte) 2); // kDLFloat
+      DLDataType.code(dtype, (byte) kDLFloat());
       DLDataType.lanes(dtype, (byte) 1);
 
       cuvsHnswIndex.dtype(indexReference.memorySegment, dtype);
 
-      var returnValue =
-          cuvsHnswDeserialize(
-              cuvsRes,
-              segmentFromIndexParams(hnswIndexParams),
-              pathSeg,
-              hnswIndexParams.getVectorDimension(),
-              0,
-              indexReference.memorySegment);
-      checkCuVSError(returnValue, "cuvsHnswDeserialize");
-
+      try (var params = segmentFromIndexParams(hnswIndexParams)) {
+        checkCuVSError(
+            cuvsHnswDeserialize(
+                cuvsRes,
+                params.handle(),
+                pathSeg,
+                hnswIndexParams.getVectorDimension(),
+                0,
+                indexReference.memorySegment),
+            "cuvsHnswDeserialize");
+      }
       return indexReference;
 
     } finally {
@@ -211,11 +208,11 @@ public class HnswIndexImpl implements HnswIndex {
   /**
    * Allocates the configured search parameters in the MemorySegment.
    */
-  private MemorySegment segmentFromIndexParams(HnswIndexParams params) {
-    MemorySegment seg = cuvsHnswIndexParams.allocate(resources.getArena());
-    cuvsHnswIndexParams.ef_construction(seg, params.getEfConstruction());
-    cuvsHnswIndexParams.num_threads(seg, params.getNumThreads());
-    return seg;
+  private CloseableHandle segmentFromIndexParams(HnswIndexParams params) {
+    var hnswParams = createHnswIndexParams();
+    cuvsHnswIndexParams.ef_construction(hnswParams.handle(), params.getEfConstruction());
+    cuvsHnswIndexParams.num_threads(hnswParams.handle(), params.getNumThreads());
+    return hnswParams;
   }
 
   /**
