@@ -1146,6 +1146,39 @@ struct inner_prod_dist {
   }
 };
 
+/**
+ * @brief Compute Hamming distance between two 128-bit packed values
+ * @param x First 128-bit packed value
+ * @param y Second 128-bit packed value
+ * @return Number of differing bits between x and y
+ */
+template <typename T>
+__device__ __forceinline__ uint32_t compute_hamming_128bit_packed(T x, T y)
+{
+  static_assert(sizeof(T) == 16, "Type T must be 128 bits (16 bytes)");
+  
+  const uint64_t* x_u64 = reinterpret_cast<const uint64_t*>(&x);
+  const uint64_t* y_u64 = reinterpret_cast<const uint64_t*>(&y);
+  
+  uint64_t xor_lo = x_u64[0] ^ y_u64[0];
+  uint64_t xor_hi = x_u64[1] ^ y_u64[1];
+  
+  return __popcll(xor_lo) + __popcll(xor_hi);
+}
+
+template <int Veclen, typename T, typename AccT>
+struct hamming_dist {
+  __device__ __forceinline__ void operator()(AccT& acc, AccT x, AccT y) {
+    if constexpr (Veclen == 16) {
+      acc += compute_hamming_128bit_packed(x, y);
+    } else if constexpr (Veclen > 1) {
+      acc += __popc(x ^ y);
+    } else {
+      acc += __popc(static_cast<uint32_t>(x ^ y));
+    }
+  }
+};
+
 /** Select the distance computation function and forward the rest of the arguments. */
 template <int Capacity,
           int Veclen,
@@ -1208,6 +1241,19 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
         raft::compose_op(raft::add_const_op<float>{1.0f}, raft::mul_const_op<float>{-1.0f}),
         std::forward<Args>(args)...);  // NB: update the description of `knn::ivf_flat::build` when
                                        // adding here a new metric.
+    case cuvs::distance::DistanceType::Hamming:
+      return launch_kernel<Capacity,
+                           Veclen,
+                           Ascending,
+                           false,
+                           T,
+                           AccT,
+                           IdxT,
+                           IvfSampleFilterT,
+                           hamming_dist<Veclen, T, AccT>>(
+        {},
+        raft::identity_op{},
+        std::forward<Args>(args)...);
     default: RAFT_FAIL("The chosen distance metric is not supported (%d)", int(metric));
   }
 }
