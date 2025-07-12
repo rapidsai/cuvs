@@ -218,6 +218,16 @@ void fit_predict(const raft::resources& handle,
   cuvs::cluster::kmeans_balanced::predict(handle, params, X, centroids_const, labels, mapping_op);
 }
 
+template <typename IdxT, typename LabelT>
+void predict_bitwise_hamming(
+  raft::resources const& handle,
+  raft::device_matrix_view<const uint8_t, IdxT, raft::row_major> dataset,
+  raft::device_matrix_view<const uint8_t, IdxT, raft::row_major> centroids,
+  raft::device_vector_view<LabelT, IdxT> labels)
+{
+  detail::predict_bitwise_hamming(handle, dataset, centroids, labels);
+}
+
 namespace helpers {
 
 /**

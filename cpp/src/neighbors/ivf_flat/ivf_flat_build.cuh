@@ -26,7 +26,6 @@
 #include <cuvs/preprocessing/quantize/binary.hpp>
 #include <raft/linalg/map.cuh>
 
-#include "../../cluster/detail/kmeans_balanced.cuh"
 #include "../../cluster/kmeans_balanced.cuh"
 #include "../detail/ann_utils.cuh"
 #include <cuvs/distance/distance.hpp>
@@ -244,7 +243,7 @@ void extend(raft::resources const& handle,
     if (index->metric() == cuvs::distance::DistanceType::BitwiseHamming) {
       auto batch_data_view = raft::make_device_matrix_view<const uint8_t, IdxT>(
         reinterpret_cast<const uint8_t*>(batch.data()), batch.size(), dim);
-      cuvs::cluster::kmeans_balanced::detail::predict_bitwise_hamming(
+      cuvs::cluster::kmeans_balanced::predict_bitwise_hamming(
         handle, batch_data_view, centroids_view_for_prediction, batch_labels_view);
     } else {
       auto batch_data_view =
