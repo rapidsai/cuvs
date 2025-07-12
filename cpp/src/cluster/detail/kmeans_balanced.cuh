@@ -1189,25 +1189,10 @@ void predict_bitwise_hamming(
   cuvs::distance::pairwise_distance(
     handle, dataset, centroids, distances.view(), cuvs::distance::DistanceType::BitwiseHamming);
 
-  // Find argmin for each row (closest centroid)
-  auto indices = raft::make_device_vector<LabelT>(handle, n_rows);
-
-  // Use raft's argmin operation to find closest centroids
-  raft::linalg::reduce_rows_by_key(distances.data_handle(),
-                                   distances.extent(1),
-                                   indices.data_handle(),
-                                   distances.extent(0),
-                                   distances.extent(1),
-                                   raft::identity_op{},
-                                   raft::ArgMin{},
-                                   stream);
-
-  // Convert indices to uint32_t labels
-  raft::linalg::map(
-    handle,
-    labels,
-    [=] __device__(IdxT idx) -> LabelT { return static_cast<LabelT>(idx); },
-    indices.view());
+  auto distances_const_view = raft::make_device_matrix_view<const float, IdxT, raft::row_major>(
+    distances.data_handle(), n_rows, n_centroids);
+  auto labels_view = raft::make_device_vector_view<LabelT, IdxT>(labels.data_handle(), n_rows);
+  raft::matrix::argmin(handle, distances_const_view, labels_view);
 }
 
 }  // namespace  cuvs::cluster::kmeans::detail
