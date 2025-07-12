@@ -193,28 +193,26 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
 
     int numTestsRuns = 10;
-    try (CuVSResources resources = CuVSResources.create()) {
-      runConcurrently(
-          numTestsRuns,
-          () ->
-              () -> {
-                try {
-                  var index = indexOnce(dataset, resources);
-                  var indexPath = serializeOnce(index);
-                  var loadedIndex = deserializeOnce(indexPath, resources);
-                  queryOnce(
-                      index,
-                      loadedIndex,
-                      SearchResults.IDENTITY_MAPPING,
-                      queries,
-                      expectedResults,
-                      resources);
-                  cleanup(indexPath, index, loadedIndex);
-                } catch (Throwable e) {
-                  throw new RuntimeException(e);
-                }
-              });
-    }
+    runConcurrently(
+        numTestsRuns,
+        () ->
+            () -> {
+              try (CuVSResources resources = CuVSResources.create()) {
+                var index = indexOnce(dataset, resources);
+                var indexPath = serializeOnce(index);
+                var loadedIndex = deserializeOnce(indexPath, resources);
+                queryOnce(
+                    index,
+                    loadedIndex,
+                    SearchResults.IDENTITY_MAPPING,
+                    queries,
+                    expectedResults,
+                    resources);
+                cleanup(indexPath, index, loadedIndex);
+              } catch (Throwable e) {
+                throw new RuntimeException(e);
+              }
+            });
   }
 
   @Test
