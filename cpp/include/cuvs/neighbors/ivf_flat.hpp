@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -215,9 +215,11 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept;
 
-  /** k-means cluster centers corresponding to the lists [n_lists, dim] for binary data (packed format) */
+  /** k-means cluster centers corresponding to the lists [n_lists, dim] for binary data (packed
+   * format) */
   raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> binary_centers() noexcept;
-  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> binary_centers() const noexcept;
+  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> binary_centers()
+    const noexcept;
 
   /**
    * (Optional) Precomputed norms of the `centers` w.r.t. the chosen distance metric [n_lists].

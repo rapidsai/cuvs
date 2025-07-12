@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1150,19 +1150,20 @@ template <typename T>
 __device__ __forceinline__ uint32_t compute_hamming_128bit_packed(T x, T y)
 {
   static_assert(sizeof(T) == 16, "Type T must be 128 bits (16 bytes)");
-  
+
   const uint64_t* x_u64 = reinterpret_cast<const uint64_t*>(&x);
   const uint64_t* y_u64 = reinterpret_cast<const uint64_t*>(&y);
-  
+
   uint64_t xor_lo = x_u64[0] ^ y_u64[0];
   uint64_t xor_hi = x_u64[1] ^ y_u64[1];
-  
+
   return __popcll(xor_lo) + __popcll(xor_hi);
 }
 
 template <int Veclen, typename T, typename AccT>
 struct hamming_dist {
-  __device__ __forceinline__ void operator()(AccT& acc, AccT x, AccT y) {
+  __device__ __forceinline__ void operator()(AccT& acc, AccT x, AccT y)
+  {
     if constexpr (Veclen == 16) {
       acc += compute_hamming_128bit_packed(x, y);
     } else if constexpr (Veclen > 1) {
@@ -1245,9 +1246,7 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
                            IdxT,
                            IvfSampleFilterT,
                            hamming_dist<Veclen, T, AccT>>(
-        {},
-        raft::identity_op{},
-        std::forward<Args>(args)...);
+        {}, raft::identity_op{}, std::forward<Args>(args)...);
     default: RAFT_FAIL("The chosen distance metric is not supported (%d)", int(metric));
   }
 }

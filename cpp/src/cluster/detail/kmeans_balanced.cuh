@@ -1166,48 +1166,48 @@ void build_hierarchical(const raft::resources& handle,
 }
 
 template <typename IdxT, typename LabelT>
-void predict_bitwise_hamming(raft::resources const& handle,
-                            raft::device_matrix_view<const uint8_t, IdxT, raft::row_major> dataset,
-                            raft::device_matrix_view<const uint8_t, IdxT, raft::row_major> centroids,
-                            raft::device_vector_view<LabelT, IdxT> labels)
+void predict_bitwise_hamming(
+  raft::resources const& handle,
+  raft::device_matrix_view<const uint8_t, IdxT, raft::row_major> dataset,
+  raft::device_matrix_view<const uint8_t, IdxT, raft::row_major> centroids,
+  raft::device_vector_view<LabelT, IdxT> labels)
 {
-  auto stream = raft::resource::get_cuda_stream(handle);
-  IdxT n_rows = dataset.extent(0);
+  auto stream      = raft::resource::get_cuda_stream(handle);
+  IdxT n_rows      = dataset.extent(0);
   IdxT n_centroids = centroids.extent(0);
-  IdxT dim = dataset.extent(1);
-  
-  RAFT_EXPECTS(dataset.extent(1) == centroids.extent(1), 
+  IdxT dim         = dataset.extent(1);
+
+  RAFT_EXPECTS(dataset.extent(1) == centroids.extent(1),
                "Dataset and centroids must have the same dimensionality");
   RAFT_EXPECTS(labels.extent(0) == n_rows,
                "Labels array must have the same number of rows as dataset");
 
   // Allocate workspace for pairwise distances
   auto distances = raft::make_device_matrix<float, IdxT>(handle, n_rows, n_centroids);
-  
+
   // Compute pairwise bitwise hamming distances
-  cuvs::distance::pairwise_distance(handle,
-                                   dataset,
-                                   centroids,
-                                   distances.view(),
-                                   cuvs::distance::DistanceType::BitwiseHamming);
-  
+  cuvs::distance::pairwise_distance(
+    handle, dataset, centroids, distances.view(), cuvs::distance::DistanceType::BitwiseHamming);
+
   // Find argmin for each row (closest centroid)
   auto indices = raft::make_device_vector<LabelT>(handle, n_rows);
-  
+
   // Use raft's argmin operation to find closest centroids
   raft::linalg::reduce_rows_by_key(distances.data_handle(),
-                                  distances.extent(1),
-                                  indices.data_handle(),
-                                  distances.extent(0),
-                                  distances.extent(1),
-                                  raft::identity_op{},
-                                  raft::ArgMin{},
-                                  stream);
-  
+                                   distances.extent(1),
+                                   indices.data_handle(),
+                                   distances.extent(0),
+                                   distances.extent(1),
+                                   raft::identity_op{},
+                                   raft::ArgMin{},
+                                   stream);
+
   // Convert indices to uint32_t labels
-  raft::linalg::map(handle, labels, [=] __device__(IdxT idx) -> LabelT {
-    return static_cast<LabelT>(idx);
-  }, indices.view());
+  raft::linalg::map(
+    handle,
+    labels,
+    [=] __device__(IdxT idx) -> LabelT { return static_cast<LabelT>(idx); },
+    indices.view());
 }
 
 }  // namespace  cuvs::cluster::kmeans::detail

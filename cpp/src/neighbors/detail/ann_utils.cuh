@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -212,8 +212,12 @@ HDI constexpr auto mapping<int8_t>::operator()(const float& x) const -> int8_t
 }
 
 template <typename IdxT>
-struct bitwise_decode_op{
-  bitwise_decode_op(const uint8_t* const binary_vecs, IdxT compressed_dim) : binary_vecs(binary_vecs), dim(dim) {uncompressed_dim = compressed_dim << 3;}
+struct bitwise_decode_op {
+  bitwise_decode_op(const uint8_t* const binary_vecs, IdxT compressed_dim)
+    : binary_vecs(binary_vecs), dim(dim)
+  {
+    uncompressed_dim = compressed_dim << 3;
+  }
   const uint8_t* binary_vecs;
   IdxT compressed_dim;
   IdxT uncompressed_dim;

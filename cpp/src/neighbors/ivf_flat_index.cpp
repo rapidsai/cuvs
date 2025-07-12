@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,8 +51,12 @@ index<T, IdxT>::index(raft::resources const& res,
     conservative_memory_allocation_{conservative_memory_allocation},
     lists_{n_lists},
     list_sizes_{raft::make_device_vector<uint32_t, uint32_t>(res, n_lists)},
-    centers_(metric != cuvs::distance::DistanceType::BitwiseHamming ? raft::make_device_matrix<float, uint32_t>(res, n_lists, dim) : raft::make_device_matrix<float, uint32_t>(res, 0, 0)),
-    binary_centers_(metric != cuvs::distance::DistanceType::BitwiseHamming ? raft::make_device_matrix<uint8_t, uint32_t>(res, 0, 0) : raft::make_device_matrix<uint8_t, uint32_t>(res, n_lists, dim)),
+    centers_(metric != cuvs::distance::DistanceType::BitwiseHamming
+               ? raft::make_device_matrix<float, uint32_t>(res, n_lists, dim)
+               : raft::make_device_matrix<float, uint32_t>(res, 0, 0)),
+    binary_centers_(metric != cuvs::distance::DistanceType::BitwiseHamming
+                      ? raft::make_device_matrix<uint8_t, uint32_t>(res, 0, 0)
+                      : raft::make_device_matrix<uint8_t, uint32_t>(res, n_lists, dim)),
     center_norms_(std::nullopt),
     data_ptrs_{raft::make_device_vector<T*, uint32_t>(res, n_lists)},
     inds_ptrs_{raft::make_device_vector<IdxT*, uint32_t>(res, n_lists)},
@@ -106,7 +110,8 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> index<T, IdxT>:
 }
 
 template <typename T, typename IdxT>
-raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> index<T, IdxT>::binary_centers() noexcept
+raft::device_matrix_view<uint8_t, uint32_t, raft::row_major>
+index<T, IdxT>::binary_centers() noexcept
 {
   return binary_centers_.view();
 }
