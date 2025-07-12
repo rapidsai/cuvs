@@ -55,7 +55,7 @@ public interface CagraIndex {
    * @return an object encapsulating the native int (uint32_t) array used to represent
    * the cagra graph
    */
-  CagraGraph getGraph();
+  Dataset getGraph();
 
   /**
    * A method to persist a CAGRA index using an instance of {@link OutputStream}
@@ -219,7 +219,7 @@ public interface CagraIndex {
      * Sets a CAGRA graph instance to re-create an index from a
      * previously built graph.
      */
-    Builder from(CagraGraph graph);
+    Builder from(Dataset graph);
 
     /**
      * Sets the dataset vectors for building the {@link CagraIndex}.

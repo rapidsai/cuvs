@@ -16,42 +16,33 @@
 package com.nvidia.cuvs.internal;
 
 import com.nvidia.cuvs.Dataset;
-import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
-import java.util.concurrent.atomic.AtomicReference;
 
-public class DatasetImpl implements Dataset {
-  private final AtomicReference<Arena> arenaReference;
-  private final MemorySegment seg;
-  private final int size;
-  private final int dimensions;
+public abstract class DatasetBaseImpl implements Dataset {
+  protected final MemorySegment memorySegment;
+  protected final DataType dataType;
+  protected final long size;
+  protected final long columns;
 
-  public DatasetImpl(Arena arena, MemorySegment memorySegment, int size, int dimensions) {
-    this.arenaReference = new AtomicReference<>(arena);
-    this.seg = memorySegment;
+  protected DatasetBaseImpl(
+      MemorySegment memorySegment, DataType dataType, long size, long columns) {
+    this.memorySegment = memorySegment;
+    this.dataType = dataType;
     this.size = size;
-    this.dimensions = dimensions;
+    this.columns = columns;
   }
 
   @Override
-  public void close() {
-    var arena = arenaReference.getAndSet(null);
-    if (arena != null) {
-      arena.close();
-    }
-  }
-
-  @Override
-  public int size() {
+  public long size() {
     return size;
   }
 
   @Override
-  public int dimensions() {
-    return dimensions;
+  public long columns() {
+    return columns;
   }
 
-  public MemorySegment asMemorySegment() {
-    return seg;
+  public MemorySegment memorySegment() {
+    return memorySegment;
   }
 }

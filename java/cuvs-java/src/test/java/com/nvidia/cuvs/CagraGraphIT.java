@@ -40,12 +40,12 @@ public class CagraGraphIT extends CuVSTestCase {
 
   @Test
   public void testGraphNeighboursGetAccess() {
-    try (var graph = CagraGraph.ofArray(graphData)) {
+    try (var graph = Dataset.ofArray(graphData)) {
       for (int n = 0; n < graph.size(); ++n) {
-        var neighbours = graph.getNeighbours(n);
-        assertEquals(graph.degree(), neighbours.size());
-        for (int i = 0; i < graph.degree(); ++i) {
-          assertEquals(graphData[n][i], neighbours.get(i));
+        var neighbours = graph.getRow(n);
+        assertEquals(graph.columns(), neighbours.size());
+        for (int i = 0; i < graph.columns(); ++i) {
+          assertEquals(graphData[n][i], neighbours.getAsInt(i));
         }
       }
     }
@@ -53,10 +53,10 @@ public class CagraGraphIT extends CuVSTestCase {
 
   @Test
   public void testGraphNeighboursCopyAccess() {
-    try (var graph = CagraGraph.ofArray(graphData)) {
+    try (var graph = Dataset.ofArray(graphData)) {
       for (int n = 0; n < graph.size(); ++n) {
-        var neighbours = graph.getNeighbours(n);
-        assertEquals(graph.degree(), neighbours.size());
+        var neighbours = graph.getRow(n);
+        assertEquals(graph.columns(), neighbours.size());
 
         int[] copy = new int[(int) neighbours.size()];
         neighbours.toArray(copy);
@@ -67,9 +67,9 @@ public class CagraGraphIT extends CuVSTestCase {
 
   @Test
   public void testGraphGetAccess() {
-    try (var graph = CagraGraph.ofArray(graphData)) {
+    try (var graph = Dataset.ofArray(graphData)) {
       for (int n = 0; n < graph.size(); ++n) {
-        for (int i = 0; i < graph.degree(); ++i) {
+        for (int i = 0; i < graph.columns(); ++i) {
           assertEquals(graphData[n][i], graph.get(n, i));
         }
       }

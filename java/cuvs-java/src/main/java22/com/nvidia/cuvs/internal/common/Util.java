@@ -262,11 +262,24 @@ public class Util {
     long cols = rows > 0 ? data[0].length : 0;
     MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout(rows * cols, C_FLOAT);
     MemorySegment dataMemorySegment = arena.allocate(dataMemoryLayout);
-    for (int r = 0; r < rows; r++) {
-      MemorySegment.copy(
-          data[r], 0, dataMemorySegment, C_FLOAT, (r * cols * C_FLOAT.byteSize()), (int) cols);
-    }
+    copy(dataMemorySegment, data);
     return dataMemorySegment;
+  }
+
+  public static void copy(MemorySegment memorySegment, float[][] data) {
+    int rows = data.length;
+    int cols = rows > 0 ? data[0].length : 0;
+    for (int r = 0; r < rows; r++) {
+      MemorySegment.copy(data[r], 0, memorySegment, C_FLOAT, (r * cols * C_FLOAT.byteSize()), cols);
+    }
+  }
+
+  public static void copy(MemorySegment memorySegment, int[][] data) {
+    int rows = data.length;
+    int cols = rows > 0 ? data[0].length : 0;
+    for (int r = 0; r < rows; r++) {
+      MemorySegment.copy(data[r], 0, memorySegment, C_INT, (r * cols * C_INT.byteSize()), cols);
+    }
   }
 
   public static BitSet concatenate(BitSet[] arr, int maxSizeOfEachBitSet) {

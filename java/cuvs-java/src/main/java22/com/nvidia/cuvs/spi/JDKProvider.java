@@ -15,14 +15,9 @@
  */
 package com.nvidia.cuvs.spi;
 
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
-
 import com.nvidia.cuvs.*;
 import com.nvidia.cuvs.internal.*;
 import com.nvidia.cuvs.internal.common.Util;
-import java.lang.foreign.Arena;
-import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -75,12 +70,10 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public Dataset.Builder newDatasetBuilder(int size, int dimensions)
+  public Dataset.Builder newDatasetBuilder(int size, int dimensions, Dataset.DataType dataType)
       throws UnsupportedOperationException {
-    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout((long) size * dimensions, C_FLOAT);
 
-    var arena = Arena.ofShared();
-    var seg = arena.allocate(dataMemoryLayout);
+    var dataset = new ArenaDatasetImpl(size, dimensions, dataType);
 
     return new Dataset.Builder() {
       int current = 0;
@@ -89,12 +82,17 @@ final class JDKProvider implements CuVSProvider {
       public void addVector(float[] vector) {
         if (current >= size) throw new ArrayIndexOutOfBoundsException();
         MemorySegment.copy(
-            vector, 0, seg, C_FLOAT, ((current++) * dimensions * C_FLOAT.byteSize()), dimensions);
+            vector,
+            0,
+            dataset.memorySegment(),
+            dataset.valueLayout(),
+            ((current++) * dimensions * dataset.valueLayout().byteSize()),
+            dimensions);
       }
 
       @Override
       public Dataset build() {
-        return new DatasetImpl(arena, seg, size, dimensions);
+        return dataset;
       }
     };
   }
@@ -106,34 +104,24 @@ final class JDKProvider implements CuVSProvider {
       throw new IllegalArgumentException("vectors should not be empty");
     }
     int size = vectors.length;
-    int dimensions = vectors[0].length;
+    int columns = vectors[0].length;
 
-    Arena arena = Arena.ofShared();
-    var memorySegment = Util.buildMemorySegment(arena, vectors);
-    return new DatasetImpl(arena, memorySegment, size, dimensions);
+    var dataset = new ArenaDatasetImpl(size, columns, Dataset.DataType.FLOAT);
+    Util.copy(dataset.memorySegment(), vectors);
+    return dataset;
   }
 
   @Override
-  public CagraGraph newArrayGraph(int[][] graph) {
-    Objects.requireNonNull(graph);
-    if (graph.length == 0) {
-      throw new IllegalArgumentException("graph should not be empty");
+  public Dataset newArrayDataset(int[][] vectors) {
+    Objects.requireNonNull(vectors);
+    if (vectors.length == 0) {
+      throw new IllegalArgumentException("vectors should not be empty");
     }
-    long nodeSize = graph.length;
-    int graphDegree = graph[0].length;
+    int size = vectors.length;
+    int columns = vectors[0].length;
 
-    var cagraGraph = new CagraGraphImpl(graphDegree, nodeSize);
-
-    for (int r = 0; r < nodeSize; r++) {
-      MemorySegment.copy(
-          graph[r],
-          0,
-          cagraGraph.memorySegment(),
-          C_INT,
-          (r * graphDegree * C_INT.byteSize()),
-          graphDegree);
-    }
-
-    return cagraGraph;
+    var dataset = new ArenaDatasetImpl(size, columns, Dataset.DataType.INT);
+    Util.copy(dataset.memorySegment(), vectors);
+    return dataset;
   }
 }

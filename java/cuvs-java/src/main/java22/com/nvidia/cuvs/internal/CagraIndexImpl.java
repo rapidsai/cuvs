@@ -29,7 +29,6 @@ import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.CagraCompressionParams;
-import com.nvidia.cuvs.CagraGraph;
 import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CagraIndexParams;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
@@ -92,12 +91,12 @@ public class CagraIndexImpl implements CagraIndex {
       CagraIndexParams indexParameters, Dataset dataset, CuVSResourcesImpl resources) {
     Objects.requireNonNull(dataset);
     this.resources = resources;
-    assert dataset instanceof DatasetImpl;
-    this.cagraIndexReference = build(indexParameters, (DatasetImpl) dataset);
+    assert dataset instanceof DatasetBaseImpl;
+    this.cagraIndexReference = build(indexParameters, (DatasetBaseImpl) dataset);
   }
 
   /**
-   * Constructor for creating an index from a pre-build {@link CagraGraph}
+   * Constructor for creating an index from a pre-build CAGRA graph
    *
    * @param metric      the distance type used
    * @param graph       a previously built CAGRA graph
@@ -106,7 +105,7 @@ public class CagraIndexImpl implements CagraIndex {
    */
   private CagraIndexImpl(
       CagraIndexParams.CuvsDistanceType metric,
-      CagraGraph graph,
+      Dataset graph,
       Dataset dataset,
       CuVSResourcesImpl resources) {
     Objects.requireNonNull(graph);
@@ -114,10 +113,11 @@ public class CagraIndexImpl implements CagraIndex {
 
     this.resources = resources;
 
-    assert graph instanceof CagraGraphImpl;
-    assert dataset instanceof DatasetImpl;
+    assert graph instanceof DatasetBaseImpl;
+    assert dataset instanceof DatasetBaseImpl;
 
-    this.cagraIndexReference = fromGraph(metric, (CagraGraphImpl) graph, (DatasetImpl) dataset);
+    this.cagraIndexReference =
+        fromGraph(metric, (DatasetBaseImpl) graph, (DatasetBaseImpl) dataset);
   }
 
   /**
@@ -174,10 +174,10 @@ public class CagraIndexImpl implements CagraIndex {
    * @return an instance of {@link IndexReference} that holds the pointer to the
    *         index
    */
-  private IndexReference build(CagraIndexParams indexParameters, DatasetImpl dataset) {
+  private IndexReference build(CagraIndexParams indexParameters, DatasetBaseImpl dataset) {
     try (var localArena = Arena.ofConfined()) {
       long rows = dataset.size();
-      long cols = dataset.dimensions();
+      long cols = dataset.columns();
 
       MemorySegment indexParamsMemorySegment =
           indexParameters != null
@@ -187,7 +187,7 @@ public class CagraIndexImpl implements CagraIndex {
       int numWriterThreads = indexParameters != null ? indexParameters.getNumWriterThreads() : 1;
       omp_set_num_threads(numWriterThreads);
 
-      MemorySegment dataSeg = dataset.asMemorySegment();
+      MemorySegment dataSeg = dataset.memorySegment();
 
       long cuvsRes = resources.getHandle();
 
@@ -425,7 +425,7 @@ public class CagraIndexImpl implements CagraIndex {
   }
 
   @Override
-  public CagraGraph getGraph() {
+  public Dataset getGraph() {
     try (var localArena = Arena.ofConfined()) {
       var outPtr = localArena.allocate(__uint32_t);
       checkCuVSError(
@@ -438,7 +438,7 @@ public class CagraIndexImpl implements CagraIndex {
           "cuvsCagraIndexGetGraphDegree");
       int size = outPtr.get(__uint32_t, 0);
 
-      var graph = new CagraGraphImpl(graphDegree, size);
+      var graph = new ArenaDatasetImpl(size, graphDegree, Dataset.DataType.INT);
 
       MemorySegment dlManagedTensor =
           prepareTensor(
@@ -460,19 +460,19 @@ public class CagraIndexImpl implements CagraIndex {
   }
 
   private IndexReference fromGraph(
-      CagraIndexParams.CuvsDistanceType metric, CagraGraphImpl graph, DatasetImpl dataset) {
+      CagraIndexParams.CuvsDistanceType metric, DatasetBaseImpl graph, DatasetBaseImpl dataset) {
     try (var localArena = Arena.ofConfined()) {
       long rows = dataset.size();
-      long cols = dataset.dimensions();
+      long cols = dataset.columns();
 
       long cuvsRes = resources.getHandle();
 
       long[] datasetShape = {rows, cols};
       MemorySegment datasetTensor =
           prepareTensor(
-              localArena, dataset.asMemorySegment(), datasetShape, kDLFloat(), 32, kDLCPU(), 1);
+              localArena, dataset.memorySegment(), datasetShape, kDLFloat(), 32, kDLCPU(), 1);
 
-      long[] graphShape = {graph.size(), graph.degree()};
+      long[] graphShape = {graph.size(), graph.columns()};
       MemorySegment graphTensor =
           prepareTensor(localArena, graph.memorySegment(), graphShape, kDLUInt(), 32, kDLCPU(), 1);
 
@@ -759,7 +759,7 @@ public class CagraIndexImpl implements CagraIndex {
     private CagraIndexParams cagraIndexParams;
     private final CuVSResourcesImpl cuvsResources;
     private InputStream inputStream;
-    private CagraGraph graph;
+    private Dataset graph;
 
     public Builder(CuVSResourcesImpl cuvsResources) {
       this.cuvsResources = cuvsResources;
@@ -772,7 +772,7 @@ public class CagraIndexImpl implements CagraIndex {
     }
 
     @Override
-    public Builder from(CagraGraph graph) {
+    public Builder from(Dataset graph) {
       this.graph = graph;
       return this;
     }

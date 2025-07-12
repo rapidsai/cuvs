@@ -88,8 +88,8 @@ public class BruteForceIndexImpl implements BruteForceIndex {
     Objects.requireNonNull(dataset);
     try (dataset) {
       this.resources = resources;
-      assert dataset instanceof DatasetImpl;
-      this.bruteForceIndexReference = build((DatasetImpl) dataset, bruteForceIndexParams);
+      assert dataset instanceof DatasetBaseImpl;
+      this.bruteForceIndexReference = build((DatasetBaseImpl) dataset, bruteForceIndexParams);
     }
   }
 
@@ -142,13 +142,14 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    * @return an instance of {@link IndexReference} that holds the pointer to the
    *         index
    */
-  private IndexReference build(DatasetImpl dataset, BruteForceIndexParams bruteForceIndexParams) {
+  private IndexReference build(
+      DatasetBaseImpl dataset, BruteForceIndexParams bruteForceIndexParams) {
     try (var localArena = Arena.ofConfined()) {
       long rows = dataset.size();
-      long cols = dataset.dimensions();
+      long cols = dataset.columns();
 
       Arena arena = resources.getArena();
-      MemorySegment datasetMemSegment = dataset.asMemorySegment();
+      MemorySegment datasetMemSegment = dataset.memorySegment();
 
       long cuvsResources = resources.getHandle();
 
