@@ -109,13 +109,13 @@ public class HnswIndexImpl implements HnswIndex {
       long cuvsRes = resources.getHandle();
 
       long[] queriesShape = {numQueries, vectorDimension};
-      MemorySegment queriesTensor = prepareTensor(arena, querySeg, queriesShape, 2, 32, 2, 1, 1);
+      MemorySegment queriesTensor = prepareTensor(arena, querySeg, queriesShape, 2, 32, 1, 1);
       long[] neighborsShape = {numQueries, topK};
       MemorySegment neighborsTensor =
-          prepareTensor(arena, neighborsMemorySegment, neighborsShape, 1, 64, 2, 1, 1);
+          prepareTensor(arena, neighborsMemorySegment, neighborsShape, 1, 64, 1, 1);
       long[] distancesShape = {numQueries, topK};
       MemorySegment distancesTensor =
-          prepareTensor(arena, distancesMemorySegment, distancesShape, 2, 32, 2, 1, 1);
+          prepareTensor(arena, distancesMemorySegment, distancesShape, 2, 32, 1, 1);
 
       int returnValue = cuvsStreamSync(cuvsRes);
       checkCuVSError(returnValue, "cuvsStreamSync");

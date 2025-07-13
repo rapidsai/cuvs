@@ -113,7 +113,8 @@ public class HnswRandomizedIT extends CuVSTestCase {
       // Create the index with the dataset
       final CagraIndex index;
       if (useNativeMemoryDataset) {
-        var datasetBuilder = Dataset.builder(vectors.length, vectors[0].length);
+        var datasetBuilder =
+            Dataset.builder(vectors.length, vectors[0].length, Dataset.DataType.FLOAT);
         for (float[] v : vectors) {
           datasetBuilder.addVector(v);
         }

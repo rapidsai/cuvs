@@ -88,8 +88,8 @@ public class BruteForceIndexImpl implements BruteForceIndex {
     Objects.requireNonNull(dataset);
     try (dataset) {
       this.resources = resources;
-      assert dataset instanceof DatasetImpl;
-      this.bruteForceIndexReference = build((DatasetImpl) dataset, bruteForceIndexParams);
+      assert dataset instanceof DatasetBaseImpl;
+      this.bruteForceIndexReference = build((DatasetBaseImpl) dataset, bruteForceIndexParams);
     }
   }
 
@@ -142,13 +142,14 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    * @return an instance of {@link IndexReference} that holds the pointer to the
    *         index
    */
-  private IndexReference build(DatasetImpl dataset, BruteForceIndexParams bruteForceIndexParams) {
+  private IndexReference build(
+      DatasetBaseImpl dataset, BruteForceIndexParams bruteForceIndexParams) {
     try (var localArena = Arena.ofConfined()) {
       long rows = dataset.size();
-      long cols = dataset.dimensions();
+      long cols = dataset.columns();
 
       Arena arena = resources.getArena();
-      MemorySegment datasetMemSegment = dataset.asMemorySegment();
+      MemorySegment datasetMemSegment = dataset.memorySegment();
 
       long cuvsResources = resources.getHandle();
 
@@ -167,7 +168,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
 
       long[] datasetShape = {rows, cols};
       MemorySegment datasetTensor =
-          prepareTensor(arena, datasetMemorySegmentP, datasetShape, 2, 32, 2, 2, 1);
+          prepareTensor(arena, datasetMemorySegmentP, datasetShape, 2, 32, 2, 1);
 
       var indexReference =
           new IndexReference(datasetMemorySegmentP, datasetBytes, createBruteForceIndex());
@@ -254,13 +255,13 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       cudaMemcpy(queriesDP, querySeg, queriesBytes, INFER_DIRECTION);
 
       long[] queriesShape = {numQueries, vectorDimension};
-      MemorySegment queriesTensor = prepareTensor(arena, queriesDP, queriesShape, 2, 32, 2, 2, 1);
+      MemorySegment queriesTensor = prepareTensor(arena, queriesDP, queriesShape, 2, 32, 2, 1);
       long[] neighborsShape = {numQueries, topk};
       MemorySegment neighborsTensor =
-          prepareTensor(arena, neighborsDP, neighborsShape, 0, 64, 2, 2, 1);
+          prepareTensor(arena, neighborsDP, neighborsShape, 0, 64, 2, 1);
       long[] distancesShape = {numQueries, topk};
       MemorySegment distancesTensor =
-          prepareTensor(arena, distancesDP, distancesShape, 2, 32, 2, 2, 1);
+          prepareTensor(arena, distancesDP, distancesShape, 2, 32, 2, 1);
 
       MemorySegment prefilter = cuvsFilter.allocate(arena);
       MemorySegment prefilterTensor;
@@ -281,7 +282,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
 
         cudaMemcpy(prefilterDP, prefilterDataMemorySegment, prefilterBytes, HOST_TO_DEVICE);
 
-        prefilterTensor = prepareTensor(arena, prefilterDP, prefilterShape, 1, 32, 1, 2, 1);
+        prefilterTensor = prepareTensor(arena, prefilterDP, prefilterShape, 1, 32, 2, 1);
 
         cuvsFilter.type(prefilter, 2);
         cuvsFilter.addr(prefilter, prefilterTensor.address());

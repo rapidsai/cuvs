@@ -50,10 +50,13 @@ public interface CuVSProvider {
   CuVSResources newCuVSResources(Path tempDirectory) throws Throwable;
 
   /** Create a {@link Dataset.Builder} instance **/
-  Dataset.Builder newDatasetBuilder(int size, int dimensions);
+  Dataset.Builder newDatasetBuilder(int size, int dimensions, Dataset.DataType dataType);
 
-  /** Create a {@link Dataset} backed by a on-heap array **/
+  /** Create a {@link Dataset} from an on-heap array **/
   Dataset newArrayDataset(float[][] vectors);
+
+  /** Create a {@link Dataset} from an on-heap array **/
+  Dataset newArrayDataset(int[][] vectors);
 
   /** Creates a new BruteForceIndex Builder. */
   BruteForceIndex.Builder newBruteForceIndexBuilder(CuVSResources cuVSResources)

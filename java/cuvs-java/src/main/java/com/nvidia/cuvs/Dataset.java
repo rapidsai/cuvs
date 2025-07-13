@@ -27,12 +27,29 @@ import com.nvidia.cuvs.spi.CuVSProvider;
  */
 public interface Dataset extends AutoCloseable {
 
+  enum DataType {
+    FLOAT,
+    INT,
+    BYTE
+  }
+
   /**
-   * Creates a dataset from a on-heap array of vectors
+   * Creates a dataset from an on-heap array of vectors.
+   * This method will allocate an additional MemorySegment to hold the graph data.
    *
    * @since 25.08
    */
   static Dataset ofArray(float[][] vectors) {
+    return CuVSProvider.provider().newArrayDataset(vectors);
+  }
+
+  /**
+   * Creates a dataset from an on-heap array of vectors.
+   * This method will allocate an additional MemorySegment to hold the graph data.
+   *
+   * @since 25.08
+   */
+  static Dataset ofArray(int[][] vectors) {
     return CuVSProvider.provider().newArrayDataset(vectors);
   }
 
@@ -54,8 +71,8 @@ public interface Dataset extends AutoCloseable {
    * @param dimensions Size of each vector in the dataset
    * @return new instance of {@link Dataset}
    */
-  static Dataset.Builder builder(int size, int dimensions) {
-    return CuVSProvider.provider().newDatasetBuilder(size, dimensions);
+  static Dataset.Builder builder(int size, int dimensions, DataType dataType) {
+    return CuVSProvider.provider().newDatasetBuilder(size, dimensions, dataType);
   }
 
   /**
@@ -63,12 +80,31 @@ public interface Dataset extends AutoCloseable {
    *
    * @return Size of the dataset
    */
-  int size();
+  long size();
 
   /**
-   * Gets the dimensions of the vectors in this dataset
+   * Gets the number of columns in the Dataset (e.g. the dimensions of the vectors in this dataset,
+   * or the graph degree for the graph represented as a list of neighbours
    *
    * @return Dimensions of the vectors in the dataset
    */
-  int dimensions();
+  long columns();
+
+  /**
+   * Access a single element of the matrix.
+   *
+   * @param row the matrix row, i.e. the node index
+   * @param col the matrix column, i.e. the i-th neighbour of the {@code row}-th node
+   */
+  int get(int row, int col);
+
+  /**
+   * Get a view (0-copy) of the row data, as a list of integers (32 bit)
+   *
+   * @param row the row for which to return the data
+   */
+  RowView getRow(long row);
+
+  @Override
+  void close();
 }
