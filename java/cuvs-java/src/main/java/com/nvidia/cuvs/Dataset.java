@@ -91,19 +91,35 @@ public interface Dataset extends AutoCloseable {
   long columns();
 
   /**
-   * Access a single element of the matrix.
-   *
-   * @param row the matrix row, i.e. the node index
-   * @param col the matrix column, i.e. the i-th neighbour of the {@code row}-th node
-   */
-  int get(int row, int col);
-
-  /**
    * Get a view (0-copy) of the row data, as a list of integers (32 bit)
    *
    * @param row the row for which to return the data
    */
   RowView getRow(long row);
+
+  /**
+   * Copies the content of this dataset to an on-heap Java matrix (array of arrays).
+   *
+   * @param array the destination array. Must be of length {@link Dataset#size()} or bigger,
+   *              and each element must be of length {@link Dataset#columns()} or bigger.
+   */
+  void toArray(int[][] array);
+
+  /**
+   * Copies the content of this dataset to an on-heap Java matrix (array of arrays).
+   *
+   * @param array the destination array. Must be of length {@link Dataset#size()} or bigger,
+   *              and each element must be of length {@link Dataset#columns()} or bigger.
+   */
+  void toArray(float[][] array);
+
+  /**
+   * Copies the content of this dataset to an on-heap Java matrix (array of arrays).
+   *
+   * @param array the destination array. Must be of length {@link Dataset#size()} or bigger,
+   *              and each element must be of length {@link Dataset#columns()} or bigger.
+   */
+  void toArray(byte[][] array);
 
   @Override
   void close();

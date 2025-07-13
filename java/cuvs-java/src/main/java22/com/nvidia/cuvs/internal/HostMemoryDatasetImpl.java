@@ -75,7 +75,7 @@ public class HostMemoryDatasetImpl extends DatasetBaseImpl {
   public RowView getRow(long nodeIndex) {
     var valueByteSize = valueLayout.byteSize();
     return new SliceRowView(
-        memorySegment().asSlice(nodeIndex * columns * valueByteSize, columns * valueByteSize),
+        memorySegment.asSlice(nodeIndex * columns * valueByteSize, columns * valueByteSize),
         columns,
         valueLayout,
         dataType,
@@ -83,9 +83,44 @@ public class HostMemoryDatasetImpl extends DatasetBaseImpl {
   }
 
   @Override
-  public void close() {}
+  public void toArray(int[][] array) {
+    assert dataType == DataType.INT;
+    assert (array.length >= size) : "Input array is not large enough";
+    assert (array.length == 0 || array[0].length >= columns) : "Input array is not large enough";
+    var valueByteSize = valueLayout.byteSize();
+    for (int r = 0; r < size; ++r) {
+      MemorySegment.copy(
+          memorySegment, valueLayout, r * columns * valueByteSize, array[r], 0, (int) columns);
+    }
+  }
 
   @Override
+  public void toArray(float[][] array) {
+    assert dataType == DataType.FLOAT;
+    assert (array.length >= size) : "Input array is not large enough";
+    assert (array.length == 0 || array[0].length >= columns) : "Input array is not large enough";
+    var valueByteSize = valueLayout.byteSize();
+    for (int r = 0; r < size; ++r) {
+      MemorySegment.copy(
+          memorySegment, valueLayout, r * columns * valueByteSize, array[r], 0, (int) columns);
+    }
+  }
+
+  @Override
+  public void toArray(byte[][] array) {
+    assert dataType == DataType.BYTE;
+    assert (array.length >= size) : "Input array is not large enough";
+    assert (array.length == 0 || array[0].length >= columns) : "Input array is not large enough";
+    var valueByteSize = valueLayout.byteSize();
+    for (int r = 0; r < size; ++r) {
+      MemorySegment.copy(
+          memorySegment, valueLayout, r * columns * valueByteSize, array[r], 0, (int) columns);
+    }
+  }
+
+  @Override
+  public void close() {}
+
   public int get(int row, int col) {
     return (int) accessor$vh.get(memorySegment, 0L, (long) row * columns + col);
   }

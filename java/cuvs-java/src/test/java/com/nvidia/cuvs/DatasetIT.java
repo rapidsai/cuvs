@@ -64,4 +64,17 @@ public class DatasetIT extends CuVSTestCase {
       }
     }
   }
+
+  @Test
+  public void testDatasetCopy() {
+    try (var dataset = Dataset.ofArray(intData)) {
+      var intDataCopy = new int[(int) dataset.size()][(int) dataset.columns()];
+      dataset.toArray(intDataCopy);
+      for (int n = 0; n < dataset.size(); ++n) {
+        for (int i = 0; i < dataset.columns(); ++i) {
+          assertEquals(intData[n][i], intDataCopy[n][i]);
+        }
+      }
+    }
+  }
 }
