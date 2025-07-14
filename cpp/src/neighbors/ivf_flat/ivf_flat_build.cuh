@@ -280,9 +280,10 @@ void extend(raft::resources const& handle,
         raft::make_device_matrix_view<float, IdxT>(temp_expanded_centers.data(), n_lists, dim * 8);
 
       // Initialize with decoded version of current centers
-      raft::linalg::map_offset(handle,
-                               expanded_centers_view,
-                               utils::bitwise_decode_op<IdxT>(index->binary_centers().data_handle(), dim));
+      raft::linalg::map_offset(
+        handle,
+        expanded_centers_view,
+        utils::bitwise_decode_op<IdxT>(index->binary_centers().data_handle(), dim));
 
       vec_batches.reset();  // Reset for second pass through the data
       for (const auto& batch : vec_batches) {
@@ -509,8 +510,9 @@ inline auto build(raft::resources const& handle,
         reinterpret_cast<int8_t*>(decoded_trainset.data()), n_rows_train, index.dim() * 8);
 
       // Decode binary trainset to expanded representation
-      raft::linalg::map_offset(
-        handle, decoded_trainset_view, utils::bitwise_decode_op<IdxT>(trainset.data(), index.dim()));
+      raft::linalg::map_offset(handle,
+                               decoded_trainset_view,
+                               utils::bitwise_decode_op<IdxT>(trainset.data(), index.dim()));
       trainset.clear();
 
       // Create decoded centers for clustering

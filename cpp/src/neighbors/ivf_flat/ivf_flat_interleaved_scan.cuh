@@ -1148,13 +1148,12 @@ struct inner_prod_dist {
   }
 };
 
-
 template <int Veclen, typename T, typename AccT>
 struct hamming_dist {
   __device__ __forceinline__ void operator()(AccT& acc, AccT x, AccT y)
   {
     if constexpr (Veclen > 1) {
-    // x and y are uint32_t, so no static_cast is needed.
+      // x and y are uint32_t, so no static_cast is needed.
 
       acc += __popc(x ^ y);
     } else {
