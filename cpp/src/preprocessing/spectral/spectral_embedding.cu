@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
+#include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/preprocessing/spectral_embedding.hpp>
-#include <raft/util/integer_utils.hpp>
 
 #include <raft/core/device_coo_matrix.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -31,15 +31,12 @@
 #include <raft/sparse/solver/lanczos.cuh>
 #include <raft/sparse/solver/lanczos_types.hpp>
 #include <raft/util/cudart_utils.hpp>
+#include <raft/util/integer_utils.hpp>
 
 #include <rmm/device_uvector.hpp>
 
 #include <thrust/sequence.h>
 #include <thrust/tabulate.h>
-
-#include <cuvs/neighbors/brute_force.hpp>
-
-#include <cstdio>
 
 namespace cuvs::preprocessing::spectral_embedding {
 
