@@ -80,7 +80,7 @@ void transform(raft::resources const& handle,
                    knn_rows.data_handle() + nnz,
                    [k_search] __device__(int idx) { return idx / k_search; });
 
-  // binarize to 1s
+  // set all distances to 1.0f (connectivity KNN graph)
   raft::matrix::fill(handle, raft::make_device_vector_view(d_distances.data_handle(), nnz), 1.0f);
 
   auto reduction_op = [] __device__(int row, int col, float a, float b) { return 0.5f * (a + b); };
@@ -139,8 +139,8 @@ void transform(raft::resources const& handle,
   auto sym_coo_row_ind = raft::make_device_vector<int>(handle, sym_coo_n_rows + 1);
   raft::sparse::convert::sorted_coo_to_csr(
     sym_coo_rows, sym_coo_nnz, sym_coo_row_ind.data_handle(), sym_coo_n_rows, stream);
-  const int test_one = sym_coo_nnz;
-  raft::copy(sym_coo_row_ind.data_handle() + sym_coo_row_ind.size() - 1, &test_one, 1, stream);
+
+  raft::copy(sym_coo_row_ind.data_handle() + sym_coo_row_ind.size() - 1, &sym_coo_nnz, 1, stream);
 
   auto csr_structure = raft::make_device_compressed_structure_view<int, int, int>(
     const_cast<int*>(sym_coo_row_ind.data_handle()),
