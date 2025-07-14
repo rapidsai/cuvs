@@ -80,6 +80,20 @@ final class JDKProvider implements CuVSProvider {
 
       @Override
       public void addVector(float[] vector) {
+        internalAddVector(vector);
+      }
+
+      @Override
+      public void addVector(byte[] vector) {
+        internalAddVector(vector);
+      }
+
+      @Override
+      public void addVector(int[] vector) {
+        internalAddVector(vector);
+      }
+
+      private void internalAddVector(Object vector) {
         if (current >= size) throw new ArrayIndexOutOfBoundsException();
         MemorySegment.copy(
             vector,
@@ -121,6 +135,20 @@ final class JDKProvider implements CuVSProvider {
     int columns = vectors[0].length;
 
     var dataset = new ArenaDatasetImpl(size, columns, Dataset.DataType.INT);
+    Util.copy(dataset.memorySegment(), vectors);
+    return dataset;
+  }
+
+  @Override
+  public Dataset newArrayDataset(byte[][] vectors) {
+    Objects.requireNonNull(vectors);
+    if (vectors.length == 0) {
+      throw new IllegalArgumentException("vectors should not be empty");
+    }
+    int size = vectors.length;
+    int columns = vectors[0].length;
+
+    var dataset = new ArenaDatasetImpl(size, columns, Dataset.DataType.BYTE);
     Util.copy(dataset.memorySegment(), vectors);
     return dataset;
   }

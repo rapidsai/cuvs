@@ -282,6 +282,14 @@ public class Util {
     }
   }
 
+  public static void copy(MemorySegment memorySegment, byte[][] data) {
+    int rows = data.length;
+    int cols = rows > 0 ? data[0].length : 0;
+    for (int r = 0; r < rows; r++) {
+      MemorySegment.copy(data[r], 0, memorySegment, C_CHAR, (r * cols * C_CHAR.byteSize()), cols);
+    }
+  }
+
   public static BitSet concatenate(BitSet[] arr, int maxSizeOfEachBitSet) {
     BitSet ret = new BitSet(maxSizeOfEachBitSet * arr.length);
     for (int i = 0; i < arr.length; i++) {

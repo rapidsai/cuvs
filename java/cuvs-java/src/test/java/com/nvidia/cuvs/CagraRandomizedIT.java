@@ -19,7 +19,6 @@ import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
-import java.lang.invoke.MethodHandles;
 import java.util.BitSet;
 import java.util.List;
 import org.junit.Before;
@@ -31,7 +30,7 @@ import org.slf4j.LoggerFactory;
 @RunWith(RandomizedRunner.class)
 public class CagraRandomizedIT extends CuVSTestCase {
 
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  private static final Logger log = LoggerFactory.getLogger(CagraRandomizedIT.class);
 
   @Before
   public void setup() {
@@ -42,7 +41,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
 
   @Test
   public void testResultsTopKWithRandomValues() throws Throwable {
-    boolean useNativeMemoryDatasets[] = {true, false};
+    boolean[] useNativeMemoryDatasets = {true, false};
     for (int i = 0; i < 100; i++) {
       for (boolean use : useNativeMemoryDatasets) {
         tmpResultsTopKWithRandomValues(use);

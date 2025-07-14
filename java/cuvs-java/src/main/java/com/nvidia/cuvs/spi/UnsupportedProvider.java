@@ -66,4 +66,9 @@ final class UnsupportedProvider implements CuVSProvider {
   public Dataset newArrayDataset(int[][] vectors) {
     throw new UnsupportedOperationException();
   }
+
+  @Override
+  public Dataset newArrayDataset(byte[][] vectors) {
+    throw new UnsupportedOperationException();
+  }
 }

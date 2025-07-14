@@ -58,6 +58,9 @@ public interface CuVSProvider {
   /** Create a {@link Dataset} from an on-heap array **/
   Dataset newArrayDataset(int[][] vectors);
 
+  /** Create a {@link Dataset} from an on-heap array **/
+  Dataset newArrayDataset(byte[][] vectors);
+
   /** Creates a new BruteForceIndex Builder. */
   BruteForceIndex.Builder newBruteForceIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;

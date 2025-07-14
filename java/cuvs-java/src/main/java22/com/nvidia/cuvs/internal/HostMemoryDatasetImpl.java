@@ -156,7 +156,7 @@ public class HostMemoryDatasetImpl extends DatasetBaseImpl {
 
     @Override
     public float getAsFloat(long index) {
-      assert dataType == DataType.INT;
+      assert dataType == DataType.FLOAT;
       return memorySegment.get((ValueLayout.OfFloat) valueLayout, index * valueByteSize);
     }
 

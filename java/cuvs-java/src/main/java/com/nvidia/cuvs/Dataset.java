@@ -53,6 +53,16 @@ public interface Dataset extends AutoCloseable {
     return CuVSProvider.provider().newArrayDataset(vectors);
   }
 
+  /**
+   * Creates a dataset from an on-heap array of vectors.
+   * This method will allocate an additional MemorySegment to hold the graph data.
+   *
+   * @since 25.08
+   */
+  static Dataset ofArray(byte[][] vectors) {
+    return CuVSProvider.provider().newArrayDataset(vectors);
+  }
+
   interface Builder {
     /**
      * Add a single vector to the dataset.
@@ -61,18 +71,33 @@ public interface Dataset extends AutoCloseable {
      */
     void addVector(float[] vector);
 
+    /**
+     * Add a single vector to the dataset.
+     *
+     * @param vector A byte array of as many elements as the dimensions
+     */
+    void addVector(byte[] vector);
+
+    /**
+     * Add a single vector to the dataset.
+     *
+     * @param vector A int array of as many elements as the dimensions
+     */
+    void addVector(int[] vector);
+
     Dataset build();
   }
 
   /**
    * Returns a builder to create a new instance of a dataset
    *
-   * @param size       Number of vectors in the dataset
-   * @param dimensions Size of each vector in the dataset
+   * @param size     Number of vectors in the dataset
+   * @param columns  Size of each vector in the dataset
+   * @param dataType The data type of the dataset elements
    * @return new instance of {@link Dataset}
    */
-  static Dataset.Builder builder(int size, int dimensions, DataType dataType) {
-    return CuVSProvider.provider().newDatasetBuilder(size, dimensions, dataType);
+  static Dataset.Builder builder(int size, int columns, DataType dataType) {
+    return CuVSProvider.provider().newDatasetBuilder(size, columns, dataType);
   }
 
   /**
