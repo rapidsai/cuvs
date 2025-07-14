@@ -225,7 +225,7 @@ void predict_bitwise_hamming(
   raft::device_matrix_view<const uint8_t, IdxT, raft::row_major> centroids,
   raft::device_vector_view<LabelT, IdxT> labels)
 {
-  detail::predict_bitwise_hamming(handle, dataset, centroids, labels);
+  cuvs::cluster::kmeans::detail::predict_bitwise_hamming(handle, dataset, centroids, labels);
 }
 
 namespace helpers {

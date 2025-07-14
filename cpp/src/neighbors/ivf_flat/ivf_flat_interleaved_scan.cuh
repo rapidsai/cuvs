@@ -34,6 +34,8 @@
 
 #include <rmm/cuda_stream_view.hpp>
 
+#include <cassert>
+
 namespace cuvs::neighbors::ivf_flat::detail {
 
 using namespace cuvs::spatial::knn::detail;  // NOLINT
@@ -1146,30 +1148,17 @@ struct inner_prod_dist {
   }
 };
 
-template <typename T>
-__device__ __forceinline__ uint32_t compute_hamming_128bit_packed(T x, T y)
-{
-  static_assert(sizeof(T) == 16, "Type T must be 128 bits (16 bytes)");
-
-  const uint64_t* x_u64 = reinterpret_cast<const uint64_t*>(&x);
-  const uint64_t* y_u64 = reinterpret_cast<const uint64_t*>(&y);
-
-  uint64_t xor_lo = x_u64[0] ^ y_u64[0];
-  uint64_t xor_hi = x_u64[1] ^ y_u64[1];
-
-  return __popcll(xor_lo) + __popcll(xor_hi);
-}
 
 template <int Veclen, typename T, typename AccT>
 struct hamming_dist {
   __device__ __forceinline__ void operator()(AccT& acc, AccT x, AccT y)
   {
-    if constexpr (Veclen == 16) {
-      acc += compute_hamming_128bit_packed(x, y);
-    } else if constexpr (Veclen > 1) {
+    if constexpr (Veclen > 1) {
+    // x and y are uint32_t, so no static_cast is needed.
+
       acc += __popc(x ^ y);
     } else {
-      acc += __popc(static_cast<uint32_t>(xv ^ yv) & 0xff);
+      acc += __popc(static_cast<uint32_t>(x ^ y) & 0xffu);
     }
   }
 };
