@@ -17,7 +17,7 @@ dependencies:
 - cxx-compiler
 - dlpack>=0.8,<1.0
 - gcc_linux-aarch64=13.*
-- go
+- go==1.24.4
 - libclang==20.1.4
 - libcublas-dev
 - libcurand-dev

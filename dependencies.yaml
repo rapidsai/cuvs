@@ -397,7 +397,7 @@ dependencies:
     common:
       - output_types: [conda]
         packages:
-          - go
+          - go==1.24.4
           - dlpack>=0.8,<1.0
   build_wheels:
     common:

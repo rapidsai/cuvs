@@ -22,7 +22,7 @@ dependencies:
 - dlpack>=0.8,<1.0
 - doxygen>=1.8.20
 - gcc_linux-aarch64=13.*
-- go
+- go==1.24.4
 - graphviz
 - ipython
 - libclang==20.1.4
