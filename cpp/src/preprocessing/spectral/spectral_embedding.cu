@@ -111,11 +111,13 @@ void transform(raft::resources const& handle,
 
   auto sym_coo_matrix =
     raft::make_device_coo_matrix<float, int, int, int>(handle, sym_coo1_n_rows, sym_coo1_n_cols);
-  auto sym_coo1_matrix_const_view = raft::make_device_coo_matrix_view<const float, int, int, int>(
-    sym_coo1_matrix.get_elements().data(), sym_coo1_structure);
 
   raft::sparse::op::coo_remove_scalar<128, float, int, int>(
-    handle, sym_coo1_matrix_const_view, raft::make_host_scalar<float>(0.0f).view(), sym_coo_matrix);
+    handle,
+    raft::make_device_coo_matrix_view<const float, int, int, int>(
+      sym_coo1_matrix.get_elements().data(), sym_coo1_structure),
+    raft::make_host_scalar<float>(0.0f).view(),
+    sym_coo_matrix);
 
   auto sym_coo_structure = sym_coo_matrix.structure_view();
   auto sym_coo_n_rows    = sym_coo_structure.get_n_rows();
