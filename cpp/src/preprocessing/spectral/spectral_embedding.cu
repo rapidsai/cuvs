@@ -92,60 +92,51 @@ void transform(raft::resources const& handle,
       return 0.5f * (a + b);
     });
 
-  auto sym_coo1_structure = sym_coo1_matrix.structure_view();
-  auto sym_coo1_n_rows    = sym_coo1_structure.get_n_rows();
-  auto sym_coo1_n_cols    = sym_coo1_structure.get_n_cols();
-  auto sym_coo1_nnz       = sym_coo1_structure.get_nnz();
-
-  auto sym_coo1_rows = sym_coo1_structure.get_rows().data();
-  auto sym_coo1_cols = sym_coo1_structure.get_cols().data();
-  auto sym_coo1_vals = sym_coo1_matrix.get_elements().data();
-
-  raft::sparse::op::coo_sort<float>(sym_coo1_n_rows,
-                                    sym_coo1_n_cols,
-                                    sym_coo1_nnz,
-                                    sym_coo1_rows,
-                                    sym_coo1_cols,
-                                    sym_coo1_vals,
+  raft::sparse::op::coo_sort<float>(n_samples,
+                                    n_samples,
+                                    sym_coo1_matrix.structure_view().get_nnz(),
+                                    sym_coo1_matrix.structure_view().get_rows().data(),
+                                    sym_coo1_matrix.structure_view().get_cols().data(),
+                                    sym_coo1_matrix.get_elements().data(),
                                     stream);
 
   auto sym_coo_matrix =
-    raft::make_device_coo_matrix<float, int, int, int>(handle, sym_coo1_n_rows, sym_coo1_n_cols);
+    raft::make_device_coo_matrix<float, int, int, int>(handle, n_samples, n_samples);
 
   raft::sparse::op::coo_remove_scalar<128, float, int, int>(
     handle,
     raft::make_device_coo_matrix_view<const float, int, int, int>(
-      sym_coo1_matrix.get_elements().data(), sym_coo1_structure),
+      sym_coo1_matrix.get_elements().data(), sym_coo1_matrix.structure_view()),
     raft::make_host_scalar<float>(0.0f).view(),
     sym_coo_matrix);
 
-  auto sym_coo_structure = sym_coo_matrix.structure_view();
-  auto sym_coo_n_rows    = sym_coo_structure.get_n_rows();
-  auto sym_coo_n_cols    = sym_coo_structure.get_n_cols();
-  auto sym_coo_nnz       = sym_coo_structure.get_nnz();
+  raft::sparse::op::coo_sort<float>(n_samples,
+                                    n_samples,
+                                    sym_coo_matrix.structure_view().get_nnz(),
+                                    sym_coo_matrix.structure_view().get_rows().data(),
+                                    sym_coo_matrix.structure_view().get_cols().data(),
+                                    sym_coo_matrix.get_elements().data(),
+                                    stream);
 
-  auto sym_coo_rows = sym_coo_structure.get_rows().data();
-  auto sym_coo_cols = sym_coo_structure.get_cols().data();
-  auto sym_coo_vals = sym_coo_matrix.get_elements().data();
+  auto sym_coo_row_ind = raft::make_device_vector<int>(handle, n_samples + 1);
+  raft::sparse::convert::sorted_coo_to_csr(sym_coo_matrix.structure_view().get_rows().data(),
+                                           sym_coo_matrix.structure_view().get_nnz(),
+                                           sym_coo_row_ind.data_handle(),
+                                           n_samples,
+                                           stream);
 
-  raft::sparse::op::coo_sort<float>(
-    sym_coo_n_rows, sym_coo_n_cols, sym_coo_nnz, sym_coo_rows, sym_coo_cols, sym_coo_vals, stream);
-
-  auto sym_coo_row_ind = raft::make_device_vector<int>(handle, sym_coo_n_rows + 1);
-  raft::sparse::convert::sorted_coo_to_csr(
-    sym_coo_rows, sym_coo_nnz, sym_coo_row_ind.data_handle(), sym_coo_n_rows, stream);
-
+  auto sym_coo_nnz = sym_coo_matrix.structure_view().get_nnz();
   raft::copy(sym_coo_row_ind.data_handle() + sym_coo_row_ind.size() - 1, &sym_coo_nnz, 1, stream);
 
   auto csr_structure = raft::make_device_compressed_structure_view<int, int, int>(
     const_cast<int*>(sym_coo_row_ind.data_handle()),
-    const_cast<int*>(sym_coo_cols),
-    sym_coo_n_rows,
-    sym_coo_n_cols,
-    sym_coo_nnz);
+    const_cast<int*>(sym_coo_matrix.structure_view().get_cols().data()),
+    n_samples,
+    n_samples,
+    sym_coo_matrix.structure_view().get_nnz());
 
   auto csr_matrix_view = raft::make_device_csr_matrix_view<float, int, int, int>(
-    const_cast<float*>(sym_coo_vals), csr_structure);
+    const_cast<float*>(sym_coo_matrix.get_elements().data()), csr_structure);
 
   auto diagonal = raft::make_device_vector<float>(handle, csr_structure.get_n_rows());
   auto laplacian =
