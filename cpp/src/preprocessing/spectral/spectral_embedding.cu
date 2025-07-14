@@ -33,8 +33,6 @@
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/integer_utils.hpp>
 
-#include <rmm/device_uvector.hpp>
-
 #include <thrust/sequence.h>
 #include <thrust/tabulate.h>
 
@@ -53,6 +51,7 @@ void transform(raft::resources const& handle,
 
   auto stream = raft::resource::get_cuda_stream(handle);
 
+  cuvs::neighbors::brute_force::search_params search_params;
   cuvs::neighbors::brute_force::index_params index_params;
   index_params.metric = cuvs::distance::DistanceType::L2SqrtExpanded;
 
@@ -61,8 +60,6 @@ void transform(raft::resources const& handle,
 
   auto index =
     cuvs::neighbors::brute_force::build(handle, index_params, raft::make_const_mdspan(dataset));
-
-  cuvs::neighbors::brute_force::search_params search_params;
 
   cuvs::neighbors::brute_force::search(
     handle, search_params, index, dataset, d_indices.view(), d_distances.view());
@@ -83,10 +80,10 @@ void transform(raft::resources const& handle,
   // set all distances to 1.0f (connectivity KNN graph)
   raft::matrix::fill(handle, raft::make_device_vector_view(d_distances.data_handle(), nnz), 1.0f);
 
-  auto coo_structure_view = raft::make_device_coordinate_structure_view<int, int, int>(
-    knn_rows.data_handle(), knn_cols.data_handle(), n_samples, n_samples, nnz);
   auto coo_matrix_view = raft::make_device_coo_matrix_view<const float, int, int, int>(
-    d_distances.data_handle(), coo_structure_view);
+    d_distances.data_handle(),
+    raft::make_device_coordinate_structure_view<int, int, int>(
+      knn_rows.data_handle(), knn_cols.data_handle(), n_samples, n_samples, nnz));
 
   auto sym_coo1_matrix =
     raft::make_device_coo_matrix<float, int, int, int>(handle, n_samples, n_samples);
@@ -112,17 +109,13 @@ void transform(raft::resources const& handle,
                                     sym_coo1_vals,
                                     stream);
 
-  auto zero_scalar = raft::make_host_scalar<float>(0.0f);
-
   auto sym_coo_matrix =
     raft::make_device_coo_matrix<float, int, int, int>(handle, sym_coo1_n_rows, sym_coo1_n_cols);
-
-  // Create a const view of the input matrix
   auto sym_coo1_matrix_const_view = raft::make_device_coo_matrix_view<const float, int, int, int>(
     sym_coo1_matrix.get_elements().data(), sym_coo1_structure);
 
   raft::sparse::op::coo_remove_scalar<128, float, int, int>(
-    handle, sym_coo1_matrix_const_view, zero_scalar.view(), sym_coo_matrix);
+    handle, sym_coo1_matrix_const_view, raft::make_host_scalar<float>(0.0f).view(), sym_coo_matrix);
 
   auto sym_coo_structure = sym_coo_matrix.structure_view();
   auto sym_coo_n_rows    = sym_coo_structure.get_n_rows();
