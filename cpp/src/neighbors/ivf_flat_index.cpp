@@ -246,6 +246,12 @@ void index<T, IdxT>::check_consistency()
     "inconsistent number of lists (clusters)");
 }
 
+template <typename T, typename IdxT>
+bool index<T, IdxT>::binary_index() const noexcept
+{
+  return binary_index_;
+}
+
 template struct index<float, uint32_t>;  // Used for refine function
 template struct index<float, int64_t>;
 template struct index<half, int64_t>;

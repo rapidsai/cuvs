@@ -272,6 +272,8 @@ struct index : cuvs::neighbors::index {
 
   void check_consistency();
 
+  bool binary_index() const noexcept;
+
  private:
   /**
    * TODO: in theory, we can lift this to the template parameter and keep it at hardware maximum
@@ -286,6 +288,7 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix<float, uint32_t, raft::row_major> centers_;
   raft::device_matrix<uint8_t, uint32_t, raft::row_major> binary_centers_;
   std::optional<raft::device_vector<float, uint32_t>> center_norms_;
+  bool binary_index_ = metric_ == cuvs::distance::DistanceType::BitwiseHamming;
 
   // Computed members
   raft::device_vector<T*, uint32_t> data_ptrs_;
