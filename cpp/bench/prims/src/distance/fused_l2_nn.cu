@@ -26,29 +26,37 @@
 
 
 void launch_memcpy() {
-    
+
     float4* dst;
     float4* src;
     const size_t len = 1024 * 1024 * 1024 / sizeof(float4);
     unsigned int blocks = 1;
     const unsigned int block_size = 1024;
     unsigned int grid_size = blocks;
-    
+
     cudaStream_t stream;
     CHECK_CUDA(cudaStreamCreate(&stream));
-    
+
     CHECK_CUDA(cudaMallocAsync(&src, len * sizeof(float4), stream));
     CHECK_CUDA(cudaMallocAsync(&dst, len * sizeof(float4), stream));
-    
+
     gpu_memcpy_kernel<<<grid_size, block_size, 0, stream>>>(src, dst, len, 5);
     CHECK_CUDA(cudaGetLastError());
-    
+
     CHECK_CUDA(cudaFreeAsync(src, stream));
     CHECK_CUDA(cudaFreeAsync(dst, stream));
-    
+
     CHECK_CUDA(cudaStreamDestroy(stream));
 }*/
 
+  template <typename DataT>
+  __global__ void rescale(DataT* arr, int scale_factor, int len) {
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+    for (int i = tid; i < len; i+=blockDim.x*gridDim.x) {
+      arr[i] = hrint(arr[i]*DataT(scale_factor));
+    }
+  }
 
   enum class AlgorithmType {
     gemm,
@@ -69,7 +77,7 @@ void launch_memcpy() {
     if constexpr (std::is_fundamental<OutT>()) {
       static_assert(std::is_same<OutT, AccT>::value, "OutT and AccT are not the same");
     } else {
-      static_assert(std::is_same<OutT, raft::KeyValuePair<IdxT, AccT>>::value, 
+      static_assert(std::is_same<OutT, raft::KeyValuePair<IdxT, AccT>>::value,
           "OutT is not raft::KeyValuePair<IdxT, AccT> type");
     }
 
@@ -93,9 +101,8 @@ void launch_memcpy() {
        handle, rng, y.data_handle(), n * k, DataT(-1.0), DataT(1.0));
 
     //CHECK_CUDA(cudaDeviceSynchronize());
-    //cudaMemcpy(x_h.data_handle(), x.data_handle(), m*k*sizeof(DataT), cudaMemcpyDeviceToHost);
-    //printf("%f", __half2float(x_h.data_handle()[0]));
-    //ref_l2nn(out_h.data_handle(), x_h.data_handle(), y_h.data_handle(), m, n, k);
+    rescale<DataT><<<(m*k)/128, 128, 0, stream>>>(x.data_handle(), 4, m*k);
+    rescale<DataT><<<(n*k)/128, 128, 0, stream>>>(y.data_handle(), 4, n*k);
     // Pre-compute norms
     raft::linalg::rowNorm(x_norm.data_handle(),
                           x.data_handle(),
@@ -128,6 +135,8 @@ void launch_memcpy() {
     // Warm up
     cublas_l2nn<DataT, AccT, OutT, IdxT, false, false>(out.data_handle(), x.data_handle(),
           y.data_handle(), m, n, k, x_norm.data_handle(), y_norm.data_handle(), workspace_blas.data_handle(), cublas_handle, stream);
+    CHECK_CUDA(cudaMemsetAsync(workspace_blas.data_handle(), 0, ws_size*sizeof(AccT)));
+    CHECK_CUDA(cudaMemsetAsync(out.data_handle(), 0, m*sizeof(OutT)));
     CHECK_CUDA(cudaStreamSynchronize(stream));
 
     //launch_memcpy();
@@ -166,14 +175,14 @@ void launch_memcpy() {
     }
     timer.stop();
     CHECK_CUDA(cudaStreamSynchronize(stream));
-    if constexpr (algo == AlgorithmType::gemm) {
+    if constexpr (algo == AlgorithmType::gemm || algo == AlgorithmType::tensor) {
       reduce_min<DataT, AccT, OutT, IdxT>(out.data_handle(),
                                     workspace_blas.data_handle(),
                                     x_norm.data_handle(),
                                     y_norm.data_handle(),
                                     m, n, stream);
     }
-    vector_compare(out_ref.data_handle(), out.data_handle(), m, 5e-1, stream);
+    vector_compare(out_ref.data_handle(), out.data_handle(), m, stream);
     state.counters["M"] = m;
     state.counters["N"] = n;
     state.counters["K"] = k;
@@ -215,7 +224,7 @@ static void CustomArguments(benchmark::internal::Benchmark* b) {
       }
     }
   }*/
-  b->Args({16*128, 8*128, 8*16});
+  b->Args({256*128, 128*128, 128});
 }
 
 

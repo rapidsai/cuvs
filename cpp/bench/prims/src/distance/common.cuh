@@ -284,103 +284,135 @@ void ref_l2nn_api(OutT* out, const DataT* A, const DataT* B, IdxT m, IdxT n, Idx
 }
 
 // Structure to track comparison failures
-struct ComparisonFailure {
-  int failed;       // Flag indicating if comparison failed
-  int64_t first_index; // First index where comparison failed
-  double diff;   // Maximum difference found
-  int mutex;        // Simple mutex lock for thread synchronization
+class ComparisonSummary {
+public:
+  double max_diff;          // Maximum difference found
+  uint64_t max_diff_index;   // where does the maximim difference occur
+  double max_a;
+  double max_b;
+  double acc_diff;          // sum of all the diffs
+  uint64_t n;               // How many items are compared
+  int mutex;                // Simple mutex lock for thread synchronization
+
+  __device__ __host__
+  void init() {
+    max_diff = 0.0;
+    max_diff_index = 0;
+    max_a = 0.0;
+    max_b = 0.0;
+    acc_diff = 0.0;
+    n = 0;
+  }
+
+  __device__ __host__
+  void update(double diff, uint64_t index, double a_val, double b_val) {
+    if ( max_diff < diff ) {
+      max_diff = diff;
+      max_diff_index = index;
+      max_a = a_val;
+      max_b = b_val;
+    }
+    acc_diff += diff;
+    n++;
+  }
+
+  __device__ __host__
+  void update(ComparisonSummary& op2) {
+    if ( max_diff < op2.max_diff ) {
+      max_diff = op2.max_diff;
+      max_diff_index = op2.max_diff_index;
+      max_a = op2.max_a;
+      max_b = op2.max_b;
+    }
+    acc_diff += op2.acc_diff;
+    n += op2.n;
+  }
+
+  __device__ __host__
+  void print() {
+    if (max_diff > 0.0) {
+      printf("Total compared %lu\n", n);
+      printf("Average diff: %f\n", acc_diff / n);
+      printf("max_diff: %f (%f - %f)\n", max_diff, max_a, max_b);
+      printf("max_diff_index: %lu\n", max_diff_index);
+    }
+  }
 };
 
 template <typename OutT, typename IdxT>
-__global__ void vector_compare_kernel(const OutT* a, const OutT* b, IdxT n, double tolerance = 1e-6,
-                                      ComparisonFailure* global_failure = nullptr) {
+__global__ void vector_compare_kernel(const OutT* a, const OutT* b, IdxT n,
+                                      ComparisonSummary* global_summary) {
   // Shared memory for tracking failures within a block
-  __shared__ ComparisonFailure block_failure;
+  __shared__ ComparisonSummary block_summary;
 
   // Initialize shared memory variable
   if (threadIdx.x == 0) {
-    block_failure.failed = 0;
-    block_failure.first_index = -1;
-    block_failure.diff = 0;
-    block_failure.mutex = 0;
+    block_summary.init();
   }
   __syncthreads();
 
   IdxT tid = threadIdx.x + blockIdx.x * blockDim.x;
 
-  if (tid < n) {
-
-    double diff;
-    if constexpr (std::is_fundamental<OutT>::value) {
+  for (IdxT i = 0; i < n; i++) {
+    tid = i;
+    double diff, a_val, b_val;
+    if constexpr (std::is_fundamental_v<OutT> || std::is_same_v<OutT, half>) {
       diff = std::abs(double(a[tid]) - double(b[tid]));
       //printf("Expected = %f vs actual = %f\n", a[tid], b[tid]);
+      a_val = double(a[tid]);
+      b_val = double(b[tid]);
+
     } else {
       diff = std::abs(double(a[tid].value) - double(b[tid].value));
       //if (tid == 0) printf("Expected = %f vs actual = %f, %d, %d\n", a[tid].value, b[tid].value, a[tid].key, b[tid].key);
+      a_val = double(a[tid].value);
+      b_val = double(b[tid].value);
     }
-    if (diff > tolerance) {
       // Acquire mutex lock using atomic compare-and-swap
-      while (atomicCAS(&block_failure.mutex, 0, 1) != 0) {
-        // Spin wait
-      }
+    /*while (atomicCAS(&block_summary.mutex, 0, 1) != 0) {
+      // Spin wait
+    }*/
 
-      // Critical section: update first_index if this is the earliest failure
-      if (block_failure.first_index == IdxT(-1) || tid < block_failure.first_index) {
-        block_failure.failed = 1;
-        block_failure.first_index = tid;
-        block_failure.diff = diff;
-      }
+    // Critical section: update first_index if this is the earliest failure
+    block_summary.update(diff, tid, a_val, b_val);
 
-      // Release mutex
-      atomicExch(&block_failure.mutex, 0);
-    }
+    // Release mutex
+    //atomicExch(&block_summary.mutex, 0);
   }
 
   __syncthreads();
 
   // First thread in the block can report the failure if needed
-  if (threadIdx.x == 0 && block_failure.failed == 1) {
+  if (threadIdx.x == 0) {
     // Acquire mutex lock using atomic compare-and-swap
-    while (atomicCAS(&global_failure->mutex, 0, 1) != 0) {
+    /*while (atomicCAS(&global_summary->mutex, 0, 1) != 0) {
       // Spin wait
-    }
+    }*/
 
     // Critical section: update first_index if this is the earliest failure
-    if (global_failure->first_index == IdxT(-1) || block_failure.first_index < global_failure->first_index) {
-      global_failure->failed = 1;
-      global_failure->first_index = block_failure.first_index;
-      global_failure->diff = block_failure.diff;
-    }
+    global_summary->update(block_summary);
 
     // Release mutex
-    atomicExch(&global_failure->mutex, 0);
+    //atomicExch(&global_summary->mutex, 0);
   }
 }
 
 template <typename OutT, typename IdxT>
-void vector_compare(const OutT* a, const OutT* b, const IdxT n, double tolerance = double(1e-6), cudaStream_t stream = nullptr) {
+void vector_compare(const OutT* a, const OutT* b, const IdxT n, cudaStream_t stream = nullptr) {
   constexpr int block_size = 256;
   const int grid_size = (n + block_size - 1) / block_size;
 
-  ComparisonFailure* global_failure;
-  CHECK_CUDA(cudaMallocManaged(&global_failure, sizeof(ComparisonFailure)));
+  ComparisonSummary* global_summary;
+  CHECK_CUDA(cudaMallocManaged(&global_summary, sizeof(ComparisonSummary)));
 
-  global_failure->failed = 0;
-  global_failure->first_index = -1;
-  global_failure->diff = 0.0;
-  global_failure->mutex = 0;
+  global_summary->init();
 
-  vector_compare_kernel<OutT, IdxT><<<grid_size, block_size, 0, stream>>>(a, b, n, tolerance, global_failure);
+  //vector_compare_kernel<OutT, IdxT><<<grid_size, block_size, 0, stream>>>(a, b, n, global_summary);
+  vector_compare_kernel<OutT, IdxT><<<1, 1, 0, stream>>>(a, b, n, global_summary);
 
   CHECK_CUDA(cudaStreamSynchronize(stream));
 
-  if (global_failure->failed) {
-    std::cout << "Vector comparison failed: values differ by more than tolerance " << tolerance << std::endl;
-    std::cout << "First failure at index " << global_failure->first_index
-              << " with difference " << global_failure->diff << std::endl;
-  } else {
-    //std::cout << "Vector comparison passed: all values within tolerance " << tolerance << std::endl;
-  }
+  global_summary->print();
 
-  CHECK_CUDA(cudaFree(global_failure));
+  CHECK_CUDA(cudaFree(global_summary));
 }
