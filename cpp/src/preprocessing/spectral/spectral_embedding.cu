@@ -128,17 +128,16 @@ void transform(raft::resources const& handle,
   auto sym_coo_nnz = sym_coo_matrix.structure_view().get_nnz();
   raft::copy(sym_coo_row_ind.data_handle() + sym_coo_row_ind.size() - 1, &sym_coo_nnz, 1, stream);
 
-  auto csr_structure = raft::make_device_compressed_structure_view<int, int, int>(
-    const_cast<int*>(sym_coo_row_ind.data_handle()),
-    const_cast<int*>(sym_coo_matrix.structure_view().get_cols().data()),
-    n_samples,
-    n_samples,
-    sym_coo_matrix.structure_view().get_nnz());
-
   auto csr_matrix_view = raft::make_device_csr_matrix_view<float, int, int, int>(
-    const_cast<float*>(sym_coo_matrix.get_elements().data()), csr_structure);
+    const_cast<float*>(sym_coo_matrix.get_elements().data()),
+    raft::make_device_compressed_structure_view<int, int, int>(
+      const_cast<int*>(sym_coo_row_ind.data_handle()),
+      const_cast<int*>(sym_coo_matrix.structure_view().get_cols().data()),
+      n_samples,
+      n_samples,
+      sym_coo_matrix.structure_view().get_nnz()));
 
-  auto diagonal = raft::make_device_vector<float>(handle, csr_structure.get_n_rows());
+  auto diagonal = raft::make_device_vector<float>(handle, n_samples);
   auto laplacian =
     spectral_embedding_config.norm_laplacian
       ? raft::sparse::linalg::laplacian_normalized(handle, csr_matrix_view, diagonal.view())
