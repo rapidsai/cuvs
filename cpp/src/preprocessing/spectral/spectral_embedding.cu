@@ -45,16 +45,13 @@ void transform(raft::resources const& handle,
                raft::device_matrix_view<float, int, raft::row_major> dataset,
                raft::device_matrix_view<float, int, raft::col_major> embedding)
 {
-  const int n_samples     = dataset.extent(0);
-  const int n_features    = dataset.extent(1);
-  const int k             = spectral_embedding_config.n_neighbors;  // Number of neighbors
-  const bool include_self = true;  // Set to false to exclude self-connections
-  const bool drop_first   = spectral_embedding_config.drop_first;
+  const int n_samples   = dataset.extent(0);
+  const int n_features  = dataset.extent(1);
+  const int k_search    = spectral_embedding_config.n_neighbors;
+  const bool drop_first = spectral_embedding_config.drop_first;
+  const size_t nnz      = n_samples * k_search;
 
   auto stream = raft::resource::get_cuda_stream(handle);
-
-  // If not including self, we need to request k+1 neighbors
-  int k_search = include_self ? k : k + 1;
 
   cuvs::neighbors::brute_force::index_params index_params;
   index_params.metric = cuvs::distance::DistanceType::L2SqrtExpanded;
@@ -70,9 +67,6 @@ void transform(raft::resources const& handle,
   cuvs::neighbors::brute_force::search(
     handle, search_params, index, dataset, d_indices.view(), d_distances.view());
 
-  // Resize COO to actual nnz
-  size_t nnz = n_samples * k_search;
-
   auto knn_rows = raft::make_device_vector<int>(handle, nnz);
   auto knn_cols = raft::make_device_vector<int>(handle, nnz);
 
@@ -81,11 +75,10 @@ void transform(raft::resources const& handle,
       return static_cast<int>(x);
     });
 
-  auto policy = raft::resource::get_thrust_policy(handle);
-  thrust::tabulate(
-    policy, knn_rows.data_handle(), knn_rows.data_handle() + nnz, [k_search] __device__(int idx) {
-      return idx / k_search;
-    });
+  thrust::tabulate(raft::resource::get_thrust_policy(handle),
+                   knn_rows.data_handle(),
+                   knn_rows.data_handle() + nnz,
+                   [k_search] __device__(int idx) { return idx / k_search; });
 
   // binarize to 1s
   raft::matrix::fill(handle, raft::make_device_vector_view(d_distances.data_handle(), nnz), 1.0f);
