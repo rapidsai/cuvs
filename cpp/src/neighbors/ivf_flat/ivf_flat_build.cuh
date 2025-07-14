@@ -71,15 +71,15 @@ auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T,
              source.list_sizes().size(),
              stream);
   if (!source.binary_index()) {
-  raft::copy(target.centers().data_handle(),
-             source.centers().data_handle(),
-             source.centers().size(),
-             stream);
+    raft::copy(target.centers().data_handle(),
+               source.centers().data_handle(),
+               source.centers().size(),
+               stream);
   } else {
-  raft::copy(target.binary_centers().data_handle(),
-             source.binary_centers().data_handle(),
-             source.binary_centers().size(),
-             stream);
+    raft::copy(target.binary_centers().data_handle(),
+               source.binary_centers().data_handle(),
+               source.binary_centers().size(),
+               stream);
   }
   if (source.center_norms().has_value()) {
     target.allocate_center_norms(res);
@@ -205,7 +205,11 @@ void extend(raft::resources const& handle,
   cuvs::cluster::kmeans::balanced_params kmeans_params;
   kmeans_params.metric = index->metric();
 
-  auto orig_centroids_view = index->binary_index() ? raft::make_device_matrix_view<const uint8_t, IdxT>(index->binary_centers().data_handle(), n_lists, dim) : raft::make_device_matrix_view<const float, IdxT>(index->centers().data_handle(), n_lists, dim);
+  auto orig_centroids_view = index->binary_index()
+                               ? raft::make_device_matrix_view<const uint8_t, IdxT>(
+                                   index->binary_centers().data_handle(), n_lists, dim)
+                               : raft::make_device_matrix_view<const float, IdxT>(
+                                   index->centers().data_handle(), n_lists, dim);
   // Calculate the batch size for the input data if it's not accessible directly from the device
   constexpr size_t kReasonableMaxBatchSize = 65536;
   size_t max_batch_size                    = std::min<size_t>(n_rows, kReasonableMaxBatchSize);
@@ -260,18 +264,23 @@ void extend(raft::resources const& handle,
 
   // Calculate the centers and sizes on the new data, starting from the original values
   if (index->adaptive_centers()) {
-    auto centroids_view = index->binary_index() ? raft::make_device_matrix_view<uint8_t, IdxT>(index->binary_centers().data_handle(), index->centers().extent(0), index->binary_centers().extent(1)) : raft::make_device_matrix_view<float, IdxT>(
-      index->centers().data_handle(), index->centers().extent(0), index->centers().extent(1));
+    auto centroids_view =
+      index->binary_index()
+        ? raft::make_device_matrix_view<uint8_t, IdxT>(index->binary_centers().data_handle(),
+                                                       index->centers().extent(0),
+                                                       index->binary_centers().extent(1))
+        : raft::make_device_matrix_view<float, IdxT>(
+            index->centers().data_handle(), index->centers().extent(0), index->centers().extent(1));
     auto list_sizes_view =
       raft::make_device_vector_view<std::remove_pointer_t<decltype(list_sizes_ptr)>, IdxT>(
         list_sizes_ptr, n_lists);
 
     if (index->metric() == cuvs::distance::DistanceType::BitwiseHamming) {
       // For binary data, we need to work in the expanded space and then convert back
-      rmm::device_uvector<float> temp_expanded_centers(
+      rmm::device_uvector<uint8_t> temp_expanded_centers(
         n_lists * dim * 8, stream, raft::resource::get_workspace_resource(handle));
-      auto expanded_centers_view =
-        raft::make_device_matrix_view<float, IdxT>(temp_expanded_centers.data(), n_lists, dim * 8);
+      auto expanded_centers_view = raft::make_device_matrix_view<uint8_t, IdxT>(
+        temp_expanded_centers.data(), n_lists, dim * 8);
 
       // Initialize with decoded version of current centers
       raft::linalg::map_offset(
@@ -281,12 +290,10 @@ void extend(raft::resources const& handle,
 
       vec_batches.reset();  // Reset for second pass through the data
       for (const auto& batch : vec_batches) {
-        // For adaptive centers with binary data, we still need to work in expanded space
-        // Decode batch to expanded representation for center calculation
-        rmm::device_uvector<int8_t> decoded_batch(
+        rmm::device_uvector<uint8_t> decoded_batch(
           batch.size() * dim * 8, stream, raft::resource::get_workspace_resource(handle));
         auto decoded_batch_view =
-          raft::make_device_matrix_view<int8_t, IdxT>(decoded_batch.data(), batch.size(), dim * 8);
+          raft::make_device_matrix_view<uint8_t, IdxT>(decoded_batch.data(), batch.size(), dim * 8);
         raft::linalg::map_offset(
           handle, decoded_batch_view, utils::bitwise_decode_op<IdxT>(batch.data(), dim));
 
@@ -298,7 +305,7 @@ void extend(raft::resources const& handle,
                                                                         expanded_centers_view,
                                                                         list_sizes_view,
                                                                         false,
-                                                                        utils::mapping<float>{});
+                                                                        raft::identity_op{});
       }
 
       // Convert updated centroids back to binary format
@@ -491,7 +498,8 @@ inline auto build(raft::resources const& handle,
 
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric = index.binary_index() ? cuvs::distance::DistanceType::L2Expanded : index.metric();
+    kmeans_params.metric =
+      index.binary_index() ? cuvs::distance::DistanceType::L2Expanded : index.metric();
 
     if (index.binary_index()) {
       // For binary data, we need to decode to expanded representation for clustering

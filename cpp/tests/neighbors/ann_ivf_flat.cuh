@@ -79,7 +79,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
   void testIVFFlat()
   {
     // Skip BitwiseHamming tests for non-uint8 data types
-    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming && 
+    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         !std::is_same_v<DataT, uint8_t>) {
       GTEST_SKIP();
     }
@@ -277,7 +277,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
   void testPacker()
   {
     // Skip BitwiseHamming tests for non-uint8 data types
-    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming && 
+    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         !std::is_same_v<DataT, uint8_t>) {
       GTEST_SKIP();
     }
@@ -415,7 +415,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
   void testFilter()
   {
     // Skip BitwiseHamming tests for non-uint8 data types
-    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming && 
+    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         !std::is_same_v<DataT, uint8_t>) {
       GTEST_SKIP();
     }
@@ -557,7 +557,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
 const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
   // test various dims (aligned and not aligned to vector sizes)
   {1000, 10000, 1, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
-  {1000, 10000, 1, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming,  true},
+  {1000, 10000, 1, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, true},
   {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
   {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
   {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},
