@@ -143,10 +143,26 @@ void build(
                  "distances matrix should be allocated to get mutual reachability distance.");
   }
 
+  std::unique_ptr<BatchBuildAux<IdxT>> aux_vectors;
   if (params.n_clusters == 1) {
     single_build(handle, params, dataset, indices, distances);
   } else {
-    batch_build(handle, params, dataset, indices, distances);
+    if (core_distances.has_value()) {
+      aux_vectors = std::make_unique<BatchBuildAux<IdxT>>(
+        params.n_clusters, dataset.extent(0), params.overlap_factor);
+      batch_build(handle, params, dataset, indices, distances, aux_vectors.get());
+    } else {
+      batch_build(handle, params, dataset, indices, distances);
+    }
+  }
+
+  if ((build_algo == GRAPH_BUILD_ALGO::NN_DESCENT) &&
+      (params.metric != cuvs::distance::DistanceType::InnerProduct)) {
+    // NN Descent doesn't include self loops. Added to keep it consistent with brute force and ivfpq
+    raft::matrix::shift(handle, indices, 1);
+    if (distances.has_value()) {
+      raft::matrix::shift(handle, distances.value(), 1, std::make_optional<T>(0.0));
+    }
   }
 
   if (core_distances.has_value()) {
@@ -165,7 +181,16 @@ void build(
     if (params.n_clusters == 1) {
       single_build(handle, params, dataset, indices, distances, dist_epilogue);
     } else {
-      batch_build(handle, params, dataset, indices, distances, dist_epilogue);
+      batch_build(handle, params, dataset, indices, distances, aux_vectors.get(), dist_epilogue);
+    }
+
+    if ((build_algo == GRAPH_BUILD_ALGO::NN_DESCENT) &&
+        (params.metric != cuvs::distance::DistanceType::InnerProduct)) {
+      raft::matrix::shift(handle, indices, 1);
+      raft::matrix::shift(handle,
+                          distances.value(),
+                          raft::make_device_matrix_view<const T, IdxT>(
+                            core_distances.value().data_handle(), num_rows, 1));
     }
   }
 }
@@ -204,6 +229,15 @@ void build(
     single_build(handle, params, dataset, indices, distances);
   }
 
+  if ((build_algo == GRAPH_BUILD_ALGO::NN_DESCENT) &&
+      (params.metric != cuvs::distance::DistanceType::InnerProduct)) {
+    // NN Descent doesn't include self loops. Added to keep it consistent with brute force and ivfpq
+    raft::matrix::shift(handle, indices, 1);
+    if (distances.has_value()) {
+      raft::matrix::shift(handle, distances.value(), 1, std::make_optional<T>(0.0));
+    }
+  }
+
   if (core_distances.has_value()) {
     size_t k        = indices.extent(1);
     size_t num_rows = core_distances.value().size();
@@ -218,6 +252,15 @@ void build(
     using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>;
     auto dist_epilogue   = ReachabilityPP{core_distances.value().data_handle(), alpha, num_rows};
     single_build(handle, params, dataset, indices, distances, dist_epilogue);
+
+    if ((build_algo == GRAPH_BUILD_ALGO::NN_DESCENT) &&
+        (params.metric != cuvs::distance::DistanceType::InnerProduct)) {
+      raft::matrix::shift(handle, indices, 1);
+      raft::matrix::shift(handle,
+                          distances.value(),
+                          raft::make_device_matrix_view<const T, IdxT>(
+                            core_distances.value().data_handle(), num_rows, 1));
+    }
   }
 }
 }  // namespace cuvs::neighbors::all_neighbors::detail

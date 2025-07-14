@@ -30,7 +30,6 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/multi_gpu.hpp>
 #include <raft/matrix/sample_rows.cuh>
-#include <raft/matrix/shift.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <variant>
 
@@ -339,7 +338,7 @@ void multi_gpu_batch_build(const raft::resources& handle,
                            raft::managed_matrix_view<IdxT, IdxT> global_neighbors,
                            raft::managed_matrix_view<T, IdxT> global_distances,
                            raft::host_vector_view<IdxT, IdxT, row_major> cluster_sizes,
-                           raft::host_vector_view<IdxT, IdxT, row_major> cluster_offsets,
+                           raft::host_vector_view<const IdxT, IdxT, row_major> cluster_offsets_c,
                            raft::host_vector_view<IdxT, IdxT, row_major> inverted_indices,
                            DistEpilogueT dist_epilogue = DistEpilogueT{})
 {
@@ -352,10 +351,11 @@ void multi_gpu_batch_build(const raft::resources& handle,
   size_t clusters_per_rank = params.n_clusters / num_ranks;
   size_t rem               = params.n_clusters - clusters_per_rank * num_ranks;
 
-  std::vector<size_t> rank_offsets(num_ranks);
-  std::vector<size_t> num_data_per_rank(num_ranks);
-  std::vector<size_t> num_clusters_per_rank(num_ranks);
-  std::vector<size_t> base_cluster_indices(num_ranks);
+  auto cluster_offsets = raft::make_host_vector<IdxT, IdxT>(cluster_offsets_c.size());
+  raft::copy(cluster_offsets.data_handle(),
+             cluster_offsets_c.data_handle(),
+             cluster_offsets_c.size(),
+             raft::resource::get_cuda_stream(handle));
 
   using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>;
   const bool mutual_reach_dist = std::is_same_v<DistEpilogueT, ReachabilityPP>;
@@ -384,11 +384,6 @@ void multi_gpu_batch_build(const raft::resources& handle,
     }
 
     size_t rank_offset = cluster_offsets(base_cluster_idx);
-
-    rank_offsets[rank]          = rank_offset;
-    num_data_per_rank[rank]     = num_data_for_this_rank;
-    num_clusters_per_rank[rank] = num_clusters_for_this_rank;
-    base_cluster_indices[rank]  = base_cluster_idx;
 
     // remap offsets for each rank
     for (size_t p = 0; p < num_clusters_for_this_rank; p++) {
@@ -441,6 +436,20 @@ void multi_gpu_batch_build(const raft::resources& handle,
                            inverted_indices_for_this_rank);
   }
 }
+template <typename IdxT>
+struct BatchBuildAux {
+  raft::host_vector<IdxT, IdxT> cluster_sizes;
+  raft::host_vector<IdxT, IdxT> cluster_offsets;
+  raft::host_vector<IdxT, IdxT> inverted_indices;
+  bool is_computed = false;
+
+  BatchBuildAux(IdxT n_clusters, IdxT num_rows, IdxT overlap_factor)
+    : cluster_sizes(raft::make_host_vector<IdxT, IdxT>(n_clusters)),
+      cluster_offsets(raft::make_host_vector<IdxT, IdxT>(n_clusters)),
+      inverted_indices(raft::make_host_vector<IdxT, IdxT>(num_rows * overlap_factor))
+  {
+  }
+};
 
 template <typename T, typename IdxT, typename DistEpilogueT = raft::identity_op>
 void batch_build(
@@ -449,6 +458,7 @@ void batch_build(
   raft::host_matrix_view<const T, IdxT, row_major> dataset,
   raft::device_matrix_view<IdxT, IdxT, row_major> indices,
   std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances = std::nullopt,
+  BatchBuildAux<IdxT>* aux_vectors                                      = nullptr,
   DistEpilogueT dist_epilogue                                           = DistEpilogueT{})
 {
   // TODO: need to optimize for reuse of cluster_offsets, cluster_sizes, inverted_indices
@@ -465,22 +475,44 @@ void batch_build(
                "overlap_factor should be smaller than n_clusters. We recommend starting from "
                "overlap_factor=2 and gradually increase it for better knn graph recall.");
 
-  auto centroids = raft::make_device_matrix<T, IdxT>(handle, params.n_clusters, num_cols);
-  get_centroids_on_data_subsample<T, IdxT>(handle, params.metric, dataset, centroids.view());
+  std::optional<raft::host_vector<IdxT, IdxT>> local_inverted_indices;
+  std::optional<raft::host_vector<IdxT, IdxT>> local_cluster_sizes;
+  std::optional<raft::host_vector<IdxT, IdxT>> local_cluster_offsets;
 
-  auto global_nearest_cluster = raft::make_host_matrix<IdxT, IdxT>(num_rows, params.overlap_factor);
-  assign_clusters<T, IdxT>(
-    handle, params, dataset, centroids.view(), global_nearest_cluster.view());
+  auto inverted_indices_view =
+    aux_vectors != nullptr
+      ? aux_vectors->inverted_indices.view()
+      : local_inverted_indices
+          .emplace(raft::make_host_vector<IdxT, IdxT>(num_rows * params.overlap_factor))
+          .view();
 
-  auto inverted_indices =
-    raft::make_host_vector<IdxT, IdxT, raft::row_major>(num_rows * params.overlap_factor);
-  auto cluster_sizes   = raft::make_host_vector<IdxT, IdxT, raft::row_major>(params.n_clusters);
-  auto cluster_offsets = raft::make_host_vector<IdxT, IdxT, raft::row_major>(params.n_clusters);
-  get_inverted_indices(handle,
-                       global_nearest_cluster.view(),
-                       inverted_indices.view(),
-                       cluster_sizes.view(),
-                       cluster_offsets.view());
+  auto cluster_sizes_view =
+    aux_vectors != nullptr
+      ? aux_vectors->cluster_sizes.view()
+      : local_cluster_sizes.emplace(raft::make_host_vector<IdxT, IdxT>(params.n_clusters)).view();
+
+  auto cluster_offsets_view =
+    aux_vectors != nullptr
+      ? aux_vectors->cluster_offsets.view()
+      : local_cluster_offsets.emplace(raft::make_host_vector<IdxT, IdxT>(params.n_clusters)).view();
+
+  if (aux_vectors == nullptr || !aux_vectors->is_computed) {
+    // clustering step is only computed when needed
+    auto centroids = raft::make_device_matrix<T, IdxT>(handle, params.n_clusters, num_cols);
+    get_centroids_on_data_subsample<T, IdxT>(handle, params.metric, dataset, centroids.view());
+
+    auto global_nearest_cluster =
+      raft::make_host_matrix<IdxT, IdxT>(num_rows, params.overlap_factor);
+    assign_clusters<T, IdxT>(
+      handle, params, dataset, centroids.view(), global_nearest_cluster.view());
+
+    get_inverted_indices(handle,
+                         global_nearest_cluster.view(),
+                         inverted_indices_view,
+                         cluster_sizes_view,
+                         cluster_offsets_view);
+    if (aux_vectors != nullptr) { aux_vectors->is_computed = true; }
+  }
 
   auto global_neighbors = raft::make_managed_matrix<IdxT, IdxT>(handle, num_rows, k);
   auto global_distances = raft::make_managed_matrix<T, IdxT>(handle, num_rows, k);
@@ -493,13 +525,13 @@ void batch_build(
                           dataset,
                           global_neighbors.view(),
                           global_distances.view(),
-                          cluster_sizes.view(),
-                          cluster_offsets.view(),
-                          inverted_indices.view(),
+                          cluster_sizes_view,
+                          raft::make_const_mdspan(cluster_offsets_view),
+                          inverted_indices_view,
                           dist_epilogue);
   } else {
     size_t max_cluster_size, min_cluster_size;
-    get_min_max_cluster_size(k, max_cluster_size, min_cluster_size, cluster_sizes.view());
+    get_min_max_cluster_size(k, max_cluster_size, min_cluster_size, cluster_sizes_view);
     std::unique_ptr<all_neighbors_builder<T, IdxT>> knn_builder =
       get_knn_builder<T, IdxT>(handle,
                                params,
@@ -515,9 +547,9 @@ void batch_build(
                            params.n_clusters,
                            global_neighbors.view(),
                            global_distances.view(),
-                           cluster_sizes.view(),
-                           cluster_offsets.view(),
-                           inverted_indices.view());
+                           cluster_sizes_view,
+                           cluster_offsets_view,
+                           inverted_indices_view);
   }
 
   raft::copy(indices.data_handle(),

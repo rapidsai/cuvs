@@ -130,7 +130,6 @@ struct all_neighbors_params {
  * compute core_distances. If core_distances is given, the resulting indices and distances will be
  * mutual reachability space.
  * @param[in] alpha distance scaling parameter as used in robust single linkage.
- * @param[in] self_loop whether to include self loops in resulting knn graph
  */
 void build(
   const raft::resources& handle,
@@ -167,7 +166,6 @@ void build(
  * compute core_distances. If core_distances is given, the resulting indices and distances will be
  * mutual reachability space.
  * @param[in] alpha distance scaling parameter as used in robust single linkage.
- * @param[in] self_loop whether to include self loops in resulting knn graph
  */
 void build(
   const raft::resources& handle,

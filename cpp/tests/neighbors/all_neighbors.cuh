@@ -130,7 +130,7 @@ void get_graphs(raft::resources& handle,
         ps.n_rows,
         core_dists_dev.data(),
         raft::resource::get_cuda_stream(handle));
-      raft::print_device_vector("core dist in bf", core_dists_dev.data(), 10, std::cout);
+
       auto epilogue =
         cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, DistanceT>{
           core_dists_dev.data(), 1.0, static_cast<size_t>(ps.n_rows)};
