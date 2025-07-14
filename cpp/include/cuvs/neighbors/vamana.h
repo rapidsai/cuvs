@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * Copyright (c) 2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ extern "C" {
 #endif
 
 /**
- * @defgroup vamana_c_index_params C API for Vamana/DiskANN Graph-based nearest neighbor search
+ * @defgroup vamana_c_index_params C API for Vamana index build
  * @{
  */
 
@@ -103,6 +103,7 @@ cuvsError_t cuvsVamanaIndexParamsDestroy(cuvsVamanaIndexParams_t params);
 typedef struct {
   uintptr_t addr;
   DLDataType dtype;
+
 } cuvsVamanaIndex;
 
 typedef cuvsVamanaIndex* cuvsVamanaIndex_t;
@@ -153,7 +154,7 @@ cuvsError_t cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim);
  * to improve graph quality. The index_params struct controls the degree of the final graph.
  *
  * The following distance metrics are supported:
- * - L2Expanded
+ * - L2
  *
  * Usage example:
  * @code{.c}
