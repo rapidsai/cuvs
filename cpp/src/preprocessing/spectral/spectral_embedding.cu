@@ -142,10 +142,9 @@ void transform(raft::resources const& handle,
     spectral_embedding_config.norm_laplacian
       ? raft::sparse::linalg::laplacian_normalized(handle, csr_matrix_view, diagonal.view())
       : raft::sparse::linalg::compute_graph_laplacian(handle, csr_matrix_view);
-  auto laplacian_structure = laplacian.structure_view();
 
   auto laplacian_elements_view = raft::make_device_vector_view<float, int>(
-    laplacian.get_elements().data(), laplacian_structure.get_nnz());
+    laplacian.get_elements().data(), laplacian.structure_view().get_nnz());
 
   raft::linalg::unary_op(handle,
                          raft::make_const_mdspan(laplacian_elements_view),
@@ -155,22 +154,21 @@ void transform(raft::resources const& handle,
   auto config           = raft::sparse::solver::lanczos_solver_config<float>();
   config.n_components   = spectral_embedding_config.n_components;
   config.max_iterations = 1000;
-  config.ncv =
-    std::min(laplacian_structure.get_n_rows(), std::max(2 * config.n_components + 1, 20));
-  config.tolerance = 1e-5;
-  config.which     = raft::sparse::solver::LANCZOS_WHICH::LA;
-  config.seed      = spectral_embedding_config.seed;
+  config.ncv            = std::min(n_samples, std::max(2 * config.n_components + 1, 20));
+  config.tolerance      = 1e-5;
+  config.which          = raft::sparse::solver::LANCZOS_WHICH::LA;
+  config.seed           = spectral_embedding_config.seed;
 
   auto eigenvalues =
     raft::make_device_vector<float, int, raft::col_major>(handle, config.n_components);
-  auto eigenvectors = raft::make_device_matrix<float, int, raft::col_major>(
-    handle, laplacian_structure.get_n_rows(), config.n_components);
+  auto eigenvectors =
+    raft::make_device_matrix<float, int, raft::col_major>(handle, n_samples, config.n_components);
 
   raft::sparse::solver::lanczos_compute_smallest_eigenvectors<int, float>(
     handle,
     config,
     raft::make_device_csr_matrix_view<float, int, int, int>(laplacian.get_elements().data(),
-                                                            laplacian_structure),
+                                                            laplacian.structure_view()),
     std::nullopt,
     eigenvalues.view(),
     eigenvectors.view());
