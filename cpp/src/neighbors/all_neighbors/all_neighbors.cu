@@ -25,11 +25,10 @@ namespace cuvs::neighbors::all_neighbors {
              raft::device_matrix_view<IdxT, IdxT, row_major> indices,                    \
              std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances,      \
              std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances, \
-             T alpha,                                                                    \
-             bool self_loop)                                                             \
+             T alpha)                                                                    \
   {                                                                                      \
     return all_neighbors::detail::build<T, IdxT>(                                        \
-      handle, params, dataset, indices, distances, core_distances, alpha, self_loop);    \
+      handle, params, dataset, indices, distances, core_distances, alpha);               \
   }                                                                                      \
                                                                                          \
   void build(const raft::resources& handle,                                              \
@@ -38,11 +37,10 @@ namespace cuvs::neighbors::all_neighbors {
              raft::device_matrix_view<IdxT, IdxT, row_major> indices,                    \
              std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances,      \
              std::optional<raft::device_vector_view<T, IdxT, row_major>> core_distances, \
-             T alpha,                                                                    \
-             bool self_loop)                                                             \
+             T alpha)                                                                    \
   {                                                                                      \
     return all_neighbors::detail::build<T, IdxT>(                                        \
-      handle, params, dataset, indices, distances, core_distances, alpha, self_loop);    \
+      handle, params, dataset, indices, distances, core_distances, alpha);               \
   }
 
 CUVS_INST_ALL_NEIGHBORS(float, int64_t);

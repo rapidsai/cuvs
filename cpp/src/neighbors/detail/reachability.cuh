@@ -33,7 +33,6 @@
 
 namespace cuvs::neighbors::detail::reachability {
 
-using namespace cuvs::neighbors;
 /**
  * Extract core distances from KNN graph. This is essentially
  * performing a knn_dists[:,min_pts]

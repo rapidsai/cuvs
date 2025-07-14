@@ -390,7 +390,6 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
       bool return_distances      = true;
       size_t num_data_in_cluster = dataset.extent(0);
       if constexpr (std::is_same_v<DistEpilogueT, ReachabilityPP>) {
-        // std::cout << "building here\n";
         // gather core dists
         raft::copy(this->inverted_indices_d.value().data_handle(),
                    inverted_indices.value().data_handle(),
@@ -545,39 +544,19 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
       "build_knn if doing batching.");
 
     if (this->n_clusters > 1) {
-      size_t num_data_in_cluster = dataset.extent(0);
-      if constexpr (std::is_same_v<DistEpilogueT, raft::identity_op>) {
-        auto idx = cuvs::neighbors::brute_force::build(this->res, bf_params.build_params, dataset);
+      auto idx = cuvs::neighbors::brute_force::build(this->res, bf_params.build_params, dataset);
 
-        cuvs::neighbors::brute_force::search(
-          this->res,
-          bf_params.search_params,
-          idx,
-          dataset,
-          raft::make_device_matrix_view<IdxT, IdxT>(
-            this->batch_neighbors_d.value().data_handle(), num_data_in_cluster, this->k),
-          raft::make_device_matrix_view<T, IdxT>(
-            this->batch_distances_d.value().data_handle(), num_data_in_cluster, this->k));
-      } else {  // special distance epilogue
-        cuvs::neighbors::detail::tiled_brute_force_knn<T, IdxT, T, DistEpilogueT>(
-          this->res,
-          dataset.data_handle(),
-          dataset.data_handle(),
-          dataset.extent(0),
-          dataset.extent(0),
-          dataset.extent(1),
-          this->k,
-          this->batch_distances_d.value().data_handle(),
-          this->batch_neighbors_d.value().data_handle(),
-          bf_params.build_params.metric,
-          2.0,
-          0,
-          0,
-          nullptr,
-          nullptr,
-          nullptr,
-          dist_epilogue);
-      }
+      size_t num_data_in_cluster = dataset.extent(0);
+
+      cuvs::neighbors::brute_force::search(
+        this->res,
+        bf_params.search_params,
+        idx,
+        dataset,
+        raft::make_device_matrix_view<IdxT, IdxT>(
+          this->batch_neighbors_d.value().data_handle(), num_data_in_cluster, this->k),
+        raft::make_device_matrix_view<T, IdxT>(
+          this->batch_distances_d.value().data_handle(), num_data_in_cluster, this->k));
 
       raft::copy(this->batch_neighbors_h.value().data_handle(),
                  this->batch_neighbors_d.value().data_handle(),
