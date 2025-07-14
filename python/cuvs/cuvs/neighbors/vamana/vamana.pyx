@@ -37,10 +37,7 @@ from pylibraft.common.interruptible import cuda_interruptible
 from cuvs.distance import DISTANCE_NAMES, DISTANCE_TYPES
 from cuvs.neighbors.common import _check_input_array
 
-from libc.stdint cimport (
-    uint32_t,
-    uintptr_t,
-)
+from libc.stdint cimport uint32_t, uintptr_t
 
 from cuvs.common.exceptions import check_cuvs
 
@@ -281,4 +278,4 @@ def save(filename, Index index, bool include_dataset=True, resources=None):
 
 # Note: Vamana index currently only supports build and serialize operations.
 # Search functionality is not yet implemented in cuVS and should be performed
-# using the DiskANN library with the serialized index. 
+# using the DiskANN library with the serialized index.

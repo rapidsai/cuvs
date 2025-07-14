@@ -177,9 +177,9 @@ cuvsError_t cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim);
  * @return cuvsError_t
  */
 cuvsError_t cuvsVamanaBuild(cuvsResources_t res,
-                           cuvsVamanaIndexParams_t params,
-                           DLManagedTensor* dataset,
-                           cuvsVamanaIndex_t index);
+                            cuvsVamanaIndexParams_t params,
+                            DLManagedTensor* dataset,
+                            cuvsVamanaIndex_t index);
 
 /**
  * @}
@@ -196,7 +196,7 @@ cuvsError_t cuvsVamanaBuild(cuvsResources_t res,
  * Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility.
  *
  * Serialized Index is to be used by the DiskANN open-source repository for graph search.
- * 
+ *
  * @code{.c}
  *   // Create cuvsResources_t
  *   cuvsResources_t res;
@@ -213,9 +213,9 @@ cuvsError_t cuvsVamanaBuild(cuvsResources_t res,
  * @return cuvsError_t
  */
 cuvsError_t cuvsVamanaSerialize(cuvsResources_t res,
-                               const char* filename,
-                               cuvsVamanaIndex_t index,
-                               bool include_dataset);
+                                const char* filename,
+                                cuvsVamanaIndex_t index,
+                                bool include_dataset);
 
 /**
  * @}
@@ -223,4 +223,4 @@ cuvsError_t cuvsVamanaSerialize(cuvsResources_t res,
 
 #ifdef __cplusplus
 }
-#endif 
+#endif

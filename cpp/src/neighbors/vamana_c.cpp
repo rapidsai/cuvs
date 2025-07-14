@@ -24,9 +24,9 @@
 #include <cuvs/core/c_api.h>
 #include <cuvs/core/exceptions.hpp>
 #include <cuvs/core/interop.hpp>
+#include <cuvs/neighbors/common.h>
 #include <cuvs/neighbors/vamana.h>
 #include <cuvs/neighbors/vamana.hpp>
-#include <cuvs/neighbors/common.h>
 
 namespace {
 
@@ -40,20 +40,20 @@ void _build(cuvsResources_t res,
 
   auto dataset = cuvs::core::from_dlpack<T>(dataset_tensor);
   cuvs::neighbors::vamana::index_params index_params;
-  index_params.metric = static_cast<cuvs::distance::DistanceType>((int)params->metric);
-  index_params.graph_degree = params->graph_degree;
-  index_params.visited_size = params->visited_size;
-  index_params.vamana_iters = params->vamana_iters;
-  index_params.alpha = params->alpha;
-  index_params.max_fraction = params->max_fraction;
-  index_params.batch_base = params->batch_base;
-  index_params.queue_size = params->queue_size;
+  index_params.metric            = static_cast<cuvs::distance::DistanceType>((int)params->metric);
+  index_params.graph_degree      = params->graph_degree;
+  index_params.visited_size      = params->visited_size;
+  index_params.vamana_iters      = params->vamana_iters;
+  index_params.alpha             = params->alpha;
+  index_params.max_fraction      = params->max_fraction;
+  index_params.batch_base        = params->batch_base;
+  index_params.queue_size        = params->queue_size;
   index_params.reverse_batchsize = params->reverse_batchsize;
 
   auto index_ptr = new cuvs::neighbors::vamana::index<T, uint32_t>(
     std::move(cuvs::neighbors::vamana::build(*res_ptr, index_params, dataset)));
 
-  index->addr = reinterpret_cast<uintptr_t>(index_ptr);
+  index->addr  = reinterpret_cast<uintptr_t>(index_ptr);
   index->dtype = dataset_tensor->dl_tensor.dtype;
 }
 
@@ -63,7 +63,7 @@ void _serialize(cuvsResources_t res,
                 cuvsVamanaIndex_t index,
                 bool include_dataset)
 {
-  auto res_ptr = reinterpret_cast<raft::resources*>(res);
+  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
   auto index_ptr = reinterpret_cast<cuvs::neighbors::vamana::index<T, uint32_t>*>(index->addr);
 
   cuvs::neighbors::vamana::serialize(*res_ptr, std::string(filename), *index_ptr, include_dataset);
@@ -74,8 +74,8 @@ void _serialize(cuvsResources_t res,
 extern "C" cuvsError_t cuvsVamanaIndexCreate(cuvsVamanaIndex_t* index)
 {
   return cuvs::core::translate_exceptions([=] {
-    *index = new cuvsVamanaIndex{};
-    (*index)->addr = 0;
+    *index          = new cuvsVamanaIndex{};
+    (*index)->addr  = 0;
     (*index)->dtype = {};
   });
 }
@@ -103,22 +103,25 @@ extern "C" cuvsError_t cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim)
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
-      auto index_ptr = reinterpret_cast<cuvs::neighbors::vamana::index<float, uint32_t>*>(index->addr);
+      auto index_ptr =
+        reinterpret_cast<cuvs::neighbors::vamana::index<float, uint32_t>*>(index->addr);
       *dim = index_ptr->dim();
     } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
-      auto index_ptr = reinterpret_cast<cuvs::neighbors::vamana::index<int8_t, uint32_t>*>(index->addr);
+      auto index_ptr =
+        reinterpret_cast<cuvs::neighbors::vamana::index<int8_t, uint32_t>*>(index->addr);
       *dim = index_ptr->dim();
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
-      auto index_ptr = reinterpret_cast<cuvs::neighbors::vamana::index<uint8_t, uint32_t>*>(index->addr);
+      auto index_ptr =
+        reinterpret_cast<cuvs::neighbors::vamana::index<uint8_t, uint32_t>*>(index->addr);
       *dim = index_ptr->dim();
     }
   });
 }
 
 extern "C" cuvsError_t cuvsVamanaBuild(cuvsResources_t res,
-                                      cuvsVamanaIndexParams_t params,
-                                      DLManagedTensor* dataset_tensor,
-                                      cuvsVamanaIndex_t index)
+                                       cuvsVamanaIndexParams_t params,
+                                       DLManagedTensor* dataset_tensor,
+                                       cuvsVamanaIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
@@ -138,9 +141,9 @@ extern "C" cuvsError_t cuvsVamanaBuild(cuvsResources_t res,
 }
 
 extern "C" cuvsError_t cuvsVamanaSerialize(cuvsResources_t res,
-                                          const char* filename,
-                                          cuvsVamanaIndex_t index,
-                                          bool include_dataset)
+                                           const char* filename,
+                                           cuvsVamanaIndex_t index,
+                                           bool include_dataset)
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
@@ -150,9 +153,8 @@ extern "C" cuvsError_t cuvsVamanaSerialize(cuvsResources_t res,
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
       _serialize<uint8_t>(res, filename, index, include_dataset);
     } else {
-      RAFT_FAIL("Unsupported index DLtensor dtype: %d and bits: %d",
-                index->dtype.code,
-                index->dtype.bits);
+      RAFT_FAIL(
+        "Unsupported index DLtensor dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
     }
   });
 }
@@ -160,22 +162,20 @@ extern "C" cuvsError_t cuvsVamanaSerialize(cuvsResources_t res,
 extern "C" cuvsError_t cuvsVamanaIndexParamsCreate(cuvsVamanaIndexParams_t* params)
 {
   return cuvs::core::translate_exceptions([=] {
-    *params = new cuvsVamanaIndexParams{};
-    (*params)->metric = L2Expanded;
-    (*params)->graph_degree = 32;
-    (*params)->visited_size = 64;
-    (*params)->vamana_iters = 1;
-    (*params)->alpha = 1.2f;
-    (*params)->max_fraction = 0.06f;
-    (*params)->batch_base = 2.0f;
-    (*params)->queue_size = 127;
+    *params                      = new cuvsVamanaIndexParams{};
+    (*params)->metric            = L2Expanded;
+    (*params)->graph_degree      = 32;
+    (*params)->visited_size      = 64;
+    (*params)->vamana_iters      = 1;
+    (*params)->alpha             = 1.2f;
+    (*params)->max_fraction      = 0.06f;
+    (*params)->batch_base        = 2.0f;
+    (*params)->queue_size        = 127;
     (*params)->reverse_batchsize = 1000000;
   });
 }
 
 extern "C" cuvsError_t cuvsVamanaIndexParamsDestroy(cuvsVamanaIndexParams_t params)
 {
-  return cuvs::core::translate_exceptions([=] {
-    delete params;
-  });
-} 
+  return cuvs::core::translate_exceptions([=] { delete params; });
+}

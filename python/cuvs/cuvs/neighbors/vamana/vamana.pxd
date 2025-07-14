@@ -15,11 +15,7 @@
 #
 # cython: language_level=3
 
-from libc.stdint cimport (
-    int32_t,
-    uint32_t,
-    uintptr_t,
-)
+from libc.stdint cimport int32_t, uint32_t, uintptr_t
 from libcpp cimport bool
 
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
@@ -77,4 +73,4 @@ cdef class Index:
 
     cdef cuvsVamanaIndex_t index
     cdef bool trained
-    cdef str active_index_type 
+    cdef str active_index_type

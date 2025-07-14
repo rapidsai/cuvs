@@ -13,16 +13,11 @@
 # limitations under the License.
 
 
-from .vamana import (
-    Index,
-    IndexParams,
-    build,
-    save,
-)
+from .vamana import Index, IndexParams, build, save
 
 __all__ = [
     "Index",
     "IndexParams",
     "build",
     "save",
-] 
+]
