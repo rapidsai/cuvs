@@ -83,8 +83,6 @@ void transform(raft::resources const& handle,
   // set all distances to 1.0f (connectivity KNN graph)
   raft::matrix::fill(handle, raft::make_device_vector_view(d_distances.data_handle(), nnz), 1.0f);
 
-  auto reduction_op = [] __device__(int row, int col, float a, float b) { return 0.5f * (a + b); };
-
   auto coo_structure_view = raft::make_device_coordinate_structure_view<int, int, int>(
     knn_rows.data_handle(), knn_cols.data_handle(), n_samples, n_samples, nnz);
   auto coo_matrix_view = raft::make_device_coo_matrix_view<const float, int, int, int>(
@@ -93,7 +91,9 @@ void transform(raft::resources const& handle,
   auto sym_coo1_matrix =
     raft::make_device_coo_matrix<float, int, int, int>(handle, n_samples, n_samples);
   raft::sparse::linalg::coo_symmetrize<128, float, int, int>(
-    handle, coo_matrix_view, sym_coo1_matrix, reduction_op);
+    handle, coo_matrix_view, sym_coo1_matrix, [] __device__(int row, int col, float a, float b) {
+      return 0.5f * (a + b);
+    });
 
   auto sym_coo1_structure = sym_coo1_matrix.structure_view();
   auto sym_coo1_n_rows    = sym_coo1_structure.get_n_rows();
