@@ -5,6 +5,7 @@ channels:
 - rapidsai-nightly
 - conda-forge
 dependencies:
+- _go_select *=cgo
 - breathe>=4.35.0
 - c-compiler
 - clang-tools==20.1.4
@@ -22,7 +23,7 @@ dependencies:
 - dlpack>=0.8,<1.0
 - doxygen>=1.8.20
 - gcc_linux-64=13.*
-- go==1.24.4
+- go
 - graphviz
 - ipython
 - libclang==20.1.4
