@@ -15,7 +15,6 @@
  */
 package com.nvidia.cuvs;
 
-import com.nvidia.cuvs.BruteForceIndex.Builder;
 import com.nvidia.cuvs.spi.CuVSProvider;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -142,13 +141,6 @@ public interface CagraIndex {
    *                     value is 1024
    */
   void serializeToHNSW(OutputStream outputStream, Path tempFile, int bufferLength) throws Throwable;
-
-  /**
-   * Gets an instance of {@link CagraIndexParams}
-   *
-   * @return an instance of {@link CagraIndexParams}
-   */
-  CagraIndexParams getCagraIndexParameters();
 
   /**
    * Gets an instance of {@link CuVSResources}

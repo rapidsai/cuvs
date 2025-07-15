@@ -21,6 +21,7 @@ import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
 import com.nvidia.cuvs.TieredIndex;
+import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
 
 /**
@@ -59,7 +60,17 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
-  public Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException {
+  public Dataset.Builder newDatasetBuilder(int size, int dimensions) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public MethodHandle newNativeDatasetBuilder() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Dataset newArrayDataset(float[][] vectors) {
     throw new UnsupportedOperationException();
   }
 }
