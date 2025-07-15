@@ -39,9 +39,8 @@ public class CuVSResourcesImpl implements CuVSResources {
   /**
    * Constructor that allocates the resources needed for cuVS
    *
-   * @throws Throwable exception thrown when native function is invoked
    */
-  public CuVSResourcesImpl(Path tempDirectory) throws Throwable {
+  public CuVSResourcesImpl(Path tempDirectory) {
     this.tempDirectory = tempDirectory;
     this.arena = Arena.ofShared();
     try (var localArena = Arena.ofConfined()) {

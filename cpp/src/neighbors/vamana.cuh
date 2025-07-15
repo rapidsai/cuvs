@@ -17,6 +17,7 @@
 #pragma once
 
 #include "detail/vamana/vamana_build.cuh"
+#include "detail/vamana/vamana_codebooks.cuh"
 #include "detail/vamana/vamana_serialize.cuh"
 
 #include <raft/core/device_mdspan.hpp>
@@ -94,6 +95,13 @@ void serialize(raft::resources const& res,
                const index<T, IdxT>& index_)
 {
   cuvs::neighbors::vamana::detail::serialize<T, IdxT>(res, file_prefix, index_);
+}
+
+template <typename T>
+index_params::codebook_params<T> deserialize_codebooks(const std::string& codebook_prefix,
+                                                       const int dim)
+{
+  return cuvs::neighbors::vamana::detail::deserialize_codebooks<T>(codebook_prefix, dim);
 }
 
 /** @} */  // end group vamana
