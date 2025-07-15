@@ -20,6 +20,7 @@
 #include "cutlass.cuh"
 
 // The distance operations:
+#include "../distance_ops/bitwise_hamming.cuh"
 #include "../distance_ops/canberra.cuh"
 #include "../distance_ops/correlation.cuh"
 #include "../distance_ops/cosine.cuh"

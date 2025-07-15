@@ -271,6 +271,9 @@ void pairwise_distance(raft::resources const& handle,
     case DistanceType::HammingUnexpanded:
       dispatch(std::integral_constant<DistanceType, DistanceType::HammingUnexpanded>{});
       break;
+    case DistanceType::BitwiseHamming:
+      dispatch(std::integral_constant<DistanceType, DistanceType::BitwiseHamming>{});
+      break;
     case DistanceType::HellingerExpanded:
       dispatch(std::integral_constant<DistanceType, DistanceType::HellingerExpanded>{});
       break;

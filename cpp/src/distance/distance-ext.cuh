@@ -224,6 +224,13 @@ instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::Canberr
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::CorrelationExpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::CosineExpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::HammingUnexpanded);
+// BitwiseHamming with integer types
+instantiate_cuvs_distance_distance(
+  cuvs::distance::DistanceType::BitwiseHamming, uint8_t, uint32_t, uint32_t, int);
+instantiate_cuvs_distance_distance(
+  cuvs::distance::DistanceType::BitwiseHamming, uint32_t, uint32_t, uint32_t, int);
+instantiate_cuvs_distance_distance(
+  cuvs::distance::DistanceType::BitwiseHamming, uint64_t, uint64_t, uint64_t, int);
 
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::HellingerExpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::InnerProduct);

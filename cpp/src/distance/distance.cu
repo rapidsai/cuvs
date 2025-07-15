@@ -89,6 +89,31 @@ instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::Canberr
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::CorrelationExpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::CosineExpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::HammingUnexpanded);
+// BitwiseHamming with integer types
+#define instantiate_cuvs_distance_distance_bitwise_hamming(DataT, AccT, OutT, IdxT)            \
+  template void cuvs::distance::detail::distance<cuvs::distance::DistanceType::BitwiseHamming, \
+                                                 DataT,                                        \
+                                                 AccT,                                         \
+                                                 OutT,                                         \
+                                                 raft::identity_op,                            \
+                                                 IdxT>(raft::resources const&,                 \
+                                                       DataT const*,                           \
+                                                       DataT const*,                           \
+                                                       OutT*,                                  \
+                                                       IdxT,                                   \
+                                                       IdxT,                                   \
+                                                       IdxT,                                   \
+                                                       void*,                                  \
+                                                       size_t,                                 \
+                                                       raft::identity_op,                      \
+                                                       bool,                                   \
+                                                       OutT);
+
+instantiate_cuvs_distance_distance_bitwise_hamming(uint8_t, uint32_t, uint32_t, int);
+instantiate_cuvs_distance_distance_bitwise_hamming(uint32_t, uint32_t, uint32_t, int);
+instantiate_cuvs_distance_distance_bitwise_hamming(uint64_t, uint64_t, uint64_t, int);
+
+#undef instantiate_cuvs_distance_distance_bitwise_hamming
 
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::HellingerExpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::InnerProduct);

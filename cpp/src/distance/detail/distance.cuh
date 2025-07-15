@@ -267,6 +267,32 @@ void distance_impl(raft::resources const& handle,
 
 template <typename DataT, typename AccT, typename OutT, typename FinOpT, typename IdxT = int>
 void distance_impl(raft::resources const& handle,
+                   distance_tag<DistanceType::BitwiseHamming> distance_type,
+                   const DataT* x,
+                   const DataT* y,
+                   OutT* out,
+                   IdxT m,
+                   IdxT n,
+                   IdxT k,
+                   AccT*,   // workspace unused
+                   size_t,  // worksize unused
+                   FinOpT fin_op,
+                   bool is_row_major,
+                   DataT)  // metric_arg unused
+{
+  ops::bitwise_hamming_distance_op<DataT, AccT, IdxT> distance_op{};
+
+  const OutT* x_norm = nullptr;
+  const OutT* y_norm = nullptr;
+
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+
+  pairwise_matrix_dispatch<decltype(distance_op), DataT, AccT, OutT, FinOpT, IdxT>(
+    distance_op, m, n, k, x, y, x_norm, y_norm, out, fin_op, stream, is_row_major);
+}
+
+template <typename DataT, typename AccT, typename OutT, typename FinOpT, typename IdxT = int>
+void distance_impl(raft::resources const& handle,
                    distance_tag<DistanceType::InnerProduct> distance_type,
                    const DataT* x,
                    const DataT* y,
