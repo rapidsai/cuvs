@@ -15,19 +15,23 @@
  */
 package com.nvidia.cuvs.internal;
 
-import com.nvidia.cuvs.internal.common.SearchResultsImpl;
+import com.nvidia.cuvs.SearchResults;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SequenceLayout;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.LongToIntFunction;
 
-/**
- * Implementation of SearchResults for TieredIndex
- */
-class TieredSearchResultsImpl extends SearchResultsImpl {
+class TieredSearchResultsImpl implements SearchResults {
+  private final SequenceLayout neighboursSequenceLayout;
+  private final SequenceLayout distancesSequenceLayout;
+  private final MemorySegment neighboursMemorySegment;
+  private final MemorySegment distancesMemorySegment;
+  private final int topK;
+  private final List<Integer> mapping;
+  private final long numberOfQueries;
 
-  protected TieredSearchResultsImpl(
+  TieredSearchResultsImpl(
       SequenceLayout neighboursSequenceLayout,
       SequenceLayout distancesSequenceLayout,
       MemorySegment neighboursMemorySegment,
@@ -35,38 +39,28 @@ class TieredSearchResultsImpl extends SearchResultsImpl {
       int topK,
       List<Integer> mapping,
       long numberOfQueries) {
-    super(
-        neighboursSequenceLayout,
-        distancesSequenceLayout,
-        neighboursMemorySegment,
-        distancesMemorySegment,
-        topK,
-        mapping,
-        numberOfQueries);
-    readResultMemorySegments();
+    this.neighboursSequenceLayout = neighboursSequenceLayout;
+    this.distancesSequenceLayout = distancesSequenceLayout;
+    this.neighboursMemorySegment = neighboursMemorySegment;
+    this.distancesMemorySegment = distancesMemorySegment;
+    this.topK = topK;
+    this.mapping = mapping;
+    this.numberOfQueries = numberOfQueries;
   }
 
-  /**
-   * Reads neighbors and distances {@link MemorySegment} and loads the values
-   * internally into the results structure.
-   */
   @Override
-  protected void readResultMemorySegments() {
-    Map<Integer, Float> intermediateResultMap = new LinkedHashMap<Integer, Float>();
-    int count = 0;
-    for (long i = 0; i < topK * numberOfQueries; i++) {
-      long neighborIdLong = (long) neighboursVarHandle.get(neighboursMemorySegment, 0L, i);
-      float dst = (float) distancesVarHandle.get(distancesMemorySegment, 0L, i);
-      if (neighborIdLong != -1L && neighborIdLong != Long.MAX_VALUE) {
-        int id = (int) neighborIdLong;
-        intermediateResultMap.put(mapping != null ? mapping.get(id) : id, dst);
-      }
-      count++;
-      if (count == topK) {
-        results.add(intermediateResultMap);
-        intermediateResultMap = new LinkedHashMap<Integer, Float>();
-        count = 0;
-      }
-    }
+  public List<Map<Integer, Float>> getResults() {
+    // Use SearchResultsImpl.create to convert the memory segments to results
+    LongToIntFunction mappingFunction = mapping != null ? (long id) -> mapping.get((int) id) : null;
+
+    return SearchResultsImpl.create(
+            neighboursSequenceLayout,
+            distancesSequenceLayout,
+            neighboursMemorySegment,
+            distancesMemorySegment,
+            topK,
+            mappingFunction,
+            numberOfQueries)
+        .getResults();
   }
 }

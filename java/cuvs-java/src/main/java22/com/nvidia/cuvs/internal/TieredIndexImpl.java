@@ -31,7 +31,6 @@ import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemcpy;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMAlloc;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsTieredIndexBuild;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsTieredIndexCreate;
@@ -133,7 +132,7 @@ public class TieredIndexImpl implements TieredIndex {
     } finally {
       destroyed = true;
     }
-    if (dataset != null) dataset.close();
+    // if (dataset != null) dataset.close();
   }
 
   /**
@@ -157,11 +156,11 @@ public class TieredIndexImpl implements TieredIndex {
       // Get host data
       MemorySegment hostDataSeg =
           dataset != null
-              ? ((DatasetImpl) dataset).seg
+              ? ((DatasetImpl) dataset).asMemorySegment()
               : Util.buildMemorySegment(resources.getArena(), vectors);
 
       Arena arena = resources.getArena();
-      long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
+      long cuvsRes = resources.getHandle();
 
       // TieredIndex REQUIRES device memory - allocate it
       MemorySegment datasetD = localArena.allocate(C_POINTER);
@@ -223,16 +222,15 @@ public class TieredIndexImpl implements TieredIndex {
       int vectorDimension = numQueries > 0 ? query.getQueryVectors()[0].length : 0;
       Arena arena = resources.getArena();
 
-      // Allocate HOST memory for results
       SequenceLayout neighborsLayout = MemoryLayout.sequenceLayout(numBlocks, C_LONG);
       SequenceLayout distancesLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
-      MemorySegment neighborsSeg = localArena.allocate(neighborsLayout);
-      MemorySegment distancesSeg = localArena.allocate(distancesLayout);
+      MemorySegment neighborsSeg = arena.allocate(neighborsLayout);
+      MemorySegment distancesSeg = arena.allocate(distancesLayout);
 
       // Get host query data
       MemorySegment hostQueriesSeg = Util.buildMemorySegment(localArena, query.getQueryVectors());
 
-      long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
+      long cuvsRes = resources.getHandle();
 
       // Allocate DEVICE memory for all data
       MemorySegment queriesD = localArena.allocate(C_POINTER);
@@ -372,11 +370,11 @@ public class TieredIndexImpl implements TieredIndex {
       // Get host data
       MemorySegment hostDataSeg =
           extendDataset != null
-              ? ((DatasetImpl) extendDataset).seg
+              ? ((DatasetImpl) extendDataset).asMemorySegment()
               : Util.buildMemorySegment(localArena, extendVectors);
 
       Arena arena = resources.getArena();
-      long cuvsRes = resources.getMemorySegment().get(cuvsResources_t, 0);
+      long cuvsRes = resources.getHandle();
 
       // Allocate device memory for extend data
       MemorySegment datasetD = localArena.allocate(C_POINTER);
