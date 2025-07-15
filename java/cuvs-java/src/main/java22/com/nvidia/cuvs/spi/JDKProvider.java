@@ -32,11 +32,31 @@ import com.nvidia.cuvs.internal.common.Util;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 
 final class JDKProvider implements CuVSProvider {
+
+  private static final MethodHandle createNativeDataset$mh = createNativeDatasetBuilder();
+
+  static MethodHandle createNativeDatasetBuilder() {
+    try {
+      var lookup = MethodHandles.lookup();
+      var mt = MethodType.methodType(Dataset.class, MemorySegment.class, int.class, int.class);
+      return lookup.findStatic(JDKProvider.class, "createNativeDataset", mt);
+    } catch (NoSuchMethodException | IllegalAccessException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static Dataset createNativeDataset(
+      MemorySegment memorySegment, int size, int dimensions) {
+    return new DatasetImpl(null, memorySegment, size, dimensions);
+  }
 
   @Override
   public CuVSResources newCuVSResources(Path tempDirectory) throws Throwable {
@@ -105,6 +125,11 @@ final class JDKProvider implements CuVSProvider {
         return new DatasetImpl(arena, seg, size, dimensions);
       }
     };
+  }
+
+  @Override
+  public MethodHandle newNativeDatasetBuilder() {
+    return createNativeDataset$mh;
   }
 
   @Override

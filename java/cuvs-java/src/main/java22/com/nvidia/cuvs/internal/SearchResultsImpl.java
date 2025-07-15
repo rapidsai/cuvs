@@ -25,18 +25,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.LongToIntFunction;
 
-/**
- * SearchResult encapsulates the logic for reading and holding search results.
- *
- * @since 25.02
- */
-class CagraSearchResults {
+class SearchResultsImpl implements SearchResults {
+
+  private final List<Map<Integer, Float>> results;
+
+  SearchResultsImpl(List<Map<Integer, Float>> results) {
+    this.results = results;
+  }
 
   /**
    * Factory method to create an on-heap SearchResults (backed by standard Java data types and containers) from
    * native/off-heap memory data structures.
-   * This class provides its own implementation for reading from native memory instead of reling on
-   * {@link SearchResultsImpl#create} because it requires special handling of neighbours IDs.
    */
   static SearchResults create(
       SequenceLayout neighboursSequenceLayout,
@@ -46,7 +45,6 @@ class CagraSearchResults {
       int topK,
       LongToIntFunction mapping,
       long numberOfQueries) {
-
     List<Map<Integer, Float>> results = new LinkedList<>();
     Map<Integer, Float> intermediateResultMap = new LinkedHashMap<>();
     var neighboursVarHandle =
@@ -56,11 +54,9 @@ class CagraSearchResults {
 
     int count = 0;
     for (long i = 0; i < topK * numberOfQueries; i++) {
-      long id = (long) neighboursVarHandle.get(neighboursMemorySegment, 0, i);
+      long id = (long) neighboursVarHandle.get(neighboursMemorySegment, 0L, i);
       float dst = (float) distancesVarHandle.get(distancesMemorySegment, 0L, i);
-      if (id != Integer.MAX_VALUE) {
-        intermediateResultMap.put(mapping.applyAsInt(id), dst);
-      }
+      intermediateResultMap.put(mapping != null ? mapping.applyAsInt((int) id) : (int) id, dst);
       count += 1;
       if (count == topK) {
         results.add(intermediateResultMap);
@@ -68,6 +64,17 @@ class CagraSearchResults {
         count = 0;
       }
     }
+
     return new SearchResultsImpl(results);
+  }
+
+  /**
+   * Gets a list results as a map of neighbor IDs to distances.
+   *
+   * @return a list of results for each query as a map of neighbor IDs to distance
+   */
+  @Override
+  public List<Map<Integer, Float>> getResults() {
+    return results;
   }
 }
