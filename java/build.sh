@@ -1,11 +1,13 @@
 #!/bin/bash
 
+# Copyright (c) 2025, NVIDIA CORPORATION.
+
 set -e -u -o pipefail
 
 ARGS="$*"
 NUMARGS=$#
 
-CURDIR=$(cd "$(dirname $0)"; pwd)
+CURDIR=$(cd "$(dirname "$0")"; pwd)
 VERSION="25.08.0" # Note: The version is updated automatically when ci/release/update-version.sh is invoked
 GROUP_ID="com.nvidia.cuvs"
 
@@ -38,5 +40,5 @@ fi
 export LD_LIBRARY_PATH=${CURDIR}/../cpp/build:${LD_LIBRARY_PATH}
 cd cuvs-java
 mvn verify "${MAVEN_VERIFY_ARGS[@]}" \
-  && mvn install:install-file -Dfile=./target/cuvs-java-$VERSION-jar-with-dependencies.jar -DgroupId=$GROUP_ID -DartifactId=cuvs-java -Dversion=$VERSION -Dpackaging=jar \
+  && mvn install:install-file -Dfile=./target/cuvs-java-$VERSION.jar -DgroupId=$GROUP_ID -DartifactId=cuvs-java -Dversion=$VERSION -Dpackaging=jar \
   && cp pom.xml ./target/

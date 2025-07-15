@@ -1,6 +1,9 @@
 #cpp code owners
 cpp/               @rapidsai/cuvs-cpp-codeowners
 
+#java code owners
+java/              @rapidsai/cuvs-java-codeowners
+
 #python code owners
 python/            @rapidsai/cuvs-python-codeowners
 
@@ -11,13 +14,15 @@ rust/              @rapidsai/cuvs-rust-codeowners
 docs/              @rapidsai/cuvs-docs-codeowners
 
 #cmake code owners
-CMakeLists.txt     @rapidsai/cuvs-cmake-codeowners
-**/cmake/          @rapidsai/cuvs-cmake-codeowners
-*.cmake            @rapidsai/cuvs-cmake-codeowners
+CMakeLists.txt                  @rapidsai/cuvs-cmake-codeowners
+**/cmake/                       @rapidsai/cuvs-cmake-codeowners
+*.cmake                         @rapidsai/cuvs-cmake-codeowners
+cpp/scripts/run-cmake-format.sh @rapidsai/cuvs-cmake-codeowners
 
 #CI code owners
 /.github/                @rapidsai/ci-codeowners
 /ci/                     @rapidsai/ci-codeowners
+/.shellcheckrc           @rapidsai/ci-codeowners
 
 #packaging code owners
 /.pre-commit-config.yaml @rapidsai/packaging-codeowners

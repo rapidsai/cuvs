@@ -3,7 +3,7 @@ files:
   all:
     output: conda
     matrix:
-      cuda: ["12.8"]
+      cuda: ["12.9"]
       arch: [x86_64, aarch64]
     includes:
       - build
@@ -29,7 +29,7 @@ files:
   bench_ann:
     output: conda
     matrix:
-      cuda: ["12.8"]
+      cuda: ["12.9"]
       arch: [x86_64, aarch64]
     includes:
       - bench
@@ -100,7 +100,7 @@ files:
   go:
     output: conda
     matrix:
-      cuda: ["12.8"]
+      cuda: ["12.9"]
       arch: [x86_64, aarch64]
     includes:
       - clang
@@ -212,9 +212,7 @@ files:
 channels:
   - rapidsai
   - rapidsai-nightly
-  - dask/label/dev
   - conda-forge
-  - nvidia
 dependencies:
   build:
     common:
@@ -261,7 +259,6 @@ dependencies:
         matrices:
           - matrix: {cuda: "12.*"}
             packages: [cuda-nvcc]
-
   rapids_build_setuptools:
     common:
       - output_types: [conda, requirements, pyproject]
@@ -269,7 +266,6 @@ dependencies:
           - &rapids_build_backend rapids-build-backend>=0.3.0,<0.4.0.dev0
           - setuptools
           - wheel
-
   build_py_cuvs:
     common:
       - output_types: [conda]
@@ -358,7 +354,6 @@ dependencies:
               - nvidia-curand
               - nvidia-cusolver
               - nvidia-cusparse
-
   depends_on_cupy:
     common:
       - output_types: conda
@@ -371,7 +366,6 @@ dependencies:
             packages:
               - cupy-cuda12x>=12.0.0
           - {matrix: null, packages: [cupy-cuda12x>=12.0.0]}
-
   test_libcuvs:
     common:
       - output_types: [conda]
@@ -392,7 +386,7 @@ dependencies:
           - sphinx-copybutton
           - sphinx-markdown-tables
           - pip:
-            - nvidia-sphinx-theme
+              - nvidia-sphinx-theme
   rust:
     common:
       - output_types: [conda]
@@ -404,6 +398,7 @@ dependencies:
       - output_types: [conda]
         packages:
           - go
+          - _go_select *=cgo
           - dlpack>=0.8,<1.0
   build_wheels:
     common:
@@ -453,7 +448,7 @@ dependencies:
     common:
       - output_types: [conda, requirements, pyproject]
         packages:
-          - pytest==7.*
+          - pytest
           - pytest-cov
   test_py_cuvs:
     common:

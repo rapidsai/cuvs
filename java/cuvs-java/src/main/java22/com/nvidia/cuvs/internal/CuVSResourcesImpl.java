@@ -13,19 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs.internal;
 
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResourcesCreate;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResourcesDestroy;
-
-import java.lang.foreign.Arena;
-import java.lang.foreign.MemorySegment;
-import java.nio.file.Path;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
 
 import com.nvidia.cuvs.CuVSResources;
+import java.lang.foreign.Arena;
+import java.nio.file.Path;
 
 /**
  * Used for allocating resources for cuVS
@@ -35,31 +32,30 @@ import com.nvidia.cuvs.CuVSResources;
 public class CuVSResourcesImpl implements CuVSResources {
 
   private final Path tempDirectory;
-  private final Arena arena;
-  private final MemorySegment resourcesMemorySegment;
+  private final long resourceHandle;
   private boolean destroyed;
 
   /**
    * Constructor that allocates the resources needed for cuVS
    *
-   * @throws Throwable exception thrown when native function is invoked
    */
-  public CuVSResourcesImpl(Path tempDirectory) throws Throwable {
+  public CuVSResourcesImpl(Path tempDirectory) {
     this.tempDirectory = tempDirectory;
-    arena = Arena.ofShared();
-    resourcesMemorySegment = arena.allocate(cuvsResources_t);
-    int returnValue = cuvsResourcesCreate(resourcesMemorySegment);
-    checkCuVSError(returnValue, "cuvsResourcesCreate");
+    try (var localArena = Arena.ofConfined()) {
+      var resourcesMemorySegment = localArena.allocate(cuvsResources_t);
+      int returnValue = cuvsResourcesCreate(resourcesMemorySegment);
+      checkCuVSError(returnValue, "cuvsResourcesCreate");
+      resourceHandle = resourcesMemorySegment.get(cuvsResources_t, 0);
+    }
   }
 
   @Override
   public void close() {
-    checkNotDestroyed();
-    int returnValue = cuvsResourcesDestroy(resourcesMemorySegment.get(cuvsResources_t, 0));
-    checkCuVSError(returnValue, "cuvsResourcesDestroy");
-    destroyed = true;
-    if (!arena.scope().isAlive()) {
-      arena.close();
+    synchronized (this) {
+      checkNotDestroyed();
+      int returnValue = cuvsResourcesDestroy(resourceHandle);
+      checkCuVSError(returnValue, "cuvsResourcesDestroy");
+      destroyed = true;
     }
   }
 
@@ -75,20 +71,12 @@ public class CuVSResourcesImpl implements CuVSResources {
   }
 
   /**
-   * Gets the reference to the cuvsResources MemorySegment.
+   * Gets the opaque CuVSResources handle, to be used whenever we need to pass a cuvsResources_t parameter
    *
-   * @return cuvsResources MemorySegment
+   * @return the CuVSResources handle
    */
-  protected MemorySegment getMemorySegment() {
+  long getHandle() {
     checkNotDestroyed();
-    return resourcesMemorySegment;
-  }
-
-  /**
-   * The allocation arena used by this resources.
-   */
-  protected Arena getArena() {
-    checkNotDestroyed();
-    return arena;
+    return resourceHandle;
   }
 }
