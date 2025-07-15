@@ -19,22 +19,23 @@
 #include "../detail/nn_descent_gnnd.hpp"
 #include "../detail/reachability.cuh"
 #include "all_neighbors_merge.cuh"
-#include "raft/core/device_mdarray.hpp"
-#include "raft/core/mdspan.hpp"
-#include "raft/core/operators.hpp"
-#include "raft/util/cudart_utils.hpp"
+
 #include <cuvs/neighbors/all_neighbors.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <cuvs/neighbors/refine.hpp>
 
+#include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/managed_mdspan.hpp>
+#include <raft/core/mdspan.hpp>
 #include <raft/core/mdspan_types.hpp>
+#include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/matrix/gather.cuh>
+#include <raft/util/cudart_utils.hpp>
 
 namespace cuvs::neighbors::all_neighbors::detail {
 using namespace cuvs::neighbors;
@@ -413,7 +414,6 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
           cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>{
             batch_core_distances.value().data_handle(), 1.0, num_data_in_cluster});
       } else {
-        // std::cout << "building in other part\n";
         nnd_builder.value().build(dataset.data_handle(),
                                   static_cast<int>(num_data_in_cluster),
                                   int_graph.value().data_handle(),
@@ -648,7 +648,6 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
 };
 
 template <typename T, typename IdxT, typename DistEpilogueT = raft::identity_op>
-
 std::unique_ptr<all_neighbors_builder<T, IdxT>> get_knn_builder(
   const raft::resources& handle,
   const all_neighbors_params& params,

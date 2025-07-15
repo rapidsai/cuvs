@@ -28,9 +28,11 @@ INSTANTIATE_TEST_CASE_P(AllNeighborsSingleTest,
                         ::testing::ValuesIn(inputsSingle));
 
 INSTANTIATE_TEST_CASE_P(AllNeighborsBatchTest, AllNeighborsTestF, ::testing::ValuesIn(inputsBatch));
+
 INSTANTIATE_TEST_CASE_P(AllNeighborsSingleMutualTest,
                         AllNeighborsTestF,
                         ::testing::ValuesIn(mutualReachSingle));
+
 INSTANTIATE_TEST_CASE_P(AllNeighborsBatchMutualTest,
                         AllNeighborsTestF,
                         ::testing::ValuesIn(mutualReachBatch));

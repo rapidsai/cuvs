@@ -156,16 +156,18 @@ void build(
     }
   }
 
-  if ((build_algo == GRAPH_BUILD_ALGO::NN_DESCENT) &&
-      (params.metric != cuvs::distance::DistanceType::InnerProduct)) {
-    // NN Descent doesn't include self loops. Added to keep it consistent with brute force and ivfpq
+  // NN Descent doesn't include self loops. Shifted to keep it consistent with brute force and ivfpq
+  bool need_shift = (build_algo == GRAPH_BUILD_ALGO::NN_DESCENT) &&
+                    (params.metric != cuvs::distance::DistanceType::InnerProduct);
+
+  if (need_shift) {
     raft::matrix::shift(handle, indices, 1);
     if (distances.has_value()) {
       raft::matrix::shift(handle, distances.value(), 1, std::make_optional<T>(0.0));
     }
   }
 
-  if (core_distances.has_value()) {
+  if (core_distances.has_value()) {  // calculate mutual reachability distances
     size_t k        = indices.extent(1);
     size_t num_rows = core_distances.value().size();
     cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
@@ -184,8 +186,7 @@ void build(
       batch_build(handle, params, dataset, indices, distances, aux_vectors.get(), dist_epilogue);
     }
 
-    if ((build_algo == GRAPH_BUILD_ALGO::NN_DESCENT) &&
-        (params.metric != cuvs::distance::DistanceType::InnerProduct)) {
+    if (need_shift) {
       raft::matrix::shift(handle, indices, 1);
       raft::matrix::shift(handle,
                           distances.value(),
@@ -229,9 +230,11 @@ void build(
     single_build(handle, params, dataset, indices, distances);
   }
 
-  if ((build_algo == GRAPH_BUILD_ALGO::NN_DESCENT) &&
-      (params.metric != cuvs::distance::DistanceType::InnerProduct)) {
-    // NN Descent doesn't include self loops. Added to keep it consistent with brute force and ivfpq
+  // NN Descent doesn't include self loops. Shifted to keep it consistent with brute force and ivfpq
+  bool need_shift = (build_algo == GRAPH_BUILD_ALGO::NN_DESCENT) &&
+                    (params.metric != cuvs::distance::DistanceType::InnerProduct);
+
+  if (need_shift) {
     raft::matrix::shift(handle, indices, 1);
     if (distances.has_value()) {
       raft::matrix::shift(handle, distances.value(), 1, std::make_optional<T>(0.0));
@@ -253,8 +256,7 @@ void build(
     auto dist_epilogue   = ReachabilityPP{core_distances.value().data_handle(), alpha, num_rows};
     single_build(handle, params, dataset, indices, distances, dist_epilogue);
 
-    if ((build_algo == GRAPH_BUILD_ALGO::NN_DESCENT) &&
-        (params.metric != cuvs::distance::DistanceType::InnerProduct)) {
+    if (need_shift) {
       raft::matrix::shift(handle, indices, 1);
       raft::matrix::shift(handle,
                           distances.value(),

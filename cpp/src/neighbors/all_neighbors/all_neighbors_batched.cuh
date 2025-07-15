@@ -436,6 +436,8 @@ void multi_gpu_batch_build(const raft::resources& handle,
                            inverted_indices_for_this_rank);
   }
 }
+
+/* Holds necessary vectors to avoid recomputation when calculating mutual rechability distances */
 template <typename IdxT>
 struct BatchBuildAux {
   raft::host_vector<IdxT, IdxT> cluster_sizes;
