@@ -30,7 +30,7 @@ extern "C" {
  * and sampling_median thresholds are calculated separately for each dimension.
  *
  */
-typedef enum { ZERO , MEAN , SAMPLING_MEDIAN }cuvsBinaryQuantizerThreshold;
+typedef enum { ZERO, MEAN, SAMPLING_MEDIAN }cuvsBinaryQuantizerThreshold;
 
 /**
  * @brief Binary quantizer parameters.
