@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * Copyright (c) 2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -581,17 +581,11 @@ template <typename T,
           typename IdxT = uint32_t,
           typename Accessor =
             host_device_accessor<std::experimental::default_accessor<float>, memory_type::host>>
-[[deprecated(
-  "NN Descent batch build is deprecated and will be removed in a future release. Please use "
-  "cuvs::all_neighbors::build(...) instead.")]]
 void batch_build(raft::resources const& res,
                  const index_params& params,
                  mdspan<const T, matrix_extent<int64_t>, row_major, Accessor> dataset,
                  index<IdxT>& global_idx)
 {
-  RAFT_LOG_WARN(
-    "NN Descent batch build is deprecated and will be removed in a future release. Please use "
-    "cuvs::all_neighbors::build(...) instead.");
   size_t graph_degree        = params.graph_degree;
   size_t intermediate_degree = params.intermediate_graph_degree;
 
