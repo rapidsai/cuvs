@@ -26,7 +26,6 @@ import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBinaryQuantizerTransform;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMAlloc;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
 
 import com.nvidia.cuvs.CuVSResources;
@@ -84,7 +83,7 @@ public class BinaryQuantizerImpl {
       long rows = dataset.size();
       long cols = dataset.dimensions();
 
-      MemorySegment datasetMemSegment = ((DatasetImpl) dataset).seg;
+      MemorySegment datasetMemSegment = ((DatasetImpl) dataset).asMemorySegment();
       return performTransform(
           resources, localArena, rows, cols, datasetMemSegment, INFER_DIRECTION);
     }
@@ -102,7 +101,7 @@ public class BinaryQuantizerImpl {
       Util.CudaMemcpyKind memcpyDirection)
       throws Throwable {
 
-    long cuvsResourcesPtr = resources.getMemorySegment().get(cuvsResources_t, 0);
+    long cuvsResourcesPtr = resources.getHandle();
 
     // Allocate device memory for input and output
     MemorySegment datasetD = localArena.allocate(C_POINTER);

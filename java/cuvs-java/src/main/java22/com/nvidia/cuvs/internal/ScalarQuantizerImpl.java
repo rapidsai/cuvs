@@ -26,7 +26,6 @@ import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMAlloc;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsScalarQuantizerCreate;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsScalarQuantizerDestroy;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsScalarQuantizerInverseTransform;
@@ -95,7 +94,7 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
       Arena arena = resources.getArena();
       MemorySegment datasetMemSegment = buildMemorySegment(localArena, dataset);
 
-      long cuvsResourcesPtr = resources.getMemorySegment().get(cuvsResources_t, 0);
+      long cuvsResourcesPtr = resources.getHandle();
 
       // Allocate device memory for input and output
       MemorySegment datasetD = localArena.allocate(C_POINTER);
@@ -162,9 +161,9 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
       long cols = dataset.dimensions();
 
       Arena arena = resources.getArena();
-      MemorySegment datasetMemSegment = ((DatasetImpl) dataset).seg;
+      MemorySegment datasetMemSegment = ((DatasetImpl) dataset).asMemorySegment();
 
-      long cuvsResourcesPtr = resources.getMemorySegment().get(cuvsResources_t, 0);
+      long cuvsResourcesPtr = resources.getHandle();
 
       // Allocate device memory for input and output
       MemorySegment datasetD = localArena.allocate(C_POINTER);
@@ -233,7 +232,7 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
       Arena arena = resources.getArena();
       MemorySegment quantizedMemSegment = buildMemorySegmentFromBytes(localArena, quantizedData);
 
-      long cuvsResourcesPtr = resources.getMemorySegment().get(cuvsResources_t, 0);
+      long cuvsResourcesPtr = resources.getHandle();
 
       // Allocate device memory for input and output
       MemorySegment quantizedD = localArena.allocate(C_POINTER);
@@ -363,10 +362,10 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
         Arena arena = resources.getArena();
         MemorySegment datasetMemSegment =
             dataset != null
-                ? ((DatasetImpl) dataset).seg
+                ? ((DatasetImpl) dataset).asMemorySegment()
                 : buildMemorySegment(localArena, trainingDataset);
 
-        long cuvsResourcesPtr = resources.getMemorySegment().get(cuvsResources_t, 0);
+        long cuvsResourcesPtr = resources.getHandle();
 
         // Create scalar quantizer params
         MemorySegment paramsSegment = arena.allocate(cuvsScalarQuantizerParams_t);

@@ -99,10 +99,7 @@ public class BinaryQuantizerIT extends CuVSTestCase {
     }
 
     // Create dataset
-    Dataset dataset = Dataset.create(rows, cols);
-    for (int i = 0; i < rows; i++) {
-      dataset.addVector(testData[i]);
-    }
+    Dataset dataset = Dataset.ofArray(testData);
 
     // Apply binary quantization
     byte[][] quantizedData = BinaryQuantizer.transform(cuvsResources, dataset);

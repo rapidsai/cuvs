@@ -102,10 +102,7 @@ public class ScalarQuantizerIT extends CuVSTestCase {
     float[][] trainingData = generateData(random, rows, cols);
 
     // Create dataset
-    Dataset dataset = Dataset.create(rows, cols);
-    for (int i = 0; i < rows; i++) {
-      dataset.addVector(trainingData[i]);
-    }
+    Dataset dataset = Dataset.ofArray(trainingData);
 
     // Create and train scalar quantizer
     ScalarQuantizer quantizer =
