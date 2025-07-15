@@ -67,6 +67,7 @@ auto build(raft::resources const& res,
            raft::device_matrix_view<const T, int64_t, raft::row_major> dataset) -> index<IdxT>
 {
   if (params.n_clusters > 1) {
+    // related issue: https://github.com/rapidsai/cuvs/issues/1051
     RAFT_LOG_WARN(
       "NN Descent batch build (using n_clusters > 1) is deprecated and will be removed in a future "
       "release. Please use cuvs::all_neighbors::build(...) instead.");
@@ -117,6 +118,7 @@ void build(raft::resources const& res,
            index<IdxT>& idx)
 {
   if (params.n_clusters > 1) {
+    // related issue: https://github.com/rapidsai/cuvs/issues/1051
     RAFT_LOG_WARN(
       "NN Descent batch build (using n_clusters > 1) is deprecated and will be removed in a future "
       "release. Please use cuvs::all_neighbors::build(...) instead.");
@@ -163,6 +165,7 @@ auto build(raft::resources const& res,
            raft::host_matrix_view<const T, int64_t, raft::row_major> dataset) -> index<IdxT>
 {
   if (params.n_clusters > 1) {
+    // related issue: https://github.com/rapidsai/cuvs/issues/1051
     RAFT_LOG_WARN(
       "NN Descent batch build (using n_clusters > 1) is deprecated and will be removed in a future "
       "release. Please use cuvs::all_neighbors::build(...) instead.");
@@ -213,6 +216,7 @@ void build(raft::resources const& res,
            index<IdxT>& idx)
 {
   if (params.n_clusters > 1) {
+    // related issue: https://github.com/rapidsai/cuvs/issues/1051
     RAFT_LOG_WARN(
       "NN Descent batch build (using n_clusters > 1) is deprecated and will be removed in a future "
       "release. Please use cuvs::all_neighbors::build(...) instead.");
