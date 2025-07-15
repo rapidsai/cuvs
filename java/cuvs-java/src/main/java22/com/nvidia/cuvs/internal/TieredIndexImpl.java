@@ -132,7 +132,6 @@ public class TieredIndexImpl implements TieredIndex {
     } finally {
       destroyed = true;
     }
-    // if (dataset != null) dataset.close();
   }
 
   /**
