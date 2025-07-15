@@ -35,6 +35,7 @@
 #include <rmm/cuda_stream_view.hpp>
 
 #include <cassert>
+#include <type_traits>
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
@@ -1150,6 +1151,7 @@ struct inner_prod_dist {
 
 template <int Veclen, typename T, typename AccT>
 struct hamming_dist {
+  static_assert(std::is_same_v<T, uint8_t>, "hamming_dist only supports uint8_t data type");
   __device__ __forceinline__ void operator()(AccT& acc, AccT x, AccT y)
   {
     if constexpr (Veclen > 1) {
@@ -1225,16 +1227,21 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
         std::forward<Args>(args)...);  // NB: update the description of `knn::ivf_flat::build` when
                                        // adding here a new metric.
     case cuvs::distance::DistanceType::BitwiseHamming:
-      return launch_kernel<Capacity,
-                           Veclen,
-                           Ascending,
-                           false,
-                           T,
-                           AccT,
-                           IdxT,
-                           IvfSampleFilterT,
-                           hamming_dist<Veclen, T, AccT>>(
-        {}, raft::identity_op{}, std::forward<Args>(args)...);
+      if constexpr (std::is_same_v<T, uint8_t>) {
+        return launch_kernel<Capacity,
+                             Veclen,
+                             Ascending,
+                             false,
+                             T,
+                             AccT,
+                             IdxT,
+                             IvfSampleFilterT,
+                             hamming_dist<Veclen, T, AccT>>(
+          {}, raft::identity_op{}, std::forward<Args>(args)...);
+      } else {
+        RAFT_FAIL("BitwiseHamming distance only supports uint8_t data type");
+      }
+      break;
     default: RAFT_FAIL("The chosen distance metric is not supported (%d)", int(metric));
   }
 }
@@ -1352,6 +1359,12 @@ void ivfflat_interleaved_scan(const index<T, IdxT>& index,
                               uint32_t& grid_dim_x,
                               rmm::cuda_stream_view stream)
 {
+  // Runtime check for BitwiseHamming distance with non-uint8_t types
+  if (metric == cuvs::distance::DistanceType::BitwiseHamming && !std::is_same_v<T, uint8_t>) {
+    RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t data type, got %s", 
+              typeid(T).name());
+  }
+
   const int capacity = raft::bound_by_power_of_two(k);
 
   auto filter_adapter = cuvs::neighbors::filtering::ivf_to_sample_filter(
