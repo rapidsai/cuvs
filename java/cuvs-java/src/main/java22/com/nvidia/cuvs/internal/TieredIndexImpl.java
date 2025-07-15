@@ -21,6 +21,7 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_POINTER;
+import static com.nvidia.cuvs.internal.common.Util.*;
 import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.*;
 import static com.nvidia.cuvs.internal.common.Util.buildMemorySegment;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
@@ -185,14 +186,18 @@ public class TieredIndexImpl implements TieredIndex {
       returnValue = cuvsStreamSync(cuvsRes);
       checkCuVSError(returnValue, "cuvsStreamSync");
 
-      returnValue = cuvsTieredIndexBuild(cuvsRes, indexParamsMemorySegment, datasetTensor, index);
+      // Extract the actual index pointer that was written by Create
+      MemorySegment actualIndexPtr = index.get(C_POINTER, 0);
+
+      returnValue =
+          cuvsTieredIndexBuild(cuvsRes, indexParamsMemorySegment, datasetTensor, actualIndexPtr);
       checkCuVSError(returnValue, "cuvsTieredIndexBuild");
 
       // Clean up device memory after build
       returnValue = cuvsRMMFree(cuvsRes, datasetDP, datasetSize);
       checkCuVSError(returnValue, "cuvsRMMFree");
 
-      return new IndexReference(index);
+      return new IndexReference(actualIndexPtr);
     }
   }
 
