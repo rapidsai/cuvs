@@ -5,6 +5,7 @@ channels:
 - rapidsai-nightly
 - conda-forge
 dependencies:
+- _go_select *=cgo
 - c-compiler
 - clang-tools==20.1.4
 - clang==20.1.4
