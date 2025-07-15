@@ -1,6 +1,9 @@
 #cpp code owners
 cpp/               @rapidsai/cuvs-cpp-codeowners
 
+#java code owners
+java/              @rapidsai/cuvs-java-codeowners
+
 #python code owners
 python/            @rapidsai/cuvs-python-codeowners
 
