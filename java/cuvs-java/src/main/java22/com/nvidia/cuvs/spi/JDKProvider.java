@@ -45,6 +45,7 @@ import java.lang.foreign.MemorySegment;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import com.nvidia.cuvs.internal.ScalarQuantizerImpl;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
