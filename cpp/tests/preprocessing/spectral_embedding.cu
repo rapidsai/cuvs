@@ -69,10 +69,6 @@ class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingI
     n_clusters_   = params_.n_clusters;
     n_components_ = params_.n_components;
 
-    // Generate blob data with the specified parameters
-    // input_ = raft::make_device_matrix<T, int, raft::row_major>(handle, n_samples_, n_features_);
-    // labels_ = raft::make_device_vector<int>(handle, n_samples_);
-
     // Generate clusters using make_blobs
     raft::random::make_blobs<T, int, raft::row_major>(
       handle,
