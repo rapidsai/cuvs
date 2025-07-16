@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <raft/util/cuda_dev_essentials.cuh>  // DI
 
 namespace cuvs::distance::detail::ops {

@@ -227,10 +227,14 @@ instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::Hamming
 // BitwiseHamming with integer types
 instantiate_cuvs_distance_distance(
   cuvs::distance::DistanceType::BitwiseHamming, uint8_t, uint32_t, uint32_t, int);
-instantiate_cuvs_distance_distance(
-  cuvs::distance::DistanceType::BitwiseHamming, uint32_t, uint32_t, uint32_t, int);
-instantiate_cuvs_distance_distance(
-  cuvs::distance::DistanceType::BitwiseHamming, uint64_t, uint64_t, uint64_t, int);
+
+extern template void cuvs::distance::pairwise_distance<uint8_t, raft::layout_c_contiguous, int, uint32_t>( \
+  raft::resources const& handle,                                                                           \
+  raft::device_matrix_view<const uint8_t, int, raft::layout_c_contiguous> const x,                         \
+  raft::device_matrix_view<const uint8_t, int, raft::layout_c_contiguous> const y,                         \
+  raft::device_matrix_view<uint32_t, int, raft::layout_c_contiguous> dist,                                 \
+  cuvs::distance::DistanceType metric,                                                                     \
+  uint32_t metric_arg);                                                                                    \
 
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::HellingerExpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::InnerProduct);
