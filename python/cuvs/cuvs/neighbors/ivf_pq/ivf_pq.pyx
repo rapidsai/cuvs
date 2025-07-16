@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -339,6 +339,105 @@ def build(IndexParams index_params, dataset, resources=None):
     return idx
 
 
+@auto_sync_resources
+def build_from_centroids(IndexParams index_params, dim, pq_centers,
+                         rotation_matrix, centers, centers_rot,
+                         resources=None):
+    """
+    Build the IvfPq index from existing centroids and codebook.
+
+    Parameters
+    ----------
+    index_params : :py:class:`cuvs.neighbors.ivf_pq.IndexParams`
+        Parameters on how to build the index
+    dim : int
+        Dimensionality of the input data
+    pq_centers : Array interface compliant matrix
+        PQ cluster centers shape (pq_dim or n_lists, pq_len, pq_book_size)
+    rotation_matrix : Array interface compliant matrix shape (rot_dim, dim)
+        Rotation matrix
+    centers : Array interface compliant matrix shape (n_lists, dim)
+        Cluster centers corresponding to the lists in the original space
+    centers_rot : Array interface compliant matrix shape (n_lists, rot_dim)
+        Cluster centers corresponding to the lists in the rotated space
+    {resources_docstring}
+
+    Returns
+    -------
+    index: :py:class:`cuvs.neighbors.ivf_pq.Index`
+
+    Examples
+    --------
+
+    >>> import cupy as cp
+    >>> from cuvs.neighbors import ivf_pq
+    >>> dim = 2048
+    >>> n_lists = 1024
+    >>> pq_dim = ...
+    >>> pq_len = ...
+    >>> pq_book_size = ...
+    >>> rot_dim = ...
+    >>> pq_centers = cp.random.random_sample((pq_dim, pq_len, pq_book_size),
+    ...                                   dtype=cp.float32)
+    >>> rotation_matrix = cp.random.random_sample((rot_dim, dim),
+    ...                                   dtype=cp.float32)
+    >>> centers = cp.random.random_sample((n_lists, dim),
+    ...                                   dtype=cp.float32)
+    >>> centers_rot = cp.random.random_sample((n_lists, rot_dim),
+    ...                                   dtype=cp.float32)
+    >>> build_params = ivf_pq.IndexParams(metric="sqeuclidean")
+    >>> index = ivf_pq.build_from_centroids(build_params, dim, pq_centers,
+    ...                                     rotation_matrix, centers,
+    ...                                     centers_rot)
+    >>> distances, neighbors = ivf_pq.search(ivf_pq.SearchParams(),
+    ...                                        index, dataset,
+    ...                                        k)
+    >>> distances = cp.asarray(distances)
+    >>> neighbors = cp.asarray(neighbors)
+    """
+
+    pq_centers_ai = wrap_array(pq_centers)
+    _check_input_array(pq_centers_ai, [np.dtype('float32')])
+
+    rotation_matrix_ai = wrap_array(rotation_matrix)
+    _check_input_array(rotation_matrix_ai, [np.dtype('float32')])
+
+    centers_ai = wrap_array(centers)
+    _check_input_array(centers_ai, [np.dtype('float32')])
+
+    centers_rot_ai = wrap_array(centers_rot)
+    _check_input_array(centers_rot_ai, [np.dtype('float32')])
+
+    cdef Index idx = Index()
+    cdef cuvsError_t build_status
+    cdef cydlpack.DLManagedTensor* pq_centers_dlpack = \
+        cydlpack.dlpack_c(pq_centers_ai)
+    cdef cydlpack.DLManagedTensor* rotation_matrix_dlpack = \
+        cydlpack.dlpack_c(rotation_matrix_ai)
+    cdef cydlpack.DLManagedTensor* centers_dlpack = \
+        cydlpack.dlpack_c(centers_ai)
+    cdef cydlpack.DLManagedTensor* centers_rot_dlpack = \
+        cydlpack.dlpack_c(centers_rot_ai)
+    cdef cuvsIvfPqIndexParams* params = index_params.params
+
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+    with cuda_interruptible():
+        check_cuvs(cuvsIvfPqBuildFromCentroids(
+            res,
+            params,
+            dim,
+            pq_centers_dlpack,
+            rotation_matrix_dlpack,
+            centers_dlpack,
+            centers_rot_dlpack,
+            idx.index
+        ))
+        idx.trained = False
+
+    return idx
+
+
 cdef _map_dtype_np_to_cuda(dtype, supported_dtypes=None):
     if supported_dtypes is not None and dtype not in supported_dtypes:
         raise TypeError("Type %s is not supported" % str(dtype))
@@ -664,5 +763,6 @@ def extend(Index index, new_vectors, new_indices, resources=None):
             new_indices_dlpack,
             index.index
         ))
+        index.trained = True
 
     return index

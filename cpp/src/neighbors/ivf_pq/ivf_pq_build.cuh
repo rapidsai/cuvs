@@ -1679,6 +1679,36 @@ auto extend(raft::resources const& handle,
   return ext_index;
 }
 
+template <typename IdxT>
+auto build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_pq::index_params& index_params,
+           const uint32_t dim,
+           raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+           raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix,
+           raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
+           raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot)
+  -> cuvs::neighbors::ivf_pq::index<IdxT>
+{
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("ivf_pq::build(%u)", dim);
+  index<IdxT> index(handle, index_params, dim);
+
+  ASSERT(index.rotation_matrix().size() == rotation_matrix.size(), "rotation_matrix size mismatch");
+  ASSERT(index.pq_centers().size() == pq_centers.size(), "pq_centers size mismatch");
+  ASSERT(index.centers().size() == centers.size(), "centers size mismatch");
+  ASSERT(index.centers_rot().size() == centers_rot.size(), "centers_rot size mismatch");
+  auto stream = raft::resource::get_cuda_stream(handle);
+  raft::copy(index.rotation_matrix().data_handle(),
+             rotation_matrix.data_handle(),
+             rotation_matrix.size(),
+             stream);
+  raft::copy(
+    index.pq_centers().data_handle(), pq_centers.data_handle(), index.pq_centers().size(), stream);
+  raft::copy(index.centers().data_handle(), centers.data_handle(), centers.size(), stream);
+  raft::copy(
+    index.centers_rot().data_handle(), centers_rot.data_handle(), centers_rot.size(), stream);
+  return index;
+}
+
 template <typename T, typename IdxT, typename accessor>
 auto build(raft::resources const& handle,
            const index_params& params,

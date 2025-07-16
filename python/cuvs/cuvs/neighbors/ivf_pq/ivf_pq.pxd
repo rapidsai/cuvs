@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -91,6 +91,15 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
     cuvsError_t cuvsIvfPqIndexGetCenters(cuvsResources_t res,
                                          cuvsIvfPqIndex_t index,
                                          DLManagedTensor * centers)
+
+    cuvsError_t cuvsIvfPqBuildFromCentroids(cuvsResources_t res,
+                                            cuvsIvfPqIndexParams_t params,
+                                            uint32_t dim,
+                                            DLManagedTensor* pq_centers,
+                                            DLManagedTensor* rotation_matrix,
+                                            DLManagedTensor* centers,
+                                            DLManagedTensor* centers_rot,
+                                            cuvsIvfPqIndex_t index)
 
     cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
                                cuvsIvfPqIndexParams* params,

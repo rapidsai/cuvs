@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -81,6 +81,49 @@ void* _build(cuvsResources_t res, cuvsIvfPqIndexParams params, DLManagedTensor* 
     using mdspan_type = raft::host_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
     cuvs::neighbors::ivf_pq::build(*res_ptr, build_params, mds, index);
+  }
+
+  return index;
+}
+
+template <typename IdxT>
+void* _build_from_centroids(cuvsResources_t res,
+                            cuvsIvfPqIndexParams params,
+                            uint32_t dim,
+                            DLManagedTensor* pq_centers,
+                            DLManagedTensor* rotation_matrix,
+                            DLManagedTensor* centers,
+                            DLManagedTensor* centers_rot)
+{
+  auto res_ptr = reinterpret_cast<raft::resources*>(res);
+
+  auto build_params = cuvs::neighbors::ivf_pq::index_params();
+  convert_c_index_params(params, &build_params);
+
+  auto index = new cuvs::neighbors::ivf_pq::index<IdxT>(*res_ptr, build_params, dim);
+
+  if (cuvs::core::is_dlpack_device_compatible(pq_centers->dl_tensor) &&
+      cuvs::core::is_dlpack_device_compatible(rotation_matrix->dl_tensor) &&
+      cuvs::core::is_dlpack_device_compatible(centers->dl_tensor) &&
+      cuvs::core::is_dlpack_device_compatible(centers_rot->dl_tensor)) {
+    using mdspan_type_3d =
+      raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major>;
+    using mdspan_type_2d     = raft::device_matrix_view<const float, IdxT, raft::row_major>;
+    auto pq_centers_mds      = cuvs::core::from_dlpack<mdspan_type_3d>(pq_centers);
+    auto rotation_matrix_mds = cuvs::core::from_dlpack<mdspan_type_2d>(rotation_matrix);
+    auto centers_mds         = cuvs::core::from_dlpack<mdspan_type_2d>(centers);
+    auto centers_rot_mds     = cuvs::core::from_dlpack<mdspan_type_2d>(centers_rot);
+
+    cuvs::neighbors::ivf_pq::build(*res_ptr,
+                                   build_params,
+                                   dim,
+                                   pq_centers_mds,
+                                   rotation_matrix_mds,
+                                   centers_mds,
+                                   centers_rot_mds,
+                                   index);
+  } else {
+    RAFT_FAIL("build inputs must be on device memory");
   }
 
   return index;
@@ -211,6 +254,24 @@ extern "C" cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
                 dataset.dtype.code,
                 dataset.dtype.bits);
     }
+  });
+}
+
+extern "C" cuvsError_t cuvsIvfPqBuildFromCentroids(cuvsResources_t res,
+                                                   cuvsIvfPqIndexParams_t params,
+                                                   uint32_t dim,
+                                                   DLManagedTensor* pq_centers,
+                                                   DLManagedTensor* rotation_matrix,
+                                                   DLManagedTensor* centers,
+                                                   DLManagedTensor* centers_rot,
+                                                   cuvsIvfPqIndex_t index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    // Use default dtype for the index
+    index->dtype.code = kDLFloat;
+    index->dtype.bits = 32;
+    index->addr       = reinterpret_cast<uintptr_t>(_build_from_centroids<int64_t>(
+      res, *params, dim, pq_centers, rotation_matrix, centers, centers_rot));
   });
 }
 
