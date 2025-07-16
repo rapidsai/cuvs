@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2018-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -454,16 +454,17 @@ void pairwise_distance(raft::resources const& handle,
 {
   // Type-metric validation: simplified approach
   constexpr bool is_uint8_type = std::is_same_v<Type, uint8_t>;
-  constexpr bool is_float_type = std::is_same_v<Type, float> || 
-                                 std::is_same_v<Type, double> || 
-                                 std::is_same_v<Type, half>;
-  
+  constexpr bool is_float_type =
+    std::is_same_v<Type, float> || std::is_same_v<Type, double> || std::is_same_v<Type, half>;
+
   if (metric == cuvs::distance::DistanceType::BitwiseHamming) {
-    RAFT_EXPECTS(is_uint8_type, 
-                 "BitwiseHamming distance requires uint8_t input type (internally optimized to uint32_t/uint64_t when possible)");
+    RAFT_EXPECTS(is_uint8_type,
+                 "BitwiseHamming distance requires uint8_t input type (internally optimized to "
+                 "uint32_t/uint64_t when possible)");
   } else {
-    RAFT_EXPECTS(is_float_type, 
-                 "Non-BitwiseHamming distance metrics require floating-point input types (float, double, half)");
+    RAFT_EXPECTS(is_float_type,
+                 "Non-BitwiseHamming distance metrics require floating-point input types (float, "
+                 "double, half)");
   }
 
   RAFT_EXPECTS(x.extent(1) == y.extent(1), "Number of columns must be equal.");

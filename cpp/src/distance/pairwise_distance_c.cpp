@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -71,7 +71,9 @@ extern "C" cuvsError_t cuvsPairwiseDistance(cuvsResources_t res,
     } else {
       // All other metrics require floating point types
       if ((x_dt.code != kDLFloat) || (y_dt.code != kDLFloat) || (dist_dt.code != kDLFloat)) {
-        RAFT_FAIL("Inputs to cuvsPairwiseDistance must all be floating point tensors (except BitwiseHamming which requires unsigned integers)");
+        RAFT_FAIL(
+          "Inputs to cuvsPairwiseDistance must all be floating point tensors (except "
+          "BitwiseHamming which requires unsigned integers)");
       }
     }
 
@@ -118,7 +120,8 @@ extern "C" cuvsError_t cuvsPairwiseDistance(cuvsResources_t res,
           _pairwise_distance<uint8_t, uint32_t>(
             res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
         } else {
-          RAFT_FAIL("BitwiseHamming only supports 8-bit unsigned integer input. Received: %d bits", x_dt.bits);
+          RAFT_FAIL("BitwiseHamming only supports 8-bit unsigned integer input. Received: %d bits",
+                    x_dt.bits);
         }
       } else {
         // Float types for other metrics
@@ -142,7 +145,8 @@ extern "C" cuvsError_t cuvsPairwiseDistance(cuvsResources_t res,
           _pairwise_distance<uint8_t, uint32_t, raft::col_major>(
             res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
         } else {
-          RAFT_FAIL("BitwiseHamming only supports 8-bit unsigned integer input. Received: %d bits", x_dt.bits);
+          RAFT_FAIL("BitwiseHamming only supports 8-bit unsigned integer input. Received: %d bits",
+                    x_dt.bits);
         }
       } else {
         // Float types for other metrics (column major)

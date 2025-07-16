@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2018-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -228,13 +228,14 @@ instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::Hamming
 instantiate_cuvs_distance_distance(
   cuvs::distance::DistanceType::BitwiseHamming, uint8_t, uint32_t, uint32_t, int);
 
-extern template void cuvs::distance::pairwise_distance<uint8_t, raft::layout_c_contiguous, int, uint32_t>( \
-  raft::resources const& handle,                                                                           \
-  raft::device_matrix_view<const uint8_t, int, raft::layout_c_contiguous> const x,                         \
-  raft::device_matrix_view<const uint8_t, int, raft::layout_c_contiguous> const y,                         \
-  raft::device_matrix_view<uint32_t, int, raft::layout_c_contiguous> dist,                                 \
-  cuvs::distance::DistanceType metric,                                                                     \
-  uint32_t metric_arg);                                                                                    \
+extern template void
+cuvs::distance::pairwise_distance<uint8_t, raft::layout_c_contiguous, int, uint32_t>(
+  raft::resources const& handle,
+  raft::device_matrix_view<const uint8_t, int, raft::layout_c_contiguous> const x,
+  raft::device_matrix_view<const uint8_t, int, raft::layout_c_contiguous> const y,
+  raft::device_matrix_view<uint32_t, int, raft::layout_c_contiguous> dist,
+  cuvs::distance::DistanceType metric,
+  uint32_t metric_arg);
 
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::HellingerExpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::InnerProduct);

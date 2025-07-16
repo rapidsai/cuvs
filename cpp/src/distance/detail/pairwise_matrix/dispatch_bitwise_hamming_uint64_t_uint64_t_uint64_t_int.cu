@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,10 +23,10 @@
  *
  */
 
-#include <raft/core/operators.hpp> // raft::identity_op
 #include "../distance_ops/all_ops.cuh"  // ops::*
-#include "dispatch-inl.cuh" // dispatch
+#include "dispatch-inl.cuh"             // dispatch
 #include "dispatch_sm60.cuh"
+#include <raft/core/operators.hpp>  // raft::identity_op
 #define instantiate_raft_distance_detail_pairwise_matrix_dispatch(                     \
   OpT, DataT, AccT, OutT, FinOpT, IdxT)                                                \
   template void cuvs::distance::detail::                                               \
@@ -44,6 +44,12 @@
       cudaStream_t stream,                                                             \
       bool is_row_major)
 
-instantiate_raft_distance_detail_pairwise_matrix_dispatch(cuvs::distance::detail::ops::bitwise_hamming_distance_op, uint64_t, uint64_t, uint64_t, raft::identity_op, int);
+instantiate_raft_distance_detail_pairwise_matrix_dispatch(
+  cuvs::distance::detail::ops::bitwise_hamming_distance_op,
+  uint64_t,
+  uint64_t,
+  uint64_t,
+  raft::identity_op,
+  int);
 
 #undef instantiate_raft_distance_detail_pairwise_matrix_dispatch

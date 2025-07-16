@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,13 +57,13 @@ void pairwise_distance(
   RAFT_EXPECTS(metric == cuvs::distance::DistanceType::BitwiseHamming,
                "This uint8_t overload only supports BitwiseHamming distance");
 
-  const auto k = x.extent(1);
+  const auto k     = x.extent(1);
   const auto x_ptr = x.data_handle();
   const auto y_ptr = y.data_handle();
-  
+
   // Check data alignment for optimization opportunities
-  const auto x_addr = reinterpret_cast<uintptr_t>(x_ptr);
-  const auto y_addr = reinterpret_cast<uintptr_t>(y_ptr);
+  const auto x_addr    = reinterpret_cast<uintptr_t>(x_ptr);
+  const auto y_addr    = reinterpret_cast<uintptr_t>(y_ptr);
   const bool aligned_8 = (x_addr % 8 == 0) && (y_addr % 8 == 0) && (k % 8 == 0);
   const bool aligned_4 = (x_addr % 4 == 0) && (y_addr % 4 == 0) && (k % 4 == 0);
 
