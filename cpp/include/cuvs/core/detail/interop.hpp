@@ -167,7 +167,6 @@ static void to_dlpack(MdspanType src, DLManagedTensor* dst)
   if constexpr (std::is_same_v<typename MdspanType::layout_type, raft::row_major>) {
     tensor->strides = NULL;
   } else {
-    std::cout << "not row major!!!" << std::endl;
     tensor->strides = new int64_t[tensor->ndim];
     for (int64_t i = 0; i < tensor->ndim; ++i) {
       tensor->strides[i] = src.stride(i);
