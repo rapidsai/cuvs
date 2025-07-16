@@ -28,6 +28,7 @@ from libcpp cimport bool, cast
 from libcpp.string cimport string
 
 from cuvs.common cimport cydlpack
+from cuvs.common.device_tensor_view import DeviceTensorView
 from cuvs.distance_type cimport cuvsDistanceType
 
 from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
@@ -291,36 +292,44 @@ cdef class Index:
 
     @property
     def dataset(self):
-        return self._get_dataset()
-
-    @auto_sync_resources
-    def _get_dataset(self, resources=None):
         if not self.trained:
             raise ValueError("Index needs to be built before getting dataset")
 
-        cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+        # get the cagra dataset from the index without copying as dlpack
+        cdef cydlpack.DLManagedTensor output_dlpack
+        check_cuvs(cuvsCagraIndexGetDatasetView(self.index, &output_dlpack))
 
-        output = np.empty((len(self), self.dim), dtype=self.dtype)
-        ai = wrap_array(output)
-        cdef cydlpack.DLManagedTensor* output_dlpack = cydlpack.dlpack_c(ai)
-        check_cuvs(cuvsCagraIndexGetDataset(res, self.index, output_dlpack))
+        # convert to CAI for ease of interop
+        cdef object output_cai = cydlpack.dl_pack_to_cai(&output_dlpack)
+        output = DeviceTensorView(output_cai)
+
+        # free up memory holding the shape/strides from the dlpack
+        if output_dlpack.deleter is not NULL:
+            output_dlpack.deleter(&output_dlpack)
+
+        # since we're referencing memory internal to this cagra index in the
+        # output view, keep the cagra index alive as long as the output view
+        # is to avoid segfaulting
+        output._index = self
+
         return output
 
     @property
     def graph(self):
-        return self._get_graph()
-
-    @auto_sync_resources
-    def _get_graph(self, resources=None):
         if not self.trained:
             raise ValueError("Index needs to be built before getting graph")
 
-        cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+        cdef cydlpack.DLManagedTensor output_dlpack
+        check_cuvs(cuvsCagraIndexGetGraphView(self.index, &output_dlpack))
 
-        output = np.empty((len(self), self.graph_degree), dtype='uint32')
-        ai = wrap_array(output)
-        cdef cydlpack.DLManagedTensor* output_dlpack = cydlpack.dlpack_c(ai)
-        check_cuvs(cuvsCagraIndexGetGraph(res, self.index, output_dlpack))
+        cdef object output_cai = cydlpack.dl_pack_to_cai(&output_dlpack)
+        output = DeviceTensorView(output_cai)
+
+        if output_dlpack.deleter is not NULL:
+            output_dlpack.deleter(&output_dlpack)
+
+        output._index = self
+
         return output
 
     def __repr__(self):

@@ -153,3 +153,23 @@ cdef DLManagedTensor* dlpack_c(ary):
     dlm.deleter = deleter
 
     return dlm
+
+cdef dl_pack_to_cai(DLManagedTensor * dlpack):
+    """ converts a DLManagedTensor to a __cuda_array_interface dict """
+    cdef DLTensor tensor = dlpack.dl_tensor
+
+    dtype = dl_data_type_to_numpy(tensor.dtype)
+    shape = tuple(tensor.shape[dim] for dim in range(tensor.ndim))
+    strides = None
+    if tensor.strides is not NULL:
+        strides = tuple(tensor.strides[dim] for dim in range(tensor.ndim))
+
+    return {
+        "shape": shape,
+        "typestr": np.dtype(dl_data_type_to_numpy(tensor.dtype)).str,
+        "data": (<size_t>tensor.data, True),
+        "strides": strides,
+        # we don't need the 'stream' capability added in cai v3 so
+        # to maximize compatibility with users use v2 for now
+        "version": 2,
+    }
