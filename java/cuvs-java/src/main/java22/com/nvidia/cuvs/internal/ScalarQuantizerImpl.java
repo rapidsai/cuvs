@@ -91,7 +91,6 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
       long rows = dataset.length;
       long cols = rows > 0 ? dataset[0].length : 0;
 
-      Arena arena = resources.getArena();
       MemorySegment datasetMemSegment = buildMemorySegment(localArena, dataset);
 
       long cuvsResourcesPtr = resources.getHandle();
@@ -160,7 +159,6 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
       long rows = dataset.size();
       long cols = dataset.dimensions();
 
-      Arena arena = resources.getArena();
       MemorySegment datasetMemSegment = ((DatasetImpl) dataset).asMemorySegment();
 
       long cuvsResourcesPtr = resources.getHandle();
@@ -229,7 +227,6 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
       long rows = quantizedData.length;
       long cols = rows > 0 ? quantizedData[0].length : 0;
 
-      Arena arena = resources.getArena();
       MemorySegment quantizedMemSegment = buildMemorySegmentFromBytes(localArena, quantizedData);
 
       long cuvsResourcesPtr = resources.getHandle();
@@ -359,7 +356,6 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
         long cols =
             dataset != null ? dataset.dimensions() : (rows > 0 ? trainingDataset[0].length : 0);
 
-        Arena arena = resources.getArena();
         MemorySegment datasetMemSegment =
             dataset != null
                 ? ((DatasetImpl) dataset).asMemorySegment()
@@ -368,7 +364,7 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
         long cuvsResourcesPtr = resources.getHandle();
 
         // Create scalar quantizer params
-        MemorySegment paramsSegment = arena.allocate(cuvsScalarQuantizerParams_t);
+        MemorySegment paramsSegment = localArena.allocate(cuvsScalarQuantizerParams_t);
         int returnValue = cuvsScalarQuantizerParamsCreate(paramsSegment);
         checkCuVSError(returnValue, "cuvsScalarQuantizerParamsCreate");
 
@@ -376,7 +372,7 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
         cuvsScalarQuantizerParams.quantile(paramsPtr, quantile);
 
         // Create scalar quantizer
-        MemorySegment quantizerSegment = arena.allocate(cuvsScalarQuantizer_t);
+        MemorySegment quantizerSegment = localArena.allocate(cuvsScalarQuantizer_t);
         returnValue = cuvsScalarQuantizerCreate(quantizerSegment);
         checkCuVSError(returnValue, "cuvsScalarQuantizerCreate");
 
