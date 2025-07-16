@@ -183,15 +183,21 @@ void build_knn_graph(
   auto free_space_ratio    = raft::resource::get_workspace_free_bytes(res) / desired_workspace_size;
   bool use_large_workspace = false;
   if (free_space_ratio < kMinWorkspaceRatio) {
-    if (max_queries * free_space_ratio >= kMinLargeBatchSize * kMinWorkspaceRatio) {
-      max_queries = static_cast<uint32_t>(max_queries * free_space_ratio / kMinWorkspaceRatio);
+    auto adjusted_max_queries =
+      static_cast<uint32_t>(max_queries * free_space_ratio / kMinWorkspaceRatio);
+    if (adjusted_max_queries >= kMinLargeBatchSize) {
+      // adjust max_queries, so that the ratio free_space_ratio gets not larger than
+      // kMinWorkspaceRatio.
       RAFT_LOG_INFO(
         "CAGRA graph build: reducing IVF-PQ search max_internal_batch_size from %u -> %u to fit "
         "the workspace",
-        pq.search_params.max_internal_batch_size,
-        max_queries);
-      pq.search_params.max_internal_batch_size = max_queries;
+        max_queries,
+        adjusted_max_queries);
+      max_queries                              = adjusted_max_queries;
+      pq.search_params.max_internal_batch_size = adjusted_max_queries;
     } else {
+      // adjusting max_queries to a very small value isn't practical, so we use the large workspace
+      // instead.
       use_large_workspace = true;
       RAFT_LOG_WARN(
         "Using large workspace memory for IVF-PQ search during CAGRA graph build. Desired "
