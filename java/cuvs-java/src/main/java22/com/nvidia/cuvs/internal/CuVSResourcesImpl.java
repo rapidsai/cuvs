@@ -32,18 +32,15 @@ import java.nio.file.Path;
 public class CuVSResourcesImpl implements CuVSResources {
 
   private final Path tempDirectory;
-  private final Arena arena;
   private final long resourceHandle;
   private final ScopedAccess access;
 
   /**
    * Constructor that allocates the resources needed for cuVS
    *
-   * @throws Throwable exception thrown when native function is invoked
    */
-  public CuVSResourcesImpl(Path tempDirectory) throws Throwable {
+  public CuVSResourcesImpl(Path tempDirectory) {
     this.tempDirectory = tempDirectory;
-    this.arena = Arena.ofShared();
     try (var localArena = Arena.ofConfined()) {
       var resourcesMemorySegment = localArena.allocate(cuvsResources_t);
       int returnValue = cuvsResourcesCreate(resourcesMemorySegment);
@@ -72,19 +69,11 @@ public class CuVSResourcesImpl implements CuVSResources {
     synchronized (this) {
       int returnValue = cuvsResourcesDestroy(resourceHandle);
       checkCuVSError(returnValue, "cuvsResourcesDestroy");
-      arena.close();
     }
   }
 
   @Override
   public Path tempDirectory() {
     return tempDirectory;
-  }
-
-  /**
-   * The allocation arena used by this resources.
-   */
-  protected Arena getArena() {
-    return arena;
   }
 }
