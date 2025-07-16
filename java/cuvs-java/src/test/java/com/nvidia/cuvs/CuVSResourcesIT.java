@@ -19,6 +19,8 @@ import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 import static org.junit.Assert.*;
 
 import java.lang.invoke.MethodHandles;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -37,49 +39,60 @@ public class CuVSResourcesIT extends CuVSTestCase {
   public void testConcurrentAccessViaCheckedCuVSResourcesIsForbidden() throws Throwable {
     var expectedError =
         "This resource is already accessed by thread [" + Thread.currentThread().threadId() + "]";
-    try (var resources = CheckedCuVSResources.create()) {
-
-      var t =
-          new Thread(
-              () -> {
-                try (var access2 = resources.access()) {
-                  log.info("Nested access to resource {}", access2.handle());
-                }
-              });
+    try (var resources = CheckedCuVSResources.create();
+        var executor = Executors.newFixedThreadPool(1)) {
 
       try (var access1 = resources.access()) {
-        log.info("Outer access to resource {}", access1.handle());
+        log.info(
+            "Outer access to resource {} from {}",
+            access1.handle(),
+            Thread.currentThread().threadId());
 
         var exception =
             assertThrows(
-                IllegalStateException.class,
+                ExecutionException.class,
                 () -> {
-                  t.start();
-                  t.join();
+                  var future =
+                      executor.submit(
+                          () -> {
+                            try (var access2 = resources.access()) {
+                              log.info(
+                                  "Nested access to resource {} from {}",
+                                  access2.handle(),
+                                  Thread.currentThread().threadId());
+                              log.info("Nested access finished");
+                            }
+                          });
+                  future.get();
                 });
-        assertEquals(expectedError, exception.getMessage());
+        assertEquals(IllegalStateException.class, exception.getCause().getClass());
+        assertEquals(expectedError, exception.getCause().getMessage());
+        log.info("Outer access finished");
       }
     }
   }
 
   @Test
   public void testSequentialAccessViaCheckedCuVSResourcesIsAllowed() throws Throwable {
-    try (var resources = CheckedCuVSResources.create()) {
-
-      var t =
-          new Thread(
-              () -> {
-                try (var access2 = resources.access()) {
-                  log.info("Access 2 to resource {}", access2.handle());
-                }
-              });
+    try (var resources = CheckedCuVSResources.create();
+        var executor = Executors.newFixedThreadPool(1)) {
 
       try (var access1 = resources.access()) {
-        log.info("Access 1 to resource {}", access1.handle());
+        log.info(
+            "Access 1 to resource {} from {}", access1.handle(), Thread.currentThread().threadId());
       }
 
-      t.start();
-      t.join();
+      var future =
+          executor.submit(
+              () -> {
+                try (var access2 = resources.access()) {
+                  log.info(
+                      "Access 2 to resource {} from {}",
+                      access2.handle(),
+                      Thread.currentThread().threadId());
+                }
+              });
+      future.get();
     }
   }
 }
