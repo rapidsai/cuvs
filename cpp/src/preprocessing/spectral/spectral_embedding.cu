@@ -102,9 +102,6 @@ void create_connectivity_graph(raft::resources const& handle,
                                     sym_coo1_matrix.get_elements().data(),
                                     stream);
 
-  // auto sym_coo_matrix =
-  //   raft::make_device_coo_matrix<float, int, int, int>(handle, n_samples, n_samples);
-
   raft::sparse::op::coo_remove_scalar<128, float, int, int>(
     handle,
     raft::make_device_coo_matrix_view<const float, int, int, int>(
@@ -113,12 +110,11 @@ void create_connectivity_graph(raft::resources const& handle,
     connectivity_graph);
 }
 
-void coo_to_csr_matrix(
+raft::device_csr_matrix_view<float, int, int, int> coo_to_csr_matrix(
   raft::resources const& handle,
   const int n_samples,
   raft::device_vector_view<int> sym_coo_row_ind,
-  raft::device_coo_matrix<float, int, int, int>& sym_coo_matrix,
-  std::optional<raft::device_csr_matrix_view<float, int, int, int>>& csr_matrix_view)
+  raft::device_coo_matrix<float, int, int, int>& sym_coo_matrix)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
@@ -139,7 +135,7 @@ void coo_to_csr_matrix(
   auto sym_coo_nnz = sym_coo_matrix.structure_view().get_nnz();
   raft::copy(sym_coo_row_ind.data_handle() + sym_coo_row_ind.size() - 1, &sym_coo_nnz, 1, stream);
 
-  csr_matrix_view = raft::make_device_csr_matrix_view<float, int, int, int>(
+  auto csr_matrix_view = raft::make_device_csr_matrix_view<float, int, int, int>(
     const_cast<float*>(sym_coo_matrix.get_elements().data()),
     raft::make_device_compressed_structure_view<int, int, int>(
       const_cast<int*>(sym_coo_row_ind.data_handle()),
@@ -147,6 +143,7 @@ void coo_to_csr_matrix(
       n_samples,
       n_samples,
       sym_coo_matrix.structure_view().get_nnz()));
+  return csr_matrix_view;
 }
 
 raft::device_csr_matrix<float, int, int, int> create_laplacian(
@@ -248,19 +245,14 @@ void transform(raft::resources const& handle,
 {
   const int n_samples = dataset.extent(0);
 
-  auto stream = raft::resource::get_cuda_stream(handle);
-
   auto sym_coo_matrix =
     raft::make_device_coo_matrix<float, int, int, int>(handle, n_samples, n_samples);
   auto sym_coo_row_ind = raft::make_device_vector<int>(handle, n_samples + 1);
-  std::optional<raft::device_csr_matrix_view<float, int, int, int>> opt_csr_matrix_view;
-  auto diagonal = raft::make_device_vector<float, int>(handle, n_samples);
+  auto diagonal        = raft::make_device_vector<float, int>(handle, n_samples);
 
   create_connectivity_graph(handle, spectral_embedding_config, dataset, embedding, sym_coo_matrix);
-  coo_to_csr_matrix(handle, n_samples, sym_coo_row_ind.view(), sym_coo_matrix, opt_csr_matrix_view);
-
-  auto csr_matrix_view = opt_csr_matrix_view.value();
-
+  auto csr_matrix_view =
+    coo_to_csr_matrix(handle, n_samples, sym_coo_row_ind.view(), sym_coo_matrix);
   auto laplacian =
     create_laplacian(handle, spectral_embedding_config, csr_matrix_view, diagonal.view());
   compute_eigenpairs(
