@@ -149,16 +149,15 @@ public class TieredIndexImpl implements TieredIndex {
 
       MemorySegment indexParamsMemorySegment =
           tieredIndexParameters != null
-              ? segmentFromIndexParams(resources, tieredIndexParameters)
+              ? segmentFromIndexParams(localArena, tieredIndexParameters)
               : MemorySegment.NULL;
 
       // Get host data
       MemorySegment hostDataSeg =
           dataset != null
               ? ((DatasetImpl) dataset).asMemorySegment()
-              : Util.buildMemorySegment(resources.getArena(), vectors);
+              : Util.buildMemorySegment(localArena, vectors);
 
-      Arena arena = resources.getArena();
       long cuvsRes = resources.getHandle();
 
       // TieredIndex REQUIRES device memory - allocate it
@@ -177,7 +176,7 @@ public class TieredIndexImpl implements TieredIndex {
       MemorySegment datasetTensor =
           prepareTensor(localArena, datasetDP, datasetShape, 2, 32, 2, 2, 1);
 
-      MemorySegment index = arena.allocate(cuvsTieredIndex_t);
+      MemorySegment index = localArena.allocate(cuvsTieredIndex_t);
       returnValue = cuvsTieredIndexCreate(index);
       checkCuVSError(returnValue, "cuvsTieredIndexCreate");
 
@@ -219,12 +218,11 @@ public class TieredIndexImpl implements TieredIndex {
       long numQueries = query.getQueryVectors().length;
       long numBlocks = (long) topK * numQueries;
       int vectorDimension = numQueries > 0 ? query.getQueryVectors()[0].length : 0;
-      Arena arena = resources.getArena();
 
       SequenceLayout neighborsLayout = MemoryLayout.sequenceLayout(numBlocks, C_LONG);
       SequenceLayout distancesLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
-      MemorySegment neighborsSeg = arena.allocate(neighborsLayout);
-      MemorySegment distancesSeg = arena.allocate(distancesLayout);
+      MemorySegment neighborsSeg = localArena.allocate(neighborsLayout);
+      MemorySegment distancesSeg = localArena.allocate(distancesLayout);
 
       // Get host query data
       MemorySegment hostQueriesSeg = Util.buildMemorySegment(localArena, query.getQueryVectors());
@@ -341,7 +339,7 @@ public class TieredIndexImpl implements TieredIndex {
         checkCuVSError(returnValue, "cuvsRMMFree");
       }
 
-      return new TieredSearchResultsImpl(
+      return TieredSearchResultsImpl.create(
           neighborsLayout,
           distancesLayout,
           neighborsSeg,
@@ -372,7 +370,6 @@ public class TieredIndexImpl implements TieredIndex {
               ? ((DatasetImpl) extendDataset).asMemorySegment()
               : Util.buildMemorySegment(localArena, extendVectors);
 
-      Arena arena = resources.getArena();
       long cuvsRes = resources.getHandle();
 
       // Allocate device memory for extend data
@@ -446,9 +443,8 @@ public class TieredIndexImpl implements TieredIndex {
   /**
    * Allocates the configured index parameters in the MemorySegment.
    */
-  private static MemorySegment segmentFromIndexParams(
-      CuVSResourcesImpl resources, TieredIndexParams params) {
-    MemorySegment seg = cuvsTieredIndexParams.allocate(resources.getArena());
+  private static MemorySegment segmentFromIndexParams(Arena arena, TieredIndexParams params) {
+    MemorySegment seg = cuvsTieredIndexParams.allocate(arena);
 
     // Get the metric from CagraParams if available, otherwise use TieredIndex metric
     int metric;
@@ -476,7 +472,7 @@ public class TieredIndexImpl implements TieredIndex {
 
     CagraIndexParams cagraParams = params.getCagraParams();
     if (cagraParams != null) {
-      MemorySegment cagraParamsSeg = cuvsCagraIndexParams.allocate(resources.getArena());
+      MemorySegment cagraParamsSeg = cuvsCagraIndexParams.allocate(arena);
 
       cuvsCagraIndexParams.intermediate_graph_degree(
           cagraParamsSeg, cagraParams.getIntermediateGraphDegree());

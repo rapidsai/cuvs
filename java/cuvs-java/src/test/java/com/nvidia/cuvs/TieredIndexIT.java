@@ -40,6 +40,7 @@ public class TieredIndexIT extends CuVSTestCase {
   @Before
   public void setup() {
     initializeRandom();
+    log.debug("Random context initialized for test");
   }
 
   @Test
@@ -77,11 +78,13 @@ public class TieredIndexIT extends CuVSTestCase {
               .withCagraParams(cagraParams)
               .build();
 
+      log.debug("Building initial TieredIndex with {} vectors", initialDataset.length);
       TieredIndex index =
           TieredIndex.newBuilder(resources)
               .withDataset(initialDataset)
               .withIndexParams(indexParams)
               .build();
+      log.debug("Initial TieredIndex built successfully");
 
       CagraSearchParams searchParams =
           new CagraSearchParams.Builder(resources).withMaxIterations(20).build();
@@ -93,12 +96,18 @@ public class TieredIndexIT extends CuVSTestCase {
               .withSearchParams(searchParams)
               .build();
 
+      log.debug("Searching initial index with {} queries", queries.length);
       SearchResults initialResults = index.search(query);
+      log.debug("Initial search completed, validating results");
       assertEquals(expectedInitialResults, roundResults(initialResults.getResults()));
 
+      log.debug("Extending index with {} additional vectors", extensionVectors.length);
       index.extend().withDataset(extensionVectors).execute();
+      log.debug("Index extension completed");
 
+      log.debug("Searching extended index");
       SearchResults extendedResults = index.search(query);
+      log.debug("Extended search completed, validating results");
       assertEquals(expectedExtendedResults, roundResults(extendedResults.getResults()));
     }
   }
@@ -112,6 +121,7 @@ public class TieredIndexIT extends CuVSTestCase {
       TieredIndexParams indexParams =
           new TieredIndexParams.Builder().minAnnRows(2).withCagraParams(cagraParams).build();
 
+      log.debug("Testing error handling with null dataset");
       TieredIndex.newBuilder(resources)
           .withIndexParams(indexParams)
           .withDataset((float[][]) null)
@@ -138,11 +148,13 @@ public class TieredIndexIT extends CuVSTestCase {
       TieredIndexParams indexParams =
           new TieredIndexParams.Builder().minAnnRows(2).withCagraParams(cagraParams).build();
 
+      log.debug("Building TieredIndex for K-value testing with {} vectors", dataset.length);
       TieredIndex index =
           TieredIndex.newBuilder(resources)
               .withDataset(dataset)
               .withIndexParams(indexParams)
               .build();
+      log.debug("TieredIndex built for K-value testing");
 
       TieredIndexQuery query1 =
           new TieredIndexQuery.Builder()
@@ -152,8 +164,10 @@ public class TieredIndexIT extends CuVSTestCase {
                   new CagraSearchParams.Builder(resources).withMaxIterations(20).build())
               .build();
 
+      log.debug("Searching with K=1");
       SearchResults results1 = index.search(query1);
       Map<Integer, Float> firstResult = results1.getResults().get(0);
+      log.debug("K=1 search completed, found {} results", firstResult.size());
 
       assertEquals(1, firstResult.size());
       assertTrue("Should contain index 0 (closest vector)", firstResult.containsKey(0));
@@ -167,8 +181,10 @@ public class TieredIndexIT extends CuVSTestCase {
                   new CagraSearchParams.Builder(resources).withMaxIterations(20).build())
               .build();
 
+      log.debug("Searching with K=3");
       SearchResults results3 = index.search(query3);
       Map<Integer, Float> thirdResult = results3.getResults().get(0);
+      log.debug("K=3 search completed, found {} results", thirdResult.size());
 
       assertEquals(3, thirdResult.size());
       assertTrue("Should contain index 0", thirdResult.containsKey(0));
@@ -195,17 +211,20 @@ public class TieredIndexIT extends CuVSTestCase {
       TieredIndexParams indexParams =
           new TieredIndexParams.Builder().minAnnRows(2).withCagraParams(cagraParams).build();
 
+      log.debug("Building TieredIndex for prefilter testing with {} vectors", dataset.length);
       TieredIndex index =
           TieredIndex.newBuilder(resources)
               .withDataset(dataset)
               .withIndexParams(indexParams)
               .build();
+      log.debug("TieredIndex built for prefilter testing");
 
       CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
 
       BitSet prefilter = new BitSet(4);
       prefilter.set(1, true);
       prefilter.set(2, true);
+      log.debug("Created prefilter allowing indices 1 and 2, excluding 0 and 3");
 
       TieredIndexQuery queryWithFilter =
           new TieredIndexQuery.Builder()
@@ -215,8 +234,10 @@ public class TieredIndexIT extends CuVSTestCase {
               .withPrefilter(prefilter, 4)
               .build();
 
+      log.debug("Searching with prefilter applied");
       SearchResults resultsWithFilter = index.search(queryWithFilter);
       Map<Integer, Float> result = resultsWithFilter.getResults().get(0);
+      log.debug("Prefilter search completed, validating filtered results");
 
       assertFalse("Index 0 should be filtered out", result.containsKey(0));
       assertFalse("Index 3 should be filtered out", result.containsKey(3));
