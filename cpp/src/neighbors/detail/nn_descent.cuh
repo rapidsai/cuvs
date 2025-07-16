@@ -643,9 +643,10 @@ __launch_bounds__(BLOCK_SIZE)
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         s_distances[i] = 1.0 - s_distances[i];
       } else if (metric == cuvs::distance::DistanceType::BitwiseHamming) {
-        s_distances[i]         = 0.0;
-        int n1                 = new_neighbors[row_id];
-        int n2                 = new_neighbors[col_id];
+        s_distances[i] = 0.0;
+        int n1         = new_neighbors[row_id];
+        int n2         = new_neighbors[col_id];
+        // TODO: https://github.com/rapidsai/cuvs/issues/1127
         const uint8_t* data_n1 = reinterpret_cast<const uint8_t*>(data) + n1 * data_dim;
         const uint8_t* data_n2 = reinterpret_cast<const uint8_t*>(data) + n2 * data_dim;
         for (int d = 0; d < data_dim; d++) {
@@ -741,9 +742,10 @@ __launch_bounds__(BLOCK_SIZE)
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         s_distances[i] = 1.0 - s_distances[i];
       } else if (metric == cuvs::distance::DistanceType::BitwiseHamming) {
-        s_distances[i]         = 0.0;
-        int n1                 = old_neighbors[row_id];
-        int n2                 = new_neighbors[col_id];
+        s_distances[i] = 0.0;
+        int n1         = old_neighbors[row_id];
+        int n2         = new_neighbors[col_id];
+        // TODO: https://github.com/rapidsai/cuvs/issues/1127
         const uint8_t* data_n1 = reinterpret_cast<const uint8_t*>(data) + n1 * data_dim;
         const uint8_t* data_n2 = reinterpret_cast<const uint8_t*>(data) + n2 * data_dim;
         for (int d = 0; d < data_dim; d++) {
