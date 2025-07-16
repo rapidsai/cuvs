@@ -338,8 +338,6 @@ void pairwise_distance(
  * @brief Compute pairwise distances for two matrices (uint8_t specialization for BitwiseHamming)
  *
  * Note: Only contiguous row- or column-major layouts supported currently.
- * This function automatically optimizes internally by using uint32_t or uint64_t 
- * computation when data alignment allows for better performance.
  *
  * Usage example:
  * @code{.cpp}

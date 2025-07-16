@@ -55,27 +55,14 @@ struct bitwise_hamming_distance_op {
 
   DI void core(AccT& acc, DataT& x, DataT& y) const
   {
-    // Handle different data types by operating on their bit representations
     if constexpr (sizeof(DataT) == 1) {
-      // 8-bit types (uint8_t, int8_t, etc.)
-      auto x_bits = *reinterpret_cast<const uint8_t*>(&x);
-      auto y_bits = *reinterpret_cast<const uint8_t*>(&y);
-      acc += __popc(static_cast<uint32_t>(x_bits ^ y_bits));
+      acc += __popc(static_cast<uint32_t>(x ^ y) & 0xffu);
     } else if constexpr (sizeof(DataT) == 2) {
-      // 16-bit types (uint16_t, int16_t, half/float16, etc.)
-      auto x_bits = *reinterpret_cast<const uint16_t*>(&x);
-      auto y_bits = *reinterpret_cast<const uint16_t*>(&y);
-      acc += __popc(static_cast<uint32_t>(x_bits ^ y_bits));
+      acc += __popc(static_cast<uint32_t>(x ^ y) & 0xffffu);
     } else if constexpr (sizeof(DataT) == 4) {
-      // 32-bit types (uint32_t, int32_t, float, etc.)
-      auto x_bits = *reinterpret_cast<const uint32_t*>(&x);
-      auto y_bits = *reinterpret_cast<const uint32_t*>(&y);
-      acc += __popc(x_bits ^ y_bits);
+      acc += __popc(x ^ y);
     } else if constexpr (sizeof(DataT) == 8) {
-      // 64-bit types (uint64_t, int64_t, double, etc.)
-      auto x_bits = *reinterpret_cast<const uint64_t*>(&x);
-      auto y_bits = *reinterpret_cast<const uint64_t*>(&y);
-      acc += __popcll(x_bits ^ y_bits);
+      acc += __popcll(x ^ y);
     } else {
       static_assert(sizeof(DataT) <= 8,
                     "BitwiseHamming distance only supports types up to 64 bits");
