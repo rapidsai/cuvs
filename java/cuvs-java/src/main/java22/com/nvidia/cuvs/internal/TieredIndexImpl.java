@@ -536,10 +536,7 @@ public class TieredIndexImpl implements TieredIndex {
    */
   @Override
   public TieredIndexType getIndexType() {
-    TieredIndexType indexType =
-        tieredIndexParameters != null && tieredIndexParameters.getCagraParams() != null
-            ? TieredIndexType.CAGRA
-            : TieredIndexType.CAGRA; // Default to CAGRA for now
+    TieredIndexType indexType = TieredIndexType.CAGRA; // Default to CAGRA for now
     return indexType;
   }
 

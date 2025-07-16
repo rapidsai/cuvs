@@ -40,12 +40,8 @@ public class TieredIndexIT extends CuVSTestCase {
   @Before
   public void setup() {
     initializeRandom();
-    log.info("Random context initialized for test.");
   }
 
-  /**
-   * Tests basic operations of TieredIndex - build, search, and extend.
-   */
   @Test
   public void testBasicOperations() throws Throwable {
     float[][] initialDataset = {
@@ -81,7 +77,6 @@ public class TieredIndexIT extends CuVSTestCase {
               .withCagraParams(cagraParams)
               .build();
 
-      log.info("Building initial index...");
       TieredIndex index =
           TieredIndex.newBuilder(resources)
               .withDataset(initialDataset)
@@ -98,24 +93,16 @@ public class TieredIndexIT extends CuVSTestCase {
               .withSearchParams(searchParams)
               .build();
 
-      log.info("Searching initial index...");
       SearchResults initialResults = index.search(query);
-      log.info("Initial search results: {}", initialResults.getResults());
       assertEquals(expectedInitialResults, roundResults(initialResults.getResults()));
 
-      log.info("Extending index...");
       index.extend().withDataset(extensionVectors).execute();
 
-      log.info("Searching extended index...");
       SearchResults extendedResults = index.search(query);
-      log.info("Extended search results: {}", extendedResults.getResults());
       assertEquals(expectedExtendedResults, roundResults(extendedResults.getResults()));
     }
   }
 
-  /**
-   * Tests error handling and parameter validation.
-   */
   @Test(expected = IllegalArgumentException.class)
   public void testErrorHandling() throws Throwable {
     try (CuVSResources resources = CuVSResources.create()) {
@@ -132,9 +119,6 @@ public class TieredIndexIT extends CuVSTestCase {
     }
   }
 
-  /**
-   * Tests search with different K values.
-   */
   @Test
   public void testDifferentKValues() throws Throwable {
     float[][] dataset = {
@@ -169,7 +153,11 @@ public class TieredIndexIT extends CuVSTestCase {
               .build();
 
       SearchResults results1 = index.search(query1);
-      assertEquals(1, results1.getResults().get(0).size());
+      Map<Integer, Float> firstResult = results1.getResults().get(0);
+
+      assertEquals(1, firstResult.size());
+      assertTrue("Should contain index 0 (closest vector)", firstResult.containsKey(0));
+      assertEquals("Distance to closest vector should be ~0.02", 0.02f, firstResult.get(0), 0.01f);
 
       TieredIndexQuery query3 =
           new TieredIndexQuery.Builder()
@@ -180,13 +168,21 @@ public class TieredIndexIT extends CuVSTestCase {
               .build();
 
       SearchResults results3 = index.search(query3);
-      assertEquals(3, results3.getResults().get(0).size());
+      Map<Integer, Float> thirdResult = results3.getResults().get(0);
+
+      assertEquals(3, thirdResult.size());
+      assertTrue("Should contain index 0", thirdResult.containsKey(0));
+      assertTrue("Should contain index 1", thirdResult.containsKey(1));
+      assertTrue("Should contain index 2", thirdResult.containsKey(2));
+
+      float dist0 = thirdResult.get(0);
+      float dist1 = thirdResult.get(1);
+      float dist2 = thirdResult.get(2);
+
+      assertTrue("Distance to index 0 should be smallest", dist0 <= dist1 && dist0 <= dist2);
     }
   }
 
-  /**
-   * Test prefilter functionality with debug logging
-   */
   @Test
   public void testPrefilter() throws Throwable {
     float[][] dataset = {{0.0f, 0.0f}, {1.0f, 1.0f}, {2.0f, 2.0f}, {3.0f, 3.0f}};
@@ -207,20 +203,9 @@ public class TieredIndexIT extends CuVSTestCase {
 
       CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
 
-      TieredIndexQuery queryWithoutFilter =
-          new TieredIndexQuery.Builder()
-              .withTopK(3)
-              .withQueryVectors(queryVectors)
-              .withSearchParams(searchParams)
-              .build();
-
-      SearchResults resultsWithoutFilter = index.search(queryWithoutFilter);
-      log.info("Results WITHOUT prefilter: {}", resultsWithoutFilter.getResults());
-
       BitSet prefilter = new BitSet(4);
       prefilter.set(1, true);
       prefilter.set(2, true);
-      // Index 0 and 3 are NOT set, so they should be excluded
 
       TieredIndexQuery queryWithFilter =
           new TieredIndexQuery.Builder()
@@ -231,11 +216,10 @@ public class TieredIndexIT extends CuVSTestCase {
               .build();
 
       SearchResults resultsWithFilter = index.search(queryWithFilter);
-      log.info("Results WITH prefilter: {}", resultsWithFilter.getResults());
-
       Map<Integer, Float> result = resultsWithFilter.getResults().get(0);
 
       assertFalse("Index 0 should be filtered out", result.containsKey(0));
+      assertFalse("Index 3 should be filtered out", result.containsKey(3));
       assertTrue("Index 1 or 2 should be present", result.containsKey(1) || result.containsKey(2));
     }
   }
