@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -132,7 +132,7 @@ void parse_build_param(const nlohmann::json& conf,
       ivf_pq_build_p.kmeans_n_iters = ivf_pq_build_conf.at("niter");
     }
     if (ivf_pq_build_conf.contains("ratio")) {
-      ivf_pq_build_p.kmeans_trainset_fraction = 1.0 / (double)conf.at("ratio");
+      ivf_pq_build_p.kmeans_trainset_fraction = 1.0 / static_cast<double>(conf.at("ratio"));
     }
     if (ivf_pq_build_conf.contains("pq_bits")) {
       ivf_pq_build_p.pq_bits = ivf_pq_build_conf.at("pq_bits");
