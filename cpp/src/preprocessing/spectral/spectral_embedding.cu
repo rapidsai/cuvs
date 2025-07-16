@@ -36,8 +36,6 @@
 #include <thrust/sequence.h>
 #include <thrust/tabulate.h>
 
-#include <optional>
-
 namespace cuvs::preprocessing::spectral_embedding {
 
 void create_connectivity_graph(raft::resources const& handle,
