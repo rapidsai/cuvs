@@ -192,7 +192,7 @@ cuvsError_t cuvsVersionGet(uint16_t* major, uint16_t* minor, uint16_t* patch);
  * @param[in] src Pointer to DLManagedTensor to copy
  * @param[out] dst Pointer to DLManagedTensor to receive copy of data
  */
-cuvsError_t cuvsCopyMatrix(cuvsResources_t res, DLManagedTensor* src, DLManagedTensor* dst);
+cuvsError_t cuvsMatrixCopy(cuvsResources_t res, DLManagedTensor* src, DLManagedTensor* dst);
 /** @} */
 
 #ifdef __cplusplus

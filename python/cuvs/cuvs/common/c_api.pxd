@@ -35,5 +35,5 @@ cdef extern from "cuvs/core/c_api.h":
     cuvsError_t cuvsStreamSync(cuvsResources_t res)
     const char * cuvsGetLastErrorText()
 
-    cuvsError_t cuvsCopyMatrix(cuvsResources_t res, DLManagedTensor * src,
+    cuvsError_t cuvsMatrixCopy(cuvsResources_t res, DLManagedTensor * src,
                                DLManagedTensor * dst)

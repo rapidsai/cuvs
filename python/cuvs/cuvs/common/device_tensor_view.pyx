@@ -15,7 +15,7 @@
 #
 import numpy as np
 
-from cuvs.common.c_api cimport cuvsCopyMatrix, cuvsResources_t
+from cuvs.common.c_api cimport cuvsMatrixCopy, cuvsResources_t
 from cuvs.common.cydlpack cimport DLManagedTensor, dlpack_c
 
 from pylibraft.common.cai_wrapper import wrap_array
@@ -72,7 +72,7 @@ cdef class DeviceTensorView:
         output = np.empty(self.shape, dtype=self.dtype)
         ai = wrap_array(output)
         cdef DLManagedTensor* output_dlpack = dlpack_c(ai)
-        check_cuvs(cuvsCopyMatrix(res, &self.tensor, output_dlpack))
+        check_cuvs(cuvsMatrixCopy(res, &self.tensor, output_dlpack))
         return output
 
     @property
