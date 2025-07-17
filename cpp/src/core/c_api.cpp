@@ -188,7 +188,7 @@ void _copy_matrix(cuvsResources_t res, DLManagedTensor* src_managed, DLManagedTe
 }
 }  // namespace
 
-extern "C" cuvsError_t cuvsCopyMatrix(cuvsResources_t res,
+extern "C" cuvsError_t cuvsMatrixCopy(cuvsResources_t res,
                                       DLManagedTensor* src_managed,
                                       DLManagedTensor* dst_managed)
 {
