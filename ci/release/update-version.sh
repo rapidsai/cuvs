@@ -109,6 +109,3 @@ done
 sed_runner "s| CuVS [[:digit:]]\{2\}\.[[:digit:]]\{2\} | CuVS ${NEXT_SHORT_TAG} |g" java/README.md
 sed_runner "s|-[[:digit:]]\{2\}\.[[:digit:]]\{2\}\.[[:digit:]]\{1,2\}\.jar|-${NEXT_FULL_JAVA_TAG}\.jar|g" java/examples/README.md
 sed_runner "s|/[[:digit:]]\{2\}\.[[:digit:]]\{2\}\.[[:digit:]]\{1,2\}/|/${NEXT_FULL_JAVA_TAG}/|g" java/examples/README.md
-
-# Update CI image tags of the form {rapids_version}-{something}
-sed_runner "s/:[0-9]*\\.[0-9]*-/:${NEXT_SHORT_TAG}-/g" ./CONTRIBUTING.md
