@@ -459,12 +459,10 @@ void pairwise_distance(raft::resources const& handle,
 
   if (metric == cuvs::distance::DistanceType::BitwiseHamming) {
     RAFT_EXPECTS(is_uint8_type,
-                 "BitwiseHamming distance requires uint8_t input type (internally optimized to "
-                 "uint32_t/uint64_t when possible)");
+                 "BitwiseHamming distance requires uint8_t input type");
   } else {
     RAFT_EXPECTS(is_float_type,
-                 "Non-BitwiseHamming distance metrics require floating-point input types (float, "
-                 "double, half)");
+                 "uint8 only supported for BitwiseHamming distance");
   }
 
   RAFT_EXPECTS(x.extent(1) == y.extent(1), "Number of columns must be equal.");

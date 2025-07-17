@@ -267,15 +267,21 @@ void distance_impl(raft::resources const& handle,
                    bool is_row_major,
                    DataT)  // metric_arg unused
 {
-  ops::bitwise_hamming_distance_op<DataT, AccT, IdxT> distance_op{};
+  // BitwiseHamming only works with integral types
+  if constexpr (std::is_integral_v<DataT>) {
+    ops::bitwise_hamming_distance_op<DataT, AccT, IdxT> distance_op{};
 
-  const OutT* x_norm = nullptr;
-  const OutT* y_norm = nullptr;
+    const OutT* x_norm = nullptr;
+    const OutT* y_norm = nullptr;
 
-  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+    cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
-  pairwise_matrix_dispatch<decltype(distance_op), DataT, AccT, OutT, FinOpT, IdxT>(
-    distance_op, m, n, k, x, y, x_norm, y_norm, out, fin_op, stream, is_row_major);
+    pairwise_matrix_dispatch<decltype(distance_op), DataT, AccT, OutT, FinOpT, IdxT>(
+      distance_op, m, n, k, x, y, x_norm, y_norm, out, fin_op, stream, is_row_major);
+  } else {
+    RAFT_FAIL("BitwiseHamming distance requires integral data types (uint8_t, uint32_t, uint64_t). "
+              "Floating-point types (float, double, half) are not supported for bitwise operations.");
+  }
 }
 
 template <typename DataT, typename AccT, typename OutT, typename FinOpT, typename IdxT = int>
