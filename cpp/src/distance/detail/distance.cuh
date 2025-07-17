@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2018-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -298,11 +298,14 @@ void distance_impl(raft::resources const& handle,
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
+  rmm::device_uvector<DataT> y_temp(n * k, stream);
+  raft::copy(y_temp.data(), y, n * k, stream);
+  const DataT* y_temp_ptr = y.data();
+
   // First sqrt x and y
   const auto raft_sqrt = raft::linalg::unaryOp<DataT, raft::sqrt_op, IdxT>;
-
   raft_sqrt((DataT*)x, x, m * k, raft::sqrt_op{}, stream);
-  if (x != y) { raft_sqrt((DataT*)y, y, n * k, raft::sqrt_op{}, stream); }
+  raft_sqrt((DataT*)y_temp_ptr, y_temp_ptr, n * k, raft::sqrt_op{}, stream);
 
   // Then calculate Hellinger distance
   ops::hellinger_distance_op<DataT, AccT, IdxT> distance_op{};
@@ -311,11 +314,11 @@ void distance_impl(raft::resources const& handle,
   const OutT* y_norm = nullptr;
 
   pairwise_matrix_dispatch<decltype(distance_op), DataT, AccT, OutT, FinOpT, IdxT>(
-    distance_op, m, n, k, x, y, x_norm, y_norm, out, fin_op, stream, is_row_major);
+    distance_op, m, n, k, x, y_temp_ptr, x_norm, y_norm, out, fin_op, stream, is_row_major);
 
   // Finally revert sqrt of x and y
-  raft_sqrt((DataT*)x, x, m * k, raft::sqrt_op{}, stream);
-  if (x != y) { raft_sqrt((DataT*)y, y, n * k, raft::sqrt_op{}, stream); }
+  const auto raft_sq = raft::linalg::unaryOp<DataT, raft::sq_op, IdxT>;
+  raft_sq((DataT*)x, x, m * k, raft::sq_op{}, stream);
 
   RAFT_CUDA_TRY(cudaGetLastError());
 }
