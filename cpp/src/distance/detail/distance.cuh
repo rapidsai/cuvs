@@ -300,7 +300,7 @@ void distance_impl(raft::resources const& handle,
 
   rmm::device_uvector<DataT> y_temp(n * k, stream);
   raft::copy(y_temp.data(), y, n * k, stream);
-  const DataT* y_temp_ptr = y.data();
+  const DataT* y_temp_ptr = y_temp.data();
 
   // First sqrt x and y
   const auto raft_sqrt = raft::linalg::unaryOp<DataT, raft::sqrt_op, IdxT>;
