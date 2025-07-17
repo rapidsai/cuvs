@@ -102,24 +102,6 @@ inline void unpack_contiguous_list_data_impl(
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
-// /** Unpack the list data; see the public interface for the api and usage. */
-// template <typename IdxT>
-// void unpack_contiguous_list_data(raft::resources const& res,
-//                                  const index<IdxT>& index,
-//                                  uint8_t* out_codes,
-//                                  uint32_t n_rows,
-//                                  uint32_t label,
-//                                  std::variant<uint32_t, const uint32_t*> offset_or_indices)
-// {
-//   unpack_contiguous_list_data(out_codes,
-//                               index.lists()[label]->data.view(),
-//                               n_rows,
-//                               index.pq_dim(),
-//                               offset_or_indices,
-//                               index.pq_bits(),
-//                               raft::resource::get_cuda_stream(res));
-// }
-
 /**
  * A producer for the `write_vector` reads tightly packed flat codes. That is,
  * the codes are not expanded to one code-per-byte.
@@ -199,22 +181,4 @@ inline void pack_contiguous_list_data_impl(
   kernel<<<blocks, threads, 0, stream>>>(list_data, codes, n_rows, pq_dim, offset_or_indices);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
-
-// template <typename IdxT>
-// void pack_contiguous_list_data(raft::resources const& res,
-//                                index<IdxT>* index,
-//                                const uint8_t* new_codes,
-//                                uint32_t n_rows,
-//                                uint32_t label,
-//                                std::variant<uint32_t, const uint32_t*> offset_or_indices)
-// {
-//   pack_contiguous_list_data(index->lists()[label]->data.view(),
-//                             new_codes,
-//                             n_rows,
-//                             index->pq_dim(),
-//                             offset_or_indices,
-//                             index->pq_bits(),
-//                             raft::resource::get_cuda_stream(res));
-// }
-
 }  // namespace cuvs::neighbors::ivf_pq::detail
