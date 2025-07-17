@@ -458,6 +458,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_float_bitset64.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_false_bitset64.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_true_bitset64.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_contiguous_list_data.cu
     src/neighbors/ivf_pq/detail/ivf_pq_process_and_fill_codes.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_float_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_half_int64_t.cu

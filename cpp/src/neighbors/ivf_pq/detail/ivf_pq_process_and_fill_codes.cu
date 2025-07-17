@@ -24,14 +24,6 @@
     raft::device_matrix_view<float> new_vectors_residual,                                    \
     std::variant<IdxT, const IdxT*> src_offset_or_indices,                                   \
     const uint32_t* new_labels,                                                              \
-    IdxT n_rows);                                                                            \
-                                                                                             \
-  template void cuvs::neighbors::ivf_pq::detail::launch_encode_list_data_kernel<IdxT>(       \
-    raft::resources const& handle,                                                           \
-    cuvs::neighbors::ivf_pq::index<IdxT>* index,                                             \
-    raft::device_matrix_view<float> new_vectors_residual,                                    \
-    uint32_t label,                                                                          \
-    std::variant<uint32_t, const uint32_t*> offset_or_indices,                               \
     IdxT n_rows);
 
 instantiate_cuvs_neighbors_ivf_pq_detail_process_and_fill_codes(int64_t);
