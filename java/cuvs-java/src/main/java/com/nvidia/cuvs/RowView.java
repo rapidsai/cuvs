@@ -27,7 +27,7 @@ public interface RowView {
   /**
    * Returns the integer element at the given position. Asserts that the
    * data type of the dataset on top of which this view is instantiates is
-   * {@link com.nvidia.cuvs.Dataset.DataType#INT}
+   * {@link CuVSMatrix.DataType#INT}
    *
    * @param index the element index
    */
@@ -36,7 +36,7 @@ public interface RowView {
   /**
    * Returns the integer element at the given position. Asserts that the
    * data type of the dataset on top of which this view is instantiates is
-   * {@link com.nvidia.cuvs.Dataset.DataType#FLOAT}
+   * {@link CuVSMatrix.DataType#FLOAT}
    *
    * @param index the element index
    */
@@ -45,7 +45,7 @@ public interface RowView {
   /**
    * Returns the integer element at the given position. Asserts that the
    * data type of the dataset on top of which this view is instantiates is
-   * {@link com.nvidia.cuvs.Dataset.DataType#BYTE}
+   * {@link CuVSMatrix.DataType#BYTE}
    *
    * @param index the element index
    */

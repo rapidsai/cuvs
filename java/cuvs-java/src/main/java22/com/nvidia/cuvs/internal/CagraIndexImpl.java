@@ -38,8 +38,8 @@ import com.nvidia.cuvs.CagraQuery;
 import com.nvidia.cuvs.CagraSearchParams;
 import com.nvidia.cuvs.CuVSIvfPqIndexParams;
 import com.nvidia.cuvs.CuVSIvfPqSearchParams;
+import com.nvidia.cuvs.CuVSMatrix;
 import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.SearchResults;
 import com.nvidia.cuvs.internal.panama.cuvsCagraCompressionParams;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndexParams;
@@ -89,11 +89,11 @@ public class CagraIndexImpl implements CagraIndex {
    * @param resources       an instance of {@link CuVSResources}
    */
   private CagraIndexImpl(
-      CagraIndexParams indexParameters, Dataset dataset, CuVSResourcesImpl resources) {
+      CagraIndexParams indexParameters, CuVSMatrix dataset, CuVSResourcesImpl resources) {
     Objects.requireNonNull(dataset);
     this.resources = resources;
-    assert dataset instanceof DatasetBaseImpl;
-    this.cagraIndexReference = build(indexParameters, (DatasetBaseImpl) dataset);
+    assert dataset instanceof CuVSMatrixBaseImpl;
+    this.cagraIndexReference = build(indexParameters, (CuVSMatrixBaseImpl) dataset);
   }
 
   /**
@@ -150,7 +150,7 @@ public class CagraIndexImpl implements CagraIndex {
    * @return an instance of {@link IndexReference} that holds the pointer to the
    *         index
    */
-  private IndexReference build(CagraIndexParams indexParameters, DatasetBaseImpl dataset) {
+  private IndexReference build(CagraIndexParams indexParameters, CuVSMatrixBaseImpl dataset) {
     try (var localArena = Arena.ofConfined()) {
       long rows = dataset.size();
       long cols = dataset.columns();
@@ -655,7 +655,7 @@ public class CagraIndexImpl implements CagraIndex {
    */
   public static class Builder implements CagraIndex.Builder {
 
-    private Dataset dataset;
+    private CuVSMatrix dataset;
     private CagraIndexParams cagraIndexParams;
     private final CuVSResourcesImpl cuvsResources;
     private InputStream inputStream;
@@ -672,12 +672,12 @@ public class CagraIndexImpl implements CagraIndex {
 
     @Override
     public Builder withDataset(float[][] vectors) {
-      this.dataset = Dataset.ofArray(vectors);
+      this.dataset = CuVSMatrix.ofArray(vectors);
       return this;
     }
 
     @Override
-    public Builder withDataset(Dataset dataset) {
+    public Builder withDataset(CuVSMatrix dataset) {
       this.dataset = dataset;
       return this;
     }
@@ -704,7 +704,7 @@ public class CagraIndexImpl implements CagraIndex {
   public static class IndexReference {
 
     private final MemorySegment memorySegment;
-    private final Dataset dataset;
+    private final CuVSMatrix dataset;
 
     /**
      * Constructs CagraIndexReference with an instance of MemorySegment passed as a
@@ -717,7 +717,7 @@ public class CagraIndexImpl implements CagraIndex {
      *                           to it so we can close it when the index is closed.
      *                           Can be null (e.g. from deserialization or merging)
      */
-    private IndexReference(MemorySegment indexMemorySegment, Dataset dataset) {
+    private IndexReference(MemorySegment indexMemorySegment, CuVSMatrix dataset) {
       this.memorySegment = indexMemorySegment;
       this.dataset = dataset;
     }

@@ -42,8 +42,8 @@ import static com.nvidia.cuvs.internal.panama.headers_h.omp_set_num_threads;
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.BruteForceIndexParams;
 import com.nvidia.cuvs.BruteForceQuery;
+import com.nvidia.cuvs.CuVSMatrix;
 import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.SearchResults;
 import com.nvidia.cuvs.internal.panama.cuvsFilter;
 import java.io.InputStream;
@@ -81,13 +81,13 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    *                              holding the index parameters
    */
   private BruteForceIndexImpl(
-      Dataset dataset, CuVSResourcesImpl resources, BruteForceIndexParams bruteForceIndexParams)
+      CuVSMatrix dataset, CuVSResourcesImpl resources, BruteForceIndexParams bruteForceIndexParams)
       throws Exception {
     Objects.requireNonNull(dataset);
     try (dataset) {
       this.resources = resources;
-      assert dataset instanceof DatasetBaseImpl;
-      this.bruteForceIndexReference = build((DatasetBaseImpl) dataset, bruteForceIndexParams);
+      assert dataset instanceof CuVSMatrixBaseImpl;
+      this.bruteForceIndexReference = build((CuVSMatrixBaseImpl) dataset, bruteForceIndexParams);
     }
   }
 
@@ -144,7 +144,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    *         index
    */
   private IndexReference build(
-      DatasetBaseImpl dataset, BruteForceIndexParams bruteForceIndexParams) {
+      CuVSMatrixBaseImpl dataset, BruteForceIndexParams bruteForceIndexParams) {
     long rows = dataset.size();
     long cols = dataset.columns();
 
@@ -391,7 +391,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    */
   public static class Builder implements BruteForceIndex.Builder {
 
-    private Dataset dataset;
+    private CuVSMatrix dataset;
     private final CuVSResourcesImpl cuvsResources;
     private BruteForceIndexParams bruteForceIndexParams;
     private InputStream inputStream;
@@ -439,18 +439,18 @@ public class BruteForceIndexImpl implements BruteForceIndex {
      */
     @Override
     public Builder withDataset(float[][] vectors) {
-      this.dataset = Dataset.ofArray(vectors);
+      this.dataset = CuVSMatrix.ofArray(vectors);
       return this;
     }
 
     /**
      * Sets the dataset for building the {@link BruteForceIndex}.
      *
-     * @param dataset a {@link Dataset} object containing the vectors
+     * @param dataset a {@link CuVSMatrix} object containing the vectors
      * @return an instance of this Builder
      */
     @Override
-    public Builder withDataset(Dataset dataset) {
+    public Builder withDataset(CuVSMatrix dataset) {
       this.dataset = dataset;
       return this;
     }

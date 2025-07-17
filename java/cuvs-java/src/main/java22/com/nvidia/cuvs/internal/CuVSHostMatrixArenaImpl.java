@@ -24,10 +24,10 @@ import java.util.concurrent.atomic.AtomicReference;
  * A Dataset implementation backed by host (CPU) memory.
  * Memory is allocated and managed by the implementation, via a Java shared {@link Arena}
  */
-public class ArenaDatasetImpl extends HostMemoryDatasetImpl {
+public class CuVSHostMatrixArenaImpl extends CuVSHostMatrixImpl {
   private final AtomicReference<Arena> arenaReference;
 
-  public ArenaDatasetImpl(long size, long columns, DataType dataType) {
+  public CuVSHostMatrixArenaImpl(long size, long columns, DataType dataType) {
     this(
         size,
         columns,
@@ -37,7 +37,7 @@ public class ArenaDatasetImpl extends HostMemoryDatasetImpl {
         Arena.ofShared());
   }
 
-  private ArenaDatasetImpl(
+  private CuVSHostMatrixArenaImpl(
       long size,
       long columns,
       DataType dataType,

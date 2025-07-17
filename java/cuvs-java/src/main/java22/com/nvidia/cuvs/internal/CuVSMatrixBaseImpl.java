@@ -15,16 +15,16 @@
  */
 package com.nvidia.cuvs.internal;
 
-import com.nvidia.cuvs.Dataset;
+import com.nvidia.cuvs.CuVSMatrix;
 import java.lang.foreign.MemorySegment;
 
-public abstract class DatasetBaseImpl implements Dataset {
+public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
   protected final MemorySegment memorySegment;
   protected final DataType dataType;
   protected final long size;
   protected final long columns;
 
-  protected DatasetBaseImpl(
+  protected CuVSMatrixBaseImpl(
       MemorySegment memorySegment, DataType dataType, long size, long columns) {
     this.memorySegment = memorySegment;
     this.dataType = dataType;

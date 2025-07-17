@@ -25,7 +25,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 @RunWith(RandomizedRunner.class)
-public class DatasetIT extends CuVSTestCase {
+public class CuVSMatrixIT extends CuVSTestCase {
 
   @Before
   public void setup() {
@@ -73,7 +73,7 @@ public class DatasetIT extends CuVSTestCase {
 
   @Test
   public void testByteDatasetRowGetAccess() {
-    try (var dataset = Dataset.ofArray(byteData)) {
+    try (var dataset = CuVSMatrix.ofArray(byteData)) {
       for (int n = 0; n < dataset.size(); ++n) {
         var row = dataset.getRow(n);
         assertEquals(dataset.columns(), row.size());
@@ -86,7 +86,7 @@ public class DatasetIT extends CuVSTestCase {
 
   @Test
   public void testByteDatasetRowCopy() {
-    try (var dataset = Dataset.ofArray(byteData)) {
+    try (var dataset = CuVSMatrix.ofArray(byteData)) {
       for (int n = 0; n < dataset.size(); ++n) {
         var row = dataset.getRow(n);
         assertEquals(dataset.columns(), row.size());
@@ -100,7 +100,7 @@ public class DatasetIT extends CuVSTestCase {
 
   @Test
   public void testByteDatasetCopy() {
-    try (var dataset = Dataset.ofArray(byteData)) {
+    try (var dataset = CuVSMatrix.ofArray(byteData)) {
       var dataCopy = new byte[(int) dataset.size()][(int) dataset.columns()];
       dataset.toArray(dataCopy);
       for (int n = 0; n < dataset.size(); ++n) {
@@ -114,7 +114,7 @@ public class DatasetIT extends CuVSTestCase {
   @Test
   public void testIntDatasetRowGetAccess() {
     var intData = createIntMatrix();
-    try (var dataset = Dataset.ofArray(intData)) {
+    try (var dataset = CuVSMatrix.ofArray(intData)) {
       for (int n = 0; n < dataset.size(); ++n) {
         var row = dataset.getRow(n);
         assertEquals(dataset.columns(), row.size());
@@ -128,7 +128,7 @@ public class DatasetIT extends CuVSTestCase {
   @Test
   public void testIntDatasetRowCopy() {
     var intData = createIntMatrix();
-    try (var dataset = Dataset.ofArray(intData)) {
+    try (var dataset = CuVSMatrix.ofArray(intData)) {
       for (int n = 0; n < dataset.size(); ++n) {
         var row = dataset.getRow(n);
         assertEquals(dataset.columns(), row.size());
@@ -143,7 +143,7 @@ public class DatasetIT extends CuVSTestCase {
   @Test
   public void testIntDatasetCopy() {
     var intData = createIntMatrix();
-    try (var dataset = Dataset.ofArray(intData)) {
+    try (var dataset = CuVSMatrix.ofArray(intData)) {
       var intDataCopy = new int[(int) dataset.size()][(int) dataset.columns()];
       dataset.toArray(intDataCopy);
       for (int n = 0; n < dataset.size(); ++n) {
@@ -157,7 +157,7 @@ public class DatasetIT extends CuVSTestCase {
   @Test
   public void testFloatDatasetRowGetAccess() {
     var floatData = createFloatMatrix();
-    try (var dataset = Dataset.ofArray(floatData)) {
+    try (var dataset = CuVSMatrix.ofArray(floatData)) {
       for (int n = 0; n < dataset.size(); ++n) {
         var row = dataset.getRow(n);
         assertEquals(dataset.columns(), row.size());
@@ -171,7 +171,7 @@ public class DatasetIT extends CuVSTestCase {
   @Test
   public void testFloatDatasetRowCopy() {
     var floatData = createFloatMatrix();
-    try (var dataset = Dataset.ofArray(floatData)) {
+    try (var dataset = CuVSMatrix.ofArray(floatData)) {
       for (int n = 0; n < dataset.size(); ++n) {
         var row = dataset.getRow(n);
         assertEquals(dataset.columns(), row.size());
@@ -186,7 +186,7 @@ public class DatasetIT extends CuVSTestCase {
   @Test
   public void testFloatDatasetCopy() {
     var floatData = createFloatMatrix();
-    try (var dataset = Dataset.ofArray(floatData)) {
+    try (var dataset = CuVSMatrix.ofArray(floatData)) {
       var dataCopy = new float[(int) dataset.size()][(int) dataset.columns()];
       dataset.toArray(dataCopy);
       for (int n = 0; n < dataset.size(); ++n) {
@@ -208,7 +208,7 @@ public class DatasetIT extends CuVSTestCase {
       }
     }
 
-    var builder = Dataset.builder(rows, cols, Dataset.DataType.FLOAT);
+    var builder = CuVSMatrix.builder(rows, cols, CuVSMatrix.DataType.FLOAT);
     for (int r = 0; r < rows; ++r) {
       builder.addVector(data[r]);
     }
@@ -237,7 +237,7 @@ public class DatasetIT extends CuVSTestCase {
       }
     }
 
-    var builder = Dataset.builder(rows, cols, Dataset.DataType.INT);
+    var builder = CuVSMatrix.builder(rows, cols, CuVSMatrix.DataType.INT);
     for (int r = 0; r < rows; ++r) {
       builder.addVector(data[r]);
     }
@@ -266,7 +266,7 @@ public class DatasetIT extends CuVSTestCase {
       }
     }
 
-    var builder = Dataset.builder(rows, cols, Dataset.DataType.BYTE);
+    var builder = CuVSMatrix.builder(rows, cols, CuVSMatrix.DataType.BYTE);
     for (int r = 0; r < rows; ++r) {
       builder.addVector(data[r]);
     }

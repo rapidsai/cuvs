@@ -29,11 +29,11 @@ import java.lang.invoke.VarHandle;
 /**
  * A Dataset implementation backed by host (CPU) memory.
  */
-public class HostMemoryDatasetImpl extends DatasetBaseImpl {
+public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl {
   private final ValueLayout valueLayout;
   protected final VarHandle accessor$vh;
 
-  public HostMemoryDatasetImpl(
+  public CuVSHostMatrixImpl(
       MemorySegment memorySegment, long size, long columns, DataType dataType) {
     this(
         memorySegment,
@@ -45,7 +45,7 @@ public class HostMemoryDatasetImpl extends DatasetBaseImpl {
             .withByteAlignment(32));
   }
 
-  protected HostMemoryDatasetImpl(
+  protected CuVSHostMatrixImpl(
       MemorySegment memorySegment,
       long size,
       long columns,

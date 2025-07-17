@@ -25,7 +25,7 @@ import com.nvidia.cuvs.spi.CuVSProvider;
  *
  * @since 25.06
  */
-public interface Dataset extends AutoCloseable {
+public interface CuVSMatrix extends AutoCloseable {
 
   enum DataType {
     FLOAT,
@@ -33,14 +33,9 @@ public interface Dataset extends AutoCloseable {
     BYTE
   }
 
-  /**
-   * Creates a dataset from an on-heap array of vectors.
-   * This method will allocate an additional MemorySegment to hold the graph data.
-   *
-   * @since 25.08
-   */
-  static Dataset ofArray(float[][] vectors) {
-    return CuVSProvider.provider().newArrayDataset(vectors);
+  enum MemoryKind {
+    HOST,
+    DEVICE
   }
 
   /**
@@ -49,8 +44,8 @@ public interface Dataset extends AutoCloseable {
    *
    * @since 25.08
    */
-  static Dataset ofArray(int[][] vectors) {
-    return CuVSProvider.provider().newArrayDataset(vectors);
+  static CuVSMatrix ofArray(float[][] vectors) {
+    return CuVSProvider.provider().newMatrixFromArray(vectors);
   }
 
   /**
@@ -59,8 +54,18 @@ public interface Dataset extends AutoCloseable {
    *
    * @since 25.08
    */
-  static Dataset ofArray(byte[][] vectors) {
-    return CuVSProvider.provider().newArrayDataset(vectors);
+  static CuVSMatrix ofArray(int[][] vectors) {
+    return CuVSProvider.provider().newMatrixFromArray(vectors);
+  }
+
+  /**
+   * Creates a dataset from an on-heap array of vectors.
+   * This method will allocate an additional MemorySegment to hold the graph data.
+   *
+   * @since 25.08
+   */
+  static CuVSMatrix ofArray(byte[][] vectors) {
+    return CuVSProvider.provider().newMatrixFromArray(vectors);
   }
 
   interface Builder {
@@ -85,7 +90,7 @@ public interface Dataset extends AutoCloseable {
      */
     void addVector(int[] vector);
 
-    Dataset build();
+    CuVSMatrix build();
   }
 
   /**
@@ -94,10 +99,10 @@ public interface Dataset extends AutoCloseable {
    * @param size     Number of vectors in the dataset
    * @param columns  Size of each vector in the dataset
    * @param dataType The data type of the dataset elements
-   * @return new instance of {@link Dataset}
+   * @return new instance of {@link CuVSMatrix}
    */
-  static Dataset.Builder builder(int size, int columns, DataType dataType) {
-    return CuVSProvider.provider().newDatasetBuilder(size, columns, dataType);
+  static CuVSMatrix.Builder builder(int size, int columns, DataType dataType) {
+    return CuVSProvider.provider().newMatrixBuilder(size, columns, dataType);
   }
 
   /**
@@ -125,24 +130,24 @@ public interface Dataset extends AutoCloseable {
   /**
    * Copies the content of this dataset to an on-heap Java matrix (array of arrays).
    *
-   * @param array the destination array. Must be of length {@link Dataset#size()} or bigger,
-   *              and each element must be of length {@link Dataset#columns()} or bigger.
+   * @param array the destination array. Must be of length {@link CuVSMatrix#size()} or bigger,
+   *              and each element must be of length {@link CuVSMatrix#columns()} or bigger.
    */
   void toArray(int[][] array);
 
   /**
    * Copies the content of this dataset to an on-heap Java matrix (array of arrays).
    *
-   * @param array the destination array. Must be of length {@link Dataset#size()} or bigger,
-   *              and each element must be of length {@link Dataset#columns()} or bigger.
+   * @param array the destination array. Must be of length {@link CuVSMatrix#size()} or bigger,
+   *              and each element must be of length {@link CuVSMatrix#columns()} or bigger.
    */
   void toArray(float[][] array);
 
   /**
    * Copies the content of this dataset to an on-heap Java matrix (array of arrays).
    *
-   * @param array the destination array. Must be of length {@link Dataset#size()} or bigger,
-   *              and each element must be of length {@link Dataset#columns()} or bigger.
+   * @param array the destination array. Must be of length {@link CuVSMatrix#size()} or bigger,
+   *              and each element must be of length {@link CuVSMatrix#columns()} or bigger.
    */
   void toArray(byte[][] array);
 

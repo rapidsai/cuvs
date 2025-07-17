@@ -33,16 +33,22 @@ final class JDKProvider implements CuVSProvider {
   static MethodHandle createNativeDatasetBuilder() {
     try {
       var lookup = MethodHandles.lookup();
-      var mt = MethodType.methodType(Dataset.class, MemorySegment.class, int.class, int.class);
+      var mt =
+          MethodType.methodType(
+              CuVSMatrix.class,
+              MemorySegment.class,
+              int.class,
+              int.class,
+              CuVSMatrix.DataType.class);
       return lookup.findStatic(JDKProvider.class, "createNativeDataset", mt);
     } catch (NoSuchMethodException | IllegalAccessException e) {
       throw new RuntimeException(e);
     }
   }
 
-  private static Dataset createNativeDataset(
-      MemorySegment memorySegment, int size, int dimensions) {
-    return new HostMemoryDatasetImpl(memorySegment, size, dimensions, Dataset.DataType.FLOAT);
+  private static CuVSMatrix createNativeDataset(
+      MemorySegment memorySegment, int size, int dimensions, CuVSMatrix.DataType dataType) {
+    return new CuVSHostMatrixImpl(memorySegment, size, dimensions, dataType);
   }
 
   @Override
@@ -90,12 +96,12 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public Dataset.Builder newDatasetBuilder(int size, int dimensions, Dataset.DataType dataType)
-      throws UnsupportedOperationException {
+  public CuVSMatrix.Builder newMatrixBuilder(
+      int size, int dimensions, CuVSMatrix.DataType dataType) throws UnsupportedOperationException {
 
-    var dataset = new ArenaDatasetImpl(size, dimensions, dataType);
+    var dataset = new CuVSHostMatrixArenaImpl(size, dimensions, dataType);
 
-    return new Dataset.Builder() {
+    return new CuVSMatrix.Builder() {
       int current = 0;
 
       @Override
@@ -125,19 +131,19 @@ final class JDKProvider implements CuVSProvider {
       }
 
       @Override
-      public Dataset build() {
+      public CuVSMatrix build() {
         return dataset;
       }
     };
   }
 
   @Override
-  public MethodHandle newNativeDatasetBuilder() {
+  public MethodHandle newNativeMatrixBuilder() {
     return createNativeDataset$mh;
   }
 
   @Override
-  public Dataset newArrayDataset(float[][] vectors) {
+  public CuVSMatrix newMatrixFromArray(float[][] vectors) {
     Objects.requireNonNull(vectors);
     if (vectors.length == 0) {
       throw new IllegalArgumentException("vectors should not be empty");
@@ -145,13 +151,13 @@ final class JDKProvider implements CuVSProvider {
     int size = vectors.length;
     int columns = vectors[0].length;
 
-    var dataset = new ArenaDatasetImpl(size, columns, Dataset.DataType.FLOAT);
+    var dataset = new CuVSHostMatrixArenaImpl(size, columns, CuVSMatrix.DataType.FLOAT);
     Util.copy(dataset.memorySegment(), vectors);
     return dataset;
   }
 
   @Override
-  public Dataset newArrayDataset(int[][] vectors) {
+  public CuVSMatrix newMatrixFromArray(int[][] vectors) {
     Objects.requireNonNull(vectors);
     if (vectors.length == 0) {
       throw new IllegalArgumentException("vectors should not be empty");
@@ -159,13 +165,13 @@ final class JDKProvider implements CuVSProvider {
     int size = vectors.length;
     int columns = vectors[0].length;
 
-    var dataset = new ArenaDatasetImpl(size, columns, Dataset.DataType.INT);
+    var dataset = new CuVSHostMatrixArenaImpl(size, columns, CuVSMatrix.DataType.INT);
     Util.copy(dataset.memorySegment(), vectors);
     return dataset;
   }
 
   @Override
-  public Dataset newArrayDataset(byte[][] vectors) {
+  public CuVSMatrix newMatrixFromArray(byte[][] vectors) {
     Objects.requireNonNull(vectors);
     if (vectors.length == 0) {
       throw new IllegalArgumentException("vectors should not be empty");
@@ -173,7 +179,7 @@ final class JDKProvider implements CuVSProvider {
     int size = vectors.length;
     int columns = vectors[0].length;
 
-    var dataset = new ArenaDatasetImpl(size, columns, Dataset.DataType.BYTE);
+    var dataset = new CuVSHostMatrixArenaImpl(size, columns, CuVSMatrix.DataType.BYTE);
     Util.copy(dataset.memorySegment(), vectors);
     return dataset;
   }
