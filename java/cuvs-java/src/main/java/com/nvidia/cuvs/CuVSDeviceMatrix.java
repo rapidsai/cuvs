@@ -16,8 +16,7 @@
 package com.nvidia.cuvs;
 
 /**
- * A Dataset implementation backed by host (CPU) memory.
+ * A Dataset implementation backed by device (GPU) memory.
  */
-public interface CuVSHostMatrix extends CuVSMatrix {
-  int get(int row, int col);
+public interface CuVSDeviceMatrix extends CuVSMatrix {
 }

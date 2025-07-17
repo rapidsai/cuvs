@@ -96,8 +96,8 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public CuVSMatrix.Builder newMatrixBuilder(
-      int size, int dimensions, CuVSMatrix.DataType dataType) throws UnsupportedOperationException {
+  public CuVSMatrix.Builder newMatrixBuilder(int size, int dimensions, CuVSMatrix.DataType dataType)
+      throws UnsupportedOperationException {
 
     var dataset = new CuVSHostMatrixArenaImpl(size, dimensions, dataType);
 
