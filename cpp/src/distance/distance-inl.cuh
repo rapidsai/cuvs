@@ -458,11 +458,9 @@ void pairwise_distance(raft::resources const& handle,
     std::is_same_v<Type, float> || std::is_same_v<Type, double> || std::is_same_v<Type, half>;
 
   if (metric == cuvs::distance::DistanceType::BitwiseHamming) {
-    RAFT_EXPECTS(is_uint8_type,
-                 "BitwiseHamming distance requires uint8_t input type");
+    RAFT_EXPECTS(is_uint8_type, "BitwiseHamming distance requires uint8_t input type");
   } else {
-    RAFT_EXPECTS(is_float_type,
-                 "uint8 only supported for BitwiseHamming distance");
+    RAFT_EXPECTS(is_float_type, "uint8 only supported for BitwiseHamming distance");
   }
 
   RAFT_EXPECTS(x.extent(1) == y.extent(1), "Number of columns must be equal.");

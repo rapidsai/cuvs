@@ -220,8 +220,8 @@ void pairwise_distance(raft::resources const& handle,
   instantiate_cuvs_distance_distance(DistT, double, double, double, int); \
   instantiate_cuvs_distance_distance(DistT, half, float, float, int)
 
-#define instantiate_cuvs_distance_distance_by_algo_int_types(DistT)                 \
-  instantiate_cuvs_distance_distance(DistT, uint8_t, uint32_t, uint32_t, int);    \
+#define instantiate_cuvs_distance_distance_by_algo_int_types(DistT)             \
+  instantiate_cuvs_distance_distance(DistT, uint8_t, uint32_t, uint32_t, int);  \
   instantiate_cuvs_distance_distance(DistT, uint32_t, uint32_t, uint32_t, int); \
   instantiate_cuvs_distance_distance(DistT, uint64_t, uint64_t, uint64_t, int)
 
@@ -229,6 +229,7 @@ instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::Canberr
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::CorrelationExpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::CosineExpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::HammingUnexpanded);
+
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::HellingerExpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::InnerProduct);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::JensenShannon);
@@ -312,8 +313,8 @@ instantiate_cuvs_distance_distance_extra(cuvs::distance::DistanceType::L2Unexpan
   instantiate_cuvs_distance_getWorkspaceSize(DistT, double, double, double, int64_t); \
   instantiate_cuvs_distance_getWorkspaceSize(DistT, half, float, float, int64_t)
 
-#define instantiate_cuvs_distance_getWorkspaceSize_by_algo_int_types(DistT)                 \
-  instantiate_cuvs_distance_getWorkspaceSize(DistT, uint8_t, uint32_t, uint32_t, int);    \
+#define instantiate_cuvs_distance_getWorkspaceSize_by_algo_int_types(DistT)             \
+  instantiate_cuvs_distance_getWorkspaceSize(DistT, uint8_t, uint32_t, uint32_t, int);  \
   instantiate_cuvs_distance_getWorkspaceSize(DistT, uint32_t, uint32_t, uint32_t, int); \
   instantiate_cuvs_distance_getWorkspaceSize(DistT, uint64_t, uint64_t, uint64_t, int)
 
@@ -338,7 +339,8 @@ instantiate_cuvs_distance_getWorkspaceSize_by_algo(cuvs::distance::DistanceType:
 instantiate_cuvs_distance_getWorkspaceSize_by_algo(cuvs::distance::DistanceType::LpUnexpanded);
 instantiate_cuvs_distance_getWorkspaceSize_by_algo(cuvs::distance::DistanceType::RusselRaoExpanded);
 
-instantiate_cuvs_distance_getWorkspaceSize_by_algo_int_types(cuvs::distance::DistanceType::BitwiseHamming);
+instantiate_cuvs_distance_getWorkspaceSize_by_algo_int_types(
+  cuvs::distance::DistanceType::BitwiseHamming);
 
 #undef instantiate_cuvs_distance_getWorkspaceSize_by_algo
 #undef instantiate_cuvs_distance_getWorkspaceSize
@@ -404,8 +406,6 @@ instantiate_cuvs_distance_pairwise_distance(uint32_t, raft::layout_f_contiguous,
 instantiate_cuvs_distance_pairwise_distance(uint64_t, raft::layout_c_contiguous, int, uint64_t);
 instantiate_cuvs_distance_pairwise_distance(uint64_t, raft::layout_f_contiguous, int, uint64_t);
 
-// Mixed type instantiations for bitwise operations with float/half/double inputs
-// These are needed for compilation even though they will be rejected at runtime
 instantiate_cuvs_distance_pairwise_distance(float, raft::layout_c_contiguous, int, uint32_t);
 instantiate_cuvs_distance_pairwise_distance(float, raft::layout_f_contiguous, int, uint32_t);
 instantiate_cuvs_distance_pairwise_distance(double, raft::layout_c_contiguous, int, uint64_t);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,12 @@
  */
 #pragma once
 
-#include "dispatch_layout.cuh"           // dispatch_layout
-#include "kernel_sm60.cuh"               // pairwise_matrix_sm60_wrapper
-#include <raft/linalg/contractions.cuh>  // raft::linalg::Policy4x4
 #include "../distance_ops/bitwise_hamming.cuh"  // ops::bitwise_hamming_distance_op
+#include "dispatch_layout.cuh"                  // dispatch_layout
+#include "kernel_sm60.cuh"                      // pairwise_matrix_sm60_wrapper
+#include <raft/linalg/contractions.cuh>         // raft::linalg::Policy4x4
 
-#include <algorithm>  // std::min
+#include <algorithm>    // std::min
 #include <cuda_fp16.h>  // half type support
 #include <type_traits>  // std::conditional
 
@@ -34,25 +34,22 @@ struct is_bitwise_op<ops::bitwise_hamming_distance_op<DataT, AccT, IdxT>> : std:
 
 template <typename T, typename OpT, typename Enable = void>
 struct PolicyTypeMap {
-    using type = T;
+  using type = T;
 };
 
 template <typename OpT>
-struct PolicyTypeMap<uint8_t, OpT, 
-    typename std::enable_if<!is_bitwise_op<OpT>::value>::type> {
-    using type = half;
+struct PolicyTypeMap<uint8_t, OpT, typename std::enable_if<!is_bitwise_op<OpT>::value>::type> {
+  using type = half;
 };
 
 template <typename OpT>
-struct PolicyTypeMap<uint32_t, OpT,
-    typename std::enable_if<!is_bitwise_op<OpT>::value>::type> {
-    using type = float;
+struct PolicyTypeMap<uint32_t, OpT, typename std::enable_if<!is_bitwise_op<OpT>::value>::type> {
+  using type = float;
 };
 
 template <typename OpT>
-struct PolicyTypeMap<uint64_t, OpT,
-    typename std::enable_if<!is_bitwise_op<OpT>::value>::type> {
-    using type = double;
+struct PolicyTypeMap<uint64_t, OpT, typename std::enable_if<!is_bitwise_op<OpT>::value>::type> {
+  using type = double;
 };
 
 template <typename OpT,
@@ -83,7 +80,7 @@ pairwise_matrix_sm60_wrapper<OpT, IdxT, DataT, OutT, FinOpT> pairwise_matrix_sm6
     // Prevent double, vec_len=4 combination (this is not supported)
     constexpr int vec_len = std::min(vec_len_op, static_cast<int>(16 / sizeof(DataT)));
 
-    using PolicyT = typename PolicyTypeMap<DataT, OpT>::type;
+    using PolicyT   = typename PolicyTypeMap<DataT, OpT>::type;
     using RowPolicy = typename raft::linalg::Policy4x4<PolicyT, vec_len>::Policy;
     using ColPolicy = typename raft::linalg::Policy4x4<PolicyT, vec_len>::ColPolicy;
     using Policy    = typename std::conditional<row_major(), RowPolicy, ColPolicy>::type;
