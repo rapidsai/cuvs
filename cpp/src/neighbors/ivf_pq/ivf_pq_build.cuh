@@ -934,30 +934,6 @@ void process_and_fill_codes(raft::resources const& handle,
 
   launch_process_and_fill_codes_kernel(
     handle, index, new_vectors_residual.view(), src_offset_or_indices, new_labels, n_rows);
-  // constexpr uint32_t kBlockSize  = 256;
-  // const uint32_t threads_per_vec = std::min<uint32_t>(raft::WarpSize, index.pq_book_size());
-  // dim3 blocks(raft::div_rounding_up_safe<IdxT>(n_rows, kBlockSize / threads_per_vec), 1, 1);
-  // dim3 threads(kBlockSize, 1, 1);
-  // auto kernel = [](uint32_t pq_bits) {
-  //   switch (pq_bits) {
-  //     case 4: return process_and_fill_codes_kernel<kBlockSize, 4, IdxT>;
-  //     case 5: return process_and_fill_codes_kernel<kBlockSize, 5, IdxT>;
-  //     case 6: return process_and_fill_codes_kernel<kBlockSize, 6, IdxT>;
-  //     case 7: return process_and_fill_codes_kernel<kBlockSize, 7, IdxT>;
-  //     case 8: return process_and_fill_codes_kernel<kBlockSize, 8, IdxT>;
-  //     default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
-  //   }
-  // }(index.pq_bits());
-  // kernel<<<blocks, threads, 0, raft::resource::get_cuda_stream(handle)>>>(
-  //   new_vectors_residual.view(),
-  //   src_offset_or_indices,
-  //   new_labels,
-  //   index.list_sizes(),
-  //   index.inds_ptrs(),
-  //   index.data_ptrs(),
-  //   index.pq_centers(),
-  //   index.codebook_kind());
-  // RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
 /**
