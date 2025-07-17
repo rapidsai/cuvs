@@ -6,7 +6,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "25.8.0"
+version = "25.10.0"
 edition = "2021"
 repository = "https://github.com/rapidsai/cuvs"
 homepage = "https://github.com/rapidsai/cuvs"
