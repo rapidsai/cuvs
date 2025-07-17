@@ -860,6 +860,7 @@ void encode_list_data(raft::resources const& res,
                                       new_vectors.data_handle(),
                                       label,
                                       mr);
+
   constexpr uint32_t kBlockSize  = 256;
   const uint32_t threads_per_vec = std::min<uint32_t>(raft::WarpSize, index->pq_book_size());
   dim3 blocks(raft::div_rounding_up_safe<uint32_t>(n_rows, kBlockSize / threads_per_vec), 1, 1);
