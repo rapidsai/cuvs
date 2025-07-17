@@ -26,6 +26,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.lang.foreign.Arena;
+import java.lang.foreign.Linker;
+import java.lang.foreign.MemoryLayout;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandles;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -132,17 +137,18 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     int numTestsRuns = 5;
     try (CuVSResources resources = CuVSResources.create()) {
       for (int j = 0; j < numTestsRuns; j++) {
-        var index = indexOnce(dataset, resources);
+        var index = indexOnce(Dataset.ofArray(dataset), resources);
         var indexPath = serializeOnce(index);
         var loadedIndex = deserializeOnce(indexPath, resources);
-        queryOnce(
+        queryAndCompare(
             index,
             loadedIndex,
             SearchResults.IDENTITY_MAPPING,
             queries,
             expectedResults,
             resources);
-        cleanup(indexPath, index, loadedIndex);
+        cleanup(index, loadedIndex);
+        Files.deleteIfExists(indexPath);
       }
     }
   }
@@ -162,17 +168,18 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
         runInAnotherThread(
             () -> {
               try {
-                var index = indexOnce(dataset, resources);
+                var index = indexOnce(Dataset.ofArray(dataset), resources);
                 var indexPath = serializeOnce(index);
                 var loadedIndex = deserializeOnce(indexPath, resources);
-                queryOnce(
+                queryAndCompare(
                     index,
                     loadedIndex,
                     SearchResults.IDENTITY_MAPPING,
                     queries,
                     expectedResults,
                     resources);
-                cleanup(indexPath, index, loadedIndex);
+                cleanup(index, loadedIndex);
+                Files.deleteIfExists(indexPath);
               } catch (Throwable e) {
                 throw new RuntimeException(e);
               }
@@ -186,7 +193,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
    */
   @Test
   public void testIndexingAndSearchingFlowConcurrently() throws Throwable {
-    float[][] dataset = createSampleData();
+    final float[][] dataset = createSampleData();
     float[][] queries = createSampleQueries();
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
 
@@ -197,17 +204,18 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
         () ->
             () -> {
               try (CuVSResources resources = CuVSResources.create()) {
-                var index = indexOnce(dataset, resources);
+                var index = indexOnce(Dataset.ofArray(dataset), resources);
                 var indexPath = serializeOnce(index);
                 var loadedIndex = deserializeOnce(indexPath, resources);
-                queryOnce(
+                queryAndCompare(
                     index,
                     loadedIndex,
                     SearchResults.IDENTITY_MAPPING,
                     queries,
                     expectedResults,
                     resources);
-                cleanup(indexPath, index, loadedIndex);
+                cleanup(index, loadedIndex);
+                Files.deleteIfExists(indexPath);
               } catch (Throwable e) {
                 throw new RuntimeException(e);
               }
@@ -217,14 +225,14 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
   @Test
   public void testIndexing() throws Throwable {
     for (int i = 0; i < 100; ++i) {
-      float[][] dataset = createSampleData();
+      final float[][] dataset = createSampleData();
       int numTestsRuns = 10;
       runConcurrently(
           numTestsRuns,
           () ->
               () -> {
                 try (CuVSResources resources = CuVSResources.create()) {
-                  var index = indexOnce(dataset, resources);
+                  var index = indexOnce(Dataset.ofArray(dataset), resources);
                   index.destroyIndex();
                 } catch (Throwable e) {
                   throw new RuntimeException(e);
@@ -236,14 +244,14 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
   @Test
   public void testSerialization() throws Throwable {
     for (int i = 0; i < 100; ++i) {
-      float[][] dataset = createSampleData();
+      final float[][] dataset = createSampleData();
       int numTestsRuns = 10;
       runConcurrently(
           numTestsRuns,
           () ->
               () -> {
                 try (CuVSResources resources = CuVSResources.create()) {
-                  var index = indexOnce(dataset, resources);
+                  var index = indexOnce(Dataset.ofArray(dataset), resources);
                   var indexPath = serializeOnce(index);
                   Files.deleteIfExists(indexPath);
                   index.destroyIndex();
@@ -256,31 +264,35 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
   @Test
   public void testDeserialization() throws Throwable {
-    float[][] dataset = createSampleData();
+    var indexPath = createSerializedIndex(Dataset.ofArray(createSampleData()));
+    for (int i = 0; i < 100; ++i) {
+      int numTestsRuns = 10;
+      runConcurrently(
+          numTestsRuns,
+          () ->
+              () -> {
+                try (CuVSResources resources = CuVSResources.create()) {
+                  deserializeOnce(indexPath, resources).destroyIndex();
+                } catch (Throwable e) {
+                  throw new RuntimeException(e);
+                }
+              });
+    }
+    Files.deleteIfExists(indexPath);
+  }
+
+  private Path createSerializedIndex(Dataset dataset) throws Throwable {
     try (CuVSResources resources = CuVSResources.create()) {
       var index = indexOnce(dataset, resources);
       var indexPath = serializeOnce(index);
-      for (int i = 0; i < 100; ++i) {
-        int numTestsRuns = 10;
-        runConcurrently(
-            numTestsRuns,
-            () ->
-                () -> {
-                  try {
-                    deserializeOnce(indexPath, resources).destroyIndex();
-                  } catch (Throwable e) {
-                    throw new RuntimeException(e);
-                  }
-                });
-      }
-      Files.deleteIfExists(indexPath);
       index.destroyIndex();
+      return indexPath;
     }
   }
 
   @Test
   public void testIndexingAndSearchingFlowWithCustomMappingFunction() throws Throwable {
-    float[][] dataset = createSampleData();
+    var dataset = Dataset.ofArray(createSampleData());
     float[][] queries = createSampleQueries();
     var expectedResults =
         List.of(
@@ -289,19 +301,20 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             Map.of(0, 0.047766715f, 3, 0.20332818f, 1, 0.48305473f),
             Map.of(2, 0.15224178f, 1, 0.59063464f, 0, 0.5986642f));
 
-    LongToIntFunction rotate = l -> (int) ((l + 1) % dataset.length);
+    LongToIntFunction rotate = l -> (int) ((l + 1) % dataset.size());
     try (CuVSResources resources = CuVSResources.create()) {
       var index = indexOnce(dataset, resources);
       var indexPath = serializeOnce(index);
       var loadedIndex = deserializeOnce(indexPath, resources);
-      queryOnce(index, loadedIndex, rotate, queries, expectedResults, resources);
-      cleanup(indexPath, index, loadedIndex);
+      queryAndCompare(index, loadedIndex, rotate, queries, expectedResults, resources);
+      cleanup(index, loadedIndex);
+      Files.deleteIfExists(indexPath);
     }
   }
 
   @Test
   public void testIndexingAndSearchingFlowWithCustomMappingList() throws Throwable {
-    float[][] dataset = createSampleData();
+    var dataset = Dataset.ofArray(createSampleData());
     float[][] queries = createSampleQueries();
     var mappings = List.of(4, 3, 2, 1);
     var expectedResults =
@@ -316,8 +329,9 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
       var index = indexOnce(dataset, resources);
       var indexPath = serializeOnce(index);
       var loadedIndex = deserializeOnce(indexPath, resources);
-      queryOnce(index, loadedIndex, rotate, queries, expectedResults, resources);
-      cleanup(indexPath, index, loadedIndex);
+      queryAndCompare(index, loadedIndex, rotate, queries, expectedResults, resources);
+      cleanup(index, loadedIndex);
+      Files.deleteIfExists(indexPath);
     }
   }
 
@@ -389,7 +403,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     }
   }
 
-  private CagraIndex indexOnce(float[][] dataset, CuVSResources resources) throws Throwable {
+  private CagraIndex indexOnce(Dataset dataset, CuVSResources resources) throws Throwable {
     // Configure index parameters
     CagraIndexParams indexParams =
         new CagraIndexParams.Builder()
@@ -423,9 +437,9 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     }
   }
 
-  private void queryOnce(
-      CagraIndex index,
-      CagraIndex loadedIndex,
+  private void queryAndCompare(
+      CagraIndex index1,
+      CagraIndex index2,
       LongToIntFunction mapping,
       float[][] queries,
       List<Map<Integer, Float>> expectedResults,
@@ -444,26 +458,63 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             .build();
 
     // Perform the search
-    SearchResults results = index.search(cuvsQuery);
+    SearchResults results = index1.search(cuvsQuery);
 
     // Check results
     log.info(results.getResults().toString());
     checkResults(expectedResults, results.getResults());
 
-    // Search from deserialized index
-    results = loadedIndex.search(cuvsQuery);
+    // Search from the second index
+    results = index2.search(cuvsQuery);
 
     // Check results
     log.info(results.getResults().toString());
     checkResults(expectedResults, results.getResults());
   }
 
-  private void cleanup(Path indexFilePath, CagraIndex index, CagraIndex loadedIndex)
-      throws Throwable {
+  private void cleanup(CagraIndex index, CagraIndex loadedIndex) throws Throwable {
     // Cleanup
-    Files.deleteIfExists(indexFilePath);
     index.destroyIndex();
     loadedIndex.destroyIndex();
+  }
+
+  @Test
+  public void testNativeDatasetEquivalent() throws Throwable {
+    float[][] sampleData = createSampleData();
+    float[][] queries = createSampleQueries();
+    List<Map<Integer, Float>> expectedResults = getExpectedResults();
+
+    ValueLayout.OfFloat C_FLOAT =
+        (ValueLayout.OfFloat) Linker.nativeLinker().canonicalLayouts().get("float");
+
+    int rows = sampleData.length;
+    int cols = sampleData[0].length;
+    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout((long) rows * cols, C_FLOAT);
+
+    try (Arena arena = Arena.ofShared()) {
+      MemorySegment dataMemorySegment = arena.allocate(dataMemoryLayout);
+      for (int r = 0; r < rows; r++) {
+        MemorySegment.copy(
+            sampleData[r], 0, dataMemorySegment, C_FLOAT, (r * cols * C_FLOAT.byteSize()), cols);
+      }
+
+      try (var resources = CuVSResources.create();
+          var javaDataset = Dataset.ofArray(sampleData);
+          var nativeDataset = DatasetHelper.fromMemorySegment(dataMemorySegment, rows, cols)) {
+
+        // Indexing with an on-heap and native datasets produce the same results
+        var javaIndex = indexOnce(javaDataset, resources);
+        var nativeIndex = indexOnce(nativeDataset, resources);
+        queryAndCompare(
+            javaIndex,
+            nativeIndex,
+            SearchResults.IDENTITY_MAPPING,
+            queries,
+            expectedResults,
+            resources);
+        cleanup(javaIndex, nativeIndex);
+      }
+    }
   }
 
   @Test
