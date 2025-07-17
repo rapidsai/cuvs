@@ -56,8 +56,8 @@ template <typename IdxT, typename DataT, typename OutT, typename FinOpT>
 int determine_vec_len(pairwise_matrix_params<IdxT, DataT, OutT, FinOpT> params)
 {
   size_t align_x = alignment_of_2d_array(params.x, params.ldx);
-  m, k size_t align_y        = alignment_of_2d_array(params.y, params.ldy);
-  n, k size_t byte_alignment = min(align_x, align_y);
+  size_t align_y = alignment_of_2d_array(params.y, params.ldy);
+  size_t byte_alignment = std::min(align_x, align_y);
 
   // Since alignment is in bytes, it could be smaller than sizeof(DataT).
   // Handle this (unlikely) case here.
