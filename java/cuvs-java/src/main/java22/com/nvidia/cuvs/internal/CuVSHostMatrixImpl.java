@@ -19,6 +19,7 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 
+import com.nvidia.cuvs.CuVSHostMatrix;
 import com.nvidia.cuvs.RowView;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
@@ -29,7 +30,7 @@ import java.lang.invoke.VarHandle;
 /**
  * A Dataset implementation backed by host (CPU) memory.
  */
-public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl {
+public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMatrix {
   private final ValueLayout valueLayout;
   protected final VarHandle accessor$vh;
 
@@ -121,6 +122,7 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl {
   @Override
   public void close() {}
 
+  @Override
   public int get(int row, int col) {
     return (int) accessor$vh.get(memorySegment, 0L, (long) row * columns + col);
   }
