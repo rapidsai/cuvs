@@ -136,18 +136,17 @@ def run_cagra_build_search_test(
         # make sure we can get the dataset from the cagra index
         dataset_from_index = index.dataset
 
-        # TODO: we get an exception copying the index.dataset to cupy:
-        #  'CUDARuntimeError: cudaErrorMisalignedAddress: misaligned address'
-        # this is possibly because the dataset is strided (?)
-        # dataset_from_index_host = cp.asnumpy(cp.array(dataset_from_index))
-        # assert np.allclose(dataset, dataset_from_index_host)
-        assert dataset_from_index.shape == (n_rows, n_cols)
+        dataset_from_index_host = dataset_from_index.copy_to_host()
+        assert np.allclose(dataset, dataset_from_index_host)
 
         # make sure we can reconstruct the index from the graph
         # Note that we can't actually use the dataset from the index itself
         # - since that is a strided matrix (and we expect non-strided inputs
-        # in the C++ cagra::build api), so we are re-using the original input
-        reloaded_index = cagra.from_graph(graph, dataset, metric=metric)
+        # in the C++ cagra::build api), so we are using the host version
+        # which will have been copied into a non-strided layout
+        reloaded_index = cagra.from_graph(
+            graph, dataset_from_index_host, metric=metric
+        )
 
         dist_device, idx_device = cagra.search(
             search_params, reloaded_index, queries_device, k

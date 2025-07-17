@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@
 from cuda.bindings.cyruntime cimport cudaStream_t
 from libc.stdint cimport uintptr_t
 
+from cuvs.common.cydlpack cimport DLManagedTensor
+
 
 cdef extern from "cuvs/core/c_api.h":
     ctypedef uintptr_t cuvsResources_t
@@ -32,3 +34,6 @@ cdef extern from "cuvs/core/c_api.h":
     cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream)
     cuvsError_t cuvsStreamSync(cuvsResources_t res)
     const char * cuvsGetLastErrorText()
+
+    cuvsError_t cuvsCopyMatrix(cuvsResources_t res, DLManagedTensor * src,
+                               DLManagedTensor * dst)

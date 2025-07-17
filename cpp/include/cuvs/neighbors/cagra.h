@@ -377,7 +377,7 @@ cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, uint32_t* size);
 cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, uint32_t* graph_degree);
 
 /**
- * @brief Returns a view of the CAGRA graph
+ * @brief Returns a view of the CAGRA dataset
  *
  * This function returns a non-owning view of the CAGRA dataset.
  * The output will be referencing device memory that is directly used
@@ -387,31 +387,15 @@ cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, uint32_t* graph
  * dataset view will be invalid.
  *
  * Note that the DLManagedTensor dataset returned will have an associated
- * 'deleter' function that must be called when the graph is no longer
+ * 'deleter' function that must be called when the dataset is no longer
  * needed. This will free up host memory that stores the shape of the
- * graph view.
+ * dataset view.
  *
  * @param[in] index CAGRA index
- * @param[inout] dataset the dataset used in cagra
+ * @param[out] dataset the dataset used in cagra
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraIndexGetDatasetView(cuvsCagraIndex_t index, DLManagedTensor* dataset);
-
-/**
- * @brief Returns a copy of the CAGRA dataset
- *
- * This function returns a copy of the CAGRA dataset. The dataset must already
- * be an allocated DLManagedTensor of shape (size, dim). The
- * memory for the dataset can be on either host or device.
- *
- * @param[in] res cuvsResources_t opaque C handle
- * @param[in] index CAGRA index
- * @param[inout] dataset output dataset, with shape (size, dim)
- * @return cuvsError_t
- */
-cuvsError_t cuvsCagraIndexCopyDataset(cuvsResources_t res,
-                                      cuvsCagraIndex_t index,
-                                      DLManagedTensor* dataset);
+cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index, DLManagedTensor* dataset);
 
 /**
  * @brief Returns a view of the CAGRA graph
@@ -429,26 +413,10 @@ cuvsError_t cuvsCagraIndexCopyDataset(cuvsResources_t res,
  * graph view.
  *
  * @param[in] index CAGRA index
- * @param[inout] graph the output knn graph.
+ * @param[out] graph the output knn graph.
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraIndexGetGraphView(cuvsCagraIndex_t index, DLManagedTensor* graph);
-
-/**
- * @brief Returns a copy of the CAGRA graph
- *
- * This function returns a copy of the CAGRA graph. The graph must already
- * be an allocated DLManagedTensor of shape (size, graph_degree). The
- * memory for the graph can be on either host or device.
- *
- * @param[in] res cuvsResources_t opaque C handle
- * @param[in] index CAGRA index
- * @param[inout] graph the output knn graph, with shape (size, graph_degree)
- * @return cuvsError_t
- */
-cuvsError_t cuvsCagraIndexCopyGraph(cuvsResources_t res,
-                                    cuvsCagraIndex_t index,
-                                    DLManagedTensor* graph);
+cuvsError_t cuvsCagraIndexGetGraph(cuvsCagraIndex_t index, DLManagedTensor* graph);
 
 /**
  * @}

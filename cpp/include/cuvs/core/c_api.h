@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -176,6 +177,22 @@ cuvsError_t cuvsRMMHostFree(void* ptr, size_t bytes);
  */
 cuvsError_t cuvsVersionGet(uint16_t* major, uint16_t* minor, uint16_t* patch);
 
+/**
+ * @brief Copy a matrix
+ *
+ * This function copies a matrix from dst to src. This lets you copy a matrix
+ * from device memory to host memory (or vice versa), while accounting for
+ * differences in strides.
+ *
+ * Both src and dst must have the same shape and dtype, but can have different
+ * strides and device type. The memory for the output dst tensor must already be
+ * allocated and the tensor initialized.
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] src Pointer to DLManagedTensor to copy
+ * @param[out] dst Pointer to DLManagedTensor to receive copy of data
+ */
+cuvsError_t cuvsCopyMatrix(cuvsResources_t res, DLManagedTensor* src, DLManagedTensor* dst);
 /** @} */
 
 #ifdef __cplusplus

@@ -296,21 +296,15 @@ cdef class Index:
             raise ValueError("Index needs to be built before getting dataset")
 
         # get the cagra dataset from the index without copying as dlpack
-        cdef cydlpack.DLManagedTensor output_dlpack
-        check_cuvs(cuvsCagraIndexGetDatasetView(self.index, &output_dlpack))
-
-        # convert to CAI for ease of interop
-        cdef object output_cai = cydlpack.dl_pack_to_cai(&output_dlpack)
-        output = DeviceTensorView(output_cai)
-
-        # free up memory holding the shape/strides from the dlpack
-        if output_dlpack.deleter is not NULL:
-            output_dlpack.deleter(&output_dlpack)
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsCagraIndexGetDataset(self.index, tensor))
 
         # since we're referencing memory internal to this cagra index in the
         # output view, keep the cagra index alive as long as the output view
         # is to avoid segfaulting
-        output._index = self
+        output.parent = self
 
         return output
 
@@ -319,17 +313,11 @@ cdef class Index:
         if not self.trained:
             raise ValueError("Index needs to be built before getting graph")
 
-        cdef cydlpack.DLManagedTensor output_dlpack
-        check_cuvs(cuvsCagraIndexGetGraphView(self.index, &output_dlpack))
-
-        cdef object output_cai = cydlpack.dl_pack_to_cai(&output_dlpack)
-        output = DeviceTensorView(output_cai)
-
-        if output_dlpack.deleter is not NULL:
-            output_dlpack.deleter(&output_dlpack)
-
-        output._index = self
-
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsCagraIndexGetGraph(self.index, tensor))
+        output.parent = self
         return output
 
     def __repr__(self):
