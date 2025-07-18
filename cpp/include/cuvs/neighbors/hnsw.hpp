@@ -72,6 +72,15 @@ struct index_params : cuvs::neighbors::index_params {
  * @param ef_construction HNSW index parameter ef_construction.
  * @param metric The distance metric to search.
  *
+ *
+ * * IMPORTANT NOTE *
+ *
+ * The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce
+ * the same recalls and QPS for the same parameter `ef`. The graphs are different internally. For
+ * the same `ef`, the from-CAGRA index likely has a slightly higher recall and slightly lower QPS.
+ * However, the Recall-QPS curves should be similar (i.e. the points are just shifted along the
+ * curve).
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
