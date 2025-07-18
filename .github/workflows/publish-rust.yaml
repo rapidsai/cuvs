@@ -11,7 +11,7 @@ jobs:
   rust-publish:
     runs-on: ubuntu-latest
     container:
-      image: rapidsai/ci-conda:latest
+      image: rapidsai/ci-conda:25.08-latest
     steps:
       - uses: actions/checkout@v4
       - name: Check if release build
