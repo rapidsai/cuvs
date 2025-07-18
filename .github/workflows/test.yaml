@@ -60,7 +60,7 @@ jobs:
       sha: ${{ inputs.sha }}
       node_type: "gpu-l4-latest-1"
       arch: "amd64"
-      container_image: "rapidsai/ci-conda:25.08-latest"
+      container_image: "rapidsai/ci-conda:25.10-latest"
       script: "ci/test_java.sh"
   wheel-tests-cuvs:
     secrets: inherit
