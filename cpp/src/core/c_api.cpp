@@ -236,3 +236,47 @@ extern "C" cuvsError_t cuvsMatrixCopy(cuvsResources_t res,
     }
   });
 }
+
+extern "C" void cuvsMatrixDestroy(DLManagedTensor* tensor)
+{
+  if (tensor->dl_tensor.shape != nullptr) {
+    delete[] tensor->dl_tensor.shape;
+    tensor->dl_tensor.shape = nullptr;
+  }
+  if (tensor->dl_tensor.strides != nullptr) {
+    delete[] tensor->dl_tensor.strides;
+    tensor->dl_tensor.strides = nullptr;
+  }
+}
+
+extern "C" cuvsError_t cuvsMatrixSliceRows(cuvsResources_t res,
+                                           DLManagedTensor* src_managed,
+                                           int64_t start,
+                                           int64_t end,
+                                           DLManagedTensor* dst_managed)
+{
+  return cuvs::core::translate_exceptions([=] {
+    RAFT_EXPECTS(end >= start, "end index must be greater than start index");
+
+    DLTensor& src = src_managed->dl_tensor;
+    DLTensor& dst = dst_managed->dl_tensor;
+    RAFT_EXPECTS(src.ndim == 2, "src should be a 2 dimensional tensor");
+
+    dst.dtype    = src.dtype;
+    dst.device   = src.device;
+    dst.ndim     = 2;
+    dst.shape    = new int64_t[2];
+    dst.shape[0] = end - start;
+    dst.shape[1] = src.shape[1];
+
+    int64_t row_strides = dst.shape[1];
+    if (src.strides) {
+      dst.strides = new int64_t[2];
+      row_strides = dst.strides[0] = src.strides[0];
+      dst.strides[1]               = src.strides[1];
+    }
+
+    dst.data = static_cast<char*>(src.data) + start * row_strides * (dst.dtype.bits / 8);
+    dst_managed->deleter = cuvsMatrixDestroy;
+  });
+}

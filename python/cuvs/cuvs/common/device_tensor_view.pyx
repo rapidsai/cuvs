@@ -13,9 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from cython.operator cimport dereference as deref
+
 import numpy as np
 
-from cuvs.common.c_api cimport cuvsMatrixCopy, cuvsResources_t
+from cuvs.common.c_api cimport (
+    cuvsMatrixCopy,
+    cuvsMatrixSliceRows,
+    cuvsResources_t,
+)
 from cuvs.common.cydlpack cimport DLManagedTensor, dlpack_c
 
 from pylibraft.common.cai_wrapper import wrap_array
@@ -43,6 +49,11 @@ cdef class DeviceTensorView:
 
     cdef DLManagedTensor tensor
     cdef public object parent
+
+    def __init__(self, array_like=None):
+        if array_like is not None:
+            ai = wrap_array(array_like)
+            self.tensor = deref(dlpack_c(ai))
 
     def __cinit__(self):
         self.parent = None
@@ -73,6 +84,36 @@ cdef class DeviceTensorView:
         ai = wrap_array(output)
         cdef DLManagedTensor* output_dlpack = dlpack_c(ai)
         check_cuvs(cuvsMatrixCopy(res, &self.tensor, output_dlpack))
+        return output
+
+    @auto_sync_resources
+    def slice_rows(self, start, end, resources=None):
+        """ Slices rows from this tensor
+
+        Slices a subset, and returns in a new DeviceTensorView without
+        copying data.
+
+        Parameters
+        ----------
+        start: int
+            the index of the first row to slice
+        end: int
+            the index of the last row to slice
+        {resources_docstring}
+
+        Returns
+        -------
+        tensor: DeviceTensorView
+            A non-owning view of the rows sliced from this tensor
+        """
+        cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+        output = DeviceTensorView()
+        cdef DLManagedTensor* output_dlpack = \
+            <DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsMatrixSliceRows(res, &self.tensor, start, end,
+                                       output_dlpack))
+        output.parent = self  # keep memory alive on returned slice
         return output
 
     @property

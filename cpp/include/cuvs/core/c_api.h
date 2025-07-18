@@ -193,6 +193,17 @@ cuvsError_t cuvsVersionGet(uint16_t* major, uint16_t* minor, uint16_t* patch);
  * @param[out] dst Pointer to DLManagedTensor to receive copy of data
  */
 cuvsError_t cuvsMatrixCopy(cuvsResources_t res, DLManagedTensor* src, DLManagedTensor* dst);
+
+/**
+ * @brief Slices rows from a matrix
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] src Pointer to DLManagedTensor to copy
+ * @param[in] start First row index to include in the
+ * @param[out] dst Pointer to DLManagedTensor to receive slice from matrix
+ */
+cuvsError_t cuvsMatrixSliceRows(
+  cuvsResources_t res, DLManagedTensor* src, int64_t start, int64_t end, DLManagedTensor* dst);
 /** @} */
 
 #ifdef __cplusplus
