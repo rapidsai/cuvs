@@ -21,6 +21,7 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_POINTER;
+import static com.nvidia.cuvs.internal.common.Util.*;
 import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.*;
 import static com.nvidia.cuvs.internal.common.Util.buildMemorySegment;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
@@ -128,12 +129,8 @@ public class TieredIndexImpl implements TieredIndex {
       long cuvsRes = resources.getHandle();
 
       // TieredIndex REQUIRES device memory - allocate it
-      MemorySegment datasetD = localArena.allocate(C_POINTER);
       long datasetSize = C_FLOAT_BYTE_SIZE * rows * cols;
-      int returnValue = cuvsRMMAlloc(cuvsRes, datasetD, datasetSize);
-      checkCuVSError(returnValue, "cuvsRMMAlloc");
-
-      MemorySegment datasetDP = datasetD.get(C_POINTER, 0);
+      MemorySegment datasetDP = allocateRMMSegment(cuvsRes, datasetSize);
 
       // Copy host to device
       Util.cudaMemcpy(datasetDP, hostDataSeg, datasetSize, HOST_TO_DEVICE);
@@ -144,7 +141,7 @@ public class TieredIndexImpl implements TieredIndex {
           prepareTensor(localArena, datasetDP, datasetShape, kDLFloat(), 32, kDLCUDA(), 1);
 
       MemorySegment index = localArena.allocate(cuvsTieredIndex_t);
-      returnValue = cuvsTieredIndexCreate(index);
+      var returnValue = cuvsTieredIndexCreate(index);
       checkCuVSError(returnValue, "cuvsTieredIndexCreate");
 
       returnValue = cuvsStreamSync(cuvsRes);
@@ -196,30 +193,18 @@ public class TieredIndexImpl implements TieredIndex {
 
       long cuvsRes = resources.getHandle();
 
-      // Allocate DEVICE memory for all data
-      MemorySegment queriesD = localArena.allocate(C_POINTER);
-      MemorySegment neighborsD = localArena.allocate(C_POINTER);
-      MemorySegment distancesD = localArena.allocate(C_POINTER);
-
       long queriesBytes = C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
       long neighborsBytes = C_LONG_BYTE_SIZE * numQueries * topK; // 64-bit for tiered index
       long distancesBytes = C_FLOAT_BYTE_SIZE * numQueries * topK;
 
-      int returnValue = cuvsRMMAlloc(cuvsRes, queriesD, queriesBytes);
-      checkCuVSError(returnValue, "cuvsRMMAlloc");
-      returnValue = cuvsRMMAlloc(cuvsRes, neighborsD, neighborsBytes);
-      checkCuVSError(returnValue, "cuvsRMMAlloc");
-      returnValue = cuvsRMMAlloc(cuvsRes, distancesD, distancesBytes);
-      checkCuVSError(returnValue, "cuvsRMMAlloc");
-
-      // Get device pointers
-      MemorySegment queriesDP = queriesD.get(C_POINTER, 0);
-      MemorySegment neighborsDP = neighborsD.get(C_POINTER, 0);
-      MemorySegment distancesDP = distancesD.get(C_POINTER, 0);
+      // Allocate DEVICE memory for all data
+      MemorySegment queriesDP = allocateRMMSegment(cuvsRes, queriesBytes);
+      MemorySegment neighborsDP = allocateRMMSegment(cuvsRes, neighborsBytes);
+      MemorySegment distancesDP = allocateRMMSegment(cuvsRes, distancesBytes);
 
       // Copy queries from host to device
-      returnValue =
-          cudaMemcpy(queriesDP, hostQueriesSeg, queriesBytes, 1); // cudaMemcpyHostToDevice
+      var returnValue =
+          cudaMemcpy(queriesDP, hostQueriesSeg, queriesBytes, cudaMemcpyHostToDevice());
       checkCudaError(returnValue, "cudaMemcpy");
 
       // Create tensors from device memory
@@ -240,9 +225,8 @@ public class TieredIndexImpl implements TieredIndex {
 
       // Handle prefilter
       MemorySegment prefilter = cuvsFilter.allocate(localArena);
-      MemorySegment prefilterD = localArena.allocate(C_POINTER);
-      MemorySegment prefilterDP = MemorySegment.NULL;
-      long prefilterBytes = 0;
+      final MemorySegment prefilterDP;
+      final long prefilterBytes;
 
       if (query.getPrefilter() != null) {
         BitSet[] prefilters = new BitSet[] {query.getPrefilter()};
@@ -256,14 +240,12 @@ public class TieredIndexImpl implements TieredIndex {
         prefilterBytes = C_INT_BYTE_SIZE * prefilterLen;
 
         // Allocate device memory for prefilter
-        returnValue = cuvsRMMAlloc(cuvsRes, prefilterD, prefilterBytes);
-        checkCuVSError(returnValue, "cuvsRMMAlloc");
-
-        prefilterDP = prefilterD.get(C_POINTER, 0);
+        prefilterDP = allocateRMMSegment(cuvsRes, prefilterBytes);
 
         // Copy prefilter to device
-        returnValue = cudaMemcpy(prefilterDP, hostPrefilterSeg, prefilterBytes, 1);
-        checkCudaError(returnValue, "cudaMemcpy");
+        checkCudaError(
+            cudaMemcpy(prefilterDP, hostPrefilterSeg, prefilterBytes, cudaMemcpyHostToDevice()),
+            "cudaMemcpy");
 
         MemorySegment prefilterTensor =
             prepareTensor(localArena, prefilterDP, prefilterShape, kDLUInt(), 32, kDLCUDA(), 1);
@@ -271,6 +253,8 @@ public class TieredIndexImpl implements TieredIndex {
         cuvsFilter.type(prefilter, 1); // BITSET
         cuvsFilter.addr(prefilter, prefilterTensor.address());
       } else {
+        prefilterDP = MemorySegment.NULL;
+        prefilterBytes = 0;
         cuvsFilter.type(prefilter, 0); // NO_FILTER
         cuvsFilter.addr(prefilter, 0);
       }
@@ -288,10 +272,9 @@ public class TieredIndexImpl implements TieredIndex {
       checkCuVSError(returnValue, "cuvsTieredIndexSearch");
 
       // Copy results from device to host
-      returnValue =
-          cudaMemcpy(neighborsSeg, neighborsDP, neighborsBytes, 2); // cudaMemcpyDeviceToHost
+      returnValue = cudaMemcpy(neighborsSeg, neighborsDP, neighborsBytes, cudaMemcpyDeviceToHost());
       checkCudaError(returnValue, "cudaMemcpy");
-      returnValue = cudaMemcpy(distancesSeg, distancesDP, distancesBytes, 2);
+      returnValue = cudaMemcpy(distancesSeg, distancesDP, distancesBytes, cudaMemcpyDeviceToHost());
       checkCudaError(returnValue, "cudaMemcpy");
 
       // Clean up device memory
@@ -339,32 +322,26 @@ public class TieredIndexImpl implements TieredIndex {
       long cuvsRes = resources.getHandle();
 
       // Allocate device memory for extend data
-      MemorySegment datasetD = localArena.allocate(C_POINTER);
       long dataSize = C_FLOAT_BYTE_SIZE * rows * cols;
-      int returnValue = cuvsRMMAlloc(cuvsRes, datasetD, dataSize);
-      checkCuVSError(returnValue, "cuvsRMMAlloc");
-
-      MemorySegment datasetDP = datasetD.get(C_POINTER, 0);
+      MemorySegment datasetDP = allocateRMMSegment(cuvsRes, dataSize);
 
       // Copy host to device
-      returnValue = cudaMemcpy(datasetDP, hostDataSeg, dataSize, 1); // cudaMemcpyHostToDevice
-      checkCudaError(returnValue, "cudaMemcpy");
+      checkCudaError(
+          cudaMemcpy(datasetDP, hostDataSeg, dataSize, cudaMemcpyHostToDevice()), "cudaMemcpy");
 
       // Create tensor from device memory
       long[] datasetShape = {rows, cols};
       MemorySegment datasetTensor =
           prepareTensor(localArena, datasetDP, datasetShape, kDLFloat(), 32, kDLCUDA(), 1);
 
-      returnValue = cuvsStreamSync(cuvsRes);
-      checkCuVSError(returnValue, "cuvsStreamSync");
+      checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync");
 
-      returnValue =
-          cuvsTieredIndexExtend(cuvsRes, datasetTensor, tieredIndexReference.getMemorySegment());
-      checkCuVSError(returnValue, "cuvsTieredIndexExtend");
+      checkCuVSError(
+          cuvsTieredIndexExtend(cuvsRes, datasetTensor, tieredIndexReference.getMemorySegment()),
+          "cuvsTieredIndexExtend");
 
       // Clean up device memory
-      returnValue = cuvsRMMFree(cuvsRes, datasetDP, dataSize);
-      checkCuVSError(returnValue, "cuvsRMMFree");
+      checkCuVSError(cuvsRMMFree(cuvsRes, datasetDP, dataSize), "cuvsRMMFree");
     }
   }
 
@@ -530,12 +507,24 @@ public class TieredIndexImpl implements TieredIndex {
 
     @Override
     public Builder withDataset(float[][] vectors) {
+      if (this.dataset != null) {
+        throw new IllegalArgumentException("An input dataset can only be specified once");
+      }
+      if (vectors == null || vectors.length == 0 || vectors[0].length == 0) {
+        throw new IllegalArgumentException("The input vectors cannot be null or empty");
+      }
       this.dataset = CuVSMatrix.ofArray(vectors);
       return this;
     }
 
     @Override
     public Builder withDataset(CuVSMatrix dataset) {
+      if (this.dataset != null) {
+        throw new IllegalArgumentException("An input dataset can only be specified once");
+      }
+      if (dataset == null) {
+        throw new IllegalArgumentException("An input dataset cannot be null");
+      }
       this.dataset = dataset;
       return this;
     }
