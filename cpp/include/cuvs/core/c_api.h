@@ -199,7 +199,8 @@ cuvsError_t cuvsMatrixCopy(cuvsResources_t res, DLManagedTensor* src, DLManagedT
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] src Pointer to DLManagedTensor to copy
- * @param[in] start First row index to include in the
+ * @param[in] start First row index to include in the output
+ * @param[in] end Last row index to include in the output
  * @param[out] dst Pointer to DLManagedTensor to receive slice from matrix
  */
 cuvsError_t cuvsMatrixSliceRows(
