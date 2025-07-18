@@ -79,6 +79,11 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
+  public TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources) {
+    return TieredIndexImpl.newBuilder(Objects.requireNonNull(cuVSResources));
+  }
+
+  @Override
   public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) throws Throwable {
     if (indexes == null || indexes.length == 0) {
       throw new IllegalArgumentException("At least one index must be provided for merging");

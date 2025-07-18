@@ -18,5 +18,4 @@ package com.nvidia.cuvs;
 /**
  * A Dataset implementation backed by device (GPU) memory.
  */
-public interface CuVSDeviceMatrix extends CuVSMatrix {
-}
+public interface CuVSDeviceMatrix extends CuVSMatrix {}

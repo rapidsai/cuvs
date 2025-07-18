@@ -21,6 +21,7 @@ import com.nvidia.cuvs.CagraMergeParams;
 import com.nvidia.cuvs.CuVSMatrix;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.HnswIndex;
+import com.nvidia.cuvs.TieredIndex;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 import java.nio.file.Path;
@@ -90,6 +91,10 @@ public interface CuVSProvider {
 
   /** Creates a new HnswIndex Builder. */
   HnswIndex.Builder newHnswIndexBuilder(CuVSResources cuVSResources)
+      throws UnsupportedOperationException;
+
+  /** Creates a new TieredIndex Builder. */
+  TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;
 
   /**
