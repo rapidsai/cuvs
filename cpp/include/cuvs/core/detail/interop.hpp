@@ -146,7 +146,7 @@ inline bool is_c_contiguous(DLManagedTensor* managed_tensor)
 static void free_dlmanaged_tensor_metadata(DLManagedTensor* tensor)
 {
   delete[] tensor->dl_tensor.shape;
-  if (tensor->dl_tensor.strides != NULL) { delete[] tensor->dl_tensor.strides; }
+  delete[] tensor->dl_tensor.strides;
 }
 #pragma GCC diagnostic pop
 
@@ -165,7 +165,7 @@ static void to_dlpack(MdspanType src, DLManagedTensor* dst)
   }
 
   if constexpr (std::is_same_v<typename MdspanType::layout_type, raft::row_major>) {
-    tensor->strides = NULL;
+    tensor->strides = nullptr;
   } else {
     tensor->strides = new int64_t[tensor->ndim];
     for (int64_t i = 0; i < tensor->ndim; ++i) {

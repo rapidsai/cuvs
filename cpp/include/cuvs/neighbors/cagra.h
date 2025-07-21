@@ -409,7 +409,7 @@ cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index, DLManagedTensor* da
  *
  * Note that the DLManagedTensor graph returned will have an associated
  * 'deleter' function that must be called when the graph is no longer
- * needed. This will free up host memory that stores the shape of the
+ * needed. This will free up host memory that stores the metadata for the
  * graph view.
  *
  * @param[in] index CAGRA index
