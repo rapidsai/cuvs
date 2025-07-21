@@ -27,7 +27,7 @@ __global__ void ref_kernel(half* out, const half* a_array, const half* b_array, 
 }
 
 template <typename IdxT>
-__global__ void tc_kernel(half* out, const half* a_mat, const half* b_mat, IdxT M, IdxT N, IdxT K)
+__global__ void tc_kernel(half* out, __restrict__ const half* a_mat, __restrict__ const half* b_mat, IdxT M, IdxT N, IdxT K)
 {
   // input for index calculation
   /*int gt_id = threadIdx.x + blockIdx.x * blockDim.x;
@@ -41,26 +41,38 @@ __global__ void tc_kernel(half* out, const half* a_mat, const half* b_mat, IdxT 
   constexpr int t_n = 8;
   constexpr int t_k = 8;
 
-
   // x is split as x1 * t_m + x2
   // y is split as y1 * t_n + y2
   // z is split as z1 * t_k + z2
 
-
-  half2 a[2];
-  half2 b[1];
-  half2 c[2];
+  half2 a[2]; half2 b[1]; half2 c[2];
 
   // Assuming blockDim.x is divisible by 32
   int tidx = threadIdx.x + blockIdx.x * blockDim.x;
   int warp_id = tidx / 32;
   int n_warps = (blockDim.x / 32) * gridDim.x;
 
-  /*      a[0] = make_half2(1.0f, 1.0f);
-        a[1] = make_half2(1.0f, 1.0f);
-        b[0] = make_half2(3.0f, 2.0f + tidx); */
+  int x2 = lane_id / 4;
+  int y2 = x2;
+  int z2 = 2*(lane_id % 4);
+  __shared__ __align__(16) half a_sh[t_m * 128];
+
+  half2* a_sh_2 = (half2*) a_sh;
+  float4* a_sh_16 = (float4*) a_sh;
+  float4* a_mat_16 = (float4*) a_mat;
 
   for (int x1 = blockIdx.y; x1 < M / t_m; x1+=gridDim.y) {
+
+    for (x2 = 0; x2 < t_m; x2++) {
+      for (int y = threadIdx.x; y < 128/8; y+=blockDim.x) {
+        //a_sh[x2*128 + y] = a_mat[x1 * t_m * 128 + x2*128 + y];
+        a_sh_16[x2*16 + y] = a_mat_16[x1 * t_m * 16 + x2 * 16 + y];
+      }
+    }
+
+    x2 = lane_id / 4;
+    y2 = x2;
+    __syncthreads();
     for (int y1 = warp_id; y1 < N / t_n; y1+=n_warps) {
 
       c[0] = make_half2(0.0f, 0.0f);
@@ -78,26 +90,29 @@ __global__ void tc_kernel(half* out, const half* a_mat, const half* b_mat, IdxT 
       // b_mat is accessed as b_mat[ (y1*t_n + y2) * K + (z1*t_k + z2) ]
       // c_mat is accessed as c_mat[ (x1*t_m + x2) * K + (y1*t_n + y2) ]
 
-      int x2 = lane_id / 4;
-      int y2 = x2;
-      int z2 = 2*(lane_id % 4);
-
       int a_offset = (x1*t_m + x2) * K + (z2);
       int b_offset = (y1*t_n + y2) * K + (z2);
 
       for (int z1 = 0; z1 < K / t_k; z1++) {
         // load a tile
         const half* ptr = a_mat + (a_offset + (z1 * t_k));
-        //a[0] = make_half2(a_mat[a_offset + (z1 * t_k) + 0*K], a_mat[a_offset + (z1 * t_k) + 1]);
-        a[0] = *((half2*)(ptr));
+        // a[0] = make_half2(a_mat[a_offset + (z1 * t_k) + 0*K], a_mat[a_offset + (z1 * t_k) + 1]);
+        // a[0] = *((half2*)(ptr));
+        //half2 a2;
+        a[0] = a_sh_2[x2*64 + z1*4 + z2/2];
+        //if (a[0].y != a_sh[x2*128+z1*t_k+z2+1]) printf("Hell bells\n");
 
         ptr += 8*K;
         //a[1] = make_half2(a_mat[a_offset + (z1 * t_k) + 8*K], a_mat[a_offset + (z1 * t_k) + 8*K + 1]);
-        a[1] = *((half2*)(ptr));
+        //a[1] = *((half2*)(ptr));
+        a[1] = a_sh_2[x2*64 + z1*4 + z2/2 + 4*128];
+        //if (a[1].x != a2.x && a[1].y != a2.y) printf("Hell bells\n");
         // load b tile
         ptr = b_mat + (b_offset + (z1 *t_k));
         //b[0] = make_half2(b_mat[b_offset + (z1 * t_k)], b_mat[b_offset + (z1 * t_k) + 1]);
-        b[0] = *((half2*)(ptr));
+        if (threadIdx.x == 130) {
+          b[0] = *((half2*)(ptr));
+        }
 
         // compute c = a * b + c
         mma_16x8x8 (a, b, c, c);
@@ -105,29 +120,14 @@ __global__ void tc_kernel(half* out, const half* a_mat, const half* b_mat, IdxT 
       x2 = lane_id / 4;
       y2 = 2*(lane_id % 4);
       int out_offset = (x1 * t_m + x2) * N + (y1 * t_n + y2);
-      out[out_offset]             = c[0].x;
-      out[out_offset + 1]         = c[0].y;
-      out[out_offset + 8 * N]     = c[1].x;
-      out[out_offset + 8 * N + 1] = c[1].y;
+      //if ( threadIdx.x == 130) {
+        out[out_offset]             = c[0].x;
+        out[out_offset + 1]         = c[0].y;
+        out[out_offset + 8 * N]     = c[1].x;
+        out[out_offset + 8 * N + 1] = c[1].y;
+      //}
     }
   }
-
-
-  /*half2 a[2] = {make_half2(a_mat[lane_id*2], a_mat[lane_id*2+1]),
-               make_half2(a_mat[64+lane_id*2], a_mat[64+lane_id*2+1])};
-
-  half2 b[1] = {make_half2 (b_mat[lane_id*2], b_mat[lane_id*2+1])};
-
-  half2 c[2] = {make_half2(0.0f, 0.0f), make_half2(0.0f, 0.0f)};
-  half2 d[2];
-
-  mma_16x8x8 (a, b, c, d);
-
-  OutAccessor<DataT, AccT, OutT, IdxT>::set_value(out[lane_id*2], d[0].x);
-  OutAccessor<DataT, AccT, OutT, IdxT>::set_value(out[lane_id*2+1], d[0].y);
-  OutAccessor<DataT, AccT, OutT, IdxT>::set_value(out[64 + lane_id*2], d[1].x);
-  OutAccessor<DataT, AccT, OutT, IdxT>::set_value(out[64 + lane_id*2+1], d[1].y);*/
-
 }
 
 template <typename IdxT, int NUM_ACC>
@@ -172,7 +172,6 @@ __global__ void tc_sim_kernel(half* out, const half* a_mat, const half* b_mat, I
         c[acc][0] = make_half2(0.0f, 0.0f);
         c[acc][1] = make_half2(0.0f, 0.0f);
       }
-
 
       int b_offset = (y1*t_n + y2) * K + (z2);
 
@@ -247,7 +246,7 @@ void tensor_l2nn(OutT* out, const DataT* x, const DataT* y, IdxT M, IdxT N, IdxT
   //DataT* z;
   //cudaMalloc(&z, sizeof(DataT)*M*N);
 
-  dim3 blocks(N/64, M/16, 1);
+  dim3 blocks(N/32, M/16, 1);
   tc_kernel<IdxT><<<blocks, 128, 0, stream>>>(out, x, y, M, N, K);
   //tc_sim_kernel<IdxT, 2><<<blocks, 128, 0, stream>>>(out, x, y, M, N, K);
   //CHECK_CUDA(cudaDeviceSynchronize());

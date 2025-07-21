@@ -31,6 +31,16 @@
     }                                                                    \
   } while (0)
 
+template <typename T>
+constexpr bool is_scalar() {
+      return std::is_same<T, double>() || std::is_same<T, float>() ||
+             std::is_same<T, half>() || std::is_same<T, int8_t>();
+}
+
+template <typename T, typename IdxT, typename AccT>
+constexpr static bool is_pair() {
+  return std::is_same<T, raft::KeyValuePair<IdxT, AccT>>();
+}
 
 template <typename DataT, typename AccT, typename OutT, typename IdxT>
 class OutAccessor {
@@ -292,6 +302,7 @@ public:
   double max_b;
   double acc_diff;          // sum of all the diffs
   uint64_t n;               // How many items are compared
+  uint64_t n_misses;
   int mutex;                // Simple mutex lock for thread synchronization
 
   __device__ __host__
@@ -302,10 +313,11 @@ public:
     max_b = 0.0;
     acc_diff = 0.0;
     n = 0;
+    n_misses = 0;
   }
 
   __device__ __host__
-  void update(double diff, uint64_t index, double a_val, double b_val) {
+  void update(double diff, uint64_t index, double a_val, double b_val, bool missed) {
     if ( max_diff < diff ) {
       max_diff = diff;
       max_diff_index = index;
@@ -314,6 +326,7 @@ public:
     }
     acc_diff += diff;
     n++;
+    n_misses = missed ? n_misses + 1 : n_misses;
   }
 
   __device__ __host__
@@ -326,14 +339,16 @@ public:
     }
     acc_diff += op2.acc_diff;
     n += op2.n;
+    n_misses += op2.n_misses;
   }
 
   __device__ __host__
   void print() {
     if (max_diff > 0.0) {
       printf("Total compared %lu\n", n);
-      printf("Average diff: %f\n", acc_diff / n);
-      printf("max_diff: %f (%f - %f)\n", max_diff, max_a, max_b);
+      printf("Total missed %lu\n", n_misses);
+      printf("Average diff: %e\n", acc_diff / n);
+      printf("max_diff: %e (%e - %e)\n", max_diff, max_a, max_b);
       printf("max_diff_index: %lu\n", max_diff_index);
     }
   }
@@ -356,6 +371,7 @@ __global__ void vector_compare_kernel(const OutT* a, const OutT* b, IdxT n,
   for (IdxT i = 0; i < n; i++) {
     tid = i;
     double diff, a_val, b_val;
+    bool missed = false;
     if constexpr (std::is_fundamental_v<OutT> || std::is_same_v<OutT, half>) {
       diff = std::abs(double(a[tid]) - double(b[tid]));
       //printf("Expected = %f vs actual = %f\n", a[tid], b[tid]);
@@ -367,6 +383,8 @@ __global__ void vector_compare_kernel(const OutT* a, const OutT* b, IdxT n,
       //if (tid == 0) printf("Expected = %f vs actual = %f, %d, %d\n", a[tid].value, b[tid].value, a[tid].key, b[tid].key);
       a_val = double(a[tid].value);
       b_val = double(b[tid].value);
+
+      missed = a[tid].key != b[tid].key;
     }
       // Acquire mutex lock using atomic compare-and-swap
     /*while (atomicCAS(&block_summary.mutex, 0, 1) != 0) {
@@ -374,7 +392,7 @@ __global__ void vector_compare_kernel(const OutT* a, const OutT* b, IdxT n,
     }*/
 
     // Critical section: update first_index if this is the earliest failure
-    block_summary.update(diff, tid, a_val, b_val);
+    block_summary.update(diff, tid, a_val, b_val, missed);
 
     // Release mutex
     //atomicExch(&block_summary.mutex, 0);
@@ -398,21 +416,18 @@ __global__ void vector_compare_kernel(const OutT* a, const OutT* b, IdxT n,
 }
 
 template <typename OutT, typename IdxT>
-void vector_compare(const OutT* a, const OutT* b, const IdxT n, cudaStream_t stream = nullptr) {
+void vector_compare(ComparisonSummary* global_summary, const OutT* a, const OutT* b, const IdxT n, cudaStream_t stream = nullptr) {
   constexpr int block_size = 256;
   const int grid_size = (n + block_size - 1) / block_size;
 
-  ComparisonSummary* global_summary;
-  CHECK_CUDA(cudaMallocManaged(&global_summary, sizeof(ComparisonSummary)));
-
-  global_summary->init();
 
   //vector_compare_kernel<OutT, IdxT><<<grid_size, block_size, 0, stream>>>(a, b, n, global_summary);
+  // Not thread safe right now, so launch only single thread
   vector_compare_kernel<OutT, IdxT><<<1, 1, 0, stream>>>(a, b, n, global_summary);
 
   CHECK_CUDA(cudaStreamSynchronize(stream));
 
-  global_summary->print();
+  //global_summary->print();
 
-  CHECK_CUDA(cudaFree(global_summary));
+  //CHECK_CUDA(cudaFree(global_summary));
 }
