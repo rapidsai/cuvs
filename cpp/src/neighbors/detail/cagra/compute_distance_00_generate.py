@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@ import os
 import glob
 
 template = """/*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,7 +65,6 @@ search_types = dict(
     float_uint32=("float", "uint32_t", "float"),  # data_t, idx_t, distance_t
     half_uint32=("half", "uint32_t", "float"),
     int8_uint32=("int8_t", "uint32_t", "float"),
-    uint8_uint32=("uint8_t", "uint32_t", "float"),
 )
 
 metric_prefix = 'DistanceType::'
@@ -116,10 +115,10 @@ for type_path, (data_t, idx_t, distance_t) in search_types.items():
 # CAGRA (Binary Hamming distance)
 for (mxdim, team) in mxdim_team:
     metric = 'BitwiseHamming'
-    type_path = 'u8_uint32'
+    type_path = 'i8_uint32'
     idx_t = 'uint32_t'
     distance_t = 'float'
-    data_t = 'uint8_t'
+    data_t = 'int8_t'
 
     path = f"compute_distance_standard_{metric}_{type_path}_dim{mxdim}_t{team}.cu"
     includes = '#include "compute_distance_standard-impl.cuh"'

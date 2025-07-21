@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ using namespace cuvs::distance;
 template struct standard_descriptor_spec<DistanceType::BitwiseHamming,
                                          32,
                                          512,
-                                         uint8_t,
+                                         int8_t,
                                          uint32_t,
                                          float>;
 
