@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -143,9 +143,10 @@ inline bool is_c_contiguous(DLManagedTensor* managed_tensor)
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
-static void free_dlmanaged_tensor_shape(DLManagedTensor* tensor)
+static void free_dlmanaged_tensor_metadata(DLManagedTensor* tensor)
 {
   delete[] tensor->dl_tensor.shape;
+  delete[] tensor->dl_tensor.strides;
 }
 #pragma GCC diagnostic pop
 
@@ -157,14 +158,21 @@ static void to_dlpack(MdspanType src, DLManagedTensor* dst)
   tensor->dtype  = data_type_to_DLDataType<typename MdspanType::value_type>();
   tensor->device = accessor_type_to_DLDevice<typename MdspanType::accessor_type>();
   tensor->ndim   = MdspanType::extents_type::rank();
-  tensor->data   = src.data_handle();
-
-  tensor->shape = new int64_t[tensor->ndim];
-  dst->deleter  = free_dlmanaged_tensor_shape;
-
+  tensor->data   = const_cast<typename MdspanType::value_type*>(src.data_handle());
+  tensor->shape  = new int64_t[tensor->ndim];
   for (int64_t i = 0; i < tensor->ndim; ++i) {
     tensor->shape[i] = src.extent(i);
   }
-}
 
+  if constexpr (std::is_same_v<typename MdspanType::layout_type, raft::row_major>) {
+    tensor->strides = nullptr;
+  } else {
+    tensor->strides = new int64_t[tensor->ndim];
+    for (int64_t i = 0; i < tensor->ndim; ++i) {
+      tensor->strides[i] = src.stride(i);
+    }
+  }
+
+  dst->deleter = free_dlmanaged_tensor_metadata;
+}
 }  // namespace cuvs::core::detail
