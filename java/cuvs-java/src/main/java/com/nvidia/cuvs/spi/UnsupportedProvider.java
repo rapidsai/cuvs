@@ -17,12 +17,12 @@ package com.nvidia.cuvs.spi;
 
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.CagraIndex;
-import com.nvidia.cuvs.CagraMergeParams;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
 import com.nvidia.cuvs.QuantizedMatrix;
 import com.nvidia.cuvs.ScalarQuantizer;
+import com.nvidia.cuvs.TieredIndex;
 import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
 
@@ -33,8 +33,33 @@ import java.nio.file.Path;
 final class UnsupportedProvider implements CuVSProvider {
 
   @Override
-  public CuVSResources newCuVSResources(Path tempDirectory) throws Throwable {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
+  public CuVSResources newCuVSResources(Path tempDirectory) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public BruteForceIndex.Builder newBruteForceIndexBuilder(CuVSResources cuVSResources) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public CagraIndex.Builder newCagraIndexBuilder(CuVSResources cuVSResources) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public HnswIndex.Builder newHnswIndexBuilder(CuVSResources cuVSResources) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) throws Throwable {
+    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -49,32 +74,6 @@ final class UnsupportedProvider implements CuVSProvider {
 
   @Override
   public Dataset newArrayDataset(float[][] vectors) {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
-  }
-
-  @Override
-  public BruteForceIndex.Builder newBruteForceIndexBuilder(CuVSResources cuVSResources) {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
-  }
-
-  @Override
-  public CagraIndex.Builder newCagraIndexBuilder(CuVSResources cuVSResources) {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
-  }
-
-  @Override
-  public HnswIndex.Builder newHnswIndexBuilder(CuVSResources cuVSResources) {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
-  }
-
-  @Override
-  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) throws Throwable {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
-  }
-
-  @Override
-  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraMergeParams mergeParams)
-      throws Throwable {
     throw new UnsupportedOperationException("CuVS is not supported on this platform");
   }
 

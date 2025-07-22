@@ -271,10 +271,11 @@ inline BuildConfig get_build_config(raft::resources const& res,
   auto allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
                          params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                          params.metric == cuvs::distance::DistanceType::CosineExpanded ||
-                         params.metric == cuvs::distance::DistanceType::InnerProduct;
+                         params.metric == cuvs::distance::DistanceType::InnerProduct ||
+                         params.metric == cuvs::distance::DistanceType::BitwiseHamming;
   RAFT_EXPECTS(allowed_metrics,
-               "The metric for NN Descent should be L2Expanded, L2SqrtExpanded, CosineExpanded or "
-               "InnerProduct");
+               "The metric for NN Descent should be L2Expanded, L2SqrtExpanded, CosineExpanded, "
+               "InnerProduct or BitwiseHamming");
   RAFT_EXPECTS(
     metric == params.metric,
     "The metrics set in nn_descent::index_params and nn_descent::index are inconsistent");

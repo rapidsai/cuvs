@@ -23,6 +23,7 @@ import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
 import com.nvidia.cuvs.QuantizedMatrix;
 import com.nvidia.cuvs.ScalarQuantizer;
+import com.nvidia.cuvs.TieredIndex;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 import java.nio.file.Path;
@@ -85,6 +86,10 @@ public interface CuVSProvider {
 
   /** Creates a new HnswIndex Builder. */
   HnswIndex.Builder newHnswIndexBuilder(CuVSResources cuVSResources)
+      throws UnsupportedOperationException;
+
+  /** Creates a new TieredIndex Builder. */
+  TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;
 
   /**
