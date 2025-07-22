@@ -25,6 +25,7 @@
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 
+#include <raft/core/host_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/itertools.hpp>
@@ -86,6 +87,10 @@ class AnnNNDescentTest : public ::testing::TestWithParam<AnnNNDescentInputs> {
  protected:
   void testNNDescent()
   {
+    if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
+        !(std::is_same_v<DataT, uint8_t> || std::is_same_v<DataT, int8_t>)) {
+      GTEST_SKIP();
+    }
     size_t queries_size = ps.n_rows * ps.graph_degree;
     std::vector<IdxT> indices_NNDescent(queries_size);
     std::vector<DistanceT> distances_NNDescent(queries_size);
@@ -471,10 +476,11 @@ class AnnNNDescentBatchTest : public ::testing::TestWithParam<AnnNNDescentBatchI
 };
 
 const std::vector<AnnNNDescentInputs> inputs =
-  raft::util::itertools::product<AnnNNDescentInputs>({2000, 4000},            // n_rows
-                                                     {4, 16, 64, 256, 1024},  // dim
-                                                     {32, 64},                // graph_degree
-                                                     {cuvs::distance::DistanceType::L2Expanded,
+  raft::util::itertools::product<AnnNNDescentInputs>({2000, 4000},                // n_rows
+                                                     {4, 16, 31, 64, 256, 1024},  // dim
+                                                     {32, 64},                    // graph_degree
+                                                     {cuvs::distance::DistanceType::BitwiseHamming,
+                                                      cuvs::distance::DistanceType::L2Expanded,
                                                       cuvs::distance::DistanceType::L2SqrtExpanded,
                                                       cuvs::distance::DistanceType::InnerProduct,
                                                       cuvs::distance::DistanceType::CosineExpanded},
