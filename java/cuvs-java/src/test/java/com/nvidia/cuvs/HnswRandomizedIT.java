@@ -98,7 +98,7 @@ public class HnswRandomizedIT extends CuVSTestCase {
     List<List<Integer>> expected = generateExpectedResults(topK, vectors, queries, null, log);
 
     // Create CuVS index and query
-    try (CuVSResources resources = CuVSResources.create()) {
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
 
       // Configure index parameters
       CagraIndexParams indexParams =
