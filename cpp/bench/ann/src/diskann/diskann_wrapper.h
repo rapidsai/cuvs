@@ -16,6 +16,7 @@
 #pragma once
 
 #include "../common/ann_types.hpp"
+#include "../common/util.hpp"
 
 #include <limits>
 
@@ -59,7 +60,6 @@ class diskann_memory : public algo<T> {
   struct search_param : public search_param_base {
     uint32_t L_search;
     uint32_t num_threads = omp_get_max_threads();
-    // Mode metric_objective;
   };
 
   diskann_memory(Metric metric, int dim, const build_param& param);
@@ -147,26 +147,41 @@ void diskann_memory<T>::set_search_param(const search_param_base& param, const v
   L_search_           = sp.L_search;
   num_search_threads_ = sp.num_threads;
 
-  // only latency mode supported. Use the num_threads search param to run search with multiple
-  // threads
-  bench_mode_ = Mode::kLatency;
+  // Determine mode based on benchmark framework's thread count
+  // In throughput mode, benchmark_n_threads > 1; in latency mode, it's 1
+  bench_mode_ = (cuvs::bench::benchmark_n_threads > 1) ? Mode::kThroughput : Mode::kLatency;
 
   // Create a pool if multiple query threads have been set and the pool hasn't been created already
   initialize_index_(0);
-  this->mem_index_->load(index_path_prefix_.c_str(), num_search_threads_, L_search_);
+  
+  // In throughput mode, we want single-threaded search since the benchmark framework handles parallelism
+  // But we still need to allocate scratch space for the number of threads that the benchmark will use
+  int load_threads = (bench_mode_ == Mode::kThroughput) ? cuvs::bench::benchmark_n_threads : num_search_threads_;
+  this->mem_index_->load(index_path_prefix_.c_str(), load_threads, L_search_);
 }
 
 template <typename T>
 void diskann_memory<T>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* indices, float* distances) const
 {
+  // In throughput mode, don't use OpenMP as the benchmark framework handles parallelism
+  if (bench_mode_ == Mode::kThroughput) {
+    for (int i = 0; i < batch_size; i++) {
+      mem_index_->search(queries + i * this->dim_,
+                         static_cast<size_t>(k),
+                         L_search_,
+                         reinterpret_cast<uint64_t*>(indices + i * k),
+                         distances + i * k);
+    }
+  } else {
 #pragma omp parallel for if (batch_size > 1) schedule(dynamic, 1) num_threads(num_search_threads_)
-  for (int i = 0; i < batch_size; i++) {
-    mem_index_->search(queries + i * this->dim_,
-                       static_cast<size_t>(k),
-                       L_search_,
-                       reinterpret_cast<uint64_t*>(indices + i * k),
-                       distances + i * k);
+    for (int i = 0; i < batch_size; i++) {
+      mem_index_->search(queries + i * this->dim_,
+                         static_cast<size_t>(k),
+                         L_search_,
+                         reinterpret_cast<uint64_t*>(indices + i * k),
+                         distances + i * k);
+    }
   }
 }
 
@@ -203,7 +218,6 @@ class diskann_ssd : public algo<T> {
     uint32_t num_threads        = omp_get_max_threads() / 2;
     uint32_t num_nodes_to_cache = 10000;
     int beam_width              = 2;
-    // Mode metric_objective;
   };
 
   diskann_ssd(Metric metric, int dim, const build_param& param);
@@ -294,25 +308,54 @@ void diskann_ssd<T>::set_search_param(const search_param_base& param, const void
   num_search_threads_ = sp.num_threads;
   num_nodes_to_cache_ = sp.num_nodes_to_cache;
   beam_width_         = sp.beam_width;
-
-  // only latency mode supported with thread pool
-  bench_mode_ = Mode::kLatency;
+  
+  // Determine mode based on benchmark framework's thread count
+  // In throughput mode, benchmark_n_threads > 1; in latency mode, it's 1
+  bench_mode_ = (cuvs::bench::benchmark_n_threads > 1) ? Mode::kThroughput : Mode::kLatency;
+  
+  // Load the index here with the correct thread count
+  // In throughput mode, we need scratch space for all benchmark threads
+  int load_threads = (bench_mode_ == Mode::kThroughput) ? cuvs::bench::benchmark_n_threads : num_search_threads_;
+  
+  reader.reset(new LinuxAlignedFileReader());
+  p_flash_index_ =
+    std::make_shared<diskann::PQFlashIndex<T>>(reader, parse_metric_to_diskann(this->metric_));
+  int result = p_flash_index_->load(load_threads, index_path_prefix_.c_str());
+  std::vector<uint32_t> node_list;
+  p_flash_index_->cache_bfs_levels(num_nodes_to_cache_, node_list);
+  p_flash_index_->load_cache_list(node_list);
+  node_list.clear();
+  node_list.shrink_to_fit();
 }
 
 template <typename T>
 void diskann_ssd<T>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
+  // In throughput mode, don't use OpenMP as the benchmark framework handles parallelism
+  if (bench_mode_ == Mode::kThroughput) {
+    for (int64_t i = 0; i < (int64_t)batch_size; i++) {
+      p_flash_index_->cached_beam_search(queries + (i * this->dim_),
+                                         static_cast<size_t>(k),
+                                         L_search_,
+                                         reinterpret_cast<uint64_t*>(neighbors + i * k),
+                                         distances + i * k,
+                                         beam_width_,
+                                         false,
+                                         nullptr);
+    }
+  } else {
 #pragma omp parallel for if (batch_size > 1) schedule(dynamic, 1) num_threads(num_search_threads_)
-  for (int64_t i = 0; i < (int64_t)batch_size; i++) {
-    p_flash_index_->cached_beam_search(queries + (i * this->dim_),
-                                       static_cast<size_t>(k),
-                                       L_search_,
-                                       reinterpret_cast<uint64_t*>(neighbors + i * k),
-                                       distances + i * k,
-                                       beam_width_,
-                                       false,
-                                       nullptr);
+    for (int64_t i = 0; i < (int64_t)batch_size; i++) {
+      p_flash_index_->cached_beam_search(queries + (i * this->dim_),
+                                         static_cast<size_t>(k),
+                                         L_search_,
+                                         reinterpret_cast<uint64_t*>(neighbors + i * k),
+                                         distances + i * k,
+                                         beam_width_,
+                                         false,
+                                         nullptr);
+    }
   }
 }
 
@@ -328,14 +371,7 @@ void diskann_ssd<T>::save(const std::string& index_file) const
 template <typename T>
 void diskann_ssd<T>::load(const std::string& index_file)
 {
-  reader.reset(new LinuxAlignedFileReader());
-  p_flash_index_ =
-    std::make_shared<diskann::PQFlashIndex<T>>(reader, parse_metric_to_diskann(this->metric_));
-  int result = p_flash_index_->load(num_search_threads_, index_file.c_str());
-  std::vector<uint32_t> node_list;
-  p_flash_index_->cache_bfs_levels(num_nodes_to_cache_, node_list);
-  p_flash_index_->load_cache_list(node_list);
-  node_list.clear();
-  node_list.shrink_to_fit();
+  // Only save the index path prefix here, actual loading happens in set_search_param
+  index_path_prefix_ = index_file;
 }
 };  // namespace cuvs::bench
