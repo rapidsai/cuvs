@@ -58,13 +58,15 @@ public class BinaryQuantizerImpl {
     CuVSResourcesImpl resources = (CuVSResourcesImpl) cuvsResources;
     Arena resultArena = Arena.ofShared();
 
-    try (var localArena = Arena.ofConfined()) {
+    try (var localArena = Arena.ofConfined();
+        var resourcesAccessor = resources.access()) {
       long rows = dataset.length;
       long cols = rows > 0 ? dataset[0].length : 0;
 
       MemorySegment datasetMemSegment = buildMemorySegment(localArena, dataset);
+      long cuvsResourcesPtr = resourcesAccessor.handle();
       return performTransform(
-          resources, localArena, resultArena, rows, cols, datasetMemSegment, HOST_TO_DEVICE);
+          cuvsResourcesPtr, localArena, resultArena, rows, cols, datasetMemSegment, HOST_TO_DEVICE);
     } catch (Throwable t) {
       resultArena.close();
       throw t;
@@ -87,13 +89,21 @@ public class BinaryQuantizerImpl {
     CuVSResourcesImpl resources = (CuVSResourcesImpl) cuvsResources;
     Arena resultArena = Arena.ofShared();
 
-    try (var localArena = Arena.ofConfined()) {
+    try (var localArena = Arena.ofConfined();
+        var resourcesAccessor = resources.access()) {
       long rows = dataset.size();
       long cols = dataset.dimensions();
 
       MemorySegment datasetMemSegment = ((DatasetImpl) dataset).asMemorySegment();
+      long cuvsResourcesPtr = resourcesAccessor.handle();
       return performTransform(
-          resources, localArena, resultArena, rows, cols, datasetMemSegment, INFER_DIRECTION);
+          cuvsResourcesPtr,
+          localArena,
+          resultArena,
+          rows,
+          cols,
+          datasetMemSegment,
+          INFER_DIRECTION);
     } catch (Throwable t) {
       resultArena.close();
       throw t;
@@ -104,7 +114,7 @@ public class BinaryQuantizerImpl {
    * Core transformation logic shared by both overloads.
    */
   private static QuantizedMatrix performTransform(
-      CuVSResourcesImpl resources,
+      long cuvsResourcesPtr,
       Arena localArena,
       Arena resultArena,
       long rows,
@@ -112,8 +122,6 @@ public class BinaryQuantizerImpl {
       MemorySegment datasetMemSegment,
       Util.CudaMemcpyKind memcpyDirection)
       throws Throwable {
-
-    long cuvsResourcesPtr = resources.getHandle();
 
     // Allocate device memory for input and output
     MemorySegment datasetD = localArena.allocate(C_POINTER);

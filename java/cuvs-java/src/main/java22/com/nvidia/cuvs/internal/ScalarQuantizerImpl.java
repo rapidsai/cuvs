@@ -53,7 +53,7 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
 
   private static final long C_BYTE_SIZE = C_CHAR.byteSize();
 
-  private final CuVSResourcesImpl resources;
+  private final CuVSResources resources;
   private final MemorySegment quantizerSegment;
   private boolean destroyed;
 
@@ -63,7 +63,7 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
    * @param resources the CuVS resources
    * @param quantizerSegment the native quantizer memory segment
    */
-  private ScalarQuantizerImpl(CuVSResourcesImpl resources, MemorySegment quantizerSegment) {
+  private ScalarQuantizerImpl(CuVSResources resources, MemorySegment quantizerSegment) {
     this.resources = resources;
     this.quantizerSegment = quantizerSegment;
   }
@@ -88,13 +88,13 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
   @Override
   public QuantizedMatrix transform(float[][] dataset) throws Throwable {
     checkNotDestroyed();
-    try (var localArena = Arena.ofConfined()) {
+    try (var localArena = Arena.ofConfined();
+        var resourcesAccessor = resources.access()) {
       long rows = dataset.length;
       long cols = rows > 0 ? dataset[0].length : 0;
 
       MemorySegment datasetMemSegment = buildMemorySegment(localArena, dataset);
-
-      long cuvsResourcesPtr = resources.getHandle();
+      long cuvsResourcesPtr = resourcesAccessor.handle();
 
       // Allocate device memory for input and output
       MemorySegment datasetD = localArena.allocate(C_POINTER);
@@ -148,13 +148,13 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
 
     Arena resultArena = Arena.ofShared();
 
-    try (var localArena = Arena.ofConfined()) {
+    try (var localArena = Arena.ofConfined();
+        var resourcesAccessor = resources.access()) {
       long rows = dataset.size();
       long cols = dataset.dimensions();
 
       MemorySegment datasetMemSegment = ((DatasetImpl) dataset).asMemorySegment();
-
-      long cuvsResourcesPtr = resources.getHandle();
+      long cuvsResourcesPtr = resourcesAccessor.handle();
 
       // Allocate device memory for input and output
       MemorySegment datasetD = localArena.allocate(C_POINTER);
@@ -216,13 +216,13 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
   @Override
   public float[][] inverseTransform(byte[][] quantizedData) throws Throwable {
     checkNotDestroyed();
-    try (var localArena = Arena.ofConfined()) {
+    try (var localArena = Arena.ofConfined();
+        var resourcesAccessor = resources.access()) {
       long rows = quantizedData.length;
       long cols = rows > 0 ? quantizedData[0].length : 0;
 
       MemorySegment quantizedMemSegment = buildMemorySegmentFromBytes(localArena, quantizedData);
-
-      long cuvsResourcesPtr = resources.getHandle();
+      long cuvsResourcesPtr = resourcesAccessor.handle();
 
       // Allocate device memory for input and output
       MemorySegment quantizedD = localArena.allocate(C_POINTER);
@@ -307,10 +307,10 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
 
   public static ScalarQuantizer.Builder newBuilder(CuVSResources cuvsResources) {
     Objects.requireNonNull(cuvsResources);
-    if (!(cuvsResources instanceof CuVSResourcesImpl)) {
+    if (!(cuvsResources instanceof CuVSResources)) {
       throw new IllegalArgumentException("Unsupported " + cuvsResources);
     }
-    return new Builder((CuVSResourcesImpl) cuvsResources);
+    return new Builder((CuVSResources) cuvsResources);
   }
 
   /**
@@ -318,12 +318,12 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
    */
   public static class Builder implements ScalarQuantizer.Builder {
 
-    private final CuVSResourcesImpl resources;
+    private final CuVSResources resources;
     private float quantile = 0.99f;
     private float[][] trainingDataset;
     private Dataset dataset;
 
-    public Builder(CuVSResourcesImpl resources) {
+    public Builder(CuVSResources resources) {
       this.resources = resources;
     }
 
@@ -354,7 +354,8 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
         throw new IllegalArgumentException("Training dataset must be provided");
       }
 
-      try (var localArena = Arena.ofConfined()) {
+      try (var localArena = Arena.ofConfined();
+          var resourcesAccessor = resources.access()) {
         long rows = dataset != null ? dataset.size() : trainingDataset.length;
         long cols =
             dataset != null ? dataset.dimensions() : (rows > 0 ? trainingDataset[0].length : 0);
@@ -364,7 +365,7 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
                 ? ((DatasetImpl) dataset).asMemorySegment()
                 : buildMemorySegment(localArena, trainingDataset);
 
-        long cuvsResourcesPtr = resources.getHandle();
+        long cuvsResourcesPtr = resourcesAccessor.handle();
 
         // Create scalar quantizer params
         MemorySegment paramsSegment = localArena.allocate(cuvsScalarQuantizerParams_t);

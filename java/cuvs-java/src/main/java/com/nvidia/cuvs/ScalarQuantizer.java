@@ -88,7 +88,7 @@ public interface ScalarQuantizer extends AutoCloseable {
   void destroy() throws Throwable;
 
   @Override
-  default void close() throws Exception {
+  default void close() {
     destroy();
   }
 
