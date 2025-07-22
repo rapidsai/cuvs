@@ -276,8 +276,8 @@ auto train(raft::resources const& res,
   const size_t dataset_size  = dataset.extent(0);
   quantizer.threshold        = raft::make_device_vector<T, int64_t>(res, dataset_dim);
 
-  using compute_t = std::conditional_t<std::is_same_v<half, T>, float, T>;
-  std::vector<compute_t> host_threshold_vec(dataset_dim);
+  using T = std::conditional_t<std::is_same_v<half, T>, float, T>;
+  std::vector<T> host_threshold_vec(dataset_dim);
   auto threshold_ptr = host_threshold_vec.data();
 
   if (params.threshold == cuvs::preprocessing::quantize::binary::bit_threshold::mean) {
@@ -287,7 +287,7 @@ auto train(raft::resources const& res,
 #pragma omp parallel for reduction(+ : threshold_ptr[ : dataset_dim])
     for (size_t i = 0; i < dataset_size; i++) {
       for (uint32_t j = 0; j < dataset_dim; j++) {
-        threshold_ptr[j] += static_cast<compute_t>(dataset.data_handle()[i * dataset_dim + j]);
+        threshold_ptr[j] += static_cast<T>(dataset.data_handle()[i * dataset_dim + j]);
       }
     }
     for (uint32_t j = 0; j < dataset_dim; j++) {
@@ -315,13 +315,13 @@ auto train(raft::resources const& res,
     const auto stride = stride_prime_list[prime_i];
 
     // Transposed
-    auto sampled_dataset = raft::make_host_matrix<compute_t, int64_t>(dataset_dim, num_samples);
+    auto sampled_dataset = raft::make_host_matrix<T, int64_t>(dataset_dim, num_samples);
 #pragma omp parallel for
     for (size_t out_i = 0; out_i < num_samples; out_i++) {
       const auto in_i = (out_i * stride) % dataset_size;
       for (uint32_t j = 0; j < dataset_dim; j++) {
         sampled_dataset.data_handle()[j * num_samples + out_i] =
-          static_cast<compute_t>(dataset.data_handle()[in_i * dataset_dim + j]);
+          static_cast<T>(dataset.data_handle()[in_i * dataset_dim + j]);
       }
     }
 
@@ -333,15 +333,15 @@ auto train(raft::resources const& res,
     }
   }
 
-  if constexpr (std::is_same_v<T, compute_t>) {
+  if constexpr (std::is_same_v<T, T>) {
     raft::copy(quantizer.threshold.data_handle(),
                host_threshold_vec.data(),
                dataset_dim,
                raft::resource::get_cuda_stream(res));
   } else {
-    auto mr         = raft::resource::get_workspace_resource(res);
-    auto casted_vec = raft::make_device_mdarray<compute_t, int64_t>(
-      res, mr, raft::make_extents<int64_t>(dataset_dim));
+    auto mr = raft::resource::get_workspace_resource(res);
+    auto casted_vec =
+      raft::make_device_mdarray<T, int64_t>(res, mr, raft::make_extents<int64_t>(dataset_dim));
     raft::copy(casted_vec.data_handle(),
                host_threshold_vec.data(),
                dataset_dim,
@@ -420,15 +420,15 @@ void transform(raft::resources const& res,
                out_dataset_size);
 
   // Use `float` for computation when T == half because a runtime error occurs with CUDA 11.8
-  using compute_t          = std::conditional_t<std::is_same_v<half, T>, float, T>;
-  auto threshold_vec       = raft::make_host_vector<compute_t, int64_t>(0);
-  compute_t* threshold_ptr = nullptr;
+  using T            = std::conditional_t<std::is_same_v<half, T>, float, T>;
+  auto threshold_vec = raft::make_host_vector<T, int64_t>(0);
+  T* threshold_ptr   = nullptr;
 
   if (quantizer.threshold.size() != 0) {
-    threshold_vec = raft::make_host_vector<compute_t, int64_t>(dataset_dim);
+    threshold_vec = raft::make_host_vector<T, int64_t>(dataset_dim);
     threshold_ptr = threshold_vec.data_handle();
 
-    if constexpr (std::is_same_v<compute_t, T>) {
+    if constexpr (std::is_same_v<T, T>) {
       raft::copy(threshold_ptr,
                  quantizer.threshold.data_handle(),
                  dataset_dim,
@@ -439,7 +439,7 @@ void transform(raft::resources const& res,
         res, mr, raft::make_extents<int64_t>(dataset_dim));
       raft::linalg::map(res,
                         casted_vec.view(),
-                        raft::cast_op<compute_t>{},
+                        raft::cast_op<T>{},
                         raft::make_const_mdspan(quantizer.threshold.view()));
       raft::copy(
         threshold_ptr, casted_vec.data_handle(), dataset_dim, raft::resource::get_cuda_stream(res));
@@ -456,7 +456,7 @@ void transform(raft::resources const& res,
           if (threshold_ptr == nullptr) {
             if (is_positive(dataset(i, in_j))) { pack |= (1u << pack_j); }
           } else {
-            if (is_positive(static_cast<compute_t>(dataset(i, in_j)) - threshold_ptr[in_j])) {
+            if (is_positive(static_cast<T>(dataset(i, in_j)) - threshold_ptr[in_j])) {
               pack |= (1u << pack_j);
             }
           }
