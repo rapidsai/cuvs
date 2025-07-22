@@ -29,6 +29,7 @@
 #include <raft/core/managed_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/multi_gpu.hpp>
+#include <raft/matrix/init.cuh>
 #include <raft/matrix/sample_rows.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <variant>
@@ -51,12 +52,14 @@ void reset_global_matrices(raft::resources const& res,
   T global_distances_fill_value =
     select_min ? std::numeric_limits<T>::max() : std::numeric_limits<T>::min();
 
-  std::fill(global_neighbors.data_handle(),
-            global_neighbors.data_handle() + num_rows * k,
-            global_neighbors_fill_value);
-  std::fill(global_distances.data_handle(),
-            global_distances.data_handle() + num_rows * k,
-            global_distances_fill_value);
+  raft::matrix::fill(
+    res,
+    raft::make_device_matrix_view<IdxT, IdxT>(global_neighbors.data_handle(), num_rows, k),
+    global_neighbors_fill_value);
+  raft::matrix::fill(
+    res,
+    raft::make_device_matrix_view<T, IdxT>(global_distances.data_handle(), num_rows, k),
+    global_distances_fill_value);
 }
 
 /**
