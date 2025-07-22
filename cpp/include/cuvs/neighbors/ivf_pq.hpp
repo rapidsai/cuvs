@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 
 #include <cuda_fp16.h>
 
+#include <cuvs/core/generic.hpp>
 #include <cuvs/neighbors/common.hpp>
 
 #include <raft/core/device_mdarray.hpp>
@@ -45,6 +46,7 @@ enum class codebook_gen {  // NOLINT
 };
 
 struct index_params : cuvs::neighbors::index_params {
+  friend class cuvs::core::generic<index_params>;  // a mark for code generation
   /**
    * The number of inverted lists (clusters)
    *
@@ -150,6 +152,7 @@ struct index_params : cuvs::neighbors::index_params {
  * @{
  */
 struct search_params : cuvs::neighbors::search_params {
+  friend class cuvs::core::generic<search_params>;
   /** The number of clusters to search. */
   uint32_t n_probes = 20;
   /**

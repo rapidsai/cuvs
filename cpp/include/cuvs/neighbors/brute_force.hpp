@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,9 +27,13 @@
 
 namespace cuvs::neighbors::brute_force {
 
-struct index_params : cuvs::neighbors::index_params {};
+struct index_params : cuvs::neighbors::index_params {
+  friend class cuvs::core::generic<index_params>;
+};
 
-struct search_params : cuvs::neighbors::search_params {};
+struct search_params : cuvs::neighbors::search_params {
+  friend class cuvs::core::generic<search_params>;
+};
 
 /**
  * @defgroup bruteforce_cpp_index Bruteforce index

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,6 +51,7 @@ namespace cuvs::neighbors::nn_descent {
  *
  */
 struct index_params : cuvs::neighbors::index_params {
+  friend class cuvs::core::generic<index_params>;
   size_t graph_degree              = 64;      // Degree of output graph.
   size_t intermediate_graph_degree = 128;     // Degree of input graph for pruning.
   size_t max_iterations            = 20;      // Number of nn-descent iterations.

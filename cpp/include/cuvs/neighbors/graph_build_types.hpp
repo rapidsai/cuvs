@@ -33,6 +33,7 @@ namespace graph_build_params {
 
 /** Specialized parameters utilizing IVF-PQ to build knn graph */
 struct ivf_pq_params {
+  friend class cuvs::core::generic<ivf_pq_params>;
   cuvs::neighbors::ivf_pq::index_params build_params;
   cuvs::neighbors::ivf_pq::search_params search_params;
   float refinement_rate = 1.0;
@@ -72,6 +73,7 @@ struct ivf_pq_params {
 using nn_descent_params = cuvs::neighbors::nn_descent::index_params;
 
 struct brute_force_params {
+  friend class cuvs::core::generic<brute_force_params>;
   cuvs::neighbors::brute_force::index_params build_params;
   cuvs::neighbors::brute_force::search_params search_params;
 };

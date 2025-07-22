@@ -62,6 +62,7 @@ static llvm::cl::opt<unsigned> NumThreads(
 struct GenericInfo {
   std::string class_name;
   std::string qualified_name;
+  std::string namespace_path;
   std::string header_path;
   std::vector<std::pair<std::string, std::string>> fields;  // name, type
 };
@@ -76,15 +77,10 @@ class GenericClassesCollector {
     classes_[info.qualified_name] = info;
   }
 
-  std::vector<GenericInfo> getClasses() const
+  std::unordered_map<std::string, GenericInfo> getClasses() const
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    std::vector<GenericInfo> result;
-    result.reserve(classes_.size());
-    for (const auto& pair : classes_) {
-      result.push_back(pair.second);
-    }
-    return result;
+    return classes_;
   }
 
   size_t size() const
@@ -112,6 +108,32 @@ unsigned getOptimalThreadCount()
   // Fall back to hardware concurrency
   unsigned hw_threads = std::thread::hardware_concurrency();
   return hw_threads > 0 ? hw_threads : 16;  // Default to 16 if detection fails
+}
+
+// Helper function to get fully qualified type name without CV qualifiers
+std::string getQualifiedTypeName(QualType qual_type)
+{
+  // Get the fully qualified type name without CV qualifiers
+  QualType unqualified_type = qual_type.getUnqualifiedType();
+  QualType canonical_type   = unqualified_type.getCanonicalType();
+
+  // Create a printing policy that suppresses class/struct/union keywords
+  PrintingPolicy policy(LangOptions{});
+  policy.SuppressTagKeyword     = true;   // This removes class/struct/union prefixes
+  policy.SuppressScope          = false;  // Keep namespace qualifications
+  policy.SuppressUnwrittenScope = true;   // Don't print implicit scopes
+
+  // Use the custom printing policy to get clean type names
+  std::string type_str = canonical_type.getAsString(policy);
+
+  // Clean up some common type name issues for better readability
+  // Replace _Bool with bool
+  if (type_str == "_Bool") { type_str = "bool"; }
+
+  // Handle size_t vs int issues - prefer the actual underlying type
+  // but keep size_t when explicitly used
+
+  return type_str;
 }
 
 // Visitor that traverses types to detect CRTP patterns
@@ -170,7 +192,6 @@ class GenericTypeTraversalVisitor : public RecursiveASTVisitor<GenericTypeTraver
                   if (auto* template_decl = dyn_cast<ClassTemplateDecl>(core_decl)) {
                     if (template_decl->getName() == "generic") {
                       generic_template_ = template_decl;
-                      llvm::outs() << "Found cuvs::core::generic template!\n";
                       return;
                     }
                   }
@@ -181,8 +202,6 @@ class GenericTypeTraversalVisitor : public RecursiveASTVisitor<GenericTypeTraver
         }
       }
     }
-
-    llvm::outs() << "Could not find cuvs::core::generic template\n";
   }
 
   void ProcessGenericClass(CXXRecordDecl* decl)
@@ -197,6 +216,22 @@ class GenericTypeTraversalVisitor : public RecursiveASTVisitor<GenericTypeTraver
     GenericInfo info;
     info.class_name     = decl->getNameAsString();
     info.qualified_name = decl->getQualifiedNameAsString();
+
+    // Get the enclosing namespace
+    DeclContext* ctx = decl->getDeclContext();
+    while (ctx && !ctx->isNamespace() && !ctx->isTranslationUnit()) {
+      ctx = ctx->getParent();
+    }
+
+    if (ctx && ctx->isNamespace()) {
+      if (auto* ns = dyn_cast<NamespaceDecl>(ctx)) {
+        info.namespace_path = ns->getQualifiedNameAsString();
+      } else {
+        info.namespace_path = "::";
+      }
+    } else {
+      info.namespace_path = "::";
+    }
 
     // Extract header file path from source location
     SourceManager& sm  = context_->getSourceManager();
@@ -231,7 +266,7 @@ class GenericTypeTraversalVisitor : public RecursiveASTVisitor<GenericTypeTraver
     if (decl->isCompleteDefinition()) {
       for (auto* field : decl->fields()) {
         std::string field_name = field->getNameAsString();
-        std::string field_type = field->getType().getAsString();
+        std::string field_type = getQualifiedTypeName(field->getType());
         info.fields.emplace_back(field_name, field_type);
         llvm::outs() << "  Field: " << field_name << " : " << field_type << "\n";
       }
@@ -242,7 +277,7 @@ class GenericTypeTraversalVisitor : public RecursiveASTVisitor<GenericTypeTraver
           if (base_record->isCompleteDefinition()) {
             for (auto* field : base_record->fields()) {
               std::string field_name = field->getNameAsString();
-              std::string field_type = field->getType().getAsString();
+              std::string field_type = getQualifiedTypeName(field->getType());
               info.fields.emplace_back(field_name, field_type);
               llvm::outs() << "  Inherited field: " << field_name << " : " << field_type << "\n";
             }
@@ -435,17 +470,18 @@ void processFilesBatch(const CompilationDatabase& db,
   }
 }
 
-std::string GenerateImplementations(const std::vector<GenericInfo>& classes)
+std::string GenerateImplementations(const std::unordered_map<std::string, GenericInfo>& classes)
 {
   std::string code = R"(// AUTO-GENERATED FILE - DO NOT EDIT
 // Generated by generate_generic_json tool
 
 #include <cuvs/core/generic.hpp>
+
 )";
 
   // Collect unique header files from all classes
   std::set<std::string> unique_headers;
-  for (const auto& cls : classes) {
+  for (const auto& [_, cls] : classes) {
     if (!cls.header_path.empty()) { unique_headers.insert(cls.header_path); }
   }
 
@@ -457,27 +493,96 @@ std::string GenerateImplementations(const std::vector<GenericInfo>& classes)
 
 #include <nlohmann/json.hpp>
 
-namespace cuvs::core {
+#include <optional>
+#include <variant>
+#include <type_traits>
 
-)";
+using json = nlohmann::json;
 
-  // Generate specializations
-  for (const auto& cls : classes) {
-    code += "template<>\n";
-    code += "auto generic<" + cls.qualified_name + ">::to_json() const -> nlohmann::json {\n";
-    code += "  nlohmann::json j;\n";
-    code += "  const auto& self = this->crtp();\n";
+template<typename Variant>
+void deserialize_variant_by_index(Variant& variant, const json& j, std::size_t index) {
+    constexpr auto variant_size = std::variant_size_v<Variant>;
 
-    for (const auto& field : cls.fields) {
-      code += "  j[\"" + field.first + "\"] = self." + field.first + ";\n";
-    }
-    code += R"(  return j;
+    auto deserialize_at_index = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        ((index == Is ? [&]() {
+            using T = std::variant_alternative_t<Is, Variant>;
+            if constexpr (std::is_convertible_v<json, T>) {
+                variant = j.get<T>();
+            }
+        }() : void()), ...);
+    };
+    deserialize_at_index(std::make_index_sequence<variant_size>{});
 }
 
 )";
-  }
 
-  code += "}  // namespace cuvs::core\n\n";
+  // Generate forward declarations
+  code += "// Forward declarations help with dependencies\n";
+  for (const auto& [qname, cls] : classes) {
+    code += "namespace " + cls.namespace_path + " {\n";
+    code += "void to_json(json&, const " + qname + "&);\n";
+    code += "void from_json(const json&, " + qname + "&);\n";
+    code += "}\n";
+  }
+  code += "\n\n";
+
+  // Generate specializations
+  for (const auto& [qname, cls] : classes) {
+    // nlohmann::json
+    code += "namespace " + cls.namespace_path + " {\n";
+    code += "void to_json(json& j, const " + qname + "& obj) {\n";
+    for (const auto& [field_name, field_type] : cls.fields) {
+      if (field_type.find("std::optional") == 0) {
+        code += "  if (obj." + field_name + ".has_value()) j[\"" + field_name + "\"] = obj." +
+                field_name + ".value();\n";
+      } else if (field_type.find("std::variant") == 0) {
+        code += "  j[\"" + field_name + "_variant\"] = obj." + field_name + ".index();\n";
+        code += "  std::visit([&](const auto& value) {\n";
+        code +=
+          "    if constexpr (!std::is_same_v<std::decay_t<decltype(value)>, std::monostate>) {\n";
+        code += "      j[\"" + field_name + "\"] = value;\n";
+        code += "    }\n";
+        code += "  }, obj." + field_name + ");\n";
+      } else {
+        code += "  j[\"" + field_name + "\"] = obj." + field_name + ";\n";
+      }
+    }
+    code += "}\n";
+
+    code += "void from_json(const json& j, " + qname + "& obj) {\n";
+    code += "  obj = " + qname + "{};\n";
+    for (const auto& [field_name, field_type] : cls.fields) {
+      if (field_type.find("std::optional") == 0) {
+        code += "  if (j.contains(\"" + field_name + "\")) {\n";
+        code += "    obj." + field_name + " = j[\"" + field_name + "\"];\n";
+        code += "  }\n";
+      } else if (field_type.find("std::variant") == 0) {
+        code += "  if (j.contains(\"" + field_name + "_variant\") && j.contains(\"" + field_name +
+                "\")) {\n";
+        code += "    auto variant_index = j[\"" + field_name + "_variant\"].get<std::size_t>();\n";
+        code += "    deserialize_variant_by_index(obj." + field_name + ", j[\"" + field_name +
+                "\"], variant_index);\n";
+        code += "  }\n";
+      } else {
+        code +=
+          "  obj." + field_name + " = j.value(\"" + field_name + "\", obj." + field_name + ");\n";
+      }
+    }
+    code += "}\n";
+    code += "}\n";
+
+    // generic<T>::to_json
+    code += "template<>\n";
+    code += "auto cuvs::core::generic<" + qname + ">::to_json(const " + qname +
+            "& obj) -> nlohmann::json {\n";
+    code += "  return obj;\n";
+    code += "}\n";
+    code += "template<>\n";
+    code += "auto cuvs::core::generic<" + qname + ">::from_json(const nlohmann::json& j) -> " +
+            qname + " {\n";
+    code += "  return j.get<" + qname + ">();\n";
+    code += "}\n\n";
+  }
 
   return code;
 }
@@ -566,8 +671,8 @@ int main(int argc, const char** argv)
   const auto& classes = g_collector->getClasses();
 
   llvm::outs() << "Found " << classes.size() << " classes inheriting from cuvs::core::generic:\n";
-  for (const auto& cls : classes) {
-    llvm::outs() << "  " << cls.qualified_name << " (" << cls.fields.size() << " fields)\n";
+  for (const auto& [name, cls] : classes) {
+    llvm::outs() << "  " << name << " (" << cls.fields.size() << " fields)\n";
   }
 
   std::string generated_code = GenerateImplementations(classes);
