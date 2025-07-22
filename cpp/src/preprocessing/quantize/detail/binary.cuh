@@ -276,7 +276,6 @@ auto train(raft::resources const& res,
   const size_t dataset_size  = dataset.extent(0);
   quantizer.threshold        = raft::make_device_vector<T, int64_t>(res, dataset_dim);
 
-  using T = std::conditional_t<std::is_same_v<half, T>, float, T>;
   std::vector<T> host_threshold_vec(dataset_dim);
   auto threshold_ptr = host_threshold_vec.data();
 
