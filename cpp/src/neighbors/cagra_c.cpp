@@ -121,10 +121,10 @@ void* _build(cuvsResources_t res, cuvsCagraIndexParams params, DLManagedTensor* 
 }
 
 template <typename T>
-void* _from_graph(cuvsResources_t res,
-                  cuvsDistanceType _metric,
-                  DLManagedTensor* graph_tensor,
-                  DLManagedTensor* dataset_tensor)
+void* _from_args(cuvsResources_t res,
+                 cuvsDistanceType _metric,
+                 DLManagedTensor* graph_tensor,
+                 DLManagedTensor* dataset_tensor)
 {
   auto metric  = static_cast<cuvs::distance::DistanceType>((int)_metric);
   auto dataset = dataset_tensor->dl_tensor;
@@ -508,27 +508,27 @@ extern "C" cuvsError_t cuvsCagraBuild(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsCagraIndexFromGraph(cuvsResources_t res,
-                                               cuvsDistanceType metric,
-                                               DLManagedTensor* graph_tensor,
-                                               DLManagedTensor* dataset_tensor,
-                                               cuvsCagraIndex_t index)
+extern "C" cuvsError_t cuvsCagraIndexFromArgs(cuvsResources_t res,
+                                              cuvsDistanceType metric,
+                                              DLManagedTensor* graph_tensor,
+                                              DLManagedTensor* dataset_tensor,
+                                              cuvsCagraIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
     index->dtype = dataset.dtype;
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
       index->addr =
-        reinterpret_cast<uintptr_t>(_from_graph<float>(res, metric, graph_tensor, dataset_tensor));
+        reinterpret_cast<uintptr_t>(_from_args<float>(res, metric, graph_tensor, dataset_tensor));
     } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
       index->addr =
-        reinterpret_cast<uintptr_t>(_from_graph<half>(res, metric, graph_tensor, dataset_tensor));
+        reinterpret_cast<uintptr_t>(_from_args<half>(res, metric, graph_tensor, dataset_tensor));
     } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
       index->addr =
-        reinterpret_cast<uintptr_t>(_from_graph<int8_t>(res, metric, graph_tensor, dataset_tensor));
+        reinterpret_cast<uintptr_t>(_from_args<int8_t>(res, metric, graph_tensor, dataset_tensor));
     } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
-      index->addr = reinterpret_cast<uintptr_t>(
-        _from_graph<uint8_t>(res, metric, graph_tensor, dataset_tensor));
+      index->addr =
+        reinterpret_cast<uintptr_t>(_from_args<uint8_t>(res, metric, graph_tensor, dataset_tensor));
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,

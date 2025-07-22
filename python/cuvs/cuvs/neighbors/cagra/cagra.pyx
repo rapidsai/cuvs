@@ -819,7 +819,7 @@ def from_graph(graph, dataset, metric="sqeuclidean", resources=None):
     cdef cydlpack.DLManagedTensor* graph_dlpack = \
         cydlpack.dlpack_c(graph_ai)
 
-    check_cuvs(cuvsCagraIndexFromGraph(
+    check_cuvs(cuvsCagraIndexFromArgs(
         res,
         c_metric,
         graph_dlpack,

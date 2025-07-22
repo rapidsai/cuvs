@@ -705,15 +705,15 @@ cuvsError_t cuvsCagraDeserialize(cuvsResources_t res, const char* filename, cuvs
  * cuvsDistanceType metric = L2Expanded;
  *
  * // Build the CAGRA Index from the graph/dataset
- * cuvsError_t status = cuvsCagraIndexFromGraph(res, metric, &graph, &dataset, index);
+ * cuvsError_t status = cuvsCagraIndexFromArgs(res, metric, &graph, &dataset, index);
  *
  * @endcode
  */
-cuvsError_t cuvsCagraIndexFromGraph(cuvsResources_t res,
-                                    cuvsDistanceType metric,
-                                    DLManagedTensor* graph,
-                                    DLManagedTensor* dataset,
-                                    cuvsCagraIndex_t index);
+cuvsError_t cuvsCagraIndexFromArgs(cuvsResources_t res,
+                                   cuvsDistanceType metric,
+                                   DLManagedTensor* graph,
+                                   DLManagedTensor* dataset,
+                                   cuvsCagraIndex_t index);
 
 /**
  * @brief Merge multiple CAGRA indices into a single CAGRA index.

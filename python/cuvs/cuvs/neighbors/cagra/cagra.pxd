@@ -169,11 +169,11 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
                                      const char * filename,
                                      cuvsCagraIndex_t index)
 
-    cuvsError_t cuvsCagraIndexFromGraph(cuvsResources_t res,
-                                        cuvsDistanceType metric,
-                                        DLManagedTensor * graph,
-                                        DLManagedTensor * dataset,
-                                        cuvsCagraIndex_t index)
+    cuvsError_t cuvsCagraIndexFromArgs(cuvsResources_t res,
+                                       cuvsDistanceType metric,
+                                       DLManagedTensor * graph,
+                                       DLManagedTensor * dataset,
+                                       cuvsCagraIndex_t index)
 
 cdef class Index:
     """
