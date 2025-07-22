@@ -18,7 +18,6 @@
 #include "../common/conf.hpp"
 #include "diskann_wrapper.h"
 
-#define JSON_DIAGNOSTICS 1
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
