@@ -14,23 +14,19 @@
  * limitations under the License.
  */
 
-// Please add the required header files below for which panama FFM API bindings are needed
+#include "vamana.cuh"
 
-#include <cuvs/core/c_api.h>
-#include <cuvs/neighbors/cagra.h>
-#include <cuvs/neighbors/brute_force.h>
-#include <cuvs/neighbors/hnsw.h>
-#include <cuvs/neighbors/ivf_pq.h>
-#include <cuvs/neighbors/common.h>
-#include <cuvs/neighbors/tiered_index.h>
-#include <cuda_runtime.h>
+namespace cuvs::neighbors::vamana {
 
-/**
- * @brief function signature for setting omp threads
- */
-void omp_set_num_threads(int n_writer_threads);
+#define CUVS_INST_VAMANA_CODEBOOKS(T)                                               \
+  auto deserialize_codebooks(const std::string& codebook_prefix, const int dim)     \
+    -> cuvs::neighbors::vamana::index_params::codebook_params<T>                    \
+  {                                                                                 \
+    return cuvs::neighbors::vamana::deserialize_codebooks<T>(codebook_prefix, dim); \
+  }
 
-/**
- * @brief function signature for getting omp threads
- */
-int omp_get_num_threads(void);
+CUVS_INST_VAMANA_CODEBOOKS(float);
+
+#undef CUVS_INST_VAMANA_CODEBOOKS
+
+}  // namespace cuvs::neighbors::vamana
