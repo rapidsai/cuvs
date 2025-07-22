@@ -30,9 +30,10 @@ public interface BinaryQuantizer {
    * Applies binary quantization transform to given dataset.
    *
    * @param dataset a two-dimensional float array to transform
-   * @return a two-dimensional byte array containing the binary quantized data
+   * @return a QuantizedMatrix containing the binary quantized data
    */
-  static byte[][] transform(CuVSResources cuvsResources, float[][] dataset) throws Throwable {
+  static QuantizedMatrix transform(CuVSResources cuvsResources, float[][] dataset)
+      throws Throwable {
     Objects.requireNonNull(cuvsResources);
     Objects.requireNonNull(dataset);
     return CuVSProvider.provider().binaryQuantizerTransform(cuvsResources, dataset);
@@ -42,9 +43,9 @@ public interface BinaryQuantizer {
    * Applies binary quantization transform to given dataset.
    *
    * @param dataset a {@link Dataset} object containing the vectors to transform
-   * @return a two-dimensional byte array containing the binary quantized data
+   * @return a QuantizedMatrix containing the binary quantized data
    */
-  static byte[][] transform(CuVSResources cuvsResources, Dataset dataset) throws Throwable {
+  static QuantizedMatrix transform(CuVSResources cuvsResources, Dataset dataset) throws Throwable {
     Objects.requireNonNull(cuvsResources);
     Objects.requireNonNull(dataset);
     return CuVSProvider.provider().binaryQuantizerTransform(cuvsResources, dataset);

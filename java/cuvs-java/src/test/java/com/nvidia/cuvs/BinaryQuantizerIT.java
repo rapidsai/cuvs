@@ -64,19 +64,32 @@ public class BinaryQuantizerIT extends CuVSTestCase {
     }
 
     // Apply binary quantization
-    byte[][] quantizedData = BinaryQuantizer.transform(cuvsResources, testData);
+    try (QuantizedMatrix quantizedMatrix = BinaryQuantizer.transform(cuvsResources, testData)) {
+      assertNotNull(quantizedMatrix);
+      assertEquals(rows, quantizedMatrix.rows());
+      assertEquals(cols, quantizedMatrix.cols());
 
-    assertNotNull(quantizedData);
-    assertEquals(rows, quantizedData.length);
-    assertEquals(cols, quantizedData[0].length);
+      // Verify binary quantization logic: positive values -> 1, negative/zero -> 0
+      for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+          byte quantizedValue = quantizedMatrix.get(i, j);
+          if (testData[i][j] > 0) {
+            assertTrue("Positive values should be quantized to 1", quantizedValue == 1);
+          } else {
+            assertTrue("Negative/zero values should be quantized to 0", quantizedValue == 0);
+          }
+        }
+      }
 
-    // Verify binary quantization logic: positive values -> 1, negative/zero -> 0
-    for (int i = 0; i < rows; i++) {
-      for (int j = 0; j < cols; j++) {
-        if (testData[i][j] > 0) {
-          assertTrue("Positive values should be quantized to 1", quantizedData[i][j] == 1);
-        } else {
-          assertTrue("Negative/zero values should be quantized to 0", quantizedData[i][j] == 0);
+      // Also test the toArray() method
+      byte[][] quantizedData = quantizedMatrix.toArray();
+      assertEquals(rows, quantizedData.length);
+      assertEquals(cols, quantizedData[0].length);
+
+      // Verify the array matches the direct access
+      for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+          assertEquals(quantizedMatrix.get(i, j), quantizedData[i][j]);
         }
       }
     }
@@ -101,25 +114,28 @@ public class BinaryQuantizerIT extends CuVSTestCase {
     // Create dataset
     Dataset dataset = Dataset.ofArray(testData);
 
-    // Apply binary quantization
-    byte[][] quantizedData = BinaryQuantizer.transform(cuvsResources, dataset);
+    try {
+      // Apply binary quantization
+      try (QuantizedMatrix quantizedMatrix = BinaryQuantizer.transform(cuvsResources, dataset)) {
+        assertNotNull(quantizedMatrix);
+        assertEquals(rows, quantizedMatrix.rows());
+        assertEquals(cols, quantizedMatrix.cols());
 
-    assertNotNull(quantizedData);
-    assertEquals(rows, quantizedData.length);
-    assertEquals(cols, quantizedData[0].length);
-
-    // Verify binary quantization logic
-    for (int i = 0; i < rows; i++) {
-      for (int j = 0; j < cols; j++) {
-        if (testData[i][j] > 0) {
-          assertTrue("Positive values should be quantized to 1", quantizedData[i][j] == 1);
-        } else {
-          assertTrue("Negative/zero values should be quantized to 0", quantizedData[i][j] == 0);
+        // Verify binary quantization logic
+        for (int i = 0; i < rows; i++) {
+          for (int j = 0; j < cols; j++) {
+            byte quantizedValue = quantizedMatrix.get(i, j);
+            if (testData[i][j] > 0) {
+              assertTrue("Positive values should be quantized to 1", quantizedValue == 1);
+            } else {
+              assertTrue("Negative/zero values should be quantized to 0", quantizedValue == 0);
+            }
+          }
         }
       }
+    } finally {
+      dataset.close();
     }
-
-    dataset.close();
   }
 
   @Test
@@ -132,25 +148,85 @@ public class BinaryQuantizerIT extends CuVSTestCase {
       {Float.MIN_VALUE, -Float.MIN_VALUE, Float.MAX_VALUE, -Float.MAX_VALUE, 0.0f}
     };
 
-    byte[][] quantizedData = BinaryQuantizer.transform(cuvsResources, testData);
+    try (QuantizedMatrix quantizedMatrix = BinaryQuantizer.transform(cuvsResources, testData)) {
+      assertNotNull(quantizedMatrix);
+      assertEquals(2, quantizedMatrix.rows());
+      assertEquals(5, quantizedMatrix.cols());
 
-    assertNotNull(quantizedData);
-    assertEquals(2, quantizedData.length);
-    assertEquals(5, quantizedData[0].length);
+      // Verify specific edge cases
+      // Row 0: [-1.0, 0.0, 1.0, -0.1, 0.1] -> [0, 0, 1, 0, 1]
+      assertEquals(0, quantizedMatrix.get(0, 0)); // -1.0 -> 0
+      assertEquals(0, quantizedMatrix.get(0, 1)); // 0.0 -> 0
+      assertEquals(1, quantizedMatrix.get(0, 2)); // 1.0 -> 1
+      assertEquals(0, quantizedMatrix.get(0, 3)); // -0.1 -> 0
+      assertEquals(1, quantizedMatrix.get(0, 4)); // 0.1 -> 1
 
-    // Verify specific edge cases
-    // Row 0: [-1.0, 0.0, 1.0, -0.1, 0.1] -> [0, 0, 1, 0, 1]
-    assertEquals(0, quantizedData[0][0]); // -1.0 -> 0
-    assertEquals(0, quantizedData[0][1]); // 0.0 -> 0
-    assertEquals(1, quantizedData[0][2]); // 1.0 -> 1
-    assertEquals(0, quantizedData[0][3]); // -0.1 -> 0
-    assertEquals(1, quantizedData[0][4]); // 0.1 -> 1
+      // Row 1: [MIN_VALUE, -MIN_VALUE, MAX_VALUE, -MAX_VALUE, 0.0] -> [1, 0, 1, 0, 0]
+      assertEquals(1, quantizedMatrix.get(1, 0)); // MIN_VALUE -> 1
+      assertEquals(0, quantizedMatrix.get(1, 1)); // -MIN_VALUE -> 0
+      assertEquals(1, quantizedMatrix.get(1, 2)); // MAX_VALUE -> 1
+      assertEquals(0, quantizedMatrix.get(1, 3)); // -MAX_VALUE -> 0
+      assertEquals(0, quantizedMatrix.get(1, 4)); // 0.0 -> 0
+    }
+  }
 
-    // Row 1: [MIN_VALUE, -MIN_VALUE, MAX_VALUE, -MAX_VALUE, 0.0] -> [1, 0, 1, 0, 0]
-    assertEquals(1, quantizedData[1][0]); // MIN_VALUE -> 1
-    assertEquals(0, quantizedData[1][1]); // -MIN_VALUE -> 0
-    assertEquals(1, quantizedData[1][2]); // MAX_VALUE -> 1
-    assertEquals(0, quantizedData[1][3]); // -MAX_VALUE -> 0
-    assertEquals(0, quantizedData[1][4]); // 0.0 -> 0
+  @Test
+  public void testBinaryQuantizerCopyRow() throws Throwable {
+    log.info("testBinaryQuantizerCopyRow");
+
+    // Generate test data
+    int rows = 10;
+    int cols = 8;
+    float[][] testData = new float[rows][cols];
+
+    for (int i = 0; i < rows; i++) {
+      for (int j = 0; j < cols; j++) {
+        testData[i][j] = (i + j) % 2 == 0 ? 1.0f : -1.0f; // Alternating pattern
+      }
+    }
+
+    try (QuantizedMatrix quantizedMatrix = BinaryQuantizer.transform(cuvsResources, testData)) {
+      // Test copyRow functionality
+      byte[] rowBuffer = new byte[cols];
+
+      for (int i = 0; i < rows; i++) {
+        quantizedMatrix.copyRow(i, rowBuffer);
+
+        // Verify the copied row matches direct access
+        for (int j = 0; j < cols; j++) {
+          assertEquals(quantizedMatrix.get(i, j), rowBuffer[j]);
+
+          // Also verify the quantization logic
+          byte expected = testData[i][j] > 0 ? (byte) 1 : (byte) 0;
+          assertEquals(expected, rowBuffer[j]);
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testBinaryQuantizerResourceManagement() throws Throwable {
+    log.info("testBinaryQuantizerResourceManagement");
+
+    float[][] testData = {{1.0f, -1.0f}, {0.5f, -0.5f}};
+
+    QuantizedMatrix quantizedMatrix = BinaryQuantizer.transform(cuvsResources, testData);
+
+    // Use the matrix
+    assertEquals(2, quantizedMatrix.rows());
+    assertEquals(2, quantizedMatrix.cols());
+    assertEquals(1, quantizedMatrix.get(0, 0));
+    assertEquals(0, quantizedMatrix.get(0, 1));
+
+    // Close the matrix
+    quantizedMatrix.close();
+
+    // Verify that accessing after close throws exception
+    try {
+      quantizedMatrix.get(0, 0);
+      assertTrue("Should throw exception after close", false);
+    } catch (IllegalStateException e) {
+      assertTrue("Expected exception message", e.getMessage().contains("closed"));
+    }
   }
 }

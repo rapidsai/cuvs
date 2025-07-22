@@ -30,6 +30,7 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
 
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
+import com.nvidia.cuvs.QuantizedMatrix;
 import com.nvidia.cuvs.internal.common.Util;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -46,22 +47,27 @@ public class BinaryQuantizerImpl {
    *
    * @param cuvsResources CuVS resources
    * @param dataset a two-dimensional float array to transform
-   * @return a two-dimensional byte array containing the binary quantized data
+   * @return a QuantizedMatrix containing the binary quantized data
    */
-  public static byte[][] transform(CuVSResources cuvsResources, float[][] dataset)
+  public static QuantizedMatrix transform(CuVSResources cuvsResources, float[][] dataset)
       throws Throwable {
     if (!(cuvsResources instanceof CuVSResourcesImpl)) {
       throw new IllegalArgumentException("Unsupported " + cuvsResources);
     }
 
     CuVSResourcesImpl resources = (CuVSResourcesImpl) cuvsResources;
+    Arena resultArena = Arena.ofShared();
 
     try (var localArena = Arena.ofConfined()) {
       long rows = dataset.length;
       long cols = rows > 0 ? dataset[0].length : 0;
 
       MemorySegment datasetMemSegment = buildMemorySegment(localArena, dataset);
-      return performTransform(resources, localArena, rows, cols, datasetMemSegment, HOST_TO_DEVICE);
+      return performTransform(
+          resources, localArena, resultArena, rows, cols, datasetMemSegment, HOST_TO_DEVICE);
+    } catch (Throwable t) {
+      resultArena.close();
+      throw t;
     }
   }
 
@@ -70,14 +76,16 @@ public class BinaryQuantizerImpl {
    *
    * @param cuvsResources CuVS resources
    * @param dataset a {@link Dataset} object containing the vectors to transform
-   * @return a two-dimensional byte array containing the binary quantized data
+   * @return a QuantizedMatrix containing the binary quantized data
    */
-  public static byte[][] transform(CuVSResources cuvsResources, Dataset dataset) throws Throwable {
+  public static QuantizedMatrix transform(CuVSResources cuvsResources, Dataset dataset)
+      throws Throwable {
     if (!(cuvsResources instanceof CuVSResourcesImpl)) {
       throw new IllegalArgumentException("Unsupported " + cuvsResources);
     }
 
     CuVSResourcesImpl resources = (CuVSResourcesImpl) cuvsResources;
+    Arena resultArena = Arena.ofShared();
 
     try (var localArena = Arena.ofConfined()) {
       long rows = dataset.size();
@@ -85,16 +93,20 @@ public class BinaryQuantizerImpl {
 
       MemorySegment datasetMemSegment = ((DatasetImpl) dataset).asMemorySegment();
       return performTransform(
-          resources, localArena, rows, cols, datasetMemSegment, INFER_DIRECTION);
+          resources, localArena, resultArena, rows, cols, datasetMemSegment, INFER_DIRECTION);
+    } catch (Throwable t) {
+      resultArena.close();
+      throw t;
     }
   }
 
   /**
    * Core transformation logic shared by both overloads.
    */
-  private static byte[][] performTransform(
+  private static QuantizedMatrix performTransform(
       CuVSResourcesImpl resources,
       Arena localArena,
+      Arena resultArena,
       long rows,
       long cols,
       MemorySegment datasetMemSegment,
@@ -138,12 +150,13 @@ public class BinaryQuantizerImpl {
       returnValue = cuvsStreamSync(cuvsResourcesPtr);
       checkCuVSError(returnValue, "cuvsStreamSync");
 
-      // Copy result back to host
-      MemorySegment outputMemSegment = localArena.allocate(C_CHAR, outputBytes);
+      // Copy result back to host using the shared result arena
+      MemorySegment outputMemSegment = resultArena.allocate(C_CHAR, outputBytes);
       cudaMemcpy(outputMemSegment, outputPtr, outputBytes, DEVICE_TO_HOST);
 
-      // Unpack bits to individual byte array
-      return unpackBinaryResult(outputMemSegment, rows, cols, outputCols);
+      // Create QuantizedMatrix with the shared result arena (1 bit per value for binary
+      // quantization)
+      return new QuantizedMatrixImpl(outputMemSegment, rows, cols, 1, resultArena);
 
     } finally {
       // Free device memory
@@ -152,23 +165,5 @@ public class BinaryQuantizerImpl {
       returnValue = cuvsRMMFree(cuvsResourcesPtr, outputPtr, outputBytes);
       checkCuVSError(returnValue, "cuvsRMMFree");
     }
-  }
-
-  /**
-   * Unpacks bit-packed binary data into individual byte array.
-   */
-  private static byte[][] unpackBinaryResult(
-      MemorySegment outputMemSegment, long rows, long cols, long outputCols) {
-
-    byte[][] result = new byte[(int) rows][(int) cols];
-    for (int i = 0; i < rows; i++) {
-      for (int j = 0; j < cols; j++) {
-        int byteIndex = j / 8;
-        int bitIndex = j % 8;
-        byte packedByte = outputMemSegment.get(C_CHAR, (i * outputCols + byteIndex) * C_BYTE_SIZE);
-        result[i][j] = (byte) ((packedByte >> bitIndex) & 1);
-      }
-    }
-    return result;
   }
 }

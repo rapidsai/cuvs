@@ -23,6 +23,7 @@ import com.nvidia.cuvs.CagraMergeParams;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
+import com.nvidia.cuvs.QuantizedMatrix;
 import com.nvidia.cuvs.ScalarQuantizer;
 import com.nvidia.cuvs.internal.BinaryQuantizerImpl;
 import com.nvidia.cuvs.internal.BruteForceIndexImpl;
@@ -155,14 +156,14 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public byte[][] binaryQuantizerTransform(CuVSResources cuVSResources, float[][] dataset)
+  public QuantizedMatrix binaryQuantizerTransform(CuVSResources cuVSResources, float[][] dataset)
       throws Throwable {
     return BinaryQuantizerImpl.transform(
         Objects.requireNonNull(cuVSResources), Objects.requireNonNull(dataset));
   }
 
   @Override
-  public byte[][] binaryQuantizerTransform(CuVSResources cuVSResources, Dataset dataset)
+  public QuantizedMatrix binaryQuantizerTransform(CuVSResources cuVSResources, Dataset dataset)
       throws Throwable {
     return BinaryQuantizerImpl.transform(
         Objects.requireNonNull(cuVSResources), Objects.requireNonNull(dataset));

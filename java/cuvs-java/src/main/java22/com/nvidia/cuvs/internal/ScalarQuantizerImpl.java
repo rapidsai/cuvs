@@ -39,6 +39,7 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
 
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
+import com.nvidia.cuvs.QuantizedMatrix;
 import com.nvidia.cuvs.ScalarQuantizer;
 import com.nvidia.cuvs.internal.panama.cuvsScalarQuantizerParams;
 import java.lang.foreign.Arena;
@@ -85,7 +86,7 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
   }
 
   @Override
-  public byte[][] transform(float[][] dataset) throws Throwable {
+  public QuantizedMatrix transform(float[][] dataset) throws Throwable {
     checkNotDestroyed();
     try (var localArena = Arena.ofConfined()) {
       long rows = dataset.length;
@@ -130,31 +131,23 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
       returnValue = cuvsStreamSync(cuvsResourcesPtr);
       checkCuVSError(returnValue, "cuvsStreamSync");
 
-      // Copy result back to host
-      MemorySegment outputMemSegment = localArena.allocate(C_CHAR, outputBytes);
+      // Copy result back to host using the shared result arena
+      Arena resultArena = Arena.ofShared();
+      MemorySegment outputMemSegment = resultArena.allocate(C_CHAR, outputBytes);
       cudaMemcpy(outputMemSegment, outputPtr, outputBytes, DEVICE_TO_HOST);
 
-      // Free device memory
-      returnValue = cuvsRMMFree(cuvsResourcesPtr, datasetPtr, datasetBytes);
-      checkCuVSError(returnValue, "cuvsRMMFree");
-      returnValue = cuvsRMMFree(cuvsResourcesPtr, outputPtr, outputBytes);
-      checkCuVSError(returnValue, "cuvsRMMFree");
-
-      // Convert to byte array
-      byte[][] result = new byte[(int) rows][(int) cols];
-      for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-          result[i][j] = outputMemSegment.get(C_CHAR, (i * cols + j) * C_BYTE_SIZE);
-        }
-      }
-
-      return result;
+      // Create QuantizedMatrix with the shared result arena (8 bits per value for scalar
+      // quantization)
+      return new QuantizedMatrixImpl(outputMemSegment, rows, cols, 8, resultArena);
     }
   }
 
   @Override
-  public byte[][] transform(Dataset dataset) throws Throwable {
+  public QuantizedMatrix transform(Dataset dataset) throws Throwable {
     checkNotDestroyed();
+
+    Arena resultArena = Arena.ofShared();
+
     try (var localArena = Arena.ofConfined()) {
       long rows = dataset.size();
       long cols = dataset.dimensions();
@@ -179,44 +172,44 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
       MemorySegment datasetPtr = datasetD.get(C_POINTER, 0);
       MemorySegment outputPtr = outputD.get(C_POINTER, 0);
 
-      // Copy input data to device
-      cudaMemcpy(datasetPtr, datasetMemSegment, datasetBytes, INFER_DIRECTION);
+      try {
+        // Copy input data to device
+        cudaMemcpy(datasetPtr, datasetMemSegment, datasetBytes, INFER_DIRECTION);
 
-      // Prepare tensors
-      long datasetShape[] = {rows, cols};
-      MemorySegment datasetTensor =
-          prepareTensor(localArena, datasetPtr, datasetShape, 2, 32, 2, 2, 1);
-      MemorySegment outputTensor =
-          prepareTensor(localArena, outputPtr, datasetShape, 0, 8, 2, 2, 1);
+        // Prepare tensors
+        long datasetShape[] = {rows, cols};
+        MemorySegment datasetTensor =
+            prepareTensor(localArena, datasetPtr, datasetShape, 2, 32, 2, 2, 1);
+        MemorySegment outputTensor =
+            prepareTensor(localArena, outputPtr, datasetShape, 0, 8, 2, 2, 1);
 
-      // Transform
-      returnValue =
-          cuvsScalarQuantizerTransform(
-              cuvsResourcesPtr, quantizerSegment, datasetTensor, outputTensor);
-      checkCuVSError(returnValue, "cuvsScalarQuantizerTransform");
+        // Transform
+        returnValue =
+            cuvsScalarQuantizerTransform(
+                cuvsResourcesPtr, quantizerSegment, datasetTensor, outputTensor);
+        checkCuVSError(returnValue, "cuvsScalarQuantizerTransform");
 
-      returnValue = cuvsStreamSync(cuvsResourcesPtr);
-      checkCuVSError(returnValue, "cuvsStreamSync");
+        returnValue = cuvsStreamSync(cuvsResourcesPtr);
+        checkCuVSError(returnValue, "cuvsStreamSync");
 
-      // Copy result back to host
-      MemorySegment outputMemSegment = localArena.allocate(C_CHAR, outputBytes);
-      cudaMemcpy(outputMemSegment, outputPtr, outputBytes, DEVICE_TO_HOST);
+        // Copy result back to host using the shared result arena
+        MemorySegment outputMemSegment = resultArena.allocate(C_CHAR, outputBytes);
+        cudaMemcpy(outputMemSegment, outputPtr, outputBytes, DEVICE_TO_HOST);
 
-      // Free device memory
-      returnValue = cuvsRMMFree(cuvsResourcesPtr, datasetPtr, datasetBytes);
-      checkCuVSError(returnValue, "cuvsRMMFree");
-      returnValue = cuvsRMMFree(cuvsResourcesPtr, outputPtr, outputBytes);
-      checkCuVSError(returnValue, "cuvsRMMFree");
+        // Create QuantizedMatrix with the shared result arena (8 bits per value for scalar
+        // quantization)
+        return new QuantizedMatrixImpl(outputMemSegment, rows, cols, 8, resultArena);
 
-      // Convert to byte array
-      byte[][] result = new byte[(int) rows][(int) cols];
-      for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-          result[i][j] = outputMemSegment.get(C_CHAR, (i * cols + j) * C_BYTE_SIZE);
-        }
+      } finally {
+        // Free device memory
+        returnValue = cuvsRMMFree(cuvsResourcesPtr, datasetPtr, datasetBytes);
+        checkCuVSError(returnValue, "cuvsRMMFree");
+        returnValue = cuvsRMMFree(cuvsResourcesPtr, outputPtr, outputBytes);
+        checkCuVSError(returnValue, "cuvsRMMFree");
       }
-
-      return result;
+    } catch (Throwable t) {
+      resultArena.close();
+      throw t;
     }
   }
 
@@ -286,6 +279,16 @@ public class ScalarQuantizerImpl implements ScalarQuantizer {
 
       return result;
     }
+  }
+
+  @Override
+  public float[][] inverseTransform(QuantizedMatrix quantizedMatrix) throws Throwable {
+    checkNotDestroyed();
+
+    // Convert QuantizedMatrix to byte array for now
+    // In the future, we could optimize this to work directly with native memory
+    byte[][] quantizedData = quantizedMatrix.toArray();
+    return inverseTransform(quantizedData);
   }
 
   private MemorySegment buildMemorySegmentFromBytes(Arena arena, byte[][] data) {

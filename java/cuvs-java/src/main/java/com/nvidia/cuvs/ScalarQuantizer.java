@@ -19,47 +19,84 @@ import com.nvidia.cuvs.spi.CuVSProvider;
 import java.util.Objects;
 
 /**
- * {@link ScalarQuantizer} encapsulates a scalar quantizer for quantizing datasets.
+ * {@link ScalarQuantizer} provides scalar quantization functionality for datasets.
  *
- * Scalar quantization is performed by a linear mapping of an interval in the
- * float data type to the full range of the quantized int type.
+ * Scalar quantization maps floating-point values to 8-bit integers using learned
+ * quantization parameters (scale and offset) that minimize quantization error.
  */
-public interface ScalarQuantizer {
+public interface ScalarQuantizer extends AutoCloseable {
 
   /**
-   * De-allocate the scalar quantizer.
-   */
-  void destroy() throws Throwable;
-
-  /**
-   * Applies quantization transform to given dataset.
+   * Applies scalar quantization transform to given dataset.
    *
    * @param dataset a two-dimensional float array to transform
-   * @return a two-dimensional byte array containing the quantized data
+   * @return a QuantizedMatrix containing the scalar quantized data
    */
-  byte[][] transform(float[][] dataset) throws Throwable;
+  QuantizedMatrix transform(float[][] dataset) throws Throwable;
 
   /**
-   * Applies quantization transform to given dataset.
+   * Applies scalar quantization transform to given dataset.
    *
    * @param dataset a {@link Dataset} object containing the vectors to transform
-   * @return a two-dimensional byte array containing the quantized data
+   * @return a QuantizedMatrix containing the scalar quantized data
    */
-  byte[][] transform(Dataset dataset) throws Throwable;
+  QuantizedMatrix transform(Dataset dataset) throws Throwable;
 
   /**
-   * Perform inverse quantization step on previously quantized dataset.
+   * Applies inverse scalar quantization transform to given quantized dataset.
    *
-   * @param quantizedData a two-dimensional byte array of quantized data
+   * @param quantizedData a two-dimensional byte array to inverse transform
    * @return a two-dimensional float array containing the dequantized data
    */
   float[][] inverseTransform(byte[][] quantizedData) throws Throwable;
 
   /**
-   * Creates a new Builder with an instance of {@link CuVSResources}.
+   * Applies inverse scalar quantization transform to given quantized dataset.
    *
-   * @param cuvsResources an instance of {@link CuVSResources}
-   * @throws UnsupportedOperationException if the provider does not support scalar quantization
+   * @param quantizedMatrix a QuantizedMatrix containing quantized data
+   * @return a two-dimensional float array containing the dequantized data
+   */
+  float[][] inverseTransform(QuantizedMatrix quantizedMatrix) throws Throwable;
+
+  /**
+   * Convenience method that applies scalar quantization and immediately converts to array.
+   *
+   * @param dataset a two-dimensional float array to transform
+   * @return a two-dimensional byte array containing the scalar quantized data
+   */
+  default byte[][] transformToArray(float[][] dataset) throws Throwable {
+    try (QuantizedMatrix matrix = transform(dataset)) {
+      return matrix.toArray();
+    }
+  }
+
+  /**
+   * Convenience method that applies scalar quantization and immediately converts to array.
+   *
+   * @param dataset a {@link Dataset} object containing the vectors to transform
+   * @return a two-dimensional byte array containing the scalar quantized data
+   */
+  default byte[][] transformToArray(Dataset dataset) throws Throwable {
+    try (QuantizedMatrix matrix = transform(dataset)) {
+      return matrix.toArray();
+    }
+  }
+
+  /**
+   * Destroys the scalar quantizer and frees associated resources.
+   */
+  void destroy() throws Throwable;
+
+  @Override
+  default void close() throws Exception {
+    destroy();
+  }
+
+  /**
+   * Creates a new ScalarQuantizer builder.
+   *
+   * @param cuvsResources the CuVS resources to use
+   * @return a new ScalarQuantizer.Builder instance
    */
   static Builder newBuilder(CuVSResources cuvsResources) {
     Objects.requireNonNull(cuvsResources);
@@ -67,40 +104,39 @@ public interface ScalarQuantizer {
   }
 
   /**
-   * Builder helps configure and create an instance of {@link ScalarQuantizer}.
+   * Builder for creating ScalarQuantizer instances.
    */
   interface Builder {
 
     /**
-     * Sets the quantile parameter for the scalar quantizer.
-     * Specifies how many outliers at top and bottom will be ignored.
-     * Must be within range of (0, 1].
+     * Sets the quantile value for quantization.
      *
-     * @param quantile the quantile value (default: 0.99)
-     * @return an instance of this Builder
+     * @param quantile the quantile value (must be between 0.0 and 1.0)
+     * @return this builder
      */
     Builder withQuantile(float quantile);
 
     /**
-     * Sets the training dataset for the scalar quantizer.
+     * Sets the training dataset for learning quantization parameters.
      *
-     * @param dataset a two-dimensional float array for training
-     * @return an instance of this Builder
+     * @param trainingDataset a two-dimensional float array for training
+     * @return this builder
      */
-    Builder withTrainingDataset(float[][] dataset);
+    Builder withTrainingDataset(float[][] trainingDataset);
 
     /**
-     * Sets the training dataset for the scalar quantizer.
+     * Sets the training dataset for learning quantization parameters.
      *
-     * @param dataset a {@link Dataset} object containing the training vectors
-     * @return an instance of this Builder
+     * @param trainingDataset a Dataset object for training
+     * @return this builder
      */
-    Builder withTrainingDataset(Dataset dataset);
+    Builder withTrainingDataset(Dataset trainingDataset);
 
     /**
-     * Builds and returns an instance of {@link ScalarQuantizer}.
+     * Builds the ScalarQuantizer instance.
      *
-     * @return an instance of {@link ScalarQuantizer}
+     * @return a new ScalarQuantizer instance
+     * @throws Throwable if an error occurs during building
      */
     ScalarQuantizer build() throws Throwable;
   }
