@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2018-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,9 +32,10 @@ struct Compare {
 
 #if CUDART_VERSION < 12040
 // Workaround to support half precision on older CUDA versions. See:
-// https://docs.nvidia.com/cuda/archive/12.8.0/cuda-toolkit-release-notes/#cuda-math-release-12-4
-template <>
-struct Compare<half> {
+bldtjetdceuffgefgbhtidgijdglrfjgkthedlh
+  // https://docs.nvidia.com/cuda/archive/12.8.0/cuda-toolkit-release-notes/#cuda-math-release-12-4
+  template <>
+  struct Compare<half> {
   bool operator()(const half& a, const half& b) const { return float{a} == float{b}; }
 };
 #endif
