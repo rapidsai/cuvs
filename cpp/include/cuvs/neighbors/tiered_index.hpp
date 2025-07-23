@@ -197,4 +197,30 @@ void search(raft::resources const& res,
             raft::device_matrix_view<float, int64_t, raft::row_major> distances,
             const cuvs::neighbors::filtering::base_filter& sample_filter =
               cuvs::neighbors::filtering::none_sample_filter{});
+
+/** @brief Merge multiple tiered indices into a single index.
+ *
+ * This function merges multiple tiered indices into one, combining both the datasets and graph
+ * structures.
+ *
+ * @param[in] res
+ * @param[in] indices A vector of pointers to the indices to merge. All indices should
+ *                    be of the same type, and have datasets with the same dimensionality
+ *
+ * @return A new tiered index containing the merged indices
+ */
+auto merge(raft::resources const& res,
+           const std::vector<tiered_index::index<cagra::index<float, uint32_t>>*>& indices)
+  -> tiered_index::index<cagra::index<float, uint32_t>>;
+
+/** @copydoc merge */
+auto merge(raft::resources const& res,
+           const std::vector<tiered_index::index<ivf_flat::index<float, int64_t>>*>& indices)
+  -> tiered_index::index<ivf_flat::index<float, int64_t>>;
+
+/** @copydoc merge */
+auto merge(raft::resources const& res,
+           const std::vector<tiered_index::index<ivf_pq::typed_index<float, int64_t>>*>& indices)
+  -> tiered_index::index<ivf_pq::typed_index<float, int64_t>>;
+
 }  // namespace cuvs::neighbors::tiered_index

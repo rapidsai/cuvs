@@ -157,6 +157,35 @@ void _extend(cuvsResources_t res, DLManagedTensor* new_vectors, cuvsTieredIndex 
 
   tiered_index::extend(*res_ptr, vectors_mds, index_ptr);
 }
+template <typename UpstreamT>
+void _merge(cuvsResources_t res,
+            cuvsTieredIndex_t* indices,
+            size_t num_indices,
+            cuvsTieredIndex_t output_index)
+{
+  auto res_ptr = reinterpret_cast<raft::resources*>(res);
+
+  std::vector<cuvs::neighbors::tiered_index::index<UpstreamT>*> cpp_indices;
+  for (size_t i = 0; i < num_indices; ++i) {
+    RAFT_EXPECTS(indices[i]->dtype.code == indices[0]->dtype.code,
+                 "indices must all have the same dtype");
+    RAFT_EXPECTS(indices[i]->dtype.bits == indices[0]->dtype.bits,
+                 "indices must all have the same dtype");
+    RAFT_EXPECTS(indices[i]->algo == indices[0]->algo,
+                 "indices must all have the same index algorithm");
+
+    auto idx_ptr =
+      reinterpret_cast<cuvs::neighbors::tiered_index::index<UpstreamT>*>(indices[i]->addr);
+    cpp_indices.push_back(idx_ptr);
+  }
+
+  auto ptr = new cuvs::neighbors::tiered_index::index<UpstreamT>(
+    cuvs::neighbors::tiered_index::merge(*res_ptr, cpp_indices));
+
+  output_index->addr  = reinterpret_cast<uintptr_t>(ptr);
+  output_index->dtype = indices[0]->dtype;
+  output_index->algo  = indices[0]->algo;
+}
 
 }  // namespace
 
@@ -299,6 +328,31 @@ extern "C" cuvsError_t cuvsTieredIndexExtend(cuvsResources_t res,
       }
       case CUVS_TIERED_INDEX_ALGO_IVF_PQ: {
         _extend<ivf_pq::typed_index<float, int64_t>>(res, new_vectors, index);
+        break;
+      }
+      default: RAFT_FAIL("unsupported tiered index algorithm");
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsTieredIndexMerge(cuvsResources_t res,
+                                            cuvsTieredIndex_t* indices,
+                                            size_t num_indices,
+                                            cuvsTieredIndex_t output_index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    RAFT_EXPECTS(num_indices >= 1, "must have at least one index to merge");
+    switch (indices[0]->algo) {
+      case CUVS_TIERED_INDEX_ALGO_CAGRA: {
+        _merge<cagra::index<float, uint32_t>>(res, indices, num_indices, output_index);
+        break;
+      }
+      case CUVS_TIERED_INDEX_ALGO_IVF_FLAT: {
+        _merge<ivf_flat::index<float, int64_t>>(res, indices, num_indices, output_index);
+        break;
+      }
+      case CUVS_TIERED_INDEX_ALGO_IVF_PQ: {
+        _merge<ivf_pq::typed_index<float, int64_t>>(res, indices, num_indices, output_index);
         break;
       }
       default: RAFT_FAIL("unsupported tiered index algorithm");

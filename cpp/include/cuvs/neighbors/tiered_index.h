@@ -249,6 +249,19 @@ cuvsError_t cuvsTieredIndexExtend(cuvsResources_t res,
 /**
  * @}
  */
+
+/**
+ * @defgroup tiered_c_index_merge Tiered index merge
+ * @{
+ */
+cuvsError_t cuvsTieredIndexMerge(cuvsResources_t res,
+                                 cuvsTieredIndex_t* indices,
+                                 size_t num_indices,
+                                 cuvsTieredIndex_t output_index);
+
+/**
+ * @}
+ */
 #ifdef __cplusplus
 }
 #endif
