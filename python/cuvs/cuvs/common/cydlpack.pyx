@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,6 +29,43 @@ cdef void deleter(DLManagedTensor* tensor) noexcept:
         stdlib.free(tensor.dl_tensor.strides)
     tensor.manager_ctx = NULL
     stdlib.free(tensor)
+
+
+def dl_data_type_to_numpy(DLDataType dtype):
+    """ Converts a DLDataType dtype to a numpy dtype """
+    if dtype.code == DLDataTypeCode.kDLFloat:
+        if dtype.bits == 32:
+            return np.float32
+        elif dtype.bits == 64:
+            return np.float64
+        elif dtype.bits == 16:
+            return np.float16
+        else:
+            raise ValueError(f"unknown float dtype bits: {dtype.bits}")
+    elif dtype.code == DLDataTypeCode.kDLInt:
+        if dtype.bits == 32:
+            return np.int32
+        elif dtype.bits == 64:
+            return np.int64
+        elif dtype.bits == 16:
+            return np.int16
+        elif dtype.bits == 8:
+            return np.int8
+        else:
+            raise ValueError(f"unknown int dtype bits: {dtype.bits}")
+    elif dtype.code == DLDataTypeCode.kDLUInt:
+        if dtype.bits == 32:
+            return np.uint32
+        elif dtype.bits == 64:
+            return np.uint64
+        elif dtype.bits == 16:
+            return np.uint16
+        elif dtype.bits == 8:
+            return np.uint8
+        else:
+            raise ValueError(f"unknown uint dtype bits: {dtype.bits}")
+    else:
+        raise ValueError(f"unknown DLDataTypeCode.code: {dtype.code}")
 
 
 cdef DLManagedTensor* dlpack_c(ary):
