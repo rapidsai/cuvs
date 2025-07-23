@@ -419,8 +419,9 @@ void transform(raft::resources const& res,
                dataset_size,
                out_dataset_size);
 
-  auto threshold_vec = raft::make_host_vector<T, int64_t>(0);
-  T* threshold_ptr   = nullptr;
+  using compute_t          = std::conditional_t<std::is_same_v<half, T>, float, T>;
+  auto threshold_vec       = raft::make_host_vector<compute_t, int64_t>(0);
+  compute_t* threshold_ptr = nullptr;
 
   if (quantizer.threshold.size() != 0) {
     threshold_vec = raft::make_host_vector<compute_t, int64_t>(dataset_dim);
