@@ -18,6 +18,7 @@ package com.nvidia.cuvs;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import java.lang.invoke.MethodHandles;
@@ -39,6 +40,7 @@ public class TieredIndexIT extends CuVSTestCase {
 
   @Before
   public void setup() {
+    assumeTrue("not supported on " + System.getProperty("os.name"), isLinuxAmd64());
     initializeRandom();
     log.debug("Random context initialized for test");
   }
