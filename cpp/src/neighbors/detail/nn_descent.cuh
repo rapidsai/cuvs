@@ -289,7 +289,7 @@ RAFT_KERNEL preprocess_data_kernel(
       } else if (metric == cuvs::distance::DistanceType::BitwiseHamming) {
         int idx_for_byte           = list_id * dim + idx;  // uint8 or int8 data
         uint8_t* output_bytes      = reinterpret_cast<uint8_t*>(output_data);
-        output_bytes[idx_for_byte] = input_data[idx_for_byte];
+        output_bytes[idx_for_byte] = input_data[(size_t)blockIdx.x * dim + idx];
       } else {  // L2Expanded or L2SqrtExpanded
         output_data[list_id * dim + idx] = input_data[(size_t)blockIdx.x * dim + idx];
         if (idx == 0) { l2_norms[list_id] = l2_norm; }
