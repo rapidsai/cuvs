@@ -76,7 +76,7 @@ Prerequisites
 
 - CMake 3.26.4+
 - GCC 9.3+ (11.4+ recommended)
-- CUDA Toolkit 12.4+
+- CUDA Toolkit 12.0+
 - Ampere architecture or better (compute capability >= 8.0)
 
 Create a build environment
