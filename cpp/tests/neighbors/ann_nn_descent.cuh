@@ -498,12 +498,13 @@ const std::vector<AnnNNDescentInputs> inputsLargeBatch =
     {0.90});
 
 const std::vector<AnnNNDescentInputs> inputsDistEpilogue =
-  raft::util::itertools::product<AnnNNDescentInputs>({2000, 4000},  // n_rows
-                                                     {64, 1024},    // dim
-                                                     {32, 64},      // graph_degree
-                                                     {cuvs::distance::DistanceType::L2Expanded},
-                                                     {true},  // data on host
-                                                     {0.90});
+  raft::util::itertools::product<AnnNNDescentInputs>(
+    {2000, 4000},  // n_rows
+    {64, 1024},    // dim
+    {32, 64},      // graph_degree
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::L2SqrtExpanded},
+    {true},  // data on host
+    {0.90});
 
 const std::vector<AnnNNDescentBatchInputs> inputsBatch =
   raft::util::itertools::product<AnnNNDescentBatchInputs>(
