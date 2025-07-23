@@ -42,6 +42,7 @@
 
 #include <chrono>
 #include <cstdio>
+#include <type_traits>
 #include <vector>
 
 #include <sys/mman.h>
@@ -704,9 +705,17 @@ index<T, IdxT> build(
   }
   RAFT_EXPECTS(
     params.metric != BitwiseHamming ||
-      std::holds_alternative<cagra::graph_build_params::iterative_search_params>(knn_build_params),
-    "IVF_PQ and NN_DESCENT for CAGRA graph build do not support BitwiseHamming as a metric. Please "
-    "use the iterative CAGRA search build.");
+      std::holds_alternative<cagra::graph_build_params::iterative_search_params>(
+        knn_build_params) ||
+      std::holds_alternative<cagra::graph_build_params::nn_descent_params>(knn_build_params),
+    "IVF_PQ for CAGRA graph build does not support BitwiseHamming as a metric. Please "
+    "use nn-descent or the iterative CAGRA search build.");
+
+  // Validate data type for BitwiseHamming metric
+  RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::BitwiseHamming ||
+                 (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>),
+               "BitwiseHamming distance is only supported for int8_t and uint8_t data types. "
+               "Current data type is not supported.");
 
   auto cagra_graph = raft::make_host_matrix<IdxT, int64_t>(0, 0);
 
