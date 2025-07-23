@@ -97,7 +97,7 @@ void cuvs_cagra_hnswlib<T, IdxT>::build(const T* dataset, size_t nrow)
   // re-use the CAGRA wrapper to parse build params
   auto bps = build_param_.cagra_build_params;
   // Not very conveniently, the CAGRA wrapper resolves parameters after the dataset shape is known,
-  // so it takes a lambda to do it. Even though we now the shape, we want to use the wrapper as-is,
+  // so it takes a lambda to do it. Even though we know the shape, we want to use the wrapper as-is,
   // so we just modify that lambda.
   bps.cagra_params = [dataset_is_on_host, orig_cagra_params = bps.cagra_params](
                        auto dataset_extents, auto metric) {
