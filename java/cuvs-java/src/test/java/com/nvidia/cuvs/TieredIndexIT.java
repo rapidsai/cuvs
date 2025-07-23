@@ -67,7 +67,7 @@ public class TieredIndexIT extends CuVSTestCase {
     List<Map<Integer, Float>> expectedExtendedResults =
         Arrays.asList(Map.of(0, 0.02f, 1, 1.62f, 2, 7.22f), Map.of(2, 0.02f, 3, 2.42f, 1, 1.62f));
 
-    try (CuVSResources resources = CuVSResources.create()) {
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
       CagraIndexParams cagraParams =
           new CagraIndexParams.Builder().withGraphDegree(4).withIntermediateGraphDegree(8).build();
 
@@ -114,7 +114,7 @@ public class TieredIndexIT extends CuVSTestCase {
 
   @Test(expected = IllegalArgumentException.class)
   public void testErrorHandling() throws Throwable {
-    try (CuVSResources resources = CuVSResources.create()) {
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
       CagraIndexParams cagraParams =
           new CagraIndexParams.Builder().withGraphDegree(4).withIntermediateGraphDegree(8).build();
 
@@ -141,7 +141,7 @@ public class TieredIndexIT extends CuVSTestCase {
 
     float[][] queries = {{0.1f, 0.1f}};
 
-    try (CuVSResources resources = CuVSResources.create()) {
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
       CagraIndexParams cagraParams =
           new CagraIndexParams.Builder().withGraphDegree(4).withIntermediateGraphDegree(8).build();
 
@@ -204,7 +204,7 @@ public class TieredIndexIT extends CuVSTestCase {
     float[][] dataset = {{0.0f, 0.0f}, {1.0f, 1.0f}, {2.0f, 2.0f}, {3.0f, 3.0f}};
     float[][] queryVectors = {{0.1f, 0.1f}};
 
-    try (CuVSResources resources = CuVSResources.create()) {
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
       CagraIndexParams cagraParams =
           new CagraIndexParams.Builder().withGraphDegree(4).withIntermediateGraphDegree(8).build();
 
