@@ -487,6 +487,16 @@ const std::vector<AnnNNDescentInputs> inputs =
                                                      {false, true},
                                                      {0.90});
 
+// Additional test cases for large datasets to test batching
+const std::vector<AnnNNDescentInputs> inputsLargeBatch =
+  raft::util::itertools::product<AnnNNDescentInputs>(
+    {150000},  // n_rows > 100000 to trigger batching
+    {64},
+    {32},
+    {cuvs::distance::DistanceType::BitwiseHamming},
+    {true},
+    {0.90});
+
 const std::vector<AnnNNDescentInputs> inputsDistEpilogue =
   raft::util::itertools::product<AnnNNDescentInputs>({2000, 4000},  // n_rows
                                                      {64, 1024},    // dim
