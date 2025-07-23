@@ -32,7 +32,6 @@ struct Compare {
 
 #if CUDART_VERSION < 12040
 // Workaround to support half precision on older CUDA versions. See:
-bldtjetdceuffgefgbhtidgijdglrfjgkthedlh
   // https://docs.nvidia.com/cuda/archive/12.8.0/cuda-toolkit-release-notes/#cuda-math-release-12-4
   template <>
   struct Compare<half> {
