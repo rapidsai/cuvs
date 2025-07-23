@@ -432,10 +432,10 @@ The table below contains all algorithms supported by cuVS. Each unique algorithm
    - Algorithms
 
  * - FAISS_GPU
-   - `faiss_gpu_flat`, `faiss_gpu_ivf_flat`, `faiss_gpu_ivf_pq`
+   - `faiss_gpu_flat`, `faiss_gpu_ivf_flat`, `faiss_gpu_ivf_pq`, `faiss_gpu_cagra`
 
  * - FAISS_CPU
-   - `faiss_cpu_flat`, `faiss_cpu_ivf_flat`, `faiss_cpu_ivf_pq`
+   - `faiss_cpu_flat`, `faiss_cpu_ivf_flat`, `faiss_cpu_ivf_pq`, `faiss_cpu_hnsw_flat`
 
  * - GGNN
    - `ggnn`
@@ -443,9 +443,12 @@ The table below contains all algorithms supported by cuVS. Each unique algorithm
  * - HNSWLIB
    - `hnswlib`
 
- * - cuVS
-   - `cuvs_brute_force`, `cuvs_cagra`, `cuvs_ivf_flat`, `cuvs_ivf_pq`, `cuvs_cagra_hnswlib`
+ * - DiskANN
+   - `diskann_memory`, `diskann_ssd`
 
+ * - cuVS
+   - `cuvs_brute_force`, `cuvs_cagra`, `cuvs_ivf_flat`, `cuvs_ivf_pq`, `cuvs_cagra_hnswlib`, `cuvs_vamana`
+ 
 
 Multi-GPU benchmarks
 --------------------

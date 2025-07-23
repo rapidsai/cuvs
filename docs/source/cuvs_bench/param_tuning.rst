@@ -379,6 +379,48 @@ This is a benchmark that enables interoperability between `CAGRA` built `HNSW` s
 
 `search` : Same as `search` of Hnswlib
 
+cuvs_vamana
+-----------
+
+Benchmark for building an in-memory Vamana graph based index on the GPU and interoperability with DiskANN for search.
+
+.. list-table::
+
+ * - Parameter
+   - Type
+   - Required
+   - Data Type
+   - Default
+   - Description
+
+ * - `graph_degree`
+   - `build`
+   - N
+   - Positive integer >0
+   - 64
+   - Maximum degree of the graph index
+
+ * - `visited_size`
+   - `build`
+   - N
+   - Positive integer >0
+   - 64
+   - Maximum number of visited nodes per search corresponds to the L parameter in the Vamana literature
+
+ * - `alpha`
+   - `build`
+   -  N
+   - Positive float >0
+   - 1.2
+   - Alpha for pruning parameter
+
+ * - `L_search`
+   - `search`
+   - Y
+   - Positive integer >0
+   - 
+   - Maximum number of visited nodes per search corresponds to the L parameter in the Vamana literature. Larger values improve recall at the cost of search time.
+
 FAISS Indexes
 =============
 
@@ -672,3 +714,33 @@ hnswlib
    - Number of threads to use for queries.
 
 Please refer to `HNSW algorithm parameters guide <https://github.com/nmslib/hnswlib/blob/master/ALGO_PARAMS.md>`_ from `hnswlib` to learn more about these arguments.
+
+DiskANN
+=======
+
+diskann_memory
+--------------
+
+Use DiskANN in-memory index for approximate search.
+
+.. list-table::
+
+ * - Parameter
+   - Type
+   - Required
+   - Data Type
+   - Default
+   - Description
+
+ * - `graph_degree`
+   - `build`
+   - N
+   - Positive integer >0
+   - 64
+   - Maximum degree of the graph index
+
+ * - `visited_size`
+   - `build`
+   - N
+   - Positive integer >0
+   - 64
