@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # limitations under the License.
 
 header = """/*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -190,23 +190,19 @@ namespace cuvs::neighbors::cagra {                                              
     return index;                                                                                                 \\
   }                                                                                                               \\
                                                                                                                   \\
+  void extend(const raft::resources& res,                                                                         \\
+              cuvs::neighbors::mg_index<cagra::index<T, IdxT>, T, IdxT>& index,                                   \\
+              raft::host_matrix_view<const T, int64_t, row_major> new_vectors,                                    \\
+              std::optional<raft::host_vector_view<const IdxT, int64_t>> new_indices)                             \\
+  {                                                                                                               \\
+    cuvs::neighbors::snmg::detail::extend(res, index, new_vectors, new_indices);                                  \\
+  }                                                                                                               \\
+                                                                                                                  \\
   void search(const raft::resources& res,                                                                         \\
               const cuvs::neighbors::mg_index<cagra::index<T, IdxT>, T, IdxT>& index,                             \\
               const mg_search_params<cagra::search_params>& search_params,                                        \\
               raft::host_matrix_view<const T, int64_t, row_major> queries,                                        \\
               raft::host_matrix_view<int64_t, int64_t, row_major> neighbors,                                      \\
-              raft::host_matrix_view<float, int64_t, row_major> distances)                                        \\
-  {                                                                                                               \\
-    cuvs::neighbors::snmg::detail::search(res, index,                                                             \\
-                                        static_cast<const cuvs::neighbors::search_params*>(&search_params),       \\
-                                        queries, neighbors, distances);                                           \\
-  }                                                                                                               \\
-                                                                                                                  \\
-    void search(const raft::resources& res,                                                                       \\
-              const cuvs::neighbors::mg_index<cagra::index<T, IdxT>, T, IdxT>& index,                             \\
-              const mg_search_params<cagra::search_params>& search_params,                                        \\
-              raft::host_matrix_view<const T, int64_t, row_major> queries,                                        \\
-              raft::host_matrix_view<uint32_t, int64_t, row_major> neighbors,                                     \\
               raft::host_matrix_view<float, int64_t, row_major> distances)                                        \\
   {                                                                                                               \\
     cuvs::neighbors::snmg::detail::search(res, index,                                                             \\
