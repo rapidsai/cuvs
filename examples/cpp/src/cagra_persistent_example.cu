@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,30 +32,30 @@
 template <typename DeviceMatrixOrView>
 auto slice_matrix(DeviceMatrixOrView source,
                   typename DeviceMatrixOrView::index_type offset_rows,
-                  typename DeviceMatrixOrView::index_type count_rows) {
+                  typename DeviceMatrixOrView::index_type count_rows)
+{
   auto n_cols = source.extent(1);
-  return raft::make_device_matrix_view<
-      typename DeviceMatrixOrView::element_type,
-      typename DeviceMatrixOrView::index_type>(
-      source.data_handle() + offset_rows * n_cols, count_rows, n_cols);
+  return raft::make_device_matrix_view<typename DeviceMatrixOrView::element_type,
+                                       typename DeviceMatrixOrView::index_type>(
+    source.data_handle() + offset_rows * n_cols, count_rows, n_cols);
 }
 
 // A helper to measure the execution time of a function
 template <typename F, typename... Args>
-void time_it(std::string label, F f, Args &&...xs) {
+void time_it(std::string label, F f, Args&&... xs)
+{
   auto start = std::chrono::system_clock::now();
   f(std::forward<Args>(xs)...);
-  auto end = std::chrono::system_clock::now();
-  auto t = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+  auto end  = std::chrono::system_clock::now();
+  auto t    = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
   auto t_ms = double(t.count()) / 1000.0;
-  std::cout << "[" << label << "] execution time: " << t_ms << " ms"
-            << std::endl;
+  std::cout << "[" << label << "] execution time: " << t_ms << " ms" << std::endl;
 }
 
-void cagra_build_search_variants(
-    raft::device_resources const &res,
-    raft::device_matrix_view<const float, int64_t> dataset,
-    raft::device_matrix_view<const float, int64_t> queries) {
+void cagra_build_search_variants(raft::device_resources const& res,
+                                 raft::device_matrix_view<const float, int64_t> dataset,
+                                 raft::device_matrix_view<const float, int64_t> queries)
+{
   using namespace cuvs::neighbors;
 
   // Number of neighbors to search
@@ -69,10 +69,8 @@ void cagra_build_search_variants(
   auto queries_b = slice_matrix(queries, n_queries_a, n_queries_b);
 
   // create output arrays
-  auto neighbors =
-      raft::make_device_matrix<uint32_t>(res, queries.extent(0), topk);
-  auto distances =
-      raft::make_device_matrix<float>(res, queries.extent(0), topk);
+  auto neighbors = raft::make_device_matrix<uint32_t>(res, queries.extent(0), topk);
+  auto distances = raft::make_device_matrix<float>(res, queries.extent(0), topk);
   // slice them same as queries
   auto neighbors_a = slice_matrix(neighbors, 0, n_queries_a);
   auto distances_a = slice_matrix(distances, 0, n_queries_a);
@@ -86,9 +84,8 @@ void cagra_build_search_variants(
   auto index = cagra::build(res, index_params, dataset);
 
   std::cout << "CAGRA index has " << index.size() << " vectors" << std::endl;
-  std::cout << "CAGRA graph has degree " << index.graph_degree()
-            << ", graph size [" << index.graph().extent(0) << ", "
-            << index.graph().extent(1) << "]" << std::endl;
+  std::cout << "CAGRA graph has degree " << index.graph_degree() << ", graph size ["
+            << index.graph().extent(0) << ", " << index.graph().extent(1) << "]" << std::endl;
 
   // use default search parameters
   cagra::search_params search_params;
@@ -97,7 +94,7 @@ void cagra_build_search_variants(
 
   // Another copy of search parameters to enable persistent kernel
   cagra::search_params search_params_persistent = search_params;
-  search_params_persistent.persistent = true;
+  search_params_persistent.persistent           = true;
   // Persistent kernel only support single-cta search algorithm for now.
   search_params_persistent.algo = cagra::search_algo::SINGLE_CTA;
   // Slightly reduce the kernel grid size to make this example program work
@@ -112,23 +109,21 @@ void cagra_build_search_variants(
   implementation interchangeably: the index stays the same, only search
   parameters need some adjustment.
   */
-  auto search_batch =
-      [&res, &index](bool needs_sync, const cagra::search_params &ps,
-                     raft::device_matrix_view<const float, int64_t> queries,
-                     raft::device_matrix_view<uint32_t, int64_t> neighbors,
-                     raft::device_matrix_view<float, int64_t> distances) {
-        cagra::search(res, ps, index, queries, neighbors, distances);
-        /*
-        To make a fair comparison, standard implementation needs to synchronize
-        with the device to make sure the kernel has finished the work.
-        Persistent kernel does not make any use of CUDA streams and blocks till
-        the results are available. Hence, synchronizing with the stream is a
-        waste of time in this case.
-         */
-        if (needs_sync) {
-          raft::resource::sync_stream(res);
-        }
-      };
+  auto search_batch = [&res, &index](bool needs_sync,
+                                     const cagra::search_params& ps,
+                                     raft::device_matrix_view<const float, int64_t> queries,
+                                     raft::device_matrix_view<uint32_t, int64_t> neighbors,
+                                     raft::device_matrix_view<float, int64_t> distances) {
+    cagra::search(res, ps, index, queries, neighbors, distances);
+    /*
+    To make a fair comparison, standard implementation needs to synchronize
+    with the device to make sure the kernel has finished the work.
+    Persistent kernel does not make any use of CUDA streams and blocks till
+    the results are available. Hence, synchronizing with the stream is a
+    waste of time in this case.
+     */
+    if (needs_sync) { raft::resource::sync_stream(res); }
+  };
 
   /*
   Define the asynchronous small-batch search setting.
@@ -157,55 +152,64 @@ void cagra_build_search_variants(
        This way, you can save some GPU resources by not manually copying the
        data in cuda streams.
   */
-  auto search_async =
-      [&res, &index](bool needs_sync, const cagra::search_params &ps,
-                     raft::device_matrix_view<const float, int64_t> queries,
-                     raft::device_matrix_view<uint32_t, int64_t> neighbors,
-                     raft::device_matrix_view<float, int64_t> distances) {
-        auto work_size = queries.extent(0);
-        using index_type = typeof(work_size);
-        // Limit the maximum number of concurrent jobs
-        constexpr index_type kMaxJobs = 1000;
-        std::array<std::future<void>, kMaxJobs> futures;
-        for (index_type i = 0; i < work_size + kMaxJobs; i++) {
-          // wait for previous job in the same slot to finish
-          if (i >= kMaxJobs) {
-            futures[i % kMaxJobs].wait();
-          }
-          // submit a new job
-          if (i < work_size) {
-            futures[i % kMaxJobs] = std::async(std::launch::async, [&]() {
-              cagra::search(res, ps, index, slice_matrix(queries, i, 1),
-                            slice_matrix(neighbors, i, 1),
-                            slice_matrix(distances, i, 1));
-            });
-          }
-        }
-        /* See the remark for search_batch */
-        if (needs_sync) {
-          raft::resource::sync_stream(res);
-        }
-      };
+  auto search_async = [&res, &index](bool needs_sync,
+                                     const cagra::search_params& ps,
+                                     raft::device_matrix_view<const float, int64_t> queries,
+                                     raft::device_matrix_view<uint32_t, int64_t> neighbors,
+                                     raft::device_matrix_view<float, int64_t> distances) {
+    auto work_size   = queries.extent(0);
+    using index_type = typeof(work_size);
+    // Limit the maximum number of concurrent jobs
+    constexpr index_type kMaxJobs = 1000;
+    std::array<std::future<void>, kMaxJobs> futures;
+    for (index_type i = 0; i < work_size + kMaxJobs; i++) {
+      // wait for previous job in the same slot to finish
+      if (i >= kMaxJobs) { futures[i % kMaxJobs].wait(); }
+      // submit a new job
+      if (i < work_size) {
+        futures[i % kMaxJobs] = std::async(std::launch::async, [&]() {
+          cagra::search(res,
+                        ps,
+                        index,
+                        slice_matrix(queries, i, 1),
+                        slice_matrix(neighbors, i, 1),
+                        slice_matrix(distances, i, 1));
+        });
+      }
+    }
+    /* See the remark for search_batch */
+    if (needs_sync) { raft::resource::sync_stream(res); }
+  };
 
   // Launch the baseline search: check the big-batch performance
-  time_it("standard/batch A", search_batch, true, search_params, queries_a,
-          neighbors_a, distances_a);
-  time_it("standard/batch B", search_batch, true, search_params, queries_b,
-          neighbors_b, distances_b);
+  time_it(
+    "standard/batch A", search_batch, true, search_params, queries_a, neighbors_a, distances_a);
+  time_it(
+    "standard/batch B", search_batch, true, search_params, queries_b, neighbors_b, distances_b);
 
   // Try to handle the same amount of work in the async setting using the
   // standard implementation.
   // (Warning: suboptimal - it uses a single stream for all async jobs)
-  time_it("standard/async A", search_async, true, search_params, queries_a,
-          neighbors_a, distances_a);
-  time_it("standard/async B", search_async, true, search_params, queries_b,
-          neighbors_b, distances_b);
+  time_it(
+    "standard/async A", search_async, true, search_params, queries_a, neighbors_a, distances_a);
+  time_it(
+    "standard/async B", search_async, true, search_params, queries_b, neighbors_b, distances_b);
 
   // Do the same using persistent kernel.
-  time_it("persistent/async A", search_async, false, search_params_persistent,
-          queries_a, neighbors_a, distances_a);
-  time_it("persistent/async B", search_async, false, search_params_persistent,
-          queries_b, neighbors_b, distances_b);
+  time_it("persistent/async A",
+          search_async,
+          false,
+          search_params_persistent,
+          queries_a,
+          neighbors_a,
+          distances_a);
+  time_it("persistent/async B",
+          search_async,
+          false,
+          search_params_persistent,
+          queries_b,
+          neighbors_b,
+          distances_b);
   /*
 Here's an example output, which shows the wall time of processing the same
 amount of data in a single batch vs in async mode (1 query per job):
@@ -233,26 +237,25 @@ for you. This increases the latency of individual jobs though.
   */
 }
 
-int main() {
+int main()
+{
   raft::device_resources res;
 
   // Set pool memory resource with 1 GiB initial pool size. All allocations use
   // the same pool.
   rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource> pool_mr(
-      rmm::mr::get_current_device_resource(), 1024 * 1024 * 1024ull);
+    rmm::mr::get_current_device_resource(), 1024 * 1024 * 1024ull);
   rmm::mr::set_current_device_resource(&pool_mr);
 
   // Create input arrays.
   int64_t n_samples = 1000000;
-  int64_t n_dim = 128;
+  int64_t n_dim     = 128;
   int64_t n_queries = 100000;
-  auto dataset =
-      raft::make_device_matrix<float, int64_t>(res, n_samples, n_dim);
-  auto queries =
-      raft::make_device_matrix<float, int64_t>(res, n_queries, n_dim);
+  auto dataset      = raft::make_device_matrix<float, int64_t>(res, n_samples, n_dim);
+  auto queries      = raft::make_device_matrix<float, int64_t>(res, n_queries, n_dim);
   generate_dataset(res, dataset.view(), queries.view());
 
   // run the interesting part of the program
-  cagra_build_search_variants(res, raft::make_const_mdspan(dataset.view()),
-                              raft::make_const_mdspan(queries.view()));
+  cagra_build_search_variants(
+    res, raft::make_const_mdspan(dataset.view()), raft::make_const_mdspan(queries.view()));
 }
