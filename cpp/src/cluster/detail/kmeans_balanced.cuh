@@ -166,7 +166,8 @@ void vector_compare(ComparisonSummary* global_summary, const OutT* a, const OutT
 
 template <typename MathT, typename IdxT, typename LabelT>
 bool use_fused(IdxT m, IdxT n, IdxT k) {
-#if __CUDA_ARCH__ >= 800
+#if __CUDA_ARCH__ > 800
+  // Use fused if unfused workspace size is great than 100 MB
   if (size_t(m) * n * sizeof(MathT) > 100 * 1024 * 1024) {
     return true;
   } else {
