@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -107,7 +107,7 @@ __global__ void kern_sort(const DATA_T* const dataset,  // [dataset_chunk_size, 
           norm2_dst += elem_b * elem_b;
         }
       }
-    } else {
+    } else if (metric == cuvs::distance::DistanceType::L2Expanded) {
       // L2Expanded
       for (int d = lane_id; d < dataset_dim; d += raft::WarpSize) {
         float diff = cuvs::spatial::knn::detail::utils::mapping<float>{}(
@@ -115,6 +115,15 @@ __global__ void kern_sort(const DATA_T* const dataset,  // [dataset_chunk_size, 
                      cuvs::spatial::knn::detail::utils::mapping<float>{}(
                        dataset[d + static_cast<uint64_t>(dataset_dim) * dstNode]);
         dist += diff * diff;
+      }
+    } else if (metric == cuvs::distance::DistanceType::BitwiseHamming) {
+      if constexpr (std::is_integral_v<DATA_T>) {
+        for (int d = lane_id; d < dataset_dim; d += raft::WarpSize) {
+          dist += __popc(
+            static_cast<uint32_t>(dataset[d + static_cast<uint64_t>(dataset_dim) * srcNode] ^
+                                  dataset[d + static_cast<uint64_t>(dataset_dim) * dstNode]) &
+            0xffu);
+        }
       }
     }
     dist += __shfl_xor_sync(0xffffffff, dist, 1);
@@ -508,8 +517,10 @@ void sort_knn_graph(
   RAFT_EXPECTS(
     metric == cuvs::distance::DistanceType::InnerProduct ||
       metric == cuvs::distance::DistanceType::CosineExpanded ||
-      metric == cuvs::distance::DistanceType::L2Expanded,
-    "Unsupported metric. Only InnerProduct, CosineExpanded, and L2Expanded are supported");
+      metric == cuvs::distance::DistanceType::L2Expanded ||
+      metric == cuvs::distance::DistanceType::BitwiseHamming,
+    "Unsupported metric. Only InnerProduct, CosineExpanded, L2Expanded and BitwiseHamming are "
+    "supported");
   const uint64_t dataset_size = dataset.extent(0);
   const uint64_t dataset_dim  = dataset.extent(1);
   const DataT* dataset_ptr    = dataset.data_handle();
