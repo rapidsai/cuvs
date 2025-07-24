@@ -66,7 +66,6 @@ void parse_search_param(const nlohmann::json& conf,
                         typename cuvs::bench::diskann_memory<T>::search_param& param)
 {
   param.L_search    = conf.at("L_search");
-  param.num_threads = conf.at("num_threads");
 }
 
 template <typename T>
@@ -74,7 +73,6 @@ void parse_search_param(const nlohmann::json& conf,
                         typename cuvs::bench::diskann_ssd<T>::search_param& param)
 {
   param.L_search    = conf.at("L_search");
-  param.num_threads = conf.at("num_threads");
   if (conf.contains("num_nodes_to_cache")) {
     param.num_nodes_to_cache = conf.at("num_nodes_to_cache");
   }
