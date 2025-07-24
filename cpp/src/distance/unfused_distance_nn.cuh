@@ -92,24 +92,23 @@ T min_val()
 
 template <typename AccT, typename IdxT>
 struct Reducer {
-  typedef raft::KeyValuePair<IdxT, AccT> KVType;
+    typedef raft::KeyValuePair<IdxT, AccT> KVType;
 
-  __device__ KVType operator()(const KVType& a, const KVType& b)
-  {
-    if ((a.value < b.value) || (a.value == b.value && a.key < b.key)) {
-      return a;
-    } else {
-      return b;
+    __device__ KVType operator()(const KVType& a, const KVType& b) {
+        if ((a.value < b.value) || (a.value == b.value && a.key < b.key)) {
+          return a;
+        } else {
+          return b;
+        }
     }
-  }
 
-  __device__ AccT operator()(const AccT& a, const AccT& b) { return a < b ? a : b; }
+    __device__ AccT operator()(const AccT& a, const AccT& b) {
+      return a < b ? a : b;
+    }
 };
 
 template <typename DataT, typename AccT, typename OutT, typename IdxT, int TPB>
-__global__ void reduce_min_kernel(
-  OutT* out, const AccT* z, const AccT* x_norm, const AccT* y_norm, IdxT m, IdxT n, bool is_sqrt)
-{
+__global__ void reduce_min_kernel(OutT* out, const AccT* z, const AccT* x_norm, const AccT* y_norm, IdxT m, IdxT n) {
   IdxT tid = threadIdx.x + blockIdx.x * blockDim.x;
   IdxT row = blockIdx.x;
 
@@ -142,36 +141,17 @@ __global__ void reduce_min_kernel(
 }
 
 template <typename DataT, typename AccT, typename OutT, typename IdxT>
-void reduce_min(OutT* out,
-                const AccT* z,
-                const AccT* x_norm,
-                const AccT* y_norm,
-                IdxT m,
-                IdxT n,
-                cudaStream_t stream,
-                bool is_sqrt)
-{
+void reduce_min(OutT* out, const AccT* z, const AccT* x_norm, const AccT* y_norm, IdxT m, IdxT n, cudaStream_t stream) {
   const int TPB = 128;
 
   int blocks = m;
-  reduce_min_kernel<DataT, AccT, OutT, IdxT, TPB>
-    <<<blocks, TPB, 0, stream>>>(out, z, x_norm, y_norm, m, n, is_sqrt);
+  reduce_min_kernel<DataT, AccT, OutT, IdxT, TPB><<<blocks, TPB, 0, stream>>>(out, z, x_norm, y_norm, m, n);
 }
 
 template <typename DataT, typename AccT, typename OutT, typename IdxT>
-void unfused_distance_nn(raft::resources const& handle,
-                         OutT* out,
-                         const DataT* x,
-                         const DataT* y,
-                         IdxT M,
-                         IdxT N,
-                         IdxT K,
-                         const AccT* x_norm,
-                         const AccT* y_norm,
-                         AccT* workspace,
-                         bool is_sqrt,
-                         cudaStream_t stream)
-{
+void cublas_l2nn(OutT* out, const DataT* x, const DataT* y, IdxT M, IdxT N, IdxT K,
+                 const AccT* x_norm, const AccT* y_norm, AccT* workspace, cublasHandle_t& cublas_h, cudaStream_t stream) {
+
   cudaDataType_t xyType, zType;
   cublasComputeType_t computeType;
 
@@ -182,75 +162,66 @@ void unfused_distance_nn(raft::resources const& handle,
   const int8_t i8_alpha = 1, i8_beta = 0;
 
   const void* alpha = nullptr;
-  const void* beta  = nullptr;
+  const void* beta = nullptr;
   if constexpr (std::is_same_v<DataT, float>) {
-    xyType      = CUDA_R_32F;
-    zType       = CUDA_R_32F;
+    xyType = CUDA_R_32F;
+    zType = CUDA_R_32F;
     computeType = CUBLAS_COMPUTE_32F;
     // computeType = CUBLAS_COMPUTE_32F_FAST_TF32;
     // computeType = CUBLAS_COMPUTE_32F_FAST_16F;
     // computeType = CUBLAS_COMPUTE_32F_FAST_16BF;
     // computeType = CUBLAS_COMPUTE_32F_EMULATED_16BFX9;
     alpha = reinterpret_cast<const void*>(&f_alpha);
-    beta  = reinterpret_cast<const void*>(&f_beta);
+    beta = reinterpret_cast<const void*>(&f_beta);
   } else if constexpr (std::is_same_v<DataT, double>) {
-    xyType      = CUDA_R_64F;
-    zType       = CUDA_R_64F;
+    xyType = CUDA_R_64F;
+    zType = CUDA_R_64F;
     computeType = CUBLAS_COMPUTE_64F;
-    alpha       = reinterpret_cast<const void*>(&d_alpha);
-    beta        = reinterpret_cast<const void*>(&d_beta);
+    alpha = reinterpret_cast<const void*>(&d_alpha);
+    beta = reinterpret_cast<const void*>(&d_beta);
   } else if constexpr (std::is_same_v<DataT, half>) {
     xyType = CUDA_R_16F;
     if constexpr (std::is_same_v<AccT, half>) {
-      zType       = CUDA_R_16F;
+      zType = CUDA_R_16F;
       computeType = CUBLAS_COMPUTE_16F;
-      // computeType = CUBLAS_COMPUTE_32F;
+      //computeType = CUBLAS_COMPUTE_32F;
       alpha = reinterpret_cast<const void*>(&h_alpha);
-      beta  = reinterpret_cast<const void*>(&h_beta);
+      beta = reinterpret_cast<const void*>(&h_beta);
     } else if constexpr (std::is_same_v<AccT, float>) {
-      zType       = CUDA_R_32F;
+      zType = CUDA_R_32F;
       computeType = CUBLAS_COMPUTE_32F;
-      alpha       = reinterpret_cast<const void*>(&f_alpha);
-      beta        = reinterpret_cast<const void*>(&f_beta);
+      alpha = reinterpret_cast<const void*>(&f_alpha);
+      beta = reinterpret_cast<const void*>(&f_beta);
     }
   } else if constexpr (std::is_same_v<DataT, int8_t>) {
     xyType = CUDA_R_8I;
     if constexpr (std::is_same_v<AccT, int32_t>) {
-      zType       = CUDA_R_32I;
+      zType = CUDA_R_32I;
       computeType = CUBLAS_COMPUTE_32I;
-      alpha       = reinterpret_cast<const void*>(&i32_alpha);
-      beta        = reinterpret_cast<const void*>(&i32_beta);
+      alpha = reinterpret_cast<const void*>(&i32_alpha);
+      beta = reinterpret_cast<const void*>(&i32_beta);
     } else if constexpr (std::is_same_v<AccT, float>) {
-      zType       = CUDA_R_32F;
+      zType = CUDA_R_32F;
       computeType = CUBLAS_COMPUTE_32F;
-      alpha       = reinterpret_cast<const void*>(&i8_alpha);
-      beta        = reinterpret_cast<const void*>(&i8_beta);
+      alpha = reinterpret_cast<const void*>(&i8_alpha);
+      beta = reinterpret_cast<const void*>(&i8_beta);
     }
   }
 
-  auto cublas_h = raft::resource::get_cublas_handle(handle);
-  RAFT_CUBLAS_TRY(cublasGemmEx(cublas_h,
-                               CUBLAS_OP_T,
-                               CUBLAS_OP_N,
-                               N,
-                               M,
-                               K,      // Dimensions (swapped due to row/col-major difference)
-                               alpha,  // alpha
-                               y,
-                               xyType,
-                               K,  // B, its data type, and leading dimension
-                               x,
-                               xyType,
-                               K,     // A, its data type, and leading dimension
-                               beta,  // beta
-                               workspace,
-                               zType,
-                               N,                   // C, its data type, and leading dimension
-                               computeType,         // Computation type
-                               CUBLAS_GEMM_DEFAULT  // Algorithm selection
-                               ));
+  CHECK_CUBLAS(cublasGemmEx(
+      cublas_h,
+      CUBLAS_OP_T, CUBLAS_OP_N,
+      N, M, K,                   // Dimensions (swapped due to row/col-major difference)
+      alpha,                    // alpha
+      y, xyType, K,            // B, its data type, and leading dimension
+      x, xyType, K,            // A, its data type, and leading dimension
+      beta,                     // beta
+      workspace, zType, N,            // C, its data type, and leading dimension
+      computeType,               // Computation type
+      CUBLAS_GEMM_DEFAULT        // Algorithm selection
+    ));
 
-  reduce_min<DataT, AccT, OutT, IdxT>(out, workspace, x_norm, y_norm, M, N, stream, is_sqrt);
+    reduce_min<DataT, AccT, OutT, IdxT>(out, workspace, x_norm, y_norm, M, N, stream);
 }
 //
 
@@ -286,25 +257,24 @@ void unfused_distance_nn(raft::resources const& handle,
  * @param[in]  stream        cuda stream
  */
 template <typename DataT, typename OutT, typename IdxT>
-void unfusedDistanceNNMinReduce(raft::resources const& handle,
-                                OutT* min,
-                                const DataT* x,
-                                const DataT* y,
-                                const DataT* xn,
-                                const DataT* yn,
-                                IdxT m,
-                                IdxT n,
-                                IdxT k,
-                                void* workspace,
-                                bool is_sqrt,
-                                bool initOutBuffer,
-                                bool isRowMajor,
-                                cuvs::distance::DistanceType metric,
-                                float metric_arg,
-                                cudaStream_t stream)
+void unfusedDistanceNNMinReduce(OutT* min,
+                              const DataT* x,
+                              const DataT* y,
+                              const DataT* xn,
+                              const DataT* yn,
+                              IdxT m,
+                              IdxT n,
+                              IdxT k,
+                              void* workspace,
+                              bool sqrt,
+                              bool initOutBuffer,
+                              bool isRowMajor,
+                              cuvs::distance::DistanceType metric,
+                              float metric_arg,
+                              cudaStream_t stream,
+                              cublasHandle_t& cublas_h)
 {
-  unfused_distance_nn<DataT, DataT, OutT, IdxT>(
-    handle, min, x, y, m, n, k, xn, yn, (DataT*)workspace, is_sqrt, stream);
+  cublas_l2nn<DataT, DataT, OutT, IdxT>(min, x, y, m, n, k, xn, yn, (DataT*)workspace, cublas_h, stream);
 }
 
 /** @} */
