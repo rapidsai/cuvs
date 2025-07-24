@@ -9,4 +9,3 @@ groups:
       graph_build_algo: ["NN_DESCENT"]
     search:
       L_search: [10, 20, 30, 40, 50, 100, 200, 300]
-      num_threads: [1]
