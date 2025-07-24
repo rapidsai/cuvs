@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -359,6 +359,66 @@ cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index);
 cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int* dim);
 
 /**
+ * @brief Get size of the CAGRA index
+ *
+ * @param[in] index CAGRA index
+ * @param[out] size return number of vectors in the index
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, uint32_t* size);
+
+/**
+ * @brief Get graph degree of the CAGRA index
+ *
+ * @param[in] index CAGRA index
+ * @param[out] graph_degree return graph degree
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, uint32_t* graph_degree);
+
+/**
+ * @brief Returns a view of the CAGRA dataset
+ *
+ * This function returns a non-owning view of the CAGRA dataset.
+ * The output will be referencing device memory that is directly used
+ * in CAGRA, without copying the dataset at all. This means that the
+ * output is only valid as long as the CAGRA index is alive, and once
+ * cuvsCagraIndexDestroy is called on the cagra index - the returned
+ * dataset view will be invalid.
+ *
+ * Note that the DLManagedTensor dataset returned will have an associated
+ * 'deleter' function that must be called when the dataset is no longer
+ * needed. This will free up host memory that stores the shape of the
+ * dataset view.
+ *
+ * @param[in] index CAGRA index
+ * @param[out] dataset the dataset used in cagra
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index, DLManagedTensor* dataset);
+
+/**
+ * @brief Returns a view of the CAGRA graph
+ *
+ * This function returns a non-owning view of the CAGRA graph.
+ * The output will be referencing device memory that is directly used
+ * in CAGRA, without copying the graph at all. This means that the
+ * output is only valid as long as the CAGRA index is alive, and once
+ * cuvsCagraIndexDestroy is called on the cagra index - the returned
+ * graph view will be invalid.
+ *
+ * Note that the DLManagedTensor graph returned will have an associated
+ * 'deleter' function that must be called when the graph is no longer
+ * needed. This will free up host memory that stores the metadata for the
+ * graph view.
+ *
+ * @param[in] index CAGRA index
+ * @param[out] graph the output knn graph.
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexGetGraph(cuvsCagraIndex_t index, DLManagedTensor* graph);
+
+/**
  * @}
  */
 
@@ -434,7 +494,8 @@ cuvsError_t cuvsCagraMergeParamsDestroy(cuvsCagraMergeParams_t params);
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] params cuvsCagraIndexParams_t used to build CAGRA index
  * @param[in] dataset DLManagedTensor* training dataset
- * @param[out] index cuvsCagraIndex_t Newly built CAGRA index
+ * @param[inout] index cuvsCagraIndex_t Newly built CAGRA index. This index needs to be already
+ *                                      created with cuvsCagraIndexCreate.
  * @return cuvsError_t
  */
 cuvsError_t cuvsCagraBuild(cuvsResources_t res,
@@ -609,9 +670,50 @@ cuvsError_t cuvsCagraSerializeToHnswlib(cuvsResources_t res,
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] filename the name of the file that stores the index
- * @param[out] index CAGRA index loaded disk
+ * @param[inout] index cuvsCagraIndex_t CAGRA index loaded from disk. This index needs to be already
+ *                                      created with cuvsCagraIndexCreate.
  */
 cuvsError_t cuvsCagraDeserialize(cuvsResources_t res, const char* filename, cuvsCagraIndex_t index);
+
+/**
+ * Load index from a dataset and graph
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] metric cuvsDistanceType to use in the index
+ * @param[in] graph the knn graph to use, shape (size, graph_degree)
+ * @param[in] dataset the dataset to use, shape (size, dim)
+ * @param[inout] index cuvsCagraIndex_t CAGRA index populated with the graph and dataset.
+ *                                      This index needs to be already created with
+ *                                      cuvsCagraIndexCreate.
+ *
+ * @code {.c}
+ * #include <cuvs/core/c_api.h>
+ * #include <cuvs/neighbors/cagra.h>
+ *
+ * // Create cuvsResources_t
+ * cuvsResources_t res;
+ * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+ *
+ * // Create CAGRA index
+ * cuvsCagraIndex_t index;
+ * cuvsError_t index_create_status = cuvsCagraIndexCreate(&index);
+ *
+ * // Assume a populated `DLManagedTensor` type here for the graph and dataset
+ * DLManagedTensor dataset;
+ * DLManagedTensor graph;
+ *
+ * cuvsDistanceType metric = L2Expanded;
+ *
+ * // Build the CAGRA Index from the graph/dataset
+ * cuvsError_t status = cuvsCagraIndexFromArgs(res, metric, &graph, &dataset, index);
+ *
+ * @endcode
+ */
+cuvsError_t cuvsCagraIndexFromArgs(cuvsResources_t res,
+                                   cuvsDistanceType metric,
+                                   DLManagedTensor* graph,
+                                   DLManagedTensor* dataset,
+                                   cuvsCagraIndex_t index);
 
 /**
  * @brief Merge multiple CAGRA indices into a single CAGRA index.
