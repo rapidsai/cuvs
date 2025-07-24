@@ -36,6 +36,103 @@ final class CuVSParamsHelper {
 
   private CuVSParamsHelper() {}
 
+  static CloseableHandle createCagraIndexParams() {
+    try (var localArena = Arena.ofConfined()) {
+      var paramsPtrPtr = localArena.allocate(cuvsCagraIndexParams_t);
+      checkCuVSError(cuvsCagraIndexParamsCreate(paramsPtrPtr), "cuvsCagraIndexParamsCreate");
+      var paramsPtr = paramsPtrPtr.get(cuvsCagraIndexParams_t, 0L);
+      return new CloseableHandle() {
+        @Override
+        public MemorySegment handle() {
+          return paramsPtr;
+        }
+
+        @Override
+        public void close() {
+          checkCuVSError(cuvsCagraIndexParamsDestroy(paramsPtr), "cuvsCagraIndexParamsDestroy");
+        }
+      };
+    }
+  }
+
+  static CloseableHandle createCagraCompressionParams() {
+    try (var localArena = Arena.ofConfined()) {
+      var paramsPtrPtr = localArena.allocate(cuvsCagraCompressionParams_t);
+      checkCuVSError(
+          cuvsCagraCompressionParamsCreate(paramsPtrPtr), "cuvsCagraCompressionParamsCreate");
+      var paramsPtr = paramsPtrPtr.get(cuvsCagraCompressionParams_t, 0L);
+      return new CloseableHandle() {
+        @Override
+        public MemorySegment handle() {
+          return paramsPtr;
+        }
+
+        @Override
+        public void close() {
+          checkCuVSError(
+              cuvsCagraCompressionParamsDestroy(paramsPtr), "cuvsCagraCompressionParamsDestroy");
+        }
+      };
+    }
+  }
+
+  static CloseableHandle createIvfPqIndexParams() {
+    try (var localArena = Arena.ofConfined()) {
+      var paramsPtrPtr = localArena.allocate(cuvsIvfPqIndexParams_t);
+      checkCuVSError(cuvsIvfPqIndexParamsCreate(paramsPtrPtr), "cuvsIvfPqIndexParamsCreate");
+      var paramsPtr = paramsPtrPtr.get(cuvsIvfPqIndexParams_t, 0L);
+      return new CloseableHandle() {
+        @Override
+        public MemorySegment handle() {
+          return paramsPtr;
+        }
+
+        @Override
+        public void close() {
+          checkCuVSError(cuvsIvfPqIndexParamsDestroy(paramsPtr), "cuvsIvfPqIndexParamsDestroy");
+        }
+      };
+    }
+  }
+
+  static CloseableHandle createIvfPqSearchParams() {
+    try (var localArena = Arena.ofConfined()) {
+      var paramsPtrPtr = localArena.allocate(cuvsIvfPqSearchParams_t);
+      checkCuVSError(cuvsIvfPqSearchParamsCreate(paramsPtrPtr), "cuvsIvfPqSearchParamsCreate");
+      var paramsPtr = paramsPtrPtr.get(cuvsIvfPqSearchParams_t, 0L);
+      return new CloseableHandle() {
+        @Override
+        public MemorySegment handle() {
+          return paramsPtr;
+        }
+
+        @Override
+        public void close() {
+          checkCuVSError(cuvsIvfPqSearchParamsDestroy(paramsPtr), "cuvsIvfPqSearchParamsDestroy");
+        }
+      };
+    }
+  }
+
+  static CloseableHandle createCagraMergeParams() {
+    try (var localArena = Arena.ofConfined()) {
+      var paramsPtrPtr = localArena.allocate(cuvsCagraMergeParams_t);
+      checkCuVSError(cuvsCagraMergeParamsCreate(paramsPtrPtr), "cuvsCagraMergeParamsCreate");
+      var paramsPtr = paramsPtrPtr.get(cuvsCagraMergeParams_t, 0L);
+      return new CloseableHandle() {
+        @Override
+        public MemorySegment handle() {
+          return paramsPtr;
+        }
+
+        @Override
+        public void close() {
+          checkCuVSError(cuvsCagraMergeParamsDestroy(paramsPtr), "cuvsCagraMergeParamsDestroy");
+        }
+      };
+    }
+  }
+  
   static CloseableHandle createHnswIndexParams() {
     try (var localArena = Arena.ofConfined()) {
       var paramsPtrPtr = localArena.allocate(cuvsHnswIndexParams_t);
