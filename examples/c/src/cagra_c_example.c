@@ -69,12 +69,16 @@ void cagra_build_search_simple() {
   // Allocate memory for `queries`, `neighbors` and `distances` output
   uint32_t *neighbors;
   float *distances, *queries_d;
-  CHECK_CUVS(cuvsRMMAlloc(res, (void **)&queries_d, sizeof(float) * n_queries * n_cols));
-  CHECK_CUVS(cuvsRMMAlloc(res, (void **)&neighbors, sizeof(uint32_t) * n_queries * topk));
-  CHECK_CUVS(cuvsRMMAlloc(res, (void **)&distances, sizeof(float) * n_queries * topk));
+  CHECK_CUVS(cuvsRMMAlloc(res, (void **)&queries_d,
+                          sizeof(float) * n_queries * n_cols));
+  CHECK_CUVS(cuvsRMMAlloc(res, (void **)&neighbors,
+                          sizeof(uint32_t) * n_queries * topk));
+  CHECK_CUVS(
+      cuvsRMMAlloc(res, (void **)&distances, sizeof(float) * n_queries * topk));
 
   // Use DLPack to represent `queries`, `neighbors` and `distances` as tensors
-  CHECK_CUDA(cudaMemcpy(queries_d, queries, sizeof(float) * 4 * 2, cudaMemcpyDefault));
+  CHECK_CUDA(
+      cudaMemcpy(queries_d, queries, sizeof(float) * 4 * 2, cudaMemcpyDefault));
 
   DLManagedTensor queries_tensor;
   queries_tensor.dl_tensor.data = queries_d;
@@ -117,17 +121,18 @@ void cagra_build_search_simple() {
   filter.type = NO_FILTER;
   filter.addr = (uintptr_t)NULL;
 
-  CHECK_CUVS(cuvsCagraSearch(res, search_params, index, &queries_tensor, &neighbors_tensor,
-                  &distances_tensor, filter));
+  CHECK_CUVS(cuvsCagraSearch(res, search_params, index, &queries_tensor,
+                             &neighbors_tensor, &distances_tensor, filter));
 
   // print results
   uint32_t *neighbors_h =
       (uint32_t *)malloc(sizeof(uint32_t) * n_queries * topk);
   float *distances_h = (float *)malloc(sizeof(float) * n_queries * topk);
-  CHECK_CUDA(cudaMemcpy(neighbors_h, neighbors, sizeof(uint32_t) * n_queries * topk,
-             cudaMemcpyDefault));
-  CHECK_CUDA(cudaMemcpy(distances_h, distances, sizeof(float) * n_queries * topk,
-             cudaMemcpyDefault));
+  CHECK_CUDA(cudaMemcpy(neighbors_h, neighbors,
+                        sizeof(uint32_t) * n_queries * topk,
+                        cudaMemcpyDefault));
+  CHECK_CUDA(cudaMemcpy(distances_h, distances,
+                        sizeof(float) * n_queries * topk, cudaMemcpyDefault));
   printf("Query 0 neighbor indices: =[%d, %d]\n", neighbors_h[0],
          neighbors_h[1]);
   printf("Query 0 neighbor distances: =[%f, %f]\n", distances_h[0],

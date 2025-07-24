@@ -19,33 +19,43 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 #include <string.h>
+#include <time.h>
 
-inline void check_cuvs(cuvsError_t code, const char * file, int line) {
+inline void check_cuvs(cuvsError_t code, const char *file, int line) {
   if (code != CUVS_SUCCESS) {
-    fprintf(stderr, "CuVS Error @ (%s: %i): %s", file, line, cuvsGetLastErrorText());
+    fprintf(stderr, "CuVS Error @ (%s: %i): %s", file, line,
+            cuvsGetLastErrorText());
     exit(1);
   }
 }
-#define CHECK_CUVS(code) { check_cuvs(code, __FILE__, __LINE__); }
+#define CHECK_CUVS(code)                                                       \
+  {                                                                            \
+    check_cuvs(code, __FILE__, __LINE__);                                      \
+  }
 
 inline void check_cuda(cudaError_t code, const char *file, int line) {
   if (code != cudaSuccess) {
-    fprintf(stderr, "CUDA Error @ (%s: %i): %s", file, line, cudaGetErrorString(code));
+    fprintf(stderr, "CUDA Error @ (%s: %i): %s", file, line,
+            cudaGetErrorString(code));
     exit(1);
   }
 }
-#define CHECK_CUDA(code) { check_cuda(code, __FILE__, __LINE__); }
+#define CHECK_CUDA(code)                                                       \
+  {                                                                            \
+    check_cuda(code, __FILE__, __LINE__);                                      \
+  }
 
 /**
  * @brief Initialize Tensor for kDLFloat.
  *
  * @param[in] t_d Pointer to a vector
- * @param[in] t_shape[] Two-dimensional array, which stores the number of rows and columns of vectors.
+ * @param[in] t_shape[] Two-dimensional array, which stores the number of rows
+ * and columns of vectors.
  * @param[out] t_tensor Stores the initialized DLManagedTensor.
  */
-void float_tensor_initialize(float* t_d, int64_t t_shape[2], DLManagedTensor* t_tensor) {
+void float_tensor_initialize(float *t_d, int64_t t_shape[2],
+                             DLManagedTensor *t_tensor) {
   t_tensor->dl_tensor.data = t_d;
   t_tensor->dl_tensor.device.device_type = kDLCUDA;
   t_tensor->dl_tensor.ndim = 2;
@@ -60,10 +70,12 @@ void float_tensor_initialize(float* t_d, int64_t t_shape[2], DLManagedTensor* t_
  * @brief Initialize Tensor for kDLInt.
  *
  * @param[in] t_d Pointer to a vector
- * @param[in] t_shape[] Two-dimensional array, which stores the number of rows and columns of vectors.
+ * @param[in] t_shape[] Two-dimensional array, which stores the number of rows
+ * and columns of vectors.
  * @param[out] t_tensor Stores the initialized DLManagedTensor.
  */
-void int_tensor_initialize(int64_t* t_d, int64_t t_shape[], DLManagedTensor* t_tensor) {
+void int_tensor_initialize(int64_t *t_d, int64_t t_shape[],
+                           DLManagedTensor *t_tensor) {
   t_tensor->dl_tensor.data = t_d;
   t_tensor->dl_tensor.device.device_type = kDLCUDA;
   t_tensor->dl_tensor.ndim = 2;
@@ -83,17 +95,18 @@ void int_tensor_initialize(int64_t* t_d, int64_t t_shape[], DLManagedTensor* t_t
  * @param[in] min Minimum value among random values.
  * @param[in] max Maximum value among random values.
  */
-void generate_dataset(float * Vec,int n_rows, int n_cols, float min, float max) {
-    float scale;
-    float * ptr = Vec;
-    srand((unsigned int)time(NULL));
-    for (int i = 0; i < n_rows; i++) {
-        for (int j = 0; j < n_cols; j++) {
-            scale = rand()/(float)RAND_MAX;
-            ptr = Vec + i * n_cols + j;
-            *ptr = min + scale * (max - min);
-        }
+void generate_dataset(float *Vec, int n_rows, int n_cols, float min,
+                      float max) {
+  float scale;
+  float *ptr = Vec;
+  srand((unsigned int)time(NULL));
+  for (int i = 0; i < n_rows; i++) {
+    for (int j = 0; j < n_cols; j++) {
+      scale = rand() / (float)RAND_MAX;
+      ptr = Vec + i * n_cols + j;
+      *ptr = min + scale * (max - min);
     }
+  }
 }
 
 /**
@@ -104,21 +117,22 @@ void generate_dataset(float * Vec,int n_rows, int n_cols, float min, float max) 
  * @param[in] n_rows the number of rows in the matrix.
  * @param[in] n_cols the number of columns in the matrix.
  */
-void print_results(int64_t * neighbor, float* distances,int n_rows, int n_cols) {
-    int64_t * pn = neighbor;
-    float * pd = distances;
-    for (int i = 0; i < n_rows; ++i) {
-        printf("Query %d neighbor indices: =[", i);
-        for (int j = 0; j < n_cols; ++j) {
-            pn = neighbor + i * n_cols + j;
-            printf(" %ld", *pn);
-        }
-        printf("]\n");
-        printf("Query %d neighbor distances: =[", i);
-        for (int j = 0; j < n_cols; ++j) {
-            pd = distances + i * n_cols + j;
-            printf(" %f", *pd);
-        }
-        printf("]\n");
+void print_results(int64_t *neighbor, float *distances, int n_rows,
+                   int n_cols) {
+  int64_t *pn = neighbor;
+  float *pd = distances;
+  for (int i = 0; i < n_rows; ++i) {
+    printf("Query %d neighbor indices: =[", i);
+    for (int j = 0; j < n_cols; ++j) {
+      pn = neighbor + i * n_cols + j;
+      printf(" %ld", *pn);
     }
+    printf("]\n");
+    printf("Query %d neighbor distances: =[", i);
+    for (int j = 0; j < n_cols; ++j) {
+      pd = distances + i * n_cols + j;
+      printf(" %f", *pd);
+    }
+    printf("]\n");
+  }
 }
