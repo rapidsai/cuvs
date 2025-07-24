@@ -66,7 +66,8 @@ namespace cuvs::cluster::kmeans::detail {
 constexpr static inline float kAdjustCentersWeight = 7.0f;
 
 template <typename MathT, typename IdxT, typename LabelT>
-bool use_fused(IdxT m, IdxT n, IdxT k) {
+bool use_fused(IdxT m, IdxT n, IdxT k)
+{
 #if __CUDA_ARCH__ > 800
   // Use fused if unfused workspace size is great than 100 MB
   if (size_t(m) * n * sizeof(MathT) > 100 * 1024 * 1024) {
@@ -113,21 +114,23 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
   LabelT* labels,
   rmm::device_async_resource_ref mr)
 {
-  auto stream = raft::resource::get_cuda_stream(handle);
+  auto stream           = raft::resource::get_cuda_stream(handle);
   bool should_use_fused = use_fused<MathT, IdxT, LabelT>(n_rows, n_clusters, dim);
 
   switch (params.metric) {
     case cuvs::distance::DistanceType::L2Expanded:
     case cuvs::distance::DistanceType::L2SqrtExpanded: {
-      size_t workspace_size = should_use_fused ? sizeof(IdxT) * n_rows : sizeof(MathT) * n_rows * n_clusters;
-      auto workspace = raft::make_device_mdarray<char, IdxT>(
-        handle, mr, raft::make_extents<IdxT>(workspace_size));
+      size_t workspace_size =
+        should_use_fused ? sizeof(IdxT) * n_rows : sizeof(MathT) * n_rows * n_clusters;
+      auto workspace =
+        raft::make_device_mdarray<char, IdxT>(handle, mr, raft::make_extents<IdxT>(workspace_size));
 
       auto minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, MathT>, IdxT>(
         handle, mr, raft::make_extents<IdxT>(n_rows));
 
-      auto unf_minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, MathT>, IdxT>(
-        handle, mr, raft::make_extents<IdxT>(n_rows));
+      auto unf_minClusterAndDistance =
+        raft::make_device_mdarray<raft::KeyValuePair<IdxT, MathT>, IdxT>(
+          handle, mr, raft::make_extents<IdxT>(n_rows));
 
       auto cublas_h = raft::resource::get_cublas_handle(handle);
       raft::KeyValuePair<IdxT, MathT> initial_value(0, std::numeric_limits<MathT>::max());
@@ -169,7 +172,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
           n_clusters,
           dim,
           (void*)workspace.data_handle(),
-          (params.metric == cuvs::distance::DistanceType::L2Expanded) ? true: false,
+          (params.metric == cuvs::distance::DistanceType::L2Expanded) ? true : false,
           false,
           true,
           params.metric,
