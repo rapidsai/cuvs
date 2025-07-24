@@ -167,9 +167,13 @@ void vector_compare(ComparisonSummary* global_summary, const OutT* a, const OutT
 template <typename MathT, typename IdxT, typename LabelT>
 bool use_fused(IdxT m, IdxT n, IdxT k) {
 #if __CUDA_ARCH__ >= 800
-  return true;
+  if (size_t(m) * n * sizeof(MathT) > 100 * 1024 * 1024) {
+    return true;
+  } else {
+    return false;
+  }
 #else
-  return false;
+  return true;
 #endif
 }
 
@@ -286,7 +290,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
           n_clusters,
           dim,
           (void*)workspace.data_handle(),
-          (params.metric == cuvs::distance::DistanceType::L2Expanded) ? false : true,
+          (params.metric == cuvs::distance::DistanceType::L2Expanded) ? true : false,
           false,
           true,
           params.metric,
