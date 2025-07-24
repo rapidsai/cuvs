@@ -17,6 +17,7 @@
 #pragma once
 #include "../detail/reachability.cuh"
 #include "all_neighbors_builder.cuh"
+#include "raft/core/logger_macros.hpp"
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/all_neighbors.hpp>
@@ -382,6 +383,17 @@ void multi_gpu_batch_build(const raft::resources& handle,
     size_t base_cluster_idx       = rank * clusters_per_rank + std::min((size_t)rank, rem);
     size_t num_clusters_for_this_rank =
       (size_t)rank < rem ? clusters_per_rank + 1 : clusters_per_rank;
+    if (num_clusters_for_this_rank == 0) {
+      // Happens in the case when num_ranks > n_clusters.
+      RAFT_LOG_WARN(
+        "Rank %d is not used for computation. This happens because the total number of ranks (%d) "
+        "> n_clusters (%lu). Consider increasing n_clusters or reduce the number of GPUs for "
+        "better utilization.",
+        rank,
+        num_ranks,
+        params.n_clusters);
+      continue;
+    }
     for (size_t p = 0; p < num_clusters_for_this_rank; p++) {
       num_data_for_this_rank += cluster_sizes(base_cluster_idx + p);
     }
