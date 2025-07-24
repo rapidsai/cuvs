@@ -159,6 +159,21 @@ The Python packages can also be uninstalled using the `build.sh` script:
 
     ./build.sh python --uninstall
 
+Go library
+^^^^^^^^^^
+
+After building the C and C++ libraries, the Golang library can be built with the following command:
+
+.. code-block:: bash
+
+    export CUDA_HOME="/usr/local/cuda" # or wherever your CUDA installation is.
+    export CGO_CFLAGS="-I${CONDA_PREFIX}/include -I${CUDA_HOME}/include"
+    export CGO_LDFLAGS="-L${CONDA_PREFIX}/lib -lcudart -lcuvs -lcuvs_c"
+    export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH"
+    export CC=clang
+
+    ./build.sh go
+
 Rust library
 ^^^^^^^^^^^^
 

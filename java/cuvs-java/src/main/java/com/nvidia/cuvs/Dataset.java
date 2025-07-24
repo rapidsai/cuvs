@@ -28,7 +28,7 @@ import com.nvidia.cuvs.spi.CuVSProvider;
 public interface Dataset extends AutoCloseable {
 
   /**
-   * Creates a dataset from a on-heap array of vectors
+   * Creates a dataset from an on-heap array of vectors
    *
    * @since 25.08
    */

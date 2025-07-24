@@ -30,7 +30,7 @@ extern "C" {
  * @{
  */
 
-enum cuvsKMeansInitMethod {
+typedef enum {
   /**
    * Sample the centroids using the kmeans++ strategy
    */
@@ -45,7 +45,7 @@ enum cuvsKMeansInitMethod {
    * User provides the array of initial centroids
    */
   Array
-};
+} cuvsKMeansInitMethod;
 
 /**
  * @brief Hyper-parameters for the kmeans algorithm
