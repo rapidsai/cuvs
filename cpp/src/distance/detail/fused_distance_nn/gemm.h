@@ -119,8 +119,8 @@ struct FusedDistanceNNGemm {
   using InstructionShape = cutlass::gemm::GemmShape<16, 8, 4>;
 
   /// Operation performed by GEMM
-  //using Operator = cutlass::arch::OpMultiplyAddFastF32;
-   using Operator = cutlass::arch::OpMultiplyAdd; // this runs only 1xTF32 for float inputs
+  using Operator = cutlass::arch::OpMultiplyAddFastF32;
+  // using Operator = cutlass::arch::OpMultiplyAdd; // this runs only 1xTF32 for float inputs
 
   // This code section describes whether you want to use tensor cores or regular SIMT cores on GPU
   // SM
