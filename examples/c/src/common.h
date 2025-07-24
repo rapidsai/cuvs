@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,22 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+
+inline void check_cuvs(cuvsError_t code, const char * file, int line) {
+  if (code != CUVS_SUCCESS) {
+    fprintf(stderr, "CuVS Error @ (%s: %i): %s", file, line, cuvsGetLastErrorText());
+    exit(1);
+  }
+}
+#define CHECK_CUVS(code) { check_cuvs(code, __FILE__, __LINE__); }
+
+inline void check_cuda(cudaError_t code, const char *file, int line) {
+  if (code != cudaSuccess) {
+    fprintf(stderr, "CUDA Error @ (%s: %i): %s", file, line, cudaGetErrorString(code));
+    exit(1);
+  }
+}
+#define CHECK_CUDA(code) { check_cuda(code, __FILE__, __LINE__); }
 
 /**
  * @brief Initialize Tensor for kDLFloat.

@@ -23,6 +23,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "common.h"
+
 float dataset[4][2] = {{0.74021935, 0.9209938},
                        {0.03902049, 0.9689629},
                        {0.92514056, 0.4463501},
@@ -41,7 +43,7 @@ void cagra_build_search_simple() {
 
   // Create a cuvsResources_t object
   cuvsResources_t res;
-  cuvsResourcesCreate(&res);
+  CHECK_CUVS(cuvsResourcesCreate(&res));
 
   // Use DLPack to represent `dataset` as a tensor
   DLManagedTensor dataset_tensor;
@@ -57,22 +59,22 @@ void cagra_build_search_simple() {
 
   // Build the CAGRA index
   cuvsCagraIndexParams_t index_params;
-  cuvsCagraIndexParamsCreate(&index_params);
+  CHECK_CUVS(cuvsCagraIndexParamsCreate(&index_params));
 
   cuvsCagraIndex_t index;
-  cuvsCagraIndexCreate(&index);
+  CHECK_CUVS(cuvsCagraIndexCreate(&index));
 
-  cuvsCagraBuild(res, index_params, &dataset_tensor, index);
+  CHECK_CUVS(cuvsCagraBuild(res, index_params, &dataset_tensor, index));
 
   // Allocate memory for `queries`, `neighbors` and `distances` output
   uint32_t *neighbors;
   float *distances, *queries_d;
-  cuvsRMMAlloc(res, (void **)&queries_d, sizeof(float) * n_queries * n_cols);
-  cuvsRMMAlloc(res, (void **)&neighbors, sizeof(uint32_t) * n_queries * topk);
-  cuvsRMMAlloc(res, (void **)&distances, sizeof(float) * n_queries * topk);
+  CHECK_CUVS(cuvsRMMAlloc(res, (void **)&queries_d, sizeof(float) * n_queries * n_cols));
+  CHECK_CUVS(cuvsRMMAlloc(res, (void **)&neighbors, sizeof(uint32_t) * n_queries * topk));
+  CHECK_CUVS(cuvsRMMAlloc(res, (void **)&distances, sizeof(float) * n_queries * topk));
 
   // Use DLPack to represent `queries`, `neighbors` and `distances` as tensors
-  cudaMemcpy(queries_d, queries, sizeof(float) * 4 * 2, cudaMemcpyDefault);
+  CHECK_CUDA(cudaMemcpy(queries_d, queries, sizeof(float) * 4 * 2, cudaMemcpyDefault));
 
   DLManagedTensor queries_tensor;
   queries_tensor.dl_tensor.data = queries_d;
@@ -109,23 +111,23 @@ void cagra_build_search_simple() {
 
   // Search the CAGRA index
   cuvsCagraSearchParams_t search_params;
-  cuvsCagraSearchParamsCreate(&search_params);
+  CHECK_CUVS(cuvsCagraSearchParamsCreate(&search_params));
 
   cuvsFilter filter;
   filter.type = NO_FILTER;
   filter.addr = (uintptr_t)NULL;
 
-  cuvsCagraSearch(res, search_params, index, &queries_tensor, &neighbors_tensor,
-                  &distances_tensor, filter);
+  CHECK_CUVS(cuvsCagraSearch(res, search_params, index, &queries_tensor, &neighbors_tensor,
+                  &distances_tensor, filter));
 
   // print results
   uint32_t *neighbors_h =
       (uint32_t *)malloc(sizeof(uint32_t) * n_queries * topk);
   float *distances_h = (float *)malloc(sizeof(float) * n_queries * topk);
-  cudaMemcpy(neighbors_h, neighbors, sizeof(uint32_t) * n_queries * topk,
-             cudaMemcpyDefault);
-  cudaMemcpy(distances_h, distances, sizeof(float) * n_queries * topk,
-             cudaMemcpyDefault);
+  CHECK_CUDA(cudaMemcpy(neighbors_h, neighbors, sizeof(uint32_t) * n_queries * topk,
+             cudaMemcpyDefault));
+  CHECK_CUDA(cudaMemcpy(distances_h, distances, sizeof(float) * n_queries * topk,
+             cudaMemcpyDefault));
   printf("Query 0 neighbor indices: =[%d, %d]\n", neighbors_h[0],
          neighbors_h[1]);
   printf("Query 0 neighbor distances: =[%f, %f]\n", distances_h[0],
@@ -135,15 +137,15 @@ void cagra_build_search_simple() {
   free(neighbors_h);
   free(distances_h);
 
-  cuvsCagraSearchParamsDestroy(search_params);
+  CHECK_CUVS(cuvsCagraSearchParamsDestroy(search_params));
 
-  cuvsRMMFree(res, distances, sizeof(float) * n_queries * topk);
-  cuvsRMMFree(res, neighbors, sizeof(uint32_t) * n_queries * topk);
-  cuvsRMMFree(res, queries_d, sizeof(float) * n_queries * n_cols);
+  CHECK_CUVS(cuvsRMMFree(res, distances, sizeof(float) * n_queries * topk));
+  CHECK_CUVS(cuvsRMMFree(res, neighbors, sizeof(uint32_t) * n_queries * topk));
+  CHECK_CUVS(cuvsRMMFree(res, queries_d, sizeof(float) * n_queries * n_cols));
 
-  cuvsCagraIndexDestroy(index);
-  cuvsCagraIndexParamsDestroy(index_params);
-  cuvsResourcesDestroy(res);
+  CHECK_CUVS(cuvsCagraIndexDestroy(index));
+  CHECK_CUVS(cuvsCagraIndexParamsDestroy(index_params));
+  CHECK_CUVS(cuvsResourcesDestroy(res));
 }
 
 int main() {

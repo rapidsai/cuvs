@@ -23,7 +23,7 @@
 void ivf_flat_build_search_simple(cuvsResources_t *res, DLManagedTensor * dataset_tensor, DLManagedTensor * queries_tensor) {
     // Create default index params
     cuvsIvfFlatIndexParams_t index_params;
-    cuvsIvfFlatIndexParamsCreate(&index_params);
+    CHECK_CUVS(cuvsIvfFlatIndexParamsCreate(&index_params));
     index_params->n_lists                  = 1024; // default value
     index_params->kmeans_n_iters = 20; // default value
     index_params->kmeans_trainset_fraction = 0.1;
@@ -31,17 +31,11 @@ void ivf_flat_build_search_simple(cuvsResources_t *res, DLManagedTensor * datase
 
     // Create IVF-Flat index
     cuvsIvfFlatIndex_t index;
-    cuvsIvfFlatIndexCreate(&index);
+    CHECK_CUVS(cuvsIvfFlatIndexCreate(&index));
 
     printf("Building IVF-Flat index\n");
     // Build the IVF-Flat Index
-    cuvsError_t build_status = cuvsIvfFlatBuild(*res, index_params, dataset_tensor, index);
-    if (build_status != CUVS_SUCCESS) {
-        printf("%s.\n", cuvsGetLastErrorText());
-        cuvsIvfFlatIndexDestroy(index);
-        cuvsIvfFlatIndexParamsDestroy(index_params);
-        return;
-    }
+    CHECK_CUVS(cuvsIvfFlatBuild(*res, index_params, dataset_tensor, index));
 
     // Create output arrays.
     int64_t topk      = 10;
@@ -50,8 +44,8 @@ void ivf_flat_build_search_simple(cuvsResources_t *res, DLManagedTensor * datase
     //Allocate memory for `neighbors` and `distances` output
     int64_t *neighbors_d;
     float *distances_d;
-    cuvsRMMAlloc(*res, (void**) &neighbors_d, sizeof(int64_t) * n_queries * topk);
-    cuvsRMMAlloc(*res, (void**) &distances_d, sizeof(float) * n_queries * topk);
+    CHECK_CUVS(cuvsRMMAlloc(*res, (void**) &neighbors_d, sizeof(int64_t) * n_queries * topk));
+    CHECK_CUVS(cuvsRMMAlloc(*res, (void**) &distances_d, sizeof(float) * n_queries * topk));
 
     DLManagedTensor neighbors_tensor;
     int64_t neighbors_shape[2] = {n_queries, topk};
@@ -63,7 +57,7 @@ void ivf_flat_build_search_simple(cuvsResources_t *res, DLManagedTensor * datase
 
     // Create default search params
     cuvsIvfFlatSearchParams_t search_params;
-    cuvsIvfFlatSearchParamsCreate(&search_params);
+    CHECK_CUVS(cuvsIvfFlatSearchParamsCreate(&search_params));
     search_params->n_probes = 50;
 
     // Search the `index` built using `ivfFlatBuild`
@@ -71,37 +65,36 @@ void ivf_flat_build_search_simple(cuvsResources_t *res, DLManagedTensor * datase
     filter.type = NO_FILTER;
     filter.addr = (uintptr_t)NULL;
 
-    cuvsError_t search_status = cuvsIvfFlatSearch(*res, search_params, index,
-     queries_tensor, &neighbors_tensor, &distances_tensor, filter);
-    if (build_status != CUVS_SUCCESS) {
-        printf("%s.\n", cuvsGetLastErrorText());
-    }
+    CHECK_CUVS(cuvsIvfFlatSearch(*res, search_params, index,
+     queries_tensor, &neighbors_tensor, &distances_tensor, filter));
 
     int64_t *neighbors = (int64_t *)malloc(n_queries * topk * sizeof(int64_t));
     float *distances = (float *)malloc(n_queries * topk * sizeof(float));
     memset(neighbors, 0, n_queries * topk * sizeof(int64_t));
     memset(distances, 0, n_queries * topk * sizeof(float));
 
-    cudaMemcpy(neighbors, neighbors_d, sizeof(int64_t) * n_queries * topk, cudaMemcpyDefault);
-    cudaMemcpy(distances, distances_d, sizeof(float) * n_queries * topk, cudaMemcpyDefault);
+    CHECK_CUDA(cudaMemcpy(neighbors, neighbors_d, sizeof(int64_t) * n_queries * topk,
+    cudaMemcpyDefault));
+    CHECK_CUDA(cudaMemcpy(distances, distances_d, sizeof(float) * n_queries * topk,
+    cudaMemcpyDefault));
 
     print_results(neighbors, distances, 2, topk);
 
     free(distances);
     free(neighbors);
 
-    cuvsRMMFree(*res, neighbors_d, sizeof(int64_t) * n_queries * topk);
-    cuvsRMMFree(*res, distances_d, sizeof(float) * n_queries * topk);
+    CHECK_CUVS(cuvsRMMFree(*res, neighbors_d, sizeof(int64_t) * n_queries * topk));
+    CHECK_CUVS(cuvsRMMFree(*res, distances_d, sizeof(float) * n_queries * topk));
 
-    cuvsIvfFlatSearchParamsDestroy(search_params);
-    cuvsIvfFlatIndexDestroy(index);
-    cuvsIvfFlatIndexParamsDestroy(index_params);
+    CHECK_CUVS(cuvsIvfFlatSearchParamsDestroy(search_params));
+    CHECK_CUVS(cuvsIvfFlatIndexDestroy(index));
+    CHECK_CUVS(cuvsIvfFlatIndexParamsDestroy(index_params));
 }
 
 void ivf_flat_build_extend_search(cuvsResources_t *res, DLManagedTensor * trainset_tensor, DLManagedTensor * dataset_tensor, DLManagedTensor * queries_tensor) {
     int64_t *data_indices_d;
     int64_t n_dataset = dataset_tensor->dl_tensor.shape[0];
-    cuvsRMMAlloc(*res, (void**) &data_indices_d, sizeof(int64_t) * n_dataset);
+    CHECK_CUVS(cuvsRMMAlloc(*res, (void**) &data_indices_d, sizeof(int64_t) * n_dataset));
     DLManagedTensor data_indices_tensor;
     int64_t data_indices_shape[1] = {n_dataset};
     int_tensor_initialize(data_indices_d, data_indices_shape, &data_indices_tensor);
@@ -120,30 +113,20 @@ void ivf_flat_build_extend_search(cuvsResources_t *res, DLManagedTensor * trains
 
     // Create default index params
     cuvsIvfFlatIndexParams_t index_params;
-    cuvsIvfFlatIndexParamsCreate(&index_params);
+    CHECK_CUVS(cuvsIvfFlatIndexParamsCreate(&index_params));
     index_params->n_lists                  = 100;
     index_params->add_data_on_build = false;
     //index_params->metric default is L2Expanded
 
     // Create IVF-Flat index
     cuvsIvfFlatIndex_t index;
-    cuvsIvfFlatIndexCreate(&index);
+    CHECK_CUVS(cuvsIvfFlatIndexCreate(&index));
 
     // Build the IVF-Flat Index
-    cuvsError_t build_status = cuvsIvfFlatBuild(*res, index_params, trainset_tensor, index);
-    if (build_status != CUVS_SUCCESS) {
-        printf("%s.\n", cuvsGetLastErrorText());
-        cuvsIvfFlatIndexDestroy(index);
-        cuvsIvfFlatIndexParamsDestroy(index_params);
-        return;
-    }
+    CHECK_CUVS(cuvsIvfFlatBuild(*res, index_params, trainset_tensor, index));
 
     printf("Filling index with the dataset vectors\n");
-    cuvsError_t extend_status = cuvsIvfFlatExtend(*res, dataset_tensor, &data_indices_tensor, index);
-    if (extend_status != CUVS_SUCCESS) {
-        printf("%s.\n", cuvsGetLastErrorText());
-        return;
-    }
+    CHECK_CUVS(cuvsIvfFlatExtend(*res, dataset_tensor, &data_indices_tensor, index));
 
     // Create output arrays.
     int64_t topk      = 10;
@@ -152,8 +135,8 @@ void ivf_flat_build_extend_search(cuvsResources_t *res, DLManagedTensor * trains
     //Allocate memory for `neighbors` and `distances` output
     int64_t *neighbors_d;
     float *distances_d;
-    cuvsRMMAlloc(*res, (void**) &neighbors_d, sizeof(int64_t) * n_queries * topk);
-    cuvsRMMAlloc(*res, (void**) &distances_d, sizeof(float) * n_queries * topk);
+    CHECK_CUVS(cuvsRMMAlloc(*res, (void**) &neighbors_d, sizeof(int64_t) * n_queries * topk));
+    CHECK_CUVS(cuvsRMMAlloc(*res, (void**) &distances_d, sizeof(float) * n_queries * topk));
 
     DLManagedTensor neighbors_tensor;
     int64_t neighbors_shape[2] = {n_queries, topk};
@@ -165,40 +148,39 @@ void ivf_flat_build_extend_search(cuvsResources_t *res, DLManagedTensor * trains
 
     // Create default search params
     cuvsIvfFlatSearchParams_t search_params;
-    cuvsIvfFlatSearchParamsCreate(&search_params);
+    CHECK_CUVS(cuvsIvfFlatSearchParamsCreate(&search_params));
     search_params->n_probes = 10;
 
     // Search the `index` built using `ivfFlatBuild`
     cuvsFilter filter;
     filter.type = NO_FILTER;
     filter.addr = (uintptr_t)NULL;
-    cuvsError_t search_status = cuvsIvfFlatSearch(*res, search_params, index,
-     queries_tensor, &neighbors_tensor, &distances_tensor, filter);
-    if (search_status != CUVS_SUCCESS) {
-        printf("%s.\n", cuvsGetLastErrorText());
-        exit(-1);
-    }
+    CHECK_CUVS(cuvsIvfFlatSearch(*res, search_params, index,
+     queries_tensor, &neighbors_tensor, &distances_tensor, filter));
 
     int64_t *neighbors = (int64_t *)malloc(n_queries * topk * sizeof(int64_t));
     float *distances = (float *)malloc(n_queries * topk * sizeof(float));
     memset(neighbors, 0, n_queries * topk * sizeof(int64_t));
     memset(distances, 0, n_queries * topk * sizeof(float));
 
-    cudaMemcpy(neighbors, neighbors_d, sizeof(int64_t) * n_queries * topk, cudaMemcpyDefault);
-    cudaMemcpy(distances, distances_d, sizeof(float) * n_queries * topk, cudaMemcpyDefault);
+    CHECK_CUDA(cudaMemcpy(neighbors, neighbors_d, sizeof(int64_t) * n_queries * topk,
+    cudaMemcpyDefault));
+    CHECK_CUDA(cudaMemcpy(distances, distances_d, sizeof(float) * n_queries * topk,
+    cudaMemcpyDefault));
 
     print_results(neighbors, distances, 2, topk);
 
     free(distances);
     free(neighbors);
     free(data_indices);
-    cuvsRMMFree(*res, data_indices_d, sizeof(int64_t) * n_dataset);
-    cuvsRMMFree(*res, neighbors_d, sizeof(int64_t) * n_queries * topk);
-    cuvsRMMFree(*res, distances_d, sizeof(float) * n_queries * topk);
+    CHECK_CUVS(cuvsRMMFree(*res, data_indices_d, sizeof(int64_t) * n_dataset));
+    CHECK_CUVS(cuvsRMMFree(*res, neighbors_d, sizeof(int64_t) * n_queries * topk));
+    CHECK_CUVS(cuvsRMMFree(*res, distances_d, sizeof(float) * n_queries * topk));
 
-    cuvsIvfFlatSearchParamsDestroy(search_params);
-    cuvsIvfFlatIndexDestroy(index);
-    cuvsIvfFlatIndexParamsDestroy(index_params);
+    CHECK_CUVS(cuvsIvfFlatSearchParamsDestroy(search_params));
+    CHECK_CUVS(cuvsIvfFlatIndexDestroy(index));
+
+    CHECK_CUVS(cuvsIvfFlatIndexParamsDestroy(index_params));
 }
 
 int main() {
@@ -217,9 +199,10 @@ int main() {
 
     // Allocate memory for `queries`
     float *dataset_d;
-    cuvsRMMAlloc(res, (void**) &dataset_d, sizeof(float) * n_samples * n_dim);
+    CHECK_CUVS(cuvsRMMAlloc(res, (void**) &dataset_d, sizeof(float) * n_samples * n_dim));
     // Use DLPack to represent `dataset_d` as a tensor
-    cudaMemcpy(dataset_d, dataset, sizeof(float) * n_samples * n_dim, cudaMemcpyDefault);
+    CHECK_CUDA(cudaMemcpy(dataset_d, dataset, sizeof(float) * n_samples * n_dim,
+    cudaMemcpyDefault));
 
     DLManagedTensor dataset_tensor;
     int64_t dataset_shape[2] = {n_samples,n_dim};
@@ -227,7 +210,7 @@ int main() {
 
     // Allocate memory for `queries`
     float *queries_d;
-    cuvsRMMAlloc(res, (void**) &queries_d, sizeof(float) * n_queries * n_dim);
+    CHECK_CUVS(cuvsRMMAlloc(res, (void**) &queries_d, sizeof(float) * n_queries * n_dim));
 
     // Use DLPack to represent `queries` as tensors
     cudaMemcpy(queries_d, queries, sizeof(float) * n_queries * n_dim, cudaMemcpyDefault);
@@ -247,8 +230,9 @@ int main() {
             *(trainset + i * n_dim + j)  = *(dataset + i * n_dim + j);
         }
     }
-    cuvsRMMAlloc(res, (void**) &trainset_d, sizeof(float) * n_trainset * n_dim);
-    cudaMemcpy(trainset_d, trainset, sizeof(float) * n_trainset * n_dim, cudaMemcpyDefault);
+    CHECK_CUVS(cuvsRMMAlloc(res, (void**) &trainset_d, sizeof(float) * n_trainset * n_dim));
+    CHECK_CUDA(cudaMemcpy(trainset_d, trainset, sizeof(float) * n_trainset * n_dim,
+    cudaMemcpyDefault));
     DLManagedTensor trainset_tensor;
     int64_t trainset_shape[2] = {n_trainset, n_dim};
     float_tensor_initialize(trainset_d, trainset_shape, &trainset_tensor);
@@ -256,10 +240,10 @@ int main() {
     // Build and extend example.
     ivf_flat_build_extend_search(&res, &trainset_tensor, &dataset_tensor, &queries_tensor);
 
-    cuvsRMMFree(res, trainset_d, sizeof(float) * n_trainset * n_dim);
-    cuvsRMMFree(res, queries_d, sizeof(float) * n_queries * n_dim);
-    cuvsRMMFree(res, dataset_d, sizeof(float) * n_samples * n_dim);
-    cuvsResourcesDestroy(res);
+    CHECK_CUVS(cuvsRMMFree(res, trainset_d, sizeof(float) * n_trainset * n_dim));
+    CHECK_CUVS(cuvsRMMFree(res, queries_d, sizeof(float) * n_queries * n_dim));
+    CHECK_CUVS(cuvsRMMFree(res, dataset_d, sizeof(float) * n_samples * n_dim));
+    CHECK_CUVS(cuvsResourcesDestroy(res));
     free(trainset);
     free(dataset);
     free(queries);
