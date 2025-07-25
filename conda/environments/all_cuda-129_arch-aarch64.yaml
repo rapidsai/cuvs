@@ -22,7 +22,7 @@ dependencies:
 - cython>=3.0.0
 - dlpack>=0.8,<1.0
 - doxygen>=1.8.20
-- gcc_linux-aarch64=13.*
+- gcc_linux-aarch64=14.*
 - go
 - graphviz
 - ipython
