@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2018-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -298,13 +298,28 @@ void distance_impl(raft::resources const& handle,
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
-  // First sqrt x and y
+  // Check if arrays overlap
+  const DataT* x_end  = x + m * k;
+  const DataT* y_end  = y + n * k;
+  bool arrays_overlap = (x < y_end) && (y < x_end);
+
   const auto raft_sqrt = raft::linalg::unaryOp<DataT, raft::sqrt_op, IdxT>;
+  const auto raft_sq   = raft::linalg::unaryOp<DataT, raft::sq_op, IdxT>;
 
-  raft_sqrt((DataT*)x, x, m * k, raft::sqrt_op{}, stream);
-  if (x != y) { raft_sqrt((DataT*)y, y, n * k, raft::sqrt_op{}, stream); }
+  if (!arrays_overlap) {
+    // Arrays don't overlap: sqrt each array independently
+    raft_sqrt((DataT*)x, x, m * k, raft::sqrt_op{}, stream);
+    raft_sqrt((DataT*)y, y, n * k, raft::sqrt_op{}, stream);
+  } else {
+    // Arrays overlap: sqrt the union of both arrays exactly once
+    const DataT* start = (x < y) ? x : y;
+    const DataT* end   = (x_end > y_end) ? x_end : y_end;
+    IdxT union_size    = end - start;
 
-  // Then calculate Hellinger distance
+    raft_sqrt((DataT*)start, start, union_size, raft::sqrt_op{}, stream);
+  }
+
+  // Calculate Hellinger distance
   ops::hellinger_distance_op<DataT, AccT, IdxT> distance_op{};
 
   const OutT* x_norm = nullptr;
@@ -313,9 +328,19 @@ void distance_impl(raft::resources const& handle,
   pairwise_matrix_dispatch<decltype(distance_op), DataT, AccT, OutT, FinOpT, IdxT>(
     distance_op, m, n, k, x, y, x_norm, y_norm, out, fin_op, stream, is_row_major);
 
-  // Finally revert sqrt of x and y
-  raft_sqrt((DataT*)x, x, m * k, raft::sqrt_op{}, stream);
-  if (x != y) { raft_sqrt((DataT*)y, y, n * k, raft::sqrt_op{}, stream); }
+  // Restore arrays by squaring back
+  if (!arrays_overlap) {
+    // Arrays don't overlap: square each array independently
+    raft_sq((DataT*)x, x, m * k, raft::sq_op{}, stream);
+    raft_sq((DataT*)y, y, n * k, raft::sq_op{}, stream);
+  } else {
+    // Arrays overlap: square the union back
+    const DataT* start = (x < y) ? x : y;
+    const DataT* end   = (x_end > y_end) ? x_end : y_end;
+    IdxT union_size    = end - start;
+
+    raft_sq((DataT*)start, start, union_size, raft::sq_op{}, stream);
+  }
 
   RAFT_CUDA_TRY(cudaGetLastError());
 }
