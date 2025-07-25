@@ -186,7 +186,7 @@ public class HnswIndexImpl implements HnswIndex {
       cuvsHnswIndex.dtype(indexReference.memorySegment, dtype);
 
       try (var params = segmentFromIndexParams(hnswIndexParams);
-          var resourcesAccessor = resources.access()) {
+          var cuvsResourcesAccessor = resources.access()) {
         checkCuVSError(
             cuvsHnswDeserialize(
                 cuvsResourcesAccessor.handle(),
