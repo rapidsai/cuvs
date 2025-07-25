@@ -26,12 +26,15 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Path.h"
 
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <future>
 #include <mutex>
 #include <set>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -42,10 +45,11 @@ using namespace clang::tooling;
 using namespace llvm;
 
 static llvm::cl::OptionCategory ToolCategory("Generic JSON Generator");
-static llvm::cl::opt<std::string> OutputFile("output",
-                                             llvm::cl::desc("Output file"),
-                                             llvm::cl::Required,
-                                             llvm::cl::cat(ToolCategory));
+
+static llvm::cl::opt<std::string> OutputDir("output-dir",
+                                            llvm::cl::desc("Output directory for generated files"),
+                                            llvm::cl::Required,
+                                            llvm::cl::cat(ToolCategory));
 
 static llvm::cl::opt<std::string> BuildPath(
   "p",
@@ -59,11 +63,17 @@ static llvm::cl::opt<unsigned> NumThreads(
   llvm::cl::init(0),
   llvm::cl::cat(ToolCategory));
 
+static llvm::cl::opt<std::string> ManifestFile(
+  "manifest",
+  llvm::cl::desc("Output file containing list of generated files"),
+  llvm::cl::Required,
+  llvm::cl::cat(ToolCategory));
+
 struct GenericInfo {
   std::string class_name;
   std::string qualified_name;
   std::string namespace_path;
-  std::string header_path;
+  std::string source_file;  // The source or header file where this instance was found
   std::vector<std::pair<std::string, std::string>> fields;  // name, type
 };
 
@@ -130,18 +140,74 @@ std::string getQualifiedTypeName(QualType qual_type)
   // Replace _Bool with bool
   if (type_str == "_Bool") { type_str = "bool"; }
 
-  // Handle size_t vs int issues - prefer the actual underlying type
-  // but keep size_t when explicitly used
-
   return type_str;
+}
+
+// Helper function to get canonical path with fallbacks
+std::string getCanonicalPath(const std::string& path)
+{
+  try {
+    return std::filesystem::canonical(path).string();
+  } catch (const std::filesystem::filesystem_error&) {
+    // If canonical fails, fall back to absolute
+    try {
+      return std::filesystem::absolute(path).string();
+    } catch (const std::filesystem::filesystem_error&) {
+      // Final fallback to the original path
+      return path;
+    }
+  }
+}
+
+// Function to get relative path from generated file to source header
+std::string getRelativeSourcePath(const std::string& source_header_path,
+                                  const std::string& generated_file_path)
+{
+  if (generated_file_path.empty()) {
+    // Fall back to extracting from common patterns
+    std::string include_str = "include/";
+    size_t include_pos      = source_header_path.find(include_str);
+    if (include_pos != std::string::npos) {
+      return source_header_path.substr(include_pos + include_str.size());
+    }
+
+    std::string src_str = "src/";
+    size_t src_pos      = source_header_path.find(src_str);
+    if (src_pos != std::string::npos) {
+      return source_header_path.substr(src_pos + src_str.size());
+    }
+
+    std::string tests_str = "tests/";
+    size_t tests_pos      = source_header_path.find(tests_str);
+    if (tests_pos != std::string::npos) {
+      return source_header_path.substr(tests_pos + tests_str.size());
+    }
+
+    // Return just the filename
+    return llvm::sys::path::filename(source_header_path).str();
+  }
+
+  // Try to make relative path from generated file to source header
+  std::filesystem::path source_path(source_header_path);
+  std::filesystem::path generated_path(generated_file_path);
+  std::filesystem::path generated_dir = generated_path.parent_path();
+
+  try {
+    auto rel = std::filesystem::relative(source_path, generated_dir);
+    return rel.string();
+  } catch (...) {
+    // Fall back to just the filename
+    return llvm::sys::path::filename(source_header_path).str();
+  }
 }
 
 // Visitor that traverses types to detect CRTP patterns
 class GenericTypeTraversalVisitor : public RecursiveASTVisitor<GenericTypeTraversalVisitor> {
  public:
   explicit GenericTypeTraversalVisitor(ASTContext* context,
-                                       std::shared_ptr<GenericClassesCollector> collector)
-    : context_(context), collector_(collector)
+                                       std::shared_ptr<GenericClassesCollector> collector,
+                                       const std::string& current_file)
+    : context_(context), collector_(collector), current_file_(current_file)
   {
   }
 
@@ -161,7 +227,6 @@ class GenericTypeTraversalVisitor : public RecursiveASTVisitor<GenericTypeTraver
       const auto& args = decl->getTemplateArgs();
       if (args.size() == 1 && args[0].getKind() == TemplateArgument::Type) {
         QualType arg_type = args[0].getAsType();
-        llvm::outs() << "  Template argument: " << arg_type.getAsString() << "\n";
 
         if (auto* record_type = arg_type->getAs<RecordType>()) {
           if (auto* record_decl = dyn_cast<CXXRecordDecl>(record_type->getDecl())) {
@@ -211,8 +276,6 @@ class GenericTypeTraversalVisitor : public RecursiveASTVisitor<GenericTypeTraver
     // Only process cuvs namespace classes
     if (class_name.find("cuvs::") != 0) { return; }
 
-    llvm::outs() << "Processing generic class: " << class_name << "\n";
-
     GenericInfo info;
     info.class_name     = decl->getNameAsString();
     info.qualified_name = decl->getQualifiedNameAsString();
@@ -237,29 +300,27 @@ class GenericTypeTraversalVisitor : public RecursiveASTVisitor<GenericTypeTraver
     SourceManager& sm  = context_->getSourceManager();
     SourceLocation loc = decl->getLocation();
     if (loc.isValid()) {
-      // Get the presumed location (accounts for #line directives)
-      PresumedLoc presumed_loc = sm.getPresumedLoc(loc);
-      if (presumed_loc.isValid()) {
-        std::string full_path = presumed_loc.getFilename();
+      FileID file_id = sm.getFileID(loc);
+      if (const FileEntry* file_entry = sm.getFileEntryForID(file_id)) {
+        std::string file_path;
 
-        // Convert to relative path from workspace root if possible
-        // Look for "include/" in the path and extract from there
-        std::string include_str = "include/";
-        size_t include_pos      = full_path.find(include_str);
-        if (include_pos != std::string::npos) {
-          info.header_path = full_path.substr(include_pos + include_str.size());
+        // Try to get the real path name first
+        StringRef real_path = file_entry->tryGetRealPathName();
+        if (!real_path.empty()) {
+          file_path = real_path.str();
         } else {
-          // Fall back to just the filename
-          size_t last_slash = full_path.find_last_of('/');
-          if (last_slash != std::string::npos) {
-            info.header_path = full_path.substr(last_slash + 1);
-          } else {
-            info.header_path = full_path;
-          }
+          // Fall back to the filename from source manager
+          file_path = sm.getFilename(loc).str();
         }
 
-        llvm::outs() << "  Header path: " << info.header_path << "\n";
+        info.source_file = getCanonicalPath(file_path);
+      } else {
+        // Fall back to current compilation unit
+        info.source_file = getCanonicalPath(current_file_);
       }
+    } else {
+      // Fall back to current compilation unit
+      info.source_file = getCanonicalPath(current_file_);
     }
 
     // Extract fields if the definition is complete
@@ -268,7 +329,6 @@ class GenericTypeTraversalVisitor : public RecursiveASTVisitor<GenericTypeTraver
         std::string field_name = field->getNameAsString();
         std::string field_type = getQualifiedTypeName(field->getType());
         info.fields.emplace_back(field_name, field_type);
-        llvm::outs() << "  Field: " << field_name << " : " << field_type << "\n";
       }
 
       // Also extract fields from base classes
@@ -279,7 +339,6 @@ class GenericTypeTraversalVisitor : public RecursiveASTVisitor<GenericTypeTraver
               std::string field_name = field->getNameAsString();
               std::string field_type = getQualifiedTypeName(field->getType());
               info.fields.emplace_back(field_name, field_type);
-              llvm::outs() << "  Inherited field: " << field_name << " : " << field_type << "\n";
             }
           }
         }
@@ -292,12 +351,15 @@ class GenericTypeTraversalVisitor : public RecursiveASTVisitor<GenericTypeTraver
   ASTContext* context_;
   std::shared_ptr<GenericClassesCollector> collector_;
   ClassTemplateDecl* generic_template_ = nullptr;
+  std::string current_file_;
 };
 
 class GenericConsumer : public ASTConsumer {
  public:
-  explicit GenericConsumer(ASTContext* context, std::shared_ptr<GenericClassesCollector> collector)
-    : visitor_(context, collector), context_(context)
+  explicit GenericConsumer(ASTContext* context,
+                           std::shared_ptr<GenericClassesCollector> collector,
+                           const std::string& current_file)
+    : visitor_(context, collector, current_file), context_(context)
   {
   }
 
@@ -310,24 +372,28 @@ class GenericConsumer : public ASTConsumer {
 
 class GenericAction : public ASTFrontendAction {
  public:
-  explicit GenericAction(std::shared_ptr<GenericClassesCollector> collector) : collector_(collector)
+  explicit GenericAction(std::shared_ptr<GenericClassesCollector> collector,
+                         const std::string& current_file)
+    : collector_(collector), current_file_(current_file)
   {
   }
 
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance& compiler,
                                                  llvm::StringRef) override
   {
-    return std::make_unique<GenericConsumer>(&compiler.getASTContext(), collector_);
+    return std::make_unique<GenericConsumer>(&compiler.getASTContext(), collector_, current_file_);
   }
 
  private:
   std::shared_ptr<GenericClassesCollector> collector_;
+  std::string current_file_;
 };
 
 class CollectingGenericAction : public GenericAction {
  public:
-  explicit CollectingGenericAction(std::shared_ptr<GenericClassesCollector> collector)
-    : GenericAction(collector)
+  explicit CollectingGenericAction(std::shared_ptr<GenericClassesCollector> collector,
+                                   const std::string& current_file)
+    : GenericAction(collector, current_file)
   {
   }
 
@@ -351,14 +417,15 @@ class CollectingGenericAction : public GenericAction {
 
 class CollectingActionFactory : public FrontendActionFactory {
  public:
-  explicit CollectingActionFactory(std::shared_ptr<GenericClassesCollector> collector)
-    : collector_(collector)
+  explicit CollectingActionFactory(std::shared_ptr<GenericClassesCollector> collector,
+                                   const std::string& current_file)
+    : collector_(collector), current_file_(current_file)
   {
   }
 
   std::unique_ptr<FrontendAction> create() override
   {
-    return std::make_unique<CollectingGenericAction>(collector_);
+    return std::make_unique<CollectingGenericAction>(collector_, current_file_);
   }
 
   bool runInvocation(std::shared_ptr<CompilerInvocation> Invocation,
@@ -385,8 +452,6 @@ class CollectingActionFactory : public FrontendActionFactory {
       return FrontendActionFactory::runInvocation(
         Invocation, Files, PCHContainerOps, &nullConsumer);
     } catch (const std::exception& e) {
-      llvm::outs() << "Exception in runInvocation: " << e.what() << "\n";
-      llvm::outs().flush();
       return true;  // Pretend success to continue with other files
     } catch (...) {
       // Ignore all compilation failures - common with CUDA files
@@ -396,6 +461,7 @@ class CollectingActionFactory : public FrontendActionFactory {
 
  private:
   std::shared_ptr<GenericClassesCollector> collector_;
+  std::string current_file_;
 };
 
 // Function to process a batch of files in parallel
@@ -409,15 +475,13 @@ void processFilesBatch(const CompilationDatabase& db,
 
       // Add arguments to make clang more permissive with CUDA code
       tool.appendArgumentsAdjuster([file](const CommandLineArguments& Args, StringRef /*unused*/) {
-        llvm::outs() << "Adjusting arguments for file: " << file << "\n";
         CommandLineArguments AdjustedArgs;
 
-        // Be very conservative - only filter out the most problematic CUDA compiler arguments
-        // Preserve all include paths and most compilation flags that CMake set up
+        // Filter out all CUDA-specific compiler arguments that clang doesn't understand
         for (size_t i = 0; i < Args.size(); ++i) {
           const auto& arg = Args[i];
 
-          // Only skip the most problematic CUDA compiler arguments
+          // Skip all CUDA-specific arguments
           if (arg.find("--generate-code") != std::string::npos ||
               arg.find("-gencode") != std::string::npos ||
               arg.find("--gpu-architecture") != std::string::npos ||
@@ -425,7 +489,13 @@ void processFilesBatch(const CompilationDatabase& db,
               arg.find("-maxrregcount") != std::string::npos ||
               arg.find("-lineinfo") != std::string::npos ||
               arg.find("-Xptxas") != std::string::npos ||
-              arg.find("-Xfatbin") != std::string::npos || arg.find("-rdc=") != std::string::npos) {
+              arg.find("-Xfatbin") != std::string::npos || arg.find("-rdc=") != std::string::npos ||
+              arg.find("-Xcompiler=") != std::string::npos ||
+              arg.find("--expt-") != std::string::npos ||
+              arg.find("-static-global-template-stub=") != std::string::npos ||
+              arg.find("-G") != std::string::npos ||
+              arg.find("-forward-unknown-to-host-compiler") != std::string::npos ||
+              arg.find("--suppress-stack-size-warning") != std::string::npos) {
             continue;  // Skip this argument
           }
 
@@ -460,7 +530,7 @@ void processFilesBatch(const CompilationDatabase& db,
         return AdjustedArgs;
       });
 
-      auto factory = std::make_unique<CollectingActionFactory>(collector);
+      auto factory = std::make_unique<CollectingActionFactory>(collector, file);
       tool.run(factory.get());  // Ignore return code, continue with other files
     } catch (...) {
       llvm::outs() << "Exception processing file: " << file << "\n";
@@ -470,26 +540,32 @@ void processFilesBatch(const CompilationDatabase& db,
   }
 }
 
-std::string GenerateImplementations(const std::unordered_map<std::string, GenericInfo>& classes)
+std::string GenerateImplementations(const std::vector<GenericInfo>& classes,
+                                    const std::string& generated_file_path)
 {
+  if (classes.empty()) { return ""; }
+
   std::string code = R"(// AUTO-GENERATED FILE - DO NOT EDIT
 // Generated by generate_generic_json tool
-
-#include <cuvs/core/generic.hpp>
 
 )";
 
   // Collect unique header files from all classes
   std::set<std::string> unique_headers;
-  for (const auto& [_, cls] : classes) {
-    if (!cls.header_path.empty()) { unique_headers.insert(cls.header_path); }
+  for (const auto& cls : classes) {
+    if (!cls.source_file.empty()) {
+      std::string relative_path = getRelativeSourcePath(cls.source_file, generated_file_path);
+      unique_headers.insert(relative_path);
+    }
   }
 
   // Add include statements for all discovered headers
   for (const auto& header : unique_headers) {
-    code += "#include <" + header + ">\n";
+    code += "#include \"" + header + "\"\n";
   }
   code += R"(
+
+#include <cuvs/core/generic.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -499,26 +575,28 @@ std::string GenerateImplementations(const std::unordered_map<std::string, Generi
 
 using json = nlohmann::json;
 
+template<typename Variant, std::size_t... Is>
+void deserialize_at_index_impl(Variant& variant, const json& j, std::size_t index, std::index_sequence<Is...>) {
+    ((index == Is ? [&]() {
+        using T = std::variant_alternative_t<Is, Variant>;
+        if constexpr (std::is_convertible_v<json, T>) {
+            variant = j.get<T>();
+        }
+    }() : void()), ...);
+}
+
 template<typename Variant>
 void deserialize_variant_by_index(Variant& variant, const json& j, std::size_t index) {
     constexpr auto variant_size = std::variant_size_v<Variant>;
-
-    auto deserialize_at_index = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        ((index == Is ? [&]() {
-            using T = std::variant_alternative_t<Is, Variant>;
-            if constexpr (std::is_convertible_v<json, T>) {
-                variant = j.get<T>();
-            }
-        }() : void()), ...);
-    };
-    deserialize_at_index(std::make_index_sequence<variant_size>{});
+    deserialize_at_index_impl(variant, j, index, std::make_index_sequence<variant_size>{});
 }
 
 )";
 
   // Generate forward declarations
   code += "// Forward declarations help with dependencies\n";
-  for (const auto& [qname, cls] : classes) {
+  for (const auto& cls : classes) {
+    auto qname = cls.qualified_name;
     code += "namespace " + cls.namespace_path + " {\n";
     code += "void to_json(json&, const " + qname + "&);\n";
     code += "void from_json(const json&, " + qname + "&);\n";
@@ -527,7 +605,8 @@ void deserialize_variant_by_index(Variant& variant, const json& j, std::size_t i
   code += "\n\n";
 
   // Generate specializations
-  for (const auto& [qname, cls] : classes) {
+  for (const auto& cls : classes) {
+    auto qname = cls.qualified_name;
     // nlohmann::json
     code += "namespace " + cls.namespace_path + " {\n";
     code += "void to_json(json& j, const " + qname + "& obj) {\n";
@@ -587,9 +666,50 @@ void deserialize_variant_by_index(Variant& variant, const json& j, std::size_t i
   return code;
 }
 
+// Generate output filename for a given source file
+std::string generateOutputFilename(const std::string& source_file)
+{
+  std::string relative_path = getRelativeSourcePath(source_file, "");
+
+  // Replace path separators with underscores and remove problematic characters
+  std::string safe_name = relative_path;
+  std::replace(safe_name.begin(), safe_name.end(), '/', '_');
+  std::replace(safe_name.begin(), safe_name.end(), '\\', '_');
+  std::replace(safe_name.begin(), safe_name.end(), '.', '_');
+  std::replace(safe_name.begin(), safe_name.end(), ':', '_');
+  std::replace(safe_name.begin(), safe_name.end(), '-', '_');
+
+  // Remove any double underscores
+  while (safe_name.find("__") != std::string::npos) {
+    size_t pos = safe_name.find("__");
+    safe_name.replace(pos, 2, "_");
+  }
+
+  // Remove leading/trailing underscores
+  while (!safe_name.empty() && safe_name[0] == '_') {
+    safe_name = safe_name.substr(1);
+  }
+  while (!safe_name.empty() && safe_name.back() == '_') {
+    safe_name.pop_back();
+  }
+
+  if (safe_name.empty()) { safe_name = "unknown"; }
+
+  safe_name += "_generic";
+
+  // Determine extension based on original file
+  std::string ext = ".cpp";
+  if (source_file.find(".cu") != std::string::npos ||
+      source_file.find(".cuh") != std::string::npos) {
+    ext = ".cu";
+  }
+
+  return safe_name + ext;
+}
+
 int main(int argc, const char** argv)
 {
-  // Parse command line options manually since we don't need source files from command line
+  // Parse command line options
   llvm::cl::ParseCommandLineOptions(argc, argv, "Generic JSON Generator\n");
 
   llvm::outs() << "Loading compilation database from: " << BuildPath << "\n";
@@ -600,42 +720,37 @@ int main(int argc, const char** argv)
   if (!compilation_db) {
     llvm::errs() << "Error loading compilation database from " << BuildPath << ": " << error_message
                  << "\n";
-    // If we can't load compilation database, generate empty implementation
-    llvm::outs() << "Generating empty implementation due to compilation database load failure\n";
-    std::ofstream output(OutputFile);
-    if (!output) {
-      llvm::errs() << "Error: Could not open output file " << OutputFile << "\n";
-      return 1;
-    }
-    output << GenerateImplementations({});
-    return 0;
+    return 1;
   }
 
-  // Get all files from the compilation database
+  // Get all files from compilation database
   auto all_files = compilation_db->getAllFiles();
 
   // Filter out external dependencies and only keep relevant source files
   std::vector<std::string> filtered_files;
   for (const auto& file : all_files) {
     // Skip external dependencies and build artifacts
-    if (file.find("_deps/") != std::string::npos || file.find("build/") != std::string::npos) {
+    if (file.find("_deps/") != std::string::npos || file.find("build/") != std::string::npos ||
+        file.find("third") != std::string::npos) {
       continue;
     }
 
     filtered_files.push_back(file);
   }
 
-  llvm::outs() << "Processing " << filtered_files.size() << " files out of " << all_files.size()
-               << " total files\n";
+  llvm::outs() << "Processing " << filtered_files.size() << " source files\n";
 
   if (filtered_files.empty()) {
-    llvm::outs() << "No source files found, generating empty implementation\n";
-    std::ofstream output(OutputFile);
-    if (!output) {
-      llvm::errs() << "Error: Could not open output file " << OutputFile << "\n";
+    llvm::outs() << "No source files found\n";
+
+    // Create empty manifest file
+    std::ofstream manifest(ManifestFile);
+    if (!manifest) {
+      llvm::errs() << "Error: Could not open manifest file " << ManifestFile << "\n";
       return 1;
     }
-    output << GenerateImplementations({});
+    manifest.close();
+
     return 0;
   }
 
@@ -670,21 +785,58 @@ int main(int argc, const char** argv)
 
   const auto& classes = g_collector->getClasses();
 
-  llvm::outs() << "Found " << classes.size() << " classes inheriting from cuvs::core::generic:\n";
-  for (const auto& [name, cls] : classes) {
-    llvm::outs() << "  " << name << " (" << cls.fields.size() << " fields)\n";
+  // Group classes by source file late in the process
+  std::unordered_map<std::string, std::vector<GenericInfo>> classes_by_source;
+  for (const auto& [_, info] : classes) {
+    classes_by_source[info.source_file].push_back(info);
   }
 
-  std::string generated_code = GenerateImplementations(classes);
+  llvm::outs() << "Found " << classes.size() << " classes inheriting from cuvs::core::generic in "
+               << classes_by_source.size() << " source files\n";
 
-  std::ofstream output(OutputFile);
-  if (!output) {
-    llvm::errs() << "Error: Could not open output file " << OutputFile << "\n";
+  // Create output directory
+  std::filesystem::create_directories(OutputDir.getValue());
+
+  // Generate files for each source file that has generic instances
+  std::vector<std::string> generated_files;
+
+  for (const auto& [source_file, classes] : classes_by_source) {
+    if (classes.empty()) continue;
+
+    std::string output_filename = generateOutputFilename(source_file);
+    std::string output_path     = OutputDir.getValue() + "/" + output_filename;
+
+    llvm::outs() << "Generating " << output_filename << " for " << classes.size()
+                 << " classes from " << source_file << "\n";
+
+    std::string generated_code = GenerateImplementations(classes, output_path);
+
+    std::ofstream output(output_path);
+    if (!output) {
+      llvm::errs() << "Error: Could not open output file " << output_path << "\n";
+      return 1;
+    }
+
+    output << generated_code;
+    output.close();
+
+    generated_files.push_back(output_path);
+  }
+
+  // Write manifest file
+  std::ofstream manifest(ManifestFile);
+  if (!manifest) {
+    llvm::errs() << "Error: Could not open manifest file " << ManifestFile << "\n";
     return 1;
   }
 
-  output << generated_code;
-  llvm::outs() << "Generated implementations written to " << OutputFile << "\n";
+  for (const auto& file : generated_files) {
+    manifest << file << "\n";
+  }
+  manifest.close();
+
+  llvm::outs() << "Generated " << generated_files.size() << " files\n";
+  llvm::outs() << "Manifest written to " << ManifestFile << "\n";
 
   return 0;
 }
