@@ -40,10 +40,6 @@
 #include <iostream>
 #include <memory>
 #include <random>
-#include <atomic>
-#include <mutex>
-#include <sstream>
-#include <set>
 
 namespace cuvs::neighbors::cagra::detail::graph {
 
@@ -532,45 +528,6 @@ void sort_knn_graph(
   const IdxT graph_size             = dataset_size;
   const uint64_t input_graph_degree = knn_graph.extent(1);
   IdxT* const input_graph_ptr       = knn_graph.data_handle();
-  
-  // Debug: Analyze the kNN graph before sorting
-  RAFT_LOG_INFO("Analyzing kNN graph before sorting:");
-  RAFT_LOG_INFO("  graph_size: %lu, input_graph_degree: %lu", graph_size, input_graph_degree);
-  
-  // Sample analysis of duplicate neighbors in the initial graph
-  std::atomic<uint64_t> total_input_duplicates{0};
-  std::atomic<uint64_t> nodes_with_duplicates{0};
-  
-#pragma omp parallel
-  {
-    uint64_t local_duplicates = 0;
-    uint64_t local_nodes_with_dup = 0;
-    
-#pragma omp for
-    for (uint64_t i = 0; i < std::min<uint64_t>(graph_size, 1000); i++) {
-      std::set<IdxT> unique_neighbors;
-      int node_duplicates = 0;
-      for (uint64_t k = 0; k < input_graph_degree; k++) {
-        auto neighbor = knn_graph(i, k);
-        if (neighbor < graph_size && !unique_neighbors.insert(neighbor).second) {
-          node_duplicates++;
-        }
-      }
-      if (node_duplicates > 0) {
-        local_duplicates += node_duplicates;
-        local_nodes_with_dup++;
-        if (i < 5) {
-          RAFT_LOG_INFO("  Node %lu has %d duplicate neighbors", i, node_duplicates);
-        }
-      }
-    }
-    
-    total_input_duplicates += local_duplicates;
-    nodes_with_duplicates += local_nodes_with_dup;
-  }
-  
-  RAFT_LOG_INFO("  Sample (first 1000 nodes): %lu nodes have duplicates, total duplicates: %lu",
-                nodes_with_duplicates.load(), total_input_duplicates.load());
 
   auto large_tmp_mr = raft::resource::get_large_workspace_resource(res);
 
@@ -785,7 +742,7 @@ void mst_optimization(raft::resources const& res,
 
   // Allocate temporal arrays
   const uint32_t mst_graph_degree = output_graph_degree;
-  auto mst_graph              = raft::make_host_matrix<IdxT, int64_t, raft::row_major>(graph_size, mst_graph_degree);
+  auto mst_graph              = raft::make_host_matrix<IdxT, int64_t>(graph_size, mst_graph_degree);
   auto outgoing_max_edges     = raft::make_host_vector<IdxT, int64_t>(graph_size);
   auto incoming_max_edges     = raft::make_host_vector<IdxT, int64_t>(graph_size);
   auto outgoing_num_edges     = raft::make_host_vector<IdxT, int64_t>(graph_size);
@@ -1279,28 +1236,6 @@ void optimize(
     // specified number of edges are picked up for each node, starting with the
     // edge with the lowest number of 2-hop detours.
     //
-    
-    // Debug: Analyze input graph characteristics
-    RAFT_LOG_INFO("Input graph analysis:");
-    RAFT_LOG_INFO("  graph_size: %lu", graph_size);
-    RAFT_LOG_INFO("  knn_graph_degree (input): %lu", knn_graph_degree);
-    RAFT_LOG_INFO("  output_graph_degree: %lu", output_graph_degree);
-    
-    // Sample analysis of first few nodes
-    {
-      uint64_t sample_invalid = 0;
-      uint64_t sample_self_loops = 0;
-      for (uint64_t i = 0; i < std::min<uint64_t>(10, graph_size); i++) {
-        for (uint64_t k = 0; k < knn_graph_degree; k++) {
-          auto neighbor = knn_graph(i, k);
-          if (neighbor >= graph_size) sample_invalid++;
-          if (neighbor == i) sample_self_loops++;
-        }
-      }
-      RAFT_LOG_INFO("  Sample of first 10 nodes: invalid=%lu, self_loops=%lu", 
-                     sample_invalid, sample_self_loops);
-    }
-    
     auto detour_count = raft::make_host_matrix<uint8_t, int64_t>(graph_size, knn_graph_degree);
 
     //
@@ -1308,8 +1243,6 @@ void optimize(
     // the number of 2-hop detours, but use the CPU.
     //
     bool _use_gpu = use_gpu;
-    RAFT_LOG_INFO("Initial use_gpu setting: %s", use_gpu ? "true" : "false");
-    
     if (_use_gpu) {
       try {
         auto d_detour_count =
@@ -1317,17 +1250,14 @@ void optimize(
         auto d_num_no_detour_edges = raft::make_device_vector<uint32_t, int64_t>(res, graph_size);
         auto d_input_graph =
           raft::make_device_matrix<IdxT, int64_t>(res, graph_size, knn_graph_degree);
-        RAFT_LOG_INFO("Successfully allocated GPU memory for pruning");
       } catch (std::bad_alloc& e) {
-        RAFT_LOG_INFO("Insufficient memory for 2-hop node counting on GPU: %s", e.what());
+        RAFT_LOG_DEBUG("Insufficient memory for 2-hop node counting on GPU");
         _use_gpu = false;
       } catch (raft::logic_error& e) {
-        RAFT_LOG_INFO("Insufficient memory for 2-hop node counting on GPU (logic error): %s", e.what());
+        RAFT_LOG_DEBUG("Insufficient memory for 2-hop node counting on GPU (logic error)");
         _use_gpu = false;
       }
     }
-    RAFT_LOG_INFO("Final use_gpu setting for pruning: %s", _use_gpu ? "true" : "false");
-    
     if (_use_gpu) {
       // Count 2-hop detours on GPU
       raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
@@ -1433,23 +1363,12 @@ void optimize(
 
     // Create pruned kNN graph
     bool invalid_neighbor_list = false;
-    std::atomic<uint64_t> total_failed_nodes{0};
-    std::atomic<uint64_t> total_duplicates{0};
-    std::atomic<uint64_t> total_out_of_range{0};
-    std::atomic<uint64_t> total_valid_neighbors{0};
-    std::vector<uint64_t> pk_distribution(output_graph_degree + 1, 0);
-    std::mutex pk_dist_mutex;
-    
 #pragma omp parallel for
     for (uint64_t i = 0; i < graph_size; i++) {
       // Find the `output_graph_degree` smallest detourable count nodes by checking the detourable
       // count of the neighbors while increasing the target detourable count from zero.
       uint64_t pk         = 0;
       uint32_t num_detour = 0;
-      uint64_t local_duplicates = 0;
-      uint64_t local_out_of_range = 0;
-      uint64_t local_valid_neighbors = 0;
-      
       for (uint32_t l = 0; l < knn_graph_degree && pk < output_graph_degree; l++) {
         uint32_t next_num_detour = std::numeric_limits<uint32_t>::max();
         for (uint64_t k = 0; k < knn_graph_degree; k++) {
@@ -1464,25 +1383,16 @@ void optimize(
 
           // Check duplication and append
           const auto candidate_node = knn_graph(i, k);
-          
-          // Debug: Count out-of-range neighbors
-          if (candidate_node >= graph_size) {
-            local_out_of_range++;
-            continue;
-          }
-          
           bool dup                  = false;
           for (uint32_t dk = 0; dk < pk; dk++) {
             if (candidate_node == output_graph_ptr[i * output_graph_degree + dk]) {
               dup = true;
-              local_duplicates++;
               break;
             }
           }
           if (!dup && candidate_node < graph_size) {
             output_graph_ptr[i * output_graph_degree + pk] = candidate_node;
             pk += 1;
-            local_valid_neighbors++;
           }
           if (pk >= output_graph_degree) break;
         }
@@ -1495,97 +1405,23 @@ void optimize(
         }
         num_detour = next_num_detour;
       }
-      
-      // Update atomic counters
-      total_duplicates += local_duplicates;
-      total_out_of_range += local_out_of_range;
-      total_valid_neighbors += local_valid_neighbors;
-      
       if (pk != output_graph_degree) {
-        total_failed_nodes++;
-        
-        // Debug: Print details for first few failing nodes
-        if (total_failed_nodes <= 10) {
-          RAFT_LOG_INFO(
-            "Node %lu failed: found %lu/%lu neighbors, duplicates=%lu, out_of_range=%lu, "
-            "last_detour_count=%u",
-            i, pk, output_graph_degree, local_duplicates, local_out_of_range, num_detour);
-          
-          // Print first few neighbors and their detour counts
-          if (total_failed_nodes <= 3) {
-            std::stringstream ss;
-            ss << "  Neighbors for node " << i << ": ";
-            for (uint64_t k = 0; k < std::min<uint64_t>(10, knn_graph_degree); k++) {
-              ss << knn_graph(i, k) << "(" << static_cast<int>(detour_count(i, k)) << ") ";
-            }
-            RAFT_LOG_INFO("%s", ss.str().c_str());
-            
-            // Analyze detour count distribution for this node
-            std::vector<int> detour_histogram(256, 0);
-            for (uint64_t k = 0; k < knn_graph_degree; k++) {
-              detour_histogram[detour_count(i, k)]++;
-            }
-            
-            std::stringstream hist_ss;
-            hist_ss << "  Detour count histogram for node " << i << ": ";
-            for (int d = 0; d < 20; d++) {
-              if (detour_histogram[d] > 0) {
-                hist_ss << d << ":" << detour_histogram[d] << " ";
-              }
-            }
-            if (detour_histogram[255] > 0) {
-              hist_ss << "255:" << detour_histogram[255] << " ";
-            }
-            RAFT_LOG_INFO("%s", hist_ss.str().c_str());
-            
-            // Check for duplicate neighbors in input graph
-            std::set<IdxT> unique_neighbors;
-            int input_duplicates = 0;
-            for (uint64_t k = 0; k < knn_graph_degree; k++) {
-              auto neighbor = knn_graph(i, k);
-              if (neighbor < graph_size && !unique_neighbors.insert(neighbor).second) {
-                input_duplicates++;
-              }
-            }
-            RAFT_LOG_INFO("  Input graph duplicates for node %lu: %d", i, input_duplicates);
-          }
-        }
-        
+        RAFT_LOG_DEBUG(
+          "Couldn't find the output_graph_degree (%lu) smallest detourable count nodes for "
+          "node %lu in the rank-based node reranking process",
+          output_graph_degree,
+          i);
         invalid_neighbor_list = true;
       }
-      
-      // Track pk distribution
-      {
-        std::lock_guard<std::mutex> lock(pk_dist_mutex);
-        pk_distribution[pk]++;
-      }
     }
-    
-    // Print summary statistics
-    RAFT_LOG_INFO("Graph pruning statistics:");
-    RAFT_LOG_INFO("  Total nodes: %lu", graph_size);
-    RAFT_LOG_INFO("  Failed nodes: %lu (%.2f%%)", 
-                   total_failed_nodes.load(), 
-                   100.0 * total_failed_nodes.load() / graph_size);
-    RAFT_LOG_INFO("  Total duplicates encountered: %lu", total_duplicates.load());
-    RAFT_LOG_INFO("  Total out-of-range neighbors: %lu", total_out_of_range.load());
-    RAFT_LOG_INFO("  Total valid neighbors added: %lu", total_valid_neighbors.load());
-    
-    // Print pk distribution for failed nodes
-    if (invalid_neighbor_list) {
-      RAFT_LOG_INFO("  Distribution of pk values:");
-      for (uint64_t pk_val = 0; pk_val <= output_graph_degree; pk_val++) {
-        if (pk_distribution[pk_val] > 0) {
-          RAFT_LOG_INFO("    pk=%lu: %lu nodes", pk_val, pk_distribution[pk_val]);
-        }
-      }
-    }
-    
     RAFT_EXPECTS(
       !invalid_neighbor_list,
       "Could not generate an intermediate CAGRA graph because the initial kNN graph contains too "
       "many invalid or duplicated neighbor nodes. This error can occur, for example, if too many "
       "overflows occur during the norm computation between the dataset vectors.");
+
+    const double time_prune_end = cur_time();
+    RAFT_LOG_DEBUG("# Pruning time: %.1lf sec", time_prune_end - time_prune_start);
   }
 
   auto rev_graph       = raft::make_host_matrix<IdxT, int64_t>(graph_size, output_graph_degree);
