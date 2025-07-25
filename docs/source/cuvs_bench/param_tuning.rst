@@ -397,7 +397,7 @@ Benchmark for building an in-memory Vamana graph based index on the GPU and inte
    - `build`
    - N
    - Positive integer >0
-   - 64
+   - 32
    - Maximum degree of the graph index
 
  * - `visited_size`
@@ -418,7 +418,7 @@ Benchmark for building an in-memory Vamana graph based index on the GPU and inte
    - `search`
    - Y
    - Positive integer >0
-   - 
+   -
    - Maximum number of visited nodes per search corresponds to the L parameter in the Vamana literature. Larger values improve recall at the cost of search time.
 
 FAISS Indexes
@@ -732,15 +732,37 @@ Use DiskANN in-memory index for approximate search.
    - Default
    - Description
 
- * - `graph_degree`
+ * - `R`
    - `build`
-   - N
+   - Y
    - Positive integer >0
-   - 64
+   -
    - Maximum degree of the graph index
 
- * - `visited_size`
+ * - `L_build`
+   - `build`
+   - Y
+   - Positive integer >0
+   -
+   - number of visited nodes per greedy search during graph construction
+
+ * - `alpha`
+   - `build`
+   - N
+   - Positive number >=1
+   - 1.2
+   - controls the pruning parameter of the graph construction
+
+ * - `num_threads`
    - `build`
    - N
    - Positive integer >0
-   - 64
+   - omp_get_max_threads()
+   - Number of CPU threads to use to build the index.
+
+ * - `L_search`
+   - `search`
+   - Y
+   - Positive integer >0
+   -
+   - visited list size during search

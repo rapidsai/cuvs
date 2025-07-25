@@ -448,7 +448,7 @@ The table below contains all algorithms supported by cuVS. Each unique algorithm
 
  * - cuVS
    - `cuvs_brute_force`, `cuvs_cagra`, `cuvs_ivf_flat`, `cuvs_ivf_pq`, `cuvs_cagra_hnswlib`, `cuvs_vamana`
- 
+
 
 Multi-GPU benchmarks
 --------------------
