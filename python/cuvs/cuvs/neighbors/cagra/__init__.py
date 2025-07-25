@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ from .cagra import (
     IndexParams,
     SearchParams,
     build,
+    from_graph,
     load,
     save,
     search,
@@ -30,6 +31,7 @@ __all__ = [
     "IndexParams",
     "SearchParams",
     "build",
+    "from_graph",
     "load",
     "save",
     "search",

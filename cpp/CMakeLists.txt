@@ -458,6 +458,8 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_float_bitset64.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_false_bitset64.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_true_bitset64.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_contiguous_list_data.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_process_and_fill_codes.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_float_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_half_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_int8_t_int64_t.cu
@@ -490,6 +492,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/vamana_serialize_int8.cu
     src/preprocessing/quantize/scalar.cu
     src/preprocessing/quantize/binary.cu
+    src/preprocessing/spectral/spectral_embedding.cu
     src/selection/select_k_float_int64_t.cu
     src/selection/select_k_float_int32_t.cu
     src/selection/select_k_float_uint32_t.cu

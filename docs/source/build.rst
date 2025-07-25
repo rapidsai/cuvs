@@ -76,8 +76,8 @@ Prerequisites
 
 - CMake 3.26.4+
 - GCC 9.3+ (11.4+ recommended)
-- CUDA Toolkit 11.4+
-- Volta architecture or better (compute capability >= 7.0)
+- CUDA Toolkit 12.0+
+- Ampere architecture or better (compute capability >= 8.0)
 
 Create a build environment
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -87,13 +87,6 @@ Conda environment scripts are provided for installing the necessary dependencies
 .. code-block:: bash
 
     conda env create --name cuvs -f conda/environments/all_cuda-128_arch-x86_64.yaml
-    conda activate cuvs
-
-The process for building from source with CUDA 11 differs slightly in that your host system will also need to have CUDA toolkit installed which is greater than, or equal to, the version you install into you conda environment. Installing CUDA toolkit into your host system is necessary because `nvcc` is not provided with Conda's cudatoolkit dependencies for CUDA 11. The following example will install create and install dependencies for a CUDA 11.8 conda environment
-
-.. code-block:: bash
-
-    conda env create --name cuvs -f conda/environments/all_cuda-118_arch-x86_64.yaml
     conda activate cuvs
 
 The recommended way to build and install cuVS from source is to use the `build.sh` script in the root of the repository. This script can build both the C++ and Python artifacts and provides CMake options for building and installing the headers, tests, benchmarks, and the pre-compiled shared library.
@@ -158,6 +151,21 @@ The Python packages can also be uninstalled using the `build.sh` script:
 .. code-block:: bash
 
     ./build.sh python --uninstall
+
+Go library
+^^^^^^^^^^
+
+After building the C and C++ libraries, the Golang library can be built with the following command:
+
+.. code-block:: bash
+
+    export CUDA_HOME="/usr/local/cuda" # or wherever your CUDA installation is.
+    export CGO_CFLAGS="-I${CONDA_PREFIX}/include -I${CUDA_HOME}/include"
+    export CGO_LDFLAGS="-L${CONDA_PREFIX}/lib -lcudart -lcuvs -lcuvs_c"
+    export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH"
+    export CC=clang
+
+    ./build.sh go
 
 Rust library
 ^^^^^^^^^^^^

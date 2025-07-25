@@ -15,17 +15,13 @@
  */
 package com.nvidia.cuvs.internal;
 
+import static com.nvidia.cuvs.internal.CuVSParamsHelper.createHnswIndexParams;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
 import static com.nvidia.cuvs.internal.common.Util.buildMemorySegment;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswDeserialize;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswIndexCreate;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswIndexDestroy;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswIndex_t;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsHnswSearch;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.HnswIndex;
@@ -33,6 +29,7 @@ import com.nvidia.cuvs.HnswIndexParams;
 import com.nvidia.cuvs.HnswQuery;
 import com.nvidia.cuvs.HnswSearchParams;
 import com.nvidia.cuvs.SearchResults;
+import com.nvidia.cuvs.internal.common.CloseableHandle;
 import com.nvidia.cuvs.internal.panama.DLDataType;
 import com.nvidia.cuvs.internal.panama.cuvsHnswIndex;
 import com.nvidia.cuvs.internal.panama.cuvsHnswIndexParams;
@@ -55,7 +52,7 @@ import java.util.UUID;
  */
 public class HnswIndexImpl implements HnswIndex {
 
-  private final CuVSResourcesImpl resources;
+  private final CuVSResources resources;
   private final HnswIndexParams hnswIndexParams;
   private final IndexReference hnswIndexReference;
 
@@ -63,10 +60,10 @@ public class HnswIndexImpl implements HnswIndex {
    * Constructor for loading the index from an {@link InputStream}
    *
    * @param inputStream an instance of stream to read the index bytes from
-   * @param resources   an instance of {@link CuVSResourcesImpl}
+   * @param resources   an instance of {@link CuVSResources}
    */
   private HnswIndexImpl(
-      InputStream inputStream, CuVSResourcesImpl resources, HnswIndexParams hnswIndexParams)
+      InputStream inputStream, CuVSResources resources, HnswIndexParams hnswIndexParams)
       throws Throwable {
     this.hnswIndexParams = hnswIndexParams;
     this.resources = resources;
@@ -105,8 +102,6 @@ public class HnswIndexImpl implements HnswIndex {
       MemorySegment distancesMemorySegment = localArena.allocate(distancesSequenceLayout);
       MemorySegment querySeg = buildMemorySegment(localArena, queryVectors);
 
-      long cuvsRes = resources.getHandle();
-
       long[] queriesShape = {numQueries, vectorDimension};
       MemorySegment queriesTensor =
           prepareTensor(localArena, querySeg, queriesShape, 2, 32, 2, 1, 1);
@@ -117,21 +112,24 @@ public class HnswIndexImpl implements HnswIndex {
       MemorySegment distancesTensor =
           prepareTensor(localArena, distancesMemorySegment, distancesShape, 2, 32, 2, 1, 1);
 
-      int returnValue = cuvsStreamSync(cuvsRes);
-      checkCuVSError(returnValue, "cuvsStreamSync");
+      try (var resourcesAccessor = resources.access()) {
+        var cuvsRes = resourcesAccessor.handle();
+        int returnValue = cuvsStreamSync(cuvsRes);
+        checkCuVSError(returnValue, "cuvsStreamSync");
 
-      returnValue =
-          cuvsHnswSearch(
-              cuvsRes,
-              segmentFromSearchParams(localArena, query.getHnswSearchParams()),
-              hnswIndexReference.getMemorySegment(),
-              queriesTensor,
-              neighborsTensor,
-              distancesTensor);
-      checkCuVSError(returnValue, "cuvsHnswSearch");
+        returnValue =
+            cuvsHnswSearch(
+                cuvsRes,
+                segmentFromSearchParams(localArena, query.getHnswSearchParams()),
+                hnswIndexReference.getMemorySegment(),
+                queriesTensor,
+                neighborsTensor,
+                distancesTensor);
+        checkCuVSError(returnValue, "cuvsHnswSearch");
 
-      returnValue = cuvsStreamSync(cuvsRes);
-      checkCuVSError(returnValue, "cuvsStreamSync");
+        returnValue = cuvsStreamSync(cuvsRes);
+        checkCuVSError(returnValue, "cuvsStreamSync");
+      }
 
       return HnswSearchResults.create(
           neighborsSequenceLayout,
@@ -178,26 +176,27 @@ public class HnswIndexImpl implements HnswIndex {
       inputStream.transferTo(outputStream);
       MemorySegment pathSeg = buildMemorySegment(localArena, tmpIndexFile.toString());
 
-      long cuvsRes = resources.getHandle();
-
       var indexReference = createHnswIndex();
 
       MemorySegment dtype = DLDataType.allocate(localArena);
       DLDataType.bits(dtype, (byte) 32);
-      DLDataType.code(dtype, (byte) 2); // kDLFloat
+      DLDataType.code(dtype, (byte) kDLFloat());
       DLDataType.lanes(dtype, (byte) 1);
 
       cuvsHnswIndex.dtype(indexReference.memorySegment, dtype);
 
-      var returnValue =
-          cuvsHnswDeserialize(
-              cuvsRes,
-              segmentFromIndexParams(localArena, hnswIndexParams),
-              pathSeg,
-              hnswIndexParams.getVectorDimension(),
-              0,
-              indexReference.memorySegment);
-      checkCuVSError(returnValue, "cuvsHnswDeserialize");
+      try (var params = segmentFromIndexParams(hnswIndexParams);
+          var cuvsResourcesAccessor = resources.access()) {
+        checkCuVSError(
+            cuvsHnswDeserialize(
+                cuvsResourcesAccessor.handle(),
+                params.handle(),
+                pathSeg,
+                hnswIndexParams.getVectorDimension(),
+                0,
+                indexReference.memorySegment),
+            "cuvsHnswDeserialize");
+      }
 
       return indexReference;
 
@@ -209,11 +208,11 @@ public class HnswIndexImpl implements HnswIndex {
   /**
    * Allocates the configured search parameters in the MemorySegment.
    */
-  private static MemorySegment segmentFromIndexParams(Arena arena, HnswIndexParams params) {
-    MemorySegment seg = cuvsHnswIndexParams.allocate(arena);
-    cuvsHnswIndexParams.ef_construction(seg, params.getEfConstruction());
-    cuvsHnswIndexParams.num_threads(seg, params.getNumThreads());
-    return seg;
+  private CloseableHandle segmentFromIndexParams(HnswIndexParams params) {
+    var hnswParams = createHnswIndexParams();
+    cuvsHnswIndexParams.ef_construction(hnswParams.handle(), params.getEfConstruction());
+    cuvsHnswIndexParams.num_threads(hnswParams.handle(), params.getNumThreads());
+    return hnswParams;
   }
 
   /**
@@ -227,11 +226,7 @@ public class HnswIndexImpl implements HnswIndex {
   }
 
   public static HnswIndex.Builder newBuilder(CuVSResources cuvsResources) {
-    Objects.requireNonNull(cuvsResources);
-    if (!(cuvsResources instanceof CuVSResourcesImpl)) {
-      throw new IllegalArgumentException("Unsupported " + cuvsResources);
-    }
-    return new HnswIndexImpl.Builder((CuVSResourcesImpl) cuvsResources);
+    return new HnswIndexImpl.Builder(Objects.requireNonNull(cuvsResources));
   }
 
   /**
@@ -239,7 +234,7 @@ public class HnswIndexImpl implements HnswIndex {
    */
   public static class Builder implements HnswIndex.Builder {
 
-    private final CuVSResourcesImpl cuvsResources;
+    private final CuVSResources cuvsResources;
     private InputStream inputStream;
     private HnswIndexParams hnswIndexParams;
 
@@ -248,7 +243,7 @@ public class HnswIndexImpl implements HnswIndex {
      *
      * @param cuvsResources an instance of {@link CuVSResources}
      */
-    public Builder(CuVSResourcesImpl cuvsResources) {
+    public Builder(CuVSResources cuvsResources) {
       this.cuvsResources = cuvsResources;
     }
 
