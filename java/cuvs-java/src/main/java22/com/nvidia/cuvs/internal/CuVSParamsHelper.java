@@ -132,7 +132,7 @@ final class CuVSParamsHelper {
       };
     }
   }
-  
+
   static CloseableHandle createHnswIndexParams() {
     try (var localArena = Arena.ofConfined()) {
       var paramsPtrPtr = localArena.allocate(cuvsHnswIndexParams_t);
