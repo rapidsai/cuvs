@@ -36,7 +36,7 @@ void scann_build_and_write(raft::device_resources const &dev_resources,
   // use default index parameters
   scann::index_params index_params;
 
-	index_params.scann_clusters = 1000;
+	index_params.n_leaves = 1000;
 	index_params.kmeans_n_rows_train = 10000;
 	index_params.partitioning_eta = 2;
 	index_params.soar_lambda = 1.5;
@@ -56,8 +56,8 @@ void scann_build_and_write(raft::device_resources const &dev_resources,
 
   std::cout << "Time to build index: " << elapsed_seconds.count() << "s\n";
 
-  // Output index to file
-//  serialize(dev_resources, "test_out", index); // Not yet implemented
+  // Output index to files in /tmp directory
+	serialize(dev_resources, "/tmp", index);
 }
 
 int main(int argc, char *argv[]) {

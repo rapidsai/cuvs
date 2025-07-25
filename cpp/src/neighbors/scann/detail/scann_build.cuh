@@ -105,17 +105,26 @@ index<T, IdxT> build(
   kmeans_params.n_iters = params.kmeans_n_iters;
 
   {
-    auto trainset =
-      raft::make_device_matrix<T, int64_t>(res, params.kmeans_n_rows_train, dataset.extent(1));
+    auto trainset = raft::make_device_matrix<T, int64_t>(res, 0, 0);
 
-    printf("Sampling rows.\n");
+    try {
+      trainset =
+        raft::make_device_matrix<T, int64_t>(res, params.kmeans_n_rows_train, dataset.extent(1));
+    } catch (raft::logic_error& e) {
+      RAFT_LOG_ERROR(
+        "Insufficient device memory for kmeans training set allocation. Please "
+        "reduce kmeans_n_rows_train.");
+      throw;
+    }
+
+    RAFT_LOG_DEBUG("Sampling rows.\n");
     sample_rows<T, int64_t>(res, random_state, dataset, trainset.view());
 
     raft::resource::sync_stream(res);
 
     // fit kmean
 
-    printf("Fitting Kmeans");
+    RAFT_LOG_DEBUG("Fitting Kmeans");
     cuvs::cluster::kmeans_balanced::fit(
       res, kmeans_params, raft::make_const_mdspan(trainset.view()), centroids_view);
   }
@@ -150,7 +159,7 @@ index<T, IdxT> build(
   dataset_vec_batches.reset();
   dataset_vec_batches.prefetch_next_batch();
 
-  printf("Batched kmeans prediction.\n");
+  RAFT_LOG_DEBUG("Batched kmeans prediction.\n");
   for (const auto& batch : dataset_vec_batches) {
     auto batch_view = raft::make_device_matrix_view<const T, int64_t>(
       batch.data(), batch.size(), dataset.extent(1));
@@ -171,7 +180,7 @@ index<T, IdxT> build(
   raft::device_vector_view<uint32_t, int64_t> soar_labels_view = idx.soar_labels();
 
   // Train PQ codebooks
-  printf("Train PQ Codebooks\n");
+  RAFT_LOG_DEBUG("Train PQ Codebooks\n");
 
   // Limit PQ training rows to 100k. IVF-PQ/VPQ limit to 65k as recall
   // doesn't increase significantly. ScaNN configs in common benchmarks use 100k,
@@ -223,7 +232,6 @@ index<T, IdxT> build(
     // Create pq codebook for this subspace
     auto sub_pq_codebook =
       create_pq_codebook<T>(res, raft::make_const_mdspan(sub_trainset.view()), pq_params);
-    // printf("TS size: %ld\n", sub_trainset.view().extent(0));
     raft::copy(full_codebook.data_handle() + (subspace * sub_pq_codebook.size()),
                sub_pq_codebook.data_handle(),
                sub_pq_codebook.size(),

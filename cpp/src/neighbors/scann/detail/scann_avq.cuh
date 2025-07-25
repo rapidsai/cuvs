@@ -15,7 +15,6 @@
  */
 
 #include <cub/cub.cuh>
-#include <nvtx3/nvtx3.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
@@ -26,8 +25,9 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/coalesced_reduction.cuh>
+#include <raft/linalg/detail/cusolver_wrappers.hpp>
 #include <raft/linalg/dot.cuh>
-#include <raft/linalg/gemm.hpp>
+#include <raft/linalg/gemm.cuh>
 #include <raft/linalg/gemv.cuh>
 #include <raft/linalg/linalg_types.hpp>
 #include <raft/linalg/map.cuh>
@@ -47,6 +47,8 @@
 
 namespace cuvs::neighbors::experimental::scann::detail {
 
+namespace {
+
 template <typename LabelT, typename IdxT>
 __global__ void build_clusters(
   LabelT const* node_to_cluster, LabelT* clusters, IdxT* cluster_start, int nodes, int n_clusters)
@@ -59,6 +61,7 @@ __global__ void build_clusters(
     clusters[cluster_ptr] = node;
   }
 }
+}  // namespace
 
 // Compute cluster sizes/offsets
 template <typename LabelT, typename IdxT>
@@ -99,8 +102,6 @@ void compute_cluster_offsets(raft::resources const& dev_resources,
                                       clusters.extent(0),
                                       stream);
 
-  raft::resource::sync_stream(dev_resources, stream);
-
   temp_storage_bytes = 0;
   // Scan to sum cluster sizes and get cluster start ptrs in flat array
   // Done in place
@@ -127,8 +128,6 @@ void sum_reduce_vector(raft::resources const& dev_resources,
                        raft::device_vector_view<T, int64_t> v,
                        raft::device_scalar_view<T> s)
 {
-  NVTX3_FUNC_RANGE();
-
   cudaStream_t stream = raft::resource::get_cuda_stream(dev_resources);
   rmm::device_async_resource_ref device_memory =
     raft::resource::get_workspace_resource(dev_resources);
@@ -149,20 +148,19 @@ void sum_reduce_vector(raft::resources const& dev_resources,
   // cudaFree(d_temp_storage);
 }
 
+// Solve Ax = b for a symmetric, pos-def matrix A via cholesky factorization
 template <typename T>
 void cholesky_solver(raft::resources const& dev_resources,
                      raft::device_matrix_view<T, int64_t, raft::col_major> A,
                      raft::device_vector_view<T, int64_t> b,
                      raft::device_vector_view<T, int64_t> x)
 {
-  NVTX3_FUNC_RANGE();
-
   cudaStream_t stream          = raft::resource::get_cuda_stream(dev_resources);
   cusolverDnHandle_t cusolverH = raft::resource::get_cusolver_dn_handle(dev_resources);
   rmm::device_async_resource_ref device_memory =
     raft::resource::get_workspace_resource(dev_resources);
 
-  RAFT_CUSOLVER_TRY(cusolverDnSetStream(cusolverH, stream));
+  // RAFT_CUSOLVER_TRY(cusolverDnSetStream(cusolverH, stream));
 
   int n                 = A.extent(0);
   int lda               = n;
@@ -170,20 +168,29 @@ void cholesky_solver(raft::resources const& dev_resources,
   cublasFillMode_t uplo = CUBLAS_FILL_MODE_LOWER;
 
   // compute bufferszie for potrf
-  RAFT_CUSOLVER_TRY(cusolverDnSpotrf_bufferSize(cusolverH, uplo, n, A.data_handle(), lda, &lwork));
+  RAFT_CUSOLVER_TRY(raft::linalg::detail::cusolverDnpotrf_bufferSize(
+    cusolverH, uplo, n, A.data_handle(), lda, &lwork));
   // compute cholesky factorization w/ potrf
   auto devInfo = raft::make_device_scalar(dev_resources, 0);
   rmm::device_uvector<T> d_work(lwork, stream, device_memory);
 
-  RAFT_CUSOLVER_TRY(cusolverDnSpotrf(
-    cusolverH, uplo, n, A.data_handle(), lda, d_work.data(), lwork, devInfo.data_handle()));
+  RAFT_CUSOLVER_TRY(raft::linalg::detail::cusolverDnpotrf(
+    cusolverH, uplo, n, A.data_handle(), lda, d_work.data(), lwork, devInfo.data_handle(), stream));
 
   // solve Ax = b
   int ldb  = b.extent(0);
   int nrhs = 1;
 
-  RAFT_CUSOLVER_TRY(cusolverDnSpotrs(
-    cusolverH, uplo, n, nrhs, A.data_handle(), lda, b.data_handle(), ldb, devInfo.data_handle()));
+  RAFT_CUSOLVER_TRY(raft::linalg::detail::cusolverDnpotrs(cusolverH,
+                                                          uplo,
+                                                          n,
+                                                          nrhs,
+                                                          A.data_handle(),
+                                                          lda,
+                                                          b.data_handle(),
+                                                          ldb,
+                                                          devInfo.data_handle(),
+                                                          stream));
 }
 
 // Apply Anisotropic Vector Quantization to recompute cluster centers
@@ -199,8 +206,6 @@ void compute_avq_centroid(raft::resources const& dev_resources,
                           raft::device_scalar_view<T> rescale_denom,
                           float eta)
 {
-  NVTX3_FUNC_RANGE();
-
   // Compute and scale norms
   auto norms = raft::make_device_vector<float, int64_t>(dev_resources, x.extent(0));
 
@@ -293,10 +298,7 @@ void compute_avq_centroid(raft::resources const& dev_resources,
                               x_trans_x.view().data_handle(),
                               x.extent(1)));
 
-  cholesky_solver(dev_resources,
-                  x_trans_x.view(),
-                  avq_centroid,  // b.view(),
-                  avq_centroid);
+  cholesky_solver(dev_resources, x_trans_x.view(), avq_centroid, avq_centroid);
 
   auto h_eta = raft::make_host_scalar<float>(eta);
 
@@ -408,7 +410,7 @@ void apply_avq(raft::resources const& res,
 
   raft::resource::sync_stream(res);
 
-  printf("Compute AVQ centroids\n");
+  RAFT_LOG_DEBUG("Compute AVQ centroids\n");
 
   for (int i = 0; i < h_cluster_ptrs.extent(0); i++) {
     int cluster_size = i + 1 < h_cluster_ptrs.extent(0) ? h_cluster_ptrs(i + 1) - h_cluster_ptrs(i)

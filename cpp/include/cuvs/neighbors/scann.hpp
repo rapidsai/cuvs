@@ -44,20 +44,38 @@ namespace cuvs::neighbors::experimental::scann {
  *
  */
 struct index_params : cuvs::neighbors::index_params {
-  // partitioning
-  uint32_t scann_clusters;
-  int64_t kmeans_n_rows_train;
+  // partitioning parameters
+
+  /** the number of leaves in the tree **/
+  uint32_t n_leaves = 1000;
+  /** the number of rows for training the tree structures **/
+  int64_t kmeans_n_rows_train = 100000;
+
+  /** the max number of iterations for training the tree structure **/
   uint32_t kmeans_n_iters = 24;
-  float partitioning_eta  = 1;
-  float soar_lambda;
+
+  /** the value of eta for AVQ adjustment during partitioning **/
+  float partitioning_eta = 1;
+
+  /** the value of lambda for SOAR spilling **/
+  float soar_lambda = 1;
 
   // Residual quanitzation params
-  uint32_t pq_dim  = 8;
+  /** the dimension of pq subspaces (must divide dataset dimension)**/
+  uint32_t pq_dim = 8;
+
+  /** the number of bits for pq codes (but be 4 or 8, for 16 and 256 codes respectively) **/
   uint32_t pq_bits = 8;
-  int64_t pq_n_rows_train;
+
+  /** the number of rows for PQ training (internally capped to 100k) **/
+  int64_t pq_n_rows_train = 100000;
+
+  /** the max number of iterations for PQ training **/
   uint32_t pq_train_iters = 10;
 
+  /** whether to apply bf16 quantization of dataset vectors **/
   bool bf16_enabled = false;
+
   // TODO - add other scann build params
 };
 
@@ -111,7 +129,7 @@ struct index : cuvs::neighbors::index {
 
   index(raft::resources const& res,
         cuvs::distance::DistanceType metric,
-        uint32_t scann_clusters,
+        uint32_t n_leaves,
         uint32_t pq_bits,
         uint32_t pq_dim,
         IdxT n_rows,
@@ -123,8 +141,8 @@ struct index : cuvs::neighbors::index {
       metric_(metric),
       pq_dim_(pq_dim),
       pq_bits_(pq_bits),
-      scann_clusters_(scann_clusters),
-      centers_(raft::make_device_matrix<float, IdxT>(res, scann_clusters, dim)),
+      n_leaves_(n_leaves),
+      centers_(raft::make_device_matrix<float, IdxT>(res, n_leaves, dim)),
       labels_(raft::make_device_vector<uint32_t, IdxT>(res, n_rows)),
       soar_labels_(raft::make_device_vector<uint32_t, IdxT>(res, n_rows)),
       pq_codebook_(
@@ -144,7 +162,7 @@ struct index : cuvs::neighbors::index {
   index(raft::resources const& res, const index_params& params, IdxT n_rows, IdxT dim)
     : index(res,
             params.metric,
-            params.scann_clusters,
+            params.n_leaves,
             params.pq_bits,
             params.pq_dim,
             n_rows,
@@ -153,7 +171,11 @@ struct index : cuvs::neighbors::index {
             dim / params.pq_dim,
             params.bf16_enabled)
   {
-    // consider addind checks on parameters (.e.g <= 8 bits pq)
+    RAFT_EXPECTS(params.pq_bits == 4 || params.pq_bits == 8, "ScaNN only supports 4 or 8 bit PQ");
+    RAFT_EXPECTS(dim >= params.pq_dim,
+                 "PQ subspace dimension (pq_dim) should be smaller than the dataset dimension");
+    RAFT_EXPECTS(dim % params.pq_dim == 0,
+                 "PQ subspace dimension (pq_dim) must divide the dataset dimension");
   }
 
   raft::device_matrix_view<float, IdxT> centers() noexcept { return centers_.view(); }
@@ -179,7 +201,7 @@ struct index : cuvs::neighbors::index {
 
   uint32_t n_rows() const noexcept { return n_rows_; }
 
-  uint32_t n_clusters() const noexcept { return scann_clusters_; }
+  uint32_t n_leaves() const noexcept { return n_leaves_; }
 
   uint32_t pq_dim() const noexcept { return pq_dim_; }
 
@@ -230,7 +252,7 @@ struct index : cuvs::neighbors::index {
   IdxT n_rows_;
   uint32_t pq_dim_;
   uint32_t pq_bits_;
-  uint32_t scann_clusters_;
+  uint32_t n_leaves_;
 
   raft::device_matrix<float, IdxT, raft::row_major> centers_;
   raft::device_vector<uint32_t, IdxT> labels_;
@@ -262,27 +284,6 @@ auto build(raft::resources const& handle,
            const cuvs::neighbors::experimental::scann::index_params& params,
            raft::host_matrix_view<const float, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::experimental::scann::index<float, int64_t>;
-
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::experimental::scann::index_params& params,
-           raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::experimental::scann::index<int8_t, int64_t>;
-
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::experimental::scann::index_params& params,
-           raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::experimental::scann::index<int8_t, int64_t>;
-
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::experimental::scann::index_params& params,
-           raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::experimental::scann::index<uint8_t, int64_t>;
-
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::experimental::scann::index_params& params,
-           raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
-  -> cuvs::neighbors::experimental::scann::index<uint8_t, int64_t>;
-
 /**
  * @defgroup scann_cpp_serialize ScaNN serialize functions
  * @{
@@ -294,14 +295,6 @@ auto build(raft::resources const& handle,
 void serialize(raft::resources const& handle,
                const std::string& file_prefix,
                const cuvs::neighbors::experimental::scann::index<float, int64_t>& index);
-
-void serialize(raft::resources const& handle,
-               const std::string& file_prefix,
-               const cuvs::neighbors::experimental::scann::index<int8_t, int64_t>& index);
-
-void serialize(raft::resources const& handle,
-               const std::string& file_prefix,
-               const cuvs::neighbors::experimental::scann::index<uint8_t, int64_t>& index);
 
 /**
  * @}

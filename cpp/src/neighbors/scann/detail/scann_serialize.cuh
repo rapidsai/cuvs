@@ -100,9 +100,14 @@ void save_labels(raft::resources const& res,
 }
 
 /**
- * Save the ScaNN index into multiple files. The format is meant
+ * Save the ScaNN index into multiple files.
  *
  * Experimental, both the API and the serialization format are subject to change.
+ * The format is meant to ease the integration into OSS ScaNN for search.
+ * Labels and quantized vectors are stored directly in .npy files, as required by OSS ScaNN.
+ * Cluster centers and the pq_codebook are also stored in .npy files, for later
+ * conversion into the correct protobuf structs by an external tool. Additional metadata
+ * required for this conversion are also serialized.
  *
  * @param[in] res the raft resource handle
  * @param[in] scann_assets_dir:  the directory where ScaNN index assets will be saved
