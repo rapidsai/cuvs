@@ -104,7 +104,7 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
             Map.of(1, 0.15224183f, 0, 0.5906347f, 3, 0.5986643f));
     for (int j = 0; j < 10; j++) {
 
-      try (CuVSResources resources = CuVSResources.create()) {
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
         BruteForceQuery cuvsQuery =
             new BruteForceQuery.Builder()
                 .withTopK(3)
@@ -132,7 +132,7 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
             Map.of(0, 0.5906347f, 1, 0.15224195f, 3, 0.5986643f));
 
     for (int j = 0; j < 10; j++) {
-      try (CuVSResources resources = CuVSResources.create()) {
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
         BruteForceQuery cuvsQuery =
             new BruteForceQuery.Builder()
                 .withTopK(3)
@@ -158,7 +158,7 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
     LongToIntFunction rotate = l -> (int) ((l + 1) % dataset.length);
 
     for (int j = 0; j < 10; j++) {
-      try (CuVSResources resources = CuVSResources.create()) {
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
         BruteForceQuery cuvsQuery =
             new BruteForceQuery.Builder()
                 .withTopK(3)
@@ -183,7 +183,7 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
     LongToIntFunction rotate = SearchResults.mappingsFromList(mappings);
 
     for (int j = 0; j < 10; j++) {
-      try (CuVSResources resources = CuVSResources.create()) {
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
         BruteForceQuery cuvsQuery =
             new BruteForceQuery.Builder()
                 .withTopK(3)
