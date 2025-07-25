@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,12 +28,14 @@ from libcpp cimport bool, cast
 from libcpp.string cimport string
 
 from cuvs.common cimport cydlpack
+from cuvs.common.device_tensor_view import DeviceTensorView
 from cuvs.distance_type cimport cuvsDistanceType
 
 from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
 
+from cuvs.common.cydlpack import dl_data_type_to_numpy
 from cuvs.distance import DISTANCE_NAMES, DISTANCE_TYPES
 from cuvs.neighbors.common import _check_input_array
 
@@ -272,6 +274,51 @@ cdef class Index:
         cdef int32_t dim
         check_cuvs(cuvsCagraIndexGetDims(self.index, &dim))
         return dim
+
+    @property
+    def graph_degree(self):
+        cdef uint32_t degree
+        check_cuvs(cuvsCagraIndexGetGraphDegree(self.index, &degree))
+        return degree
+
+    def __len__(self):
+        cdef uint32_t size
+        check_cuvs(cuvsCagraIndexGetSize(self.index, &size))
+        return size
+
+    @property
+    def dtype(self):
+        return dl_data_type_to_numpy(self.index.dtype)
+
+    @property
+    def dataset(self):
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting dataset")
+
+        # get the cagra dataset from the index without copying as dlpack
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsCagraIndexGetDataset(self.index, tensor))
+
+        # since we're referencing memory internal to this cagra index in the
+        # output view, keep the cagra index alive as long as the output view
+        # is to avoid segfaulting
+        output.parent = self
+
+        return output
+
+    @property
+    def graph(self):
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting graph")
+
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsCagraIndexGetGraph(self.index, tensor))
+        output.parent = self
+        return output
 
     def __repr__(self):
         # todo(dgd): update repr as we expose data through C API
@@ -732,5 +779,51 @@ def load(filename, resources=None):
         c_filename.c_str(),
         idx.index
     ))
+    idx.trained = True
+    return idx
+
+
+@auto_sync_resources
+def from_graph(graph, dataset, metric="sqeuclidean", resources=None):
+    """
+    Construct a cagra index from an existing graph and dataset
+
+    Parameters
+    ----------
+    graph : Array interface compliant matrix with shape (n_samples,
+        graph_degree)
+    dataset : Array interface compliant matrix shape (n_samples, dim)
+        Supported dtype [float32, float16, int8, uint8]
+    metric : str
+    {resources_docstring}
+
+    Returns
+    -------
+    index: cuvs.cagra.Index
+    """
+    cdef cuvsDistanceType c_metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
+
+    cdef Index idx = Index()
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+    dataset_ai = wrap_array(dataset)
+    _check_input_array(dataset_ai, [np.dtype('float32'),
+                                    np.dtype('float16'),
+                                    np.dtype('byte'),
+                                    np.dtype('ubyte')])
+    cdef cydlpack.DLManagedTensor* dataset_dlpack = \
+        cydlpack.dlpack_c(dataset_ai)
+
+    graph_ai = wrap_array(graph)
+    _check_input_array(graph_ai, [np.dtype('uint32')])
+    cdef cydlpack.DLManagedTensor* graph_dlpack = \
+        cydlpack.dlpack_c(graph_ai)
+
+    check_cuvs(cuvsCagraIndexFromArgs(
+        res,
+        c_metric,
+        graph_dlpack,
+        dataset_dlpack,
+        idx.index))
     idx.trained = True
     return idx
