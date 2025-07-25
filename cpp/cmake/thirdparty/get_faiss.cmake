@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,6 +45,7 @@ function(find_and_configure_faiss)
   if(CXX_AVX2_FOUND)
     set(CUVS_FAISS_OPT_LEVEL "avx2")
   endif()
+
 
   rapids_cpm_find(faiss ${version} ${build_patch_only}
     GLOBAL_TARGETS faiss faiss_avx2 faiss_gpu_objs faiss::faiss faiss::faiss_avx2
