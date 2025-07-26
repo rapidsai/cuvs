@@ -119,7 +119,21 @@ RAFT_KERNEL merge_subgraphs_kernel(IdxT* cluster_data_indices,
     for (int i = 0; i < ITEMS_PER_THREAD; i++) {
       size_t colId = idxBase + i;
       if (colId > 0 && colId < 2 * graph_degree) {
-        uniqueMask[colId] = static_cast<int16_t>(blockValues[colId] != blockValues[colId - 1]);
+        // this assumes same distance between vector from two different batches, which should be
+        // true. however, currently there are subtle differences in the result based on the matrix
+        // size used to call gemm. This makes it difficult to remove duplicates, because they might
+        // no longer be right next to each other after sorting by distances. Thus, for now we sweep
+        // the whole row to check for duplicates, and keep the first occurrence only.
+        // related issue: https://github.com/rapidsai/cuvs/issues/1056
+        // uniqueMask[colId] = static_cast<int16_t>(blockValues[colId] != blockValues[colId - 1]);
+        int is_unique = 1;
+        for (int j = 0; j < 2 * graph_degree; ++j) {
+          if (j < colId && blockValues[j] == blockValues[colId]) {
+            is_unique = 0;
+            break;
+          }
+        }
+        uniqueMask[colId] = static_cast<int16_t>(is_unique);
       }
     }
 
