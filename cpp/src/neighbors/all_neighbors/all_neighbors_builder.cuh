@@ -412,7 +412,7 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
           return_distances,
           this->batch_distances_d.value().data_handle(),
           cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>{
-            batch_core_distances.value().data_handle(), 1.0, num_data_in_cluster});
+            batch_core_distances.value().data_handle(), dist_epilogue.alpha, num_data_in_cluster});
       } else {
         nnd_builder.value().build(dataset.data_handle(),
                                   static_cast<int>(num_data_in_cluster),
@@ -529,6 +529,12 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
     size_t num_cols = dataset.extent(1);
     data_d.emplace(
       raft::make_device_matrix<T, IdxT, row_major>(this->res, this->max_cluster_size, num_cols));
+    if constexpr (std::is_same_v<
+                    DistEpilogueT,
+                    cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>>) {
+      batch_core_distances.emplace(
+        raft::make_device_vector<T, IdxT>(this->res, this->max_cluster_size));
+    }
   }
 
   void build_knn_common(
@@ -544,20 +550,57 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
       "build_knn if doing batching.");
 
     if (this->n_clusters > 1) {
-      auto idx = cuvs::neighbors::brute_force::build(this->res, bf_params.build_params, dataset);
-
       size_t num_data_in_cluster = dataset.extent(0);
+      using ReachabilityPP =
+        cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>;
 
-      cuvs::neighbors::brute_force::search(
-        this->res,
-        bf_params.search_params,
-        idx,
-        dataset,
-        raft::make_device_matrix_view<IdxT, IdxT>(
-          this->batch_neighbors_d.value().data_handle(), num_data_in_cluster, this->k),
-        raft::make_device_matrix_view<T, IdxT>(
-          this->batch_distances_d.value().data_handle(), num_data_in_cluster, this->k));
+      if constexpr (std::is_same_v<DistEpilogueT, ReachabilityPP>) {
+        // gather core dists
+        raft::copy(this->inverted_indices_d.value().data_handle(),
+                   inverted_indices.value().data_handle(),
+                   num_data_in_cluster,
+                   raft::resource::get_cuda_stream(this->res));
 
+        raft::matrix::gather(this->res,
+                             raft::make_device_matrix_view<const T, IdxT>(
+                               dist_epilogue.core_dists, dist_epilogue.n, 1),
+                             raft::make_device_vector_view<const IdxT, IdxT>(
+                               this->inverted_indices_d.value().data_handle(), num_data_in_cluster),
+                             raft::make_device_matrix_view<T, IdxT>(
+                               batch_core_distances.value().data_handle(), num_data_in_cluster, 1));
+
+        cuvs::neighbors::detail::tiled_brute_force_knn<T, IdxT, T, DistEpilogueT>(
+          this->res,
+          dataset.data_handle(),
+          dataset.data_handle(),
+          dataset.extent(0),
+          dataset.extent(0),
+          dataset.extent(1),
+          this->k,
+          this->batch_distances_d.value().data_handle(),
+          this->batch_neighbors_d.value().data_handle(),
+          bf_params.build_params.metric,
+          2.0,
+          0,
+          0,
+          nullptr,
+          nullptr,
+          nullptr,
+          ReachabilityPP{
+            batch_core_distances.value().data_handle(), dist_epilogue.alpha, num_data_in_cluster});
+      } else {
+        auto idx = cuvs::neighbors::brute_force::build(this->res, bf_params.build_params, dataset);
+
+        cuvs::neighbors::brute_force::search(
+          this->res,
+          bf_params.search_params,
+          idx,
+          dataset,
+          raft::make_device_matrix_view<IdxT, IdxT>(
+            this->batch_neighbors_d.value().data_handle(), num_data_in_cluster, this->k),
+          raft::make_device_matrix_view<T, IdxT>(
+            this->batch_distances_d.value().data_handle(), num_data_in_cluster, this->k));
+      }
       raft::copy(this->batch_neighbors_h.value().data_handle(),
                  this->batch_neighbors_d.value().data_handle(),
                  num_data_in_cluster * this->k,
@@ -645,6 +688,7 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
   DistEpilogueT dist_epilogue;
 
   std::optional<raft::device_matrix<T, IdxT, row_major>> data_d;
+  std::optional<raft::device_vector<T, IdxT>> batch_core_distances;
 };
 
 template <typename T, typename IdxT, typename DistEpilogueT = raft::identity_op>
