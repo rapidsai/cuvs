@@ -30,14 +30,8 @@ import static com.nvidia.cuvs.internal.common.Util.concatenate;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
-import com.nvidia.cuvs.CagraIndexParams;
-import com.nvidia.cuvs.CagraSearchParams;
-import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.Dataset;
-import com.nvidia.cuvs.SearchResults;
-import com.nvidia.cuvs.TieredIndex;
-import com.nvidia.cuvs.TieredIndexParams;
-import com.nvidia.cuvs.TieredIndexQuery;
+import com.nvidia.cuvs.*;
+import com.nvidia.cuvs.CuVSMatrix;
 import com.nvidia.cuvs.internal.common.Util;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndexParams;
 import com.nvidia.cuvs.internal.panama.cuvsCagraSearchParams;
@@ -62,7 +56,7 @@ import java.util.Objects;
  * @since 25.02
  */
 public class TieredIndexImpl implements TieredIndex {
-  private final Dataset dataset;
+  private final CuVSMatrix dataset;
   private final CuVSResources resources;
   private final TieredIndexParams tieredIndexParameters;
   private final IndexReference tieredIndexReference;
@@ -72,7 +66,7 @@ public class TieredIndexImpl implements TieredIndex {
    * Constructor for building the index using specified dataset
    */
   private TieredIndexImpl(
-      TieredIndexParams indexParameters, Dataset dataset, CuVSResources resources) {
+      TieredIndexParams indexParameters, CuVSMatrix dataset, CuVSResources resources) {
     this.tieredIndexParameters = indexParameters;
     this.dataset = dataset;
     this.resources = resources;
@@ -97,7 +91,7 @@ public class TieredIndexImpl implements TieredIndex {
    * Invokes the native destroy_tiered_index to de-allocate the Tiered index
    */
   @Override
-  public void destroyIndex() throws Throwable {
+  public void destroyIndex() {
     checkNotDestroyed();
     try {
       int returnValue = cuvsTieredIndexDestroy(tieredIndexReference.getMemorySegment());
@@ -105,7 +99,6 @@ public class TieredIndexImpl implements TieredIndex {
       if (dataset != null) {
         dataset.close();
       }
-
     } finally {
       destroyed = true;
     }
@@ -121,8 +114,9 @@ public class TieredIndexImpl implements TieredIndex {
    */
   private IndexReference build() {
     try (var localArena = Arena.ofConfined()) {
+      assert dataset != null;
       long rows = dataset.size();
-      long cols = dataset.dimensions();
+      long cols = dataset.columns();
 
       MemorySegment indexParamsMemorySegment =
           tieredIndexParameters != null
@@ -130,7 +124,7 @@ public class TieredIndexImpl implements TieredIndex {
               : MemorySegment.NULL;
 
       // Get host data
-      MemorySegment hostDataSeg = ((DatasetImpl) dataset).asMemorySegment();
+      MemorySegment hostDataSeg = ((CuVSHostMatrixImpl) dataset).memorySegment();
 
       try (var resourceAccess = resources.access()) {
         long cuvsRes = resourceAccess.handle();
@@ -145,7 +139,7 @@ public class TieredIndexImpl implements TieredIndex {
         // Create tensor from device memory
         long[] datasetShape = {rows, cols};
         MemorySegment datasetTensor =
-            prepareTensor(localArena, datasetDP, datasetShape, kDLFloat(), 32, 2, kDLCUDA(), 1);
+            prepareTensor(localArena, datasetDP, datasetShape, kDLFloat(), 32, kDLCUDA(), 1);
 
         MemorySegment index = localArena.allocate(cuvsTieredIndex_t);
         var returnValue = cuvsTieredIndexCreate(index);
@@ -219,21 +213,14 @@ public class TieredIndexImpl implements TieredIndex {
         // Create tensors from device memory
         long[] queriesShape = {numQueries, vectorDimension};
         MemorySegment queriesTensor =
-            prepareTensor(localArena, queriesDP, queriesShape, kDLFloat(), 32, 2, kDLCUDA(), 1);
+            prepareTensor(localArena, queriesDP, queriesShape, kDLFloat(), 32, kDLCUDA(), 1);
         long[] neighborsShape = {numQueries, topK};
         MemorySegment neighborsTensor =
             prepareTensor(
-                localArena,
-                neighborsDP,
-                neighborsShape,
-                kDLInt(),
-                64,
-                2,
-                kDLCUDA(),
-                1); // 64-bit int
+                localArena, neighborsDP, neighborsShape, kDLInt(), 64, kDLCUDA(), 1); // 64-bit int
         long[] distancesShape = {numQueries, topK};
         MemorySegment distancesTensor =
-            prepareTensor(localArena, distancesDP, distancesShape, kDLFloat(), 32, 2, kDLCUDA(), 1);
+            prepareTensor(localArena, distancesDP, distancesShape, kDLFloat(), 32, kDLCUDA(), 1);
 
         // Sync before prefilter setup
         returnValue = cuvsStreamSync(cuvsRes);
@@ -264,8 +251,7 @@ public class TieredIndexImpl implements TieredIndex {
               "cudaMemcpy");
 
           MemorySegment prefilterTensor =
-              prepareTensor(
-                  localArena, prefilterDP, prefilterShape, kDLUInt(), 32, 1, kDLCUDA(), 1);
+              prepareTensor(localArena, prefilterDP, prefilterShape, kDLUInt(), 32, kDLCUDA(), 1);
 
           cuvsFilter.type(prefilter, 1); // BITSET
           cuvsFilter.addr(prefilter, prefilterTensor.address());
@@ -330,13 +316,14 @@ public class TieredIndexImpl implements TieredIndex {
   /**
    * Performs the actual extend operation
    */
-  private void performExtend(Dataset extendDataset) throws Throwable {
+  private void performExtend(CuVSMatrix extendDataset) {
     try (var localArena = Arena.ofConfined()) {
+      assert extendDataset != null;
       long rows = extendDataset.size();
-      long cols = extendDataset.dimensions();
+      long cols = extendDataset.columns();
 
       // Get host data
-      MemorySegment hostDataSeg = ((DatasetImpl) extendDataset).asMemorySegment();
+      MemorySegment hostDataSeg = ((CuVSMatrixBaseImpl) extendDataset).memorySegment();
 
       try (var resourceAccess = resources.access()) {
         long cuvsRes = resourceAccess.handle();
@@ -352,7 +339,7 @@ public class TieredIndexImpl implements TieredIndex {
         // Create tensor from device memory
         long[] datasetShape = {rows, cols};
         MemorySegment datasetTensor =
-            prepareTensor(localArena, datasetDP, datasetShape, kDLFloat(), 32, 2, kDLCUDA(), 1);
+            prepareTensor(localArena, datasetDP, datasetShape, kDLFloat(), 32, kDLCUDA(), 1);
 
         checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync");
 
@@ -371,7 +358,7 @@ public class TieredIndexImpl implements TieredIndex {
    */
   public static class ExtendBuilder implements TieredIndex.ExtendBuilder {
     private final TieredIndexImpl index;
-    private Dataset dataset;
+    private CuVSMatrix dataset;
 
     private ExtendBuilder(TieredIndexImpl index) {
       this.index = index;
@@ -379,18 +366,18 @@ public class TieredIndexImpl implements TieredIndex {
 
     @Override
     public ExtendBuilder withDataset(float[][] vectors) {
-      this.dataset = Dataset.ofArray(vectors);
+      this.dataset = CuVSMatrix.ofArray(vectors);
       return this;
     }
 
     @Override
-    public ExtendBuilder withDataset(Dataset dataset) {
+    public ExtendBuilder withDataset(CuVSMatrix dataset) {
       this.dataset = dataset;
       return this;
     }
 
     @Override
-    public void execute() throws Throwable {
+    public void execute() {
       if (dataset == null) {
         throw new IllegalArgumentException("Must provide a dataset");
       }
@@ -508,7 +495,7 @@ public class TieredIndexImpl implements TieredIndex {
    */
   public static class Builder implements TieredIndex.Builder {
     private final CuVSResources resources;
-    private Dataset dataset;
+    private CuVSMatrix dataset;
     private TieredIndexParams params;
     private TieredIndexType indexType = TieredIndexType.CAGRA;
     private InputStream inputStream;
@@ -531,12 +518,12 @@ public class TieredIndexImpl implements TieredIndex {
       if (vectors == null || vectors.length == 0 || vectors[0].length == 0) {
         throw new IllegalArgumentException("The input vectors cannot be null or empty");
       }
-      this.dataset = Dataset.ofArray(vectors);
+      this.dataset = CuVSMatrix.ofArray(vectors);
       return this;
     }
 
     @Override
-    public Builder withDataset(Dataset dataset) {
+    public Builder withDataset(CuVSMatrix dataset) {
       if (this.dataset != null) {
         throw new IllegalArgumentException("An input dataset can only be specified once");
       }
