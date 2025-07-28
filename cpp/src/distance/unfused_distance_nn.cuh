@@ -81,15 +81,6 @@ namespace distance {
  * @param[in]  stream        cuda stream
  */
 
-#define CHECK_CUBLAS(call)                                                             \
-  do {                                                                                 \
-    cublasStatus_t status = call;                                                      \
-    if (status != CUBLAS_STATUS_SUCCESS) {                                             \
-      std::cerr << "cuBLAS Error at line " << __LINE__ << ": " << status << std::endl; \
-      exit(EXIT_FAILURE);                                                              \
-    }                                                                                  \
-  } while (0)
-
 template <typename T>
 __host__ __device__ T max_val()
 {
@@ -247,7 +238,7 @@ void unfused_distance_nn(OutT* out,
     }
   }
 
-  CHECK_CUBLAS(cublasGemmEx(cublas_h,
+  RAFT_CUBLAS_TRY(cublasGemmEx(cublas_h,
                             CUBLAS_OP_T,
                             CUBLAS_OP_N,
                             N,
