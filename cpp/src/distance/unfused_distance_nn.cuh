@@ -19,19 +19,8 @@
 
 #pragma once
 
-// #include "detail/fused_distance_nn.cuh"
-// #include "fused_distance_nn_helpers.cuh"
 #include <raft/core/resources.hpp>
-#include <raft/linalg/contractions.cuh>
-#include <raft/util/cuda_utils.cuh>
-
-#include <cub/cub.cuh>
-
-#include <stdint.h>
-
-#include <cublas_v2.h>
-#include <limits>
-#include <type_traits>
+#include <raft/linalg/detail/cublas_wrappers.hpp>
 
 namespace cuvs {
 namespace distance {
