@@ -33,6 +33,7 @@ import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.*;
 import com.nvidia.cuvs.CuVSMatrix;
+import com.nvidia.cuvs.internal.common.CloseableHandle;
 import com.nvidia.cuvs.internal.common.Util;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndexParams;
 import com.nvidia.cuvs.internal.panama.cuvsCagraSearchParams;
