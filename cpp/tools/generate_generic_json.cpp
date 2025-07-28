@@ -811,15 +811,85 @@ std::string generateCMakeContent(
   const std::string root_target = "cuvs_objs";
   std::ostringstream cmake_content;
 
-  // Write header comment explaining the CMake file
-  cmake_content << "# Generated CMake file for generic JSON serialization\n";
-  cmake_content << "# AUTO-GENERATED - DO NOT EDIT\n";
-  cmake_content << "#\n";
-  cmake_content << "# This file creates object library targets for each generated source file\n";
-  cmake_content << "# and adds them as dependencies to the targets that use the generic classes.\n";
-  cmake_content << "# Target names are extracted from CMakeFiles/<TARGET_NAME>.dir/ patterns\n";
-  cmake_content << "# in the compilation database.\n";
-  cmake_content << "#\n\n";
+  // Write header comment and dependency gathering function
+  cmake_content << R"(# Generated CMake file for generic JSON serialization
+# AUTO-GENERATED - DO NOT EDIT
+#
+# This file creates object library targets for each generated source file
+# and adds them as dependencies to the targets that use the generic classes.
+# Each generated target automatically inherits the intersection of dependencies
+# from its dependent targets to ensure headers are available during compilation.
+# Target names are extracted from CMakeFiles/<TARGET_NAME>.dir/ patterns
+# in the compilation database.
+#
+
+# Function to find common dependencies among targets and apply them to a target
+function(get_target_dependency_intersection target_to_apply)
+  set(target_list ${ARGN})
+  set(common_deps "")
+  set(first_target TRUE)
+
+  foreach(target IN LISTS target_list)
+    if(TARGET ${target})
+      # Get all dependencies of this target
+      set(target_deps "")
+
+      # Get LINK_LIBRARIES property
+      get_target_property(link_libs ${target} LINK_LIBRARIES)
+      if(link_libs AND NOT link_libs STREQUAL "link_libs-NOTFOUND")
+        list(APPEND target_deps ${link_libs})
+      endif()
+
+      # Get INTERFACE_LINK_LIBRARIES property
+      get_target_property(iface_libs ${target} INTERFACE_LINK_LIBRARIES)
+      if(iface_libs AND NOT iface_libs STREQUAL "iface_libs-NOTFOUND")
+        list(APPEND target_deps ${iface_libs})
+      endif()
+
+      # Remove duplicates and filter out problematic entries
+      if(target_deps)
+        list(REMOVE_DUPLICATES target_deps)
+
+        # Filter out generator expressions, object library references, self-references, and circular dependencies
+        set(filtered_deps "")
+        foreach(dep IN LISTS target_deps)
+          if(NOT dep MATCHES "\\$<.*>" AND
+             NOT dep STREQUAL "${target}" AND
+             NOT dep MATCHES "^cuvs_generic_.*" AND
+             NOT dep STREQUAL "cuvs" AND
+             NOT dep STREQUAL "cuvs_objs" AND
+             NOT dep STREQUAL "libcuvs")
+            list(APPEND filtered_deps ${dep})
+          endif()
+        endforeach()
+        set(target_deps ${filtered_deps})
+      endif()
+
+      if(first_target)
+        # First target - initialize common_deps with its dependencies
+        set(common_deps ${target_deps})
+        set(first_target FALSE)
+      else()
+        # Subsequent targets - find intersection
+        set(intersection "")
+        foreach(dep IN LISTS common_deps)
+          if(dep IN_LIST target_deps)
+            list(APPEND intersection ${dep})
+          endif()
+        endforeach()
+        set(common_deps ${intersection})
+      endif()
+    endif()
+  endforeach()
+
+  # Apply common dependencies if any exist
+  if(common_deps)
+    list(REMOVE_DUPLICATES common_deps)
+    target_link_libraries(${target_to_apply} PRIVATE ${common_deps})
+  endif()
+endfunction()
+
+)";
 
   for (const auto& [source_file, classes] : classes_by_source) {
     if (classes.empty()) continue;
@@ -839,13 +909,22 @@ std::string generateCMakeContent(
       all_targets.insert(cls.target_names.begin(), cls.target_names.end());
     }
 
-    // Create object library target
+    // Create object library target with intersection-based dependency gathering
     cmake_content << "# Generated from " << source_file << "\n";
     cmake_content << "add_library(" << target_name << " OBJECT \"" << output_path << "\")\n";
     cmake_content << "target_link_libraries(" << target_name << "\n";
     cmake_content << "  PRIVATE " << root_target << "\n";
     cmake_content << "  PUBLIC nlohmann_json::nlohmann_json\n";
-    cmake_content << ")\n";
+    cmake_content << ")\n\n";
+
+    // Get common dependencies from dependent targets using intersection and apply them
+    cmake_content
+      << "# Get common dependencies from dependent targets using intersection and apply them\n";
+    cmake_content << "get_target_dependency_intersection(" << target_name;
+    for (const auto& target : all_targets) {
+      if (target != root_target) { cmake_content << " " << target; }
+    }
+    cmake_content << ")\n\n";
     cmake_content << "set_target_properties(" << target_name << " PROPERTIES\n";
     cmake_content << "  CXX_STANDARD 17\n";
     cmake_content << "  CXX_STANDARD_REQUIRED ON\n";
