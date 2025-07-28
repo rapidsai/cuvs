@@ -33,6 +33,7 @@
 #include <fstream>
 #include <future>
 #include <mutex>
+#include <regex>
 #include <set>
 #include <sstream>
 #include <string>
@@ -75,6 +76,7 @@ struct GenericInfo {
   std::string namespace_path;
   std::string source_file;  // The source or header file where this instance was found
   std::vector<std::pair<std::string, std::string>> fields;  // name, type
+  std::set<std::string> target_names;  // Set of target names that include this class
 };
 
 // Thread-safe container for collecting generic classes
@@ -84,7 +86,14 @@ class GenericClassesCollector {
   {
     std::lock_guard<std::mutex> lock(mutex_);
     // Use qualified name as key to avoid duplicates from multiple compilation units
-    classes_[info.qualified_name] = info;
+    auto it = classes_.find(info.qualified_name);
+    if (it != classes_.end()) {
+      // Class already exists, merge target names
+      it->second.target_names.insert(info.target_names.begin(), info.target_names.end());
+    } else {
+      // New class, add it directly
+      classes_[info.qualified_name] = info;
+    }
   }
 
   std::unordered_map<std::string, GenericInfo> getClasses() const
@@ -118,6 +127,35 @@ unsigned getOptimalThreadCount()
   // Fall back to hardware concurrency
   unsigned hw_threads = std::thread::hardware_concurrency();
   return hw_threads > 0 ? hw_threads : 16;  // Default to 16 if detection fails
+}
+
+/**
+ * Extracts target name from a compilation database output path.
+ *
+ * This function uses regex to find the pattern "CMakeFiles/(<TARGET_NAME>).dir/" in the
+ * compilation command's output file path.
+ *
+ * For example:
+ * - "CMakeFiles/cuvs.dir/src/neighbors/ivf_flat.cu.o" -> "cuvs"
+ * - "CMakeFiles/cuvs_tests.dir/tests/neighbors/test_ivf.cu.o" -> "cuvs_tests"
+ * - "build/CMakeFiles/libcuvs.dir/src/core/generic.cpp.o" -> "libcuvs"
+ *
+ * @param compile_command The compilation command from the compilation database
+ * @return Target name if found, empty string otherwise
+ */
+std::string extractTargetName(const CompileCommand& compile_command)
+{
+  std::regex cmake_pattern(R"(CMakeFiles[/\\]([^/\\]+)\.dir[/\\])");
+  std::smatch match;
+
+  if (std::regex_search(compile_command.Output, match, cmake_pattern)) {
+    if (match.size() > 1) {
+      std::string target_name = match[1].str();
+      if (!target_name.empty()) { return target_name; }
+    }
+  }
+
+  return "";  // No target name found
 }
 
 // Helper function to get fully qualified type name without CV qualifiers
@@ -206,8 +244,12 @@ class GenericTypeTraversalVisitor : public RecursiveASTVisitor<GenericTypeTraver
  public:
   explicit GenericTypeTraversalVisitor(ASTContext* context,
                                        std::shared_ptr<GenericClassesCollector> collector,
-                                       const std::string& current_file)
-    : context_(context), collector_(collector), current_file_(current_file)
+                                       const std::string& current_file,
+                                       const std::set<std::string>& target_names)
+    : context_(context),
+      collector_(collector),
+      current_file_(current_file),
+      target_names_(target_names)
   {
   }
 
@@ -279,6 +321,11 @@ class GenericTypeTraversalVisitor : public RecursiveASTVisitor<GenericTypeTraver
     GenericInfo info;
     info.class_name     = decl->getNameAsString();
     info.qualified_name = decl->getQualifiedNameAsString();
+
+    // Set target name if available
+    if (!target_names_.empty()) {
+      info.target_names.insert(target_names_.begin(), target_names_.end());
+    }
 
     // Get the enclosing namespace
     DeclContext* ctx = decl->getDeclContext();
@@ -352,14 +399,16 @@ class GenericTypeTraversalVisitor : public RecursiveASTVisitor<GenericTypeTraver
   std::shared_ptr<GenericClassesCollector> collector_;
   ClassTemplateDecl* generic_template_ = nullptr;
   std::string current_file_;
+  std::set<std::string> target_names_;
 };
 
 class GenericConsumer : public ASTConsumer {
  public:
   explicit GenericConsumer(ASTContext* context,
                            std::shared_ptr<GenericClassesCollector> collector,
-                           const std::string& current_file)
-    : visitor_(context, collector, current_file), context_(context)
+                           const std::string& current_file,
+                           const std::set<std::string>& target_names)
+    : visitor_(context, collector, current_file, target_names), context_(context)
   {
   }
 
@@ -373,27 +422,31 @@ class GenericConsumer : public ASTConsumer {
 class GenericAction : public ASTFrontendAction {
  public:
   explicit GenericAction(std::shared_ptr<GenericClassesCollector> collector,
-                         const std::string& current_file)
-    : collector_(collector), current_file_(current_file)
+                         const std::string& current_file,
+                         const std::set<std::string>& target_names)
+    : collector_(collector), current_file_(current_file), target_names_(target_names)
   {
   }
 
   std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance& compiler,
                                                  llvm::StringRef) override
   {
-    return std::make_unique<GenericConsumer>(&compiler.getASTContext(), collector_, current_file_);
+    return std::make_unique<GenericConsumer>(
+      &compiler.getASTContext(), collector_, current_file_, target_names_);
   }
 
  private:
   std::shared_ptr<GenericClassesCollector> collector_;
   std::string current_file_;
+  std::set<std::string> target_names_;
 };
 
 class CollectingGenericAction : public GenericAction {
  public:
   explicit CollectingGenericAction(std::shared_ptr<GenericClassesCollector> collector,
-                                   const std::string& current_file)
-    : GenericAction(collector, current_file)
+                                   const std::string& current_file,
+                                   const std::set<std::string>& target_names)
+    : GenericAction(collector, current_file, target_names)
   {
   }
 
@@ -418,14 +471,15 @@ class CollectingGenericAction : public GenericAction {
 class CollectingActionFactory : public FrontendActionFactory {
  public:
   explicit CollectingActionFactory(std::shared_ptr<GenericClassesCollector> collector,
-                                   const std::string& current_file)
-    : collector_(collector), current_file_(current_file)
+                                   const std::string& current_file,
+                                   const std::set<std::string>& target_names)
+    : collector_(collector), current_file_(current_file), target_names_(target_names)
   {
   }
 
   std::unique_ptr<FrontendAction> create() override
   {
-    return std::make_unique<CollectingGenericAction>(collector_, current_file_);
+    return std::make_unique<CollectingGenericAction>(collector_, current_file_, target_names_);
   }
 
   bool runInvocation(std::shared_ptr<CompilerInvocation> Invocation,
@@ -462,6 +516,7 @@ class CollectingActionFactory : public FrontendActionFactory {
  private:
   std::shared_ptr<GenericClassesCollector> collector_;
   std::string current_file_;
+  std::set<std::string> target_names_;
 };
 
 // Function to process a batch of files in parallel
@@ -472,6 +527,13 @@ void processFilesBatch(const CompilationDatabase& db,
   for (const auto& file : files) {
     try {
       ClangTool tool(db, {file});
+
+      // Extract target names from all compilation commands for this file
+      std::set<std::string> target_names;
+      for (const auto& compile_command : db.getCompileCommands(file)) {
+        std::string target_name = extractTargetName(compile_command);
+        if (!target_name.empty()) { target_names.insert(target_name); }
+      }
 
       // Add arguments to make clang more permissive with CUDA code
       tool.appendArgumentsAdjuster([file](const CommandLineArguments& Args, StringRef /*unused*/) {
@@ -530,7 +592,7 @@ void processFilesBatch(const CompilationDatabase& db,
         return AdjustedArgs;
       });
 
-      auto factory = std::make_unique<CollectingActionFactory>(collector, file);
+      auto factory = std::make_unique<CollectingActionFactory>(collector, file, target_names);
       tool.run(factory.get());  // Ignore return code, continue with other files
     } catch (...) {
       llvm::outs() << "Exception processing file: " << file << "\n";
@@ -806,8 +868,25 @@ int main(int argc, const char** argv)
     std::string output_filename = generateOutputFilename(source_file);
     std::string output_path     = OutputDir.getValue() + "/" + output_filename;
 
+    // Collect all unique target names for classes in this file
+    std::set<std::string> all_targets;
+    for (const auto& cls : classes) {
+      all_targets.insert(cls.target_names.begin(), cls.target_names.end());
+    }
+
     llvm::outs() << "Generating " << output_filename << " for " << classes.size()
-                 << " classes from " << source_file << "\n";
+                 << " classes from " << source_file;
+    if (!all_targets.empty()) {
+      llvm::outs() << " (targets: ";
+      bool first = true;
+      for (const auto& target : all_targets) {
+        if (!first) llvm::outs() << ", ";
+        llvm::outs() << target;
+        first = false;
+      }
+      llvm::outs() << ")";
+    }
+    llvm::outs() << "\n";
 
     std::string generated_code = GenerateImplementations(classes, output_path);
 
@@ -823,16 +902,46 @@ int main(int argc, const char** argv)
     generated_files.push_back(output_path);
   }
 
-  // Write manifest file
+  // Write manifest file with target information
+  // Format: <generated_file_path>:<target1>,<target2>,...
+  // This allows CMake to know which targets need which generated files
   std::ofstream manifest(ManifestFile);
   if (!manifest) {
     llvm::errs() << "Error: Could not open manifest file " << ManifestFile << "\n";
     return 1;
   }
 
-  for (const auto& file : generated_files) {
-    manifest << file << "\n";
+  // Write header comment explaining the manifest format
+  manifest << "# Generated files manifest\n";
+  manifest << "# Format: <generated_file_path>:<target1>,<target2>,...\n";
+  manifest << "# Each line contains a generated file path followed by a colon and\n";
+  manifest << "# a comma-separated list of target names that use classes from this file.\n";
+  manifest << "# Target names are extracted from CMakeFiles/<TARGET_NAME>.dir/ patterns\n";
+  manifest << "# in the compilation database.\n";
+  manifest << "#\n";
+
+  for (const auto& [source_file, classes] : classes_by_source) {
+    if (classes.empty()) continue;
+
+    std::string output_filename = generateOutputFilename(source_file);
+    std::string output_path     = OutputDir.getValue() + "/" + output_filename;
+
+    // Collect all unique target names for classes in this file
+    std::set<std::string> all_targets;
+    for (const auto& cls : classes) {
+      all_targets.insert(cls.target_names.begin(), cls.target_names.end());
+    }
+
+    manifest << output_path << ":";
+    bool first = true;
+    for (const auto& target : all_targets) {
+      if (!first) manifest << ",";
+      manifest << target;
+      first = false;
+    }
+    manifest << "\n";
   }
+
   manifest.close();
 
   llvm::outs() << "Generated " << generated_files.size() << " files\n";
