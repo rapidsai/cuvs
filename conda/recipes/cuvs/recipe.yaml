@@ -48,6 +48,7 @@ requirements:
     - ${{ compiler("cuda") }}
     - cuda-version =${{ cuda_version }}
     - ${{ stdlib("c") }}
+    - clangdev
   host:
     - cuda-version =${{ cuda_version }}
     - cython >=3.0.0

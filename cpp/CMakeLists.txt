@@ -184,6 +184,9 @@ if(BUILD_C_LIBRARY)
   include(cmake/thirdparty/get_dlpack.cmake)
 endif()
 
+# JSON serialization via cuvs::generic
+include(cmake/thirdparty/get_nlohmann_json.cmake)
+
 if(BUILD_TESTS OR BUILD_C_TESTS)
   include(${rapids-cmake-dir}/cpm/gtest.cmake)
   rapids_cpm_gtest(BUILD_STATIC)
@@ -843,3 +846,7 @@ endif()
 if(BUILD_CUVS_BENCH)
   add_subdirectory(bench/ann/)
 endif()
+
+# ##################################################################################################
+# * build tools / codegen --------------------------------------------------------------
+add_subdirectory(tools)
