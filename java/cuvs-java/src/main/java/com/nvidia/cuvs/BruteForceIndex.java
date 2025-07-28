@@ -111,10 +111,10 @@ public interface BruteForceIndex {
     /**
      * Sets the dataset for building the {@link BruteForceIndex}.
      *
-     * @param dataset a {@link Dataset} object containing the vectors
+     * @param dataset a {@link CuVSMatrix} object containing the vectors
      * @return an instance of this Builder
      */
-    Builder withDataset(Dataset dataset);
+    Builder withDataset(CuVSMatrix dataset);
 
     /**
      * Builds and returns an instance of {@link BruteForceIndex}.
