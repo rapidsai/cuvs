@@ -132,7 +132,6 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
         raft::make_device_mdarray<raft::KeyValuePair<IdxT, MathT>, IdxT>(
           handle, mr, raft::make_extents<IdxT>(n_rows));
 
-      auto cublas_h = raft::resource::get_cublas_handle(handle);
       raft::KeyValuePair<IdxT, MathT> initial_value(0, std::numeric_limits<MathT>::max());
       thrust::fill(raft::resource::get_thrust_policy(handle),
                    minClusterAndDistance.data_handle(),
@@ -163,6 +162,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
           stream);
       } else {
         cuvs::distance::unfusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
+          handle,
           unf_minClusterAndDistance.data_handle(),
           dataset,
           centers,
@@ -177,8 +177,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
           true,
           params.metric,
           0.0f,
-          stream,
-          cublas_h);
+          stream);
       }
 
       // todo(lsugy): use KVP + iterator in caller.
