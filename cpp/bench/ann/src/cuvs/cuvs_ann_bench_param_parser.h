@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -83,7 +83,9 @@ void parse_build_param(const nlohmann::json& conf,
 {
   param.n_lists = conf.at("nlist");
   if (conf.contains("niter")) { param.kmeans_n_iters = conf.at("niter"); }
-  if (conf.contains("ratio")) { param.kmeans_trainset_fraction = 1.0 / (double)conf.at("ratio"); }
+  if (conf.contains("ratio")) {
+    param.kmeans_trainset_fraction = 1.0 / static_cast<double>(conf.at("ratio"));
+  }
 }
 
 template <typename T, typename IdxT>
@@ -102,7 +104,9 @@ void parse_build_param(const nlohmann::json& conf,
 {
   if (conf.contains("nlist")) { param.n_lists = conf.at("nlist"); }
   if (conf.contains("niter")) { param.kmeans_n_iters = conf.at("niter"); }
-  if (conf.contains("ratio")) { param.kmeans_trainset_fraction = 1.0 / (double)conf.at("ratio"); }
+  if (conf.contains("ratio")) {
+    param.kmeans_trainset_fraction = 1.0 / static_cast<double>(conf.at("ratio"));
+  }
   if (conf.contains("pq_bits")) { param.pq_bits = conf.at("pq_bits"); }
   if (conf.contains("pq_dim")) { param.pq_dim = conf.at("pq_dim"); }
   if (conf.contains("codebook_kind")) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,10 @@
 
 #include "common.cuh"
 
+#include <cuvs/neighbors/ivf_flat.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
-#include <cuvs/neighbors/ivf_flat.hpp>
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/mr/device/device_memory_resource.hpp>
@@ -64,7 +64,7 @@ void ivf_flat_build_search_simple(raft::device_resources const& dev_resources,
     dev_resources, search_params, index, queries, neighbors.view(), distances.view());
 
   // The call to ivf_flat::search is asynchronous. Before accessing the data, sync by calling
-   raft::resource::sync_stream(dev_resources);
+  raft::resource::sync_stream(dev_resources);
 
   print_results(dev_resources, neighbors.view(), distances.view());
 }
@@ -121,7 +121,7 @@ void ivf_flat_build_extend_search(raft::device_resources const& dev_resources,
     dev_resources, search_params, index, queries, neighbors.view(), distances.view());
 
   // The call to ivf_flat::search is asynchronous. Before accessing the data, sync using:
-   raft::resource::sync_stream(dev_resources);
+  raft::resource::sync_stream(dev_resources);
 
   print_results(dev_resources, neighbors.view(), distances.view());
 }
