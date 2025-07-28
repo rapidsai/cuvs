@@ -20,7 +20,7 @@
 #pragma once
 
 #include <raft/core/resources.hpp>
-#include <raft/linalg/detail/cublas_wrappers.hpp>
+#include <raft/core/resource/cublas_handle.hpp>
 
 namespace cuvs {
 namespace distance {
@@ -158,7 +158,8 @@ void reduce_min(OutT* out,
 }
 
 template <typename DataT, typename AccT, typename OutT, typename IdxT>
-void unfused_distance_nn(OutT* out,
+void unfused_distance_nn(raft::resources const& handle,
+                 OutT* out,
                  const DataT* x,
                  const DataT* y,
                  IdxT M,
@@ -168,7 +169,6 @@ void unfused_distance_nn(OutT* out,
                  const AccT* y_norm,
                  AccT* workspace,
                  bool is_sqrt,
-                 cublasHandle_t& cublas_h,
                  cudaStream_t stream)
 {
   cudaDataType_t xyType, zType;
@@ -227,6 +227,7 @@ void unfused_distance_nn(OutT* out,
     }
   }
 
+  auto cublas_h = raft::resource::get_cublas_handle(handle);
   RAFT_CUBLAS_TRY(cublasGemmEx(cublas_h,
                             CUBLAS_OP_T,
                             CUBLAS_OP_N,
@@ -284,7 +285,8 @@ void unfused_distance_nn(OutT* out,
  * @param[in]  stream        cuda stream
  */
 template <typename DataT, typename OutT, typename IdxT>
-void unfusedDistanceNNMinReduce(OutT* min,
+void unfusedDistanceNNMinReduce(raft::resources const& handle,
+                                OutT* min,
                                 const DataT* x,
                                 const DataT* y,
                                 const DataT* xn,
@@ -298,11 +300,10 @@ void unfusedDistanceNNMinReduce(OutT* min,
                                 bool isRowMajor,
                                 cuvs::distance::DistanceType metric,
                                 float metric_arg,
-                                cudaStream_t stream,
-                                cublasHandle_t& cublas_h)
+                                cudaStream_t stream)
 {
   unfused_distance_nn<DataT, DataT, OutT, IdxT>(
-    min, x, y, m, n, k, xn, yn, (DataT*)workspace, is_sqrt, cublas_h, stream);
+    handle, min, x, y, m, n, k, xn, yn, (DataT*)workspace, is_sqrt, stream);
 }
 
 /** @} */
