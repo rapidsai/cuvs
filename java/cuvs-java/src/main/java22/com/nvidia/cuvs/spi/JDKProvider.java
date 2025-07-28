@@ -23,16 +23,14 @@ import com.nvidia.cuvs.CagraMergeParams;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
-import com.nvidia.cuvs.QuantizedMatrix;
-import com.nvidia.cuvs.ScalarQuantizer;
-import com.nvidia.cuvs.internal.BinaryQuantizerImpl;
 import com.nvidia.cuvs.TieredIndex;
+import com.nvidia.cuvs.internal.BinaryQuantizerImpl;
 import com.nvidia.cuvs.internal.BruteForceIndexImpl;
 import com.nvidia.cuvs.internal.CagraIndexImpl;
 import com.nvidia.cuvs.internal.CuVSResourcesImpl;
 import com.nvidia.cuvs.internal.DatasetImpl;
 import com.nvidia.cuvs.internal.HnswIndexImpl;
-import com.nvidia.cuvs.internal.ScalarQuantizerImpl;
+import com.nvidia.cuvs.internal.Scalar8BitQuantizerImpl;
 import com.nvidia.cuvs.internal.TieredIndexImpl;
 import com.nvidia.cuvs.internal.common.Util;
 import java.lang.foreign.Arena;
@@ -132,6 +130,16 @@ final class JDKProvider implements CuVSProvider {
       }
 
       @Override
+      public void addVector(byte[] vector) {
+        throw new UnsupportedOperationException("Byte vectors not supported in this builder");
+      }
+
+      @Override
+      public void addVector(boolean[] vector) {
+        throw new UnsupportedOperationException("Boolean vectors not supported in this builder");
+      }
+
+      @Override
       public Dataset build() {
         return new DatasetImpl(arena, seg, size, dimensions);
       }
@@ -158,21 +166,41 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public ScalarQuantizer.Builder newScalarQuantizerBuilder(CuVSResources cuVSResources) {
-    return ScalarQuantizerImpl.newBuilder(Objects.requireNonNull(cuVSResources));
+  public Dataset newByteArrayDataset(byte[][] vectors) {
+    Objects.requireNonNull(vectors);
+    if (vectors.length == 0) {
+      return new DatasetImpl(Arena.ofShared(), MemorySegment.NULL, 0, 0);
+    }
+    int rows = vectors.length;
+    int cols = vectors[0].length;
+    Arena arena = Arena.ofShared();
+    MemorySegment segment = Util.buildMemorySegmentFromBytes(arena, vectors);
+    return new DatasetImpl(arena, segment, rows, cols);
   }
 
   @Override
-  public QuantizedMatrix binaryQuantizerTransform(CuVSResources cuVSResources, float[][] dataset)
+  public Object createScalar8BitQuantizerImpl(CuVSResources resources, Dataset trainingDataset)
       throws Throwable {
-    return BinaryQuantizerImpl.transform(
-        Objects.requireNonNull(cuVSResources), Objects.requireNonNull(dataset));
+    return Scalar8BitQuantizerImpl.create(resources, trainingDataset);
   }
 
   @Override
-  public QuantizedMatrix binaryQuantizerTransform(CuVSResources cuVSResources, Dataset dataset)
-      throws Throwable {
-    return BinaryQuantizerImpl.transform(
-        Objects.requireNonNull(cuVSResources), Objects.requireNonNull(dataset));
+  public Dataset transformScalar8Bit(Object impl, Dataset input) throws Throwable {
+    return ((Scalar8BitQuantizerImpl) impl).transform(input);
+  }
+
+  @Override
+  public float[][] inverseTransformScalar8Bit(Object impl, Dataset quantizedData) throws Throwable {
+    return ((Scalar8BitQuantizerImpl) impl).inverseTransform(quantizedData);
+  }
+
+  @Override
+  public Dataset transformBinary(CuVSResources resources, Dataset input) throws Throwable {
+    return BinaryQuantizerImpl.transform(resources, input);
+  }
+
+  @Override
+  public void closeScalar8BitQuantizer(Object impl) throws Throwable {
+    ((Scalar8BitQuantizerImpl) impl).close();
   }
 }

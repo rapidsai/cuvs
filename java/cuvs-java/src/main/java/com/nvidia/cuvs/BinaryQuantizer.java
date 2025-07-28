@@ -16,38 +16,70 @@
 package com.nvidia.cuvs;
 
 import com.nvidia.cuvs.spi.CuVSProvider;
-import java.util.Objects;
 
 /**
- * {@link BinaryQuantizer} provides binary quantization functionality for datasets.
+ * Binary quantizer implementation that transforms 32-bit float datasets into 1-bit binary datasets.
  *
- * Binary quantization applies a transform that changes any positive values to a
- * bitwise 1 and negative/zero values to 0.
+ * <p>Binary quantization reduces each float32 value to a single bit, providing maximum compression
+ * but with significant precision loss. This quantizer does not require training and does not
+ * support inverse transformation.
+ *
+ * @since 25.08
  */
-public interface BinaryQuantizer {
+public class BinaryQuantizer implements CuVSQuantizer {
+  private final CuVSResources resources;
+  private final int precision = 8;
 
   /**
-   * Applies binary quantization transform to given dataset.
+   * Creates a new binary quantizer with the specified resources.
    *
-   * @param dataset a two-dimensional float array to transform
-   * @return a QuantizedMatrix containing the binary quantized data
+   * @param resources The CuVS resources to use for quantization operations
    */
-  static QuantizedMatrix transform(CuVSResources cuvsResources, float[][] dataset)
-      throws Throwable {
-    Objects.requireNonNull(cuvsResources);
-    Objects.requireNonNull(dataset);
-    return CuVSProvider.provider().binaryQuantizerTransform(cuvsResources, dataset);
+  public BinaryQuantizer(CuVSResources resources) {
+    this.resources = resources;
+    // Note: Binary quantization is stateless, no impl object needed
   }
 
-  /**
-   * Applies binary quantization transform to given dataset.
-   *
-   * @param dataset a {@link Dataset} object containing the vectors to transform
-   * @return a QuantizedMatrix containing the binary quantized data
-   */
-  static QuantizedMatrix transform(CuVSResources cuvsResources, Dataset dataset) throws Throwable {
-    Objects.requireNonNull(cuvsResources);
-    Objects.requireNonNull(dataset);
-    return CuVSProvider.provider().binaryQuantizerTransform(cuvsResources, dataset);
+  @Override
+  public int precision() {
+    return precision;
+  }
+
+  @Override
+  public Dataset transform(Dataset input) throws Throwable {
+    // Validate input precision
+    if (input.precision() != 32) {
+      throw new IllegalArgumentException(
+          "BinaryQuantizer requires 32-bit float input, got " + input.precision() + "-bit");
+    }
+
+    // Use the correct provider method signature (resources, not impl)
+    Dataset result = CuVSProvider.provider().transformBinary(resources, input);
+
+    // Validate output precision
+    if (result.precision() != 8) {
+      throw new IllegalStateException(
+          "Expected 1-bit output from binary quantization, got " + result.precision() + "-bit");
+    }
+
+    return result;
+  }
+
+  @Override
+  public void train(Dataset trainingData) throws Throwable {
+    // Binary quantization doesn't require training
+    throw new UnsupportedOperationException("Binary quantization does not require training");
+  }
+
+  @Override
+  public float[][] inverseTransform(Dataset quantizedData) throws Throwable {
+    // Binary quantization typically doesn't support exact inverse transformation
+    throw new UnsupportedOperationException(
+        "Binary quantization does not support inverse transformation");
+  }
+
+  @Override
+  public void close() throws Exception {
+    // Binary quantizer is stateless, no cleanup needed
   }
 }

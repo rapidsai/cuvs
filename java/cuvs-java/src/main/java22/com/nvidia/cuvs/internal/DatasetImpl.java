@@ -54,4 +54,54 @@ public class DatasetImpl implements Dataset {
   public MemorySegment asMemorySegment() {
     return seg;
   }
+
+  /**
+   * Converts the dataset into a Java heap array of bytes.
+   * This method is primarily for 8-bit precision datasets.
+   *
+   * @return A byte[][] array representing the dataset.
+   * @throws IllegalStateException if the dataset is not 8-bit precision.
+   */
+  public byte[][] toByteArray() {
+    if (precision() != 8) {
+      throw new IllegalStateException(
+          "Dataset is not 8-bit precision. Current precision: " + precision());
+    }
+    byte[][] result = new byte[size][dimensions];
+    for (int i = 0; i < size; i++) {
+      for (int j = 0; j < dimensions; j++) {
+        result[i][j] = seg.get(java.lang.foreign.ValueLayout.JAVA_BYTE, (long) i * dimensions + j);
+      }
+    }
+    return result;
+  }
+
+  @Override
+  public int precision() {
+    if (size == 0 || dimensions == 0) {
+      return 32; // Default for empty datasets
+    }
+
+    long totalElements = (long) size * dimensions;
+    long segmentBytes = seg.byteSize();
+
+    // Calculate expected bytes for different precisions
+    long expectedFloat32Bytes = totalElements * 4; // 4 bytes per float
+    long expectedInt8Bytes = totalElements * 1; // 1 byte per int8
+    long expectedBinaryBytes = (totalElements + 7) / 8; // Packed bits
+
+    // Match against actual segment size
+    if (segmentBytes == expectedFloat32Bytes) {
+      return 32;
+    } else if (segmentBytes == expectedInt8Bytes) {
+      return 8;
+    } else if (segmentBytes == expectedBinaryBytes) {
+      return 1;
+    } else {
+      throw new IllegalStateException(
+          String.format(
+              "Cannot determine precision: segment has %d bytes for %d elements",
+              segmentBytes, totalElements));
+    }
+  }
 }

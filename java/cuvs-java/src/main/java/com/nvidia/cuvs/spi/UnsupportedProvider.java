@@ -20,8 +20,6 @@ import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
-import com.nvidia.cuvs.QuantizedMatrix;
-import com.nvidia.cuvs.ScalarQuantizer;
 import com.nvidia.cuvs.TieredIndex;
 import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
@@ -78,19 +76,33 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
-  public ScalarQuantizer.Builder newScalarQuantizerBuilder(CuVSResources cuVSResources) {
+  public Dataset newByteArrayDataset(byte[][] vectors) {
     throw new UnsupportedOperationException("CuVS is not supported on this platform");
   }
 
   @Override
-  public QuantizedMatrix binaryQuantizerTransform(CuVSResources cuVSResources, float[][] dataset)
+  public Object createScalar8BitQuantizerImpl(CuVSResources resources, Dataset trainingDataset)
       throws Throwable {
     throw new UnsupportedOperationException("CuVS is not supported on this platform");
   }
 
   @Override
-  public QuantizedMatrix binaryQuantizerTransform(CuVSResources cuVSResources, Dataset dataset)
-      throws Throwable {
+  public float[][] inverseTransformScalar8Bit(Object impl, Dataset quantizedData) throws Throwable {
+    throw new UnsupportedOperationException("CuVS is not supported on this platform");
+  }
+
+  @Override
+  public Dataset transformBinary(CuVSResources resources, Dataset input) throws Throwable {
+    throw new UnsupportedOperationException("CuVS is not supported on this platform");
+  }
+
+  @Override
+  public Dataset transformScalar8Bit(Object impl, Dataset input) throws Throwable {
+    throw new UnsupportedOperationException("CuVS is not supported on this platform");
+  }
+
+  @Override
+  public void closeScalar8BitQuantizer(Object impl) throws Throwable {
     throw new UnsupportedOperationException("CuVS is not supported on this platform");
   }
 }

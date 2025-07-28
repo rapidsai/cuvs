@@ -38,8 +38,13 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSerialize;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsCagraSerializeToHnswlib;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
+import static com.nvidia.cuvs.internal.panama.headers_h.kDLBool;
+import static com.nvidia.cuvs.internal.panama.headers_h.kDLFloat;
+import static com.nvidia.cuvs.internal.panama.headers_h.kDLInt;
+import static com.nvidia.cuvs.internal.panama.headers_h.kDLUInt;
 import static com.nvidia.cuvs.internal.panama.headers_h.omp_set_num_threads;
 
+import com.nvidia.cuvs.BinaryQuantizer;
 import com.nvidia.cuvs.CagraCompressionParams;
 import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CagraIndexParams;
@@ -49,6 +54,7 @@ import com.nvidia.cuvs.CagraQuery;
 import com.nvidia.cuvs.CagraSearchParams;
 import com.nvidia.cuvs.CuVSIvfPqIndexParams;
 import com.nvidia.cuvs.CuVSIvfPqSearchParams;
+import com.nvidia.cuvs.CuVSQuantizer;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.SearchResults;
@@ -89,6 +95,7 @@ import java.util.UUID;
 public class CagraIndexImpl implements CagraIndex {
   private final CuVSResources resources;
   private final IndexReference cagraIndexReference;
+  private final CuVSQuantizer indexQuantizer;
   private boolean destroyed;
 
   /**
@@ -101,10 +108,7 @@ public class CagraIndexImpl implements CagraIndex {
    */
   private CagraIndexImpl(
       CagraIndexParams indexParameters, Dataset dataset, CuVSResources resources) {
-    Objects.requireNonNull(dataset);
-    this.resources = resources;
-    assert dataset instanceof DatasetImpl;
-    this.cagraIndexReference = build(indexParameters, (DatasetImpl) dataset);
+    this(indexParameters, dataset, resources, null);
   }
 
   /**
@@ -115,6 +119,7 @@ public class CagraIndexImpl implements CagraIndex {
    */
   private CagraIndexImpl(InputStream inputStream, CuVSResources resources) throws Throwable {
     this.resources = resources;
+    this.indexQuantizer = null;
     this.cagraIndexReference = deserialize(inputStream);
   }
 
@@ -127,8 +132,24 @@ public class CagraIndexImpl implements CagraIndex {
    */
   private CagraIndexImpl(IndexReference indexReference, CuVSResources resources) {
     this.resources = resources;
+    this.indexQuantizer = null;
     this.cagraIndexReference = indexReference;
     this.destroyed = false;
+  }
+
+  /**
+   * Constructor for building the index using specified dataset with quantizer
+   */
+  private CagraIndexImpl(
+      CagraIndexParams indexParameters,
+      Dataset dataset,
+      CuVSResources resources,
+      CuVSQuantizer quantizer) {
+    Objects.requireNonNull(dataset);
+    this.resources = resources;
+    this.indexQuantizer = quantizer;
+    assert dataset instanceof DatasetImpl;
+    this.cagraIndexReference = build(indexParameters, (DatasetImpl) dataset, quantizer);
   }
 
   private void checkNotDestroyed() {
@@ -161,10 +182,13 @@ public class CagraIndexImpl implements CagraIndex {
    * @return an instance of {@link IndexReference} that holds the pointer to the
    *         index
    */
-  private IndexReference build(CagraIndexParams indexParameters, DatasetImpl dataset) {
+  private IndexReference build(
+      CagraIndexParams indexParameters, DatasetImpl dataset, CuVSQuantizer quantizer) {
     try (var localArena = Arena.ofConfined()) {
       long rows = dataset.size();
       long cols = dataset.dimensions();
+
+      int datasetPrecision = dataset.precision();
 
       MemorySegment indexParamsMemorySegment =
           indexParameters != null
@@ -178,7 +202,15 @@ public class CagraIndexImpl implements CagraIndex {
 
       long[] datasetShape = {rows, cols};
       MemorySegment datasetTensor =
-          prepareTensor(localArena, dataSeg, datasetShape, 2, 32, 2, 2, 1);
+          prepareTensor(
+              localArena,
+              dataSeg,
+              datasetShape,
+              getDataTypeCode(datasetPrecision, this.indexQuantizer),
+              datasetPrecision,
+              2,
+              2,
+              1);
 
       var index = createCagraIndex();
 
@@ -238,19 +270,33 @@ public class CagraIndexImpl implements CagraIndex {
     try (var localArena = Arena.ofConfined()) {
       checkNotDestroyed();
       int topK = query.getTopK();
-      long numQueries = query.getQueryVectors().length;
+      int queryPrecision = query.getQueryPrecision();
+      long numQueries;
+      int vectorDimension;
+      MemorySegment floatsSeg;
+      // Handle both quantized and float queries
+      if (query.hasQuantizedQueries()) {
+        Dataset quantizedQueries = query.getQuantizedQueries();
+        numQueries = quantizedQueries.size();
+        vectorDimension = quantizedQueries.dimensions();
+        floatsSeg = ((DatasetImpl) quantizedQueries).asMemorySegment();
+      } else {
+        float[][] queryVectors = query.getQueryVectors();
+        numQueries = queryVectors.length;
+        vectorDimension = numQueries > 0 ? queryVectors[0].length : 0;
+        floatsSeg = buildMemorySegment(localArena, queryVectors);
+      }
+
+      // Calculate bytes based on actual precision
+      long queriesBytes = getQueryBytesSize(numQueries, vectorDimension, queryPrecision);
       long numBlocks = topK * numQueries;
-      int vectorDimension = numQueries > 0 ? query.getQueryVectors()[0].length : 0;
+      long neighborsBytes = C_INT_BYTE_SIZE * numQueries * topK;
+      long distancesBytes = C_FLOAT_BYTE_SIZE * numQueries * topK;
 
       SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_INT);
       SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
       MemorySegment neighborsMemorySegment = localArena.allocate(neighborsSequenceLayout);
       MemorySegment distancesMemorySegment = localArena.allocate(distancesSequenceLayout);
-      MemorySegment floatsSeg = buildMemorySegment(localArena, query.getQueryVectors());
-
-      long queriesBytes = C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
-      long neighborsBytes = C_INT_BYTE_SIZE * numQueries * topK;
-      long distancesBytes = C_FLOAT_BYTE_SIZE * numQueries * topK;
 
       try (var resourcesAccessor = resources.access()) {
         var cuvsRes = resourcesAccessor.handle();
@@ -265,7 +311,15 @@ public class CagraIndexImpl implements CagraIndex {
 
         long[] queriesShape = {numQueries, vectorDimension};
         MemorySegment queriesTensor =
-            prepareTensor(localArena, queriesDP, queriesShape, 2, 32, 2, 2, 1);
+            prepareTensor(
+                localArena,
+                queriesDP,
+                queriesShape,
+                getDataTypeCode(queryPrecision, this.indexQuantizer),
+                queryPrecision,
+                2,
+                2,
+                1);
         long[] neighborsShape = {numQueries, topK};
         MemorySegment neighborsTensor =
             prepareTensor(localArena, neighborsDP, neighborsShape, 1, 32, 2, 2, 1);
@@ -668,6 +722,37 @@ public class CagraIndexImpl implements CagraIndex {
     return seg;
   }
 
+  // Helper method to map precision to data type codes
+  private int getDataTypeCode(int precision, CuVSQuantizer quantizer) {
+    switch (precision) {
+      case 32:
+        return kDLFloat();
+      case 8:
+        if (quantizer instanceof BinaryQuantizer) {
+          return kDLUInt();
+        } else {
+          return kDLInt();
+        }
+      case 1:
+        return kDLBool();
+      default:
+        throw new IllegalArgumentException("Unsupported precision: " + precision);
+    }
+  }
+
+  private long getQueryBytesSize(long numQueries, int vectorDimension, int precision) {
+    switch (precision) {
+      case 32:
+        return C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
+      case 8:
+        return numQueries * vectorDimension;
+      case 1:
+        return (numQueries * vectorDimension + 7) / 8;
+      default:
+        throw new IllegalArgumentException("Unsupported query precision: " + precision);
+    }
+  }
+
   /**
    * Builder helps configure and create an instance of {@link CagraIndex}.
    */
@@ -677,6 +762,7 @@ public class CagraIndexImpl implements CagraIndex {
     private CagraIndexParams cagraIndexParams;
     private final CuVSResources cuvsResources;
     private InputStream inputStream;
+    private CuVSQuantizer quantizer;
 
     public Builder(CuVSResources cuvsResources) {
       this.cuvsResources = cuvsResources;
@@ -707,10 +793,28 @@ public class CagraIndexImpl implements CagraIndex {
     }
 
     @Override
+    public Builder withQuantizer(CuVSQuantizer quantizer) {
+      this.quantizer = quantizer;
+      return this;
+    }
+
+    @Override
     public CagraIndexImpl build() throws Throwable {
       if (inputStream != null) {
         return new CagraIndexImpl(inputStream, cuvsResources);
       } else {
+        if (quantizer != null && dataset != null) {
+          if (dataset.precision() != 32) {
+            throw new IllegalArgumentException(
+                "Quantizer input requires 32-bit precision, dataset has "
+                    + dataset.precision()
+                    + "-bit");
+          }
+
+          Dataset quantizedDataset = quantizer.transform(dataset);
+
+          return new CagraIndexImpl(cagraIndexParams, quantizedDataset, cuvsResources, quantizer);
+        }
         return new CagraIndexImpl(cagraIndexParams, dataset, cuvsResources);
       }
     }

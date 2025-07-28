@@ -233,6 +233,8 @@ public interface CagraIndex {
      */
     Builder withIndexParams(CagraIndexParams cagraIndexParameters);
 
+    Builder withQuantizer(CuVSQuantizer quantizer);
+
     /**
      * Builds and returns an instance of CagraIndex.
      *

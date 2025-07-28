@@ -38,6 +38,7 @@ import java.lang.foreign.Arena;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemoryLayout.PathElement;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -341,5 +342,19 @@ public class Util {
 
       return datasetMemorySegment.get(C_POINTER, 0);
     }
+  }
+
+  public static MemorySegment buildMemorySegmentFromBytes(Arena arena, byte[][] data) {
+    long rows = data.length;
+    long cols = rows > 0 ? data[0].length : 0;
+    long totalBytes = rows * cols;
+
+    MemorySegment segment = arena.allocate(totalBytes);
+    for (int i = 0; i < rows; i++) {
+      for (int j = 0; j < cols; j++) {
+        segment.set(ValueLayout.JAVA_BYTE, (long) i * cols + j, data[i][j]);
+      }
+    }
+    return segment;
   }
 }

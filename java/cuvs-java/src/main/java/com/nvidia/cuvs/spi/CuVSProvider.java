@@ -21,8 +21,6 @@ import com.nvidia.cuvs.CagraMergeParams;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
-import com.nvidia.cuvs.QuantizedMatrix;
-import com.nvidia.cuvs.ScalarQuantizer;
 import com.nvidia.cuvs.TieredIndex;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
@@ -76,6 +74,9 @@ public interface CuVSProvider {
   /** Create a {@link Dataset} backed by a on-heap array **/
   Dataset newArrayDataset(float[][] vectors);
 
+  /** Create a {@link Dataset} backed by a on-heap byte array */
+  Dataset newByteArrayDataset(byte[][] vectors);
+
   /** Creates a new BruteForceIndex Builder. */
   BruteForceIndex.Builder newBruteForceIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;
@@ -115,17 +116,18 @@ public interface CuVSProvider {
     return mergeCagraIndexes(indexes);
   }
 
-  /** Creates a new ScalarQuantizer Builder. */
-  ScalarQuantizer.Builder newScalarQuantizerBuilder(CuVSResources cuVSResources)
-      throws UnsupportedOperationException;
-
-  /** Applies binary quantization transform to the given dataset. */
-  QuantizedMatrix binaryQuantizerTransform(CuVSResources cuVSResources, float[][] dataset)
+  Object createScalar8BitQuantizerImpl(CuVSResources resources, Dataset trainingDataset)
       throws Throwable;
 
-  /** Applies binary quantization transform to the given dataset. */
-  QuantizedMatrix binaryQuantizerTransform(CuVSResources cuVSResources, Dataset dataset)
-      throws Throwable;
+  float[][] inverseTransformScalar8Bit(Object impl, Dataset quantizedData) throws Throwable;
+
+  Dataset transformBinary(CuVSResources resources, Dataset input) throws Throwable;
+
+  /** Transforms dataset using Scalar8BitQuantizer */
+  Dataset transformScalar8Bit(Object impl, Dataset input) throws Throwable;
+
+  /** Closes Scalar8BitQuantizer implementation */
+  void closeScalar8BitQuantizer(Object impl) throws Throwable;
 
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {

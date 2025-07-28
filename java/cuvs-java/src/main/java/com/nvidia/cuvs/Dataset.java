@@ -36,6 +36,10 @@ public interface Dataset extends AutoCloseable {
     return CuVSProvider.provider().newArrayDataset(vectors);
   }
 
+  static Dataset ofArray(byte[][] vectors) {
+    return CuVSProvider.provider().newByteArrayDataset(vectors);
+  }
+
   interface Builder {
     /**
      * Add a single vector to the dataset.
@@ -43,6 +47,20 @@ public interface Dataset extends AutoCloseable {
      * @param vector A float array of as many elements as the dimensions
      */
     void addVector(float[] vector);
+
+    /**
+     * Add a single byte vector to the dataset.
+     *
+     * @param vector A byte array of as many elements as the dimensions
+     */
+    void addVector(byte[] vector);
+
+    /**
+     * Add a single boolean vector to the dataset.
+     *
+     * @param vector A boolean array of as many elements as the dimensions
+     */
+    void addVector(boolean[] vector);
 
     Dataset build();
   }
@@ -71,4 +89,11 @@ public interface Dataset extends AutoCloseable {
    * @return Dimensions of the vectors in the dataset
    */
   int dimensions();
+
+  /**
+   * Returns the bit precision of the dataset based on its data type.
+   *
+   * @return The bit precision (8, 16, 32, etc.)
+   */
+  int precision();
 }

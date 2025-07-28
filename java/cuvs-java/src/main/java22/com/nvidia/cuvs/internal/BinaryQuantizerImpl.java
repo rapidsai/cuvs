@@ -27,10 +27,11 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBinaryQuantizerTrans
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMAlloc;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
+import static com.nvidia.cuvs.internal.panama.headers_h.kDLFloat;
+import static com.nvidia.cuvs.internal.panama.headers_h.kDLUInt;
 
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.Dataset;
-import com.nvidia.cuvs.QuantizedMatrix;
 import com.nvidia.cuvs.internal.common.Util;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -47,24 +48,20 @@ public class BinaryQuantizerImpl {
    *
    * @param cuvsResources CuVS resources
    * @param dataset a two-dimensional float array to transform
-   * @return a QuantizedMatrix containing the binary quantized data
+   * @return a Dataset containing the binary quantized data
    */
-  public static QuantizedMatrix transform(CuVSResources cuvsResources, float[][] dataset)
-      throws Throwable {
-    if (!(cuvsResources instanceof CuVSResourcesImpl)) {
-      throw new IllegalArgumentException("Unsupported " + cuvsResources);
-    }
-
-    CuVSResourcesImpl resources = (CuVSResourcesImpl) cuvsResources;
+  public static Dataset transform(CuVSResources cuvsResources, float[][] dataset) throws Throwable {
     Arena resultArena = Arena.ofShared();
 
     try (var localArena = Arena.ofConfined();
-        var resourcesAccessor = resources.access()) {
+        var resourcesAccessor = cuvsResources.access()) {
+
       long rows = dataset.length;
       long cols = rows > 0 ? dataset[0].length : 0;
 
       MemorySegment datasetMemSegment = buildMemorySegment(localArena, dataset);
       long cuvsResourcesPtr = resourcesAccessor.handle();
+
       return performTransform(
           cuvsResourcesPtr, localArena, resultArena, rows, cols, datasetMemSegment, HOST_TO_DEVICE);
     } catch (Throwable t) {
@@ -78,32 +75,43 @@ public class BinaryQuantizerImpl {
    *
    * @param cuvsResources CuVS resources
    * @param dataset a {@link Dataset} object containing the vectors to transform
-   * @return a QuantizedMatrix containing the binary quantized data
+   * @return a Dataset containing the binary quantized data
    */
-  public static QuantizedMatrix transform(CuVSResources cuvsResources, Dataset dataset)
-      throws Throwable {
-    if (!(cuvsResources instanceof CuVSResourcesImpl)) {
-      throw new IllegalArgumentException("Unsupported " + cuvsResources);
+  public static Dataset transform(CuVSResources cuvsResources, Dataset dataset) throws Throwable {
+    // Validate input precision
+    if (dataset.precision() != 32) {
+      throw new IllegalArgumentException(
+          "BinaryQuantizer requires 32-bit float input, got " + dataset.precision() + "-bit");
     }
 
-    CuVSResourcesImpl resources = (CuVSResourcesImpl) cuvsResources;
     Arena resultArena = Arena.ofShared();
 
     try (var localArena = Arena.ofConfined();
-        var resourcesAccessor = resources.access()) {
+        var resourcesAccessor = cuvsResources.access()) {
+
       long rows = dataset.size();
       long cols = dataset.dimensions();
 
       MemorySegment datasetMemSegment = ((DatasetImpl) dataset).asMemorySegment();
       long cuvsResourcesPtr = resourcesAccessor.handle();
-      return performTransform(
-          cuvsResourcesPtr,
-          localArena,
-          resultArena,
-          rows,
-          cols,
-          datasetMemSegment,
-          INFER_DIRECTION);
+
+      Dataset result =
+          performTransform(
+              cuvsResourcesPtr,
+              localArena,
+              resultArena,
+              rows,
+              cols,
+              datasetMemSegment,
+              INFER_DIRECTION);
+
+      // Validate output precision
+      if (result.precision() != 8) {
+        throw new IllegalStateException(
+            "Expected 8-bit output from binary quantization, got " + result.precision() + "-bit");
+      }
+
+      return result;
     } catch (Throwable t) {
       resultArena.close();
       throw t;
@@ -113,7 +121,7 @@ public class BinaryQuantizerImpl {
   /**
    * Core transformation logic shared by both overloads.
    */
-  private static QuantizedMatrix performTransform(
+  private static Dataset performTransform(
       long cuvsResourcesPtr,
       Arena localArena,
       Arena resultArena,
@@ -128,14 +136,13 @@ public class BinaryQuantizerImpl {
     MemorySegment outputD = localArena.allocate(C_POINTER);
 
     long datasetBytes = C_FLOAT_BYTE_SIZE * rows * cols;
-    long outputCols = (cols + 7) / 8; // Ceiling division for bit packing
-    long outputBytes = C_BYTE_SIZE * rows * outputCols;
+    long outputBytes = rows * cols; // 1 byte per element for uint8_t output
 
     int returnValue = cuvsRMMAlloc(cuvsResourcesPtr, datasetD, datasetBytes);
-    checkCuVSError(returnValue, "cuvsRMMAlloc");
+    checkCuVSError(returnValue, "cuvsRMMAlloc for dataset");
 
     returnValue = cuvsRMMAlloc(cuvsResourcesPtr, outputD, outputBytes);
-    checkCuVSError(returnValue, "cuvsRMMAlloc");
+    checkCuVSError(returnValue, "cuvsRMMAlloc for output");
 
     MemorySegment datasetPtr = datasetD.get(C_POINTER, 0);
     MemorySegment outputPtr = outputD.get(C_POINTER, 0);
@@ -144,34 +151,61 @@ public class BinaryQuantizerImpl {
       // Copy input data to device
       cudaMemcpy(datasetPtr, datasetMemSegment, datasetBytes, memcpyDirection);
 
-      // Prepare tensors
-      long datasetShape[] = {rows, cols};
-      long outputShape[] = {rows, outputCols};
-      MemorySegment datasetTensor =
-          prepareTensor(localArena, datasetPtr, datasetShape, 2, 32, 2, 2, 1);
-      MemorySegment outputTensor = prepareTensor(localArena, outputPtr, outputShape, 1, 8, 2, 2, 1);
+      // Synchronize before transformation
+      returnValue = cuvsStreamSync(cuvsResourcesPtr);
+      checkCuVSError(returnValue, "cuvsStreamSync before transform");
 
-      // Transform
+      // Prepare tensors with correct device context and data types
+      long datasetShape[] = {rows, cols};
+      long outputShape[] = {rows, cols};
+
+      MemorySegment datasetTensor =
+          prepareTensor(
+              localArena,
+              datasetPtr,
+              datasetShape,
+              kDLFloat(),
+              32,
+              2, // ndim
+              2, // device_type: use 2 to match your working quantizers
+              1 // device_id
+              );
+
+      MemorySegment outputTensor =
+          prepareTensor(
+              localArena,
+              outputPtr,
+              outputShape,
+              kDLUInt(),
+              8, // Use kDLInt with 8-bit for uint8_t output
+              2, // ndim
+              2, // device_type: use 2 to match your working quantizers
+              1 // device_id
+              );
+
+      // Use the training + transform pattern by calling the native function
+      // that handles training internally (as shown in the C implementation)
       returnValue = cuvsBinaryQuantizerTransform(cuvsResourcesPtr, datasetTensor, outputTensor);
       checkCuVSError(returnValue, "cuvsBinaryQuantizerTransform");
 
+      // Synchronize after transformation
       returnValue = cuvsStreamSync(cuvsResourcesPtr);
-      checkCuVSError(returnValue, "cuvsStreamSync");
+      checkCuVSError(returnValue, "cuvsStreamSync after transform");
 
-      // Copy result back to host using the shared result arena
+      // Copy result back to host
       MemorySegment outputMemSegment = resultArena.allocate(C_CHAR, outputBytes);
       cudaMemcpy(outputMemSegment, outputPtr, outputBytes, DEVICE_TO_HOST);
 
-      // Create QuantizedMatrix with the shared result arena (1 bit per value for binary
-      // quantization)
-      return new QuantizedMatrixImpl(outputMemSegment, rows, cols, 1, resultArena);
+      // Create DatasetImpl with 8-bit quantized data
+      return new DatasetImpl(resultArena, outputMemSegment, (int) rows, (int) cols);
 
     } finally {
       // Free device memory
       returnValue = cuvsRMMFree(cuvsResourcesPtr, datasetPtr, datasetBytes);
-      checkCuVSError(returnValue, "cuvsRMMFree");
+      checkCuVSError(returnValue, "cuvsRMMFree for dataset");
+
       returnValue = cuvsRMMFree(cuvsResourcesPtr, outputPtr, outputBytes);
-      checkCuVSError(returnValue, "cuvsRMMFree");
+      checkCuVSError(returnValue, "cuvsRMMFree for output");
     }
   }
 }

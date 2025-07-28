@@ -20,108 +20,107 @@ import java.util.BitSet;
 import java.util.function.LongToIntFunction;
 
 /**
- * CagraQuery holds the CagraSearchParams and the query vectors to be used while
- * invoking search.
+ * CagraQuery holds the search parameters plus either raw float[][] vectors
+ * or a quantized {@link Dataset} for querying a CAGRA index.
  *
  * @since 25.02
  */
 public class CagraQuery {
 
   private final CagraSearchParams cagraSearchParameters;
-  private final LongToIntFunction mapping;
   private final float[][] queryVectors;
+  private final Dataset quantizedQueries;
+  private final LongToIntFunction mapping;
   private final int topK;
   private final BitSet prefilter;
   private final int numDocs;
 
-  /**
-   * Constructs an instance of {@link CagraQuery} using cagraSearchParameters,
-   * preFilter, queryVectors, mapping, and topK.
-   *
-   * @param cagraSearchParameters an instance of {@link CagraSearchParams} holding
-   *                              the search parameters
-   * @param queryVectors          2D float query vector array
-   * @param mapping               a function mapping ordinals (neighbor IDs) to custom user IDs
-   * @param topK                  the top k results to return
-   * @param prefilter             A single BitSet to use as filter while searching the CAGRA index
-   * @param numDocs               Total number of dataset vectors; used to align the prefilter correctly
-   */
-  public CagraQuery(
+  private CagraQuery(
       CagraSearchParams cagraSearchParameters,
       float[][] queryVectors,
+      Dataset quantizedQueries,
       LongToIntFunction mapping,
       int topK,
       BitSet prefilter,
       int numDocs) {
-    super();
     this.cagraSearchParameters = cagraSearchParameters;
     this.queryVectors = queryVectors;
+    this.quantizedQueries = quantizedQueries;
     this.mapping = mapping;
     this.topK = topK;
     this.prefilter = prefilter;
     this.numDocs = numDocs;
   }
 
-  /**
-   * Gets the instance of CagraSearchParams initially set.
-   *
-   * @return an instance CagraSearchParams
-   */
+  /** Start building a new CagraQuery. */
+  public static Builder newBuilder() {
+    return new Builder();
+  }
+
   public CagraSearchParams getCagraSearchParameters() {
     return cagraSearchParameters;
   }
 
   /**
-   * Gets the query vector 2D float array.
-   *
-   * @return 2D float array
+   * If this query was built without a quantizer, returns the original float vectors.
+   * Otherwise returns null.
    */
   public float[][] getQueryVectors() {
     return queryVectors;
   }
 
   /**
-   * Gets the function mapping ordinals (neighbor IDs) to custom user IDs
+   * If this query was built with a quantizer, returns the quantized Dataset.
+   * Otherwise returns null.
    */
+  public Dataset getQuantizedQueries() {
+    return quantizedQueries;
+  }
+
+  /** True if this query carries a quantized Dataset instead of float[][] */
+  public boolean hasQuantizedQueries() {
+    return quantizedQueries != null;
+  }
+
+  /**
+   * Returns the bit‐precision of the query payload:
+   * 32 for raw floats, 8 or 1 for quantized.
+   */
+  public int getQueryPrecision() {
+    return quantizedQueries != null ? quantizedQueries.precision() : 32;
+  }
+
+  public CuVSQuantizer getQuantizer() {
+    return null;
+  }
+
   public LongToIntFunction getMapping() {
     return mapping;
   }
 
-  /**
-   * Gets the topK value.
-   *
-   * @return the topK value
-   */
   public int getTopK() {
     return topK;
   }
 
-  /**
-   * Gets the prefilter BitSet.
-   *
-   * @return a BitSet object representing the prefilter
-   */
   public BitSet getPrefilter() {
     return prefilter;
   }
 
-  /**
-   * Gets the number of documents in this index, as used for prefilter
-   *
-   * @return number of documents as an integer
-   */
   public int getNumDocs() {
     return numDocs;
   }
 
   @Override
   public String toString() {
-    return "CuVSQuery [cagraSearchParameters="
+    return "CagraQuery["
+        + "params="
         + cagraSearchParameters
-        + ", queryVectors="
-        + Arrays.toString(queryVectors)
-        + ", mapping="
-        + mapping
+        + ", floatVectors="
+        + (queryVectors != null ? Arrays.toString(queryVectors) : "null")
+        + ", quantized="
+        + (quantizedQueries != null
+            ? ("Dataset@" + quantizedQueries.precision() + "-bit")
+            : "false")
         + ", topK="
         + topK
         + "]";
@@ -138,67 +137,30 @@ public class CagraQuery {
     private int topK = 2;
     private BitSet prefilter;
     private int numDocs;
+    private CuVSQuantizer quantizer;
 
-    /**
-     * Default constructor.
-     */
     public Builder() {}
 
-    /**
-     * Sets the instance of configured CagraSearchParams to be passed for search.
-     *
-     * @param cagraSearchParams an instance of the configured CagraSearchParams to
-     *                          be used for this query
-     * @return an instance of this Builder
-     */
-    public Builder withSearchParams(CagraSearchParams cagraSearchParams) {
-      this.cagraSearchParams = cagraSearchParams;
+    public Builder withSearchParams(CagraSearchParams params) {
+      this.cagraSearchParams = params;
       return this;
     }
 
-    /**
-     * Registers the query vectors to be passed in the search call.
-     *
-     * @param queryVectors 2D float query vector array
-     * @return an instance of this Builder
-     */
     public Builder withQueryVectors(float[][] queryVectors) {
       this.queryVectors = queryVectors;
       return this;
     }
 
-    /**
-     * Sets the function used to map ordinals (neighbor IDs) to custom user IDs
-     *
-     * @param mapping a function mapping ordinals (neighbor IDs) to custom user IDs
-     * @return an instance of this Builder
-     */
     public Builder withMapping(LongToIntFunction mapping) {
       this.mapping = mapping;
       return this;
     }
 
-    /**
-     * Registers the topK value.
-     *
-     * @param topK the topK value used to retrieve the topK results
-     * @return an instance of this Builder
-     */
     public Builder withTopK(int topK) {
       this.topK = topK;
       return this;
     }
 
-    /**
-     * Sets a global prefilter for all queries in this {@link CagraQuery}.
-     * The {@code prefilter} array must contain exactly one {@link BitSet},
-     * which is applied to all queries. A bit value of {@code 1} includes the
-     * corresponding dataset vector; {@code 0} excludes it.
-     *
-     * @param prefilter an array with the global filter BitSet
-     * @param numDocs total number of vectors in the dataset (for alignment)
-     * @return this {@link Builder} instance
-     */
     public Builder withPrefilter(BitSet prefilter, int numDocs) {
       this.prefilter = prefilter;
       this.numDocs = numDocs;
@@ -206,12 +168,46 @@ public class CagraQuery {
     }
 
     /**
-     * Builds an instance of CuVSQuery.
-     *
-     * @return an instance of CuVSQuery
+     * Specify a quantizer to automatically transform the float[][] queryVectors
+     * into a quantized {@link Dataset} using the same quantizer used for training.
      */
-    public CagraQuery build() {
-      return new CagraQuery(cagraSearchParams, queryVectors, mapping, topK, prefilter, numDocs);
+    public Builder withQuantizer(CuVSQuantizer quantizer) {
+      this.quantizer = quantizer;
+      return this;
+    }
+
+    @Override
+    public CuVSQuantizer getQuantizer() {
+      return quantizer;
+    }
+
+    /**
+     * Builds the CagraQuery. If a quantizer was provided, queryVectors is ignored
+     * and a quantized Dataset is produced instead.
+     */
+    public CagraQuery build() throws Throwable {
+      if (queryVectors == null) {
+        throw new IllegalArgumentException("Query vectors must be provided");
+      }
+
+      Dataset quantized = null;
+      float[][] floatsForQuery = queryVectors;
+
+      if (quantizer != null) {
+        // wrap float[][] in a Dataset and quantize
+        Dataset tmp = Dataset.ofArray(queryVectors);
+        if (tmp.precision() != 32) {
+          tmp.close();
+          throw new IllegalArgumentException(
+              "Query quantization requires 32-bit float input, got " + tmp.precision() + "-bit");
+        }
+        quantized = quantizer.transform(tmp);
+        tmp.close();
+        floatsForQuery = null;
+      }
+
+      return new CagraQuery(
+          cagraSearchParams, floatsForQuery, quantized, mapping, topK, prefilter, numDocs);
     }
   }
 }
