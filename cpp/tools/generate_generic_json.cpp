@@ -66,7 +66,7 @@ static llvm::cl::opt<unsigned> NumThreads(
 
 static llvm::cl::opt<std::string> ManifestFile(
   "manifest",
-  llvm::cl::desc("Output file containing list of generated files"),
+  llvm::cl::desc("Output CMake file with target definitions and dependencies"),
   llvm::cl::Required,
   llvm::cl::cat(ToolCategory));
 
@@ -637,12 +637,44 @@ std::string GenerateImplementations(const std::vector<GenericInfo>& classes,
 
 using json = nlohmann::json;
 
+// Template functions to transform to and from JSON objects
+template<typename T>
+nlohmann::json to_json_helper(const T& obj) {
+    if constexpr (std::is_convertible_v<T, nlohmann::json>) {
+        return nlohmann::json(obj);
+    } else {
+        return cuvs::core::generic<T>::to_json(obj);
+    }
+}
+
+template<typename T>
+auto from_json_helper(const nlohmann::json& j) -> T {
+    if constexpr (std::is_convertible_v<nlohmann::json, T>) {
+        return j.get<T>();
+    } else {
+        return cuvs::core::generic<T>::from_json(j);
+    }
+}
+
+template<typename T>
+auto get_from_json(const nlohmann::json& j, const std::string& key, const T& default_value) -> T {
+    if constexpr (std::is_convertible_v<nlohmann::json, T>) {
+        return j.value(key, default_value);
+    } else {
+        if (j.contains(key)) {
+            return cuvs::core::generic<T>::from_json(j[key]);
+        } else {
+            return default_value;
+        }
+    }
+}
+
 template<typename Variant, std::size_t... Is>
 void deserialize_at_index_impl(Variant& variant, const json& j, std::size_t index, std::index_sequence<Is...>) {
     ((index == Is ? [&]() {
         using T = std::variant_alternative_t<Is, Variant>;
         if constexpr (std::is_convertible_v<json, T>) {
-            variant = j.get<T>();
+            variant = from_json_helper<T>(j);
         }
     }() : void()), ...);
 }
@@ -674,18 +706,18 @@ void deserialize_variant_by_index(Variant& variant, const json& j, std::size_t i
     code += "void to_json(json& j, const " + qname + "& obj) {\n";
     for (const auto& [field_name, field_type] : cls.fields) {
       if (field_type.find("std::optional") == 0) {
-        code += "  if (obj." + field_name + ".has_value()) j[\"" + field_name + "\"] = obj." +
-                field_name + ".value();\n";
+        code += "  if (obj." + field_name + ".has_value()) j[\"" + field_name +
+                "\"] = to_json_helper(obj." + field_name + ".value());\n";
       } else if (field_type.find("std::variant") == 0) {
         code += "  j[\"" + field_name + "_variant\"] = obj." + field_name + ".index();\n";
         code += "  std::visit([&](const auto& value) {\n";
         code +=
           "    if constexpr (!std::is_same_v<std::decay_t<decltype(value)>, std::monostate>) {\n";
-        code += "      j[\"" + field_name + "\"] = value;\n";
+        code += "      j[\"" + field_name + "\"] = to_json_helper(value);\n";
         code += "    }\n";
         code += "  }, obj." + field_name + ");\n";
       } else {
-        code += "  j[\"" + field_name + "\"] = obj." + field_name + ";\n";
+        code += "  j[\"" + field_name + "\"] = to_json_helper(obj." + field_name + ");\n";
       }
     }
     code += "}\n";
@@ -695,7 +727,8 @@ void deserialize_variant_by_index(Variant& variant, const json& j, std::size_t i
     for (const auto& [field_name, field_type] : cls.fields) {
       if (field_type.find("std::optional") == 0) {
         code += "  if (j.contains(\"" + field_name + "\")) {\n";
-        code += "    obj." + field_name + " = j[\"" + field_name + "\"];\n";
+        code += "    obj." + field_name + " = from_json_helper<std::decay_t<decltype(obj." +
+                field_name + ".value())>>(j[\"" + field_name + "\"]);\n";
         code += "  }\n";
       } else if (field_type.find("std::variant") == 0) {
         code += "  if (j.contains(\"" + field_name + "_variant\") && j.contains(\"" + field_name +
@@ -705,8 +738,8 @@ void deserialize_variant_by_index(Variant& variant, const json& j, std::size_t i
                 "\"], variant_index);\n";
         code += "  }\n";
       } else {
-        code +=
-          "  obj." + field_name + " = j.value(\"" + field_name + "\", obj." + field_name + ");\n";
+        code += "  obj." + field_name + " = get_from_json(j, \"" + field_name + "\", obj." +
+                field_name + ");\n";
       }
     }
     code += "}\n";
@@ -769,6 +802,104 @@ std::string generateOutputFilename(const std::string& source_file)
   return safe_name + ext;
 }
 
+// Generate CMake content for targets and dependencies
+std::string generateCMakeContent(
+  const std::unordered_map<std::string, std::vector<GenericInfo>>& classes_by_source)
+{
+  // We inherit the options and includes from the root target, which is an object library,
+  // so we don't need to link it explicitly.
+  const std::string root_target = "cuvs_objs";
+  std::ostringstream cmake_content;
+
+  // Write header comment explaining the CMake file
+  cmake_content << "# Generated CMake file for generic JSON serialization\n";
+  cmake_content << "# AUTO-GENERATED - DO NOT EDIT\n";
+  cmake_content << "#\n";
+  cmake_content << "# This file creates object library targets for each generated source file\n";
+  cmake_content << "# and adds them as dependencies to the targets that use the generic classes.\n";
+  cmake_content << "# Target names are extracted from CMakeFiles/<TARGET_NAME>.dir/ patterns\n";
+  cmake_content << "# in the compilation database.\n";
+  cmake_content << "#\n\n";
+
+  for (const auto& [source_file, classes] : classes_by_source) {
+    if (classes.empty()) continue;
+
+    std::string output_filename = generateOutputFilename(source_file);
+    std::string output_path     = OutputDir.getValue() + "/" + output_filename;
+
+    // Create a safe target name based on the output filename
+    std::string target_name = "cuvs_generic_" + output_filename;
+    // Remove file extension from target name
+    size_t ext_pos = target_name.find_last_of('.');
+    if (ext_pos != std::string::npos) { target_name = target_name.substr(0, ext_pos); }
+
+    // Collect all unique target names for classes in this file
+    std::set<std::string> all_targets;
+    for (const auto& cls : classes) {
+      all_targets.insert(cls.target_names.begin(), cls.target_names.end());
+    }
+
+    // Create object library target
+    cmake_content << "# Generated from " << source_file << "\n";
+    cmake_content << "add_library(" << target_name << " OBJECT \"" << output_path << "\")\n";
+    cmake_content << "target_link_libraries(" << target_name << "\n";
+    cmake_content << "  PRIVATE " << root_target << "\n";
+    cmake_content << "  PUBLIC nlohmann_json::nlohmann_json\n";
+    cmake_content << ")\n";
+    cmake_content << "set_target_properties(" << target_name << " PROPERTIES\n";
+    cmake_content << "  CXX_STANDARD 17\n";
+    cmake_content << "  CXX_STANDARD_REQUIRED ON\n";
+
+    // Check if this is a CUDA file
+    if (output_path.find(".cu") != std::string::npos) {
+      cmake_content << "  CUDA_STANDARD 17\n";
+      cmake_content << "  CUDA_STANDARD_REQUIRED ON\n";
+    }
+    cmake_content << ")\n\n";
+
+    // Add dependencies to original targets
+    for (const auto& target : all_targets) {
+      if (target == root_target) { continue; }  // Don't add circular dependencies
+      cmake_content << "if(TARGET " << target << ")\n";
+      cmake_content << "  target_link_libraries(" << target << " PRIVATE " << target_name << ")\n";
+      cmake_content << "endif()\n";
+    }
+    cmake_content << "\n";
+  }
+
+  return cmake_content.str();
+}
+
+// Write CMake file only if content has changed to avoid infinite CMake reconfiguration
+bool writeCMakeFileIfChanged(const std::string& file_path, const std::string& new_content)
+{
+  // Try to read existing content
+  std::string existing_content;
+  {
+    std::ifstream existing_file(file_path);
+    if (existing_file) {
+      std::ostringstream buffer;
+      buffer << existing_file.rdbuf();
+      existing_content = buffer.str();
+      existing_file.close();
+    }
+  }
+
+  // Only write if content is different
+  if (existing_content != new_content) {
+    std::ofstream cmake_file(file_path);
+    if (!cmake_file) {
+      llvm::errs() << "Error: Could not open CMake file " << file_path << "\n";
+      return false;
+    }
+    cmake_file << new_content;
+    cmake_file.close();
+    return true;
+  }
+
+  return false;  // No change needed
+}
+
 int main(int argc, const char** argv)
 {
   // Parse command line options
@@ -805,13 +936,20 @@ int main(int argc, const char** argv)
   if (filtered_files.empty()) {
     llvm::outs() << "No source files found\n";
 
-    // Create empty manifest file
-    std::ofstream manifest(ManifestFile);
-    if (!manifest) {
-      llvm::errs() << "Error: Could not open manifest file " << ManifestFile << "\n";
-      return 1;
+    // Create empty CMake file content
+    std::string empty_cmake_content =
+      "# Generated CMake file for generic JSON serialization\n"
+      "# AUTO-GENERATED - DO NOT EDIT\n"
+      "#\n"
+      "# No generic classes found - empty file\n"
+      "#\n";
+
+    bool file_was_written = writeCMakeFileIfChanged(ManifestFile, empty_cmake_content);
+    if (file_was_written) {
+      llvm::outs() << "Empty CMake file written to " << ManifestFile << "\n";
+    } else {
+      llvm::outs() << "Empty CMake file " << ManifestFile << " already up-to-date\n";
     }
-    manifest.close();
 
     return 0;
   }
@@ -902,50 +1040,20 @@ int main(int argc, const char** argv)
     generated_files.push_back(output_path);
   }
 
-  // Write manifest file with target information
-  // Format: <generated_file_path>:<target1>,<target2>,...
-  // This allows CMake to know which targets need which generated files
-  std::ofstream manifest(ManifestFile);
-  if (!manifest) {
-    llvm::errs() << "Error: Could not open manifest file " << ManifestFile << "\n";
-    return 1;
+  // Generate CMake content and write only if changed
+  std::string cmake_content = generateCMakeContent(classes_by_source);
+  bool file_was_written     = writeCMakeFileIfChanged(ManifestFile, cmake_content);
+
+  if (!file_was_written) {
+    llvm::outs() << "CMake file content unchanged - skipping write to avoid reconfiguration\n";
   }
-
-  // Write header comment explaining the manifest format
-  manifest << "# Generated files manifest\n";
-  manifest << "# Format: <generated_file_path>:<target1>,<target2>,...\n";
-  manifest << "# Each line contains a generated file path followed by a colon and\n";
-  manifest << "# a comma-separated list of target names that use classes from this file.\n";
-  manifest << "# Target names are extracted from CMakeFiles/<TARGET_NAME>.dir/ patterns\n";
-  manifest << "# in the compilation database.\n";
-  manifest << "#\n";
-
-  for (const auto& [source_file, classes] : classes_by_source) {
-    if (classes.empty()) continue;
-
-    std::string output_filename = generateOutputFilename(source_file);
-    std::string output_path     = OutputDir.getValue() + "/" + output_filename;
-
-    // Collect all unique target names for classes in this file
-    std::set<std::string> all_targets;
-    for (const auto& cls : classes) {
-      all_targets.insert(cls.target_names.begin(), cls.target_names.end());
-    }
-
-    manifest << output_path << ":";
-    bool first = true;
-    for (const auto& target : all_targets) {
-      if (!first) manifest << ",";
-      manifest << target;
-      first = false;
-    }
-    manifest << "\n";
-  }
-
-  manifest.close();
 
   llvm::outs() << "Generated " << generated_files.size() << " files\n";
-  llvm::outs() << "Manifest written to " << ManifestFile << "\n";
+  if (file_was_written) {
+    llvm::outs() << "CMake file written to " << ManifestFile << "\n";
+  } else {
+    llvm::outs() << "CMake file " << ManifestFile << " already up-to-date\n";
+  }
 
   return 0;
 }
