@@ -478,7 +478,6 @@ void batch_build(
   BatchBuildAux<IdxT>* aux_vectors                                      = nullptr,
   DistEpilogueT dist_epilogue                                           = DistEpilogueT{})
 {
-  // TODO: need to optimize for reuse of cluster_offsets, cluster_sizes, inverted_indices
   if (raft::resource::is_multi_gpu(handle)) {
     // For efficient CPU-computation of omp parallel for regions per GPU
     omp_set_nested(1);
