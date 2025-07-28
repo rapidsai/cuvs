@@ -178,7 +178,7 @@ void reduce_min(OutT* out,
 }
 
 template <typename DataT, typename AccT, typename OutT, typename IdxT>
-void cublas_l2nn(OutT* out,
+void unfused_distance_nn(OutT* out,
                  const DataT* x,
                  const DataT* y,
                  IdxT M,
@@ -321,7 +321,7 @@ void unfusedDistanceNNMinReduce(OutT* min,
                                 cudaStream_t stream,
                                 cublasHandle_t& cublas_h)
 {
-  cublas_l2nn<DataT, DataT, OutT, IdxT>(
+  unfused_distance_nn<DataT, DataT, OutT, IdxT>(
     min, x, y, m, n, k, xn, yn, (DataT*)workspace, is_sqrt, cublas_h, stream);
 }
 
