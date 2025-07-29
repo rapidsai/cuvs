@@ -21,11 +21,10 @@
 
 namespace cuvs::neighbors::hnsw {
 
-auto cagra_compat_params(raft::matrix_extent<int64_t> dataset,
-                         int M,
-                         int ef_construction,
-                         cuvs::distance::DistanceType metric)
-  -> cuvs::neighbors::cagra::index_params
+auto to_cagra_params(raft::matrix_extent<int64_t> dataset,
+                     int M,
+                     int ef_construction,
+                     cuvs::distance::DistanceType metric) -> cuvs::neighbors::cagra::index_params
 {
   auto ivf_pq_params = cuvs::neighbors::graph_build_params::ivf_pq_params(dataset, metric);
   ivf_pq_params.search_params.n_probes =

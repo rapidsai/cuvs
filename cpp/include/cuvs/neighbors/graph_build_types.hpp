@@ -75,10 +75,17 @@ struct ivf_pq_params {
       }
     }
 
-    build_params.n_lists                  = std::max<uint32_t>(1, n_rows / 2000);
-    build_params.kmeans_n_iters           = 10;
-    build_params.kmeans_trainset_fraction = std::min(1.0, 1.0 / std::sqrt(n_rows * 1e-5));
-    build_params.codebook_kind            = ivf_pq::codebook_gen::PER_SUBSPACE;
+    build_params.n_lists        = std::max<uint32_t>(1, n_rows / 2000);
+    build_params.kmeans_n_iters = 10;
+
+    const double kMinPointsPerCluster         = 32;
+    const double min_kmeans_trainset_points   = kMinPointsPerCluster * build_params.n_lists;
+    const double max_kmeans_trainset_fraction = 1.0;
+    const double min_kmeans_trainset_fraction =
+      std::min(max_kmeans_trainset_fraction, min_kmeans_trainset_points / n_rows);
+    build_params.kmeans_trainset_fraction = std::clamp(
+      1.0 / std::sqrt(n_rows * 1e-5), min_kmeans_trainset_fraction, max_kmeans_trainset_fraction);
+    build_params.codebook_kind = ivf_pq::codebook_gen::PER_SUBSPACE;
 
     search_params                         = cuvs::neighbors::ivf_pq::search_params{};
     search_params.n_probes                = std::round(std::sqrt(build_params.n_lists) / 20 + 4);

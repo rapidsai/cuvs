@@ -86,12 +86,12 @@ struct index_params : cuvs::neighbors::index_params {
  *   using namespace cuvs::neighbors;
  *   raft::resources res;
  *   auto dataset = raft::make_device_matrix<float, int64_t>(res, N, D);
- *   auto cagra_params = cagra_compat_params(dataset.extents(), M, efc);
+ *   auto cagra_params = to_cagra_params(dataset.extents(), M, efc);
  *   auto cagra_index = cagra::build(res, cagra_params, dataset);
  *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, cagra_index);
  * @endcode
  */
-cuvs::neighbors::cagra::index_params cagra_compat_params(
+cuvs::neighbors::cagra::index_params to_cagra_params(
   raft::matrix_extent<int64_t> dataset,
   int M,
   int ef_construction,

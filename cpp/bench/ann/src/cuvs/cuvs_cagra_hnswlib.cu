@@ -59,7 +59,7 @@ auto parse_build_param(const nlohmann::json& conf) ->
     // to override them.
     cagra_params.cagra_params = [conf, hnsw_params](raft::matrix_extent<int64_t> extents,
                                                     cuvs::distance::DistanceType dist_type) {
-      auto ps = cuvs::neighbors::hnsw::cagra_compat_params(
+      auto ps = cuvs::neighbors::hnsw::to_cagra_params(
         extents, conf.at("M"), hnsw_params.ef_construction, dist_type);
       ps.metric = dist_type;
       // NB: above, we only provide the defaults. Below we parse the explicit parameters as usual.
