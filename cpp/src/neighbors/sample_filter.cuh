@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@
 namespace cuvs::neighbors::filtering {
 
 /* A filter that filters nothing. This is the default behavior. */
-inline _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
+inline _RAFT_HOST_DEVICE bool base_filter::operator()(
   // query index
   const uint32_t query_ix,
   // the current inverted list index
@@ -39,15 +39,29 @@ inline _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
   return true;
 }
 
-/* A filter that filters nothing. This is the default behavior. */
-inline _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
-  // query index
-  const uint32_t query_ix,
-  // the index of the current sample
-  const uint32_t sample_ix) const
-{
-  return true;
-}
+// /* A filter that filters nothing. This is the default behavior. */
+// inline _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
+//   // query index
+//   const uint32_t query_ix,
+//   // the current inverted list index
+//   const uint32_t cluster_ix,
+//   // the index of the current sample inside the current inverted list
+//   const uint32_t sample_ix) const
+// {
+//   printf("nonsample 3 arg printed\n");
+//   return true;
+// }
+
+// /* A filter that filters nothing. This is the default behavior. */
+// inline _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
+//   // query index
+//   const uint32_t query_ix,
+//   // the index of the current sample
+//   const uint32_t sample_ix) const
+// {
+//   printf("nonsample 2 arg printed\n");
+//   return true;
+// }
 
 template <typename filter_t, typename = void>
 struct takes_three_args : std::false_type {};
@@ -66,8 +80,8 @@ struct takes_three_args<
  * @tparam filter_t
  */
 template <typename index_t, typename filter_t>
-ivf_to_sample_filter<index_t, filter_t>::ivf_to_sample_filter(const index_t* const* inds_ptrs,
-                                                              const filter_t next_filter)
+_RAFT_HOST_DEVICE ivf_to_sample_filter<index_t, filter_t>::ivf_to_sample_filter(
+  const index_t* const* inds_ptrs, const filter_t next_filter)
   : inds_ptrs_{inds_ptrs}, next_filter_{next_filter}
 {
 }
@@ -93,7 +107,7 @@ inline _RAFT_HOST_DEVICE bool ivf_to_sample_filter<index_t, filter_t>::operator(
 }
 
 template <typename bitset_t, typename index_t>
-bitset_filter<bitset_t, index_t>::bitset_filter(
+_RAFT_HOST_DEVICE bitset_filter<bitset_t, index_t>::bitset_filter(
   const cuvs::core::bitset_view<bitset_t, index_t> bitset_for_filtering)
   : bitset_view_{bitset_for_filtering}
 {
@@ -107,6 +121,7 @@ inline _RAFT_HOST_DEVICE bool bitset_filter<bitset_t, index_t>::operator()(
   const uint32_t sample_ix) const
 {
   return bitset_view_.test(sample_ix);
+  // return true;
 }
 
 template <typename bitset_t, typename index_t>
