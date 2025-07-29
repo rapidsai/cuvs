@@ -708,7 +708,6 @@ void compute_similarity_run(selected<OutT, LutT> s,
       auto& typed_sample_filter = dynamic_cast<
         const filtering::ivf_to_sample_filter<int64_t, filtering::none_sample_filter>&>(
         sample_filter_ref);
-
       ivf_no_filter ivf_no_filter_(typed_sample_filter.inds_ptrs_);
       s.kernel<<<s.grid_dim, s.block_dim, s.smem_size, stream>>>(dim,
                                                                  n_probes,
@@ -741,7 +740,6 @@ void compute_similarity_run(selected<OutT, LutT> s,
           sample_filter_ref);
       ivf_bitset_filter ivf_bitset_filter_(typed_sample_filter.inds_ptrs_,
                                            typed_sample_filter.next_filter_.bitset_view_);
-      printf("got dev filter ptr BITSET\n");
       s.kernel<<<s.grid_dim, s.block_dim, s.smem_size, stream>>>(
         dim,
         n_probes,
@@ -764,7 +762,6 @@ void compute_similarity_run(selected<OutT, LutT> s,
         lut_scores,
         _out_scores,
         _out_indices);
-
       cudaDeviceSynchronize();
       break;
     }

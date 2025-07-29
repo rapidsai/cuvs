@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * Copyright (c) 2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,12 +28,10 @@ TEST_BUILD_SERIALIZE_SEARCH(f32_f32_i64)
 INSTANTIATE(f32_f32_i64,
             defaults() + small_dims() + big_dims_moderate_lut() + enum_variety_l2() +
               enum_variety_l2sqrt() + enum_variety_ip() + enum_variety_cosine());
-// INSTANTIATE(f32_f32_i64, defaults());
 
 TEST_BUILD_SEARCH(f32_f32_i64_filter)
 INSTANTIATE(f32_f32_i64_filter,
             defaults() + small_dims() + big_dims_moderate_lut() + enum_variety_l2() +
               enum_variety_l2sqrt() + enum_variety_ip() + enum_variety_cosine());
-// INSTANTIATE(f32_f32_i64_filter, defaults());
 
 }  // namespace cuvs::neighbors::ivf_pq

@@ -485,40 +485,25 @@ namespace filtering {
 enum class FilterType { Base, None, Bitmap, Bitset };
 
 struct base_filter {
-  _RAFT_HOST_DEVICE base_filter() {};
-  _RAFT_HOST_DEVICE virtual ~base_filter()   = default;
+  virtual ~base_filter()                     = default;
   virtual FilterType get_filter_type() const = 0;
-  _RAFT_HOST_DEVICE virtual bool operator()(
+};
+
+/* A filter that filters nothing. This is the default behavior. */
+struct none_sample_filter : public base_filter {
+  inline _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
     // the current inverted list index
     const uint32_t cluster_ix,
     // the index of the current sample inside the current inverted list
     const uint32_t sample_ix) const;
-};
-
-/* A filter that filters nothing. This is the default behavior. */
-struct none_sample_filter : public base_filter {
-  inline _RAFT_HOST_DEVICE none_sample_filter() {};
-  inline _RAFT_HOST_DEVICE bool operator()(
-    // query index
-    const uint32_t query_ix,
-    // the current inverted list index
-    const uint32_t cluster_ix,
-    // the index of the current sample inside the current inverted list
-    const uint32_t sample_ix) const override
-  {
-    return true;
-  };
 
   inline _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
     // the index of the current sample
-    const uint32_t sample_ix) const
-  {
-    return true;
-  };
+    const uint32_t sample_ix) const;
 
   FilterType get_filter_type() const override { return FilterType::None; }
 };
@@ -536,8 +521,7 @@ struct ivf_to_sample_filter : public base_filter {
   const index_t* const* inds_ptrs_;
   const filter_t next_filter_;
 
-  _RAFT_HOST_DEVICE ivf_to_sample_filter(const index_t* const* inds_ptrs,
-                                         const filter_t next_filter);
+  ivf_to_sample_filter(const index_t* const* inds_ptrs, const filter_t next_filter);
 
   /** If the original filter takes three arguments, then don't modify the arguments.
    * If the original filter takes two arguments, then we are using `inds_ptr_` to obtain the sample
@@ -549,7 +533,7 @@ struct ivf_to_sample_filter : public base_filter {
     // the current inverted list index
     const uint32_t cluster_ix,
     // the index of the current sample inside the current inverted list
-    const uint32_t sample_ix) const override;
+    const uint32_t sample_ix) const;
 
   FilterType get_filter_type() const override { return next_filter_.get_filter_type(); }
 };
@@ -562,7 +546,6 @@ struct ivf_to_sample_filter : public base_filter {
  */
 template <typename bitmap_t, typename index_t>
 struct bitmap_filter : public base_filter {
-  using base_filter::operator();
   using view_t = cuvs::core::bitmap_view<bitmap_t, index_t>;
 
   // View of the bitset to use as a filter
@@ -591,13 +574,12 @@ struct bitmap_filter : public base_filter {
  */
 template <typename bitset_t, typename index_t>
 struct bitset_filter : public base_filter {
-  using base_filter::operator();
   using view_t = cuvs::core::bitset_view<bitset_t, index_t>;
 
   // View of the bitset to use as a filter
   const view_t bitset_view_;
 
-  _RAFT_HOST_DEVICE bitset_filter(const view_t bitset_for_filtering);
+  bitset_filter(const view_t bitset_for_filtering);
 
   inline _RAFT_HOST_DEVICE bool operator()(
     // query index
