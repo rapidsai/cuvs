@@ -120,16 +120,16 @@ public class TieredIndexImpl implements TieredIndex {
       long rows = dataset.size();
       long cols = dataset.columns();
 
-      CloseableHandle indexParamsHandle =
-          tieredIndexParameters != null
-              ? segmentFromIndexParams(localArena, tieredIndexParameters)
-              : CloseableHandle.NULL;
-      MemorySegment indexParamsMemorySegment = indexParamsHandle.handle();
-
       // Get host data
       MemorySegment hostDataSeg = ((CuVSHostMatrixImpl) dataset).memorySegment();
 
-      try (var resourceAccess = resources.access()) {
+      try (var resourceAccess = resources.access();
+          var indexParamsHandle =
+              tieredIndexParameters != null
+                  ? segmentFromIndexParams(localArena, tieredIndexParameters)
+                  : CloseableHandle.NULL) {
+
+        MemorySegment indexParamsMemorySegment = indexParamsHandle.handle();
         long cuvsRes = resourceAccess.handle();
 
         // TieredIndex REQUIRES device memory - allocate it
