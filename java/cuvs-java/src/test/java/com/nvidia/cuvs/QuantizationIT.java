@@ -77,7 +77,7 @@ public class QuantizationIT extends CuVSTestCase {
     try (CuVSResources resources = CheckedCuVSResources.create()) {
 
       // 1. Create training dataset
-      Dataset trainingDataset = Dataset.ofArray(dataset);
+      CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
       assertEquals("Training dataset should be 32-bit", 32, trainingDataset.precision());
 
       // 2. Create scalar quantizer
@@ -145,10 +145,10 @@ public class QuantizationIT extends CuVSTestCase {
       log.info("✓ Quantized index serialization/deserialization works");
 
       // 6. Test inverse transform
-      Dataset quantizedQueries = quantizedQuery.getQuantizedQueries();
-      float[][] recoveredQueries = quantizer.inverseTransform(quantizedQueries);
+      CuVSMatrix quantizedQueries = quantizedQuery.getQuantizedQueries();
+      CuVSMatrix recoveredQueries = quantizer.inverseTransform(quantizedQueries);
       assertNotNull("Inverse transform should work", recoveredQueries);
-      assertEquals("Should recover all queries", queries.length, recoveredQueries.length);
+      assertEquals("Should recover all queries", queries.length, recoveredQueries.size());
 
       // Cleanup
       quantizedIndex.destroyIndex();
@@ -173,7 +173,7 @@ public class QuantizationIT extends CuVSTestCase {
     try (CuVSResources resources = CheckedCuVSResources.create()) {
 
       // 1. Create training dataset
-      Dataset trainingDataset = Dataset.ofArray(dataset);
+      CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
       assertEquals("Training dataset should be 32-bit", 32, trainingDataset.precision());
 
       // 2. Create binary quantizer
@@ -228,7 +228,7 @@ public class QuantizationIT extends CuVSTestCase {
           results.get(0).size());
 
       // 5. Verify binary quantizer doesn't support inverse transform
-      Dataset binaryQueries = binaryQuery.getQuantizedQueries();
+      CuVSMatrix binaryQueries = binaryQuery.getQuantizedQueries();
       try {
         binaryQuantizer.inverseTransform(binaryQueries);
         assertTrue("Binary quantizer should not support inverse transform", false);
@@ -280,7 +280,7 @@ public class QuantizationIT extends CuVSTestCase {
               .withMetric(CuvsDistanceType.L2Expanded)
               .build();
 
-      Dataset trainingDataset = Dataset.ofArray(dataset);
+      CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
 
       // Build baseline index
       CagraIndex baselineIndex =

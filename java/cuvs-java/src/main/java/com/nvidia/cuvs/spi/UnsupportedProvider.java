@@ -17,8 +17,8 @@ package com.nvidia.cuvs.spi;
 
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.CagraIndex;
+import com.nvidia.cuvs.CuVSMatrix;
 import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
 import com.nvidia.cuvs.TieredIndex;
 import java.lang.invoke.MethodHandle;
@@ -61,43 +61,50 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
-  public Dataset.Builder newDatasetBuilder(int size, int dimensions) {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
+  public CuVSMatrix.Builder newMatrixBuilder(
+      int size, int dimensions, CuVSMatrix.DataType dataType) {
+    throw new UnsupportedOperationException();
   }
 
   @Override
-  public MethodHandle newNativeDatasetBuilder() {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
+  public MethodHandle newNativeMatrixBuilder() {
+    throw new UnsupportedOperationException();
   }
 
   @Override
-  public Dataset newArrayDataset(float[][] vectors) {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
+  public CuVSMatrix newMatrixFromArray(float[][] vectors) {
+    throw new UnsupportedOperationException();
   }
 
   @Override
-  public Dataset newByteArrayDataset(byte[][] vectors) {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
+  public CuVSMatrix newMatrixFromArray(int[][] vectors) {
+    throw new UnsupportedOperationException();
   }
 
   @Override
-  public Object createScalar8BitQuantizerImpl(CuVSResources resources, Dataset trainingDataset)
+  public CuVSMatrix newMatrixFromArray(byte[][] vectors) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Object createScalar8BitQuantizerImpl(CuVSResources resources, CuVSMatrix trainingDataset)
       throws Throwable {
     throw new UnsupportedOperationException("CuVS is not supported on this platform");
   }
 
   @Override
-  public float[][] inverseTransformScalar8Bit(Object impl, Dataset quantizedData) throws Throwable {
+  public float[][] inverseTransformScalar8Bit(Object impl, CuVSMatrix quantizedData)
+      throws Throwable {
     throw new UnsupportedOperationException("CuVS is not supported on this platform");
   }
 
   @Override
-  public Dataset transformBinary(CuVSResources resources, Dataset input) throws Throwable {
+  public CuVSMatrix transformBinary(CuVSResources resources, CuVSMatrix input) throws Throwable {
     throw new UnsupportedOperationException("CuVS is not supported on this platform");
   }
 
   @Override
-  public Dataset transformScalar8Bit(Object impl, Dataset input) throws Throwable {
+  public CuVSMatrix transformScalar8Bit(Object impl, CuVSMatrix input) throws Throwable {
     throw new UnsupportedOperationException("CuVS is not supported on this platform");
   }
 

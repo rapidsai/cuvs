@@ -46,7 +46,7 @@ public class BinaryQuantizer implements CuVSQuantizer {
   }
 
   @Override
-  public Dataset transform(Dataset input) throws Throwable {
+  public CuVSMatrix transform(CuVSMatrix input) throws Throwable {
     // Validate input precision
     if (input.precision() != 32) {
       throw new IllegalArgumentException(
@@ -54,7 +54,7 @@ public class BinaryQuantizer implements CuVSQuantizer {
     }
 
     // Use the correct provider method signature (resources, not impl)
-    Dataset result = CuVSProvider.provider().transformBinary(resources, input);
+    CuVSMatrix result = CuVSProvider.provider().transformBinary(resources, input);
 
     // Validate output precision
     if (result.precision() != 8) {
@@ -66,13 +66,13 @@ public class BinaryQuantizer implements CuVSQuantizer {
   }
 
   @Override
-  public void train(Dataset trainingData) throws Throwable {
+  public void train(CuVSMatrix trainingData) throws Throwable {
     // Binary quantization doesn't require training
     throw new UnsupportedOperationException("Binary quantization does not require training");
   }
 
   @Override
-  public float[][] inverseTransform(Dataset quantizedData) throws Throwable {
+  public CuVSMatrix inverseTransform(CuVSMatrix quantizedData) throws Throwable {
     // Binary quantization typically doesn't support exact inverse transformation
     throw new UnsupportedOperationException(
         "Binary quantization does not support inverse transformation");

@@ -29,7 +29,7 @@ public class CagraQuery {
 
   private final CagraSearchParams cagraSearchParameters;
   private final float[][] queryVectors;
-  private final Dataset quantizedQueries;
+  private final CuVSMatrix quantizedQueries;
   private final LongToIntFunction mapping;
   private final int topK;
   private final BitSet prefilter;
@@ -38,7 +38,7 @@ public class CagraQuery {
   private CagraQuery(
       CagraSearchParams cagraSearchParameters,
       float[][] queryVectors,
-      Dataset quantizedQueries,
+      CuVSMatrix quantizedQueries,
       LongToIntFunction mapping,
       int topK,
       BitSet prefilter,
@@ -73,7 +73,7 @@ public class CagraQuery {
    * If this query was built with a quantizer, returns the quantized Dataset.
    * Otherwise returns null.
    */
-  public Dataset getQuantizedQueries() {
+  public CuVSMatrix getQuantizedQueries() {
     return quantizedQueries;
   }
 
@@ -88,10 +88,6 @@ public class CagraQuery {
    */
   public int getQueryPrecision() {
     return quantizedQueries != null ? quantizedQueries.precision() : 32;
-  }
-
-  public CuVSQuantizer getQuantizer() {
-    return null;
   }
 
   public LongToIntFunction getMapping() {
@@ -176,11 +172,6 @@ public class CagraQuery {
       return this;
     }
 
-    @Override
-    public CuVSQuantizer getQuantizer() {
-      return quantizer;
-    }
-
     /**
      * Builds the CagraQuery. If a quantizer was provided, queryVectors is ignored
      * and a quantized Dataset is produced instead.
@@ -190,12 +181,12 @@ public class CagraQuery {
         throw new IllegalArgumentException("Query vectors must be provided");
       }
 
-      Dataset quantized = null;
+      CuVSMatrix quantized = null;
       float[][] floatsForQuery = queryVectors;
 
       if (quantizer != null) {
         // wrap float[][] in a Dataset and quantize
-        Dataset tmp = Dataset.ofArray(queryVectors);
+        CuVSMatrix tmp = CuVSMatrix.ofArray(queryVectors);
         if (tmp.precision() != 32) {
           tmp.close();
           throw new IllegalArgumentException(

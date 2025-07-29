@@ -34,14 +34,14 @@ public interface CuVSQuantizer extends AutoCloseable {
    * @param input The input dataset of float32 vectors (must have precision() == 32)
    * @return A new Dataset containing the quantized vectors with this quantizer's precision
    */
-  Dataset transform(Dataset input) throws Throwable;
+  CuVSMatrix transform(CuVSMatrix input) throws Throwable;
 
   /**
    * Optional training method - only applies to quantizers that require training.
    *
    * @param trainingData The dataset to train on (must have precision() == 32)
    */
-  default void train(Dataset trainingData) throws Throwable {
+  default void train(CuVSMatrix trainingData) throws Throwable {
     throw new UnsupportedOperationException(
         "Training not supported for " + getClass().getSimpleName());
   }
@@ -53,7 +53,7 @@ public interface CuVSQuantizer extends AutoCloseable {
    *                      (must have precision() matching this quantizer's precision())
    * @return A float[][] array containing the de-quantized vectors
    */
-  default float[][] inverseTransform(Dataset quantizedData) throws Throwable {
+  default CuVSMatrix inverseTransform(CuVSMatrix quantizedData) throws Throwable {
     throw new UnsupportedOperationException(
         "Inverse transform not supported for " + getClass().getSimpleName());
   }

@@ -34,17 +34,17 @@ public class Scalar8BitQuantizer implements CuVSQuantizer {
   private final int precision = 8;
 
   /**
-   * Creates a new scalar 8-bit quantizer with Dataset training data.
+   * Creates a new scalar 8-bit quantizer with CuVSMatrix training data.
    *
    * <p>The training dataset is used to compute quantization parameters (min/max values)
    * for each dimension. The quantizer will be immediately ready for use after construction.
    *
    * @param resources The CuVS resources to use for quantization operations
-   * @param trainingDataset A Dataset containing training vectors (must have 32-bit precision)
+   * @param trainingDataset A CuVSMatrix containing training vectors (must have 32-bit precision)
    * @throws Throwable if an error occurs during quantizer training
    * @throws IllegalArgumentException if trainingDataset is null or doesn't have 32-bit precision
    */
-  public Scalar8BitQuantizer(CuVSResources resources, Dataset trainingDataset) throws Throwable {
+  public Scalar8BitQuantizer(CuVSResources resources, CuVSMatrix trainingDataset) throws Throwable {
     if (trainingDataset == null) {
       throw new IllegalArgumentException("Training dataset cannot be null");
     }
@@ -63,14 +63,14 @@ public class Scalar8BitQuantizer implements CuVSQuantizer {
   }
 
   @Override
-  public Dataset transform(Dataset input) throws Throwable {
+  public CuVSMatrix transform(CuVSMatrix input) throws Throwable {
     // Validate input precision
     if (input.precision() != 32) {
       throw new IllegalArgumentException(
           "Scalar8BitQuantizer requires 32-bit float input, got " + input.precision() + "-bit");
     }
 
-    Dataset result = CuVSProvider.provider().transformScalar8Bit(impl, input);
+    CuVSMatrix result = CuVSProvider.provider().transformScalar8Bit(impl, input);
 
     // Validate output precision
     if (result.precision() != 8) {
@@ -82,14 +82,14 @@ public class Scalar8BitQuantizer implements CuVSQuantizer {
   }
 
   @Override
-  public void train(Dataset trainingData) throws Throwable {
+  public void train(CuVSMatrix trainingData) throws Throwable {
     // Training is handled during construction for ScalarQuantizer
     // This method could be implemented if you want to support re-training
     throw new UnsupportedOperationException("Training handled during construction");
   }
 
   @Override
-  public float[][] inverseTransform(Dataset quantizedData) throws Throwable {
+  public CuVSMatrix inverseTransform(CuVSMatrix quantizedData) throws Throwable {
     // Validate input precision for inverse transform
     if (quantizedData.precision() != 8) {
       throw new IllegalArgumentException(

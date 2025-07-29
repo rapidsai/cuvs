@@ -30,8 +30,9 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
 import static com.nvidia.cuvs.internal.panama.headers_h.kDLFloat;
 import static com.nvidia.cuvs.internal.panama.headers_h.kDLUInt;
 
+import com.nvidia.cuvs.CuVSMatrix;
+import com.nvidia.cuvs.CuVSMatrix.DataType;
 import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.internal.common.Util;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -48,9 +49,10 @@ public class BinaryQuantizerImpl {
    *
    * @param cuvsResources CuVS resources
    * @param dataset a two-dimensional float array to transform
-   * @return a Dataset containing the binary quantized data
+   * @return a CuVSMatrix containing the binary quantized data
    */
-  public static Dataset transform(CuVSResources cuvsResources, float[][] dataset) throws Throwable {
+  public static CuVSMatrix transform(CuVSResources cuvsResources, float[][] dataset)
+      throws Throwable {
     Arena resultArena = Arena.ofShared();
 
     try (var localArena = Arena.ofConfined();
@@ -74,10 +76,11 @@ public class BinaryQuantizerImpl {
    * Applies binary quantization transform to given dataset.
    *
    * @param cuvsResources CuVS resources
-   * @param dataset a {@link Dataset} object containing the vectors to transform
-   * @return a Dataset containing the binary quantized data
+   * @param dataset a {@link CuVSMatrix} object containing the vectors to transform
+   * @return a CuVSMatrix containing the binary quantized data
    */
-  public static Dataset transform(CuVSResources cuvsResources, Dataset dataset) throws Throwable {
+  public static CuVSMatrix transform(CuVSResources cuvsResources, CuVSMatrix dataset)
+      throws Throwable {
     // Validate input precision
     if (dataset.precision() != 32) {
       throw new IllegalArgumentException(
@@ -90,12 +93,12 @@ public class BinaryQuantizerImpl {
         var resourcesAccessor = cuvsResources.access()) {
 
       long rows = dataset.size();
-      long cols = dataset.dimensions();
+      long cols = dataset.columns();
 
-      MemorySegment datasetMemSegment = ((DatasetImpl) dataset).asMemorySegment();
+      MemorySegment datasetMemSegment = ((CuVSMatrixBaseImpl) dataset).memorySegment();
       long cuvsResourcesPtr = resourcesAccessor.handle();
 
-      Dataset result =
+      CuVSMatrix result =
           performTransform(
               cuvsResourcesPtr,
               localArena,
@@ -121,7 +124,7 @@ public class BinaryQuantizerImpl {
   /**
    * Core transformation logic shared by both overloads.
    */
-  private static Dataset performTransform(
+  private static CuVSMatrix performTransform(
       long cuvsResourcesPtr,
       Arena localArena,
       Arena resultArena,
@@ -160,28 +163,10 @@ public class BinaryQuantizerImpl {
       long outputShape[] = {rows, cols};
 
       MemorySegment datasetTensor =
-          prepareTensor(
-              localArena,
-              datasetPtr,
-              datasetShape,
-              kDLFloat(),
-              32,
-              2, // ndim
-              2, // device_type: use 2 to match your working quantizers
-              1 // device_id
-              );
+          prepareTensor(localArena, datasetPtr, datasetShape, kDLFloat(), 32, 2, 1);
 
       MemorySegment outputTensor =
-          prepareTensor(
-              localArena,
-              outputPtr,
-              outputShape,
-              kDLUInt(),
-              8, // Use kDLInt with 8-bit for uint8_t output
-              2, // ndim
-              2, // device_type: use 2 to match your working quantizers
-              1 // device_id
-              );
+          prepareTensor(localArena, outputPtr, outputShape, kDLUInt(), 8, 2, 1);
 
       // Use the training + transform pattern by calling the native function
       // that handles training internally (as shown in the C implementation)
@@ -196,8 +181,8 @@ public class BinaryQuantizerImpl {
       MemorySegment outputMemSegment = resultArena.allocate(C_CHAR, outputBytes);
       cudaMemcpy(outputMemSegment, outputPtr, outputBytes, DEVICE_TO_HOST);
 
-      // Create DatasetImpl with 8-bit quantized data
-      return new DatasetImpl(resultArena, outputMemSegment, (int) rows, (int) cols);
+      // Create CuVSMatrix using the populated outputMemSegment
+      return new CuVSHostMatrixImpl(outputMemSegment, rows, cols, DataType.BYTE);
 
     } finally {
       // Free device memory
