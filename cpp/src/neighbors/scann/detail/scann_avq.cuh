@@ -25,6 +25,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/coalesced_reduction.cuh>
+#include <raft/linalg/detail/cublas_wrappers.hpp>
 #include <raft/linalg/detail/cusolver_wrappers.hpp>
 #include <raft/linalg/dot.cuh>
 #include <raft/linalg/gemm.cuh>
@@ -193,7 +194,7 @@ void cholesky_solver(raft::resources const& dev_resources,
                                                           stream));
 }
 
-// Apply Anisotropic Vector Quantization to recompute cluster centers
+// Apply Anisotropic Vector Quantization to a single cluster
 // via Theorem 4.2 in https://arxiv.org/abs/1908.10396 with
 //   h_i_parallel = eta * || x_i || ^ (eta - 1)
 //   h_i_orthogonal = ||x _i || ^ (eta -1)
@@ -258,9 +259,7 @@ void compute_avq_centroid(raft::resources const& dev_resources,
   // skipping zero elements in the vector should be ok, since they are norms
   // of dataset vectors
   raft::linalg::binary_mult_skip_zero<raft::Apply::ALONG_COLUMNS>(
-    dev_resources, x, raft::make_const_mdspan(norms_eta_3.view())
-    // raft::Apply::ALONG_COLUMNSi
-  );
+    dev_resources, x, raft::make_const_mdspan(norms_eta_3.view()));
 
   // x^T x
   auto x_trans = raft::make_device_matrix<float, int64_t>(dev_resources, x.extent(1), x.extent(0));
@@ -277,9 +276,7 @@ void compute_avq_centroid(raft::resources const& dev_resources,
   auto eta_m_1       = raft::make_device_scalar<float>(dev_resources, eta - 1);
   auto cublas_handle = raft::resource::get_cublas_handle(dev_resources);
 
-  cublasPointerMode_t pm;
-  cublasGetPointerMode(cublas_handle, &pm);
-  cublasSetPointerMode(cublas_handle, CUBLAS_POINTER_MODE_DEVICE);
+  raft::linalg::detail::cublas_device_pointer_mode<true> pm(cublas_handle);
 
   RAFT_CUBLAS_TRY(cublasSetStream(cublas_handle, raft::resource::get_cuda_stream(dev_resources)));
 
@@ -329,8 +326,6 @@ void compute_avq_centroid(raft::resources const& dev_resources,
                     raft::make_const_mdspan(avq_centroid),
                     raft::make_const_mdspan(avq_centroid),
                     rescale_denom);
-
-  cublasSetPointerMode(cublas_handle, pm);
 }
 
 template <typename T>
@@ -373,6 +368,25 @@ void rescale_avq_centroids(raft::resources const& dev_resources,
                            });
 }
 
+/**
+ * @brief Perform AVQ adjustment on cluster centers
+ *
+ * Apply Anisotropic Vector Quantization to recompute cluster centers
+ * via Theorem 4.2 in https://arxiv.org/abs/1908.10396 with
+ *  h_i_parallel = eta * || x_i || ^ (eta - 1)
+ * h_i_orthogonal = ||x _i || ^ (eta -1)
+ * as taken from the open source ScaNN implementation
+ *
+ * @tparam T
+ * @tparam IdxT
+ * @tparam LabelT
+ * @tparam Accessor
+ * @param res raft resources
+ * @param dataset the dataset (host or device), size [n_rows, dim]
+ * @param centroids_view cluster centers, size [n_clusters, dim]
+ * @param labels_view nearest cluster idx for each dataset vector, size [n_rows]
+ * @param eta the weight for the parallel component of the residual in the avq update
+ */
 template <typename T,
           typename IdxT     = int64_t,
           typename LabelT   = uint32_t,
@@ -404,6 +418,7 @@ void apply_avq(raft::resources const& res,
                                                       cluster_ptrs.view().data_handle(),
                                                       dataset.extent(0),
                                                       labels_view.extent(0));
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   auto rescale_num   = raft::make_device_vector<float, int64_t>(res, centroids_view.extent(0));
   auto rescale_denom = raft::make_device_vector<float, int64_t>(res, centroids_view.extent(0));

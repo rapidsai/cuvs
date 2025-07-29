@@ -143,6 +143,20 @@ auto create_pq_codebook(raft::resources const& res,
   return pq_code_book;
 }
 
+/**
+ * @brief Subtract cluster center coordinates from each dataset vector.
+ *
+ * residual[i, k] = dataset[i ,k] - centers[l, k],
+ * where l = labels[i], the cluster label corresponding to vector i.
+ *
+ * @tparam T
+ * @tparam LabelT
+ * @param res raft resources
+ * @param dataset dataset vectors, size [n_rows, dim]
+ * @param centers cluster center coordinates, size [n_clusters, dim]
+ * @param labels cluster labels, size [n_rows]
+ * @return device matrix with the residuals, size [n_rows, dim]
+ */
 template <typename T, typename LabelT>
 auto compute_residuals(raft::resources const& res,
                        raft::device_matrix_view<const T, int64_t> dataset,
@@ -164,6 +178,22 @@ auto compute_residuals(raft::resources const& res,
   return residuals;
 }
 
+/**}
+ * @brief Generate PQ codes for residual vectors using codebook
+ *
+ * For each subspace, minimize L2 norm between residual vectors and
+ * PQ centers to generate codes for residual vectors
+ *
+ * @tparam T
+ * @tparam IdxT
+ * @tparam LabelT
+ * @param res raft resources
+ * @param residuals the residual vectors we're quantizing, size [n_rows, dim]
+ * @param pq_codebook the codebook of PQ centers size [dim, 1 << pq_bits]
+ * @oaran ps parameters used with vpq_dataset for pq quantization
+ * @return device matrix with (packed) codes from vpq, size [n_rows, 1 +ceil((dim / pq_dim *
+ * pq_bits) /( 8 * sizeof(LabelT)))]
+ */
 template <typename T, typename IdxT, typename LabelT>
 auto quantize_residuals(raft::resources const& res,
                         raft::device_matrix_view<const T, int64_t> residuals,
@@ -171,9 +201,16 @@ auto quantize_residuals(raft::resources const& res,
                         cuvs::neighbors::vpq_params ps)
   -> raft::device_matrix<uint8_t, IdxT, raft::row_major>
 {
-  auto dim         = residuals.extent(1);
+  auto dim = residuals.extent(1);
+
+  // Using a single 0 vector for the vq_codebook, since we already have
+  // vq centers and computed residuals w.r.t those centers
   auto vq_codebook = raft::make_device_matrix<T, uint32_t, raft::row_major>(res, 1, dim);
-  raft::linalg::map_offset(res, vq_codebook.view(), [] __device__(size_t i) { return 0; });
+
+  RAFT_CUDA_TRY(cudaMemsetAsync(vq_codebook.data_handle(),
+                                0,
+                                vq_codebook.size() * sizeof(T),
+                                raft::resource::get_cuda_stream(res)));
 
   auto codes = process_and_fill_codes_subspaces<T, IdxT>(
     res, ps, residuals, raft::make_const_mdspan(vq_codebook.view()), pq_codebook);
@@ -181,15 +218,27 @@ auto quantize_residuals(raft::resources const& res,
   return codes;
 }
 
-// VPQ gives codes in a "packed" form. The first 4 bytes give the code for
-// vector quantization, and the remaining bytes the codes for subspace product
-// quantization. In the case of 4 bit PQ, each byte stores codes for 2 subspaces
-// in a packed form.
-//
-// This function unpacks the codes by discarding the VQ code (which we don't need,
-// since we use VPQ only for residual quantization) and (in the case of 4-bit PQ)
-// unpackes the subspace codes into one byte each. This is for interoperability
-// with open source ScaNN, which doesn't pack codes
+/**
+ * @brief Unpack VPQ codes into 1-byte per code
+ *
+ * VPQ gives codes in a "packed" form. The first 4 bytes give the code for
+ * vector quantization, and the remaining bytes the codes for subspace product
+ * quantization. In the case of 4 bit PQ, each byte stores codes for 2 subspaces
+ * in a packed form.
+ *
+ * This function unpacks the codes by discarding the VQ code (which we don't need,
+ * since we use VPQ only for residual quantization) and (in the case of 4-bit PQ)
+ * unpackes the subspace codes into one byte each. This is for interoperability
+ * with open source ScaNN, which doesn't pack codes
+ *
+ * @tparam IdxT
+ * @param res raft resources
+ * @param unpacked_codes_view matrix of unpacked codes, size  [n_rows, dim / pq_dim]
+ * @param codes_view packed codes from vpq, size [n_rows, 1 +ceil((dim / pq_dim * pq_bits) /( 8 *
+ * sizeof(LabelT)))]
+ * @param pq_bits number of bits used for PQ
+ * @param num_subspaces the number of pq_subspaces (dim / pq_dim)
+ */
 template <typename IdxT>
 void unpack_codes(raft::resources const& res,
                   raft::device_matrix_view<uint8_t, IdxT> unpacked_codes_view,
@@ -218,6 +267,20 @@ void unpack_codes(raft::resources const& res,
   }
 }
 
+/**
+ * @brief sample dataset vectors/labels and compute their residuals for PQ training
+ *
+ * @tparam T
+ * @tparms LabelT
+ * @tparam Accessor
+ * @param res raft resources
+ * @param random_state state for random generator
+ * @param dataset the dataset (host or device), size [n_rows, dim]
+ * @param centroids the centers from kmeans training, size [n_clusters, dim]
+ * @param labels the idx of the nearest center for each dataset vector, size [n_rows]
+ * @param n_samples number of samples
+ * @return the sampled residuals for PQ training, size [n_samples, dim]
+ */
 template <typename T,
           typename LabelT,
           typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,

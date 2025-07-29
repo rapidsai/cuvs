@@ -64,7 +64,7 @@ struct index_params : cuvs::neighbors::index_params {
   /** the dimension of pq subspaces (must divide dataset dimension)**/
   uint32_t pq_dim = 8;
 
-  /** the number of bits for pq codes (but be 4 or 8, for 16 and 256 codes respectively) **/
+  /** the number of bits for pq codes (must be 4 or 8, for 16 and 256 codes respectively) **/
   uint32_t pq_bits = 8;
 
   /** the number of rows for PQ training (internally capped to 100k) **/
@@ -289,7 +289,15 @@ auto build(raft::resources const& handle,
  * @{
  */
 /**
- * Save the index to file.
+ * @brief Save the index to files in a directory
+ *
+ * This serializes the index into a list of files for integration into
+ * OSS ScaNN for use with search
+ *
+ * NOTE: the implementation of ScaNN index build is EXPERIMENTAL and currently
+ * not subject to comprehensive, automated testing. Accuracy and performance
+ * are not guaranteed, and could diverge without warning.
+ *
  */
 
 void serialize(raft::resources const& handle,

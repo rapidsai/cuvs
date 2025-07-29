@@ -48,10 +48,12 @@
 #include <raft/linalg/power.cuh>
 #include <raft/linalg/reduce.cuh>
 #include <raft/linalg/transpose.cuh>
+#include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/argmin.cuh>
 #include <raft/matrix/copy.cuh>
 #include <raft/matrix/diagonal.cuh>
 #include <raft/matrix/init.cuh>
+#include <raft/matrix/sample_rows.cuh>
 #include <raft/matrix/slice.cuh>
 #include <raft/random/make_blobs.cuh>
 #include <raft/random/rng.cuh>
@@ -118,7 +120,7 @@ index<T, IdxT> build(
     }
 
     RAFT_LOG_DEBUG("Sampling rows.\n");
-    sample_rows<T, int64_t>(res, random_state, dataset, trainset.view());
+    raft::matrix::sample_rows(res, random_state, dataset, trainset.view());
 
     raft::resource::sync_stream(res);
 
@@ -199,14 +201,8 @@ index<T, IdxT> build(
   int dim_per_subspace = params.pq_dim;
   int num_clusters     = 1 << params.pq_bits;
 
-  auto temp_codebook = raft::make_device_matrix<T, uint32_t>(res, 1, num_clusters);
-  //	auto full_codebook = raft::make_device_matrix<T,uint32_t>(res, num_clusters,
-  // num_subspaces*dim_per_subspace);
   auto full_codebook =
     raft::make_device_matrix<T, uint32_t>(res, num_clusters * num_subspaces, dim_per_subspace);
-
-  auto temp_avq_quant =
-    raft::make_device_matrix<uint8_t, uint32_t>(res, 1, trainset_residuals.extent(0));
 
   // Loop each subspace, training codebooks for each
   for (int subspace = 0; subspace < num_subspaces; subspace++) {
@@ -232,6 +228,7 @@ index<T, IdxT> build(
     // Create pq codebook for this subspace
     auto sub_pq_codebook =
       create_pq_codebook<T>(res, raft::make_const_mdspan(sub_trainset.view()), pq_params);
+
     raft::copy(full_codebook.data_handle() + (subspace * sub_pq_codebook.size()),
                sub_pq_codebook.data_handle(),
                sub_pq_codebook.size(),
@@ -248,7 +245,7 @@ index<T, IdxT> build(
   dataset_vec_batches.prefetch_next_batch();
 
   // Quantize residuals for both normal and SOAR assignments
-  printf("Quantize residuals\n");
+  RAFT_LOG_DEBUG("Quantize residuals");
   for (const auto& batch : dataset_vec_batches) {
     auto batch_view = raft::make_device_matrix_view<const T, int64_t>(
       batch.data(), batch.size(), dataset.extent(1));
@@ -259,19 +256,21 @@ index<T, IdxT> build(
     auto batch_soar_labels_view = raft::make_device_vector_view<uint32_t, int64_t>(
       soar_labels_view.data_handle() + batch.offset(), batch.size());
 
+    // Compute residuals for use in SOAR + quantization
+    auto avq_residuals = compute_residuals<T, uint32_t>(
+      res, batch_view, raft::make_const_mdspan(centroids_view), batch_labels_view);
+
     // Compute SOAR labels.
     // We compute SOAR labels in this loop to eliminate one HtoD copy of the full dataset.
     compute_soar_labels<T, uint32_t>(res,
                                      batch_view,
+                                     raft::make_const_mdspan(avq_residuals.view()),
                                      centroids_view,
                                      batch_labels_view,
                                      batch_soar_labels_view,
                                      params.soar_lambda);
 
     // Compute and quantize residuals
-    auto avq_residuals = compute_residuals<T, uint32_t>(
-      res, batch_view, raft::make_const_mdspan(centroids_view), batch_labels_view);
-
     auto avq_quant = quantize_residuals<T, IdxT, uint32_t>(
       res, raft::make_const_mdspan(avq_residuals.view()), full_codebook.view(), pq_params);
 
@@ -309,14 +308,23 @@ index<T, IdxT> build(
     auto bf16_dataset = raft::make_device_matrix<int16_t, int64_t>(res, batch_view.extent(0), dim);
 
     if (params.bf16_enabled) {
-      raft::linalg::map_offset(res, bf16_dataset.view(), [batch_view, dim] __device__(size_t i) {
-        int64_t row_idx = i / dim;
-        int64_t col_idx = i % dim;
+      // raft::linalg::map_offset(res, bf16_dataset.view(), [batch_view, dim] __device__(size_t i) {
+      //   int64_t row_idx = i / dim;
+      //   int64_t col_idx = i % dim;
 
-        nv_bfloat16 val = __float2bfloat16(batch_view(row_idx, col_idx));
+      //  nv_bfloat16 val = __float2bfloat16(batch_view(row_idx, col_idx));
 
-        return reinterpret_cast<int16_t&>(val);
-      });
+      //  return reinterpret_cast<int16_t&>(val);
+      //});
+      raft::linalg::unaryOp(
+        bf16_dataset.data_handle(),
+        batch_view.data_handle(),
+        batch_view.size(),
+        [] __device__(T x) {
+          nv_bfloat16 val = __float2bfloat16(x);
+          return reinterpret_cast<int16_t&>(val);
+        },
+        resource::get_cuda_stream(res));
     }
 
     // Prefetch next batch
@@ -324,32 +332,21 @@ index<T, IdxT> build(
 
     // Copy unpacked codes to host
     // TODO (rmaschal): these copies are blocking and not overlapped
-    auto h_quantized_residuals_view = raft::make_host_matrix_view<uint8_t, uint32_t>(
-      idx.quantized_residuals().data_handle() + batch.offset() * num_subspaces,
-      batch.size(),
-      num_subspaces);
-
-    raft::copy(h_quantized_residuals_view.data_handle(),
+    raft::copy(idx.quantized_residuals().data_handle() + batch.offset() * num_subspaces,
                quantized_residuals.data_handle(),
                quantized_residuals.size(),
                stream);
 
-    auto h_quantized_soar_residuals_view = raft::make_host_matrix_view<uint8_t, uint32_t>(
-      idx.quantized_soar_residuals().data_handle() + batch.offset() * num_subspaces,
-      batch.size(),
-      num_subspaces);
-
-    raft::copy(h_quantized_soar_residuals_view.data_handle(),
+    raft::copy(idx.quantized_soar_residuals().data_handle() + batch.offset() * num_subspaces,
                quantized_soar_residuals.data_handle(),
                quantized_soar_residuals.size(),
                stream);
 
     if (params.bf16_enabled) {
-      auto h_bf16_dataset_view = raft::make_host_matrix_view<int16_t, int64_t>(
-        idx.bf16_dataset().data_handle() + batch.offset() * dim, batch.size(), dim);
-
-      raft::copy(
-        h_bf16_dataset_view.data_handle(), bf16_dataset.data_handle(), bf16_dataset.size(), stream);
+      raft::copy(idx.bf16_dataset().data_handle() + batch.offset() * dim,
+                 bf16_dataset.data_handle(),
+                 bf16_dataset.size(),
+                 stream);
     }
   }
 

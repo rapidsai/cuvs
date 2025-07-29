@@ -50,6 +50,7 @@ struct gather_functor {
     raft::resource::sync_stream(res, stream);
 
     int n_threads = std::min<int>(omp_get_max_threads(), 32);
+
 #pragma omp parallel for num_threads(n_threads)
     for (int i = 0; i < h_cluster_ids.extent(0); i++) {
       // std::
@@ -64,24 +65,4 @@ struct gather_functor {
   }
 };
 
-template <typename T,
-          typename IdxT     = int64_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
-void sample_rows(
-  raft::resources const& res,
-  random::RngState random_state,
-  raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, Accessor> dataset,
-  raft::device_matrix_view<T, IdxT> trainset)
-{
-  raft::device_vector<int64_t, int64_t> train_indices =
-    raft::random::excess_subsample<int64_t, int64_t>(
-      res, random_state, dataset.extent(0), trainset.extent(0));
-
-  gather_functor<T, int64_t>{}(res,
-                               dataset,
-                               raft::make_const_mdspan(train_indices.view()),
-                               trainset,
-                               raft::resource::get_cuda_stream(res));
-}
 }  // namespace cuvs::neighbors::experimental::scann::detail

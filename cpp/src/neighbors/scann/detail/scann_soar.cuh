@@ -41,29 +41,32 @@
 #include <raft/matrix/diagonal.cuh>
 #include <raft/matrix/init.cuh>
 
-// Compute a second, spilled cluster for each dataset vector by minimizing
-// the loss function in Theorem 3.1 of https://arxiv.org/abs/2404.00774
+/**
+ * @brief Compute SOAR labels for each dataset vector
+ *
+ * Compute a second, spilled cluster for each dataset vector by minimizing
+ * the loss function in Theorem 3.1 of https://arxiv.org/abs/2404.00774
+ *
+ * @tparam T
+ * @tparam LavelT
+ * @param res raft resources
+ * @param dataset the dataset, size [n_rows, dim]
+ * @param residuals the residual vectors r, size [n_rows, dim]
+ * @param centers the cluster centers, size [n_clusters, dim]
+ * @param labels the cluster assignments, size [n_rows]
+ * @param soar_labels the computed soar labels
+ * @param lambda the weight for the projection of a residual r' onto r in the SOAR loss
+ */
 template <typename T, typename LabelT>
 void compute_soar_labels(raft::resources const& dev_resources,
                          raft::device_matrix_view<const T, int64_t> dataset,
+                         raft::device_matrix_view<const T, int64_t> residuals,
                          raft::device_matrix_view<T, int64_t> centers,
                          raft::device_vector_view<const LabelT, int64_t> labels,
                          raft::device_vector_view<LabelT, int64_t> soar_labels,
                          float lambda)
 {
-  // compute residuals
-  auto residuals =
-    raft::make_device_matrix<T, int64_t>(dev_resources, dataset.extent(0), dataset.extent(1));
   auto dim = dataset.extent(1);
-
-  raft::linalg::map_offset(
-    dev_resources, residuals.view(), [dataset, centers, labels, dim] __device__(size_t i) {
-      int row_idx  = i / dim;
-      int el_idx   = i % dim;
-      LabelT label = labels(row_idx);
-
-      return dataset(row_idx, el_idx) - centers(label, el_idx);
-    });
 
   // compute SOAR metric for each center
   auto soar_scores =
@@ -74,7 +77,7 @@ void compute_soar_labels(raft::resources const& dev_resources,
     dev_resources, residuals.extent(0), residuals.extent(1));
 
   raft::linalg::row_normalize(dev_resources,
-                              raft::make_const_mdspan(residuals.view()),
+                              residuals,
                               residuals_norm.view(),
                               0.0f,
                               raft::sq_op(),
@@ -90,22 +93,22 @@ void compute_soar_labels(raft::resources const& dev_resources,
 
   auto dataset_dot_residual = raft::make_device_vector<float, int64_t>(dev_resources, n_rows);
 
-  cublasSgemvStridedBatched(cublas_handle,
-                            CUBLAS_OP_N,
-                            1,
-                            dim,
-                            alpha.data_handle(),
-                            dataset.data_handle(),
-                            1,
-                            dim,
-                            residuals_norm.data_handle(),
-                            1,
-                            dim,
-                            beta.data_handle(),
-                            dataset_dot_residual.data_handle(),
-                            1,
-                            1,
-                            n_rows);
+  RAFT_CUBLAS_TRY(cublasSgemvStridedBatched(cublas_handle,
+                                            CUBLAS_OP_N,
+                                            1,
+                                            dim,
+                                            alpha.data_handle(),
+                                            dataset.data_handle(),
+                                            1,
+                                            dim,
+                                            residuals_norm.data_handle(),
+                                            1,
+                                            dim,
+                                            beta.data_handle(),
+                                            dataset_dot_residual.data_handle(),
+                                            1,
+                                            1,
+                                            n_rows));
 
   auto centers_norm = raft::make_device_vector<float, int64_t>(dev_resources, centers.extent(0));
   auto centers_transpose =
