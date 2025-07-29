@@ -194,19 +194,6 @@ struct host_filter {
   virtual ~host_filter() {}
 };
 
-// template <typename dev_filter_t, typename... Args>
-// __global__ void init_dev_filter(dev_filter_t *p_filter, Args... args) {
-//     // We use placement new to construct the filter in the already allocated memory space pointed
-//     by p_filter.
-//     // We could have used a simple new operation as well, to perform the allocation here.
-//     // We have a limit on the heap size available when we allocate from device code, therefore
-//     the allocation was done on the host side.
-//     //
-//     https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html?highlight=malloc#heap-memory-allocation
-//     new (p_filter) dev_filter_t(args...);
-//     // printf("%d\n", p_filter->filter_param);
-// }
-
 // /// Helper kernel to destruct filter object on device.
 template <typename dev_filter_t>
 __global__ void destruct_dev_filter(dev_filter_t* p_filter)
@@ -238,12 +225,10 @@ struct filter_impl : public host_filter {
 
   filter_impl(const int64_t* const* inds_ptrs, InnerArgs... inner_args)
   {
-    // allocate inner filter
     cudaMalloc(&p_inner_filter, sizeof(InnerFilterT));
     init_inner_filter<<<1, 1>>>(p_inner_filter, inner_args...);
     cudaDeviceSynchronize();
 
-    // allocate outer filter
     cudaMalloc(&p_outer_filter, sizeof(OuterFilterT));
     init_outer_filter<<<1, 1>>>(p_outer_filter, inds_ptrs, p_inner_filter);
     cudaDeviceSynchronize();
@@ -252,10 +237,8 @@ struct filter_impl : public host_filter {
   ~filter_impl()
   {
     // TODO: automatic destruction of inner?
-    // destruct outer filter
     destruct_dev_filter<<<1, 1>>>(p_outer_filter);
     cudaFree(p_outer_filter);
-    // destruct inner filter
     destruct_dev_filter<<<1, 1>>>(p_inner_filter);
     cudaFree(p_inner_filter);
   }
