@@ -159,6 +159,8 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
                                uint32_t n_probes,
                                uint32_t topk)
 {
+  static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
+                "IdxT must be able to represent all values of uint32_t");
   const uint64_t i        = threadIdx.x + BlockDim * uint64_t(blockIdx.x);
   const uint32_t query_ix = i / uint64_t(topk);
   if (query_ix >= n_queries) { return; }
@@ -170,8 +172,8 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
   uint32_t data_ix        = neighbors_in[k];
   const uint32_t chunk_ix = find_chunk_ix(data_ix, n_probes, chunk_indices);
   const bool valid        = chunk_ix < n_probes;
-  neighbors_out[k] =
-    valid ? db_indices[clusters_to_probe[chunk_ix]][data_ix] : kOutOfBoundsRecord<IdxT>;
+  neighbors_out[k] = valid ? static_cast<IdxT>(db_indices[clusters_to_probe[chunk_ix]][data_ix])
+                           : kOutOfBoundsRecord<IdxT>;
 }
 
 /**
