@@ -17,10 +17,15 @@ package com.nvidia.cuvs;
 
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Objects;
 import java.util.function.LongToIntFunction;
 
 /**
  * BruteForceQuery holds the query vectors to be used while invoking search.
+ *
+ * <p><strong>Thread Safety:</strong> Each BruteForceQuery instance should use its own
+ * CuVSResources object that is not shared with other threads. Sharing CuVSResources
+ * between threads can lead to memory allocation errors or JVM crashes.
  *
  * @since 25.02
  */
@@ -31,6 +36,7 @@ public class BruteForceQuery {
   private final BitSet[] prefilters;
   private int numDocs = -1;
   private final int topK;
+  private final CuVSResources resources;
 
   /**
    * Constructs an instance of {@link BruteForceQuery} using queryVectors,
@@ -43,18 +49,21 @@ public class BruteForceQuery {
    *                     index
    * @param numDocs      Maximum of bits in each prefilter, representing number of documents in this index.
    *                     Used only when prefilter(s) is/are passed.
+   * @param resources    CuVSResources instance to use for this query
    */
   public BruteForceQuery(
       float[][] queryVectors,
       LongToIntFunction mapping,
       int topK,
       BitSet[] prefilters,
-      int numDocs) {
+      int numDocs,
+      CuVSResources resources) {
     this.queryVectors = queryVectors;
     this.mapping = mapping;
     this.topK = topK;
     this.prefilters = prefilters;
     this.numDocs = numDocs;
+    this.resources = resources;
   }
 
   /**
@@ -100,6 +109,15 @@ public class BruteForceQuery {
     return numDocs;
   }
 
+  /**
+   * Gets the CuVSResources instance for this query.
+   *
+   * @return the CuVSResources instance
+   */
+  public CuVSResources getResources() {
+    return resources;
+  }
+
   @Override
   public String toString() {
     return "BruteForceQuery [mapping="
@@ -123,6 +141,20 @@ public class BruteForceQuery {
     private int numDocs;
     private LongToIntFunction mapping = SearchResults.IDENTITY_MAPPING;
     private int topK = 2;
+    private final CuVSResources resources;
+
+    /**
+     * Constructor that requires CuVSResources.
+     *
+     * <p><strong>Important:</strong> The provided CuVSResources instance should not be
+     * shared with other threads. Each thread performing searches should create its own
+     * CuVSResources instance to avoid memory allocation conflicts and potential JVM crashes.
+     *
+     * @param resources the CuVSResources instance to use for this query (must not be shared between threads)
+     */
+    public Builder(CuVSResources resources) {
+      this.resources = Objects.requireNonNull(resources, "resources cannot be null");
+    }
 
     /**
      * Registers the query vectors to be passed in the search call.
@@ -176,7 +208,7 @@ public class BruteForceQuery {
      * @return an instance of {@link BruteForceQuery}
      */
     public BruteForceQuery build() {
-      return new BruteForceQuery(queryVectors, mapping, topK, prefilters, numDocs);
+      return new BruteForceQuery(queryVectors, mapping, topK, prefilters, numDocs, resources);
     }
   }
 }
