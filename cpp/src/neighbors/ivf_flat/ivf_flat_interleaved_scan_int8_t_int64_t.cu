@@ -19,11 +19,5 @@
 namespace cuvs::neighbors::ivf_flat::detail {
 
 CUVS_INST_IVF_FLAT_INTERLEAVED_SCAN(int8_t, int64_t, filtering::none_sample_filter);
-CUVS_INST_IVF_FLAT_INTERLEAVED_SCAN(int8_t,
-                                    int64_t,
-                                    filtering::bitset_filter<uint32_t COMMA int64_t>);
-
-#undef COMMA
-#undef CUVS_INST_IVF_FLAT_INTERLEAVED_SCAN
 
 }  // namespace cuvs::neighbors::ivf_flat::detail

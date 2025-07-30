@@ -102,9 +102,9 @@ auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T,
  * @tparam T      element type.
  * @tparam IdxT   type of the vector ids in the index (corresponds to second arg ofindex<T, IdxT>)
  * @tparam LabelT label type
+ * @tparam SourceIndexT input index type (usually same as IdxT)
  * @tparam gather_src if false, then we build the index from vectors source_vecs[i,:], otherwise
  *     we use source_vecs[source_ixs[i],:]. In both cases i=0..n_rows-1.
- * @tparam SourceIndexT input index type (usually same as IdxT)
  *
  * @param[in] labels device pointer to the cluster ids for each row [n_rows]
  * @param[in] source_vecs device pointer to the input data [n_rows, dim]
@@ -119,7 +119,7 @@ auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T,
  * @param veclen size of vectorized loads/stores; must satisfy `dim % veclen == 0`.
  *
  */
-template <typename T, typename IdxT, typename LabelT, bool gather_src = false, typename SourceIdxT>
+template <typename T, typename IdxT, typename LabelT, typename SourceIdxT, bool gather_src = false>
 RAFT_KERNEL build_index_kernel(const LabelT* labels,
                                const T* source_vecs,
                                const SourceIdxT* source_ixs,
@@ -504,7 +504,7 @@ inline void fill_refinement_index(raft::resources const& handle,
 
   const dim3 block_dim(256);
   const dim3 grid_dim(raft::ceildiv<IdxT>(n_queries * n_candidates, block_dim.x));
-  build_index_kernel<T, IdxT, LabelT, true>
+  build_index_kernel<T, IdxT, LabelT, CandidateIdxT, true>
     <<<grid_dim, block_dim, 0, stream>>>(new_labels.data(),
                                          dataset,
                                          candidate_idx,

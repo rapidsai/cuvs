@@ -13,9 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #include "ivf_flat_interleaved_scan_explicit_inst.cuh"
+#include <cuda_fp16.h>
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
-CUVS_INST_IVF_FLAT_INTERLEAVED_SCAN(float, int64_t, filtering::none_sample_filter);
+CUVS_INST_IVF_FLAT_INTERLEAVED_SCAN(half,
+                                    int64_t,
+                                    filtering::bitset_filter<uint32_t COMMA int64_t>);
+
 }  // namespace cuvs::neighbors::ivf_flat::detail
