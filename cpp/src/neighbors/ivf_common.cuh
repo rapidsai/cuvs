@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -148,17 +148,19 @@ __device__ inline auto find_chunk_ix(uint32_t& sample_ix,  // NOLINT
   return ix_min;
 }
 
-template <int BlockDim, typename IdxT>
+template <int BlockDim, typename IdxT, typename DbIdxT>
 __launch_bounds__(BlockDim) RAFT_KERNEL
   postprocess_neighbors_kernel(IdxT* neighbors_out,                // [n_queries, topk]
                                const uint32_t* neighbors_in,       // [n_queries, topk]
-                               const IdxT* const* db_indices,      // [n_clusters][..]
+                               const DbIdxT* const* db_indices,    // [n_clusters][..]
                                const uint32_t* clusters_to_probe,  // [n_queries, n_probes]
                                const uint32_t* chunk_indices,      // [n_queries, n_probes]
                                uint32_t n_queries,
                                uint32_t n_probes,
                                uint32_t topk)
 {
+  static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
+                "IdxT must be able to represent all values of uint32_t");
   const uint64_t i        = threadIdx.x + BlockDim * uint64_t(blockIdx.x);
   const uint32_t query_ix = i / uint64_t(topk);
   if (query_ix >= n_queries) { return; }
@@ -170,8 +172,8 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
   uint32_t data_ix        = neighbors_in[k];
   const uint32_t chunk_ix = find_chunk_ix(data_ix, n_probes, chunk_indices);
   const bool valid        = chunk_ix < n_probes;
-  neighbors_out[k] =
-    valid ? db_indices[clusters_to_probe[chunk_ix]][data_ix] : kOutOfBoundsRecord<IdxT>;
+  neighbors_out[k] = valid ? static_cast<IdxT>(db_indices[clusters_to_probe[chunk_ix]][data_ix])
+                           : kOutOfBoundsRecord<IdxT>;
 }
 
 /**
@@ -181,10 +183,10 @@ __launch_bounds__(BlockDim) RAFT_KERNEL
  * probed clusters / defined by the `chunk_indices`.
  * We assume the searched sample sizes (for a single query) fit into `uint32_t`.
  */
-template <typename IdxT>
+template <typename IdxT, typename DbIdxT>
 void postprocess_neighbors(IdxT* neighbors_out,                // [n_queries, topk]
                            const uint32_t* neighbors_in,       // [n_queries, topk]
-                           const IdxT* const* db_indices,      // [n_clusters][..]
+                           const DbIdxT* const* db_indices,    // [n_clusters][..]
                            const uint32_t* clusters_to_probe,  // [n_queries, n_probes]
                            const uint32_t* chunk_indices,      // [n_queries, n_probes]
                            uint32_t n_queries,

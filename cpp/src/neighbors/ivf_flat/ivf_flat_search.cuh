@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,10 @@
 
 #include "../../core/nvtx.hpp"
 #include "../detail/ann_utils.cuh"
-#include "../ivf_common.cuh"              // cuvs::neighbors::detail::ivf
-#include "ivf_flat_interleaved_scan.cuh"  // interleaved_scan
-#include <cuvs/neighbors/common.hpp>      // none_sample_filter
-#include <cuvs/neighbors/ivf_flat.hpp>    // raft::neighbors::ivf_flat::index
+#include "../ivf_common.cuh"                  // cuvs::neighbors::detail::ivf
+#include "ivf_flat_interleaved_scan_ext.cuh"  // interleaved_scan
+#include <cuvs/neighbors/common.hpp>          // none_sample_filter
+#include <cuvs/neighbors/ivf_flat.hpp>        // raft::neighbors::ivf_flat::index
 
 #include "../detail/ann_utils.cuh"      // utils::mapping
 #include <cuvs/distance/distance.hpp>   // is_min_close, DistanceType
@@ -33,12 +33,18 @@
 #include <raft/linalg/gemm.cuh>      // raft::linalg::gemm
 #include <raft/linalg/norm.cuh>      // raft::linalg::norm
 #include <raft/linalg/unary_op.cuh>  // raft::linalg::unary_op
+#include <raft/matrix/detail/select_warpsort.cuh>
 
 #include <rmm/resource_ref.hpp>
 
 namespace cuvs::neighbors::ivf_flat::detail {
 
 using namespace cuvs::spatial::knn::detail;  // NOLINT
+
+auto RAFT_WEAK_FUNCTION is_local_topk_feasible(uint32_t k) -> bool
+{
+  return k <= raft::matrix::detail::select::warpsort::kMaxCapacity;
+}
 
 template <typename T, typename AccT, typename IdxT, typename IvfSampleFilterT>
 void search_impl(raft::resources const& handle,
