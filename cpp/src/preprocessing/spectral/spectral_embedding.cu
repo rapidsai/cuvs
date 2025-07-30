@@ -234,9 +234,6 @@ void compute_eigenpairs(raft::resources const& handle,
     raft::make_const_mdspan(col_indices.view()),     // Column indices to gather
     embedding_row_view                               // Destination matrix (as row-major view)
   );
-
-  // raft::print_device_vector("embedding", embedding.data_handle(), embedding.extent(0) *
-  // embedding.extent(1), std::cout);
 }
 
 void transform(raft::resources const& handle,
@@ -260,10 +257,10 @@ void transform(raft::resources const& handle,
     handle, spectral_embedding_config, n_samples, laplacian, diagonal.view(), embedding);
 }
 
-void transform_precomputed(raft::resources const& handle,
-                           params spectral_embedding_config,
-                           raft::device_coo_matrix<float, int, int, int>& connectivity_graph,
-                           raft::device_matrix_view<float, int, raft::col_major> embedding)
+void transform(raft::resources const& handle,
+               params spectral_embedding_config,
+               raft::device_coo_matrix<float, int, int, int>& connectivity_graph,
+               raft::device_matrix_view<float, int, raft::col_major> embedding)
 {
   const int n_samples = connectivity_graph.structure_view().get_n_rows();
 
@@ -274,15 +271,6 @@ void transform_precomputed(raft::resources const& handle,
     coo_to_csr_matrix(handle, n_samples, sym_coo_row_ind.view(), connectivity_graph);
   auto laplacian =
     create_laplacian(handle, spectral_embedding_config, csr_matrix_view, diagonal.view());
-
-  // raft::print_device_vector("laplacian.get_elements().data", laplacian.get_elements().data(),
-  // laplacian.structure_view().get_nnz(), std::cout);
-  // raft::print_device_vector("laplacian.get_indptr().data",
-  // laplacian.structure_view().get_indptr().data(), laplacian.structure_view().get_n_rows() + 1,
-  // std::cout); raft::print_device_vector("laplacian.get_indices().data",
-  // laplacian.structure_view().get_indices().data(), laplacian.structure_view().get_nnz(),
-  // std::cout);
-
   compute_eigenpairs(
     handle, spectral_embedding_config, n_samples, laplacian, diagonal.view(), embedding);
 }
