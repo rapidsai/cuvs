@@ -149,7 +149,7 @@ void batched_insert_vamana(
   auto start_t = std::chrono::system_clock::now();
 #endif
 
-  // Initialize graph with valid neighbor indices (raft::upper_bound<IdxT>()).
+  // Initialize graph with invalid neighbor indices (raft::upper_bound<IdxT>()).
   auto d_graph = raft::make_device_matrix<IdxT, int64_t>(res, graph.extent(0), graph.extent(1));
   raft::linalg::map(res, d_graph.view(), raft::const_op<IdxT>{raft::upper_bound<IdxT>()});
 
