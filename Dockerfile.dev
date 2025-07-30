@@ -1,0 +1,129 @@
+# syntax=docker/dockerfile:1.5
+
+# ==============================================================================
+# RAPIDS cuVS Development Docker Image
+#
+# Uses official RAPIDS devcontainer base image and conda environment configuration
+# for consistency and maintainability. Designed as a comprehensive development
+# environment for cuVS projects.
+#
+# Usage:
+#   docker build -f Dockerfile.dev -t cuvs:dev .
+#   docker run --gpus all -v $(pwd):/workspace/cuvs -it cuvs:dev
+#
+# Custom RAPIDS Version:
+#   docker build -f Dockerfile.dev --build-arg RAPIDS_VER=25.06 -t cuvs:dev .
+#
+# Custom Environment:
+#   docker build -f Dockerfile.dev --build-arg CONDA_ENV_FILE=conda/environments/bench_ann_cuda-129_arch-x86_64.yaml -t cuvs:bench .
+#
+# Environment will be automatically activated and working directory set to /workspace/cuvs
+# ==============================================================================
+
+# Configurable build arguments
+ARG RAPIDS_VER=25.08
+ARG CUDA_VER=12.9
+ARG CONDA_ENV_FILE=conda/environments/all_cuda-129_arch-x86_64.yaml
+
+# Use RAPIDS pre-built development container as base
+FROM rapidsai/devcontainers:${RAPIDS_VER}-cpp-mambaforge-ubuntu22.04
+
+# Display build configuration
+ARG RAPIDS_VER
+ARG CUDA_VER
+ARG CONDA_ENV_FILE
+RUN echo "Building cuVS Development Environment:" && \
+    echo "  RAPIDS Version: ${RAPIDS_VER}" && \
+    echo "  CUDA Version: ${CUDA_VER}" && \
+    echo "  Conda Environment: ${CONDA_ENV_FILE}" && \
+    echo "  Base Image: rapidsai/devcontainers:${RAPIDS_VER}-cpp-mambaforge-ubuntu22.04"
+
+# Container metadata
+LABEL maintainer="RAPIDS cuVS Team"
+LABEL description="cuVS Development Environment - Built on RAPIDS devcontainer"
+LABEL org.opencontainers.image.source="https://github.com/rapidsai/cuvs"
+LABEL org.opencontainers.image.usage="docker run --gpus all -v \$(pwd):/workspace/cuvs -it <image>"
+
+# Development environment setup
+ENV PYTHONSAFEPATH=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH=/opt/conda/bin:$PATH
+
+# Install additional development tools (base image has most tools already)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Additional debugging and profiling tools
+    gdb \
+    valgrind \
+    strace \
+    htop \
+    # Text editors
+    vim \
+    nano \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Copy and validate the official conda environment file
+ARG CONDA_ENV_FILE
+COPY ${CONDA_ENV_FILE} /tmp/environment.yaml
+RUN test -f /tmp/environment.yaml || (echo "Environment file not found: ${CONDA_ENV_FILE}" && exit 1)
+
+# Create development environment using mamba (faster than conda)
+# Use absolute path since mamba/conda are in /opt/conda/bin/
+RUN /opt/conda/bin/mamba env create -f /tmp/environment.yaml && \
+    /opt/conda/bin/conda clean -afy
+
+# Initialize conda for the user and configure environment activation (like root Dockerfile)
+RUN CONDA_ENV_NAME=$(grep "^name:" /tmp/environment.yaml | cut -d' ' -f2) && \
+    /opt/conda/bin/conda init bash && \
+    echo "conda activate ${CONDA_ENV_NAME}" >> ~/.bashrc && \
+    echo "conda activate ${CONDA_ENV_NAME}" >> ~/.bash_profile && \
+    echo "Environment '${CONDA_ENV_NAME}' created successfully"
+
+# Set environment variables for automatic environment activation (like root Dockerfile)
+RUN CONDA_ENV_NAME=$(grep "^name:" /tmp/environment.yaml | cut -d' ' -f2) && \
+    echo "export PATH=/opt/conda/envs/${CONDA_ENV_NAME}/bin:/opt/conda/bin:\$PATH" >> /etc/environment && \
+    echo "export CONDA_DEFAULT_ENV=${CONDA_ENV_NAME}" >> /etc/environment && \
+    echo "export CONDA_PREFIX=/opt/conda/envs/${CONDA_ENV_NAME}" >> /etc/environment
+
+# CUDA environment variables (inherit most from base image)
+ENV CUDAARCHS="RAPIDS" \
+    CMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc
+
+# Set up workspace directory to cuvs (compatible with devcontainer workflow)
+WORKDIR /workspace/cuvs
+RUN mkdir -p /workspace/cuvs && chmod 755 /workspace
+
+# Development-friendly settings and fix history file path
+ENV TERM=xterm-256color \
+    EDITOR=vim \
+    HISTFILE=/root/.bash_history
+
+# Create necessary directories for shell history
+RUN mkdir -p /root/.local/state
+
+# Create a convenience script to show environment info
+RUN echo '#!/bin/bash\n\
+CONDA_ENV_NAME=$(grep "^name:" /tmp/environment.yaml 2>/dev/null | cut -d" " -f2 || echo "cuvs-dev")\n\
+echo "cuVS Development Environment"\n\
+echo "==========================="\n\
+echo "RAPIDS Version: '${RAPIDS_VER}'"\n\
+echo "CUDA Version: $(nvcc --version 2>/dev/null | grep release || echo \"Not found\")"\n\
+echo "Target Environment: ${CONDA_ENV_NAME}"\n\
+echo "Environment File: $(basename '${CONDA_ENV_FILE}')"\n\
+echo "Current Environment: ${CONDA_DEFAULT_ENV:-base}"\n\
+echo ""\n\
+echo "Python: $(python --version 2>/dev/null || echo \"Not available\")"\n\
+echo "CMake: $(cmake --version 2>/dev/null | head -1 || echo \"Not found\")"\n\
+echo "GCC: $(gcc --version 2>/dev/null | head -1 || echo \"Not found\")"\n\
+echo ""\n\
+echo "Workspace: /workspace/cuvs"\n\
+echo "Compatible with RAPIDS devcontainer workflow"\n\
+echo ""\n\
+echo "Quick Start:"\n\
+echo "  ./build.sh cuvs     # Build cuVS"\n\
+echo "  pytest python/      # Run tests"\n\
+' > /usr/local/bin/cuvs-dev-info && chmod +x /usr/local/bin/cuvs-dev-info
+
+# Default command (like root Dockerfile, but show info first)
+CMD ["bash", "-c", "cuvs-dev-info && exec bash"]
