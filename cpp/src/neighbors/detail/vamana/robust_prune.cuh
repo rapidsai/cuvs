@@ -87,15 +87,14 @@ __global__ void RobustPruneKernel(
     DistPair<IdxT, accT> nbh_list;
   };
 
-
   // Dynamic shared memory used for blocksort, temp vector storage, and neighborhood list
   extern __shared__ __align__(alignof(ShmemLayout)) char smem[];
 
   int align_padding = raft::alignTo<int>(dim, alignof(ShmemLayout)) - dim;
 
-  float* occlusion_list              = reinterpret_cast<float*>(smem);
-  DistPair<IdxT, accT>* new_nbh_list = reinterpret_cast<DistPair<IdxT, accT>*>(
-    &smem[(degree + visited_size) * sizeof(float)]);
+  float* occlusion_list = reinterpret_cast<float*>(smem);
+  DistPair<IdxT, accT>* new_nbh_list =
+    reinterpret_cast<DistPair<IdxT, accT>*>(&smem[(degree + visited_size) * sizeof(float)]);
 
   static __shared__ Point<T, accT> s_query;
   s_query.coords = &s_coords_mem[blockIdx.x * (dim + align_padding)];
@@ -222,7 +221,7 @@ __global__ void RobustPruneKernel(
       }
 
       // Move all "accepted" candidates to front of list and zero out the rest
-      if(threadIdx.x==0) {
+      if (threadIdx.x == 0) {
         int out_idx = 1;
         for (int read_idx = 1; out_idx < accept_count; read_idx++) {
           if (occlusion_list[read_idx] == raft::lower_bound<float>()) {  // If it is "accepted"

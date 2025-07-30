@@ -72,21 +72,23 @@ void create_insert_permutation(std::vector<IdxT>& insert_order, uint32_t N)
   }
 }
 
-template<typename IdxT>
-__global__ void print_mtx(raft::device_vector_view<IdxT, int64_t> vec) {
+template <typename IdxT>
+__global__ void print_mtx(raft::device_vector_view<IdxT, int64_t> vec)
+{
   printf("extents:%ld\n", vec.extent(0));
-  for(int i=0; i<vec.extent(0); i++) {
+  for (int i = 0; i < vec.extent(0); i++) {
     printf("%d, ", vec(i));
   }
   printf("\n");
 }
 
-template<typename IdxT, typename accT>
-__global__ void print_queryIds(void* query_list_ptr) {
+template <typename IdxT, typename accT>
+__global__ void print_queryIds(void* query_list_ptr)
+{
   QueryCandidates<IdxT, accT>* query_list =
     static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
 
-  for(int i=0; i<50; i++) {
+  for (int i = 0; i < 50; i++) {
     printf("queryId:%d\n", query_list[i].queryId);
   }
 }
@@ -173,17 +175,19 @@ void batched_insert_vamana(
                                                                     visited_dists.data_handle(),
                                                                     (int)max_batchsize,
                                                                     visited_size,
-								    1);
+                                                                    1);
   auto topk_pq_mem =
     raft::make_device_mdarray<Node<accT>>(res,
                                           raft::resource::get_large_workspace_resource(res),
                                           raft::make_extents<int64_t>(max_batchsize, visited_size));
 
-  int align_padding          = raft::alignTo(dim, 16) - dim;
+  int align_padding = raft::alignTo(dim, 16) - dim;
 
   auto s_coords_mem = raft::make_device_mdarray<T>(
-    res, raft::resource::get_large_workspace_resource(res),
-    raft::make_extents<int64_t>(min(maxBlocks, max(max_batchsize, reverse_batch)), dim+align_padding));
+    res,
+    raft::resource::get_large_workspace_resource(res),
+    raft::make_extents<int64_t>(min(maxBlocks, max(max_batchsize, reverse_batch)),
+                                dim + align_padding));
 
   // Create random permutation for order of node inserts into graph
   std::vector<IdxT> insert_order;
@@ -194,14 +198,13 @@ void batched_insert_vamana(
   SELECT_SORT_SMEM_SIZE(degree, visited_size);  // Sets sort_smem_size based on dataset
 
   // Total dynamic shared memory used by GreedySearch
-  int search_smem_total_size = static_cast<int>(
-    (dim + align_padding) * sizeof(T) +  // visited_size * sizeof(Node<accT>) +
-    degree * sizeof(int) + queue_size * sizeof(DistPair<IdxT, accT>));
+  int search_smem_total_size =
+    static_cast<int>((dim + align_padding) * sizeof(T) +  // visited_size * sizeof(Node<accT>) +
+                     degree * sizeof(int) + queue_size * sizeof(DistPair<IdxT, accT>));
 
   // Total dynamic shared memory size needed by both RobustPrune calls
-  int prune_smem_total_size =
-    (degree + visited_size) * sizeof(float) +  // Occlusion list
-    (degree + visited_size) * sizeof(DistPair<IdxT, accT>);
+  int prune_smem_total_size = (degree + visited_size) * sizeof(float) +  // Occlusion list
+                              (degree + visited_size) * sizeof(DistPair<IdxT, accT>);
 
   RAFT_LOG_DEBUG(
     "Dynamic shared memory usage (bytes): GreedySearch: %d, Segment Sort: %d, Robust Prune: %d",
@@ -239,9 +242,7 @@ void batched_insert_vamana(
     if (start + step_size > (int)(insert_iters * (float)N)) {
       step_size = (int)(insert_iters * (float)N) - start;
     }
-    if (start + step_size > N) {
-      step_size = N - start;
-    }
+    if (start + step_size > N) { step_size = N - start; }
     RAFT_LOG_DEBUG("Starting batch of inserts indices_start:%d, batch_size:%d", start, step_size);
 
     int num_blocks = min(maxBlocks, step_size);
@@ -324,17 +325,15 @@ void batched_insert_vamana(
 #endif
 
     // compute prefix sums of query_list sizes - TODO parallelize prefix sums
-//    auto d_total_edges = raft::make_device_mdarray<int>(
-//      res, raft::resource::get_workspace_resource(res), raft::make_extents<int64_t>(1));
+    //    auto d_total_edges = raft::make_device_mdarray<int>(
+    //      res, raft::resource::get_workspace_resource(res), raft::make_extents<int64_t>(1));
     rmm::device_scalar<int> d_total_edges(stream);
-    prefix_sums_sizes<accT, IdxT>
-      <<<1, 1, 0, stream>>>(query_list, step_size, d_total_edges.data());
+    prefix_sums_sizes<accT, IdxT><<<1, 1, 0, stream>>>(query_list, step_size, d_total_edges.data());
     RAFT_CUDA_TRY(cudaPeekAtLastError());
 
     int total_edges = d_total_edges.value(stream);
-//    raft::copy(&total_edges, d_total_edges.data_handle(), 1, stream);
-//    RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
-
+    //    raft::copy(&total_edges, d_total_edges.data_handle(), 1, stream);
+    //    RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
 
     auto edge_dist_pair = raft::make_device_mdarray<DistPair<IdxT, accT>>(
       res,
@@ -395,7 +394,9 @@ void batched_insert_vamana(
       res, edge_dest.view(), [temp_ptr] __device__(size_t i) { return temp_ptr[i].idx; });
       */
     raft::linalg::map(
-      res, edge_dest.view(), [] __device__(auto x) { return x.idx; },
+      res,
+      edge_dest.view(),
+      [] __device__(auto x) { return x.idx; },
       raft::make_const_mdspan(edge_dist_pair.view()));
 
     void* d_temp_storage      = nullptr;
@@ -447,7 +448,6 @@ void batched_insert_vamana(
     rev_time += elapsed_seconds.count();
     start_t = std::chrono::system_clock::now();
 #endif
-
 
     // Batch execution of reverse edge creation/application
     reverse_batch = params.reverse_batchsize;
@@ -514,16 +514,14 @@ void batched_insert_vamana(
       RAFT_CUDA_TRY(cudaPeekAtLastError());
 
       // Segmented sort on reverse_list
-      SortPairsKernel<T, accT, IdxT>
-        <<<num_blocks, blockD, sort_smem_size, stream>>>(
-          reverse_list_ptr.data_handle(), reverse_batch, degree);
+      SortPairsKernel<T, accT, IdxT><<<num_blocks, blockD, sort_smem_size, stream>>>(
+        reverse_list_ptr.data_handle(), reverse_batch, degree);
       RAFT_CUDA_TRY(cudaPeekAtLastError());
 
       // Write new edge lists to graph
       write_graph_edges_kernel<accT, IdxT><<<num_blocks, blockD, 0, stream>>>(
         d_graph.view(), reverse_list_ptr.data_handle(), degree, reverse_batch);
       RAFT_CUDA_TRY(cudaPeekAtLastError());
-
     }
 
 #if KERNEL_TIMING
@@ -579,7 +577,8 @@ index<T, IdxT> build(
 
   RAFT_EXPECTS(params.visited_size > graph_degree, "visited_size must be > graph_degree");
 
-  RAFT_EXPECTS(params.vamana_iters >= 1.0, "vamana_iters must be at least 1.0 to insert the entire input dataset");
+  RAFT_EXPECTS(params.vamana_iters >= 1.0,
+               "vamana_iters must be at least 1.0 to insert the entire input dataset");
 
   int dim = dataset.extent(1);
 

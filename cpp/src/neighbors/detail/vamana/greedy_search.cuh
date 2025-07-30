@@ -65,9 +65,7 @@ __forceinline__ __device__ void sort_visited(
 
 namespace {
 
-template <typename T,
-          typename accT,
-          typename IdxT     = uint32_t>
+template <typename T, typename accT, typename IdxT = uint32_t>
 __global__ void SortPairsKernel(void* query_list_ptr, int num_queries, int topk)
 {
   union ShmemLayout {

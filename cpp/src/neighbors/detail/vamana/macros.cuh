@@ -20,14 +20,13 @@ namespace cuvs::neighbors::vamana::detail {
 
 /* Macros to compute the shared memory requirements for CUB primitives used by search and prune */
 #define COMPUTE_SMEM_SIZE(degree, visited_size, DEG, CANDS)                                     \
-  if (degree == DEG && visited_size <= CANDS && visited_size > CANDS / 2) {                      \
-    sort_smem_size = static_cast<int>(                                                    \
-      sizeof(typename cub::BlockMergeSort<DistPair<IdxT, accT>, 32, CANDS / 32>::TempStorage));  \
-                                                                                                 \
+  if (degree == DEG && visited_size <= CANDS && visited_size > CANDS / 2) {                     \
+    sort_smem_size = static_cast<int>(                                                          \
+      sizeof(typename cub::BlockMergeSort<DistPair<IdxT, accT>, 32, CANDS / 32>::TempStorage)); \
   }
 
 // Current supported sizes for degree and visited_size. Note that visited_size must be > degree
-#define SELECT_SORT_SMEM_SIZE(degree, visited_size)       \
+#define SELECT_SORT_SMEM_SIZE(degree, visited_size)  \
   COMPUTE_SMEM_SIZE(degree, visited_size, 32, 64);   \
   COMPUTE_SMEM_SIZE(degree, visited_size, 32, 128);  \
   COMPUTE_SMEM_SIZE(degree, visited_size, 32, 256);  \

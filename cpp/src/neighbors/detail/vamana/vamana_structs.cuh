@@ -348,10 +348,8 @@ __global__ void prefix_sums_sizes(QueryCandidates<IdxT, accT>* query_list,
 
 // Device fcn to have a threadblock copy coordinates into shared memory
 template <typename T, typename accT>
-__device__ void update_shared_point(Point<T, accT>* shared_point,
-                                    const T* data_ptr,
-                                    int id,
-                                    int dim, int idx)
+__device__ void update_shared_point(
+  Point<T, accT>* shared_point, const T* data_ptr, int id, int dim, int idx)
 {
   shared_point->id  = id;
   shared_point->Dim = dim;
@@ -393,12 +391,11 @@ __global__ void write_graph_edges_kernel(raft::device_matrix_view<IdxT, int64_t>
 
 // Create src and dest edge lists used to sort and create reverse edges
 template <typename accT, typename IdxT = uint32_t>
-__global__ void create_reverse_edge_list(
-  void* query_list_ptr,
-  int num_queries,
-  int degree,
-  IdxT* edge_src,
-  DistPair<IdxT, accT>* edge_dest)
+__global__ void create_reverse_edge_list(void* query_list_ptr,
+                                         int num_queries,
+                                         int degree,
+                                         IdxT* edge_src,
+                                         DistPair<IdxT, accT>* edge_dest)
 {
   QueryCandidates<IdxT, accT>* query_list =
     static_cast<QueryCandidates<IdxT, accT>*>(query_list_ptr);
@@ -468,7 +465,6 @@ __global__ void recompute_reverse_dists(
 
   for (int i = blockIdx.x; i < unique_dests; i += gridDim.x) {
     for (int j = 0; j < reverse_list[i].size; j++) {
-
       reverse_list[i].dists[j] =
         dist<T, accT>(&vec_ptr[(size_t)(reverse_list[i].queryId) * (size_t)dim],
                       &vec_ptr[(size_t)(reverse_list[i].ids[j]) * (size_t)dim],
