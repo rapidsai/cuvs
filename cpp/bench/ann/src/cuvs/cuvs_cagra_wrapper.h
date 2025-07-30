@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,6 +61,8 @@ template <typename T, typename IdxT>
 class cuvs_cagra : public algo<T>, public algo_gpu {
  public:
   using search_param_base = typename algo<T>::search_param;
+  using algo<T>::dim_;
+  using algo<T>::metric_;
 
   struct search_param : public search_param_base {
     cuvs::neighbors::cagra::search_params p;
@@ -78,37 +80,18 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   };
 
   struct build_param {
-    cuvs::neighbors::cagra::index_params cagra_params;
-    CagraBuildAlgo algo;
-    std::optional<cuvs::neighbors::nn_descent::index_params> nn_descent_params = std::nullopt;
-    std::optional<float> ivf_pq_refine_rate                                    = std::nullopt;
-    std::optional<cuvs::neighbors::ivf_pq::index_params> ivf_pq_build_params   = std::nullopt;
-    std::optional<cuvs::neighbors::ivf_pq::search_params> ivf_pq_search_params = std::nullopt;
-    size_t num_dataset_splits                                                  = 1;
+    // The optimal defaults depend on the dataset shape and thus only available once the build
+    // function is called.
+    using dataset_dependent_params = std::function<cuvs::neighbors::cagra::index_params(
+      raft::matrix_extent<int64_t>, cuvs::distance::DistanceType)>;
+    dataset_dependent_params cagra_params;
+    size_t num_dataset_splits = 1;
     CagraMergeType merge_type = CagraMergeType::kPhysical;
-
-    void prepare_build_params(const raft::extent_2d<IdxT>& dataset_extents)
-    {
-      if (algo == CagraBuildAlgo::kIvfPq) {
-        auto pq_params = cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(
-          dataset_extents, cagra_params.metric);
-        if (ivf_pq_build_params) { pq_params.build_params = *ivf_pq_build_params; }
-        if (ivf_pq_search_params) { pq_params.search_params = *ivf_pq_search_params; }
-        if (ivf_pq_refine_rate) { pq_params.refinement_rate = *ivf_pq_refine_rate; }
-        cagra_params.graph_build_params = pq_params;
-      } else if (algo == CagraBuildAlgo::kNnDescent) {
-        auto nn_params = cuvs::neighbors::cagra::graph_build_params::nn_descent_params(
-          cagra_params.intermediate_graph_degree);
-        if (nn_descent_params) { nn_params = *nn_descent_params; }
-        cagra_params.graph_build_params = nn_params;
-      }
-    }
   };
 
   cuvs_cagra(Metric metric, int dim, const build_param& param, int concurrent_searches = 1)
     : algo<T>(metric, dim),
       index_params_(param),
-      dimension_(dim),
 
       dataset_(std::make_shared<raft::device_matrix<T, int64_t, raft::row_major>>(
         std::move(raft::make_device_matrix<T, int64_t>(handle_, 0, 0)))),
@@ -119,8 +102,6 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
           nullptr, 0, 0))
 
   {
-    index_params_.cagra_params.metric         = parse_metric_type(metric);
-    index_params_.ivf_pq_build_params->metric = parse_metric_type(metric);
   }
 
   void build(const T* dataset, size_t nrow) final;
@@ -181,7 +162,6 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   bool need_dataset_update_{true};
   cuvs::neighbors::cagra::search_params search_params_;
   std::shared_ptr<cuvs::neighbors::cagra::index<T, IdxT>> index_;
-  int dimension_;
   std::shared_ptr<raft::device_matrix<IdxT, int64_t, raft::row_major>> graph_;
   std::shared_ptr<raft::device_matrix<T, int64_t, raft::row_major>> dataset_;
   std::shared_ptr<raft::device_matrix_view<const T, int64_t, raft::row_major>> input_dataset_v_;
@@ -209,10 +189,9 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
 template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
 {
-  auto dataset_extents = raft::make_extents<IdxT>(nrow, dimension_);
-  index_params_.prepare_build_params(dataset_extents);
+  auto dataset_extents = raft::make_extents<IdxT>(nrow, dim_);
+  auto params          = index_params_.cagra_params(dataset_extents, parse_metric_type(metric_));
 
-  auto& params = index_params_.cagra_params;
   auto dataset_view_host =
     raft::make_mdspan<const T, IdxT, raft::row_major, true, false>(dataset, dataset_extents);
   auto dataset_view_device =
@@ -229,14 +208,13 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
       IdxT start = static_cast<IdxT>(i * rows_per_split);
       if (start >= nrow) break;
       IdxT rows        = std::min(rows_per_split, static_cast<IdxT>(nrow) - start);
-      const T* sub_ptr = dataset + static_cast<size_t>(start) * dimension_;
+      const T* sub_ptr = dataset + static_cast<size_t>(start) * dim_;
       auto sub_host =
-        raft::make_host_matrix_view<const T, int64_t, raft::row_major>(sub_ptr, rows, dimension_);
+        raft::make_host_matrix_view<const T, int64_t, raft::row_major>(sub_ptr, rows, dim_);
       auto sub_dev =
-        raft::make_device_matrix_view<const T, int64_t, raft::row_major>(sub_ptr, rows, dimension_);
+        raft::make_device_matrix_view<const T, int64_t, raft::row_major>(sub_ptr, rows, dim_);
 
-      auto sub_index =
-        cuvs::neighbors::cagra::index<T, IdxT>(handle_, index_params_.cagra_params.metric);
+      auto sub_index = cuvs::neighbors::cagra::index<T, IdxT>(handle_, params.metric);
       if (index_params_.merge_type == CagraMergeType::kPhysical) {
         if (dataset_is_on_host) {
           sub_index.update_dataset(handle_, sub_host);
@@ -256,7 +234,7 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
       sub_indices_.push_back(std::move(sub_index_shared));
     }
     if (index_params_.merge_type == CagraMergeType::kPhysical) {
-      cuvs::neighbors::cagra::merge_params merge_params{index_params_.cagra_params};
+      cuvs::neighbors::cagra::merge_params merge_params{params};
       merge_params.merge_strategy = cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
 
       std::vector<cuvs::neighbors::cagra::index<T, IdxT>*> indices;
@@ -377,11 +355,11 @@ void cuvs_cagra<T, IdxT>::set_search_dataset(const T* dataset, size_t nrow)
       IdxT start = static_cast<IdxT>(i * rows_per_split);
       if (start >= nrow) break;
       IdxT rows        = std::min(rows_per_split, static_cast<IdxT>(nrow) - start);
-      const T* sub_ptr = dataset + static_cast<size_t>(start) * dimension_;
+      const T* sub_ptr = dataset + static_cast<size_t>(start) * dim_;
       auto sub_host =
-        raft::make_host_matrix_view<const T, int64_t, raft::row_major>(sub_ptr, rows, dimension_);
+        raft::make_host_matrix_view<const T, int64_t, raft::row_major>(sub_ptr, rows, dim_);
       auto sub_dev =
-        raft::make_device_matrix_view<const T, int64_t, raft::row_major>(sub_ptr, rows, dimension_);
+        raft::make_device_matrix_view<const T, int64_t, raft::row_major>(sub_ptr, rows, dim_);
       auto sub_index = sub_indices_[i].get();
       if (index_params_.merge_type == CagraMergeType::kLogical) {
         if (dataset_is_on_host) {
@@ -471,8 +449,7 @@ void cuvs_cagra<T, IdxT>::search_base(
   static_assert(std::is_integral_v<algo_base::index_type>);
   static_assert(std::is_integral_v<IdxT>);
 
-  auto queries_view =
-    raft::make_device_matrix_view<const T, int64_t>(queries, batch_size, dimension_);
+  auto queries_view = raft::make_device_matrix_view<const T, int64_t>(queries, batch_size, dim_);
   auto neighbors_view =
     raft::make_device_matrix_view<algo_base::index_type, int64_t>(neighbors, batch_size, k);
   auto distances_view = raft::make_device_matrix_view<float, int64_t>(distances, batch_size, k);
@@ -491,7 +468,8 @@ void cuvs_cagra<T, IdxT>::search_base(
         handle_, search_params_, *index_, queries_view, neighbors_view, distances_view, *filter_);
     } else {
       if (index_params_.merge_type == CagraMergeType::kLogical) {
-        cuvs::neighbors::cagra::merge_params merge_params{index_params_.cagra_params};
+        // TODO: index merge must happen outside of search, otherwise what are we benchmarking?
+        cuvs::neighbors::cagra::merge_params merge_params{cuvs::neighbors::cagra::index_params{}};
         merge_params.merge_strategy = cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL;
 
         // Create wrapped indices for composite merge
@@ -579,8 +557,8 @@ void cuvs_cagra<T, IdxT>::search(
     auto candidate_ixs =
       raft::make_device_matrix_view<const algo_base::index_type, algo_base::index_type>(
         candidates_ptr, batch_size, k0);
-    auto queries_v = raft::make_device_matrix_view<const T, algo_base::index_type>(
-      queries, batch_size, dimension_);
+    auto queries_v =
+      raft::make_device_matrix_view<const T, algo_base::index_type>(queries, batch_size, dim_);
     refine_helper(
       res, *input_dataset_v_, queries_v, candidate_ixs, k, neighbors, distances, index_->metric());
   }
