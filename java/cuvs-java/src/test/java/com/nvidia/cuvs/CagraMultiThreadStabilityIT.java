@@ -110,7 +110,7 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
                   log.info("Performing validation query from separate thread...");
                   float[][] validationQueries = generateRandomDataset(5, dimensions);
 
-                  CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
+                  CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
                   CagraQuery query =
                       new CagraQuery.Builder()
                           .withTopK(topK)
@@ -160,7 +160,8 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
                     for (int queryId = 0; queryId < queriesPerThread; queryId++) {
                       float[][] queries = generateRandomDataset(queryBatchSize, dimensions);
 
-                      CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
+                      CagraSearchParams searchParams =
+                          new CagraSearchParams.Builder(resources).build();
                       CagraQuery query =
                           new CagraQuery.Builder()
                               .withTopK(topK)
@@ -262,14 +263,11 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
     AtomicInteger successfulThreads = new AtomicInteger(0);
     AtomicReference<Throwable> firstError = new AtomicReference<>();
 
-    CuVSResources indexResources = CuVSResources.create();
-
     // Create index in separate thread
     Thread indexThread =
         new Thread(
             () -> {
-              // try (CuVSResources indexResources = CuVSResources.create()) {
-              try {
+              try (CuVSResources indexResources = CuVSResources.create()) {
                 log.info("Creating CAGRA index with dedicated resources...");
 
                 CagraIndexParams indexParams =
@@ -327,7 +325,7 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
       Future<?> future =
           executor.submit(
               () -> {
-                try {
+                try (CuVSResources threadResources = CuVSResources.create()) {
 
                   CagraIndex index = indexRef.get();
                   assertNotNull("Index should be available", index);
@@ -335,7 +333,8 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
                   for (int queryId = 0; queryId < queriesPerThread; queryId++) {
                     float[][] queries = generateRandomDataset(10, dimensions);
 
-                    CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
+                    CagraSearchParams searchParams =
+                        new CagraSearchParams.Builder(threadResources).build();
                     CagraQuery query =
                         new CagraQuery.Builder()
                             .withTopK(5)
