@@ -63,9 +63,9 @@ struct AnnVamanaInputs {
   int visited_size;
   double max_fraction;
   cuvs::distance::DistanceType metric;
-//  float insert_iters;
   bool host_dataset;
   int reverse_batchsize;
+  double insert_iters;
 
   // cagra search params
   int n_queries;
@@ -138,7 +138,7 @@ class AnnVamanaTest : public ::testing::TestWithParam<AnnVamanaInputs> {
     index_params.visited_size      = ps.visited_size;
     index_params.max_fraction      = ps.max_fraction;
     index_params.reverse_batchsize = ps.reverse_batchsize;
-//    index_params.vamana_iters      = ps.insert_iters;
+    index_params.vamana_iters      = ps.insert_iters;
 
     auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
       (const DataT*)database.data(), ps.n_rows, ps.dim);
@@ -274,9 +274,9 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
     {64, 256},  // visited_size
     {0.06, 0.1},
     {cuvs::distance::DistanceType::L2Expanded},
-//    {1, 1.5},
     {false},
     {100, 1000000},
+    {1.0, 1.5},
     {100},
     {10},
     {cagra::search_algo::AUTO},
@@ -292,9 +292,9 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
     {128, 512},  // visited_size
     {0.06},
     {cuvs::distance::DistanceType::L2Expanded},
-//    {1, 1.5},
     {false},
     {1000000},
+    {1.0},
     {100},
     {10},
     {cagra::search_algo::AUTO},
@@ -311,9 +311,9 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
     {256},  // visited_size
     {0.06},
     {cuvs::distance::DistanceType::L2Expanded},
-//    {1, 1.5},
     {false},
     {1000000},
+    {1.0},
     {100},
     {10},
     {cagra::search_algo::AUTO},
@@ -330,9 +330,9 @@ inline std::vector<AnnVamanaInputs> generate_inputs()
     {512, 1024},  // visited_size
     {0.06},
     {cuvs::distance::DistanceType::L2Expanded},
-//   {1, 1.5},
     {false},
     {1000000},
+    {1.0},
     {100},
     {10},
     {cagra::search_algo::AUTO},

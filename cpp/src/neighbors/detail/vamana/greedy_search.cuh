@@ -67,9 +67,7 @@ namespace {
 
 template <typename T,
           typename accT,
-          typename IdxT     = uint32_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT     = uint32_t>
 __global__ void SortPairsKernel(void* query_list_ptr, int num_queries, int topk)
 {
   union ShmemLayout {
@@ -143,8 +141,6 @@ __global__ void GreedySearchKernel(
   smem_offset += (dim + align_padding) * sizeof(T);
 
   Node<accT>* topk_pq = &topk_pq_mem[blockIdx.x * topk];
-  //  Node<accT>* topk_pq = reinterpret_cast<Node<accT>*>(&smem[smem_offset]); // Used to test
-  //  scenarios using more shared memory smem_offset += topk * sizeof(Node<accT>);
 
   int* neighbor_array = reinterpret_cast<int*>(&smem[smem_offset]);
   smem_offset += degree * sizeof(int);
@@ -266,7 +262,6 @@ __global__ void GreedySearchKernel(
         if (neighbor_array[j] == raft::upper_bound<IdxT>())
           atomicMin(&num_neighbors, (int)j);  // warp-wide min to find the number of neighbors
       }
-      //      __syncthreads();
 
       // computing distances between the query vector and neighbor vectors then enqueue in priority
       // queue.

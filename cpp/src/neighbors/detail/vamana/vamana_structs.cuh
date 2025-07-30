@@ -50,22 +50,6 @@ template <typename IdxT, typename accT>
 struct __align__(16) DistPair {
   accT dist;
   IdxT idx;
-
-  /*
-    __device__ __host__ DistPair& operator=(const DistPair& other)
-    {
-      dist = other.dist;
-      idx  = other.idx;
-      return *this;
-    }
-
-    __device__ __host__ DistPair& operator=(const volatile DistPair& other)
-    {
-      dist = other.dist;
-      idx  = other.idx;
-      return *this;
-    }
-    */
 };
 
 // Swap the values of two DistPair<SUMTYPE> objects
@@ -89,17 +73,6 @@ struct CmpDist {
     return lhs.dist < rhs.dist;
   }
 };
-
-// Structure to sort by distance
-/*
-struct CmpDist2 {
-  template <typename IdxT, typename accT>
-  __device__ bool operator()(const DistPair<IdxT, accT>& lhs, const DistPair<IdxT, accT>& rhs)
-  {
-    return lhs.dist < rhs.dist;
-  }
-};
-*/
 
 // Used to sort reverse edges by destination
 template <typename IdxT>
@@ -378,6 +351,20 @@ template <typename T, typename accT>
 __device__ void update_shared_point(Point<T, accT>* shared_point,
                                     const T* data_ptr,
                                     int id,
+                                    int dim, int idx)
+{
+  shared_point->id  = id;
+  shared_point->Dim = dim;
+  for (size_t i = threadIdx.x; i < dim; i += blockDim.x) {
+    shared_point->coords[i] = data_ptr[(size_t)(id) * (size_t)(dim) + i];
+  }
+}
+
+// Device fcn to have a threadblock copy coordinates into shared memory
+template <typename T, typename accT>
+__device__ void update_shared_point(Point<T, accT>* shared_point,
+                                    const T* data_ptr,
+                                    int id,
                                     int dim)
 {
   shared_point->id  = id;
@@ -407,7 +394,6 @@ __global__ void write_graph_edges_kernel(raft::device_matrix_view<IdxT, int64_t>
 // Create src and dest edge lists used to sort and create reverse edges
 template <typename accT, typename IdxT = uint32_t>
 __global__ void create_reverse_edge_list(
-  //  void* query_list_ptr, int num_queries, int degree, IdxT* edge_src, IdxT* edge_dest)
   void* query_list_ptr,
   int num_queries,
   int degree,
@@ -482,6 +468,7 @@ __global__ void recompute_reverse_dists(
 
   for (int i = blockIdx.x; i < unique_dests; i += gridDim.x) {
     for (int j = 0; j < reverse_list[i].size; j++) {
+
       reverse_list[i].dists[j] =
         dist<T, accT>(&vec_ptr[(size_t)(reverse_list[i].queryId) * (size_t)dim],
                       &vec_ptr[(size_t)(reverse_list[i].ids[j]) * (size_t)dim],

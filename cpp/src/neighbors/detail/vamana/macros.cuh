@@ -19,28 +19,26 @@
 namespace cuvs::neighbors::vamana::detail {
 
 /* Macros to compute the shared memory requirements for CUB primitives used by search and prune */
-#define COMPUTE_SMEM_SIZES(degree, visited_size, DEG, CANDS)                                     \
+#define COMPUTE_SMEM_SIZE(degree, visited_size, DEG, CANDS)                                     \
   if (degree == DEG && visited_size <= CANDS && visited_size > CANDS / 2) {                      \
-    search_smem_sort_size = static_cast<int>(                                                    \
+    sort_smem_size = static_cast<int>(                                                    \
       sizeof(typename cub::BlockMergeSort<DistPair<IdxT, accT>, 32, CANDS / 32>::TempStorage));  \
                                                                                                  \
-    prune_smem_sort_size = static_cast<int>(sizeof(                                              \
-      typename cub::BlockMergeSort<DistPair<IdxT, accT>, 32, (CANDS + DEG) / 32>::TempStorage)); \
   }
 
 // Current supported sizes for degree and visited_size. Note that visited_size must be > degree
-#define SELECT_SMEM_SIZES(degree, visited_size)       \
-  COMPUTE_SMEM_SIZES(degree, visited_size, 32, 64);   \
-  COMPUTE_SMEM_SIZES(degree, visited_size, 32, 128);  \
-  COMPUTE_SMEM_SIZES(degree, visited_size, 32, 256);  \
-  COMPUTE_SMEM_SIZES(degree, visited_size, 32, 512);  \
-  COMPUTE_SMEM_SIZES(degree, visited_size, 64, 128);  \
-  COMPUTE_SMEM_SIZES(degree, visited_size, 64, 256);  \
-  COMPUTE_SMEM_SIZES(degree, visited_size, 64, 512);  \
-  COMPUTE_SMEM_SIZES(degree, visited_size, 128, 256); \
-  COMPUTE_SMEM_SIZES(degree, visited_size, 128, 512); \
-  COMPUTE_SMEM_SIZES(degree, visited_size, 256, 512); \
-  COMPUTE_SMEM_SIZES(degree, visited_size, 256, 1024);
+#define SELECT_SORT_SMEM_SIZE(degree, visited_size)       \
+  COMPUTE_SMEM_SIZE(degree, visited_size, 32, 64);   \
+  COMPUTE_SMEM_SIZE(degree, visited_size, 32, 128);  \
+  COMPUTE_SMEM_SIZE(degree, visited_size, 32, 256);  \
+  COMPUTE_SMEM_SIZE(degree, visited_size, 32, 512);  \
+  COMPUTE_SMEM_SIZE(degree, visited_size, 64, 128);  \
+  COMPUTE_SMEM_SIZE(degree, visited_size, 64, 256);  \
+  COMPUTE_SMEM_SIZE(degree, visited_size, 64, 512);  \
+  COMPUTE_SMEM_SIZE(degree, visited_size, 128, 256); \
+  COMPUTE_SMEM_SIZE(degree, visited_size, 128, 512); \
+  COMPUTE_SMEM_SIZE(degree, visited_size, 256, 512); \
+  COMPUTE_SMEM_SIZE(degree, visited_size, 256, 1024);
 
 /* Macros to call the CUB BlockSort primitives for supported sizes for GREEDY SEARCH */
 #define SEARCH_CALL_SORT(topk, CANDS)                                             \

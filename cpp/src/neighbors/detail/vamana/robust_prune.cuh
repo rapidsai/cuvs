@@ -24,8 +24,6 @@
 #include "macros.cuh"
 #include "vamana_structs.cuh"
 
-#define GRAPH_SLACK_FACTOR 1.05
-
 namespace cuvs::neighbors::vamana::detail {
 
 // Load candidates (from query) and previous edges (from nbh_list) into registers (tmp) spanning
@@ -49,62 +47,6 @@ __forceinline__ __device__ void load_to_registers(DistPair<IdxT, accT>* tmp,
   for (int i = 0; i < nbh_per_thread; i++) {
     tmp[cands_per_thread + i] = nbh_list[nbh_per_thread * threadIdx.x + i];
   }
-}
-
-/* Combines edge and candidate lists, removes duplicates, and sorts by distance
- * Uses CUB primitives, so needs to be templated. Called with Macros for supported sizes above */
-template <typename accT, typename IdxT, int DEG, int CANDS>
-__forceinline__ __device__ void sort_edges_and_cands(
-  DistPair<IdxT, accT>* new_nbh_list,
-  QueryCandidates<IdxT, accT>* query,
-  typename cub::BlockMergeSort<DistPair<IdxT, accT>, 32, (DEG + CANDS) / 32>::TempStorage* sort_mem)
-{
-  const int ELTS   = (DEG + CANDS) / 32;
-  using BlockSortT = cub::BlockMergeSort<DistPair<IdxT, accT>, 32, ELTS>;
-  DistPair<IdxT, accT> tmp[ELTS];
-
-  load_to_registers<accT, IdxT, DEG, CANDS>(tmp, query, new_nbh_list);
-
-  __syncthreads();
-  BlockSortT(*sort_mem).Sort(tmp, CmpDist());
-  __syncthreads();
-
-  // Mark duplicates and re-sort
-  // Copy last element over and shuffle to check for duplicate between threads
-  new_nbh_list[ELTS * threadIdx.x + (ELTS - 1)] = tmp[ELTS - 1];
-  if (tmp[ELTS - 1].idx == tmp[ELTS - 2].idx) {
-    new_nbh_list[ELTS * threadIdx.x + (ELTS - 1)].idx  = raft::upper_bound<IdxT>();
-    new_nbh_list[ELTS * threadIdx.x + (ELTS - 1)].dist = raft::upper_bound<accT>();
-  }
-  __shfl_up_sync(0xffffffff, tmp[ELTS - 1].idx, 1);
-  __syncthreads();
-
-  for (int i = ELTS - 2; i > 0; i--) {
-    if (tmp[i].idx == tmp[i - 1].idx) {
-      tmp[i].idx  = raft::upper_bound<IdxT>();
-      tmp[i].dist = raft::upper_bound<accT>();
-    }
-  }
-  if (threadIdx.x == 0) {
-    if (tmp[0].idx == tmp[ELTS - 1].idx) {
-      tmp[0].idx  = raft::upper_bound<IdxT>();
-      tmp[0].dist = raft::upper_bound<accT>();
-    }
-  }
-
-  tmp[ELTS - 1].idx =
-    new_nbh_list[ELTS * threadIdx.x + (ELTS - 1)].idx;  // copy back to tmp for re-shuffling
-  tmp[ELTS - 1].dist = new_nbh_list[ELTS * threadIdx.x + (ELTS - 1)].dist;
-
-  __syncthreads();
-  BlockSortT(*sort_mem).Sort(tmp, CmpDist());
-  __syncthreads();
-
-  for (int i = 0; i < ELTS; i++) {
-    new_nbh_list[ELTS * threadIdx.x + i].idx  = tmp[i].idx;
-    new_nbh_list[ELTS * threadIdx.x + i].dist = tmp[i].dist;
-  }
-  __syncthreads();
 }
 
 namespace {
@@ -131,7 +73,6 @@ __global__ void RobustPruneKernel(
   int visited_size,
   cuvs::distance::DistanceType metric,
   float alpha,
-  int sort_smem_size,
   T* s_coords_mem)
 {
   int n      = dataset.extent(0);
@@ -146,14 +87,15 @@ __global__ void RobustPruneKernel(
     DistPair<IdxT, accT> nbh_list;
   };
 
+
   // Dynamic shared memory used for blocksort, temp vector storage, and neighborhood list
   extern __shared__ __align__(alignof(ShmemLayout)) char smem[];
 
   int align_padding = raft::alignTo<int>(dim, alignof(ShmemLayout)) - dim;
 
-  float* occlusion_list              = reinterpret_cast<float*>(&smem[sort_smem_size]);
+  float* occlusion_list              = reinterpret_cast<float*>(smem);
   DistPair<IdxT, accT>* new_nbh_list = reinterpret_cast<DistPair<IdxT, accT>*>(
-    &smem[(degree + visited_size) * sizeof(float) + sort_smem_size]);
+    &smem[(degree + visited_size) * sizeof(float)]);
 
   static __shared__ Point<T, accT> s_query;
   s_query.coords = &s_coords_mem[blockIdx.x * (dim + align_padding)];
@@ -164,7 +106,7 @@ __global__ void RobustPruneKernel(
   for (int i = blockIdx.x; i < num_queries; i += gridDim.x) {
     int queryId = query_list[i].queryId;
 
-    update_shared_point<T, accT>(&s_query, &dataset(0, 0), queryId, dim);
+    update_shared_point<T, accT>(&s_query, &dataset(0, 0), queryId, dim, i);
 
     int graphIdx = 0;
     int listIdx  = 0;
@@ -265,7 +207,7 @@ __global__ void RobustPruneKernel(
           occlusion_list[pass_start] = raft::lower_bound<float>();  // Mark as "accepted"
           accept_count++;
 
-          // Update rets of the occlusion list
+          // Update rest of the occlusion list
           for (int occId = pass_start + 1; occId < res_size; occId++) {
             if (occlusion_list[occId] <= alpha &&
                 occlusion_list[occId] != raft::lower_bound<float>()) {
@@ -273,11 +215,6 @@ __global__ void RobustPruneKernel(
               accT djk     = dist<T, accT>(cand_ptr, k_ptr, dim, metric);
               accT new_occ = (float)(new_nbh_list[occId].dist / djk);
 
-              // USED TO DEBUG
-              //	      if(threadIdx.x==0 && i==0) {
-              //                printf("pass:%d, occId:%d, dist:%0.3f, djk:%0.3f, new_occ:%0.3f\n",
-              //                pass_start, occId, new_nbh_list[occId].dist, djk, new_occ);
-              //	      }
               occlusion_list[occId] = std::max(occlusion_list[occId], new_occ);
             }
           }
@@ -285,15 +222,18 @@ __global__ void RobustPruneKernel(
       }
 
       // Move all "accepted" candidates to front of list and zero out the rest
-      int out_idx = 1;
-      for (int read_idx = 1; out_idx < accept_count; read_idx++) {
-        if (occlusion_list[read_idx] == raft::lower_bound<float>()) {  // If it is "accepted"
-          new_nbh_list[out_idx].idx  = new_nbh_list[read_idx].idx;
-          new_nbh_list[out_idx].dist = new_nbh_list[read_idx].dist;
-          out_idx++;
+      if(threadIdx.x==0) {
+        int out_idx = 1;
+        for (int read_idx = 1; out_idx < accept_count; read_idx++) {
+          if (occlusion_list[read_idx] == raft::lower_bound<float>()) {  // If it is "accepted"
+            new_nbh_list[out_idx].idx  = new_nbh_list[read_idx].idx;
+            new_nbh_list[out_idx].dist = new_nbh_list[read_idx].dist;
+            out_idx++;
+          }
         }
       }
-      for (int out_idx = accept_count; out_idx < degree; out_idx++) {
+      __syncthreads();
+      for (int out_idx = accept_count + threadIdx.x; out_idx < degree; out_idx++) {
         new_nbh_list[out_idx].idx  = raft::upper_bound<IdxT>();
         new_nbh_list[out_idx].dist = raft::upper_bound<accT>();
       }
