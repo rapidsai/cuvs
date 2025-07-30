@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,6 +63,39 @@ struct index_params : cuvs::neighbors::index_params {
    */
   int num_threads = 0;
 };
+
+/**
+ * @brief Create a CAGRA index parameters compatible with HNSW index
+ *
+ * @param dataset The shape of the input dataset.
+ * @param M HNSW index parameter M.
+ * @param ef_construction HNSW index parameter ef_construction.
+ * @param metric The distance metric to search.
+ *
+ *
+ * * IMPORTANT NOTE *
+ *
+ * The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce
+ * the same recalls and QPS for the same parameter `ef`. The graphs are different internally. For
+ * the same `ef`, the from-CAGRA index likely has a slightly higher recall and slightly lower QPS.
+ * However, the Recall-QPS curves should be similar (i.e. the points are just shifted along the
+ * curve).
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   raft::resources res;
+ *   auto dataset = raft::make_device_matrix<float, int64_t>(res, N, D);
+ *   auto cagra_params = to_cagra_params(dataset.extents(), M, efc);
+ *   auto cagra_index = cagra::build(res, cagra_params, dataset);
+ *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, cagra_index);
+ * @endcode
+ */
+cuvs::neighbors::cagra::index_params to_cagra_params(
+  raft::matrix_extent<int64_t> dataset,
+  int M,
+  int ef_construction,
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 
 /**@}*/
 
