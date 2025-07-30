@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,6 +67,10 @@ auto build(raft::resources const& res,
            raft::device_matrix_view<const T, int64_t, raft::row_major> dataset) -> index<IdxT>
 {
   if (params.n_clusters > 1) {
+    // related issue: https://github.com/rapidsai/cuvs/issues/1051
+    RAFT_LOG_WARN(
+      "NN Descent batch build (using n_clusters > 1) is deprecated and will be removed in a future "
+      "release. Please use cuvs::all_neighbors::build(...) instead.");
     if constexpr (std::is_same_v<T, float>) {
       return detail::experimental::batch_build<T, IdxT>(res, params, dataset);
     } else {
@@ -114,6 +118,10 @@ void build(raft::resources const& res,
            index<IdxT>& idx)
 {
   if (params.n_clusters > 1) {
+    // related issue: https://github.com/rapidsai/cuvs/issues/1051
+    RAFT_LOG_WARN(
+      "NN Descent batch build (using n_clusters > 1) is deprecated and will be removed in a future "
+      "release. Please use cuvs::all_neighbors::build(...) instead.");
     if constexpr (std::is_same_v<T, float>) {
       detail::experimental::batch_build<T, IdxT>(res, params, dataset, idx);
     } else {
@@ -157,6 +165,10 @@ auto build(raft::resources const& res,
            raft::host_matrix_view<const T, int64_t, raft::row_major> dataset) -> index<IdxT>
 {
   if (params.n_clusters > 1) {
+    // related issue: https://github.com/rapidsai/cuvs/issues/1051
+    RAFT_LOG_WARN(
+      "NN Descent batch build (using n_clusters > 1) is deprecated and will be removed in a future "
+      "release. Please use cuvs::all_neighbors::build(...) instead.");
     if constexpr (std::is_same_v<T, float>) {
       return detail::experimental::batch_build<T, IdxT>(res, params, dataset);
     } else {
@@ -204,6 +216,10 @@ void build(raft::resources const& res,
            index<IdxT>& idx)
 {
   if (params.n_clusters > 1) {
+    // related issue: https://github.com/rapidsai/cuvs/issues/1051
+    RAFT_LOG_WARN(
+      "NN Descent batch build (using n_clusters > 1) is deprecated and will be removed in a future "
+      "release. Please use cuvs::all_neighbors::build(...) instead.");
     if constexpr (std::is_same_v<T, float>) {
       detail::experimental::batch_build<T, IdxT>(res, params, dataset, idx);
     } else {

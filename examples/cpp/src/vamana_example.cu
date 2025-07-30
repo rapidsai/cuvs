@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,13 @@ template <typename T>
 void vamana_build_and_write(raft::device_resources const &dev_resources,
                             raft::device_matrix_view<const T, int64_t> dataset,
                             std::string out_fname, int degree, int visited_size,
-                            float max_fraction, float iters) {
+                            std::string out_fname,
+                            int degree,
+                            int visited_size,
+                            float max_fraction,
+                            float iters,
+                            std::string codebook_prefix)
+{
   using namespace cuvs::neighbors;
 
   // use default index parameters
@@ -40,6 +46,7 @@ void vamana_build_and_write(raft::device_resources const &dev_resources,
   index_params.visited_size = visited_size;
   index_params.graph_degree = degree;
   index_params.vamana_iters = iters;
+  index_params.codebooks    = vamana::deserialize_codebooks(codebook_prefix, dataset.extent(1));
 
   std::cout << "Building Vamana index (search graph)" << std::endl;
 
@@ -55,19 +62,30 @@ void vamana_build_and_write(raft::device_resources const &dev_resources,
 
   std::cout << "Time to build index: " << elapsed_seconds.count() << "s\n";
 
-  // Output index to file
+  // Output index to file (in-memory format)
   serialize(dev_resources, out_fname, index);
+
+  // Output index to file (disk sector-aligned format)
+  serialize(dev_resources, out_fname + ".sector_aligned", index, false, true);
 }
 
-void usage() {
-  printf("Usage: ./vamana_example <data filename> <output filename> <dtype> "
-         "<graph "
-         "degree> <visited_size> <max_fraction> <iterations> \n");
+void usage()
+{
+  printf(
+    "Usage: ./vamana_example <data filename> <output filename> <datatype> "
+    "<graph degree> <visited_size> <max_fraction> <iterations> <(optional) "
+    "codebook prefix>\n");
+
   printf("Input file expected to be binary file of fp32 vectors.\n");
   printf("Graph degree sizes supported: 32, 64, 128, 256\n");
+  printf("Datatype of input dataset (int8 or float)\n");
   printf("Visited_size must be > degree and a power of 2.\n");
   printf("max_fraction > 0 and <= 1. Typical values are 0.06 or 0.1.\n");
-  printf("Default iterations = 1, increase for better quality graph.\n");
+  printf("Default iterations = 1.0, increase for better quality graph.\n");
+  printf(
+    "Optional path prefix to pq pivots and rotation matrix files. Expects pq pivots file at "
+    "${codebook_prefix}_pq_pivots.bin and rotation matrix file at "
+    "${codebook_prefix}_pq_pivots.bin_rotation_matrix.bin.\n");
   exit(1);
 }
 
@@ -87,7 +105,7 @@ int main(int argc, char *argv[]) {
   // limit. raft::resource::set_workspace_to_pool_resource(dev_resources, 2 *
   // 1024 * 1024 * 1024ull);
 
-  if (argc != 8)
+  if (argc != 8 && argc != 9)
     usage();
 
   std::string data_fname = (std::string)(argv[1]); // Input filename
@@ -97,6 +115,9 @@ int main(int argc, char *argv[]) {
   int max_visited = atoi(argv[5]);
   float max_fraction = atof(argv[6]);
   float iters = atof(argv[7]);
+    std::string codebook_prefix = "";
+  if (argc >= 9)
+    codebook_prefix = (std::string)argv[8];  // Path prefix to pq pivots and rotation matrix files
 
   if (dtype == "int8") {
     // Read in binary dataset file
@@ -106,7 +127,7 @@ int main(int argc, char *argv[]) {
     // Simple build example to create graph and write to a file
     vamana_build_and_write<int8_t>(
         dev_resources, raft::make_const_mdspan(dataset.view()), out_fname,
-        degree, max_visited, max_fraction, iters);
+        degree, max_visited, max_fraction, iters, codebook_prefix);
   } else if (dtype == "float") {
     // Read in binary dataset file
     auto dataset =
@@ -115,7 +136,7 @@ int main(int argc, char *argv[]) {
     // Simple build example to create graph and write to a file
     vamana_build_and_write<float>(
         dev_resources, raft::make_const_mdspan(dataset.view()), out_fname,
-        degree, max_visited, max_fraction, iters);
+        degree, max_visited, max_fraction, iters, codebook_prefix);
   } else {
     usage();
   }
