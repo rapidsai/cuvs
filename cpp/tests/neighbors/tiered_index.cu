@@ -154,7 +154,7 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<AnnTieredIndexInputs>
         auto index2 = cuvs::neighbors::tiered_index::build(handle_, build_params, database_view2);
 
         std::vector<cuvs::neighbors::tiered_index::index<UpstreamT>*> indices = {&index, &index2};
-        final_index.emplace(cuvs::neighbors::tiered_index::merge(handle_, indices));
+        final_index.emplace(cuvs::neighbors::tiered_index::merge(handle_, build_params, indices));
 
       } else {
         RAFT_FAIL("unknown test_strategy");

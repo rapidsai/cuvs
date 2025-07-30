@@ -301,7 +301,9 @@ auto build(
  * @brief merge multiple indices together
  */
 template <typename UpstreamT>
-auto merge(raft::resources const& res, const std::vector<tiered_index::index<UpstreamT>*>& indices)
+auto merge(raft::resources const& res,
+           const index_params<typename UpstreamT::index_params_type>& index_params,
+           const std::vector<tiered_index::index<UpstreamT>*>& indices)
   -> std::shared_ptr<index_state<UpstreamT>>
 {
   using value_type = typename UpstreamT::value_type;
@@ -358,8 +360,9 @@ auto merge(raft::resources const& res, const std::vector<tiered_index::index<Ups
     new_storage->num_rows_used += storage->num_rows_used;
   }
 
-  auto next_state     = std::make_shared<index_state<UpstreamT>>(*indices[0]->state);
-  next_state->storage = new_storage;
+  auto next_state          = std::make_shared<index_state<UpstreamT>>(*indices[0]->state);
+  next_state->storage      = new_storage;
+  next_state->build_params = index_params;
 
   if (next_state->bfknn_rows() > static_cast<size_t>(next_state->build_params.min_ann_rows)) {
     next_state = compact(res, *next_state);

@@ -1975,10 +1975,8 @@ void serialize_to_hnswlib(
  * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
  * in device memory by default; otherwise, host memory is used automatically.
  *
- * @note: The `merge_params.merge_strategy` parameter cannot be set to MERGE_STRATEGY_LOGICAL
- * using this API. Please use the API in the `cuvs/neighbors/composite/merge.hpp` instead
- * if you want to use the logical merge functionality, this API only supports physical merge
- * (`merge_params.merge_strategy = MERGE_STRATEGY_PHYSICAL`).
+ * @note: This API only supports physical merge (`merge_strategy = MERGE_STRATEGY_PHYSICAL`), and
+ * attempting a logical merge here will throw an error.
  *
  * Usage example:
  * @code{.cpp}
