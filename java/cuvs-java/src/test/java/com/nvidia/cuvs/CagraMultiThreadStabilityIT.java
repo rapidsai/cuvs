@@ -40,7 +40,6 @@ import org.junit.runner.RunWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-// Test multi-threaded CAGRA usage to catch memory issues and crashes
 @RunWith(RandomizedRunner.class)
 public class CagraMultiThreadStabilityIT extends CuVSTestCase {
 
@@ -53,11 +52,8 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
     log.info("Multi-threaded stability test initialized");
   }
 
-  // Test that demonstrates the requirement for synchronized keyword
-  // This test specifically creates high contention scenarios that would fail without
-  // synchronization
   @Test
-  public void testSynchronizedSearchRequirement() throws Throwable {
+  public void testQueryingUsingMultipleThreads() throws Throwable {
     final int dataSize = 10000;
     final int dimensions = 256;
     final int numThreads = 16; // High thread count to increase contention
@@ -65,15 +61,13 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
     final int queryBatchSize = 1; // Small batch size to increase frequency of calls
     final int topK = 10;
 
-    log.info("Starting synchronized search requirement test:");
     log.info("  Dataset: {}x{}", dataSize, dimensions);
     log.info("  Threads: {}, Queries per thread: {}", numThreads, queriesPerThread);
-    log.info("  This test demonstrates why synchronized keyword is required");
 
     float[][] dataset = generateRandomDataset(dataSize, dimensions);
 
     try (CuVSResources resources = CheckedCuVSResources.create()) {
-      log.info("Creating CAGRA index for synchronization test...");
+      log.info("Creating CAGRA index for MultiThreaded stability test...");
 
       CagraIndexParams indexParams =
           new CagraIndexParams.Builder()
@@ -92,7 +86,7 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
 
       log.info("CAGRA index created, starting high-contention multi-threaded search...");
 
-      // Create high contention scenario that would fail without synchronization
+      // Create high contention scenario that would fail without using separate resources in every thread
       ExecutorService executor = Executors.newFixedThreadPool(numThreads);
       List<Future<?>> futures = new ArrayList<>();
       CountDownLatch startLatch = new CountDownLatch(1);
@@ -172,12 +166,11 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
       int expectedTotalQueries = numThreads * queriesPerThread;
       int actualSuccessfulQueries = successfulQueries.get();
 
-      log.info("Synchronized search test results:");
       log.info("  Successful queries: {} / {}", actualSuccessfulQueries, expectedTotalQueries);
 
       if (firstError.get() != null) {
         fail(
-            "Synchronized search test failed - this indicates the synchronized keyword is required:"
+            "MultiThreaded stablity test failed:"
                 + " "
                 + firstError.get().getMessage());
       }
@@ -186,8 +179,6 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
       assertTrue(
           "All queries should complete successfully",
           actualSuccessfulQueries == expectedTotalQueries);
-
-      log.info("Synchronized search test PASSED - synchronized keyword is working correctly");
 
       index.destroyIndex();
     }
