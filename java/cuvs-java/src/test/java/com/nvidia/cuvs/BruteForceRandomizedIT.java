@@ -106,7 +106,7 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
     List<List<Integer>> expected = generateExpectedResults(topK, vectors, queries, prefilters, log);
 
     // Create CuVS index and query
-    try (CuVSResources resources = CuVSResources.create()) {
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
 
       BruteForceQuery query =
           new BruteForceQuery.Builder()
@@ -120,11 +120,14 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
 
       BruteForceIndex index;
       if (useNativeMemoryDataset) {
-        Dataset dataset = Dataset.create(vectors.length, vectors[0].length);
-        for (float[] v : vectors) dataset.addVector(v);
+        var datasetBuilder =
+            CuVSMatrix.builder(vectors.length, vectors[0].length, CuVSMatrix.DataType.FLOAT);
+        for (float[] v : vectors) {
+          datasetBuilder.addVector(v);
+        }
         index =
             BruteForceIndex.newBuilder(resources)
-                .withDataset(dataset)
+                .withDataset(datasetBuilder.build())
                 .withIndexParams(indexParams)
                 .build();
       } else {

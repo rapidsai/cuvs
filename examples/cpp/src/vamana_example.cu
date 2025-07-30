@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,8 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
                             int degree,
                             int visited_size,
                             float max_fraction,
-                            int iters)
+                            int iters,
+                            std::string codebook_prefix)
 {
   using namespace cuvs::neighbors;
 
@@ -44,6 +45,7 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
   index_params.visited_size = visited_size;
   index_params.graph_degree = degree;
   index_params.vamana_iters = iters;
+  index_params.codebooks    = vamana::deserialize_codebooks(codebook_prefix, dataset.extent(1));
 
   std::cout << "Building Vamana index (search graph)" << std::endl;
 
@@ -58,20 +60,28 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
 
   std::cout << "Time to build index: " << elapsed_seconds.count() << "s\n";
 
-  // Output index to file
+  // Output index to file (in-memory format)
   serialize(dev_resources, out_fname, index);
+
+  // Output index to file (disk sector-aligned format)
+  serialize(dev_resources, out_fname + ".sector_aligned", index, false, true);
 }
 
 void usage()
 {
   printf(
     "Usage: ./vamana_example <data filename> <output filename> <graph "
-    "degree> <visited_size> <max_fraction> <iterations> \n");
+    "degree> <visited_size> <max_fraction> <iterations> <(optional) "
+    "codebook prefix>\n");
   printf("Input file expected to be binary file of fp32 vectors.\n");
   printf("Graph degree sizes supported: 32, 64, 128, 256\n");
   printf("Visited_size must be > degree and a power of 2.\n");
   printf("max_fraction > 0 and <= 1. Typical values are 0.06 or 0.1.\n");
   printf("Default iterations = 1, increase for better quality graph.\n");
+  printf(
+    "Optional path prefix to pq pivots and rotation matrix files. Expects pq pivots file at "
+    "${codebook_prefix}_pq_pivots.bin and rotation matrix file at "
+    "${codebook_prefix}_pq_pivots.bin_rotation_matrix.bin.\n");
   exit(1);
 }
 
@@ -92,14 +102,17 @@ int main(int argc, char* argv[])
   // limit. raft::resource::set_workspace_to_pool_resource(dev_resources, 2 *
   // 1024 * 1024 * 1024ull);
 
-  if (argc != 7) usage();
+  if (argc != 7 && argc != 8) usage();
 
-  std::string data_fname = (std::string)(argv[1]);  // Input filename
-  std::string out_fname  = (std::string)argv[2];    // Output index filename
-  int degree             = atoi(argv[3]);
-  int max_visited        = atoi(argv[4]);
-  float max_fraction     = atof(argv[5]);
-  int iters              = atoi(argv[6]);
+  std::string data_fname      = (std::string)(argv[1]);  // Input filename
+  std::string out_fname       = (std::string)argv[2];    // Output index filename
+  int degree                  = atoi(argv[3]);
+  int max_visited             = atoi(argv[4]);
+  float max_fraction          = atof(argv[5]);
+  int iters                   = atoi(argv[6]);
+  std::string codebook_prefix = "";
+  if (argc >= 8)
+    codebook_prefix = (std::string)argv[7];  // Path prefix to pq pivots and rotation matrix files
 
   // Read in binary dataset file
   auto dataset = read_bin_dataset<uint8_t, int64_t>(dev_resources, data_fname, INT_MAX);
@@ -111,5 +124,6 @@ int main(int argc, char* argv[])
                                   degree,
                                   max_visited,
                                   max_fraction,
-                                  iters);
+                                  iters,
+                                  codebook_prefix);
 }

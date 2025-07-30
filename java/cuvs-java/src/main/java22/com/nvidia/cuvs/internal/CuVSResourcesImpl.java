@@ -22,7 +22,6 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
 
 import com.nvidia.cuvs.CuVSResources;
 import java.lang.foreign.Arena;
-import java.lang.foreign.MemorySegment;
 import java.nio.file.Path;
 
 /**
@@ -33,60 +32,48 @@ import java.nio.file.Path;
 public class CuVSResourcesImpl implements CuVSResources {
 
   private final Path tempDirectory;
-  private final Arena arena;
-  private final MemorySegment resourcesMemorySegment;
-  private boolean destroyed;
+  private final long resourceHandle;
+  private final ScopedAccess access;
 
   /**
    * Constructor that allocates the resources needed for cuVS
    *
-   * @throws Throwable exception thrown when native function is invoked
    */
-  public CuVSResourcesImpl(Path tempDirectory) throws Throwable {
+  public CuVSResourcesImpl(Path tempDirectory) {
     this.tempDirectory = tempDirectory;
-    arena = Arena.ofShared();
-    resourcesMemorySegment = arena.allocate(cuvsResources_t);
-    int returnValue = cuvsResourcesCreate(resourcesMemorySegment);
-    checkCuVSError(returnValue, "cuvsResourcesCreate");
+    try (var localArena = Arena.ofConfined()) {
+      var resourcesMemorySegment = localArena.allocate(cuvsResources_t);
+      int returnValue = cuvsResourcesCreate(resourcesMemorySegment);
+      checkCuVSError(returnValue, "cuvsResourcesCreate");
+      this.resourceHandle = resourcesMemorySegment.get(cuvsResources_t, 0);
+      this.access =
+          new ScopedAccess() {
+            @Override
+            public long handle() {
+              return resourceHandle;
+            }
+
+            @Override
+            public void close() {}
+          };
+    }
+  }
+
+  @Override
+  public ScopedAccess access() {
+    return this.access;
   }
 
   @Override
   public void close() {
-    checkNotDestroyed();
-    int returnValue = cuvsResourcesDestroy(resourcesMemorySegment.get(cuvsResources_t, 0));
-    checkCuVSError(returnValue, "cuvsResourcesDestroy");
-    destroyed = true;
-    if (!arena.scope().isAlive()) {
-      arena.close();
+    synchronized (this) {
+      int returnValue = cuvsResourcesDestroy(resourceHandle);
+      checkCuVSError(returnValue, "cuvsResourcesDestroy");
     }
   }
 
   @Override
   public Path tempDirectory() {
     return tempDirectory;
-  }
-
-  private void checkNotDestroyed() {
-    if (destroyed) {
-      throw new IllegalStateException("destroyed");
-    }
-  }
-
-  /**
-   * Gets the reference to the cuvsResources MemorySegment.
-   *
-   * @return cuvsResources MemorySegment
-   */
-  protected MemorySegment getMemorySegment() {
-    checkNotDestroyed();
-    return resourcesMemorySegment;
-  }
-
-  /**
-   * The allocation arena used by this resources.
-   */
-  protected Arena getArena() {
-    checkNotDestroyed();
-    return arena;
   }
 }
