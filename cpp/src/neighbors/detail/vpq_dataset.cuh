@@ -25,6 +25,7 @@
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/map.cuh>
@@ -241,25 +242,25 @@ auto train_pq(const raft::resources& res,
   return pq_centers;
 }
 
-template <uint32_t subwarpsize, typename datat, typename matht, typename idxt, typename labelt>
+template <uint32_t SubWarpSize, typename DataT, typename MathT, typename IdxT, typename LabelT>
 __device__ auto compute_code(
-  raft::device_matrix_view<const datat, idxt, raft::row_major> dataset,
-  raft::device_matrix_view<const matht, uint32_t, raft::row_major> vq_centers,
-  raft::device_matrix_view<const matht, uint32_t, raft::row_major> pq_centers,
-  idxt i,
+  raft::device_matrix_view<const DataT, IdxT, raft::row_major> dataset,
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers,
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
+  IdxT i,
   uint32_t j,
-  labelt vq_label) -> uint8_t
+  LabelT vq_label) -> uint8_t
 {
-  auto data_mapping = cuvs::spatial::knn::detail::utils::mapping<matht>{};
-  uint32_t lane_id  = raft::Pow2<subwarpsize>::mod(raft::laneId());
+  auto data_mapping = cuvs::spatial::knn::detail::utils::mapping<MathT>{};
+  uint32_t lane_id  = raft::Pow2<SubWarpSize>::mod(raft::laneId());
 
   const uint32_t pq_book_size = pq_centers.extent(0);
   const uint32_t pq_len       = pq_centers.extent(1);
   float min_dist              = std::numeric_limits<float>::infinity();
   uint8_t code                = 0;
-  // calculate the distance for each pq cluster, find the minimum for each thread
-  for (uint32_t l = lane_id; l < pq_book_size; l += subwarpsize) {
-    // nb: the l2 quantifiers on residuals are always trained on l2 metric.
+  // calculate the distance for each PQ cluster, find the minimum for each thread
+  for (uint32_t l = lane_id; l < pq_book_size; l += SubWarpSize) {
+    // NB: the L2 quantifiers on residuals are always trained on L2 metric.
     float d = 0.0f;
     for (uint32_t k = 0; k < pq_len; k++) {
       auto jk = j * pq_len + k;
@@ -274,9 +275,9 @@ __device__ auto compute_code(
   }
   // reduce among threads
 #pragma unroll
-  for (uint32_t stride = subwarpsize >> 1; stride > 0; stride >>= 1) {
-    const auto other_dist = raft::shfl_xor(min_dist, stride, subwarpsize);
-    const auto other_code = raft::shfl_xor(code, stride, subwarpsize);
+  for (uint32_t stride = SubWarpSize >> 1; stride > 0; stride >>= 1) {
+    const auto other_dist = raft::shfl_xor(min_dist, stride, SubWarpSize);
+    const auto other_code = raft::shfl_xor(code, stride, SubWarpSize);
     if (other_dist < min_dist) {
       min_dist = other_dist;
       code     = other_code;
