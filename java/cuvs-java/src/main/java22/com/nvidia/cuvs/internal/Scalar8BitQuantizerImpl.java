@@ -111,6 +111,14 @@ public class Scalar8BitQuantizerImpl {
       MemorySegment datasetMemSegment = ((CuVSMatrixBaseImpl) dataset).memorySegment();
       long cuvsResourcesPtr = resourcesAccessor.handle();
 
+      // WARNING: Current GPU quantization implementation is inefficient
+      // It copies dataset from host to GPU, performs quantization on GPU,
+      // then copies results back to host. This introduces significant overhead.
+      // 
+      // TODO: Once Java API supports creating datasets directly on GPU 
+      // (e.g., CuVSDeviceMatrix), optimize by keeping data on GPU throughout
+      // the quantization process to eliminate unnecessary memory transfers.
+
       if (dataset.memoryKind() == MemoryKind.HOST) {
         // CPU path: no device alloc / cudaMemcpy
         return performTransformHost(

@@ -94,6 +94,14 @@ public class BinaryQuantizerImpl {
       MemorySegment datasetMemSegment = ((CuVSMatrixBaseImpl) dataset).memorySegment();
       long cuvsResourcesPtr = resourcesAccessor.handle();
 
+      // TODO: GPU Quantization Optimization Needed
+      // Current implementation is inefficient due to:
+      // 1. Host-to-device copy of input dataset
+      // 2. Device-to-host copy of quantized results
+      // 
+      // Future improvement: Support GPU-native dataset creation in Java API
+      // to perform quantization entirely on GPU without data transfers.
+
       if (dataset.memoryKind() == MemoryKind.HOST) {
         // CPU quantization path
         return performTransformHost(cuvsResourcesPtr, localArena, rows, cols, datasetMemSegment);
