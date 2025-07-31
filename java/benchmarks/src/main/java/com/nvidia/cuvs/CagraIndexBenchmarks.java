@@ -77,12 +77,12 @@ public class CagraIndexBenchmarks {
         return segment;
     }
 
-    private static Dataset fromMemorySegment(MemorySegment memorySegment, int size, int dimensions) {
+    private static CuVSMatrix fromMemorySegment(MemorySegment memorySegment, int size, int dimensions) {
         try {
-            return (Dataset)
+            return (CuVSMatrix)
                     CuVSProvider.provider()
-                            .newNativeDatasetBuilder()
-                            .invokeExact(memorySegment, size, dimensions);
+                            .newNativeMatrixBuilder()
+                            .invokeExact(memorySegment, size, dimensions, CuVSMatrix.DataType.FLOAT);
         } catch (Throwable e) {
             if (e instanceof Error err) {
                 throw err;
@@ -185,7 +185,7 @@ public class CagraIndexBenchmarks {
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     @BenchmarkMode(Mode.AverageTime)
     public void testDatasetFromHeap(Blackhole blackhole) throws Throwable {
-        try (var dataset = Dataset.ofArray(arrayDataset)) {
+        try (var dataset = CuVSMatrix.ofArray(arrayDataset)) {
             blackhole.consume(dataset);
         }
     }

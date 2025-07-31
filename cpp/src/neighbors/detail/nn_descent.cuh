@@ -53,6 +53,7 @@
 #include <optional>
 #include <queue>
 #include <random>
+#include <type_traits>
 
 namespace cuvs::neighbors::nn_descent::detail {
 
@@ -289,7 +290,7 @@ RAFT_KERNEL preprocess_data_kernel(
       } else if (metric == cuvs::distance::DistanceType::BitwiseHamming) {
         int idx_for_byte           = list_id * dim + idx;  // uint8 or int8 data
         uint8_t* output_bytes      = reinterpret_cast<uint8_t*>(output_data);
-        output_bytes[idx_for_byte] = input_data[idx_for_byte];
+        output_bytes[idx_for_byte] = input_data[(size_t)blockIdx.x * dim + idx];
       } else {  // L2Expanded or L2SqrtExpanded
         output_data[list_id * dim + idx] = input_data[(size_t)blockIdx.x * dim + idx];
         if (idx == 0) { l2_norms[list_id] = l2_norm; }
@@ -566,6 +567,10 @@ __launch_bounds__(BLOCK_SIZE)
 
   __syncthreads();
 
+  // if we have a distance epilogue, distances need to be fully calculated instead of postprocessing
+  // them.
+  bool can_postprocess_dist = std::is_same_v<DistEpilogue_t, raft::identity_op>;
+
   remove_duplicates(new_neighbors,
                     list_new_size2.x,
                     new_neighbors + list_new_size2.x,
@@ -638,7 +643,7 @@ __launch_bounds__(BLOCK_SIZE)
     int col_id = i / SKEWED_MAX_NUM_BI_SAMPLES;
 
     if (row_id < list_new_size && col_id < list_new_size) {
-      if (metric == cuvs::distance::DistanceType::InnerProduct) {
+      if (metric == cuvs::distance::DistanceType::InnerProduct && can_postprocess_dist) {
         s_distances[i] = -s_distances[i];
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         s_distances[i] = 1.0 - s_distances[i];
@@ -658,6 +663,9 @@ __launch_bounds__(BLOCK_SIZE)
         // for fp32 vs fp16 precision differences resulting in negative distances when distance
         // should be 0 related issue: https://github.com/rapidsai/cuvs/issues/991
         s_distances[i] = s_distances[i] < 0.0f ? 0.0f : s_distances[i];
+        if (!can_postprocess_dist && metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+          s_distances[i] = sqrtf(s_distances[i]);
+        }
       }
       s_distances[i] = dist_epilogue(s_distances[i], new_neighbors[row_id], new_neighbors[col_id]);
     } else {
@@ -737,7 +745,7 @@ __launch_bounds__(BLOCK_SIZE)
     int row_id = i % SKEWED_MAX_NUM_BI_SAMPLES;
     int col_id = i / SKEWED_MAX_NUM_BI_SAMPLES;
     if (row_id < list_old_size && col_id < list_new_size) {
-      if (metric == cuvs::distance::DistanceType::InnerProduct) {
+      if (metric == cuvs::distance::DistanceType::InnerProduct && can_postprocess_dist) {
         s_distances[i] = -s_distances[i];
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         s_distances[i] = 1.0 - s_distances[i];
@@ -757,6 +765,9 @@ __launch_bounds__(BLOCK_SIZE)
         // for fp32 vs fp16 precision differences resulting in negative distances when distance
         // should be 0 related issue: https://github.com/rapidsai/cuvs/issues/991
         s_distances[i] = s_distances[i] < 0.0f ? 0.0f : s_distances[i];
+        if (!can_postprocess_dist && metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+          s_distances[i] = sqrtf(s_distances[i]);
+        }
       }
       s_distances[i] = dist_epilogue(s_distances[i], old_neighbors[row_id], new_neighbors[col_id]);
     } else {
@@ -1257,10 +1268,12 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
     auto output_dist_view = raft::make_device_matrix_view<DistData_t, int64_t, raft::row_major>(
       output_distances, nrow_, build_config_.output_graph_degree);
     // distance post-processing
-    if (build_config_.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+    bool can_postprocess_dist = std::is_same_v<DistEpilogue_t, raft::identity_op>;
+    if (build_config_.metric == cuvs::distance::DistanceType::L2SqrtExpanded &&
+        can_postprocess_dist) {
       raft::linalg::map(
         res, output_dist_view, raft::sqrt_op{}, raft::make_const_mdspan(output_dist_view));
-    } else if (!cuvs::distance::is_min_close(build_config_.metric)) {
+    } else if (!cuvs::distance::is_min_close(build_config_.metric) && can_postprocess_dist) {
       // revert negated innerproduct
       raft::linalg::map(res,
                         output_dist_view,

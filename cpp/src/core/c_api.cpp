@@ -278,6 +278,7 @@ extern "C" cuvsError_t cuvsMatrixSliceRows(cuvsResources_t res,
     DLTensor& src = src_managed->dl_tensor;
     DLTensor& dst = dst_managed->dl_tensor;
     RAFT_EXPECTS(src.ndim == 2, "src should be a 2 dimensional tensor");
+    RAFT_EXPECTS(src.shape != nullptr, "shape should be initialized in the src tensor");
 
     dst.dtype    = src.dtype;
     dst.device   = src.device;
