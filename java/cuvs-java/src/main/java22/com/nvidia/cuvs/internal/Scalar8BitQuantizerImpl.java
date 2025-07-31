@@ -114,8 +114,8 @@ public class Scalar8BitQuantizerImpl {
       // WARNING: Current GPU quantization implementation is inefficient
       // It copies dataset from host to GPU, performs quantization on GPU,
       // then copies results back to host. This introduces significant overhead.
-      // 
-      // TODO: Once Java API supports creating datasets directly on GPU 
+      //
+      // TODO: Once Java API supports creating datasets directly on GPU
       // (e.g., CuVSDeviceMatrix), optimize by keeping data on GPU throughout
       // the quantization process to eliminate unnecessary memory transfers.
 
