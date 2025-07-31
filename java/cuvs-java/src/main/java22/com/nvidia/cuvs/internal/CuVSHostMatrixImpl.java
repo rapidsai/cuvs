@@ -120,6 +120,11 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
   }
 
   @Override
+  public MemoryKind memoryKind() {
+    return MemoryKind.HOST;
+  }
+
+  @Override
   public void close() {}
 
   @Override

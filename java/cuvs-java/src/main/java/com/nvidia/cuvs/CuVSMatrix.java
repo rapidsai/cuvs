@@ -157,6 +157,13 @@ public interface CuVSMatrix extends AutoCloseable {
    */
   void toArray(byte[][] array);
 
+  /**
+   * Gets where the content is stored
+   *
+   * @return MemoryKind whether HOST or DEVICE
+   */
+  CuVSMatrix.MemoryKind memoryKind();
+
   @Override
   void close();
 }

@@ -81,7 +81,7 @@ public interface CuVSProvider {
   /** Create a {@link CuVSMatrix} from an on-heap array **/
   CuVSMatrix newMatrixFromArray(byte[][] vectors);
 
-  /** Create a {@link Dataset} backed by a on-heap byte array */
+  /** Create a {@link CuVSMatrix} backed by a on-heap byte array */
   CuVSMatrix newByteArrayDataset(byte[][] vectors);
 
   /** Creates a new BruteForceIndex Builder. */

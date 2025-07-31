@@ -21,7 +21,7 @@ import java.util.function.LongToIntFunction;
 
 /**
  * CagraQuery holds the search parameters plus either raw float[][] vectors
- * or a quantized {@link Dataset} for querying a CAGRA index.
+ * or a quantized {@link CuVSMatrix} for querying a CAGRA index.
  *
  * @since 25.02
  */
@@ -165,7 +165,7 @@ public class CagraQuery {
 
     /**
      * Specify a quantizer to automatically transform the float[][] queryVectors
-     * into a quantized {@link Dataset} using the same quantizer used for training.
+     * into a quantized {@link CuVSMatrix} using the same quantizer used for training.
      */
     public Builder withQuantizer(CuVSQuantizer quantizer) {
       this.quantizer = quantizer;

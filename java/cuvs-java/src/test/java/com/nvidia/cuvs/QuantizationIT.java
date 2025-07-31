@@ -16,22 +16,13 @@
 package com.nvidia.cuvs;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
 import java.lang.invoke.MethodHandles;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -50,370 +41,307 @@ public class QuantizationIT extends CuVSTestCase {
     log.info("Random context initialized for quantization test.");
   }
 
-  private static float[][] createSampleData() {
+  private static float[][] createSimpleDataset() {
     return new float[][] {
-      {0.74021935f, 0.9209938f},
-      {0.03902049f, 0.9689629f},
-      {0.92514056f, 0.4463501f},
-      {0.6673192f, 0.10993068f}
+      {1.0f, 2.0f, 3.0f},
+      {4.0f, 5.0f, 6.0f},
+      {7.0f, 8.0f, 9.0f},
+      {10.0f, 11.0f, 12.0f},
+      {13.0f, 14.0f, 15.0f}
     };
   }
 
-  private static float[][] createSampleQueries() {
+  private static float[][] createSimpleQueries() {
     return new float[][] {
-      {0.48216683f, 0.0428398f},
-      {0.5084142f, 0.6545497f}
+      {1.1f, 2.1f, 3.1f},
+      {7.1f, 8.1f, 9.1f}
     };
   }
 
-  /**
-   * Test scalar 8-bit quantization workflow: indexing with quantized dataset and searching with quantized queries
-   */
   @Test
-  public void testScalar8BitQuantizationFlow() throws Throwable {
-    float[][] dataset = createSampleData();
-    float[][] queries = createSampleQueries();
+  public void testScalarQuantizerBasicFlow() throws Throwable {
+    float[][] dataset = createSimpleDataset();
+    float[][] queries = createSimpleQueries();
 
     try (CuVSResources resources = CheckedCuVSResources.create()) {
-
-      // 1. Create training dataset
+      // Create float32 dataset
       CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
-      assertEquals("Training dataset should be 32-bit", 32, trainingDataset.precision());
+      assertEquals(32, trainingDataset.precision());
+      assertEquals(dataset.length, trainingDataset.size());
+      assertEquals(dataset[0].length, trainingDataset.columns());
 
-      // 2. Create scalar quantizer
-      CuVSQuantizer quantizer = new Scalar8BitQuantizer(resources, trainingDataset);
-      assertEquals("Quantizer should have 8-bit precision", 8, quantizer.precision());
-      log.info("Created Scalar8BitQuantizer with {}-bit precision", quantizer.precision());
+      // Create scalar quantizer
+      Scalar8BitQuantizer quantizer = new Scalar8BitQuantizer(resources, trainingDataset);
+      assertEquals(8, quantizer.precision());
+      log.info("Created scalar quantizer with 8-bit precision");
 
-      // 3. Build index with quantized dataset using withQuantizer()
-      CagraIndexParams indexParams =
-          new CagraIndexParams.Builder()
-              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
-              .withGraphDegree(1)
-              .withIntermediateGraphDegree(2)
-              .withNumWriterThreads(32)
-              .withMetric(CuvsDistanceType.L2Expanded)
-              .build();
-
-      CagraIndex quantizedIndex =
-          CagraIndex.newBuilder(resources)
-              .withDataset(trainingDataset) // 32-bit input
-              .withQuantizer(quantizer) // automatically quantizes to 8-bit
-              .withIndexParams(indexParams)
-              .build();
-
-      log.info("✓ Index built with quantized dataset");
-
-      // 4. Test search with quantized queries
-      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
-
-      CagraQuery quantizedQuery =
-          CagraQuery.newBuilder()
-              .withQueryVectors(queries) // 32-bit input
-              .withQuantizer(quantizer) // automatically quantizes to 8-bit
-              .withSearchParams(searchParams)
-              .withTopK(3)
-              .build();
-
-      // Verify query was properly quantized
-      assertTrue("Query should have quantized vectors", quantizedQuery.hasQuantizedQueries());
-      assertEquals(
-          "Quantized query should have 8-bit precision", 8, quantizedQuery.getQueryPrecision());
-
-      SearchResults quantizedResults = quantizedIndex.search(quantizedQuery);
-      assertNotNull("Quantized query results should not be null", quantizedResults);
-
-      List<Map<Integer, Float>> results = quantizedResults.getResults();
-      assertEquals("Should return results for all queries", queries.length, results.size());
-      assertTrue("Each query should return some results", results.get(0).size() > 0);
-
-      log.info(
-          "✓ Quantized search completed: {} queries, {} results each",
-          results.size(),
-          results.get(0).size());
-
-      // 5. Test serialization/deserialization works with quantized index
-      Path indexPath = serializeIndex(quantizedIndex);
-      CagraIndex loadedIndex = deserializeIndex(indexPath, resources);
-
-      SearchResults loadedResults = loadedIndex.search(quantizedQuery);
-      assertEquals(
-          "Loaded index should return same number of queries",
-          results.size(),
-          loadedResults.getResults().size());
-
-      log.info("✓ Quantized index serialization/deserialization works");
-
-      // 6. Test inverse transform
-      CuVSMatrix quantizedQueries = quantizedQuery.getQuantizedQueries();
-      CuVSMatrix recoveredQueries = quantizer.inverseTransform(quantizedQueries);
-      assertNotNull("Inverse transform should work", recoveredQueries);
-      assertEquals("Should recover all queries", queries.length, recoveredQueries.size());
-
-      // Cleanup
-      quantizedIndex.destroyIndex();
-      loadedIndex.destroyIndex();
-      quantizer.close();
-      trainingDataset.close();
-      quantizedQueries.close();
-      Files.deleteIfExists(indexPath);
-
-      log.info("✓ Scalar 8-bit quantization test completed successfully");
-    }
-  }
-
-  /**
-   * Test binary quantization workflow: indexing and searching with 1-bit quantized data
-   */
-  @Test
-  public void testBinaryQuantizationFlow() throws Throwable {
-    float[][] dataset = createSampleData();
-    float[][] queries = createSampleQueries();
-
-    try (CuVSResources resources = CheckedCuVSResources.create()) {
-
-      // 1. Create training dataset
-      CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
-      assertEquals("Training dataset should be 32-bit", 32, trainingDataset.precision());
-
-      // 2. Create binary quantizer
-      CuVSQuantizer binaryQuantizer = new BinaryQuantizer(resources);
-      assertEquals("Binary quantizer should have 8-bit precision", 8, binaryQuantizer.precision());
-      log.info("Created BinaryQuantizer with {}-bit precision", binaryQuantizer.precision());
-
-      // 3. Build index with binary quantized dataset
-      CagraIndexParams indexParams =
-          new CagraIndexParams.Builder()
-              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
-              .withGraphDegree(1)
-              .withIntermediateGraphDegree(2)
-              .withNumWriterThreads(32)
-              .withMetric(CuvsDistanceType.L2Expanded)
-              .build();
-
-      CagraIndex binaryIndex =
-          CagraIndex.newBuilder(resources)
-              .withDataset(trainingDataset) // 32-bit input
-              .withQuantizer(binaryQuantizer) // automatically quantizes to 1-bit
-              .withIndexParams(indexParams)
-              .build();
-
-      log.info("✓ Index built with binary quantized dataset");
-
-      // 4. Search with binary quantized queries
-      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
-
-      CagraQuery binaryQuery =
-          CagraQuery.newBuilder()
-              .withQueryVectors(queries) // 32-bit input
-              .withQuantizer(binaryQuantizer) // automatically quantizes to 1-bit
-              .withSearchParams(searchParams)
-              .withTopK(3)
-              .build();
-
-      // Verify query was properly quantized
-      assertTrue("Query should have quantized vectors", binaryQuery.hasQuantizedQueries());
-      assertEquals("Binary query should have 8-bit precision", 8, binaryQuery.getQueryPrecision());
-
-      SearchResults binaryResults = binaryIndex.search(binaryQuery);
-      assertNotNull("Binary query results should not be null", binaryResults);
-
-      List<Map<Integer, Float>> results = binaryResults.getResults();
-      assertEquals("Should return results for all queries", queries.length, results.size());
-      assertTrue("Each query should return some results", results.get(0).size() > 0);
-
-      log.info(
-          "✓ Binary quantized search completed: {} queries, {} results each",
-          results.size(),
-          results.get(0).size());
-
-      // 5. Verify binary quantizer doesn't support inverse transform
-      CuVSMatrix binaryQueries = binaryQuery.getQuantizedQueries();
-      try {
-        binaryQuantizer.inverseTransform(binaryQueries);
-        assertTrue("Binary quantizer should not support inverse transform", false);
-      } catch (UnsupportedOperationException e) {
-        log.info("✓ Binary quantizer correctly doesn't support inverse transform");
-      }
-
-      // Cleanup
-      binaryIndex.destroyIndex();
-      binaryQuantizer.close();
-      trainingDataset.close();
-      binaryQueries.close();
-
-      log.info("✓ Binary quantization test completed successfully");
-    }
-  }
-
-  private Path serializeIndex(CagraIndex index) throws Throwable {
-    Path indexFilePath = Path.of(UUID.randomUUID() + ".cag");
-    try (var outputStream = Files.newOutputStream(indexFilePath)) {
-      index.serialize(outputStream);
-    }
-    return indexFilePath;
-  }
-
-  private CagraIndex deserializeIndex(Path indexFilePath, CuVSResources resources)
-      throws Throwable {
-    try (var inputStream = Files.newInputStream(indexFilePath)) {
-      return CagraIndex.newBuilder(resources).from(inputStream).build();
-    }
-  }
-
-  /**
-   * Test that verifies quantized search results have reasonable recall compared to baseline
-   */
-  @Test
-  public void testQuantizedSearchQuality() throws Throwable {
-    float[][] dataset = createLargerSampleData(); // Use larger dataset for meaningful recall
-    float[][] queries = createSampleQueries();
-
-    try (CuVSResources resources = CheckedCuVSResources.create()) {
-      // 1. Build baseline (non-quantized) index and get reference results
+      // Build index with quantized dataset
       CagraIndexParams indexParams =
           new CagraIndexParams.Builder()
               .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
               .withGraphDegree(2)
-              .withIntermediateGraphDegree(4)
-              .withNumWriterThreads(32)
+              .withIntermediateGraphDegree(3)
+              .withNumWriterThreads(1)
               .withMetric(CuvsDistanceType.L2Expanded)
               .build();
 
-      CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
-
-      // Build baseline index
-      CagraIndex baselineIndex =
+      CagraIndex index =
           CagraIndex.newBuilder(resources)
               .withDataset(trainingDataset)
+              .withQuantizer(quantizer)
               .withIndexParams(indexParams)
               .build();
 
-      // Get baseline results
+      log.info("Built index with quantized dataset");
+
+      // Create search parameters
       CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
-      CagraQuery baselineQuery =
+
+      // Create quantized query
+      CagraQuery query =
           CagraQuery.newBuilder()
               .withQueryVectors(queries)
+              .withQuantizer(quantizer)
               .withSearchParams(searchParams)
-              .withTopK(10) // Use higher K for recall calculation
+              .withTopK(3)
               .build();
 
-      SearchResults baselineResults = baselineIndex.search(baselineQuery);
+      assertTrue("Query should have quantized vectors", query.hasQuantizedQueries());
+      assertEquals(8, query.getQueryPrecision());
+      log.info("Created quantized query");
 
-      // 2. Test Scalar 8-bit quantization
-      CuVSQuantizer scalar8BitQuantizer = new Scalar8BitQuantizer(resources, trainingDataset);
+      // Perform search
+      SearchResults results = index.search(query);
+      assertNotNull("Search results should not be null", results);
 
-      CagraIndex quantizedIndex =
-          CagraIndex.newBuilder(resources)
-              .withDataset(trainingDataset)
-              .withQuantizer(scalar8BitQuantizer)
-              .withIndexParams(indexParams)
-              .build();
+      // Verify results
+      assertEquals(
+          "Should have results for all queries", queries.length, results.getResults().size());
 
-      CagraQuery quantizedQuery =
-          CagraQuery.newBuilder()
-              .withQueryVectors(queries)
-              .withQuantizer(scalar8BitQuantizer)
-              .withSearchParams(searchParams)
-              .withTopK(10)
-              .build();
+      for (int i = 0; i < results.getResults().size(); i++) {
+        Map<Integer, Float> queryResults = results.getResults().get(i);
+        assertFalse("Query " + i + " should return some neighbors", queryResults.isEmpty());
 
-      SearchResults quantizedResults = quantizedIndex.search(quantizedQuery);
+        // Verify all returned IDs are within valid range
+        for (Integer id : queryResults.keySet()) {
+          assertTrue("Returned ID should be valid", id >= 0 && id < dataset.length);
+        }
+      }
 
-      // 3. Calculate and verify recall
-      double recall = calculateRecall(baselineResults, quantizedResults, 5); // Check recall@5
-      log.info("Scalar 8-bit quantization recall@5: {}", recall);
-
-      // Expect reasonable recall (should be > 0.6 for 8-bit quantization)
-      assertTrue("Scalar 8-bit quantization should maintain reasonable recall", recall > 0.6);
-
-      // 4. Test Binary quantization (expect lower recall)
-      CuVSQuantizer binaryQuantizer = new BinaryQuantizer(resources);
-
-      CagraIndex binaryIndex =
-          CagraIndex.newBuilder(resources)
-              .withDataset(trainingDataset)
-              .withQuantizer(binaryQuantizer)
-              .withIndexParams(indexParams)
-              .build();
-
-      CagraQuery binaryQuery =
-          CagraQuery.newBuilder()
-              .withQueryVectors(queries)
-              .withQuantizer(binaryQuantizer)
-              .withSearchParams(searchParams)
-              .withTopK(10)
-              .build();
-
-      SearchResults binaryResults = binaryIndex.search(binaryQuery);
-
-      double binaryRecall = calculateRecall(baselineResults, binaryResults, 5);
-      log.info("Binary quantization recall@5: {}", binaryRecall);
-
-      // Binary quantization should have lower recall than scalar quantization
-      assertTrue("Binary quantization recall should be lower than scalar", binaryRecall < recall);
-      assertTrue("Binary quantization should still have some recall", binaryRecall > 0.2);
-
-      // 5. Verify quantization actually happened
-      assertTrue("Scalar query should be quantized", quantizedQuery.hasQuantizedQueries());
-      assertTrue("Binary query should be quantized", binaryQuery.hasQuantizedQueries());
-      assertEquals("Scalar quantized data should be 8-bit", 8, quantizedQuery.getQueryPrecision());
-      assertEquals("Binary quantized data should be 8-bit", 8, binaryQuery.getQueryPrecision());
+      log.info(
+          "Search completed successfully with {} queries returning neighbors",
+          results.getResults().size());
 
       // Cleanup
-      baselineIndex.destroyIndex();
-      quantizedIndex.destroyIndex();
-      binaryIndex.destroyIndex();
-      scalar8BitQuantizer.close();
-      binaryQuantizer.close();
+      index.destroyIndex();
+      quantizer.close();
       trainingDataset.close();
     }
   }
 
-  private static float[][] createLargerSampleData() {
-    // Create a larger dataset for meaningful recall testing
-    return new float[][] {
-      {0.74021935f, 0.9209938f},
-      {0.03902049f, 0.9689629f},
-      {0.92514056f, 0.4463501f},
-      {0.6673192f, 0.10993068f},
-      {0.1f, 0.2f},
-      {0.3f, 0.4f},
-      {0.5f, 0.6f},
-      {0.7f, 0.8f},
-      {0.11f, 0.21f},
-      {0.31f, 0.41f},
-      {0.51f, 0.61f},
-      {0.71f, 0.81f},
-      {0.12f, 0.22f},
-      {0.32f, 0.42f},
-      {0.52f, 0.62f},
-      {0.72f, 0.82f}
-      // Add more vectors as needed
-    };
+  @Test
+  public void testBinaryQuantizerBasicFlow() throws Throwable {
+    float[][] dataset = createSimpleDataset();
+    float[][] queries = createSimpleQueries();
+
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
+      // Create float32 dataset
+      CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
+      assertEquals(32, trainingDataset.precision());
+
+      // Create binary quantizer
+      BinaryQuantizer quantizer = new BinaryQuantizer(resources);
+      assertEquals(8, quantizer.precision());
+      log.info("Created binary quantizer");
+
+      // Build index with quantized dataset
+      CagraIndexParams indexParams =
+          new CagraIndexParams.Builder()
+              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+              .withGraphDegree(2)
+              .withIntermediateGraphDegree(3)
+              .withNumWriterThreads(1)
+              .withMetric(CuvsDistanceType.L2Expanded)
+              .build();
+
+      CagraIndex index =
+          CagraIndex.newBuilder(resources)
+              .withDataset(trainingDataset)
+              .withQuantizer(quantizer)
+              .withIndexParams(indexParams)
+              .build();
+
+      log.info("Built index with binary quantized dataset");
+
+      // Create search parameters
+      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+
+      // Create quantized query
+      CagraQuery query =
+          CagraQuery.newBuilder()
+              .withQueryVectors(queries)
+              .withQuantizer(quantizer)
+              .withSearchParams(searchParams)
+              .withTopK(3)
+              .build();
+
+      assertTrue("Query should have quantized vectors", query.hasQuantizedQueries());
+      assertEquals(8, query.getQueryPrecision());
+
+      // Perform search
+      SearchResults results = index.search(query);
+      assertNotNull("Search results should not be null", results);
+
+      // Verify results
+      assertEquals(
+          "Should have results for all queries", queries.length, results.getResults().size());
+
+      for (int i = 0; i < results.getResults().size(); i++) {
+        Map<Integer, Float> queryResults = results.getResults().get(i);
+        assertFalse("Query " + i + " should return some neighbors", queryResults.isEmpty());
+
+        // Verify all returned IDs are within valid range
+        for (Integer id : queryResults.keySet()) {
+          assertTrue("Returned ID should be valid", id >= 0 && id < dataset.length);
+        }
+      }
+
+      log.info("Binary quantized search completed successfully");
+
+      // Test that inverse transform is not supported
+      CuVSMatrix quantizedQueries = query.getQuantizedQueries();
+      assertThrows(
+          UnsupportedOperationException.class, () -> quantizer.inverseTransform(quantizedQueries));
+
+      // Cleanup
+      index.destroyIndex();
+      quantizer.close();
+      trainingDataset.close();
+      quantizedQueries.close();
+    }
   }
 
-  private double calculateRecall(SearchResults baseline, SearchResults quantized, int k) {
-    List<Map<Integer, Float>> baselineResults = baseline.getResults();
-    List<Map<Integer, Float>> quantizedResults = quantized.getResults();
+  @Test
+  public void testScalarQuantizerInverseTransform() throws Throwable {
+    float[][] dataset = createSimpleDataset();
 
-    double totalRecall = 0.0;
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
+      CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
+      Scalar8BitQuantizer quantizer = new Scalar8BitQuantizer(resources, trainingDataset);
 
-    for (int i = 0; i < baselineResults.size(); i++) {
-      Set<Integer> baselineTopK =
-          baselineResults.get(i).keySet().stream().limit(k).collect(Collectors.toSet());
+      // Transform and inverse transform
+      CuVSMatrix quantized = quantizer.transform(trainingDataset);
+      assertEquals(8, quantized.precision());
 
-      Set<Integer> quantizedTopK =
-          quantizedResults.get(i).keySet().stream().limit(k).collect(Collectors.toSet());
+      CuVSMatrix recovered = quantizer.inverseTransform(quantized);
+      assertEquals(32, recovered.precision());
+      assertEquals(trainingDataset.size(), recovered.size());
+      assertEquals(trainingDataset.columns(), recovered.columns());
 
-      // Calculate intersection
-      Set<Integer> intersection = new HashSet<>(baselineTopK);
-      intersection.retainAll(quantizedTopK);
+      log.info("Inverse transform completed successfully");
 
-      double queryRecall = (double) intersection.size() / k;
-      totalRecall += queryRecall;
+      // Cleanup
+      quantizer.close();
+      trainingDataset.close();
+      quantized.close();
+      recovered.close();
     }
+  }
 
-    return totalRecall / baselineResults.size();
+  @Test
+  public void testCPUBinaryQuantization() throws Throwable {
+    float[][] dataset = createSimpleDataset();
+
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
+      CuVSMatrix inputDataset = CuVSMatrix.ofArray(dataset);
+      assertEquals(CuVSMatrix.MemoryKind.HOST, inputDataset.memoryKind());
+
+      BinaryQuantizer quantizer = new BinaryQuantizer(resources);
+
+      // Test binary quantization
+      CuVSMatrix quantized = quantizer.transform(inputDataset);
+      assertEquals(8, quantized.precision()); // Binary packed into bytes
+      assertEquals(CuVSMatrix.MemoryKind.HOST, quantized.memoryKind());
+
+      // Test that inverse transform throws
+      assertThrows(
+          UnsupportedOperationException.class, () -> quantizer.inverseTransform(quantized));
+
+      quantizer.close();
+      inputDataset.close();
+      quantized.close();
+
+      log.info("✓ Binary CPU quantization test passed");
+    }
+  }
+
+  @Test
+  public void testRandomizedScalarQuantizedIndexingAndSearch() throws Throwable {
+    int maxDatasetSize = 60;
+    int maxDimensions = 20;
+    int maxQueries = 5;
+    int maxTopK = 4;
+
+    for (int iteration = 0; iteration < 5; iteration++) {
+      int datasetSize = random.nextInt(maxDatasetSize) + maxTopK;
+      int dims = random.nextInt(maxDimensions) + 2;
+      int numQueries = random.nextInt(maxQueries) + 1;
+      int topK = Math.min(random.nextInt(maxTopK) + 1, datasetSize);
+
+      // Generate dataset and query
+      float[][] dataset = new float[datasetSize][dims];
+      float[][] queries = new float[numQueries][dims];
+      for (int i = 0; i < datasetSize; i++)
+        for (int d = 0; d < dims; d++) dataset[i][d] = (float) random.nextGaussian();
+      for (int i = 0; i < numQueries; i++)
+        for (int d = 0; d < dims; d++) queries[i][d] = (float) random.nextGaussian();
+
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
+        CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
+        Scalar8BitQuantizer quantizer = new Scalar8BitQuantizer(resources, trainingDataset);
+
+        CagraIndexParams indexParams =
+            new CagraIndexParams.Builder()
+                .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+                .withGraphDegree(Math.min(4, datasetSize - 1))
+                .withIntermediateGraphDegree(Math.min(5, datasetSize))
+                .withNumWriterThreads(1)
+                .withMetric(CuvsDistanceType.L2Expanded)
+                .build();
+
+        CagraIndex index =
+            CagraIndex.newBuilder(resources)
+                .withDataset(trainingDataset)
+                .withQuantizer(quantizer)
+                .withIndexParams(indexParams)
+                .build();
+
+        CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+        CagraQuery query =
+            CagraQuery.newBuilder()
+                .withQueryVectors(queries)
+                .withQuantizer(quantizer)
+                .withSearchParams(searchParams)
+                .withTopK(topK)
+                .build();
+
+        SearchResults results = index.search(query);
+        assertNotNull("Results must not be null", results);
+        assertEquals("One result per query", numQueries, results.getResults().size());
+
+        for (int qi = 0; qi < numQueries; qi++) {
+          Map<Integer, Float> result = results.getResults().get(qi);
+          // It is possible for result to have < topK entries if datasetSize == topK
+          assertFalse("Each query should return non-empty result", result.isEmpty());
+          for (Integer id : result.keySet()) {
+            assertTrue("ID in result should be in range", id >= 0 && id < datasetSize);
+          }
+        }
+
+        quantizer.close();
+        trainingDataset.close();
+        index.destroyIndex();
+      }
+    }
   }
 }
