@@ -16,9 +16,7 @@
 package com.nvidia.cuvs;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
@@ -137,9 +135,9 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
 
     int numTestsRuns = 5;
-    try (CuVSResources resources = CuVSResources.create()) {
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
       for (int j = 0; j < numTestsRuns; j++) {
-        var index = indexOnce(Dataset.ofArray(dataset), resources);
+        var index = indexOnce(CuVSMatrix.ofArray(dataset), resources);
         var indexPath = serializeOnce(index);
         var loadedIndex = deserializeOnce(indexPath, resources);
         queryAndCompare(
@@ -165,12 +163,12 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
 
     int numTestsRuns = 5;
-    try (CuVSResources resources = CuVSResources.create()) {
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
       for (int j = 0; j < numTestsRuns; j++) {
         runInAnotherThread(
             () -> {
               try {
-                var index = indexOnce(Dataset.ofArray(dataset), resources);
+                var index = indexOnce(CuVSMatrix.ofArray(dataset), resources);
                 var indexPath = serializeOnce(index);
                 var loadedIndex = deserializeOnce(indexPath, resources);
                 queryAndCompare(
@@ -200,12 +198,13 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
 
     int numTestsRuns = 10;
+
     runConcurrently(
         numTestsRuns,
         () ->
             () -> {
-              try (CuVSResources resources = CuVSResources.create()) {
-                var index = indexOnce(Dataset.ofArray(dataset), resources);
+              try (CuVSResources resources = CheckedCuVSResources.create()) {
+                var index = indexOnce(CuVSMatrix.ofArray(dataset), resources);
                 var indexPath = serializeOnce(index);
                 var loadedIndex = deserializeOnce(indexPath, resources);
                 queryAndCompare(
@@ -232,8 +231,8 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
           numTestsRuns,
           () ->
               () -> {
-                try (CuVSResources resources = CuVSResources.create()) {
-                  var index = indexOnce(Dataset.ofArray(dataset), resources);
+                try (CuVSResources resources = CheckedCuVSResources.create()) {
+                  var index = indexOnce(CuVSMatrix.ofArray(dataset), resources);
                   index.destroyIndex();
                 } catch (Throwable e) {
                   throw new RuntimeException(e);
@@ -251,8 +250,8 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
           numTestsRuns,
           () ->
               () -> {
-                try (CuVSResources resources = CuVSResources.create()) {
-                  var index = indexOnce(Dataset.ofArray(dataset), resources);
+                try (CuVSResources resources = CheckedCuVSResources.create()) {
+                  var index = indexOnce(CuVSMatrix.ofArray(dataset), resources);
                   var indexPath = serializeOnce(index);
                   Files.deleteIfExists(indexPath);
                   index.destroyIndex();
@@ -265,14 +264,14 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
   @Test
   public void testDeserialization() throws Throwable {
-    var indexPath = createSerializedIndex(Dataset.ofArray(createSampleData()));
+    var indexPath = createSerializedIndex(CuVSMatrix.ofArray(createSampleData()));
     for (int i = 0; i < 100; ++i) {
       int numTestsRuns = 10;
       runConcurrently(
           numTestsRuns,
           () ->
               () -> {
-                try (CuVSResources resources = CuVSResources.create()) {
+                try (CuVSResources resources = CheckedCuVSResources.create()) {
                   deserializeOnce(indexPath, resources).destroyIndex();
                 } catch (Throwable e) {
                   throw new RuntimeException(e);
@@ -282,8 +281,8 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     Files.deleteIfExists(indexPath);
   }
 
-  private Path createSerializedIndex(Dataset dataset) throws Throwable {
-    try (CuVSResources resources = CuVSResources.create()) {
+  private Path createSerializedIndex(CuVSMatrix dataset) throws Throwable {
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
       var index = indexOnce(dataset, resources);
       var indexPath = serializeOnce(index);
       index.destroyIndex();
@@ -293,7 +292,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
   @Test
   public void testIndexingAndSearchingFlowWithCustomMappingFunction() throws Throwable {
-    var dataset = Dataset.ofArray(createSampleData());
+    var dataset = CuVSMatrix.ofArray(createSampleData());
     float[][] queries = createSampleQueries();
     var expectedResults =
         List.of(
@@ -303,7 +302,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             Map.of(2, 0.15224178f, 1, 0.59063464f, 0, 0.5986642f));
 
     LongToIntFunction rotate = l -> (int) ((l + 1) % dataset.size());
-    try (CuVSResources resources = CuVSResources.create()) {
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
       var index = indexOnce(dataset, resources);
       var indexPath = serializeOnce(index);
       var loadedIndex = deserializeOnce(indexPath, resources);
@@ -315,7 +314,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
   @Test
   public void testIndexingAndSearchingFlowWithCustomMappingList() throws Throwable {
-    var dataset = Dataset.ofArray(createSampleData());
+    var dataset = CuVSMatrix.ofArray(createSampleData());
     float[][] queries = createSampleQueries();
     var mappings = List.of(4, 3, 2, 1);
     var expectedResults =
@@ -326,7 +325,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             Map.of(3, 0.15224178f, 4, 0.59063464f, 1, 0.5986642f));
 
     LongToIntFunction rotate = SearchResults.mappingsFromList(mappings);
-    try (CuVSResources resources = CuVSResources.create()) {
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
       var index = indexOnce(dataset, resources);
       var indexPath = serializeOnce(index);
       var loadedIndex = deserializeOnce(indexPath, resources);
@@ -362,7 +361,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             .withMetric(CuvsDistanceType.L2Expanded)
             .build();
 
-    try (CuVSResources resources = CuVSResources.create()) {
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
       CagraIndex index =
           CagraIndex.newBuilder(resources)
               .withDataset(dataset)
@@ -404,7 +403,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     }
   }
 
-  private CagraIndex indexOnce(Dataset dataset, CuVSResources resources) throws Throwable {
+  private CagraIndex indexOnce(CuVSMatrix dataset, CuVSResources resources) throws Throwable {
     // Configure index parameters
     CagraIndexParams indexParams =
         new CagraIndexParams.Builder()
@@ -500,8 +499,10 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
       }
 
       try (var resources = CuVSResources.create();
-          var javaDataset = Dataset.ofArray(sampleData);
-          var nativeDataset = DatasetHelper.fromMemorySegment(dataMemorySegment, rows, cols)) {
+          var javaDataset = CuVSMatrix.ofArray(sampleData);
+          var nativeDataset =
+              DatasetHelper.fromMemorySegment(
+                  dataMemorySegment, rows, cols, CuVSMatrix.DataType.FLOAT)) {
 
         // Indexing with an on-heap and native datasets produce the same results
         var javaIndex = indexOnce(javaDataset, resources);
@@ -543,7 +544,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             Map.of(2, 0.5f, 3, 0.5f, 1, 180.5f),
             Map.of(0, 0.0f, 1, 2.0f, 2, 200.0f));
 
-    try (CuVSResources resources = CuVSResources.create()) {
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
       CagraIndexParams indexParams =
           new CagraIndexParams.Builder()
               .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
@@ -633,7 +634,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             Map.of(2, 0.5f, 3, 0.5f, 1, 180.5f),
             Map.of(0, 0.0f, 1, 2.0f, 2, 200.0f));
 
-    try (CuVSResources resources = CuVSResources.create()) {
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
       CagraIndexParams indexParams =
           new CagraIndexParams.Builder()
               .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
