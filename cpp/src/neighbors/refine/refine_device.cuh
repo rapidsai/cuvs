@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 #include "../../core/nvtx.hpp"
 #include "../detail/ann_utils.cuh"
 #include "../ivf_flat/ivf_flat_build.cuh"
-#include "../ivf_flat/ivf_flat_interleaved_scan.cuh"
+#include "../ivf_flat/ivf_flat_interleaved_scan_ext.cuh"
 #include "refine_common.hpp"
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
@@ -81,15 +81,15 @@ void refine_device(
                    fake_coarse_idx.data(),
                    fake_coarse_idx.data() + n_queries);
 
-  cuvs::neighbors::ivf_flat::index<data_t, idx_t> refinement_index(
+  cuvs::neighbors::ivf_flat::index<data_t, int64_t> refinement_index(
     handle, metric, n_queries, false, true, dim);
 
-  cuvs::neighbors::ivf_flat::detail::fill_refinement_index<data_t, idx_t>(
+  cuvs::neighbors::ivf_flat::detail::fill_refinement_index<data_t, int64_t>(
     handle,
     &refinement_index,
     dataset.data_handle(),
     neighbor_candidates.data_handle(),
-    static_cast<idx_t>(n_queries),
+    static_cast<int64_t>(n_queries),
     static_cast<uint32_t>(n_candidates));
   uint32_t grid_dim_x = 1;
 
@@ -113,25 +113,25 @@ void refine_device(
     neighbors_uint32 = neighbors_uint32_buf.data();
   }
 
-  cuvs::neighbors::ivf_flat::detail::ivfflat_interleaved_scan<
-    data_t,
-    typename cuvs::spatial::knn::detail::utils::config<data_t>::value_t,
-    idx_t>(refinement_index,
-           queries.data_handle(),
-           fake_coarse_idx.data(),
-           static_cast<uint32_t>(n_queries),
-           0,
-           metric,
-           1,
-           k,
-           0,
-           chunk_index.data(),
-           cuvs::distance::is_min_close(metric),
-           cuvs::neighbors::filtering::none_sample_filter(),
-           neighbors_uint32,
-           distances.data_handle(),
-           grid_dim_x,
-           raft::resource::get_cuda_stream(handle));
+  using acc_t = typename cuvs::spatial::knn::detail::utils::config<data_t>::value_t;
+
+  cuvs::neighbors::ivf_flat::detail::ivfflat_interleaved_scan<data_t, acc_t, int64_t>(
+    refinement_index,
+    queries.data_handle(),
+    fake_coarse_idx.data(),
+    static_cast<uint32_t>(n_queries),
+    0,
+    metric,
+    1,
+    k,
+    0,
+    chunk_index.data(),
+    cuvs::distance::is_min_close(metric),
+    cuvs::neighbors::filtering::none_sample_filter(),
+    neighbors_uint32,
+    distances.data_handle(),
+    grid_dim_x,
+    raft::resource::get_cuda_stream(handle));
 
   // postprocessing -- neighbors from position to actual id
   cuvs::neighbors::ivf::detail::postprocess_neighbors(indices.data_handle(),

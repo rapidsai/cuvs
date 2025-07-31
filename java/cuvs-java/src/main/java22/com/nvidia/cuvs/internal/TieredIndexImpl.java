@@ -15,6 +15,7 @@
  */
 package com.nvidia.cuvs.internal;
 
+import static com.nvidia.cuvs.internal.CuVSParamsHelper.createTieredIndexParams;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT_BYTE_SIZE;
@@ -32,6 +33,7 @@ import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.*;
 import com.nvidia.cuvs.CuVSMatrix;
+import com.nvidia.cuvs.internal.common.CloseableHandle;
 import com.nvidia.cuvs.internal.common.Util;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndexParams;
 import com.nvidia.cuvs.internal.panama.cuvsCagraSearchParams;
@@ -118,15 +120,16 @@ public class TieredIndexImpl implements TieredIndex {
       long rows = dataset.size();
       long cols = dataset.columns();
 
-      MemorySegment indexParamsMemorySegment =
-          tieredIndexParameters != null
-              ? segmentFromIndexParams(localArena, tieredIndexParameters)
-              : MemorySegment.NULL;
-
       // Get host data
       MemorySegment hostDataSeg = ((CuVSHostMatrixImpl) dataset).memorySegment();
 
-      try (var resourceAccess = resources.access()) {
+      try (var resourceAccess = resources.access();
+          var indexParamsHandle =
+              tieredIndexParameters != null
+                  ? segmentFromIndexParams(localArena, tieredIndexParameters)
+                  : CloseableHandle.NULL) {
+
+        MemorySegment indexParamsMemorySegment = indexParamsHandle.handle();
         long cuvsRes = resourceAccess.handle();
 
         // TieredIndex REQUIRES device memory - allocate it
@@ -389,16 +392,20 @@ public class TieredIndexImpl implements TieredIndex {
   /**
    * Allocates the configured index parameters in the MemorySegment.
    */
-  private static MemorySegment segmentFromIndexParams(Arena arena, TieredIndexParams params) {
-    MemorySegment seg = cuvsTieredIndexParams.allocate(arena);
+
+  /**
+   * Allocates the configured index parameters in a MemorySegment and returns a CloseableHandle
+   * for safe resource management.
+   */
+  private static CloseableHandle segmentFromIndexParams(Arena arena, TieredIndexParams params) {
+    CloseableHandle paramsHandle = createTieredIndexParams();
+    MemorySegment seg = paramsHandle.handle();
 
     // Get the metric from CagraParams if available, otherwise use TieredIndex metric
     int metric;
     if (params.getCagraParams() != null) {
-      // Use the metric from CagraParams to ensure consistency
       metric = params.getCagraParams().getCuvsDistanceType().value;
     } else {
-      // Fallback to TieredIndex metric
       metric =
           switch (params.getMetric()) {
             case L2 -> 0;
@@ -407,19 +414,15 @@ public class TieredIndexImpl implements TieredIndex {
                 throw new IllegalArgumentException("Unsupported metric: " + params.getMetric());
           };
     }
-
     cuvsTieredIndexParams.metric(seg, metric);
-
     int algo = 0; // CUVS_TIERED_INDEX_ALGO_CAGRA
     cuvsTieredIndexParams.algo(seg, algo);
-
     cuvsTieredIndexParams.min_ann_rows(seg, params.getMinAnnRows());
     cuvsTieredIndexParams.create_ann_index_on_extend(seg, params.isCreateAnnIndexOnExtend());
 
     CagraIndexParams cagraParams = params.getCagraParams();
     if (cagraParams != null) {
       MemorySegment cagraParamsSeg = cuvsCagraIndexParams.allocate(arena);
-
       cuvsCagraIndexParams.intermediate_graph_degree(
           cagraParamsSeg, cagraParams.getIntermediateGraphDegree());
       cuvsCagraIndexParams.graph_degree(cagraParamsSeg, cagraParams.getGraphDegree());
@@ -427,14 +430,12 @@ public class TieredIndexImpl implements TieredIndex {
       cuvsCagraIndexParams.nn_descent_niter(
           cagraParamsSeg, cagraParams.getNNDescentNumIterations());
       cuvsCagraIndexParams.metric(cagraParamsSeg, metric);
-
       cuvsTieredIndexParams.cagra_params(seg, cagraParamsSeg);
     }
-
     cuvsTieredIndexParams.ivf_flat_params(seg, MemorySegment.NULL);
     cuvsTieredIndexParams.ivf_pq_params(seg, MemorySegment.NULL);
 
-    return seg;
+    return paramsHandle;
   }
 
   /**
