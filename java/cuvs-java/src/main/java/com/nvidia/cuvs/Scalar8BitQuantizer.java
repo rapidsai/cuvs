@@ -31,6 +31,10 @@ import com.nvidia.cuvs.spi.CuVSProvider;
  */
 public class Scalar8BitQuantizer implements CuVSQuantizer {
   private final Object impl;
+
+  /**
+   * The bit precision used by this quantizer (8-bit signed integers).
+   */
   private final int precision = 8;
 
   /**
@@ -57,6 +61,11 @@ public class Scalar8BitQuantizer implements CuVSQuantizer {
     this.impl = CuVSProvider.provider().createScalar8BitQuantizerImpl(resources, trainingDataset);
   }
 
+  /**
+   * Returns the bit precision of quantized data produced by this quantizer.
+   *
+   * @return The bit precision (8 for this scalar quantizer)
+   */
   @Override
   public int precision() {
     return precision;

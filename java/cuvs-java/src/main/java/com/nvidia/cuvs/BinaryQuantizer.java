@@ -28,6 +28,10 @@ import com.nvidia.cuvs.spi.CuVSProvider;
  */
 public class BinaryQuantizer implements CuVSQuantizer {
   private final CuVSResources resources;
+
+  /**
+   * The bit precision used by this quantizer (8-bit for packed binary data).
+   */
   private final int precision = 8;
 
   /**
@@ -37,9 +41,13 @@ public class BinaryQuantizer implements CuVSQuantizer {
    */
   public BinaryQuantizer(CuVSResources resources) {
     this.resources = resources;
-    // Note: Binary quantization is stateless, no impl object needed
   }
 
+  /**
+   * Returns the bit precision of quantized data produced by this quantizer.
+   *
+   * @return The bit precision (8 for this scalar quantizer)
+   */
   @Override
   public int precision() {
     return precision;
@@ -53,13 +61,12 @@ public class BinaryQuantizer implements CuVSQuantizer {
           "BinaryQuantizer requires 32-bit float input, got " + input.precision() + "-bit");
     }
 
-    // Use the correct provider method signature (resources, not impl)
     CuVSMatrix result = CuVSProvider.provider().transformBinary(resources, input);
 
     // Validate output precision
     if (result.precision() != 8) {
       throw new IllegalStateException(
-          "Expected 1-bit output from binary quantization, got " + result.precision() + "-bit");
+          "Expected 8-bit output from binary quantization, got " + result.precision() + "-bit");
     }
 
     return result;
@@ -67,19 +74,15 @@ public class BinaryQuantizer implements CuVSQuantizer {
 
   @Override
   public void train(CuVSMatrix trainingData) throws Throwable {
-    // Binary quantization doesn't require training
     throw new UnsupportedOperationException("Binary quantization does not require training");
   }
 
   @Override
   public CuVSMatrix inverseTransform(CuVSMatrix quantizedData) throws Throwable {
-    // Binary quantization typically doesn't support exact inverse transformation
     throw new UnsupportedOperationException(
         "Binary quantization does not support inverse transformation");
   }
 
   @Override
-  public void close() throws Exception {
-    // Binary quantizer is stateless, no cleanup needed
-  }
+  public void close() throws Exception {}
 }

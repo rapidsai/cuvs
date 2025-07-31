@@ -40,6 +40,7 @@ public interface CuVSQuantizer extends AutoCloseable {
    * Optional training method - only applies to quantizers that require training.
    *
    * @param trainingData The dataset to train on (must have precision() == 32)
+   * @throws Throwable if an error occurs during training
    */
   default void train(CuVSMatrix trainingData) throws Throwable {
     throw new UnsupportedOperationException(

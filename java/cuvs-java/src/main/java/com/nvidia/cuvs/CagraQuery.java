@@ -35,6 +35,19 @@ public class CagraQuery {
   private final BitSet prefilter;
   private final int numDocs;
 
+  /**
+   * Constructs an instance of {@link CagraQuery} using cagraSearchParameters,
+   * preFilter, queryVectors, mapping, and topK.
+   *
+   * @param cagraSearchParameters an instance of {@link CagraSearchParams} holding
+   *                              the search parameters
+   * @param queryVectors          2D float query vector array
+   * @param quantizedQueries      2D quantized query vector array
+   * @param mapping               a function mapping ordinals (neighbor IDs) to custom user IDs
+   * @param topK                  the top k results to return
+   * @param prefilter             A single BitSet to use as filter while searching the CAGRA index
+   * @param numDocs               Total number of dataset vectors; used to align the prefilter correctly
+   */
   private CagraQuery(
       CagraSearchParams cagraSearchParameters,
       float[][] queryVectors,
@@ -57,6 +70,11 @@ public class CagraQuery {
     return new Builder();
   }
 
+  /**
+   * Gets the instance of CagraSearchParams initially set.
+   *
+   * @return an instance CagraSearchParams
+   */
   public CagraSearchParams getCagraSearchParameters() {
     return cagraSearchParameters;
   }
@@ -90,18 +108,36 @@ public class CagraQuery {
     return quantizedQueries != null ? quantizedQueries.precision() : 32;
   }
 
+  /**
+   * Gets the function mapping ordinals (neighbor IDs) to custom user IDs
+   */
   public LongToIntFunction getMapping() {
     return mapping;
   }
 
+  /**
+   * Gets the topK value.
+   *
+   * @return the topK value
+   */
   public int getTopK() {
     return topK;
   }
 
+  /**
+   * Gets the prefilter BitSet.
+   *
+   * @return a BitSet object representing the prefilter
+   */
   public BitSet getPrefilter() {
     return prefilter;
   }
 
+  /**
+   * Gets the number of documents in this index, as used for prefilter
+   *
+   * @return number of documents as an integer
+   */
   public int getNumDocs() {
     return numDocs;
   }
@@ -117,6 +153,8 @@ public class CagraQuery {
         + (quantizedQueries != null
             ? ("Dataset@" + quantizedQueries.precision() + "-bit")
             : "false")
+        + ", mapping="
+        + mapping
         + ", topK="
         + topK
         + "]";
@@ -135,28 +173,66 @@ public class CagraQuery {
     private int numDocs;
     private CuVSQuantizer quantizer;
 
+    /**
+     * Default constructor.
+     */
     public Builder() {}
 
+    /**
+     * Sets the instance of configured CagraSearchParams to be passed for search.
+     *
+     * @param cagraSearchParams an instance of the configured CagraSearchParams to
+     *                          be used for this query
+     * @return an instance of this Builder
+     */
     public Builder withSearchParams(CagraSearchParams params) {
       this.cagraSearchParams = params;
       return this;
     }
 
+    /**
+     * Registers the query vectors to be passed in the search call.
+     *
+     * @param queryVectors 2D float query vector array
+     * @return an instance of this Builder
+     */
     public Builder withQueryVectors(float[][] queryVectors) {
       this.queryVectors = queryVectors;
       return this;
     }
 
+    /**
+     * Sets the function used to map ordinals (neighbor IDs) to custom user IDs
+     *
+     * @param mapping a function mapping ordinals (neighbor IDs) to custom user IDs
+     * @return an instance of this Builder
+     */
     public Builder withMapping(LongToIntFunction mapping) {
       this.mapping = mapping;
       return this;
     }
 
+    /**
+     * Registers the topK value.
+     *
+     * @param topK the topK value used to retrieve the topK results
+     * @return an instance of this Builder
+     */
     public Builder withTopK(int topK) {
       this.topK = topK;
       return this;
     }
 
+    /**
+     * Sets a global prefilter for all queries in this {@link CagraQuery}.
+     * The {@code prefilter} array must contain exactly one {@link BitSet},
+     * which is applied to all queries. A bit value of {@code 1} includes the
+     * corresponding dataset vector; {@code 0} excludes it.
+     *
+     * @param prefilter an array with the global filter BitSet
+     * @param numDocs total number of vectors in the dataset (for alignment)
+     * @return this {@link Builder} instance
+     */
     public Builder withPrefilter(BitSet prefilter, int numDocs) {
       this.prefilter = prefilter;
       this.numDocs = numDocs;
@@ -185,7 +261,7 @@ public class CagraQuery {
       float[][] floatsForQuery = queryVectors;
 
       if (quantizer != null) {
-        // wrap float[][] in a Dataset and quantize
+        // wrap float[][] in a CuVSMatrix and quantize
         CuVSMatrix tmp = CuVSMatrix.ofArray(queryVectors);
         if (tmp.precision() != 32) {
           tmp.close();
