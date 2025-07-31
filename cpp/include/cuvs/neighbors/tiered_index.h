@@ -265,7 +265,7 @@ cuvsError_t cuvsTieredIndexExtend(cuvsResources_t res,
  * @return cuvsError_t
  */
 cuvsError_t cuvsTieredIndexMerge(cuvsResources_t res,
-                                 cuvsTieredIndexParams_t params,
+                                 cuvsTieredIndexParams_t index_params,
                                  cuvsTieredIndex_t* indices,
                                  size_t num_indices,
                                  cuvsTieredIndex_t output_index);
