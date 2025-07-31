@@ -431,8 +431,16 @@ inline auto cuda_info()
   cudaRuntimeGetVersion(&runtime);
 
   cudaDeviceProp device_prop;
-  cudaGetDevice(&dev);
-  cudaGetDeviceProperties(&device_prop, dev);
+  auto err_code = cudaGetDevice(&dev);
+  if (err_code != cudaSuccess) {
+    throw std::runtime_error{"cuda_info: call to cudaGetDevice failed with code " +
+                             std::to_string(err_code)};
+  }
+  err_code = cudaGetDeviceProperties(&device_prop, dev);
+  if (err_code != cudaSuccess) {
+    throw std::runtime_error{"cuda_info: call to cudaGetDeviceProperties failed with code " +
+                             std::to_string(err_code)};
+  }
   props.emplace_back("gpu_name", std::string(device_prop.name));
   props.emplace_back("gpu_sm_count", std::to_string(device_prop.multiProcessorCount));
   props.emplace_back("gpu_sm_freq", std::to_string(device_prop.clockRate * 1e3));
