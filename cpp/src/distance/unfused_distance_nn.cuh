@@ -133,6 +133,7 @@ __global__ void reduce_min_kernel(
 
   if (threadIdx.x == 0) {
     if (is_sqrt) {
+      // TODO: call the correct sqrt function here
       out[row] = block_result;
     } else {
       out[row] = block_result;
