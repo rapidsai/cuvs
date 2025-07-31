@@ -98,7 +98,7 @@ public class BinaryQuantizerImpl {
       // Current implementation is inefficient due to:
       // 1. Host-to-device copy of input dataset
       // 2. Device-to-host copy of quantized results
-      // 
+      //
       // Future improvement: Support GPU-native dataset creation in Java API
       // to perform quantization entirely on GPU without data transfers.
 
