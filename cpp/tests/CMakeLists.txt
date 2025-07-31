@@ -148,6 +148,10 @@ if(BUILD_TESTS)
   )
 
   ConfigureTest(
+    NAME NEIGHBORS_ANN_SCANN_TEST PATH neighbors/ann_scann/test_float_int64_t.cu GPUS 1 PERCENT 1
+  )
+
+  ConfigureTest(
     NAME NEIGHBORS_ANN_BRUTE_FORCE_TEST PATH neighbors/ann_brute_force/test_float.cu
     neighbors/ann_brute_force/test_half.cu GPUS 1 PERCENT 100
   )
