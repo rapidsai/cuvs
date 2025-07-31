@@ -51,6 +51,7 @@ function(find_and_configure_faiss)
     set(CUVS_FAISS_OPT_LEVEL "sve")
   endif()
 
+
   rapids_cpm_find(faiss ${version} ${build_patch_only}
     GLOBAL_TARGETS faiss faiss_avx2 faiss_sve faiss_gpu_objs faiss::faiss faiss::faiss_avx2 faiss::faiss_sve
     CPM_ARGS

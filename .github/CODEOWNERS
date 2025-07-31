@@ -1,14 +1,18 @@
 #cpp code owners
 cpp/               @rapidsai/cuvs-cpp-codeowners
+examples/cpp/      @rapidsai/cuvs-cpp-codeowners
+examples/c/        @rapidsai/cuvs-cpp-codeowners
 
 #java code owners
 java/              @rapidsai/cuvs-java-codeowners
+examples/java/     @rapidsai/cuvs-java-codeowners
 
 #python code owners
 python/            @rapidsai/cuvs-python-codeowners
 
 #rust code owners
 rust/              @rapidsai/cuvs-rust-codeowners
+examples/rust/     @rapidsai/cuvs-rust-codeowners
 
 #docs code owners
 docs/              @rapidsai/cuvs-docs-codeowners
