@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include <raft/core/resources.hpp>
 #include <raft/core/resource/cublas_handle.hpp>
+#include <raft/core/resources.hpp>
 
 namespace cuvs {
 namespace distance {
@@ -160,17 +160,17 @@ void reduce_min(OutT* out,
 
 template <typename DataT, typename AccT, typename OutT, typename IdxT>
 void unfused_distance_nn(raft::resources const& handle,
-                 OutT* out,
-                 const DataT* x,
-                 const DataT* y,
-                 IdxT M,
-                 IdxT N,
-                 IdxT K,
-                 const AccT* x_norm,
-                 const AccT* y_norm,
-                 AccT* workspace,
-                 bool is_sqrt,
-                 cudaStream_t stream)
+                         OutT* out,
+                         const DataT* x,
+                         const DataT* y,
+                         IdxT M,
+                         IdxT N,
+                         IdxT K,
+                         const AccT* x_norm,
+                         const AccT* y_norm,
+                         AccT* workspace,
+                         bool is_sqrt,
+                         cudaStream_t stream)
 {
   cudaDataType_t xyType, zType;
   cublasComputeType_t computeType;
@@ -230,25 +230,25 @@ void unfused_distance_nn(raft::resources const& handle,
 
   auto cublas_h = raft::resource::get_cublas_handle(handle);
   RAFT_CUBLAS_TRY(cublasGemmEx(cublas_h,
-                            CUBLAS_OP_T,
-                            CUBLAS_OP_N,
-                            N,
-                            M,
-                            K,      // Dimensions (swapped due to row/col-major difference)
-                            alpha,  // alpha
-                            y,
-                            xyType,
-                            K,  // B, its data type, and leading dimension
-                            x,
-                            xyType,
-                            K,     // A, its data type, and leading dimension
-                            beta,  // beta
-                            workspace,
-                            zType,
-                            N,                   // C, its data type, and leading dimension
-                            computeType,         // Computation type
-                            CUBLAS_GEMM_DEFAULT  // Algorithm selection
-                            ));
+                               CUBLAS_OP_T,
+                               CUBLAS_OP_N,
+                               N,
+                               M,
+                               K,      // Dimensions (swapped due to row/col-major difference)
+                               alpha,  // alpha
+                               y,
+                               xyType,
+                               K,  // B, its data type, and leading dimension
+                               x,
+                               xyType,
+                               K,     // A, its data type, and leading dimension
+                               beta,  // beta
+                               workspace,
+                               zType,
+                               N,                   // C, its data type, and leading dimension
+                               computeType,         // Computation type
+                               CUBLAS_GEMM_DEFAULT  // Algorithm selection
+                               ));
 
   reduce_min<DataT, AccT, OutT, IdxT>(out, workspace, x_norm, y_norm, M, N, stream, is_sqrt);
 }
