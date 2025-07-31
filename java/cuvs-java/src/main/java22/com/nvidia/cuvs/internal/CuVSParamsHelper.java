@@ -151,4 +151,23 @@ final class CuVSParamsHelper {
       };
     }
   }
+
+  static CloseableHandle createTieredIndexParams() {
+    try (var localArena = Arena.ofConfined()) {
+      var paramsPtrPtr = localArena.allocate(cuvsTieredIndexParams_t);
+      checkCuVSError(cuvsTieredIndexParamsCreate(paramsPtrPtr), "cuvsTieredIndexParamsCreate");
+      var paramsPtr = paramsPtrPtr.get(cuvsTieredIndexParams_t, 0L);
+      return new CloseableHandle() {
+        @Override
+        public MemorySegment handle() {
+          return paramsPtr;
+        }
+
+        @Override
+        public void close() {
+          checkCuVSError(cuvsTieredIndexParamsDestroy(paramsPtr), "cuvsTieredIndexParamsDestroy");
+        }
+      };
+    }
+  }
 }
