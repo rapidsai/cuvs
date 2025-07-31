@@ -68,6 +68,8 @@ constexpr static inline float kAdjustCentersWeight = 7.0f;
 template <typename MathT, typename IdxT, typename LabelT>
 bool use_fused(IdxT m, IdxT n, IdxT k)
 {
+  // TODO: @tfeher Try using helpers from Try using the helpers from raft/util/arch.cuh
+  // https://github.com/rapidsai/cuvs/blob/1155a3a427cd1d1bfaf8fe74a937ed6dfa797ec7/cpp/src/neighbors/detail/nn_descent.cuh#L1210-L1222
 #if __CUDA_ARCH__ > 800
   // Use fused if unfused workspace size is great than 100 MB
   if (size_t(m) * n * sizeof(MathT) > 100 * 1024 * 1024) {
