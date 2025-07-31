@@ -432,7 +432,12 @@ inline auto cuda_info()
 
   cudaDeviceProp device_prop;
   auto err_code = cudaGetDevice(&dev);
-  if (err_code != cudaSuccess) {
+  if (err_code == cudaErrorNoDevice || err_code == cudaErrorInvalidDevice) {
+    throw std::runtime_error{"cuda_info: call to cudaGetDevice failed with code " +
+                             std::to_string(err_code) +
+                             ". If you are running on a CPU-only machine, please "
+                             "use the CPU package instead."};
+  } else if (err_code != cudaSuccess) {
     throw std::runtime_error{"cuda_info: call to cudaGetDevice failed with code " +
                              std::to_string(err_code)};
   }
