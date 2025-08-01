@@ -83,7 +83,7 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
                                                                     FinalLambda fin_op)
 {
 // compile only if below non-ampere arch.
-#if __CUDA_ARCH__ < 800
+// #if __CUDA_ARCH__ < 800
   extern __shared__ char smem[];
 
   typedef raft::KeyValuePair<IdxT, DataT> KVPair;
@@ -179,7 +179,7 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
         fin_op,
         rowEpilog_lambda);
   obj.run();
-#endif
+// #endif
 }
 
 }  // namespace detail

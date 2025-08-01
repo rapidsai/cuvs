@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@
 #include "fused_distance_nn/cutlass_base.cuh"
 #include "fused_distance_nn/fused_cosine_nn.cuh"
 #include "fused_distance_nn/fused_l2_nn.cuh"
+#include "fused_distance_nn/fused_bitwise_hamming_nn.cuh"
 #include "fused_distance_nn/helper_structs.cuh"
 #include "fused_distance_nn/simt_kernel.cuh"
 #include "pairwise_distance_base.cuh"  // PairwiseDistances
@@ -88,7 +89,15 @@ void fusedDistanceNNImpl(OutT* min,
       fusedL2NNImpl<DataT, OutT, IdxT, P, ReduceOpT, KVPReduceOpT>(
         min, x, y, xn, yn, m, n, k, workspace, redOp, pairRedOp, sqrt, false, stream);
       break;
-    default: assert("only cosine/l2 metric is supported with fusedDistanceNN\n"); break;
+    case cuvs::distance::DistanceType::BitwiseHamming:
+      if constexpr (std::is_same_v<DataT, uint8_t>) {
+        fusedBitwiseHammingNN<DataT, OutT, IdxT, P, ReduceOpT, KVPReduceOpT>(
+          min, x, y, xn, yn, m, n, k, workspace, redOp, pairRedOp, sqrt, stream);
+      } else {
+        assert(false && "BitwiseHamming distance is only supported for uint8_t data type");
+      }
+      break;
+    default: assert("only cosine/l2/bitwise hamming metric is supported with fusedDistanceNN\n"); break;
   }
 }
 

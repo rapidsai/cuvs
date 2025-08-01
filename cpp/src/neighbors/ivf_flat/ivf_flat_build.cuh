@@ -245,7 +245,7 @@ void extend(raft::resources const& handle,
         index->binary_centers().data_handle(), n_lists, dim);
 
       if (index->binary_index()) {
-        cuvs::cluster::kmeans_balanced::predict_bitwise_hamming(
+        cuvs::cluster::kmeans::detail::predict_bitwise_hamming(
           handle, batch_data_view, centroids_view, batch_labels_view);
       } else {
         auto orig_centroids_view = raft::make_device_matrix_view<const float, IdxT>(
