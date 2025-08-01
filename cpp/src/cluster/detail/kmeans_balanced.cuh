@@ -1241,4 +1241,5 @@ void build_hierarchical(const raft::resources& handle,
                      mapping_op,
                      device_memory);
 }
+
 }  // namespace  cuvs::cluster::kmeans::detail
