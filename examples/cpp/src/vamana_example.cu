@@ -33,9 +33,6 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
                             std::string out_fname,
                             int degree,
                             int visited_size,
-                            std::string out_fname,
-                            int degree,
-                            int visited_size,
                             float max_fraction,
                             float iters,
                             std::string codebook_prefix)
@@ -48,7 +45,10 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
   index_params.visited_size = visited_size;
   index_params.graph_degree = degree;
   index_params.vamana_iters = iters;
-  index_params.codebooks    = vamana::deserialize_codebooks(codebook_prefix, dataset.extent(1));
+
+  if (codebook_prefix != "") {
+    index_params.codebooks = vamana::deserialize_codebooks(codebook_prefix, dataset.extent(1));
+  }
 
   std::cout << "Building Vamana index (search graph)" << std::endl;
 
@@ -67,7 +67,9 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
   serialize(dev_resources, out_fname, index);
 
   // Output index to file (disk sector-aligned format)
-  serialize(dev_resources, out_fname + ".sector_aligned", index, false, true);
+  if (codebook_prefix != "") {
+    serialize(dev_resources, out_fname + ".sector_aligned", index, false, true);
+  }
 }
 
 void usage()
