@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -135,6 +135,13 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
     cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index)
 
     cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int32_t* dim)
+    cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, uint32_t* size)
+    cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index,
+                                             uint32_t* degree)
+    cuvsError_t cuvsCagraIndexGetGraph(cuvsCagraIndex_t index,
+                                       DLManagedTensor * graph)
+    cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index,
+                                         DLManagedTensor * dataset)
 
     cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                                cuvsCagraIndexParams* params,
@@ -161,6 +168,12 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
     cuvsError_t cuvsCagraDeserialize(cuvsResources_t res,
                                      const char * filename,
                                      cuvsCagraIndex_t index)
+
+    cuvsError_t cuvsCagraIndexFromArgs(cuvsResources_t res,
+                                       cuvsDistanceType metric,
+                                       DLManagedTensor * graph,
+                                       DLManagedTensor * dataset,
+                                       cuvsCagraIndex_t index)
 
 cdef class Index:
     """

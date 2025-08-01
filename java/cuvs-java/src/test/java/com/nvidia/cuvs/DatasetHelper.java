@@ -22,11 +22,12 @@ import java.lang.invoke.MethodHandle;
 public class DatasetHelper {
 
   private static final MethodHandle createDataset$mh =
-      CuVSProvider.provider().newNativeDatasetBuilder();
+      CuVSProvider.provider().newNativeMatrixBuilder();
 
-  public static Dataset fromMemorySegment(MemorySegment memorySegment, int size, int dimensions) {
+  public static CuVSMatrix fromMemorySegment(
+      MemorySegment memorySegment, int size, int dimensions, CuVSMatrix.DataType dataType) {
     try {
-      return (Dataset) createDataset$mh.invokeExact(memorySegment, size, dimensions);
+      return (CuVSMatrix) createDataset$mh.invokeExact(memorySegment, size, dimensions, dataType);
     } catch (Throwable e) {
       if (e instanceof Error err) {
         throw err;

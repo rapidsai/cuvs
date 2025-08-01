@@ -43,11 +43,6 @@ using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 constexpr int kThreadsPerBlock = 128;
 
-auto RAFT_WEAK_FUNCTION is_local_topk_feasible(uint32_t k) -> bool
-{
-  return k <= raft::matrix::detail::select::warpsort::kMaxCapacity;
-}
-
 /**
  * @brief Copy `n` elements per block from one place to another.
  *

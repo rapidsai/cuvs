@@ -119,9 +119,9 @@ public class HnswBuildAndSearchIT extends CuVSTestCase {
             Map.of(1, 0.15224178f, 0, 0.59063464f, 3, 0.59866416f));
 
     for (int j = 0; j < 10; j++) {
-      try (CuVSResources resources = CuVSResources.create()) {
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
         HnswQuery hnswQuery =
-            new HnswQuery.Builder()
+            new HnswQuery.Builder(resources)
                 .withMapping(SearchResults.IDENTITY_MAPPING)
                 .withQueryVectors(queries)
                 .withSearchParams(new HnswSearchParams.Builder().build())
@@ -144,9 +144,9 @@ public class HnswBuildAndSearchIT extends CuVSTestCase {
     LongToIntFunction rotate = l -> (int) ((l + 1) % dataset.length);
 
     for (int j = 0; j < 10; j++) {
-      try (CuVSResources resources = CuVSResources.create()) {
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
         HnswQuery hnswQuery =
-            new HnswQuery.Builder()
+            new HnswQuery.Builder(resources)
                 .withQueryVectors(queries)
                 .withMapping(rotate)
                 .withSearchParams(new HnswSearchParams.Builder().build())
@@ -170,9 +170,9 @@ public class HnswBuildAndSearchIT extends CuVSTestCase {
     LongToIntFunction rotate = SearchResults.mappingsFromList(mappings);
 
     for (int j = 0; j < 10; j++) {
-      try (CuVSResources resources = CuVSResources.create()) {
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
         HnswQuery hnswQuery =
-            new HnswQuery.Builder()
+            new HnswQuery.Builder(resources)
                 .withQueryVectors(queries)
                 .withMapping(rotate)
                 .withSearchParams(new HnswSearchParams.Builder().build())

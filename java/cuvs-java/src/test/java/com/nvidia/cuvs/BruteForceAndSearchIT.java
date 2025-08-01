@@ -18,7 +18,8 @@ package com.nvidia.cuvs;
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 
 import java.io.*;
-import java.lang.invoke.MethodHandles;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
@@ -26,12 +27,8 @@ import java.util.UUID;
 import java.util.function.LongToIntFunction;
 import org.junit.Before;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class BruteForceAndSearchIT extends CuVSTestCase {
-
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   @Before
   public void setup() {
@@ -67,31 +64,30 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
             .build();
 
     // Saving the index on to the disk.
-    String indexFileName = UUID.randomUUID().toString() + ".bf";
+    String indexFileName = UUID.randomUUID() + ".bf";
     try (var outputStream = new FileOutputStream(indexFileName)) {
       index.serialize(outputStream);
     }
 
     // Loading a BRUTEFORCE index from disk.
-    File indexFile = new File(indexFileName);
-    InputStream inputStream = new FileInputStream(indexFile);
-    BruteForceIndex loadedIndex = BruteForceIndex.newBuilder(resources).from(inputStream).build();
+    Path indexFile = Path.of(indexFileName);
+    try (var inputStream = Files.newInputStream(indexFile)) {
+      BruteForceIndex loadedIndex = BruteForceIndex.newBuilder(resources).from(inputStream).build();
 
-    // search the loaded index
-    SearchResults results = loadedIndex.search(cuvsQuery);
-    checkResults(expectedResults, results.getResults());
+      // search the loaded index
+      SearchResults results = loadedIndex.search(cuvsQuery);
+      checkResults(expectedResults, results.getResults());
 
-    // search the first index
-    results = index.search(cuvsQuery);
-    checkResults(expectedResults, results.getResults());
+      // search the first index
+      results = index.search(cuvsQuery);
+      checkResults(expectedResults, results.getResults());
 
-    // Cleanup
-    index.destroyIndex();
-    loadedIndex.destroyIndex();
-
-    if (indexFile.exists()) {
-      indexFile.delete();
+      // Cleanup
+      index.destroyIndex();
+      loadedIndex.destroyIndex();
     }
+
+    Files.deleteIfExists(indexFile);
   }
 
   /**
@@ -108,9 +104,9 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
             Map.of(1, 0.15224183f, 0, 0.5906347f, 3, 0.5986643f));
     for (int j = 0; j < 10; j++) {
 
-      try (CuVSResources resources = CuVSResources.create()) {
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
         BruteForceQuery cuvsQuery =
-            new BruteForceQuery.Builder()
+            new BruteForceQuery.Builder(resources)
                 .withTopK(3)
                 .withQueryVectors(queries)
                 .withMapping(SearchResults.IDENTITY_MAPPING)
@@ -136,9 +132,9 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
             Map.of(0, 0.5906347f, 1, 0.15224195f, 3, 0.5986643f));
 
     for (int j = 0; j < 10; j++) {
-      try (CuVSResources resources = CuVSResources.create()) {
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
         BruteForceQuery cuvsQuery =
-            new BruteForceQuery.Builder()
+            new BruteForceQuery.Builder(resources)
                 .withTopK(3)
                 .withQueryVectors(queries)
                 .withPrefilters(
@@ -162,9 +158,9 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
     LongToIntFunction rotate = l -> (int) ((l + 1) % dataset.length);
 
     for (int j = 0; j < 10; j++) {
-      try (CuVSResources resources = CuVSResources.create()) {
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
         BruteForceQuery cuvsQuery =
-            new BruteForceQuery.Builder()
+            new BruteForceQuery.Builder(resources)
                 .withTopK(3)
                 .withQueryVectors(queries)
                 .withMapping(rotate)
@@ -187,9 +183,9 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
     LongToIntFunction rotate = SearchResults.mappingsFromList(mappings);
 
     for (int j = 0; j < 10; j++) {
-      try (CuVSResources resources = CuVSResources.create()) {
+      try (CuVSResources resources = CheckedCuVSResources.create()) {
         BruteForceQuery cuvsQuery =
-            new BruteForceQuery.Builder()
+            new BruteForceQuery.Builder(resources)
                 .withTopK(3)
                 .withQueryVectors(queries)
                 .withMapping(rotate)

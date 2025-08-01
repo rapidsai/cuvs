@@ -89,10 +89,10 @@ The following command pulls the nightly container for Python version 3.10, CUDA 
 
 .. code-block:: bash
 
-   docker pull rapidsai/cuvs-bench:24.12a-cuda12.5-py3.10 # substitute cuvs-bench for the exact desired container.
+   docker pull rapidsai/cuvs-bench:25.10a-cuda12.5-py3.10 # substitute cuvs-bench for the exact desired container.
 
 The CUDA and python versions can be changed for the supported values:
-- Supported CUDA versions: 11.8 and 12.5
+- Supported CUDA versions: 12
 - Supported Python versions: 3.10 and 3.11.
 
 You can see the exact versions as well in the dockerhub site:
@@ -236,7 +236,7 @@ For GPU-enabled systems, the `DATA_FOLDER` variable should be a local folder whe
     export DATA_FOLDER=path/to/store/datasets/and/results
     docker run --gpus all --rm -it -u $(id -u)                      \
         -v $DATA_FOLDER:/data/benchmarks                            \
-        rapidsai/cuvs-bench:25.08-cuda12.9-py3.13              \
+        rapidsai/cuvs-bench:25.10-cuda12.9-py3.13              \
         "--dataset deep-image-96-angular"                           \
         "--normalize"                                               \
         "--algorithms cuvs_cagra,cuvs_ivf_pq --batch-size 10 -k 10" \
@@ -249,7 +249,7 @@ Usage of the above command is as follows:
  * - Argument
    - Description
 
- * - `rapidsai/cuvs-bench:25.08-cuda12.9-py3.13`
+ * - `rapidsai/cuvs-bench:25.10-cuda12.9-py3.13`
    - Image to use. Can be either `cuvs-bench` or `cuvs-bench-datasets`
 
  * - `"--dataset deep-image-96-angular"`
@@ -296,7 +296,7 @@ All of the `cuvs-bench` images contain the Conda packages, so they can be used d
         --entrypoint /bin/bash                          \
         --workdir /data/benchmarks                      \
         -v $DATA_FOLDER:/data/benchmarks                \
-        rapidsai/cuvs-bench:25.08-cuda12.9-py3.13
+        rapidsai/cuvs-bench:25.10-cuda12.9-py3.13
 
 This will drop you into a command line in the container, with the `cuvs-bench` python package ready to use, as described in the [Running the benchmarks](#running-the-benchmarks) section above:
 
@@ -432,10 +432,10 @@ The table below contains all algorithms supported by cuVS. Each unique algorithm
    - Algorithms
 
  * - FAISS_GPU
-   - `faiss_gpu_flat`, `faiss_gpu_ivf_flat`, `faiss_gpu_ivf_pq`
+   - `faiss_gpu_flat`, `faiss_gpu_ivf_flat`, `faiss_gpu_ivf_pq`, `faiss_gpu_cagra`
 
  * - FAISS_CPU
-   - `faiss_cpu_flat`, `faiss_cpu_ivf_flat`, `faiss_cpu_ivf_pq`
+   - `faiss_cpu_flat`, `faiss_cpu_ivf_flat`, `faiss_cpu_ivf_pq`, `faiss_cpu_hnsw_flat`
 
  * - GGNN
    - `ggnn`
@@ -443,8 +443,11 @@ The table below contains all algorithms supported by cuVS. Each unique algorithm
  * - HNSWLIB
    - `hnswlib`
 
+ * - DiskANN
+   - `diskann_memory`, `diskann_ssd`
+
  * - cuVS
-   - `cuvs_brute_force`, `cuvs_cagra`, `cuvs_ivf_flat`, `cuvs_ivf_pq`, `cuvs_cagra_hnswlib`
+   - `cuvs_brute_force`, `cuvs_cagra`, `cuvs_ivf_flat`, `cuvs_ivf_pq`, `cuvs_cagra_hnswlib`, `cuvs_vamana`
 
 
 Multi-GPU benchmarks

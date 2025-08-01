@@ -98,7 +98,7 @@ public class HnswRandomizedIT extends CuVSTestCase {
     List<List<Integer>> expected = generateExpectedResults(topK, vectors, queries, null, log);
 
     // Create CuVS index and query
-    try (CuVSResources resources = CuVSResources.create()) {
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
 
       // Configure index parameters
       CagraIndexParams indexParams =
@@ -113,7 +113,8 @@ public class HnswRandomizedIT extends CuVSTestCase {
       // Create the index with the dataset
       final CagraIndex index;
       if (useNativeMemoryDataset) {
-        var datasetBuilder = Dataset.builder(vectors.length, vectors[0].length);
+        var datasetBuilder =
+            CuVSMatrix.builder(vectors.length, vectors[0].length, CuVSMatrix.DataType.FLOAT);
         for (float[] v : vectors) {
           datasetBuilder.addVector(v);
         }
@@ -153,7 +154,7 @@ public class HnswRandomizedIT extends CuVSTestCase {
               new HnswSearchParams.Builder().withNumThreads(32).build();
 
           HnswQuery hnswQuery =
-              new HnswQuery.Builder()
+              new HnswQuery.Builder(resources)
                   .withQueryVectors(queries)
                   .withSearchParams(hnswSearchParams)
                   .withTopK(topK)
