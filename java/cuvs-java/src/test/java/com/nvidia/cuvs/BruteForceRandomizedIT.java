@@ -109,7 +109,7 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
     try (CuVSResources resources = CheckedCuVSResources.create()) {
 
       BruteForceQuery query =
-          new BruteForceQuery.Builder()
+          new BruteForceQuery.Builder(resources)
               .withTopK(topK)
               .withQueryVectors(queries)
               .withPrefilters(prefilters, vectors.length)
