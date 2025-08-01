@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -82,8 +82,8 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
                                                                     OpT distance_op,
                                                                     FinalLambda fin_op)
 {
-// compile only if below non-ampere arch.
-// #if __CUDA_ARCH__ < 800
+  // compile only if below non-ampere arch.
+  // #if __CUDA_ARCH__ < 800
   extern __shared__ char smem[];
 
   typedef raft::KeyValuePair<IdxT, DataT> KVPair;
@@ -179,7 +179,7 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
         fin_op,
         rowEpilog_lambda);
   obj.run();
-// #endif
+  // #endif
 }
 
 }  // namespace detail

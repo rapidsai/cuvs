@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "../distance_ops/bitwise_hamming.cuh"     // ops::bitwise_hamming_distance_op
-#include "../pairwise_distance_base.cuh"  // PairwiseDistances
+#include "../distance_ops/bitwise_hamming.cuh"  // ops::bitwise_hamming_distance_op
+#include "../pairwise_distance_base.cuh"        // PairwiseDistances
 #include "cutlass_base.cuh"
 #include "helper_structs.cuh"
 #include "simt_kernel.cuh"
@@ -42,19 +42,19 @@ template <typename DataT,
           typename ReduceOpT,
           typename KVPReduceOpT>
 void fusedBitwiseHammingNN(OutT* min,
-                   const DataT* x,
-                   const DataT* y,
-                   const DataT* xn,
-                   const DataT* yn,
-                   IdxT m,
-                   IdxT n,
-                   IdxT k,
-                   int* workspace,
-                   ReduceOpT redOp,
-                   KVPReduceOpT pairRedOp,
-                   bool sqrt,
-                   bool initOutBuffer,
-                   cudaStream_t stream)
+                           const DataT* x,
+                           const DataT* y,
+                           const DataT* xn,
+                           const DataT* yn,
+                           IdxT m,
+                           IdxT n,
+                           IdxT k,
+                           int* workspace,
+                           ReduceOpT redOp,
+                           KVPReduceOpT pairRedOp,
+                           bool sqrt,
+                           bool initOutBuffer,
+                           cudaStream_t stream)
 {
   typedef Policy P;
 
@@ -70,7 +70,7 @@ void fusedBitwiseHammingNN(OutT* min,
     RAFT_CUDA_TRY(cudaGetLastError());
   }
 
-  using AccT     = DataT;
+  using AccT = DataT;
   ops::bitwise_hamming_distance_op<DataT, AccT, IdxT> distance_op{};
 
   raft::identity_op fin_op{};
@@ -84,15 +84,15 @@ void fusedBitwiseHammingNN(OutT* min,
                                       decltype(distance_op),
                                       decltype(fin_op)>;
 
-  void* kernel_ptr   = reinterpret_cast<void*>(kernel);
+  void* kernel_ptr = reinterpret_cast<void*>(kernel);
 
-    constexpr size_t shmemSize = P::SmemSize;
-    dim3 grid                  = launchConfigGenerator<P>(m, n, shmemSize, kernel);
+  constexpr size_t shmemSize = P::SmemSize;
+  dim3 grid                  = launchConfigGenerator<P>(m, n, shmemSize, kernel);
 
-    kernel<<<grid, blk, shmemSize, stream>>>(
-      min, x, y, xn, yn, m, n, k, maxVal, workspace, redOp, pairRedOp, distance_op, fin_op);
-    RAFT_CUDA_TRY(cudaGetLastError());
-  }
+  kernel<<<grid, blk, shmemSize, stream>>>(
+    min, x, y, xn, yn, m, n, k, maxVal, workspace, redOp, pairRedOp, distance_op, fin_op);
+  RAFT_CUDA_TRY(cudaGetLastError());
+}
 }
 
 }  // namespace detail

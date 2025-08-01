@@ -17,7 +17,7 @@
 #pragma once
 
 #include "../distance_ops/bitwise_hamming.cuh"  // ops::bitwise_hamming_distance_op
-#include "../pairwise_distance_base.cuh"         // PairwiseDistances
+#include "../pairwise_distance_base.cuh"        // PairwiseDistances
 #include "helper_structs.cuh"
 #include "simt_kernel.cuh"
 
@@ -60,7 +60,7 @@ void fusedBitwiseHammingNN(OutT* min,
 
   // Create the distance operation
   ops::bitwise_hamming_distance_op<DataT, float, IdxT> distance_op{k};
-  
+
   // No special finalization operation needed
   ::raft::identity_op fin_op{};
 
@@ -76,8 +76,8 @@ void fusedBitwiseHammingNN(OutT* min,
   // Since BitwiseHamming distance doesn't have a CUTLASS-accelerated version,
   // we only use the SIMT kernel
   constexpr size_t shmemSize = P::SmemSize;
-  
-  // Launch kernel  
+
+  // Launch kernel
   dim3 grid = launchConfigGenerator<P>(m, n, shmemSize, kernel);
   kernel<<<grid, blk, shmemSize, stream>>>(
     min, x, y, xn, yn, m, n, k, maxVal, workspace, redOp, pairRedOp, distance_op, fin_op);
@@ -86,4 +86,4 @@ void fusedBitwiseHammingNN(OutT* min,
 
 }  // namespace detail
 }  // namespace distance
-}  // namespace cuvs 
+}  // namespace cuvs

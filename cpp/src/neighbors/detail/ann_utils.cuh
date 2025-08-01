@@ -226,7 +226,8 @@ struct bitwise_decode_op {
   {
     IdxT row_id = i / uncompressed_dim;
     IdxT col_id = i % uncompressed_dim;
-    return static_cast<OutT>(-1 + 2 * ((binary_vecs[(row_id * compressed_dim + col_id) >> 3] >> (col_id & 7)) & 1));
+    return static_cast<OutT>(
+      -1 + 2 * ((binary_vecs[(row_id * compressed_dim + col_id) >> 3] >> (col_id & 7)) & 1));
   };
 };
 

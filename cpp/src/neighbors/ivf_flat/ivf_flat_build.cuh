@@ -237,8 +237,8 @@ void extend(raft::resources const& handle,
   if constexpr (std::is_same_v<T, uint8_t>) {
     // For uint8_t, handle both binary and non-binary cases
     for (const auto& batch : vec_batches) {
-      auto batch_data_view =
-        raft::make_device_matrix_view<const uint8_t, IdxT>(batch.data(), batch.size(), index->dim());
+      auto batch_data_view = raft::make_device_matrix_view<const uint8_t, IdxT>(
+        batch.data(), batch.size(), index->dim());
       auto batch_labels_view = raft::make_device_vector_view<LabelT, IdxT>(
         new_labels.data_handle() + batch.offset(), batch.size());
       auto centroids_view = raft::make_device_matrix_view<const uint8_t, IdxT>(
@@ -314,20 +314,21 @@ void extend(raft::resources const& handle,
         for (const auto& batch : vec_batches) {
           rmm::device_uvector<uint8_t> decoded_batch(
             batch.size() * dim * 8, stream, raft::resource::get_workspace_resource(handle));
-          auto decoded_batch_view =
-            raft::make_device_matrix_view<uint8_t, IdxT>(decoded_batch.data(), batch.size(), dim * 8);
+          auto decoded_batch_view = raft::make_device_matrix_view<uint8_t, IdxT>(
+            decoded_batch.data(), batch.size(), dim * 8);
           raft::linalg::map_offset(
             handle, decoded_batch_view, utils::bitwise_decode_op<uint8_t, IdxT>(batch.data(), dim));
 
           auto batch_labels_view = raft::make_device_vector_view<const LabelT, IdxT>(
             new_labels.data_handle() + batch.offset(), batch.size());
-          cuvs::cluster::kmeans_balanced::helpers::calc_centers_and_sizes(handle,
-                                                                          raft::make_const_mdspan(decoded_batch_view),
-                                                                          batch_labels_view,
-                                                                          raft::make_const_mdspan(expanded_centers_view),
-                                                                          list_sizes_view,
-                                                                          false,
-                                                                          raft::identity_op{});
+          cuvs::cluster::kmeans_balanced::helpers::calc_centers_and_sizes(
+            handle,
+            raft::make_const_mdspan(decoded_batch_view),
+            batch_labels_view,
+            raft::make_const_mdspan(expanded_centers_view),
+            list_sizes_view,
+            false,
+            raft::identity_op{});
         }
 
         // Convert updated centroids back to binary format
@@ -336,7 +337,7 @@ void extend(raft::resources const& handle,
           handle, temp_quantizer, expanded_centers_view, index->binary_centers());
       } else {
         // Error: BitwiseHamming with non-uint8_t type
-        RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t data type, got %s", 
+        RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t data type, got %s",
                   typeid(T).name());
       }
     } else {
@@ -490,15 +491,15 @@ inline auto build(raft::resources const& handle,
   auto stream = raft::resource::get_cuda_stream(handle);
   cuvs::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_flat::build(%zu, %u)", size_t(n_rows), dim);
-  if (params.metric == cuvs::distance::DistanceType::BitwiseHamming && !std::is_same_v<T, uint8_t>) {
-    RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t input type, got %s", 
+  if (params.metric == cuvs::distance::DistanceType::BitwiseHamming &&
+      !std::is_same_v<T, uint8_t>) {
+    RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t input type, got %s",
               typeid(T).name());
   }
   static_assert(std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, uint8_t> ||
                   std::is_same_v<T, int8_t>,
                 "unsupported data type");
 
-  
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
   RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::CosineExpanded || dim > 1,
@@ -534,45 +535,47 @@ inline auto build(raft::resources const& handle,
     kmeans_params.metric =
       index.binary_index() ? cuvs::distance::DistanceType::L2Expanded : index.metric();
 
-  if constexpr (std::is_same_v<T, uint8_t>) {
-        if (index.binary_index()) {
-          // For binary data, we need to decode to expanded representation for clustering
-          rmm::device_uvector<uint8_t> decoded_trainset(
-            n_rows_train * index.dim() * 8,
-            stream,
-            raft::resource::get_large_workspace_resource(handle));
-          auto decoded_trainset_view = raft::make_device_matrix_view<uint8_t, IdxT>(
-            decoded_trainset.data(), n_rows_train, index.dim() * 8);
+    if constexpr (std::is_same_v<T, uint8_t>) {
+      if (index.binary_index()) {
+        // For binary data, we need to decode to expanded representation for clustering
+        rmm::device_uvector<uint8_t> decoded_trainset(
+          n_rows_train * index.dim() * 8,
+          stream,
+          raft::resource::get_large_workspace_resource(handle));
+        auto decoded_trainset_view = raft::make_device_matrix_view<uint8_t, IdxT>(
+          decoded_trainset.data(), n_rows_train, index.dim() * 8);
 
-          // Decode binary trainset to expanded representation
-          raft::linalg::map_offset(handle,
-                                   decoded_trainset_view,
-                                   utils::bitwise_decode_op<uint8_t, IdxT>(trainset.data(), index.dim()));
-          trainset.release();
+        // Decode binary trainset to expanded representation
+        raft::linalg::map_offset(
+          handle,
+          decoded_trainset_view,
+          utils::bitwise_decode_op<uint8_t, IdxT>(trainset.data(), index.dim()));
+        trainset.release();
 
-          rmm::device_uvector<float> decoded_centers(
-            index.n_lists() * index.dim() * 8, stream, raft::resource::get_workspace_resource(handle));
-          auto decoded_centers_view = raft::make_device_matrix_view<float, IdxT>(
-            decoded_centers.data(), index.n_lists(), index.dim() * 8);
+        rmm::device_uvector<float> decoded_centers(index.n_lists() * index.dim() * 8,
+                                                   stream,
+                                                   raft::resource::get_workspace_resource(handle));
+        auto decoded_centers_view = raft::make_device_matrix_view<float, IdxT>(
+          decoded_centers.data(), index.n_lists(), index.dim() * 8);
 
-          cuvs::cluster::kmeans_balanced::fit(handle,
-                                              kmeans_params,
-                                              raft::make_const_mdspan(decoded_trainset_view),
-                                              decoded_centers_view);
-        } else {
-          // For non-binary data, use standard clustering
-          auto centers_view = raft::make_device_matrix_view<float, IdxT>(
-            index.centers().data_handle(), index.n_lists(), index.dim());
-          cuvs::cluster::kmeans_balanced::fit(
-            handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
-        }
+        cuvs::cluster::kmeans_balanced::fit(handle,
+                                            kmeans_params,
+                                            raft::make_const_mdspan(decoded_trainset_view),
+                                            decoded_centers_view);
       } else {
-        // For non-uint8_t types, always use standard clustering (BitwiseHamming already caught above)
+        // For non-binary data, use standard clustering
         auto centers_view = raft::make_device_matrix_view<float, IdxT>(
           index.centers().data_handle(), index.n_lists(), index.dim());
         cuvs::cluster::kmeans_balanced::fit(
           handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
       }
+    } else {
+      // For non-uint8_t types, always use standard clustering (BitwiseHamming already caught above)
+      auto centers_view = raft::make_device_matrix_view<float, IdxT>(
+        index.centers().data_handle(), index.n_lists(), index.dim());
+      cuvs::cluster::kmeans_balanced::fit(
+        handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
+    }
   }
 
   // add the data if necessary

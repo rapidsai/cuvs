@@ -38,7 +38,7 @@ struct bitwise_hamming_distance_op {
 
   bitwise_hamming_distance_op(IdxT k_) noexcept : k(k_) {}
 
-  static constexpr bool use_norms = false;
+  static constexpr bool use_norms            = false;
   static constexpr bool expensive_inner_loop = false;
 
   template <typename Policy>
@@ -47,20 +47,20 @@ struct bitwise_hamming_distance_op {
     return Policy::SmemSize;
   }
 
-  __device__ __forceinline__ void core(AccT& acc, DataT& x, DataT& y) const 
-  { 
+  __device__ __forceinline__ void core(AccT& acc, DataT& x, DataT& y) const
+  {
     static_assert(std::is_same_v<DataT, uint8_t>, "BitwiseHamming only supports uint8_t");
     acc += static_cast<AccT>(__popc(static_cast<uint32_t>(x ^ y) & 0xffu));
   }
 
   template <typename Policy>
   __device__ __forceinline__ void epilog(AccT acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
-                 AccT* regxn,
-                 AccT* regyn,
-                 IdxT gridStrideX,
-                 IdxT gridStrideY) const
+                                         AccT* regxn,
+                                         AccT* regyn,
+                                         IdxT gridStrideX,
+                                         IdxT gridStrideY) const
   {
   }
 };
 
-}  // namespace cuvs::distance::detail::ops 
+}  // namespace cuvs::distance::detail::ops

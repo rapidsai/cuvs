@@ -18,9 +18,9 @@
 
 #include "distance_ops/l2_exp.cuh"  // ops::l2_exp_distance_op
 #include "fused_distance_nn/cutlass_base.cuh"
+#include "fused_distance_nn/fused_bitwise_hamming_nn.cuh"
 #include "fused_distance_nn/fused_cosine_nn.cuh"
 #include "fused_distance_nn/fused_l2_nn.cuh"
-#include "fused_distance_nn/fused_bitwise_hamming_nn.cuh"
 #include "fused_distance_nn/helper_structs.cuh"
 #include "fused_distance_nn/simt_kernel.cuh"
 #include "pairwise_distance_base.cuh"  // PairwiseDistances
@@ -97,7 +97,9 @@ void fusedDistanceNNImpl(OutT* min,
         assert(false && "BitwiseHamming distance is only supported for uint8_t data type");
       }
       break;
-    default: assert("only cosine/l2/bitwise hamming metric is supported with fusedDistanceNN\n"); break;
+    default:
+      assert("only cosine/l2/bitwise hamming metric is supported with fusedDistanceNN\n");
+      break;
   }
 }
 

@@ -22,14 +22,11 @@
 
 #include "../../core/nvtx.hpp"
 #include "../../distance/distance.cuh"
-#include "../../distance/detail/fused_distance_nn/helper_structs.cuh"
-#include "../../distance/detail/pairwise_distance_base.cuh"
 
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
-#include <raft/core/kvp.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
@@ -46,7 +43,6 @@
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/device_atomics.cuh>
 #include <raft/util/integer_utils.hpp>
-#include <raft/util/cuda_dev_essentials.cuh>
 
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/device_scalar.hpp>
@@ -226,39 +222,35 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
  * @brief Predict labels for the dataset; uint8_t only (specialization for BitwiseHamming).
  */
 template <typename IdxT, typename LabelT>
-inline void predict_bitwise_hamming(
-  const raft::resources& handle,
-  const cuvs::cluster::kmeans::balanced_params& params,
-  const uint8_t* centers,
-  IdxT n_clusters,
-  IdxT dim,
-  const uint8_t* dataset,
-  const uint8_t* dataset_norm,
-  IdxT n_rows,
-  LabelT* labels,
-  rmm::device_async_resource_ref mr)
+inline void predict_bitwise_hamming(const raft::resources& handle,
+                                    const cuvs::cluster::kmeans::balanced_params& params,
+                                    const uint8_t* centers,
+                                    IdxT n_clusters,
+                                    IdxT dim,
+                                    const uint8_t* dataset,
+                                    const uint8_t* dataset_norm,
+                                    IdxT n_rows,
+                                    LabelT* labels,
+                                    rmm::device_async_resource_ref mr)
 {
   RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::BitwiseHamming,
                "uint8_t data only supports BitwiseHamming distance");
-  
+
   auto stream = raft::resource::get_cuda_stream(handle);
-  
+
   auto workspace = raft::make_device_mdarray<char, IdxT>(
     handle, mr, raft::make_extents<IdxT>((sizeof(int)) * n_rows));
-  
+
   auto minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, float>, IdxT>(
     handle, mr, raft::make_extents<IdxT>(n_rows));
-  
+
   raft::KeyValuePair<IdxT, float> initial_value(0, std::numeric_limits<float>::max());
   thrust::fill(raft::resource::get_thrust_policy(handle),
                minClusterAndDistance.data_handle(),
                minClusterAndDistance.data_handle() + n_rows,
                initial_value);
-  
-  cuvs::distance::fusedDistanceNN<uint8_t,
-                                  float,
-                                  IdxT,
-                                  raft::KeyValuePair<IdxT, float>>(
+
+  cuvs::distance::fusedDistanceNN<uint8_t, float, IdxT, raft::KeyValuePair<IdxT, float>>(
     minClusterAndDistance.data_handle(),
     dataset,
     centers,
@@ -274,8 +266,7 @@ inline void predict_bitwise_hamming(
     params.metric,
     0.0f,
     stream);
-  
-  // Copy keys to output  labels
+
   thrust::transform(raft::resource::get_thrust_policy(handle),
                     minClusterAndDistance.data_handle(),
                     minClusterAndDistance.data_handle() + n_rows,
@@ -283,19 +274,15 @@ inline void predict_bitwise_hamming(
                     raft::compose_op<raft::cast_op<LabelT>, raft::key_op>());
 }
 
-/**
- * @brief Convenience overload for predict_bitwise_hamming with matrix/vector views
- */
 template <typename IdxT, typename LabelT>
-inline void predict_bitwise_hamming(
-  const raft::resources& handle,
-  raft::device_matrix_view<const uint8_t, IdxT> dataset,
-  raft::device_matrix_view<const uint8_t, IdxT> centers,
-  raft::device_vector_view<LabelT, IdxT> labels)
+inline void predict_bitwise_hamming(const raft::resources& handle,
+                                    raft::device_matrix_view<const uint8_t, IdxT> dataset,
+                                    raft::device_matrix_view<const uint8_t, IdxT> centers,
+                                    raft::device_vector_view<LabelT, IdxT> labels)
 {
   cuvs::cluster::kmeans::balanced_params params;
   params.metric = cuvs::distance::DistanceType::BitwiseHamming;
-  
+
   predict_bitwise_hamming(handle,
                           params,
                           centers.data_handle(),
@@ -1252,6 +1239,6 @@ void build_hierarchical(const raft::resources& handle,
                      5,
                      MathT{0.2},
                      mapping_op,
-                                          device_memory);
-
+                     device_memory);
+}
 }  // namespace  cuvs::cluster::kmeans::detail

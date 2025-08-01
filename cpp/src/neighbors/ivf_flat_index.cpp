@@ -15,10 +15,10 @@
  */
 
 #include <cstdint>
-#include <type_traits>
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <raft/core/logger.hpp>
+#include <type_traits>
 
 namespace cuvs::neighbors::ivf_flat {
 
@@ -66,10 +66,10 @@ index<T, IdxT>::index(raft::resources const& res,
 {
   // Validate that BitwiseHamming distance is only used with uint8_t data type
   if (metric == cuvs::distance::DistanceType::BitwiseHamming && !std::is_same_v<T, uint8_t>) {
-    RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t data type, got %s", 
+    RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t data type, got %s",
               typeid(T).name());
   }
-  
+
   check_consistency();
   accum_sorted_sizes_(n_lists) = 0;
 }
