@@ -32,63 +32,48 @@ import java.nio.file.Path;
 public class CuVSResourcesImpl implements CuVSResources {
 
   private final Path tempDirectory;
-  private final Arena arena;
   private final long resourceHandle;
-  private boolean destroyed;
+  private final ScopedAccess access;
 
   /**
    * Constructor that allocates the resources needed for cuVS
    *
-   * @throws Throwable exception thrown when native function is invoked
    */
-  public CuVSResourcesImpl(Path tempDirectory) throws Throwable {
+  public CuVSResourcesImpl(Path tempDirectory) {
     this.tempDirectory = tempDirectory;
-    this.arena = Arena.ofShared();
     try (var localArena = Arena.ofConfined()) {
       var resourcesMemorySegment = localArena.allocate(cuvsResources_t);
       int returnValue = cuvsResourcesCreate(resourcesMemorySegment);
       checkCuVSError(returnValue, "cuvsResourcesCreate");
-      resourceHandle = resourcesMemorySegment.get(cuvsResources_t, 0);
+      this.resourceHandle = resourcesMemorySegment.get(cuvsResources_t, 0);
+      this.access =
+          new ScopedAccess() {
+            @Override
+            public long handle() {
+              return resourceHandle;
+            }
+
+            @Override
+            public void close() {}
+          };
     }
+  }
+
+  @Override
+  public ScopedAccess access() {
+    return this.access;
   }
 
   @Override
   public void close() {
     synchronized (this) {
-      checkNotDestroyed();
       int returnValue = cuvsResourcesDestroy(resourceHandle);
       checkCuVSError(returnValue, "cuvsResourcesDestroy");
-      destroyed = true;
-      arena.close();
     }
   }
 
   @Override
   public Path tempDirectory() {
     return tempDirectory;
-  }
-
-  private void checkNotDestroyed() {
-    if (destroyed) {
-      throw new IllegalStateException("destroyed");
-    }
-  }
-
-  /**
-   * Gets the opaque CuVSResources handle, to be used whenever we need to pass a cuvsResources_t parameter
-   *
-   * @return the CuVSResources handle
-   */
-  long getHandle() {
-    checkNotDestroyed();
-    return resourceHandle;
-  }
-
-  /**
-   * The allocation arena used by this resources.
-   */
-  protected Arena getArena() {
-    checkNotDestroyed();
-    return arena;
   }
 }

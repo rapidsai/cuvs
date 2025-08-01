@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -100,8 +100,9 @@ auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T,
  *   there are no dependencies between threads, hence no constraints on the block size.
  *
  * @tparam T      element type.
- * @tparam IdxT   type of the indices in the source source_vecs
+ * @tparam IdxT   type of the vector ids in the index (corresponds to second arg ofindex<T, IdxT>)
  * @tparam LabelT label type
+ * @tparam SourceIndexT input index type (usually same as IdxT)
  * @tparam gather_src if false, then we build the index from vectors source_vecs[i,:], otherwise
  *     we use source_vecs[source_ixs[i],:]. In both cases i=0..n_rows-1.
  *
@@ -118,10 +119,10 @@ auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T,
  * @param veclen size of vectorized loads/stores; must satisfy `dim % veclen == 0`.
  *
  */
-template <typename T, typename IdxT, typename LabelT, bool gather_src = false>
+template <typename T, typename IdxT, typename LabelT, typename SourceIdxT, bool gather_src = false>
 RAFT_KERNEL build_index_kernel(const LabelT* labels,
                                const T* source_vecs,
-                               const IdxT* source_ixs,
+                               const SourceIdxT* source_ixs,
                                T** list_data_ptrs,
                                IdxT** list_index_ptrs,
                                uint32_t* list_sizes_ptr,
@@ -135,7 +136,10 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
   auto source_ix = source_ixs == nullptr ? i + batch_offset : source_ixs[i];
   // In the context of refinement, some indices may be invalid (the generating NN algorithm does
   // not return enough valid items). Do not add the item to the index in this case.
-  if (source_ix == ivf::kInvalidRecord<IdxT> || source_ix == raft::upper_bound<IdxT>()) { return; }
+  if (source_ix == ivf::kInvalidRecord<SourceIdxT> ||
+      source_ix == raft::upper_bound<SourceIdxT>()) {
+    return;
+  }
 
   auto list_id     = labels[i];
   auto inlist_id   = atomicAdd(list_sizes_ptr + list_id, 1);
@@ -460,11 +464,11 @@ inline auto build(raft::resources const& handle,
  * @param[in] candidate_idx device pointer to neighbor candidates, size [n_queries, n_candidates]
  * @param[in] n_candidates  of neighbor_candidates
  */
-template <typename T, typename IdxT>
+template <typename T, typename IdxT, typename CandidateIdxT>
 inline void fill_refinement_index(raft::resources const& handle,
                                   index<T, IdxT>* refinement_index,
                                   const T* dataset,
-                                  const IdxT* candidate_idx,
+                                  const CandidateIdxT* candidate_idx,
                                   IdxT n_queries,
                                   uint32_t n_candidates)
 {
@@ -500,7 +504,7 @@ inline void fill_refinement_index(raft::resources const& handle,
 
   const dim3 block_dim(256);
   const dim3 grid_dim(raft::ceildiv<IdxT>(n_queries * n_candidates, block_dim.x));
-  build_index_kernel<T, IdxT, LabelT, true>
+  build_index_kernel<T, IdxT, LabelT, CandidateIdxT, true>
     <<<grid_dim, block_dim, 0, stream>>>(new_labels.data(),
                                          dataset,
                                          candidate_idx,
