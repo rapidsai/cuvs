@@ -325,7 +325,7 @@ void extend(raft::resources const& handle,
             handle,
             raft::make_const_mdspan(decoded_batch_view),
             batch_labels_view,
-            raft::make_const_mdspan(expanded_centers_view),
+            expanded_centers_view,
             list_sizes_view,
             false,
             raft::identity_op{});

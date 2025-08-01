@@ -54,12 +54,12 @@ void fusedBitwiseHammingNN(OutT* min,
   typedef Policy P;
 
   dim3 blk(P::Nthreads);
-  // Use float for accumulator type regardless of DataT
-  constexpr auto maxVal = std::numeric_limits<float>::max();
+  constexpr auto maxVal = std::numeric_limits<DataT>::max();
   typedef ::raft::KeyValuePair<IdxT, OutT> KVPair;
 
   // Create the distance operation
-  ops::bitwise_hamming_distance_op<DataT, float, IdxT> distance_op{k};
+  using AccT = DataT;
+  ops::bitwise_hamming_distance_op<DataT, AccT, IdxT> distance_op{k};
 
   // No special finalization operation needed
   ::raft::identity_op fin_op{};
@@ -73,11 +73,8 @@ void fusedBitwiseHammingNN(OutT* min,
                                       decltype(distance_op),
                                       decltype(fin_op)>;
 
-  // Since BitwiseHamming distance doesn't have a CUTLASS-accelerated version,
-  // we only use the SIMT kernel
   constexpr size_t shmemSize = P::SmemSize;
 
-  // Launch kernel
   dim3 grid = launchConfigGenerator<P>(m, n, shmemSize, kernel);
   kernel<<<grid, blk, shmemSize, stream>>>(
     min, x, y, xn, yn, m, n, k, maxVal, workspace, redOp, pairRedOp, distance_op, fin_op);
