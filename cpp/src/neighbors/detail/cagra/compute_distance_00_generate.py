@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@ import os
 import glob
 
 template = """/*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,7 +54,7 @@ mxdim_team = [(128, 8), (256, 16), (512, 32)]
 #mxdim_team = [(32, 8), (64, 16), (128, 32)]
 
 pq_bits = [8]
-pq_lens = [2, 4]
+pq_lens = [2, 4, 8]
 
 # rblock = [(256, 4), (512, 2), (1024, 1)]
 # rcandidates = [32]
