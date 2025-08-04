@@ -96,11 +96,11 @@ public class QuantizationIT extends CuVSTestCase {
       log.info("Built index with quantized dataset");
 
       // Create search parameters
-      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+      CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
 
       // Create quantized query
       CagraQuery query =
-          CagraQuery.newBuilder()
+          CagraQuery.newBuilder(resources)
               .withQueryVectors(queries)
               .withQuantizer(quantizer)
               .withSearchParams(searchParams)
@@ -175,11 +175,11 @@ public class QuantizationIT extends CuVSTestCase {
       log.info("Built index with binary quantized dataset");
 
       // Create search parameters
-      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+      CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
 
       // Create quantized query
       CagraQuery query =
-          CagraQuery.newBuilder()
+          CagraQuery.newBuilder(resources)
               .withQueryVectors(queries)
               .withQuantizer(quantizer)
               .withSearchParams(searchParams)
@@ -335,9 +335,9 @@ public class QuantizationIT extends CuVSTestCase {
                 .withIndexParams(indexParams)
                 .build();
 
-        CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+        CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
         CagraQuery query =
-            CagraQuery.newBuilder()
+            CagraQuery.newBuilder(resources)
                 .withQueryVectors(queries)
                 .withQuantizer(quantizer)
                 .withSearchParams(searchParams)
@@ -409,9 +409,9 @@ public class QuantizationIT extends CuVSTestCase {
       log.info("Built index with ZERO threshold binary quantization");
 
       // Create quantized query
-      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+      CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
       CagraQuery query =
-          CagraQuery.newBuilder()
+          CagraQuery.newBuilder(resources)
               .withQueryVectors(queries)
               .withQuantizer(quantizer)
               .withSearchParams(searchParams)
@@ -496,9 +496,9 @@ public class QuantizationIT extends CuVSTestCase {
       log.info("Built index with MEAN threshold binary quantization");
 
       // Perform search
-      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+      CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
       CagraQuery query =
-          CagraQuery.newBuilder()
+          CagraQuery.newBuilder(resources)
               .withQueryVectors(queries)
               .withQuantizer(quantizer)
               .withSearchParams(searchParams)
@@ -581,10 +581,10 @@ public class QuantizationIT extends CuVSTestCase {
 
       log.info("Built index with binary quantized dataset");
 
-      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+      CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
 
       CagraQuery query =
-          CagraQuery.newBuilder()
+          CagraQuery.newBuilder(resources)
               .withQueryVectors(queries)
               .withQuantizer(quantizer)
               .withSearchParams(searchParams)
