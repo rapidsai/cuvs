@@ -1684,28 +1684,47 @@ auto build(raft::resources const& handle,
            const cuvs::neighbors::ivf_pq::index_params& index_params,
            const uint32_t dim,
            raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
-           raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix,
            raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
-           raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot)
-  -> cuvs::neighbors::ivf_pq::index<IdxT>
+           std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>>
+             rotation_matrix_opt) -> cuvs::neighbors::ivf_pq::index<IdxT>
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("ivf_pq::build(%u)", dim);
+  auto stream = raft::resource::get_cuda_stream(handle);
   index<IdxT> index(handle, index_params, dim);
 
-  ASSERT(index.rotation_matrix().size() == rotation_matrix.size(), "rotation_matrix size mismatch");
+  utils::memzero(
+    index.accum_sorted_sizes().data_handle(), index.accum_sorted_sizes().size(), stream);
+  utils::memzero(index.list_sizes().data_handle(), index.list_sizes().size(), stream);
+  utils::memzero(index.data_ptrs().data_handle(), index.data_ptrs().size(), stream);
+  utils::memzero(index.inds_ptrs().data_handle(), index.inds_ptrs().size(), stream);
+
   ASSERT(index.pq_centers().size() == pq_centers.size(), "pq_centers size mismatch");
-  ASSERT(index.centers().size() == centers.size(), "centers size mismatch");
-  ASSERT(index.centers_rot().size() == centers_rot.size(), "centers_rot size mismatch");
-  auto stream = raft::resource::get_cuda_stream(handle);
-  raft::copy(index.rotation_matrix().data_handle(),
-             rotation_matrix.data_handle(),
-             rotation_matrix.size(),
-             stream);
+
+  auto inplace = index.dim() == index.rot_dim();
+
+  if (rotation_matrix_opt) {
+    ASSERT(index.rotation_matrix().size() == rotation_matrix_opt.value().size(),
+           "rotation_matrix size mismatch");
+  } else {
+    ASSERT(!(index_params.force_random_rotation || !inplace),
+           "rotation_matrix is required if (force_random_rotation or !inplace) is false");
+  }
+
   raft::copy(
     index.pq_centers().data_handle(), pq_centers.data_handle(), index.pq_centers().size(), stream);
-  raft::copy(index.centers().data_handle(), centers.data_handle(), centers.size(), stream);
-  raft::copy(
-    index.centers_rot().data_handle(), centers_rot.data_handle(), centers_rot.size(), stream);
+
+  if (rotation_matrix_opt) {
+    auto rotation_matrix = rotation_matrix_opt.value();
+    raft::copy(index.rotation_matrix().data_handle(),
+               rotation_matrix.data_handle(),
+               rotation_matrix.size(),
+               stream);
+  } else {
+    helpers::make_rotation_matrix(handle, &index, index_params.force_random_rotation);
+  }
+
+  helpers::set_centers(handle, &index, centers);
+
   return index;
 }
 

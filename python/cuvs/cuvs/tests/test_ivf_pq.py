@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 
+import cupy as cp
 import numpy as np
 import pytest
 from pylibraft.common import device_ndarray
@@ -217,3 +218,83 @@ def test_ivf_pq_dtype(inplace, dtype, array_type):
         inplace=inplace,
         array_type=array_type,
     )
+
+
+@pytest.mark.parametrize("force_random_rotation", [True, False])
+@pytest.mark.parametrize("codebook_kind", ["subspace", "cluster"])
+@pytest.mark.parametrize("n_cols", [10, 32, 63, 200])
+@pytest.mark.parametrize("pq_bits", [4, 8])
+@pytest.mark.parametrize("n_lists", [10, 30, 100])
+def test_build_from_args(
+    force_random_rotation, codebook_kind, n_cols, pq_bits, n_lists
+):
+    dtype = np.float32
+    metric = "sqeuclidean"
+    n_rows = 10000
+    n_queries = 100
+    k = 10
+    build_params = ivf_pq.IndexParams(
+        n_lists=n_lists,
+        metric=metric,
+        force_random_rotation=force_random_rotation,
+        codebook_kind=codebook_kind,
+        pq_bits=pq_bits,
+    )
+    dataset = generate_data((n_rows, n_cols), dtype)
+    queries = generate_data((n_queries, n_cols), dtype)
+    if metric == "inner_product":
+        dataset = normalize(dataset, norm="l2", axis=1)
+    index = ivf_pq.build(build_params, dataset)
+    rotation_matrix = index.rotation_matrix
+    codebook = index.codebook
+    centers = cp.array(
+        index.centers.copy_to_host()
+    )  # TODO: Investigate stride issue for centers
+    if codebook_kind == "subspace":
+        assert codebook.shape[0] == index.pq_dim
+    else:
+        assert codebook.shape[0] == index.n_lists
+    assert index.pq_len == codebook.shape[1]
+    inplace = (index.pq_dim * index.pq_len) == n_cols
+    if force_random_rotation or (not inplace):
+        index2 = ivf_pq.build_from_args(
+            build_params, n_cols, codebook, centers, rotation_matrix
+        )
+    else:
+        index2 = ivf_pq.build_from_args(
+            build_params, n_cols, codebook, centers
+        )
+    assert index2.codebook.shape == codebook.shape
+    assert index2.centers.shape == centers.shape
+    assert index2.pq_dim == index.pq_dim
+    assert index2.pq_len == index.pq_len
+    assert index2.pq_book_size == index.pq_book_size
+    assert np.allclose(
+        index2.rotation_matrix.copy_to_host(), rotation_matrix.copy_to_host()
+    )
+    assert np.allclose(
+        cp.array(index2.codebook).get(), cp.array(codebook).get()
+    )
+    assert np.allclose(index2.centers.copy_to_host(), centers.get())
+
+    indices = np.arange(n_rows, dtype=np.int64)
+    index2 = ivf_pq.extend(index2, dataset, indices)
+
+    search_params = ivf_pq.SearchParams(
+        n_probes=10,
+    )
+    ret_output = ivf_pq.search(
+        search_params, index, device_ndarray(queries), k
+    )
+    res_output2 = ivf_pq.search(
+        search_params, index2, device_ndarray(queries), k
+    )
+    out_dist_device, out_idx_device = ret_output
+    out_dist_device2, out_idx_device2 = res_output2
+    out_dist = out_dist_device.copy_to_host()
+    out_idx = out_idx_device.copy_to_host()
+    out_dist2 = out_dist_device2.copy_to_host()
+    out_idx2 = out_idx_device2.copy_to_host()
+    tol = 1e-5
+    assert np.allclose(out_dist, out_dist2, rtol=tol)
+    assert (1 - np.isclose(out_idx, out_idx2).sum()) / out_idx.size < tol

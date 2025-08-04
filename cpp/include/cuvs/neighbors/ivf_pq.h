@@ -267,18 +267,45 @@ uint32_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index);
 /** Get the dimensionality */
 uint32_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index);
 
+/** Get the pq_dim */
+uint32_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index);
+
+/** Get the pq_len */
+uint32_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index);
+
+/** Get the pq_book_size */
+uint32_t cuvsIvfPqIndexGetPqBookSize(cuvsIvfPqIndex_t index);
+
 /**
  * @brief Get the cluster centers corresponding to the lists in the original space
  *
- * @param[in] res cuvsResources_t opaque C handle
  * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
  * @param[out] centers Preallocated array on host or device memory to store output,
  * dimensions [n_lists, dim]
  * @return cuvsError_t
  */
-cuvsError_t cuvsIvfPqIndexGetCenters(cuvsResources_t res,
-                                     cuvsIvfPqIndex_t index,
-                                     DLManagedTensor* centers);
+cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* centers);
+
+/**
+ * @brief Get the codebook corresponding to the lists in the original space
+ *
+ * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
+ * @param[out] codebook Preallocated array on host or device memory to store output,
+ * dimensions [n_lists or pq_dim, pq_len, pq_book_size]
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqIndexGetCodebook(cuvsIvfPqIndex_t index, DLManagedTensor* codebook);
+
+/**
+ * @brief Get the codebook corresponding to the lists in the original space
+ *
+ * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
+ * @param[out] rotation_matrix Preallocated array on host or device memory to store output,
+ * dimensions [dim, rot_dim]
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqIndexGetRotationMatrix(cuvsIvfPqIndex_t index,
+                                            DLManagedTensor* rotation_matrix);
 /**
  * @}
  */
@@ -349,9 +376,8 @@ cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
  *
  * // Assume populated `DLManagedTensor` types here
  * DLManagedTensor pq_centers;
- * DLManagedTensor rotation_matrix;
  * DLManagedTensor centers;
- * DLManagedTensor centers_rot;
+ * DLManagedTensor rotation_matrix;
  *
  * // Create default index params
  * cuvsIvfPqIndexParams_t index_params;
@@ -363,7 +389,7 @@ cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
  *
  * // Build the IVF-PQ Index
  * cuvsError_t build_status = cuvsIvfPqBuildFromCentroids(res, index_params, dim, &pq_centers,
- *   &rotation_matrix, &centers, &centers_rot, index);
+ *   &centers, &rotation_matrix, index);
  *
  * // de-allocate `index_params`, `index` and `res`
  * cuvsError_t params_destroy_status = cuvsIvfPqIndexParamsDestroy(index_params);
@@ -374,21 +400,19 @@ cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
  * @param[in] res cuvsResources_t opaque C handle
  * @param[in] params cuvsIvfPqIndexParams_t used to build IVF-PQ index
  * @param[in] dim dimensionality of the input data
- * @param[in] pq_centers DLManagedTensor* PQ cluster centers
- * @param[in] rotation_matrix DLManagedTensor* rotation matrix
+ * @param[in] pq_centers DLManagedTensor* PQ codebook
  * @param[in] centers DLManagedTensor* cluster centers
- * @param[in] centers_rot DLManagedTensor* cluster centers in rotated space
+ * @param[in] rotation_matrix DLManagedTensor* rotation matrix (optional)
  * @param[out] index cuvsIvfPqIndex_t Newly built IVF-PQ index
  * @return cuvsError_t
  */
-cuvsError_t cuvsIvfPqBuildFromCentroids(cuvsResources_t res,
-                                        cuvsIvfPqIndexParams_t params,
-                                        uint32_t dim,
-                                        DLManagedTensor* pq_centers,
-                                        DLManagedTensor* rotation_matrix,
-                                        DLManagedTensor* centers,
-                                        DLManagedTensor* centers_rot,
-                                        cuvsIvfPqIndex_t index);
+cuvsError_t cuvsIvfPqBuildFromArgs(cuvsResources_t res,
+                                   cuvsIvfPqIndexParams_t params,
+                                   uint32_t dim,
+                                   DLManagedTensor* pq_centers,
+                                   DLManagedTensor* centers,
+                                   DLManagedTensor* rotation_matrix,
+                                   cuvsIvfPqIndex_t index);
 /**
  * @}
  */

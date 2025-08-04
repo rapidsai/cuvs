@@ -87,41 +87,36 @@ void* _build(cuvsResources_t res, cuvsIvfPqIndexParams params, DLManagedTensor* 
 }
 
 template <typename IdxT>
-void* _build_from_centroids(cuvsResources_t res,
-                            cuvsIvfPqIndexParams params,
-                            uint32_t dim,
-                            DLManagedTensor* pq_centers,
-                            DLManagedTensor* rotation_matrix,
-                            DLManagedTensor* centers,
-                            DLManagedTensor* centers_rot)
+void* _build_from_args(cuvsResources_t res,
+                       cuvsIvfPqIndexParams params,
+                       uint32_t dim,
+                       DLManagedTensor* pq_centers,
+                       DLManagedTensor* centers,
+                       DLManagedTensor* rotation_matrix)
 {
-  auto res_ptr = reinterpret_cast<raft::resources*>(res);
+  using mdspan_type_3d =
+    raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major>;
+  using mdspan_type_2d = raft::device_matrix_view<const float, IdxT, raft::row_major>;
+  auto res_ptr         = reinterpret_cast<raft::resources*>(res);
 
   auto build_params = cuvs::neighbors::ivf_pq::index_params();
   convert_c_index_params(params, &build_params);
 
   auto index = new cuvs::neighbors::ivf_pq::index<IdxT>(*res_ptr, build_params, dim);
+  std::optional<mdspan_type_2d> rotation_matrix_opt;
+  if (rotation_matrix != nullptr &&
+      cuvs::core::is_dlpack_device_compatible(rotation_matrix->dl_tensor)) {
+    rotation_matrix_opt =
+      std::make_optional(cuvs::core::from_dlpack<mdspan_type_2d>(rotation_matrix));
+  }
 
   if (cuvs::core::is_dlpack_device_compatible(pq_centers->dl_tensor) &&
-      cuvs::core::is_dlpack_device_compatible(rotation_matrix->dl_tensor) &&
-      cuvs::core::is_dlpack_device_compatible(centers->dl_tensor) &&
-      cuvs::core::is_dlpack_device_compatible(centers_rot->dl_tensor)) {
-    using mdspan_type_3d =
-      raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major>;
-    using mdspan_type_2d     = raft::device_matrix_view<const float, IdxT, raft::row_major>;
-    auto pq_centers_mds      = cuvs::core::from_dlpack<mdspan_type_3d>(pq_centers);
-    auto rotation_matrix_mds = cuvs::core::from_dlpack<mdspan_type_2d>(rotation_matrix);
-    auto centers_mds         = cuvs::core::from_dlpack<mdspan_type_2d>(centers);
-    auto centers_rot_mds     = cuvs::core::from_dlpack<mdspan_type_2d>(centers_rot);
+      cuvs::core::is_dlpack_device_compatible(centers->dl_tensor)) {
+    auto pq_centers_mds = cuvs::core::from_dlpack<mdspan_type_3d>(pq_centers);
+    auto centers_mds    = cuvs::core::from_dlpack<mdspan_type_2d>(centers);
 
-    cuvs::neighbors::ivf_pq::build(*res_ptr,
-                                   build_params,
-                                   dim,
-                                   pq_centers_mds,
-                                   rotation_matrix_mds,
-                                   centers_mds,
-                                   centers_rot_mds,
-                                   index);
+    cuvs::neighbors::ivf_pq::build(
+      *res_ptr, build_params, dim, pq_centers_mds, centers_mds, rotation_matrix_opt, index);
   } else {
     RAFT_FAIL("build inputs must be on device memory");
   }
@@ -200,6 +195,7 @@ void _extend(cuvsResources_t res,
   }
 }
 
+/*
 template <typename output_mdspan_type, typename IdxT>
 void _get_centers(cuvsResources_t res, cuvsIvfPqIndex index, DLManagedTensor* centers)
 {
@@ -208,6 +204,22 @@ void _get_centers(cuvsResources_t res, cuvsIvfPqIndex index, DLManagedTensor* ce
   auto dst       = cuvs::core::from_dlpack<output_mdspan_type>(centers);
 
   cuvs::neighbors::ivf_pq::helpers::extract_centers(*res_ptr, *index_ptr, dst);
+}*/
+
+template <typename output_mdspan_type, typename IdxT>
+void _get_codebook(cuvsResources_t res, cuvsIvfPqIndex index, DLManagedTensor* codebook)
+{
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  cuvs::core::to_dlpack(index_ptr->pq_centers(), codebook);
+}
+
+template <typename output_mdspan_type, typename IdxT>
+void _get_rotation_matrix(cuvsResources_t res,
+                          cuvsIvfPqIndex index,
+                          DLManagedTensor* rotation_matrix)
+{
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  cuvs::core::to_dlpack(index_ptr->rotation_matrix(), rotation_matrix);
 }
 }  // namespace
 
@@ -257,21 +269,20 @@ extern "C" cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqBuildFromCentroids(cuvsResources_t res,
-                                                   cuvsIvfPqIndexParams_t params,
-                                                   uint32_t dim,
-                                                   DLManagedTensor* pq_centers,
-                                                   DLManagedTensor* rotation_matrix,
-                                                   DLManagedTensor* centers,
-                                                   DLManagedTensor* centers_rot,
-                                                   cuvsIvfPqIndex_t index)
+extern "C" cuvsError_t cuvsIvfPqBuildFromArgs(cuvsResources_t res,
+                                              cuvsIvfPqIndexParams_t params,
+                                              uint32_t dim,
+                                              DLManagedTensor* pq_centers,
+                                              DLManagedTensor* centers,
+                                              DLManagedTensor* rotation_matrix,
+                                              cuvsIvfPqIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] {
     // Use default dtype for the index
     index->dtype.code = kDLFloat;
     index->dtype.bits = 32;
-    index->addr       = reinterpret_cast<uintptr_t>(_build_from_centroids<int64_t>(
-      res, *params, dim, pq_centers, rotation_matrix, centers, centers_rot));
+    index->addr       = reinterpret_cast<uintptr_t>(
+      _build_from_args<int64_t>(res, *params, dim, pq_centers, centers, rotation_matrix));
   });
 }
 
@@ -409,11 +420,10 @@ extern "C" uint32_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index)
   return index_ptr->dim();
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetCenters(cuvsResources_t res,
-                                                cuvsIvfPqIndex_t index,
-                                                DLManagedTensor* centers)
+extern "C" cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* centers)
 {
   return cuvs::core::translate_exceptions([=] {
+    /*
     if (cuvs::core::is_dlpack_device_compatible(centers->dl_tensor)) {
       using output_mdspan_type = raft::device_matrix_view<float, int64_t, raft::row_major>;
       _get_centers<output_mdspan_type, int64_t>(res, *index, centers);
@@ -421,5 +431,77 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetCenters(cuvsResources_t res,
       using output_mdspan_type = raft::host_matrix_view<float, int64_t, raft::row_major>;
       _get_centers<output_mdspan_type, int64_t>(res, *index, centers);
     }
+    */
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+    // auto centers_mdspan = raft::make_mdspan<float, uint32_t, raft::strided_layout_right>(
+    //   index_ptr->centers().data_handle(), index_ptr->n_lists(), index_ptr->dim());
+    // auto centers_view = raft::make_device_strided_matrix_view<const float, int64_t>(
+    //   index_ptr->centers().data_handle(), index_ptr->centers().extent(0), index_ptr->dim(),
+    //   stride);
+
+    auto stride = index_ptr->dim_ext();
+    raft::matrix_extent<int64_t> extents{index_ptr->centers().extent(0), index_ptr->dim()};
+    auto layout = raft::make_strided_layout(extents, std::array<int64_t, 2>{stride, 1});
+
+    raft::device_matrix_view<float, int64_t, raft::layout_stride> centers_view{
+      index_ptr->centers().data_handle(), layout};
+
+    std::cout << "centers_view.strides = " << centers_view.stride(0) << ", "
+              << centers_view.stride(1) << std::endl;
+    cuvs::core::to_dlpack(centers_view, centers);
+    std::cout << "centers->dl_tensor.strides = " << centers->dl_tensor.strides[0] << ", "
+              << centers->dl_tensor.strides[1] << std::endl;
   });
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexGetCodebook(cuvsIvfPqIndex_t index, DLManagedTensor* codebook)
+{
+  return cuvs::core::translate_exceptions([=] {
+    /*if (cuvs::core::is_dlpack_device_compatible(codebook->dl_tensor)) {
+      using output_mdspan_type = raft::device_mdspan<float, raft::extent_3d<uint32_t>,
+    raft::row_major>; //raft::device_matrix_view<float, int64_t, raft::row_major>;
+      _get_codebook<output_mdspan_type, int64_t>(res, *index, codebook);
+    } else {
+      using output_mdspan_type = raft::host_mdspan<float, raft::extent_3d<uint32_t>,
+    raft::row_major>; //raft::host_matrix_view<float, int64_t, raft::row_major>;
+      _get_codebook<output_mdspan_type, int64_t>(res, *index, codebook);
+    }*/
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+    cuvs::core::to_dlpack(index_ptr->pq_centers(), codebook);
+  });
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexGetRotationMatrix(cuvsIvfPqIndex_t index,
+                                                       DLManagedTensor* rotation_matrix)
+{
+  return cuvs::core::translate_exceptions([=] {
+    /*if (cuvs::core::is_dlpack_device_compatible(rotation_matrix->dl_tensor)) {
+      using output_mdspan_type = raft::device_matrix_view<float, uint32_t, raft::row_major>;
+      _get_rotation_matrix<output_mdspan_type, int64_t>(res, *index, rotation_matrix);
+    } else {
+      using output_mdspan_type = raft::host_matrix_view<float, uint32_t, raft::row_major>;
+      _get_rotation_matrix<output_mdspan_type, int64_t>(res, *index, rotation_matrix);
+    }*/
+
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+    cuvs::core::to_dlpack(index_ptr->rotation_matrix(), rotation_matrix);
+  });
+}
+
+extern "C" uint32_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index)
+{
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+  return index_ptr->pq_dim();
+}
+
+extern "C" uint32_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index)
+{
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+  return index_ptr->pq_len();
+}
+
+extern "C" uint32_t cuvsIvfPqIndexGetPqBookSize(cuvsIvfPqIndex_t index)
+{
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+  return index_ptr->pq_book_size();
 }
