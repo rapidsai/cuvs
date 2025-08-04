@@ -20,6 +20,8 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 
 import com.nvidia.cuvs.CuVSHostMatrix;
+import com.nvidia.cuvs.CuVSMatrix.DataType;
+import com.nvidia.cuvs.CuVSMatrix.MemoryKind;
 import com.nvidia.cuvs.RowView;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;

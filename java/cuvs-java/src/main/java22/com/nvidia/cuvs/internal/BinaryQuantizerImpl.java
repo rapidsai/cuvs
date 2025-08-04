@@ -80,9 +80,9 @@ public class BinaryQuantizerImpl {
 
   public static CuVSMatrix transform(
       CuVSResources cuvsResources, CuVSMatrix dataset, int thresholdType) throws Throwable {
-    if (dataset.precision() != 32) {
+    if (dataset.dataType() != DataType.FLOAT) {
       throw new IllegalArgumentException(
-          "BinaryQuantizer requires 32-bit float input, got " + dataset.precision() + "-bit");
+          "BinaryQuantizer requires FLOAT input, got " + dataset.dataType());
     }
 
     try (var localArena = Arena.ofConfined();
@@ -94,6 +94,10 @@ public class BinaryQuantizerImpl {
       MemorySegment datasetMemSegment = ((CuVSMatrixBaseImpl) dataset).memorySegment();
       long cuvsResourcesPtr = resourcesAccessor.handle();
 
+      // TODO: Currently all datasets are HOST memory kind, preventing testing of GPU quantization
+      // flow.
+      // Future improvement: Support GPU-native dataset creation in Java API to enable direct GPU
+      // quantization testing.
       if (dataset.memoryKind() == MemoryKind.HOST) {
         return performTransformHost(
             cuvsResourcesPtr, localArena, rows, cols, datasetMemSegment, thresholdType);
@@ -108,9 +112,9 @@ public class BinaryQuantizerImpl {
                 INFER_DIRECTION,
                 thresholdType);
 
-        if (result.precision() != 8) {
+        if (result.dataType() != DataType.BYTE) {
           throw new IllegalStateException(
-              "Expected 8-bit output from binary quantization, got " + result.precision() + "-bit");
+              "Expected BYTE output from binary quantization, got " + result.dataType());
         }
         return result;
       }

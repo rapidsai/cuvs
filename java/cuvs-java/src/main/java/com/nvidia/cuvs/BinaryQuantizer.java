@@ -15,13 +15,14 @@
  */
 package com.nvidia.cuvs;
 
+import com.nvidia.cuvs.CuVSMatrix.DataType;
 import com.nvidia.cuvs.spi.CuVSProvider;
 
 /**
- * Binary quantizer implementation that transforms 32-bit float datasets into 1-bit binary datasets.
+ * Binary quantizer implementation that transforms 32-bit float datasets into 8-bit packed binary datasets.
  *
- * <p>Binary quantization reduces each float32 value to a single bit, providing maximum compression
- * but with significant precision loss. This quantizer does not require training and does not
+ * <p>Binary quantization reduces each float32 value to a single bit, which are then packed into 8-bit
+ * unsigned integers for efficient storage. This quantizer does not require training and does not
  * support inverse transformation.
  *
  * @since 25.08
@@ -31,9 +32,9 @@ public class BinaryQuantizer implements CuVSQuantizer {
   private final ThresholdType thresholdType;
 
   /**
-   * The bit precision used by this quantizer (8-bit for packed binary data).
+   * The data type used by this quantizer (BYTE for packed binary data).
    */
-  private final int precision = 8;
+  private final DataType outputDataType = DataType.BYTE;
 
   /**
    * Creates a new binary quantizer with the specified resources.
@@ -78,13 +79,13 @@ public class BinaryQuantizer implements CuVSQuantizer {
   }
 
   /**
-   * Returns the bit precision of quantized data produced by this quantizer.
+   * Returns the data type of quantized data produced by this quantizer.
    *
-   * @return The bit precision (8 for this scalar quantizer)
+   * @return The DataType (BYTE for this binary quantizer)
    */
   @Override
-  public int precision() {
-    return precision;
+  public DataType outputDataType() {
+    return outputDataType;
   }
 
   /**
@@ -96,19 +97,19 @@ public class BinaryQuantizer implements CuVSQuantizer {
 
   @Override
   public CuVSMatrix transform(CuVSMatrix input) throws Throwable {
-    // Validate input precision
-    if (input.precision() != 32) {
+    // Validate input data type
+    if (input.dataType() != DataType.FLOAT) {
       throw new IllegalArgumentException(
-          "BinaryQuantizer requires 32-bit float input, got " + input.precision() + "-bit");
+          "BinaryQuantizer requires FLOAT input, got " + input.dataType());
     }
 
     CuVSMatrix result =
         CuVSProvider.provider().transformBinary(resources, input, thresholdType.getValue());
 
-    // Validate output precision
-    if (result.precision() != 8) {
+    // Validate output data type
+    if (result.dataType() != DataType.BYTE) {
       throw new IllegalStateException(
-          "Expected 8-bit output from binary quantization, got " + result.precision() + "-bit");
+          "Expected BYTE output from binary quantization, got " + result.dataType());
     }
 
     return result;

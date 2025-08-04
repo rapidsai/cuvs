@@ -21,6 +21,7 @@ import static org.junit.Assert.*;
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
+import com.nvidia.cuvs.CuVSMatrix.DataType;
 import java.lang.invoke.MethodHandles;
 import java.util.Map;
 import org.junit.Before;
@@ -66,14 +67,14 @@ public class QuantizationIT extends CuVSTestCase {
     try (CuVSResources resources = CheckedCuVSResources.create()) {
       // Create float32 dataset
       CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
-      assertEquals(32, trainingDataset.precision());
+      assertEquals(DataType.FLOAT, trainingDataset.dataType());
       assertEquals(dataset.length, trainingDataset.size());
       assertEquals(dataset[0].length, trainingDataset.columns());
 
       // Create scalar quantizer
       Scalar8BitQuantizer quantizer = new Scalar8BitQuantizer(resources, trainingDataset);
-      assertEquals(8, quantizer.precision());
-      log.info("Created scalar quantizer with 8-bit precision");
+      assertEquals(DataType.BYTE, quantizer.outputDataType());
+      log.info("Created scalar quantizer with BYTE data type");
 
       // Build index with quantized dataset
       CagraIndexParams indexParams =
@@ -107,7 +108,7 @@ public class QuantizationIT extends CuVSTestCase {
               .build();
 
       assertTrue("Query should have quantized vectors", query.hasQuantizedQueries());
-      assertEquals(8, query.getQueryPrecision());
+      assertEquals(DataType.BYTE, query.getQueryDataType());
       log.info("Created quantized query");
 
       // Perform search
@@ -147,11 +148,11 @@ public class QuantizationIT extends CuVSTestCase {
     try (CuVSResources resources = CheckedCuVSResources.create()) {
       // Create float32 dataset
       CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
-      assertEquals(32, trainingDataset.precision());
+      assertEquals(DataType.FLOAT, trainingDataset.dataType());
 
       // Create binary quantizer
       BinaryQuantizer quantizer = new BinaryQuantizer(resources);
-      assertEquals(8, quantizer.precision());
+      assertEquals(DataType.BYTE, quantizer.outputDataType());
       log.info("Created binary quantizer");
 
       // Build index with quantized dataset
@@ -186,7 +187,7 @@ public class QuantizationIT extends CuVSTestCase {
               .build();
 
       assertTrue("Query should have quantized vectors", query.hasQuantizedQueries());
-      assertEquals(8, query.getQueryPrecision());
+      assertEquals(DataType.BYTE, query.getQueryDataType());
 
       // Perform search
       SearchResults results = index.search(query);
@@ -238,14 +239,18 @@ public class QuantizationIT extends CuVSTestCase {
 
       // Transform and inverse transform
       CuVSMatrix quantized = quantizer.transform(trainingDataset);
-      assertEquals(8, quantized.precision());
+      assertEquals(DataType.BYTE, quantized.dataType());
 
       CuVSMatrix recovered = quantizer.inverseTransform(quantized);
-      assertEquals(32, recovered.precision());
+      assertEquals(DataType.FLOAT, recovered.dataType());
       assertEquals(trainingDataset.size(), recovered.size());
       assertEquals(trainingDataset.columns(), recovered.columns());
 
       log.info("Inverse transform completed successfully");
+
+      // Verify quantization worked
+      assertEquals(DataType.BYTE, quantized.dataType());
+      assertEquals(DataType.FLOAT, recovered.dataType());
 
       // Cleanup
       quantizer.close();
@@ -267,7 +272,7 @@ public class QuantizationIT extends CuVSTestCase {
 
       // Test binary quantization
       CuVSMatrix quantized = quantizer.transform(inputDataset);
-      assertEquals(8, quantized.precision()); // Binary packed into bytes
+      assertEquals(DataType.BYTE, quantized.dataType()); // Binary packed into bytes
       assertEquals(CuVSMatrix.MemoryKind.HOST, quantized.memoryKind());
 
       // Test that inverse transform throws
@@ -381,7 +386,7 @@ public class QuantizationIT extends CuVSTestCase {
       // Test ZERO threshold (0)
       BinaryQuantizer quantizer =
           new BinaryQuantizer(resources, BinaryQuantizer.ThresholdType.ZERO);
-      assertEquals(8, quantizer.precision());
+      assertEquals(DataType.BYTE, quantizer.outputDataType());
       assertEquals(BinaryQuantizer.ThresholdType.ZERO, quantizer.getThresholdType());
 
       // Build index with binary quantized dataset
@@ -414,7 +419,7 @@ public class QuantizationIT extends CuVSTestCase {
               .build();
 
       assertTrue("Query should have quantized vectors", query.hasQuantizedQueries());
-      assertEquals(8, query.getQueryPrecision());
+      assertEquals(DataType.BYTE, query.getQueryDataType());
 
       // Perform search
       SearchResults results = index.search(query);
@@ -551,11 +556,11 @@ public class QuantizationIT extends CuVSTestCase {
 
     try (CuVSResources resources = CheckedCuVSResources.create()) {
       CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
-      assertEquals(32, trainingDataset.precision());
+      assertEquals(DataType.FLOAT, trainingDataset.dataType());
 
       BinaryQuantizer quantizer =
           new BinaryQuantizer(resources, BinaryQuantizer.ThresholdType.SAMPLING_MEDIAN);
-      assertEquals(8, quantizer.precision());
+      assertEquals(DataType.BYTE, quantizer.outputDataType());
       log.info("Created binary quantizer with sampling median threshold");
 
       CagraIndexParams indexParams =
@@ -587,7 +592,7 @@ public class QuantizationIT extends CuVSTestCase {
               .build();
 
       assertTrue("Query should have quantized vectors", query.hasQuantizedQueries());
-      assertEquals(8, query.getQueryPrecision());
+      assertEquals(DataType.BYTE, query.getQueryDataType());
 
       SearchResults results = index.search(query);
       assertNotNull("Search results should not be null", results);

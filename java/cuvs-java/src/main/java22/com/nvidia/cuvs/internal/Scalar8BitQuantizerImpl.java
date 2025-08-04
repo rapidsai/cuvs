@@ -70,10 +70,6 @@ public class Scalar8BitQuantizerImpl {
     }
   }
 
-  public int precision() {
-    return 8;
-  }
-
   public void destroy() throws Throwable {
     checkNotDestroyed();
     try {
@@ -91,9 +87,9 @@ public class Scalar8BitQuantizerImpl {
   public CuVSMatrix transform(CuVSMatrix dataset) throws Throwable {
     checkNotDestroyed();
 
-    if (dataset.precision() != 32) {
+    if (dataset.dataType() != DataType.FLOAT) {
       throw new IllegalArgumentException(
-          "Scalar8BitQuantizer requires 32-bit float input, got " + dataset.precision() + "-bit");
+          "Scalar8BitQuantizer requires FLOAT input, got " + dataset.dataType());
     }
 
     try (Arena resultArena = Arena.ofShared();
@@ -106,6 +102,10 @@ public class Scalar8BitQuantizerImpl {
       MemorySegment datasetMemSegment = ((CuVSMatrixBaseImpl) dataset).memorySegment();
       long cuvsResourcesPtr = resourcesAccessor.handle();
 
+      // TODO: Currently all datasets are HOST memory kind, preventing testing of GPU quantization
+      // flow.
+      // Future improvement: Support GPU-native dataset creation in Java API to enable direct GPU
+      // quantization testing.
       if (dataset.memoryKind() == MemoryKind.HOST) {
         return performTransformHost(
             cuvsResourcesPtr, quantizerSegment, localArena, rows, cols, datasetMemSegment);
@@ -185,9 +185,9 @@ public class Scalar8BitQuantizerImpl {
       }
     }
 
-    if (result.precision() != 8) {
+    if (result.dataType() != DataType.BYTE) {
       throw new IllegalStateException(
-          "Expected 8-bit output from scalar quantization, got " + result.precision() + "-bit");
+          "Expected BYTE output from scalar quantization, got " + result.dataType());
     }
 
     return result;
@@ -256,9 +256,9 @@ public class Scalar8BitQuantizerImpl {
   public CuVSMatrix inverseTransform(CuVSMatrix quantizedData) throws Throwable {
     checkNotDestroyed();
 
-    if (quantizedData.precision() != 8) {
+    if (quantizedData.dataType() != DataType.BYTE) {
       throw new IllegalArgumentException(
-          "Inverse transform requires 8-bit input, got " + quantizedData.precision() + "-bit");
+          "Inverse transform requires BYTE input, got " + quantizedData.dataType());
     }
 
     try (Arena resultArena = Arena.ofShared();
@@ -270,6 +270,10 @@ public class Scalar8BitQuantizerImpl {
       MemorySegment quantizedMemSegment = ((CuVSMatrixBaseImpl) quantizedData).memorySegment();
       long cuvsResourcesPtr = resourcesAccessor.handle();
 
+      // TODO: Currently all datasets are HOST memory kind, preventing testing of GPU quantization
+      // flow.
+      // Future improvement: Support GPU-native dataset creation in Java API to enable direct GPU
+      // quantization testing.
       if (quantizedData.memoryKind() == MemoryKind.HOST) {
         return performInverseTransformHost(
             cuvsResourcesPtr, quantizerSegment, localArena, rows, cols, quantizedMemSegment);

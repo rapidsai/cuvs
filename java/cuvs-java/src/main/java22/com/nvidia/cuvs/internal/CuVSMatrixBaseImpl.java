@@ -16,6 +16,7 @@
 package com.nvidia.cuvs.internal;
 
 import com.nvidia.cuvs.CuVSMatrix;
+import com.nvidia.cuvs.CuVSMatrix.DataType;
 import java.lang.foreign.MemorySegment;
 
 public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
@@ -47,11 +48,7 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
   }
 
   @Override
-  public int precision() {
-    return switch (dataType) {
-      case FLOAT -> 32;
-      case INT -> 32;
-      case BYTE -> 8;
-    };
+  public DataType dataType() {
+    return dataType;
   }
 }

@@ -41,6 +41,7 @@ import com.nvidia.cuvs.CagraSearchParams;
 import com.nvidia.cuvs.CuVSIvfPqIndexParams;
 import com.nvidia.cuvs.CuVSIvfPqSearchParams;
 import com.nvidia.cuvs.CuVSMatrix;
+import com.nvidia.cuvs.CuVSMatrix.DataType;
 import com.nvidia.cuvs.CuVSQuantizer;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.SearchResults;
@@ -175,7 +176,7 @@ public class CagraIndexImpl implements CagraIndex {
   private IndexReference build(CagraIndexParams indexParameters, CuVSMatrixBaseImpl dataset) {
     long rows = dataset.size();
     long cols = dataset.columns();
-    int datasetPrecision = dataset.precision();
+    DataType datasetDataType = dataset.dataType();
 
     try (var indexParams = segmentFromIndexParams(indexParameters);
         var localArena = Arena.ofConfined()) {
@@ -192,8 +193,8 @@ public class CagraIndexImpl implements CagraIndex {
               localArena,
               dataSeg,
               datasetShape,
-              getDataTypeCode(datasetPrecision, this.indexQuantizer),
-              datasetPrecision,
+              getDataTypeCode(datasetDataType, this.indexQuantizer),
+              getPrecisionFromDataType(datasetDataType),
               2,
               1);
 
@@ -254,26 +255,31 @@ public class CagraIndexImpl implements CagraIndex {
   public SearchResults search(CagraQuery query) throws Throwable {
     try (var localArena = Arena.ofConfined()) {
       checkNotDestroyed();
-      int topK = query.getTopK();
-      int queryPrecision = query.getQueryPrecision();
+
+      // Extract query information upfront to avoid "mutually-null" fields
       long numQueries;
       int vectorDimension;
+      DataType queryDataType;
       MemorySegment floatsSeg;
-      // Handle both quantized and float queries
+
       if (query.hasQuantizedQueries()) {
         CuVSMatrix quantizedQueries = query.getQuantizedQueries();
         numQueries = quantizedQueries.size();
         vectorDimension = (int) quantizedQueries.columns();
+        queryDataType = quantizedQueries.dataType();
         floatsSeg = ((CuVSMatrixBaseImpl) quantizedQueries).memorySegment();
       } else {
         float[][] queryVectors = query.getQueryVectors();
         numQueries = queryVectors.length;
         vectorDimension = numQueries > 0 ? queryVectors[0].length : 0;
+        queryDataType = DataType.FLOAT; // Float queries are always FLOAT
         floatsSeg = buildMemorySegment(localArena, queryVectors);
       }
 
-      // Calculate bytes based on actual precision
-      long queriesBytes = getQueryBytesSize(numQueries, vectorDimension, queryPrecision);
+      int topK = query.getTopK();
+
+      // Calculate bytes based on actual data type
+      long queriesBytes = getQueryBytesSize(numQueries, vectorDimension, queryDataType);
       long numBlocks = topK * numQueries;
       long neighborsBytes = C_INT_BYTE_SIZE * numQueries * topK;
       long distancesBytes = C_FLOAT_BYTE_SIZE * numQueries * topK;
@@ -300,8 +306,8 @@ public class CagraIndexImpl implements CagraIndex {
                 localArena,
                 queriesDP,
                 queriesShape,
-                getDataTypeCode(queryPrecision, this.indexQuantizer),
-                queryPrecision,
+                getDataTypeCode(queryDataType, this.indexQuantizer),
+                getPrecisionFromDataType(queryDataType),
                 2,
                 1);
         long[] neighborsShape = {numQueries, topK};
@@ -725,34 +731,48 @@ public class CagraIndexImpl implements CagraIndex {
     return new CompositeCloseableHandle(seg, handles);
   }
 
-  // Helper method to map precision to data type codes
-  private int getDataTypeCode(int precision, CuVSQuantizer quantizer) {
-    switch (precision) {
-      case 32:
+  // Helper method to map DataType to data type codes
+  private int getDataTypeCode(DataType dataType, CuVSQuantizer quantizer) {
+    switch (dataType) {
+      case FLOAT:
         return kDLFloat();
-      case 8:
+      case BYTE:
         if (quantizer instanceof BinaryQuantizer) {
           return kDLUInt();
         } else {
           return kDLInt();
         }
-      case 1:
-        return kDLBool();
+      case INT:
+        return kDLInt();
       default:
-        throw new IllegalArgumentException("Unsupported precision: " + precision);
+        throw new IllegalArgumentException("Unsupported data type: " + dataType);
     }
   }
 
-  private long getQueryBytesSize(long numQueries, int vectorDimension, int precision) {
-    switch (precision) {
-      case 32:
-        return C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
-      case 8:
-        return numQueries * vectorDimension;
-      case 1:
-        return (numQueries * vectorDimension + 7) / 8;
+  // Helper method to convert DataType to precision
+  private int getPrecisionFromDataType(DataType dataType) {
+    switch (dataType) {
+      case FLOAT:
+        return 32;
+      case BYTE:
+        return 8;
+      case INT:
+        return 32;
       default:
-        throw new IllegalArgumentException("Unsupported query precision: " + precision);
+        throw new IllegalArgumentException("Unsupported data type: " + dataType);
+    }
+  }
+
+  private long getQueryBytesSize(long numQueries, int vectorDimension, DataType dataType) {
+    switch (dataType) {
+      case FLOAT:
+        return C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
+      case BYTE:
+        return numQueries * vectorDimension;
+      case INT:
+        return C_INT_BYTE_SIZE * numQueries * vectorDimension;
+      default:
+        throw new IllegalArgumentException("Unsupported query data type: " + dataType);
     }
   }
 
@@ -807,11 +827,9 @@ public class CagraIndexImpl implements CagraIndex {
         return new CagraIndexImpl(inputStream, cuvsResources);
       } else {
         if (quantizer != null && dataset != null) {
-          if (dataset.precision() != 32) {
+          if (dataset.dataType() != DataType.FLOAT) {
             throw new IllegalArgumentException(
-                "Quantizer input requires 32-bit precision, dataset has "
-                    + dataset.precision()
-                    + "-bit");
+                "Quantizer input requires FLOAT data type, dataset has " + dataset.dataType());
           }
 
           CuVSMatrix quantizedDataset = quantizer.transform(dataset);

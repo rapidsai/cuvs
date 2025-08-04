@@ -15,6 +15,7 @@
  */
 package com.nvidia.cuvs;
 
+import com.nvidia.cuvs.CuVSMatrix.DataType;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.function.LongToIntFunction;
@@ -101,11 +102,12 @@ public class CagraQuery {
   }
 
   /**
-   * Returns the bit‐precision of the query payload:
-   * 32 for raw floats, 8 or 1 for quantized.
+   * Returns the data type of the query payload:
+   * - 32 for float32 queries
+   * - 8 for quantized queries
    */
-  public int getQueryPrecision() {
-    return quantizedQueries != null ? quantizedQueries.precision() : 32;
+  public DataType getQueryDataType() {
+    return quantizedQueries != null ? quantizedQueries.dataType() : DataType.FLOAT;
   }
 
   /**
@@ -150,9 +152,7 @@ public class CagraQuery {
         + ", floatVectors="
         + (queryVectors != null ? Arrays.toString(queryVectors) : "null")
         + ", quantized="
-        + (quantizedQueries != null
-            ? ("Dataset@" + quantizedQueries.precision() + "-bit")
-            : "false")
+        + (quantizedQueries != null ? ("Dataset@" + quantizedQueries.dataType() + "-bit") : "false")
         + ", mapping="
         + mapping
         + ", topK="
@@ -262,14 +262,13 @@ public class CagraQuery {
 
       if (quantizer != null) {
         // wrap float[][] in a CuVSMatrix and quantize
-        CuVSMatrix tmp = CuVSMatrix.ofArray(queryVectors);
-        if (tmp.precision() != 32) {
-          tmp.close();
-          throw new IllegalArgumentException(
-              "Query quantization requires 32-bit float input, got " + tmp.precision() + "-bit");
+        try (CuVSMatrix tmp = CuVSMatrix.ofArray(queryVectors)) {
+          if (tmp.dataType() != DataType.FLOAT) {
+            throw new IllegalArgumentException(
+                "Query quantization requires FLOAT input, got " + tmp.dataType());
+          }
+          quantized = quantizer.transform(tmp);
         }
-        quantized = quantizer.transform(tmp);
-        tmp.close();
         floatsForQuery = null;
       }
 

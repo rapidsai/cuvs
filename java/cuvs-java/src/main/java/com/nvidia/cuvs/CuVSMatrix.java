@@ -69,10 +69,15 @@ public interface CuVSMatrix extends AutoCloseable {
   }
 
   /**
-   * Returns the bit precision of this matrix data.
-   * @return The bit precision (1 for binary, 8 for 8-bit, 32 for float32)
+   * Returns the data type of this matrix.
+   *
+   * <p>DataType provides the fundamental type information needed for all operations.
+   * FLOAT represents 32-bit floating point data, INT represents 32-bit integer data,
+   * and BYTE represents 8-bit data (used for quantized values).
+   *
+   * @return The DataType of this matrix
    */
-  int precision();
+  DataType dataType();
 
   interface Builder {
     /**

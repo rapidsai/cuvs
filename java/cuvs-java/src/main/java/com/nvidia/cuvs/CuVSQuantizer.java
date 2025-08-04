@@ -15,6 +15,8 @@
  */
 package com.nvidia.cuvs;
 
+import com.nvidia.cuvs.CuVSMatrix.DataType;
+
 /**
  * Base interface for all cuVS quantizers providing unified quantization operations.
  *
@@ -22,11 +24,11 @@ package com.nvidia.cuvs;
 public interface CuVSQuantizer extends AutoCloseable {
 
   /**
-   * Returns the bit precision of this quantizer.
+   * Returns the data type of quantized data produced by this quantizer.
    *
-   * @return The bit precision (1 for binary, 8 for scalar 8-bit, 32 for float32)
+   * @return The DataType of the quantized output (BYTE for quantized data)
    */
-  int precision();
+  DataType outputDataType();
 
   /**
    * Transforms a float32 dataset into a quantized dataset.
