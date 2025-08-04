@@ -16,9 +16,8 @@
 
 #pragma once
 
-#include "../ivf_common.cuh"     // dummy_block_sort_t
-#include "../sample_filter.cuh"  // none_sample_filter
-
+#include "../ivf_common.cuh"           // dummy_block_sort_t
+#include "../sample_filter.cuh"        // none_sample_filter
 #include <cuvs/distance/distance.hpp>  // cuvs::distance::DistanceType
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>               // codebook_gen
