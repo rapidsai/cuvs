@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -83,7 +83,9 @@ void parse_build_param(const nlohmann::json& conf,
 {
   param.n_lists = conf.at("nlist");
   if (conf.contains("niter")) { param.kmeans_n_iters = conf.at("niter"); }
-  if (conf.contains("ratio")) { param.kmeans_trainset_fraction = 1.0 / (double)conf.at("ratio"); }
+  if (conf.contains("ratio")) {
+    param.kmeans_trainset_fraction = 1.0 / static_cast<double>(conf.at("ratio"));
+  }
 }
 
 template <typename T, typename IdxT>
@@ -102,7 +104,9 @@ void parse_build_param(const nlohmann::json& conf,
 {
   if (conf.contains("nlist")) { param.n_lists = conf.at("nlist"); }
   if (conf.contains("niter")) { param.kmeans_n_iters = conf.at("niter"); }
-  if (conf.contains("ratio")) { param.kmeans_trainset_fraction = 1.0 / (double)conf.at("ratio"); }
+  if (conf.contains("ratio")) {
+    param.kmeans_trainset_fraction = 1.0 / static_cast<double>(conf.at("ratio"));
+  }
   if (conf.contains("pq_bits")) { param.pq_bits = conf.at("pq_bits"); }
   if (conf.contains("pq_dim")) { param.pq_dim = conf.at("pq_dim"); }
   if (conf.contains("codebook_kind")) {
@@ -229,55 +233,84 @@ nlohmann::json collect_conf_with_prefix(const nlohmann::json& conf,
 }
 
 template <typename T, typename IdxT>
+void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::cagra::index_params& params)
+{
+  // NB: try to avoid setting parameters implicitly, because this parsing may be used after
+  // parameter heuristics are applied (e.g. in cuvs_cagra_hnswlib.cu).
+  if (conf.contains("graph_degree")) { params.graph_degree = conf.at("graph_degree"); }
+  if (conf.contains("intermediate_graph_degree")) {
+    params.intermediate_graph_degree = conf.at("intermediate_graph_degree");
+  } else {
+    // Only update the intermediate graph degree if it's invalid.
+    params.intermediate_graph_degree =
+      std::max(params.graph_degree, params.intermediate_graph_degree);
+  }
+
+  nlohmann::json comp_search_conf = collect_conf_with_prefix(conf, "compression_");
+  if (!comp_search_conf.empty()) {
+    auto vpq_pams = params.compression.value_or(cuvs::neighbors::vpq_params{});
+    parse_build_param(comp_search_conf, vpq_pams);
+    params.compression.emplace(vpq_pams);
+  }
+
+  if (conf.contains("guarantee_connectivity")) {
+    params.guarantee_connectivity = conf.at("guarantee_connectivity");
+  }
+
+  // Override the graph_build_algo if requested explicitly
+  if (conf.contains("graph_build_algo")) {
+    if (conf.at("graph_build_algo") == "IVF_PQ") {
+      if (!std::holds_alternative<cuvs::neighbors::graph_build_params::ivf_pq_params>(
+            params.graph_build_params)) {
+        params.graph_build_params = cuvs::neighbors::graph_build_params::ivf_pq_params{};
+      }
+    } else if (conf.at("graph_build_algo") == "NN_DESCENT") {
+      if (!std::holds_alternative<cuvs::neighbors::graph_build_params::nn_descent_params>(
+            params.graph_build_params)) {
+        params.graph_build_params = cuvs::neighbors::graph_build_params::nn_descent_params{};
+      }
+    }
+  }
+
+  // Parse build-algo-specific parameters and use them to decide on the algo type
+  nlohmann::json ivf_pq_build_conf  = collect_conf_with_prefix(conf, "ivf_pq_build_");
+  nlohmann::json ivf_pq_search_conf = collect_conf_with_prefix(conf, "ivf_pq_search_");
+  nlohmann::json nn_descent_conf    = collect_conf_with_prefix(conf, "nn_descent_");
+
+  if (std::holds_alternative<std::monostate>(params.graph_build_params)) {
+    if (!ivf_pq_build_conf.empty() || !ivf_pq_search_conf.empty()) {
+      params.graph_build_params = cuvs::neighbors::graph_build_params::ivf_pq_params{};
+    } else if (!nn_descent_conf.empty()) {
+      params.graph_build_params = cuvs::neighbors::graph_build_params::nn_descent_params{};
+    } else {
+      params.graph_build_params = cuvs::neighbors::graph_build_params::iterative_search_params{};
+    }
+  }
+
+  // Apply build-algo-specific parameters
+  std::visit(
+    [&](auto& arg) {
+      using U = std::decay_t<decltype(arg)>;
+      if constexpr (std::is_same_v<U, cuvs::neighbors::graph_build_params::ivf_pq_params>) {
+        parse_build_param<T, IdxT>(ivf_pq_build_conf, arg.build_params);
+        typename cuvs::bench::cuvs_ivf_pq<T, IdxT>::search_param sparam;
+        sparam.pq_param     = arg.search_params;
+        sparam.refine_ratio = arg.refinement_rate;
+        parse_search_param<T, IdxT>(ivf_pq_search_conf, sparam);
+        arg.search_params   = sparam.pq_param;
+        arg.refinement_rate = sparam.refine_ratio;
+      } else if constexpr (std::is_same_v<U,
+                                          cuvs::neighbors::graph_build_params::nn_descent_params>) {
+        parse_build_param<T, IdxT>(nn_descent_conf, arg);
+      }
+    },
+    params.graph_build_params);
+}
+
+template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
                        typename cuvs::bench::cuvs_cagra<T, IdxT>::build_param& param)
 {
-  if (conf.contains("graph_degree")) {
-    param.cagra_params.graph_degree              = conf.at("graph_degree");
-    param.cagra_params.intermediate_graph_degree = param.cagra_params.graph_degree * 2;
-  }
-  if (conf.contains("intermediate_graph_degree")) {
-    param.cagra_params.intermediate_graph_degree = conf.at("intermediate_graph_degree");
-  }
-  if (conf.contains("graph_build_algo")) {
-    if (conf.at("graph_build_algo") == "IVF_PQ") {
-      param.algo = cuvs::bench::CagraBuildAlgo::kIvfPq;
-    } else if (conf.at("graph_build_algo") == "NN_DESCENT") {
-      param.algo = cuvs::bench::CagraBuildAlgo::kNnDescent;
-    } else {
-      param.algo = cuvs::bench::CagraBuildAlgo::kAuto;
-    }
-  }
-  nlohmann::json ivf_pq_build_conf = collect_conf_with_prefix(conf, "ivf_pq_build_");
-  if (!ivf_pq_build_conf.empty()) {
-    cuvs::neighbors::ivf_pq::index_params bparam;
-    parse_build_param<T, IdxT>(ivf_pq_build_conf, bparam);
-    param.ivf_pq_build_params = bparam;
-  }
-  nlohmann::json ivf_pq_search_conf = collect_conf_with_prefix(conf, "ivf_pq_search_");
-  if (!ivf_pq_search_conf.empty()) {
-    typename cuvs::bench::cuvs_ivf_pq<T, IdxT>::search_param sparam;
-    parse_search_param<T, IdxT>(ivf_pq_search_conf, sparam);
-    param.ivf_pq_search_params = sparam.pq_param;
-    param.ivf_pq_refine_rate   = sparam.refine_ratio;
-  }
-  nlohmann::json nn_descent_conf = collect_conf_with_prefix(conf, "nn_descent_");
-  if (!nn_descent_conf.empty()) {
-    cuvs::neighbors::nn_descent::index_params nn_param;
-    nn_param.intermediate_graph_degree = 1.5 * param.cagra_params.intermediate_graph_degree;
-    parse_build_param<T, IdxT>(nn_descent_conf, nn_param);
-    if (nn_param.graph_degree != param.cagra_params.intermediate_graph_degree) {
-      nn_param.graph_degree = param.cagra_params.intermediate_graph_degree;
-    }
-    param.nn_descent_params = nn_param;
-  }
-  nlohmann::json comp_search_conf = collect_conf_with_prefix(conf, "compression_");
-  if (!comp_search_conf.empty()) {
-    cuvs::neighbors::vpq_params vpq_pams;
-    parse_build_param(comp_search_conf, vpq_pams);
-    param.cagra_params.compression.emplace(vpq_pams);
-  }
-
   if (conf.contains("num_dataset_splits")) {
     param.num_dataset_splits = conf.at("num_dataset_splits");
   }
@@ -291,6 +324,23 @@ void parse_build_param(const nlohmann::json& conf,
       throw std::runtime_error("invalid value for merge_type");
     }
   }
+  param.cagra_params = [conf](raft::matrix_extent<int64_t> extents,
+                              cuvs::distance::DistanceType dist_type) {
+    // Delayed parsing/initialization of cagra_params - it's called once the dataset shape is known
+    auto cagra_params   = cuvs::neighbors::cagra::index_params{};
+    cagra_params.metric = dist_type;
+    if (conf.value("graph_build_algo", "") == "IVF_PQ") {
+      cagra_params.graph_build_params =
+        cuvs::neighbors::cagra::graph_build_params::ivf_pq_params(extents, dist_type);
+    } else if (conf.value("graph_build_algo", "") == "NN_DESCENT") {
+      cagra_params.graph_build_params =
+        cuvs::neighbors::cagra::graph_build_params::nn_descent_params(
+          conf.value("intermediate_graph_degree", cagra_params.intermediate_graph_degree),
+          dist_type);
+    }
+    ::parse_build_param<T, IdxT>(conf, cagra_params);
+    return cagra_params;
+  };
 }
 
 cuvs::bench::AllocatorType parse_allocator(std::string mem_type)

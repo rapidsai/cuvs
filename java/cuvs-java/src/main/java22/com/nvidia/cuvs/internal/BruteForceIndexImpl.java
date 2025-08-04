@@ -220,7 +220,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
       MemorySegment querySeg = buildMemorySegment(localArena, cuvsQuery.getQueryVectors());
 
       int topk = cuvsQuery.getTopK();
-      try (var resourcesAccessor = resources.access()) {
+      try (var resourcesAccessor = cuvsQuery.getResources().access()) {
         long cuvsResources = resourcesAccessor.handle();
 
         long queriesBytes = C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
