@@ -419,7 +419,6 @@ void transform(raft::resources const& res,
                dataset_size,
                out_dataset_size);
 
-  // Use `float` for computation when T == half because a runtime error occurs with CUDA 11.8
   using compute_t          = std::conditional_t<std::is_same_v<half, T>, float, T>;
   auto threshold_vec       = raft::make_host_vector<compute_t, int64_t>(0);
   compute_t* threshold_ptr = nullptr;

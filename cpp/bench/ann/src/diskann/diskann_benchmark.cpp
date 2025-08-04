@@ -35,9 +35,9 @@ template <typename T>
 void parse_build_param(const nlohmann::json& conf,
                        typename cuvs::bench::diskann_memory<T>::build_param& param)
 {
-  param.R = conf.at("R");
-  if (conf.contains("L_build")) { param.L_build = conf.at("L_build"); }
-  if (conf.contains("alpha")) { param.alpha = conf.at("alpha"); }
+  param.R       = conf.at("R");
+  param.L_build = conf.at("L_build");
+  if (conf.contains("alpha")) { param.num_threads = conf.at("alpha"); }
   if (conf.contains("num_threads")) { param.num_threads = conf.at("num_threads"); }
 }
 
@@ -45,9 +45,9 @@ template <typename T>
 void parse_build_param(const nlohmann::json& conf,
                        typename cuvs::bench::diskann_ssd<T>::build_param& param)
 {
-  param.R = conf.at("R");
-  if (conf.contains("L_build")) { param.L_build = conf.at("L_build"); }
-  if (conf.contains("alpha")) { param.alpha = conf.at("alpha"); }
+  param.R       = conf.at("R");
+  param.L_build = conf.at("L_build");
+  if (conf.contains("alpha")) { param.num_threads = conf.at("alpha"); }
   if (conf.contains("num_threads")) { param.num_threads = conf.at("num_threads"); }
   if (conf.contains("QD")) { param.QD = conf.at("QD"); }
   param.dataset_base_file = cuvs::bench::configuration::singleton().get_dataset_conf().base_file;
