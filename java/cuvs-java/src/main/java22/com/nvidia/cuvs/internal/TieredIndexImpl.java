@@ -196,7 +196,7 @@ public class TieredIndexImpl implements TieredIndex {
       // Get host query data
       MemorySegment hostQueriesSeg = Util.buildMemorySegment(localArena, query.getQueryVectors());
 
-      try (var resourceAccess = resources.access()) {
+      try (var resourceAccess = query.getResources().access()) {
         long cuvsRes = resourceAccess.handle();
 
         long queriesBytes = C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;

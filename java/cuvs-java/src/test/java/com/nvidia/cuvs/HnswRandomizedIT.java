@@ -154,7 +154,7 @@ public class HnswRandomizedIT extends CuVSTestCase {
               new HnswSearchParams.Builder().withNumThreads(32).build();
 
           HnswQuery hnswQuery =
-              new HnswQuery.Builder()
+              new HnswQuery.Builder(resources)
                   .withQueryVectors(queries)
                   .withSearchParams(hnswSearchParams)
                   .withTopK(topK)

@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2023-2024, NVIDIA CORPORATION.
+# Copyright (c) 2023-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -14,7 +14,7 @@
 # Use RAPIDS_VERSION_MAJOR_MINOR from cmake/rapids_config.cmake
 set(CUVS_VERSION "${RAPIDS_VERSION_MAJOR_MINOR}")
 set(CUVS_FORK "rapidsai")
-set(CUVS_PINNED_TAG "branch-${RAPIDS_VERSION_MAJOR_MINOR}")
+set(CUVS_PINNED_TAG "${rapids-cmake-branch}")
 
 function(find_and_configure_cuvs)
     set(oneValueArgs VERSION FORK PINNED_TAG ENABLE_NVTX BUILD_CUVS_C_LIBRARY)
