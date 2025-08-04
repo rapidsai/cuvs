@@ -23,8 +23,8 @@
 #include <stdio.h>
 
 // Forward declarations for multi-GPU resource functions
-extern cuvsError_t cuvsMgResourcesCreate(cuvsResources_t* res);
-extern cuvsError_t cuvsMgResourcesDestroy(cuvsResources_t res);
+extern cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res);
+extern cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res);
 
 typedef enum { MG_ALGO_IVF_FLAT, MG_ALGO_IVF_PQ, MG_ALGO_CAGRA } mg_algo_t;
 
@@ -60,7 +60,7 @@ int run_mg_ivf_flat_test(mg_test_params params,
 
   // Create multi-GPU resources
   cuvsResources_t res;
-  cuvsMgResourcesCreate(&res);
+  cuvsMultiGpuResourcesCreate(&res);
 
   // Create dataset tensor
   DLManagedTensor dataset_tensor;
@@ -164,7 +164,7 @@ cleanup:
   cuvsMgIvfFlatSearchParamsDestroy(search_params);
   cuvsMgIvfFlatIndexParamsDestroy(build_params);
   cuvsMgIvfFlatIndexDestroy(index);
-  cuvsMgResourcesDestroy(res);
+  cuvsMultiGpuResourcesDestroy(res);
 
   return (build_result == CUVS_SUCCESS && extend_result == CUVS_SUCCESS &&
           search_result == CUVS_SUCCESS)
@@ -190,7 +190,7 @@ int run_mg_ivf_pq_test(mg_test_params params,
 
   // Create multi-GPU resources
   cuvsResources_t res;
-  cuvsMgResourcesCreate(&res);
+  cuvsMultiGpuResourcesCreate(&res);
 
   // Create dataset tensor
   DLManagedTensor dataset_tensor;
@@ -294,7 +294,7 @@ cleanup:
   cuvsMgIvfPqSearchParamsDestroy(search_params);
   cuvsMgIvfPqIndexParamsDestroy(build_params);
   cuvsMgIvfPqIndexDestroy(index);
-  cuvsMgResourcesDestroy(res);
+  cuvsMultiGpuResourcesDestroy(res);
 
   return (build_result == CUVS_SUCCESS && extend_result == CUVS_SUCCESS &&
           search_result == CUVS_SUCCESS)
@@ -320,7 +320,7 @@ int run_mg_cagra_test(mg_test_params params,
 
   // Create multi-GPU resources
   cuvsResources_t res;
-  cuvsMgResourcesCreate(&res);
+  cuvsMultiGpuResourcesCreate(&res);
 
   // Create dataset tensor
   DLManagedTensor dataset_tensor;
@@ -411,7 +411,7 @@ cleanup:
   cuvsMgCagraSearchParamsDestroy(search_params);
   cuvsMgCagraIndexParamsDestroy(build_params);
   cuvsMgCagraIndexDestroy(index);
-  cuvsMgResourcesDestroy(res);
+  cuvsMultiGpuResourcesDestroy(res);
 
   return (build_result == CUVS_SUCCESS && search_result == CUVS_SUCCESS) ? 0 : 1;
 }

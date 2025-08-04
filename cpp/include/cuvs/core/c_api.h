@@ -82,7 +82,7 @@ cuvsError_t cuvsResourcesDestroy(cuvsResources_t res);
  * @param[in] res cuvsResources_t opaque C handle
  * @return cuvsError_t
  */
-cuvsError_t cuvsMgResourcesCreate(cuvsResources_t* res);
+cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res);
 
 /**
  * @brief Destroy and de-allocate opaque C handle for C++ type `raft::device_resources_snmg`
@@ -90,7 +90,7 @@ cuvsError_t cuvsMgResourcesCreate(cuvsResources_t* res);
  * @param[in] res cuvsResources_t opaque C handle
  * @return cuvsError_t
  */
-cuvsError_t cuvsMgResourcesDestroy(cuvsResources_t res);
+cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res);
 
 /**
  * @brief Set cudaStream_t on cuvsResources_t to queue CUDA kernels on APIs

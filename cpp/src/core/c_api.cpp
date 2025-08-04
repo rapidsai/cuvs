@@ -50,7 +50,7 @@ extern "C" cuvsError_t cuvsResourcesDestroy(cuvsResources_t res)
   });
 }
 
-extern "C" cuvsError_t cuvsMgResourcesCreate(cuvsResources_t* res)
+extern "C" cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res)
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = new raft::device_resources_snmg{};
@@ -58,7 +58,7 @@ extern "C" cuvsError_t cuvsMgResourcesCreate(cuvsResources_t* res)
   });
 }
 
-extern "C" cuvsError_t cuvsMgResourcesDestroy(cuvsResources_t res)
+extern "C" cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res)
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::device_resources_snmg*>(res);
