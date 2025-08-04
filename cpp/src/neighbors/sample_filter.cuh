@@ -72,6 +72,9 @@ _RAFT_HOST_DEVICE ivf_to_sample_filter<index_t, filter_t>::ivf_to_sample_filter(
 {
 }
 
+template <typename index_t, typename filter_t>
+_RAFT_HOST_DEVICE ivf_to_sample_filter<index_t, filter_t>::~ivf_to_sample_filter() = default;
+
 /** If the original filter takes three arguments, then don't modify the arguments.
  * If the original filter takes two arguments, then we are using `inds_ptr_` to obtain the sample
  * index.
@@ -98,6 +101,9 @@ _RAFT_HOST_DEVICE bitset_filter<bitset_t, index_t>::bitset_filter(
   : bitset_view_{bitset_for_filtering}
 {
 }
+
+template <typename bitset_t, typename index_t>
+_RAFT_HOST_DEVICE bitset_filter<bitset_t, index_t>::~bitset_filter() = default;
 
 template <typename bitset_t, typename index_t>
 inline _RAFT_HOST_DEVICE bool bitset_filter<bitset_t, index_t>::operator()(

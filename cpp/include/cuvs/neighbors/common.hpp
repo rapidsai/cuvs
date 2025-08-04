@@ -485,15 +485,17 @@ namespace filtering {
 enum class FilterType { None, Bitmap, Bitset };
 
 struct base_filter {
-  _RAFT_HOST_DEVICE base_filter() = default;
+  inline _RAFT_HOST_DEVICE base_filter();
   _RAFT_HOST_DEVICE virtual ~base_filter(){};
   virtual FilterType get_filter_type() const = 0;
 };
 
+_RAFT_HOST_DEVICE inline base_filter::base_filter() = default;
+
 /* A filter that filters nothing. This is the default behavior. */
 struct none_sample_filter : public base_filter {
-  _RAFT_HOST_DEVICE none_sample_filter()  = default;
-  _RAFT_HOST_DEVICE ~none_sample_filter() = default;
+  inline _RAFT_HOST_DEVICE none_sample_filter();
+  inline _RAFT_HOST_DEVICE ~none_sample_filter();
 
   inline _RAFT_HOST_DEVICE bool operator()(
     // query index
@@ -512,6 +514,9 @@ struct none_sample_filter : public base_filter {
   FilterType get_filter_type() const override { return FilterType::None; }
 };
 
+_RAFT_HOST_DEVICE inline none_sample_filter::none_sample_filter()  = default;
+_RAFT_HOST_DEVICE inline none_sample_filter::~none_sample_filter() = default;
+
 /**
  * @brief Filter used to convert the cluster index and sample index
  * of an IVF search into a sample index. This can be used as an
@@ -527,7 +532,7 @@ struct ivf_to_sample_filter : public base_filter {
 
   _RAFT_HOST_DEVICE ivf_to_sample_filter(const index_t* const* inds_ptrs,
                                          const filter_t next_filter);
-  _RAFT_HOST_DEVICE ~ivf_to_sample_filter() = default;
+  _RAFT_HOST_DEVICE ~ivf_to_sample_filter();
   /** If the original filter takes three arguments, then don't modify the arguments.
    * If the original filter takes two arguments, then we are using `inds_ptr_` to obtain the sample
    * index.
@@ -585,7 +590,7 @@ struct bitset_filter : public base_filter {
   const view_t bitset_view_;
 
   _RAFT_HOST_DEVICE bitset_filter(const view_t bitset_for_filtering);
-  _RAFT_HOST_DEVICE ~bitset_filter() = default;
+  _RAFT_HOST_DEVICE ~bitset_filter();
   inline _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
