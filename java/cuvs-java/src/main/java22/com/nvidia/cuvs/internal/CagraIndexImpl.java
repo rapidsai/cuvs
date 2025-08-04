@@ -289,7 +289,7 @@ public class CagraIndexImpl implements CagraIndex {
       MemorySegment neighborsMemorySegment = localArena.allocate(neighborsSequenceLayout);
       MemorySegment distancesMemorySegment = localArena.allocate(distancesSequenceLayout);
 
-      try (var resourcesAccessor = resources.access()) {
+      try (var resourcesAccessor = query.getResources().access()) {
         var cuvsRes = resourcesAccessor.handle();
 
         MemorySegment queriesDP = allocateRMMSegment(cuvsRes, queriesBytes);

@@ -369,9 +369,9 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
               .build();
 
       // No prefilter (all points allowed)
-      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+      CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
       CagraQuery fullQuery =
-          new CagraQuery.Builder()
+          new CagraQuery.Builder(resources)
               .withTopK(2)
               .withSearchParams(searchParams)
               .withQueryVectors(queries)
@@ -387,7 +387,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
       prefilter.set(2);
 
       CagraQuery filteredQuery =
-          new CagraQuery.Builder()
+          new CagraQuery.Builder(resources)
               .withTopK(2)
               .withSearchParams(searchParams)
               .withQueryVectors(queries)
@@ -446,11 +446,11 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
       CuVSResources resources)
       throws Throwable {
     // Configure search parameters
-    CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+    CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
 
     // Create a query object with the query vectors
     CagraQuery cuvsQuery =
-        new CagraQuery.Builder()
+        new CagraQuery.Builder(resources)
             .withTopK(3)
             .withSearchParams(searchParams)
             .withQueryVectors(queries)
@@ -572,10 +572,10 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
       CagraIndex mergedIndex = CagraIndex.merge(new CagraIndex[] {index1, index2});
       log.info("Merge completed successfully");
 
-      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+      CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
 
       CagraQuery query =
-          new CagraQuery.Builder()
+          new CagraQuery.Builder(resources)
               .withTopK(3)
               .withSearchParams(searchParams)
               .withQueryVectors(queries)
@@ -678,10 +678,10 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
           CagraIndex.merge(new CagraIndex[] {index1, index2}, physicalMergeParams);
       log.info("Physical merge completed successfully");
 
-      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+      CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
 
       CagraQuery query =
-          new CagraQuery.Builder()
+          new CagraQuery.Builder(resources)
               .withTopK(3)
               .withSearchParams(searchParams)
               .withQueryVectors(queries)

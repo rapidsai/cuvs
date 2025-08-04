@@ -18,11 +18,16 @@ package com.nvidia.cuvs;
 import com.nvidia.cuvs.CuVSMatrix.DataType;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Objects;
 import java.util.function.LongToIntFunction;
 
 /**
  * CagraQuery holds the search parameters plus either raw float[][] vectors
  * or a quantized {@link CuVSMatrix} for querying a CAGRA index.
+ *
+ * <p><strong>Thread Safety:</strong> Each CagraQuery instance should use its own
+ * CuVSResources object that is not shared with other threads. Sharing CuVSResources
+ * between threads can lead to memory allocation errors or JVM crashes.
  *
  * @since 25.02
  */
@@ -35,6 +40,7 @@ public class CagraQuery {
   private final int topK;
   private final BitSet prefilter;
   private final int numDocs;
+  private final CuVSResources resources;
 
   /**
    * Constructs an instance of {@link CagraQuery} using cagraSearchParameters,
@@ -48,6 +54,7 @@ public class CagraQuery {
    * @param topK                  the top k results to return
    * @param prefilter             A single BitSet to use as filter while searching the CAGRA index
    * @param numDocs               Total number of dataset vectors; used to align the prefilter correctly
+   * @param resources             CuVSResources instance to use for this query
    */
   private CagraQuery(
       CagraSearchParams cagraSearchParameters,
@@ -56,7 +63,8 @@ public class CagraQuery {
       LongToIntFunction mapping,
       int topK,
       BitSet prefilter,
-      int numDocs) {
+      int numDocs,
+      CuVSResources resources) {
     this.cagraSearchParameters = cagraSearchParameters;
     this.queryVectors = queryVectors;
     this.quantizedQueries = quantizedQueries;
@@ -64,11 +72,12 @@ public class CagraQuery {
     this.topK = topK;
     this.prefilter = prefilter;
     this.numDocs = numDocs;
+    this.resources = resources;
   }
 
   /** Start building a new CagraQuery. */
-  public static Builder newBuilder() {
-    return new Builder();
+  public static Builder newBuilder(CuVSResources resources) {
+    return new Builder(resources);
   }
 
   /**
@@ -144,6 +153,15 @@ public class CagraQuery {
     return numDocs;
   }
 
+  /**
+   * Gets the CuVSResources instance for this query.
+   *
+   * @return the CuVSResources instance
+   */
+  public CuVSResources getResources() {
+    return resources;
+  }
+
   @Override
   public String toString() {
     return "CagraQuery["
@@ -172,11 +190,20 @@ public class CagraQuery {
     private BitSet prefilter;
     private int numDocs;
     private CuVSQuantizer quantizer;
+    private final CuVSResources resources;
 
     /**
-     * Default constructor.
+     * Constructor that requires CuVSResources.
+     *
+     * <p><strong>Important:</strong> The provided CuVSResources instance should not be
+     * shared with other threads. Each thread performing searches should create its own
+     * CuVSResources instance to avoid memory allocation conflicts and potential JVM crashes.
+     *
+     * @param resources the CuVSResources instance to use for this query (must not be shared between threads)
      */
-    public Builder() {}
+    public Builder(CuVSResources resources) {
+      this.resources = Objects.requireNonNull(resources, "resources cannot be null");
+    }
 
     /**
      * Sets the instance of configured CagraSearchParams to be passed for search.
@@ -273,7 +300,14 @@ public class CagraQuery {
       }
 
       return new CagraQuery(
-          cagraSearchParams, floatsForQuery, quantized, mapping, topK, prefilter, numDocs);
+          cagraSearchParams,
+          floatsForQuery,
+          quantized,
+          mapping,
+          topK,
+          prefilter,
+          numDocs,
+          resources);
     }
   }
 }

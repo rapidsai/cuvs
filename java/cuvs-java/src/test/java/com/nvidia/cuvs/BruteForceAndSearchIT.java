@@ -106,7 +106,7 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
 
       try (CuVSResources resources = CheckedCuVSResources.create()) {
         BruteForceQuery cuvsQuery =
-            new BruteForceQuery.Builder()
+            new BruteForceQuery.Builder(resources)
                 .withTopK(3)
                 .withQueryVectors(queries)
                 .withMapping(SearchResults.IDENTITY_MAPPING)
@@ -134,7 +134,7 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
     for (int j = 0; j < 10; j++) {
       try (CuVSResources resources = CheckedCuVSResources.create()) {
         BruteForceQuery cuvsQuery =
-            new BruteForceQuery.Builder()
+            new BruteForceQuery.Builder(resources)
                 .withTopK(3)
                 .withQueryVectors(queries)
                 .withPrefilters(
@@ -160,7 +160,7 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
     for (int j = 0; j < 10; j++) {
       try (CuVSResources resources = CheckedCuVSResources.create()) {
         BruteForceQuery cuvsQuery =
-            new BruteForceQuery.Builder()
+            new BruteForceQuery.Builder(resources)
                 .withTopK(3)
                 .withQueryVectors(queries)
                 .withMapping(rotate)
@@ -185,7 +185,7 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
     for (int j = 0; j < 10; j++) {
       try (CuVSResources resources = CheckedCuVSResources.create()) {
         BruteForceQuery cuvsQuery =
-            new BruteForceQuery.Builder()
+            new BruteForceQuery.Builder(resources)
                 .withTopK(3)
                 .withQueryVectors(queries)
                 .withMapping(rotate)
