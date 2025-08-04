@@ -16,8 +16,9 @@
 
 #pragma once
 
-#include "../sample_filter.cuh"        // none_sample_filter
-#include "ivf_pq_fp_8bit.cuh"          // cuvs::neighbors::ivf_pq::detail::fp_8bit
+#include "../sample_filter.cuh"  // none_sample_filter
+#include "ivf_pq_fp_8bit.cuh"    // cuvs::neighbors::ivf_pq::detail::fp_8bit
+
 #include <cuvs/distance/distance.hpp>  // cuvs::distance::DistanceType
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>    // cuvs::neighbors::ivf_pq::codebook_gen
@@ -57,7 +58,7 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
                                       const float* queries,
                                       const uint32_t* index_list,
                                       float* query_kths,
-                                      filtering::base_filter* sample_filter,
+                                      filtering::ivf_to_sample_filter_dev filter_variant,
                                       LutT* lut_scores,
                                       OutT* _out_scores,
                                       uint32_t* _out_indices);

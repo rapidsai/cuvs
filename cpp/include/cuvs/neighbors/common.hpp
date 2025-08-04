@@ -482,15 +482,19 @@ namespace filtering {
  * @{
  */
 
-enum class FilterType { Base, None, Bitmap, Bitset };
+enum class FilterType { None, Bitmap, Bitset };
 
 struct base_filter {
-  virtual ~base_filter()                     = default;
+  _RAFT_HOST_DEVICE base_filter() = default;
+  _RAFT_HOST_DEVICE virtual ~base_filter(){};  //           = default;
   virtual FilterType get_filter_type() const = 0;
 };
 
 /* A filter that filters nothing. This is the default behavior. */
 struct none_sample_filter : public base_filter {
+  _RAFT_HOST_DEVICE none_sample_filter()  = default;
+  _RAFT_HOST_DEVICE ~none_sample_filter() = default;
+
   inline _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
@@ -521,8 +525,9 @@ struct ivf_to_sample_filter : public base_filter {
   const index_t* const* inds_ptrs_;
   const filter_t next_filter_;
 
-  ivf_to_sample_filter(const index_t* const* inds_ptrs, const filter_t next_filter);
-
+  _RAFT_HOST_DEVICE ivf_to_sample_filter(const index_t* const* inds_ptrs,
+                                         const filter_t next_filter);
+  _RAFT_HOST_DEVICE ~ivf_to_sample_filter() = default;
   /** If the original filter takes three arguments, then don't modify the arguments.
    * If the original filter takes two arguments, then we are using `inds_ptr_` to obtain the sample
    * index.
@@ -579,7 +584,8 @@ struct bitset_filter : public base_filter {
   // View of the bitset to use as a filter
   const view_t bitset_view_;
 
-  bitset_filter(const view_t bitset_for_filtering);
+  _RAFT_HOST_DEVICE bitset_filter(const view_t bitset_for_filtering);
+  _RAFT_HOST_DEVICE ~bitset_filter() = default;
   inline _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
@@ -592,120 +598,6 @@ struct bitset_filter : public base_filter {
 
   template <typename csr_matrix_t>
   void to_csr(raft::resources const& handle, csr_matrix_t& csr);
-};
-
-template <typename filter_t, typename = void>
-struct takes_three_args_dev : std::false_type {};
-template <typename filter_t>
-struct takes_three_args_dev<
-  filter_t,
-  std::void_t<decltype(std::declval<filter_t>()(uint32_t{}, uint32_t{}, uint32_t{}))>>
-  : std::true_type {};
-
-struct base_filter_dev {
-  __device__ base_filter_dev() {};
-  __device__ virtual ~base_filter_dev(){};
-
-  __device__ virtual bool call(uint32_t query_ix,
-                               uint32_t cluster_ix,
-                               uint32_t sample_ix) const = 0;
-
-  virtual FilterType get_filter_type() const { return FilterType::Base; }
-};
-
-template <typename index_t, typename filter_t>
-struct ivf_to_sample_filter_dev : public base_filter_dev {
-  const index_t* const* inds_ptrs_;
-  const filter_t next_filter_;
-
-  __device__ ivf_to_sample_filter_dev(const index_t* const* inds_ptrs, const filter_t next_filter)
-    : inds_ptrs_{inds_ptrs}, next_filter_{next_filter} {};
-  __device__ ~ivf_to_sample_filter_dev() {}
-
-  /** If the original filter takes three arguments, then don't modify the arguments.
-   * If the original filter takes two arguments, then we are using `inds_ptr_` to obtain the sample
-   * index.
-   */
-  inline __device__ bool operator()(const uint32_t query_ix,
-                                    const uint32_t cluster_ix,
-                                    const uint32_t sample_ix) const
-  {
-    if constexpr (takes_three_args_dev<filter_t>::value) {
-      return next_filter_(query_ix, cluster_ix, sample_ix);
-    } else {
-      return next_filter_(query_ix, inds_ptrs_[cluster_ix][sample_ix]);
-    }
-  };
-
-  __device__ bool call(uint32_t q, uint32_t c, uint32_t s) const override
-  {
-    return (*this)(q, c, s);
-  }
-
-  FilterType get_filter_type() const override { return next_filter_.get_filter_type(); }
-};
-
-/* A filter that filters nothing. This is the default behavior. */
-struct none_sample_filter_dev : public base_filter_dev {
-  __device__ none_sample_filter_dev() {};
-  __device__ ~none_sample_filter_dev() {}
-  inline __device__ bool operator()(
-    // query index
-    const uint32_t query_ix,
-    // the current inverted list index
-    const uint32_t cluster_ix,
-    // the index of the current sample inside the current inverted list
-    const uint32_t sample_ix) const
-  {
-    return true;
-  };
-
-  inline __device__ bool operator()(
-    // query index
-    const uint32_t query_ix,
-    // the index of the current sample
-    const uint32_t sample_ix) const
-  {
-    return true;
-  };
-
-  __device__ bool call(uint32_t q, uint32_t c, uint32_t s) const override
-  {
-    return (*this)(q, c, s);
-  }
-
-  FilterType get_filter_type() const override { return FilterType::None; }
-};
-
-template <typename bitset_t, typename index_t>
-struct bitset_filter_dev : public base_filter_dev {
-  // using base_filter_dev::operator();
-  using view_t = cuvs::core::bitset_view<bitset_t, index_t>;
-
-  // View of the bitset to use as a filter
-  const view_t bitset_view_;
-
-  __device__ bitset_filter_dev(const view_t bitset_for_filtering)
-    : bitset_view_{bitset_for_filtering} {};
-  __device__ ~bitset_filter_dev() {}
-
-  inline __device__ bool operator()(
-    // query index
-    const uint32_t query_ix,
-    // the index of the current sample
-    const uint32_t sample_ix) const
-  {
-    return bitset_view_.test(sample_ix);
-    // return true;
-  };
-  __device__ bool call(uint32_t q, uint32_t c, uint32_t s) const override { return true; }
-
-  FilterType get_filter_type() const override { return FilterType::Bitset; }
-
-  // view_t view() const { return bitset_view_; }
-
-  // template <typename csr_matrix_t>
-  // void to_csr(raft::resources const& handle, csr_matrix_t& csr);
 };
 
 /** @} */  // end group neighbors_filtering

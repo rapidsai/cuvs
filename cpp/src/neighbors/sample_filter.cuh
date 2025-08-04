@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,8 +66,8 @@ struct takes_three_args<
  * @tparam filter_t
  */
 template <typename index_t, typename filter_t>
-ivf_to_sample_filter<index_t, filter_t>::ivf_to_sample_filter(const index_t* const* inds_ptrs,
-                                                              const filter_t next_filter)
+_RAFT_HOST_DEVICE ivf_to_sample_filter<index_t, filter_t>::ivf_to_sample_filter(
+  const index_t* const* inds_ptrs, const filter_t next_filter)
   : inds_ptrs_{inds_ptrs}, next_filter_{next_filter}
 {
 }
@@ -93,7 +93,7 @@ inline _RAFT_HOST_DEVICE bool ivf_to_sample_filter<index_t, filter_t>::operator(
 }
 
 template <typename bitset_t, typename index_t>
-bitset_filter<bitset_t, index_t>::bitset_filter(
+_RAFT_HOST_DEVICE bitset_filter<bitset_t, index_t>::bitset_filter(
   const cuvs::core::bitset_view<bitset_t, index_t> bitset_for_filtering)
   : bitset_view_{bitset_for_filtering}
 {
@@ -139,5 +139,90 @@ void bitmap_filter<bitmap_t, index_t>::to_csr(raft::resources const& handle, csr
 {
   raft::sparse::convert::bitmap_to_csr(handle, bitmap_view_, csr);
 }
+
+struct ivf_to_sample_filter_dev {
+  FilterType tag;
+  const void* obj_ptr;
+
+  __device__ bool operator()(uint32_t q, uint32_t c, uint32_t s) const
+  {
+    switch (tag) {
+      case FilterType::None:
+        return reinterpret_cast<
+                 const filtering::ivf_to_sample_filter<int64_t, filtering::none_sample_filter>*>(
+                 obj_ptr)
+          ->operator()(q, c, s);
+      case FilterType::Bitset:
+        return reinterpret_cast<const filtering::ivf_to_sample_filter<
+          int64_t,
+          filtering::bitset_filter<uint32_t, int64_t>>*>(obj_ptr)
+          ->operator()(q, c, s);
+      default: return true;
+    }
+  }
+};
+
+template <typename dev_filter_t>
+__global__ void destruct_dev_filter(dev_filter_t* p_filter)
+{
+  p_filter->~dev_filter_t();
+}
+
+template <typename InnerFilterT, typename... Args>
+__global__ void init_inner_filter(InnerFilterT* p_inner_filter, Args... args)
+{
+  new (p_inner_filter) InnerFilterT(args...);
+}
+
+template <typename OuterFilterT, typename InnerFilterT, typename... Args>
+__global__ void init_outer_filter(OuterFilterT* p_outer_filter,
+                                  const int64_t* const* inds_ptrs,
+                                  InnerFilterT* p_inner_filter)
+{
+  new (p_outer_filter) OuterFilterT(inds_ptrs, *p_inner_filter);
+}
+
+/* Device side filter wrapper for ivf_to_sample_filter. ivf_to_sample_filter_dev is used to avoid
+ * dynamic dispatching on device. */
+template <typename InnerFilterT, typename... InnerArgs>
+struct ivf_to_sample_dev_wrapper {
+  using OuterFilterT = filtering::ivf_to_sample_filter<int64_t, InnerFilterT>;
+  OuterFilterT* p_outer_filter;
+  InnerFilterT* p_inner_filter;
+  filtering::ivf_to_sample_filter_dev h_placeholder;
+
+  ivf_to_sample_dev_wrapper(FilterType tag,
+                            const int64_t* const* inds_ptrs,
+                            InnerArgs... inner_args)
+  {
+    cudaMalloc(&p_inner_filter, sizeof(InnerFilterT));
+    init_inner_filter<<<1, 1>>>(p_inner_filter, inner_args...);
+    cudaDeviceSynchronize();
+
+    cudaMalloc(&p_outer_filter, sizeof(OuterFilterT));
+    init_outer_filter<<<1, 1>>>(p_outer_filter, inds_ptrs, p_inner_filter);
+    cudaDeviceSynchronize();
+
+    h_placeholder = {tag, p_outer_filter};
+  }
+
+  ~ivf_to_sample_dev_wrapper()
+  {
+    destruct_dev_filter<<<1, 1>>>(p_outer_filter);
+    cudaDeviceSynchronize();
+    cudaFree(p_outer_filter);
+
+    destruct_dev_filter<<<1, 1>>>(p_inner_filter);
+    cudaDeviceSynchronize();
+    cudaFree(p_inner_filter);
+  }
+
+  filtering::ivf_to_sample_filter_dev get_dev_filter() const { return h_placeholder; }
+};
+
+using ivf_to_sample_dev_none = filtering::ivf_to_sample_dev_wrapper<filtering::none_sample_filter>;
+using ivf_to_sample_dev_bitset =
+  filtering::ivf_to_sample_dev_wrapper<filtering::bitset_filter<uint32_t, int64_t>,
+                                       cuvs::core::bitset_view<uint32_t, int64_t>>;
 
 }  // namespace cuvs::neighbors::filtering
