@@ -181,8 +181,8 @@ public class CagraQuery {
     /**
      * Sets the instance of configured CagraSearchParams to be passed for search.
      *
-     * @param cagraSearchParams an instance of the configured CagraSearchParams to
-     *                          be used for this query
+     * @param params an instance of the configured CagraSearchParams to
+     *               be used for this query
      * @return an instance of this Builder
      */
     public Builder withSearchParams(CagraSearchParams params) {

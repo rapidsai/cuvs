@@ -16,7 +16,6 @@
 package com.nvidia.cuvs.internal;
 
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_POINTER;
 import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.*;
@@ -60,9 +59,6 @@ public class Scalar8BitQuantizerImpl {
   private final MemorySegment quantizerSegment;
   private boolean destroyed;
 
-  /**
-   * Constructor for creating a trained scalar quantizer.
-   */
   private Scalar8BitQuantizerImpl(CuVSResources resources, MemorySegment quantizerSegment) {
     this.resources = resources;
     this.quantizerSegment = quantizerSegment;
@@ -95,7 +91,6 @@ public class Scalar8BitQuantizerImpl {
   public CuVSMatrix transform(CuVSMatrix dataset) throws Throwable {
     checkNotDestroyed();
 
-    // Validate input precision
     if (dataset.precision() != 32) {
       throw new IllegalArgumentException(
           "Scalar8BitQuantizer requires 32-bit float input, got " + dataset.precision() + "-bit");
@@ -111,71 +106,91 @@ public class Scalar8BitQuantizerImpl {
       MemorySegment datasetMemSegment = ((CuVSMatrixBaseImpl) dataset).memorySegment();
       long cuvsResourcesPtr = resourcesAccessor.handle();
 
-      // WARNING: Current GPU quantization implementation is inefficient
-      // It copies dataset from host to GPU, performs quantization on GPU,
-      // then copies results back to host. This introduces significant overhead.
-      //
-      // TODO: Once Java API supports creating datasets directly on GPU
-      // (e.g., CuVSDeviceMatrix), optimize by keeping data on GPU throughout
-      // the quantization process to eliminate unnecessary memory transfers.
-
       if (dataset.memoryKind() == MemoryKind.HOST) {
-        // CPU path: no device alloc / cudaMemcpy
         return performTransformHost(
             cuvsResourcesPtr, quantizerSegment, localArena, rows, cols, datasetMemSegment);
       }
 
-      long datasetBytes = C_FLOAT_BYTE_SIZE * rows * cols;
-      long outputBytes = C_BYTE_SIZE * rows * cols;
+      return performTransformGPU(
+          cuvsResourcesPtr,
+          quantizerSegment,
+          localArena,
+          resultArena,
+          rows,
+          cols,
+          datasetMemSegment);
+    } catch (Throwable t) {
+      throw t;
+    }
+  }
+
+  /**
+   * GPU transform with buffered processing for large datasets.
+   */
+  private CuVSMatrix performTransformGPU(
+      long cuvsResourcesPtr,
+      MemorySegment quantizerSeg,
+      Arena localArena,
+      Arena resultArena,
+      long rows,
+      long cols,
+      MemorySegment datasetMemSegment)
+      throws Throwable {
+
+    final long BUFFER_SIZE_BYTES = 1024 * 1024;
+    final long FLOAT_SIZE = C_FLOAT_BYTE_SIZE;
+    final long FLOATS_PER_BUFFER = BUFFER_SIZE_BYTES / FLOAT_SIZE;
+    final long ROWS_PER_BUFFER = Math.max(1, FLOATS_PER_BUFFER / cols);
+
+    CuVSMatrix result = new CuVSHostMatrixArenaImpl(rows, cols, DataType.BYTE);
+
+    for (long startRow = 0; startRow < rows; startRow += ROWS_PER_BUFFER) {
+      long endRow = Math.min(startRow + ROWS_PER_BUFFER, rows);
+      long chunkRows = endRow - startRow;
+
+      long datasetBytes = FLOAT_SIZE * chunkRows * cols;
+      long outputBytes = C_BYTE_SIZE * chunkRows * cols;
 
       MemorySegment datasetPtr = allocateRMMSegment(cuvsResourcesPtr, datasetBytes);
       MemorySegment outputPtr = allocateRMMSegment(cuvsResourcesPtr, outputBytes);
 
       try {
-        // Copy input data to device
-        cudaMemcpy(datasetPtr, datasetMemSegment, datasetBytes, INFER_DIRECTION);
+        MemorySegment chunkData =
+            datasetMemSegment.asSlice(startRow * cols * FLOAT_SIZE, datasetBytes);
+        cudaMemcpy(datasetPtr, chunkData, datasetBytes, INFER_DIRECTION);
 
-        // Prepare tensors
-        long datasetShape[] = {rows, cols};
+        long datasetShape[] = {chunkRows, cols};
         MemorySegment datasetTensor =
             prepareTensor(localArena, datasetPtr, datasetShape, kDLFloat(), 32, kDLCUDA(), 1);
         MemorySegment outputTensor =
             prepareTensor(localArena, outputPtr, datasetShape, kDLInt(), 8, kDLCUDA(), 1);
 
-        // Transform
         int returnValue =
             cuvsScalarQuantizerTransform(
-                cuvsResourcesPtr, quantizerSegment, datasetTensor, outputTensor);
+                cuvsResourcesPtr, quantizerSeg, datasetTensor, outputTensor);
         checkCuVSError(returnValue, "cuvsScalarQuantizerTransform");
 
         returnValue = cuvsStreamSync(cuvsResourcesPtr);
         checkCuVSError(returnValue, "cuvsStreamSync");
 
-        // Copy result back to host
-        MemorySegment outputMemSegment = resultArena.allocate(C_CHAR, outputBytes);
-        cudaMemcpy(outputMemSegment, outputPtr, outputBytes, DEVICE_TO_HOST);
-
-        // Create matrix using the populated outputMemSegment
-        CuVSMatrix result = new CuVSHostMatrixImpl(outputMemSegment, rows, cols, DataType.BYTE);
-
-        // Validate output precision
-        if (result.precision() != 8) {
-          throw new IllegalStateException(
-              "Expected 8-bit output from scalar quantization, got " + result.precision() + "-bit");
-        }
-
-        return result;
+        MemorySegment resultChunk =
+            ((CuVSMatrixBaseImpl) result).memorySegment().asSlice(startRow * cols, outputBytes);
+        cudaMemcpy(resultChunk, outputPtr, outputBytes, DEVICE_TO_HOST);
 
       } finally {
-        // Free device memory
         int returnValue = cuvsRMMFree(cuvsResourcesPtr, datasetPtr, datasetBytes);
         checkCuVSError(returnValue, "cuvsRMMFree");
         returnValue = cuvsRMMFree(cuvsResourcesPtr, outputPtr, outputBytes);
         checkCuVSError(returnValue, "cuvsRMMFree");
       }
-    } catch (Throwable t) {
-      throw t;
     }
+
+    if (result.precision() != 8) {
+      throw new IllegalStateException(
+          "Expected 8-bit output from scalar quantization, got " + result.precision() + "-bit");
+    }
+
+    return result;
   }
 
   private MemorySegment buildMemorySegmentFromBytes(Arena arena, byte[][] data) {
@@ -192,9 +207,6 @@ public class Scalar8BitQuantizerImpl {
     return segment;
   }
 
-  /**
-   * Creates a new Scalar8BitQuantizerImpl with training on the provided dataset.
-   */
   public static Scalar8BitQuantizerImpl create(CuVSResources resources, CuVSMatrix trainingDataset)
       throws Throwable {
     Objects.requireNonNull(resources);
@@ -208,7 +220,6 @@ public class Scalar8BitQuantizerImpl {
       MemorySegment datasetMemSegment = ((CuVSMatrixBaseImpl) trainingDataset).memorySegment();
       long cuvsResourcesPtr = resourcesAccessor.handle();
 
-      // Create scalar quantizer params
       MemorySegment paramsSegment = localArena.allocate(cuvsScalarQuantizerParams_t);
       int returnValue = cuvsScalarQuantizerParamsCreate(paramsSegment);
       checkCuVSError(returnValue, "cuvsScalarQuantizerParamsCreate");
@@ -216,16 +227,13 @@ public class Scalar8BitQuantizerImpl {
       MemorySegment paramsPtr = paramsSegment.get(C_POINTER, 0);
       cuvsScalarQuantizerParams.quantile(paramsPtr, 0.99f);
 
-      // Create scalar quantizer
       MemorySegment quantizerSegment = localArena.allocate(cuvsScalarQuantizer_t);
       returnValue = cuvsScalarQuantizerCreate(quantizerSegment);
       checkCuVSError(returnValue, "cuvsScalarQuantizerCreate");
 
       MemorySegment quantizerPtr = quantizerSegment.get(C_POINTER, 0);
 
-      // Check if we should use CPU or GPU path for training
       if (trainingDataset.memoryKind() == MemoryKind.HOST) {
-        // CPU training path
         long datasetShape[] = {rows, cols};
         MemorySegment datasetTensor =
             prepareTensor(localArena, datasetMemSegment, datasetShape, kDLFloat(), 32, kDLCPU(), 1);
@@ -234,27 +242,10 @@ public class Scalar8BitQuantizerImpl {
             cuvsScalarQuantizerTrain(cuvsResourcesPtr, paramsPtr, datasetTensor, quantizerPtr);
         checkCuVSError(returnValue, "cuvsScalarQuantizerTrain");
       } else {
-        // GPU training path (existing code)
-        long datasetBytes = C_FLOAT_BYTE_SIZE * rows * cols;
-        MemorySegment datasetPtr = allocateRMMSegment(cuvsResourcesPtr, datasetBytes);
-        cudaMemcpy(datasetPtr, datasetMemSegment, datasetBytes, INFER_DIRECTION);
-
-        long datasetShape[] = {rows, cols};
-        MemorySegment datasetTensor =
-            prepareTensor(localArena, datasetPtr, datasetShape, kDLFloat(), 32, kDLCUDA(), 1);
-
-        returnValue =
-            cuvsScalarQuantizerTrain(cuvsResourcesPtr, paramsPtr, datasetTensor, quantizerPtr);
-        checkCuVSError(returnValue, "cuvsScalarQuantizerTrain");
-
-        returnValue = cuvsStreamSync(cuvsResourcesPtr);
-        checkCuVSError(returnValue, "cuvsStreamSync");
-
-        returnValue = cuvsRMMFree(cuvsResourcesPtr, datasetPtr, datasetBytes);
-        checkCuVSError(returnValue, "cuvsRMMFree");
+        performGPUTraining(
+            cuvsResourcesPtr, paramsPtr, quantizerPtr, localArena, rows, cols, datasetMemSegment);
       }
 
-      // Clean up params
       returnValue = cuvsScalarQuantizerParamsDestroy(paramsPtr);
       checkCuVSError(returnValue, "cuvsScalarQuantizerParamsDestroy");
 
@@ -280,22 +271,54 @@ public class Scalar8BitQuantizerImpl {
       long cuvsResourcesPtr = resourcesAccessor.handle();
 
       if (quantizedData.memoryKind() == MemoryKind.HOST) {
-        // CPU inverse transform path
         return performInverseTransformHost(
             cuvsResourcesPtr, quantizerSegment, localArena, rows, cols, quantizedMemSegment);
       }
 
-      // GPU inverse transform path (existing code)
-      long quantizedBytes = C_BYTE_SIZE * rows * cols;
-      long outputBytes = C_FLOAT_BYTE_SIZE * rows * cols;
+      return performInverseTransformGPU(
+          cuvsResourcesPtr,
+          quantizerSegment,
+          localArena,
+          resultArena,
+          rows,
+          cols,
+          quantizedMemSegment);
+    }
+  }
+
+  private CuVSMatrix performInverseTransformGPU(
+      long cuvsResourcesPtr,
+      MemorySegment quantizerSeg,
+      Arena localArena,
+      Arena resultArena,
+      long rows,
+      long cols,
+      MemorySegment quantizedMemSegment)
+      throws Throwable {
+
+    final long BUFFER_SIZE_BYTES = 1024 * 1024;
+    final long BYTE_SIZE = C_BYTE_SIZE;
+    final long BYTES_PER_BUFFER = BUFFER_SIZE_BYTES;
+    final long ROWS_PER_BUFFER = Math.max(1, BYTES_PER_BUFFER / (cols * BYTE_SIZE));
+
+    CuVSMatrix result = new CuVSHostMatrixArenaImpl(rows, cols, DataType.FLOAT);
+
+    for (long startRow = 0; startRow < rows; startRow += ROWS_PER_BUFFER) {
+      long endRow = Math.min(startRow + ROWS_PER_BUFFER, rows);
+      long chunkRows = endRow - startRow;
+
+      long quantizedBytes = BYTE_SIZE * chunkRows * cols;
+      long outputBytes = C_FLOAT_BYTE_SIZE * chunkRows * cols;
 
       MemorySegment quantizedPtr = allocateRMMSegment(cuvsResourcesPtr, quantizedBytes);
       MemorySegment outputPtr = allocateRMMSegment(cuvsResourcesPtr, outputBytes);
 
       try {
-        cudaMemcpy(quantizedPtr, quantizedMemSegment, quantizedBytes, INFER_DIRECTION);
+        MemorySegment chunkData =
+            quantizedMemSegment.asSlice(startRow * cols * BYTE_SIZE, quantizedBytes);
+        cudaMemcpy(quantizedPtr, chunkData, quantizedBytes, INFER_DIRECTION);
 
-        long datasetShape[] = {rows, cols};
+        long datasetShape[] = {chunkRows, cols};
         MemorySegment quantizedTensor =
             prepareTensor(localArena, quantizedPtr, datasetShape, kDLInt(), 8, kDLCUDA(), 1);
         MemorySegment outputTensor =
@@ -303,21 +326,70 @@ public class Scalar8BitQuantizerImpl {
 
         int returnValue =
             cuvsScalarQuantizerInverseTransform(
-                cuvsResourcesPtr, quantizerSegment, quantizedTensor, outputTensor);
+                cuvsResourcesPtr, quantizerSeg, quantizedTensor, outputTensor);
         checkCuVSError(returnValue, "cuvsScalarQuantizerInverseTransform");
 
         returnValue = cuvsStreamSync(cuvsResourcesPtr);
         checkCuVSError(returnValue, "cuvsStreamSync");
 
-        MemorySegment outputMemSegment = resultArena.allocate(C_FLOAT, outputBytes);
-        cudaMemcpy(outputMemSegment, outputPtr, outputBytes, DEVICE_TO_HOST);
-
-        return new CuVSHostMatrixImpl(outputMemSegment, rows, cols, DataType.FLOAT);
+        MemorySegment resultChunk =
+            ((CuVSMatrixBaseImpl) result)
+                .memorySegment()
+                .asSlice(startRow * cols * C_FLOAT_BYTE_SIZE, outputBytes);
+        cudaMemcpy(resultChunk, outputPtr, outputBytes, DEVICE_TO_HOST);
 
       } finally {
         int returnValue = cuvsRMMFree(cuvsResourcesPtr, quantizedPtr, quantizedBytes);
         checkCuVSError(returnValue, "cuvsRMMFree");
         returnValue = cuvsRMMFree(cuvsResourcesPtr, outputPtr, outputBytes);
+        checkCuVSError(returnValue, "cuvsRMMFree");
+      }
+    }
+
+    return result;
+  }
+
+  private static void performGPUTraining(
+      long cuvsResourcesPtr,
+      MemorySegment paramsPtr,
+      MemorySegment quantizerPtr,
+      Arena localArena,
+      long rows,
+      long cols,
+      MemorySegment datasetMemSegment)
+      throws Throwable {
+
+    final long BUFFER_SIZE_BYTES = 1024 * 1024;
+    final long FLOAT_SIZE = C_FLOAT_BYTE_SIZE;
+    final long FLOATS_PER_BUFFER = BUFFER_SIZE_BYTES / FLOAT_SIZE;
+    final long ROWS_PER_BUFFER = Math.max(1, FLOATS_PER_BUFFER / cols);
+
+    for (long startRow = 0; startRow < rows; startRow += ROWS_PER_BUFFER) {
+      long endRow = Math.min(startRow + ROWS_PER_BUFFER, rows);
+      long chunkRows = endRow - startRow;
+
+      long datasetBytes = FLOAT_SIZE * chunkRows * cols;
+
+      MemorySegment datasetPtr = allocateRMMSegment(cuvsResourcesPtr, datasetBytes);
+
+      try {
+        MemorySegment chunkData =
+            datasetMemSegment.asSlice(startRow * cols * FLOAT_SIZE, datasetBytes);
+        cudaMemcpy(datasetPtr, chunkData, datasetBytes, INFER_DIRECTION);
+
+        long datasetShape[] = {chunkRows, cols};
+        MemorySegment datasetTensor =
+            prepareTensor(localArena, datasetPtr, datasetShape, kDLFloat(), 32, kDLCUDA(), 1);
+
+        int returnValue =
+            cuvsScalarQuantizerTrain(cuvsResourcesPtr, paramsPtr, datasetTensor, quantizerPtr);
+        checkCuVSError(returnValue, "cuvsScalarQuantizerTrain");
+
+        returnValue = cuvsStreamSync(cuvsResourcesPtr);
+        checkCuVSError(returnValue, "cuvsStreamSync");
+
+      } finally {
+        int returnValue = cuvsRMMFree(cuvsResourcesPtr, datasetPtr, datasetBytes);
         checkCuVSError(returnValue, "cuvsRMMFree");
       }
     }
@@ -332,13 +404,19 @@ public class Scalar8BitQuantizerImpl {
       MemorySegment dataSeg)
       throws Throwable {
 
-    // Create matrix that manages its own arena
     var result = new CuVSHostMatrixArenaImpl(rows, cols, DataType.BYTE);
 
     long[] shape = {rows, cols};
     MemorySegment inTensor = prepareTensor(localArena, dataSeg, shape, kDLFloat(), 32, kDLCPU(), 1);
     MemorySegment outTensor =
-        prepareTensor(localArena, result.memorySegment(), shape, kDLInt(), 8, kDLCPU(), 1);
+        prepareTensor(
+            localArena,
+            ((CuVSMatrixBaseImpl) result).memorySegment(),
+            shape,
+            kDLInt(),
+            8,
+            kDLCPU(),
+            1);
 
     int rv = cuvsScalarQuantizerTransform(resPtr, quantizerSeg, inTensor, outTensor);
     checkCuVSError(rv, "cuvsScalarQuantizerTransform (host)");
@@ -355,14 +433,20 @@ public class Scalar8BitQuantizerImpl {
       MemorySegment quantizedSeg)
       throws Throwable {
 
-    // Create matrix that manages its own arena
     var result = new CuVSHostMatrixArenaImpl(rows, cols, DataType.FLOAT);
 
     long[] shape = {rows, cols};
     MemorySegment inTensor =
         prepareTensor(localArena, quantizedSeg, shape, kDLInt(), 8, kDLCPU(), 1);
     MemorySegment outTensor =
-        prepareTensor(localArena, result.memorySegment(), shape, kDLFloat(), 32, kDLCPU(), 1);
+        prepareTensor(
+            localArena,
+            ((CuVSMatrixBaseImpl) result).memorySegment(),
+            shape,
+            kDLFloat(),
+            32,
+            kDLCPU(),
+            1);
 
     int rv = cuvsScalarQuantizerInverseTransform(resPtr, quantizerSeg, inTensor, outTensor);
     checkCuVSError(rv, "cuvsScalarQuantizerInverseTransform (host)");

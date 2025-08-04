@@ -213,7 +213,13 @@ final class JDKProvider implements CuVSProvider {
 
   @Override
   public CuVSMatrix transformBinary(CuVSResources resources, CuVSMatrix input) throws Throwable {
-    return BinaryQuantizerImpl.transform(resources, input);
+    return BinaryQuantizerImpl.transform(resources, input, 0);
+  }
+
+  @Override
+  public CuVSMatrix transformBinary(CuVSResources resources, CuVSMatrix input, int thresholdType)
+      throws Throwable {
+    return BinaryQuantizerImpl.transform(resources, input, thresholdType);
   }
 
   @Override

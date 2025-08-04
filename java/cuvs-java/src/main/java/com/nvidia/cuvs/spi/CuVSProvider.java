@@ -128,6 +128,9 @@ public interface CuVSProvider {
 
   CuVSMatrix inverseTransformScalar8Bit(Object impl, CuVSMatrix quantizedData) throws Throwable;
 
+  CuVSMatrix transformBinary(CuVSResources resources, CuVSMatrix input, int thresholdType)
+      throws Throwable;
+
   CuVSMatrix transformBinary(CuVSResources resources, CuVSMatrix input) throws Throwable;
 
   /** Transforms dataset using Scalar8BitQuantizer */

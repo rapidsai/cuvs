@@ -28,6 +28,7 @@ import com.nvidia.cuvs.spi.CuVSProvider;
  */
 public class BinaryQuantizer implements CuVSQuantizer {
   private final CuVSResources resources;
+  private final ThresholdType thresholdType;
 
   /**
    * The bit precision used by this quantizer (8-bit for packed binary data).
@@ -40,7 +41,40 @@ public class BinaryQuantizer implements CuVSQuantizer {
    * @param resources The CuVS resources to use for quantization operations
    */
   public BinaryQuantizer(CuVSResources resources) {
+    this(resources, ThresholdType.ZERO);
+  }
+
+  /**
+   * Creates a binary quantizer with specified threshold type.
+   *
+   * @param resources The CuVS resources
+   * @param thresholdType The threshold type for binary conversion (ZERO, MEAN, or SAMPLING_MEDIAN)
+   */
+  public BinaryQuantizer(CuVSResources resources, ThresholdType thresholdType) {
     this.resources = resources;
+    this.thresholdType = thresholdType;
+  }
+
+  /**
+   * Threshold types supported by binary quantization.
+   */
+  public enum ThresholdType {
+    /** Use zero as threshold value */
+    ZERO(0),
+    /** Use mean of dataset as threshold */
+    MEAN(1),
+    /** Use sampling median as threshold */
+    SAMPLING_MEDIAN(2);
+
+    private final int value;
+
+    ThresholdType(int value) {
+      this.value = value;
+    }
+
+    public int getValue() {
+      return value;
+    }
   }
 
   /**
@@ -53,6 +87,13 @@ public class BinaryQuantizer implements CuVSQuantizer {
     return precision;
   }
 
+  /**
+   * Gets the threshold value used for binary quantization.
+   */
+  public ThresholdType getThresholdType() {
+    return thresholdType;
+  }
+
   @Override
   public CuVSMatrix transform(CuVSMatrix input) throws Throwable {
     // Validate input precision
@@ -61,7 +102,8 @@ public class BinaryQuantizer implements CuVSQuantizer {
           "BinaryQuantizer requires 32-bit float input, got " + input.precision() + "-bit");
     }
 
-    CuVSMatrix result = CuVSProvider.provider().transformBinary(resources, input);
+    CuVSMatrix result =
+        CuVSProvider.provider().transformBinary(resources, input, thresholdType.getValue());
 
     // Validate output precision
     if (result.precision() != 8) {
@@ -74,7 +116,8 @@ public class BinaryQuantizer implements CuVSQuantizer {
 
   @Override
   public void train(CuVSMatrix trainingData) throws Throwable {
-    throw new UnsupportedOperationException("Binary quantization does not require training");
+    throw new UnsupportedOperationException(
+        "Binary quantization performs training internally during each transform call");
   }
 
   @Override

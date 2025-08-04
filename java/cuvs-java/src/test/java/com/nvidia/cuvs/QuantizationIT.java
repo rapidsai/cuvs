@@ -210,8 +210,15 @@ public class QuantizationIT extends CuVSTestCase {
 
       // Test that inverse transform is not supported
       CuVSMatrix quantizedQueries = query.getQuantizedQueries();
-      assertThrows(
-          UnsupportedOperationException.class, () -> quantizer.inverseTransform(quantizedQueries));
+      try {
+        quantizer.inverseTransform(quantizedQueries);
+        fail("Expected UnsupportedOperationException to be thrown");
+      } catch (UnsupportedOperationException e) {
+        // Expected exception - test passes
+        assertTrue(
+            "Exception message should mention inverse transform",
+            e.getMessage().contains("inverse"));
+      }
 
       // Cleanup
       index.destroyIndex();
@@ -264,8 +271,15 @@ public class QuantizationIT extends CuVSTestCase {
       assertEquals(CuVSMatrix.MemoryKind.HOST, quantized.memoryKind());
 
       // Test that inverse transform throws
-      assertThrows(
-          UnsupportedOperationException.class, () -> quantizer.inverseTransform(quantized));
+      try {
+        quantizer.inverseTransform(quantized);
+        fail("Expected UnsupportedOperationException to be thrown");
+      } catch (UnsupportedOperationException e) {
+        // Expected exception - test passes
+        assertTrue(
+            "Exception message should mention inverse transform",
+            e.getMessage().contains("inverse"));
+      }
 
       quantizer.close();
       inputDataset.close();
@@ -342,6 +356,252 @@ public class QuantizationIT extends CuVSTestCase {
         trainingDataset.close();
         index.destroyIndex();
       }
+    }
+  }
+
+  @Test
+  public void testBinaryQuantizationWithZeroThreshold() throws Throwable {
+    float[][] dataset =
+        new float[][] {
+          {-2.0f, -1.0f, 0.0f, 1.0f, 2.0f}, // crosses zero
+          {0.1f, 0.5f, 1.0f, 1.5f, 2.0f}, // all positive
+          {-2.0f, -1.5f, -1.0f, -0.5f, 0.0f}, // mostly negative
+          {-1.0f, 0.0f, 1.0f, 2.0f, 3.0f} // mixed
+        };
+
+    float[][] queries =
+        new float[][] {
+          {0.5f, 0.5f, 0.5f, 0.5f, 0.5f},
+          {-0.5f, -0.5f, -0.5f, -0.5f, -0.5f}
+        };
+
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
+      CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
+
+      // Test ZERO threshold (0)
+      BinaryQuantizer quantizer =
+          new BinaryQuantizer(resources, BinaryQuantizer.ThresholdType.ZERO);
+      assertEquals(8, quantizer.precision());
+      assertEquals(BinaryQuantizer.ThresholdType.ZERO, quantizer.getThresholdType());
+
+      // Build index with binary quantized dataset
+      CagraIndexParams indexParams =
+          new CagraIndexParams.Builder()
+              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+              .withGraphDegree(2)
+              .withIntermediateGraphDegree(3)
+              .withNumWriterThreads(1)
+              .withMetric(CuvsDistanceType.L2Expanded)
+              .build();
+
+      CagraIndex index =
+          CagraIndex.newBuilder(resources)
+              .withDataset(trainingDataset)
+              .withQuantizer(quantizer)
+              .withIndexParams(indexParams)
+              .build();
+
+      log.info("Built index with ZERO threshold binary quantization");
+
+      // Create quantized query
+      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+      CagraQuery query =
+          CagraQuery.newBuilder()
+              .withQueryVectors(queries)
+              .withQuantizer(quantizer)
+              .withSearchParams(searchParams)
+              .withTopK(2)
+              .build();
+
+      assertTrue("Query should have quantized vectors", query.hasQuantizedQueries());
+      assertEquals(8, query.getQueryPrecision());
+
+      // Perform search
+      SearchResults results = index.search(query);
+      assertNotNull("Search results should not be null", results);
+      assertEquals(
+          "Should have results for all queries", queries.length, results.getResults().size());
+
+      // Verify quantization behavior - values > 0 should become 1, values <= 0 should become 0
+      CuVSMatrix quantizedDataset = quantizer.transform(trainingDataset);
+      byte[][] result = new byte[(int) quantizedDataset.size()][(int) quantizedDataset.columns()];
+      quantizedDataset.toArray(result);
+
+      byte firstByte = result[0][0];
+      int[] unpackedBits = new int[5]; // Unpack first 5 bits
+      for (int i = 0; i < 5; i++) {
+        unpackedBits[i] = (firstByte >> i) & 1;
+      }
+
+      // Verify first row: [-2.0, -1.0, 0.0, 1.0, 2.0] -> [0, 0, 0, 1, 1]
+      int[] expectedRow0 = {0, 0, 0, 1, 1};
+      assertArrayEquals("ZERO threshold failed for row 0", expectedRow0, unpackedBits);
+
+      // Cleanup
+      index.destroyIndex();
+      quantizer.close();
+      trainingDataset.close();
+      quantizedDataset.close();
+
+      log.info("✓ ZERO threshold binary quantization test passed");
+    }
+  }
+
+  @Test
+  public void testBinaryQuantizationWithMeanThreshold() throws Throwable {
+    float[][] dataset =
+        new float[][] {
+          {1.0f, 2.0f, 3.0f, 4.0f, 5.0f}, // mean = 3.0
+          {0.0f, 1.0f, 2.0f, 3.0f, 4.0f}, // mean = 2.0
+          {2.0f, 4.0f, 6.0f, 8.0f, 10.0f}, // mean = 6.0
+          {-1.0f, 0.0f, 1.0f, 2.0f, 3.0f} // mean = 1.0
+        };
+
+    float[][] queries =
+        new float[][] {
+          {2.5f, 2.5f, 2.5f, 2.5f, 2.5f},
+          {1.0f, 3.0f, 5.0f, 7.0f, 9.0f}
+        };
+
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
+      CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
+
+      // Test MEAN threshold (1)
+      BinaryQuantizer quantizer =
+          new BinaryQuantizer(resources, BinaryQuantizer.ThresholdType.MEAN);
+      assertEquals(BinaryQuantizer.ThresholdType.MEAN, quantizer.getThresholdType());
+
+      // Build index
+      CagraIndexParams indexParams =
+          new CagraIndexParams.Builder()
+              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+              .withGraphDegree(2)
+              .withIntermediateGraphDegree(3)
+              .withNumWriterThreads(1)
+              .withMetric(CuvsDistanceType.L2Expanded)
+              .build();
+
+      CagraIndex index =
+          CagraIndex.newBuilder(resources)
+              .withDataset(trainingDataset)
+              .withQuantizer(quantizer)
+              .withIndexParams(indexParams)
+              .build();
+
+      log.info("Built index with MEAN threshold binary quantization");
+
+      // Perform search
+      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+      CagraQuery query =
+          CagraQuery.newBuilder()
+              .withQueryVectors(queries)
+              .withQuantizer(quantizer)
+              .withSearchParams(searchParams)
+              .withTopK(2)
+              .build();
+
+      SearchResults results = index.search(query);
+      assertNotNull("Search results should not be null", results);
+      assertEquals(
+          "Should have results for all queries", queries.length, results.getResults().size());
+
+      // Calculate overall mean: (3.0 + 2.0 + 6.0 + 1.0) / 4 = 3.0
+      // Verify quantization behavior - values > mean should become 1, values <= mean should become
+      // 0
+      CuVSMatrix quantizedDataset = quantizer.transform(trainingDataset);
+      byte[][] result1 = new byte[(int) quantizedDataset.size()][(int) quantizedDataset.columns()];
+
+      // Copy data from CuVSMatrix to array
+      quantizedDataset.toArray(result1);
+
+      // Verify that MEAN threshold produces different results than ZERO threshold
+      BinaryQuantizer zeroQuantizer =
+          new BinaryQuantizer(resources, BinaryQuantizer.ThresholdType.ZERO);
+      CuVSMatrix zeroQuantized = zeroQuantizer.transform(trainingDataset);
+      byte[][] zeroData = new byte[(int) zeroQuantized.size()][(int) zeroQuantized.columns()];
+      zeroQuantized.toArray(zeroData);
+
+      // They should produce different results for this dataset
+      boolean isDifferent = false;
+      for (int i = 0; i < result1.length && !isDifferent; i++) {
+        for (int j = 0; j < result1[i].length && !isDifferent; j++) {
+          if (result1[i][j] != zeroData[i][j]) {
+            isDifferent = true;
+          }
+        }
+      }
+      assertTrue("MEAN and ZERO thresholds should produce different results", isDifferent);
+
+      // Cleanup
+      index.destroyIndex();
+      quantizer.close();
+      zeroQuantizer.close();
+      trainingDataset.close();
+      quantizedDataset.close();
+      zeroQuantized.close();
+
+      log.info("✓ MEAN threshold binary quantization test passed");
+    }
+  }
+
+  @Test
+  public void testBinaryQuantizationWithSamplingMedianThreshold() throws Throwable {
+    float[][] dataset = createSimpleDataset();
+    float[][] queries = createSimpleQueries();
+
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
+      CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
+      assertEquals(32, trainingDataset.precision());
+
+      BinaryQuantizer quantizer =
+          new BinaryQuantizer(resources, BinaryQuantizer.ThresholdType.SAMPLING_MEDIAN);
+      assertEquals(8, quantizer.precision());
+      log.info("Created binary quantizer with sampling median threshold");
+
+      CagraIndexParams indexParams =
+          new CagraIndexParams.Builder()
+              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+              .withGraphDegree(2)
+              .withIntermediateGraphDegree(3)
+              .withNumWriterThreads(1)
+              .withMetric(CuvsDistanceType.L2Expanded)
+              .build();
+
+      CagraIndex index =
+          CagraIndex.newBuilder(resources)
+              .withDataset(trainingDataset)
+              .withQuantizer(quantizer)
+              .withIndexParams(indexParams)
+              .build();
+
+      log.info("Built index with binary quantized dataset");
+
+      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+
+      CagraQuery query =
+          CagraQuery.newBuilder()
+              .withQueryVectors(queries)
+              .withQuantizer(quantizer)
+              .withSearchParams(searchParams)
+              .withTopK(3)
+              .build();
+
+      assertTrue("Query should have quantized vectors", query.hasQuantizedQueries());
+      assertEquals(8, query.getQueryPrecision());
+
+      SearchResults results = index.search(query);
+      assertNotNull("Search results should not be null", results);
+
+      assertEquals(
+          "Should return results for each query", queries.length, results.getResults().size());
+
+      for (int i = 0; i < results.getResults().size(); i++) {
+        Map<Integer, Float> result = results.getResults().get(i);
+        assertFalse("Each query should return non-empty result", result.isEmpty());
+        assertTrue("Should return at most topK results", result.size() <= 3);
+      }
+
+      log.info("✓ Binary quantization with sampling median threshold test passed");
     }
   }
 }
