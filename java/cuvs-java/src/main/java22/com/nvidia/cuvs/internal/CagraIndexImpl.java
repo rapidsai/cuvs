@@ -242,8 +242,8 @@ public class CagraIndexImpl implements CagraIndex {
       final boolean hasPreFilter = query.getPrefilter() != null;
       final BitSet[] prefilters =
           hasPreFilter ? new BitSet[] {query.getPrefilter()} : new BitSet[0];
-      final long prefilterLen =
-          hasPreFilter ? (((query.getNumDocs() * prefilters.length) + 31) / 32) : 0;
+      final long prefilterDataLength = hasPreFilter ? query.getNumDocs() * prefilters.length : 0;
+      final long prefilterLen = hasPreFilter ? (prefilterDataLength + 31) / 32 : 0;
       final long prefilterBytes = C_INT_BYTE_SIZE * prefilterLen;
 
       try (var resourcesAccessor = query.getResources().access()) {
@@ -286,13 +286,15 @@ public class CagraIndexImpl implements CagraIndex {
           MemorySegment prefilter = cuvsFilter.allocate(localArena);
           MemorySegment prefilterTensor;
 
-          if (hasPreFilter) {
+          if (!hasPreFilter) {
             cuvsFilter.type(prefilter, 0); // NO_FILTER
             cuvsFilter.addr(prefilter, 0);
           } else {
+            long[] prefilterShape = {prefilterLen};
+
             cudaMemcpy(
                 prefilterDP.handle(), prefilterDataMemorySegment, prefilterBytes, HOST_TO_DEVICE);
-            final long[] prefilterShape = {prefilterLen};
+
             prefilterTensor =
                 prepareTensor(
                     localArena, prefilterDP.handle(), prefilterShape, kDLUInt(), 32, kDLCUDA(), 1);
@@ -321,16 +323,16 @@ public class CagraIndexImpl implements CagraIndex {
           cudaMemcpy(neighborsMemorySegment, neighborsDP.handle(), neighborsBytes, INFER_DIRECTION);
           cudaMemcpy(distancesMemorySegment, distancesDP.handle(), distancesBytes, INFER_DIRECTION);
         }
-
-        return CagraSearchResults.create(
-            neighborsSequenceLayout,
-            distancesSequenceLayout,
-            neighborsMemorySegment,
-            distancesMemorySegment,
-            topK,
-            query.getMapping(),
-            numQueries);
       }
+
+      return CagraSearchResults.create(
+          neighborsSequenceLayout,
+          distancesSequenceLayout,
+          neighborsMemorySegment,
+          distancesMemorySegment,
+          topK,
+          query.getMapping(),
+          numQueries);
     }
   }
 
