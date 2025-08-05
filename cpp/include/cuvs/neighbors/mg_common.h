@@ -33,30 +33,30 @@ extern "C" {
  */
 typedef enum {
   /** Index is replicated on each device, favors throughput */
-  CUVS_MG_REPLICATED,
+  CUVS_NEIGHBORS_MG_REPLICATED,
   /** Index is split on several devices, favors scaling */
-  CUVS_MG_SHARDED
-} cuvsMgDistributionMode;
+  CUVS_NEIGHBORS_MG_SHARDED
+} cuvsMultiGpuDistributionMode;
 
 /**
  * @brief Search mode when using a replicated index
  */
 typedef enum {
   /** Search queries are split to maintain equal load on GPUs */
-  CUVS_MG_LOAD_BALANCER,
+  CUVS_NEIGHBORS_MG_LOAD_BALANCER,
   /** Each search query is processed by a single GPU in a round-robin fashion */
-  CUVS_MG_ROUND_ROBIN
-} cuvsMgReplicatedSearchMode;
+  CUVS_NEIGHBORS_MG_ROUND_ROBIN
+} cuvsMultiGpuReplicatedSearchMode;
 
 /**
  * @brief Merge mode when using a sharded index
  */
 typedef enum {
   /** Search batches are merged on the root rank */
-  CUVS_MG_MERGE_ON_ROOT_RANK,
+  CUVS_NEIGHBORS_MG_MERGE_ON_ROOT_RANK,
   /** Search batches are merged in a tree reduction fashion */
-  CUVS_MG_TREE_MERGE
-} cuvsMgShardedMergeMode;
+  CUVS_NEIGHBORS_MG_TREE_MERGE
+} cuvsMultiGpuShardedMergeMode;
 
 /**
  * @}

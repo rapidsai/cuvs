@@ -24,7 +24,8 @@
 #include <dlpack/dlpack.h>
 #include <raft/core/error.hpp>
 
-extern "C" cuvsError_t cuvsMgCagraIndexParamsCreate(cuvsMgCagraIndexParams_t* index_params)
+extern "C" cuvsError_t cuvsMultiGpuCagraIndexParamsCreate(
+  cuvsMultiGpuCagraIndexParams_t* index_params)
 {
   return cuvs::core::translate_exceptions([=] {
     // Create base CAGRA parameters
@@ -32,14 +33,15 @@ extern "C" cuvsError_t cuvsMgCagraIndexParamsCreate(cuvsMgCagraIndexParams_t* in
     cuvsCagraIndexParamsCreate(&base_params);
 
     // Create MG wrapper with default values
-    *index_params = new cuvsMgCagraIndexParams{
+    *index_params = new cuvsMultiGpuCagraIndexParams{
       .base_params = base_params,
-      .mode        = CUVS_MG_SHARDED  // Default to sharded mode
+      .mode        = CUVS_NEIGHBORS_MG_SHARDED  // Default to sharded mode
     };
   });
 }
 
-extern "C" cuvsError_t cuvsMgCagraIndexParamsDestroy(cuvsMgCagraIndexParams_t index_params)
+extern "C" cuvsError_t cuvsMultiGpuCagraIndexParamsDestroy(
+  cuvsMultiGpuCagraIndexParams_t index_params)
 {
   return cuvs::core::translate_exceptions([=] {
     if (index_params) {
@@ -49,7 +51,7 @@ extern "C" cuvsError_t cuvsMgCagraIndexParamsDestroy(cuvsMgCagraIndexParams_t in
   });
 }
 
-extern "C" cuvsError_t cuvsMgCagraSearchParamsCreate(cuvsMgCagraSearchParams_t* params)
+extern "C" cuvsError_t cuvsMultiGpuCagraSearchParamsCreate(cuvsMultiGpuCagraSearchParams_t* params)
 {
   return cuvs::core::translate_exceptions([=] {
     // Create base CAGRA search parameters
@@ -57,16 +59,16 @@ extern "C" cuvsError_t cuvsMgCagraSearchParamsCreate(cuvsMgCagraSearchParams_t* 
     cuvsCagraSearchParamsCreate(&base_params);
 
     // Create MG wrapper with default values
-    *params = new cuvsMgCagraSearchParams{
+    *params = new cuvsMultiGpuCagraSearchParams{
       .base_params      = base_params,
-      .search_mode      = CUVS_MG_LOAD_BALANCER,  // Default to load balancer
-      .merge_mode       = CUVS_MG_TREE_MERGE,     // Default to tree merge
-      .n_rows_per_batch = 1LL << 20               // Default to 1M rows per batch
+      .search_mode      = CUVS_NEIGHBORS_MG_LOAD_BALANCER,  // Default to load balancer
+      .merge_mode       = CUVS_NEIGHBORS_MG_TREE_MERGE,     // Default to tree merge
+      .n_rows_per_batch = 1LL << 20                         // Default to 1M rows per batch
     };
   });
 }
 
-extern "C" cuvsError_t cuvsMgCagraSearchParamsDestroy(cuvsMgCagraSearchParams_t params)
+extern "C" cuvsError_t cuvsMultiGpuCagraSearchParamsDestroy(cuvsMultiGpuCagraSearchParams_t params)
 {
   return cuvs::core::translate_exceptions([=] {
     if (params) {
@@ -76,12 +78,12 @@ extern "C" cuvsError_t cuvsMgCagraSearchParamsDestroy(cuvsMgCagraSearchParams_t 
   });
 }
 
-extern "C" cuvsError_t cuvsMgCagraIndexCreate(cuvsMgCagraIndex_t* index)
+extern "C" cuvsError_t cuvsMultiGpuCagraIndexCreate(cuvsMultiGpuCagraIndex_t* index)
 {
-  return cuvs::core::translate_exceptions([=] { *index = new cuvsMgCagraIndex{}; });
+  return cuvs::core::translate_exceptions([=] { *index = new cuvsMultiGpuCagraIndex{}; });
 }
 
-extern "C" cuvsError_t cuvsMgCagraIndexDestroy(cuvsMgCagraIndex_t index)
+extern "C" cuvsError_t cuvsMultiGpuCagraIndexDestroy(cuvsMultiGpuCagraIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] {
     if (index) {
@@ -121,25 +123,26 @@ void convert_c_search_params(cuvsCagraSearchParams params,
                              cuvs::neighbors::cagra::search_params* out);
 
 void convert_c_mg_index_params(
-  cuvsMgCagraIndexParams params,
+  cuvsMultiGpuCagraIndexParams params,
   int64_t n_rows,
   int64_t dim,
   cuvs::neighbors::mg_index_params<cuvs::neighbors::cagra::index_params>* out)
 {
   convert_c_index_params(*params.base_params, n_rows, dim, out);
-  out->mode = (params.mode == CUVS_MG_SHARDED) ? cuvs::neighbors::distribution_mode::SHARDED
-                                               : cuvs::neighbors::distribution_mode::REPLICATED;
+  out->mode = (params.mode == CUVS_NEIGHBORS_MG_SHARDED)
+                ? cuvs::neighbors::distribution_mode::SHARDED
+                : cuvs::neighbors::distribution_mode::REPLICATED;
 }
 
 void convert_c_mg_search_params(
-  cuvsMgCagraSearchParams params,
+  cuvsMultiGpuCagraSearchParams params,
   cuvs::neighbors::mg_search_params<cuvs::neighbors::cagra::search_params>* out)
 {
   convert_c_search_params(*params.base_params, out);
-  out->search_mode      = (params.search_mode == CUVS_MG_LOAD_BALANCER)
+  out->search_mode      = (params.search_mode == CUVS_NEIGHBORS_MG_LOAD_BALANCER)
                             ? cuvs::neighbors::replicated_search_mode::LOAD_BALANCER
                             : cuvs::neighbors::replicated_search_mode::ROUND_ROBIN;
-  out->merge_mode       = (params.merge_mode == CUVS_MG_TREE_MERGE)
+  out->merge_mode       = (params.merge_mode == CUVS_NEIGHBORS_MG_TREE_MERGE)
                             ? cuvs::neighbors::sharded_merge_mode::TREE_MERGE
                             : cuvs::neighbors::sharded_merge_mode::MERGE_ON_ROOT_RANK;
   out->n_rows_per_batch = params.n_rows_per_batch;
@@ -149,7 +152,9 @@ void convert_c_mg_search_params(
 namespace {
 
 template <typename T>
-void* _mg_build(cuvsResources_t res, cuvsMgCagraIndexParams params, DLManagedTensor* dataset_tensor)
+void* _mg_build(cuvsResources_t res,
+                cuvsMultiGpuCagraIndexParams params,
+                DLManagedTensor* dataset_tensor)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
   auto dataset = dataset_tensor->dl_tensor;
@@ -170,8 +175,8 @@ void* _mg_build(cuvsResources_t res, cuvsMgCagraIndexParams params, DLManagedTen
 
 template <typename T>
 void _mg_search(cuvsResources_t res,
-                cuvsMgCagraSearchParams params,
-                cuvsMgCagraIndex index,
+                cuvsMultiGpuCagraSearchParams params,
+                cuvsMultiGpuCagraIndex index,
                 DLManagedTensor* queries_tensor,
                 DLManagedTensor* neighbors_tensor,
                 DLManagedTensor* distances_tensor)
@@ -199,7 +204,7 @@ void _mg_search(cuvsResources_t res,
 
 template <typename T>
 void _mg_extend(cuvsResources_t res,
-                cuvsMgCagraIndex index,
+                cuvsMultiGpuCagraIndex index,
                 DLManagedTensor* new_vectors_tensor,
                 DLManagedTensor* new_indices_tensor)
 {
@@ -221,7 +226,7 @@ void _mg_extend(cuvsResources_t res,
 }
 
 template <typename T>
-void _mg_serialize(cuvsResources_t res, cuvsMgCagraIndex index, const char* filename)
+void _mg_serialize(cuvsResources_t res, cuvsMultiGpuCagraIndex index, const char* filename)
 {
   auto res_ptr      = reinterpret_cast<raft::resources*>(res);
   auto mg_index_ptr = reinterpret_cast<
@@ -255,10 +260,10 @@ void* _mg_distribute(cuvsResources_t res, const char* filename)
 
 }  // anonymous namespace
 
-extern "C" cuvsError_t cuvsMgCagraBuild(cuvsResources_t res,
-                                        cuvsMgCagraIndexParams_t params,
-                                        DLManagedTensor* dataset_tensor,
-                                        cuvsMgCagraIndex_t index)
+extern "C" cuvsError_t cuvsMultiGpuCagraBuild(cuvsResources_t res,
+                                              cuvsMultiGpuCagraIndexParams_t params,
+                                              DLManagedTensor* dataset_tensor,
+                                              cuvsMultiGpuCagraIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset      = dataset_tensor->dl_tensor;
@@ -280,12 +285,12 @@ extern "C" cuvsError_t cuvsMgCagraBuild(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsMgCagraSearch(cuvsResources_t res,
-                                         cuvsMgCagraSearchParams_t params,
-                                         cuvsMgCagraIndex_t index,
-                                         DLManagedTensor* queries_tensor,
-                                         DLManagedTensor* neighbors_tensor,
-                                         DLManagedTensor* distances_tensor)
+extern "C" cuvsError_t cuvsMultiGpuCagraSearch(cuvsResources_t res,
+                                               cuvsMultiGpuCagraSearchParams_t params,
+                                               cuvsMultiGpuCagraIndex_t index,
+                                               DLManagedTensor* queries_tensor,
+                                               DLManagedTensor* neighbors_tensor,
+                                               DLManagedTensor* distances_tensor)
 {
   return cuvs::core::translate_exceptions([=] {
     auto queries = queries_tensor->dl_tensor;
@@ -305,10 +310,10 @@ extern "C" cuvsError_t cuvsMgCagraSearch(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsMgCagraExtend(cuvsResources_t res,
-                                         cuvsMgCagraIndex_t index,
-                                         DLManagedTensor* new_vectors_tensor,
-                                         DLManagedTensor* new_indices_tensor)
+extern "C" cuvsError_t cuvsMultiGpuCagraExtend(cuvsResources_t res,
+                                               cuvsMultiGpuCagraIndex_t index,
+                                               DLManagedTensor* new_vectors_tensor,
+                                               DLManagedTensor* new_indices_tensor)
 {
   return cuvs::core::translate_exceptions([=] {
     auto vectors = new_vectors_tensor->dl_tensor;
@@ -328,9 +333,9 @@ extern "C" cuvsError_t cuvsMgCagraExtend(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsMgCagraSerialize(cuvsResources_t res,
-                                            cuvsMgCagraIndex_t index,
-                                            const char* filename)
+extern "C" cuvsError_t cuvsMultiGpuCagraSerialize(cuvsResources_t res,
+                                                  cuvsMultiGpuCagraIndex_t index,
+                                                  const char* filename)
 {
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
@@ -346,9 +351,9 @@ extern "C" cuvsError_t cuvsMgCagraSerialize(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsMgCagraDeserialize(cuvsResources_t res,
-                                              const char* filename,
-                                              cuvsMgCagraIndex_t index)
+extern "C" cuvsError_t cuvsMultiGpuCagraDeserialize(cuvsResources_t res,
+                                                    const char* filename,
+                                                    cuvsMultiGpuCagraIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] {
     // We need to read dtype from file since we don't know it yet
@@ -359,9 +364,9 @@ extern "C" cuvsError_t cuvsMgCagraDeserialize(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsMgCagraDistribute(cuvsResources_t res,
-                                             const char* filename,
-                                             cuvsMgCagraIndex_t index)
+extern "C" cuvsError_t cuvsMultiGpuCagraDistribute(cuvsResources_t res,
+                                                   const char* filename,
+                                                   cuvsMultiGpuCagraIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] {
     // We need to read dtype from file since we don't know it yet

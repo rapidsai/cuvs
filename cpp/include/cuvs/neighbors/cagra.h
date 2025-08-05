@@ -778,6 +778,3 @@ cuvsError_t cuvsCagraMerge(cuvsResources_t res,
 #ifdef __cplusplus
 }
 #endif
-
-// Include Multi-GPU support
-#include <cuvs/neighbors/mg_cagra.h>

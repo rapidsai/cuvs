@@ -75,12 +75,12 @@ int run_mg_ivf_flat_test(mg_test_params params,
   dataset_tensor.dl_tensor.strides            = NULL;
 
   // Create index
-  cuvsMgIvfFlatIndex_t index;
-  cuvsMgIvfFlatIndexCreate(&index);
+  cuvsMultiGpuIvfFlatIndex_t index;
+  cuvsMultiGpuIvfFlatIndexCreate(&index);
 
   // Build index
-  cuvsMgIvfFlatIndexParams_t build_params;
-  cuvsMgIvfFlatIndexParamsCreate(&build_params);
+  cuvsMultiGpuIvfFlatIndexParams_t build_params;
+  cuvsMultiGpuIvfFlatIndexParamsCreate(&build_params);
   build_params->base_params->metric                   = params.metric;
   build_params->base_params->n_lists                  = params.nlist;
   build_params->base_params->add_data_on_build        = false;
@@ -88,12 +88,12 @@ int run_mg_ivf_flat_test(mg_test_params params,
   build_params->base_params->metric_arg               = 0;
 
   if (params.mode == MG_MODE_REPLICATED) {
-    build_params->mode = CUVS_MG_REPLICATED;
+    build_params->mode = CUVS_NEIGHBORS_MG_REPLICATED;
   } else {
-    build_params->mode = CUVS_MG_SHARDED;
+    build_params->mode = CUVS_NEIGHBORS_MG_SHARDED;
   }
 
-  cuvsError_t build_result = cuvsMgIvfFlatBuild(res, build_params, &dataset_tensor, index);
+  cuvsError_t build_result = cuvsMultiGpuIvfFlatBuild(res, build_params, &dataset_tensor, index);
   if (build_result != CUVS_SUCCESS) {
     const char* error_msg = cuvsGetLastErrorText();
     printf("MG IVF-Flat build failed: %s\n", error_msg ? error_msg : "Unknown error");
@@ -101,7 +101,7 @@ int run_mg_ivf_flat_test(mg_test_params params,
   }
 
   // Extend index with data
-  cuvsError_t extend_result = cuvsMgIvfFlatExtend(res, index, &dataset_tensor, NULL);
+  cuvsError_t extend_result = cuvsMultiGpuIvfFlatExtend(res, index, &dataset_tensor, NULL);
   if (extend_result != CUVS_SUCCESS) {
     printf("MG IVF-Flat extend failed\n");
     goto cleanup;
@@ -144,14 +144,14 @@ int run_mg_ivf_flat_test(mg_test_params params,
   distances_tensor.dl_tensor.strides            = NULL;
 
   // Search index
-  cuvsMgIvfFlatSearchParams_t search_params;
-  cuvsMgIvfFlatSearchParamsCreate(&search_params);
+  cuvsMultiGpuIvfFlatSearchParams_t search_params;
+  cuvsMultiGpuIvfFlatSearchParamsCreate(&search_params);
   search_params->base_params->n_probes = params.nprobe;
-  search_params->search_mode           = CUVS_MG_LOAD_BALANCER;
-  search_params->merge_mode            = CUVS_MG_TREE_MERGE;
+  search_params->search_mode           = CUVS_NEIGHBORS_MG_LOAD_BALANCER;
+  search_params->merge_mode            = CUVS_NEIGHBORS_MG_TREE_MERGE;
   search_params->n_rows_per_batch      = 3000;
 
-  cuvsError_t search_result = cuvsMgIvfFlatSearch(
+  cuvsError_t search_result = cuvsMultiGpuIvfFlatSearch(
     res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
   if (search_result != CUVS_SUCCESS) {
     printf("MG IVF-Flat search failed\n");
@@ -161,9 +161,9 @@ int run_mg_ivf_flat_test(mg_test_params params,
   printf("MG IVF-Flat test completed successfully\n");
 
 cleanup:
-  cuvsMgIvfFlatSearchParamsDestroy(search_params);
-  cuvsMgIvfFlatIndexParamsDestroy(build_params);
-  cuvsMgIvfFlatIndexDestroy(index);
+  cuvsMultiGpuIvfFlatSearchParamsDestroy(search_params);
+  cuvsMultiGpuIvfFlatIndexParamsDestroy(build_params);
+  cuvsMultiGpuIvfFlatIndexDestroy(index);
   cuvsMultiGpuResourcesDestroy(res);
 
   return (build_result == CUVS_SUCCESS && extend_result == CUVS_SUCCESS &&
@@ -205,12 +205,12 @@ int run_mg_ivf_pq_test(mg_test_params params,
   dataset_tensor.dl_tensor.strides            = NULL;
 
   // Create index
-  cuvsMgIvfPqIndex_t index;
-  cuvsMgIvfPqIndexCreate(&index);
+  cuvsMultiGpuIvfPqIndex_t index;
+  cuvsMultiGpuIvfPqIndexCreate(&index);
 
   // Build index
-  cuvsMgIvfPqIndexParams_t build_params;
-  cuvsMgIvfPqIndexParamsCreate(&build_params);
+  cuvsMultiGpuIvfPqIndexParams_t build_params;
+  cuvsMultiGpuIvfPqIndexParamsCreate(&build_params);
   build_params->base_params->metric                   = params.metric;
   build_params->base_params->n_lists                  = params.nlist;
   build_params->base_params->add_data_on_build        = false;
@@ -218,12 +218,12 @@ int run_mg_ivf_pq_test(mg_test_params params,
   build_params->base_params->metric_arg               = 0;
 
   if (params.mode == MG_MODE_REPLICATED) {
-    build_params->mode = CUVS_MG_REPLICATED;
+    build_params->mode = CUVS_NEIGHBORS_MG_REPLICATED;
   } else {
-    build_params->mode = CUVS_MG_SHARDED;
+    build_params->mode = CUVS_NEIGHBORS_MG_SHARDED;
   }
 
-  cuvsError_t build_result = cuvsMgIvfPqBuild(res, build_params, &dataset_tensor, index);
+  cuvsError_t build_result = cuvsMultiGpuIvfPqBuild(res, build_params, &dataset_tensor, index);
   if (build_result != CUVS_SUCCESS) {
     const char* error_msg = cuvsGetLastErrorText();
     printf("MG IVF-PQ build failed: %s\n", error_msg ? error_msg : "Unknown error");
@@ -231,7 +231,7 @@ int run_mg_ivf_pq_test(mg_test_params params,
   }
 
   // Extend index with data
-  cuvsError_t extend_result = cuvsMgIvfPqExtend(res, index, &dataset_tensor, NULL);
+  cuvsError_t extend_result = cuvsMultiGpuIvfPqExtend(res, index, &dataset_tensor, NULL);
   if (extend_result != CUVS_SUCCESS) {
     printf("MG IVF-PQ extend failed\n");
     goto cleanup;
@@ -274,14 +274,14 @@ int run_mg_ivf_pq_test(mg_test_params params,
   distances_tensor.dl_tensor.strides            = NULL;
 
   // Search index
-  cuvsMgIvfPqSearchParams_t search_params;
-  cuvsMgIvfPqSearchParamsCreate(&search_params);
+  cuvsMultiGpuIvfPqSearchParams_t search_params;
+  cuvsMultiGpuIvfPqSearchParamsCreate(&search_params);
   search_params->base_params->n_probes = params.nprobe;
-  search_params->search_mode           = CUVS_MG_LOAD_BALANCER;
-  search_params->merge_mode            = CUVS_MG_TREE_MERGE;
+  search_params->search_mode           = CUVS_NEIGHBORS_MG_LOAD_BALANCER;
+  search_params->merge_mode            = CUVS_NEIGHBORS_MG_TREE_MERGE;
   search_params->n_rows_per_batch      = 3000;
 
-  cuvsError_t search_result = cuvsMgIvfPqSearch(
+  cuvsError_t search_result = cuvsMultiGpuIvfPqSearch(
     res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
   if (search_result != CUVS_SUCCESS) {
     printf("MG IVF-PQ search failed\n");
@@ -291,9 +291,9 @@ int run_mg_ivf_pq_test(mg_test_params params,
   printf("MG IVF-PQ test completed successfully\n");
 
 cleanup:
-  cuvsMgIvfPqSearchParamsDestroy(search_params);
-  cuvsMgIvfPqIndexParamsDestroy(build_params);
-  cuvsMgIvfPqIndexDestroy(index);
+  cuvsMultiGpuIvfPqSearchParamsDestroy(search_params);
+  cuvsMultiGpuIvfPqIndexParamsDestroy(build_params);
+  cuvsMultiGpuIvfPqIndexDestroy(index);
   cuvsMultiGpuResourcesDestroy(res);
 
   return (build_result == CUVS_SUCCESS && extend_result == CUVS_SUCCESS &&
@@ -335,20 +335,20 @@ int run_mg_cagra_test(mg_test_params params,
   dataset_tensor.dl_tensor.strides            = NULL;
 
   // Create index
-  cuvsMgCagraIndex_t index;
-  cuvsMgCagraIndexCreate(&index);
+  cuvsMultiGpuCagraIndex_t index;
+  cuvsMultiGpuCagraIndexCreate(&index);
 
   // Build index
-  cuvsMgCagraIndexParams_t build_params;
-  cuvsMgCagraIndexParamsCreate(&build_params);
+  cuvsMultiGpuCagraIndexParams_t build_params;
+  cuvsMultiGpuCagraIndexParamsCreate(&build_params);
 
   if (params.mode == MG_MODE_REPLICATED) {
-    build_params->mode = CUVS_MG_REPLICATED;
+    build_params->mode = CUVS_NEIGHBORS_MG_REPLICATED;
   } else {
-    build_params->mode = CUVS_MG_SHARDED;
+    build_params->mode = CUVS_NEIGHBORS_MG_SHARDED;
   }
 
-  cuvsError_t build_result = cuvsMgCagraBuild(res, build_params, &dataset_tensor, index);
+  cuvsError_t build_result = cuvsMultiGpuCagraBuild(res, build_params, &dataset_tensor, index);
   if (build_result != CUVS_SUCCESS) {
     const char* error_msg = cuvsGetLastErrorText();
     printf("MG CAGRA build failed: %s\n", error_msg ? error_msg : "Unknown error");
@@ -392,13 +392,13 @@ int run_mg_cagra_test(mg_test_params params,
   distances_tensor.dl_tensor.strides            = NULL;
 
   // Search index
-  cuvsMgCagraSearchParams_t search_params;
-  cuvsMgCagraSearchParamsCreate(&search_params);
-  search_params->search_mode      = CUVS_MG_LOAD_BALANCER;
-  search_params->merge_mode       = CUVS_MG_TREE_MERGE;
+  cuvsMultiGpuCagraSearchParams_t search_params;
+  cuvsMultiGpuCagraSearchParamsCreate(&search_params);
+  search_params->search_mode      = CUVS_NEIGHBORS_MG_LOAD_BALANCER;
+  search_params->merge_mode       = CUVS_NEIGHBORS_MG_TREE_MERGE;
   search_params->n_rows_per_batch = 3000;
 
-  cuvsError_t search_result = cuvsMgCagraSearch(
+  cuvsError_t search_result = cuvsMultiGpuCagraSearch(
     res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor);
   if (search_result != CUVS_SUCCESS) {
     printf("MG CAGRA search failed\n");
@@ -408,9 +408,9 @@ int run_mg_cagra_test(mg_test_params params,
   printf("MG CAGRA test completed successfully\n");
 
 cleanup:
-  cuvsMgCagraSearchParamsDestroy(search_params);
-  cuvsMgCagraIndexParamsDestroy(build_params);
-  cuvsMgCagraIndexDestroy(index);
+  cuvsMultiGpuCagraSearchParamsDestroy(search_params);
+  cuvsMultiGpuCagraIndexParamsDestroy(build_params);
+  cuvsMultiGpuCagraIndexDestroy(index);
   cuvsMultiGpuResourcesDestroy(res);
 
   return (build_result == CUVS_SUCCESS && search_result == CUVS_SUCCESS) ? 0 : 1;
