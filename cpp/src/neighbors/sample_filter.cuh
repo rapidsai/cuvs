@@ -168,6 +168,7 @@ struct ivf_to_sample_filter_dev {
   }
 };
 
+namespace {
 template <typename dev_filter_t>
 __global__ void destruct_dev_filter(dev_filter_t* p_filter)
 {
@@ -187,6 +188,7 @@ __global__ void init_outer_filter(OuterFilterT* p_outer_filter,
 {
   new (p_outer_filter) OuterFilterT(inds_ptrs, *p_inner_filter);
 }
+}  // namespace
 
 /* Device side filter wrapper for ivf_to_sample_filter. ivf_to_sample_filter_dev is used to avoid
  * dynamic dispatching on device. */
