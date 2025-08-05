@@ -17,9 +17,11 @@ package com.nvidia.cuvs.spi;
 
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.CagraIndex;
+import com.nvidia.cuvs.CuVSMatrix;
 import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.HnswIndex;
+import com.nvidia.cuvs.TieredIndex;
+import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
 
 /**
@@ -48,17 +50,38 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
+  public TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) throws Throwable {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public Dataset.Builder newDatasetBuilder(int size, int dimensions) {
+  public CuVSMatrix.Builder newMatrixBuilder(
+      int size, int dimensions, CuVSMatrix.DataType dataType) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public Dataset newArrayDataset(float[][] vectors) {
+  public MethodHandle newNativeMatrixBuilder() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public CuVSMatrix newMatrixFromArray(float[][] vectors) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public CuVSMatrix newMatrixFromArray(int[][] vectors) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public CuVSMatrix newMatrixFromArray(byte[][] vectors) {
     throw new UnsupportedOperationException();
   }
 }

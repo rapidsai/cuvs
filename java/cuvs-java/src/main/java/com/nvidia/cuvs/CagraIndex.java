@@ -15,7 +15,6 @@
  */
 package com.nvidia.cuvs;
 
-import com.nvidia.cuvs.BruteForceIndex.Builder;
 import com.nvidia.cuvs.spi.CuVSProvider;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -220,10 +219,10 @@ public interface CagraIndex {
     /**
      * Sets the dataset for building the {@link CagraIndex}.
      *
-     * @param dataset a {@link Dataset} object containing the vectors
+     * @param dataset a {@link CuVSMatrix} object containing the vectors
      * @return an instance of this Builder
      */
-    Builder withDataset(Dataset dataset);
+    Builder withDataset(CuVSMatrix dataset);
 
     /**
      * Registers an instance of configured {@link CagraIndexParams} with this

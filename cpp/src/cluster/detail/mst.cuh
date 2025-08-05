@@ -20,6 +20,7 @@
 #include "raft/core/device_mdspan.hpp"
 #include "raft/core/operators.hpp"
 #include <cuvs/distance/distance.hpp>
+#include <raft/core/memory_type.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/label/classlabels.cuh>
 #include <raft/linalg/map.cuh>
@@ -324,9 +325,7 @@ void build_sorted_mst(
   int iters        = 1;
   int n_components = cuvs::sparse::neighbors::get_n_components(color, m, stream);
 
-  cudaPointerAttributes attr;
-  RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, X));
-  bool data_on_device = attr.type == cudaMemoryTypeDevice;
+  bool data_on_device = raft::memory_type_from_pointer(X) != raft::memory_type::host;
 
   while (n_components > 1 && iters < max_iter) {
     if (data_on_device) {
