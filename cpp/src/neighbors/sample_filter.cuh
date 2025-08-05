@@ -175,17 +175,13 @@ __global__ void destruct_dev_filter(dev_filter_t* p_filter)
   p_filter->~dev_filter_t();
 }
 
-template <typename InnerFilterT, typename... Args>
-__global__ void init_inner_filter(InnerFilterT* p_inner_filter, Args... args)
+template <typename OuterFilterT, typename InnerFilterT, typename... InnerArgs>
+__global__ void init_dev_filters(OuterFilterT* p_outer_filter,
+                                 InnerFilterT* p_inner_filter,
+                                 const int64_t* const* inds_ptrs,
+                                 InnerArgs... inner_args)
 {
-  new (p_inner_filter) InnerFilterT(args...);
-}
-
-template <typename OuterFilterT, typename InnerFilterT, typename... Args>
-__global__ void init_outer_filter(OuterFilterT* p_outer_filter,
-                                  const int64_t* const* inds_ptrs,
-                                  InnerFilterT* p_inner_filter)
-{
+  new (p_inner_filter) InnerFilterT(inner_args...);
   new (p_outer_filter) OuterFilterT(inds_ptrs, *p_inner_filter);
 }
 }  // namespace
@@ -198,17 +194,18 @@ struct ivf_to_sample_dev_wrapper {
   OuterFilterT* p_outer_filter;
   InnerFilterT* p_inner_filter;
   filtering::ivf_to_sample_filter_dev h_placeholder;
+  rmm::cuda_stream_view stream_;
 
-  ivf_to_sample_dev_wrapper(FilterType tag,
+  ivf_to_sample_dev_wrapper(rmm::cuda_stream_view stream,
+                            FilterType tag,
                             const int64_t* const* inds_ptrs,
                             InnerArgs... inner_args)
+    : stream_(stream)
   {
-    cudaMalloc(&p_inner_filter, sizeof(InnerFilterT));
-    init_inner_filter<<<1, 1>>>(p_inner_filter, inner_args...);
-    cudaDeviceSynchronize();
-
-    cudaMalloc(&p_outer_filter, sizeof(OuterFilterT));
-    init_outer_filter<<<1, 1>>>(p_outer_filter, inds_ptrs, p_inner_filter);
+    RAFT_CUDA_TRY(cudaMalloc(&p_outer_filter, sizeof(OuterFilterT)));
+    RAFT_CUDA_TRY(cudaMalloc(&p_inner_filter, sizeof(InnerFilterT)));
+    init_dev_filters<<<1, 1, 0, stream_>>>(
+      p_outer_filter, p_inner_filter, inds_ptrs, inner_args...);
     cudaDeviceSynchronize();
 
     h_placeholder = {tag, p_outer_filter};
@@ -216,12 +213,10 @@ struct ivf_to_sample_dev_wrapper {
 
   ~ivf_to_sample_dev_wrapper()
   {
-    destruct_dev_filter<<<1, 1>>>(p_outer_filter);
+    // this calls the destructor for the inner filter as well
+    destruct_dev_filter<<<1, 1, 0, stream_>>>(p_outer_filter);
     cudaDeviceSynchronize();
     cudaFree(p_outer_filter);
-
-    destruct_dev_filter<<<1, 1>>>(p_inner_filter);
-    cudaDeviceSynchronize();
     cudaFree(p_inner_filter);
   }
 

@@ -654,8 +654,8 @@ void compute_similarity_run(selected<OutT, LutT> s,
           const filtering::ivf_to_sample_filter<int64_t, filtering::none_sample_filter>&>(
           sample_filter_ref);
 
-        filtering::ivf_to_sample_dev_none ivf_none_(filtering::FilterType::None,
-                                                    typed_sample_filter.inds_ptrs_);
+        filtering::ivf_to_sample_dev_none ivf_none_(
+          stream, filtering::FilterType::None, typed_sample_filter.inds_ptrs_);
         launch_kernel(ivf_none_.get_dev_filter());
       } catch (const std::bad_cast& e) {
       }
@@ -669,6 +669,7 @@ void compute_similarity_run(selected<OutT, LutT> s,
           sample_filter_ref);
 
         filtering::ivf_to_sample_dev_bitset ivf_bitset_(
+          stream,
           filtering::FilterType::Bitset,
           typed_sample_filter.inds_ptrs_,
           typed_sample_filter.next_filter_.bitset_view_);
