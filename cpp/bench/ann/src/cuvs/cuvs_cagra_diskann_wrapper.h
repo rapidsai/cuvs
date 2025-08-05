@@ -89,9 +89,7 @@ cuvs_cagra_diskann<T, IdxT>::cuvs_cagra_diskann(Metric metric, int dim, const bu
   diskann_memory_search_ = std::make_shared<cuvs::bench::diskann_memory<T>>(
     metric,
     dim,
-    typename diskann_memory<T>::build_param{
-      static_cast<uint32_t>(32),
-      static_cast<uint32_t>(32)});
+    typename diskann_memory<T>::build_param{static_cast<uint32_t>(32), static_cast<uint32_t>(32)});
 }
 
 template <typename T, typename IdxT>

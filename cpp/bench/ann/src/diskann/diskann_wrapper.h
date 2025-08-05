@@ -141,22 +141,21 @@ template <typename T>
 void diskann_memory<T>::set_search_param(const search_param_base& param, const void* filter_bitset)
 {
   if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
-  auto sp             = dynamic_cast<const search_param&>(param);
-  L_search_           = sp.L_search;
+  auto sp   = dynamic_cast<const search_param&>(param);
+  L_search_ = sp.L_search;
 }
 
 template <typename T>
 void diskann_memory<T>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* indices, float* distances) const
 {
-    for (int i = 0; i < batch_size; i++) {
-      mem_index_->search(queries + i * this->dim_,
-                         static_cast<size_t>(k),
-                         L_search_,
-                         reinterpret_cast<uint64_t*>(indices + i * k),
-                         distances + i * k);
-    }
-  
+  for (int i = 0; i < batch_size; i++) {
+    mem_index_->search(queries + i * this->dim_,
+                       static_cast<size_t>(k),
+                       L_search_,
+                       reinterpret_cast<uint64_t*>(indices + i * k),
+                       distances + i * k);
+  }
 }
 
 template <typename T>
@@ -173,7 +172,7 @@ void diskann_memory<T>::load(const std::string& index_file)
   bench_mode_ = (cuvs::bench::benchmark_n_threads > 1) ? Mode::kThroughput : Mode::kLatency;
 
   initialize_index_(0);
-  
+
   int load_threads = (bench_mode_ == Mode::kThroughput) ? cuvs::bench::benchmark_n_threads : 1;
   this->mem_index_->load(index_path_prefix_.c_str(), load_threads, 2000);
 }
@@ -243,6 +242,7 @@ class diskann_ssd : public algo<T> {
 template <typename T>
 diskann_ssd<T>::diskann_ssd(Metric metric, int dim, const build_param& param) : algo<T>(metric, dim)
 {
+  // Currently set the indexing RAM budget and the search RAM budget to max value to avoid sharding
   uint32_t build_dram_budget  = std::numeric_limits<uint32_t>::max();
   uint32_t search_dram_budget = std::numeric_limits<uint32_t>::max();
   index_build_params_str =
@@ -286,21 +286,23 @@ template <typename T>
 void diskann_ssd<T>::search(
   const T* queries, int batch_size, int k, algo_base::index_type* neighbors, float* distances) const
 {
-    for (int64_t i = 0; i < (int64_t)batch_size; i++) {
-      p_flash_index_->cached_beam_search(queries + (i * this->dim_),
-                                         static_cast<size_t>(k),
-                                         L_search_,
-                                         reinterpret_cast<uint64_t*>(neighbors + i * k),
-                                         distances + i * k,
-                                         beam_width_,
-                                         false,
-                                         nullptr);
-    }
+  for (int64_t i = 0; i < (int64_t)batch_size; i++) {
+    p_flash_index_->cached_beam_search(queries + (i * this->dim_),
+                                       static_cast<size_t>(k),
+                                       L_search_,
+                                       reinterpret_cast<uint64_t*>(neighbors + i * k),
+                                       distances + i * k,
+                                       beam_width_,
+                                       false,
+                                       nullptr);
+  }
 }
 
 template <typename T>
 void diskann_ssd<T>::save(const std::string& index_file) const
 {
+  // Nothing to do here. Index already saved in build stage, but an empty file has to be created
+  // with the index filename.
   std::ofstream of(index_file);
   of.close();
 }
@@ -313,7 +315,7 @@ void diskann_ssd<T>::load(const std::string& index_file)
   bench_mode_ = (cuvs::bench::benchmark_n_threads > 1) ? Mode::kThroughput : Mode::kLatency;
 
   int load_threads = (bench_mode_ == Mode::kThroughput) ? cuvs::bench::benchmark_n_threads : 1;
-  
+
   reader.reset(new LinuxAlignedFileReader());
   p_flash_index_ =
     std::make_shared<diskann::PQFlashIndex<T>>(reader, parse_metric_to_diskann(this->metric_));
