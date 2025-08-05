@@ -22,10 +22,6 @@
 #include <cuvs/neighbors/mg_ivf_pq.h>
 #include <stdio.h>
 
-// Forward declarations for multi-GPU resource functions
-extern cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res);
-extern cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res);
-
 typedef enum { MG_ALGO_IVF_FLAT, MG_ALGO_IVF_PQ, MG_ALGO_CAGRA } mg_algo_t;
 
 typedef enum { MG_MODE_REPLICATED, MG_MODE_SHARDED, MG_MODE_LOCAL_THEN_DISTRIBUTED } mg_mode_t;

@@ -45,7 +45,7 @@ extern "C" cuvsError_t cuvsMultiGpuCagraIndexParamsDestroy(
 {
   return cuvs::core::translate_exceptions([=] {
     if (index_params) {
-      // Base parameters are destroyed automatically
+      cuvsCagraIndexParamsDestroy(index_params->base_params);
       delete index_params;
     }
   });
@@ -72,7 +72,7 @@ extern "C" cuvsError_t cuvsMultiGpuCagraSearchParamsDestroy(cuvsMultiGpuCagraSea
 {
   return cuvs::core::translate_exceptions([=] {
     if (params) {
-      // Base parameters are destroyed automatically
+      cuvsCagraSearchParamsDestroy(params->base_params);
       delete params;
     }
   });
@@ -94,6 +94,12 @@ extern "C" cuvsError_t cuvsMultiGpuCagraIndexDestroy(cuvsMultiGpuCagraIndex_t in
                                                      float,
                                                      uint32_t>*>(index->addr);
         delete mg_index_ptr;
+      } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+        auto mg_index_ptr =
+          reinterpret_cast<cuvs::neighbors::mg_index<cuvs::neighbors::cagra::index<half, uint32_t>,
+                                                     half,
+                                                     uint32_t>*>(index->addr);
+        delete mg_index_ptr;
       } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
         auto mg_index_ptr = reinterpret_cast<
           cuvs::neighbors::
@@ -113,14 +119,6 @@ extern "C" cuvsError_t cuvsMultiGpuCagraIndexDestroy(cuvsMultiGpuCagraIndex_t in
 }
 
 namespace cuvs::neighbors::cagra {
-
-// Forward declarations for functions defined in cagra_c.cpp
-void convert_c_index_params(cuvsCagraIndexParams params,
-                            int64_t n_rows,
-                            int64_t dim,
-                            cuvs::neighbors::cagra::index_params* out);
-void convert_c_search_params(cuvsCagraSearchParams params,
-                             cuvs::neighbors::cagra::search_params* out);
 
 void convert_c_mg_index_params(
   cuvsMultiGpuCagraIndexParams params,
@@ -272,7 +270,8 @@ extern "C" cuvsError_t cuvsMultiGpuCagraBuild(cuvsResources_t res,
 
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
       index->addr = reinterpret_cast<uintptr_t>(_mg_build<float>(res, *params, dataset_tensor));
-
+    } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
+      index->addr = reinterpret_cast<uintptr_t>(_mg_build<half>(res, *params, dataset_tensor));
     } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
       index->addr = reinterpret_cast<uintptr_t>(_mg_build<int8_t>(res, *params, dataset_tensor));
     } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
@@ -297,7 +296,8 @@ extern "C" cuvsError_t cuvsMultiGpuCagraSearch(cuvsResources_t res,
 
     if (queries.dtype.code == kDLFloat && queries.dtype.bits == 32) {
       _mg_search<float>(res, *params, *index, queries_tensor, neighbors_tensor, distances_tensor);
-
+    } else if (queries.dtype.code == kDLFloat && queries.dtype.bits == 16) {
+      _mg_search<half>(res, *params, *index, queries_tensor, neighbors_tensor, distances_tensor);
     } else if (queries.dtype.code == kDLInt && queries.dtype.bits == 8) {
       _mg_search<int8_t>(res, *params, *index, queries_tensor, neighbors_tensor, distances_tensor);
     } else if (queries.dtype.code == kDLUInt && queries.dtype.bits == 8) {
@@ -320,7 +320,8 @@ extern "C" cuvsError_t cuvsMultiGpuCagraExtend(cuvsResources_t res,
 
     if (vectors.dtype.code == kDLFloat && vectors.dtype.bits == 32) {
       _mg_extend<float>(res, *index, new_vectors_tensor, new_indices_tensor);
-
+    } else if (vectors.dtype.code == kDLFloat && vectors.dtype.bits == 16) {
+      _mg_extend<half>(res, *index, new_vectors_tensor, new_indices_tensor);
     } else if (vectors.dtype.code == kDLInt && vectors.dtype.bits == 8) {
       _mg_extend<int8_t>(res, *index, new_vectors_tensor, new_indices_tensor);
     } else if (vectors.dtype.code == kDLUInt && vectors.dtype.bits == 8) {
@@ -340,7 +341,8 @@ extern "C" cuvsError_t cuvsMultiGpuCagraSerialize(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
       _mg_serialize<float>(res, *index, filename);
-
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      _mg_serialize<half>(res, *index, filename);
     } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
       _mg_serialize<int8_t>(res, *index, filename);
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {

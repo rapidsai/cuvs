@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "ivf_flat_c.hpp"
 #include <cuvs/core/exceptions.hpp>
 #include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/common.hpp>
@@ -44,7 +45,7 @@ extern "C" cuvsError_t cuvsMultiGpuIvfFlatIndexParamsDestroy(
 {
   return cuvs::core::translate_exceptions([=] {
     if (index_params) {
-      // Base parameters are destroyed automatically
+      cuvsIvfFlatIndexParamsDestroy(index_params->base_params);
       delete index_params;
     }
   });
@@ -73,7 +74,7 @@ extern "C" cuvsError_t cuvsMultiGpuIvfFlatSearchParamsDestroy(
 {
   return cuvs::core::translate_exceptions([=] {
     if (params) {
-      // Base parameters are destroyed automatically
+      cuvsIvfFlatSearchParamsDestroy(params->base_params);
       delete params;
     }
   });
@@ -114,12 +115,6 @@ extern "C" cuvsError_t cuvsMultiGpuIvfFlatIndexDestroy(cuvsMultiGpuIvfFlatIndex_
 }
 
 namespace cuvs::neighbors::ivf_flat {
-
-// Forward declarations for functions defined in ivf_flat_c.cpp
-void convert_c_index_params(cuvsIvfFlatIndexParams params,
-                            cuvs::neighbors::ivf_flat::index_params* out);
-void convert_c_search_params(cuvsIvfFlatSearchParams params,
-                             cuvs::neighbors::ivf_flat::search_params* out);
 
 void convert_c_mg_index_params(
   cuvsMultiGpuIvfFlatIndexParams params,
