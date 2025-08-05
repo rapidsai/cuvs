@@ -90,8 +90,8 @@ cuvs_cagra_diskann<T, IdxT>::cuvs_cagra_diskann(Metric metric, int dim, const bu
     metric,
     dim,
     typename diskann_memory<T>::build_param{
-      static_cast<uint32_t>(param.cagra_params.graph_degree),
-      static_cast<uint32_t>(param.cagra_params.graph_degree)});
+      static_cast<uint32_t>(32),
+      static_cast<uint32_t>(32)});
 }
 
 template <typename T, typename IdxT>
@@ -118,7 +118,7 @@ void cuvs_cagra_diskann<T, IdxT>::save(const std::string& file) const
   size_t file_offset = 0;
   index_of.seekp(file_offset, index_of.beg);
   uint32_t max_degree = 0;
-  size_t index_size   = 24;  // Starting metadata
+  size_t index_size   = 24;
   uint32_t start = static_cast<uint32_t>(rand() % (cagra_build_.get_index()->graph().extent(0)));
   size_t num_frozen_points     = 0;
   uint32_t max_observed_degree = 0;

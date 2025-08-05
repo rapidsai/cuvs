@@ -550,7 +550,7 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
     config.graph_degree              = param.graph_degree;
     config.intermediate_graph_degree = param.intermediate_graph_degree;
     config.device                    = this->device_;
-    config.store_dataset             = false;
+    config.store_dataset             = true;
     if (param.cagra_build_algo == "IVF_PQ") {
       config.build_algo           = faiss::gpu::graph_build_algo::IVF_PQ;
       this->ivf_pq_build_params_  = param.ivf_pq_build_params;
@@ -580,7 +580,7 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
 
     auto cpu_hnsw_index = std::make_unique<faiss::IndexHNSWCagra>();
     // Only add the base HNSW layer to serialize the CAGRA index.
-    cpu_hnsw_index->base_level_only = true;
+    cpu_hnsw_index->base_level_only = false;
     static_cast<faiss::gpu::GpuIndexCagra*>(this->index_.get())->copyTo(cpu_hnsw_index.get());
     faiss::write_index(cpu_hnsw_index.get(), file.c_str());
   }
@@ -655,9 +655,19 @@ class faiss_gpu_cagra_hnsw : public faiss_gpu<T> {
     omp_single_thread_scope omp_single_thread;
     this->search_index_.reset(static_cast<faiss::IndexHNSWCagra*>(faiss::read_index(file.c_str())));
   }
+  
+  [[nodiscard]] auto get_sync_stream() const noexcept -> cudaStream_t override
+  {
+    if (this->gpu_resource_ == nullptr) {
+      return 0;
+    }
+    return this->gpu_resource_->getDefaultStream(this->device_);
+  }
   std::unique_ptr<algo<T>> copy() override
   {
-    return std::make_unique<faiss_gpu_cagra_hnsw<T>>(*this);
+    auto new_instance = std::make_unique<faiss_gpu_cagra_hnsw<T>>(*this);
+    new_instance->build_index_ = nullptr;
+    return new_instance;
   };
 
  private:
