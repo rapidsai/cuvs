@@ -86,7 +86,8 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
 
       log.info("CAGRA index created, starting high-contention multi-threaded search...");
 
-      // Create high contention scenario that would fail without using separate resources in every thread
+      // Create high contention scenario that would fail without using separate resources in every
+      // thread
       ExecutorService executor = Executors.newFixedThreadPool(numThreads);
       List<Future<?>> futures = new ArrayList<>();
       CountDownLatch startLatch = new CountDownLatch(1);
@@ -169,10 +170,7 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
       log.info("  Successful queries: {} / {}", actualSuccessfulQueries, expectedTotalQueries);
 
       if (firstError.get() != null) {
-        fail(
-            "MultiThreaded stablity test failed:"
-                + " "
-                + firstError.get().getMessage());
+        fail("MultiThreaded stablity test failed:" + " " + firstError.get().getMessage());
       }
 
       assertTrue("All threads should complete successfully", allCompleted);
