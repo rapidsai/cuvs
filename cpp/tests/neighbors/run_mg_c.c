@@ -103,6 +103,25 @@ int run_mg_ivf_flat_test(mg_test_params params,
     goto cleanup;
   }
 
+  // Serialize index to test serialization/deserialization
+  const char* serialize_filename = "/tmp/mg_ivf_flat_test_index.bin";
+  cuvsError_t serialize_result   = cuvsMultiGpuIvfFlatSerialize(res, index, serialize_filename);
+  if (serialize_result != CUVS_SUCCESS) {
+    printf("MG IVF-Flat serialize failed\n");
+    goto cleanup;
+  }
+
+  // Destroy current index and recreate it
+  cuvsMultiGpuIvfFlatIndexDestroy(index);
+  cuvsMultiGpuIvfFlatIndexCreate(&index);
+
+  // Deserialize index from file
+  cuvsError_t deserialize_result = cuvsMultiGpuIvfFlatDeserialize(res, serialize_filename, index);
+  if (deserialize_result != CUVS_SUCCESS) {
+    printf("MG IVF-Flat deserialize failed\n");
+    goto cleanup;
+  }
+
   // Create queries tensor
   DLManagedTensor queries_tensor;
   queries_tensor.dl_tensor.data               = query_data;
@@ -162,7 +181,11 @@ cleanup:
   cuvsMultiGpuIvfFlatIndexDestroy(index);
   cuvsMultiGpuResourcesDestroy(res);
 
+  // Clean up temporary serialization file
+  remove("/tmp/mg_ivf_flat_test_index.bin");
+
   return (build_result == CUVS_SUCCESS && extend_result == CUVS_SUCCESS &&
+          serialize_result == CUVS_SUCCESS && deserialize_result == CUVS_SUCCESS &&
           search_result == CUVS_SUCCESS)
            ? 0
            : 1;
@@ -233,6 +256,25 @@ int run_mg_ivf_pq_test(mg_test_params params,
     goto cleanup;
   }
 
+  // Serialize index to test serialization/deserialization
+  const char* serialize_filename = "/tmp/mg_ivf_pq_test_index.bin";
+  cuvsError_t serialize_result   = cuvsMultiGpuIvfPqSerialize(res, index, serialize_filename);
+  if (serialize_result != CUVS_SUCCESS) {
+    printf("MG IVF-PQ serialize failed\n");
+    goto cleanup;
+  }
+
+  // Destroy current index and recreate it
+  cuvsMultiGpuIvfPqIndexDestroy(index);
+  cuvsMultiGpuIvfPqIndexCreate(&index);
+
+  // Deserialize index from file
+  cuvsError_t deserialize_result = cuvsMultiGpuIvfPqDeserialize(res, serialize_filename, index);
+  if (deserialize_result != CUVS_SUCCESS) {
+    printf("MG IVF-PQ deserialize failed\n");
+    goto cleanup;
+  }
+
   // Create queries tensor
   DLManagedTensor queries_tensor;
   queries_tensor.dl_tensor.data               = query_data;
@@ -292,7 +334,11 @@ cleanup:
   cuvsMultiGpuIvfPqIndexDestroy(index);
   cuvsMultiGpuResourcesDestroy(res);
 
+  // Clean up temporary serialization file
+  remove("/tmp/mg_ivf_pq_test_index.bin");
+
   return (build_result == CUVS_SUCCESS && extend_result == CUVS_SUCCESS &&
+          serialize_result == CUVS_SUCCESS && deserialize_result == CUVS_SUCCESS &&
           search_result == CUVS_SUCCESS)
            ? 0
            : 1;
@@ -348,6 +394,25 @@ int run_mg_cagra_test(mg_test_params params,
   if (build_result != CUVS_SUCCESS) {
     const char* error_msg = cuvsGetLastErrorText();
     printf("MG CAGRA build failed: %s\n", error_msg ? error_msg : "Unknown error");
+    goto cleanup;
+  }
+
+  // Serialize index to test serialization/deserialization
+  const char* serialize_filename = "/tmp/mg_cagra_test_index.bin";
+  cuvsError_t serialize_result   = cuvsMultiGpuCagraSerialize(res, index, serialize_filename);
+  if (serialize_result != CUVS_SUCCESS) {
+    printf("MG CAGRA serialize failed\n");
+    goto cleanup;
+  }
+
+  // Destroy current index and recreate it
+  cuvsMultiGpuCagraIndexDestroy(index);
+  cuvsMultiGpuCagraIndexCreate(&index);
+
+  // Deserialize index from file
+  cuvsError_t deserialize_result = cuvsMultiGpuCagraDeserialize(res, serialize_filename, index);
+  if (deserialize_result != CUVS_SUCCESS) {
+    printf("MG CAGRA deserialize failed\n");
     goto cleanup;
   }
 
@@ -409,7 +474,13 @@ cleanup:
   cuvsMultiGpuCagraIndexDestroy(index);
   cuvsMultiGpuResourcesDestroy(res);
 
-  return (build_result == CUVS_SUCCESS && search_result == CUVS_SUCCESS) ? 0 : 1;
+  // Clean up temporary serialization file
+  remove("/tmp/mg_cagra_test_index.bin");
+
+  return (build_result == CUVS_SUCCESS && serialize_result == CUVS_SUCCESS &&
+          deserialize_result == CUVS_SUCCESS && search_result == CUVS_SUCCESS)
+           ? 0
+           : 1;
 }
 
 // Generate reference results using brute force

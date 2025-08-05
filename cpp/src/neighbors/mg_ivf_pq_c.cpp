@@ -23,6 +23,9 @@
 #include <cuvs/neighbors/mg_ivf_pq.h>
 #include <dlpack/dlpack.h>
 #include <raft/core/error.hpp>
+#include <raft/core/serialize.hpp>
+
+#include <fstream>
 
 extern "C" cuvsError_t cuvsMultiGpuIvfPqIndexParamsCreate(
   cuvsMultiGpuIvfPqIndexParams_t* index_params)
@@ -347,11 +350,29 @@ extern "C" cuvsError_t cuvsMultiGpuIvfPqDeserialize(cuvsResources_t res,
                                                     cuvsMultiGpuIvfPqIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] {
-    // We need to read dtype from file since we don't know it yet
-    // For now, we'll default to float32
-    index->dtype.code = kDLFloat;
-    index->dtype.bits = 32;
-    index->addr       = reinterpret_cast<uintptr_t>(_mg_deserialize<float>(res, filename));
+    std::ifstream is(filename, std::ios::in | std::ios::binary);
+    if (!is) { RAFT_FAIL("Cannot open file %s", filename); }
+    char dtype_string[4];
+    is.read(dtype_string, 4);
+    auto dtype = raft::detail::numpy_serializer::parse_descr(std::string(dtype_string, 4));
+    is.close();
+
+    index->dtype.bits = dtype.itemsize * 8;
+    if (dtype.kind == 'f' && dtype.itemsize == 4) {
+      index->dtype.code = kDLFloat;
+      index->addr       = reinterpret_cast<uintptr_t>(_mg_deserialize<float>(res, filename));
+    } else if (dtype.kind == 'f' && dtype.itemsize == 2) {
+      index->dtype.code = kDLFloat;
+      index->addr       = reinterpret_cast<uintptr_t>(_mg_deserialize<half>(res, filename));
+    } else if (dtype.kind == 'i' && dtype.itemsize == 1) {
+      index->dtype.code = kDLInt;
+      index->addr       = reinterpret_cast<uintptr_t>(_mg_deserialize<int8_t>(res, filename));
+    } else if (dtype.kind == 'u' && dtype.itemsize == 1) {
+      index->dtype.code = kDLUInt;
+      index->addr       = reinterpret_cast<uintptr_t>(_mg_deserialize<uint8_t>(res, filename));
+    } else {
+      RAFT_FAIL("Unsupported index dtype");
+    }
   });
 }
 
@@ -360,10 +381,28 @@ extern "C" cuvsError_t cuvsMultiGpuIvfPqDistribute(cuvsResources_t res,
                                                    cuvsMultiGpuIvfPqIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] {
-    // We need to read dtype from file since we don't know it yet
-    // For now, we'll default to float32
-    index->dtype.code = kDLFloat;
-    index->dtype.bits = 32;
-    index->addr       = reinterpret_cast<uintptr_t>(_mg_distribute<float>(res, filename));
+    std::ifstream is(filename, std::ios::in | std::ios::binary);
+    if (!is) { RAFT_FAIL("Cannot open file %s", filename); }
+    char dtype_string[4];
+    is.read(dtype_string, 4);
+    auto dtype = raft::detail::numpy_serializer::parse_descr(std::string(dtype_string, 4));
+    is.close();
+
+    index->dtype.bits = dtype.itemsize * 8;
+    if (dtype.kind == 'f' && dtype.itemsize == 4) {
+      index->dtype.code = kDLFloat;
+      index->addr       = reinterpret_cast<uintptr_t>(_mg_distribute<float>(res, filename));
+    } else if (dtype.kind == 'f' && dtype.itemsize == 2) {
+      index->dtype.code = kDLFloat;
+      index->addr       = reinterpret_cast<uintptr_t>(_mg_distribute<half>(res, filename));
+    } else if (dtype.kind == 'i' && dtype.itemsize == 1) {
+      index->dtype.code = kDLInt;
+      index->addr       = reinterpret_cast<uintptr_t>(_mg_distribute<int8_t>(res, filename));
+    } else if (dtype.kind == 'u' && dtype.itemsize == 1) {
+      index->dtype.code = kDLUInt;
+      index->addr       = reinterpret_cast<uintptr_t>(_mg_distribute<uint8_t>(res, filename));
+    } else {
+      RAFT_FAIL("Unsupported index dtype");
+    }
   });
 }

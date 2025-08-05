@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,9 +72,13 @@ void deserialize(const raft::resources& clique,
   std::ifstream is(filename, std::ios::in | std::ios::binary);
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
+  char dtype_string[4];
+  is.read(dtype_string, 4);
+
   const auto& handle = raft::resource::set_current_device_to_root_rank(clique);
-  index.mode_        = (cuvs::neighbors::distribution_mode)deserialize_scalar<int>(handle, is);
-  index.num_ranks_   = deserialize_scalar<int>(handle, is);
+  index.mode_ =
+    static_cast<cuvs::neighbors::distribution_mode>(deserialize_scalar<int>(handle, is));
+  index.num_ranks_ = deserialize_scalar<int>(handle, is);
 
   if (index.num_ranks_ != raft::resource::get_num_ranks(clique)) {
     RAFT_FAIL("Serialized index has %d ranks whereas NCCL clique has %d ranks",
@@ -643,9 +647,14 @@ void serialize(const raft::resources& clique,
   std::ofstream of(filename, std::ios::out | std::ios::binary);
   if (!of) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
+  std::string dtype_string = raft::detail::numpy_serializer::get_numpy_dtype<T>().to_string();
+  dtype_string.resize(4);
+  of << dtype_string;
+
   const auto& handle = raft::resource::set_current_device_to_root_rank(clique);
+
   serialize_scalar(handle, of, (int)index.mode_);
-  serialize_scalar(handle, of, index.num_ranks_);
+  serialize_scalar(handle, of, (int)index.num_ranks_);
 
   for (int rank = 0; rank < index.num_ranks_; rank++) {
     const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
