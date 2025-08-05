@@ -282,6 +282,10 @@ void set_centers(raft::resources const& handle,
                  index<int64_t>* index,
                  raft::device_matrix_view<const float, uint32_t, raft::row_major> cluster_centers)
 {
+  std::cout << "set_centers(" << cluster_centers.extent(0) << ", " << cluster_centers.extent(1)
+            << ")" << std::endl;
+  std::cout << "index->n_lists() = " << index->n_lists() << ", index->dim() = " << index->dim()
+            << std::endl;
   RAFT_EXPECTS(cluster_centers.extent(0) == index->n_lists(),
                "Number of rows in the new centers must be equal to the number of IVF lists");
   RAFT_EXPECTS(cluster_centers.extent(1) == index->dim(),
@@ -303,7 +307,21 @@ void extract_centers(raft::resources const& res,
 {
   detail::extract_centers(res, index, cluster_centers);
 }
+/*
+void extract_codebook(raft::resources const& res,
+                     const cuvs::neighbors::ivf_pq::index<int64_t>& index,
+                     raft::device_matrix_view<float, uint32_t, raft::row_major> codebook)
+{
+  detail::extract_codebook(res, index, codebook);
+}
 
+void extract_codebook(raft::resources const& res,
+                     const cuvs::neighbors::ivf_pq::index<int64_t>& index,
+                     raft::host_matrix_view<float, uint32_t, raft::row_major> codebook)
+{
+  detail::extract_codebook(res, index, codebook);
+}
+*/
 void recompute_internal_state(const raft::resources& res, index<int64_t>* index)
 {
   ivf::detail::recompute_internal_state(res, *index);

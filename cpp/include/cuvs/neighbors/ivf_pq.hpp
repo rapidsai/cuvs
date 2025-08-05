@@ -516,6 +516,11 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix<float, uint32_t, raft::row_major> centers_rot_;
   raft::device_matrix<float, uint32_t, raft::row_major> rotation_matrix_;
 
+  // Views of the data members
+  raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers_view_;
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_view_;
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix_view_;
+
   // Lazy-initialized low-precision variants of index members - for low-precision coarse search.
   // These are never serialized and not touched during build/extend.
   mutable std::optional<raft::device_matrix<int8_t, uint32_t, raft::row_major>> centers_int8_;
@@ -2933,6 +2938,35 @@ void extract_centers(raft::resources const& res,
 void extract_centers(raft::resources const& res,
                      const index<int64_t>& index,
                      raft::host_matrix_view<float, uint32_t, raft::row_major> cluster_centers);
+
+/**
+ * @brief Public helper API for fetching a trained index's PQ codebook
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   raft::resources res;
+ *   // allocate the buffer for the output codebook
+ *   auto codeboook_buffer = rmm::device_uvector<float>(index.pq_dim() * index.pq_len() *
+ * index.pq_book_size()); auto codebook = raft::device_mdspan<float, raft::extent_3d<uint32_t>,
+ * raft::row_major> ( codeboook_buffer.data(), index.pq_dim(), index.pq_len(),
+ * index.pq_book_size());
+ *   // Extract the PQ codebook into the buffer
+ *   cuvs::neighbors::ivf_pq::helpers::extract_codebook(res, index, codebook);
+ * @endcode
+ *
+ * @param[in] res raft resource
+ * @param[in] index IVF-PQ index (passed by reference)
+ * @param[out] codebook PQ codebook [index.pq_dim(), index.pq_len(), index.pq_book_size()]
+ */
+/*
+void extract_codebook(raft::resources const& res,
+                     const index<int64_t>& index,
+                     raft::device_matrix_view<float, uint32_t, raft::row_major> codebook);
+
+void extract_codebook(raft::resources const& res,
+                     const index<int64_t>& index,
+                     raft::host_matrix_view<float, uint32_t, raft::row_major> codebook);
+*/
 /**
  * @brief Helper exposing the re-computation of list sizes and related arrays if IVF lists have been
  * modified externally.

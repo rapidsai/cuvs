@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,10 +90,13 @@ index<IdxT>::index(raft::resources const& handle,
     lists_{n_lists},
     list_sizes_{raft::make_device_vector<uint32_t, uint32_t>(handle, n_lists)},
     pq_centers_{raft::make_device_mdarray<float>(handle, make_pq_centers_extents())},
+    pq_centers_view_{pq_centers_.view()},
     centers_{raft::make_device_matrix<float, uint32_t>(handle, n_lists, this->dim_ext())},
+    centers_view_{centers_.view()},
     centers_rot_{raft::make_device_matrix<float, uint32_t>(handle, n_lists, this->rot_dim())},
     rotation_matrix_{
       raft::make_device_matrix<float, uint32_t>(handle, this->rot_dim(), this->dim())},
+    rotation_matrix_view_{rotation_matrix_.view()},
     data_ptrs_{raft::make_device_vector<uint8_t*, uint32_t>(handle, n_lists)},
     inds_ptrs_{raft::make_device_vector<IdxT*, uint32_t>(handle, n_lists)},
     accum_sorted_sizes_{raft::make_host_vector<IdxT, uint32_t>(n_lists + 1)}
@@ -101,6 +104,38 @@ index<IdxT>::index(raft::resources const& handle,
   check_consistency();
   accum_sorted_sizes_(n_lists) = 0;
 }
+
+/*template <typename IdxT>
+index<IdxT>::index(raft::resources const& handle,
+                   cuvs::distance::DistanceType metric,
+                   codebook_gen codebook_kind,
+                   uint32_t n_lists,
+                   uint32_t dim,
+                   uint32_t pq_bits,
+                   uint32_t pq_dim,
+                   bool conservative_memory_allocation,
+                   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major>
+pq_centers_view, raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_view,
+                   std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>>
+rotation_matrix_view) : cuvs::neighbors::index(), metric_(metric), codebook_kind_(codebook_kind),
+    dim_(dim),
+    pq_bits_(pq_bits),
+    pq_dim_(pq_dim == 0 ? calculate_pq_dim(dim) : pq_dim),
+    conservative_memory_allocation_(conservative_memory_allocation),
+    lists_{n_lists},
+    list_sizes_{raft::make_device_vector<uint32_t, uint32_t>(handle, n_lists)},
+    pq_centers_view_{pq_centers_view},
+    centers_view_{centers_view},
+    centers_rot_{raft::make_device_matrix<float, uint32_t>(handle, n_lists, this->rot_dim())},
+    rotation_matrix_view_{rotation_matrix_view.has_value() ? rotation_matrix_view.value() :
+raft::make_device_matrix_view<const float, uint32_t>(nullptr, 0, 0)},
+    data_ptrs_{raft::make_device_vector<uint8_t*, uint32_t>(handle, n_lists)},
+    inds_ptrs_{raft::make_device_vector<IdxT*, uint32_t>(handle, n_lists)},
+    accum_sorted_sizes_{raft::make_host_vector<IdxT, uint32_t>(n_lists + 1)}
+{
+  check_consistency();
+  accum_sorted_sizes_(n_lists) = 0;
+}*/
 
 template <typename IdxT>
 IdxT index<IdxT>::size() const noexcept
@@ -189,7 +224,7 @@ raft::device_mdspan<const float,
                     raft::row_major>
 index<IdxT>::pq_centers() const noexcept
 {
-  return pq_centers_.view();
+  return pq_centers_view_;
 }
 
 template <typename IdxT>
@@ -242,7 +277,7 @@ template <typename IdxT>
 raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::rotation_matrix()
   const noexcept
 {
-  return rotation_matrix_.view();
+  return rotation_matrix_view_;
 }
 
 template <typename IdxT>
@@ -281,7 +316,7 @@ template <typename IdxT>
 raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::centers()
   const noexcept
 {
-  return centers_.view();
+  return centers_view_;
 }
 
 template <typename IdxT>

@@ -1692,6 +1692,11 @@ auto build(raft::resources const& handle,
   auto stream = raft::resource::get_cuda_stream(handle);
   index<IdxT> index(handle, index_params, dim);
 
+  /*index<IdxT> index(handle, index_params.metric, index_params.codebook_kind,
+    index_params.n_lists, dim, index_params.pq_bits, index_params.pq_dim,
+    index_params.conservative_memory_allocation, pq_centers, centers,
+    rotation_matrix_opt);*/
+
   utils::memzero(
     index.accum_sorted_sizes().data_handle(), index.accum_sorted_sizes().size(), stream);
   utils::memzero(index.list_sizes().data_handle(), index.list_sizes().size(), stream);
