@@ -131,12 +131,10 @@ RAFT_KERNEL merge_subgraphs_kernel(IdxT* cluster_data_indices,
         int is_unique = 1;
         IdxT curr_val = blockValues[colId];
 #pragma unroll
-        for (int offset = -4; offset <= 4; offset++) {
-          if (offset == 0) continue;  // skip self
-
+        for (int offset = -4; offset < 0; offset++) {
           int neighbor_idx = static_cast<int>(colId) + offset;
 
-          if (neighbor_idx >= 0 && neighbor_idx < limit) {
+          if (neighbor_idx >= 0) {
             if (blockValues[neighbor_idx] == curr_val) {
               is_unique = 0;
               break;
