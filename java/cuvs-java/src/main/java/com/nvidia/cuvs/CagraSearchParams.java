@@ -98,7 +98,6 @@ public class CagraSearchParams {
   /**
    * Constructs an instance of CagraSearchParams with passed search parameters.
    *
-   * @param resources          the resources instance to use
    * @param maxQueries         the maximum number of queries to search at the same
    *                           time (batch size)
    * @param iTopKSize          the number of intermediate search results retained
@@ -120,7 +119,6 @@ public class CagraSearchParams {
    *                           selection
    */
   private CagraSearchParams(
-      CuVSResources resources,
       int maxQueries,
       int iTopKSize,
       int maxIterations,
@@ -303,7 +301,6 @@ public class CagraSearchParams {
    */
   public static class Builder {
 
-    private CuVSResources resources;
     private int maxQueries;
     private int iTopKSize = 64;
     private int maxIterations;
@@ -319,13 +316,9 @@ public class CagraSearchParams {
     private HashMapMode hashMapMode;
 
     /**
-     * Constructs this Builder with an instance of Arena.
-     *
-     * @param resources the {@link CuVSResources} instance to use
+     * Default constructor.
      */
-    public Builder(CuVSResources resources) {
-      this.resources = resources;
-    }
+    public Builder() {}
 
     /**
      * Sets the maximum number of queries to search at the same time (batch size).
@@ -486,7 +479,6 @@ public class CagraSearchParams {
      */
     public CagraSearchParams build() {
       return new CagraSearchParams(
-          resources,
           maxQueries,
           iTopKSize,
           maxIterations,
