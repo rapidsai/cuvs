@@ -11,17 +11,17 @@ This maven project contains examples for CAGRA, HNSW, and Bruteforce algorithms.
 ### CAGRA Example
 In the current directory do:
 ```
-mvn package && java --enable-native-access=ALL-UNNAMED -cp target/cuvs-java-examples-25.08.0.jar:$HOME/.m2/repository/com/nvidia/cuvs/cuvs-java/25.08.0/cuvs-java-25.08.0.jar com.nvidia.cuvs.examples.CagraExample
+mvn package && java --enable-native-access=ALL-UNNAMED -cp target/cuvs-java-examples-25.10.0.jar:$HOME/.m2/repository/com/nvidia/cuvs/cuvs-java/25.10.0/cuvs-java-25.10.0.jar com.nvidia.cuvs.examples.CagraExample
 ```
 
 ### HNSW Example
 In the current directory do:
 ```
-mvn package && java --enable-native-access=ALL-UNNAMED -cp target/cuvs-java-examples-25.08.0.jar:$HOME/.m2/repository/com/nvidia/cuvs/cuvs-java/25.08.0/cuvs-java-25.08.0.jar com.nvidia.cuvs.examples.HnswExample
+mvn package && java --enable-native-access=ALL-UNNAMED -cp target/cuvs-java-examples-25.10.0.jar:$HOME/.m2/repository/com/nvidia/cuvs/cuvs-java/25.10.0/cuvs-java-25.10.0.jar com.nvidia.cuvs.examples.HnswExample
 ```
 
 ### Bruteforce Example
 In the current directory do:
 ```
-mvn package && java --enable-native-access=ALL-UNNAMED -cp target/cuvs-java-examples-25.08.0.jar:$HOME/.m2/repository/com/nvidia/cuvs/cuvs-java/25.08.0/cuvs-java-25.08.0.jar com.nvidia.cuvs.examples.BruteForceExample
+mvn package && java --enable-native-access=ALL-UNNAMED -cp target/cuvs-java-examples-25.10.0.jar:$HOME/.m2/repository/com/nvidia/cuvs/cuvs-java/25.10.0/cuvs-java-25.10.0.jar com.nvidia.cuvs.examples.BruteForceExample
 ```

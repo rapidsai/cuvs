@@ -15,22 +15,37 @@
  */
 package com.nvidia.cuvs.internal;
 
-import com.nvidia.cuvs.Dataset;
 import java.lang.foreign.Arena;
-import java.lang.foreign.MemorySegment;
+import java.lang.foreign.SequenceLayout;
+import java.lang.foreign.ValueLayout;
 import java.util.concurrent.atomic.AtomicReference;
 
-public class DatasetImpl implements Dataset {
+/**
+ * A Dataset implementation backed by host (CPU) memory.
+ * Memory is allocated and managed by the implementation, via a Java shared {@link Arena}
+ */
+public class CuVSHostMatrixArenaImpl extends CuVSHostMatrixImpl {
   private final AtomicReference<Arena> arenaReference;
-  private final MemorySegment seg;
-  private final int size;
-  private final int dimensions;
 
-  public DatasetImpl(Arena arena, MemorySegment memorySegment, int size, int dimensions) {
+  public CuVSHostMatrixArenaImpl(long size, long columns, DataType dataType) {
+    this(
+        size,
+        columns,
+        dataType,
+        valueLayoutFromType(dataType),
+        sequenceLayoutFromType(size, columns, dataType),
+        Arena.ofShared());
+  }
+
+  private CuVSHostMatrixArenaImpl(
+      long size,
+      long columns,
+      DataType dataType,
+      ValueLayout valueLayout,
+      SequenceLayout layout,
+      Arena arena) {
+    super(arena.allocate(layout), size, columns, dataType, valueLayout, layout);
     this.arenaReference = new AtomicReference<>(arena);
-    this.seg = memorySegment;
-    this.size = size;
-    this.dimensions = dimensions;
   }
 
   @Override
@@ -39,19 +54,5 @@ public class DatasetImpl implements Dataset {
     if (arena != null) {
       arena.close();
     }
-  }
-
-  @Override
-  public int size() {
-    return size;
-  }
-
-  @Override
-  public int dimensions() {
-    return dimensions;
-  }
-
-  public MemorySegment asMemorySegment() {
-    return seg;
   }
 }

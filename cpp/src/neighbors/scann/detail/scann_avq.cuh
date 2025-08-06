@@ -1,0 +1,460 @@
+/*
+ * Copyright (c) 2025, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include <cub/cub.cuh>
+#include <raft/core/device_mdarray.hpp>
+#include <raft/core/device_mdspan.hpp>
+#include <raft/core/error.hpp>
+#include <raft/core/host_device_accessor.hpp>
+#include <raft/core/host_mdarray.hpp>
+#include <raft/core/host_mdspan.hpp>
+#include <raft/core/operators.hpp>
+#include <raft/core/resource/cuda_stream.hpp>
+#include <raft/linalg/add.cuh>
+#include <raft/linalg/coalesced_reduction.cuh>
+#include <raft/linalg/detail/cublas_wrappers.hpp>
+#include <raft/linalg/detail/cusolver_wrappers.hpp>
+#include <raft/linalg/dot.cuh>
+#include <raft/linalg/gemm.cuh>
+#include <raft/linalg/gemv.cuh>
+#include <raft/linalg/linalg_types.hpp>
+#include <raft/linalg/map.cuh>
+#include <raft/linalg/matrix_vector.cuh>
+#include <raft/linalg/matrix_vector_op.cuh>
+#include <raft/linalg/multiply.cuh>
+#include <raft/linalg/norm.cuh>
+#include <raft/linalg/power.cuh>
+#include <raft/linalg/reduce.cuh>
+#include <raft/linalg/transpose.cuh>
+#include <raft/matrix/argmin.cuh>
+#include <raft/matrix/copy.cuh>
+#include <raft/matrix/diagonal.cuh>
+#include <raft/matrix/init.cuh>
+
+#include "scann_common.cuh"
+
+namespace cuvs::neighbors::experimental::scann::detail {
+
+namespace {
+
+template <typename LabelT, typename IdxT>
+__global__ void build_clusters(
+  LabelT const* node_to_cluster, LabelT* clusters, IdxT* cluster_start, int nodes, int n_clusters)
+{
+  size_t node = blockDim.x * blockIdx.x + threadIdx.x;
+
+  if (node < nodes) {
+    LabelT cluster        = node_to_cluster[node];
+    LabelT cluster_ptr    = atomicAdd(&cluster_start[cluster], 1);
+    clusters[cluster_ptr] = node;
+  }
+}
+}  // namespace
+
+// Compute cluster sizes/offsets
+template <typename LabelT, typename IdxT>
+void compute_cluster_offsets(raft::resources const& dev_resources,
+                             raft::device_vector_view<const LabelT, IdxT> clusters,
+                             raft::device_vector_view<LabelT, int64_t> cluster_sizes)
+{
+  cudaStream_t stream = raft::resource::get_cuda_stream(dev_resources);
+  rmm::device_async_resource_ref device_memory =
+    raft::resource::get_workspace_resource(dev_resources);
+
+  // Histrogram to compute cluster sizes
+  int num_levels  = cluster_sizes.extent(0) + 1;
+  int lower_level = 0;
+  int upper_level = cluster_sizes.extent(0);
+
+  size_t temp_storage_bytes = 0;
+
+  cub::DeviceHistogram::HistogramEven(nullptr,
+                                      temp_storage_bytes,
+                                      clusters.data_handle(),
+                                      cluster_sizes.data_handle(),
+                                      num_levels,
+                                      lower_level,
+                                      upper_level,
+                                      clusters.extent(0),
+                                      stream);
+
+  rmm::device_uvector<char> temp_storage_hist(temp_storage_bytes, stream, device_memory);
+
+  cub::DeviceHistogram::HistogramEven(temp_storage_hist.data(),
+                                      temp_storage_bytes,
+                                      clusters.data_handle(),
+                                      cluster_sizes.data_handle(),
+                                      num_levels,
+                                      lower_level,
+                                      upper_level,
+                                      clusters.extent(0),
+                                      stream);
+
+  temp_storage_bytes = 0;
+  // Scan to sum cluster sizes and get cluster start ptrs in flat array
+  // Done in place
+  int num_items = cluster_sizes.extent(0);
+
+  cub::DeviceScan::ExclusiveSum(nullptr,
+                                temp_storage_bytes,
+                                cluster_sizes.data_handle(),
+                                cluster_sizes.data_handle(),
+                                num_items);
+
+  rmm::device_uvector<char> temp_storage_sum(temp_storage_bytes, stream, device_memory);
+
+  cub::DeviceScan::ExclusiveSum(temp_storage_sum.data(),
+                                temp_storage_bytes,
+                                cluster_sizes.data_handle(),
+                                cluster_sizes.data_handle(),
+                                num_items);
+}
+
+// Sum elements of device vector into device scalar
+template <typename T>
+void sum_reduce_vector(raft::resources const& dev_resources,
+                       raft::device_vector_view<T, int64_t> v,
+                       raft::device_scalar_view<T> s)
+{
+  cudaStream_t stream = raft::resource::get_cuda_stream(dev_resources);
+  rmm::device_async_resource_ref device_memory =
+    raft::resource::get_workspace_resource(dev_resources);
+
+  size_t temp_storage_bytes = 0;
+
+  cub::DeviceReduce::Sum(
+    nullptr, temp_storage_bytes, v.data_handle(), s.data_handle(), v.extent(0), stream);
+
+  rmm::device_uvector<char> temp_storage(temp_storage_bytes, stream, device_memory);
+  // cudaMalloc(&d_temp_storage, temp_storage_bytes);
+
+  cub::DeviceReduce::Sum(
+    temp_storage.data(), temp_storage_bytes, v.data_handle(), s.data_handle(), v.extent(0), stream);
+
+  // raft::resource::sync_stream(dev_resources, stream);
+
+  // cudaFree(d_temp_storage);
+}
+
+// Solve Ax = b for a symmetric, pos-def matrix A via cholesky factorization
+template <typename T>
+void cholesky_solver(raft::resources const& dev_resources,
+                     raft::device_matrix_view<T, int64_t, raft::col_major> A,
+                     raft::device_vector_view<T, int64_t> b,
+                     raft::device_vector_view<T, int64_t> x)
+{
+  cudaStream_t stream          = raft::resource::get_cuda_stream(dev_resources);
+  cusolverDnHandle_t cusolverH = raft::resource::get_cusolver_dn_handle(dev_resources);
+  rmm::device_async_resource_ref device_memory =
+    raft::resource::get_workspace_resource(dev_resources);
+
+  // RAFT_CUSOLVER_TRY(cusolverDnSetStream(cusolverH, stream));
+
+  int n                 = A.extent(0);
+  int lda               = n;
+  int lwork             = 0;
+  cublasFillMode_t uplo = CUBLAS_FILL_MODE_LOWER;
+
+  // compute bufferszie for potrf
+  RAFT_CUSOLVER_TRY(raft::linalg::detail::cusolverDnpotrf_bufferSize(
+    cusolverH, uplo, n, A.data_handle(), lda, &lwork));
+  // compute cholesky factorization w/ potrf
+  auto devInfo = raft::make_device_scalar(dev_resources, 0);
+  rmm::device_uvector<T> d_work(lwork, stream, device_memory);
+
+  RAFT_CUSOLVER_TRY(raft::linalg::detail::cusolverDnpotrf(
+    cusolverH, uplo, n, A.data_handle(), lda, d_work.data(), lwork, devInfo.data_handle(), stream));
+
+  // solve Ax = b
+  int ldb  = b.extent(0);
+  int nrhs = 1;
+
+  RAFT_CUSOLVER_TRY(raft::linalg::detail::cusolverDnpotrs(cusolverH,
+                                                          uplo,
+                                                          n,
+                                                          nrhs,
+                                                          A.data_handle(),
+                                                          lda,
+                                                          b.data_handle(),
+                                                          ldb,
+                                                          devInfo.data_handle(),
+                                                          stream));
+}
+
+// Apply Anisotropic Vector Quantization to a single cluster
+// via Theorem 4.2 in https://arxiv.org/abs/1908.10396 with
+//   h_i_parallel = eta * || x_i || ^ (eta - 1)
+//   h_i_orthogonal = ||x _i || ^ (eta -1)
+// as taken from the open source ScaNN implementation
+template <typename T>
+void compute_avq_centroid(raft::resources const& dev_resources,
+                          raft::device_matrix_view<T, int64_t> x,
+                          raft::device_vector_view<T, int64_t> avq_centroid,
+                          raft::device_scalar_view<T> rescale_num,
+                          raft::device_scalar_view<T> rescale_denom,
+                          float eta)
+{
+  // Compute and scale norms
+  auto norms = raft::make_device_vector<float, int64_t>(dev_resources, x.extent(0));
+
+  raft::linalg::norm<raft::linalg::NormType::L2Norm, raft::Apply::ALONG_ROWS>(
+    dev_resources, raft::make_const_mdspan(x), norms.view());
+
+  // Compute || x_i || ^ 0.5 * (eta -3)
+  auto norms_eta_3 = raft::make_device_vector<float, int64_t>(dev_resources, x.extent(0));
+  auto eta_3       = raft::make_host_scalar<float>((eta - 3) / 2);
+
+  raft::linalg::power_scalar(dev_resources,
+                             raft::make_const_mdspan(norms.view()),
+                             norms_eta_3.view(),
+                             raft::make_const_mdspan(eta_3.view()));
+
+  // Compute || x_i || ^ (eta - 1)
+  auto norms_eta_1 = raft::make_device_vector<float, int64_t>(dev_resources, x.extent(0));
+  auto eta_1       = raft::make_host_scalar<float>(eta - 1);
+
+  raft::linalg::power_scalar(dev_resources,
+                             raft::make_const_mdspan(norms.view()),
+                             norms_eta_1.view(),
+                             raft::make_const_mdspan(eta_1.view()));
+
+  auto sum_norms_eta_1 = raft::make_device_scalar<float>(dev_resources, 0.0);
+
+  sum_reduce_vector(dev_resources, norms_eta_1.view(), sum_norms_eta_1.view());
+
+  auto x_eta_1 = raft::make_device_matrix<float, int64_t>(dev_resources, x.extent(0), x.extent(1));
+
+  raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
+    dev_resources,
+    raft::make_const_mdspan(x),
+    raft::make_const_mdspan(norms_eta_1.view()),
+    x_eta_1.view(),
+    raft::mul_op());
+
+  raft::linalg::reduce<true, false>(avq_centroid.data_handle(),
+                                    raft::make_const_mdspan(x_eta_1.view()).data_handle(),
+                                    x_eta_1.extent(1),
+                                    x_eta_1.extent(0),
+                                    0.0f,
+                                    raft::resource::get_cuda_stream(dev_resources),
+                                    false,
+                                    raft::identity_op(),
+                                    raft::add_op(),
+                                    raft::identity_op());
+
+  // scale x
+  // skipping zero elements in the vector should be ok, since they are norms
+  // of dataset vectors
+  raft::linalg::binary_mult_skip_zero<raft::Apply::ALONG_COLUMNS>(
+    dev_resources, x, raft::make_const_mdspan(norms_eta_3.view()));
+
+  // x^T x
+  auto x_trans = raft::make_device_matrix<float, int64_t>(dev_resources, x.extent(1), x.extent(0));
+
+  raft::linalg::transpose(dev_resources, x, x_trans.view());
+
+  // Solving a system of linear equations via QR decomp only supports col_major
+  // for some reason
+  auto x_trans_x = raft::make_device_matrix<float, int64_t, raft::col_major>(
+    dev_resources, x.extent(1), x.extent(1));
+
+  raft::matrix::eye(dev_resources, x_trans_x.view());
+
+  auto eta_m_1       = raft::make_device_scalar<float>(dev_resources, eta - 1);
+  auto cublas_handle = raft::resource::get_cublas_handle(dev_resources);
+
+  raft::linalg::detail::cublas_device_pointer_mode<true> pm(cublas_handle);
+
+  RAFT_CUBLAS_TRY(cublasSetStream(cublas_handle, raft::resource::get_cuda_stream(dev_resources)));
+
+  RAFT_CUBLAS_TRY(cublasSgemm(cublas_handle,
+                              cublasOperation_t::CUBLAS_OP_T,
+                              cublasOperation_t::CUBLAS_OP_T,
+                              x.extent(1),
+                              x.extent(1),
+                              x.extent(0),
+                              eta_m_1.data_handle(),
+                              x_trans.view().data_handle(),
+                              x.extent(0),
+                              x.data_handle(),
+                              x.extent(1),
+                              sum_norms_eta_1.data_handle(),
+                              x_trans_x.view().data_handle(),
+                              x.extent(1)));
+
+  cholesky_solver(dev_resources, x_trans_x.view(), avq_centroid, avq_centroid);
+
+  auto h_eta = raft::make_host_scalar<float>(eta);
+
+  raft::linalg::multiply_scalar(dev_resources,
+                                raft::make_const_mdspan(avq_centroid),
+                                avq_centroid,
+                                raft::make_const_mdspan(h_eta.view()));
+
+  auto dots = raft::make_device_vector<float, int64_t>(dev_resources, x.extent(1));
+
+  raft::linalg::reduce<true, false>(dots.data_handle(),
+                                    raft::make_const_mdspan(x).data_handle(),
+                                    x.extent(1),
+                                    x.extent(0),
+                                    0.0f,
+                                    raft::resource::get_cuda_stream(dev_resources),
+                                    false,
+                                    raft::identity_op(),
+                                    raft::add_op(),
+                                    raft::identity_op());
+
+  raft::linalg::dot(dev_resources,
+                    raft::make_const_mdspan(dots.view()),
+                    raft::make_const_mdspan(avq_centroid),
+                    rescale_num);
+
+  raft::linalg::dot(dev_resources,
+                    raft::make_const_mdspan(avq_centroid),
+                    raft::make_const_mdspan(avq_centroid),
+                    rescale_denom);
+}
+
+template <typename T>
+void rescale_avq_centroids(raft::resources const& dev_resources,
+                           raft::device_matrix_view<T, int64_t> centroids,
+                           raft::device_vector_view<T, int64_t> rescale_num_v,
+                           raft::device_vector_view<T, int64_t> rescale_denom_v,
+                           raft::device_vector_view<uint32_t, int64_t> cluster_sizes,
+                           uint32_t dataset_size)
+{
+  auto rescale_num   = raft::make_device_scalar<float>(dev_resources, 0);
+  auto rescale_denom = raft::make_device_scalar<float>(dev_resources, 0);
+
+  sum_reduce_vector(dev_resources, rescale_num_v, rescale_num.view());
+
+  raft::linalg::map_offset(dev_resources,
+                           raft::make_const_mdspan(rescale_denom_v),
+                           rescale_denom_v,
+                           [cluster_sizes, dataset_size] __device__(size_t i, float x) {
+                             uint32_t cluster_size = i + 1 < cluster_sizes.extent(0)
+                                                       ? cluster_sizes[i + 1] - cluster_sizes[i]
+                                                       : dataset_size - cluster_sizes[i];
+
+                             return x * cluster_size;
+                           });
+
+  sum_reduce_vector(dev_resources, rescale_denom_v, rescale_denom.view());
+
+  auto rescale_num_ptr   = rescale_num.data_handle();
+  auto rescale_denom_ptr = rescale_denom.data_handle();
+
+  raft::linalg::map_offset(dev_resources,
+                           raft::make_const_mdspan(centroids),
+                           centroids,
+                           [rescale_num_ptr, rescale_denom_ptr] __device__(size_t i, float x) {
+                             // should probably check the denominator is nonzero
+                             float rescale = (*rescale_num_ptr) / (*rescale_denom_ptr);
+
+                             return x * rescale;
+                           });
+}
+
+/**
+ * @brief Perform AVQ adjustment on cluster centers
+ *
+ * Apply Anisotropic Vector Quantization to recompute cluster centers
+ * via Theorem 4.2 in https://arxiv.org/abs/1908.10396 with
+ *  h_i_parallel = eta * || x_i || ^ (eta - 1)
+ * h_i_orthogonal = ||x _i || ^ (eta -1)
+ * as taken from the open source ScaNN implementation
+ *
+ * @tparam T
+ * @tparam IdxT
+ * @tparam LabelT
+ * @tparam Accessor
+ * @param res raft resources
+ * @param dataset the dataset (host or device), size [n_rows, dim]
+ * @param centroids_view cluster centers, size [n_clusters, dim]
+ * @param labels_view nearest cluster idx for each dataset vector, size [n_rows]
+ * @param eta the weight for the parallel component of the residual in the avq update
+ */
+template <typename T,
+          typename IdxT     = int64_t,
+          typename LabelT   = uint32_t,
+          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
+                                                         raft::memory_type::host>>
+void apply_avq(raft::resources const& res,
+               raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, Accessor> dataset,
+               raft::device_matrix_view<T, IdxT> centroids_view,
+               raft::device_vector_view<const LabelT, IdxT> labels_view,
+               float eta)
+{
+  // Compute clusters
+
+  cudaStream_t stream = raft::resource::get_cuda_stream(res);
+  auto cluster_ptrs   = raft::make_device_vector<uint32_t, int64_t>(res, centroids_view.extent(0));
+  auto clusters       = raft::make_device_vector<uint32_t, int64_t>(res, dataset.extent(0));
+
+  compute_cluster_offsets(res, labels_view, cluster_ptrs.view());
+
+  auto h_cluster_ptrs = raft::make_host_vector<uint32_t, int64_t>(cluster_ptrs.extent(0));
+
+  raft::copy(h_cluster_ptrs.data_handle(), cluster_ptrs.data_handle(), cluster_ptrs.size(), stream);
+
+  dim3 block(32, 1, 1);
+  dim3 grid((dataset.extent(0) + block.x - 1) / block.x, 1, 1);
+
+  build_clusters<uint32_t, uint32_t><<<grid, block>>>(labels_view.data_handle(),
+                                                      clusters.view().data_handle(),
+                                                      cluster_ptrs.view().data_handle(),
+                                                      dataset.extent(0),
+                                                      labels_view.extent(0));
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+
+  auto rescale_num   = raft::make_device_vector<float, int64_t>(res, centroids_view.extent(0));
+  auto rescale_denom = raft::make_device_vector<float, int64_t>(res, centroids_view.extent(0));
+
+  raft::resource::sync_stream(res);
+
+  RAFT_LOG_DEBUG("Compute AVQ centroids\n");
+
+  for (int i = 0; i < h_cluster_ptrs.extent(0); i++) {
+    int cluster_size = i + 1 < h_cluster_ptrs.extent(0) ? h_cluster_ptrs(i + 1) - h_cluster_ptrs(i)
+                                                        : dataset.extent(0) - h_cluster_ptrs(i);
+
+    if (cluster_size == 0) { continue; }
+    auto cluster_ids = raft::make_device_vector_view<const uint32_t, int64_t>(
+      clusters.data_handle() + h_cluster_ptrs(i), cluster_size);
+    auto cluster_vectors =
+      raft::make_device_matrix<float, int64_t>(res, cluster_size, dataset.extent(1));
+    auto avq_centroid = raft::make_device_vector_view<float, int64_t>(
+      centroids_view.data_handle() + i * dataset.extent(1), dataset.extent(1));
+    auto rescale_num_view   = raft::make_device_scalar_view<float>(rescale_num.data_handle() + i);
+    auto rescale_denom_view = raft::make_device_scalar_view<float>(rescale_denom.data_handle() + i);
+
+    gather_functor<float, uint32_t>{}(
+      res, dataset, cluster_ids, cluster_vectors.view(), raft::resource::get_cuda_stream(res));
+
+    compute_avq_centroid(
+      res, cluster_vectors.view(), avq_centroid, rescale_num_view, rescale_denom_view, eta);
+  }
+
+  rescale_avq_centroids(res,
+                        centroids_view,
+                        rescale_num.view(),
+                        rescale_denom.view(),
+                        cluster_ptrs.view(),
+                        dataset.extent(0));
+
+  raft::resource::sync_stream(res);
+}
+}  // namespace cuvs::neighbors::experimental::scann::detail

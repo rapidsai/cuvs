@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,8 @@ class cuvs_cagra_hnswlib : public algo<T>, public algo_gpu {
   using search_param_base = typename algo<T>::search_param;
 
   struct build_param {
-    typename cuvs_cagra<T, IdxT>::build_param cagra_build_param;
+    using cagra_wrapper_params = typename cuvs_cagra<T, IdxT>::build_param;
+    cagra_wrapper_params cagra_build_params;
     cuvs::neighbors::hnsw::index_params hnsw_index_params;
   };
 
@@ -94,8 +95,16 @@ void cuvs_cagra_hnswlib<T, IdxT>::build(const T* dataset, size_t nrow)
   bool dataset_is_on_host = raft::get_device_for_address(dataset) == -1;
 
   // re-use the CAGRA wrapper to parse build params
-  auto bps                                 = build_param_.cagra_build_param;
-  bps.cagra_params.attach_dataset_on_build = !dataset_is_on_host;
+  auto bps = build_param_.cagra_build_params;
+  // Not very conveniently, the CAGRA wrapper resolves parameters after the dataset shape is known,
+  // so it takes a lambda to do it. Even though we know the shape, we want to use the wrapper as-is,
+  // so we just modify that lambda.
+  bps.cagra_params = [dataset_is_on_host, orig_cagra_params = bps.cagra_params](
+                       auto dataset_extents, auto metric) {
+    auto params                    = orig_cagra_params(dataset_extents, metric);
+    params.attach_dataset_on_build = !dataset_is_on_host;
+    return params;
+  };
   cuvs_cagra<T, IdxT> cagra_wrapper{this->metric_, this->dim_, bps};
 
   // build the CAGRA index

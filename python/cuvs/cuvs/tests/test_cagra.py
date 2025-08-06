@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 
+import cupy as cp
 import numpy as np
 import pytest
 from pylibraft.common import device_ndarray
@@ -122,6 +123,36 @@ def run_cagra_build_search_test(
 
     recall = calc_recall(out_idx, skl_idx)
     assert recall > 0.7
+
+    # test that we can get the cagra graph from the index
+    graph = index.graph
+    assert graph.shape == (n_rows, graph_degree)
+
+    # make sure we can convert the graph to cupy, and access it
+    cp_graph = cp.array(graph)
+    assert cp_graph.shape == (n_rows, graph_degree)
+
+    if compression is None:
+        # make sure we can get the dataset from the cagra index
+        dataset_from_index = index.dataset
+
+        dataset_from_index_host = dataset_from_index.copy_to_host()
+        assert np.allclose(dataset, dataset_from_index_host)
+
+        # make sure we can reconstruct the index from the graph
+        # Note that we can't actually use the dataset from the index itself
+        # - since that is a strided matrix (and we expect non-strided inputs
+        # in the C++ cagra::build api), so we are using the host version
+        # which will have been copied into a non-strided layout
+        reloaded_index = cagra.from_graph(
+            graph, dataset_from_index_host, metric=metric
+        )
+
+        dist_device, idx_device = cagra.search(
+            search_params, reloaded_index, queries_device, k
+        )
+        recall = calc_recall(idx_device.copy_to_host(), skl_idx)
+        assert recall > 0.7
 
 
 @pytest.mark.parametrize("inplace", [True, False])
