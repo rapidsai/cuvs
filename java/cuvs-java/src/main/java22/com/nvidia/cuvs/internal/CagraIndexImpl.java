@@ -239,7 +239,7 @@ public class CagraIndexImpl implements CagraIndex {
       long neighborsBytes = C_INT_BYTE_SIZE * numQueries * topK;
       long distancesBytes = C_FLOAT_BYTE_SIZE * numQueries * topK;
 
-      try (var resourcesAccessor = resources.access()) {
+      try (var resourcesAccessor = query.getResources().access()) {
         var cuvsRes = resourcesAccessor.handle();
 
         MemorySegment queriesDP = allocateRMMSegment(cuvsRes, queriesBytes);
