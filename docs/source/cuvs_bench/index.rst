@@ -89,7 +89,7 @@ The following command pulls the nightly container for Python version 3.10, CUDA 
 
 .. code-block:: bash
 
-   docker pull rapidsai/cuvs-bench:24.12a-cuda12.5-py3.10 # substitute cuvs-bench for the exact desired container.
+   docker pull rapidsai/cuvs-bench:25.08a-cuda12.5-py3.10 # substitute cuvs-bench for the exact desired container.
 
 The CUDA and python versions can be changed for the supported values:
 - Supported CUDA versions: 12
