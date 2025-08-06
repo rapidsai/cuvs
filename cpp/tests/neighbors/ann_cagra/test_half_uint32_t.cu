@@ -25,7 +25,8 @@ TEST_P(AnnCagraTestF16_U32, AnnCagra_U32) { this->testCagra<uint32_t>(); }
 TEST_P(AnnCagraTestF16_U32, AnnCagra_I64) { this->testCagra<int64_t>(); }
 
 typedef AnnCagraIndexMergeTest<float, half, std::uint32_t> AnnCagraIndexMergeTestF16_U32;
-TEST_P(AnnCagraIndexMergeTestF16_U32, AnnCagraIndexMerge) { this->testCagra(); }
+TEST_P(AnnCagraIndexMergeTestF16_U32, AnnCagraIndexMerge_U32) { this->testCagra<uint32_t>(); }
+TEST_P(AnnCagraIndexMergeTestF16_U32, AnnCagraIndexMerge_I64) { this->testCagra<int64_t>(); }
 
 INSTANTIATE_TEST_CASE_P(AnnCagraTest, AnnCagraTestF16_U32, ::testing::ValuesIn(inputs));
 INSTANTIATE_TEST_CASE_P(AnnCagraIndexMergeTest,

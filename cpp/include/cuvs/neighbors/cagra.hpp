@@ -120,6 +120,7 @@ struct index_params : cuvs::neighbors::index_params {
    * Whether to use MST optimization to guarantee graph connectivity.
    */
   bool guarantee_connectivity = false;
+
   /**
    * Whether to add the dataset content to the index, i.e.:
    *
@@ -274,27 +275,9 @@ struct extend_params {
  */
 
 /**
- * @brief Determines the strategy for merging CAGRA graphs.
- *
- * @note Currently, only the PHYSICAL strategy is supported.
- */
-enum MergeStrategy {
-  /**
-   * @brief Physical merge: Builds a new CAGRA graph from the union of dataset points
-   * in existing CAGRA graphs.
-   *
-   * This is expensive to build but does not impact search latency or quality.
-   * Preferred for many smaller CAGRA graphs.
-   *
-   * @note Currently, this is the only supported strategy.
-   */
-  PHYSICAL
-};
-
-/**
  * @brief Parameters for merging CAGRA indexes.
  */
-struct merge_params {
+struct merge_params : cuvs::neighbors::merge_params {
   merge_params() = default;
 
   /**
@@ -306,8 +289,12 @@ struct merge_params {
   /// Parameters for creating the output index.
   cagra::index_params output_index_params;
 
-  /// Strategy for merging. Defaults to `MergeStrategy::PHYSICAL`.
-  MergeStrategy strategy = MergeStrategy::PHYSICAL;
+  /// Strategy for merging. Defaults to `MergeStrategy::MERGE_STRATEGY_PHYSICAL`.
+  cuvs::neighbors::MergeStrategy merge_strategy =
+    cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL;
+
+  /// Implementation of the polymorphic strategy() method
+  cuvs::neighbors::MergeStrategy strategy() const { return merge_strategy; }
 };
 
 /**
@@ -2611,3 +2598,5 @@ auto distribute(const raft::resources& clique, const std::string& filename)
   -> cuvs::neighbors::mg_index<cagra::index<T, IdxT>, T, IdxT>;
 
 }  // namespace cuvs::neighbors::cagra
+
+#include <cuvs/neighbors/cagra_index_wrapper.hpp>

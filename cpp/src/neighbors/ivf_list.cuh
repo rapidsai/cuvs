@@ -101,10 +101,10 @@ void resize_list(raft::resources const& res,
   if (old_used_size > 0) {
     auto copied_data_extents = spec.make_list_extents(old_used_size);
     auto copied_view         = raft::make_mdspan<typename ListT::value_type,
-                                         typename ListT::size_type,
-                                         raft::row_major,
-                                         false,
-                                         true>(new_list->data.data_handle(), copied_data_extents);
+                                                 typename ListT::size_type,
+                                                 raft::row_major,
+                                                 false,
+                                                 true>(new_list->data.data_handle(), copied_data_extents);
     raft::copy(copied_view.data_handle(),
                orig_list->data.data_handle(),
                copied_view.size(),
