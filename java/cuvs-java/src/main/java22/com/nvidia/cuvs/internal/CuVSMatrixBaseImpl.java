@@ -15,11 +15,15 @@
  */
 package com.nvidia.cuvs.internal;
 
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.CuVSMatrix;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 
 public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
   protected final MemorySegment memorySegment;
@@ -50,10 +54,7 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
   }
 
   protected int bits() {
-    return switch (dataType) {
-      case FLOAT, INT, UINT -> 32;
-      case BYTE -> 8;
-    };
+    return dataType.bytes() * 8;
   }
 
   protected int code() {
@@ -61,6 +62,14 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
       case FLOAT -> kDLFloat();
       case INT -> kDLInt();
       case UINT, BYTE -> kDLUInt();
+    };
+  }
+
+  protected static ValueLayout valueLayoutFromType(DataType dataType) {
+    return switch (dataType) {
+      case FLOAT -> C_FLOAT;
+      case INT, UINT -> C_INT;
+      case BYTE -> C_CHAR;
     };
   }
 

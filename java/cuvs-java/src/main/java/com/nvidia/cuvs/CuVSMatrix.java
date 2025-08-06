@@ -31,7 +31,14 @@ public interface CuVSMatrix extends AutoCloseable {
     FLOAT,
     INT,
     UINT,
-    BYTE
+    BYTE;
+
+    public int bytes() {
+      return switch (this) {
+        case FLOAT, INT, UINT -> 4;
+        case BYTE -> 1;
+      };
+    }
   }
 
   enum MemoryKind {
@@ -87,7 +94,7 @@ public interface CuVSMatrix extends AutoCloseable {
     /**
      * Add a single vector to the dataset.
      *
-     * @param vector A int array of as many elements as the dimensions
+     * @param vector An int array of as many elements as the dimensions
      */
     void addVector(int[] vector);
 
@@ -102,7 +109,7 @@ public interface CuVSMatrix extends AutoCloseable {
    * @param dataType The data type of the dataset elements
    * @return new instance of {@link CuVSMatrix}
    */
-  static CuVSMatrix.Builder builder(int size, int columns, DataType dataType) {
+  static Builder builder(int size, int columns, DataType dataType) {
     return CuVSProvider.provider().newMatrixBuilder(size, columns, dataType);
   }
 
