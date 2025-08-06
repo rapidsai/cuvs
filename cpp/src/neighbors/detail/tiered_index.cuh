@@ -297,6 +297,79 @@ auto build(
   return std::shared_ptr<index_state<UpstreamT>>(ret);
 }
 
+/**
+ * @brief merge multiple indices together
+ */
+template <typename UpstreamT>
+auto merge(raft::resources const& res,
+           const index_params<typename UpstreamT::index_params_type>& index_params,
+           const std::vector<tiered_index::index<UpstreamT>*>& indices)
+  -> std::shared_ptr<index_state<UpstreamT>>
+{
+  using value_type = typename UpstreamT::value_type;
+
+  RAFT_EXPECTS(indices.size() > 0, "Must pass at least one index to merge");
+
+  for (auto index : indices) {
+    RAFT_EXPECTS(index != nullptr,
+                 "Null pointer detected in 'indices'. Ensure all elements are valid before usage.");
+  }
+
+  // handle simple case of only one index being merged
+  if (indices.size() == 1) { return indices[0]->state; }
+
+  auto dim           = indices[0]->state->dim();
+  auto include_norms = indices[0]->state->storage->include_norms;
+
+  // validate data and check what needs to be merged
+  size_t bfknn_rows = 0, ann_rows = 0;
+  for (auto index : indices) {
+    RAFT_EXPECTS(dim == index->state->dim(), "Each index must have the same dimensionality");
+    bfknn_rows += index->state->bfknn_rows();
+    ann_rows += index->state->ann_rows();
+  }
+
+  // degenerate case - all indices are empty, just re-use the state from the first index
+  if (!bfknn_rows && !ann_rows) { return indices[0]->state; }
+
+  // concatenate all the storages together
+  auto to_allocate = bfknn_rows + ann_rows;
+  auto new_storage =
+    std::make_shared<brute_force_storage<value_type>>(res, to_allocate, dim, include_norms);
+
+  for (auto index : indices) {
+    auto storage = index->state->storage;
+
+    // copy over dataset to new storage
+    raft::copy(res,
+               raft::make_device_matrix_view<value_type, int64_t, raft::row_major>(
+                 new_storage->dataset.data() + new_storage->num_rows_used * dim,
+                 storage->num_rows_used,
+                 dim),
+               raft::make_device_matrix_view<const value_type, int64_t, raft::row_major>(
+                 storage->dataset.data(), storage->num_rows_used, dim));
+
+    // copy over precalculated norms
+    if (include_norms) {
+      raft::copy(res,
+                 raft::make_device_vector_view<value_type, int64_t, raft::row_major>(
+                   new_storage->norms->data() + new_storage->num_rows_used, storage->num_rows_used),
+                 raft::make_device_vector_view<const value_type, int64_t, raft::row_major>(
+                   storage->norms->data(), storage->num_rows_used));
+    }
+    new_storage->num_rows_used += storage->num_rows_used;
+  }
+
+  auto next_state          = std::make_shared<index_state<UpstreamT>>(*indices[0]->state);
+  next_state->storage      = new_storage;
+  next_state->build_params = index_params;
+
+  if (next_state->bfknn_rows() > static_cast<size_t>(next_state->build_params.min_ann_rows)) {
+    next_state = compact(res, *next_state);
+  }
+  return next_state;
+}
+
 template <typename UpstreamT>
 auto extend(raft::resources const& res,
             const index_state<UpstreamT>& current,

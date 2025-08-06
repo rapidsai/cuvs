@@ -34,18 +34,30 @@
 
 namespace cuvs::neighbors::tiered_index {
 
+enum TieredIndexTestStrategy { TEST_EXTEND, TEST_MERGE };
+
 struct AnnTieredIndexInputs {
   int n_rows;
   int dim;
   cuvs::distance::DistanceType metric;
   int k;
   int n_queries;
-  double min_recall;
+  TieredIndexTestStrategy test_strategy;
 };
+
+inline ::std::ostream& operator<<(::std::ostream& os, const TieredIndexTestStrategy& p)
+{
+  switch (p) {
+    case TEST_EXTEND: os << "TEST_EXTEND"; break;
+    case TEST_MERGE: os << "TEST_MERGE"; break;
+  }
+  return os;
+}
 
 inline ::std::ostream& operator<<(::std::ostream& os, const AnnTieredIndexInputs& p)
 {
   os << "dataset shape=" << p.n_rows << "x" << p.dim << ", metric=" << print_metric{p.metric}
+     << ", k=" << p.k << ", n_queries=" << p.n_queries << ", test_strategy=" << p.test_strategy
      << std::endl;
   return os;
 }
@@ -95,25 +107,57 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<AnnTieredIndexInputs>
     // Calculate tiered index
     std::vector<int64_t> indices_tiered(ps.n_queries * ps.k);
     std::vector<value_type> distances_tiered(ps.n_queries * ps.k);
+    double min_recall = 0.85;
     {
       index_params<typename UpstreamT::index_params_type> build_params;
       build_params.metric                     = ps.metric;
       build_params.min_ann_rows               = 2000;
       build_params.create_ann_index_on_extend = true;
 
-      // include 50% of the rows in the initial build - and then incrementally add
-      // the rest row by row
+      typename UpstreamT::search_params_type search_params;
+      if constexpr (std::is_same_v<ivf_flat::search_params,
+                                   typename UpstreamT::search_params_type>) {
+        // min_recall logic copied from ivf_flat unittest
+        min_recall =
+          static_cast<double>(search_params.n_probes) / static_cast<double>(build_params.n_lists);
+      }
+      if constexpr (std::is_same_v<ivf_pq::search_params, typename UpstreamT::search_params_type>) {
+        min_recall =
+          static_cast<double>(search_params.n_probes) / static_cast<double>(build_params.n_lists);
+      }
+
+      // include 50% of the rows in the initial build
       auto initial_rows  = ps.n_rows / 2;
       auto database_view = raft::make_device_matrix_view<const value_type, int64_t>(
         (const value_type*)database.data(), initial_rows, ps.dim);
-
       auto index = cuvs::neighbors::tiered_index::build(handle_, build_params, database_view);
-      for (int i = initial_rows; i < ps.n_rows; ++i) {
-        cuvs::neighbors::tiered_index::extend(
-          handle_,
-          raft::make_device_matrix_view<const value_type, int64_t>(
-            (const value_type*)database.data() + i * ps.dim, 1, ps.dim),
-          &index);
+
+      std::optional<cuvs::neighbors::tiered_index::index<UpstreamT>> final_index;
+
+      if (ps.test_strategy == TEST_EXTEND) {
+        // test extend functionality by adding remaining vectors one by one
+        for (int i = initial_rows; i < ps.n_rows; ++i) {
+          cuvs::neighbors::tiered_index::extend(
+            handle_,
+            raft::make_device_matrix_view<const value_type, int64_t>(
+              (const value_type*)database.data() + i * ps.dim, 1, ps.dim),
+            &index);
+        }
+        final_index.emplace(index);
+      } else if (ps.test_strategy == TEST_MERGE) {
+        // test merge by creating a new index with the remaining vectors and then merge into the
+        // main index
+        auto database_view2 = raft::make_device_matrix_view<const value_type, int64_t>(
+          (const value_type*)database.data() + initial_rows * ps.dim,
+          ps.n_rows - initial_rows,
+          ps.dim);
+        auto index2 = cuvs::neighbors::tiered_index::build(handle_, build_params, database_view2);
+
+        std::vector<cuvs::neighbors::tiered_index::index<UpstreamT>*> indices = {&index, &index2};
+        final_index.emplace(cuvs::neighbors::tiered_index::merge(handle_, build_params, indices));
+
+      } else {
+        RAFT_FAIL("unknown test_strategy");
       }
       raft::resource::sync_stream(handle_);
 
@@ -122,23 +166,13 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<AnnTieredIndexInputs>
       rmm::device_uvector<value_type> distances_tiered_dev(ps.n_queries * ps.k, stream_);
       rmm::device_uvector<int64_t> indices_tiered_dev(ps.n_queries * ps.k, stream_);
 
-      typename UpstreamT::search_params_type search_params;
-
-      if constexpr (std::is_same_v<ivf_flat::search_params,
-                                   typename UpstreamT::search_params_type>) {
-        search_params.n_probes = 128;
-      }
-      if constexpr (std::is_same_v<ivf_pq::search_params, typename UpstreamT::search_params_type>) {
-        search_params.n_probes = 128;
-      }
-
       auto distances_view = raft::make_device_matrix_view<value_type, int64_t>(
         (value_type*)distances_tiered_dev.data(), ps.n_queries, ps.k);
       auto indices_view = raft::make_device_matrix_view<int64_t, int64_t>(
         (int64_t*)indices_tiered_dev.data(), ps.n_queries, ps.k);
 
       cuvs::neighbors::tiered_index::search(
-        handle_, search_params, index, queries_view, indices_view, distances_view);
+        handle_, search_params, *final_index, queries_view, indices_view, distances_view);
 
       raft::update_host(
         distances_tiered.data(), distances_tiered_dev.data(), ps.n_queries * ps.k, stream_);
@@ -147,7 +181,6 @@ class ANNTieredIndexTest : public ::testing::TestWithParam<AnnTieredIndexInputs>
       raft::resource::sync_stream(handle_);
     }
 
-    double min_recall = ps.min_recall;
     EXPECT_TRUE(eval_neighbours(indices_naive,
                                 indices_tiered,
                                 distances_naive,
@@ -193,7 +226,7 @@ const std::vector<AnnTieredIndexInputs> inputs =
      cuvs::distance::DistanceType::InnerProduct},  // metric
     {10},                                          // k
     {10},                                          // n_queries
-    {0.85}                                         // min_recall
+    {TEST_EXTEND, TEST_MERGE}                      // test_strategy
   );
 typedef ANNTieredIndexTest<cagra::index<float, uint32_t>> CAGRA_F;
 TEST_P(CAGRA_F, AnnTieredIndex) { this->testTieredIndex(); }
