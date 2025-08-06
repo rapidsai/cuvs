@@ -125,8 +125,9 @@ RAFT_KERNEL merge_subgraphs_kernel(IdxT* cluster_data_indices,
         // This makes it difficult to remove duplicates, because they might no longer be right next
         // to each other after sorting by distances. Thus, for now we sweep a neighboring window of
         // size 4 or sweep the entire row to check for duplicates, and keep the first occurrence
-        // only. related issue: https://github.com/rapidsai/cuvs/issues/1056 uniqueMask[colId] =
-        // static_cast<int16_t>(blockValues[colId] != blockValues[colId - 1]);
+        // only.
+        // related issue: https://github.com/rapidsai/cuvs/issues/1056
+        // uniqueMask[colId] = static_cast<int16_t>(blockValues[colId] != blockValues[colId - 1]);
 
         int is_unique = 1;
 
