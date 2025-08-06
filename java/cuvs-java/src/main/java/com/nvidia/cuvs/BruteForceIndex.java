@@ -13,15 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
+import com.nvidia.cuvs.spi.CuVSProvider;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.Objects;
-
-import com.nvidia.cuvs.spi.CuVSProvider;
 
 /**
  *
@@ -56,6 +54,7 @@ public interface BruteForceIndex {
    *                     bytes into
    */
   void serialize(OutputStream outputStream) throws Throwable;
+
   /**
    * A method to persist a BRUTEFORCE index using an instance of
    * {@link OutputStream} and path to the intermediate temporary file.
@@ -112,10 +111,10 @@ public interface BruteForceIndex {
     /**
      * Sets the dataset for building the {@link BruteForceIndex}.
      *
-     * @param dataset a {@link Dataset} object containing the vectors
+     * @param dataset a {@link CuVSMatrix} object containing the vectors
      * @return an instance of this Builder
      */
-    Builder withDataset(Dataset dataset);
+    Builder withDataset(CuVSMatrix dataset);
 
     /**
      * Builds and returns an instance of {@link BruteForceIndex}.

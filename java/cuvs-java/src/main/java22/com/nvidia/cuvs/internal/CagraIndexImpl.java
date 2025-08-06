@@ -13,30 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs.internal;
 
+import static com.nvidia.cuvs.internal.CuVSParamsHelper.*;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.downcallHandle;
-import static com.nvidia.cuvs.internal.common.Util.checkError;
-import static java.lang.foreign.ValueLayout.ADDRESS;
-
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.lang.foreign.Arena;
-import java.lang.foreign.FunctionDescriptor;
-import java.lang.foreign.MemoryLayout;
-import java.lang.foreign.MemorySegment;
-import java.lang.foreign.SequenceLayout;
-import java.lang.invoke.MethodHandle;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Objects;
-import java.util.UUID;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT_BYTE_SIZE;
+import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.HOST_TO_DEVICE;
+import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.INFER_DIRECTION;
+import static com.nvidia.cuvs.internal.common.Util.allocateRMMSegment;
+import static com.nvidia.cuvs.internal.common.Util.buildMemorySegment;
+import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
+import static com.nvidia.cuvs.internal.common.Util.concatenate;
+import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
+import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.CagraCompressionParams;
 import com.nvidia.cuvs.CagraIndex;
@@ -45,19 +37,32 @@ import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.CagraMergeParams;
 import com.nvidia.cuvs.CagraQuery;
 import com.nvidia.cuvs.CagraSearchParams;
+import com.nvidia.cuvs.CuVSIvfPqIndexParams;
+import com.nvidia.cuvs.CuVSIvfPqSearchParams;
+import com.nvidia.cuvs.CuVSMatrix;
 import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.Dataset;
 import com.nvidia.cuvs.SearchResults;
-import com.nvidia.cuvs.internal.common.Util;
+import com.nvidia.cuvs.internal.common.CloseableHandle;
+import com.nvidia.cuvs.internal.common.CompositeCloseableHandle;
 import com.nvidia.cuvs.internal.panama.cuvsCagraCompressionParams;
-import com.nvidia.cuvs.internal.panama.cuvsCagraIndex;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndexParams;
 import com.nvidia.cuvs.internal.panama.cuvsCagraMergeParams;
 import com.nvidia.cuvs.internal.panama.cuvsCagraSearchParams;
+import com.nvidia.cuvs.internal.panama.cuvsFilter;
 import com.nvidia.cuvs.internal.panama.cuvsIvfPqIndexParams;
 import com.nvidia.cuvs.internal.panama.cuvsIvfPqParams;
 import com.nvidia.cuvs.internal.panama.cuvsIvfPqSearchParams;
-import java.util.BitSet;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemoryLayout;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.SequenceLayout;
+import java.lang.foreign.ValueLayout;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
 
 /**
  * {@link CagraIndex} encapsulates a CAGRA index, along with methods to interact
@@ -72,55 +77,24 @@ import java.util.BitSet;
  * @since 25.02
  */
 public class CagraIndexImpl implements CagraIndex {
-
-  private static final MethodHandle indexMethodHandle = downcallHandle("build_cagra_index",
-      FunctionDescriptor.of(ADDRESS, ADDRESS, C_LONG, C_LONG, ADDRESS, ADDRESS, ADDRESS, ADDRESS, C_INT));
-
-  private static final MethodHandle searchMethodHandle = downcallHandle("search_cagra_index",
-      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, C_INT, C_LONG, C_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, C_LONG));
-
-  private static final MethodHandle serializeMethodHandle = downcallHandle("serialize_cagra_index",
-      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, ADDRESS));
-
-  private static final MethodHandle deserializeMethodHandle = downcallHandle("deserialize_cagra_index",
-      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, ADDRESS));
-
-  private static final MethodHandle destroyIndexMethodHandle = downcallHandle("destroy_cagra_index",
-      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS));
-
-  private static final MethodHandle serializeCAGRAIndexToHNSWMethodHandle = downcallHandle("serialize_cagra_index_to_hnsw",
-      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, ADDRESS));
-
-
-  private static final MethodHandle mergeMethodHandle = downcallHandle("merge_cagra_indexes",
-      FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, C_INT, ADDRESS, ADDRESS));
-
-  private final float[][] vectors;
-  private final Dataset dataset;
-  private final CuVSResourcesImpl resources;
-  private final CagraIndexParams cagraIndexParameters;
-  private final CagraCompressionParams cagraCompressionParams;
+  private final CuVSResources resources;
   private final IndexReference cagraIndexReference;
   private boolean destroyed;
 
   /**
    * Constructor for building the index using specified dataset
    *
-   * @param indexParameters        an instance of {@link CagraIndexParams} holding
-   *                               the index parameters
-   * @param cagraCompressionParams an instance of {@link CagraCompressionParams}
-   *                               holding the compression parameters
-   * @param dataset                the dataset for indexing
-   * @param resources              an instance of {@link CuVSResources}
+   * @param indexParameters an instance of {@link CagraIndexParams} holding the
+   *                        index parameters
+   * @param dataset         the dataset for indexing
+   * @param resources       an instance of {@link CuVSResources}
    */
-  private CagraIndexImpl(CagraIndexParams indexParameters, CagraCompressionParams cagraCompressionParams, float[][] vectors,
-      Dataset dataset, CuVSResourcesImpl resources) throws Throwable {
-    this.cagraIndexParameters = indexParameters;
-    this.cagraCompressionParams = cagraCompressionParams;
-    this.vectors = vectors;
-    this.dataset = dataset;
+  private CagraIndexImpl(
+      CagraIndexParams indexParameters, CuVSMatrix dataset, CuVSResources resources) {
+    Objects.requireNonNull(dataset);
     this.resources = resources;
-    this.cagraIndexReference = build();
+    assert dataset instanceof CuVSMatrixBaseImpl;
+    this.cagraIndexReference = build(indexParameters, (CuVSMatrixBaseImpl) dataset);
   }
 
   /**
@@ -129,11 +103,7 @@ public class CagraIndexImpl implements CagraIndex {
    * @param inputStream an instance of stream to read the index bytes from
    * @param resources   an instance of {@link CuVSResources}
    */
-  private CagraIndexImpl(InputStream inputStream, CuVSResourcesImpl resources) throws Throwable {
-    this.cagraIndexParameters = null;
-    this.cagraCompressionParams = null;
-    this.vectors = null;
-    this.dataset = null;
+  private CagraIndexImpl(InputStream inputStream, CuVSResources resources) throws Throwable {
     this.resources = resources;
     this.cagraIndexReference = deserialize(inputStream);
   }
@@ -145,11 +115,7 @@ public class CagraIndexImpl implements CagraIndex {
    * @param indexReference The reference to the existing index
    * @param resources The resources instance
    */
-  private CagraIndexImpl(IndexReference indexReference, CuVSResourcesImpl resources) {
-    this.vectors = null;
-    this.cagraIndexParameters = null;
-    this.cagraCompressionParams = null;
-    this.dataset = null;
+  private CagraIndexImpl(IndexReference indexReference, CuVSResources resources) {
     this.resources = resources;
     this.cagraIndexReference = indexReference;
     this.destroyed = false;
@@ -167,14 +133,15 @@ public class CagraIndexImpl implements CagraIndex {
   @Override
   public void destroyIndex() throws Throwable {
     checkNotDestroyed();
-    try (var arena = Arena.ofConfined()) {
-      MemorySegment returnValue = arena.allocate(C_INT);
-      destroyIndexMethodHandle.invokeExact(cagraIndexReference.getMemorySegment(), returnValue);
-      checkError(returnValue.get(C_INT, 0L), "destroyIndexMethodHandle");
+    try {
+      int returnValue = cuvsCagraIndexDestroy(cagraIndexReference.getMemorySegment());
+      checkCuVSError(returnValue, "cuvsCagraIndexDestroy");
+      if (cagraIndexReference.dataset != null) {
+        cagraIndexReference.dataset.close();
+      }
     } finally {
       destroyed = true;
     }
-    if (dataset != null) dataset.close();
   }
 
   /**
@@ -184,37 +151,64 @@ public class CagraIndexImpl implements CagraIndex {
    * @return an instance of {@link IndexReference} that holds the pointer to the
    *         index
    */
-  private IndexReference build() throws Throwable {
-    long rows = dataset != null? dataset.size(): vectors.length;
-    long cols = dataset != null? dataset.dimensions(): (rows > 0 ? vectors[0].length : 0);
+  private IndexReference build(CagraIndexParams indexParameters, CuVSMatrixBaseImpl dataset) {
+    long rows = dataset.size();
+    long cols = dataset.columns();
 
-    MemorySegment indexParamsMemorySegment = cagraIndexParameters != null
-        ? segmentFromIndexParams(resources, cagraIndexParameters)
-        : MemorySegment.NULL;
+    try (var indexParams = segmentFromIndexParams(indexParameters);
+        var localArena = Arena.ofConfined()) {
+      MemorySegment indexParamsMemorySegment = indexParams.handle();
 
-    int numWriterThreads = cagraIndexParameters != null ? cagraIndexParameters.getNumWriterThreads() : 1;
+      int numWriterThreads = indexParameters != null ? indexParameters.getNumWriterThreads() : 1;
+      omp_set_num_threads(numWriterThreads);
 
-    MemorySegment compressionParamsMemorySegment = cagraCompressionParams != null
-        ? segmentFromCompressionParams(cagraCompressionParams)
-        : MemorySegment.NULL;
+      MemorySegment dataSeg = dataset.memorySegment();
 
-    MemorySegment dataSeg = dataset != null? ((DatasetImpl) dataset).seg:
-    	Util.buildMemorySegment(resources.getArena(), vectors);
+      long[] datasetShape = {rows, cols};
+      MemorySegment datasetTensor = prepareTensor(localArena, dataSeg, datasetShape, 2, 32, 2, 1);
 
+      var index = createCagraIndex();
+
+      if (cuvsCagraIndexParams.build_algo(indexParamsMemorySegment)
+          == 1) { // when build algo is IVF_PQ
+        MemorySegment cuvsIvfPqIndexParamsMS =
+            cuvsIvfPqParams.ivf_pq_build_params(
+                cuvsCagraIndexParams.graph_build_params(indexParamsMemorySegment));
+        int n_lists = cuvsIvfPqIndexParams.n_lists(cuvsIvfPqIndexParamsMS);
+        // As rows cannot be less than n_lists value so trim down.
+        cuvsIvfPqIndexParams.n_lists(
+            cuvsIvfPqIndexParamsMS, (int) (rows < n_lists ? rows : n_lists));
+      }
+      try (var resourcesAccessor = resources.access()) {
+        var cuvsRes = resourcesAccessor.handle();
+
+        var returnValue = cuvsStreamSync(cuvsRes);
+        checkCuVSError(returnValue, "cuvsStreamSync");
+
+        returnValue = cuvsCagraBuild(cuvsRes, indexParamsMemorySegment, datasetTensor, index);
+        checkCuVSError(returnValue, "cuvsCagraBuild");
+
+        returnValue = cuvsStreamSync(cuvsRes);
+        checkCuVSError(returnValue, "cuvsStreamSync");
+      }
+      omp_set_num_threads(1);
+
+      return new IndexReference(index, dataset);
+    }
+  }
+
+  private static MemorySegment createCagraIndex() {
     try (var localArena = Arena.ofConfined()) {
-      MemorySegment returnValue = localArena.allocate(C_INT);
-      var indexSeg = (MemorySegment) indexMethodHandle.invokeExact(
-        dataSeg,
-        rows,
-        cols,
-        resources.getMemorySegment(),
-        returnValue,
-        indexParamsMemorySegment,
-        compressionParamsMemorySegment,
-        numWriterThreads
-      );
-      checkError(returnValue.get(C_INT, 0L), "indexMethodHandle");
-      return new IndexReference(indexSeg);
+      MemorySegment indexPtrPtr = localArena.allocate(cuvsCagraIndex_t);
+      // cuvsCagraIndexCreate gets a pointer to a cuvsCagraIndex_t, which is defined as a pointer to
+      // cuvsCagraIndex.
+      // It's basically an "out" parameter: the C functions will create the index and "return back"
+      // a pointer to it: (*index = new cuvsCagraIndex{};
+      // The "out parameter" pointer is needed only for the duration of the function invocation (it
+      // could be a stack pointer, in C) so we allocate it from our localArena
+      var returnValue = cuvsCagraIndexCreate(indexPtrPtr);
+      checkCuVSError(returnValue, "cuvsCagraIndexCreate");
+      return indexPtrPtr.get(cuvsCagraIndex_t, 0);
     }
   }
 
@@ -228,136 +222,210 @@ public class CagraIndexImpl implements CagraIndex {
    */
   @Override
   public SearchResults search(CagraQuery query) throws Throwable {
-    checkNotDestroyed();
-    int topK = query.getMapping() != null ? Math.min(query.getMapping().size(), query.getTopK()) : query.getTopK();
-    long numQueries = query.getQueryVectors().length;
-    long numBlocks = topK * numQueries;
-    int vectorDimension = numQueries > 0 ? query.getQueryVectors()[0].length : 0;
-
-    SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_INT);
-    SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
-    MemorySegment neighborsMemorySegment = resources.getArena().allocate(neighborsSequenceLayout);
-    MemorySegment distancesMemorySegment = resources.getArena().allocate(distancesSequenceLayout);
-    MemorySegment floatsSeg = Util.buildMemorySegment(resources.getArena(), query.getQueryVectors());
-
-    long prefilterDataLength = 0;
-    MemorySegment prefilterData = MemorySegment.NULL;
-    if (query.getPrefilter() != null) {
-      long[] longArray = query.getPrefilter().toLongArray();
-      prefilterData = Util.buildMemorySegment(resources.getArena(), longArray);
-      prefilterDataLength = query.getNumDocs();
-    }
-
-
     try (var localArena = Arena.ofConfined()) {
-      MemorySegment returnValue = localArena.allocate(C_INT);
-      searchMethodHandle.invokeExact(
-        cagraIndexReference.getMemorySegment(),
-        floatsSeg,
-        topK,
-        numQueries,
-        vectorDimension,
-        resources.getMemorySegment(),
-        neighborsMemorySegment,
-        distancesMemorySegment,
-        returnValue,
-        segmentFromSearchParams(query.getCagraSearchParameters()),
-        prefilterData,
-        prefilterDataLength
-      );
-      checkError(returnValue.get(C_INT, 0L), "searchMethodHandle");
+      checkNotDestroyed();
+      int topK = query.getTopK();
+      long numQueries = query.getQueryVectors().length;
+      long numBlocks = topK * numQueries;
+      int vectorDimension = numQueries > 0 ? query.getQueryVectors()[0].length : 0;
+
+      SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_INT);
+      SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
+      MemorySegment neighborsMemorySegment = localArena.allocate(neighborsSequenceLayout);
+      MemorySegment distancesMemorySegment = localArena.allocate(distancesSequenceLayout);
+      MemorySegment floatsSeg = buildMemorySegment(localArena, query.getQueryVectors());
+
+      long queriesBytes = C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
+      long neighborsBytes = C_INT_BYTE_SIZE * numQueries * topK;
+      long distancesBytes = C_FLOAT_BYTE_SIZE * numQueries * topK;
+
+      try (var resourcesAccessor = resources.access()) {
+        var cuvsRes = resourcesAccessor.handle();
+
+        MemorySegment queriesDP = allocateRMMSegment(cuvsRes, queriesBytes);
+        MemorySegment neighborsDP = allocateRMMSegment(cuvsRes, neighborsBytes);
+        MemorySegment distancesDP = allocateRMMSegment(cuvsRes, distancesBytes);
+        MemorySegment prefilterDP = MemorySegment.NULL;
+        long prefilterLen = 0;
+
+        cudaMemcpy(queriesDP, floatsSeg, queriesBytes, INFER_DIRECTION);
+
+        long[] queriesShape = {numQueries, vectorDimension};
+        MemorySegment queriesTensor =
+            prepareTensor(localArena, queriesDP, queriesShape, 2, 32, 2, 1);
+        long[] neighborsShape = {numQueries, topK};
+        MemorySegment neighborsTensor =
+            prepareTensor(localArena, neighborsDP, neighborsShape, 1, 32, 2, 1);
+        long[] distancesShape = {numQueries, topK};
+        MemorySegment distancesTensor =
+            prepareTensor(localArena, distancesDP, distancesShape, 2, 32, 2, 1);
+
+        var returnValue = cuvsStreamSync(cuvsRes);
+        checkCuVSError(returnValue, "cuvsStreamSync");
+
+        // prepare the prefiltering data
+        long prefilterDataLength = 0;
+        MemorySegment prefilterDataMemorySegment = MemorySegment.NULL;
+        BitSet[] prefilters;
+        if (query.getPrefilter() != null) {
+          prefilters = new BitSet[] {query.getPrefilter()};
+          BitSet concatenatedFilters = concatenate(prefilters, query.getNumDocs());
+          long[] filters = concatenatedFilters.toLongArray();
+          prefilterDataMemorySegment = buildMemorySegment(localArena, filters);
+          prefilterDataLength = query.getNumDocs() * prefilters.length;
+        }
+
+        MemorySegment prefilter = cuvsFilter.allocate(localArena);
+        MemorySegment prefilterTensor;
+
+        final long prefilterBytes;
+
+        if (prefilterDataMemorySegment == MemorySegment.NULL) {
+          cuvsFilter.type(prefilter, 0); // NO_FILTER
+          cuvsFilter.addr(prefilter, 0);
+          prefilterBytes = 0;
+        } else {
+          long[] prefilterShape = {(prefilterDataLength + 31) / 32};
+          prefilterLen = prefilterShape[0];
+          prefilterBytes = C_INT_BYTE_SIZE * prefilterLen;
+
+          prefilterDP = allocateRMMSegment(cuvsRes, prefilterBytes);
+
+          cudaMemcpy(prefilterDP, prefilterDataMemorySegment, prefilterBytes, HOST_TO_DEVICE);
+
+          prefilterTensor = prepareTensor(localArena, prefilterDP, prefilterShape, 1, 32, 2, 1);
+
+          cuvsFilter.type(prefilter, 1);
+          cuvsFilter.addr(prefilter, prefilterTensor.address());
+        }
+
+        returnValue = cuvsStreamSync(cuvsRes);
+        checkCuVSError(returnValue, "cuvsStreamSync");
+
+        returnValue =
+            cuvsCagraSearch(
+                cuvsRes,
+                segmentFromSearchParams(localArena, query.getCagraSearchParameters()),
+                cagraIndexReference.getMemorySegment(),
+                queriesTensor,
+                neighborsTensor,
+                distancesTensor,
+                prefilter);
+        checkCuVSError(returnValue, "cuvsCagraSearch");
+
+        returnValue = cuvsStreamSync(cuvsRes);
+        checkCuVSError(returnValue, "cuvsStreamSync");
+
+        cudaMemcpy(neighborsMemorySegment, neighborsDP, neighborsBytes, INFER_DIRECTION);
+        cudaMemcpy(distancesMemorySegment, distancesDP, distancesBytes, INFER_DIRECTION);
+
+        returnValue = cuvsRMMFree(cuvsRes, distancesDP, distancesBytes);
+        checkCuVSError(returnValue, "cuvsRMMFree");
+        returnValue = cuvsRMMFree(cuvsRes, neighborsDP, neighborsBytes);
+        checkCuVSError(returnValue, "cuvsRMMFree");
+        returnValue = cuvsRMMFree(cuvsRes, queriesDP, queriesBytes);
+        checkCuVSError(returnValue, "cuvsRMMFree");
+
+        if (prefilterLen > 0) {
+          returnValue = cuvsRMMFree(cuvsRes, prefilterDP, C_INT_BYTE_SIZE * prefilterBytes);
+          checkCuVSError(returnValue, "cuvsRMMFree");
+        }
+      }
+
+      return CagraSearchResults.create(
+          neighborsSequenceLayout,
+          distancesSequenceLayout,
+          neighborsMemorySegment,
+          distancesMemorySegment,
+          topK,
+          query.getMapping(),
+          numQueries);
     }
-    return new CagraSearchResults(neighborsSequenceLayout, distancesSequenceLayout, neighborsMemorySegment,
-        distancesMemorySegment, topK, query.getMapping(), numQueries);
   }
 
   @Override
   public void serialize(OutputStream outputStream) throws Throwable {
-    Path p = Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".cag");
-    serialize(outputStream, p, 1024);
+    Path path =
+        Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".cag");
+    serialize(outputStream, path, 1024);
   }
 
   @Override
   public void serialize(OutputStream outputStream, int bufferLength) throws Throwable {
-    Path p = Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".cag");
-    serialize(outputStream, p, bufferLength);
+    Path path =
+        Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".cag");
+    serialize(outputStream, path, bufferLength);
   }
 
   @Override
-  public void serialize(OutputStream outputStream, Path tempFile, int bufferLength) throws Throwable {
+  public void serialize(OutputStream outputStream, Path tempFile, int bufferLength)
+      throws Throwable {
     checkNotDestroyed();
-    tempFile = tempFile.toAbsolutePath();
-    MemorySegment pathSeg = Util.buildMemorySegment(resources.getArena(), tempFile.toString());
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment returnValue = localArena.allocate(C_INT);
-      serializeMethodHandle.invokeExact(
-        resources.getMemorySegment(),
-        cagraIndexReference.getMemorySegment(),
-        returnValue,
-        pathSeg
-      );
-      checkError(returnValue.get(C_INT, 0L), "serializeMethodHandle");
+    final var tempFilePath = tempFile.toAbsolutePath();
+    try (var localArena = Arena.ofConfined();
+        var resourcesAccessor = resources.access()) {
 
-      try (FileInputStream fileInputStream = new FileInputStream(tempFile.toFile())) {
+      long cuvsRes = resourcesAccessor.handle();
+      var returnValue =
+          cuvsCagraSerialize(
+              cuvsRes,
+              localArena.allocateFrom(tempFilePath.toString()),
+              cagraIndexReference.getMemorySegment(),
+              true);
+      checkCuVSError(returnValue, "cuvsCagraSerialize");
+
+      try (var fileInputStream = Files.newInputStream(tempFilePath)) {
         byte[] chunk = new byte[bufferLength];
         int chunkLength = 0;
         while ((chunkLength = fileInputStream.read(chunk)) != -1) {
           outputStream.write(chunk, 0, chunkLength);
         }
       } finally {
-        Files.deleteIfExists(tempFile);
+        Files.deleteIfExists(tempFilePath);
       }
     }
   }
 
   @Override
   public void serializeToHNSW(OutputStream outputStream) throws Throwable {
-    Path p = Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".hnsw");
-    serializeToHNSW(outputStream, p, 1024);
+    Path path =
+        Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".hnsw");
+    serializeToHNSW(outputStream, path, 1024);
   }
 
   @Override
   public void serializeToHNSW(OutputStream outputStream, int bufferLength) throws Throwable {
-    Path p = Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".hnsw");
-    serializeToHNSW(outputStream, p, bufferLength);
+    Path path =
+        Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".hnsw");
+    serializeToHNSW(outputStream, path, bufferLength);
   }
 
   @Override
-  public void serializeToHNSW(OutputStream outputStream, Path tempFile, int bufferLength) throws Throwable {
+  public void serializeToHNSW(OutputStream outputStream, Path tempFile, int bufferLength)
+      throws Throwable {
     checkNotDestroyed();
-    tempFile = tempFile.toAbsolutePath();
-    MemorySegment pathSeg = Util.buildMemorySegment(resources.getArena(), tempFile.toString());
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment returnValue = localArena.allocate(C_INT);
-      serializeCAGRAIndexToHNSWMethodHandle.invokeExact(
-        resources.getMemorySegment(),
-        pathSeg,
-        cagraIndexReference.getMemorySegment(),
-        returnValue
-      );
-      checkError(returnValue.get(C_INT, 0L), "serializeCAGRAIndexToHNSWMethodHandle");
+    final var tempFilePath = tempFile.toAbsolutePath();
 
-      try (FileInputStream fileInputStream = new FileInputStream(tempFile.toFile())) {
-        byte[] chunk = new byte[bufferLength];
-        int chunkLength;
-        while ((chunkLength = fileInputStream.read(chunk)) != -1) {
-          outputStream.write(chunk, 0, chunkLength);
-        }
-      } finally {
-        Files.deleteIfExists(tempFile);
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment pathSeg = buildMemorySegment(localArena, tempFile.toString());
+
+      try (var resourcesAccessor = resources.access()) {
+        checkCuVSError(
+            cuvsCagraSerializeToHnswlib(
+                resourcesAccessor.handle(), pathSeg, cagraIndexReference.getMemorySegment()),
+            "cuvsCagraSerializeToHnswlib");
       }
     }
-  }
 
-  /**
-   * Gets an instance of {@link IndexReference} by deserializing a CAGRA index
-   * using an {@link InputStream}.
-   *
-   * @param inputStream an instance of {@link InputStream}
-   * @return an instance of {@link IndexReference}.
-   */
-  private IndexReference deserialize(InputStream inputStream) throws Throwable {
-    return deserialize(inputStream, 1024);
+    try (FileInputStream fileInputStream = new FileInputStream(tempFilePath.toFile())) {
+      byte[] chunk = new byte[bufferLength];
+      int chunkLength;
+      while ((chunkLength = fileInputStream.read(chunk)) != -1) {
+        outputStream.write(chunk, 0, chunkLength);
+      }
+    } finally {
+      Files.deleteIfExists(tempFilePath);
+    }
   }
 
   /**
@@ -365,43 +433,29 @@ public class CagraIndexImpl implements CagraIndex {
    * using an {@link InputStream}.
    *
    * @param inputStream  an instance of {@link InputStream}
-   * @param bufferLength the length of the buffer to use while reading the bytes
-   *                     from the stream. Default value is 1024.
    * @return an instance of {@link IndexReference}.
    */
-  private IndexReference deserialize(InputStream inputStream, int bufferLength) throws Throwable {
-    Path tmpIndexFile = Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".cag");
-    tmpIndexFile = tmpIndexFile.toAbsolutePath();
-    IndexReference indexReference = new IndexReference(resources);
+  private IndexReference deserialize(InputStream inputStream) throws Throwable {
+    Path tmpIndexFile =
+        Files.createTempFile(resources.tempDirectory(), UUID.randomUUID().toString(), ".cag")
+            .toAbsolutePath();
+    var index = createCagraIndex();
 
-    try (var in = inputStream;
-         FileOutputStream fileOutputStream = new FileOutputStream(tmpIndexFile.toFile())) {
-      in.transferTo(fileOutputStream);
-      MemorySegment pathSeg = Util.buildMemorySegment(resources.getArena(), tmpIndexFile.toString());
-      try (var localArena = Arena.ofConfined()) {
-        MemorySegment returnValue = localArena.allocate(C_INT);
-        deserializeMethodHandle.invokeExact(
-          resources.getMemorySegment(),
-          indexReference.getMemorySegment(),
-          returnValue,
-          pathSeg
-        );
-        checkError(returnValue.get(C_INT, 0L), "deserializeMethodHandle");
+    try (inputStream;
+        var outputStream = Files.newOutputStream(tmpIndexFile);
+        var arena = Arena.ofConfined()) {
+      inputStream.transferTo(outputStream);
+
+      try (var resourcesAccessor = resources.access()) {
+        var cuvsRes = resourcesAccessor.handle();
+        var returnValue =
+            cuvsCagraDeserialize(cuvsRes, arena.allocateFrom(tmpIndexFile.toString()), index);
+        checkCuVSError(returnValue, "cuvsCagraDeserialize");
       }
     } finally {
       Files.deleteIfExists(tmpIndexFile);
     }
-    return indexReference;
-  }
-
-  /**
-   * Gets an instance of {@link CagraIndexParams}
-   *
-   * @return an instance of {@link CagraIndexParams}
-   */
-  @Override
-  public CagraIndexParams getCagraIndexParameters() {
-    return cagraIndexParameters;
+    return new IndexReference(index, null);
   }
 
   /**
@@ -410,75 +464,123 @@ public class CagraIndexImpl implements CagraIndex {
    * @return an instance of {@link CuVSResources}
    */
   @Override
-  public CuVSResourcesImpl getCuVSResources() {
+  public CuVSResources getCuVSResources() {
     return resources;
   }
 
-
   /**
-   * Allocates the configured compression parameters in the MemorySegment.
+   * Allocates the native CagraIndexParams data structures and fills the configured index parameters in.
    */
-  private MemorySegment segmentFromCompressionParams(CagraCompressionParams params) {
-    MemorySegment seg = cuvsCagraCompressionParams.allocate(resources.getArena());
-    cuvsCagraCompressionParams.pq_bits(seg, params.getPqBits());
-    cuvsCagraCompressionParams.pq_dim(seg, params.getPqDim());
-    cuvsCagraCompressionParams.vq_n_centers(seg, params.getVqNCenters());
-    cuvsCagraCompressionParams.kmeans_n_iters(seg, params.getKmeansNIters());
-    cuvsCagraCompressionParams.vq_kmeans_trainset_fraction(seg, params.getVqKmeansTrainsetFraction());
-    cuvsCagraCompressionParams.pq_kmeans_trainset_fraction(seg, params.getPqKmeansTrainsetFraction());
-    return seg;
+  private static CloseableHandle segmentFromIndexParams(CagraIndexParams params) {
+
+    if (params == null) {
+      return CloseableHandle.NULL;
+    }
+
+    var handles = new ArrayList<CloseableHandle>();
+
+    var indexParams = createCagraIndexParams();
+    handles.add(indexParams);
+    var indexPtr = indexParams.handle();
+
+    populateNativeIndexParams(indexPtr, params, handles);
+
+    return new CompositeCloseableHandle(indexPtr, handles);
   }
 
-  /**
-   * Allocates the configured index parameters in the MemorySegment.
-   */
-  private static MemorySegment segmentFromIndexParams(CuVSResourcesImpl resources, CagraIndexParams params) {
-    MemorySegment seg = cuvsCagraIndexParams.allocate(resources.getArena());
-    cuvsCagraIndexParams.intermediate_graph_degree(seg, params.getIntermediateGraphDegree());
-    cuvsCagraIndexParams.graph_degree(seg, params.getGraphDegree());
-    cuvsCagraIndexParams.build_algo(seg, params.getCagraGraphBuildAlgo().value);
-    cuvsCagraIndexParams.nn_descent_niter(seg, params.getNNDescentNumIterations());
-    cuvsCagraIndexParams.metric(seg, params.getCuvsDistanceType().value);
+  private static void populateNativeIndexParams(
+      MemorySegment indexPtr, CagraIndexParams params, List<CloseableHandle> handles) {
 
+    cuvsCagraIndexParams.intermediate_graph_degree(indexPtr, params.getIntermediateGraphDegree());
+    cuvsCagraIndexParams.graph_degree(indexPtr, params.getGraphDegree());
+    cuvsCagraIndexParams.build_algo(indexPtr, params.getCagraGraphBuildAlgo().value);
+    cuvsCagraIndexParams.nn_descent_niter(indexPtr, params.getNNDescentNumIterations());
+    cuvsCagraIndexParams.metric(indexPtr, params.getCuvsDistanceType().value);
+
+    CagraCompressionParams cagraCompressionParams = params.getCagraCompressionParams();
+    if (cagraCompressionParams != null) {
+      var compressionParams = createCagraCompressionParams();
+      handles.add(compressionParams);
+      MemorySegment cuvsCagraCompressionParamsMemorySegment = compressionParams.handle();
+      cuvsCagraCompressionParams.pq_bits(
+          cuvsCagraCompressionParamsMemorySegment, cagraCompressionParams.getPqBits());
+      cuvsCagraCompressionParams.pq_dim(
+          cuvsCagraCompressionParamsMemorySegment, cagraCompressionParams.getPqDim());
+      cuvsCagraCompressionParams.vq_n_centers(
+          cuvsCagraCompressionParamsMemorySegment, cagraCompressionParams.getVqNCenters());
+      cuvsCagraCompressionParams.kmeans_n_iters(
+          cuvsCagraCompressionParamsMemorySegment, cagraCompressionParams.getKmeansNIters());
+      cuvsCagraCompressionParams.vq_kmeans_trainset_fraction(
+          cuvsCagraCompressionParamsMemorySegment,
+          cagraCompressionParams.getVqKmeansTrainsetFraction());
+      cuvsCagraCompressionParams.pq_kmeans_trainset_fraction(
+          cuvsCagraCompressionParamsMemorySegment,
+          cagraCompressionParams.getPqKmeansTrainsetFraction());
+      cuvsCagraIndexParams.compression(indexPtr, cuvsCagraCompressionParamsMemorySegment);
+    }
 
     if (params.getCagraGraphBuildAlgo().equals(CagraGraphBuildAlgo.IVF_PQ)) {
 
-      MemorySegment ivfpqIndexParamsMemorySegment = cuvsIvfPqIndexParams.allocate(resources.getArena());
-      cuvsIvfPqIndexParams.metric(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().getMetric().value);
-      cuvsIvfPqIndexParams.metric_arg(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().getMetricArg());
-      cuvsIvfPqIndexParams.add_data_on_build(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().isAddDataOnBuild());
-      cuvsIvfPqIndexParams.n_lists(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().getnLists());
-      cuvsIvfPqIndexParams.kmeans_n_iters(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().getKmeansNIters());
-      cuvsIvfPqIndexParams.kmeans_trainset_fraction(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().getKmeansTrainsetFraction());
-      cuvsIvfPqIndexParams.pq_bits(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().getPqBits());
-      cuvsIvfPqIndexParams.pq_dim(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().getPqDim());
-      cuvsIvfPqIndexParams.codebook_kind(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().getCodebookKind().value);
-      cuvsIvfPqIndexParams.force_random_rotation(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().isForceRandomRotation());
-      cuvsIvfPqIndexParams.conservative_memory_allocation(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().isConservativeMemoryAllocation());
-      cuvsIvfPqIndexParams.max_train_points_per_pq_code(ivfpqIndexParamsMemorySegment, params.getCuVSIvfPqParams().getIndexParams().getMaxTrainPointsPerPqCode());
+      var ivfPqIndexParams = createIvfPqIndexParams();
+      handles.add(ivfPqIndexParams);
+      MemorySegment ivfpqIndexParamsMemorySegment = ivfPqIndexParams.handle();
+      CuVSIvfPqIndexParams cuVSIvfPqIndexParams = params.getCuVSIvfPqParams().getIndexParams();
 
-      MemorySegment ivfpqSearchParamsMemorySegment = cuvsIvfPqSearchParams.allocate(resources.getArena());
-      cuvsIvfPqSearchParams.n_probes(ivfpqSearchParamsMemorySegment, params.getCuVSIvfPqParams().getSearchParams().getnProbes());
-      cuvsIvfPqSearchParams.lut_dtype(ivfpqSearchParamsMemorySegment, params.getCuVSIvfPqParams().getSearchParams().getLutDtype().value);
-      cuvsIvfPqSearchParams.internal_distance_dtype(ivfpqSearchParamsMemorySegment, params.getCuVSIvfPqParams().getSearchParams().getInternalDistanceDtype().value);
-      cuvsIvfPqSearchParams.preferred_shmem_carveout(ivfpqSearchParamsMemorySegment, params.getCuVSIvfPqParams().getSearchParams().getPreferredShmemCarveout());
+      cuvsIvfPqIndexParams.metric(
+          ivfpqIndexParamsMemorySegment, cuVSIvfPqIndexParams.getMetric().value);
+      cuvsIvfPqIndexParams.metric_arg(
+          ivfpqIndexParamsMemorySegment, cuVSIvfPqIndexParams.getMetricArg());
+      cuvsIvfPqIndexParams.add_data_on_build(
+          ivfpqIndexParamsMemorySegment, cuVSIvfPqIndexParams.isAddDataOnBuild());
+      cuvsIvfPqIndexParams.n_lists(ivfpqIndexParamsMemorySegment, cuVSIvfPqIndexParams.getnLists());
+      cuvsIvfPqIndexParams.kmeans_n_iters(
+          ivfpqIndexParamsMemorySegment, cuVSIvfPqIndexParams.getKmeansNIters());
+      cuvsIvfPqIndexParams.kmeans_trainset_fraction(
+          ivfpqIndexParamsMemorySegment, cuVSIvfPqIndexParams.getKmeansTrainsetFraction());
+      cuvsIvfPqIndexParams.pq_bits(ivfpqIndexParamsMemorySegment, cuVSIvfPqIndexParams.getPqBits());
+      cuvsIvfPqIndexParams.pq_dim(ivfpqIndexParamsMemorySegment, cuVSIvfPqIndexParams.getPqDim());
+      cuvsIvfPqIndexParams.codebook_kind(
+          ivfpqIndexParamsMemorySegment, cuVSIvfPqIndexParams.getCodebookKind().value);
+      cuvsIvfPqIndexParams.force_random_rotation(
+          ivfpqIndexParamsMemorySegment, cuVSIvfPqIndexParams.isForceRandomRotation());
+      cuvsIvfPqIndexParams.conservative_memory_allocation(
+          ivfpqIndexParamsMemorySegment, cuVSIvfPqIndexParams.isConservativeMemoryAllocation());
+      cuvsIvfPqIndexParams.max_train_points_per_pq_code(
+          ivfpqIndexParamsMemorySegment, cuVSIvfPqIndexParams.getMaxTrainPointsPerPqCode());
 
-      MemorySegment cuvsIvfPqParamsMemorySegment = cuvsIvfPqParams.allocate(resources.getArena());
-      cuvsIvfPqParams.ivf_pq_build_params(cuvsIvfPqParamsMemorySegment, ivfpqIndexParamsMemorySegment);
-      cuvsIvfPqParams.ivf_pq_search_params(cuvsIvfPqParamsMemorySegment, ivfpqSearchParamsMemorySegment);
-      cuvsIvfPqParams.refinement_rate(cuvsIvfPqParamsMemorySegment, params.getCuVSIvfPqParams().getRefinementRate());
+      var ivfPqSearchParams = createIvfPqSearchParams();
+      handles.add(ivfPqSearchParams);
+      MemorySegment ivfpqSearchParamsMemorySegment = ivfPqSearchParams.handle();
+      CuVSIvfPqSearchParams cuVSIvfPqSearchParams = params.getCuVSIvfPqParams().getSearchParams();
+      cuvsIvfPqSearchParams.n_probes(
+          ivfpqSearchParamsMemorySegment, cuVSIvfPqSearchParams.getnProbes());
+      cuvsIvfPqSearchParams.lut_dtype(
+          ivfpqSearchParamsMemorySegment, cuVSIvfPqSearchParams.getLutDtype().value);
+      cuvsIvfPqSearchParams.internal_distance_dtype(
+          ivfpqSearchParamsMemorySegment, cuVSIvfPqSearchParams.getInternalDistanceDtype().value);
+      cuvsIvfPqSearchParams.preferred_shmem_carveout(
+          ivfpqSearchParamsMemorySegment, cuVSIvfPqSearchParams.getPreferredShmemCarveout());
 
-      cuvsCagraIndexParams.graph_build_params(seg, cuvsIvfPqParamsMemorySegment);
+      // This is already allocated by cuvsCagraIndexParamsCreate,
+      // we just need to populate it.
+      MemorySegment cuvsIvfPqParamsMemorySegment =
+          cuvsCagraIndexParams.graph_build_params(indexPtr);
+      cuvsIvfPqParams.ivf_pq_build_params(
+          cuvsIvfPqParamsMemorySegment, ivfpqIndexParamsMemorySegment);
+      cuvsIvfPqParams.ivf_pq_search_params(
+          cuvsIvfPqParamsMemorySegment, ivfpqSearchParamsMemorySegment);
+      cuvsIvfPqParams.refinement_rate(
+          cuvsIvfPqParamsMemorySegment, params.getCuVSIvfPqParams().getRefinementRate());
+
+      cuvsCagraIndexParams.graph_build_params(indexPtr, cuvsIvfPqParamsMemorySegment);
     }
-
-    return seg;
   }
 
   /**
    * Allocates the configured search parameters in the MemorySegment.
    */
-  private MemorySegment segmentFromSearchParams(CagraSearchParams params) {
-    MemorySegment seg = cuvsCagraSearchParams.allocate(resources.getArena());
+  private MemorySegment segmentFromSearchParams(Arena arena, CagraSearchParams params) {
+    MemorySegment seg = cuvsCagraSearchParams.allocate(arena);
     cuvsCagraSearchParams.max_queries(seg, params.getMaxQueries());
     cuvsCagraSearchParams.itopk_size(seg, params.getITopKSize());
     cuvsCagraSearchParams.max_iterations(seg, params.getMaxIterations());
@@ -499,11 +601,7 @@ public class CagraIndexImpl implements CagraIndex {
   }
 
   public static CagraIndex.Builder newBuilder(CuVSResources cuvsResources) {
-    Objects.requireNonNull(cuvsResources);
-    if (!(cuvsResources instanceof CuVSResourcesImpl)) {
-      throw new IllegalArgumentException("Unsupported " + cuvsResources);
-    }
-    return new CagraIndexImpl.Builder((CuVSResourcesImpl)cuvsResources);
+    return new CagraIndexImpl.Builder(Objects.requireNonNull(cuvsResources));
   }
 
   /**
@@ -511,9 +609,8 @@ public class CagraIndexImpl implements CagraIndex {
    *
    * @param indexes Array of CAGRA indexes to merge
    * @return A new merged CAGRA index
-   * @throws Throwable if an error occurs during the merge operation
    */
-  public static CagraIndex merge(CagraIndex[] indexes) throws Throwable {
+  public static CagraIndex merge(CagraIndex[] indexes) {
     return merge(indexes, null);
   }
 
@@ -523,76 +620,71 @@ public class CagraIndexImpl implements CagraIndex {
    * @param indexes Array of CAGRA indexes to merge
    * @param mergeParams Parameters to control the merge operation, or null to use defaults
    * @return A new merged CAGRA index
-   * @throws Throwable if an error occurs during the merge operation
    */
-  public static CagraIndex merge(CagraIndex[] indexes, CagraMergeParams mergeParams) throws Throwable {
-    CuVSResourcesImpl resources = (CuVSResourcesImpl) indexes[0].getCuVSResources();
-    IndexReference mergedIndexReference = new IndexReference(resources);
+  public static CagraIndex merge(CagraIndex[] indexes, CagraMergeParams mergeParams) {
+    CuVSResources resources = indexes[0].getCuVSResources();
+    var mergedIndex = createCagraIndex();
 
-    try (var arena = Arena.ofConfined()) {
-      MemorySegment indexesSegment = arena.allocate(indexes.length * ADDRESS.byteSize());
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment indexesSegment =
+          localArena.allocate(indexes.length * ValueLayout.ADDRESS.byteSize());
+
       for (int i = 0; i < indexes.length; i++) {
         CagraIndexImpl indexImpl = (CagraIndexImpl) indexes[i];
-        indexesSegment.setAtIndex(ADDRESS, i, indexImpl.cagraIndexReference.getMemorySegment());
+        indexesSegment.setAtIndex(
+            ValueLayout.ADDRESS, i, indexImpl.cagraIndexReference.getMemorySegment());
       }
 
-      MemorySegment returnValue = arena.allocate(C_INT);
-
-      MemorySegment mergeParamsSegment = MemorySegment.NULL;
-      if (mergeParams != null) {
-        mergeParamsSegment = createMergeParamsSegment(mergeParams, resources);
+      try (var nativeMergeParams = createMergeParamsSegment(mergeParams);
+          var resourcesAccessor = resources.access()) {
+        var cuvsRes = resourcesAccessor.handle();
+        checkCuVSError(
+            cuvsCagraMerge(
+                cuvsRes, nativeMergeParams.handle(), indexesSegment, indexes.length, mergedIndex),
+            "cuvsCagraMerge");
       }
-
-      mergeMethodHandle.invokeExact(
-        resources.getMemorySegment(),
-        indexesSegment,
-        mergedIndexReference.getMemorySegment(),
-        indexes.length,
-        returnValue,
-        mergeParamsSegment
-      );
-
-      checkError(returnValue.get(C_INT, 0L), "mergeMethodHandle");
     }
 
-    return new CagraIndexImpl(mergedIndexReference, resources);
+    return new CagraIndexImpl(new IndexReference(mergedIndex, null), resources);
   }
 
   /**
-   * Creates a memory segment for merge parameters.
+   * Creates (allocates and fill) native memory version of merge parameters.
    *
-   * @param mergeParams The merge parameters
-   * @param resources The CuVS resources
    * @return A memory segment with the merge parameters
    */
-  private static MemorySegment createMergeParamsSegment(CagraMergeParams mergeParams, CuVSResourcesImpl resources) {
-    MemorySegment seg = cuvsCagraMergeParams.allocate(resources.getArena());
+  private static CloseableHandle createMergeParamsSegment(CagraMergeParams mergeParams) {
+    var handles = new ArrayList<CloseableHandle>();
 
-    if (mergeParams.getOutputIndexParams() != null) {
-      MemorySegment outputIndexParamsSeg = segmentFromIndexParams(resources, mergeParams.getOutputIndexParams());
-      cuvsCagraMergeParams.output_index_params(seg, outputIndexParamsSeg);
+    var nativeMergeParams = createCagraMergeParams();
+    handles.add(nativeMergeParams);
+    var seg = nativeMergeParams.handle();
+
+    // The output index params are already allocated by cuvsCagraMergeParamsCreate,
+    // we just need to populate it.
+    var outputIndexParamsPtr = cuvsCagraMergeParams.output_index_params(seg);
+    if (mergeParams != null) {
+      populateNativeIndexParams(outputIndexParamsPtr, mergeParams.getOutputIndexParams(), handles);
+      cuvsCagraMergeParams.strategy(seg, mergeParams.getStrategy().value);
     } else {
-      cuvsCagraMergeParams.output_index_params(seg, MemorySegment.NULL);
+      populateNativeIndexParams(
+          outputIndexParamsPtr, new CagraIndexParams.Builder().build(), handles);
     }
 
-    cuvsCagraMergeParams.strategy(seg, mergeParams.getStrategy().value);
-
-    return seg;
+    return new CompositeCloseableHandle(seg, handles);
   }
 
   /**
    * Builder helps configure and create an instance of {@link CagraIndex}.
    */
-  public static class Builder implements CagraIndex.Builder{
+  public static class Builder implements CagraIndex.Builder {
 
-    private float[][] vectors;
-    private Dataset dataset;
+    private CuVSMatrix dataset;
     private CagraIndexParams cagraIndexParams;
-    private CagraCompressionParams cagraCompressionParams;
-    private CuVSResourcesImpl cuvsResources;
+    private final CuVSResources cuvsResources;
     private InputStream inputStream;
 
-    public Builder(CuVSResourcesImpl cuvsResources) {
+    public Builder(CuVSResources cuvsResources) {
       this.cuvsResources = cuvsResources;
     }
 
@@ -604,12 +696,12 @@ public class CagraIndexImpl implements CagraIndex {
 
     @Override
     public Builder withDataset(float[][] vectors) {
-      this.vectors = vectors;
+      this.dataset = CuVSMatrix.ofArray(vectors);
       return this;
     }
 
     @Override
-    public Builder withDataset(Dataset dataset) {
+    public Builder withDataset(CuVSMatrix dataset) {
       this.dataset = dataset;
       return this;
     }
@@ -621,20 +713,11 @@ public class CagraIndexImpl implements CagraIndex {
     }
 
     @Override
-    public Builder withCompressionParams(CagraCompressionParams cagraCompressionParams) {
-      this.cagraCompressionParams = cagraCompressionParams;
-      return this;
-    }
-
-    @Override
     public CagraIndexImpl build() throws Throwable {
       if (inputStream != null) {
         return new CagraIndexImpl(inputStream, cuvsResources);
       } else {
-    	if (vectors != null && dataset != null) {
-    		throw new IllegalArgumentException("Please specify only one type of dataset (a float[] or a Dataset instance)");
-    	}
-        return new CagraIndexImpl(cagraIndexParams, cagraCompressionParams, vectors, dataset, cuvsResources);
+        return new CagraIndexImpl(cagraIndexParams, dataset, cuvsResources);
       }
     }
   }
@@ -645,13 +728,7 @@ public class CagraIndexImpl implements CagraIndex {
   public static class IndexReference {
 
     private final MemorySegment memorySegment;
-
-    /**
-     * Constructs CagraIndexReference and allocate the MemorySegment.
-     */
-    protected IndexReference(CuVSResourcesImpl resources) {
-      memorySegment = cuvsCagraIndex.allocate(resources.getArena());
-    }
+    private final CuVSMatrix dataset;
 
     /**
      * Constructs CagraIndexReference with an instance of MemorySegment passed as a
@@ -659,9 +736,14 @@ public class CagraIndexImpl implements CagraIndex {
      *
      * @param indexMemorySegment the MemorySegment instance to use for containing
      *                           index reference
+     * @param dataset            the dataset used for indexing; the dataset lifetime
+     *                           matches the lifetime of the index, we need to keep a reference
+     *                           to it so we can close it when the index is closed.
+     *                           Can be null (e.g. from deserialization or merging)
      */
-    protected IndexReference(MemorySegment indexMemorySegment) {
+    private IndexReference(MemorySegment indexMemorySegment, CuVSMatrix dataset) {
       this.memorySegment = indexMemorySegment;
+      this.dataset = dataset;
     }
 
     /**

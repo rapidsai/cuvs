@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/version_config.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -85,6 +87,14 @@ int main()
   // Destroy resources
   error = cuvsResourcesDestroy(res);
   if (error == CUVS_ERROR) { exit(EXIT_FAILURE); }
+
+  // Check version
+  uint16_t major, minor, patch;
+  error = cuvsVersionGet(&major, &minor, &patch);
+  if (error == CUVS_ERROR || major != CUVS_VERSION_MAJOR || minor != CUVS_VERSION_MINOR ||
+      patch != CUVS_VERSION_PATCH) {
+    exit(EXIT_FAILURE);
+  }
 
   return 0;
 }

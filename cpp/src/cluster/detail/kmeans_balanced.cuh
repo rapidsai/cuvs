@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -113,8 +113,8 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
 
       auto centroidsNorm =
         raft::make_device_mdarray<MathT, IdxT>(handle, mr, raft::make_extents<IdxT>(n_clusters));
-      raft::linalg::rowNorm<MathT, IdxT>(
-        centroidsNorm.data_handle(), centers, dim, n_clusters, raft::linalg::L2Norm, true, stream);
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true, MathT, IdxT>(
+        centroidsNorm.data_handle(), centers, dim, n_clusters, stream);
 
       cuvs::distance::fusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
         minClusterAndDistance.data_handle(),
@@ -156,14 +156,8 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
 
       auto centroidsNorm =
         raft::make_device_mdarray<MathT, IdxT>(handle, mr, raft::make_extents<IdxT>(n_clusters));
-      raft::linalg::rowNorm<MathT, IdxT>(centroidsNorm.data_handle(),
-                                         centers,
-                                         dim,
-                                         n_clusters,
-                                         raft::linalg::L2Norm,
-                                         true,
-                                         stream,
-                                         raft::sqrt_op{});
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true, MathT, IdxT>(
+        centroidsNorm.data_handle(), centers, dim, n_clusters, stream, raft::sqrt_op{});
 
       cuvs::distance::fusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
         minClusterAndDistance.data_handle(),
@@ -320,9 +314,12 @@ void calc_centers_and_sizes(const raft::resources& handle,
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
+  auto centersView      = raft::make_device_matrix_view<MathT>(centers, n_clusters, dim);
+  auto clusterSizesView = raft::make_device_vector_view<const CounterT>(cluster_sizes, n_clusters);
+
   if (!reset_counters) {
-    raft::linalg::matrixVectorOp(
-      centers, centers, cluster_sizes, dim, n_clusters, true, false, raft::mul_op(), stream);
+    raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
+      handle, raft::make_const_mdspan(centersView), clusterSizesView, centersView, raft::mul_op{});
   }
 
   rmm::device_uvector<char> workspace(0, stream, mr);
@@ -356,15 +353,11 @@ void calc_centers_and_sizes(const raft::resources& handle,
     raft::linalg::add(cluster_sizes, cluster_sizes, temp_sizes, n_clusters, stream);
   }
 
-  raft::linalg::matrixVectorOp(centers,
-                               centers,
-                               cluster_sizes,
-                               dim,
-                               n_clusters,
-                               true,
-                               false,
-                               raft::div_checkzero_op(),
-                               stream);
+  raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(handle,
+                                                             raft::make_const_mdspan(centersView),
+                                                             clusterSizesView,
+                                                             centersView,
+                                                             raft::div_checkzero_op{});
 }
 
 /** Computes the L2 norm of the dataset, converting to MathT if necessary */
@@ -395,8 +388,8 @@ void compute_norm(const raft::resources& handle,
     dataset_ptr = static_cast<const MathT*>(mapped_dataset.data());
   }
 
-  raft::linalg::rowNorm<MathT, IdxT>(
-    dataset_norm, dataset_ptr, dim, n_rows, raft::linalg::L2Norm, true, stream, norm_fin_op);
+  raft::linalg::rowNorm<raft::linalg::L2Norm, true, MathT, IdxT>(
+    dataset_norm, dataset_ptr, dim, n_rows, stream, norm_fin_op);
 }
 
 /**
@@ -732,8 +725,8 @@ void balancing_em_iters(const raft::resources& handle,
           cluster_centers, n_clusters, dim);
         auto clusters_out_view = raft::make_device_matrix_view<MathT, IdxT, raft::row_major>(
           cluster_centers, n_clusters, dim);
-        raft::linalg::row_normalize(
-          handle, clusters_in_view, clusters_out_view, raft::linalg::L2Norm);
+        raft::linalg::row_normalize<raft::linalg::L2Norm>(
+          handle, clusters_in_view, clusters_out_view);
         break;
       }
       default: break;

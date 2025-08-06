@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
 /**
@@ -23,7 +22,6 @@ package com.nvidia.cuvs;
  */
 public class CagraCompressionParams {
 
-  private CuVSResources resources;
   private final int pqBits;
   private final int pqDim;
   private final int vqNCenters;
@@ -35,7 +33,6 @@ public class CagraCompressionParams {
    * Constructs an instance of CagraCompressionParams with passed search
    * parameters.
    *
-   * @param resources                the resources instance to use
    * @param pqBits                   the bit length of the vector element after
    *                                 compression by PQ
    * @param pqDim                    the dimensionality of the vector after
@@ -49,9 +46,13 @@ public class CagraCompressionParams {
    * @param pqKmeansTrainsetFraction the fraction of data to use during iterative
    *                                 kmeans building (PQ phase)
    */
-  private CagraCompressionParams(CuVSResources resources, int pqBits, int pqDim, int vqNCenters, int kmeansNIters,
-      double vqKmeansTrainsetFraction, double pqKmeansTrainsetFraction) {
-    this.resources = resources;
+  private CagraCompressionParams(
+      int pqBits,
+      int pqDim,
+      int vqNCenters,
+      int kmeansNIters,
+      double vqKmeansTrainsetFraction,
+      double pqKmeansTrainsetFraction) {
     this.pqBits = pqBits;
     this.pqDim = pqDim;
     this.vqNCenters = vqNCenters;
@@ -122,9 +123,19 @@ public class CagraCompressionParams {
 
   @Override
   public String toString() {
-    return "CagraCompressionParams [pqBits=" + pqBits + ", pqDim=" + pqDim + ", vqNCenters=" + vqNCenters
-        + ", kmeansNIters=" + kmeansNIters + ", vqKmeansTrainsetFraction=" + vqKmeansTrainsetFraction
-        + ", pqKmeansTrainsetFraction=" + pqKmeansTrainsetFraction + "]";
+    return "CagraCompressionParams [pqBits="
+        + pqBits
+        + ", pqDim="
+        + pqDim
+        + ", vqNCenters="
+        + vqNCenters
+        + ", kmeansNIters="
+        + kmeansNIters
+        + ", vqKmeansTrainsetFraction="
+        + vqKmeansTrainsetFraction
+        + ", pqKmeansTrainsetFraction="
+        + pqKmeansTrainsetFraction
+        + "]";
   }
 
   /**
@@ -132,7 +143,6 @@ public class CagraCompressionParams {
    */
   public static class Builder {
 
-    private CuVSResources resources;
     private int pqBits = 8;
     private int pqDim = 0;
     private int vqNCenters = 0;
@@ -140,9 +150,7 @@ public class CagraCompressionParams {
     private double vqKmeansTrainsetFraction = 0;
     private double pqKmeansTrainsetFraction = 0;
 
-    public Builder(CuVSResources resources) {
-      this.resources = resources;
-    }
+    public Builder() {}
 
     /**
      * Sets the bit length of the vector element after compression by PQ.
@@ -230,7 +238,12 @@ public class CagraCompressionParams {
      * @return an instance of {@link CagraCompressionParams}
      */
     public CagraCompressionParams build() {
-      return new CagraCompressionParams(resources, pqBits, pqDim, vqNCenters, kmeansNIters, vqKmeansTrainsetFraction,
+      return new CagraCompressionParams(
+          pqBits,
+          pqDim,
+          vqNCenters,
+          kmeansNIters,
+          vqKmeansTrainsetFraction,
           pqKmeansTrainsetFraction);
     }
   }

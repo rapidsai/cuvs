@@ -16,8 +16,21 @@
 
 // Please add the required header files below for which panama FFM API bindings are needed
 
+#include <cuvs/core/c_api.h>
 #include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/brute_force.h>
 #include <cuvs/neighbors/hnsw.h>
 #include <cuvs/neighbors/ivf_pq.h>
-#include "gpuinfo.h"
+#include <cuvs/neighbors/common.h>
+#include <cuvs/neighbors/tiered_index.h>
+#include <cuda_runtime.h>
+
+/**
+ * @brief function signature for setting omp threads
+ */
+void omp_set_num_threads(int n_writer_threads);
+
+/**
+ * @brief function signature for getting omp threads
+ */
+int omp_get_num_threads(void);

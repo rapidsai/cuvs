@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -274,26 +274,32 @@ DataT silhouette_score(
   RAFT_CUDA_TRY(cudaMemsetAsync(
     averageDistanceBetweenSampleAndCluster.data(), 0, nRows * nLabels * sizeof(DataT), stream));
 
-  raft::linalg::matrixVectorOp(averageDistanceBetweenSampleAndCluster.data(),
-                               sampleToClusterSumOfDistances.data(),
-                               binCountArray.data(),
-                               binCountArray.data(),
-                               nLabels,
-                               nRows,
-                               true,
-                               true,
-                               DivOp<DataT>(),
-                               stream);
+  auto averageDistanceBetweenSampleAndClusterView = raft::make_device_matrix_view<DataT>(
+    averageDistanceBetweenSampleAndCluster.data(), nRows, nLabels);
+  auto sampleToClusterSumOfDistancesView = raft::make_device_matrix_view<const DataT>(
+    sampleToClusterSumOfDistances.data(), nRows, nLabels);
+  auto binCountArrayView =
+    raft::make_device_vector_view<const DataT>(binCountArray.data(), nLabels);
+
+  raft::linalg::matrix_vector_op<raft::Apply::ALONG_ROWS>(
+    handle,
+    sampleToClusterSumOfDistancesView,
+    binCountArrayView,
+    averageDistanceBetweenSampleAndClusterView,
+    [] __device__(DataT a, DataT b) {
+      if (b == 0)
+        return static_cast<DataT>(ULLONG_MAX);
+      else
+        return a / b;
+    });
 
   // calculating row-wise minimum
-  raft::linalg::reduce<DataT, DataT, int, raft::identity_op, raft::min_op>(
+  raft::linalg::reduce<true, true, DataT, DataT, int, raft::identity_op, raft::min_op>(
     d_bArray.data(),
     averageDistanceBetweenSampleAndCluster.data(),
     nLabels,
     nRows,
     std::numeric_limits<DataT>::max(),
-    true,
-    true,
     stream,
     false,
     raft::identity_op{},

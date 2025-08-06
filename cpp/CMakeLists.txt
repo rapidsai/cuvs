@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2020-2024, NVIDIA CORPORATION.
+# Copyright (c) 2020-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -37,7 +37,7 @@ project(
 set(CMAKE_INSTALL_MESSAGE LAZY)
 
 # Write the version header
-rapids_cmake_write_version_file(include/cuvs/version_config.hpp)
+rapids_cmake_write_version_file(include/cuvs/version_config.h)
 
 # ##################################################################################################
 # * build type ---------------------------------------------------------------
@@ -416,7 +416,6 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/iface/iface_pq_half_int64_t.cu
     src/neighbors/iface/iface_pq_int8_t_int64_t.cu
     src/neighbors/iface/iface_pq_uint8_t_int64_t.cu
-    src/neighbors/detail/cagra/cagra_build.cpp
     src/neighbors/detail/cagra/topk_for_cagra/topk.cu
     src/neighbors/dynamic_batching.cu
     src/neighbors/cagra_index_wrapper.cu
@@ -433,6 +432,14 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/ivf_flat/ivf_flat_search_half_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_search_int8_t_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_search_uint8_t_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_float_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_half_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_int8_t_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_uint8_t_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_float_int64_t_bitset.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_half_int64_t_bitset.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_int8_t_int64_t_bitset.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_uint8_t_int64_t_bitset.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_float_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_half_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_int8_t_int64_t.cu
@@ -459,6 +466,8 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_float_bitset64.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_false_bitset64.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_true_bitset64.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_contiguous_list_data.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_process_and_fill_codes.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_float_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_half_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_int8_t_int64_t.cu
@@ -479,17 +488,21 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/refine/detail/refine_host_half_float.cpp
     src/neighbors/refine/detail/refine_host_int8_t_float.cpp
     src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
+    src/neighbors/scann/scann_build_float.cu
+    src/neighbors/scann/scann_serialize_float.cu
     src/neighbors/sample_filter.cu
     src/neighbors/tiered_index.cu
     src/neighbors/sparse_brute_force.cu
     src/neighbors/vamana_build_float.cu
     src/neighbors/vamana_build_uint8.cu
     src/neighbors/vamana_build_int8.cu
+    src/neighbors/vamana_codebooks_float.cu
     src/neighbors/vamana_serialize_float.cu
     src/neighbors/vamana_serialize_uint8.cu
     src/neighbors/vamana_serialize_int8.cu
     src/preprocessing/quantize/scalar.cu
     src/preprocessing/quantize/binary.cu
+    src/preprocessing/spectral/spectral_embedding.cu
     src/selection/select_k_float_int64_t.cu
     src/selection/select_k_float_int32_t.cu
     src/selection/select_k_float_uint32_t.cu
@@ -747,6 +760,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     target_include_directories(
       cuvs_c
       PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
+             "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
       INTERFACE "$<INSTALL_INTERFACE:include>"
     )
 
@@ -794,7 +808,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
   endif()
 
   install(
-    FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.hpp
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.h
     COMPONENT cuvs
     DESTINATION include/cuvs
   )
