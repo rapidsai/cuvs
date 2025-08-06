@@ -102,11 +102,12 @@ RAFT_KERNEL merge_subgraphs_kernel(IdxT* cluster_data_indices,
 
     __syncthreads();
 
+    size_t limit = 2 * graph_degree;
     // load sorted result into shared memory to get unique values
     idxBase = threadIdx.x * ITEMS_PER_THREAD;
     for (int i = 0; i < ITEMS_PER_THREAD; i++) {
       size_t colId = idxBase + i;
-      if (colId < 2 * graph_degree) {
+      if (colId < limit) {
         blockKeys[colId]   = threadKeyValuePair[i].key;
         blockValues[colId] = threadKeyValuePair[i].value;
       }
@@ -118,8 +119,29 @@ RAFT_KERNEL merge_subgraphs_kernel(IdxT* cluster_data_indices,
     if (threadIdx.x == 0) { uniqueMask[0] = 1; }
     for (int i = 0; i < ITEMS_PER_THREAD; i++) {
       size_t colId = idxBase + i;
-      if (colId > 0 && colId < 2 * graph_degree) {
-        uniqueMask[colId] = static_cast<int16_t>(blockValues[colId] != blockValues[colId - 1]);
+      if (colId > 0 && colId < limit) {
+        // this assumes same distance between vector from two different batches. however, currently
+        // there are subtle differences in the result based on the matrix size used to call gemm.
+        // This makes it difficult to remove duplicates, because they might no longer be right next
+        // to each other after sorting by distances. Thus, for now we sweep a neighboring window of
+        // size 4 to check for duplicates, and keep the first occurrence only. related issue:
+        // https://github.com/rapidsai/cuvs/issues/1056
+        // uniqueMask[colId] = static_cast<int16_t>(blockValues[colId] != blockValues[colId - 1]);
+
+        int is_unique = 1;
+        IdxT curr_val = blockValues[colId];
+#pragma unroll
+        for (int offset = -4; offset < 0; offset++) {
+          int neighbor_idx = static_cast<int>(colId) + offset;
+
+          if (neighbor_idx >= 0) {
+            if (blockValues[neighbor_idx] == curr_val) {
+              is_unique = 0;
+              break;
+            }
+          }
+        }
+        uniqueMask[colId] = static_cast<int16_t>(is_unique);
       }
     }
 
@@ -127,7 +149,7 @@ RAFT_KERNEL merge_subgraphs_kernel(IdxT* cluster_data_indices,
 
     // prefix sum
     if (threadIdx.x == 0) {
-      for (int i = 1; i < 2 * graph_degree; i++) {
+      for (int i = 1; i < limit; i++) {
         uniqueMask[i] += uniqueMask[i - 1];
       }
     }
@@ -141,7 +163,7 @@ RAFT_KERNEL merge_subgraphs_kernel(IdxT* cluster_data_indices,
 
     for (int i = 0; i < ITEMS_PER_THREAD; i++) {
       size_t colId = idxBase + i;
-      if (colId > 0 && colId < 2 * graph_degree) {
+      if (colId > 0 && colId < limit) {
         bool is_unique       = uniqueMask[colId] != uniqueMask[colId - 1];
         int16_t global_colId = uniqueMask[colId] - 1;
         if (is_unique && static_cast<size_t>(global_colId) < graph_degree) {
