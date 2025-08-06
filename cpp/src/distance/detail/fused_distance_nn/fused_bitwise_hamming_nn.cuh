@@ -58,8 +58,7 @@ void fusedBitwiseHammingNN(OutT* min,
   typedef ::raft::KeyValuePair<IdxT, OutT> KVPair;
 
   // Create the distance operation
-  using AccT = DataT;
-  ops::bitwise_hamming_distance_op<DataT, AccT, IdxT> distance_op{k};
+  ops::bitwise_hamming_distance_op<DataT, uint32_t, IdxT> distance_op{k};
 
   // No special finalization operation needed
   ::raft::identity_op fin_op{};
@@ -77,7 +76,7 @@ void fusedBitwiseHammingNN(OutT* min,
 
   dim3 grid = launchConfigGenerator<P>(m, n, shmemSize, kernel);
   kernel<<<grid, blk, shmemSize, stream>>>(
-    min, x, y, xn, yn, m, n, k, maxVal, workspace, redOp, pairRedOp, distance_op, fin_op);
+    min, x, y, nullptr, nullptr, m, n, k, maxVal, workspace, redOp, pairRedOp, distance_op, fin_op);
   cudaGetLastError();
 }
 

@@ -81,8 +81,6 @@ void fusedDistanceNNImpl(OutT* min,
   switch (metric) {
     case cuvs::distance::DistanceType::CosineExpanded:
       if constexpr (std::is_same_v<DataT, uint8_t> || std::is_same_v<DataT, int8_t>) {
-        // This should never be reached at runtime for uint8_t/int8_t
-        // The caller should ensure proper metric selection for the data type
         assert(false && "Cosine distance is not supported for uint8_t/int8_t data types");
       } else {
         fusedCosineNN<DataT, OutT, IdxT, P, ReduceOpT, KVPReduceOpT>(

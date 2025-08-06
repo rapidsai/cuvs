@@ -241,16 +241,16 @@ inline void predict_bitwise_hamming(const raft::resources& handle,
   auto workspace = raft::make_device_mdarray<char, IdxT>(
     handle, mr, raft::make_extents<IdxT>((sizeof(int)) * n_rows));
 
-  auto minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, uint8_t>, IdxT>(
+  auto minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, uint32_t>, IdxT>(
     handle, mr, raft::make_extents<IdxT>(n_rows));
 
-  raft::KeyValuePair<IdxT, uint8_t> initial_value(0, std::numeric_limits<uint8_t>::max());
+  raft::KeyValuePair<IdxT, uint32_t> initial_value(0, std::numeric_limits<uint32_t>::max());
   thrust::fill(raft::resource::get_thrust_policy(handle),
                minClusterAndDistance.data_handle(),
                minClusterAndDistance.data_handle() + n_rows,
                initial_value);
 
-  cuvs::distance::fusedDistanceNNMinReduce<uint8_t, raft::KeyValuePair<IdxT, uint8_t>, IdxT>(
+  cuvs::distance::fusedDistanceNNMinReduce<uint8_t, raft::KeyValuePair<IdxT, uint32_t>, IdxT>(
     minClusterAndDistance.data_handle(),
     dataset,
     centers,
