@@ -111,7 +111,7 @@ public class HnswIndexImpl implements HnswIndex {
       MemorySegment distancesTensor =
           prepareTensor(localArena, distancesMemorySegment, distancesShape, 2, 32, 1, 1);
 
-      try (var resourcesAccessor = resources.access()) {
+      try (var resourcesAccessor = query.getResources().access()) {
         var cuvsRes = resourcesAccessor.handle();
         int returnValue = cuvsStreamSync(cuvsRes);
         checkCuVSError(returnValue, "cuvsStreamSync");

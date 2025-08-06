@@ -89,10 +89,10 @@ public class TieredIndexIT extends CuVSTestCase {
       log.debug("Initial TieredIndex built successfully");
 
       CagraSearchParams searchParams =
-          new CagraSearchParams.Builder(resources).withMaxIterations(20).build();
+          new CagraSearchParams.Builder().withMaxIterations(20).build();
 
       TieredIndexQuery query =
-          new TieredIndexQuery.Builder()
+          TieredIndexQuery.newBuilder(resources)
               .withTopK(3)
               .withQueryVectors(queries)
               .withSearchParams(searchParams)
@@ -159,11 +159,10 @@ public class TieredIndexIT extends CuVSTestCase {
       log.debug("TieredIndex built for K-value testing");
 
       TieredIndexQuery query1 =
-          new TieredIndexQuery.Builder()
+          TieredIndexQuery.newBuilder(resources)
               .withTopK(1)
               .withQueryVectors(queries)
-              .withSearchParams(
-                  new CagraSearchParams.Builder(resources).withMaxIterations(20).build())
+              .withSearchParams(new CagraSearchParams.Builder().withMaxIterations(20).build())
               .build();
 
       log.debug("Searching with K=1");
@@ -176,11 +175,10 @@ public class TieredIndexIT extends CuVSTestCase {
       assertEquals("Distance to closest vector should be ~0.02", 0.02f, firstResult.get(0), 0.01f);
 
       TieredIndexQuery query3 =
-          new TieredIndexQuery.Builder()
+          TieredIndexQuery.newBuilder(resources)
               .withTopK(3)
               .withQueryVectors(queries)
-              .withSearchParams(
-                  new CagraSearchParams.Builder(resources).withMaxIterations(20).build())
+              .withSearchParams(new CagraSearchParams.Builder().withMaxIterations(20).build())
               .build();
 
       log.debug("Searching with K=3");
@@ -221,7 +219,7 @@ public class TieredIndexIT extends CuVSTestCase {
               .build();
       log.debug("TieredIndex built for prefilter testing");
 
-      CagraSearchParams searchParams = new CagraSearchParams.Builder(resources).build();
+      CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
 
       BitSet prefilter = new BitSet(4);
       prefilter.set(1, true);
@@ -229,7 +227,7 @@ public class TieredIndexIT extends CuVSTestCase {
       log.debug("Created prefilter allowing indices 1 and 2, excluding 0 and 3");
 
       TieredIndexQuery queryWithFilter =
-          new TieredIndexQuery.Builder()
+          TieredIndexQuery.newBuilder(resources)
               .withTopK(3)
               .withQueryVectors(queryVectors)
               .withSearchParams(searchParams)
