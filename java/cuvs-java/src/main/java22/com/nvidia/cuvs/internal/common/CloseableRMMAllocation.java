@@ -15,9 +15,12 @@
  */
 package com.nvidia.cuvs.internal.common;
 
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_POINTER;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMAlloc;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
 
+import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 
 /**
@@ -31,10 +34,20 @@ public class CloseableRMMAllocation implements CloseableHandle {
   private final long numBytes;
   private MemorySegment pointer;
 
-  public CloseableRMMAllocation(long cuvsResourceHandle, long numBytes, MemorySegment pointer) {
+  private CloseableRMMAllocation(long cuvsResourceHandle, long numBytes, MemorySegment pointer) {
     this.cuvsResourceHandle = cuvsResourceHandle;
     this.numBytes = numBytes;
     this.pointer = pointer;
+  }
+
+  public static CloseableRMMAllocation allocateRMMSegment(long cuvsResourceHandle, long numBytes) {
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment datasetMemorySegment = localArena.allocate(C_POINTER);
+      checkCuVSError(
+          cuvsRMMAlloc(cuvsResourceHandle, datasetMemorySegment, numBytes), "cuvsRMMAlloc");
+      return new CloseableRMMAllocation(
+          cuvsResourceHandle, numBytes, datasetMemorySegment.get(C_POINTER, 0));
+    }
   }
 
   @Override

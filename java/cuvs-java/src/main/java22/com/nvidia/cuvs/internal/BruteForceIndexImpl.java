@@ -15,6 +15,7 @@
  */
 package com.nvidia.cuvs.internal;
 
+import static com.nvidia.cuvs.internal.common.CloseableRMMAllocation.allocateRMMSegment;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT_BYTE_SIZE;
@@ -22,7 +23,6 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.HOST_TO_DEVICE;
 import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.INFER_DIRECTION;
-import static com.nvidia.cuvs.internal.common.Util.allocateRMMSegment;
 import static com.nvidia.cuvs.internal.common.Util.buildMemorySegment;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.concatenate;
@@ -178,8 +178,8 @@ public class BruteForceIndexImpl implements BruteForceIndex {
         returnValue = cuvsStreamSync(cuvsResources);
         checkCuVSError(returnValue, "cuvsStreamSync");
 
-        closeableDataMemorySegmentP.release();
-        return new IndexReference(datasetMemorySegmentP, datasetBytes, tensorDataArena, index);
+        return new IndexReference(
+            closeableDataMemorySegmentP.release(), datasetBytes, tensorDataArena, index);
       }
     } finally {
       omp_set_num_threads(1);
