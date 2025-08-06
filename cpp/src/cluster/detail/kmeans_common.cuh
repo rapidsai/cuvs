@@ -158,7 +158,7 @@ void checkWeight(raft::resources const& handle,
   raft::resource::sync_stream(handle, stream);
 
   if (wt_sum != n_samples) {
-    RAFT_LOG_DEBUG(
+    RAFT_LOG_INFO(
       "[Warning!] KMeans: normalizing the user provided sample weight to "
       "sum up to %d samples",
       n_samples);
@@ -298,6 +298,10 @@ void pairwise_distance_kmeans(raft::resources const& handle,
   auto n_samples  = X.extent(0);
   auto n_features = X.extent(1);
   auto n_clusters = centroids.extent(0);
+
+  RAFT_LOG_INFO("pairwise_distance_kmeans - n_samples=%zu, n_features=%zu, n_clusters=%zu, metric=%d",
+                 static_cast<size_t>(n_samples), static_cast<size_t>(n_features), 
+                 static_cast<size_t>(n_clusters), static_cast<int>(metric));
 
   ASSERT(X.extent(1) == centroids.extent(1),
          "# features in dataset and centroids are different (must be same)");
@@ -509,10 +513,19 @@ void minClusterDistanceCompute(raft::resources const& handle,
   auto n_features     = X.extent(1);
   auto n_clusters     = centroids.extent(0);
 
+  RAFT_LOG_INFO("minClusterDistanceCompute: metric = %d", metric);
+  RAFT_LOG_INFO("minClusterDistanceCompute - n_samples=%zu, n_features=%zu, n_clusters=%zu, "
+                 "batch_samples=%d, batch_centroids=%d",
+                 static_cast<size_t>(n_samples), static_cast<size_t>(n_features), 
+                 static_cast<size_t>(n_clusters), batch_samples, batch_centroids);
+
   bool is_fused = metric == cuvs::distance::DistanceType::L2Expanded ||
                   metric == cuvs::distance::DistanceType::L2SqrtExpanded;
   auto dataBatchSize = is_fused ? (IndexT)n_samples : getDataBatchSize(batch_samples, n_samples);
   auto centroidsBatchSize = getCentroidsBatchSize(batch_centroids, n_clusters);
+  
+  RAFT_LOG_INFO("Batch sizes - dataBatchSize=%zu, centroidsBatchSize=%zu, is_fused=%d",
+                 static_cast<size_t>(dataBatchSize), static_cast<size_t>(centroidsBatchSize), is_fused);
 
   if (is_fused) {
     L2NormBuf_OR_DistBuf.resize(n_clusters, stream);
@@ -596,6 +609,11 @@ void minClusterDistanceCompute(raft::resources const& handle,
         pairwise_distance_kmeans<DataT, IndexT>(
           handle, datasetView, centroidsView, pairwiseDistanceView, metric);
 
+        RAFT_LOG_INFO("Before coalescedReduction in minClusterDistanceCompute - "
+                       "extent(0)=%zu, extent(1)=%zu", 
+                       static_cast<size_t>(pairwiseDistanceView.extent(0)), 
+                       static_cast<size_t>(pairwiseDistanceView.extent(1)));
+
         raft::linalg::coalescedReduction(minClusterDistanceView.data_handle(),
                                          pairwiseDistanceView.data_handle(),
                                          pairwiseDistanceView.extent(1),
@@ -606,6 +624,8 @@ void minClusterDistanceCompute(raft::resources const& handle,
                                          raft::identity_op{},
                                          raft::min_op{},
                                          raft::identity_op{});
+        
+        RAFT_LOG_INFO("After coalescedReduction - successful");
       }
     }
   }

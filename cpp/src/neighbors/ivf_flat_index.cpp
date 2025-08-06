@@ -174,7 +174,11 @@ IdxT index<T, IdxT>::size() const noexcept
 template <typename T, typename IdxT>
 uint32_t index<T, IdxT>::dim() const noexcept
 {
-  return centers_.extent(1);
+  if (binary_index_) {
+    return binary_centers_.extent(1);
+  } else {
+    return centers_.extent(1);
+  }
 }
 
 template <typename T, typename IdxT>
