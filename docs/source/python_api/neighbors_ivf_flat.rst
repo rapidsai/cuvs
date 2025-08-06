@@ -42,3 +42,8 @@ Index load
 ##########
 
 .. autofunction:: cuvs.neighbors.ivf_flat.load
+
+Index extend
+############
+
+.. autofunction:: cuvs.neighbors.ivf_flat.extend
