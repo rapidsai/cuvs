@@ -13,16 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs.spi;
 
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.CagraIndex;
-import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.Dataset;
-import com.nvidia.cuvs.HnswIndex;
 import com.nvidia.cuvs.CagraMergeParams;
-
+import com.nvidia.cuvs.CuVSMatrix;
+import com.nvidia.cuvs.CuVSResources;
+import com.nvidia.cuvs.HnswIndex;
+import com.nvidia.cuvs.TieredIndex;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodType;
 import java.nio.file.Path;
 
 /**
@@ -49,11 +50,36 @@ public interface CuVSProvider {
   }
 
   /** Creates a new CuVSResources. */
-  CuVSResources newCuVSResources(Path tempDirectory)
-      throws Throwable;
+  CuVSResources newCuVSResources(Path tempDirectory) throws Throwable;
 
-  /** Create a {@link Dataset} instance **/
-  Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException;
+  /** Create a {@link CuVSMatrix.Builder} instance **/
+  CuVSMatrix.Builder newMatrixBuilder(int size, int dimensions, CuVSMatrix.DataType dataType);
+
+  /**
+   * Returns the factory method used to build a Dataset from native memory.
+   * The factory method will have this signature:
+   * {@code Dataset createNativeDataset(memorySegment, size, dimensions, dataType)},
+   * where {@code memorySegment} is a {@code java.lang.foreign.MemorySegment} containing {@code int size} vectors of
+   * {@code int dimensions} length of type {@link CuVSMatrix.DataType}.
+   * <p>
+   * In order to expose this factory in a way that is compatible with Java 21, the factory method is returned as a
+   * {@link MethodHandle} with {@link MethodType} equal to
+   * {@code (Dataset.class, MemorySegment.class, int.class, int.class, Dataset.DataType.class)}.
+   * The caller will need to invoke the factory via the {@link MethodHandle#invokeExact} method:
+   * {@code Dataset dataset = (Dataset)newNativeDatasetBuilder().invokeExact(memorySegment, size, dimensions, dataType)}
+   * </p>
+   * @return a MethodHandle which can be invoked to build a Dataset from an external {@code MemorySegment}
+   */
+  MethodHandle newNativeMatrixBuilder();
+
+  /** Create a {@link CuVSMatrix} from an on-heap array **/
+  CuVSMatrix newMatrixFromArray(float[][] vectors);
+
+  /** Create a {@link CuVSMatrix} from an on-heap array **/
+  CuVSMatrix newMatrixFromArray(int[][] vectors);
+
+  /** Create a {@link CuVSMatrix} from an on-heap array **/
+  CuVSMatrix newMatrixFromArray(byte[][] vectors);
 
   /** Creates a new BruteForceIndex Builder. */
   BruteForceIndex.Builder newBruteForceIndexBuilder(CuVSResources cuVSResources)
@@ -65,6 +91,10 @@ public interface CuVSProvider {
 
   /** Creates a new HnswIndex Builder. */
   HnswIndex.Builder newHnswIndexBuilder(CuVSResources cuVSResources)
+      throws UnsupportedOperationException;
+
+  /** Creates a new TieredIndex Builder. */
+  TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;
 
   /**
@@ -84,7 +114,8 @@ public interface CuVSProvider {
    * @return A new merged CAGRA index
    * @throws Throwable if an error occurs during the merge operation
    */
-  default CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraMergeParams mergeParams) throws Throwable {
+  default CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraMergeParams mergeParams)
+      throws Throwable {
     // Default implementation falls back to the method without parameters
     return mergeCagraIndexes(indexes);
   }

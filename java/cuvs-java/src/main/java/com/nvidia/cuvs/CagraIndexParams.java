@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
 /**
@@ -30,6 +29,7 @@ public class CagraIndexParams {
   private final int nnDescentNiter;
   private final int numWriterThreads;
   private final CuVSIvfPqParams cuVSIvfPqParams;
+  private final CagraCompressionParams cagraCompressionParams;
 
   /**
    * Enum that denotes which ANN algorithm is used to build CAGRA graph.
@@ -156,14 +156,12 @@ public class CagraIndexParams {
     private CuvsDistanceType(int value) {
       this.value = value;
     }
-
   }
 
   /**
    * Enum that denotes codebook gen options.
    */
   public enum CodebookGen {
-
     PER_SUBSPACE(0),
 
     PER_CLUSTER(1);
@@ -182,7 +180,6 @@ public class CagraIndexParams {
    * Enum that denotes cuda datatypes.
    */
   public enum CudaDataType {
-
     CUDA_R_16F(2),
 
     CUDA_C_16F(6),
@@ -250,8 +247,15 @@ public class CagraIndexParams {
     }
   }
 
-  private CagraIndexParams(int intermediateGraphDegree, int graphDegree, CagraGraphBuildAlgo CuvsCagraGraphBuildAlgo,
-      int nnDescentNiter, int writerThreads, CuvsDistanceType cuvsDistanceType, CuVSIvfPqParams cuVSIvfPqParams) {
+  private CagraIndexParams(
+      int intermediateGraphDegree,
+      int graphDegree,
+      CagraGraphBuildAlgo CuvsCagraGraphBuildAlgo,
+      int nnDescentNiter,
+      int writerThreads,
+      CuvsDistanceType cuvsDistanceType,
+      CuVSIvfPqParams cuVSIvfPqParams,
+      CagraCompressionParams cagraCompressionParams) {
     this.intermediateGraphDegree = intermediateGraphDegree;
     this.graphDegree = graphDegree;
     this.cuvsCagraGraphBuildAlgo = CuvsCagraGraphBuildAlgo;
@@ -259,6 +263,7 @@ public class CagraIndexParams {
     this.numWriterThreads = writerThreads;
     this.cuvsDistanceType = cuvsDistanceType;
     this.cuVSIvfPqParams = cuVSIvfPqParams;
+    this.cagraCompressionParams = cagraCompressionParams;
   }
 
   /**
@@ -315,12 +320,46 @@ public class CagraIndexParams {
     return cuVSIvfPqParams;
   }
 
+  /**
+   * Gets the CAGRA build algorithm.
+   */
+  public CagraGraphBuildAlgo getCuvsCagraGraphBuildAlgo() {
+    return cuvsCagraGraphBuildAlgo;
+  }
+
+  /**
+   * Gets the number of Iterations to run.
+   */
+  public int getNnDescentNiter() {
+    return nnDescentNiter;
+  }
+
+  /**
+   * Gets the CAGRA compression parameters.
+   */
+  public CagraCompressionParams getCagraCompressionParams() {
+    return cagraCompressionParams;
+  }
+
   @Override
   public String toString() {
-    return "CagraIndexParams [cuvsCagraGraphBuildAlgo=" + cuvsCagraGraphBuildAlgo + ", cuvsDistanceType="
-        + cuvsDistanceType + ", intermediateGraphDegree=" + intermediateGraphDegree + ", graphDegree=" + graphDegree
-        + ", nnDescentNiter=" + nnDescentNiter + ", numWriterThreads=" + numWriterThreads + ", cuVSIvfPqParams="
-        + cuVSIvfPqParams + "]";
+    return "CagraIndexParams [cuvsCagraGraphBuildAlgo="
+        + cuvsCagraGraphBuildAlgo
+        + ", cuvsDistanceType="
+        + cuvsDistanceType
+        + ", intermediateGraphDegree="
+        + intermediateGraphDegree
+        + ", graphDegree="
+        + graphDegree
+        + ", nnDescentNiter="
+        + nnDescentNiter
+        + ", numWriterThreads="
+        + numWriterThreads
+        + ", cuVSIvfPqParams="
+        + cuVSIvfPqParams
+        + ", cagraCompressionParams="
+        + cagraCompressionParams
+        + "]";
   }
 
   /**
@@ -335,9 +374,9 @@ public class CagraIndexParams {
     private int nnDescentNumIterations = 20;
     private int numWriterThreads = 2;
     private CuVSIvfPqParams cuVSIvfPqParams = new CuVSIvfPqParams.Builder().build();
+    private CagraCompressionParams cagraCompressionParams;
 
-    public Builder() {
-    }
+    public Builder() {}
 
     /**
      * Sets the degree of input graph for pruning.
@@ -419,13 +458,32 @@ public class CagraIndexParams {
     }
 
     /**
+     * Registers an instance of configured {@link CagraCompressionParams} with this
+     * Builder.
+     *
+     * @param cagraCompressionParams An instance of CagraCompressionParams.
+     * @return An instance of this Builder.
+     */
+    public Builder withCompressionParams(CagraCompressionParams cagraCompressionParams) {
+      this.cagraCompressionParams = cagraCompressionParams;
+      return this;
+    }
+
+    /**
      * Builds an instance of {@link CagraIndexParams}.
      *
      * @return an instance of {@link CagraIndexParams}
      */
     public CagraIndexParams build() {
-      return new CagraIndexParams(intermediateGraphDegree, graphDegree, cuvsCagraGraphBuildAlgo, nnDescentNumIterations,
-          numWriterThreads, cuvsDistanceType, cuVSIvfPqParams);
+      return new CagraIndexParams(
+          intermediateGraphDegree,
+          graphDegree,
+          cuvsCagraGraphBuildAlgo,
+          nnDescentNumIterations,
+          numWriterThreads,
+          cuvsDistanceType,
+          cuVSIvfPqParams,
+          cagraCompressionParams);
     }
   }
 }

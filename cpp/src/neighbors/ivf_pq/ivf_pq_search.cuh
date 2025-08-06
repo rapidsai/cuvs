@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -151,7 +151,7 @@ void select_clusters(raft::resources const& handle,
     } break;
     default: RAFT_FAIL("Unsupported distance type %d.", int(metric));
   }
-  rmm::device_uvector<float> qc_distances(n_queries * n_lists, stream, mr);
+  rmm::device_uvector<float> qc_distances(size_t(n_queries) * size_t(n_lists), stream, mr);
   raft::linalg::gemm(handle,
                      true,
                      false,
@@ -169,7 +169,7 @@ void select_clusters(raft::resources const& handle,
                      stream);
 
   // Select neighbor clusters for each query.
-  rmm::device_uvector<float> cluster_dists(n_queries * n_probes, stream, mr);
+  rmm::device_uvector<float> cluster_dists(size_t(n_queries) * size_t(n_probes), stream, mr);
   cuvs::selection::select_k(
     handle,
     raft::make_device_matrix_view<const float, int64_t>(qc_distances.data(), n_queries, n_lists),
@@ -237,7 +237,7 @@ void select_clusters(raft::resources const& handle,
     } break;
     default: RAFT_FAIL("Unsupported distance type %d.", int(metric));
   }
-  rmm::device_uvector<dist_type> qc_distances(n_queries * n_lists, stream, mr);
+  rmm::device_uvector<dist_type> qc_distances(size_t(n_queries) * size_t(n_lists), stream, mr);
   raft::linalg::gemm(handle,
                      true,
                      false,
@@ -255,7 +255,7 @@ void select_clusters(raft::resources const& handle,
                      stream);
 
   // Select neighbor clusters for each query.
-  rmm::device_uvector<dist_type> cluster_dists(n_queries * n_probes, stream, mr);
+  rmm::device_uvector<dist_type> cluster_dists(size_t(n_queries) * size_t(n_probes), stream, mr);
   // cuvs::selection::select_k lacks uint32_t-as-a-value support at the moment
   raft::matrix::select_k<dist_type, uint32_t>(
     handle,
@@ -322,7 +322,7 @@ void select_clusters(raft::resources const& handle,
     } break;
     default: RAFT_FAIL("Unsupported distance type %d.", int(metric));
   }
-  rmm::device_uvector<dist_type> qc_distances(n_queries * n_lists, stream, mr);
+  rmm::device_uvector<dist_type> qc_distances(size_t(n_queries) * size_t(n_lists), stream, mr);
   raft::linalg::gemm(handle,
                      true,
                      false,
@@ -340,7 +340,7 @@ void select_clusters(raft::resources const& handle,
                      stream);
 
   // Select neighbor clusters for each query.
-  rmm::device_uvector<dist_type> cluster_dists(n_queries * n_probes, stream, mr);
+  rmm::device_uvector<dist_type> cluster_dists(size_t(n_queries) * size_t(n_probes), stream, mr);
   cuvs::selection::select_k(
     handle,
     raft::make_device_matrix_view<const dist_type, int64_t>(
@@ -730,8 +730,9 @@ struct ivfpq_search {
 };
 
 /**
- * A heuristic for bounding the number of queries per batch, to improve GPU utilization.
- * (based on the number of SMs and the work size).
+ * A heuristic for bounding the number of queries in compute similarity kernel batch, to improve GPU
+ * utilization. (based on the number of SMs and the work size). A major restriction here is the
+ * max_samples - how many intermediate results may be kept in memory.
  *
  * @param res is used to query the workspace size
  * @param k top-k
@@ -742,11 +743,11 @@ struct ivfpq_search {
  *
  * @return maximum recommended batch size.
  */
-inline auto get_max_batch_size(raft::resources const& res,
-                               uint32_t k,
-                               uint32_t n_probes,
-                               uint32_t n_queries,
-                               uint32_t max_samples) -> uint32_t
+inline auto get_max_fine_batch_size(raft::resources const& res,
+                                    uint32_t k,
+                                    uint32_t n_probes,
+                                    uint32_t n_queries,
+                                    uint32_t max_samples) -> uint32_t
 {
   uint32_t max_batch_size = n_queries;
   uint32_t n_ctas_total   = raft::resource::get_device_properties(res).multiProcessorCount * 2;
@@ -776,6 +777,44 @@ inline auto get_max_batch_size(raft::resources const& res,
     return smaller_batch_size;
   }
   return max_batch_size;
+}
+
+/**
+ * A heuristic for bounding the number of queries per batch for the outer loop of the search,
+ * to improve GPU utilization and memory usage.
+ *
+ * @param res is used to query the workspace size
+ * @param data_size size of each data element in bytes
+ * @param n_probes number of selected clusters per query
+ * @param n_lists total number of clusters
+ * @param n_queries number of queries to process
+ * @param max_queries maximum number of queries that can be processed at once
+ *
+ * @return maximum recommended batch size for the outer loop
+ */
+inline auto get_max_coarse_batch_size(raft::resources const& res,
+                                      const search_params& params,
+                                      uint32_t n_probes,
+                                      uint32_t n_lists,
+                                      uint32_t n_queries) -> uint32_t
+{
+  size_t data_size = 4;
+  switch (params.coarse_search_dtype) {
+    case CUDA_R_32F: data_size = 4; break;
+    case CUDA_R_16F: data_size = 2; break;
+    case CUDA_R_8I: data_size = 1; break;
+    default: RAFT_FAIL("Unexpected coarse_search_dtype (%d)", int(params.coarse_search_dtype));
+  }
+  // How much data we allocate for coarse GEMM.
+  // This is NOT all memory we need, as a rule of thumb max it out to half of the workspace.
+  // We don't reach this limit by default, but only when we increase the max_internal_batch_size by
+  // a lot.
+  auto bytes_per_query = static_cast<size_t>(n_probes + n_lists) * data_size;
+  auto max_per_ws      = raft::resource::get_workspace_free_bytes(res) / bytes_per_query;
+  return std::max<uint32_t>(
+    1,
+    std::min<uint32_t>(max_per_ws / 2,
+                       std::min<uint32_t>(params.max_internal_batch_size, n_queries)));
 }
 
 template <typename T, typename IdxT>
@@ -867,33 +906,37 @@ inline void search(raft::resources const& handle,
   auto mr = raft::resource::get_workspace_resource(handle);
 
   // Maximum number of query vectors to search at the same time.
-  const auto max_queries =
-    std::min<uint32_t>(std::max<uint32_t>(n_queries, 1), params.max_internal_batch_size);
-  auto max_batch_size = get_max_batch_size(handle, k, n_probes, max_queries, max_samples);
+  // Number of queries in the outer loop, which includes query transform and coarse search.
+  const auto max_bs_outer =
+    get_max_coarse_batch_size(handle, params, n_probes, index.n_lists(), n_queries);
+  // Number of queries in the inner loop, which includes the fine search;
+  // This is usually smaller than the outer loop when the non-fused kernel has to keep intermediate
+  // results in the device memory.
+  auto max_bs_inner = get_max_fine_batch_size(handle, k, n_probes, max_bs_outer, max_samples);
 
   using some_query_t = std::
     variant<rmm::device_uvector<float>, rmm::device_uvector<half>, rmm::device_uvector<int8_t>>;
   some_query_t gemm_queries(
     params.coarse_search_dtype == CUDA_R_32F
       ? std::move(some_query_t{
-          std::in_place_type_t<rmm::device_uvector<float>>{}, max_queries * dim_ext, stream, mr})
+          std::in_place_type_t<rmm::device_uvector<float>>{}, max_bs_outer * dim_ext, stream, mr})
     : params.coarse_search_dtype == CUDA_R_16F
       ? std::move(some_query_t{
-          std::in_place_type_t<rmm::device_uvector<half>>{}, max_queries * dim_ext, stream, mr})
+          std::in_place_type_t<rmm::device_uvector<half>>{}, max_bs_outer * dim_ext, stream, mr})
     : params.coarse_search_dtype == CUDA_R_8I
       ? std::move(some_query_t{
-          std::in_place_type_t<rmm::device_uvector<int8_t>>{}, max_queries * dim_ext, stream, mr})
+          std::in_place_type_t<rmm::device_uvector<int8_t>>{}, max_bs_outer * dim_ext, stream, mr})
       : throw raft::logic_error("Unsupported coarse_search_dtype (only CUDA_R_32F, "
                                 "CUDA_R_16F, and CUDA_R_8I are supported)"));
-  rmm::device_uvector<float> rot_queries(max_queries * index.rot_dim(), stream, mr);
-  rmm::device_uvector<uint32_t> clusters_to_probe(max_queries * n_probes, stream, mr);
+  rmm::device_uvector<float> rot_queries(max_bs_outer * index.rot_dim(), stream, mr);
+  rmm::device_uvector<uint32_t> clusters_to_probe(max_bs_outer * n_probes, stream, mr);
 
   auto filter_adapter = cuvs::neighbors::filtering::ivf_to_sample_filter(
     index.inds_ptrs().data_handle(), sample_filter);
   auto search_instance = ivfpq_search<IdxT, decltype(filter_adapter)>::fun(params, index.metric());
 
-  for (uint32_t offset_q = 0; offset_q < n_queries; offset_q += max_queries) {
-    uint32_t queries_batch = min(max_queries, n_queries - offset_q);
+  for (uint32_t offset_q = 0; offset_q < n_queries; offset_q += max_bs_outer) {
+    uint32_t queries_batch = min(max_bs_outer, n_queries - offset_q);
     raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> batch_scope(
       "ivf_pq::search-batch(queries: %u - %u)", offset_q, offset_q + queries_batch);
 
@@ -942,14 +985,12 @@ inline void search(raft::resources const& handle,
       gemm_queries);
     if (index.metric() == distance::DistanceType::CosineExpanded) {
       auto rot_queries_view = raft::make_device_matrix_view<float, uint32_t>(
-        rot_queries.data(), max_queries, index.rot_dim());
-      raft::linalg::row_normalize(handle,
-                                  raft::make_const_mdspan(rot_queries_view),
-                                  rot_queries_view,
-                                  raft::linalg::NormType::L2Norm);
+        rot_queries.data(), max_bs_outer, index.rot_dim());
+      raft::linalg::row_normalize<raft::linalg::L2Norm>(
+        handle, raft::make_const_mdspan(rot_queries_view), rot_queries_view);
     }
-    for (uint32_t offset_b = 0; offset_b < queries_batch; offset_b += max_batch_size) {
-      uint32_t batch_size = min(max_batch_size, queries_batch - offset_b);
+    for (uint32_t offset_b = 0; offset_b < queries_batch; offset_b += max_bs_inner) {
+      uint32_t batch_size = min(max_bs_inner, queries_batch - offset_b);
       /* The distance calculation is done in the rotated/transformed space;
          as long as `index.rotation_matrix()` is orthogonal, the distances and thus results are
          preserved.

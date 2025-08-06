@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -29,7 +30,7 @@ extern "C" {
  * @{
  */
 /**
- * @brief An enum denoting return values for function calls
+ * @brief An enum denoting error statuses for function calls
  *
  */
 typedef enum { CUVS_ERROR, CUVS_SUCCESS } cuvsError_t;
@@ -167,6 +168,43 @@ cuvsError_t cuvsRMMHostAlloc(void** ptr, size_t bytes);
  */
 cuvsError_t cuvsRMMHostFree(void* ptr, size_t bytes);
 
+/**
+ * @brief Get the version of the cuVS library
+ * @param[out] major Major version
+ * @param[out] minor Minor version
+ * @param[out] patch Patch version
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsVersionGet(uint16_t* major, uint16_t* minor, uint16_t* patch);
+
+/**
+ * @brief Copy a matrix
+ *
+ * This function copies a matrix from dst to src. This lets you copy a matrix
+ * from device memory to host memory (or vice versa), while accounting for
+ * differences in strides.
+ *
+ * Both src and dst must have the same shape and dtype, but can have different
+ * strides and device type. The memory for the output dst tensor must already be
+ * allocated and the tensor initialized.
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] src Pointer to DLManagedTensor to copy
+ * @param[out] dst Pointer to DLManagedTensor to receive copy of data
+ */
+cuvsError_t cuvsMatrixCopy(cuvsResources_t res, DLManagedTensor* src, DLManagedTensor* dst);
+
+/**
+ * @brief Slices rows from a matrix
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] src Pointer to DLManagedTensor to copy
+ * @param[in] start First row index to include in the output
+ * @param[in] end Last row index to include in the output
+ * @param[out] dst Pointer to DLManagedTensor to receive slice from matrix
+ */
+cuvsError_t cuvsMatrixSliceRows(
+  cuvsResources_t res, DLManagedTensor* src, int64_t start, int64_t end, DLManagedTensor* dst);
 /** @} */
 
 #ifdef __cplusplus

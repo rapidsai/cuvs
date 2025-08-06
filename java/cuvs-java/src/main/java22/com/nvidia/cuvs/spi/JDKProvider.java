@@ -13,29 +13,46 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs.spi;
 
-import com.nvidia.cuvs.BruteForceIndex;
-import com.nvidia.cuvs.CagraIndex;
-import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.Dataset;
-import com.nvidia.cuvs.HnswIndex;
-import com.nvidia.cuvs.CagraMergeParams;
-import com.nvidia.cuvs.internal.BruteForceIndexImpl;
-import com.nvidia.cuvs.internal.CagraIndexImpl;
-import com.nvidia.cuvs.internal.CuVSResourcesImpl;
-import com.nvidia.cuvs.internal.DatasetImpl;
-import com.nvidia.cuvs.internal.HnswIndexImpl;
-
+import com.nvidia.cuvs.*;
+import com.nvidia.cuvs.internal.*;
+import com.nvidia.cuvs.internal.common.Util;
+import java.lang.foreign.MemorySegment;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 
 final class JDKProvider implements CuVSProvider {
 
+  private static final MethodHandle createNativeDataset$mh = createNativeDatasetBuilder();
+
+  static MethodHandle createNativeDatasetBuilder() {
+    try {
+      var lookup = MethodHandles.lookup();
+      var mt =
+          MethodType.methodType(
+              CuVSMatrix.class,
+              MemorySegment.class,
+              int.class,
+              int.class,
+              CuVSMatrix.DataType.class);
+      return lookup.findStatic(JDKProvider.class, "createNativeDataset", mt);
+    } catch (NoSuchMethodException | IllegalAccessException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static CuVSMatrix createNativeDataset(
+      MemorySegment memorySegment, int size, int dimensions, CuVSMatrix.DataType dataType) {
+    return new CuVSHostMatrixImpl(memorySegment, size, dimensions, dataType);
+  }
+
   @Override
-  public CuVSResources newCuVSResources(Path tempDirectory) throws Throwable {
+  public CuVSResources newCuVSResources(Path tempDirectory) {
     Objects.requireNonNull(tempDirectory);
     if (Files.notExists(tempDirectory)) {
       throw new IllegalArgumentException("does not exist:" + tempDirectory);
@@ -62,6 +79,11 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
+  public TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources) {
+    return TieredIndexImpl.newBuilder(Objects.requireNonNull(cuVSResources));
+  }
+
+  @Override
   public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) throws Throwable {
     if (indexes == null || indexes.length == 0) {
       throw new IllegalArgumentException("At least one index must be provided for merging");
@@ -70,7 +92,8 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraMergeParams mergeParams) throws Throwable {
+  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraMergeParams mergeParams)
+      throws Throwable {
     if (indexes == null || indexes.length == 0) {
       throw new IllegalArgumentException("At least one index must be provided for merging");
     }
@@ -78,7 +101,91 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public Dataset newDataset(int size, int dimensions) throws UnsupportedOperationException {
-      return new DatasetImpl(size, dimensions);
+  public CuVSMatrix.Builder newMatrixBuilder(int size, int dimensions, CuVSMatrix.DataType dataType)
+      throws UnsupportedOperationException {
+
+    var dataset = new CuVSHostMatrixArenaImpl(size, dimensions, dataType);
+
+    return new CuVSMatrix.Builder() {
+      int current = 0;
+
+      @Override
+      public void addVector(float[] vector) {
+        internalAddVector(vector);
+      }
+
+      @Override
+      public void addVector(byte[] vector) {
+        internalAddVector(vector);
+      }
+
+      @Override
+      public void addVector(int[] vector) {
+        internalAddVector(vector);
+      }
+
+      private void internalAddVector(Object vector) {
+        if (current >= size) throw new ArrayIndexOutOfBoundsException();
+        MemorySegment.copy(
+            vector,
+            0,
+            dataset.memorySegment(),
+            dataset.valueLayout(),
+            ((current++) * dimensions * dataset.valueLayout().byteSize()),
+            dimensions);
+      }
+
+      @Override
+      public CuVSMatrix build() {
+        return dataset;
+      }
+    };
+  }
+
+  @Override
+  public MethodHandle newNativeMatrixBuilder() {
+    return createNativeDataset$mh;
+  }
+
+  @Override
+  public CuVSMatrix newMatrixFromArray(float[][] vectors) {
+    Objects.requireNonNull(vectors);
+    if (vectors.length == 0) {
+      throw new IllegalArgumentException("vectors should not be empty");
+    }
+    int size = vectors.length;
+    int columns = vectors[0].length;
+
+    var dataset = new CuVSHostMatrixArenaImpl(size, columns, CuVSMatrix.DataType.FLOAT);
+    Util.copy(dataset.memorySegment(), vectors);
+    return dataset;
+  }
+
+  @Override
+  public CuVSMatrix newMatrixFromArray(int[][] vectors) {
+    Objects.requireNonNull(vectors);
+    if (vectors.length == 0) {
+      throw new IllegalArgumentException("vectors should not be empty");
+    }
+    int size = vectors.length;
+    int columns = vectors[0].length;
+
+    var dataset = new CuVSHostMatrixArenaImpl(size, columns, CuVSMatrix.DataType.INT);
+    Util.copy(dataset.memorySegment(), vectors);
+    return dataset;
+  }
+
+  @Override
+  public CuVSMatrix newMatrixFromArray(byte[][] vectors) {
+    Objects.requireNonNull(vectors);
+    if (vectors.length == 0) {
+      throw new IllegalArgumentException("vectors should not be empty");
+    }
+    int size = vectors.length;
+    int columns = vectors[0].length;
+
+    var dataset = new CuVSHostMatrixArenaImpl(size, columns, CuVSMatrix.DataType.BYTE);
+    Util.copy(dataset.memorySegment(), vectors);
+    return dataset;
   }
 }

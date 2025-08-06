@@ -38,3 +38,8 @@ Index load
 ##########
 
 .. autofunction:: cuvs.neighbors.hnsw.load
+
+Index extend
+###########
+
+.. autofunction:: cuvs.neighbors.hnsw.extend

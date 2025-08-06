@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-#include <cstdint>
 #include <cuvs/core/c_api.h>
 #include <cuvs/core/exceptions.hpp>
-#include <memory>
+#include <cuvs/version_config.h>
+
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/util/cudart_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/mr/device/device_memory_resource.hpp>
 #include <rmm/mr/device/managed_memory_resource.hpp>
@@ -27,6 +28,9 @@
 #include <rmm/mr/device/per_device_resource.hpp>
 #include <rmm/mr/device/pool_memory_resource.hpp>
 #include <rmm/mr/host/pinned_memory_resource.hpp>
+
+#include <cstdint>
+#include <memory>
 #include <thread>
 
 extern "C" cuvsError_t cuvsResourcesCreate(cuvsResources_t* res)
@@ -154,3 +158,126 @@ extern "C" const char* cuvsGetLastErrorText()
 }
 
 extern "C" void cuvsSetLastErrorText(const char* error) { last_error_text = error ? error : ""; }
+
+extern "C" cuvsError_t cuvsVersionGet(uint16_t* major, uint16_t* minor, uint16_t* patch)
+{
+  *major = CUVS_VERSION_MAJOR;
+  *minor = CUVS_VERSION_MINOR;
+  *patch = CUVS_VERSION_PATCH;
+  return CUVS_SUCCESS;
+}
+
+namespace {
+template <typename T>
+void _copy_matrix(cuvsResources_t res, DLManagedTensor* src_managed, DLManagedTensor* dst_managed)
+{
+  DLTensor& src = src_managed->dl_tensor;
+  DLTensor& dst = dst_managed->dl_tensor;
+
+  int64_t src_row_stride = src.strides == nullptr ? src.shape[1] : src.strides[0];
+  int64_t dst_row_stride = dst.strides == nullptr ? dst.shape[1] : dst.strides[0];
+  auto res_ptr           = reinterpret_cast<raft::resources*>(res);
+
+  raft::copy_matrix<T>(static_cast<T*>(dst.data),
+                       dst_row_stride,
+                       static_cast<const T*>(src.data),
+                       src_row_stride,
+                       src.shape[1],
+                       src.shape[0],
+                       raft::resource::get_cuda_stream(*res_ptr));
+}
+}  // namespace
+
+extern "C" cuvsError_t cuvsMatrixCopy(cuvsResources_t res,
+                                      DLManagedTensor* src_managed,
+                                      DLManagedTensor* dst_managed)
+{
+  return cuvs::core::translate_exceptions([=] {
+    DLTensor& src = src_managed->dl_tensor;
+    DLTensor& dst = dst_managed->dl_tensor;
+
+    RAFT_EXPECTS(src.ndim == 2, "src should be a 2 dimensional tensor");
+    RAFT_EXPECTS(dst.ndim == 2, "dst should be a 2 dimensional tensor");
+
+    for (int64_t i = 0; i < src.ndim; ++i) {
+      RAFT_EXPECTS(src.shape[i] == dst.shape[i], "shape mismatch between src and dst tensors");
+    }
+    RAFT_EXPECTS(src.dtype.code == dst.dtype.code, "dtype mismatch between src and dst tensors");
+
+    // at some point we could probably copy from a float32 to a float16 here, but for the
+    // moment this isn't supported
+    RAFT_EXPECTS(src.dtype.bits == dst.dtype.bits,
+                 "dtype bits width mismatch between src and dst tensors");
+
+    if (src.dtype.code == kDLFloat && src.dtype.bits == 32) {
+      _copy_matrix<float>(res, src_managed, dst_managed);
+    } else if (src.dtype.code == kDLFloat && src.dtype.bits == 16) {
+      _copy_matrix<half>(res, src_managed, dst_managed);
+    } else if (src.dtype.code == kDLFloat && src.dtype.bits == 64) {
+      _copy_matrix<double>(res, src_managed, dst_managed);
+    } else if (src.dtype.code == kDLInt && src.dtype.bits == 8) {
+      _copy_matrix<int8_t>(res, src_managed, dst_managed);
+    } else if (src.dtype.code == kDLInt && src.dtype.bits == 16) {
+      _copy_matrix<int16_t>(res, src_managed, dst_managed);
+    } else if (src.dtype.code == kDLInt && src.dtype.bits == 32) {
+      _copy_matrix<int32_t>(res, src_managed, dst_managed);
+    } else if (src.dtype.code == kDLInt && src.dtype.bits == 64) {
+      _copy_matrix<int64_t>(res, src_managed, dst_managed);
+    } else if (src.dtype.code == kDLUInt && src.dtype.bits == 8) {
+      _copy_matrix<uint8_t>(res, src_managed, dst_managed);
+    } else if (src.dtype.code == kDLUInt && src.dtype.bits == 16) {
+      _copy_matrix<uint16_t>(res, src_managed, dst_managed);
+    } else if (src.dtype.code == kDLUInt && src.dtype.bits == 32) {
+      _copy_matrix<uint32_t>(res, src_managed, dst_managed);
+    } else if (src.dtype.code == kDLUInt && src.dtype.bits == 64) {
+      _copy_matrix<uint64_t>(res, src_managed, dst_managed);
+    } else {
+      RAFT_FAIL("Unsupported dtype: %d and bits: %d", src.dtype.code, src.dtype.bits);
+    }
+  });
+}
+
+extern "C" void cuvsMatrixDestroy(DLManagedTensor* tensor)
+{
+  if (tensor->dl_tensor.shape != nullptr) {
+    delete[] tensor->dl_tensor.shape;
+    tensor->dl_tensor.shape = nullptr;
+  }
+  if (tensor->dl_tensor.strides != nullptr) {
+    delete[] tensor->dl_tensor.strides;
+    tensor->dl_tensor.strides = nullptr;
+  }
+}
+
+extern "C" cuvsError_t cuvsMatrixSliceRows(cuvsResources_t res,
+                                           DLManagedTensor* src_managed,
+                                           int64_t start,
+                                           int64_t end,
+                                           DLManagedTensor* dst_managed)
+{
+  return cuvs::core::translate_exceptions([=] {
+    RAFT_EXPECTS(end >= start, "end index must be greater than start index");
+
+    DLTensor& src = src_managed->dl_tensor;
+    DLTensor& dst = dst_managed->dl_tensor;
+    RAFT_EXPECTS(src.ndim == 2, "src should be a 2 dimensional tensor");
+    RAFT_EXPECTS(src.shape != nullptr, "shape should be initialized in the src tensor");
+
+    dst.dtype    = src.dtype;
+    dst.device   = src.device;
+    dst.ndim     = 2;
+    dst.shape    = new int64_t[2];
+    dst.shape[0] = end - start;
+    dst.shape[1] = src.shape[1];
+
+    int64_t row_strides = dst.shape[1];
+    if (src.strides) {
+      dst.strides = new int64_t[2];
+      row_strides = dst.strides[0] = src.strides[0];
+      dst.strides[1]               = src.strides[1];
+    }
+
+    dst.data = static_cast<char*>(src.data) + start * row_strides * (dst.dtype.bits / 8);
+    dst_managed->deleter = cuvsMatrixDestroy;
+  });
+}

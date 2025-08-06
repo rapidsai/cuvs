@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@
 
 #include <chrono>
 #include <cstdio>
+#include <type_traits>
 #include <vector>
 
 #include <sys/mman.h>
@@ -166,25 +167,51 @@ void build_knn_graph(
   const auto num_queries = dataset.extent(0);
 
   // Use the same maximum batch size as the ivf_pq::search to avoid allocating more than needed.
-  const uint32_t max_queries = pq.search_params.max_internal_batch_size;
+  uint32_t max_queries = pq.search_params.max_internal_batch_size;
 
   // Heuristic: the build_knn_graph code should use only a fraction of the workspace memory; the
   // rest should be used by the ivf_pq::search. Here we say that the workspace size should be a good
   // multiple of what is required for the I/O batching below.
   constexpr size_t kMinWorkspaceRatio = 5;
-  auto desired_workspace_size         = max_queries * kMinWorkspaceRatio *
-                                (sizeof(DataT) * dataset.extent(1)  // queries (dataset batch)
-                                 + sizeof(float) * gpu_top_k        // distances
-                                 + sizeof(int64_t) * gpu_top_k      // neighbors
-                                 + sizeof(float) * top_k            // refined_distances
-                                 + sizeof(int64_t) * top_k          // refined_neighbors
-                                );
+  constexpr size_t kMinLargeBatchSize = 512;
+  auto desired_workspace_size =
+    max_queries * (sizeof(DataT) * dataset.extent(1)  // queries (dataset batch)
+                   + sizeof(float) * gpu_top_k        // distances
+                   + sizeof(int64_t) * gpu_top_k      // neighbors
+                   + sizeof(float) * top_k            // refined_distances
+                   + sizeof(int64_t) * top_k          // refined_neighbors
+                  );
+  auto free_space_ratio    = raft::resource::get_workspace_free_bytes(res) / desired_workspace_size;
+  bool use_large_workspace = false;
+  if (free_space_ratio < kMinWorkspaceRatio) {
+    auto adjusted_max_queries =
+      static_cast<uint32_t>(max_queries * free_space_ratio / kMinWorkspaceRatio);
+    if (adjusted_max_queries >= kMinLargeBatchSize) {
+      // adjust max_queries, so that the ratio free_space_ratio gets not larger than
+      // kMinWorkspaceRatio.
+      RAFT_LOG_INFO(
+        "CAGRA graph build: reducing IVF-PQ search max_internal_batch_size from %u -> %u to fit "
+        "the workspace",
+        max_queries,
+        adjusted_max_queries);
+      max_queries                              = adjusted_max_queries;
+      pq.search_params.max_internal_batch_size = adjusted_max_queries;
+    } else {
+      // adjusting max_queries to a very small value isn't practical, so we use the large workspace
+      // instead.
+      use_large_workspace = true;
+      RAFT_LOG_WARN(
+        "Using large workspace memory for IVF-PQ search during CAGRA graph build. Desired "
+        "workspace size: %zu, free workspace size: %zu",
+        desired_workspace_size * kMinWorkspaceRatio,
+        raft::resource::get_workspace_free_bytes(res));
+    }
+  }
 
   // If the workspace is smaller than desired, put the I/O buffers into the large workspace.
   rmm::device_async_resource_ref workspace_mr =
-    desired_workspace_size <= raft::resource::get_workspace_free_bytes(res)
-      ? raft::resource::get_workspace_resource(res)
-      : raft::resource::get_large_workspace_resource(res);
+    use_large_workspace ? raft::resource::get_large_workspace_resource(res)
+                        : raft::resource::get_workspace_resource(res);
 
   RAFT_LOG_DEBUG(
     "IVF-PQ search node_degree: %d, top_k: %d,  gpu_top_k: %d,  max_batch_size:: %d, n_probes: %u",
@@ -678,9 +705,17 @@ index<T, IdxT> build(
   }
   RAFT_EXPECTS(
     params.metric != BitwiseHamming ||
-      std::holds_alternative<cagra::graph_build_params::iterative_search_params>(knn_build_params),
-    "IVF_PQ and NN_DESCENT for CAGRA graph build do not support BitwiseHamming as a metric. Please "
-    "use the iterative CAGRA search build.");
+      std::holds_alternative<cagra::graph_build_params::iterative_search_params>(
+        knn_build_params) ||
+      std::holds_alternative<cagra::graph_build_params::nn_descent_params>(knn_build_params),
+    "IVF_PQ for CAGRA graph build does not support BitwiseHamming as a metric. Please "
+    "use nn-descent or the iterative CAGRA search build.");
+
+  // Validate data type for BitwiseHamming metric
+  RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::BitwiseHamming ||
+                 (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>),
+               "BitwiseHamming distance is only supported for int8_t and uint8_t data types. "
+               "Current data type is not supported.");
 
   auto cagra_graph = raft::make_host_matrix<IdxT, int64_t>(0, 0);
 

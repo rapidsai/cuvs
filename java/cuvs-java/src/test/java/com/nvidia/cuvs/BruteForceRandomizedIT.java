@@ -13,22 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 
+import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import java.lang.invoke.MethodHandles;
 import java.util.BitSet;
 import java.util.List;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.carrotsearch.randomizedtesting.RandomizedRunner;
 
 @RunWith(RandomizedRunner.class)
 public class BruteForceRandomizedIT extends CuVSTestCase {
@@ -44,9 +41,9 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
 
   @Test
   public void testResultsTopKWithRandomValues() throws Throwable {
-	boolean useNativeMemoryDatasets[] = {true, false};
-	for (int i = 0; i < 10; i++) {
-      for (boolean use: useNativeMemoryDatasets) {
+    boolean useNativeMemoryDatasets[] = {true, false};
+    for (int i = 0; i < 10; i++) {
+      for (boolean use : useNativeMemoryDatasets) {
         tmpResultsTopKWithRandomValues(use);
       }
     }
@@ -63,8 +60,7 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
     int numQueries = random.nextInt(NUM_QUERIES_LIMIT) + 1;
     int topK = Math.min(random.nextInt(TOP_K_LIMIT) + 1, datasetSize);
     boolean usePrefilter = random.nextBoolean();
-    if (datasetSize < topK)
-      datasetSize = topK;
+    if (datasetSize < topK) datasetSize = topK;
 
     BitSet[] prefilters = null;
     if (usePrefilter) {
@@ -110,28 +106,33 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
     List<List<Integer>> expected = generateExpectedResults(topK, vectors, queries, prefilters, log);
 
     // Create CuVS index and query
-    try (CuVSResources resources = CuVSResources.create()) {
+    try (CuVSResources resources = CheckedCuVSResources.create()) {
 
-      BruteForceQuery query = new BruteForceQuery.Builder()
-          .withTopK(topK)
-          .withQueryVectors(queries)
-          .withPrefilters(prefilters, vectors.length)
-          .build();
+      BruteForceQuery query =
+          new BruteForceQuery.Builder(resources)
+              .withTopK(topK)
+              .withQueryVectors(queries)
+              .withPrefilters(prefilters, vectors.length)
+              .build();
 
-      BruteForceIndexParams indexParams = new BruteForceIndexParams.Builder()
-          .withNumWriterThreads(32)
-          .build();
+      BruteForceIndexParams indexParams =
+          new BruteForceIndexParams.Builder().withNumWriterThreads(32).build();
 
       BruteForceIndex index;
       if (useNativeMemoryDataset) {
-        Dataset dataset = Dataset.create(vectors.length, vectors[0].length);
-        for (float[] v: vectors) dataset.addVector(v);
-        index = BruteForceIndex.newBuilder(resources)
-                .withDataset(dataset)
+        var datasetBuilder =
+            CuVSMatrix.builder(vectors.length, vectors[0].length, CuVSMatrix.DataType.FLOAT);
+        for (float[] v : vectors) {
+          datasetBuilder.addVector(v);
+        }
+        index =
+            BruteForceIndex.newBuilder(resources)
+                .withDataset(datasetBuilder.build())
                 .withIndexParams(indexParams)
                 .build();
       } else {
-        index = BruteForceIndex.newBuilder(resources)
+        index =
+            BruteForceIndex.newBuilder(resources)
                 .withDataset(vectors)
                 .withIndexParams(indexParams)
                 .build();
