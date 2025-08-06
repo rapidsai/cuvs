@@ -248,10 +248,15 @@ void index<T, IdxT>::check_consistency()
   RAFT_EXPECTS(list_sizes_.extent(0) == n_lists, "inconsistent list size");
   RAFT_EXPECTS(data_ptrs_.extent(0) == n_lists, "inconsistent list size");
   RAFT_EXPECTS(inds_ptrs_.extent(0) == n_lists, "inconsistent list size");
+  if (binary_index_) {
+    RAFT_EXPECTS(binary_centers_.extent(0) == list_sizes_.extent(0),
+                 "inconsistent number of lists (clusters)");
+  } else {
   RAFT_EXPECTS(                                       //
     (centers_.extent(0) == list_sizes_.extent(0)) &&  //
       (!center_norms_.has_value() || centers_.extent(0) == center_norms_->extent(0)),
     "inconsistent number of lists (clusters)");
+}
 }
 
 template <typename T, typename IdxT>

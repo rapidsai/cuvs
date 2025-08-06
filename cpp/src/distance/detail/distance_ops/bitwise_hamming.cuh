@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include <stdint.h>
 
 namespace cuvs::distance::detail::ops {
 
