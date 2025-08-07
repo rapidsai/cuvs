@@ -52,8 +52,16 @@ public interface CuVSProvider {
   /** Creates a new CuVSResources. */
   CuVSResources newCuVSResources(Path tempDirectory) throws Throwable;
 
-  /** Create a {@link CuVSMatrix.Builder} instance **/
-  CuVSMatrix.Builder newMatrixBuilder(int size, int dimensions, CuVSMatrix.DataType dataType);
+  /** Create a {@link CuVSMatrix.Builder} instance for a host memory matrix **/
+  CuVSMatrix.Builder newHostMatrixBuilder(int size, int dimensions, CuVSMatrix.DataType dataType);
+
+  /** Create a {@link CuVSMatrix.Builder} instance for a device memory matrix **/
+  CuVSMatrix.Builder newDeviceMatrixBuilder(
+      CuVSResources cuVSResources,
+      int size,
+      int dimensions,
+      CuVSMatrix.DataType dataType,
+      int copyType);
 
   /**
    * Returns the factory method used to build a Dataset from native memory.

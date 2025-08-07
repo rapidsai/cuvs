@@ -15,15 +15,19 @@
  */
 package com.nvidia.cuvs.spi;
 
+import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
+
 import com.nvidia.cuvs.*;
 import com.nvidia.cuvs.internal.*;
 import com.nvidia.cuvs.internal.common.Util;
+import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Objects;
 
 final class JDKProvider implements CuVSProvider {
@@ -101,26 +105,41 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public CuVSMatrix.Builder newMatrixBuilder(int size, int dimensions, CuVSMatrix.DataType dataType)
-      throws UnsupportedOperationException {
+  public CuVSMatrix.Builder newHostMatrixBuilder(
+      int size, int columns, CuVSMatrix.DataType dataType) throws UnsupportedOperationException {
 
-    var dataset = new CuVSHostMatrixArenaImpl(size, dimensions, dataType);
+    var matrix = new CuVSHostMatrixArenaImpl(size, columns, dataType);
 
     return new CuVSMatrix.Builder() {
       int current = 0;
 
       @Override
       public void addVector(float[] vector) {
+        if (vector.length != columns) {
+          throw new IllegalArgumentException(
+              String.format(
+                  Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+        }
         internalAddVector(vector);
       }
 
       @Override
       public void addVector(byte[] vector) {
+        if (vector.length != columns) {
+          throw new IllegalArgumentException(
+              String.format(
+                  Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+        }
         internalAddVector(vector);
       }
 
       @Override
       public void addVector(int[] vector) {
+        if (vector.length != columns) {
+          throw new IllegalArgumentException(
+              String.format(
+                  Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+        }
         internalAddVector(vector);
       }
 
@@ -129,15 +148,86 @@ final class JDKProvider implements CuVSProvider {
         MemorySegment.copy(
             vector,
             0,
-            dataset.memorySegment(),
-            dataset.valueLayout(),
-            ((current++) * dimensions * dataset.valueLayout().byteSize()),
-            dimensions);
+            matrix.memorySegment(),
+            matrix.valueLayout(),
+            ((current++) * columns * matrix.valueLayout().byteSize()),
+            columns);
       }
 
       @Override
       public CuVSMatrix build() {
-        return dataset;
+        return matrix;
+      }
+    };
+  }
+
+  @Override
+  public CuVSMatrix.Builder newDeviceMatrixBuilder(
+      CuVSResources cuVSResources,
+      int size,
+      int columns,
+      CuVSMatrix.DataType dataType,
+      int copyType)
+      throws UnsupportedOperationException {
+
+    var matrix = new CuVSDeviceMatrixRMMImpl(cuVSResources, size, columns, dataType, copyType);
+
+    return new CuVSMatrix.Builder() {
+      int current = 0;
+      MemorySegment tempSegment;
+      final Arena tempSegmentArena = Arena.ofShared();
+
+      @Override
+      public void addVector(float[] vector) {
+        if (vector.length != columns) {
+          throw new IllegalArgumentException(
+              String.format(
+                  Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+        }
+        internalAddVector(vector);
+      }
+
+      @Override
+      public void addVector(byte[] vector) {
+        if (vector.length != columns) {
+          throw new IllegalArgumentException(
+              String.format(
+                  Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+        }
+        internalAddVector(vector);
+      }
+
+      @Override
+      public void addVector(int[] vector) {
+        if (vector.length != columns) {
+          throw new IllegalArgumentException(
+              String.format(
+                  Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+        }
+        internalAddVector(vector);
+      }
+
+      private void internalAddVector(Object vector) {
+        if (current >= size) {
+          throw new ArrayIndexOutOfBoundsException();
+        }
+
+        long rowBytes = columns * matrix.valueLayout().byteSize();
+        if (tempSegment == null) {
+          tempSegment = tempSegmentArena.allocate(rowBytes);
+        }
+
+        MemorySegment.copy(vector, 0, tempSegment, matrix.valueLayout(), 0, columns);
+
+        var dstOffset = ((current++) * rowBytes);
+        var dst = matrix.memorySegment().asSlice(dstOffset);
+        cudaMemcpy(dst, tempSegment, rowBytes);
+      }
+
+      @Override
+      public CuVSMatrix build() {
+        tempSegmentArena.close();
+        return matrix;
       }
     };
   }

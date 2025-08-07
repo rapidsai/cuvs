@@ -27,7 +27,6 @@ import java.lang.invoke.VarHandle;
  * A Dataset implementation backed by host (CPU) memory.
  */
 public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMatrix {
-  private final ValueLayout valueLayout;
   protected final VarHandle accessor$vh;
 
   public CuVSHostMatrixImpl(
@@ -49,15 +48,8 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
       DataType dataType,
       ValueLayout valueLayout,
       MemoryLayout sequenceLayout) {
-    super(memorySegment, dataType, size, columns);
+    super(memorySegment, dataType, valueLayout, size, columns);
     this.accessor$vh = sequenceLayout.varHandle(MemoryLayout.PathElement.sequenceElement());
-    this.valueLayout = valueLayout;
-  }
-
-  protected static SequenceLayout sequenceLayoutFromType(
-      long size, long columns, DataType dataType) {
-    return MemoryLayout.sequenceLayout(size * columns, valueLayoutFromType(dataType))
-        .withByteAlignment(32);
   }
 
   @Override
@@ -113,10 +105,6 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
   @Override
   public int get(int row, int col) {
     return (int) accessor$vh.get(memorySegment, 0L, (long) row * columns + col);
-  }
-
-  public ValueLayout valueLayout() {
-    return valueLayout;
   }
 
   @Override

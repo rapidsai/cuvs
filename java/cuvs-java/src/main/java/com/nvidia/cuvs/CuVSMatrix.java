@@ -31,14 +31,7 @@ public interface CuVSMatrix extends AutoCloseable {
     FLOAT,
     INT,
     UINT,
-    BYTE;
-
-    public int bytes() {
-      return switch (this) {
-        case FLOAT, INT, UINT -> 4;
-        case BYTE -> 1;
-      };
-    }
+    BYTE
   }
 
   enum MemoryKind {
@@ -109,8 +102,23 @@ public interface CuVSMatrix extends AutoCloseable {
    * @param dataType The data type of the dataset elements
    * @return new instance of {@link CuVSMatrix}
    */
-  static Builder builder(int size, int columns, DataType dataType) {
-    return CuVSProvider.provider().newMatrixBuilder(size, columns, dataType);
+  static Builder hostBuilder(int size, int columns, DataType dataType) {
+    return CuVSProvider.provider().newHostMatrixBuilder(size, columns, dataType);
+  }
+
+  /**
+   * Returns a builder to create a new instance of a dataset
+   *
+   * @param resources CuVS resources used to allocate the device memory needed
+   * @param size      Number of vectors in the dataset
+   * @param columns   Size of each vector in the dataset
+   * @param dataType  The data type of the dataset elements
+   * @return new instance of {@link CuVSMatrix}
+   */
+  static Builder deviceBuilder(
+      CuVSResources resources, int size, int columns, DataType dataType, int copyType) {
+    return CuVSProvider.provider()
+        .newDeviceMatrixBuilder(resources, size, columns, dataType, copyType);
   }
 
   /**

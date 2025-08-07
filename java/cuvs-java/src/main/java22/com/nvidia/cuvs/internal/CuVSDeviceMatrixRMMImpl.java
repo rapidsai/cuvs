@@ -22,22 +22,30 @@ import com.nvidia.cuvs.CuVSDeviceMatrix;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.internal.common.Util;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 
 public class CuVSDeviceMatrixRMMImpl extends CuVSDeviceMatrixImpl implements CuVSDeviceMatrix {
 
   private final CuVSResources resources;
 
   public CuVSDeviceMatrixRMMImpl(
-      CuVSResources resources, long size, long columns, DataType dataType) {
+      CuVSResources resources, long size, long columns, DataType dataType, int copyType) {
     super(
-        resources, allocateRMMSegment(resources, size, columns, dataType), size, columns, dataType);
+        resources,
+        allocateRMMSegment(resources, size, columns, valueLayoutFromType(dataType)),
+        size,
+        columns,
+        dataType,
+        valueLayoutFromType(dataType),
+        copyType);
     this.resources = resources;
   }
 
   private static MemorySegment allocateRMMSegment(
-      CuVSResources resources, long size, long columns, DataType dataType) {
+      CuVSResources resources, long size, long columns, ValueLayout valueLayout) {
     try (var resourcesAccess = resources.access()) {
-      return Util.allocateRMMSegment(resourcesAccess.handle(), size * columns * dataType.bytes());
+      return Util.allocateRMMSegment(
+          resourcesAccess.handle(), size * columns * valueLayout.byteSize());
     }
   }
 

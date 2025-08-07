@@ -21,20 +21,24 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.CuVSMatrix;
-import java.lang.foreign.Arena;
-import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
+import java.lang.foreign.*;
 
 public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
   protected final MemorySegment memorySegment;
   protected final DataType dataType;
+  protected final ValueLayout valueLayout;
   protected final long size;
   protected final long columns;
 
   protected CuVSMatrixBaseImpl(
-      MemorySegment memorySegment, DataType dataType, long size, long columns) {
+      MemorySegment memorySegment,
+      DataType dataType,
+      ValueLayout valueLayout,
+      long size,
+      long columns) {
     this.memorySegment = memorySegment;
     this.dataType = dataType;
+    this.valueLayout = valueLayout;
     this.size = size;
     this.columns = columns;
   }
@@ -53,8 +57,12 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
     return memorySegment;
   }
 
+  public ValueLayout valueLayout() {
+    return valueLayout;
+  }
+
   protected int bits() {
-    return dataType.bytes() * 8;
+    return (int) (valueLayout.byteSize() * 8);
   }
 
   protected int code() {
@@ -73,5 +81,15 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
     };
   }
 
+  protected static SequenceLayout sequenceLayoutFromType(
+      long size, long columns, DataType dataType) {
+    return MemoryLayout.sequenceLayout(size * columns, valueLayoutFromType(dataType))
+        .withByteAlignment(32);
+  }
+
   public abstract MemorySegment toTensor(Arena arena);
+
+  public static CuVSDeviceMatrixImpl fromTensor(MemorySegment dlManagedTensor) {
+    throw new UnsupportedOperationException("TODO");
+  }
 }
