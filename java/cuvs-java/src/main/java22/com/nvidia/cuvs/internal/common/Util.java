@@ -45,7 +45,7 @@ import java.util.List;
 
 public class Util {
 
-  public static final int CUVS_SUCCESS = 1;
+  public static final int CUVS_SUCCESS = headers_h.CUVS_SUCCESS();
   public static final int CUDA_SUCCESS = 0;
 
   private Util() {}
@@ -103,8 +103,7 @@ public class Util {
    */
   public static void cudaMemcpy(
       MemorySegment dest, MemorySegment src, long numBytes, CudaMemcpyKind kind) {
-    int returnValue =
-        com.nvidia.cuvs.internal.panama.headers_h.cudaMemcpy(dest, src, numBytes, kind.kind);
+    int returnValue = Native.cudaMemcpy(dest, src, numBytes, kind.kind);
     checkCudaError(returnValue, "cudaMemcpy");
   }
 

@@ -20,7 +20,6 @@ import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
 import com.nvidia.cuvs.*;
 import com.nvidia.cuvs.internal.*;
 import com.nvidia.cuvs.internal.common.Util;
-import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -174,8 +173,6 @@ final class JDKProvider implements CuVSProvider {
 
     return new CuVSMatrix.Builder() {
       int current = 0;
-      MemorySegment tempSegment;
-      final Arena tempSegmentArena = Arena.ofShared();
 
       @Override
       public void addVector(float[] vector) {
@@ -184,7 +181,7 @@ final class JDKProvider implements CuVSProvider {
               String.format(
                   Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
         }
-        internalAddVector(vector);
+        internalAddVector(MemorySegment.ofArray(vector));
       }
 
       @Override
@@ -194,7 +191,7 @@ final class JDKProvider implements CuVSProvider {
               String.format(
                   Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
         }
-        internalAddVector(vector);
+        internalAddVector(MemorySegment.ofArray(vector));
       }
 
       @Override
@@ -204,29 +201,22 @@ final class JDKProvider implements CuVSProvider {
               String.format(
                   Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
         }
-        internalAddVector(vector);
+        internalAddVector(MemorySegment.ofArray(vector));
       }
 
-      private void internalAddVector(Object vector) {
+      private void internalAddVector(MemorySegment arraySegment) {
         if (current >= size) {
           throw new ArrayIndexOutOfBoundsException();
         }
 
         long rowBytes = columns * matrix.valueLayout().byteSize();
-        if (tempSegment == null) {
-          tempSegment = tempSegmentArena.allocate(rowBytes);
-        }
-
-        MemorySegment.copy(vector, 0, tempSegment, matrix.valueLayout(), 0, columns);
-
         var dstOffset = ((current++) * rowBytes);
         var dst = matrix.memorySegment().asSlice(dstOffset);
-        cudaMemcpy(dst, tempSegment, rowBytes);
+        cudaMemcpy(dst, arraySegment, rowBytes);
       }
 
       @Override
       public CuVSMatrix build() {
-        tempSegmentArena.close();
         return matrix;
       }
     };
