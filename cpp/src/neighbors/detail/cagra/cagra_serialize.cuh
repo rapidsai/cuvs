@@ -74,7 +74,7 @@ void serialize(raft::resources const& res,
 
   raft::serialize_scalar(res, os, include_dataset);
   if (include_dataset) {
-    RAFT_LOG_INFO("Saving CAGRA index with dataset");
+    RAFT_LOG_DEBUG("Saving CAGRA index with dataset");
     neighbors::detail::serialize(res, os, index_.data());
   } else {
     RAFT_LOG_DEBUG("Saving CAGRA index WITHOUT dataset");
