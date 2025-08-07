@@ -247,9 +247,6 @@ __device__ auto ivfpq_compute_score(uint32_t pq_dim,
  * @param query_kth
  *   query_kths keep the current state of the filtering - atomically updated distances to the
  *   k-th closest neighbors for each query [n_queries].
- * @param sample_filter
- *   A filter that selects samples for a given query. Use an instance of none_sample_filter to
- *   provide a green light for every sample.
  * @param lut_scores
  *   The device pointer for storing the lookup table globally [gridDim.x, pq_dim << PqBits].
  *   Ignored when `EnableSMemLut == true`.
@@ -262,6 +259,13 @@ __device__ auto ivfpq_compute_score(uint32_t pq_dim,
  *   clusters / defined by the `_chunk_indices`.
  *   The indices can have values within the range [0, max_samples).
  *   Ignored  when `Capacity == 0`.
+ * @param filter_tag
+ *   The filter tag to indicate the filter. Currently supports FilterType::None (which provides a
+ *   green light for every sample) and FilterType::Bitset.
+ * @param inds_ptrs
+ *   inds_ptrs from ivf_to_sample_filter
+ * @param filter_bitset_view
+ *   bitset view needed when filter_tag == FilterType::Bitset
  */
 template <typename OutT,
           typename LutT,
@@ -269,27 +273,30 @@ template <typename OutT,
           int Capacity,
           bool PrecompBaseDiff,
           bool EnableSMemLut>
-RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
-                                      uint32_t n_probes,
-                                      uint32_t pq_dim,
-                                      uint32_t n_queries,
-                                      uint32_t queries_offset,
-                                      cuvs::distance::DistanceType metric,
-                                      codebook_gen codebook_kind,
-                                      uint32_t topk,
-                                      uint32_t max_samples,
-                                      const float* cluster_centers,
-                                      const float* pq_centers,
-                                      const uint8_t* const* pq_dataset,
-                                      const uint32_t* cluster_labels,
-                                      const uint32_t* _chunk_indices,
-                                      const float* queries,
-                                      const uint32_t* index_list,
-                                      float* query_kths,
-                                      filtering::ivf_to_sample_filter_dev sample_filter,
-                                      LutT* lut_scores,
-                                      OutT* _out_scores,
-                                      uint32_t* _out_indices)
+RAFT_KERNEL compute_similarity_kernel(
+  uint32_t dim,
+  uint32_t n_probes,
+  uint32_t pq_dim,
+  uint32_t n_queries,
+  uint32_t queries_offset,
+  cuvs::distance::DistanceType metric,
+  codebook_gen codebook_kind,
+  uint32_t topk,
+  uint32_t max_samples,
+  const float* cluster_centers,
+  const float* pq_centers,
+  const uint8_t* const* pq_dataset,
+  const uint32_t* cluster_labels,
+  const uint32_t* _chunk_indices,
+  const float* queries,
+  const uint32_t* index_list,
+  float* query_kths,
+  LutT* lut_scores,
+  OutT* _out_scores,
+  uint32_t* _out_indices,
+  filtering::FilterType filter_tag,
+  const int64_t* const* inds_ptrs,
+  cuda::std::optional<cuvs::core::bitset_view<uint32_t, int64_t>> filter_bitset_view)
 {
   /* Shared memory:
 
@@ -475,13 +482,23 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
     __syncthreads();
     local_topk_t block_topk(topk, lut_end, query_kth);
 
+    auto inds_ptrs_label = inds_ptrs[label];
     // Compute a distance for each sample
     for (uint32_t i = threadIdx.x; i < n_samples_aligned;
          i += blockDim.x, pq_thread_data += pq_line_width) {
-      OutT score = kDummy;
-      bool valid = i < n_samples;
+      OutT score            = kDummy;
+      bool valid            = i < n_samples;
+      bool valid_filter_res = false;
+      if (filter_tag == filtering::FilterType::None) {
+        valid_filter_res =
+          valid && filtering::none_sample_filter{}(queries_offset + query_ix, label, i);
+      } else {
+        valid_filter_res =
+          valid && filtering::bitset_filter<uint32_t, int64_t>(filter_bitset_view.value())(
+                     queries_offset + query_ix, inds_ptrs_label[i]);
+      }
       // Check bounds and that the sample is acceptable for the query
-      if (valid && sample_filter(queries_offset + query_ix, label, i)) {
+      if (valid_filter_res) {
         score = ivfpq_compute_score<OutT, LutT, vec_t, PqBits>(
           pq_dim,
           reinterpret_cast<const vec_t::io_t*>(pq_thread_data),
@@ -622,30 +639,35 @@ void compute_similarity_run(selected<OutT, LutT> s,
                             OutT* _out_scores,
                             uint32_t* _out_indices)
 {
-  auto launch_kernel = [&](filtering::ivf_to_sample_filter_dev dev_filter) {
-    s.kernel<<<s.grid_dim, s.block_dim, s.smem_size, stream>>>(dim,
-                                                               n_probes,
-                                                               pq_dim,
-                                                               n_queries,
-                                                               queries_offset,
-                                                               metric,
-                                                               codebook_kind,
-                                                               topk,
-                                                               max_samples,
-                                                               cluster_centers,
-                                                               pq_centers,
-                                                               pq_dataset,
-                                                               cluster_labels,
-                                                               _chunk_indices,
-                                                               queries,
-                                                               index_list,
-                                                               query_kths,
-                                                               dev_filter,
-                                                               lut_scores,
-                                                               _out_scores,
-                                                               _out_indices);
-    RAFT_CHECK_CUDA(stream);
-  };
+  auto launch_kernel =
+    [&](filtering::FilterType filter_tag,
+        const int64_t* const* inds_ptrs,
+        cuda::std::optional<cuvs::core::bitset_view<uint32_t, int64_t>> filter_bitset_view) {
+      s.kernel<<<s.grid_dim, s.block_dim, s.smem_size, stream>>>(dim,
+                                                                 n_probes,
+                                                                 pq_dim,
+                                                                 n_queries,
+                                                                 queries_offset,
+                                                                 metric,
+                                                                 codebook_kind,
+                                                                 topk,
+                                                                 max_samples,
+                                                                 cluster_centers,
+                                                                 pq_centers,
+                                                                 pq_dataset,
+                                                                 cluster_labels,
+                                                                 _chunk_indices,
+                                                                 queries,
+                                                                 index_list,
+                                                                 query_kths,
+                                                                 lut_scores,
+                                                                 _out_scores,
+                                                                 _out_indices,
+                                                                 filter_tag,
+                                                                 inds_ptrs,
+                                                                 filter_bitset_view);
+      RAFT_CHECK_CUDA(stream);
+    };
 
   switch (sample_filter_ref.get_filter_type()) {
     case filtering::FilterType::None: {
@@ -654,9 +676,8 @@ void compute_similarity_run(selected<OutT, LutT> s,
           const filtering::ivf_to_sample_filter<int64_t, filtering::none_sample_filter>&>(
           sample_filter_ref);
 
-        filtering::ivf_to_sample_dev_none ivf_none_(
-          stream, filtering::FilterType::None, typed_sample_filter.inds_ptrs_);
-        launch_kernel(ivf_none_.get_dev_filter());
+        launch_kernel(
+          filtering::FilterType::None, typed_sample_filter.inds_ptrs_, cuda::std::nullopt);
       } catch (const std::bad_cast& e) {
       }
       break;
@@ -668,12 +689,9 @@ void compute_similarity_run(selected<OutT, LutT> s,
                                                 filtering::bitset_filter<uint32_t, int64_t>>&>(
           sample_filter_ref);
 
-        filtering::ivf_to_sample_dev_bitset ivf_bitset_(
-          stream,
-          filtering::FilterType::Bitset,
-          typed_sample_filter.inds_ptrs_,
-          typed_sample_filter.next_filter_.bitset_view_);
-        launch_kernel(ivf_bitset_.get_dev_filter());
+        launch_kernel(filtering::FilterType::Bitset,
+                      typed_sample_filter.inds_ptrs_,
+                      typed_sample_filter.next_filter_.bitset_view_);
       } catch (const std::bad_cast& e) {
       }
       break;

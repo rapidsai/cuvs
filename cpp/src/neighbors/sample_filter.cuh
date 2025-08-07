@@ -28,7 +28,7 @@
 namespace cuvs::neighbors::filtering {
 
 /* A filter that filters nothing. This is the default behavior. */
-inline _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
+constexpr __forceinline__ _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
   // query index
   const uint32_t query_ix,
   // the current inverted list index
@@ -40,7 +40,7 @@ inline _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
 }
 
 /* A filter that filters nothing. This is the default behavior. */
-inline _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
+constexpr __forceinline__ _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
   // query index
   const uint32_t query_ix,
   // the index of the current sample
@@ -106,7 +106,7 @@ template <typename bitset_t, typename index_t>
 _RAFT_HOST_DEVICE bitset_filter<bitset_t, index_t>::~bitset_filter() = default;
 
 template <typename bitset_t, typename index_t>
-inline _RAFT_HOST_DEVICE bool bitset_filter<bitset_t, index_t>::operator()(
+constexpr __forceinline__ _RAFT_HOST_DEVICE bool bitset_filter<bitset_t, index_t>::operator()(
   // query index
   const uint32_t query_ix,
   // the index of the current sample
@@ -145,87 +145,4 @@ void bitmap_filter<bitmap_t, index_t>::to_csr(raft::resources const& handle, csr
 {
   raft::sparse::convert::bitmap_to_csr(handle, bitmap_view_, csr);
 }
-
-struct ivf_to_sample_filter_dev {
-  FilterType tag;
-  const void* obj_ptr;
-
-  __device__ bool operator()(uint32_t q, uint32_t c, uint32_t s) const
-  {
-    switch (tag) {
-      case FilterType::None:
-        return reinterpret_cast<
-                 const filtering::ivf_to_sample_filter<int64_t, filtering::none_sample_filter>*>(
-                 obj_ptr)
-          ->operator()(q, c, s);
-      case FilterType::Bitset:
-        return reinterpret_cast<const filtering::ivf_to_sample_filter<
-          int64_t,
-          filtering::bitset_filter<uint32_t, int64_t>>*>(obj_ptr)
-          ->operator()(q, c, s);
-      default: return true;
-    }
-  }
-};
-
-namespace {
-template <typename dev_filter_t>
-__global__ void destruct_dev_filter(dev_filter_t* p_filter)
-{
-  p_filter->~dev_filter_t();
-}
-
-template <typename OuterFilterT, typename InnerFilterT, typename... InnerArgs>
-__global__ void init_dev_filters(OuterFilterT* p_outer_filter,
-                                 InnerFilterT* p_inner_filter,
-                                 const int64_t* const* inds_ptrs,
-                                 InnerArgs... inner_args)
-{
-  new (p_inner_filter) InnerFilterT(inner_args...);
-  new (p_outer_filter) OuterFilterT(inds_ptrs, *p_inner_filter);
-}
-}  // namespace
-
-/* Device side filter wrapper for ivf_to_sample_filter. ivf_to_sample_filter_dev is used to avoid
- * dynamic dispatching on device. */
-template <typename InnerFilterT, typename... InnerArgs>
-struct ivf_to_sample_dev_wrapper {
-  using OuterFilterT = filtering::ivf_to_sample_filter<int64_t, InnerFilterT>;
-  OuterFilterT* p_outer_filter;
-  InnerFilterT* p_inner_filter;
-  filtering::ivf_to_sample_filter_dev h_placeholder;
-  rmm::cuda_stream_view stream_;
-
-  ivf_to_sample_dev_wrapper(rmm::cuda_stream_view stream,
-                            FilterType tag,
-                            const int64_t* const* inds_ptrs,
-                            InnerArgs... inner_args)
-    : stream_(stream)
-  {
-    RAFT_CUDA_TRY(cudaMalloc(&p_outer_filter, sizeof(OuterFilterT)));
-    RAFT_CUDA_TRY(cudaMalloc(&p_inner_filter, sizeof(InnerFilterT)));
-    init_dev_filters<<<1, 1, 0, stream_>>>(
-      p_outer_filter, p_inner_filter, inds_ptrs, inner_args...);
-    cudaDeviceSynchronize();
-
-    h_placeholder = {tag, p_outer_filter};
-  }
-
-  ~ivf_to_sample_dev_wrapper()
-  {
-    // this calls the destructor for the inner filter as well
-    destruct_dev_filter<<<1, 1, 0, stream_>>>(p_outer_filter);
-    cudaDeviceSynchronize();
-    cudaFree(p_outer_filter);
-    cudaFree(p_inner_filter);
-  }
-
-  filtering::ivf_to_sample_filter_dev get_dev_filter() const { return h_placeholder; }
-};
-
-using ivf_to_sample_dev_none = filtering::ivf_to_sample_dev_wrapper<filtering::none_sample_filter>;
-using ivf_to_sample_dev_bitset =
-  filtering::ivf_to_sample_dev_wrapper<filtering::bitset_filter<uint32_t, int64_t>,
-                                       cuvs::core::bitset_view<uint32_t, int64_t>>;
-
 }  // namespace cuvs::neighbors::filtering

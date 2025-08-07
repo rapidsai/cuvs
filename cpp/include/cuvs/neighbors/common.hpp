@@ -497,7 +497,7 @@ struct none_sample_filter : public base_filter {
   inline _RAFT_HOST_DEVICE none_sample_filter();
   inline _RAFT_HOST_DEVICE ~none_sample_filter();
 
-  inline _RAFT_HOST_DEVICE bool operator()(
+  constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
     // the current inverted list index
@@ -505,7 +505,7 @@ struct none_sample_filter : public base_filter {
     // the index of the current sample inside the current inverted list
     const uint32_t sample_ix) const;
 
-  inline _RAFT_HOST_DEVICE bool operator()(
+  constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
     // the index of the current sample
@@ -591,7 +591,7 @@ struct bitset_filter : public base_filter {
 
   _RAFT_HOST_DEVICE bitset_filter(const view_t bitset_for_filtering);
   _RAFT_HOST_DEVICE ~bitset_filter();
-  inline _RAFT_HOST_DEVICE bool operator()(
+  constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
     // the index of the current sample
