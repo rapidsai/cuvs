@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
 
+from cuvs.common.device_tensor_view import DeviceTensorView
 from cuvs.distance import DISTANCE_NAMES, DISTANCE_TYPES
 from cuvs.neighbors.common import _check_input_array
 
@@ -257,19 +258,65 @@ cdef class Index:
     def centers(self):
         """ Get the cluster centers corresponding to the lists in the
         original space """
-        return self._get_centers()
-
-    @auto_sync_resources
-    def _get_centers(self, resources=None):
         if not self.trained:
             raise ValueError("Index needs to be built before getting centers")
 
-        cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetCenters(self.index, tensor))
+        # since we're referencing memory internal to this ivfpq index in the
+        # output view, keep the ivfpq index alive as long as the output view
+        # is to avoid segfaulting
+        output.parent = self
+        return output
 
-        output = np.empty((self.n_lists, self.dim), dtype='float32')
-        ai = wrap_array(output)
-        cdef cydlpack.DLManagedTensor* output_dlpack = cydlpack.dlpack_c(ai)
-        check_cuvs(cuvsIvfPqIndexGetCenters(res, self.index, output_dlpack))
+    @property
+    def codebook(self):
+        """ Get the PQ codebook """
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting codebook")
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetCodebook(self.index, tensor))
+        # since we're referencing memory internal to this ivfpq index in the
+        # output view, keep the ivfpq index alive as long as the output view
+        # is to avoid segfaulting
+        output.parent = self
+        return output
+
+    @property
+    def pq_dim(self):
+        """ Get the pq_dim """
+        return cuvsIvfPqIndexGetPqDim(self.index)
+
+    @property
+    def pq_len(self):
+        """ Get the pq_len """
+        return cuvsIvfPqIndexGetPqLen(self.index)
+
+    @property
+    def pq_book_size(self):
+        """ Get the pq_book_size """
+        return cuvsIvfPqIndexGetPqBookSize(self.index)
+
+    @property
+    def rotation_matrix(self):
+        """ Get the rotation matrix """
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting "
+                             "rotation matrix")
+
+        # get the rotation matrix from the index without copying as dlpack
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetRotationMatrix(self.index, tensor))
+        # since we're referencing memory internal to this ivfpq index in the
+        # output view, keep the ivfpq index alive as long as the output view
+        # is to avoid segfaulting
+        output.parent = self
         return output
 
 
@@ -332,6 +379,96 @@ def build(IndexParams index_params, dataset, resources=None):
             res,
             params,
             dataset_dlpack,
+            idx.index
+        ))
+        idx.trained = True
+
+    return idx
+
+
+@auto_sync_resources
+def build_from_args(IndexParams index_params, dim, codebooks,
+                    centers, rotation_matrix=None,
+                    resources=None):
+    """
+    Build the IvfPq index from existing centroids and codebook.
+
+    Parameters
+    ----------
+    index_params : :py:class:`cuvs.neighbors.ivf_pq.IndexParams`
+        Parameters on how to build the index
+    dim : int
+        Dimensionality of the input data
+    codebooks : Array interface compliant matrix
+        PQ cluster centers shape (pq_dim or n_lists, pq_len, pq_book_size)
+    centers : Array interface compliant matrix shape (n_lists, dim)
+        Cluster centers corresponding to the lists in the original space
+    rotation_matrix : Optional array interface compliant matrix
+        Rotation matrix. Mandatory if index_params.force_random_rotation
+        is True. Shape (rot_dim, dim)
+    {resources_docstring}
+
+    Returns
+    -------
+    index: :py:class:`cuvs.neighbors.ivf_pq.Index`
+
+    Examples
+    --------
+
+    >>> import cupy as cp
+    >>> from cuvs.neighbors import ivf_pq
+    >>> dim = 2048
+    >>> n_lists = 1024
+    >>> pq_dim = ...
+    >>> pq_len = ...
+    >>> pq_book_size = ...
+    >>> rot_dim = ...
+    >>> codebooks = cp.random.random_sample((pq_dim, pq_len, pq_book_size),
+    ...                                   dtype=cp.float32)
+    >>> rotation_matrix = cp.random.random_sample((rot_dim, dim),
+    ...                                   dtype=cp.float32)
+    >>> centers = cp.random.random_sample((n_lists, dim),
+    ...                                   dtype=cp.float32)
+    >>> build_params = ivf_pq.IndexParams(metric="sqeuclidean")
+    >>> index = ivf_pq.build_from_args(build_params, dim, codebooks,
+    ...                                     centers, rotation_matrix)
+    >>> distances, neighbors = ivf_pq.search(ivf_pq.SearchParams(),
+    ...                                      index, queries, k)
+    >>> distances = cp.asarray(distances)
+    >>> neighbors = cp.asarray(neighbors)
+    """
+
+    codebooks_ai = wrap_array(codebooks)
+    _check_input_array(codebooks_ai, [np.dtype('float32')])
+
+    centers_ai = wrap_array(centers)
+    _check_input_array(centers_ai, [np.dtype('float32')], exp_row_major=False)
+
+    if rotation_matrix is not None:
+        rotation_matrix_ai = wrap_array(rotation_matrix)
+        _check_input_array(rotation_matrix_ai, [np.dtype('float32')])
+
+    cdef Index idx = Index()
+    cdef cuvsError_t build_status
+    cdef cydlpack.DLManagedTensor* codebooks_dlpack = \
+        cydlpack.dlpack_c(codebooks_ai)
+    cdef cydlpack.DLManagedTensor* centers_dlpack = \
+        cydlpack.dlpack_c(centers_ai)
+    cdef cydlpack.DLManagedTensor* rotation_matrix_dlpack = NULL
+    if rotation_matrix is not None:
+        rotation_matrix_dlpack = cydlpack.dlpack_c(rotation_matrix_ai)
+    cdef cuvsIvfPqIndexParams* params = index_params.params
+
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+    with cuda_interruptible():
+        check_cuvs(cuvsIvfPqBuildFromArgs(
+            res,
+            params,
+            dim,
+            codebooks_dlpack,
+            centers_dlpack,
+            rotation_matrix_dlpack,
             idx.index
         ))
         idx.trained = True
@@ -664,5 +801,6 @@ def extend(Index index, new_vectors, new_indices, resources=None):
             new_indices_dlpack,
             index.index
         ))
+        index.trained = True
 
     return index
