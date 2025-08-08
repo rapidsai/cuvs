@@ -22,3 +22,4 @@
 #include <cuvs/neighbors/ivf_flat.h>
 #include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/ivf_pq.h>
+#include <cuvs/cluster/kmeans.h>

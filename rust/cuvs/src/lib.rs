@@ -23,6 +23,7 @@ pub mod cagra;
 pub mod distance;
 pub mod distance_type;
 pub mod ivf_flat;
+pub mod kmeans;
 mod dlpack;
 mod error;
 pub mod ivf_pq;
