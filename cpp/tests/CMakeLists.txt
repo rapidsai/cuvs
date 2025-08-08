@@ -148,6 +148,10 @@ if(BUILD_TESTS)
   )
 
   ConfigureTest(
+    NAME NEIGHBORS_ANN_SCANN_TEST PATH neighbors/ann_scann/test_float_int64_t.cu GPUS 1 PERCENT 1
+  )
+
+  ConfigureTest(
     NAME NEIGHBORS_ANN_BRUTE_FORCE_TEST PATH neighbors/ann_brute_force/test_float.cu
     neighbors/ann_brute_force/test_half.cu GPUS 1 PERCENT 100
   )
@@ -208,7 +212,7 @@ if(BUILD_TESTS)
 
   ConfigureTest(
     NAME NEIGHBORS_ALL_NEIGHBORS_TEST PATH neighbors/all_neighbors/test_float.cu GPUS 1 PERCENT 100
-    ADDITIONAL_DEP nccl
+    ADDITIONAL_DEP NCCL::NCCL
   )
 
   ConfigureTest(

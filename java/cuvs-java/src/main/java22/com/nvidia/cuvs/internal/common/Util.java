@@ -19,12 +19,10 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_POINTER;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaGetDeviceCount;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaGetDeviceProperties_v2;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemGetInfo;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaSetDevice;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMAlloc;
 import static com.nvidia.cuvs.internal.panama.headers_h.size_t;
 
 import com.nvidia.cuvs.GPUInfo;
@@ -264,11 +262,32 @@ public class Util {
     long cols = rows > 0 ? data[0].length : 0;
     MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout(rows * cols, C_FLOAT);
     MemorySegment dataMemorySegment = arena.allocate(dataMemoryLayout);
-    for (int r = 0; r < rows; r++) {
-      MemorySegment.copy(
-          data[r], 0, dataMemorySegment, C_FLOAT, (r * cols * C_FLOAT.byteSize()), (int) cols);
-    }
+    copy(dataMemorySegment, data);
     return dataMemorySegment;
+  }
+
+  public static void copy(MemorySegment memorySegment, float[][] data) {
+    int rows = data.length;
+    int cols = rows > 0 ? data[0].length : 0;
+    for (int r = 0; r < rows; r++) {
+      MemorySegment.copy(data[r], 0, memorySegment, C_FLOAT, (r * cols * C_FLOAT.byteSize()), cols);
+    }
+  }
+
+  public static void copy(MemorySegment memorySegment, int[][] data) {
+    int rows = data.length;
+    int cols = rows > 0 ? data[0].length : 0;
+    for (int r = 0; r < rows; r++) {
+      MemorySegment.copy(data[r], 0, memorySegment, C_INT, (r * cols * C_INT.byteSize()), cols);
+    }
+  }
+
+  public static void copy(MemorySegment memorySegment, byte[][] data) {
+    int rows = data.length;
+    int cols = rows > 0 ? data[0].length : 0;
+    for (int r = 0; r < rows; r++) {
+      MemorySegment.copy(data[r], 0, memorySegment, C_CHAR, (r * cols * C_CHAR.byteSize()), cols);
+    }
   }
 
   public static BitSet concatenate(BitSet[] arr, int maxSizeOfEachBitSet) {
@@ -293,7 +312,6 @@ public class Util {
    * @param[in] shape the shape of the tensor
    * @param[in] code the type code of base types
    * @param[in] bits the shape of the tensor
-   * @param[in] ndim the number of dimensions
    * @return DLManagedTensor
    */
   public static MemorySegment prepareTensor(
@@ -302,7 +320,6 @@ public class Util {
       long[] shape,
       int code,
       int bits,
-      int ndim,
       int deviceType,
       int lanes) {
 
@@ -315,6 +332,7 @@ public class Util {
     DLDevice.device_type(dlDevice, deviceType);
     DLTensor.device(dlTensor, dlDevice);
 
+    var ndim = shape.length;
     DLTensor.ndim(dlTensor, ndim);
 
     MemorySegment dtype = DLDataType.allocate(arena);
@@ -330,16 +348,5 @@ public class Util {
     DLManagedTensor.dl_tensor(tensor, dlTensor);
 
     return tensor;
-  }
-
-  public static MemorySegment allocateRMMSegment(long resourceHandle, long datasetBytes) {
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment datasetMemorySegment = localArena.allocate(C_POINTER);
-
-      var returnValue = cuvsRMMAlloc(resourceHandle, datasetMemorySegment, datasetBytes);
-      checkCuVSError(returnValue, "cuvsRMMAlloc");
-
-      return datasetMemorySegment.get(C_POINTER, 0);
-    }
   }
 }
