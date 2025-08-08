@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -82,11 +82,12 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
                                                                     OpT distance_op,
                                                                     FinalLambda fin_op)
 {
-// compile only if below non-ampere arch.
-#if __CUDA_ARCH__ < 800
+  // compile only if below non-ampere arch.
+  // #if __CUDA_ARCH__ < 800
   extern __shared__ char smem[];
 
-  typedef raft::KeyValuePair<IdxT, DataT> KVPair;
+  using AccT = std::conditional_t<std::is_same_v<DataT, uint8_t>, uint32_t, DataT>;
+  typedef raft::KeyValuePair<IdxT, AccT> KVPair;
   KVPair val[P::AccRowsPerTh];
 #pragma unroll
   for (int i = 0; i < P::AccRowsPerTh; ++i) {
@@ -95,9 +96,9 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
 
   // epilogue operation lambda for final value calculation
   auto epilog_lambda = [n, pairRedOp, &val, maxVal] __device__(
-                         DataT acc[P::AccRowsPerTh][P::AccColsPerTh],
-                         DataT * regxn,
-                         DataT * regyn,
+                         AccT acc[P::AccRowsPerTh][P::AccColsPerTh],
+                         AccT * regxn,
+                         AccT * regyn,
                          IdxT gridStrideX,
                          IdxT gridStrideY) {
     KVPReduceOpT pairRed_op(pairRedOp);
@@ -152,8 +153,9 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
   IdxT lda = k, ldb = k, ldd = n;
   constexpr bool row_major = true;
   constexpr bool write_out = false;
+  using AccT               = std::conditional_t<std::is_same_v<DataT, uint8_t>, uint32_t, DataT>;
   PairwiseDistances<DataT,
-                    DataT,  // OutT (unused in PairwiseDistances)
+                    AccT,  // OutT (unused in PairwiseDistances)
                     IdxT,
                     P,
                     decltype(distance_op),
@@ -170,8 +172,8 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
         lda,
         ldb,
         ldd,
-        xn,
-        yn,
+        reinterpret_cast<const AccT*>(xn),
+        reinterpret_cast<const AccT*>(yn),
         nullptr,  // Output pointer
         smem,
         distance_op,
@@ -179,7 +181,7 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
         fin_op,
         rowEpilog_lambda);
   obj.run();
-#endif
+  // #endif
 }
 
 }  // namespace detail
