@@ -21,6 +21,7 @@
 #include "connectivities.cuh"
 #include "mst.cuh"
 #include <cuvs/cluster/agglomerative.hpp>
+#include <cuvs/neighbors/all_neighbors.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/sparse/coo.hpp>
 #include <raft/util/cudart_utils.hpp>
@@ -59,27 +60,60 @@ void build_mr_linkage(raft::resources const& handle,
                       raft::device_vector_view<value_t, value_idx> out_distances,
                       raft::device_vector_view<value_idx, value_idx> out_sizes)
 {
-  size_t m                        = X.extent(0);
-  size_t n                        = X.extent(1);
-  auto mutual_reachability_indptr = raft::make_device_vector<value_idx, value_idx>(handle, m + 1);
-  raft::sparse::COO<value_t, value_idx, nnz_t> mutual_reachability_coo(
-    raft::resource::get_cuda_stream(handle), min_samples * m * 2);
+  size_t m         = X.extent(0);
+  size_t n         = X.extent(1);
+  auto stream      = raft::resource::get_cuda_stream(handle);
+  auto exec_policy = raft::resource::get_thrust_policy(handle);
 
-  // Replace this with mutual reachability graph cronstruction from within all_neighbors wrapper.
-  // Reference: https://github.com/rapidsai/cuvs/issues/982
-  cuvs::neighbors::detail::reachability::mutual_reachability_graph<value_idx, value_t, nnz_t>(
-    handle,
-    X.data_handle(),
-    m,
-    n,
-    metric,
-    min_samples,
-    alpha,
-    mutual_reachability_indptr.data_handle(),
-    core_dists.data_handle(),
-    mutual_reachability_coo);
+  auto mr_indptr = raft::make_device_vector<value_idx, value_idx>(handle, m + 1);
+  raft::sparse::COO<value_t, value_idx, nnz_t> mr_coo(stream, min_samples * m * 2);
 
-  // auto color = raft::make_device_vector<value_idx, value_idx>(handle, static_cast<value_idx>(m));
+  auto inds  = raft::make_device_matrix<value_idx, value_idx>(handle, m, min_samples);
+  auto dists = raft::make_device_matrix<value_t, value_idx>(handle, m, min_samples);
+
+  cuvs::neighbors::all_neighbors::all_neighbors_params all_neigh_p;
+  all_neigh_p.metric                = metric;
+  auto brute_force_p                = neighbors::graph_build_params::brute_force_params{};
+  brute_force_p.build_params.metric = metric;
+  all_neigh_p.graph_build_params    = brute_force_p;
+  cuvs::neighbors::all_neighbors::build(
+    handle, all_neigh_p, X, inds.view(), dists.view(), core_dists, alpha);
+
+  // self-loops get max distance
+  rmm::device_uvector<value_idx> coo_rows(min_samples * m, stream);
+  auto coo_rows_counting_itr = thrust::make_counting_iterator<value_idx>(0);
+  thrust::transform(exec_policy,
+                    coo_rows_counting_itr,
+                    coo_rows_counting_itr + (m * min_samples),
+                    coo_rows.data(),
+                    [min_samples] __device__(value_idx c) -> value_idx { return c / min_samples; });
+
+  raft::sparse::linalg::symmetrize(handle,
+                                   coo_rows.data(),
+                                   inds.data_handle(),
+                                   dists.data_handle(),
+                                   static_cast<value_idx>(m),
+                                   static_cast<value_idx>(m),
+                                   static_cast<nnz_t>(min_samples * m),
+                                   mr_coo);
+
+  raft::sparse::convert::sorted_coo_to_csr(
+    mr_coo.rows(), mr_coo.nnz, mr_indptr.data_handle(), m + 1, stream);
+
+  // self-loops get max distance
+  auto transform_in =
+    thrust::make_zip_iterator(thrust::make_tuple(mr_coo.rows(), mr_coo.cols(), mr_coo.vals()));
+
+  thrust::transform(exec_policy,
+                    transform_in,
+                    transform_in + mr_coo.nnz,
+                    mr_coo.vals(),
+                    [=] __device__(const thrust::tuple<value_idx, value_idx, value_t>& tup) {
+                      return thrust::get<0>(tup) == thrust::get<1>(tup)
+                               ? std::numeric_limits<value_t>::max()
+                               : thrust::get<2>(tup);
+                    });
+
   rmm::device_uvector<value_idx> color(m, raft::resource::get_cuda_stream(handle));
   cuvs::sparse::neighbors::MutualReachabilityFixConnectivitiesRedOp<value_idx, value_t>
     reduction_op(core_dists.data_handle(), m);
@@ -88,16 +122,16 @@ void build_mr_linkage(raft::resources const& handle,
 
   detail::build_sorted_mst<value_idx, value_t>(handle,
                                                X.data_handle(),
-                                               mutual_reachability_indptr.data_handle(),
-                                               mutual_reachability_coo.cols(),
-                                               mutual_reachability_coo.vals(),
+                                               mr_indptr.data_handle(),
+                                               mr_coo.cols(),
+                                               mr_coo.vals(),
                                                m,
                                                n,
                                                out_mst.structure_view().get_rows().data(),
                                                out_mst.structure_view().get_cols().data(),
                                                out_mst.get_elements().data(),
                                                color.data(),
-                                               mutual_reachability_coo.nnz,
+                                               mr_coo.nnz,
                                                reduction_op,
                                                metric,
                                                10);
