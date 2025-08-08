@@ -133,8 +133,8 @@ struct loadAndComputeDist {
       for (int k = 0; k < Veclen; ++k) {
         compute_dist(dist, queryRegs[k], encV[k]);
         if constexpr (ComputeNorm) {
-          norm_query += queryRegs[k] * queryRegs[k];
-          norm_data += encV[k] * encV[k];
+          norm_query += (AccT)(queryRegs[k] * queryRegs[k]);
+          norm_data += (AccT)(encV[k] * encV[k]);
         }
       }
     }
@@ -168,8 +168,8 @@ struct loadAndComputeDist {
           T q = raft::shfl(queryReg, d + k, raft::WarpSize);
           compute_dist(dist, q, encV[k]);
           if constexpr (ComputeNorm) {
-            norm_query += q * q;
-            norm_data += encV[k] * encV[k];
+            norm_query += (AccT)(q * q);
+            norm_data += (AccT)(encV[k] * encV[k]);
           }
         }
       }
@@ -194,8 +194,8 @@ struct loadAndComputeDist {
         T q = raft::shfl(queryReg, d + k, raft::WarpSize);
         compute_dist(dist, q, enc[k]);
         if constexpr (ComputeNorm) {
-          norm_query += q * q;
-          norm_data += enc[k] * enc[k];
+          norm_query += (AccT)(q * q);
+          norm_data += (AccT)(enc[k] * enc[k]);
         }
       }
     }
