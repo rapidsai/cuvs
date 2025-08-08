@@ -213,6 +213,8 @@ public class CagraIndexImpl implements CagraIndex {
     }
   }
 
+  private static final BitSet[] EMPTY_PREFILTER_BITSET = new BitSet[0];
+
   /**
    * Invokes the native search_cagra_index via the Panama API for searching a
    * CAGRA index.
@@ -241,7 +243,7 @@ public class CagraIndexImpl implements CagraIndex {
       final long distancesBytes = C_FLOAT_BYTE_SIZE * numQueries * topK;
       final boolean hasPreFilter = query.getPrefilter() != null;
       final BitSet[] prefilters =
-          hasPreFilter ? new BitSet[] {query.getPrefilter()} : new BitSet[0];
+          hasPreFilter ? new BitSet[] {query.getPrefilter()} : EMPTY_PREFILTER_BITSET;
       final long prefilterDataLength = hasPreFilter ? query.getNumDocs() * prefilters.length : 0;
       final long prefilterLen = hasPreFilter ? (prefilterDataLength + 31) / 32 : 0;
       final long prefilterBytes = C_INT_BYTE_SIZE * prefilterLen;
