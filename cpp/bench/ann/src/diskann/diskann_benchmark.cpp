@@ -65,16 +65,14 @@ template <typename T>
 void parse_search_param(const nlohmann::json& conf,
                         typename cuvs::bench::diskann_memory<T>::search_param& param)
 {
-  param.L_search    = conf.at("L_search");
-  param.num_threads = conf.at("num_threads");
+  param.L_search = conf.at("L_search");
 }
 
 template <typename T>
 void parse_search_param(const nlohmann::json& conf,
                         typename cuvs::bench::diskann_ssd<T>::search_param& param)
 {
-  param.L_search    = conf.at("L_search");
-  param.num_threads = conf.at("num_threads");
+  param.L_search = conf.at("L_search");
   if (conf.contains("num_nodes_to_cache")) {
     param.num_nodes_to_cache = conf.at("num_nodes_to_cache");
   }
@@ -132,6 +130,8 @@ std::unique_ptr<typename cuvs::bench::algo<T>::search_param> create_search_param
 };  // namespace cuvs::bench
 
 REGISTER_ALGO_INSTANCE(float);
+REGISTER_ALGO_INSTANCE(std::int8_t);
+REGISTER_ALGO_INSTANCE(std::uint8_t);
 
 #ifdef ANN_BENCH_BUILD_MAIN
 #include "../common/benchmark.hpp"

@@ -4,10 +4,9 @@ constraints:
 groups:
   base:
     build:
-      R: [64, 96]
+      R: [32, 64, 96]
       L_build: [128, 256, 384]
       alpha: [1.2]
       num_threads: [32]
     search:
-      num_threads: [32]
       L_search: [10, 20, 30, 40, 50, 100, 200, 300]
