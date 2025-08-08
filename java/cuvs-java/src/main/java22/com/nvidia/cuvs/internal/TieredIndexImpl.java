@@ -166,6 +166,8 @@ public class TieredIndexImpl implements TieredIndex {
     }
   }
 
+  private static final BitSet[] EMPTY_PREFILTER_BITSET = new BitSet[0];
+
   /**
    * Translates C search_tiered_index function to Java
    * Invokes the native search_tiered_index via the Panama API for searching a
@@ -195,30 +197,25 @@ public class TieredIndexImpl implements TieredIndex {
       // Get host query data
       MemorySegment hostQueriesSeg = Util.buildMemorySegment(localArena, query.getQueryVectors());
 
+      final long queriesBytes = C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
+      final long neighborsBytes = C_LONG_BYTE_SIZE * numQueries * topK; // 64-bit for tiered index
+      final long distancesBytes = C_FLOAT_BYTE_SIZE * numQueries * topK;
+      final boolean hasPreFilter = query.getPrefilter() != null;
+      final BitSet[] prefilters =
+          hasPreFilter ? new BitSet[] {query.getPrefilter()} : EMPTY_PREFILTER_BITSET;
+      final long prefilterDataLength = hasPreFilter ? query.getNumDocs() * prefilters.length : 0;
+      final long prefilterLen = hasPreFilter ? (prefilterDataLength + 31) / 32 : 0;
+      final long prefilterBytes = C_INT_BYTE_SIZE * prefilterLen;
+
       try (var resourceAccess = query.getResources().access()) {
         long cuvsRes = resourceAccess.handle();
-
-        final long queriesBytes = C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
-        final long neighborsBytes = C_LONG_BYTE_SIZE * numQueries * topK; // 64-bit for tiered index
-        final long distancesBytes = C_FLOAT_BYTE_SIZE * numQueries * topK;
-        final boolean hasPreFilters = query.getPrefilter() != null;
-        final long prefilterBytes;
-        if (hasPreFilters) {
-          BitSet[] prefilters = new BitSet[] {query.getPrefilter()};
-          long prefilterDataLength = query.getNumDocs() * prefilters.length;
-          long[] prefilterShape = {(prefilterDataLength + 31) / 32};
-          long prefilterLen = prefilterShape[0];
-          prefilterBytes = C_INT_BYTE_SIZE * prefilterLen;
-        } else {
-          prefilterBytes = 0;
-        }
 
         // Allocate DEVICE memory for all data
         try (var queriesDP = allocateRMMSegment(cuvsRes, queriesBytes);
             var neighborsDP = allocateRMMSegment(cuvsRes, neighborsBytes);
             var distancesDP = allocateRMMSegment(cuvsRes, distancesBytes);
             var prefilterDP =
-                hasPreFilters
+                hasPreFilter
                     ? allocateRMMSegment(cuvsRes, prefilterBytes)
                     : CloseableRMMAllocation.EMPTY) {
 
@@ -255,14 +252,12 @@ public class TieredIndexImpl implements TieredIndex {
           // Handle prefilter
           MemorySegment prefilter = cuvsFilter.allocate(localArena);
 
-          if (query.getPrefilter() != null) {
-            BitSet[] prefilters = new BitSet[] {query.getPrefilter()};
+          if (hasPreFilter) {
             BitSet concatenatedFilters = concatenate(prefilters, (int) query.getNumDocs());
             long[] filters = concatenatedFilters.toLongArray();
             MemorySegment hostPrefilterSeg = buildMemorySegment(localArena, filters);
 
-            long prefilterDataLength = query.getNumDocs() * prefilters.length;
-            long[] prefilterShape = {(prefilterDataLength + 31) / 32};
+            long[] prefilterShape = {prefilterLen};
 
             // Copy prefilter to device
             checkCudaError(
