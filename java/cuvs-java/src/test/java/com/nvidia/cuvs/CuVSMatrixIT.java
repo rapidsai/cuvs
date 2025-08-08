@@ -23,9 +23,13 @@ import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RunWith(RandomizedRunner.class)
 public class CuVSMatrixIT extends CuVSTestCase {
+
+  private static final Logger log = LoggerFactory.getLogger(CuVSMatrixIT.class);
 
   @Before
   public void setup() {
@@ -61,6 +65,10 @@ public class CuVSMatrixIT extends CuVSTestCase {
     int rows = randomIntBetween(1, 32);
     int cols = randomIntBetween(1, 100);
 
+    return createFloatMatrix(rows, cols);
+  }
+
+  private float[][] createFloatMatrix(int rows, int cols) {
     float[][] result = new float[rows][cols];
 
     for (int r = 0; r < rows; ++r) {
@@ -71,42 +79,99 @@ public class CuVSMatrixIT extends CuVSTestCase {
     return result;
   }
 
-  @Test
-  public void testByteDatasetRowGetAccess() {
-    try (var dataset = CuVSMatrix.ofArray(byteData)) {
-      for (int n = 0; n < dataset.size(); ++n) {
-        var row = dataset.getRow(n);
-        assertEquals(dataset.columns(), row.size());
-        for (int i = 0; i < dataset.columns(); ++i) {
-          assertEquals(byteData[n][i], row.getAsByte(i));
-        }
+  private void testByteDatasetRowGetAccess(CuVSMatrix dataset) {
+    for (int n = 0; n < dataset.size(); ++n) {
+      var row = dataset.getRow(n);
+      assertEquals(dataset.columns(), row.size());
+      for (int i = 0; i < dataset.columns(); ++i) {
+        assertEquals(byteData[n][i], row.getAsByte(i));
       }
     }
   }
 
   @Test
-  public void testByteDatasetRowCopy() {
-    try (var dataset = CuVSMatrix.ofArray(byteData)) {
-      for (int n = 0; n < dataset.size(); ++n) {
-        var row = dataset.getRow(n);
-        assertEquals(dataset.columns(), row.size());
+  public void testByteHostDatasetRowGetAccess() {
+    try (var matrix = CuVSMatrix.ofArray(byteData)) {
+      testByteDatasetRowGetAccess(matrix);
+    }
+  }
 
-        var rowCopy = new byte[(int) row.size()];
-        row.toArray(rowCopy);
-        assertArrayEquals(byteData[n], rowCopy);
+  @Test
+  public void testByteDeviceDatasetRowGetAccess() throws Throwable {
+    try (var resources = CheckedCuVSResources.create()) {
+      var builder =
+          CuVSMatrix.deviceBuilder(
+              resources, byteData.length, byteData[0].length, CuVSMatrix.DataType.BYTE, 0);
+      for (int i = 0; i < byteData.length; i++) {
+        builder.addVector(byteData[i]);
+      }
+      try (var matrix = builder.build()) {
+        testByteDatasetRowGetAccess(matrix);
+      }
+    }
+  }
+
+  private void testByteDatasetRowCopy(CuVSMatrix dataset) {
+    for (int n = 0; n < dataset.size(); ++n) {
+      var row = dataset.getRow(n);
+      assertEquals(dataset.columns(), row.size());
+
+      var rowCopy = new byte[(int) row.size()];
+      row.toArray(rowCopy);
+      assertArrayEquals(byteData[n], rowCopy);
+    }
+  }
+
+  @Test
+  public void testByteHostDatasetRowCopy() {
+    try (var dataset = CuVSMatrix.ofArray(byteData)) {
+      testByteDatasetRowCopy(dataset);
+    }
+  }
+
+  @Test
+  public void testByteDeviceDatasetRowCopy() throws Throwable {
+    try (var resources = CheckedCuVSResources.create()) {
+      var builder =
+          CuVSMatrix.deviceBuilder(
+              resources, byteData.length, byteData[0].length, CuVSMatrix.DataType.BYTE, 0);
+      for (int i = 0; i < byteData.length; i++) {
+        builder.addVector(byteData[i]);
+      }
+      try (var matrix = builder.build()) {
+        testByteDatasetRowCopy(matrix);
+      }
+    }
+  }
+
+  private void testByteDatasetCopy(CuVSMatrix dataset) {
+    var dataCopy = new byte[(int) dataset.size()][(int) dataset.columns()];
+    dataset.toArray(dataCopy);
+    for (int n = 0; n < dataset.size(); ++n) {
+      for (int i = 0; i < dataset.columns(); ++i) {
+        assertEquals(byteData[n][i], dataCopy[n][i]);
       }
     }
   }
 
   @Test
-  public void testByteDatasetCopy() {
+  public void testByteHostDatasetCopy() {
     try (var dataset = CuVSMatrix.ofArray(byteData)) {
-      var dataCopy = new byte[(int) dataset.size()][(int) dataset.columns()];
-      dataset.toArray(dataCopy);
-      for (int n = 0; n < dataset.size(); ++n) {
-        for (int i = 0; i < dataset.columns(); ++i) {
-          assertEquals(byteData[n][i], dataCopy[n][i]);
-        }
+      testByteDatasetCopy(dataset);
+    }
+  }
+
+  @Test
+  public void testByteDeviceDatasetCopy() throws Throwable {
+    try (var resources = CheckedCuVSResources.create()) {
+      var builder =
+          CuVSMatrix.deviceBuilder(
+              resources, byteData.length, byteData[0].length, CuVSMatrix.DataType.BYTE, 0);
+      for (int i = 0; i < byteData.length; i++) {
+        builder.addVector(byteData[i]);
+      }
+      try (var matrix = builder.build()) {
+        testByteDatasetCopy(matrix);
       }
     }
   }
@@ -328,6 +393,43 @@ public class CuVSMatrixIT extends CuVSTestCase {
     try (var resources = CheckedCuVSResources.create()) {
       testByteDatasetBuilder(
           rows, cols, CuVSMatrix.deviceBuilder(resources, rows, cols, CuVSMatrix.DataType.BYTE, 0));
+    }
+  }
+
+  @Test
+  public void testDeviceToHost() throws Throwable {
+
+    final int size = 16 * 1024;
+    final int columns = 2048;
+    final float[][] data = createFloatMatrix(size, columns);
+
+    try (var resources = CuVSResources.create()) {
+
+      var builder =
+          CuVSMatrix.deviceBuilder(resources, size, columns, CuVSMatrix.DataType.FLOAT, 2);
+      for (int i = 0; i < size; ++i) {
+        var array = data[i];
+        builder.addVector(array);
+      }
+
+      try (var deviceMatrix = (CuVSDeviceMatrix) builder.build()) {
+        var hostMatrix = deviceMatrix.toHost(resources);
+        assertEquals(data.length, deviceMatrix.size());
+        assertEquals(data[0].length, deviceMatrix.columns());
+
+        assertEquals(deviceMatrix.size(), hostMatrix.size());
+        assertEquals(deviceMatrix.columns(), hostMatrix.columns());
+
+        var roundTripData = new float[size][columns];
+
+        hostMatrix.toArray(roundTripData);
+
+        for (int n = 0; n < hostMatrix.size(); ++n) {
+          for (int i = 0; i < hostMatrix.columns(); ++i) {
+            assertEquals(data[n][i], roundTripData[n][i], 1e-9);
+          }
+        }
+      }
     }
   }
 }

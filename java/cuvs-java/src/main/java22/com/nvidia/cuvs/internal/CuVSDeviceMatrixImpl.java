@@ -21,6 +21,8 @@ import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.*;
+import com.nvidia.cuvs.internal.panama.DLManagedTensor;
+import com.nvidia.cuvs.internal.panama.DLTensor;
 import java.lang.foreign.*;
 import java.util.function.Function;
 
@@ -122,6 +124,7 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
 
   private void populateBuffer(long startRow) {
     if (hostBuffer == MemorySegment.NULL) {
+      //      System.out.println("Creating a buffer of size " + hostBufferBytes);
       hostBuffer = createBuffer(hostBufferBytes);
     }
 
@@ -131,20 +134,17 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
   private void populateBufferWithCuvs(MemorySegment buffer, long startRow, long bufferBytes) {
     try (var localArena = Arena.ofConfined()) {
       long rowBytes = columns * valueLayout.byteSize();
-      var endRow = Math.min(startRow + (bufferBytes / rowBytes), size - 1);
-      var rowCount = endRow - startRow + 1;
+      var endRow = Math.min(startRow + (bufferBytes / rowBytes), size);
+      var rowCount = endRow - startRow;
+
+      //      System.out.printf(
+      //          Locale.ROOT, "startRow: %d, endRow %d, count: %d\n", startRow, endRow, rowCount);
 
       // TODO: we need stride information too here (optionally)
       MemorySegment sliceTensor =
-          prepareTensor(
-              localArena,
-              MemorySegment.NULL,
-              new long[] {rowCount, columns},
-              code(),
-              bits(),
-              kDLCUDA(),
-              1);
+          prepareTensor(localArena, MemorySegment.NULL, new long[2], code(), bits(), kDLCUDA(), 1);
       cuvsMatrixSliceRows(0, toTensor(localArena), startRow, endRow, sliceTensor);
+      assert DLTensor.shape(DLManagedTensor.dl_tensor(sliceTensor)).get(C_LONG, 0) == rowCount;
 
       MemorySegment bufferTensor =
           prepareTensor(
@@ -152,6 +152,7 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
 
       try (var resourceAccess = resources.access()) {
         cuvsMatrixCopy(resourceAccess.handle(), sliceTensor, bufferTensor);
+        cuvsStreamSync(resourceAccess.handle());
 
         bufferedMatrixRowStart = startRow;
         bufferedMatrixRowEnd = endRow;
@@ -160,37 +161,36 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
   }
 
   private void populateBufferWithCuda2D(MemorySegment buffer, long startRow, long bufferBytes) {
-
     long rowBytes = columns * valueLayout.byteSize();
-    var endRow = Math.min(startRow + (bufferBytes / rowBytes), size - 1);
-    var rowCount = endRow - startRow + 1;
+    var endRow = Math.min(startRow + (bufferBytes / rowBytes), size);
+    var rowCount = endRow - startRow;
 
     var src = memorySegment.asSlice(startRow * rowBytes);
-    cudaMemcpy2D(buffer, rowBytes, src, rowBytes, columns, rowCount, cudaMemcpyDeviceToHost());
+    cudaMemcpy2D(buffer, rowBytes, src, rowBytes, rowBytes, rowCount, cudaMemcpyDefault());
 
     bufferedMatrixRowStart = startRow;
     bufferedMatrixRowEnd = endRow;
   }
 
-  private void populateBufferWithCuda2DAsync(
-      MemorySegment buffer, long startRow, long bufferBytes) {
-    try (var localArena = Arena.ofConfined()) {
-      long rowBytes = columns * valueLayout.byteSize();
-      var endRow = Math.min(startRow + (bufferBytes / rowBytes), size - 1);
-      var rowCount = endRow - startRow + 1;
+  private void populateBufferWithCuda2DAsync(MemorySegment buffer, long startRow, long bufferBytes) {
+    long rowBytes = columns * valueLayout.byteSize();
+    var endRow = Math.min(startRow + (bufferBytes / rowBytes), size);
+    var rowCount = endRow - startRow;
 
-      var streamMemorySegment = localArena.allocate(C_POINTER);
-      cudaStreamCreate(streamMemorySegment);
-      var stream = streamMemorySegment.get(C_POINTER, 0);
+    var src = memorySegment.asSlice(startRow * rowBytes);
+    cudaMemcpy2DAsync(
+        buffer,
+        rowBytes,
+        src,
+        rowBytes,
+        rowBytes,
+        rowCount,
+        cudaMemcpyDefault(),
+        memcopyStream);
+    cudaStreamSynchronize(memcopyStream);
 
-      var src = memorySegment.asSlice(startRow * rowBytes);
-      cudaMemcpy2DAsync(
-          buffer, rowBytes, src, rowBytes, columns, rowCount, cudaMemcpyDeviceToHost(), stream);
-      cudaStreamDestroy(stream);
-
-      bufferedMatrixRowStart = startRow;
-      bufferedMatrixRowEnd = endRow;
-    }
+    bufferedMatrixRowStart = startRow;
+    bufferedMatrixRowEnd = endRow;
   }
 
   protected long getMatrixSizeInBytes() {
@@ -202,11 +202,11 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
     if (row < bufferedMatrixRowStart || row >= bufferedMatrixRowEnd) {
       populateBuffer(row);
     }
-
-    var valueLayout = valueLayoutFromType(dataType);
     var valueByteSize = valueLayout.byteSize();
+    var startRow = row - bufferedMatrixRowStart;
+
     return new SliceRowView(
-        memorySegment.asSlice(row * columns * valueByteSize, columns * valueByteSize),
+        hostBuffer.asSlice(startRow * columns * valueByteSize, columns * valueByteSize),
         columns,
         valueLayout,
         dataType,
@@ -283,22 +283,22 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
   }
 
   CuVSHostMatrix toHostCuvs(CuVSResources resources) {
-    var graph = new CuVSHostMatrixArenaImpl(size, columns, dataType);
+    var hostMatrix = new CuVSHostMatrixArenaImpl(size, columns, dataType);
     try (var localArena = Arena.ofConfined()) {
-      var graphHostTensor = graph.toTensor(localArena);
+      var hostMatrixTensor = hostMatrix.toTensor(localArena);
 
       try (var resourceAccess = resources.access()) {
         var cuvsRes = resourceAccess.handle();
         checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync");
 
-        var graphDeviceTensor = toTensor(localArena);
+        var deviceMatrixTensor = toTensor(localArena);
         checkCuVSError(
-            cuvsMatrixCopy(cuvsRes, graphDeviceTensor, graphHostTensor), "cuvsMatrixCopy");
+            cuvsMatrixCopy(cuvsRes, deviceMatrixTensor, hostMatrixTensor), "cuvsMatrixCopy");
 
         checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync");
       }
     }
-    return graph;
+    return hostMatrix;
   }
 
   CuVSHostMatrix toHostCuda2D(CuVSResources resources) {
@@ -307,7 +307,7 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
 
     var hostMemory = createBuffer(getMatrixSizeInBytes());
     cudaMemcpy2D(
-        hostMemory, rowBytes, memorySegment, rowBytes, columns, size, cudaMemcpyDeviceToHost());
+        hostMemory, rowBytes, memorySegment, rowBytes, rowBytes, size, cudaMemcpyDeviceToHost());
 
     return new CuVSHostMatrixImpl(hostMemory, size, columns, dataType) {
       @Override
@@ -320,26 +320,20 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
 
   CuVSHostMatrix toHostCuda2DAsync(CuVSResources resources) {
     // TODO: stride
+    var hostMatrix = new CuVSHostMatrixArenaImpl(size, columns, dataType);
+
     long rowBytes = columns * valueLayout.byteSize();
 
-    var hostMemory = createBuffer(getMatrixSizeInBytes());
     cudaMemcpy2DAsync(
-        hostMemory,
+        hostMatrix.memorySegment(),
         rowBytes,
         memorySegment,
         rowBytes,
-        columns,
+        rowBytes,
         size,
         cudaMemcpyDeviceToHost(),
         memcopyStream);
     cudaStreamSynchronize(memcopyStream);
-
-    return new CuVSHostMatrixImpl(hostMemory, size, columns, dataType) {
-      @Override
-      public void close() {
-        super.close();
-        cudaFreeHost(hostMemory);
-      }
-    };
+    return hostMatrix;
   }
 }

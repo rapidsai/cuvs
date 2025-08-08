@@ -226,9 +226,9 @@ final class JDKProvider implements CuVSProvider {
     private final int columns;
     private final int size;
     private final CuVSDeviceMatrixRMMImpl matrix;
-    int current;
-    MemorySegment tempSegment;
-    final Arena tempSegmentArena;
+    private int current;
+    private MemorySegment tempSegment;
+    private final Arena tempSegmentArena;
 
     public NativeSegmentBuilder(
         CuVSResources resources,

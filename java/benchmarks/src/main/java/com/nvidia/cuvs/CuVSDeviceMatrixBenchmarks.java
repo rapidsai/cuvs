@@ -35,9 +35,10 @@ public class CuVSDeviceMatrixBenchmarks {
 
   private float[][] data;
 
-  CuVSDeviceMatrix matrixWithCuvsCopy;
-  CuVSDeviceMatrix matrixWithCudaCopy;
-  CuVSDeviceMatrix matrixWithCudaCopyAsync;
+  private CuVSResources resources;
+  private CuVSDeviceMatrix matrixWithCuvsCopy;
+  private CuVSDeviceMatrix matrixWithCudaCopy;
+  private CuVSDeviceMatrix matrixWithCudaCopyAsync;
 
   private float[][] createRandomData() {
     var array = new float[size][dims];
@@ -53,23 +54,23 @@ public class CuVSDeviceMatrixBenchmarks {
   @Setup
   public void initialize() throws Throwable {
     data = createRandomData();
-    try (CuVSResources resources = CuVSResources.create()) {
-      var builder0 = CuVSMatrix.deviceBuilder(resources, size, dims, CuVSMatrix.DataType.FLOAT, 0);
-      var builder1 = CuVSMatrix.deviceBuilder(resources, size, dims, CuVSMatrix.DataType.FLOAT, 1);
-      var builder2 = CuVSMatrix.deviceBuilder(resources, size, dims, CuVSMatrix.DataType.FLOAT, 2);
+    resources = CuVSResources.create();
 
-      for (int i = 0; i < size; ++i) {
-        var array = data[i];
-        builder0.addVector(array);
-        builder1.addVector(array);
-        builder2.addVector(array);
-      }
+    var builder0 = CuVSMatrix.deviceBuilder(resources, size, dims, CuVSMatrix.DataType.FLOAT, 0);
+    var builder1 = CuVSMatrix.deviceBuilder(resources, size, dims, CuVSMatrix.DataType.FLOAT, 1);
+    var builder2 = CuVSMatrix.deviceBuilder(resources, size, dims, CuVSMatrix.DataType.FLOAT, 2);
 
-
-      matrixWithCuvsCopy = (CuVSDeviceMatrix) builder0.build();
-      matrixWithCudaCopy = (CuVSDeviceMatrix) builder1.build();
-      matrixWithCudaCopyAsync = (CuVSDeviceMatrix) builder2.build();
+    for (int i = 0; i < size; ++i) {
+      var array = data[i];
+      builder0.addVector(array);
+      builder1.addVector(array);
+      builder2.addVector(array);
     }
+
+
+    matrixWithCuvsCopy = (CuVSDeviceMatrix) builder0.build();
+    matrixWithCudaCopy = (CuVSDeviceMatrix) builder1.build();
+    matrixWithCudaCopyAsync = (CuVSDeviceMatrix) builder2.build();
   }
 
   @TearDown
@@ -83,6 +84,9 @@ public class CuVSDeviceMatrixBenchmarks {
     if (matrixWithCudaCopyAsync != null) {
       matrixWithCudaCopyAsync.close();
     }
+    if (resources != null) {
+      resources.close();
+    }
   }
 
   @Benchmark
@@ -93,9 +97,9 @@ public class CuVSDeviceMatrixBenchmarks {
   }
 
   @Benchmark
-  public void matrixCopyToHostWithCuvs(Blackhole bh) throws Throwable {
+  public void matrixCopyToHostWithCuvs() throws Throwable {
     try (var resources = CuVSResources.create()) {
-      bh.consume(matrixWithCuvsCopy.toHost(resources));
+      matrixWithCuvsCopy.toHost(resources).close();
     }
   }
 
@@ -107,9 +111,9 @@ public class CuVSDeviceMatrixBenchmarks {
   }
 
   @Benchmark
-  public void matrixCopyToHostWithCuda(Blackhole bh) throws Throwable {
+  public void matrixCopyToHostWithCuda() throws Throwable {
     try (var resources = CuVSResources.create()) {
-      bh.consume(matrixWithCudaCopy.toHost(resources));
+      matrixWithCudaCopy.toHost(resources).close();
     }
   }
 
@@ -121,9 +125,9 @@ public class CuVSDeviceMatrixBenchmarks {
   }
 
   @Benchmark
-  public void matrixCopyToHostWithCudaAsync(Blackhole bh) throws Throwable {
+  public void matrixCopyToHostWithCudaAsync() throws Throwable {
     try (var resources = CuVSResources.create()) {
-      bh.consume(matrixWithCudaCopyAsync.toHost(resources));
+      matrixWithCudaCopyAsync.toHost(resources).close();
     }
   }
 
