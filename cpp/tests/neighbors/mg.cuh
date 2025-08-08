@@ -524,7 +524,6 @@ class AnnMGTest : public ::testing::TestWithParam<AnnMGInputs> {
 
       // making sure that the NCCL comms are initialized before OMP section
       raft::resource::get_nccl_comms(clique_);
-
 #pragma omp parallel for
       for (uint64_t search_idx = 0; search_idx < searches_correctness.size(); search_idx++) {
         uint64_t offset            = search_idx * ps.num_queries * ps.k;
@@ -686,8 +685,6 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-
-  /*
   {7000,
    10000,
    8,
@@ -699,9 +696,6 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-  */
-
-  /*
   {7000,
    10000,
    8,
@@ -792,8 +786,6 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-
-  /*
   {7000,
    10000,
    8,
@@ -805,8 +797,6 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-  */
-
   {3,
    10000,
    8,
@@ -829,8 +819,6 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-
-  /*
   {3,
    10000,
    8,
@@ -842,6 +830,5 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-  */
 };
 }  // namespace cuvs::neighbors::mg
