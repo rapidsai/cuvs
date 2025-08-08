@@ -54,10 +54,11 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
       long columns,
       DataType dataType,
       ValueLayout valueLayout,
-      int bufferFillerType) {
+      int copyType) {
     super(deviceMemorySegment, dataType, valueLayout, size, columns);
     this.resources = resources;
 
+    var bufferFillerType = copyType & 0xF;
     switch (bufferFillerType) {
       case 1:
         {
