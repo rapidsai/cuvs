@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@ import os
 import glob
 
 template = """/*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -102,7 +102,7 @@ for type_path, (data_t, idx_t, distance_t) in search_types.items():
         for code_book_t in code_book_types:
             for pq_len in pq_lens:
                 for pq_bit in pq_bits:
-                    for metric in ['L2Expanded']:
+                    for metric in ['L2Expanded', 'InnerProduct']:
                         path = f"compute_distance_vpq_{metric}_{type_path}_dim{mxdim}_t{team}_{pq_bit}pq_{pq_len}subd_{code_book_t}.cu"
                         includes = '#include "compute_distance_vpq-impl.cuh"'
                         params = f"{metric_prefix}{metric}, {team}, {mxdim}, {pq_bit}, {pq_len}, {code_book_t}, {data_t}, {idx_t}, {distance_t}"
