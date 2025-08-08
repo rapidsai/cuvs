@@ -335,6 +335,7 @@ if(BUILD_SHARED_LIBS)
     src/distance/detail/kernels/gram_matrix.cu
     src/distance/detail/kernels/kernel_factory.cu
     src/distance/detail/kernels/kernel_matrices.cu
+    src/distance/detail/pairwise_matrix/dispatch_bitwise_hamming_uint8_t_uint32_t_uint32_t_int.cu
     src/distance/detail/pairwise_matrix/dispatch_canberra_float_float_float_int.cu
     src/distance/detail/pairwise_matrix/dispatch_canberra_half_float_float_int.cu
     src/distance/detail/pairwise_matrix/dispatch_canberra_double_double_double_int.cu

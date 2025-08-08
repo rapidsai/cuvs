@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2023, NVIDIA CORPORATION.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -331,6 +331,99 @@ void pairwise_distance(
   raft::device_matrix_view<float, std::int64_t, raft::layout_f_contiguous> dist,
   cuvs::distance::DistanceType metric,
   float metric_arg = 2.0f);
+
+// BitwiseHamming integer type overloads
+
+/**
+ * @brief Compute pairwise distances for two matrices (uint8_t specialization for BitwiseHamming)
+ *
+ * Note: Only contiguous row- or column-major layouts supported currently.
+ *
+ * Usage example:
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <raft/core/device_mdarray.hpp>
+ * #include <cuvs/distance/distance.hpp>
+ *
+ * raft::resources handle;
+ * int n_samples = 5000;
+ * int n_features = 50;
+ *
+ * auto input = raft::make_device_matrix<uint8_t>(handle, n_samples, n_features);
+ *
+ * // ... fill input with binary data ...
+ *
+ * auto output = raft::make_device_matrix<uint32_t>(handle, n_samples, n_samples);
+ *
+ * auto metric = cuvs::distance::DistanceType::BitwiseHamming;
+ * cuvs::distance::pairwise_distance(handle,
+ *                                   raft::make_const(input.view()),
+ *                                   raft::make_const(input.view()),
+ *                                   output.view(),
+ *                                   metric);
+ * @endcode
+ *
+ * @param[in] handle raft handle
+ * @param[in] x first set of points (size n*k)
+ * @param[in] y second set of points (size m*k)
+ * @param[out] dist output distance matrix (size n*m)
+ * @param[in] metric distance to evaluate (must be BitwiseHamming)
+ * @param[in] metric_arg metric argument (unused for BitwiseHamming)
+ */
+void pairwise_distance(
+  raft::resources const& handle,
+  raft::device_matrix_view<const uint8_t, std::int64_t, raft::layout_c_contiguous> const x,
+  raft::device_matrix_view<const uint8_t, std::int64_t, raft::layout_c_contiguous> const y,
+  raft::device_matrix_view<uint32_t, std::int64_t, raft::layout_c_contiguous> dist,
+  cuvs::distance::DistanceType metric,
+  uint32_t metric_arg = 2);
+
+/**
+ * @brief Compute pairwise distances for two matrices (uint8_t specialization for BitwiseHamming
+ * with column major layout)
+ *
+ * Note: Only contiguous row- or column-major layouts supported currently.
+ *
+ * Usage example:
+ * @code{.cpp}
+ * #include <raft/core/resources.hpp>
+ * #include <raft/core/device_mdarray.hpp>
+ * #include <cuvs/distance/distance.hpp>
+ *
+ * raft::resources handle;
+ * int n_samples = 5000;
+ * int n_features = 50;
+ *
+ * auto input = raft::make_device_matrix<uint8_t, std::int64_t, raft::layout_f_contiguous>(
+ *     handle, n_samples, n_features);
+ *
+ * // ... fill input with binary data ...
+ *
+ * auto output = raft::make_device_matrix<uint32_t, std::int64_t, raft::layout_f_contiguous>(
+ *     handle, n_samples, n_samples);
+ *
+ * auto metric = cuvs::distance::DistanceType::BitwiseHamming;
+ * cuvs::distance::pairwise_distance(handle,
+ *                                   raft::make_const(input.view()),
+ *                                   raft::make_const(input.view()),
+ *                                   output.view(),
+ *                                   metric);
+ * @endcode
+ *
+ * @param[in] handle raft handle
+ * @param[in] x first set of points (size n*k)
+ * @param[in] y second set of points (size m*k)
+ * @param[out] dist output distance matrix (size n*m)
+ * @param[in] metric distance to evaluate (must be BitwiseHamming)
+ * @param[in] metric_arg metric argument (unused for BitwiseHamming)
+ */
+void pairwise_distance(
+  raft::resources const& handle,
+  raft::device_matrix_view<const uint8_t, std::int64_t, raft::layout_f_contiguous> const x,
+  raft::device_matrix_view<const uint8_t, std::int64_t, raft::layout_f_contiguous> const y,
+  raft::device_matrix_view<uint32_t, std::int64_t, raft::layout_f_contiguous> dist,
+  cuvs::distance::DistanceType metric,
+  uint32_t metric_arg = 2);
 
 /**
  * @brief Compute sparse pairwise distances between x and y, using the provided

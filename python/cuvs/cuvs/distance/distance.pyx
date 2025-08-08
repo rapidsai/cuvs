@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -54,7 +54,7 @@ DISTANCE_NAMES = {v: k for k, v in DISTANCE_TYPES.items()}
 SUPPORTED_DISTANCES = ["euclidean", "l1", "cityblock", "l2", "inner_product",
                        "chebyshev", "minkowski", "canberra", "kl_divergence",
                        "correlation", "russellrao", "hellinger", "lp",
-                       "hamming", "jensenshannon", "cosine", "sqeuclidean"]
+                       "hamming", "bitwise_hamming", "jensenshannon", "cosine", "sqeuclidean"]
 
 
 @auto_sync_resources
