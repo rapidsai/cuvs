@@ -50,6 +50,13 @@ public interface CagraIndex {
    */
   SearchResults search(CagraQuery query) throws Throwable;
 
+  /** Returns the CAGRA graph
+   *
+   * @return a {@link CuVSMatrix} encapsulating the native int (uint32_t) array used to represent
+   * the cagra graph
+   */
+  CuVSMatrix getGraph();
+
   /**
    * A method to persist a CAGRA index using an instance of {@link OutputStream}
    * for writing index bytes.
@@ -207,6 +214,12 @@ public interface CagraIndex {
      * @return an instance of this Builder
      */
     Builder from(InputStream inputStream);
+
+    /**
+     * Sets a CAGRA graph instance to re-create an index from a
+     * previously built graph.
+     */
+    Builder from(CuVSMatrix graph);
 
     /**
      * Sets the dataset vectors for building the {@link CagraIndex}.

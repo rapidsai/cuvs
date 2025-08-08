@@ -55,13 +55,23 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
-  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) throws Throwable {
+  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public CuVSMatrix.Builder newMatrixBuilder(
+  public CuVSMatrix.Builder newHostMatrixBuilder(
       int size, int dimensions, CuVSMatrix.DataType dataType) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public CuVSMatrix.Builder newDeviceMatrixBuilder(
+      CuVSResources cuVSResources,
+      int size,
+      int dimensions,
+      CuVSMatrix.DataType dataType,
+      int copyType) {
     throw new UnsupportedOperationException();
   }
 

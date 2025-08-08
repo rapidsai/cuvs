@@ -31,7 +31,6 @@ import java.lang.foreign.Linker;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
-import java.lang.invoke.MethodHandles;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -56,7 +55,7 @@ import org.slf4j.LoggerFactory;
 @RunWith(RandomizedRunner.class)
 public class CagraBuildAndSearchIT extends CuVSTestCase {
 
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  private static final Logger log = LoggerFactory.getLogger(CagraBuildAndSearchIT.class);
 
   @Before
   public void setup() {
@@ -287,6 +286,48 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
       var indexPath = serializeOnce(index);
       index.destroyIndex();
       return indexPath;
+    }
+  }
+
+  @Test
+  public void testReconstructIndexFromGraph() throws Throwable {
+    try (var dataset = CuVSMatrix.ofArray(createSampleData())) {
+      var queries = createSampleQueries();
+      List<Map<Integer, Float>> expectedResults = getExpectedResults();
+
+      try (CuVSResources resources = CuVSResources.create()) {
+        var index = indexOnce(dataset, resources);
+        var graph = index.getGraph();
+
+        var reconstructedIndex =
+            CagraIndex.newBuilder(resources)
+                .from(graph)
+                .withDataset(dataset)
+                .withIndexParams(
+                    new CagraIndexParams.Builder().withMetric(CuvsDistanceType.L2Expanded).build())
+                .build();
+        queryAndCompare(
+            index,
+            reconstructedIndex,
+            SearchResults.IDENTITY_MAPPING,
+            queries,
+            expectedResults,
+            resources);
+
+        var originalIndexPath = serializeOnce(index);
+        var reconstructedIndexPath = serializeOnce(reconstructedIndex);
+
+        var originalBytes = Files.readAllBytes(originalIndexPath);
+        var reconstructedBytes = Files.readAllBytes(reconstructedIndexPath);
+
+        assertArrayEquals(originalBytes, reconstructedBytes);
+
+        index.destroyIndex();
+        reconstructedIndex.destroyIndex();
+
+        Files.deleteIfExists(originalIndexPath);
+        Files.deleteIfExists(reconstructedIndexPath);
+      }
     }
   }
 

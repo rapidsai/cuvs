@@ -30,6 +30,7 @@ public interface CuVSMatrix extends AutoCloseable {
   enum DataType {
     FLOAT,
     INT,
+    UINT,
     BYTE
   }
 
@@ -86,7 +87,7 @@ public interface CuVSMatrix extends AutoCloseable {
     /**
      * Add a single vector to the dataset.
      *
-     * @param vector A int array of as many elements as the dimensions
+     * @param vector An int array of as many elements as the dimensions
      */
     void addVector(int[] vector);
 
@@ -101,8 +102,23 @@ public interface CuVSMatrix extends AutoCloseable {
    * @param dataType The data type of the dataset elements
    * @return new instance of {@link CuVSMatrix}
    */
-  static CuVSMatrix.Builder builder(int size, int columns, DataType dataType) {
-    return CuVSProvider.provider().newMatrixBuilder(size, columns, dataType);
+  static Builder hostBuilder(int size, int columns, DataType dataType) {
+    return CuVSProvider.provider().newHostMatrixBuilder(size, columns, dataType);
+  }
+
+  /**
+   * Returns a builder to create a new instance of a dataset
+   *
+   * @param resources CuVS resources used to allocate the device memory needed
+   * @param size      Number of vectors in the dataset
+   * @param columns   Size of each vector in the dataset
+   * @param dataType  The data type of the dataset elements
+   * @return new instance of {@link CuVSMatrix}
+   */
+  static Builder deviceBuilder(
+      CuVSResources resources, int size, int columns, DataType dataType, int copyType) {
+    return CuVSProvider.provider()
+        .newDeviceMatrixBuilder(resources, size, columns, dataType, copyType);
   }
 
   /**

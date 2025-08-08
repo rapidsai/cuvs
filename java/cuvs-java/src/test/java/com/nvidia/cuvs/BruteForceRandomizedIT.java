@@ -121,7 +121,7 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
       BruteForceIndex index;
       if (useNativeMemoryDataset) {
         var datasetBuilder =
-            CuVSMatrix.builder(vectors.length, vectors[0].length, CuVSMatrix.DataType.FLOAT);
+            CuVSMatrix.hostBuilder(vectors.length, vectors[0].length, CuVSMatrix.DataType.FLOAT);
         for (float[] v : vectors) {
           datasetBuilder.addVector(v);
         }

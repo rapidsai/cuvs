@@ -15,19 +15,36 @@
  */
 package com.nvidia.cuvs.internal;
 
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
+
 import com.nvidia.cuvs.CuVSMatrix;
-import java.lang.foreign.MemorySegment;
+import com.nvidia.cuvs.CuVSResources;
+import com.nvidia.cuvs.internal.panama.DLDataType;
+import com.nvidia.cuvs.internal.panama.DLDevice;
+import com.nvidia.cuvs.internal.panama.DLManagedTensor;
+import com.nvidia.cuvs.internal.panama.DLTensor;
+import java.lang.foreign.*;
+import java.util.Locale;
 
 public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
   protected final MemorySegment memorySegment;
   protected final DataType dataType;
+  protected final ValueLayout valueLayout;
   protected final long size;
   protected final long columns;
 
   protected CuVSMatrixBaseImpl(
-      MemorySegment memorySegment, DataType dataType, long size, long columns) {
+      MemorySegment memorySegment,
+      DataType dataType,
+      ValueLayout valueLayout,
+      long size,
+      long columns) {
     this.memorySegment = memorySegment;
     this.dataType = dataType;
+    this.valueLayout = valueLayout;
     this.size = size;
     this.columns = columns;
   }
@@ -44,5 +61,97 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
 
   public MemorySegment memorySegment() {
     return memorySegment;
+  }
+
+  public ValueLayout valueLayout() {
+    return valueLayout;
+  }
+
+  protected int bits() {
+    return (int) (valueLayout.byteSize() * 8);
+  }
+
+  protected int code() {
+    return switch (dataType) {
+      case FLOAT -> kDLFloat();
+      case INT -> kDLInt();
+      case UINT, BYTE -> kDLUInt();
+    };
+  }
+
+  protected static ValueLayout valueLayoutFromType(DataType dataType) {
+    return switch (dataType) {
+      case FLOAT -> C_FLOAT;
+      case INT, UINT -> C_INT;
+      case BYTE -> C_CHAR;
+    };
+  }
+
+  protected static SequenceLayout sequenceLayoutFromType(
+      long size, long columns, DataType dataType) {
+    return MemoryLayout.sequenceLayout(size * columns, valueLayoutFromType(dataType))
+        .withByteAlignment(32);
+  }
+
+  public abstract MemorySegment toTensor(Arena arena);
+
+  public static CuVSMatrix fromTensor(MemorySegment dlManagedTensor, CuVSResources resources) {
+    // TODO: remove CuVSResources parameter if we get rid of it in CuVSDeviceMatrixImpl
+    var dlTensor = DLManagedTensor.dl_tensor(dlManagedTensor);
+    var dlDevice = DLTensor.device(dlTensor);
+
+    var deviceType = DLDevice.device_type(dlDevice);
+
+    var data = DLTensor.data(dlTensor);
+    if (data == MemorySegment.NULL) {
+      throw new IllegalArgumentException("[data] must not be NULL");
+    }
+
+    var ndim = DLTensor.ndim(dlTensor);
+    if (ndim != 2) {
+      throw new IllegalArgumentException("CuVSMatrix only supports 2D data");
+    }
+
+    var dtype = DLTensor.dtype(dlTensor);
+    var code = DLDataType.code(dtype);
+    var bits = DLDataType.bits(dtype);
+
+    final DataType dataType = dataTypeFromTensor(code, bits);
+
+    var shape = DLTensor.shape(dlTensor);
+    if (shape == MemorySegment.NULL) {
+      throw new IllegalArgumentException("[shape] must not be NULL");
+    }
+    var rows = shape.get(C_LONG, 0);
+    var cols = shape.get(C_LONG, 1);
+
+    var strides = DLTensor.strides(dlTensor);
+    // TODO
+
+    if (deviceType == kDLCUDA()) {
+      return new CuVSDeviceMatrixImpl(
+          resources, data, rows, cols, dataType, valueLayoutFromType(dataType), 0);
+    } else if (deviceType == kDLCPU()) {
+      return new CuVSHostMatrixImpl(data, rows, cols, dataType);
+    } else {
+      throw new IllegalArgumentException("Unsupported device type: " + deviceType);
+    }
+  }
+
+  private static DataType dataTypeFromTensor(byte code, byte bits) {
+    final DataType dataType;
+    if (code == kDLUInt() && bits == 32) {
+      dataType = DataType.UINT;
+    } else if (code == kDLInt() && bits == 32) {
+      dataType = DataType.INT;
+    } else if (code == kDLFloat() && bits == 32) {
+      dataType = DataType.FLOAT;
+    } else if ((code == kDLInt() || code == kDLUInt()) && bits == 8) {
+      dataType = DataType.BYTE;
+    } else {
+      throw new IllegalArgumentException(
+          String.format(Locale.ROOT, "Unsupported data type (code=%d, bits=%d)", code, bits));
+    }
+    return dataType;
   }
 }
