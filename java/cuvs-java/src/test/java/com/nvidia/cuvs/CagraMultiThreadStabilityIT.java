@@ -57,7 +57,7 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
   public void setup() {
     assumeTrue("not supported on " + System.getProperty("os.name"), isLinuxAmd64());
     initializeRandom();
-    log.info("Multi-threaded stability test initialized");
+    log.trace("Multi-threaded stability test initialized");
   }
 
   @Test
@@ -77,14 +77,14 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
     final int dataSize = 10000;
     final int numThreads = 16;
 
-    log.info("  Dataset: {}x{}", dataSize, dimensions);
+    log.debug("  Dataset: {}x{}", dataSize, dimensions);
     // High thread count to increase contention
-    log.info("  Threads: {}, Queries per thread: {}", numThreads, queriesPerThread);
+    log.debug("  Threads: {}, Queries per thread: {}", numThreads, queriesPerThread);
 
     float[][] dataset = generateRandomDataset(dataSize);
 
     try (CuVSResources resources = CheckedCuVSResources.create()) {
-      log.info("Creating CAGRA index for MultiThreaded stability test...");
+      log.trace("Creating CAGRA index for MultiThreaded stability test...");
 
       CagraIndexParams indexParams =
           new CagraIndexParams.Builder()
@@ -101,7 +101,7 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
               .withIndexParams(indexParams)
               .build();
 
-      log.info("CAGRA index created, starting high-contention multi-threaded search...");
+      log.trace("CAGRA index created, starting high-contention multi-threaded search...");
 
       // Create high contention scenario that would fail without using separate resources in every
       // thread
@@ -128,7 +128,7 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
                         // No Thread.yield() - maximize contention
                       }
 
-                      log.info("Thread {} completed successfully", finalThreadId);
+                      log.trace("Thread {} completed successfully", finalThreadId);
 
                     } catch (Throwable t) {
                       log.error("Thread {} failed: {}", finalThreadId, t.getMessage(), t);
@@ -141,7 +141,7 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
         }
 
         // Start all threads simultaneously to maximize contention
-        log.info("Starting all {} threads simultaneously...", numThreads);
+        log.debug("Starting all {} threads simultaneously...", numThreads);
         startLatch.countDown();
 
         // Wait for all threads to complete
@@ -167,7 +167,7 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
         int expectedTotalQueries = numThreads * queriesPerThread;
         int actualSuccessfulQueries = successfulQueries.get();
 
-        log.info("  Successful queries: {} / {}", actualSuccessfulQueries, expectedTotalQueries);
+        log.debug("  Successful queries: {} / {}", actualSuccessfulQueries, expectedTotalQueries);
 
         if (firstError.get() != null) {
           fail("MultiThreaded stablity test failed:" + " " + firstError.get().getMessage());

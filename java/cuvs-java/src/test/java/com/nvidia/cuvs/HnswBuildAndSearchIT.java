@@ -93,7 +93,7 @@ public class HnswBuildAndSearchIT extends CuVSTestCase {
         SearchResults results = hnswIndex.search(hnswQuery);
 
         // Check results
-        log.info(results.getResults().toString());
+        log.debug(results.getResults().toString());
         checkResults(expectedResults, results.getResults());
 
         // Cleanup

@@ -35,7 +35,7 @@ public abstract class CuVSTestCase {
 
   protected void initializeRandom() {
     random = RandomizedContext.current().getRandom();
-    log.info("Test seed: " + RandomizedContext.current().getRunnerSeedAsString());
+    log.debug("Test seed: " + RandomizedContext.current().getRunnerSeedAsString());
   }
 
   protected float[][] generateData(Random random, int rows, int cols) {
@@ -77,7 +77,7 @@ public abstract class CuVSTestCase {
       neighborsResult.add(neighbors.subList(0, Math.min(topK * 2 + 10, dataset.length)));
     }
 
-    log.info("Expected results generated successfully.");
+    log.trace("Expected results generated successfully.");
     return neighborsResult;
   }
 
@@ -89,8 +89,8 @@ public abstract class CuVSTestCase {
       int numQueries) {
 
     for (int i = 0; i < numQueries; i++) {
-      log.info("Results returned for query " + i + ": " + results.getResults().get(i).keySet());
-      log.info(
+      log.debug("Results returned for query " + i + ": " + results.getResults().get(i).keySet());
+      log.debug(
           "Expected results for query "
               + i
               + ": "
@@ -109,7 +109,7 @@ public abstract class CuVSTestCase {
               .toList();
 
       // just make sure that the first 5 results are in the expected list (which
-      // comprises of 2*topK results)
+      // consists of 2*topK results)
       for (int j = 0; j < Math.min(5, sortedResultKeys.size()); j++) {
         assertTrue(
             "Not found in expected list: " + sortedResultKeys.get(j),
