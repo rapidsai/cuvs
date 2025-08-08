@@ -19,7 +19,6 @@
 #include "common.hpp"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/common.hpp>
-#include <cuvs/neighbors/graph_build_types.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -34,6 +33,10 @@
 
 #include <optional>
 #include <variant>
+
+namespace cuvs::neighbors::graph_build_params {
+using iterative_search_params = cuvs::neighbors::search_params;
+}
 
 namespace cuvs::neighbors::cagra {
 // For re-exporting into cagra namespace
