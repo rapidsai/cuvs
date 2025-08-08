@@ -421,18 +421,19 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
                                   this->batch_distances_d.value().data_handle());
       }
 
-      remap_and_merge_subgraphs<T, IdxT, int>(this->res,
-                                              this->inverted_indices_d.value().view(),
-                                              inverted_indices.value(),
-                                              int_graph.value().view(),
-                                              this->batch_neighbors_h.value().view(),
-                                              this->batch_neighbors_d.value().view(),
-                                              this->batch_distances_d.value().view(),
-                                              global_neighbors.value(),
-                                              global_distances.value(),
-                                              num_data_in_cluster,
-                                              this->k,
-                                              cuvs::distance::is_min_close(nnd_params.metric));
+      remap_and_merge_subgraphs<T, IdxT, int, std::is_same_v<DistEpilogueT, ReachabilityPP>>(
+        this->res,
+        this->inverted_indices_d.value().view(),
+        inverted_indices.value(),
+        int_graph.value().view(),
+        this->batch_neighbors_h.value().view(),
+        this->batch_neighbors_d.value().view(),
+        this->batch_distances_d.value().view(),
+        global_neighbors.value(),
+        global_distances.value(),
+        num_data_in_cluster,
+        this->k,
+        cuvs::distance::is_min_close(nnd_params.metric));
     } else {
       size_t num_rows = dataset.extent(0);
 
@@ -606,7 +607,7 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
                  num_data_in_cluster * this->k,
                  raft::resource::get_cuda_stream(this->res));
 
-      remap_and_merge_subgraphs<T, IdxT, IdxT>(
+      remap_and_merge_subgraphs<T, IdxT, IdxT, std::is_same_v<DistEpilogueT, ReachabilityPP>>(
         this->res,
         this->inverted_indices_d.value().view(),
         inverted_indices.value(),
