@@ -17,10 +17,13 @@
 #pragma once
 
 #include "../../sparse/neighbors/cross_component_nn.cuh"
+#include "raft/core/device_mdspan.hpp"
+#include "raft/core/operators.hpp"
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/memory_type.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/label/classlabels.cuh>
+#include <raft/linalg/map.cuh>
 #include <raft/matrix/detail/gather.cuh>
 #include <raft/matrix/diagonal.cuh>
 #include <raft/sparse/op/sort.cuh>
@@ -74,7 +77,7 @@ void merge_msts(raft::sparse::solver::Graph_COO<value_idx, value_idx, value_t>& 
 template <typename value_idx, typename value_t, typename red_op>
 void connect_knn_graph(
   raft::resources const& handle,
-  const value_t* X,
+  raft::device_matrix_view<const value_t, value_idx> X,
   raft::sparse::solver::Graph_COO<value_idx, value_idx, value_t>& msf,
   size_t m,
   size_t n,
@@ -93,7 +96,7 @@ void connect_knn_graph(
 
   cuvs::sparse::neighbors::cross_component_nn<value_idx, value_t>(handle,
                                                                   connected_edges,
-                                                                  X,
+                                                                  X.data_handle(),
                                                                   color,
                                                                   m,
                                                                   n,
@@ -132,22 +135,30 @@ void connect_knn_graph(
  * @param[inout] msf edge list containing the mst result
  * @param[in] m number of rows in X
  * @param[in] n number of columns in X
- * @param[in] n_components number of components in color
  * @param[inout] color the color labels array returned from the mst invocation
  * @return updated MST edge list
  */
-template <typename value_idx, typename value_t>
+template <typename value_idx, typename value_t, typename red_op = raft::identity_op>
 void connect_knn_graph(
   raft::resources const& handle,
-  const value_t* X,
+  raft::host_matrix_view<const value_t, value_idx> X,
   raft::sparse::solver::Graph_COO<value_idx, value_idx, value_t>& msf,
   size_t m,
   size_t n,
-  int n_components,
   value_idx* color,
+  red_op reduction_op                 = red_op{},
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded)
 {
-  auto stream = raft::resource::get_cuda_stream(handle);
+  using namespace cuvs::sparse::neighbors;
+  static_assert(
+    std::is_same_v<red_op, raft::identity_op> ||
+      std::is_same_v<red_op, MutualReachabilityFixConnectivitiesRedOp<value_idx, value_t>> ||
+      std::is_same_v<red_op, FixConnectivitiesRedOp<value_idx, value_t>>,
+    "reduction_op must be identity_op, MutualReachabilityFixConnectivitiesRedOp, or "
+    "FixConnectivitiesRedOp");
+
+  auto stream      = raft::resource::get_cuda_stream(handle);
+  int n_components = get_n_components(color, m, stream);
 
   rmm::device_uvector<value_idx> d_color_remapped(m, stream);
   raft::label::make_monotonic(d_color_remapped.data(), color, m, stream, true);
@@ -190,34 +201,48 @@ void connect_knn_graph(
     host_v_indices.push_back(v);
   }
 
-  auto device_u_indices = raft::make_device_vector<value_idx, int64_t>(handle, n_components - 1);
-  auto device_v_indices = raft::make_device_vector<value_idx, int64_t>(handle, n_components - 1);
+  size_t new_nnz = n_components - 1;
 
-  raft::copy(device_u_indices.data_handle(), host_u_indices.data(), n_components - 1, stream);
-  raft::copy(device_v_indices.data_handle(), host_v_indices.data(), n_components - 1, stream);
+  auto device_u_indices = raft::make_device_vector<value_idx, value_idx>(handle, new_nnz);
+  auto device_v_indices = raft::make_device_vector<value_idx, value_idx>(handle, new_nnz);
 
-  auto X_view = raft::make_host_matrix_view<const value_t, int64_t>(X, m, n);
-  auto data_u = raft::make_device_matrix<value_t, int64_t>(handle, n_components - 1, n);
-  auto data_v = raft::make_device_matrix<value_t, int64_t>(handle, n_components - 1, n);
+  raft::copy(device_u_indices.data_handle(), host_u_indices.data(), new_nnz, stream);
+  raft::copy(device_v_indices.data_handle(), host_v_indices.data(), new_nnz, stream);
+
+  auto data_u = raft::make_device_matrix<value_t, value_idx>(handle, new_nnz, n);
+  auto data_v = raft::make_device_matrix<value_t, value_idx>(handle, new_nnz, n);
 
   raft::matrix::detail::gather(
-    handle, X_view, raft::make_const_mdspan(device_u_indices.view()), data_u.view());
+    handle, X, raft::make_const_mdspan(device_u_indices.view()), data_u.view());
   raft::matrix::detail::gather(
-    handle, X_view, raft::make_const_mdspan(device_v_indices.view()), data_v.view());
+    handle, X, raft::make_const_mdspan(device_v_indices.view()), data_v.view());
 
-  auto pairwise_dist =
-    raft::make_device_matrix<value_t, int64_t>(handle, n_components - 1, n_components - 1);
+  auto pairwise_dist = raft::make_device_matrix<value_t, value_idx>(handle, new_nnz, new_nnz);
   cuvs::distance::pairwise_distance(handle,
                                     raft::make_const_mdspan(data_u.view()),
                                     raft::make_const_mdspan(data_v.view()),
                                     pairwise_dist.view(),
                                     metric);
 
-  auto pairwise_dist_vec = raft::make_device_vector<value_t, int64_t>(handle, n_components - 1);
+  auto pairwise_dist_vec = raft::make_device_vector<value_t, value_idx>(handle, n_components - 1);
   raft::matrix::get_diagonal(
     handle, raft::make_const_mdspan(pairwise_dist.view()), pairwise_dist_vec.view());
 
-  size_t new_nnz = n_components - 1;
+  if constexpr (std::is_same<red_op,
+                             MutualReachabilityFixConnectivitiesRedOp<value_idx, value_t>>::value) {
+    raft::linalg::map_offset(
+      handle,
+      pairwise_dist_vec.view(),
+      [pairwise_dist_ptr    = pairwise_dist_vec.data_handle(),
+       core_dist_ptr        = reduction_op.core_dists,
+       device_u_indices_ptr = device_u_indices.data_handle(),
+       device_v_indices_ptr = device_v_indices.data_handle()] __device__(auto i) {
+        float dist        = pairwise_dist_ptr[i];
+        float u_core_dist = core_dist_ptr[device_u_indices_ptr[i]];
+        float v_core_dist = core_dist_ptr[device_v_indices_ptr[i]];
+        return fmaxf(dist, fmaxf(u_core_dist, v_core_dist));
+      });
+  }
 
   // sort in order of rows to run sorted_coo_to_csr
   auto rows_begin = thrust::device_pointer_cast(device_u_indices.data_handle());
@@ -304,9 +329,24 @@ void build_sorted_mst(
 
   while (n_components > 1 && iters < max_iter) {
     if (data_on_device) {
-      connect_knn_graph<value_idx, value_t>(handle, X, mst_coo, m, n, color, reduction_op);
+      connect_knn_graph<value_idx, value_t>(
+        handle,
+        raft::make_device_matrix_view<const value_t, value_idx>(X, m, n),
+        mst_coo,
+        m,
+        n,
+        color,
+        reduction_op);
     } else {
-      connect_knn_graph<value_idx, value_t>(handle, X, mst_coo, m, n, n_components, color, metric);
+      connect_knn_graph<value_idx, value_t>(
+        handle,
+        raft::make_host_matrix_view<const value_t, value_idx>(X, m, n),
+        mst_coo,
+        m,
+        n,
+        color,
+        reduction_op,
+        metric);
     }
 
     iters++;
