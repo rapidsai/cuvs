@@ -30,6 +30,7 @@ public interface CuVSMatrix extends AutoCloseable {
   enum DataType {
     FLOAT,
     INT,
+    UINT,
     BYTE
   }
 

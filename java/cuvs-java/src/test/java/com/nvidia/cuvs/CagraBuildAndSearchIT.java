@@ -291,6 +291,48 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
   }
 
   @Test
+  public void testReconstructIndexFromGraph() throws Throwable {
+    try (var dataset = CuVSMatrix.ofArray(createSampleData())) {
+      var queries = createSampleQueries();
+      List<Map<Integer, Float>> expectedResults = getExpectedResults();
+
+      try (CuVSResources resources = CuVSResources.create()) {
+        var index = indexOnce(dataset, resources);
+        var graph = index.getGraph();
+
+        var reconstructedIndex =
+            CagraIndex.newBuilder(resources)
+                .from(graph)
+                .withDataset(dataset)
+                .withIndexParams(
+                    new CagraIndexParams.Builder().withMetric(CuvsDistanceType.L2Expanded).build())
+                .build();
+        queryAndCompare(
+            index,
+            reconstructedIndex,
+            SearchResults.IDENTITY_MAPPING,
+            queries,
+            expectedResults,
+            resources);
+
+        var originalIndexPath = serializeOnce(index);
+        var reconstructedIndexPath = serializeOnce(reconstructedIndex);
+
+        var originalBytes = Files.readAllBytes(originalIndexPath);
+        var reconstructedBytes = Files.readAllBytes(reconstructedIndexPath);
+
+        assertArrayEquals(originalBytes, reconstructedBytes);
+
+        index.destroyIndex();
+        reconstructedIndex.destroyIndex();
+
+        Files.deleteIfExists(originalIndexPath);
+        Files.deleteIfExists(reconstructedIndexPath);
+      }
+    }
+  }
+
+  @Test
   public void testIndexingAndSearchingFlowWithCustomMappingFunction() throws Throwable {
     var dataset = CuVSMatrix.ofArray(createSampleData());
     float[][] queries = createSampleQueries();
