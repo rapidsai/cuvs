@@ -15,22 +15,27 @@
  */
 #pragma once
 
+#include "../detail/knn_brute_force.cuh"
 #include "../detail/nn_descent_gnnd.hpp"
+#include "../detail/reachability.cuh"
 #include "all_neighbors_merge.cuh"
-#include "raft/core/device_mdarray.hpp"
-#include "raft/core/mdspan.hpp"
-#include "raft/util/cudart_utils.hpp"
+
 #include <cuvs/neighbors/all_neighbors.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <cuvs/neighbors/refine.hpp>
 
+#include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/managed_mdspan.hpp>
+#include <raft/core/mdspan.hpp>
 #include <raft/core/mdspan_types.hpp>
+#include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/matrix/gather.cuh>
+#include <raft/util/cudart_utils.hpp>
 
 namespace cuvs::neighbors::all_neighbors::detail {
 using namespace cuvs::neighbors;
@@ -304,7 +309,7 @@ struct all_neighbors_builder_ivfpq : public all_neighbors_builder<T, IdxT> {
   std::optional<raft::host_matrix<T, IdxT>> refined_distances_h;
 };
 
-template <typename T, typename IdxT = int64_t>
+template <typename T, typename IdxT = int64_t, typename DistEpilogueT = raft::identity_op>
 struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> {
   all_neighbors_builder_nn_descent(
     raft::resources const& res,
@@ -314,10 +319,12 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
     size_t k,
     graph_build_params::nn_descent_params& params,
     std::optional<raft::device_matrix_view<IdxT, IdxT, row_major>> indices = std::nullopt,
-    std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances  = std::nullopt)
+    std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances  = std::nullopt,
+    DistEpilogueT dist_epilogue                                            = DistEpilogueT{})
     : all_neighbors_builder<T, IdxT>(
         res, n_clusters, min_cluster_size, max_cluster_size, k, indices, distances),
-      nnd_params{params}
+      nnd_params{params},
+      dist_epilogue{dist_epilogue}
   {
   }
 
@@ -346,6 +353,13 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
     nnd_builder.emplace(this->res, build_config);
     int_graph.emplace(raft::make_host_matrix<int, IdxT, row_major>(
       this->max_cluster_size, static_cast<IdxT>(extended_graph_degree)));
+
+    if constexpr (std::is_same_v<
+                    DistEpilogueT,
+                    cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>>) {
+      batch_core_distances.emplace(
+        raft::make_device_vector<T, IdxT>(this->res, this->max_cluster_size));
+    }
   }
 
   void prepare_build(raft::device_matrix_view<const T, IdxT, row_major> dataset) override
@@ -371,37 +385,78 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
       "need valid inverted_indices, global_neighbors, and global_distances for "
       "build_knn if doing batching.");
 
+    using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>;
+
     if (this->n_clusters > 1) {
       bool return_distances      = true;
       size_t num_data_in_cluster = dataset.extent(0);
-      nnd_builder.value().build(dataset.data_handle(),
-                                static_cast<int>(num_data_in_cluster),
-                                int_graph.value().data_handle(),
-                                return_distances,
-                                this->batch_distances_d.value().data_handle());
+      if constexpr (std::is_same_v<DistEpilogueT, ReachabilityPP>) {
+        // gather core dists
+        raft::copy(this->inverted_indices_d.value().data_handle(),
+                   inverted_indices.value().data_handle(),
+                   num_data_in_cluster,
+                   raft::resource::get_cuda_stream(this->res));
 
-      remap_and_merge_subgraphs<T, IdxT, int>(this->res,
-                                              this->inverted_indices_d.value().view(),
-                                              inverted_indices.value(),
-                                              int_graph.value().view(),
-                                              this->batch_neighbors_h.value().view(),
-                                              this->batch_neighbors_d.value().view(),
-                                              this->batch_distances_d.value().view(),
-                                              global_neighbors.value(),
-                                              global_distances.value(),
-                                              num_data_in_cluster,
-                                              this->k,
-                                              cuvs::distance::is_min_close(nnd_params.metric));
+        raft::matrix::gather(this->res,
+                             raft::make_device_matrix_view<const T, IdxT>(
+                               dist_epilogue.core_dists, dist_epilogue.n, 1),
+                             raft::make_device_vector_view<const IdxT, IdxT>(
+                               this->inverted_indices_d.value().data_handle(), num_data_in_cluster),
+                             raft::make_device_matrix_view<T, IdxT>(
+                               batch_core_distances.value().data_handle(), num_data_in_cluster, 1));
+
+        nnd_builder.value().build(
+          dataset.data_handle(),
+          static_cast<int>(num_data_in_cluster),
+          int_graph.value().data_handle(),
+          return_distances,
+          this->batch_distances_d.value().data_handle(),
+          cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>{
+            batch_core_distances.value().data_handle(), dist_epilogue.alpha, num_data_in_cluster});
+      } else {
+        nnd_builder.value().build(dataset.data_handle(),
+                                  static_cast<int>(num_data_in_cluster),
+                                  int_graph.value().data_handle(),
+                                  return_distances,
+                                  this->batch_distances_d.value().data_handle());
+      }
+
+      remap_and_merge_subgraphs<T, IdxT, int, std::is_same_v<DistEpilogueT, ReachabilityPP>>(
+        this->res,
+        this->inverted_indices_d.value().view(),
+        inverted_indices.value(),
+        int_graph.value().view(),
+        this->batch_neighbors_h.value().view(),
+        this->batch_neighbors_d.value().view(),
+        this->batch_distances_d.value().view(),
+        global_neighbors.value(),
+        global_distances.value(),
+        num_data_in_cluster,
+        this->k,
+        cuvs::distance::is_min_close(nnd_params.metric));
     } else {
       size_t num_rows = dataset.extent(0);
 
-      nnd_builder.value().build(
-        dataset.data_handle(),
-        static_cast<int>(num_rows),
-        int_graph.value().data_handle(),
-        this->distances_.has_value(),
-        this->distances_.value_or(raft::make_device_matrix<T, IdxT>(this->res, 0, 0).view())
-          .data_handle());
+      if constexpr (std::is_same_v<DistEpilogueT, ReachabilityPP>) {
+        nnd_builder.value().build(
+          dataset.data_handle(),
+          static_cast<int>(num_rows),
+          int_graph.value().data_handle(),
+          this->distances_.has_value(),
+          this->distances_.value_or(raft::make_device_matrix<T, IdxT>(this->res, 0, 0).view())
+            .data_handle(),
+          cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int, T>{
+            dist_epilogue.core_dists, dist_epilogue.alpha, dist_epilogue.n});
+      } else {
+        nnd_builder.value().build(
+          dataset.data_handle(),
+          static_cast<int>(num_rows),
+          int_graph.value().data_handle(),
+          this->distances_.has_value(),
+          this->distances_.value_or(raft::make_device_matrix<T, IdxT>(this->res, 0, 0).view())
+            .data_handle(),
+          dist_epilogue);
+      }
 
       auto tmp_indices = raft::make_host_matrix<IdxT, IdxT>(int_graph.value().extent(0), this->k);
 
@@ -443,9 +498,12 @@ struct all_neighbors_builder_nn_descent : public all_neighbors_builder<T, IdxT> 
 
   std::optional<nn_descent::detail::GNND<const T, int>> nnd_builder;
   std::optional<raft::host_matrix<int, IdxT>> int_graph;
+
+  DistEpilogueT dist_epilogue;
+  std::optional<raft::device_vector<T, IdxT>> batch_core_distances;
 };
 
-template <typename T, typename IdxT = int64_t>
+template <typename T, typename IdxT = int64_t, typename DistEpilogueT = raft::identity_op>
 struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT> {
   all_neighbors_builder_brute_force(
     raft::resources const& res,
@@ -455,10 +513,12 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
     size_t k,
     graph_build_params::brute_force_params& params,
     std::optional<raft::device_matrix_view<IdxT, IdxT, row_major>> indices = std::nullopt,
-    std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances  = std::nullopt)
+    std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances  = std::nullopt,
+    DistEpilogueT dist_epilogue                                            = DistEpilogueT{})
     : all_neighbors_builder<T, IdxT>(
         res, n_clusters, min_cluster_size, max_cluster_size, k, indices, distances),
-      bf_params{params}
+      bf_params{params},
+      dist_epilogue{dist_epilogue}
   {
   }
 
@@ -470,6 +530,12 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
     size_t num_cols = dataset.extent(1);
     data_d.emplace(
       raft::make_device_matrix<T, IdxT, row_major>(this->res, this->max_cluster_size, num_cols));
+    if constexpr (std::is_same_v<
+                    DistEpilogueT,
+                    cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>>) {
+      batch_core_distances.emplace(
+        raft::make_device_vector<T, IdxT>(this->res, this->max_cluster_size));
+    }
   }
 
   void build_knn_common(
@@ -485,26 +551,63 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
       "build_knn if doing batching.");
 
     if (this->n_clusters > 1) {
-      auto idx = cuvs::neighbors::brute_force::build(this->res, bf_params.build_params, dataset);
-
       size_t num_data_in_cluster = dataset.extent(0);
+      using ReachabilityPP =
+        cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>;
 
-      cuvs::neighbors::brute_force::search(
-        this->res,
-        bf_params.search_params,
-        idx,
-        dataset,
-        raft::make_device_matrix_view<IdxT, IdxT>(
-          this->batch_neighbors_d.value().data_handle(), num_data_in_cluster, this->k),
-        raft::make_device_matrix_view<T, IdxT>(
-          this->batch_distances_d.value().data_handle(), num_data_in_cluster, this->k));
+      if constexpr (std::is_same_v<DistEpilogueT, ReachabilityPP>) {
+        // gather core dists
+        raft::copy(this->inverted_indices_d.value().data_handle(),
+                   inverted_indices.value().data_handle(),
+                   num_data_in_cluster,
+                   raft::resource::get_cuda_stream(this->res));
 
+        raft::matrix::gather(this->res,
+                             raft::make_device_matrix_view<const T, IdxT>(
+                               dist_epilogue.core_dists, dist_epilogue.n, 1),
+                             raft::make_device_vector_view<const IdxT, IdxT>(
+                               this->inverted_indices_d.value().data_handle(), num_data_in_cluster),
+                             raft::make_device_matrix_view<T, IdxT>(
+                               batch_core_distances.value().data_handle(), num_data_in_cluster, 1));
+
+        cuvs::neighbors::detail::tiled_brute_force_knn<T, IdxT, T, DistEpilogueT>(
+          this->res,
+          dataset.data_handle(),
+          dataset.data_handle(),
+          dataset.extent(0),
+          dataset.extent(0),
+          dataset.extent(1),
+          this->k,
+          this->batch_distances_d.value().data_handle(),
+          this->batch_neighbors_d.value().data_handle(),
+          bf_params.build_params.metric,
+          2.0,
+          0,
+          0,
+          nullptr,
+          nullptr,
+          nullptr,
+          ReachabilityPP{
+            batch_core_distances.value().data_handle(), dist_epilogue.alpha, num_data_in_cluster});
+      } else {
+        auto idx = cuvs::neighbors::brute_force::build(this->res, bf_params.build_params, dataset);
+
+        cuvs::neighbors::brute_force::search(
+          this->res,
+          bf_params.search_params,
+          idx,
+          dataset,
+          raft::make_device_matrix_view<IdxT, IdxT>(
+            this->batch_neighbors_d.value().data_handle(), num_data_in_cluster, this->k),
+          raft::make_device_matrix_view<T, IdxT>(
+            this->batch_distances_d.value().data_handle(), num_data_in_cluster, this->k));
+      }
       raft::copy(this->batch_neighbors_h.value().data_handle(),
                  this->batch_neighbors_d.value().data_handle(),
                  num_data_in_cluster * this->k,
                  raft::resource::get_cuda_stream(this->res));
 
-      remap_and_merge_subgraphs<T, IdxT, IdxT>(
+      remap_and_merge_subgraphs<T, IdxT, IdxT, std::is_same_v<DistEpilogueT, ReachabilityPP>>(
         this->res,
         this->inverted_indices_d.value().view(),
         inverted_indices.value(),
@@ -518,17 +621,41 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
         this->k,
         cuvs::distance::is_min_close(bf_params.build_params.metric));
     } else {
-      auto idx = cuvs::neighbors::brute_force::build(this->res, bf_params.build_params, dataset);
+      if constexpr (std::is_same_v<DistEpilogueT, raft::identity_op>) {
+        auto idx = cuvs::neighbors::brute_force::build(this->res, bf_params.build_params, dataset);
 
-      cuvs::neighbors::brute_force::search(
-        this->res,
-        bf_params.search_params,
-        idx,
-        dataset,
-        this->indices_.value(),
-        this->distances_.has_value()
-          ? this->distances_.value()
-          : raft::make_device_matrix<T, IdxT>(this->res, dataset.extent(0), this->k).view());
+        cuvs::neighbors::brute_force::search(
+          this->res,
+          bf_params.search_params,
+          idx,
+          dataset,
+          this->indices_.value(),
+          this->distances_.has_value()
+            ? this->distances_.value()
+            : raft::make_device_matrix<T, IdxT>(this->res, dataset.extent(0), this->k).view());
+      } else {
+        cuvs::neighbors::detail::tiled_brute_force_knn<T, IdxT, T, DistEpilogueT>(
+          this->res,
+          dataset.data_handle(),
+          dataset.data_handle(),
+          dataset.extent(0),
+          dataset.extent(0),
+          dataset.extent(1),
+          this->k,
+          this->distances_.has_value()
+            ? this->distances_.value().data_handle()
+            : raft::make_device_matrix<T, IdxT>(this->res, dataset.extent(0), this->k)
+                .data_handle(),
+          this->indices_.value().data_handle(),
+          bf_params.build_params.metric,
+          2.0,
+          0,
+          0,
+          nullptr,
+          nullptr,
+          nullptr,
+          dist_epilogue);
+      }
     }
   }
 
@@ -559,11 +686,13 @@ struct all_neighbors_builder_brute_force : public all_neighbors_builder<T, IdxT>
   }
 
   graph_build_params::brute_force_params bf_params;
+  DistEpilogueT dist_epilogue;
 
   std::optional<raft::device_matrix<T, IdxT, row_major>> data_d;
+  std::optional<raft::device_vector<T, IdxT>> batch_core_distances;
 };
 
-template <typename T, typename IdxT>
+template <typename T, typename IdxT, typename DistEpilogueT = raft::identity_op>
 std::unique_ptr<all_neighbors_builder<T, IdxT>> get_knn_builder(
   const raft::resources& handle,
   const all_neighbors_params& params,
@@ -571,7 +700,8 @@ std::unique_ptr<all_neighbors_builder<T, IdxT>> get_knn_builder(
   size_t max_cluster_size,
   size_t k,
   std::optional<raft::device_matrix_view<IdxT, IdxT, row_major>> indices = std::nullopt,
-  std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances  = std::nullopt)
+  std::optional<raft::device_matrix_view<T, IdxT, row_major>> distances  = std::nullopt,
+  DistEpilogueT dist_epilogue                                            = DistEpilogueT{})
 {
   if (std::holds_alternative<graph_build_params::brute_force_params>(params.graph_build_params)) {
     auto brute_force_params =
@@ -580,14 +710,17 @@ std::unique_ptr<all_neighbors_builder<T, IdxT>> get_knn_builder(
       RAFT_LOG_WARN("Setting brute_force_params metric to metric given for batching algorithm");
       brute_force_params.build_params.metric = params.metric;
     }
-    return std::make_unique<all_neighbors_builder_brute_force<T, IdxT>>(handle,
-                                                                        params.n_clusters,
-                                                                        min_cluster_size,
-                                                                        max_cluster_size,
-                                                                        k,
-                                                                        brute_force_params,
-                                                                        indices,
-                                                                        distances);
+    return std::make_unique<all_neighbors_builder_brute_force<T, IdxT, DistEpilogueT>>(
+      handle,
+      params.n_clusters,
+      min_cluster_size,
+      max_cluster_size,
+      k,
+      brute_force_params,
+      indices,
+      distances,
+      dist_epilogue);
+
   } else if (std::holds_alternative<graph_build_params::nn_descent_params>(
                params.graph_build_params)) {
     auto nn_descent_params =
@@ -596,14 +729,16 @@ std::unique_ptr<all_neighbors_builder<T, IdxT>> get_knn_builder(
       RAFT_LOG_WARN("Setting nnd_params metric to metric given for batching algorithm");
       nn_descent_params.metric = params.metric;
     }
-    return std::make_unique<all_neighbors_builder_nn_descent<T, IdxT>>(handle,
-                                                                       params.n_clusters,
-                                                                       min_cluster_size,
-                                                                       max_cluster_size,
-                                                                       k,
-                                                                       nn_descent_params,
-                                                                       indices,
-                                                                       distances);
+    return std::make_unique<all_neighbors_builder_nn_descent<T, IdxT, DistEpilogueT>>(
+      handle,
+      params.n_clusters,
+      min_cluster_size,
+      max_cluster_size,
+      k,
+      nn_descent_params,
+      indices,
+      distances,
+      dist_epilogue);
   } else if (std::holds_alternative<graph_build_params::ivf_pq_params>(params.graph_build_params)) {
     auto ivf_pq_params = std::get<graph_build_params::ivf_pq_params>(params.graph_build_params);
     if (ivf_pq_params.build_params.metric != params.metric) {

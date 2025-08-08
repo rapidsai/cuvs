@@ -126,13 +126,19 @@ struct all_neighbors_params {
  *                in host memory
  * @param[out] indices nearest neighbor indices of shape [n_row x k]
  * @param[out] distances nearest neighbor distances [n_row x k]
+ * @param[out] core_distances array for core distances of size [n_row]. Requires distances matrix to
+ * compute core_distances. If core_distances is given, the resulting indices and distances will be
+ * mutual reachability space.
+ * @param[in] alpha distance scaling parameter as used in robust single linkage.
  */
 void build(
   const raft::resources& handle,
   const all_neighbors_params& params,
   raft::host_matrix_view<const float, int64_t, row_major> dataset,
   raft::device_matrix_view<int64_t, int64_t, row_major> indices,
-  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances = std::nullopt);
+  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances      = std::nullopt,
+  std::optional<raft::device_vector_view<float, int64_t, row_major>> core_distances = std::nullopt,
+  float alpha                                                                       = 1.0);
 
 /**
  * @brief Builds an approximate all-neighbors knn graph (find nearest neighbors for all the training
@@ -156,13 +162,19 @@ void build(
  *                in device memory
  * @param[out] indices nearest neighbor indices of shape [n_row x k]
  * @param[out] distances nearest neighbor distances [n_row x k]
+ * @param[out] core_distances array for core distances of size [n_row]. Requires distances matrix to
+ * compute core_distances. If core_distances is given, the resulting indices and distances will be
+ * mutual reachability space.
+ * @param[in] alpha distance scaling parameter as used in robust single linkage.
  */
 void build(
   const raft::resources& handle,
   const all_neighbors_params& params,
   raft::device_matrix_view<const float, int64_t, row_major> dataset,
   raft::device_matrix_view<int64_t, int64_t, row_major> indices,
-  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances = std::nullopt);
+  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances      = std::nullopt,
+  std::optional<raft::device_vector_view<float, int64_t, row_major>> core_distances = std::nullopt,
+  float alpha                                                                       = 1.0);
 
 /** @} */
 }  // namespace cuvs::neighbors::all_neighbors
