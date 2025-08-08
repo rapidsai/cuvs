@@ -35,7 +35,6 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceIndexDestr
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceIndex_t;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceSearch;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceSerialize;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
 import static com.nvidia.cuvs.internal.panama.headers_h.omp_set_num_threads;
 
@@ -119,20 +118,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
     try {
       int returnValue = cuvsBruteForceIndexDestroy(bruteForceIndexReference.indexPtr);
       checkCuVSError(returnValue, "cuvsBruteForceIndexDestroy");
-
-      if (bruteForceIndexReference.datasetBytes > 0) {
-        try (var resourcesAccessor = resources.access()) {
-          checkCuVSError(
-              cuvsRMMFree(
-                  resourcesAccessor.handle(),
-                  bruteForceIndexReference.datasetPtr,
-                  bruteForceIndexReference.datasetBytes),
-              "cuvsRMMFree");
-        }
-      }
-      if (bruteForceIndexReference.tensorDataArena != null) {
-        bruteForceIndexReference.tensorDataArena.close();
-      }
+      bruteForceIndexReference.close(resources);
     } finally {
       destroyed = true;
     }
@@ -179,7 +165,10 @@ public class BruteForceIndexImpl implements BruteForceIndex {
         checkCuVSError(returnValue, "cuvsStreamSync");
 
         return new IndexReference(
-            closeableDataMemorySegmentP.release(), datasetBytes, tensorDataArena, index);
+            new CloseableRMMAllocation(closeableDataMemorySegmentP),
+            datasetBytes,
+            tensorDataArena,
+            index);
       }
     } finally {
       omp_set_num_threads(1);
@@ -476,27 +465,39 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    */
   private static class IndexReference {
 
-    private final MemorySegment datasetPtr;
+    private final CloseableRMMAllocation datasetAllocationHandle;
     private final long datasetBytes;
     private final Arena tensorDataArena;
     private final MemorySegment indexPtr;
 
     private IndexReference(
-        MemorySegment datasetPtr,
+        CloseableRMMAllocation datasetAllocationHandle,
         long datasetBytes,
         Arena tensorDataArena,
         MemorySegment indexPtr) {
-      this.datasetPtr = datasetPtr;
+      this.datasetAllocationHandle = datasetAllocationHandle;
       this.datasetBytes = datasetBytes;
       this.tensorDataArena = tensorDataArena;
       this.indexPtr = indexPtr;
     }
 
     private IndexReference(MemorySegment indexPtr) {
-      this.datasetPtr = MemorySegment.NULL;
+      this.datasetAllocationHandle = CloseableRMMAllocation.EMPTY;
       this.datasetBytes = 0;
       this.tensorDataArena = null;
       this.indexPtr = indexPtr;
+    }
+
+    /**
+     * Free up the memory used for dataset, tensor-data.
+     */
+    private void close(CuVSResources resources) {
+      try (var resourcesAccessor = resources.access()) {
+        datasetAllocationHandle.close();
+      }
+      if (tensorDataArena != null) {
+        tensorDataArena.close();
+      }
     }
   }
 }

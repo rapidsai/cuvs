@@ -31,13 +31,22 @@ import java.lang.foreign.MemorySegment;
 public class CloseableRMMAllocation implements CloseableHandle {
 
   private final long cuvsResourceHandle;
-  private final long numBytes;
+  private long numBytes;
   private MemorySegment pointer;
 
   private CloseableRMMAllocation(long cuvsResourceHandle, long numBytes, MemorySegment pointer) {
     this.cuvsResourceHandle = cuvsResourceHandle;
     this.numBytes = numBytes;
     this.pointer = pointer;
+  }
+
+  /**
+   * Copy constructor transfers the ownership of the argument's MemorySegment to this object.
+   */
+  public CloseableRMMAllocation(CloseableRMMAllocation other) {
+    this.cuvsResourceHandle = other.cuvsResourceHandle;
+    this.numBytes = other.numBytes;
+    this.pointer = other.release();
   }
 
   public static CloseableRMMAllocation allocateRMMSegment(long cuvsResourceHandle, long numBytes) {
@@ -55,9 +64,10 @@ public class CloseableRMMAllocation implements CloseableHandle {
     return pointer;
   }
 
-  public MemorySegment release() {
+  private MemorySegment release() {
     var oldPointer = pointer;
     pointer = MemorySegment.NULL;
+    numBytes = 0;
     return oldPointer;
   }
 
