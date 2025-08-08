@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -937,3 +937,11 @@ void deserialize(raft::resources const& handle,
  */
 
 }  // namespace cuvs::neighbors::brute_force
+
+/** Specialized parameters utilizing brute force to build knn graph */
+namespace cuvs::neighbors::graph_build_params {
+struct brute_force_params {
+  cuvs::neighbors::brute_force::index_params build_params;
+  cuvs::neighbors::brute_force::search_params search_params;
+};
+}  // namespace cuvs::neighbors::graph_build_params
