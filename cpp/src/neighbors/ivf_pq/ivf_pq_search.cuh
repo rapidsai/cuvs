@@ -417,10 +417,7 @@ template <typename OutT, typename LutT, typename IvfSampleFilterT>
 struct search_kernel_cache {
   /** Number of matmul invocations to cache. */
   static constexpr size_t kDefaultSize = 100;
-  raft::cache::lru<search_kernel_key,
-                   search_kernel_key_hash,
-                   std::equal_to<>,
-                   selected<OutT, LutT, IvfSampleFilterT>>
+  raft::cache::lru<search_kernel_key, search_kernel_key_hash, std::equal_to<>, selected<OutT, LutT>>
     value{kDefaultSize};
 };
 
@@ -557,7 +554,7 @@ void ivfpq_search_worker(raft::resources const& handle,
     } break;
   }
 
-  selected<ScoreT, LutT, IvfSampleFilterT> search_instance;
+  selected<ScoreT, LutT> search_instance;
   search_kernel_key search_key{manage_local_topk,
                                coresidency,
                                preferred_shmem_carveout,
@@ -571,17 +568,17 @@ void ivfpq_search_worker(raft::resources const& handle,
     raft::resource::get_custom_resource<search_kernel_cache<ScoreT, LutT, IvfSampleFilterT>>(handle)
       ->value;
   if (!cache.get(search_key, &search_instance)) {
-    search_instance = compute_similarity_select<ScoreT, LutT, IvfSampleFilterT>(
-      raft::resource::get_device_properties(handle),
-      manage_local_topk,
-      coresidency,
-      preferred_shmem_carveout,
-      index.pq_bits(),
-      index.pq_dim(),
-      precomp_data_count,
-      n_queries,
-      n_probes,
-      topK);
+    search_instance =
+      compute_similarity_select<ScoreT, LutT>(raft::resource::get_device_properties(handle),
+                                              manage_local_topk,
+                                              coresidency,
+                                              preferred_shmem_carveout,
+                                              index.pq_bits(),
+                                              index.pq_dim(),
+                                              precomp_data_count,
+                                              n_queries,
+                                              n_probes,
+                                              topK);
     cache.set(search_key, search_instance);
   }
 
