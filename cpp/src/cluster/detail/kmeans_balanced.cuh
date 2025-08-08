@@ -17,6 +17,8 @@
 #pragma once
 
 #include "../../distance/fused_distance_nn.cuh"
+#include "../../distance/unfused_distance_nn.cuh"
+
 #include "kmeans_common.cuh"
 #include <cuvs/cluster/kmeans.hpp>
 
@@ -27,6 +29,7 @@
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
+#include <raft/core/resource/cublas_handle.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
@@ -62,6 +65,23 @@ namespace cuvs::cluster::kmeans::detail {
 
 constexpr static inline float kAdjustCentersWeight = 7.0f;
 
+template <typename MathT, typename IdxT, typename LabelT>
+bool use_fused(IdxT m, IdxT n, IdxT k)
+{
+  // TODO: @tfeher Try using helpers from Try using the helpers from raft/util/arch.cuh
+  // https://github.com/rapidsai/cuvs/blob/1155a3a427cd1d1bfaf8fe74a937ed6dfa797ec7/cpp/src/neighbors/detail/nn_descent.cuh#L1210-L1222
+#if __CUDA_ARCH__ > 800
+  // Use fused if unfused workspace size is great than 100 MB
+  if (size_t(m) * n * sizeof(MathT) > 100 * 1024 * 1024) {
+    return true;
+  } else {
+    return false;
+  }
+#else
+  return true;
+#endif
+}
+
 /**
  * @brief Predict labels for the dataset; floating-point types only.
  *
@@ -96,15 +116,24 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
   LabelT* labels,
   rmm::device_async_resource_ref mr)
 {
-  auto stream = raft::resource::get_cuda_stream(handle);
+  auto stream           = raft::resource::get_cuda_stream(handle);
+  bool should_use_fused = use_fused<MathT, IdxT, LabelT>(n_rows, n_clusters, dim);
+
   switch (params.metric) {
     case cuvs::distance::DistanceType::L2Expanded:
     case cuvs::distance::DistanceType::L2SqrtExpanded: {
-      auto workspace = raft::make_device_mdarray<char, IdxT>(
-        handle, mr, raft::make_extents<IdxT>((sizeof(int)) * n_rows));
+      size_t workspace_size =
+        should_use_fused ? sizeof(IdxT) * n_rows : sizeof(MathT) * n_rows * n_clusters;
+      auto workspace =
+        raft::make_device_mdarray<char, IdxT>(handle, mr, raft::make_extents<IdxT>(workspace_size));
 
       auto minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, MathT>, IdxT>(
         handle, mr, raft::make_extents<IdxT>(n_rows));
+
+      auto unf_minClusterAndDistance =
+        raft::make_device_mdarray<raft::KeyValuePair<IdxT, MathT>, IdxT>(
+          handle, mr, raft::make_extents<IdxT>(n_rows));
+
       raft::KeyValuePair<IdxT, MathT> initial_value(0, std::numeric_limits<MathT>::max());
       thrust::fill(raft::resource::get_thrust_policy(handle),
                    minClusterAndDistance.data_handle(),
@@ -116,22 +145,42 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
       raft::linalg::rowNorm<raft::linalg::L2Norm, true, MathT, IdxT>(
         centroidsNorm.data_handle(), centers, dim, n_clusters, stream);
 
-      cuvs::distance::fusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
-        minClusterAndDistance.data_handle(),
-        dataset,
-        centers,
-        dataset_norm,
-        centroidsNorm.data_handle(),
-        n_rows,
-        n_clusters,
-        dim,
-        (void*)workspace.data_handle(),
-        (params.metric == cuvs::distance::DistanceType::L2Expanded) ? false : true,
-        false,
-        true,
-        params.metric,
-        0.0f,
-        stream);
+      if (should_use_fused) {
+        cuvs::distance::fusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
+          minClusterAndDistance.data_handle(),
+          dataset,
+          centers,
+          dataset_norm,
+          centroidsNorm.data_handle(),
+          n_rows,
+          n_clusters,
+          dim,
+          (void*)workspace.data_handle(),
+          (params.metric == cuvs::distance::DistanceType::L2Expanded) ? false : true,
+          false,
+          true,
+          params.metric,
+          0.0f,
+          stream);
+      } else {
+        cuvs::distance::unfusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
+          handle,
+          unf_minClusterAndDistance.data_handle(),
+          dataset,
+          centers,
+          dataset_norm,
+          centroidsNorm.data_handle(),
+          n_rows,
+          n_clusters,
+          dim,
+          (void*)workspace.data_handle(),
+          (params.metric == cuvs::distance::DistanceType::L2Expanded) ? false : true,
+          false,
+          true,
+          params.metric,
+          0.0f,
+          stream);
+      }
 
       // todo(lsugy): use KVP + iterator in caller.
       // Copy keys to output labels

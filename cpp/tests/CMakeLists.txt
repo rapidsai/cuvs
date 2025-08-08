@@ -110,7 +110,7 @@ endfunction()
 if(BUILD_TESTS)
   ConfigureTest(
     NAME NEIGHBORS_TEST PATH neighbors/brute_force.cu neighbors/brute_force_prefiltered.cu
-    neighbors/sparse_brute_force.cu neighbors/refine.cu GPUS 1 PERCENT 100
+    neighbors/sparse_brute_force.cu neighbors/refine.cu neighbors/1_nn.cu GPUS 1 PERCENT 100
   )
 
   ConfigureTest(NAME NEIGHBORS_TIERED_INDEX_TEST PATH neighbors/tiered_index.cu GPUS 1 PERCENT 100)
