@@ -16,6 +16,7 @@
 package com.nvidia.cuvs.internal;
 
 import com.nvidia.cuvs.CuVSMatrix;
+import com.nvidia.cuvs.CuVSMatrix.DataType;
 import java.lang.foreign.MemorySegment;
 
 public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
@@ -44,5 +45,10 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
 
   public MemorySegment memorySegment() {
     return memorySegment;
+  }
+
+  @Override
+  public DataType dataType() {
+    return dataType;
   }
 }

@@ -1,0 +1,132 @@
+/*
+ * Copyright (c) 2025, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.nvidia.cuvs;
+
+import com.nvidia.cuvs.CuVSMatrix.DataType;
+import com.nvidia.cuvs.spi.CuVSProvider;
+
+/**
+ * Binary quantizer implementation that transforms 32-bit float datasets into 8-bit packed binary datasets.
+ *
+ * <p>Binary quantization reduces each float32 value to a single bit, which are then packed into 8-bit
+ * unsigned integers for efficient storage. This quantizer does not require training and does not
+ * support inverse transformation.
+ *
+ * @since 25.08
+ */
+public class BinaryQuantizer implements CuVSQuantizer {
+  private final CuVSResources resources;
+  private final ThresholdType thresholdType;
+
+  /**
+   * The data type used by this quantizer (BYTE for packed binary data).
+   */
+  private final DataType outputDataType = DataType.BYTE;
+
+  /**
+   * Creates a new binary quantizer with the specified resources.
+   *
+   * @param resources The CuVS resources to use for quantization operations
+   */
+  public BinaryQuantizer(CuVSResources resources) {
+    this(resources, ThresholdType.ZERO);
+  }
+
+  /**
+   * Creates a binary quantizer with specified threshold type.
+   *
+   * @param resources The CuVS resources
+   * @param thresholdType The threshold type for binary conversion (ZERO, MEAN, or SAMPLING_MEDIAN)
+   */
+  public BinaryQuantizer(CuVSResources resources, ThresholdType thresholdType) {
+    this.resources = resources;
+    this.thresholdType = thresholdType;
+  }
+
+  /**
+   * Threshold types supported by binary quantization.
+   */
+  public enum ThresholdType {
+    /** Use zero as threshold value */
+    ZERO(0),
+    /** Use mean of dataset as threshold */
+    MEAN(1),
+    /** Use sampling median as threshold */
+    SAMPLING_MEDIAN(2);
+
+    private final int value;
+
+    ThresholdType(int value) {
+      this.value = value;
+    }
+
+    public int getValue() {
+      return value;
+    }
+  }
+
+  /**
+   * Returns the data type of quantized data produced by this quantizer.
+   *
+   * @return The DataType (BYTE for this binary quantizer)
+   */
+  @Override
+  public DataType outputDataType() {
+    return outputDataType;
+  }
+
+  /**
+   * Gets the threshold value used for binary quantization.
+   */
+  public ThresholdType getThresholdType() {
+    return thresholdType;
+  }
+
+  @Override
+  public CuVSMatrix transform(CuVSMatrix input) throws Throwable {
+    // Validate input data type
+    if (input.dataType() != DataType.FLOAT) {
+      throw new IllegalArgumentException(
+          "BinaryQuantizer requires FLOAT input, got " + input.dataType());
+    }
+
+    CuVSMatrix result =
+        CuVSProvider.provider().transformBinary(resources, input, thresholdType.getValue());
+
+    // Validate output data type
+    if (result.dataType() != DataType.BYTE) {
+      throw new IllegalStateException(
+          "Expected BYTE output from binary quantization, got " + result.dataType());
+    }
+
+    return result;
+  }
+
+  @Override
+  public void train(CuVSMatrix trainingData) throws Throwable {
+    throw new UnsupportedOperationException(
+        "Binary quantization performs training internally during each transform call");
+  }
+
+  @Override
+  public CuVSMatrix inverseTransform(CuVSMatrix quantizedData) throws Throwable {
+    throw new UnsupportedOperationException(
+        "Binary quantization does not support inverse transformation");
+  }
+
+  @Override
+  public void close() throws Exception {}
+}

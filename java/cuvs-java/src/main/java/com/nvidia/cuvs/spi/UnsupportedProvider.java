@@ -25,7 +25,8 @@ import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
 
 /**
- * A provider that unconditionally throws UnsupportedOperationException.
+ * A provider that throws UnsupportedOperationException for all operations.
+ * Used as a fallback when no proper implementation is available.
  */
 final class UnsupportedProvider implements CuVSProvider {
 
@@ -83,5 +84,43 @@ final class UnsupportedProvider implements CuVSProvider {
   @Override
   public CuVSMatrix newMatrixFromArray(byte[][] vectors) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public CuVSMatrix newByteArrayDataset(byte[][] vectors) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Object createScalar8BitQuantizerImpl(CuVSResources resources, CuVSMatrix trainingDataset)
+      throws Throwable {
+    throw new UnsupportedOperationException("CuVS is not supported on this platform");
+  }
+
+  @Override
+  public CuVSMatrix inverseTransformScalar8Bit(Object impl, CuVSMatrix quantizedData)
+      throws Throwable {
+    throw new UnsupportedOperationException("CuVS is not supported on this platform");
+  }
+
+  @Override
+  public CuVSMatrix transformBinary(CuVSResources resources, CuVSMatrix input, int thresholdType)
+      throws Throwable {
+    throw new UnsupportedOperationException("CuVS is not supported on this platform");
+  }
+
+  @Override
+  public CuVSMatrix transformBinary(CuVSResources resources, CuVSMatrix input) throws Throwable {
+    throw new UnsupportedOperationException("CuVS is not supported on this platform");
+  }
+
+  @Override
+  public CuVSMatrix transformScalar8Bit(Object impl, CuVSMatrix input) throws Throwable {
+    throw new UnsupportedOperationException("CuVS is not supported on this platform");
+  }
+
+  @Override
+  public void closeScalar8BitQuantizer(Object impl) throws Throwable {
+    throw new UnsupportedOperationException("CuVS is not supported on this platform");
   }
 }

@@ -81,6 +81,9 @@ public interface CuVSProvider {
   /** Create a {@link CuVSMatrix} from an on-heap array **/
   CuVSMatrix newMatrixFromArray(byte[][] vectors);
 
+  /** Create a {@link CuVSMatrix} backed by a on-heap byte array */
+  CuVSMatrix newByteArrayDataset(byte[][] vectors);
+
   /** Creates a new BruteForceIndex Builder. */
   BruteForceIndex.Builder newBruteForceIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;
@@ -119,6 +122,22 @@ public interface CuVSProvider {
     // Default implementation falls back to the method without parameters
     return mergeCagraIndexes(indexes);
   }
+
+  Object createScalar8BitQuantizerImpl(CuVSResources resources, CuVSMatrix trainingDataset)
+      throws Throwable;
+
+  CuVSMatrix inverseTransformScalar8Bit(Object impl, CuVSMatrix quantizedData) throws Throwable;
+
+  CuVSMatrix transformBinary(CuVSResources resources, CuVSMatrix input, int thresholdType)
+      throws Throwable;
+
+  CuVSMatrix transformBinary(CuVSResources resources, CuVSMatrix input) throws Throwable;
+
+  /** Transforms dataset using Scalar8BitQuantizer */
+  CuVSMatrix transformScalar8Bit(Object impl, CuVSMatrix input) throws Throwable;
+
+  /** Closes Scalar8BitQuantizer implementation */
+  void closeScalar8BitQuantizer(Object impl) throws Throwable;
 
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {
