@@ -210,13 +210,8 @@ if(BUILD_TESTS)
 
   ConfigureTest(NAME NEIGHBORS_BALL_COVER_TEST PATH neighbors/ball_cover.cu GPUS 1 PERCENT 100)
 
-  set(NCCL_DEPS "")
-  if(BUILD_MG_ALGOS)
-    list(APPEND NCCL_DEPS NCCL::NCCL)
-  endif()
   ConfigureTest(
     NAME NEIGHBORS_ALL_NEIGHBORS_TEST PATH neighbors/all_neighbors/test_float.cu GPUS 1 PERCENT 100
-    ADDITIONAL_DEP ${NCCL_DEPS}
   )
 
   ConfigureTest(
