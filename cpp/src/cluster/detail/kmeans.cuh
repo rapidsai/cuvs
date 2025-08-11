@@ -32,13 +32,11 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/linalg/map.cuh>
 #include <raft/linalg/map_then_reduce.cuh>
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce_cols_by_key.cuh>
 #include <raft/linalg/reduce_rows_by_key.cuh>
-#include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/cuda_utils.cuh>
@@ -1075,12 +1073,11 @@ void kmeans_predict(raft::resources const& handle,
     raft::value_op{},
     raft::add_op{});
 
-  thrust::transform(
-    raft::resource::get_thrust_policy(handle),
-    minClusterAndDistance.data_handle(),
-    minClusterAndDistance.data_handle() + minClusterAndDistance.size(),
-    labels.data_handle(),
-    raft::key_op{});
+    thrust::transform(raft::resource::get_thrust_policy(handle),
+                      minClusterAndDistance.data_handle(),
+                      minClusterAndDistance.data_handle() + minClusterAndDistance.size(),
+                      labels.data_handle(),
+                      raft::key_op{});
 
   inertia[0] = clusterCostD.value(stream);
 }
