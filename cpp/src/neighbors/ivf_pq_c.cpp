@@ -443,7 +443,7 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManage
     raft::matrix_extent<int64_t> extents{index_ptr->centers().extent(0), index_ptr->dim()};
     auto layout = raft::make_strided_layout(extents, std::array<int64_t, 2>{stride, 1});
 
-    raft::device_matrix_view<float, int64_t, raft::layout_stride> centers_view{
+    raft::device_matrix_view<const float, int64_t, raft::layout_stride> centers_view{
       index_ptr->centers().data_handle(), layout};
 
     std::cout << "centers_view.strides = " << centers_view.stride(0) << ", "

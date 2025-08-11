@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -148,10 +148,10 @@ auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT
   auto index = cuvs::neighbors::ivf_pq::index<IdxT>(
     handle_, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, cma);
 
-  raft::deserialize_mdspan(handle_, is, index.pq_centers());
+  raft::deserialize_mdspan(handle_, is, index.pq_centers_owning_view());
   raft::deserialize_mdspan(handle_, is, index.centers());
   raft::deserialize_mdspan(handle_, is, index.centers_rot());
-  raft::deserialize_mdspan(handle_, is, index.rotation_matrix());
+  raft::deserialize_mdspan(handle_, is, index.rotation_matrix_owning_view());
   raft::deserialize_mdspan(handle_, is, index.list_sizes());
   auto list_device_spec = list_spec<uint32_t, IdxT>{pq_bits, pq_dim, cma};
   auto list_store_spec  = list_spec<uint32_t, IdxT>{pq_bits, pq_dim, true};

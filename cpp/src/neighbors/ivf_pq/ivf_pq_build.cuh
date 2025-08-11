@@ -300,7 +300,7 @@ void transpose_pq_centers(const raft::resources& handle,
   auto span_source = raft::make_mdspan<const float, uint32_t, raft::row_major, false, true>(
     pq_centers_source, extents_source);
   auto pq_centers_view = raft::make_device_vector_view<float, IdxT>(
-    index.pq_centers().data_handle(), index.pq_centers().size());
+    index.pq_centers_owning_view().data_handle(), index.pq_centers_owning_view().size());
   raft::linalg::map_offset(handle, pq_centers_view, [span_source, extents] __device__(size_t i) {
     uint32_t ii[3];
     for (int r = 2; r > 0; r--) {
@@ -1044,11 +1044,11 @@ auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
              source.list_sizes().data_handle(),
              source.list_sizes().size(),
              stream);
-  raft::copy(target.rotation_matrix().data_handle(),
+  raft::copy(target.rotation_matrix_owning_view().data_handle(),
              source.rotation_matrix().data_handle(),
              source.rotation_matrix().size(),
              stream);
-  raft::copy(target.pq_centers().data_handle(),
+  raft::copy(target.pq_centers_owning_view().data_handle(),
              source.pq_centers().data_handle(),
              source.pq_centers().size(),
              stream);
@@ -1316,7 +1316,17 @@ auto build(raft::resources const& handle,
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("ivf_pq::build(%u)", dim);
   auto stream = raft::resource::get_cuda_stream(handle);
-  index<IdxT> index(handle, index_params, dim);
+
+  index<IdxT> index(handle,
+                    index_params.metric,
+                    index_params.codebook_kind,
+                    index_params.n_lists,
+                    dim,
+                    index_params.pq_bits,
+                    index_params.pq_dim,
+                    index_params.conservative_memory_allocation,
+                    pq_centers,
+                    rotation_matrix_opt);
 
   utils::memzero(
     index.accum_sorted_sizes().data_handle(), index.accum_sorted_sizes().size(), stream);
@@ -1324,28 +1334,11 @@ auto build(raft::resources const& handle,
   utils::memzero(index.data_ptrs().data_handle(), index.data_ptrs().size(), stream);
   utils::memzero(index.inds_ptrs().data_handle(), index.inds_ptrs().size(), stream);
 
-  ASSERT(index.pq_centers().size() == pq_centers.size(), "pq_centers size mismatch");
-
   auto inplace = index.dim() == index.rot_dim();
 
-  if (rotation_matrix_opt) {
-    ASSERT(index.rotation_matrix().size() == rotation_matrix_opt.value().size(),
-           "rotation_matrix size mismatch");
-  } else {
+  if (!rotation_matrix_opt) {
     ASSERT(!(index_params.force_random_rotation || !inplace),
            "rotation_matrix is required if (force_random_rotation or !inplace) is false");
-  }
-
-  raft::copy(
-    index.pq_centers().data_handle(), pq_centers.data_handle(), index.pq_centers().size(), stream);
-
-  if (rotation_matrix_opt) {
-    auto rotation_matrix = rotation_matrix_opt.value();
-    raft::copy(index.rotation_matrix().data_handle(),
-               rotation_matrix.data_handle(),
-               rotation_matrix.size(),
-               stream);
-  } else {
     helpers::make_rotation_matrix(handle, &index, index_params.force_random_rotation);
   }
 

@@ -275,7 +275,7 @@ void make_rotation_matrix(raft::resources const& res,
                        force_random_rotation,
                        index->rot_dim(),
                        index->dim(),
-                       index->rotation_matrix().data_handle());
+                       index->rotation_matrix_owning_view().data_handle());
 }
 
 void set_centers(raft::resources const& handle,
@@ -303,7 +303,21 @@ void extract_centers(raft::resources const& res,
 {
   detail::extract_centers(res, index, cluster_centers);
 }
+/*
+void extract_codebook(raft::resources const& res,
+                     const cuvs::neighbors::ivf_pq::index<int64_t>& index,
+                     raft::device_matrix_view<float, uint32_t, raft::row_major> codebook)
+{
+  detail::extract_codebook(res, index, codebook);
+}
 
+void extract_codebook(raft::resources const& res,
+                     const cuvs::neighbors::ivf_pq::index<int64_t>& index,
+                     raft::host_matrix_view<float, uint32_t, raft::row_major> codebook)
+{
+  detail::extract_codebook(res, index, codebook);
+}
+*/
 void recompute_internal_state(const raft::resources& res, index<int64_t>* index)
 {
   ivf::detail::recompute_internal_state(res, *index);
