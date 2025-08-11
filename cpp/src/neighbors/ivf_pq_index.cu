@@ -134,9 +134,8 @@ index<IdxT>::index(
       rotation_matrix_view.has_value()
         ? raft::make_device_matrix<float, uint32_t>(handle, 0, 0)
         : raft::make_device_matrix<float, uint32_t>(handle, this->rot_dim(), this->dim())},
-    rotation_matrix_view_{rotation_matrix_view.has_value()
-                            ? rotation_matrix_view.value()
-                            : raft::make_device_matrix_view<const float, uint32_t>(nullptr, 0, 0)},
+    rotation_matrix_view_{rotation_matrix_view.has_value() ? rotation_matrix_view.value()
+                                                           : rotation_matrix_.view()},
     data_ptrs_{raft::make_device_vector<uint8_t*, uint32_t>(handle, n_lists)},
     inds_ptrs_{raft::make_device_vector<IdxT*, uint32_t>(handle, n_lists)},
     accum_sorted_sizes_{raft::make_host_vector<IdxT, uint32_t>(n_lists + 1)}

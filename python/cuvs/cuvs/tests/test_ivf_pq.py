@@ -247,9 +247,7 @@ def test_build_from_args(
     index = ivf_pq.build(build_params, dataset)
     rotation_matrix = index.rotation_matrix
     codebook = index.codebook
-    centers = cp.array(
-        index.centers.copy_to_host()
-    )  # TODO: Investigate stride issue for centers
+    centers = cp.array(index.centers.copy_to_host())
     if codebook_kind == "subspace":
         assert codebook.shape[0] == index.pq_dim
     else:

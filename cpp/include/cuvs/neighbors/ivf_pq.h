@@ -280,8 +280,7 @@ uint32_t cuvsIvfPqIndexGetPqBookSize(cuvsIvfPqIndex_t index);
  * @brief Get the cluster centers corresponding to the lists in the original space
  *
  * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
- * @param[out] centers Preallocated array on host or device memory to store output,
- * dimensions [n_lists, dim]
+ * @param[out] centers View of the array on device memory, dimensions [n_lists, dim]
  * @return cuvsError_t
  */
 cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* centers);
@@ -290,7 +289,7 @@ cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* ce
  * @brief Get the codebook corresponding to the lists in the original space
  *
  * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
- * @param[out] codebook Preallocated array on host or device memory to store output,
+ * @param[out] codebook View of the array on device memory,
  * dimensions [n_lists or pq_dim, pq_len, pq_book_size]
  * @return cuvsError_t
  */
@@ -300,8 +299,8 @@ cuvsError_t cuvsIvfPqIndexGetCodebook(cuvsIvfPqIndex_t index, DLManagedTensor* c
  * @brief Get the codebook corresponding to the lists in the original space
  *
  * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
- * @param[out] rotation_matrix Preallocated array on host or device memory to store output,
- * dimensions [dim, rot_dim]
+ * @param[out] rotation_matrix View of the array on device memory, dimensions
+ * [dim, rot_dim]
  * @return cuvsError_t
  */
 cuvsError_t cuvsIvfPqIndexGetRotationMatrix(cuvsIvfPqIndex_t index,
