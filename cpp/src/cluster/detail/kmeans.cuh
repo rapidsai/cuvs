@@ -1075,13 +1075,12 @@ void kmeans_predict(raft::resources const& handle,
     raft::value_op{},
     raft::add_op{});
 
-  thrust::transform(raft::resource::get_thrust_policy(handle),
-                    minClusterAndDistance.data_handle(),
-                    minClusterAndDistance.data_handle() + minClusterAndDistance.size(),
-                    labels.data_handle(),
-                    [=] __device__(const raft::KeyValuePair<IndexT, DataT> kvp) {
-                      return kvp.key;
-                    });
+  thrust::transform(
+    raft::resource::get_thrust_policy(handle),
+    minClusterAndDistance.data_handle(),
+    minClusterAndDistance.data_handle() + minClusterAndDistance.size(),
+    labels.data_handle(),
+    raft::key_op{});
 
   inertia[0] = clusterCostD.value(stream);
 }

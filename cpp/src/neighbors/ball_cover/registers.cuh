@@ -1459,13 +1459,14 @@ void rbc_eps_pass(raft::resources const& handle,
 
     if (actual_max > max_k_in) {
       // ceil vd to max_k
-      raft::linalg::unaryOp(vd_ptr,
-                            vd_ptr,
-                            n_query_rows,
-                            [max_k_in] __device__(value_idx vd_count) {
-                              return vd_count > max_k_in ? max_k_in : vd_count;
-                            },
-                            raft::resource::get_cuda_stream(handle));
+      raft::linalg::unaryOp(
+        vd_ptr,
+        vd_ptr,
+        n_query_rows,
+        [max_k_in] __device__(value_idx vd_count) {
+          return vd_count > max_k_in ? max_k_in : vd_count;
+        },
+        raft::resource::get_cuda_stream(handle));
     }
 
     thrust::exclusive_scan(raft::resource::get_thrust_policy(handle),

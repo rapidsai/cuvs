@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -432,11 +432,8 @@ class PrefilteredBruteForceOnBitmapTest
     raft::copy(dataset_h.data(), blobs_in_val.data_handle(), dataset_size, stream);
 
     if constexpr (std::is_same_v<value_t, half>) {
-      raft::linalg::unaryOp(dataset_d.data(),
-                            blobs_in_val.data_handle(),
-                            dataset_size,
-                            float_to_half(),
-                            stream);
+      raft::linalg::unaryOp(
+        dataset_d.data(), blobs_in_val.data_handle(), dataset_size, float_to_half(), stream);
     } else {
       raft::copy(dataset_d.data(), blobs_in_val.data_handle(), dataset_size, stream);
     }
@@ -856,11 +853,8 @@ class PrefilteredBruteForceOnBitsetTest
     raft::copy(dataset_h.data(), blobs_in_val.data_handle(), dataset_size, stream);
 
     if constexpr (std::is_same_v<value_t, half>) {
-      raft::linalg::unaryOp(dataset_d.data(),
-                            blobs_in_val.data_handle(),
-                            dataset_size,
-                            float_to_half(),
-                            stream);
+      raft::linalg::unaryOp(
+        dataset_d.data(), blobs_in_val.data_handle(), dataset_size, float_to_half(), stream);
     } else {
       raft::copy(dataset_d.data(), blobs_in_val.data_handle(), dataset_size, stream);
     }

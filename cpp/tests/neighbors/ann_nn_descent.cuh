@@ -241,7 +241,7 @@ class AnnNNDescentDistEpiTest : public ::testing::TestWithParam<AnnNNDescentInpu
         ps.graph_degree,
         ps.graph_degree,
         ps.n_rows,
-        core_dists_dev.data())
+        core_dists_dev.data());
       auto epilogue =
         cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, DistanceT>{
           core_dists_dev.data(), 1.0, static_cast<size_t>(ps.n_rows)};

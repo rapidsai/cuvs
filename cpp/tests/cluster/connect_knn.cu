@@ -79,7 +79,7 @@ class ConnectKNNTest : public ::testing::TestWithParam<ConnectKNNInputs> {
     rmm::device_uvector<T> core_dists(ps.n_rows, stream);
     if (ps.mutual_reach) {
       cuvs::neighbors::detail::reachability::core_distances<int64_t, T>(
-        dists.data(), ps.k, ps.k, (size_t)ps.n_rows, core_dists.data(), stream);
+        handle, dists.data(), ps.k, ps.k, (size_t)ps.n_rows, core_dists.data());
 
       auto epilogue = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int64_t, T>{
         core_dists.data(), 1.0};
@@ -113,10 +113,10 @@ class ConnectKNNTest : public ::testing::TestWithParam<ConnectKNNInputs> {
 
     // changing inds and dists to sparse format
     int64_t k = ps.k;
-    auto coo_rows_view = raft::make_device_vector_view<int64_t, int64_t>(coo_rows.data(), ps.n_rows * ps.k);
-    raft::linalg::map_offset(handle, coo_rows_view, [k] __device__(int64_t c) -> int64_t { 
-      return c / k; 
-    });
+    auto coo_rows_view =
+      raft::make_device_vector_view<int64_t, int64_t>(coo_rows.data(), ps.n_rows * ps.k);
+    raft::linalg::map_offset(
+      handle, coo_rows_view, [k] __device__(int64_t c) -> int64_t { return c / k; });
 
     raft::sparse::linalg::symmetrize(handle,
                                      coo_rows.data(),

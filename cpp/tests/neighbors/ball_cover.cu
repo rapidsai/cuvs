@@ -194,16 +194,10 @@ class BallCoverKNNQueryTest : public ::testing::TestWithParam<BallCoverInputs<va
                                          raft::resource::get_cuda_stream(handle));
 
     if (metric == cuvs::distance::DistanceType::Haversine) {
-      raft::linalg::unaryOp(X.data(),
-                            X.data(),
-                            X.size(),
-                            ToRadians(),
-                            raft::resource::get_cuda_stream(handle));
-      raft::linalg::unaryOp(X2.data(),
-                            X2.data(),
-                            X2.size(),
-                            ToRadians(),
-                            raft::resource::get_cuda_stream(handle));
+      raft::linalg::unaryOp(
+        X.data(), X.data(), X.size(), ToRadians(), raft::resource::get_cuda_stream(handle));
+      raft::linalg::unaryOp(
+        X2.data(), X2.data(), X2.size(), ToRadians(), raft::resource::get_cuda_stream(handle));
     }
 
     compute_bfknn(handle,
@@ -306,11 +300,8 @@ class BallCoverAllKNNTest : public ::testing::TestWithParam<BallCoverInputs<valu
       (const value_t*)X.data(), params.n_rows, params.n_cols);
 
     if (metric == cuvs::distance::DistanceType::Haversine) {
-      raft::linalg::unaryOp(X.data(),
-                            X.data(),
-                            X.size(),
-                            ToRadians(),
-                            raft::resource::get_cuda_stream(handle));
+      raft::linalg::unaryOp(
+        X.data(), X.data(), X.size(), ToRadians(), raft::resource::get_cuda_stream(handle));
     }
 
     compute_bfknn(handle,

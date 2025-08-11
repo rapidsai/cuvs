@@ -25,8 +25,8 @@
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/label/classlabels.cuh>
 #include <raft/linalg/map.cuh>
-#include <raft/linalg/unary_op.cuh>
 #include <raft/linalg/norm.cuh>
+#include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/matrix/scatter.cuh>
 #include <raft/sparse/convert/csr.cuh>
@@ -394,16 +394,16 @@ void perform_1nn(raft::resources const& handle,
   }
 
   // Transform the keys so that they correctly point to the unpermuted indices.
-  raft::linalg::unaryOp(kvp,
-                        kvp,
-                        n_rows,
-                        [sort_plan = sort_plan.data_handle()] __device__(OutT KVP) {
-                          OutT res;
-                          res.value = KVP.value;
-                          res.key   = sort_plan[KVP.key];
-                          return res;
-                        },
-                        stream);
+  thrust::transform(exec_policy,
+                    kvp,
+                    kvp + n_rows,
+                    kvp,
+                    [sort_plan = sort_plan.data_handle()] __device__(OutT KVP) {
+                      OutT res;
+                      res.value = KVP.value;
+                      res.key   = sort_plan[KVP.key];
+                      return res;
+                    });
 
   // Undo permutation of the rows of X by scattering in place.
   raft::matrix::scatter(handle, X_mutable_view, sort_plan_const_view, (value_idx)col_batch_size);
@@ -422,7 +422,7 @@ void perform_1nn(raft::resources const& handle,
   raft::copy_async(kvp, tmp_kvp.data_handle(), n_rows, stream);
 
   LookupColorOp<value_idx, value_t> extract_colors_op(colors);
-  raft::linalg::unaryOp(nn_colors, kvp, n_rows, extract_colors_op, stream);
+  thrust::transform(exec_policy, kvp, kvp + n_rows, nn_colors, extract_colors_op);
 }
 
 /**
