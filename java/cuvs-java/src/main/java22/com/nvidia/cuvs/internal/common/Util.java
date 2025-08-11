@@ -19,12 +19,10 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaGetDeviceCount;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaGetDeviceProperties_v2;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemGetInfo;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaSetDevice;
-import static com.nvidia.cuvs.internal.panama.headers_h.size_t;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
+import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaStream_t;
 
+import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.GPUInfo;
 import com.nvidia.cuvs.internal.panama.DLDataType;
 import com.nvidia.cuvs.internal.panama.DLDevice;
@@ -101,7 +99,8 @@ public class Util {
    */
   public static void cudaMemcpy(
       MemorySegment dest, MemorySegment src, long numBytes, CudaMemcpyKind kind) {
-    int returnValue = Native.cudaMemcpy(dest, src, numBytes, kind.kind);
+    int returnValue =
+        com.nvidia.cuvs.internal.panama.headers_h.cudaMemcpy(dest, src, numBytes, kind.kind);
     checkCudaError(returnValue, "cudaMemcpy");
   }
 
@@ -114,6 +113,18 @@ public class Util {
    */
   public static void cudaMemcpy(MemorySegment dest, MemorySegment src, long numBytes) {
     Util.cudaMemcpy(dest, src, numBytes, CudaMemcpyKind.INFER_DIRECTION);
+  }
+
+  /**
+   * Helper to get the default CUDA stream associated with a {@link CuVSResources}
+   */
+  public static MemorySegment getDefaultStream(CuVSResources resources) {
+    try (var resourcesAccess = resources.access();
+        var localArena = Arena.ofConfined()) {
+      var streamPointer = localArena.allocate(cudaStream_t);
+      checkCuVSError(cuvsStreamGet(resourcesAccess.handle(), streamPointer), "cuvsStreamGet");
+      return streamPointer.get(cudaStream_t, 0);
+    }
   }
 
   static final long MAX_ERROR_TEXT = 1_000_000L;

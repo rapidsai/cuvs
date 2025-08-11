@@ -16,12 +16,12 @@
 package com.nvidia.cuvs.spi;
 
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_POINTER;
-import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
-import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaFreeHost;
-import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaMallocHost;
+import static com.nvidia.cuvs.internal.common.Util.*;
+import static com.nvidia.cuvs.internal.panama.headers_h_1.*;
 
 import com.nvidia.cuvs.*;
 import com.nvidia.cuvs.internal.*;
+import com.nvidia.cuvs.internal.common.Native;
 import com.nvidia.cuvs.internal.common.Util;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -168,7 +168,7 @@ final class JDKProvider implements CuVSProvider {
       throws UnsupportedOperationException {
 
     var builderCopyType = copyType & 0xF0;
-    return switch (copyType) {
+    return switch (builderCopyType) {
       case 0x10 -> new HeapSegmentBuilder(resources, size, columns, dataType, copyType);
       case 0x20 -> new CudaHostSegmentBuilder(resources, size, columns, dataType, copyType);
       default -> new NativeSegmentBuilder(resources, size, columns, dataType, copyType);
@@ -225,7 +225,8 @@ final class JDKProvider implements CuVSProvider {
   private static class NativeSegmentBuilder implements CuVSMatrix.Builder {
     private final int columns;
     private final int size;
-    private final CuVSDeviceMatrixRMMImpl matrix;
+    private final CuVSDeviceMatrixImpl matrix;
+    private final MemorySegment stream;
     private int current;
     private MemorySegment tempSegment;
     private final Arena tempSegmentArena;
@@ -238,7 +239,8 @@ final class JDKProvider implements CuVSProvider {
         int copyType) {
       this.columns = columns;
       this.size = size;
-      this.matrix = new CuVSDeviceMatrixRMMImpl(resources, size, columns, dataType, copyType);
+      this.matrix = CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType, copyType);
+      this.stream = Util.getDefaultStream(resources);
       current = 0;
       tempSegmentArena = Arena.ofShared();
     }
@@ -287,7 +289,9 @@ final class JDKProvider implements CuVSProvider {
 
       var dstOffset = ((current++) * rowBytes);
       var dst = matrix.memorySegment().asSlice(dstOffset);
-      cudaMemcpy(dst, tempSegment, rowBytes);
+      checkCudaError(
+          Native.cudaMemcpyAsync(dst, tempSegment, rowBytes, cudaMemcpyHostToDevice(), stream),
+          "cudaMemcpyAsync");
     }
 
     @Override
@@ -300,7 +304,8 @@ final class JDKProvider implements CuVSProvider {
   private static class HeapSegmentBuilder implements CuVSMatrix.Builder {
     private final int columns;
     private final int size;
-    private final CuVSDeviceMatrixRMMImpl matrix;
+    private final CuVSDeviceMatrixImpl matrix;
+    private final MemorySegment stream;
     int current;
 
     public HeapSegmentBuilder(
@@ -311,7 +316,8 @@ final class JDKProvider implements CuVSProvider {
         int copyType) {
       this.columns = columns;
       this.size = size;
-      this.matrix = new CuVSDeviceMatrixRMMImpl(resources, size, columns, dataType, copyType);
+      this.matrix = CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType, copyType);
+      this.stream = Util.getDefaultStream(resources);
       current = 0;
     }
 
@@ -354,7 +360,9 @@ final class JDKProvider implements CuVSProvider {
 
       var dstOffset = ((current++) * rowBytes);
       var dst = matrix.memorySegment().asSlice(dstOffset);
-      cudaMemcpy(dst, vector, rowBytes);
+      checkCudaError(
+          Native.cudaMemcpyAsync(dst, vector, rowBytes, cudaMemcpyHostToDevice(), stream),
+          "cudaMemcpyAsync");
     }
 
     @Override
@@ -366,7 +374,8 @@ final class JDKProvider implements CuVSProvider {
   private static class CudaHostSegmentBuilder implements CuVSMatrix.Builder {
     private final int columns;
     private final int size;
-    private final CuVSDeviceMatrixRMMImpl matrix;
+    private final CuVSDeviceMatrixImpl matrix;
+    private final MemorySegment stream;
     int current;
     MemorySegment tempSegment;
 
@@ -378,7 +387,8 @@ final class JDKProvider implements CuVSProvider {
         int copyType) {
       this.columns = columns;
       this.size = size;
-      this.matrix = new CuVSDeviceMatrixRMMImpl(resources, size, columns, dataType, copyType);
+      this.matrix = CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType, copyType);
+      this.stream = getDefaultStream(resources);
       current = 0;
     }
 
@@ -434,7 +444,9 @@ final class JDKProvider implements CuVSProvider {
 
       var dstOffset = ((current++) * rowBytes);
       var dst = matrix.memorySegment().asSlice(dstOffset);
-      cudaMemcpy(dst, tempSegment, rowBytes);
+      checkCudaError(
+          Native.cudaMemcpyAsync(dst, tempSegment, rowBytes, cudaMemcpyHostToDevice(), stream),
+          "cudaMemcpyAsync");
     }
 
     @Override

@@ -15,8 +15,7 @@
  */
 package com.nvidia.cuvs.internal.common;
 
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemcpy$address;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemcpy$descriptor;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
@@ -27,18 +26,19 @@ public final class Native {
 
   private static final Linker LINKER = Linker.nativeLinker();
 
-  private static final MethodHandle cudaMemcpy$mh =
+  private static final MethodHandle cudaMemcpyAsync$mh =
       LINKER.downcallHandle(
-          cudaMemcpy$address(), cudaMemcpy$descriptor(), Linker.Option.critical(true));
+          cudaMemcpyAsync$address(), cudaMemcpyAsync$descriptor(), Linker.Option.critical(true));
 
   /**
    * {@snippet lang=c :
-   * extern cudaError_t cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind)
+   * extern cudaError_t cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream)
    * }
    */
-  public static int cudaMemcpy(MemorySegment dst, MemorySegment src, long count, int kind) {
+  public static int cudaMemcpyAsync(
+      MemorySegment dst, MemorySegment src, long count, int kind, MemorySegment stream) {
     try {
-      return (int) cudaMemcpy$mh.invokeExact(dst, src, count, kind);
+      return (int) cudaMemcpyAsync$mh.invokeExact(dst, src, count, kind, stream);
     } catch (Throwable ex$) {
       throw new AssertionError("should not reach here", ex$);
     }

@@ -15,46 +15,42 @@
  */
 package com.nvidia.cuvs.internal;
 
-import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
-
 import com.nvidia.cuvs.CuVSDeviceMatrix;
 import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.internal.common.Util;
-import java.lang.foreign.MemorySegment;
+import com.nvidia.cuvs.internal.common.CloseableRMMAllocation;
 import java.lang.foreign.ValueLayout;
 
 public class CuVSDeviceMatrixRMMImpl extends CuVSDeviceMatrixImpl implements CuVSDeviceMatrix {
 
-  private final CuVSResources resources;
+  private final CloseableRMMAllocation rmmAllocation;
 
-  public CuVSDeviceMatrixRMMImpl(
-      CuVSResources resources, long size, long columns, DataType dataType, int copyType) {
-    super(
-        resources,
-        allocateRMMSegment(resources, size, columns, valueLayoutFromType(dataType)),
-        size,
-        columns,
-        dataType,
-        valueLayoutFromType(dataType),
-        copyType);
-    this.resources = resources;
+  private CuVSDeviceMatrixRMMImpl(
+      CuVSResources resources,
+      CloseableRMMAllocation rmmAllocation,
+      long size,
+      long columns,
+      DataType dataType,
+      ValueLayout valueLayout,
+      int copyType) {
+    super(resources, rmmAllocation.handle(), size, columns, dataType, valueLayout, copyType);
+    this.rmmAllocation = rmmAllocation;
   }
 
-  private static MemorySegment allocateRMMSegment(
-      CuVSResources resources, long size, long columns, ValueLayout valueLayout) {
+  public static CuVSDeviceMatrixImpl create(
+      CuVSResources resources, long size, long columns, DataType dataType, int copyType) {
     try (var resourcesAccess = resources.access()) {
-      return Util.allocateRMMSegment(
-          resourcesAccess.handle(), size * columns * valueLayout.byteSize());
+      var valueLayout = valueLayoutFromType(dataType);
+      var rmmAllocation =
+          CloseableRMMAllocation.allocateRMMSegment(
+              resourcesAccess.handle(), size * columns * valueLayout.byteSize());
+      return new CuVSDeviceMatrixRMMImpl(
+          resources, rmmAllocation, size, columns, dataType, valueLayout, copyType);
     }
   }
 
   @Override
   public void close() {
     super.close();
-    var bytes = getMatrixSizeInBytes();
-    try (var resourcesAccessor = resources.access()) {
-      checkCuVSError(cuvsRMMFree(resourcesAccessor.handle(), memorySegment, bytes), "cuvsRMMFree");
-    }
+    rmmAllocation.close();
   }
 }
