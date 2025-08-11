@@ -23,6 +23,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
+#include <raft/linalg/unary_op.cuh>
 #include <raft/random/make_blobs.cuh>
 #include <raft/util/cudart_utils.hpp>
 
@@ -193,16 +194,16 @@ class BallCoverKNNQueryTest : public ::testing::TestWithParam<BallCoverInputs<va
                                          raft::resource::get_cuda_stream(handle));
 
     if (metric == cuvs::distance::DistanceType::Haversine) {
-      thrust::transform(raft::resource::get_thrust_policy(handle),
-                        X.data(),
-                        X.data() + X.size(),
-                        X.data(),
-                        ToRadians());
-      thrust::transform(raft::resource::get_thrust_policy(handle),
-                        X2.data(),
-                        X2.data() + X2.size(),
-                        X2.data(),
-                        ToRadians());
+      raft::linalg::unaryOp(X.data(),
+                            X.data(),
+                            X.size(),
+                            ToRadians(),
+                            raft::resource::get_cuda_stream(handle));
+      raft::linalg::unaryOp(X2.data(),
+                            X2.data(),
+                            X2.size(),
+                            ToRadians(),
+                            raft::resource::get_cuda_stream(handle));
     }
 
     compute_bfknn(handle,
@@ -305,11 +306,11 @@ class BallCoverAllKNNTest : public ::testing::TestWithParam<BallCoverInputs<valu
       (const value_t*)X.data(), params.n_rows, params.n_cols);
 
     if (metric == cuvs::distance::DistanceType::Haversine) {
-      thrust::transform(raft::resource::get_thrust_policy(handle),
-                        X.data(),
-                        X.data() + X.size(),
-                        X.data(),
-                        ToRadians());
+      raft::linalg::unaryOp(X.data(),
+                            X.data(),
+                            X.size(),
+                            ToRadians(),
+                            raft::resource::get_cuda_stream(handle));
     }
 
     compute_bfknn(handle,

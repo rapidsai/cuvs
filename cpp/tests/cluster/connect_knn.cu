@@ -16,6 +16,7 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/handle.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/random/make_blobs.cuh>
 #include <raft/sparse/convert/csr.cuh>
 #include <raft/sparse/coo.hpp>
@@ -111,13 +112,11 @@ class ConnectKNNTest : public ::testing::TestWithParam<ConnectKNNInputs> {
     rmm::device_uvector<int64_t> indptr(ps.n_rows + 1, stream);
 
     // changing inds and dists to sparse format
-    int64_t k                  = ps.k;
-    auto coo_rows_counting_itr = thrust::make_counting_iterator<int64_t>(0);
-    thrust::transform(raft::resource::get_thrust_policy(handle),
-                      coo_rows_counting_itr,
-                      coo_rows_counting_itr + (ps.n_rows * ps.k),
-                      coo_rows.data(),
-                      [k] __device__(int64_t c) -> int64_t { return c / k; });
+    int64_t k = ps.k;
+    auto coo_rows_view = raft::make_device_vector_view<int64_t, int64_t>(coo_rows.data(), ps.n_rows * ps.k);
+    raft::linalg::map_offset(handle, coo_rows_view, [k] __device__(int64_t c) -> int64_t { 
+      return c / k; 
+    });
 
     raft::sparse::linalg::symmetrize(handle,
                                      coo_rows.data(),

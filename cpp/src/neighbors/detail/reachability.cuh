@@ -17,6 +17,8 @@
 #pragma once
 #include "./knn_brute_force.cuh"
 
+#include <raft/core/handle.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/sparse/convert/csr.cuh>
 #include <raft/sparse/linalg/symmetrize.cuh>
@@ -53,11 +55,10 @@ void core_distances(
   ASSERT(n_neighbors >= min_samples,
          "the size of the neighborhood should be greater than or equal to min_samples");
 
-  auto exec_policy = rmm::exec_policy(stream);
+  raft::resources handle(stream);
+  auto out_view = raft::make_device_vector_view<value_t, value_idx>(out, n);
 
-  auto indices = thrust::make_counting_iterator<value_idx>(0);
-
-  thrust::transform(exec_policy, indices, indices + n, out, [=] __device__(value_idx row) {
+  raft::linalg::map_offset(handle, out_view, [=] __device__(value_idx row) {
     return knn_dists[row * n_neighbors + (min_samples - 1)];
   });
 }
@@ -222,12 +223,10 @@ void mutual_reachability_graph(const raft::resources& handle,
     handle, inds.data(), dists.data(), X, m, n, min_samples, core_dists, (value_t)1.0 / alpha);
 
   // self-loops get max distance
-  auto coo_rows_counting_itr = thrust::make_counting_iterator<value_idx>(0);
-  thrust::transform(exec_policy,
-                    coo_rows_counting_itr,
-                    coo_rows_counting_itr + (m * min_samples),
-                    coo_rows.data(),
-                    [min_samples] __device__(value_idx c) -> value_idx { return c / min_samples; });
+  auto coo_rows_view = raft::make_device_vector_view<value_idx, value_idx>(coo_rows.data(), m * min_samples);
+  raft::linalg::map_offset(handle, coo_rows_view, [min_samples] __device__(value_idx c) -> value_idx {
+    return c / min_samples;
+  });
 
   raft::sparse::linalg::symmetrize(handle,
                                    coo_rows.data(),
@@ -241,18 +240,19 @@ void mutual_reachability_graph(const raft::resources& handle,
   raft::sparse::convert::sorted_coo_to_csr(out.rows(), out.nnz, indptr, m + 1, stream);
 
   // self-loops get max distance
-  auto transform_in =
-    thrust::make_zip_iterator(thrust::make_tuple(out.rows(), out.cols(), out.vals()));
+  auto rows_view = raft::make_device_vector_view<const value_idx, nnz_t>(out.rows(), out.nnz);
+  auto cols_view = raft::make_device_vector_view<const value_idx, nnz_t>(out.cols(), out.nnz);
+  auto vals_in_view = raft::make_device_vector_view<const value_t, nnz_t>(out.vals(), out.nnz);
+  auto vals_out_view = raft::make_device_vector_view<value_t, nnz_t>(out.vals(), out.nnz);
 
-  thrust::transform(exec_policy,
-                    transform_in,
-                    transform_in + out.nnz,
-                    out.vals(),
-                    [=] __device__(const thrust::tuple<value_idx, value_idx, value_t>& tup) {
-                      return thrust::get<0>(tup) == thrust::get<1>(tup)
-                               ? std::numeric_limits<value_t>::max()
-                               : thrust::get<2>(tup);
-                    });
+  raft::linalg::map(handle,
+                    vals_out_view,
+                    [=] __device__(const value_idx row, const value_idx col, const value_t val) {
+                      return row == col ? std::numeric_limits<value_t>::max() : val;
+                    },
+                    rows_view,
+                    cols_view,
+                    vals_in_view);
 }
 
 }  // namespace cuvs::neighbors::detail::reachability

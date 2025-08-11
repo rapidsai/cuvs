@@ -32,11 +32,13 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/linalg/map_then_reduce.cuh>
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce_cols_by_key.cuh>
 #include <raft/linalg/reduce_rows_by_key.cuh>
+#include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/cuda_utils.cuh>
@@ -513,17 +515,19 @@ void kmeans_fit_main(raft::resources const& handle,
     workspace);
 
   // TODO: add different templates for InType of binaryOp to avoid thrust transform
-  thrust::transform(raft::resource::get_thrust_policy(handle),
-                    minClusterAndDistance.data_handle(),
-                    minClusterAndDistance.data_handle() + minClusterAndDistance.size(),
-                    weight.data_handle(),
-                    minClusterAndDistance.data_handle(),
+  raft::linalg::map(handle,
+                    raft::make_device_vector_view<raft::KeyValuePair<IndexT, DataT>, IndexT>(
+                      minClusterAndDistance.data_handle(), minClusterAndDistance.size()),
                     [=] __device__(const raft::KeyValuePair<IndexT, DataT> kvp, DataT wt) {
                       raft::KeyValuePair<IndexT, DataT> res;
                       res.value = kvp.value * wt;
                       res.key   = kvp.key;
                       return res;
-                    });
+                    },
+                    raft::make_device_vector_view<const raft::KeyValuePair<IndexT, DataT>, IndexT>(
+                      minClusterAndDistance.data_handle(), minClusterAndDistance.size()),
+                    raft::make_device_vector_view<const DataT, IndexT>(
+                      weight.data_handle(), minClusterAndDistance.size()));
 
   // calculate cluster cost phi_x(C)
   cuvs::cluster::kmeans::detail::computeClusterCost(
@@ -1053,17 +1057,19 @@ void kmeans_predict(raft::resources const& handle,
   // calculate cluster cost phi_x(C)
   rmm::device_scalar<DataT> clusterCostD(stream);
   // TODO: add different templates for InType of binaryOp to avoid thrust transform
-  thrust::transform(raft::resource::get_thrust_policy(handle),
-                    minClusterAndDistance.data_handle(),
-                    minClusterAndDistance.data_handle() + minClusterAndDistance.size(),
-                    weight.data_handle(),
-                    minClusterAndDistance.data_handle(),
+  raft::linalg::map(handle,
+                    raft::make_device_vector_view<raft::KeyValuePair<IndexT, DataT>, IndexT>(
+                      minClusterAndDistance.data_handle(), minClusterAndDistance.size()),
                     [=] __device__(const raft::KeyValuePair<IndexT, DataT> kvp, DataT wt) {
                       raft::KeyValuePair<IndexT, DataT> res;
                       res.value = kvp.value * wt;
                       res.key   = kvp.key;
                       return res;
-                    });
+                    },
+                    raft::make_device_vector_view<const raft::KeyValuePair<IndexT, DataT>, IndexT>(
+                      minClusterAndDistance.data_handle(), minClusterAndDistance.size()),
+                    raft::make_device_vector_view<const DataT, IndexT>(
+                      weight.data_handle(), minClusterAndDistance.size()));
 
   cuvs::cluster::kmeans::detail::computeClusterCost(
     handle,
@@ -1073,11 +1079,11 @@ void kmeans_predict(raft::resources const& handle,
     raft::value_op{},
     raft::add_op{});
 
-  thrust::transform(raft::resource::get_thrust_policy(handle),
-                    minClusterAndDistance.data_handle(),
-                    minClusterAndDistance.data_handle() + minClusterAndDistance.size(),
-                    labels.data_handle(),
-                    raft::key_op{});
+  raft::linalg::unaryOp(labels.data_handle(),
+                        minClusterAndDistance.data_handle(),
+                        minClusterAndDistance.size(),
+                        raft::key_op{},
+                        stream);
 
   inertia[0] = clusterCostD.value(stream);
 }
