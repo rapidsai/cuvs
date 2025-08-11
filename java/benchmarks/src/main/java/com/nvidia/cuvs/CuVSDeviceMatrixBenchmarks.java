@@ -36,9 +36,8 @@ public class CuVSDeviceMatrixBenchmarks {
   private float[][] data;
 
   private CuVSResources resources;
-  private CuVSDeviceMatrix matrixWithCuvsCopy;
-  private CuVSDeviceMatrix matrixWithCudaCopy;
-  private CuVSDeviceMatrix matrixWithCudaCopyAsync;
+  private CuVSDeviceMatrix matrixWithNativeBuffer;
+  private CuVSDeviceMatrix matrixWithPinnedBuffer;
 
   private float[][] createRandomData() {
     var array = new float[size][dims];
@@ -58,31 +57,25 @@ public class CuVSDeviceMatrixBenchmarks {
 
     var builder0 = CuVSMatrix.deviceBuilder(resources, size, dims, CuVSMatrix.DataType.FLOAT, 0);
     var builder1 = CuVSMatrix.deviceBuilder(resources, size, dims, CuVSMatrix.DataType.FLOAT, 1);
-    var builder2 = CuVSMatrix.deviceBuilder(resources, size, dims, CuVSMatrix.DataType.FLOAT, 2);
 
     for (int i = 0; i < size; ++i) {
       var array = data[i];
       builder0.addVector(array);
       builder1.addVector(array);
-      builder2.addVector(array);
     }
 
 
-    matrixWithCuvsCopy = (CuVSDeviceMatrix) builder0.build();
-    matrixWithCudaCopy = (CuVSDeviceMatrix) builder1.build();
-    matrixWithCudaCopyAsync = (CuVSDeviceMatrix) builder2.build();
+    matrixWithNativeBuffer = (CuVSDeviceMatrix) builder0.build();
+    matrixWithPinnedBuffer = (CuVSDeviceMatrix) builder1.build();
   }
 
   @TearDown
   public void cleanUp() {
-    if (matrixWithCuvsCopy != null) {
-      matrixWithCuvsCopy.close();
+    if (matrixWithNativeBuffer != null) {
+      matrixWithNativeBuffer.close();
     }
-    if (matrixWithCudaCopy != null) {
-      matrixWithCudaCopy.close();
-    }
-    if (matrixWithCudaCopyAsync != null) {
-      matrixWithCudaCopyAsync.close();
+    if (matrixWithPinnedBuffer != null) {
+      matrixWithPinnedBuffer.close();
     }
     if (resources != null) {
       resources.close();
@@ -90,44 +83,23 @@ public class CuVSDeviceMatrixBenchmarks {
   }
 
   @Benchmark
-  public void matrixReadRowsWithCuvs(Blackhole bh) {
+  public void matrixReadRowsWithPinnedBuffer(Blackhole bh) {
     for (int i = 0; i < size; ++i) {
-      bh.consume(matrixWithCuvsCopy.getRow(i));
+      bh.consume(matrixWithPinnedBuffer.getRow(i));
     }
   }
 
   @Benchmark
-  public void matrixCopyToHostWithCuvs() throws Throwable {
-    try (var resources = CuVSResources.create()) {
-      matrixWithCuvsCopy.toHost(resources).close();
-    }
-  }
-
-  @Benchmark
-  public void matrixReadRowsWithCuda(Blackhole bh) {
+  public void matrixReadRowsWithNativeBuffer(Blackhole bh) {
     for (int i = 0; i < size; ++i) {
-      bh.consume(matrixWithCudaCopy.getRow(i));
+      bh.consume(matrixWithNativeBuffer.getRow(i));
     }
   }
 
   @Benchmark
-  public void matrixCopyToHostWithCuda() throws Throwable {
+  public void matrixCopyToHost() throws Throwable {
     try (var resources = CuVSResources.create()) {
-      matrixWithCudaCopy.toHost(resources).close();
-    }
-  }
-
-  @Benchmark
-  public void matrixReadRowsWithCudaAsync(Blackhole bh) {
-    for (int i = 0; i < size; ++i) {
-      bh.consume(matrixWithCudaCopyAsync.getRow(i));
-    }
-  }
-
-  @Benchmark
-  public void matrixCopyToHostWithCudaAsync() throws Throwable {
-    try (var resources = CuVSResources.create()) {
-      matrixWithCudaCopyAsync.toHost(resources).close();
+      matrixWithPinnedBuffer.toHost(resources).close();
     }
   }
 
