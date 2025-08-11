@@ -135,11 +135,11 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
 
       // todo(lsugy): use KVP + iterator in caller.
       // Copy keys to output labels
-      raft::linalg::unaryOp(labels,
-                            minClusterAndDistance.data_handle(),
-                            n_rows,
-                            raft::compose_op<raft::cast_op<LabelT>, raft::key_op>(),
-                            stream);
+      thrust::transform(raft::resource::get_thrust_policy(handle),
+                        minClusterAndDistance.data_handle(),
+                        minClusterAndDistance.data_handle() + n_rows,
+                        labels,
+                        raft::compose_op<raft::cast_op<LabelT>, raft::key_op>());
       break;
     }
     case cuvs::distance::DistanceType::CosineExpanded: {
@@ -176,11 +176,11 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
         0.0f,
         stream);
       // Copy keys to output labels
-      raft::linalg::unaryOp(labels,
-                            minClusterAndDistance.data_handle(),
-                            n_rows,
-                            raft::compose_op<raft::cast_op<LabelT>, raft::key_op>(),
-                            stream);
+      thrust::transform(raft::resource::get_thrust_policy(handle),
+                        minClusterAndDistance.data_handle(),
+                        minClusterAndDistance.data_handle() + n_rows,
+                        labels,
+                        raft::compose_op<raft::cast_op<LabelT>, raft::key_op>());
       break;
     }
     case cuvs::distance::DistanceType::InnerProduct: {

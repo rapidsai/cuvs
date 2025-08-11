@@ -80,10 +80,10 @@ struct distance_graph_impl<Linkage::KNN_GRAPH, value_idx, value_t> {
     data.resize(knn_graph_coo.nnz, stream);
 
     // self-loops get max distance
-    auto rows_view = raft::make_device_vector_view<const value_idx, nnz_t>(knn_graph_coo.rows(), knn_graph_coo.nnz);
-    auto cols_view = raft::make_device_vector_view<const value_idx, nnz_t>(knn_graph_coo.cols(), knn_graph_coo.nnz);
-    auto vals_in_view = raft::make_device_vector_view<const value_t, nnz_t>(knn_graph_coo.vals(), knn_graph_coo.nnz);
-    auto vals_out_view = raft::make_device_vector_view<value_t, nnz_t>(knn_graph_coo.vals(), knn_graph_coo.nnz);
+    auto rows_view = raft::make_device_vector_view<const value_idx, value_idx>(knn_graph_coo.rows(), knn_graph_coo.nnz);
+    auto cols_view = raft::make_device_vector_view<const value_idx, value_idx>(knn_graph_coo.cols(), knn_graph_coo.nnz);
+    auto vals_in_view = raft::make_device_vector_view<const value_t, value_idx>(knn_graph_coo.vals(), knn_graph_coo.nnz);
+    auto vals_out_view = raft::make_device_vector_view<value_t, value_idx>(knn_graph_coo.vals(), knn_graph_coo.nnz);
 
     raft::linalg::map(handle,
                       vals_out_view,

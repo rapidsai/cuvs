@@ -50,12 +50,12 @@ namespace cuvs::neighbors::detail::reachability {
  */
 template <typename value_idx, typename value_t, int tpb = 256>
 void core_distances(
-  value_t* knn_dists, int min_samples, int n_neighbors, size_t n, value_t* out, cudaStream_t stream)
+  raft::resources const& handle,
+  value_t* knn_dists, int min_samples, int n_neighbors, size_t n, value_t* out)
 {
   ASSERT(n_neighbors >= min_samples,
          "the size of the neighborhood should be greater than or equal to min_samples");
 
-  raft::resources handle(stream);
   auto out_view = raft::make_device_vector_view<value_t, value_idx>(out, n);
 
   raft::linalg::map_offset(handle, out_view, [=] __device__(value_idx row) {
@@ -119,7 +119,7 @@ void _compute_core_dists(const raft::resources& handle,
   compute_knn(handle, X, inds.data(), dists.data(), m, n, X, m, min_samples, metric);
 
   // Slice core distances (distances to kth nearest neighbor)
-  core_distances<value_idx>(dists.data(), min_samples, min_samples, m, core_dists, stream);
+  core_distances<value_idx>(handle, dists.data(), min_samples, min_samples, m, core_dists);
 }
 
 //  Functor to post-process distances into reachability space
@@ -214,7 +214,7 @@ void mutual_reachability_graph(const raft::resources& handle,
   compute_knn(handle, X, inds.data(), dists.data(), m, n, X, m, min_samples, metric);
 
   // Slice core distances (distances to kth nearest neighbor)
-  core_distances<value_idx>(dists.data(), min_samples, min_samples, m, core_dists, stream);
+  core_distances<value_idx>(handle, dists.data(), min_samples, min_samples, m, core_dists);
 
   /**
    * Compute L2 norm
