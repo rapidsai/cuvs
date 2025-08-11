@@ -275,17 +275,13 @@ void make_rotation_matrix(raft::resources const& res,
                        force_random_rotation,
                        index->rot_dim(),
                        index->dim(),
-                       index->rotation_matrix().data_handle());
+                       index->rotation_matrix_owning_view().data_handle());
 }
 
 void set_centers(raft::resources const& handle,
                  index<int64_t>* index,
                  raft::device_matrix_view<const float, uint32_t, raft::row_major> cluster_centers)
 {
-  std::cout << "set_centers(" << cluster_centers.extent(0) << ", " << cluster_centers.extent(1)
-            << ")" << std::endl;
-  std::cout << "index->n_lists() = " << index->n_lists() << ", index->dim() = " << index->dim()
-            << std::endl;
   RAFT_EXPECTS(cluster_centers.extent(0) == index->n_lists(),
                "Number of rows in the new centers must be equal to the number of IVF lists");
   RAFT_EXPECTS(cluster_centers.extent(1) == index->dim(),

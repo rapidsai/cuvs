@@ -388,7 +388,7 @@ cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
  * cuvsError_t index_create_status = cuvsIvfPqIndexCreate(&index);
  *
  * // Build the IVF-PQ Index
- * cuvsError_t build_status = cuvsIvfPqBuildFromCentroids(res, index_params, dim, &pq_centers,
+ * cuvsError_t build_status = cuvsIvfPqBuildFromArgs(res, index_params, dim, &pq_centers,
  *   &centers, &rotation_matrix, index);
  *
  * // de-allocate `index_params`, `index` and `res`
