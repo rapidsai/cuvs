@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/all_neighbors.hpp>
 #include <optional>
 #include <variant>
 
@@ -144,6 +145,8 @@ struct mutual_reachability_params {
   /** weight applied when internal distance is chosen for mutual reachability (value of 1.0 disables
    * the weighting) */
   float alpha = 1.0;
+  cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_p{
+    cuvs::neighbors::graph_build_params::brute_force_params{}};
 };
 }  // namespace linkage_graph_params
 /**

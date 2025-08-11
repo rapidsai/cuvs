@@ -77,7 +77,8 @@ void build_linkage(
                                              out_mst,
                                              out_dendrogram,
                                              out_distances,
-                                             out_sizes);
+                                             out_sizes,
+                                             mr_params.all_neighbors_p);
   } else {
     auto dist_params =
       std::get<cuvs::cluster::agglomerative::helpers::linkage_graph_params::distance_params>(

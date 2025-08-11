@@ -58,7 +58,8 @@ void build_mr_linkage(raft::resources const& handle,
                       raft::device_coo_matrix_view<value_t, value_idx, value_idx, nnz_t> out_mst,
                       raft::device_matrix_view<value_idx, value_idx> out_dendrogram,
                       raft::device_vector_view<value_t, value_idx> out_distances,
-                      raft::device_vector_view<value_idx, value_idx> out_sizes)
+                      raft::device_vector_view<value_idx, value_idx> out_sizes,
+                      cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_p)
 {
   size_t m         = X.extent(0);
   size_t n         = X.extent(1);
@@ -71,13 +72,9 @@ void build_mr_linkage(raft::resources const& handle,
   auto inds  = raft::make_device_matrix<value_idx, value_idx>(handle, m, min_samples);
   auto dists = raft::make_device_matrix<value_t, value_idx>(handle, m, min_samples);
 
-  cuvs::neighbors::all_neighbors::all_neighbors_params all_neigh_p;
-  all_neigh_p.metric                = metric;
-  auto brute_force_p                = neighbors::graph_build_params::brute_force_params{};
-  brute_force_p.build_params.metric = metric;
-  all_neigh_p.graph_build_params    = brute_force_p;
+  all_neighbors_p.metric = metric;  // propagating given metric to all_neighbors
   cuvs::neighbors::all_neighbors::build(
-    handle, all_neigh_p, X, inds.view(), dists.view(), core_dists, alpha);
+    handle, all_neighbors_p, X, inds.view(), dists.view(), core_dists, alpha);
 
   // self-loops get max distance
   rmm::device_uvector<value_idx> coo_rows(min_samples * m, stream);
@@ -100,7 +97,6 @@ void build_mr_linkage(raft::resources const& handle,
   raft::sparse::convert::sorted_coo_to_csr(
     mr_coo.rows(), mr_coo.nnz, mr_indptr.data_handle(), m + 1, stream);
 
-  // self-loops get max distance
   auto transform_in =
     thrust::make_zip_iterator(thrust::make_tuple(mr_coo.rows(), mr_coo.cols(), mr_coo.vals()));
 
