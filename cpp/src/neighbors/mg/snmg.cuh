@@ -606,7 +606,7 @@ void search(const raft::resources& clique,
     int64_t n_batches = raft::ceildiv(n_rows, (int64_t)n_rows_per_batch);
     if (n_batches <= 1) n_rows_per_batch = n_rows;
 
-    if (merge_mode == MERGE_ON_ROOT_RANK) {
+    if (merge_mode == MERGE_ON_ROOT_RANK && index.num_ranks_ > 1) {
       RAFT_LOG_DEBUG("SHARDED SEARCH WITH MERGE_ON_ROOT_RANK MERGE MODE: %d*%drows",
                      n_batches,
                      n_rows_per_batch);
@@ -621,7 +621,7 @@ void search(const raft::resources& clique,
                                        n_cols,
                                        n_neighbors,
                                        n_batches);
-    } else if (merge_mode == TREE_MERGE) {
+    } else if (merge_mode == TREE_MERGE && index.num_ranks_ > 1) {
       RAFT_LOG_DEBUG(
         "SHARDED SEARCH WITH TREE_MERGE MERGE MODE %d*%drows", n_batches, n_rows_per_batch);
       sharded_search_with_tree_merge(clique,
@@ -635,6 +635,28 @@ void search(const raft::resources& clique,
                                      n_cols,
                                      n_neighbors,
                                      n_batches);
+    } else {
+      const int rank = 0;
+#pragma omp parallel for
+      for (int64_t batch_idx = 0; batch_idx < n_batches; batch_idx++) {
+        int64_t offset                  = batch_idx * n_rows_per_batch;
+        int64_t query_offset            = offset * n_cols;
+        int64_t output_offset           = offset * n_neighbors;
+        int64_t n_rows_of_current_batch = std::min(n_rows_per_batch, n_rows - offset);
+
+        run_search_batch(clique,
+                         index,
+                         rank,
+                         search_params,
+                         queries,
+                         neighbors,
+                         distances,
+                         query_offset,
+                         output_offset,
+                         n_rows_of_current_batch,
+                         n_cols,
+                         n_neighbors);
+      }
     }
   }
 }
