@@ -38,7 +38,11 @@ namespace cuvs::neighbors::nn_descent {
  * @brief Build nn-descent Index with dataset in device memory
  *
  * The following distance metrics are supported:
- * - L2
+ * - L2Expanded
+ * - L2SqrtExpanded
+ * - CosineExpanded
+ * - InnerProduct
+ * - BitwiseHamming (when T == int8, uint8)
  *
  * Usage example:
  * @code{.cpp}
@@ -46,7 +50,7 @@ namespace cuvs::neighbors::nn_descent {
  *   // use default index parameters
  *   nn_descent::index_params index_params;
  *   // create and fill the index from a [N, D] raft::device_matrix_view dataset
- *   auto index = cagra::build(res, index_params, dataset);
+ *   auto index = nn_descent::build(res, index_params, dataset);
  *   // index.graph() provides a raft::host_matrix_view of an
  *   // all-neighbors knn graph of dimensions [N, k] of the input
  *   // dataset
@@ -85,7 +89,11 @@ auto build(raft::resources const& res,
  * @brief Build nn-descent Index with dataset in device memory
  *
  * The following distance metrics are supported:
- * - L2
+ * - L2Expanded
+ * - L2SqrtExpanded
+ * - CosineExpanded
+ * - InnerProduct
+ * - BitwiseHamming (when T == int8, uint8)
  *
  * Usage example:
  * @code{.cpp}
@@ -95,7 +103,7 @@ auto build(raft::resources const& res,
  *   // create and fill the index from a [N, D] raft::device_matrix_view dataset
  *   auto knn_graph = raft::make_host_matrix<uint32_t, int64_t>(N, D);
  *   auto index = nn_descent::index{res, knn_graph.view()};
- *   cagra::build(res, index_params, dataset, index);
+ *   nn_descent::build(res, index_params, dataset, index);
  *   // index.graph() provides a raft::host_matrix_view of an
  *   // all-neighbors knn graph of dimensions [N, k] of the input
  *   // dataset
@@ -136,7 +144,11 @@ void build(raft::resources const& res,
  * @brief Build nn-descent Index with dataset in host memory
  *
  * The following distance metrics are supported:
- * - L2
+ * - L2Expanded
+ * - L2SqrtExpanded
+ * - CosineExpanded
+ * - InnerProduct
+ * - BitwiseHamming (when T == int8, uint8)
  *
  * Usage example:
  * @code{.cpp}
@@ -144,7 +156,7 @@ void build(raft::resources const& res,
  *   // use default index parameters
  *   nn_descent::index_params index_params;
  *   // create and fill the index from a [N, D] raft::host_matrix_view dataset
- *   auto index = cagra::build(res, index_params, dataset);
+ *   auto index = nn_descent::build(res, index_params, dataset);
  *   // index.graph() provides a raft::host_matrix_view of an
  *   // all-neighbors knn graph of dimensions [N, k] of the input
  *   // dataset
@@ -183,7 +195,11 @@ auto build(raft::resources const& res,
  * @brief Build nn-descent Index with dataset in host memory
  *
  * The following distance metrics are supported:
- * - L2
+ * - L2Expanded
+ * - L2SqrtExpanded
+ * - CosineExpanded
+ * - InnerProduct
+ * - BitwiseHamming (when T == int8, uint8)
  *
  * Usage example:
  * @code{.cpp}
@@ -193,7 +209,7 @@ auto build(raft::resources const& res,
  *   // create and fill the index from a [N, D] raft::host_matrix_view dataset
  *   auto knn_graph = raft::make_host_matrix<uint32_t, int64_t>(N, D);
  *   auto index = nn_descent::index{res, knn_graph.view()};
- *   cagra::build(res, index_params, dataset, index);
+ *   nn_descent::build(res, index_params, dataset, index);
  *   // index.graph() provides a raft::host_matrix_view of an
  *   // all-neighbors knn graph of dimensions [N, k] of the input
  *   // dataset
