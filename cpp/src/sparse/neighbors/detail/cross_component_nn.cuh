@@ -26,7 +26,6 @@
 #include <raft/label/classlabels.cuh>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/norm.cuh>
-#include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/matrix/scatter.cuh>
 #include <raft/sparse/convert/csr.cuh>
