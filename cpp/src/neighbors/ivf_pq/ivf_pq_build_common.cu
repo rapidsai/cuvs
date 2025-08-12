@@ -318,10 +318,12 @@ auto build(
   const uint32_t dim,
   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
+  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
   std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix)
   -> cuvs::neighbors::ivf_pq::index<int64_t>
 {
-  return detail::build<int64_t>(handle, index_params, dim, pq_centers, centers, rotation_matrix);
+  return detail::build<int64_t>(
+    handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix);
 }
 
 void build(
@@ -330,9 +332,11 @@ void build(
   const uint32_t dim,
   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
+  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
   std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix,
   cuvs::neighbors::ivf_pq::index<int64_t>* idx)
 {
-  *idx = detail::build<int64_t>(handle, index_params, dim, pq_centers, centers, rotation_matrix);
+  *idx = detail::build<int64_t>(
+    handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix);
 }
 }  // namespace cuvs::neighbors::ivf_pq

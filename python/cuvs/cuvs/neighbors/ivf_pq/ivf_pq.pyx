@@ -272,6 +272,24 @@ cdef class Index:
         return output
 
     @property
+    def centers_rot(self):
+        """ Get the cluster centers corresponding to the lists in the rotated
+        space [n_lists, rot_dim] """
+        if not self.trained:
+            raise ValueError(
+                "Index needs to be built before getting centers_rot")
+
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetCentersRot(self.index, tensor))
+        # since we're referencing memory internal to this ivfpq index in the
+        # output view, keep the ivfpq index alive as long as the output view
+        # is to avoid segfaulting
+        output.parent = self
+        return output
+
+    @property
     def codebook(self):
         """ Get the PQ codebook """
         if not self.trained:
@@ -388,7 +406,7 @@ def build(IndexParams index_params, dataset, resources=None):
 
 @auto_sync_resources
 def build_from_args(IndexParams index_params, dim, codebooks,
-                    centers, rotation_matrix=None,
+                    centers, centers_rot=None, rotation_matrix=None,
                     resources=None):
     """
     Build the IvfPq index from existing centroids and codebook.
@@ -401,8 +419,10 @@ def build_from_args(IndexParams index_params, dim, codebooks,
         Dimensionality of the input data
     codebooks : Array interface compliant matrix
         PQ cluster centers shape (pq_dim or n_lists, pq_len, pq_book_size)
-    centers : Array interface compliant matrix shape (n_lists, dim)
+    centers : Array interface compliant matrix shape (n_lists, dim_ext)
         Cluster centers corresponding to the lists in the original space
+    centers_rot : Array interface compliant matrix shape (n_lists, rot_dim)
+        Cluster centers corresponding to the lists in the rotated space
     rotation_matrix : Optional array interface compliant matrix
         Rotation matrix. Mandatory if index_params.force_random_rotation
         is True. Shape (rot_dim, dim)
@@ -423,12 +443,15 @@ def build_from_args(IndexParams index_params, dim, codebooks,
     >>> pq_len = ...
     >>> pq_book_size = ...
     >>> rot_dim = ...
+    >>> dim_ext = ...
     >>> codebooks = cp.random.random_sample((pq_dim, pq_len, pq_book_size),
     ...                                   dtype=cp.float32)
     >>> rotation_matrix = cp.random.random_sample((rot_dim, dim),
     ...                                   dtype=cp.float32)
-    >>> centers = cp.random.random_sample((n_lists, dim),
+    >>> centers = cp.random.random_sample((n_lists, dim_ext),
     ...                                   dtype=cp.float32)
+    >>> centers_rot = cp.random.random_sample((n_lists, rot_dim),
+    ...                                       dtype=cp.float32)
     >>> build_params = ivf_pq.IndexParams(metric="sqeuclidean")
     >>> index = ivf_pq.build_from_args(build_params, dim, codebooks,
     ...                                     centers, rotation_matrix)
@@ -442,7 +465,11 @@ def build_from_args(IndexParams index_params, dim, codebooks,
     _check_input_array(codebooks_ai, [np.dtype('float32')])
 
     centers_ai = wrap_array(centers)
-    _check_input_array(centers_ai, [np.dtype('float32')], exp_row_major=False)
+    _check_input_array(centers_ai, [np.dtype('float32')])
+
+    if centers_rot is not None:
+        centers_rot_ai = wrap_array(centers_rot)
+        _check_input_array(centers_rot_ai, [np.dtype('float32')])
 
     if rotation_matrix is not None:
         rotation_matrix_ai = wrap_array(rotation_matrix)
@@ -454,6 +481,9 @@ def build_from_args(IndexParams index_params, dim, codebooks,
         cydlpack.dlpack_c(codebooks_ai)
     cdef cydlpack.DLManagedTensor* centers_dlpack = \
         cydlpack.dlpack_c(centers_ai)
+    cdef cydlpack.DLManagedTensor* centers_rot_dlpack = NULL
+    if centers_rot is not None:
+        centers_rot_dlpack = cydlpack.dlpack_c(centers_rot_ai)
     cdef cydlpack.DLManagedTensor* rotation_matrix_dlpack = NULL
     if rotation_matrix is not None:
         rotation_matrix_dlpack = cydlpack.dlpack_c(rotation_matrix_ai)
@@ -468,6 +498,7 @@ def build_from_args(IndexParams index_params, dim, codebooks,
             dim,
             codebooks_dlpack,
             centers_dlpack,
+            centers_rot_dlpack,
             rotation_matrix_dlpack,
             idx.index
         ))

@@ -391,6 +391,9 @@ struct index : cuvs::neighbors::index {
     uint32_t pq_dim,
     bool conservative_memory_allocation,
     raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers_view,
+    raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_view,
+    std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>>
+      centers_rot_view,
     std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>>
       rotation_matrix_view);
 
@@ -489,8 +492,9 @@ struct index : cuvs::neighbors::index {
   raft::device_vector_view<const uint32_t, uint32_t, raft::row_major> list_sizes() const noexcept;
 
   /** Cluster centers corresponding to the lists in the original space [n_lists, dim_ext] */
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept;
+  /** Owning view of the centers [n_lists, dim_ext] */
+  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_owning_view();
 
   raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> centers_int8(
     const raft::resources& res) const;
@@ -498,8 +502,9 @@ struct index : cuvs::neighbors::index {
     const raft::resources& res) const;
 
   /** Cluster centers corresponding to the lists in the rotated space [n_lists, rot_dim] */
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot() const noexcept;
+  /** Owning view of the cluster centers in the rotated space [n_lists, rot_dim] */
+  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot_owning_view();
 
   /** fetch size of a particular IVF list in bytes using the list extents.
    * Usage example:
@@ -537,6 +542,8 @@ struct index : cuvs::neighbors::index {
 
   // Views of the data members
   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers_view_;
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_view_;
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot_view_;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix_view_;
 
   // Lazy-initialized low-precision variants of index members - for low-precision coarse search.
@@ -635,6 +642,8 @@ void build(raft::resources const& handle,
  *   - codebook_gen::PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
  * @param[in] centers Cluster centers corresponding to the lists in the original space [n_lists,
  * dim_ext]
+ * @param[in] centers_rot Optional cluster centers corresponding to the lists in the rotated space
+ * [n_lists, rot_dim]
  * @param[in] rotation_matrix The optional transform matrix (original space -> rotated padded space)
  * [rot_dim, dim]
  * @return Resulting ivf_pq::index
@@ -645,6 +654,7 @@ auto build(
   const uint32_t dim,
   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
+  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> centers_rot_opt,
   std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix)
   -> cuvs::neighbors::ivf_pq::index<int64_t>;
 
@@ -669,6 +679,8 @@ auto build(
  *   - codebook_gen::PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
  * @param[in] centers Cluster centers corresponding to the lists in the original space [n_lists,
  * dim_ext]
+ * @param[in] centers_rot Optional cluster centers corresponding to the lists in the rotated space
+ * [n_lists, rot_dim]
  * @param[in] rotation_matrix The optional transform matrix (original space -> rotated padded space)
  * [rot_dim, dim]
  * @param[out] idx reference to ivf_pq::index
@@ -679,6 +691,7 @@ void build(
   const uint32_t dim,
   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
+  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> centers_rot_opt,
   std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix,
   cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 

@@ -92,7 +92,9 @@ index<IdxT>::index(raft::resources const& handle,
     pq_centers_{raft::make_device_mdarray<float>(handle, make_pq_centers_extents())},
     pq_centers_view_{pq_centers_.view()},
     centers_{raft::make_device_matrix<float, uint32_t>(handle, n_lists, this->dim_ext())},
+    centers_view_{centers_.view()},
     centers_rot_{raft::make_device_matrix<float, uint32_t>(handle, n_lists, this->rot_dim())},
+    centers_rot_view_{centers_rot_.view()},
     rotation_matrix_{
       raft::make_device_matrix<float, uint32_t>(handle, this->rot_dim(), this->dim())},
     rotation_matrix_view_{rotation_matrix_.view()},
@@ -115,6 +117,8 @@ index<IdxT>::index(
   uint32_t pq_dim,
   bool conservative_memory_allocation,
   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers_view,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_view,
+  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> centers_rot_view,
   std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>>
     rotation_matrix_view)
   : cuvs::neighbors::index(),
@@ -128,8 +132,13 @@ index<IdxT>::index(
     list_sizes_{raft::make_device_vector<uint32_t, uint32_t>(handle, n_lists)},
     pq_centers_{raft::make_device_mdarray<float>(handle, raft::make_extents<uint32_t>(0, 0, 0))},
     pq_centers_view_{pq_centers_view},
-    centers_{raft::make_device_matrix<float, uint32_t>(handle, n_lists, this->dim_ext())},
-    centers_rot_{raft::make_device_matrix<float, uint32_t>(handle, n_lists, this->rot_dim())},
+    centers_{raft::make_device_matrix<float, uint32_t>(handle, 0, 0)},
+    centers_view_{centers_view},
+    centers_rot_{centers_rot_view.has_value()
+                   ? raft::make_device_matrix<float, uint32_t>(handle, 0, 0)
+                   : raft::make_device_matrix<float, uint32_t>(handle, n_lists, this->rot_dim())},
+    centers_rot_view_{centers_rot_view.has_value() ? centers_rot_view.value()
+                                                   : centers_rot_.view()},
     rotation_matrix_{
       rotation_matrix_view.has_value()
         ? raft::make_device_matrix<float, uint32_t>(handle, 0, 0)
@@ -319,8 +328,10 @@ raft::device_vector_view<const uint32_t, uint32_t, raft::row_major> index<IdxT>:
 }
 
 template <typename IdxT>
-raft::device_matrix_view<float, uint32_t, raft::row_major> index<IdxT>::centers() noexcept
+raft::device_matrix_view<float, uint32_t, raft::row_major> index<IdxT>::centers_owning_view()
 {
+  RAFT_EXPECTS(centers_.size() != 0,
+               "Empty centers mdarray. Index built from args can't be modified");
   return centers_.view();
 }
 
@@ -328,12 +339,14 @@ template <typename IdxT>
 raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::centers()
   const noexcept
 {
-  return centers_.view();
+  return centers_view_;
 }
 
 template <typename IdxT>
-raft::device_matrix_view<float, uint32_t, raft::row_major> index<IdxT>::centers_rot() noexcept
+raft::device_matrix_view<float, uint32_t, raft::row_major> index<IdxT>::centers_rot_owning_view()
 {
+  RAFT_EXPECTS(centers_rot_.size() != 0,
+               "Empty centers rot mdarray. Index built from args can't be modified");
   return centers_rot_.view();
 }
 
@@ -341,7 +354,7 @@ template <typename IdxT>
 raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::centers_rot()
   const noexcept
 {
-  return centers_rot_.view();
+  return centers_rot_view_;
 }
 
 template <typename IdxT>

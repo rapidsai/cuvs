@@ -149,8 +149,8 @@ auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT
     handle_, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, cma);
 
   raft::deserialize_mdspan(handle_, is, index.pq_centers_owning_view());
-  raft::deserialize_mdspan(handle_, is, index.centers());
-  raft::deserialize_mdspan(handle_, is, index.centers_rot());
+  raft::deserialize_mdspan(handle_, is, index.centers_owning_view());
+  raft::deserialize_mdspan(handle_, is, index.centers_rot_owning_view());
   raft::deserialize_mdspan(handle_, is, index.rotation_matrix_owning_view());
   raft::deserialize_mdspan(handle_, is, index.list_sizes());
   auto list_device_spec = list_spec<uint32_t, IdxT>{pq_bits, pq_dim, cma};

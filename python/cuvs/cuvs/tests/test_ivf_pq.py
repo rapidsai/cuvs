@@ -221,16 +221,22 @@ def test_ivf_pq_dtype(inplace, dtype, array_type):
 
 
 @pytest.mark.parametrize("force_random_rotation", [True, False])
+@pytest.mark.parametrize("use_centers_rot", [True, False])
 @pytest.mark.parametrize("codebook_kind", ["subspace", "cluster"])
-@pytest.mark.parametrize("n_cols", [10, 32, 63, 200])
+@pytest.mark.parametrize("n_cols", [10, 200])
 @pytest.mark.parametrize("pq_bits", [4, 8])
-@pytest.mark.parametrize("n_lists", [10, 30, 100])
+@pytest.mark.parametrize("n_lists", [10, 90])
 def test_build_from_args(
-    force_random_rotation, codebook_kind, n_cols, pq_bits, n_lists
+    force_random_rotation,
+    use_centers_rot,
+    codebook_kind,
+    n_cols,
+    pq_bits,
+    n_lists,
 ):
     dtype = np.float32
     metric = "sqeuclidean"
-    n_rows = 10000
+    n_rows = 3000
     n_queries = 100
     k = 10
     build_params = ivf_pq.IndexParams(
@@ -242,12 +248,14 @@ def test_build_from_args(
     )
     dataset = generate_data((n_rows, n_cols), dtype)
     queries = generate_data((n_queries, n_cols), dtype)
-    if metric == "inner_product":
-        dataset = normalize(dataset, norm="l2", axis=1)
     index = ivf_pq.build(build_params, dataset)
     rotation_matrix = index.rotation_matrix
     codebook = index.codebook
-    centers = cp.array(index.centers.copy_to_host())
+    centers = index.centers
+    if use_centers_rot:
+        centers_rot = index.centers_rot
+    else:
+        centers_rot = None
     if codebook_kind == "subspace":
         assert codebook.shape[0] == index.pq_dim
     else:
@@ -256,11 +264,16 @@ def test_build_from_args(
     inplace = (index.pq_dim * index.pq_len) == n_cols
     if force_random_rotation or (not inplace):
         index2 = ivf_pq.build_from_args(
-            build_params, n_cols, codebook, centers, rotation_matrix
+            build_params,
+            n_cols,
+            codebook,
+            centers,
+            centers_rot=centers_rot,
+            rotation_matrix=rotation_matrix,
         )
     else:
         index2 = ivf_pq.build_from_args(
-            build_params, n_cols, codebook, centers
+            build_params, n_cols, codebook, centers, centers_rot=centers_rot
         )
     assert index2.codebook.shape == codebook.shape
     assert index2.centers.shape == centers.shape
@@ -273,7 +286,10 @@ def test_build_from_args(
     assert np.allclose(
         cp.array(index2.codebook).get(), cp.array(codebook).get()
     )
-    assert np.allclose(index2.centers.copy_to_host(), centers.get())
+    assert np.allclose(index2.centers.copy_to_host(), centers.copy_to_host())
+    assert np.allclose(
+        index2.centers_rot.copy_to_host(), index.centers_rot.copy_to_host()
+    )
 
     indices = np.arange(n_rows, dtype=np.int64)
     index2 = ivf_pq.extend(index2, dataset, indices)

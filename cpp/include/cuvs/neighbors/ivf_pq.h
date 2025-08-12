@@ -280,7 +280,8 @@ uint32_t cuvsIvfPqIndexGetPqBookSize(cuvsIvfPqIndex_t index);
  * @brief Get the cluster centers corresponding to the lists in the original space
  *
  * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
- * @param[out] centers View of the array on device memory, dimensions [n_lists, dim]
+ * @param[out] centers View of the centers array on device memory,
+ * dimensions [n_lists, dim_ext].
  * @return cuvsError_t
  */
 cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* centers);
@@ -305,6 +306,16 @@ cuvsError_t cuvsIvfPqIndexGetCodebook(cuvsIvfPqIndex_t index, DLManagedTensor* c
  */
 cuvsError_t cuvsIvfPqIndexGetRotationMatrix(cuvsIvfPqIndex_t index,
                                             DLManagedTensor* rotation_matrix);
+
+/**
+ * @brief Get the cluster centers in the rotated space
+ *
+ * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
+ * @param[out] centers_rot View of the array on device memory, dimensions
+ * [n_lists, rot_dim]
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqIndexGetCentersRot(cuvsIvfPqIndex_t index, DLManagedTensor* centers_rot);
 /**
  * @}
  */
@@ -401,6 +412,7 @@ cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
  * @param[in] dim dimensionality of the input data
  * @param[in] pq_centers DLManagedTensor* PQ codebook
  * @param[in] centers DLManagedTensor* cluster centers
+ * @param[in] centers_rot DLManagedTensor* cluster centers in the rotated space (optional)
  * @param[in] rotation_matrix DLManagedTensor* rotation matrix (optional)
  * @param[out] index cuvsIvfPqIndex_t Newly built IVF-PQ index
  * @return cuvsError_t
@@ -410,6 +422,7 @@ cuvsError_t cuvsIvfPqBuildFromArgs(cuvsResources_t res,
                                    uint32_t dim,
                                    DLManagedTensor* pq_centers,
                                    DLManagedTensor* centers,
+                                   DLManagedTensor* centers_rot,
                                    DLManagedTensor* rotation_matrix,
                                    cuvsIvfPqIndex_t index);
 /**

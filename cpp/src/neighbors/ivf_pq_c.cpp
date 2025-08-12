@@ -92,6 +92,7 @@ void* _build_from_args(cuvsResources_t res,
                        uint32_t dim,
                        DLManagedTensor* pq_centers,
                        DLManagedTensor* centers,
+                       DLManagedTensor* centers_rot,
                        DLManagedTensor* rotation_matrix)
 {
   using mdspan_type_3d =
@@ -109,14 +110,24 @@ void* _build_from_args(cuvsResources_t res,
     rotation_matrix_opt =
       std::make_optional(cuvs::core::from_dlpack<mdspan_type_2d>(rotation_matrix));
   }
+  std::optional<mdspan_type_2d> centers_rot_opt;
+  if (centers_rot != nullptr && cuvs::core::is_dlpack_device_compatible(centers_rot->dl_tensor)) {
+    centers_rot_opt = std::make_optional(cuvs::core::from_dlpack<mdspan_type_2d>(centers_rot));
+  }
 
   if (cuvs::core::is_dlpack_device_compatible(pq_centers->dl_tensor) &&
       cuvs::core::is_dlpack_device_compatible(centers->dl_tensor)) {
     auto pq_centers_mds = cuvs::core::from_dlpack<mdspan_type_3d>(pq_centers);
     auto centers_mds    = cuvs::core::from_dlpack<mdspan_type_2d>(centers);
 
-    cuvs::neighbors::ivf_pq::build(
-      *res_ptr, build_params, dim, pq_centers_mds, centers_mds, rotation_matrix_opt, index);
+    cuvs::neighbors::ivf_pq::build(*res_ptr,
+                                   build_params,
+                                   dim,
+                                   pq_centers_mds,
+                                   centers_mds,
+                                   centers_rot_opt,
+                                   rotation_matrix_opt,
+                                   index);
   } else {
     RAFT_FAIL("build inputs must be on device memory");
   }
@@ -247,6 +258,7 @@ extern "C" cuvsError_t cuvsIvfPqBuildFromArgs(cuvsResources_t res,
                                               uint32_t dim,
                                               DLManagedTensor* pq_centers,
                                               DLManagedTensor* centers,
+                                              DLManagedTensor* centers_rot,
                                               DLManagedTensor* rotation_matrix,
                                               cuvsIvfPqIndex_t index)
 {
@@ -254,8 +266,8 @@ extern "C" cuvsError_t cuvsIvfPqBuildFromArgs(cuvsResources_t res,
     // Use default dtype for the index
     index->dtype.code = kDLFloat;
     index->dtype.bits = 32;
-    index->addr       = reinterpret_cast<uintptr_t>(
-      _build_from_args<int64_t>(res, *params, dim, pq_centers, centers, rotation_matrix));
+    index->addr       = reinterpret_cast<uintptr_t>(_build_from_args<int64_t>(
+      res, *params, dim, pq_centers, centers, centers_rot, rotation_matrix));
   });
 }
 
@@ -397,15 +409,7 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManage
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
-
-    auto stride = index_ptr->dim_ext();
-    raft::matrix_extent<int64_t> extents{index_ptr->centers().extent(0), index_ptr->dim()};
-    auto layout = raft::make_strided_layout(extents, std::array<int64_t, 2>{stride, 1});
-
-    raft::device_matrix_view<const float, int64_t, raft::layout_stride> centers_view{
-      index_ptr->centers().data_handle(), layout};
-
-    cuvs::core::to_dlpack(centers_view, centers);
+    cuvs::core::to_dlpack(index_ptr->centers(), centers);
   });
 }
 
@@ -423,6 +427,15 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetRotationMatrix(cuvsIvfPqIndex_t index,
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
     cuvs::core::to_dlpack(index_ptr->rotation_matrix(), rotation_matrix);
+  });
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexGetCentersRot(cuvsIvfPqIndex_t index,
+                                                   DLManagedTensor* centers_rot)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+    cuvs::core::to_dlpack(index_ptr->centers_rot(), centers_rot);
   });
 }
 

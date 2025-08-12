@@ -100,6 +100,9 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
     cuvsError_t cuvsIvfPqIndexGetCodebook(cuvsIvfPqIndex_t index,
                                           DLManagedTensor * codebook)
 
+    cuvsError_t cuvsIvfPqIndexGetCentersRot(
+        cuvsIvfPqIndex_t index, DLManagedTensor * centers_rot)
+
     cuvsError_t cuvsIvfPqIndexGetRotationMatrix(
         cuvsIvfPqIndex_t index, DLManagedTensor * rotation_matrix)
 
@@ -108,6 +111,7 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
                                        uint32_t dim,
                                        DLManagedTensor* pq_centers,
                                        DLManagedTensor* centers,
+                                       DLManagedTensor* centers_rot,
                                        DLManagedTensor* rotation_matrix,
                                        cuvsIvfPqIndex_t index)
 
