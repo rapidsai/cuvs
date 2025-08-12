@@ -124,27 +124,23 @@ void construct_landmark_1nn(raft::resources const& handle,
                             int64_t k,
                             cuvs::neighbors::ball_cover::index<value_idx, value_t>& index)
 {
-  rmm::device_uvector<value_idx> R_1nn_inds(index.m, raft::resource::get_cuda_stream(handle));
+  auto R_1nn_inds = raft::make_device_vector<value_idx, value_idx>(handle, index.m);
 
   thrust::fill(raft::resource::get_thrust_policy(handle),
-               R_1nn_inds.data(),
-               R_1nn_inds.data() + index.m,
+               R_1nn_inds.data_handle(),
+               R_1nn_inds.data_handle() + index.m,
                std::numeric_limits<value_idx>::max());
 
-  value_idx* R_1nn_inds_ptr = R_1nn_inds.data();
-  value_t* R_1nn_dists_ptr  = index.get_R_1nn_dists().data_handle();
-
+  raft::linalg::map_offset(handle, R_1nn_inds.view(), [R_knn_inds_ptr, k] __device__(value_idx i) {
+    return R_knn_inds_ptr[i * k];
+  });
   raft::linalg::map_offset(
-    handle, R_1nn_inds_ptr, index.m, [R_knn_inds_ptr, k] __device__(value_idx i) {
-      return R_knn_inds_ptr[i * k];
-    });
-  raft::linalg::map_offset(
-    handle, R_1nn_dists_ptr, index.m, [R_knn_dists_ptr, k] __device__(value_idx i) {
+    handle, index.get_R_1nn_dists(), [R_knn_dists_ptr, k] __device__(value_idx i) {
       return R_knn_dists_ptr[i * k];
     });
 
   auto keys = thrust::make_zip_iterator(
-    thrust::make_tuple(R_1nn_inds.data(), index.get_R_1nn_dists().data_handle()));
+    thrust::make_tuple(R_1nn_inds.data_handle(), index.get_R_1nn_dists().data_handle()));
 
   // group neighborhoods for each reference landmark and sort each group by distance
   thrust::sort_by_key(raft::resource::get_thrust_policy(handle),
@@ -154,7 +150,7 @@ void construct_landmark_1nn(raft::resources const& handle,
                       NNComp());
 
   // convert to CSR for fast lookup
-  raft::sparse::convert::sorted_coo_to_csr(R_1nn_inds.data(),
+  raft::sparse::convert::sorted_coo_to_csr(R_1nn_inds.data_handle(),
                                            index.m,
                                            index.get_R_indptr().data_handle(),
                                            index.n_landmarks + 1,
