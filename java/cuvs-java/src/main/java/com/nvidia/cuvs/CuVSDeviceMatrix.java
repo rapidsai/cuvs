@@ -19,11 +19,24 @@ package com.nvidia.cuvs;
  * A Dataset implementation backed by device (GPU) memory.
  */
 public interface CuVSDeviceMatrix extends CuVSMatrix {
-  void toHost(CuVSHostMatrix hostMatrix, CuVSResources resources);
 
-  default CuVSHostMatrix toHost(CuVSResources resources) {
+  /**
+   * Fills the provided, pre-allocated host matrix with data from this device matrix.
+   * The content of the provided host matrix will be overwritten; the 2 matrices must have the
+   * same element type and dimension.
+   *
+   * @param hostMatrix  the host-memory-backed matrix to fill.
+   */
+  void toHost(CuVSHostMatrix hostMatrix);
+
+  /**
+   * FReturns a new, host matrix with data from this device matrix.
+   * The returned host matrix will need to be managed by the caller, which will be
+   * responsible to call {@link CuVSMatrix#close()} to free its resources when done.
+   */
+  default CuVSHostMatrix toHost() {
     var hostMatrix = (CuVSHostMatrix) CuVSMatrix.hostBuilder(size(), columns(), dataType()).build();
-    toHost(hostMatrix, resources);
+    toHost(hostMatrix);
     return hostMatrix;
   }
 }

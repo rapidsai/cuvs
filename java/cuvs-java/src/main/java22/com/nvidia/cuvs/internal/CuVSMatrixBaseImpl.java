@@ -72,10 +72,16 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
     return valueLayout;
   }
 
+  /**
+   * Size (in bits) for the element type of this matrix
+   */
   protected int bits() {
     return (int) (valueLayout.byteSize() * 8);
   }
 
+  /**
+   * DLTensor data type {@code code} for the element type of this matrix
+   */
   protected int code() {
     return switch (dataType) {
       case FLOAT -> kDLFloat();
@@ -98,8 +104,21 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
         .withByteAlignment(32);
   }
 
+  /**
+   * Creates a {@link DLManagedTensor} representing the matrix data and shape, to be
+   * passed to the CuVS C API.
+   * @param arena The Arena to use to allocate DL data structures
+   * @return a {@link MemorySegment} for the newly allocated DLManagedTensor
+   */
   public abstract MemorySegment toTensor(Arena arena);
 
+  /**
+   * Creates a {@link CuVSMatrix} from data and infos from a {@link DLManagedTensor}
+   *
+   * @param dlManagedTensor a {@link MemorySegment} representing the source DLManagedTensor
+   * @param resources       {@link CuVSResources} to allocate the resulting matrix
+   * @return a {@link CuVSMatrix} encapsulating the same data as the input {@link DLManagedTensor}
+   */
   public static CuVSMatrix fromTensor(MemorySegment dlManagedTensor, CuVSResources resources) {
     var dlTensor = DLManagedTensor.dl_tensor(dlManagedTensor);
     var dlDevice = DLTensor.device(dlTensor);

@@ -20,6 +20,10 @@ import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.internal.common.CloseableRMMAllocation;
 import java.lang.foreign.ValueLayout;
 
+/**
+ * A Dataset implementation backed by device (GPU) memory, allocated
+ * using RMM functions from {@link CuVSResources} pools (via {@link CloseableRMMAllocation}).
+ */
 public class CuVSDeviceMatrixRMMImpl extends CuVSDeviceMatrixImpl implements CuVSDeviceMatrix {
 
   private final CloseableRMMAllocation rmmAllocation;

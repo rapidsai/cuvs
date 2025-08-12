@@ -27,7 +27,7 @@ import java.lang.foreign.*;
 public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDeviceMatrix {
 
   private static final int CHUNK_BYTES =
-      32 * 1024 * 1024; // 32MB seems like the optimal size to optimize PCIe bandwidth
+      8 * 1024 * 1024; // Based on benchmarks, 8MB seems the minimum size to optimize PCIe bandwidth
   private final long hostBufferBytes;
 
   private long bufferedMatrixRowStart = 0;
@@ -216,7 +216,13 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
   }
 
   @Override
-  public void toHost(CuVSHostMatrix hostMatrix, CuVSResources resources) {
+  public void toHost(CuVSHostMatrix hostMatrix) {
+    if (hostMatrix.columns() != columns || hostMatrix.size() != size) {
+      throw new IllegalArgumentException("[hostMatrix] must have the same dimensions");
+    }
+    if (hostMatrix.dataType() != dataType) {
+      throw new IllegalArgumentException("[hostMatrix] must have the same dataType");
+    }
     try (var localArena = Arena.ofConfined()) {
       var hostMatrixTensor = ((CuVSHostMatrixImpl) hostMatrix).toTensor(localArena);
 

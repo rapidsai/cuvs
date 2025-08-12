@@ -88,10 +88,8 @@ public class CuVSDeviceMatrixBenchmarks {
   }
 
   @Benchmark
-  public void matrixCopyDeviceToHost() throws Throwable {
-    try (var resources = CuVSResources.create()) {
-      deviceMatrix.toHost(hostMatrix, resources);
-    }
+  public void matrixCopyDeviceToHost() {
+    deviceMatrix.toHost(hostMatrix);
   }
 
   @Benchmark

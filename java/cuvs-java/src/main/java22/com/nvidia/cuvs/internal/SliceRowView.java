@@ -20,6 +20,9 @@ import com.nvidia.cuvs.RowView;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 
+/**
+ * A {@link RowView} over a {@link MemorySegment} slice.
+ */
 class SliceRowView implements RowView {
   private final MemorySegment memorySegment;
   private final long size;
