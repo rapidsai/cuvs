@@ -17,7 +17,8 @@
 #pragma once
 #include "./knn_brute_force.cuh"
 
-#include <raft/core/handle.hpp>
+#include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resources.hpp>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/sparse/convert/csr.cuh>
