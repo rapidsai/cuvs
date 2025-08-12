@@ -20,8 +20,11 @@
 #include "agglomerative.cuh"
 #include "connectivities.cuh"
 #include "mst.cuh"
+#include "raft/core/device_mdspan.hpp"
 #include <cuvs/cluster/agglomerative.hpp>
 #include <cuvs/neighbors/all_neighbors.hpp>
+#include <raft/core/mdspan.hpp>
+#include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/sparse/coo.hpp>
 #include <raft/util/cudart_utils.hpp>
@@ -48,18 +51,22 @@ namespace cuvs::cluster::agglomerative::detail {
  * @param[out] out_distances distances of output
  * @param[out] out_sizes cluster sizes of output
  */
-template <typename value_t = float, typename value_idx = int, typename nnz_t = size_t>
-void build_mr_linkage(raft::resources const& handle,
-                      raft::device_matrix_view<const value_t, value_idx, raft::row_major> X,
-                      value_idx min_samples,
-                      float alpha,
-                      cuvs::distance::DistanceType metric,
-                      raft::device_vector_view<value_t, value_idx> core_dists,
-                      raft::device_coo_matrix_view<value_t, value_idx, value_idx, nnz_t> out_mst,
-                      raft::device_matrix_view<value_idx, value_idx> out_dendrogram,
-                      raft::device_vector_view<value_t, value_idx> out_distances,
-                      raft::device_vector_view<value_idx, value_idx> out_sizes,
-                      cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_p)
+template <typename value_t   = float,
+          typename value_idx = int,
+          typename nnz_t     = size_t,
+          typename Accessor  = raft::device_accessor<std::experimental::default_accessor<value_t>>>
+void build_mr_linkage(
+  raft::resources const& handle,
+  raft::mdspan<const value_t, raft::matrix_extent<value_idx>, raft::row_major, Accessor> X,
+  value_idx min_samples,
+  float alpha,
+  cuvs::distance::DistanceType metric,
+  raft::device_vector_view<value_t, value_idx> core_dists,
+  raft::device_coo_matrix_view<value_t, value_idx, value_idx, nnz_t> out_mst,
+  raft::device_matrix_view<value_idx, value_idx> out_dendrogram,
+  raft::device_vector_view<value_t, value_idx> out_distances,
+  raft::device_vector_view<value_idx, value_idx> out_sizes,
+  cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_p)
 {
   size_t m         = X.extent(0);
   size_t n         = X.extent(1);
@@ -72,7 +79,10 @@ void build_mr_linkage(raft::resources const& handle,
   auto inds  = raft::make_device_matrix<value_idx, value_idx>(handle, m, min_samples);
   auto dists = raft::make_device_matrix<value_t, value_idx>(handle, m, min_samples);
 
-  all_neighbors_p.metric = metric;  // propagating given metric to all_neighbors
+  if (all_neighbors_p.metric != metric) {
+    RAFT_LOG_WARN("Setting all neighbors metric to given metrix for build_mr_linkage");
+    all_neighbors_p.metric = metric;
+  }
   cuvs::neighbors::all_neighbors::build(
     handle, all_neighbors_p, X, inds.view(), dists.view(), core_dists, alpha);
 

@@ -175,6 +175,18 @@ void build_linkage(
   raft::device_vector_view<float, int64_t> out_distances,
   raft::device_vector_view<int64_t, int64_t> out_sizes,
   std::optional<raft::device_vector_view<float, int64_t>> core_dists);
+
+void build_linkage(
+  raft::resources const& handle,
+  raft::host_matrix_view<const float, int64_t, raft::row_major> X,
+  std::variant<linkage_graph_params::distance_params,
+               linkage_graph_params::mutual_reachability_params> linkage_graph_params,
+  cuvs::distance::DistanceType metric,
+  raft::device_coo_matrix_view<float, int64_t, int64_t, size_t> out_mst,
+  raft::device_matrix_view<int64_t, int64_t> dendrogram,
+  raft::device_vector_view<float, int64_t> out_distances,
+  raft::device_vector_view<int64_t, int64_t> out_sizes,
+  std::optional<raft::device_vector_view<float, int64_t>> core_dists);
 }  // namespace helpers
 /**
  * @}
