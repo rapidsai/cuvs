@@ -53,21 +53,21 @@ public interface CuVSProvider {
   CuVSResources newCuVSResources(Path tempDirectory) throws Throwable;
 
   /** Create a {@link CuVSMatrix.Builder} instance for a host memory matrix **/
-  CuVSMatrix.Builder newHostMatrixBuilder(int size, int dimensions, CuVSMatrix.DataType dataType);
+  CuVSMatrix.Builder newHostMatrixBuilder(long size, long dimensions, CuVSMatrix.DataType dataType);
 
   /** Create a {@link CuVSMatrix.Builder} instance for a device memory matrix **/
   CuVSMatrix.Builder newDeviceMatrixBuilder(
       CuVSResources cuVSResources,
-      int size,
-      int dimensions,
+      long size,
+      long dimensions,
       CuVSMatrix.DataType dataType,
       int copyType);
 
   /** Create a {@link CuVSMatrix.Builder} instance for a device memory matrix **/
   CuVSMatrix.Builder newDeviceMatrixBuilder(
       CuVSResources cuVSResources,
-      int size,
-      int dimensions,
+      long size,
+      long dimensions,
       int rowStride,
       int columnStride,
       CuVSMatrix.DataType dataType,

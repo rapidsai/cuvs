@@ -61,15 +61,15 @@ final class UnsupportedProvider implements CuVSProvider {
 
   @Override
   public CuVSMatrix.Builder newHostMatrixBuilder(
-      int size, int dimensions, CuVSMatrix.DataType dataType) {
+      long size, long dimensions, CuVSMatrix.DataType dataType) {
     throw new UnsupportedOperationException();
   }
 
   @Override
   public CuVSMatrix.Builder newDeviceMatrixBuilder(
       CuVSResources cuVSResources,
-      int size,
-      int dimensions,
+      long size,
+      long dimensions,
       CuVSMatrix.DataType dataType,
       int copyType) {
     throw new UnsupportedOperationException();
@@ -78,8 +78,8 @@ final class UnsupportedProvider implements CuVSProvider {
   @Override
   public CuVSMatrix.Builder newDeviceMatrixBuilder(
       CuVSResources cuVSResources,
-      int size,
-      int dimensions,
+      long size,
+      long dimensions,
       int rowStride,
       int columnStride,
       CuVSMatrix.DataType dataType,

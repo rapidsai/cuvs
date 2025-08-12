@@ -39,6 +39,8 @@ public class CuVSDeviceMatrixBenchmarks {
   private CuVSDeviceMatrix matrixWithNativeBuffer;
   private CuVSDeviceMatrix matrixWithPinnedBuffer;
 
+  private CuVSHostMatrix hostMatrix;
+
   private float[][] createRandomData() {
     var array = new float[size][dims];
 
@@ -67,6 +69,7 @@ public class CuVSDeviceMatrixBenchmarks {
 
     matrixWithNativeBuffer = (CuVSDeviceMatrix) builder0.build();
     matrixWithPinnedBuffer = (CuVSDeviceMatrix) builder1.build();
+    hostMatrix = (CuVSHostMatrix) CuVSMatrix.hostBuilder(size, dims, CuVSMatrix.DataType.FLOAT).build();
   }
 
   @TearDown
@@ -76,6 +79,9 @@ public class CuVSDeviceMatrixBenchmarks {
     }
     if (matrixWithPinnedBuffer != null) {
       matrixWithPinnedBuffer.close();
+    }
+    if (hostMatrix != null) {
+      hostMatrix.close();
     }
     if (resources != null) {
       resources.close();
@@ -99,7 +105,7 @@ public class CuVSDeviceMatrixBenchmarks {
   @Benchmark
   public void matrixCopyToHost() throws Throwable {
     try (var resources = CuVSResources.create()) {
-      matrixWithPinnedBuffer.toHost(resources).close();
+      matrixWithPinnedBuffer.toHost(hostMatrix, resources);
     }
   }
 

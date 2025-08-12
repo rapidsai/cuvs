@@ -396,6 +396,11 @@ public class CagraIndexImpl implements CagraIndex {
           cuvsCagraIndexGetGraph(cagraIndexReference.getMemorySegment(), graphDeviceTensor),
           "cuvsCagraIndexGetGraph");
 
+      assert DLTensor.ndim(DLManagedTensor.dl_tensor(graphDeviceTensor)) == 2;
+      assert DLTensor.shape(DLManagedTensor.dl_tensor(graphDeviceTensor)).get(int64_t, 0) > 0;
+      assert DLTensor.shape(DLManagedTensor.dl_tensor(graphDeviceTensor)).getAtIndex(int64_t, 1)
+          > 0;
+
       var graph = CuVSMatrixBaseImpl.fromTensor(graphDeviceTensor, resources);
       assert graph instanceof CuVSDeviceMatrix;
       return (CuVSDeviceMatrix) graph;

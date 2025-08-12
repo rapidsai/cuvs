@@ -102,7 +102,7 @@ public interface CuVSMatrix extends AutoCloseable {
    * @param dataType The data type of the dataset elements
    * @return new instance of {@link CuVSMatrix}
    */
-  static Builder hostBuilder(int size, int columns, DataType dataType) {
+  static Builder hostBuilder(long size, long columns, DataType dataType) {
     return CuVSProvider.provider().newHostMatrixBuilder(size, columns, dataType);
   }
 
@@ -116,7 +116,7 @@ public interface CuVSMatrix extends AutoCloseable {
    * @return new instance of {@link CuVSMatrix}
    */
   static Builder deviceBuilder(
-      CuVSResources resources, int size, int columns, DataType dataType, int copyType) {
+      CuVSResources resources, long size, long columns, DataType dataType, int copyType) {
     return CuVSProvider.provider()
         .newDeviceMatrixBuilder(resources, size, columns, dataType, copyType);
   }
@@ -135,6 +135,13 @@ public interface CuVSMatrix extends AutoCloseable {
    * @return Dimensions of the vectors in the dataset
    */
   long columns();
+
+  /**
+   * Gets the element type
+   *
+   * @return a {@link DataType} describing the matrix element type
+   */
+  DataType dataType();
 
   /**
    * Get a view (0-copy) of the row data, as a list of integers (32 bit)

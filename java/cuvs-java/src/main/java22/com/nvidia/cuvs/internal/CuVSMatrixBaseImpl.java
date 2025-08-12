@@ -59,6 +59,11 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
     return columns;
   }
 
+  @Override
+  public DataType dataType() {
+    return dataType;
+  }
+
   public MemorySegment memorySegment() {
     return memorySegment;
   }
@@ -102,7 +107,7 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
     var deviceType = DLDevice.device_type(dlDevice);
 
     var data = DLTensor.data(dlTensor);
-    if (data == MemorySegment.NULL) {
+    if (data.equals(MemorySegment.NULL)) {
       throw new IllegalArgumentException("[data] must not be NULL");
     }
 
@@ -118,17 +123,21 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
     final DataType dataType = dataTypeFromTensor(code, bits);
 
     var shape = DLTensor.shape(dlTensor);
-    if (shape == MemorySegment.NULL) {
+    if (shape.equals(MemorySegment.NULL)) {
       throw new IllegalArgumentException("[shape] must not be NULL");
     }
-    var rows = shape.get(C_LONG, 0);
-    var cols = shape.get(C_LONG, 1);
+
+    var rows = shape.get(int64_t, 0);
+    var cols = shape.getAtIndex(int64_t, 1);
 
     if (deviceType == kDLCUDA()) {
       var strides = DLTensor.strides(dlTensor);
-      if (strides != MemorySegment.NULL) {
-        var rowStride = strides.get(C_LONG, 0);
-        var colStride = strides.get(C_LONG, 1);
+      if (strides.equals(MemorySegment.NULL)) {
+        return new CuVSDeviceMatrixImpl(
+            resources, data, rows, cols, dataType, valueLayoutFromType(dataType), 0);
+      } else {
+        var rowStride = strides.get(int64_t, 0);
+        var colStride = strides.getAtIndex(int64_t, 1);
         return new CuVSDeviceMatrixImpl(
             resources,
             data,
@@ -139,9 +148,6 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
             dataType,
             valueLayoutFromType(dataType),
             0);
-      } else {
-        return new CuVSDeviceMatrixImpl(
-            resources, data, rows, cols, dataType, valueLayoutFromType(dataType), 0);
       }
     } else if (deviceType == kDLCPU()) {
       return new CuVSHostMatrixImpl(data, rows, cols, dataType);

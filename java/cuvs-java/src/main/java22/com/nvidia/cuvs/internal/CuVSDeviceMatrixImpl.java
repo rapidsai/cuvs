@@ -71,7 +71,7 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
     this.rowStride = rowStride;
     this.columnStride = columnStride;
 
-    var bufferArena = Arena.ofAuto();
+    var bufferArena = Arena.ofShared();
 
     var bufferType = copyType & 0xF;
     switch (bufferType) {
@@ -140,10 +140,12 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
           "cuvsMatrixSliceRows");
       assert DLTensor.shape(DLManagedTensor.dl_tensor(sliceManagedTensor)).get(C_LONG, 0)
           == rowCount;
+      assert DLTensor.shape(DLManagedTensor.dl_tensor(sliceManagedTensor)).getAtIndex(C_LONG, 1)
+          == columns;
 
       MemorySegment bufferTensor =
           prepareTensor(
-              localArena, hostBuffer, new long[] {rowCount, columns}, code(), bits(), kDLCUDA(), 1);
+              localArena, hostBuffer, new long[] {rowCount, columns}, code(), bits(), kDLCPU(), 1);
 
       try (var resourceAccess = resources.access()) {
         checkCuVSError(
@@ -236,10 +238,9 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
   }
 
   @Override
-  public CuVSHostMatrix toHost(CuVSResources resources) {
-    var hostMatrix = new CuVSHostMatrixArenaImpl(size, columns, dataType);
+  public void toHost(CuVSHostMatrix hostMatrix, CuVSResources resources) {
     try (var localArena = Arena.ofConfined()) {
-      var hostMatrixTensor = hostMatrix.toTensor(localArena);
+      var hostMatrixTensor = ((CuVSHostMatrixImpl) hostMatrix).toTensor(localArena);
 
       try (var resourceAccess = resources.access()) {
         var cuvsRes = resourceAccess.handle();
@@ -249,7 +250,6 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
         checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync");
       }
     }
-    return hostMatrix;
   }
 
   @Override

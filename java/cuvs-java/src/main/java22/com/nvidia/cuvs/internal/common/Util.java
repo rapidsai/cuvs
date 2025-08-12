@@ -368,7 +368,6 @@ public class Util {
 
     MemorySegment managedTensor = DLManagedTensor.allocate(arena);
     MemorySegment tensor = DLTensor.allocate(arena);
-    DLManagedTensor.dl_tensor(managedTensor, tensor);
 
     DLTensor.data(tensor, data);
 
@@ -391,6 +390,10 @@ public class Util {
       DLTensor.strides(tensor, MemorySegment.NULL);
     }
 
+    // Copy tensor information into the DLManagedTensor struct
+    DLManagedTensor.dl_tensor(managedTensor, tensor);
+
+    assert bits == DLDataType.bits(DLTensor.dtype(DLManagedTensor.dl_tensor(managedTensor)));
     return managedTensor;
   }
 }

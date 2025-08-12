@@ -108,7 +108,7 @@ final class JDKProvider implements CuVSProvider {
 
   @Override
   public CuVSMatrix.Builder newHostMatrixBuilder(
-      int size, int columns, CuVSMatrix.DataType dataType) throws UnsupportedOperationException {
+      long size, long columns, CuVSMatrix.DataType dataType) throws UnsupportedOperationException {
 
     return new CuVSMatrix.Builder() {
       final CuVSHostMatrixArenaImpl matrix = new CuVSHostMatrixArenaImpl(size, columns, dataType);
@@ -152,7 +152,7 @@ final class JDKProvider implements CuVSProvider {
             matrix.memorySegment(),
             matrix.valueLayout(),
             ((current++) * columns * matrix.valueLayout().byteSize()),
-            columns);
+            (int) columns);
       }
 
       @Override
@@ -164,7 +164,7 @@ final class JDKProvider implements CuVSProvider {
 
   @Override
   public CuVSMatrix.Builder newDeviceMatrixBuilder(
-      CuVSResources resources, int size, int columns, CuVSMatrix.DataType dataType, int copyType)
+      CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType, int copyType)
       throws UnsupportedOperationException {
 
     var builderCopyType = copyType & 0xF0;
@@ -178,8 +178,8 @@ final class JDKProvider implements CuVSProvider {
   @Override
   public CuVSMatrix.Builder newDeviceMatrixBuilder(
       CuVSResources resources,
-      int size,
-      int columns,
+      long size,
+      long columns,
       int rowStride,
       int columnStride,
       CuVSMatrix.DataType dataType,
@@ -248,8 +248,8 @@ final class JDKProvider implements CuVSProvider {
   }
 
   private static class NativeSegmentBuilder implements CuVSMatrix.Builder {
-    private final int columns;
-    private final int size;
+    private final long columns;
+    private final long size;
     private final CuVSDeviceMatrixImpl matrix;
     private final MemorySegment stream;
     private int current;
@@ -258,8 +258,8 @@ final class JDKProvider implements CuVSProvider {
 
     private NativeSegmentBuilder(
         CuVSResources resources,
-        int size,
-        int columns,
+        long size,
+        long columns,
         CuVSMatrix.DataType dataType,
         int copyType) {
       this.columns = columns;
@@ -272,8 +272,8 @@ final class JDKProvider implements CuVSProvider {
 
     private NativeSegmentBuilder(
         CuVSResources resources,
-        int size,
-        int columns,
+        long size,
+        long columns,
         int rowStride,
         int columnStride,
         CuVSMatrix.DataType dataType,
@@ -328,7 +328,7 @@ final class JDKProvider implements CuVSProvider {
         tempSegment = tempSegmentArena.allocate(rowBytes);
       }
 
-      MemorySegment.copy(vector, 0, tempSegment, matrix.valueLayout(), 0, columns);
+      MemorySegment.copy(vector, 0, tempSegment, matrix.valueLayout(), 0, (int) columns);
 
       var dstOffset = ((current++) * rowBytes);
       var dst = matrix.memorySegment().asSlice(dstOffset);
@@ -345,16 +345,16 @@ final class JDKProvider implements CuVSProvider {
   }
 
   private static class HeapSegmentBuilder implements CuVSMatrix.Builder {
-    private final int columns;
-    private final int size;
+    private final long columns;
+    private final long size;
     private final CuVSDeviceMatrixImpl matrix;
     private final MemorySegment stream;
     int current;
 
     private HeapSegmentBuilder(
         CuVSResources resources,
-        int size,
-        int columns,
+        long size,
+        long columns,
         CuVSMatrix.DataType dataType,
         int copyType) {
       this.columns = columns;
@@ -366,8 +366,8 @@ final class JDKProvider implements CuVSProvider {
 
     private HeapSegmentBuilder(
         CuVSResources resources,
-        int size,
-        int columns,
+        long size,
+        long columns,
         int rowStride,
         int columnStride,
         CuVSMatrix.DataType dataType,
@@ -432,8 +432,8 @@ final class JDKProvider implements CuVSProvider {
   }
 
   private static class CudaHostSegmentBuilder implements CuVSMatrix.Builder {
-    private final int columns;
-    private final int size;
+    private final long columns;
+    private final long size;
     private final CuVSDeviceMatrixImpl matrix;
     private final MemorySegment stream;
     int current;
@@ -441,8 +441,8 @@ final class JDKProvider implements CuVSProvider {
 
     private CudaHostSegmentBuilder(
         CuVSResources resources,
-        int size,
-        int columns,
+        long size,
+        long columns,
         CuVSMatrix.DataType dataType,
         int copyType) {
       this.columns = columns;
@@ -454,8 +454,8 @@ final class JDKProvider implements CuVSProvider {
 
     private CudaHostSegmentBuilder(
         CuVSResources resources,
-        int size,
-        int columns,
+        long size,
+        long columns,
         int rowStride,
         int columnStride,
         CuVSMatrix.DataType dataType,
@@ -517,7 +517,7 @@ final class JDKProvider implements CuVSProvider {
         tempSegment = createBuffer(rowBytes);
       }
 
-      MemorySegment.copy(vector, 0, tempSegment, matrix.valueLayout(), 0, columns);
+      MemorySegment.copy(vector, 0, tempSegment, matrix.valueLayout(), 0, (int) columns);
 
       var dstOffset = ((current++) * rowBytes);
       var dst = matrix.memorySegment().asSlice(dstOffset);

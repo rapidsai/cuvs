@@ -19,5 +19,11 @@ package com.nvidia.cuvs;
  * A Dataset implementation backed by device (GPU) memory.
  */
 public interface CuVSDeviceMatrix extends CuVSMatrix {
-  CuVSHostMatrix toHost(CuVSResources resources);
+  void toHost(CuVSHostMatrix hostMatrix, CuVSResources resources);
+
+  default CuVSHostMatrix toHost(CuVSResources resources) {
+    var hostMatrix = (CuVSHostMatrix) CuVSMatrix.hostBuilder(size(), columns(), dataType()).build();
+    toHost(hostMatrix, resources);
+    return hostMatrix;
+  }
 }

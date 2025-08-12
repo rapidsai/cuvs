@@ -412,8 +412,9 @@ public class CuVSMatrixIT extends CuVSTestCase {
         builder.addVector(array);
       }
 
-      try (var deviceMatrix = (CuVSDeviceMatrix) builder.build()) {
-        var hostMatrix = deviceMatrix.toHost(resources);
+      try (var deviceMatrix = (CuVSDeviceMatrix) builder.build();
+          var hostMatrix = deviceMatrix.toHost(resources)) {
+
         assertEquals(data.length, deviceMatrix.size());
         assertEquals(data[0].length, deviceMatrix.columns());
 
