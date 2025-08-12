@@ -145,4 +145,49 @@ void bitmap_filter<bitmap_t, index_t>::to_csr(raft::resources const& handle, csr
 {
   raft::sparse::convert::bitmap_to_csr(handle, bitmap_view_, csr);
 }
+
+struct none_filter_args_t {};
+using bitset_filter_args_t =
+  std::tuple<const int64_t* const*, cuvs::core::bitset_view<uint32_t, int64_t>>;
+
+struct ivf_filter_dev {
+  filtering::FilterType tag_;
+
+  union ivf_filter_dev_args_variant {
+    none_filter_args_t none_filter_args;
+    bitset_filter_args_t bitset_filter_args;
+
+    _RAFT_HOST_DEVICE ivf_filter_dev_args_variant() {}
+    _RAFT_HOST_DEVICE ~ivf_filter_dev_args_variant() {}
+  } args_;
+
+  _RAFT_HOST_DEVICE ivf_filter_dev(none_filter_args_t args = {}) : tag_(FilterType::None)
+  {
+    new (&args_.none_filter_args) none_filter_args_t(args);
+  }
+
+  _RAFT_HOST_DEVICE ivf_filter_dev(const bitset_filter_args_t& args) : tag_(FilterType::Bitset)
+  {
+    new (&args_.bitset_filter_args) bitset_filter_args_t(args);
+  }
+
+  constexpr inline _RAFT_HOST_DEVICE bool operator()(const uint32_t query_ix,
+                                                     const uint32_t cluster_ix,
+                                                     const uint32_t sample_ix)
+  {
+    switch (tag_) {
+      case FilterType::None:
+        return filtering::none_sample_filter{}(query_ix, cluster_ix, sample_ix);
+      case FilterType::Bitset: {
+        auto& inds_ptrs_   = std::get<0>(args_.bitset_filter_args);
+        auto& bitset_view_ = std::get<1>(args_.bitset_filter_args);
+
+        return filtering::bitset_filter<uint32_t, int64_t>(bitset_view_)(
+          query_ix, inds_ptrs_[cluster_ix][sample_ix]);
+      }
+      default: return true;
+    }
+  }
+};
+
 }  // namespace cuvs::neighbors::filtering
