@@ -15,7 +15,6 @@
  */
 package com.nvidia.cuvs.spi;
 
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_POINTER;
 import static com.nvidia.cuvs.internal.common.Util.*;
 import static com.nvidia.cuvs.internal.panama.headers_h_1.*;
 
@@ -23,7 +22,6 @@ import com.nvidia.cuvs.*;
 import com.nvidia.cuvs.internal.*;
 import com.nvidia.cuvs.internal.common.Native;
 import com.nvidia.cuvs.internal.common.Util;
-import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -164,15 +162,10 @@ final class JDKProvider implements CuVSProvider {
 
   @Override
   public CuVSMatrix.Builder newDeviceMatrixBuilder(
-      CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType, int copyType)
+      CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType)
       throws UnsupportedOperationException {
 
-    var builderCopyType = copyType & 0xF0;
-    return switch (builderCopyType) {
-      case 0x10 -> new HeapSegmentBuilder(resources, size, columns, dataType, copyType);
-      case 0x20 -> new CudaHostSegmentBuilder(resources, size, columns, dataType, copyType);
-      default -> new NativeSegmentBuilder(resources, size, columns, dataType, copyType);
-    };
+    return new HeapSegmentBuilder(resources, size, columns, dataType);
   }
 
   @Override
@@ -182,22 +175,8 @@ final class JDKProvider implements CuVSProvider {
       long columns,
       int rowStride,
       int columnStride,
-      CuVSMatrix.DataType dataType,
-      int copyType)
-      throws UnsupportedOperationException {
-
-    var builderCopyType = copyType & 0xF0;
-    return switch (builderCopyType) {
-      case 0x10 ->
-          new HeapSegmentBuilder(
-              resources, size, columns, rowStride, columnStride, dataType, copyType);
-      case 0x20 ->
-          new CudaHostSegmentBuilder(
-              resources, size, columns, rowStride, columnStride, dataType, copyType);
-      default ->
-          new NativeSegmentBuilder(
-              resources, size, columns, rowStride, columnStride, dataType, copyType);
-    };
+      CuVSMatrix.DataType dataType) {
+    return new HeapSegmentBuilder(resources, size, columns, rowStride, columnStride, dataType);
   }
 
   @Override
@@ -247,103 +226,6 @@ final class JDKProvider implements CuVSProvider {
     return dataset;
   }
 
-  private static class NativeSegmentBuilder implements CuVSMatrix.Builder {
-    private final long columns;
-    private final long size;
-    private final CuVSDeviceMatrixImpl matrix;
-    private final MemorySegment stream;
-    private int current;
-    private MemorySegment tempSegment;
-    private final Arena tempSegmentArena;
-
-    private NativeSegmentBuilder(
-        CuVSResources resources,
-        long size,
-        long columns,
-        CuVSMatrix.DataType dataType,
-        int copyType) {
-      this.columns = columns;
-      this.size = size;
-      this.matrix = CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType, copyType);
-      this.stream = Util.getDefaultStream(resources);
-      current = 0;
-      tempSegmentArena = Arena.ofShared();
-    }
-
-    private NativeSegmentBuilder(
-        CuVSResources resources,
-        long size,
-        long columns,
-        int rowStride,
-        int columnStride,
-        CuVSMatrix.DataType dataType,
-        int copyType) {
-      this.columns = columns;
-      this.size = size;
-      this.matrix =
-          CuVSDeviceMatrixRMMImpl.create(
-              resources, size, columns, rowStride, columnStride, dataType, copyType);
-      this.stream = Util.getDefaultStream(resources);
-      current = 0;
-      tempSegmentArena = Arena.ofShared();
-    }
-
-    @Override
-    public void addVector(float[] vector) {
-      if (vector.length != columns) {
-        throw new IllegalArgumentException(
-            String.format(
-                Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
-      }
-      internalAddVector(vector);
-    }
-
-    @Override
-    public void addVector(byte[] vector) {
-      if (vector.length != columns) {
-        throw new IllegalArgumentException(
-            String.format(
-                Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
-      }
-      internalAddVector(vector);
-    }
-
-    @Override
-    public void addVector(int[] vector) {
-      if (vector.length != columns) {
-        throw new IllegalArgumentException(
-            String.format(
-                Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
-      }
-      internalAddVector(vector);
-    }
-
-    private void internalAddVector(Object vector) {
-      if (current >= size) {
-        throw new ArrayIndexOutOfBoundsException();
-      }
-
-      long rowBytes = columns * matrix.valueLayout().byteSize();
-      if (tempSegment == null) {
-        tempSegment = tempSegmentArena.allocate(rowBytes);
-      }
-
-      MemorySegment.copy(vector, 0, tempSegment, matrix.valueLayout(), 0, (int) columns);
-
-      var dstOffset = ((current++) * rowBytes);
-      var dst = matrix.memorySegment().asSlice(dstOffset);
-      checkCudaError(
-          Native.cudaMemcpyAsync(dst, tempSegment, rowBytes, cudaMemcpyHostToDevice(), stream),
-          "cudaMemcpyAsync");
-    }
-
-    @Override
-    public CuVSMatrix build() {
-      tempSegmentArena.close();
-      return matrix;
-    }
-  }
-
   private static class HeapSegmentBuilder implements CuVSMatrix.Builder {
     private final long columns;
     private final long size;
@@ -352,14 +234,10 @@ final class JDKProvider implements CuVSProvider {
     int current;
 
     private HeapSegmentBuilder(
-        CuVSResources resources,
-        long size,
-        long columns,
-        CuVSMatrix.DataType dataType,
-        int copyType) {
+        CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType) {
       this.columns = columns;
       this.size = size;
-      this.matrix = CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType, copyType);
+      this.matrix = CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType);
       this.stream = Util.getDefaultStream(resources);
       current = 0;
     }
@@ -370,13 +248,12 @@ final class JDKProvider implements CuVSProvider {
         long columns,
         int rowStride,
         int columnStride,
-        CuVSMatrix.DataType dataType,
-        int copyType) {
+        CuVSMatrix.DataType dataType) {
       this.columns = columns;
       this.size = size;
       this.matrix =
           CuVSDeviceMatrixRMMImpl.create(
-              resources, size, columns, rowStride, columnStride, dataType, copyType);
+              resources, size, columns, rowStride, columnStride, dataType);
       this.stream = Util.getDefaultStream(resources);
       current = 0;
     }
@@ -427,110 +304,6 @@ final class JDKProvider implements CuVSProvider {
 
     @Override
     public CuVSMatrix build() {
-      return matrix;
-    }
-  }
-
-  private static class CudaHostSegmentBuilder implements CuVSMatrix.Builder {
-    private final long columns;
-    private final long size;
-    private final CuVSDeviceMatrixImpl matrix;
-    private final MemorySegment stream;
-    int current;
-    MemorySegment tempSegment;
-
-    private CudaHostSegmentBuilder(
-        CuVSResources resources,
-        long size,
-        long columns,
-        CuVSMatrix.DataType dataType,
-        int copyType) {
-      this.columns = columns;
-      this.size = size;
-      this.matrix = CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType, copyType);
-      this.stream = getDefaultStream(resources);
-      current = 0;
-    }
-
-    private CudaHostSegmentBuilder(
-        CuVSResources resources,
-        long size,
-        long columns,
-        int rowStride,
-        int columnStride,
-        CuVSMatrix.DataType dataType,
-        int copyType) {
-      this.columns = columns;
-      this.size = size;
-      this.matrix =
-          CuVSDeviceMatrixRMMImpl.create(
-              resources, size, columns, rowStride, columnStride, dataType, copyType);
-      this.stream = getDefaultStream(resources);
-      current = 0;
-    }
-
-    @Override
-    public void addVector(float[] vector) {
-      if (vector.length != columns) {
-        throw new IllegalArgumentException(
-            String.format(
-                Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
-      }
-      internalAddVector(vector);
-    }
-
-    @Override
-    public void addVector(byte[] vector) {
-      if (vector.length != columns) {
-        throw new IllegalArgumentException(
-            String.format(
-                Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
-      }
-      internalAddVector(vector);
-    }
-
-    @Override
-    public void addVector(int[] vector) {
-      if (vector.length != columns) {
-        throw new IllegalArgumentException(
-            String.format(
-                Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
-      }
-      internalAddVector(vector);
-    }
-
-    private MemorySegment createBuffer(long bufferBytes) {
-      try (var localArena = Arena.ofConfined()) {
-        MemorySegment pointer = localArena.allocate(C_POINTER);
-        cudaMallocHost(pointer, bufferBytes);
-        return pointer.get(C_POINTER, 0);
-      }
-    }
-
-    private void internalAddVector(Object vector) {
-      if (current >= size) {
-        throw new ArrayIndexOutOfBoundsException();
-      }
-
-      long rowBytes = columns * matrix.valueLayout().byteSize();
-      if (tempSegment == null) {
-        tempSegment = createBuffer(rowBytes);
-      }
-
-      MemorySegment.copy(vector, 0, tempSegment, matrix.valueLayout(), 0, (int) columns);
-
-      var dstOffset = ((current++) * rowBytes);
-      var dst = matrix.memorySegment().asSlice(dstOffset);
-      checkCudaError(
-          Native.cudaMemcpyAsync(dst, tempSegment, rowBytes, cudaMemcpyHostToDevice(), stream),
-          "cudaMemcpyAsync");
-    }
-
-    @Override
-    public CuVSMatrix build() {
-      if (tempSegment != null) {
-        cudaFreeHost(tempSegment);
-      }
       return matrix;
     }
   }

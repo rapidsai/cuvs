@@ -134,7 +134,7 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
       var strides = DLTensor.strides(dlTensor);
       if (strides.equals(MemorySegment.NULL)) {
         return new CuVSDeviceMatrixImpl(
-            resources, data, rows, cols, dataType, valueLayoutFromType(dataType), 0);
+            resources, data, rows, cols, dataType, valueLayoutFromType(dataType));
       } else {
         var rowStride = strides.get(int64_t, 0);
         var colStride = strides.getAtIndex(int64_t, 1);
@@ -146,8 +146,7 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
             rowStride,
             colStride,
             dataType,
-            valueLayoutFromType(dataType),
-            0);
+            valueLayoutFromType(dataType));
       }
     } else if (deviceType == kDLCPU()) {
       return new CuVSHostMatrixImpl(data, rows, cols, dataType);

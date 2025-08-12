@@ -57,11 +57,7 @@ public interface CuVSProvider {
 
   /** Create a {@link CuVSMatrix.Builder} instance for a device memory matrix **/
   CuVSMatrix.Builder newDeviceMatrixBuilder(
-      CuVSResources cuVSResources,
-      long size,
-      long dimensions,
-      CuVSMatrix.DataType dataType,
-      int copyType);
+      CuVSResources cuVSResources, long size, long dimensions, CuVSMatrix.DataType dataType);
 
   /** Create a {@link CuVSMatrix.Builder} instance for a device memory matrix **/
   CuVSMatrix.Builder newDeviceMatrixBuilder(
@@ -70,8 +66,7 @@ public interface CuVSProvider {
       long dimensions,
       int rowStride,
       int columnStride,
-      CuVSMatrix.DataType dataType,
-      int copyType);
+      CuVSMatrix.DataType dataType);
 
   /**
    * Returns the factory method used to build a Dataset from native memory.

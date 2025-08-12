@@ -101,7 +101,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
     try (var resources = CheckedCuVSResources.create()) {
       var builder =
           CuVSMatrix.deviceBuilder(
-              resources, byteData.length, byteData[0].length, CuVSMatrix.DataType.BYTE, 0);
+              resources, byteData.length, byteData[0].length, CuVSMatrix.DataType.BYTE);
       for (int i = 0; i < byteData.length; i++) {
         builder.addVector(byteData[i]);
       }
@@ -134,7 +134,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
     try (var resources = CheckedCuVSResources.create()) {
       var builder =
           CuVSMatrix.deviceBuilder(
-              resources, byteData.length, byteData[0].length, CuVSMatrix.DataType.BYTE, 0);
+              resources, byteData.length, byteData[0].length, CuVSMatrix.DataType.BYTE);
       for (int i = 0; i < byteData.length; i++) {
         builder.addVector(byteData[i]);
       }
@@ -166,7 +166,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
     try (var resources = CheckedCuVSResources.create()) {
       var builder =
           CuVSMatrix.deviceBuilder(
-              resources, byteData.length, byteData[0].length, CuVSMatrix.DataType.BYTE, 0);
+              resources, byteData.length, byteData[0].length, CuVSMatrix.DataType.BYTE);
       for (int i = 0; i < byteData.length; i++) {
         builder.addVector(byteData[i]);
       }
@@ -300,12 +300,9 @@ public class CuVSMatrixIT extends CuVSTestCase {
   public void testFloatDatasetDeviceBuilder() throws Throwable {
     int rows = randomIntBetween(1, 1024);
     int cols = randomIntBetween(1, 2048);
-    int copyType = randomIntBetween(0, 2);
     try (var resources = CheckedCuVSResources.create()) {
       testFloatDatasetBuilder(
-          rows,
-          cols,
-          CuVSMatrix.deviceBuilder(resources, rows, cols, CuVSMatrix.DataType.FLOAT, copyType));
+          rows, cols, CuVSMatrix.deviceBuilder(resources, rows, cols, CuVSMatrix.DataType.FLOAT));
     }
   }
 
@@ -348,7 +345,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
     int cols = randomIntBetween(1, 2048);
     try (var resources = CheckedCuVSResources.create()) {
       testIntDatasetBuilder(
-          rows, cols, CuVSMatrix.deviceBuilder(resources, rows, cols, CuVSMatrix.DataType.INT, 0));
+          rows, cols, CuVSMatrix.deviceBuilder(resources, rows, cols, CuVSMatrix.DataType.INT));
     }
   }
 
@@ -392,7 +389,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
     int cols = randomIntBetween(1, 2048);
     try (var resources = CheckedCuVSResources.create()) {
       testByteDatasetBuilder(
-          rows, cols, CuVSMatrix.deviceBuilder(resources, rows, cols, CuVSMatrix.DataType.BYTE, 0));
+          rows, cols, CuVSMatrix.deviceBuilder(resources, rows, cols, CuVSMatrix.DataType.BYTE));
     }
   }
 
@@ -405,8 +402,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
 
     try (var resources = CuVSResources.create()) {
 
-      var builder =
-          CuVSMatrix.deviceBuilder(resources, size, columns, CuVSMatrix.DataType.FLOAT, 2);
+      var builder = CuVSMatrix.deviceBuilder(resources, size, columns, CuVSMatrix.DataType.FLOAT);
       for (int i = 0; i < size; ++i) {
         var array = data[i];
         builder.addVector(array);

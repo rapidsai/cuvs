@@ -23,17 +23,12 @@ import com.nvidia.cuvs.*;
 import com.nvidia.cuvs.internal.panama.DLManagedTensor;
 import com.nvidia.cuvs.internal.panama.DLTensor;
 import java.lang.foreign.*;
-import java.util.function.Consumer;
-import java.util.function.LongFunction;
 
 public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDeviceMatrix {
 
   private static final int CHUNK_BYTES =
       32 * 1024 * 1024; // 32MB seems like the optimal size to optimize PCIe bandwidth
   private final long hostBufferBytes;
-
-  private final LongFunction<MemorySegment> bufferCreator;
-  private final Consumer<MemorySegment> bufferDestroyer;
 
   private long bufferedMatrixRowStart = 0;
   private long bufferedMatrixRowEnd = 0;
@@ -51,9 +46,8 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
       long size,
       long columns,
       DataType dataType,
-      ValueLayout valueLayout,
-      int copyType) {
-    this(resources, deviceMemorySegment, size, columns, -1, -1, dataType, valueLayout, copyType);
+      ValueLayout valueLayout) {
+    this(resources, deviceMemorySegment, size, columns, -1, -1, dataType, valueLayout);
   }
 
   protected CuVSDeviceMatrixImpl(
@@ -64,27 +58,11 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
       long rowStride,
       long columnStride,
       DataType dataType,
-      ValueLayout valueLayout,
-      int copyType) {
+      ValueLayout valueLayout) {
     super(deviceMemorySegment, dataType, valueLayout, size, columns);
     this.resources = resources;
     this.rowStride = rowStride;
     this.columnStride = columnStride;
-
-    var bufferArena = Arena.ofShared();
-
-    var bufferType = copyType & 0xF;
-    switch (bufferType) {
-      case 1:
-        {
-          this.bufferCreator = CuVSDeviceMatrixImpl::createPinnedBuffer;
-          this.bufferDestroyer = CuVSDeviceMatrixImpl::destroyPinnedBuffer;
-        }
-        break;
-      default:
-        this.bufferCreator = bufferArena::allocate;
-        this.bufferDestroyer = _ -> bufferArena.close();
-    }
 
     long rowBytes = columns * valueLayout.byteSize();
     long matrixBytes = size * rowBytes;
@@ -121,7 +99,7 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
   private void populateBuffer(long startRow) {
     if (hostBuffer == MemorySegment.NULL) {
       //      System.out.println("Creating a buffer of size " + hostBufferBytes);
-      hostBuffer = bufferCreator.apply(hostBufferBytes);
+      hostBuffer = createPinnedBuffer(hostBufferBytes);
     }
 
     try (var localArena = Arena.ofConfined()) {
@@ -255,7 +233,7 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
   @Override
   public void close() {
     if (hostBuffer != MemorySegment.NULL) {
-      bufferDestroyer.accept(hostBuffer);
+      destroyPinnedBuffer(hostBuffer);
       hostBuffer = MemorySegment.NULL;
     }
   }

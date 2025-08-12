@@ -116,9 +116,8 @@ public interface CuVSMatrix extends AutoCloseable {
    * @return new instance of {@link CuVSMatrix}
    */
   static Builder deviceBuilder(
-      CuVSResources resources, long size, long columns, DataType dataType, int copyType) {
-    return CuVSProvider.provider()
-        .newDeviceMatrixBuilder(resources, size, columns, dataType, copyType);
+      CuVSResources resources, long size, long columns, DataType dataType) {
+    return CuVSProvider.provider().newDeviceMatrixBuilder(resources, size, columns, dataType);
   }
 
   /**
