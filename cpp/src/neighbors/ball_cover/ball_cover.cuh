@@ -25,6 +25,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/matrix/copy.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/sparse/convert/csr.cuh>
@@ -36,7 +37,6 @@
 #include <thrust/fill.h>
 #include <thrust/for_each.h>
 #include <thrust/functional.h>
-#include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/reduce.h>
 #include <thrust/sequence.h>
@@ -134,11 +134,13 @@ void construct_landmark_1nn(raft::resources const& handle,
   value_idx* R_1nn_inds_ptr = R_1nn_inds.data();
   value_t* R_1nn_dists_ptr  = index.get_R_1nn_dists().data_handle();
 
-  auto idxs = thrust::make_counting_iterator<value_idx>(0);
-  thrust::for_each(
-    raft::resource::get_thrust_policy(handle), idxs, idxs + index.m, [=] __device__(value_idx i) {
-      R_1nn_inds_ptr[i]  = R_knn_inds_ptr[i * k];
-      R_1nn_dists_ptr[i] = R_knn_dists_ptr[i * k];
+  raft::linalg::map_offset(handle, R_1nn_inds_ptr, index.m,
+    [R_knn_inds_ptr, k] __device__(value_idx i) {
+      return R_knn_inds_ptr[i * k];
+    });
+  raft::linalg::map_offset(handle, R_1nn_dists_ptr, index.m,
+    [R_knn_dists_ptr, k] __device__(value_idx i) {
+      return R_knn_dists_ptr[i * k];
     });
 
   auto keys = thrust::make_zip_iterator(
@@ -212,18 +214,13 @@ template <typename value_idx, typename value_t>
 void compute_landmark_radii(raft::resources const& handle,
                             cuvs::neighbors::ball_cover::index<value_idx, value_t>& index)
 {
-  auto entries = thrust::make_counting_iterator<value_idx>(0);
-
   const value_idx* R_indptr_ptr  = index.get_R_indptr().data_handle();
   const value_t* R_1nn_dists_ptr = index.get_R_1nn_dists().data_handle();
-  value_t* R_radius_ptr          = index.get_R_radius().data_handle();
-  thrust::for_each(raft::resource::get_thrust_policy(handle),
-                   entries,
-                   entries + index.n_landmarks,
-                   [=] __device__(value_idx input) {
-                     value_idx last_row_idx = R_indptr_ptr[input + 1] - 1;
-                     R_radius_ptr[input]    = R_1nn_dists_ptr[last_row_idx];
-                   });
+  raft::linalg::map_offset(handle, index.get_R_radius(), 
+    [R_indptr_ptr, R_1nn_dists_ptr] __device__(value_idx input) {
+      value_idx last_row_idx = R_indptr_ptr[input + 1] - 1;
+      return R_1nn_dists_ptr[last_row_idx];
+    });
 }
 
 /**
