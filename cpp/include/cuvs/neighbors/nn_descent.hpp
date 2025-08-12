@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,7 +56,6 @@ struct index_params : cuvs::neighbors::index_params {
   size_t max_iterations            = 20;      // Number of nn-descent iterations.
   float termination_threshold      = 0.0001;  // Termination threshold of nn-descent.
   bool return_distances            = true;    // return distances if true
-  size_t n_clusters                = 1;       // defaults to not using any batching
 
   /** @brief Construct NN descent parameters for a specific kNN graph degree
    *
