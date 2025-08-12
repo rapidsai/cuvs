@@ -134,12 +134,12 @@ void construct_landmark_1nn(raft::resources const& handle,
   value_idx* R_1nn_inds_ptr = R_1nn_inds.data();
   value_t* R_1nn_dists_ptr  = index.get_R_1nn_dists().data_handle();
 
-  raft::linalg::map_offset(handle, R_1nn_inds_ptr, index.m,
-    [R_knn_inds_ptr, k] __device__(value_idx i) {
+  raft::linalg::map_offset(
+    handle, R_1nn_inds_ptr, index.m, [R_knn_inds_ptr, k] __device__(value_idx i) {
       return R_knn_inds_ptr[i * k];
     });
-  raft::linalg::map_offset(handle, R_1nn_dists_ptr, index.m,
-    [R_knn_dists_ptr, k] __device__(value_idx i) {
+  raft::linalg::map_offset(
+    handle, R_1nn_dists_ptr, index.m, [R_knn_dists_ptr, k] __device__(value_idx i) {
       return R_knn_dists_ptr[i * k];
     });
 
@@ -216,8 +216,8 @@ void compute_landmark_radii(raft::resources const& handle,
 {
   const value_idx* R_indptr_ptr  = index.get_R_indptr().data_handle();
   const value_t* R_1nn_dists_ptr = index.get_R_1nn_dists().data_handle();
-  raft::linalg::map_offset(handle, index.get_R_radius(), 
-    [R_indptr_ptr, R_1nn_dists_ptr] __device__(value_idx input) {
+  raft::linalg::map_offset(
+    handle, index.get_R_radius(), [R_indptr_ptr, R_1nn_dists_ptr] __device__(value_idx input) {
       value_idx last_row_idx = R_indptr_ptr[input + 1] - 1;
       return R_1nn_dists_ptr[last_row_idx];
     });
