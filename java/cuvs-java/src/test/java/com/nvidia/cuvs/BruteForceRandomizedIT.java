@@ -36,7 +36,7 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
   public void setup() {
     assumeTrue(isLinuxAmd64());
     initializeRandom();
-    log.info("Random context initialized for test.");
+    log.trace("Random context initialized for test.");
   }
 
   @Test
@@ -80,10 +80,10 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
     // Generate random query vectors
     float[][] queries = generateData(random, numQueries, dimensions);
 
-    log.info("Dataset size: {}x{}", datasetSize, dimensions);
-    log.info("Query size: {}x{}", numQueries, dimensions);
-    log.info("TopK: {}", topK);
-    log.info("Use native memory dataset? " + useNativeMemoryDataset);
+    log.debug("Dataset size: {}x{}", datasetSize, dimensions);
+    log.debug("Query size: {}x{}", numQueries, dimensions);
+    log.debug("TopK: {}", topK);
+    log.debug("Use native memory dataset? " + useNativeMemoryDataset);
 
     // Debugging: Log dataset and queries
     if (log.isDebugEnabled()) {
@@ -138,7 +138,7 @@ public class BruteForceRandomizedIT extends CuVSTestCase {
                 .build();
       }
 
-      log.info("Index built successfully. Executing search...");
+      log.trace("Index built successfully. Executing search...");
       SearchResults results = index.search(query);
 
       compareResults(results, expected, topK, datasetSize, numQueries);

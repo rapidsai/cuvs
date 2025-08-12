@@ -71,6 +71,13 @@ public class Util {
     }
   }
 
+  private static final long UNSIGNED_INT_MASK = 0xFFFFFFFFL;
+
+  public static long dereferenceUnsignedInt(MemorySegment ptr) {
+    assert ptr.byteSize() == 4;
+    return ptr.get(uint32_t, 0) & UNSIGNED_INT_MASK;
+  }
+
   /**
    * Java analog to CUDA's cudaMemcpyKind, used for cudaMemcpy() calls.
    * @see <a href="https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html">CUDA Runtime API</a>
