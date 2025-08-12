@@ -151,7 +151,9 @@ void pairwise_distances(const raft::resources& handle,
   value_idx blocks = raft::ceildiv(nnz, (value_idx)256);
   fill_indices2<value_idx><<<blocks, 256, 0, stream>>>(indices, m, nnz);
 
-  thrust::sequence(exec_policy, indptr, indptr + m, 0, (int)m);
+  raft::linalg::map_offset(handle,
+                           raft::make_device_vector_view<value_idx, value_idx>(indptr, m),
+                           [=] __device__(value_idx idx) { return idx; });
 
   raft::update_device(indptr + m, &nnz, 1, stream);
 
