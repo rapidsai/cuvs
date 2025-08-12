@@ -247,6 +247,8 @@ __device__ auto ivfpq_compute_score(uint32_t pq_dim,
  * @param query_kth
  *   query_kths keep the current state of the filtering - atomically updated distances to the
  *   k-th closest neighbors for each query [n_queries].
+ * @param sample_filter
+ *   A filter that selects samples for a given query.
  * @param lut_scores
  *   The device pointer for storing the lookup table globally [gridDim.x, pq_dim << PqBits].
  *   Ignored when `EnableSMemLut == true`.
@@ -259,13 +261,6 @@ __device__ auto ivfpq_compute_score(uint32_t pq_dim,
  *   clusters / defined by the `_chunk_indices`.
  *   The indices can have values within the range [0, max_samples).
  *   Ignored  when `Capacity == 0`.
- * @param filter_tag
- *   The filter tag to indicate the filter. Currently supports FilterType::None (which provides a
- *   green light for every sample) and FilterType::Bitset.
- * @param inds_ptrs
- *   inds_ptrs from ivf_to_sample_filter
- * @param filter_bitset_view
- *   bitset view needed when filter_tag == FilterType::Bitset
  */
 template <typename OutT,
           typename LutT,
@@ -290,10 +285,10 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
                                       const float* queries,
                                       const uint32_t* index_list,
                                       float* query_kths,
+                                      filtering::ivf_filter_dev sample_filter,
                                       LutT* lut_scores,
                                       OutT* _out_scores,
-                                      uint32_t* _out_indices,
-                                      filtering::ivf_filter_dev sample_filter)
+                                      uint32_t* _out_indices)
 {
   /* Shared memory:
 
@@ -644,10 +639,10 @@ void compute_similarity_run(selected<OutT, LutT> s,
                                                                queries,
                                                                index_list,
                                                                query_kths,
+                                                               sample_filter,
                                                                lut_scores,
                                                                _out_scores,
-                                                               _out_indices,
-                                                               sample_filter);
+                                                               _out_indices);
     RAFT_CHECK_CUDA(stream);
   };
 

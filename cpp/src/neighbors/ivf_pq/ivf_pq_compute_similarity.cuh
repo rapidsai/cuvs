@@ -58,10 +58,10 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
                                       const float* queries,
                                       const uint32_t* index_list,
                                       float* query_kths,
+                                      filtering::ivf_filter_dev sample_filter,
                                       LutT* lut_scores,
                                       OutT* _out_scores,
-                                      uint32_t* _out_indices,
-                                      filtering::ivf_filter_dev sample_filter);
+                                      uint32_t* _out_indices);
 
 // The signature of the kernel defined by a minimal set of template parameters
 template <typename OutT, typename LutT>
