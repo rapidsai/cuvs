@@ -153,7 +153,7 @@ void pairwise_distances(const raft::resources& handle,
 
   raft::linalg::map_offset(handle,
                            raft::make_device_vector_view<value_idx, value_idx>(indptr, m),
-                           [=] __device__(value_idx idx) { return idx; });
+                           [=] __device__(value_idx idx) { return idx * m; });
 
   raft::update_device(indptr + m, &nnz, 1, stream);
 
