@@ -36,6 +36,29 @@ public class CuVSDeviceMatrixRMMImpl extends CuVSDeviceMatrixImpl implements CuV
     this.rmmAllocation = rmmAllocation;
   }
 
+  private CuVSDeviceMatrixRMMImpl(
+      CuVSResources resources,
+      CloseableRMMAllocation rmmAllocation,
+      long size,
+      long columns,
+      long rowStride,
+      long columnStride,
+      DataType dataType,
+      ValueLayout valueLayout,
+      int copyType) {
+    super(
+        resources,
+        rmmAllocation.handle(),
+        size,
+        columns,
+        rowStride,
+        columnStride,
+        dataType,
+        valueLayout,
+        copyType);
+    this.rmmAllocation = rmmAllocation;
+  }
+
   public static CuVSDeviceMatrixImpl create(
       CuVSResources resources, long size, long columns, DataType dataType, int copyType) {
     try (var resourcesAccess = resources.access()) {
@@ -45,6 +68,32 @@ public class CuVSDeviceMatrixRMMImpl extends CuVSDeviceMatrixImpl implements CuV
               resourcesAccess.handle(), size * columns * valueLayout.byteSize());
       return new CuVSDeviceMatrixRMMImpl(
           resources, rmmAllocation, size, columns, dataType, valueLayout, copyType);
+    }
+  }
+
+  public static CuVSDeviceMatrixImpl create(
+      CuVSResources resources,
+      long size,
+      long columns,
+      long rowStride,
+      long columnStride,
+      DataType dataType,
+      int copyType) {
+    try (var resourcesAccess = resources.access()) {
+      var valueLayout = valueLayoutFromType(dataType);
+      var rmmAllocation =
+          CloseableRMMAllocation.allocateRMMSegment(
+              resourcesAccess.handle(), size * columns * valueLayout.byteSize());
+      return new CuVSDeviceMatrixRMMImpl(
+          resources,
+          rmmAllocation,
+          size,
+          columns,
+          rowStride,
+          columnStride,
+          dataType,
+          valueLayout,
+          copyType);
     }
   }
 

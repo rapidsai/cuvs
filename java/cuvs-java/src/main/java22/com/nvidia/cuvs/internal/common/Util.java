@@ -323,12 +323,14 @@ public class Util {
   }
 
   /**
-   * @brief Helper function for creating DLManagedTensor instance
+   * Helper function for creating a DLManagedTensor instance
    *
-   * @param[in] data the data pointer points to the allocated data
-   * @param[in] shape the shape of the tensor
-   * @param[in] code the type code of base types
-   * @param[in] bits the shape of the tensor
+   * @param arena      the Arena to use to allocate native memory for this data structure
+   * @param data       the data pointer points to the allocated data
+   * @param shape      the shape of the tensor
+   * @param code       the type code of the matrix elements (e.g. kDLFloat())
+   * @param bits       the size in bits of the matrix elements
+   * @param deviceType the device where {@code data} is held (kDLCPU() or kDLCUDA())
    * @return DLManagedTensor
    */
   public static MemorySegment prepareTensor(
@@ -339,31 +341,56 @@ public class Util {
       int bits,
       int deviceType,
       int lanes) {
+    return prepareTensor(arena, data, shape, null, code, bits, deviceType, lanes);
+  }
 
-    MemorySegment tensor = DLManagedTensor.allocate(arena);
-    MemorySegment dlTensor = DLTensor.allocate(arena);
+  /**
+   * Helper function for creating a DLManagedTensor instance
+   *
+   * @param arena      the Arena to use to allocate native memory for this data structure
+   * @param data       the data pointer points to the allocated data
+   * @param shape      the shape of the tensor
+   * @param strides    the strides for each dimension (can be null)
+   * @param code       the type code of the matrix elements (e.g. kDLFloat())
+   * @param bits       the size in bits of the matrix elements
+   * @param deviceType the device where {@code data} is held (kDLCPU() or kDLCUDA())
+   * @return DLManagedTensor
+   */
+  public static MemorySegment prepareTensor(
+      Arena arena,
+      MemorySegment data,
+      long[] shape,
+      long[] strides,
+      int code,
+      int bits,
+      int deviceType,
+      int lanes) {
 
-    DLTensor.data(dlTensor, data);
+    MemorySegment managedTensor = DLManagedTensor.allocate(arena);
+    MemorySegment tensor = DLTensor.allocate(arena);
+    DLManagedTensor.dl_tensor(managedTensor, tensor);
+
+    DLTensor.data(tensor, data);
 
     MemorySegment dlDevice = DLDevice.allocate(arena);
     DLDevice.device_type(dlDevice, deviceType);
-    DLTensor.device(dlTensor, dlDevice);
-
-    var ndim = shape.length;
-    DLTensor.ndim(dlTensor, ndim);
+    DLTensor.device(tensor, dlDevice);
 
     MemorySegment dtype = DLDataType.allocate(arena);
     DLDataType.code(dtype, (byte) code);
     DLDataType.bits(dtype, (byte) bits);
     DLDataType.lanes(dtype, (short) lanes);
-    DLTensor.dtype(dlTensor, dtype);
+    DLTensor.dtype(tensor, dtype);
 
-    DLTensor.shape(dlTensor, Util.buildMemorySegment(arena, shape));
+    DLTensor.ndim(tensor, shape.length);
+    DLTensor.shape(tensor, Util.buildMemorySegment(arena, shape));
+    if (strides != null) {
+      assert shape.length == strides.length;
+      DLTensor.strides(tensor, Util.buildMemorySegment(arena, strides));
+    } else {
+      DLTensor.strides(tensor, MemorySegment.NULL);
+    }
 
-    DLTensor.strides(dlTensor, MemorySegment.NULL);
-
-    DLManagedTensor.dl_tensor(tensor, dlTensor);
-
-    return tensor;
+    return managedTensor;
   }
 }

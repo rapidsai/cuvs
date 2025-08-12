@@ -40,6 +40,9 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
 
   private final CuVSResources resources;
 
+  private final long rowStride;
+  private final long columnStride;
+
   private MemorySegment hostBuffer = MemorySegment.NULL;
 
   protected CuVSDeviceMatrixImpl(
@@ -50,8 +53,23 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
       DataType dataType,
       ValueLayout valueLayout,
       int copyType) {
+    this(resources, deviceMemorySegment, size, columns, -1, -1, dataType, valueLayout, copyType);
+  }
+
+  protected CuVSDeviceMatrixImpl(
+      CuVSResources resources,
+      MemorySegment deviceMemorySegment,
+      long size,
+      long columns,
+      long rowStride,
+      long columnStride,
+      DataType dataType,
+      ValueLayout valueLayout,
+      int copyType) {
     super(deviceMemorySegment, dataType, valueLayout, size, columns);
     this.resources = resources;
+    this.rowStride = rowStride;
+    this.columnStride = columnStride;
 
     var bufferArena = Arena.ofAuto();
 
@@ -83,9 +101,9 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
 
   @Override
   public MemorySegment toTensor(Arena arena) {
-    // TODO: support stride
+    var strides = rowStride >= 0 ? new long[] {rowStride, columnStride} : null;
     return prepareTensor(
-        arena, memorySegment, new long[] {size, columns}, code(), bits(), kDLCUDA(), 1);
+        arena, memorySegment, new long[] {size, columns}, strides, code(), bits(), kDLCUDA(), 1);
   }
 
   private static MemorySegment createPinnedBuffer(long bufferBytes) {
@@ -114,13 +132,14 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
       //      System.out.printf(
       //          Locale.ROOT, "startRow: %d, endRow %d, count: %d\n", startRow, endRow, rowCount);
 
-      // TODO: we need stride information too here (optionally)
-      MemorySegment sliceTensor =
-          prepareTensor(localArena, MemorySegment.NULL, new long[2], code(), bits(), kDLCUDA(), 1);
+      MemorySegment sliceManagedTensor = DLManagedTensor.allocate(localArena);
+      DLManagedTensor.dl_tensor(sliceManagedTensor, DLTensor.allocate(localArena));
+
       checkCuVSError(
-          cuvsMatrixSliceRows(0, toTensor(localArena), startRow, endRow, sliceTensor),
+          cuvsMatrixSliceRows(0, toTensor(localArena), startRow, endRow, sliceManagedTensor),
           "cuvsMatrixSliceRows");
-      assert DLTensor.shape(DLManagedTensor.dl_tensor(sliceTensor)).get(C_LONG, 0) == rowCount;
+      assert DLTensor.shape(DLManagedTensor.dl_tensor(sliceManagedTensor)).get(C_LONG, 0)
+          == rowCount;
 
       MemorySegment bufferTensor =
           prepareTensor(
@@ -128,17 +147,14 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
 
       try (var resourceAccess = resources.access()) {
         checkCuVSError(
-            cuvsMatrixCopy(resourceAccess.handle(), sliceTensor, bufferTensor), "cuvsMatrixCopy");
+            cuvsMatrixCopy(resourceAccess.handle(), sliceManagedTensor, bufferTensor),
+            "cuvsMatrixCopy");
         checkCuVSError(cuvsStreamSync(resourceAccess.handle()), "cuvsStreamSync");
 
         bufferedMatrixRowStart = startRow;
         bufferedMatrixRowEnd = endRow;
       }
     }
-  }
-
-  protected long getMatrixSizeInBytes() {
-    return size * columns * valueLayout.byteSize();
   }
 
   @Override
@@ -200,18 +216,20 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
   }
 
   private void copyRow(Object array, Arena localArena, int r, MemorySegment tmpRowSegment) {
-    MemorySegment sliceTensor =
-        prepareTensor(
-            localArena, MemorySegment.NULL, new long[] {1, columns}, code(), bits(), kDLCUDA(), 1);
+    MemorySegment sliceManagedTensor = DLManagedTensor.allocate(localArena);
+    DLManagedTensor.dl_tensor(sliceManagedTensor, DLTensor.allocate(localArena));
+
     checkCuVSError(
-        cuvsMatrixSliceRows(0, toTensor(localArena), r, r + 1, sliceTensor), "cuvsMatrixSliceRows");
+        cuvsMatrixSliceRows(0, toTensor(localArena), r, r + 1, sliceManagedTensor),
+        "cuvsMatrixSliceRows");
 
     MemorySegment bufferTensor =
         prepareTensor(
             localArena, tmpRowSegment, new long[] {1, columns}, code(), bits(), kDLCUDA(), 1);
     try (var resourceAccess = resources.access()) {
       checkCuVSError(
-          cuvsMatrixCopy(resourceAccess.handle(), sliceTensor, bufferTensor), "cuvsMatrixCopy");
+          cuvsMatrixCopy(resourceAccess.handle(), sliceManagedTensor, bufferTensor),
+          "cuvsMatrixCopy");
       checkCuVSError(cuvsStreamSync(resourceAccess.handle()), "cuvsStreamSync");
     }
     MemorySegment.copy(tmpRowSegment, valueLayout, 0L, array, 0, (int) columns);

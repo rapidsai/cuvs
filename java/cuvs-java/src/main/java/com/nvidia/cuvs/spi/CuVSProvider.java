@@ -63,6 +63,16 @@ public interface CuVSProvider {
       CuVSMatrix.DataType dataType,
       int copyType);
 
+  /** Create a {@link CuVSMatrix.Builder} instance for a device memory matrix **/
+  CuVSMatrix.Builder newDeviceMatrixBuilder(
+      CuVSResources cuVSResources,
+      int size,
+      int dimensions,
+      int rowStride,
+      int columnStride,
+      CuVSMatrix.DataType dataType,
+      int copyType);
+
   /**
    * Returns the factory method used to build a Dataset from native memory.
    * The factory method will have this signature:

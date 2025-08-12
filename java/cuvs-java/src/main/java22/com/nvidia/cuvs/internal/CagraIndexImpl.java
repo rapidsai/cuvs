@@ -180,7 +180,6 @@ public class CagraIndexImpl implements CagraIndex {
    */
   private IndexReference build(CagraIndexParams indexParameters, CuVSMatrixBaseImpl dataset) {
     long rows = dataset.size();
-    long cols = dataset.columns();
 
     try (var indexParams = segmentFromIndexParams(indexParameters);
         var localArena = Arena.ofConfined()) {
@@ -189,14 +188,7 @@ public class CagraIndexImpl implements CagraIndex {
       int numWriterThreads = indexParameters != null ? indexParameters.getNumWriterThreads() : 1;
       omp_set_num_threads(numWriterThreads);
 
-      MemorySegment dataSeg = dataset.memorySegment();
-      // TODO: type kDLCPU()/kDLCUDA() should be aligned with the CuVSMatrixBaseImpl type (host or
-      // device?)
-
-      long[] datasetShape = {rows, cols};
-      MemorySegment datasetTensor =
-          prepareTensor(localArena, dataSeg, datasetShape, kDLFloat(), 32, kDLCPU(), 1);
-
+      var datasetTensor = dataset.toTensor(localArena);
       var index = createCagraIndex();
 
       if (cuvsCagraIndexParams.build_algo(indexParamsMemorySegment)
@@ -212,6 +204,7 @@ public class CagraIndexImpl implements CagraIndex {
       try (var resourcesAccessor = resources.access()) {
         var cuvsRes = resourcesAccessor.handle();
 
+        // TODO: do we need a stream sync here?
         var returnValue = cuvsStreamSync(cuvsRes);
         checkCuVSError(returnValue, "cuvsStreamSync");
 

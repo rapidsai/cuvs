@@ -176,6 +176,31 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
+  public CuVSMatrix.Builder newDeviceMatrixBuilder(
+      CuVSResources resources,
+      int size,
+      int columns,
+      int rowStride,
+      int columnStride,
+      CuVSMatrix.DataType dataType,
+      int copyType)
+      throws UnsupportedOperationException {
+
+    var builderCopyType = copyType & 0xF0;
+    return switch (builderCopyType) {
+      case 0x10 ->
+          new HeapSegmentBuilder(
+              resources, size, columns, rowStride, columnStride, dataType, copyType);
+      case 0x20 ->
+          new CudaHostSegmentBuilder(
+              resources, size, columns, rowStride, columnStride, dataType, copyType);
+      default ->
+          new NativeSegmentBuilder(
+              resources, size, columns, rowStride, columnStride, dataType, copyType);
+    };
+  }
+
+  @Override
   public MethodHandle newNativeMatrixBuilder() {
     return createNativeDataset$mh;
   }
@@ -231,7 +256,7 @@ final class JDKProvider implements CuVSProvider {
     private MemorySegment tempSegment;
     private final Arena tempSegmentArena;
 
-    public NativeSegmentBuilder(
+    private NativeSegmentBuilder(
         CuVSResources resources,
         int size,
         int columns,
@@ -240,6 +265,24 @@ final class JDKProvider implements CuVSProvider {
       this.columns = columns;
       this.size = size;
       this.matrix = CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType, copyType);
+      this.stream = Util.getDefaultStream(resources);
+      current = 0;
+      tempSegmentArena = Arena.ofShared();
+    }
+
+    private NativeSegmentBuilder(
+        CuVSResources resources,
+        int size,
+        int columns,
+        int rowStride,
+        int columnStride,
+        CuVSMatrix.DataType dataType,
+        int copyType) {
+      this.columns = columns;
+      this.size = size;
+      this.matrix =
+          CuVSDeviceMatrixRMMImpl.create(
+              resources, size, columns, rowStride, columnStride, dataType, copyType);
       this.stream = Util.getDefaultStream(resources);
       current = 0;
       tempSegmentArena = Arena.ofShared();
@@ -308,7 +351,7 @@ final class JDKProvider implements CuVSProvider {
     private final MemorySegment stream;
     int current;
 
-    public HeapSegmentBuilder(
+    private HeapSegmentBuilder(
         CuVSResources resources,
         int size,
         int columns,
@@ -317,6 +360,23 @@ final class JDKProvider implements CuVSProvider {
       this.columns = columns;
       this.size = size;
       this.matrix = CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType, copyType);
+      this.stream = Util.getDefaultStream(resources);
+      current = 0;
+    }
+
+    private HeapSegmentBuilder(
+        CuVSResources resources,
+        int size,
+        int columns,
+        int rowStride,
+        int columnStride,
+        CuVSMatrix.DataType dataType,
+        int copyType) {
+      this.columns = columns;
+      this.size = size;
+      this.matrix =
+          CuVSDeviceMatrixRMMImpl.create(
+              resources, size, columns, rowStride, columnStride, dataType, copyType);
       this.stream = Util.getDefaultStream(resources);
       current = 0;
     }
@@ -379,7 +439,7 @@ final class JDKProvider implements CuVSProvider {
     int current;
     MemorySegment tempSegment;
 
-    public CudaHostSegmentBuilder(
+    private CudaHostSegmentBuilder(
         CuVSResources resources,
         int size,
         int columns,
@@ -388,6 +448,23 @@ final class JDKProvider implements CuVSProvider {
       this.columns = columns;
       this.size = size;
       this.matrix = CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType, copyType);
+      this.stream = getDefaultStream(resources);
+      current = 0;
+    }
+
+    private CudaHostSegmentBuilder(
+        CuVSResources resources,
+        int size,
+        int columns,
+        int rowStride,
+        int columnStride,
+        CuVSMatrix.DataType dataType,
+        int copyType) {
+      this.columns = columns;
+      this.size = size;
+      this.matrix =
+          CuVSDeviceMatrixRMMImpl.create(
+              resources, size, columns, rowStride, columnStride, dataType, copyType);
       this.stream = getDefaultStream(resources);
       current = 0;
     }

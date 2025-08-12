@@ -76,6 +76,18 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
+  public CuVSMatrix.Builder newDeviceMatrixBuilder(
+      CuVSResources cuVSResources,
+      int size,
+      int dimensions,
+      int rowStride,
+      int columnStride,
+      CuVSMatrix.DataType dataType,
+      int copyType) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public MethodHandle newNativeMatrixBuilder() {
     throw new UnsupportedOperationException();
   }

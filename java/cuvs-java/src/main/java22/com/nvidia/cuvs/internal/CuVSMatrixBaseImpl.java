@@ -96,7 +96,6 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
   public abstract MemorySegment toTensor(Arena arena);
 
   public static CuVSMatrix fromTensor(MemorySegment dlManagedTensor, CuVSResources resources) {
-    // TODO: remove CuVSResources parameter if we get rid of it in CuVSDeviceMatrixImpl
     var dlTensor = DLManagedTensor.dl_tensor(dlManagedTensor);
     var dlDevice = DLTensor.device(dlTensor);
 
@@ -125,12 +124,25 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
     var rows = shape.get(C_LONG, 0);
     var cols = shape.get(C_LONG, 1);
 
-    var strides = DLTensor.strides(dlTensor);
-    // TODO
-
     if (deviceType == kDLCUDA()) {
-      return new CuVSDeviceMatrixImpl(
-          resources, data, rows, cols, dataType, valueLayoutFromType(dataType), 0);
+      var strides = DLTensor.strides(dlTensor);
+      if (strides != MemorySegment.NULL) {
+        var rowStride = strides.get(C_LONG, 0);
+        var colStride = strides.get(C_LONG, 1);
+        return new CuVSDeviceMatrixImpl(
+            resources,
+            data,
+            rows,
+            cols,
+            rowStride,
+            colStride,
+            dataType,
+            valueLayoutFromType(dataType),
+            0);
+      } else {
+        return new CuVSDeviceMatrixImpl(
+            resources, data, rows, cols, dataType, valueLayoutFromType(dataType), 0);
+      }
     } else if (deviceType == kDLCPU()) {
       return new CuVSHostMatrixImpl(data, rows, cols, dataType);
     } else {
