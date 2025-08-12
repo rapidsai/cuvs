@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -209,6 +209,38 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     auto index_view =
       raft::make_device_matrix_view<const DataT, int64_t>(database.data(), ps.num_db_vecs, ps.dim);
     return cuvs::neighbors::ivf_pq::build(handle_, ipams, index_view);
+  }
+
+  auto build_from_args_extends()
+  {
+    auto ipams  = ps.index_params;
+    auto source = build_only();
+    auto index  = cuvs::neighbors::ivf_pq::build(handle_,
+                                                ipams,
+                                                ps.dim,
+                                                source.pq_centers(),
+                                                source.centers(),
+                                                std::make_optional(source.centers_rot()),
+                                                std::make_optional(source.rotation_matrix()));
+
+    auto db_indices = raft::make_device_vector<IdxT>(handle_, ps.num_db_vecs);
+    raft::linalg::map_offset(handle_, db_indices.view(), raft::identity_op{});
+    raft::resource::sync_stream(handle_);
+    auto size_1      = IdxT(ps.num_db_vecs) / 2;
+    auto size_2      = IdxT(ps.num_db_vecs) - size_1;
+    auto vecs_1      = database.data();
+    auto vecs_2      = database.data() + size_t(size_1) * size_t(ps.dim);
+    auto inds_1      = db_indices.data_handle();
+    auto inds_2      = db_indices.data_handle() + size_t(size_1);
+    auto vecs_2_view = raft::make_device_matrix_view<const DataT, int64_t>(vecs_2, size_2, ps.dim);
+    auto inds_2_view = raft::make_device_vector_view<const IdxT, int64_t>(inds_2, size_2);
+    cuvs::neighbors::ivf_pq::extend(handle_, vecs_2_view, inds_2_view, &index);
+
+    auto vecs_1_view =
+      raft::make_device_matrix_view<const DataT, int64_t, raft::row_major>(vecs_1, size_1, ps.dim);
+    auto inds_1_view = raft::make_device_vector_view<const IdxT, int64_t>(inds_1, size_1);
+    cuvs::neighbors::ivf_pq::extend(handle_, vecs_1_view, inds_1_view, &index);
+    return index;
   }
 
   auto build_only_host_input()
@@ -1103,6 +1135,12 @@ inline auto special_cases() -> test_cases_t
   TEST_P(type, build_serialize_search) /* NOLINT */          \
   {                                                          \
     this->run([this]() { return this->build_serialize(); }); \
+  }
+
+#define TEST_BUILD_FROM_ARGS_SEARCH(type)                            \
+  TEST_P(type, build_from_args_search) /* NOLINT */                  \
+  {                                                                  \
+    this->run([this]() { return this->build_from_args_extends(); }); \
   }
 
 #define INSTANTIATE(type, vals) \
