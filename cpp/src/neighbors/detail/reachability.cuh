@@ -26,12 +26,6 @@
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/device_uvector.hpp>
-#include <rmm/exec_policy.hpp>
-
-#include <thrust/iterator/counting_iterator.h>
-#include <thrust/iterator/zip_iterator.h>
-#include <thrust/transform.h>
-#include <thrust/tuple.h>
 
 namespace cuvs::neighbors::detail::reachability {
 
@@ -206,8 +200,7 @@ void mutual_reachability_graph(const raft::resources& handle,
   RAFT_EXPECTS(metric == cuvs::distance::DistanceType::L2SqrtExpanded,
                "Currently only L2 expanded distance is supported");
 
-  auto stream      = raft::resource::get_cuda_stream(handle);
-  auto exec_policy = raft::resource::get_thrust_policy(handle);
+  auto stream = raft::resource::get_cuda_stream(handle);
 
   rmm::device_uvector<value_idx> coo_rows(min_samples * m, stream);
   rmm::device_uvector<value_idx> inds(min_samples * m, stream);

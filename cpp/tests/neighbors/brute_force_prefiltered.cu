@@ -33,10 +33,6 @@
 #include <gtest/gtest.h>
 
 #include <cuda_fp16.h>
-#include <thrust/device_vector.h>
-#include <thrust/iterator/transform_iterator.h>
-#include <thrust/reduce.h>
-#include <thrust/transform.h>
 
 #include <algorithm>
 #include <cmath>
