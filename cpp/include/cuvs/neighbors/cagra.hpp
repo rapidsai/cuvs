@@ -532,7 +532,7 @@ struct index : cuvs::neighbors::index {
   /**
    * Replace the source indices with a new source indices taking the ownership of the passed vector.
    */
-  void update_source_indices(raft::device_vector<const index_type, int64_t>&& source_indices)
+  void update_source_indices(raft::device_vector<index_type, int64_t>&& source_indices)
   {
     RAFT_EXPECTS(source_indices.extent(0) == size(),
                  "Source indices must have the same number of rows as the index");
