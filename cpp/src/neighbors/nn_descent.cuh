@@ -46,7 +46,7 @@ namespace cuvs::neighbors::nn_descent {
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace cuvs::neighbors::experimental;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   nn_descent::index_params index_params;
  *   // create and fill the index from a [N, D] raft::device_matrix_view dataset
@@ -97,7 +97,7 @@ auto build(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace cuvs::neighbors::experimental;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   nn_descent::index_params index_params;
  *   // create and fill the index from a [N, D] raft::device_matrix_view dataset
@@ -152,7 +152,7 @@ void build(raft::resources const& res,
  *
  * Usage example:
  * @code{.cpp}
- *   using namespace cuvs::neighbors::experimental;
+ *   using namespace cuvs::neighbors;
  *   // use default index parameters
  *   nn_descent::index_params index_params;
  *   // create and fill the index from a [N, D] raft::host_matrix_view dataset
