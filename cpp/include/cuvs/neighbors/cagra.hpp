@@ -29,6 +29,7 @@
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/stream_view.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/norm.cuh>
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
@@ -476,7 +477,7 @@ struct index : cuvs::neighbors::index {
                       raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
   {
     dataset_       = make_aligned_dataset(res, dataset, 16);
-    dataset_norms_ = std::nullopt;
+    dataset_norms_.reset();
   }
 
   /** Set the dataset reference explicitly to a device matrix view with padding. */
@@ -484,7 +485,7 @@ struct index : cuvs::neighbors::index {
                       raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset)
   {
     dataset_       = make_aligned_dataset(res, dataset, 16);
-    dataset_norms_ = std::nullopt;
+    dataset_norms_.reset();
   }
 
   /**
