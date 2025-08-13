@@ -343,6 +343,9 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
+    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded &&
+        ((!std::is_same_v<DataT, float>) || (ps.build_algo != graph_build_algo::IVF_PQ)))
+      GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<SearchIdxT> indices_Cagra(queries_size);
@@ -527,6 +530,9 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ)))
+      GTEST_SKIP();
+    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded &&
+        ((!std::is_same_v<DataT, float>) || (ps.build_algo != graph_build_algo::IVF_PQ)))
       GTEST_SKIP();
     // If the dataset dimension is small and the dataset size is large, there can be a lot of
     // dataset vectors that have the same distance to the query, especially in the binary Hamming
@@ -1218,6 +1224,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1},
     {cuvs::distance::DistanceType::L2Expanded,
      cuvs::distance::DistanceType::InnerProduct,
+     cuvs::distance::DistanceType::CosineExpanded,
      cuvs::distance::DistanceType::BitwiseHamming},
     {false},
     {true},
@@ -1243,7 +1250,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0, 8, 16, 32},  // team_size
     {64},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct, cuvs::distance::DistanceType::CosineExpanded},
     {false},
     {false},
     {0.995},
@@ -1268,7 +1275,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},  // team_size
     {32, 64, 128, 256, 512, 768},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct, cuvs::distance::DistanceType::CosineExpanded},
     {false},
     {true},
     {0.995},
@@ -1350,7 +1357,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},  // team_size
     {64},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct, cuvs::distance::DistanceType::CosineExpanded},
     {false, true},
     {false},
     {0.99},
