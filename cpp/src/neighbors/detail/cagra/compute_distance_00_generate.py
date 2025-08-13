@@ -159,7 +159,7 @@ auto dataset_descriptor_init(const cagra::search_params& params,
                              const float* dataset_norms = nullptr)
   -> dataset_descriptor_host<DataT, IndexT, DistanceT>
 {{
-  auto [init, priority] = descriptor_instances::select<DataT, IndexT, DistanceT>(params, dataset, metric);
+  auto [init, priority] = descriptor_instances::select<DataT, IndexT, DistanceT>(params, dataset, metric, dataset_norms);
   if (init == nullptr || priority < 0) {{
     RAFT_FAIL("No dataset descriptor instance compiled for this parameter combination.");
   }}
