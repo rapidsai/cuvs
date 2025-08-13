@@ -209,7 +209,7 @@ void search_main(raft::resources const& res,
 
     raft::linalg::matrix_vector_op<raft::Apply::ALONG_ROWS>(res,
                                                             raft::make_const_mdspan(distances),
-                                                            raft::make_const_mdspan(query_norms),
+                                                            raft::make_const_mdspan(query_norms.view()),
                                                             distances,
                                                             raft::div_op());
   }
