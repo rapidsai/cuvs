@@ -209,16 +209,13 @@ void search_main(raft::resources const& res,
       int query_idx    = idx / k;
       float query_norm = query_norms_ptr[query_idx];
       if (query_norm > 0) {
-        // Convert from negative inner product to cosine distance
         dist_out[idx] = 1.0f + dist_out[idx] / query_norm;
       } else {
         dist_out[idx] = 1.0f;
       }
     };
 
-    // Launch the normalization
     raft::linalg::map_offset(dist_out, n_elements, normalize_cosine_kernel, stream);
-    RAFT_CUDA_TRY(cudaPeekAtLastError());
   } else {
     cuvs::neighbors::ivf::detail::postprocess_distances(dist_out,
                                                         dist_in,
