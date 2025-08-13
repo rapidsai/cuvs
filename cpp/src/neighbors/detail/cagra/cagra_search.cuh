@@ -202,10 +202,6 @@ void search_main(raft::resources const& res,
     const auto k         = distances.extent(1);
     auto query_norms_ptr = query_norms.data_handle();
 
-    // Convert from negative inner product to cosine distance
-    // Current distances are: -inner_product / dataset_norm
-    // We need: 1 - inner_product / (query_norm * dataset_norm)
-    // Which is: 1 + distances / query_norm
     auto cosine_convert_op = [query_norms_ptr, k] __device__(auto idx, auto dist) {
       auto query_idx = idx / k;
       auto query_norm = query_norms_ptr[query_idx];
