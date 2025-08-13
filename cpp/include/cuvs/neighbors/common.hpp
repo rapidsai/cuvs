@@ -580,7 +580,6 @@ struct bitset_filter : public base_filter {
   const view_t bitset_view_;
 
   _RAFT_HOST_DEVICE bitset_filter(const view_t bitset_for_filtering);
-  // _RAFT_HOST_DEVICE ~bitset_filter();
   constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
