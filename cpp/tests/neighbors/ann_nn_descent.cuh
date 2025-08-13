@@ -400,7 +400,6 @@ class AnnNNDescentBatchTest : public ::testing::TestWithParam<AnnNNDescentBatchI
         index_params.intermediate_graph_degree = 2 * ps.graph_degree;
         index_params.max_iterations            = 100;
         index_params.return_distances          = true;
-        index_params.n_clusters                = ps.recall_cluster.second;
 
         auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
           (const DataT*)database.data(), ps.n_rows, ps.dim);
@@ -487,16 +486,6 @@ const std::vector<AnnNNDescentInputs> inputs =
                                                      {false, true},
                                                      {0.90});
 
-// Additional test cases for large datasets to test batching
-const std::vector<AnnNNDescentInputs> inputsLargeBatch =
-  raft::util::itertools::product<AnnNNDescentInputs>(
-    {150000},  // n_rows > 100000 to trigger batching
-    {64},
-    {32},
-    {cuvs::distance::DistanceType::BitwiseHamming},
-    {true},
-    {0.90});
-
 const std::vector<AnnNNDescentInputs> inputsDistEpilogue =
   raft::util::itertools::product<AnnNNDescentInputs>(
     {2000, 4000},  // n_rows
@@ -505,14 +494,5 @@ const std::vector<AnnNNDescentInputs> inputsDistEpilogue =
     {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::L2SqrtExpanded},
     {true},  // data on host
     {0.90});
-
-const std::vector<AnnNNDescentBatchInputs> inputsBatch =
-  raft::util::itertools::product<AnnNNDescentBatchInputs>(
-    {std::make_pair(0.9, 3lu), std::make_pair(0.9, 2lu)},  // min_recall, n_clusters
-    {4000, 5000},                                          // n_rows
-    {192, 512},                                            // dim
-    {32, 64},                                              // graph_degree
-    {cuvs::distance::DistanceType::L2Expanded},
-    {false, true});
 
 }  // namespace cuvs::neighbors::nn_descent

@@ -18,12 +18,10 @@
 
 #include "detail/nn_descent.cuh"
 
-#include <cmath>
 #include <cstdint>
 #include <cuvs/neighbors/nn_descent.hpp>
 
 #include <raft/core/device_mdspan.hpp>
-#include <raft/core/error.hpp>
 #include <raft/core/host_mdspan.hpp>
 
 namespace cuvs::neighbors::nn_descent {
