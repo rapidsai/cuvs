@@ -187,17 +187,10 @@ void search_main(raft::resources const& res,
   constexpr float kScale = cuvs::spatial::knn::detail::utils::config<T>::kDivisor /
                            cuvs::spatial::knn::detail::utils::config<DistanceT>::kDivisor;
 
-  // For CosineExpanded, we need to divide by query norms as the final postprocessing step
   if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
-    // First, convert inner product to cosine similarity
-    // The distances are currently: -inner_product / dataset_norm
-    // We need to convert to: 1 - inner_product / (query_norm * dataset_norm)
-
-    // Allocate space for query norms
     auto stream = raft::resource::get_cuda_stream(res);
     rmm::device_uvector<float> query_norms(queries.extent(0), stream);
 
-    // Compute query norms
     raft::linalg::rowNorm<raft::linalg::L2Norm, true>(query_norms.data(),
                                                       queries.data_handle(),
                                                       queries.extent(1),
@@ -205,12 +198,7 @@ void search_main(raft::resources const& res,
                                                       stream,
                                                       raft::sqrt_op{});
 
-    // Launch kernel to normalize distances by query norms
-    int n_elements = distances.extent(0) * distances.extent(1);
-    int block_size = 256;
-    int grid_size  = raft::div_rounding_up_safe(n_elements, block_size);
 
-    // Define kernel to normalize cosine distances
     const auto n_queries = distances.extent(0);
     const auto k         = distances.extent(1);
     auto query_norms_ptr = query_norms.data();
