@@ -460,7 +460,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         auto removed_indices =
           raft::make_device_vector<IdxT, int64_t>(handle_, test_ivf_sample_filter::offset);
         raft::linalg::map_offset(
-          handle_, removed_indices.view(), [] __device__(IdxT i) { return i; });
+          handle_, removed_indices.view(), raft::identity_op{});
         raft::resource::sync_stream(handle_);
 
         cuvs::core::bitset<std::uint32_t, IdxT> removed_indices_bitset(
