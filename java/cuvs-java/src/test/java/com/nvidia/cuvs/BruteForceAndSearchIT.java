@@ -57,7 +57,6 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
         new BruteForceIndexParams.Builder().withNumWriterThreads(32).build();
 
     // Create the index with the dataset
-    Path indexFile;
     try (BruteForceIndex index =
         BruteForceIndex.newBuilder(resources)
             .withDataset(dataset)
@@ -71,10 +70,10 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
       }
 
       // Loading a BRUTEFORCE index from disk.
-      indexFile = Path.of(indexFileName);
+      Path indexFile = Path.of(indexFileName);
       try (var inputStream = Files.newInputStream(indexFile);
-          BruteForceIndex loadedIndex =
-              BruteForceIndex.newBuilder(resources).from(inputStream).build()) {
+           BruteForceIndex loadedIndex =
+                   BruteForceIndex.newBuilder(resources).from(inputStream).build()) {
 
         // search the loaded index
         SearchResults results = loadedIndex.search(cuvsQuery);
@@ -84,9 +83,8 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
         results = index.search(cuvsQuery);
         checkResults(expectedResults, results.getResults());
       }
+      Files.deleteIfExists(indexFile);
     }
-
-    Files.deleteIfExists(indexFile);
   }
 
   /**
