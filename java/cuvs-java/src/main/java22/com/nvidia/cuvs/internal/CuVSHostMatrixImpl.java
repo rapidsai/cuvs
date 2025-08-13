@@ -110,6 +110,6 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
   @Override
   public MemorySegment toTensor(Arena arena) {
     return prepareTensor(
-        arena, memorySegment, new long[] {size, columns}, code(), bits(), kDLCPU(), 1);
+        arena, memorySegment, new long[] {size, columns}, code(), bits(), kDLCPU());
   }
 }

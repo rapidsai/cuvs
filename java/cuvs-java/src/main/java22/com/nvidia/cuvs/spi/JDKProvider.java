@@ -105,10 +105,10 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public CuVSMatrix.Builder newHostMatrixBuilder(
+  public CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
       long size, long columns, CuVSMatrix.DataType dataType) throws UnsupportedOperationException {
 
-    return new CuVSMatrix.Builder() {
+    return new CuVSMatrix.Builder<>() {
       final CuVSHostMatrixArenaImpl matrix = new CuVSHostMatrixArenaImpl(size, columns, dataType);
       int current = 0;
 
@@ -154,14 +154,14 @@ final class JDKProvider implements CuVSProvider {
       }
 
       @Override
-      public CuVSMatrix build() {
+      public CuVSHostMatrix build() {
         return matrix;
       }
     };
   }
 
   @Override
-  public CuVSMatrix.Builder newDeviceMatrixBuilder(
+  public CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
       CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType)
       throws UnsupportedOperationException {
 
@@ -169,7 +169,7 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public CuVSMatrix.Builder newDeviceMatrixBuilder(
+  public CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
       CuVSResources resources,
       long size,
       long columns,
@@ -226,7 +226,7 @@ final class JDKProvider implements CuVSProvider {
     return dataset;
   }
 
-  private static class HeapSegmentBuilder implements CuVSMatrix.Builder {
+  private static class HeapSegmentBuilder implements CuVSMatrix.Builder<CuVSDeviceMatrix> {
     private final long columns;
     private final long size;
     private final CuVSDeviceMatrixImpl matrix;
@@ -303,7 +303,7 @@ final class JDKProvider implements CuVSProvider {
     }
 
     @Override
-    public CuVSMatrix build() {
+    public CuVSDeviceMatrix build() {
       return matrix;
     }
   }

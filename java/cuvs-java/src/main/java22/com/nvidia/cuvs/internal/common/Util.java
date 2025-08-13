@@ -334,14 +334,8 @@ public class Util {
    * @return DLManagedTensor
    */
   public static MemorySegment prepareTensor(
-      Arena arena,
-      MemorySegment data,
-      long[] shape,
-      int code,
-      int bits,
-      int deviceType,
-      int lanes) {
-    return prepareTensor(arena, data, shape, null, code, bits, deviceType, lanes);
+      Arena arena, MemorySegment data, long[] shape, int code, int bits, int deviceType) {
+    return prepareTensor(arena, data, shape, null, code, bits, deviceType);
   }
 
   /**
@@ -363,8 +357,7 @@ public class Util {
       long[] strides,
       int code,
       int bits,
-      int deviceType,
-      int lanes) {
+      int deviceType) {
 
     MemorySegment managedTensor = DLManagedTensor.allocate(arena);
     MemorySegment tensor = DLTensor.allocate(arena);
@@ -378,7 +371,8 @@ public class Util {
     MemorySegment dtype = DLDataType.allocate(arena);
     DLDataType.code(dtype, (byte) code);
     DLDataType.bits(dtype, (byte) bits);
-    DLDataType.lanes(dtype, (short) lanes);
+    // Number of lanes for vectorized types (1 for scalar types)
+    DLDataType.lanes(dtype, (short) 1);
     DLTensor.dtype(tensor, dtype);
 
     DLTensor.ndim(tensor, shape.length);

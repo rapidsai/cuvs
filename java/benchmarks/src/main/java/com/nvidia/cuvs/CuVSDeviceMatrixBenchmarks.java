@@ -63,8 +63,8 @@ public class CuVSDeviceMatrixBenchmarks {
     }
 
 
-    deviceMatrix = (CuVSDeviceMatrix) builder0.build();
-    hostMatrix = (CuVSHostMatrix) CuVSMatrix.hostBuilder(size, dims, CuVSMatrix.DataType.FLOAT).build();
+    deviceMatrix = builder0.build();
+    hostMatrix = CuVSMatrix.hostBuilder(size, dims, CuVSMatrix.DataType.FLOAT).build();
   }
 
   @TearDown
@@ -101,7 +101,7 @@ public class CuVSDeviceMatrixBenchmarks {
         var array = data[i];
         builder.addVector(array);
       }
-      var matrix = builder.build();
+      CuVSDeviceMatrix matrix = builder.build();
       matrix.close();
     }
   }

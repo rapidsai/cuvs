@@ -268,15 +268,15 @@ public class CagraIndexImpl implements CagraIndex {
           long[] queriesShape = {numQueries, vectorDimension};
           MemorySegment queriesTensor =
               prepareTensor(
-                  localArena, queriesDP.handle(), queriesShape, kDLFloat(), 32, kDLCUDA(), 1);
+                  localArena, queriesDP.handle(), queriesShape, kDLFloat(), 32, kDLCUDA());
           long[] neighborsShape = {numQueries, topK};
           MemorySegment neighborsTensor =
               prepareTensor(
-                  localArena, neighborsDP.handle(), neighborsShape, kDLUInt(), 32, kDLCUDA(), 1);
+                  localArena, neighborsDP.handle(), neighborsShape, kDLUInt(), 32, kDLCUDA());
           long[] distancesShape = {numQueries, topK};
           MemorySegment distancesTensor =
               prepareTensor(
-                  localArena, distancesDP.handle(), distancesShape, kDLFloat(), 32, kDLCUDA(), 1);
+                  localArena, distancesDP.handle(), distancesShape, kDLFloat(), 32, kDLCUDA());
 
           var returnValue = cuvsStreamSync(cuvsRes);
           checkCuVSError(returnValue, "cuvsStreamSync");
@@ -303,7 +303,7 @@ public class CagraIndexImpl implements CagraIndex {
 
             prefilterTensor =
                 prepareTensor(
-                    localArena, prefilterDP.handle(), prefilterShape, kDLUInt(), 32, kDLCUDA(), 1);
+                    localArena, prefilterDP.handle(), prefilterShape, kDLUInt(), 32, kDLCUDA());
 
             cuvsFilter.type(prefilter, 1);
             cuvsFilter.addr(prefilter, prefilterTensor.address());

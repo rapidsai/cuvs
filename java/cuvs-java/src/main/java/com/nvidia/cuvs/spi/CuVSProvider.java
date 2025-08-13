@@ -15,13 +15,7 @@
  */
 package com.nvidia.cuvs.spi;
 
-import com.nvidia.cuvs.BruteForceIndex;
-import com.nvidia.cuvs.CagraIndex;
-import com.nvidia.cuvs.CagraMergeParams;
-import com.nvidia.cuvs.CuVSMatrix;
-import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.HnswIndex;
-import com.nvidia.cuvs.TieredIndex;
+import com.nvidia.cuvs.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 import java.nio.file.Path;
@@ -53,14 +47,15 @@ public interface CuVSProvider {
   CuVSResources newCuVSResources(Path tempDirectory) throws Throwable;
 
   /** Create a {@link CuVSMatrix.Builder} instance for a host memory matrix **/
-  CuVSMatrix.Builder newHostMatrixBuilder(long size, long dimensions, CuVSMatrix.DataType dataType);
+  CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
+      long size, long dimensions, CuVSMatrix.DataType dataType);
 
   /** Create a {@link CuVSMatrix.Builder} instance for a device memory matrix **/
-  CuVSMatrix.Builder newDeviceMatrixBuilder(
+  CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
       CuVSResources cuVSResources, long size, long dimensions, CuVSMatrix.DataType dataType);
 
   /** Create a {@link CuVSMatrix.Builder} instance for a device memory matrix **/
-  CuVSMatrix.Builder newDeviceMatrixBuilder(
+  CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
       CuVSResources cuVSResources,
       long size,
       long dimensions,

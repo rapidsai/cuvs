@@ -52,7 +52,7 @@ public interface CagraIndex {
 
   /** Returns the CAGRA graph
    *
-   * @return a {@link CuVSMatrix} encapsulating the native int (uint32_t) array used to represent
+   * @return a {@link CuVSDeviceMatrix} encapsulating the native int (uint32_t) array used to represent
    * the cagra graph
    */
   CuVSDeviceMatrix getGraph();

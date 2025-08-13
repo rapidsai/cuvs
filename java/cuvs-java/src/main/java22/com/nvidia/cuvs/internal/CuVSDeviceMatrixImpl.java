@@ -81,7 +81,7 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
   public MemorySegment toTensor(Arena arena) {
     var strides = rowStride >= 0 ? new long[] {rowStride, columnStride} : null;
     return prepareTensor(
-        arena, memorySegment, new long[] {size, columns}, strides, code(), bits(), kDLCUDA(), 1);
+        arena, memorySegment, new long[] {size, columns}, strides, code(), bits(), kDLCUDA());
   }
 
   private static MemorySegment createPinnedBuffer(long bufferBytes) {
@@ -123,7 +123,7 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
 
       MemorySegment bufferTensor =
           prepareTensor(
-              localArena, hostBuffer, new long[] {rowCount, columns}, code(), bits(), kDLCPU(), 1);
+              localArena, hostBuffer, new long[] {rowCount, columns}, code(), bits(), kDLCPU());
 
       try (var resourceAccess = resources.access()) {
         checkCuVSError(
@@ -205,7 +205,7 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
 
     MemorySegment bufferTensor =
         prepareTensor(
-            localArena, tmpRowSegment, new long[] {1, columns}, code(), bits(), kDLCUDA(), 1);
+            localArena, tmpRowSegment, new long[] {1, columns}, code(), bits(), kDLCUDA());
     try (var resourceAccess = resources.access()) {
       checkCuVSError(
           cuvsMatrixCopy(resourceAccess.handle(), sliceManagedTensor, bufferTensor),

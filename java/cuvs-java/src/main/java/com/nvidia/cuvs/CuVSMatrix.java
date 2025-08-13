@@ -69,7 +69,7 @@ public interface CuVSMatrix extends AutoCloseable {
     return CuVSProvider.provider().newMatrixFromArray(vectors);
   }
 
-  interface Builder {
+  interface Builder<T extends CuVSMatrix> {
     /**
      * Add a single vector to the dataset.
      *
@@ -91,7 +91,7 @@ public interface CuVSMatrix extends AutoCloseable {
      */
     void addVector(int[] vector);
 
-    CuVSMatrix build();
+    T build();
   }
 
   /**
@@ -100,9 +100,9 @@ public interface CuVSMatrix extends AutoCloseable {
    * @param size     Number of vectors in the dataset
    * @param columns  Size of each vector in the dataset
    * @param dataType The data type of the dataset elements
-   * @return new instance of {@link CuVSMatrix}
+   * @return a builder for creating a {@link CuVSHostMatrix}
    */
-  static Builder hostBuilder(long size, long columns, DataType dataType) {
+  static Builder<CuVSHostMatrix> hostBuilder(long size, long columns, DataType dataType) {
     return CuVSProvider.provider().newHostMatrixBuilder(size, columns, dataType);
   }
 
@@ -113,9 +113,9 @@ public interface CuVSMatrix extends AutoCloseable {
    * @param size      Number of vectors in the dataset
    * @param columns   Size of each vector in the dataset
    * @param dataType  The data type of the dataset elements
-   * @return new instance of {@link CuVSMatrix}
+   * @return a builder for creating a {@link CuVSDeviceMatrix}
    */
-  static Builder deviceBuilder(
+  static Builder<CuVSDeviceMatrix> deviceBuilder(
       CuVSResources resources, long size, long columns, DataType dataType) {
     return CuVSProvider.provider().newDeviceMatrixBuilder(resources, size, columns, dataType);
   }

@@ -30,12 +30,12 @@ public interface CuVSDeviceMatrix extends CuVSMatrix {
   void toHost(CuVSHostMatrix hostMatrix);
 
   /**
-   * FReturns a new, host matrix with data from this device matrix.
+   * Returns a new, host matrix with data from this device matrix.
    * The returned host matrix will need to be managed by the caller, which will be
    * responsible to call {@link CuVSMatrix#close()} to free its resources when done.
    */
   default CuVSHostMatrix toHost() {
-    var hostMatrix = (CuVSHostMatrix) CuVSMatrix.hostBuilder(size(), columns(), dataType()).build();
+    var hostMatrix = CuVSMatrix.hostBuilder(size(), columns(), dataType()).build();
     toHost(hostMatrix);
     return hostMatrix;
   }
