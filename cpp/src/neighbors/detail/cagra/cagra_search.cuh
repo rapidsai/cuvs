@@ -188,34 +188,26 @@ void search_main(raft::resources const& res,
                            cuvs::spatial::knn::detail::utils::config<DistanceT>::kDivisor;
 
   if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
-    auto stream = raft::resource::get_cuda_stream(res);
-    rmm::device_uvector<float> query_norms(queries.extent(0), stream);
+    auto stream      = raft::resource::get_cuda_stream(res);
+    auto query_norms = raft::make_device_vector<T, int64_t>(res, queries.extent(0));
 
-    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(query_norms.data(),
+    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(query_norms.data_handle(),
                                                       queries.data_handle(),
                                                       queries.extent(1),
                                                       queries.extent(0),
                                                       stream,
                                                       raft::sqrt_op{});
 
-
     const auto n_queries = distances.extent(0);
     const auto k         = distances.extent(1);
-    auto query_norms_ptr = query_norms.data();
+    auto query_norms_ptr = query_norms.data_handle();
 
-    auto normalize_cosine_kernel =
-      [dist_out, query_norms_ptr, n_queries, k] __device__(int idx) -> void {
-      if (idx >= n_queries * k) return;
-      int query_idx    = idx / k;
-      float query_norm = query_norms_ptr[query_idx];
-      if (query_norm > 0) {
-        dist_out[idx] = 1.0f + dist_out[idx] / query_norm;
-      } else {
-        dist_out[idx] = 1.0f;
-      }
-    };
-
-    raft::linalg::map_offset(dist_out, n_elements, normalize_cosine_kernel, stream);
+    raft::linalg::matrix_vector_op<raft::Apply::ALONG_ROWS>(
+      res,
+      raft::make_const_mdspan(distances),
+      raft::make_const_mdspan(query_norms.view()),
+      distances,
+      raft::div_op{});
   } else {
     cuvs::neighbors::ivf::detail::postprocess_distances(dist_out,
                                                         dist_in,
