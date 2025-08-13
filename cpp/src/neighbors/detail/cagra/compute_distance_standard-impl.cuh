@@ -36,7 +36,9 @@ RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
 
 template <typename DATA_T, typename DISTANCE_T, cuvs::distance::DistanceType Metric>
 RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
-  -> std::enable_if_t<Metric == cuvs::distance::DistanceType::InnerProduct, DISTANCE_T>
+  -> std::enable_if_t<Metric == cuvs::distance::DistanceType::InnerProduct ||
+                        Metric == cuvs::distance::DistanceType::CosineExpanded,
+                      DISTANCE_T>
 {
   return -static_cast<DISTANCE_T>(a) * static_cast<DISTANCE_T>(b);
 }
@@ -50,15 +52,6 @@ RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
   // mask the result of xor for the integer promotion
   const auto v = (a ^ b) & 0xffu;
   return __popc(v);
-}
-
-template <typename DATA_T, typename DISTANCE_T, cuvs::distance::DistanceType Metric>
-RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
-  -> std::enable_if_t<Metric == cuvs::distance::DistanceType::CosineExpanded, DISTANCE_T>
-{
-  // For cosine distance, we compute inner product here
-  // Normalization will be done in post-processing
-  return -static_cast<DISTANCE_T>(a) * static_cast<DISTANCE_T>(b);
 }
 }  // namespace
 
