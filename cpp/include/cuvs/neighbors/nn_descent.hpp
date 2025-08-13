@@ -506,6 +506,7 @@ auto build(raft::resources const& res,
            std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph =
              std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
 
+/** @} */
 /**
  * @brief Test if we have enough GPU memory to run NN descent algorithm.
  *
