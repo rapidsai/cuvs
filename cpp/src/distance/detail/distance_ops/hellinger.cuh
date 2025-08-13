@@ -50,14 +50,14 @@ struct hellinger_distance_op {
   DI void core(AccT& acc, DataT& x, DataT& y) const
   {
     // This is sqrt(x) * sqrt(y).
-    const auto product = x * y;
+    const AccT product = raft::to_float(x) * raft::to_float(y);
     acc += product;
   };
 
   template <typename Policy>
   DI void epilog(AccT acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
-                 DataT* regxn,
-                 DataT* regyn,
+                 AccT* regxn,
+                 AccT* regyn,
                  IdxT gridStrideX,
                  IdxT gridStrideY) const
   {

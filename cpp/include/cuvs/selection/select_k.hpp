@@ -87,6 +87,16 @@ void select_k(
   SelectAlgo algo                                                       = SelectAlgo::kAuto,
   std::optional<raft::device_vector_view<const int64_t, int64_t>> len_i = std::nullopt);
 
+void select_k(raft::resources const& handle,
+              raft::device_matrix_view<const float, int64_t, raft::row_major> in_val,
+              std::optional<raft::device_matrix_view<const int, int64_t, raft::row_major>> in_idx,
+              raft::device_matrix_view<float, int64_t, raft::row_major> out_val,
+              raft::device_matrix_view<int, int64_t, raft::row_major> out_idx,
+              bool select_min,
+              bool sorted                                                       = false,
+              SelectAlgo algo                                                   = SelectAlgo::kAuto,
+              std::optional<raft::device_vector_view<const int, int64_t>> len_i = std::nullopt);
+
 /**
  * Select k smallest or largest key/values from each row in the input data.
  *

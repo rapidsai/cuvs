@@ -48,3 +48,11 @@ Index search
     :project: cuvs
     :members:
     :content-only:
+
+Index serialize
+---------------
+
+.. doxygengroup:: ivf_flat_c_index_serialize
+    :project: cuvs
+    :members:
+    :content-only:

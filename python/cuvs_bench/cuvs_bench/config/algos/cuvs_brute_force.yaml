@@ -1,0 +1,5 @@
+name: cuvs_brute_force
+groups:
+  base:
+    build:
+    search:

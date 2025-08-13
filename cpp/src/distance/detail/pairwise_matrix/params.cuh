@@ -27,8 +27,8 @@ struct pairwise_matrix_params {
   IdxT ld_out;
   const DataT* x;
   const DataT* y;
-  const DataT* x_norm;
-  const DataT* y_norm;
+  const OutT* x_norm;
+  const OutT* y_norm;
   OutT* out;
   FinOpT fin_op;
   bool is_row_major;

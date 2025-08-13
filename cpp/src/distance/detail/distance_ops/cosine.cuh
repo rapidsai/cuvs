@@ -18,17 +18,19 @@
 
 #include <raft/util/cuda_dev_essentials.cuh>  // DI
 
+#include <cuda_fp16.h>
+
 namespace cuvs::distance::detail::ops {
 
 // Epilogue operator for CUTLASS based kernel
 template <typename DataT, typename AccT>
 struct cosine_cutlass_op {
   __device__ cosine_cutlass_op() noexcept {}
-  __device__ AccT operator()(DataT& aNorm, const DataT& bNorm, DataT& accVal) const noexcept
+  __device__ AccT operator()(AccT& aNorm, const AccT& bNorm, AccT& accVal) const noexcept
   {
     return static_cast<AccT>(1.0) - static_cast<AccT>(accVal / (aNorm * bNorm));
   }
-  __device__ AccT operator()(DataT aData) const noexcept { return aData; }
+  __device__ AccT operator()(DataT aData) const noexcept { return raft::to_float(aData); }
 };
 
 /**
@@ -55,15 +57,22 @@ struct cosine_distance_op {
   template <typename Policy>
   static constexpr size_t shared_mem_size()
   {
-    return Policy::SmemSize + ((Policy::Mblk + Policy::Nblk) * sizeof(DataT));
+    return Policy::SmemSize + ((Policy::Mblk + Policy::Nblk) * sizeof(AccT));
   }
 
-  DI void core(AccT& acc, DataT& x, DataT& y) const { acc += x * y; };
+  DI void core(AccT& acc, DataT& x, DataT& y) const
+  {
+    if constexpr ((std::is_same_v<AccT, float> && std::is_same_v<DataT, half>)) {
+      acc += __half2float(x) * __half2float(y);
+    } else {
+      acc += x * y;
+    }
+  };
 
   template <typename Policy>
   DI void epilog(AccT acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
-                 DataT* regxn,
-                 DataT* regyn,
+                 AccT* regxn,
+                 AccT* regyn,
                  IdxT gridStrideX,
                  IdxT gridStrideY) const
   {
@@ -71,7 +80,11 @@ struct cosine_distance_op {
     for (int i = 0; i < Policy::AccRowsPerTh; ++i) {
 #pragma unroll
       for (int j = 0; j < Policy::AccColsPerTh; ++j) {
-        acc[i][j] = 1.0 - (acc[i][j] / (regxn[i] * regyn[j]));
+        if constexpr ((std::is_same_v<AccT, float> && std::is_same_v<AccT, half>)) {
+          acc[i][j] = 1.0 - (acc[i][j] / (__half2float(regxn[i]) * __half2float(regyn[j])));
+        } else {
+          acc[i][j] = 1.0 - (acc[i][j] / (regxn[i] * regyn[j]));
+        }
       }
     }
   }

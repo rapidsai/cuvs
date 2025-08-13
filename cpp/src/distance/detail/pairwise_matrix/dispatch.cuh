@@ -15,10 +15,4 @@
  */
 #pragma once
 
-#ifndef CUVS_EXPLICIT_INSTANTIATE_ONLY
-#include "dispatch-inl.cuh"
-#endif
-
-#ifdef RAFT_COMPILED
 #include "dispatch-ext.cuh"
-#endif

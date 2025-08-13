@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,11 +25,59 @@
 namespace cuvs::bench {
 
 template <typename T, typename IdxT>
+auto parse_build_param(const nlohmann::json& conf) ->
+  typename cuvs::bench::cuvs_cagra_hnswlib<T, IdxT>::build_param
+{
+  typename cuvs::bench::cuvs_cagra_hnswlib<T, IdxT>::build_param param;
+  auto& hnsw_params  = param.hnsw_index_params;
+  auto& cagra_params = param.cagra_build_params;
+  if (conf.contains("hierarchy")) {
+    if (conf.at("hierarchy") == "none") {
+      hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::NONE;
+    } else if (conf.at("hierarchy") == "cpu") {
+      hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::CPU;
+    } else if (conf.at("hierarchy") == "gpu") {
+      hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::GPU;
+    } else {
+      THROW("Invalid value for hierarchy: %s", conf.at("hierarchy").get<std::string>().c_str());
+    }
+  } else {
+    hnsw_params.hierarchy = cuvs::neighbors::hnsw::HnswHierarchy::GPU;
+  }
+  if (conf.contains("ef_construction")) {
+    hnsw_params.ef_construction = conf.at("ef_construction");
+  }
+  if (conf.contains("num_threads")) { hnsw_params.num_threads = conf.at("num_threads"); }
+
+  // Reuse the CAGRA wrapper params parser
+  ::parse_build_param<T, IdxT>(conf, cagra_params);
+  // If the users provides parameter M, we can use the CAGRA-HNSW heuristics to find optimal
+  // parameters for the dataset and HNSW reference.
+  if (conf.contains("M")) {
+    // Postpone the parsing of the CAGRA build params until the dataset extents are known.
+    // We the default parameters depend on the dataset extents; and we still would like to be able
+    // to override them.
+    cagra_params.cagra_params = [conf, hnsw_params](raft::matrix_extent<int64_t> extents,
+                                                    cuvs::distance::DistanceType dist_type) {
+      auto ps = cuvs::neighbors::hnsw::to_cagra_params(
+        extents, conf.at("M"), hnsw_params.ef_construction, dist_type);
+      ps.metric = dist_type;
+      // NB: above, we only provide the defaults. Below we parse the explicit parameters as usual.
+      ::parse_build_param<T, uint32_t>(conf, ps);
+      return ps;
+    };
+  }
+  return param;
+}
+
+template <typename T, typename IdxT>
 void parse_search_param(const nlohmann::json& conf,
                         typename cuvs::bench::cuvs_cagra_hnswlib<T, IdxT>::search_param& param)
 {
-  param.ef = conf.at("ef");
-  if (conf.contains("numThreads")) { param.num_threads = conf.at("numThreads"); }
+  param.hnsw_search_param.ef = conf.at("ef");
+  if (conf.contains("num_threads")) {
+    param.hnsw_search_param.num_threads = conf.at("num_threads");
+  }
 }
 
 template <typename T>
@@ -41,11 +89,11 @@ auto create_algo(const std::string& algo_name,
   [[maybe_unused]] cuvs::bench::Metric metric = parse_metric(distance);
   std::unique_ptr<cuvs::bench::algo<T>> a;
 
-  if constexpr (std::is_same_v<T, float> or std::is_same_v<T, std::uint8_t>) {
+  if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, int8_t> ||
+                std::is_same_v<T, uint8_t>) {
     if (algo_name == "raft_cagra_hnswlib" || algo_name == "cuvs_cagra_hnswlib") {
-      typename cuvs::bench::cuvs_cagra_hnswlib<T, uint32_t>::build_param param;
-      parse_build_param<T, uint32_t>(conf, param);
-      a = std::make_unique<cuvs::bench::cuvs_cagra_hnswlib<T, uint32_t>>(metric, dim, param);
+      auto params = parse_build_param<T, uint32_t>(conf);
+      a = std::make_unique<cuvs::bench::cuvs_cagra_hnswlib<T, uint32_t>>(metric, dim, params);
     }
   }
 
@@ -71,6 +119,7 @@ auto create_search_param(const std::string& algo_name, const nlohmann::json& con
 }  // namespace cuvs::bench
 
 REGISTER_ALGO_INSTANCE(float);
+REGISTER_ALGO_INSTANCE(half);
 REGISTER_ALGO_INSTANCE(std::int8_t);
 REGISTER_ALGO_INSTANCE(std::uint8_t);
 

@@ -18,6 +18,8 @@
 
 #include <raft/util/cuda_dev_essentials.cuh>  // DI
 
+#include <cuda_fp16.h>
+
 namespace cuvs::distance::detail::ops {
 
 /**
@@ -53,14 +55,19 @@ struct l2_unexp_distance_op {
 
   DI void core(AccT& acc, DataT& x, DataT& y) const
   {
-    const auto diff = x - y;
-    acc += diff * diff;
+    if constexpr ((std::is_same_v<AccT, float> && std::is_same_v<DataT, half>)) {
+      const auto diff = __half2float(x) - __half2float(y);
+      acc += diff * diff;
+    } else {
+      const auto diff = x - y;
+      acc += diff * diff;
+    }
   };
 
   template <typename Policy>
   DI void epilog(AccT acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
-                 DataT* regxn,
-                 DataT* regyn,
+                 AccT* regxn,
+                 AccT* regyn,
                  IdxT gridStrideX,
                  IdxT gridStrideY) const
   {

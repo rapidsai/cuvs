@@ -27,6 +27,22 @@ Index search parameters
     :members:
     :content-only:
 
+Index extend parameters
+-----------------------
+
+.. doxygengroup:: cagra_cpp_extend_params
+    :project: cuvs
+    :members:
+    :content-only:
+
+Index extend memory buffers
+---------------------------
+
+.. doxygengroup:: cagra_cpp_extend_memory_buffers
+    :project: cuvs
+    :members:
+    :content-only:
+
 Index
 -----
 
@@ -51,3 +67,18 @@ Index search
     :members:
     :content-only:
 
+Index extend
+------------
+
+.. doxygengroup:: cagra_cpp_index_extend
+    :project: cuvs
+    :members:
+    :content-only:
+
+Index serialize
+---------------
+
+.. doxygengroup:: cagra_cpp_serialize
+    :project: cuvs
+    :members:
+    :content-only:

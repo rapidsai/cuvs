@@ -116,6 +116,15 @@ struct cuvsIvfPqIndexParams {
    * flag to `true` if you prefer to use as little GPU memory for the database as possible.
    */
   bool conservative_memory_allocation;
+
+  /**
+   * The max number of data points to use per PQ code during PQ codebook training. Using more data
+   * points per PQ code may increase the quality of PQ codebook but may also increase the build
+   * time. The parameter is applied to both PQ codebook generation methods, i.e., PER_SUBSPACE and
+   * PER_CLUSTER. In both cases, we will use `pq_book_size * max_train_points_per_pq_code` training
+   * points to train each codebook.
+   */
+  uint32_t max_train_points_per_pq_code;
 };
 
 typedef struct cuvsIvfPqIndexParams* cuvsIvfPqIndexParams_t;
@@ -169,6 +178,21 @@ struct cuvsIvfPqSearchParams {
    * performance slightly.
    */
   cudaDataType_t internal_distance_dtype;
+  /**
+   * The data type to use as the GEMM element type when searching the clusters to probe.
+   *
+   * Possible values: [CUDA_R_8I, CUDA_R_16F, CUDA_R_32F].
+   *
+   * - Legacy default: CUDA_R_32F (float)
+   * - Recommended for performance: CUDA_R_16F (half)
+   * - Experimental/low-precision: CUDA_R_8I (int8_t)
+   *    (WARNING: int8_t variant degrades recall unless data is normalized and low-dimensional)
+   */
+  cudaDataType_t coarse_search_dtype;
+  /**
+   * Set the internal batch size to improve GPU utilization at the cost of larger memory footprint.
+   */
+  uint32_t max_internal_batch_size;
   /**
    * Preferred fraction of SM's unified memory / L1 cache to be used as shared memory.
    *
@@ -236,6 +260,25 @@ cuvsError_t cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index);
  * @param[in] index cuvsIvfPqIndex_t to de-allocate
  */
 cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index);
+
+/** Get the number of clusters/inverted lists */
+uint32_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index);
+
+/** Get the dimensionality */
+uint32_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index);
+
+/**
+ * @brief Get the cluster centers corresponding to the lists in the original space
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
+ * @param[out] centers Preallocated array on host or device memory to store output,
+ * dimensions [n_lists, dim]
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqIndexGetCenters(cuvsResources_t res,
+                                     cuvsIvfPqIndex_t index,
+                                     DLManagedTensor* centers);
 /**
  * @}
  */
@@ -249,8 +292,9 @@ cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index);
  *        `DLDeviceType` equal to `kDLCUDA`, `kDLCUDAHost`, `kDLCUDAManaged`,
  *        or `kDLCPU`. Also, acceptable underlying types are:
  *        1. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
- *        2. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
- *        3. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
+ *        2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
+ *        3. `kDLDataType.code == kDLInt` and `kDLDataType.bits = 8`
+ *        4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
  *
  * @code {.c}
  * #include <cuvs/core/c_api.h>
@@ -305,6 +349,7 @@ cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
  *        with the same type of `queries`, such that `index.dtype.code ==
  * queries.dl_tensor.dtype.code` Types for input are:
  *        1. `queries`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
+ *            or `kDLDataType.bits = 16`
  *        2. `neighbors`: `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 32`
  *        3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *
@@ -391,6 +436,26 @@ cuvsError_t cuvsIvfPqDeserialize(cuvsResources_t res, const char* filename, cuvs
  * @}
  */
 
+/**
+ * @defgroup ivf_pq_c_index_extend IVF-PQ index extend
+ * @{
+ */
+/**
+ * @brief Extend the index with the new data.
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] new_vectors DLManagedTensor* the new vectors to add to the index
+ * @param[in] new_indices DLManagedTensor* vector of new indices for the new vectors
+ * @param[inout] index IVF-PQ index to be extended
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqExtend(cuvsResources_t res,
+                            DLManagedTensor* new_vectors,
+                            DLManagedTensor* new_indices,
+                            cuvsIvfPqIndex_t index);
+/**
+ * @}
+ */
 #ifdef __cplusplus
 }
 #endif

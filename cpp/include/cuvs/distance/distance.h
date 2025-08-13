@@ -62,6 +62,8 @@ typedef enum {
   RusselRaoExpanded = 18,
   /** Dice-Sorensen distance **/
   DiceExpanded = 19,
+  /** Bitstring Hamming distance **/
+  BitwiseHamming = 20,
   /** Precomputed (special value) **/
   Precomputed = 100
 } cuvsDistanceType;

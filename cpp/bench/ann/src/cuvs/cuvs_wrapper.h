@@ -26,6 +26,7 @@
 #include <fstream>
 #include <memory>
 #include <stdexcept>
+#include <stdint.h>
 #include <string>
 #include <type_traits>
 
@@ -57,7 +58,7 @@ class cuvs_gpu : public algo<T>, public algo_gpu {
 
   void build(const T*, size_t) final;
 
-  void set_search_param(const search_param_base& param) override;
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override;
 
   void search(const T* queries,
               int batch_size,
@@ -90,6 +91,8 @@ class cuvs_gpu : public algo<T>, public algo_gpu {
   int device_;
   const T* dataset_;
   size_t nrow_;
+
+  std::shared_ptr<cuvs::neighbors::filtering::base_filter> filter_;
 };
 
 template <typename T>
@@ -110,9 +113,9 @@ void cuvs_gpu<T>::build(const T* dataset, size_t nrow)
 }
 
 template <typename T>
-void cuvs_gpu<T>::set_search_param(const search_param_base&)
+void cuvs_gpu<T>::set_search_param(const search_param_base&, const void* filter_bitset)
 {
-  // Nothing to set here as it is brute force implementation
+  filter_ = make_cuvs_filter(filter_bitset, index_->size());
 }
 
 template <typename T>
@@ -155,7 +158,7 @@ void cuvs_gpu<T>::search(
   auto distances_view = raft::make_device_matrix_view<float, int64_t>(distances, batch_size, k);
 
   cuvs::neighbors::brute_force::search(
-    handle_, *index_, queries_view, neighbors_view, distances_view, std::nullopt);
+    handle_, *index_, queries_view, neighbors_view, distances_view, *filter_);
 }
 
 template <typename T>

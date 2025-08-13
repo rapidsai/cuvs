@@ -57,7 +57,10 @@ class ggnn : public algo<T>, public algo_gpu {
 
   void build(const T* dataset, size_t nrow) override { impl_->build(dataset, nrow); }
 
-  void set_search_param(const search_param_base& param) override { impl_->set_search_param(param); }
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override
+  {
+    impl_->set_search_param(param, filter_bitset);
+  }
   void search(const T* queries,
               int batch_size,
               int k,
@@ -128,7 +131,7 @@ class ggnn_impl : public algo<T>, public algo_gpu {
 
   void build(const T* dataset, size_t nrow) override;
 
-  void set_search_param(const search_param_base& param) override;
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override;
   void search(const T* queries,
               int batch_size,
               int k,
@@ -243,8 +246,10 @@ void ggnn_impl<T, measure, D, KBuild, KQuery, S>::set_search_dataset(const T* da
 }
 
 template <typename T, DistanceMeasure measure, int D, int KBuild, int KQuery, int S>
-void ggnn_impl<T, measure, D, KBuild, KQuery, S>::set_search_param(const search_param_base& param)
+void ggnn_impl<T, measure, D, KBuild, KQuery, S>::set_search_param(const search_param_base& param,
+                                                                   const void* filter_bitset)
 {
+  if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
   search_param_ = dynamic_cast<const typename ggnn<T>::search_param&>(param);
 }
 

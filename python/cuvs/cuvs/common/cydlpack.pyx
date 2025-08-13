@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,8 +25,47 @@ cdef void deleter(DLManagedTensor* tensor) noexcept:
     if tensor.manager_ctx is NULL:
         return
     stdlib.free(tensor.dl_tensor.shape)
+    if tensor.dl_tensor.strides is not NULL:
+        stdlib.free(tensor.dl_tensor.strides)
     tensor.manager_ctx = NULL
     stdlib.free(tensor)
+
+
+def dl_data_type_to_numpy(DLDataType dtype):
+    """ Converts a DLDataType dtype to a numpy dtype """
+    if dtype.code == DLDataTypeCode.kDLFloat:
+        if dtype.bits == 32:
+            return np.float32
+        elif dtype.bits == 64:
+            return np.float64
+        elif dtype.bits == 16:
+            return np.float16
+        else:
+            raise ValueError(f"unknown float dtype bits: {dtype.bits}")
+    elif dtype.code == DLDataTypeCode.kDLInt:
+        if dtype.bits == 32:
+            return np.int32
+        elif dtype.bits == 64:
+            return np.int64
+        elif dtype.bits == 16:
+            return np.int16
+        elif dtype.bits == 8:
+            return np.int8
+        else:
+            raise ValueError(f"unknown int dtype bits: {dtype.bits}")
+    elif dtype.code == DLDataTypeCode.kDLUInt:
+        if dtype.bits == 32:
+            return np.uint32
+        elif dtype.bits == 64:
+            return np.uint64
+        elif dtype.bits == 16:
+            return np.uint16
+        elif dtype.bits == 8:
+            return np.uint8
+        else:
+            raise ValueError(f"unknown uint dtype bits: {dtype.bits}")
+    else:
+        raise ValueError(f"unknown DLDataTypeCode.code: {dtype.code}")
 
 
 cdef DLManagedTensor* dlpack_c(ary):
@@ -95,10 +134,19 @@ cdef DLManagedTensor* dlpack_c(ary):
     tensor.data = <void*> tensor_ptr
     tensor.device = dev
     tensor.dtype = dtype
-    tensor.strides = NULL
     tensor.ndim = ndim
     tensor.shape = shape
     tensor.byte_offset = 0
+
+    if ary.c_contiguous:
+        tensor.strides = NULL
+    elif ary.f_contiguous:
+        tensor.strides = <int64_t*>stdlib.malloc(ndim * sizeof(int64_t))
+        tensor.strides[0] = 1
+        for i in range(1, ndim):
+            tensor.strides[i] = tensor.strides[i-1] * tensor.shape[i-1]
+    else:
+        raise ValueError("Input data must be contiguous")
 
     dlm.dl_tensor = tensor
     dlm.manager_ctx = NULL

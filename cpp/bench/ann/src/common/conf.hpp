@@ -45,38 +45,65 @@ class configuration {
     // the range of rows is [subset_first_row, subset_first_row + subset_size)
     // however, subset_size = 0 means using all rows after subset_first_row
     // that is, the subset is [subset_first_row, #rows in base_file)
-    size_t subset_first_row{0};
-    size_t subset_size{0};
+    uint32_t subset_first_row{0};
+    uint32_t subset_size{0};
     std::string query_file;
     std::string distance;
     std::optional<std::string> groundtruth_neighbors_file{std::nullopt};
 
     // data type of input dataset, possible values ["float", "int8", "uint8"]
     std::string dtype;
+
+    std::optional<double> filtering_rate{std::nullopt};
   };
 
-  explicit inline configuration(std::istream& conf_stream)
+  [[nodiscard]] inline auto get_dataset_conf() const -> const dataset_conf&
+  {
+    return dataset_conf_;
+  }
+  [[nodiscard]] inline auto get_dataset_conf() -> dataset_conf& { return dataset_conf_; }
+  [[nodiscard]] inline auto get_indices() const -> const std::vector<index>& { return indices_; };
+  [[nodiscard]] inline auto get_indices() -> std::vector<index>& { return indices_; };
+
+  /** The benchmark initializes the configuration once and has a chance to modify it during the
+   * setup. */
+  static inline auto initialize(std::istream& conf_stream,
+                                std::string data_prefix,
+                                std::string index_prefix) -> configuration&
+  {
+    singleton_ =
+      std::unique_ptr<configuration>(new configuration{conf_stream, data_prefix, index_prefix});
+    return *singleton_;
+  }
+
+  /** Any algorithm can access the benchmark configuration as an immutable context. */
+  [[nodiscard]] static inline auto singleton() -> const configuration& { return *singleton_; }
+
+ private:
+  explicit inline configuration(std::istream& conf_stream,
+                                std::string data_prefix,
+                                std::string index_prefix)
   {
     // to enable comments in json
     auto conf = nlohmann::json::parse(conf_stream, nullptr, true, true);
 
-    parse_dataset(conf.at("dataset"));
-    parse_index(conf.at("index"), conf.at("search_basic_param"));
+    parse_dataset(conf.at("dataset"), data_prefix);
+    parse_index(conf.at("index"), conf.at("search_basic_param"), index_prefix);
   }
 
-  [[nodiscard]] inline auto get_dataset_conf() const -> dataset_conf { return dataset_conf_; }
-  [[nodiscard]] inline auto get_indices() const -> std::vector<index> { return indices_; };
-
- private:
-  inline void parse_dataset(const nlohmann::json& conf)
+  inline void parse_dataset(const nlohmann::json& conf, std::string data_prefix)
   {
     dataset_conf_.name       = conf.at("name");
-    dataset_conf_.base_file  = conf.at("base_file");
-    dataset_conf_.query_file = conf.at("query_file");
+    dataset_conf_.base_file  = combine_path(data_prefix, conf.at("base_file"));
+    dataset_conf_.query_file = combine_path(data_prefix, conf.at("query_file"));
     dataset_conf_.distance   = conf.at("distance");
+    if (conf.contains("filtering_rate")) {
+      dataset_conf_.filtering_rate.emplace(conf.at("filtering_rate"));
+    }
 
     if (conf.contains("groundtruth_neighbors_file")) {
-      dataset_conf_.groundtruth_neighbors_file = conf.at("groundtruth_neighbors_file");
+      dataset_conf_.groundtruth_neighbors_file =
+        combine_path(data_prefix, conf.at("groundtruth_neighbors_file"));
     }
     if (conf.contains("subset_first_row")) {
       dataset_conf_.subset_first_row = conf.at("subset_first_row");
@@ -103,7 +130,9 @@ class configuration {
       }
     }
   }
-  inline void parse_index(const nlohmann::json& index_conf, const nlohmann::json& search_basic_conf)
+  inline void parse_index(const nlohmann::json& index_conf,
+                          const nlohmann::json& search_basic_conf,
+                          std::string index_prefix)
   {
     const int batch_size = search_basic_conf.at("batch_size");
     const int k          = search_basic_conf.at("k");
@@ -113,7 +142,7 @@ class configuration {
       index.name        = conf.at("name");
       index.algo        = conf.at("algo");
       index.build_param = conf.at("build_param");
-      index.file        = conf.at("file");
+      index.file        = combine_path(index_prefix, conf.at("file"));
       index.batch_size  = batch_size;
       index.k           = k;
 
@@ -142,6 +171,8 @@ class configuration {
 
   dataset_conf dataset_conf_;
   std::vector<index> indices_;
+
+  static inline std::unique_ptr<configuration> singleton_ = nullptr;
 };
 
 }  // namespace cuvs::bench

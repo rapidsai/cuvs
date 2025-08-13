@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 #pragma once
 
+#include "../../../core/nvtx.hpp"
 #include "../../vpq_dataset.cuh"
 #include "graph_core.cuh"
 #include <cuvs/neighbors/cagra.hpp>
@@ -25,17 +26,14 @@
 #include <raft/core/host_device_accessor.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/refine.hpp>
 
-// TODO: Fixme- this needs to be migrated
-#include "../../ivf_pq/ivf_pq_build.cuh"
-#include "../../ivf_pq/ivf_pq_search.cuh"
-#include "../../nn_descent.cuh"
+#include <cuvs/neighbors/nn_descent.hpp>
 
 // TODO: This shouldn't be calling spatial/knn APIs
 #include "../ann_utils.cuh"
@@ -44,11 +42,12 @@
 
 #include <chrono>
 #include <cstdio>
+#include <type_traits>
 #include <vector>
 
-namespace cuvs::neighbors::cagra::detail {
+#include <sys/mman.h>
 
-static const std::string RAFT_NAME = "raft";
+namespace cuvs::neighbors::cagra::detail {
 
 template <typename IdxT>
 void write_to_graph(raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
@@ -133,7 +132,7 @@ void build_knn_graph(
                "Currently only L2Expanded, InnerProduct and CosineExpanded metrics are supported");
 
   uint32_t node_degree = knn_graph.extent(1);
-  raft::common::nvtx::range<raft::common::nvtx::domain::raft> fun_scope(
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "cagra::build_graph(%zu, %zu, %u)",
     size_t(dataset.extent(0)),
     size_t(dataset.extent(1)),
@@ -157,8 +156,7 @@ void build_knn_graph(
   }();
 
   RAFT_LOG_DEBUG("# Building IVF-PQ index %s", model_name.c_str());
-  auto index =
-    cuvs::neighbors::ivf_pq::detail::build<DataT, int64_t>(res, pq.build_params, dataset);
+  auto index = cuvs::neighbors::ivf_pq::build(res, pq.build_params, dataset);
 
   //
   // search top (k + 1) neighbors
@@ -170,45 +168,72 @@ void build_knn_graph(
   const auto num_queries = dataset.extent(0);
 
   // Use the same maximum batch size as the ivf_pq::search to avoid allocating more than needed.
-  using cuvs::neighbors::ivf_pq::detail::kMaxQueries;
+  uint32_t max_queries = pq.search_params.max_internal_batch_size;
+
   // Heuristic: the build_knn_graph code should use only a fraction of the workspace memory; the
   // rest should be used by the ivf_pq::search. Here we say that the workspace size should be a good
   // multiple of what is required for the I/O batching below.
   constexpr size_t kMinWorkspaceRatio = 5;
-  auto desired_workspace_size         = kMaxQueries * kMinWorkspaceRatio *
-                                (sizeof(DataT) * dataset.extent(1)  // queries (dataset batch)
-                                 + sizeof(float) * gpu_top_k        // distances
-                                 + sizeof(int64_t) * gpu_top_k      // neighbors
-                                 + sizeof(float) * top_k            // refined_distances
-                                 + sizeof(int64_t) * top_k          // refined_neighbors
-                                );
+  constexpr size_t kMinLargeBatchSize = 512;
+  auto desired_workspace_size =
+    max_queries * (sizeof(DataT) * dataset.extent(1)  // queries (dataset batch)
+                   + sizeof(float) * gpu_top_k        // distances
+                   + sizeof(int64_t) * gpu_top_k      // neighbors
+                   + sizeof(float) * top_k            // refined_distances
+                   + sizeof(int64_t) * top_k          // refined_neighbors
+                  );
+  auto free_space_ratio    = raft::resource::get_workspace_free_bytes(res) / desired_workspace_size;
+  bool use_large_workspace = false;
+  if (free_space_ratio < kMinWorkspaceRatio) {
+    auto adjusted_max_queries =
+      static_cast<uint32_t>(max_queries * free_space_ratio / kMinWorkspaceRatio);
+    if (adjusted_max_queries >= kMinLargeBatchSize) {
+      // adjust max_queries, so that the ratio free_space_ratio gets not larger than
+      // kMinWorkspaceRatio.
+      RAFT_LOG_INFO(
+        "CAGRA graph build: reducing IVF-PQ search max_internal_batch_size from %u -> %u to fit "
+        "the workspace",
+        max_queries,
+        adjusted_max_queries);
+      max_queries                              = adjusted_max_queries;
+      pq.search_params.max_internal_batch_size = adjusted_max_queries;
+    } else {
+      // adjusting max_queries to a very small value isn't practical, so we use the large workspace
+      // instead.
+      use_large_workspace = true;
+      RAFT_LOG_WARN(
+        "Using large workspace memory for IVF-PQ search during CAGRA graph build. Desired "
+        "workspace size: %zu, free workspace size: %zu",
+        desired_workspace_size * kMinWorkspaceRatio,
+        raft::resource::get_workspace_free_bytes(res));
+    }
+  }
 
   // If the workspace is smaller than desired, put the I/O buffers into the large workspace.
   rmm::device_async_resource_ref workspace_mr =
-    desired_workspace_size <= raft::resource::get_workspace_free_bytes(res)
-      ? raft::resource::get_workspace_resource(res)
-      : raft::resource::get_large_workspace_resource(res);
+    use_large_workspace ? raft::resource::get_large_workspace_resource(res)
+                        : raft::resource::get_workspace_resource(res);
 
   RAFT_LOG_DEBUG(
     "IVF-PQ search node_degree: %d, top_k: %d,  gpu_top_k: %d,  max_batch_size:: %d, n_probes: %u",
     node_degree,
     top_k,
     gpu_top_k,
-    kMaxQueries,
+    max_queries,
     pq.search_params.n_probes);
 
   auto distances = raft::make_device_mdarray<float>(
-    res, workspace_mr, raft::make_extents<int64_t>(kMaxQueries, gpu_top_k));
+    res, workspace_mr, raft::make_extents<int64_t>(max_queries, gpu_top_k));
   auto neighbors = raft::make_device_mdarray<int64_t>(
-    res, workspace_mr, raft::make_extents<int64_t>(kMaxQueries, gpu_top_k));
+    res, workspace_mr, raft::make_extents<int64_t>(max_queries, gpu_top_k));
   auto refined_distances = raft::make_device_mdarray<float>(
-    res, workspace_mr, raft::make_extents<int64_t>(kMaxQueries, top_k));
+    res, workspace_mr, raft::make_extents<int64_t>(max_queries, top_k));
   auto refined_neighbors = raft::make_device_mdarray<int64_t>(
-    res, workspace_mr, raft::make_extents<int64_t>(kMaxQueries, top_k));
-  auto neighbors_host = raft::make_host_matrix<int64_t, int64_t>(kMaxQueries, gpu_top_k);
-  auto queries_host   = raft::make_host_matrix<DataT, int64_t>(kMaxQueries, dataset.extent(1));
-  auto refined_neighbors_host = raft::make_host_matrix<int64_t, int64_t>(kMaxQueries, top_k);
-  auto refined_distances_host = raft::make_host_matrix<float, int64_t>(kMaxQueries, top_k);
+    res, workspace_mr, raft::make_extents<int64_t>(max_queries, top_k));
+  auto neighbors_host = raft::make_host_matrix<int64_t, int64_t>(max_queries, gpu_top_k);
+  auto queries_host   = raft::make_host_matrix<DataT, int64_t>(max_queries, dataset.extent(1));
+  auto refined_neighbors_host = raft::make_host_matrix<int64_t, int64_t>(max_queries, top_k);
+  auto refined_distances_host = raft::make_host_matrix<float, int64_t>(max_queries, top_k);
 
   // TODO(tfeher): batched search with multiple GPUs
   std::size_t num_self_included = 0;
@@ -219,7 +244,7 @@ void build_knn_graph(
     dataset.data_handle(),
     dataset.extent(0),
     dataset.extent(1),
-    static_cast<int64_t>(kMaxQueries),
+    static_cast<int64_t>(max_queries),
     raft::resource::get_cuda_stream(res),
     workspace_mr);
 
@@ -349,6 +374,14 @@ void build_knn_graph(
   }
 
   if (!first) RAFT_LOG_DEBUG("# Finished building kNN graph");
+  if (static_cast<double>(num_self_included) / dataset.extent(0) * 100. < 5) {
+    RAFT_LOG_WARN(
+      "Self-included ratio is low: %2.2f %%. This can lead to poor recall. "
+      "Consider using a different configuration for the IVF-PQ index, "
+      "increasing the refinement rate, or using higher-precision data type for "
+      "LUT/Internal Distance.",
+      static_cast<double>(num_self_included) / dataset.extent(0) * 100.);
+  }
 }
 
 template <typename DataT, typename IdxT, typename accessor>
@@ -358,8 +391,8 @@ void build_knn_graph(
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
   cuvs::neighbors::nn_descent::index_params build_params)
 {
-  auto nn_descent_idx = cuvs::neighbors::nn_descent::index<IdxT>(res, knn_graph);
-  cuvs::neighbors::nn_descent::build<DataT, IdxT>(res, build_params, dataset, nn_descent_idx);
+  std::optional<raft::host_matrix_view<IdxT, int64_t, row_major>> graph_view = knn_graph;
+  auto nn_descent_idx = cuvs::neighbors::nn_descent::build(res, build_params, dataset, graph_view);
 
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
   using g_accessor    = typename decltype(nn_descent_idx.graph())::accessor_type;
@@ -373,7 +406,8 @@ void build_knn_graph(
       nn_descent_idx.graph().extent(0),
       nn_descent_idx.graph().extent(1));
 
-  cuvs::neighbors::cagra::detail::graph::sort_knn_graph(res, dataset, knn_graph_internal);
+  cuvs::neighbors::cagra::detail::graph::sort_knn_graph(
+    res, build_params.metric, dataset, knn_graph_internal);
 }
 
 template <
@@ -383,7 +417,8 @@ template <
 void optimize(
   raft::resources const& res,
   raft::mdspan<IdxT, raft::matrix_extent<int64_t>, raft::row_major, g_accessor> knn_graph,
-  raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph)
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> new_graph,
+  const bool guarantee_connectivity = false)
 {
   using internal_IdxT = typename std::make_unsigned<IdxT>::type;
 
@@ -401,7 +436,225 @@ void optimize(
       knn_graph.extent(0),
       knn_graph.extent(1));
 
-  cagra::detail::graph::optimize(res, knn_graph_internal, new_graph_internal);
+  cagra::detail::graph::optimize(
+    res, knn_graph_internal, new_graph_internal, guarantee_connectivity);
+}
+
+// RAII wrapper for allocating memory with Transparent HugePage
+struct mmap_owner {
+  // Allocate a new memory (not backed by a file)
+  mmap_owner(size_t size) : size_{size}
+  {
+    int flags = MAP_ANONYMOUS | MAP_PRIVATE;
+    ptr_      = mmap(nullptr, size, PROT_READ | PROT_WRITE, flags, -1, 0);
+    if (ptr_ == MAP_FAILED) {
+      ptr_ = nullptr;
+      throw std::runtime_error("cuvs::mmap_owner error");
+    }
+    if (madvise(ptr_, size, MADV_HUGEPAGE) != 0) {
+      munmap(ptr_, size);
+      ptr_ = nullptr;
+      throw std::runtime_error("cuvs::mmap_owner error");
+    }
+  }
+
+  ~mmap_owner() noexcept
+  {
+    if (ptr_ != nullptr) { munmap(ptr_, size_); }
+  }
+
+  // No copies for owning struct
+  mmap_owner(const mmap_owner& res)                      = delete;
+  auto operator=(const mmap_owner& other) -> mmap_owner& = delete;
+  // Moving is fine
+  mmap_owner(mmap_owner&& other)
+    : ptr_{std::exchange(other.ptr_, nullptr)}, size_{std::exchange(other.size_, 0)}
+  {
+  }
+  auto operator=(mmap_owner&& other) -> mmap_owner&
+  {
+    std::swap(this->ptr_, other.ptr_);
+    std::swap(this->size_, other.size_);
+    return *this;
+  }
+
+  [[nodiscard]] auto data() const -> void* { return ptr_; }
+  [[nodiscard]] auto size() const -> size_t { return size_; }
+
+ private:
+  void* ptr_;
+  size_t size_;
+};
+
+template <typename T,
+          typename IdxT     = uint32_t,
+          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
+                                                         raft::memory_type::host>>
+auto iterative_build_graph(
+  raft::resources const& res,
+  const index_params& params,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
+{
+  size_t intermediate_degree = params.intermediate_graph_degree;
+  size_t graph_degree        = params.graph_degree;
+
+  auto cagra_graph = raft::make_host_matrix<IdxT, int64_t>(0, 0);
+
+  // Iteratively improve the accuracy of the graph by repeatedly running
+  // CAGRA's search() and optimize(). As for the size of the graph, instead
+  // of targeting all nodes from the beginning, the number of nodes is
+  // initially small, and the number of nodes is doubled with each iteration.
+  RAFT_LOG_INFO("Iteratively creating/improving graph index using CAGRA's search() and optimize()");
+
+  // If dataset is a host matrix, change it to a device matrix. Also, if the
+  // dimensionality of the dataset does not meet the alighnemt restriction,
+  // add extra dimensions and change it to a strided matrix.
+  std::unique_ptr<strided_dataset<T, int64_t>> dev_aligned_dataset;
+  try {
+    dev_aligned_dataset = make_aligned_dataset(res, dataset);
+  } catch (raft::logic_error& e) {
+    RAFT_LOG_ERROR("Iterative CAGRA graph build requires the dataset to fit GPU memory");
+    throw e;
+  }
+  auto dev_aligned_dataset_view = dev_aligned_dataset.get()->view();
+
+  // If the matrix stride and extent do no match, the extra dimensions are
+  // also as extent since it cannot be used as query matrix.
+  auto dev_dataset =
+    raft::make_device_matrix_view<const T, int64_t>(dev_aligned_dataset_view.data_handle(),
+                                                    dev_aligned_dataset_view.extent(0),
+                                                    dev_aligned_dataset_view.stride(0));
+
+  // Determine initial graph size.
+  uint64_t final_graph_size   = (uint64_t)dataset.extent(0);
+  uint64_t initial_graph_size = (final_graph_size + 1) / 2;
+  while (initial_graph_size > graph_degree * 64) {
+    initial_graph_size = (initial_graph_size + 1) / 2;
+  }
+  RAFT_LOG_DEBUG("# initial graph size = %lu", (uint64_t)initial_graph_size);
+
+  // Allocate memory for search results.
+  constexpr uint64_t max_chunk_size = 8192;
+  auto topk                         = intermediate_degree;
+  auto dev_neighbors = raft::make_device_matrix<IdxT, int64_t>(res, max_chunk_size, topk);
+  auto dev_distances = raft::make_device_matrix<float, int64_t>(res, max_chunk_size, topk);
+
+  // Determine graph degree and number of search results while increasing
+  // graph size.
+  auto small_graph_degree = std::max(graph_degree / 2, std::min(graph_degree, (uint64_t)32));
+  auto small_topk         = topk * small_graph_degree / graph_degree;
+  RAFT_LOG_DEBUG("# graph_degree = %lu", (uint64_t)graph_degree);
+  RAFT_LOG_DEBUG("# small_graph_degree = %lu", (uint64_t)small_graph_degree);
+  RAFT_LOG_DEBUG("# topk = %lu", (uint64_t)topk);
+  RAFT_LOG_DEBUG("# small_topk = %lu", (uint64_t)small_topk);
+
+  // Create an initial graph. The initial graph created here is not suitable for
+  // searching, but connectivity is guaranteed.
+  auto offset       = raft::make_host_vector<IdxT, int64_t>(small_graph_degree);
+  const double base = sqrt((double)2.0);
+  for (uint64_t j = 0; j < small_graph_degree; j++) {
+    if (j == 0) {
+      offset(j) = 1;
+    } else {
+      offset(j) = offset(j - 1) + 1;
+    }
+    IdxT ofst = initial_graph_size * pow(base, (double)j - small_graph_degree - 1);
+    if (offset(j) < ofst) { offset(j) = ofst; }
+    RAFT_LOG_DEBUG("# offset(%lu) = %lu\n", (uint64_t)j, (uint64_t)offset(j));
+  }
+  cagra_graph = raft::make_host_matrix<IdxT, int64_t>(initial_graph_size, small_graph_degree);
+  for (uint64_t i = 0; i < initial_graph_size; i++) {
+    for (uint64_t j = 0; j < small_graph_degree; j++) {
+      cagra_graph(i, j) = (i + offset(j)) % initial_graph_size;
+    }
+  }
+
+  // Allocate memory for neighbors list using Transparent HugePage
+  constexpr size_t thp_size = 2 * 1024 * 1024;
+  size_t byte_size          = sizeof(IdxT) * final_graph_size * topk;
+  if (byte_size % thp_size) { byte_size += thp_size - (byte_size % thp_size); }
+  mmap_owner neighbors_list(byte_size);
+  IdxT* neighbors_ptr = (IdxT*)neighbors_list.data();
+  memset(neighbors_ptr, 0, byte_size);
+
+  auto curr_graph_size = initial_graph_size;
+  while (true) {
+    RAFT_LOG_DEBUG("# graph_size = %lu (%.3lf)",
+                   (uint64_t)curr_graph_size,
+                   (double)curr_graph_size / final_graph_size);
+
+    auto curr_query_size   = std::min(2 * curr_graph_size, final_graph_size);
+    auto curr_topk         = small_topk;
+    auto curr_itopk_size   = small_topk * 3 / 2;
+    auto curr_graph_degree = small_graph_degree;
+    if (curr_query_size == final_graph_size) {
+      curr_topk         = topk;
+      curr_itopk_size   = topk * 2;
+      curr_graph_degree = graph_degree;
+    }
+
+    cuvs::neighbors::cagra::search_params search_params;
+    search_params.algo        = cuvs::neighbors::cagra::search_algo::AUTO;
+    search_params.max_queries = max_chunk_size;
+    search_params.itopk_size  = curr_itopk_size;
+
+    // Create an index (idx), a query view (dev_query_view), and a mdarray for
+    // search results (neighbors).
+    auto dev_dataset_view = raft::make_device_matrix_view<const T, int64_t>(
+      dev_dataset.data_handle(), (int64_t)curr_graph_size, dev_dataset.extent(1));
+
+    auto idx = index<T, IdxT>(
+      res, params.metric, dev_dataset_view, raft::make_const_mdspan(cagra_graph.view()));
+
+    auto dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
+      dev_dataset.data_handle(), (int64_t)curr_query_size, dev_dataset.extent(1));
+
+    auto neighbors_view =
+      raft::make_host_matrix_view<IdxT, int64_t>(neighbors_ptr, curr_query_size, curr_topk);
+
+    // Search.
+    // Since there are many queries, divide them into batches and search them.
+    cuvs::spatial::knn::detail::utils::batch_load_iterator<T> query_batch(
+      dev_query_view.data_handle(),
+      curr_query_size,
+      dev_query_view.extent(1),
+      max_chunk_size,
+      raft::resource::get_cuda_stream(res),
+      raft::resource::get_workspace_resource(res));
+    for (const auto& batch : query_batch) {
+      auto batch_dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
+        batch.data(), batch.size(), dev_query_view.extent(1));
+      auto batch_dev_neighbors_view = raft::make_device_matrix_view<IdxT, int64_t>(
+        dev_neighbors.data_handle(), batch.size(), curr_topk);
+      auto batch_dev_distances_view = raft::make_device_matrix_view<float, int64_t>(
+        dev_distances.data_handle(), batch.size(), curr_topk);
+
+      cuvs::neighbors::cagra::search(res,
+                                     search_params,
+                                     idx,
+                                     batch_dev_query_view,
+                                     batch_dev_neighbors_view,
+                                     batch_dev_distances_view);
+
+      auto batch_neighbors_view = raft::make_host_matrix_view<IdxT, int64_t>(
+        neighbors_view.data_handle() + batch.offset() * curr_topk, batch.size(), curr_topk);
+      raft::copy(batch_neighbors_view.data_handle(),
+                 batch_dev_neighbors_view.data_handle(),
+                 batch_neighbors_view.size(),
+                 raft::resource::get_cuda_stream(res));
+    }
+
+    // Optimize graph
+    bool flag_last  = (curr_graph_size == final_graph_size);
+    curr_graph_size = curr_query_size;
+    cagra_graph     = raft::make_host_matrix<IdxT, int64_t>(0, 0);  // delete existing grahp
+    cagra_graph     = raft::make_host_matrix<IdxT, int64_t>(curr_graph_size, curr_graph_degree);
+    optimize<IdxT>(
+      res, neighbors_view, cagra_graph.view(), flag_last ? params.guarantee_connectivity : 0);
+    if (flag_last) { break; }
+  }
+
+  return cagra_graph;
 }
 
 template <typename T,
@@ -415,6 +668,13 @@ index<T, IdxT> build(
 {
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
+  common::nvtx::range<common::nvtx::domain::cuvs> function_scope(
+    "cagra::build<%s>(%zu, %zu)",
+    Accessor::is_managed_type::value ? "managed"
+    : Accessor::is_host_type::value  ? "host"
+                                     : "device",
+    intermediate_degree,
+    graph_degree);
   if (intermediate_degree >= static_cast<size_t>(dataset.extent(0))) {
     RAFT_LOG_WARN(
       "Intermediate graph degree cannot be larger than dataset size, reducing it to %lu",
@@ -430,59 +690,94 @@ index<T, IdxT> build(
     graph_degree = intermediate_degree;
   }
 
-  std::optional<raft::host_matrix<IdxT, int64_t>> knn_graph(
-    raft::make_host_matrix<IdxT, int64_t>(dataset.extent(0), intermediate_degree));
-
   // Set default value in case knn_build_params is not defined.
   auto knn_build_params = params.graph_build_params;
   if (std::holds_alternative<std::monostate>(params.graph_build_params)) {
     // Heuristic to decide default build algo and its params.
-    if (params.metric == cuvs::distance::DistanceType::L2Expanded &&
-        cuvs::neighbors::nn_descent::has_enough_device_memory(
+    if (cuvs::neighbors::nn_descent::has_enough_device_memory(
           res, dataset.extents(), sizeof(IdxT))) {
       RAFT_LOG_DEBUG("NN descent solver");
-      knn_build_params = cagra::graph_build_params::nn_descent_params(intermediate_degree);
+      knn_build_params =
+        cagra::graph_build_params::nn_descent_params(intermediate_degree, params.metric);
     } else {
       RAFT_LOG_DEBUG("Selecting IVF-PQ solver");
       knn_build_params = cagra::graph_build_params::ivf_pq_params(dataset.extents(), params.metric);
     }
   }
+  RAFT_EXPECTS(
+    params.metric != BitwiseHamming ||
+      std::holds_alternative<cagra::graph_build_params::iterative_search_params>(
+        knn_build_params) ||
+      std::holds_alternative<cagra::graph_build_params::nn_descent_params>(knn_build_params),
+    "IVF_PQ for CAGRA graph build does not support BitwiseHamming as a metric. Please "
+    "use nn-descent or the iterative CAGRA search build.");
+
+  // Validate data type for BitwiseHamming metric
+  RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::BitwiseHamming ||
+                 (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>),
+               "BitwiseHamming distance is only supported for int8_t and uint8_t data types. "
+               "Current data type is not supported.");
+
+  auto cagra_graph = raft::make_host_matrix<IdxT, int64_t>(0, 0);
 
   // Dispatch based on graph_build_params
-  if (std::holds_alternative<cagra::graph_build_params::ivf_pq_params>(knn_build_params)) {
-    auto ivf_pq_params =
-      std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(knn_build_params);
-    build_knn_graph(res, dataset, knn_graph->view(), ivf_pq_params);
+  if (std::holds_alternative<cagra::graph_build_params::iterative_search_params>(
+        knn_build_params)) {
+    cagra_graph = iterative_build_graph<T, IdxT, Accessor>(res, params, dataset);
   } else {
-    RAFT_EXPECTS(
-      params.metric == cuvs::distance::DistanceType::L2Expanded,
-      "L2Expanded is the only distance metrics supported for CAGRA build with nn_descent");
-    auto nn_descent_params =
-      std::get<cagra::graph_build_params::nn_descent_params>(knn_build_params);
+    std::optional<raft::host_matrix<IdxT, int64_t>> knn_graph(
+      raft::make_host_matrix<IdxT, int64_t>(dataset.extent(0), intermediate_degree));
 
-    if (nn_descent_params.graph_degree != intermediate_degree) {
-      RAFT_LOG_WARN(
-        "Graph degree (%lu) for nn-descent needs to match cagra intermediate graph degree (%lu), "
-        "aligning "
-        "nn-descent graph_degree.",
-        nn_descent_params.graph_degree,
-        intermediate_degree);
-      nn_descent_params = cagra::graph_build_params::nn_descent_params(intermediate_degree);
+    if (std::holds_alternative<cagra::graph_build_params::ivf_pq_params>(knn_build_params)) {
+      auto ivf_pq_params =
+        std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(knn_build_params);
+      if (ivf_pq_params.build_params.metric != params.metric) {
+        RAFT_LOG_WARN(
+          "Metric (%lu) for IVF-PQ needs to match cagra metric (%lu), "
+          "aligning IVF-PQ metric.",
+          ivf_pq_params.build_params.metric,
+          params.metric);
+        ivf_pq_params.build_params.metric = params.metric;
+      }
+      build_knn_graph(res, dataset, knn_graph->view(), ivf_pq_params);
+    } else {
+      auto nn_descent_params =
+        std::get<cagra::graph_build_params::nn_descent_params>(knn_build_params);
+
+      if (nn_descent_params.metric != params.metric) {
+        RAFT_LOG_WARN(
+          "Metric (%lu) for nn-descent needs to match cagra metric (%lu), "
+          "aligning nn-descent metric.",
+          nn_descent_params.metric,
+          params.metric);
+        nn_descent_params.metric = params.metric;
+      }
+      if (nn_descent_params.graph_degree != intermediate_degree) {
+        RAFT_LOG_WARN(
+          "Graph degree (%lu) for nn-descent needs to match cagra intermediate graph degree (%lu), "
+          "aligning "
+          "nn-descent graph_degree.",
+          nn_descent_params.graph_degree,
+          intermediate_degree);
+        nn_descent_params =
+          cagra::graph_build_params::nn_descent_params(intermediate_degree, params.metric);
+      }
+
+      // Use nn-descent to build CAGRA knn graph
+      nn_descent_params.return_distances = false;
+      build_knn_graph<T, IdxT>(res, dataset, knn_graph->view(), nn_descent_params);
     }
 
-    // Use nn-descent to build CAGRA knn graph
-    build_knn_graph<T, IdxT>(res, dataset, knn_graph->view(), nn_descent_params);
+    cagra_graph = raft::make_host_matrix<IdxT, int64_t>(dataset.extent(0), graph_degree);
+
+    RAFT_LOG_TRACE("optimizing graph");
+    optimize<IdxT>(res, knn_graph->view(), cagra_graph.view(), params.guarantee_connectivity);
+
+    // free intermediate graph before trying to create the index
+    knn_graph.reset();
   }
 
-  auto cagra_graph = raft::make_host_matrix<IdxT, int64_t>(dataset.extent(0), graph_degree);
-
-  RAFT_LOG_INFO("optimizing graph");
-  optimize<IdxT>(res, knn_graph->view(), cagra_graph.view());
-
-  // free intermediate graph before trying to create the index
-  knn_graph.reset();
-
-  RAFT_LOG_INFO("Graph optimized, creating index");
+  RAFT_LOG_TRACE("Graph optimized, creating index");
 
   // Construct an index from dataset and optimized knn graph.
   if (params.compression.has_value()) {
@@ -498,15 +793,22 @@ index<T, IdxT> build(
 
     return idx;
   }
-  try {
-    return index<T, IdxT>(res, params.metric, dataset, raft::make_const_mdspan(cagra_graph.view()));
-  } catch (std::bad_alloc& e) {
-    RAFT_LOG_DEBUG("Insufficient GPU memory to construct CAGRA index with dataset on GPU");
-    // We just add the graph. User is expected to update dataset separately (e.g allocating in
-    // managed memory).
-  } catch (raft::logic_error& e) {
-    // The memory error can also manifest as logic_error.
-    RAFT_LOG_DEBUG("Insufficient GPU memory to construct CAGRA index with dataset on GPU");
+  if (params.attach_dataset_on_build) {
+    try {
+      return index<T, IdxT>(
+        res, params.metric, dataset, raft::make_const_mdspan(cagra_graph.view()));
+    } catch (std::bad_alloc& e) {
+      RAFT_LOG_WARN(
+        "Insufficient GPU memory to construct CAGRA index with dataset on GPU. Only the graph will "
+        "be added to the index");
+      // We just add the graph. User is expected to update dataset separately (e.g allocating in
+      // managed memory).
+    } catch (raft::logic_error& e) {
+      // The memory error can also manifest as logic_error.
+      RAFT_LOG_WARN(
+        "Insufficient GPU memory to construct CAGRA index with dataset on GPU. Only the graph will "
+        "be added to the index");
+    }
   }
   index<T, IdxT> idx(res, params.metric);
   idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));

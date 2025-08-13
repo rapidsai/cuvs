@@ -34,3 +34,18 @@ Index search
 ############
 
 .. autofunction:: cuvs.neighbors.cagra.search
+
+Index save
+##########
+
+.. autofunction:: cuvs.neighbors.cagra.save
+
+Index load
+##########
+
+.. autofunction:: cuvs.neighbors.cagra.load
+
+Index extend
+###########
+
+.. autofunction:: cuvs.neighbors.cagra.extend

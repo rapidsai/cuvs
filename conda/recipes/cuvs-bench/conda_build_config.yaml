@@ -1,0 +1,5 @@
+glog_version:
+  - ">=0.6.0"
+
+h5py_version:
+  - ">=3.8.0"

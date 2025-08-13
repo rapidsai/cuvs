@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2023, NVIDIA CORPORATION.
+ * Copyright (c) 2018-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,10 @@ namespace cuvs::sparse::neighbors {
 
 template <typename value_idx, typename value_t>
 using FixConnectivitiesRedOp = detail::FixConnectivitiesRedOp<value_idx, value_t>;
+
+template <typename value_idx, typename value_t>
+using MutualReachabilityFixConnectivitiesRedOp =
+  detail::MutualReachabilityFixConnectivitiesRedOp<value_idx, value_t>;
 
 /**
  * Gets the number of unique components from array of
@@ -77,11 +81,11 @@ void cross_component_nn(
   raft::sparse::COO<value_t, value_idx>& out,
   const value_t* X,
   const value_idx* orig_colors,
-  size_t n_rows,
-  size_t n_cols,
+  value_idx n_rows,
+  value_idx n_cols,
   red_op reduction_op,
-  size_t row_batch_size               = 0,
-  size_t col_batch_size               = 0,
+  value_idx row_batch_size            = 0,
+  value_idx col_batch_size            = 0,
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded)
 {
   detail::cross_component_nn(handle,

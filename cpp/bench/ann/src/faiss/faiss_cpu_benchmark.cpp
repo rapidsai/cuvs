@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -69,12 +69,37 @@ void parse_build_param(const nlohmann::json& conf,
 }
 
 template <typename T>
+void parse_build_param(const nlohmann::json& conf,
+                       typename cuvs::bench::faiss_cpu_hnsw_flat<T>::build_param& param)
+{
+  param.M = conf.at("M");
+  if (conf.contains("efConstruction")) {
+    param.efConstruction = conf.at("efConstruction");
+  } else {
+    param.efConstruction = 40;
+  }
+}
+
+template <typename T>
 void parse_search_param(const nlohmann::json& conf,
                         typename cuvs::bench::faiss_cpu<T>::search_param& param)
 {
   param.nprobe = conf.at("nprobe");
   if (conf.contains("refine_ratio")) { param.refine_ratio = conf.at("refine_ratio"); }
-  if (conf.contains("numThreads")) { param.num_threads = conf.at("numThreads"); }
+  if (conf.contains("parallel_mode")) { param.parallel_mode = conf.at("parallel_mode"); }
+}
+
+template <typename T>
+void parse_search_param(const nlohmann::json& conf,
+                        typename cuvs::bench::faiss_cpu_hnsw_flat<T>::search_param& param)
+{
+  faiss::SearchParametersHNSW p;
+  if (conf.contains("efSearch")) { p.efSearch = conf.at("efSearch"); }
+  if (conf.contains("check_relative_distance")) {
+    p.check_relative_distance = conf.at("check_relative_distance");
+  }
+  if (conf.contains("bounded_queue")) { p.bounded_queue = conf.at("bounded_queue"); }
+  param.p = p;
 }
 
 template <typename T, template <typename> class Algo>
@@ -104,6 +129,8 @@ auto create_algo(const std::string& algo_name,
       a = make_algo<T, cuvs::bench::faiss_cpu_ivfsq>(metric, dim, conf);
     } else if (algo_name == "faiss_cpu_flat") {
       a = std::make_unique<cuvs::bench::faiss_cpu_flat<T>>(metric, dim);
+    } else if (algo_name == "faiss_cpu_hnsw_flat") {
+      a = make_algo<T, cuvs::bench::faiss_cpu_hnsw_flat>(metric, dim, conf);
     }
   }
 
@@ -125,6 +152,10 @@ auto create_search_param(const std::string& algo_name, const nlohmann::json& con
     return param;
   } else if (algo_name == "faiss_cpu_flat") {
     auto param = std::make_unique<typename cuvs::bench::faiss_cpu<T>::search_param>();
+    return param;
+  } else if (algo_name == "faiss_cpu_hnsw_flat") {
+    auto param = std::make_unique<typename cuvs::bench::faiss_cpu_hnsw_flat<T>::search_param>();
+    parse_search_param<T>(conf, *param);
     return param;
   }
   // else

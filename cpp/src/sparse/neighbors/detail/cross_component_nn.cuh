@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2018-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,7 +67,7 @@ struct FixConnectivitiesRedOp {
   // default constructor for cutlass
   DI FixConnectivitiesRedOp() : m(0) {}
 
-  FixConnectivitiesRedOp(value_idx m_) : m(m_){};
+  FixConnectivitiesRedOp(value_idx m_) : m(m_) {};
 
   typedef typename raft::KeyValuePair<value_idx, value_t> KVP;
   DI void operator()(value_idx rit, KVP* out, const KVP& other) const
@@ -106,6 +106,93 @@ struct FixConnectivitiesRedOp {
   void gather(const raft::resources& handle, value_idx* map) {}
 
   void scatter(const raft::resources& handle, value_idx* map) {}
+};
+
+template <typename value_idx, typename value_t>
+struct MutualReachabilityFixConnectivitiesRedOp {
+  value_t* core_dists;
+  value_idx m;
+
+  DI MutualReachabilityFixConnectivitiesRedOp() : m(0), core_dists(nullptr) {}
+
+  MutualReachabilityFixConnectivitiesRedOp(value_t* core_dists, value_idx m)
+    : core_dists(core_dists), m(m) {};
+
+  typedef typename raft::KeyValuePair<value_idx, value_t> KVP;
+  DI void operator()(value_idx rit, KVP* out, const KVP& other) const
+  {
+    if (rit < m && other.value < std::numeric_limits<value_t>::max()) {
+      value_t core_dist_rit   = core_dists[rit];
+      value_t core_dist_other = max(core_dist_rit, max(core_dists[other.key], other.value));
+
+      value_t core_dist_out;
+      if (out->key > -1) {
+        core_dist_out = max(core_dist_rit, max(core_dists[out->key], out->value));
+      } else {
+        core_dist_out = out->value;
+      }
+
+      bool smaller = core_dist_other < core_dist_out;
+      out->key     = smaller ? other.key : out->key;
+      out->value   = smaller ? core_dist_other : core_dist_out;
+    }
+  }
+
+  DI KVP operator()(value_idx rit, const KVP& a, const KVP& b) const
+  {
+    if (rit < m && a.key > -1) {
+      value_t core_dist_rit = core_dists[rit];
+      value_t core_dist_a   = max(core_dist_rit, max(core_dists[a.key], a.value));
+
+      value_t core_dist_b;
+      if (b.key > -1) {
+        core_dist_b = max(core_dist_rit, max(core_dists[b.key], b.value));
+      } else {
+        core_dist_b = b.value;
+      }
+
+      return core_dist_a < core_dist_b ? KVP(a.key, core_dist_a) : KVP(b.key, core_dist_b);
+    }
+
+    return b;
+  }
+
+  DI void init(value_t* out, value_t maxVal) const { *out = maxVal; }
+  DI void init(KVP* out, value_t maxVal) const
+  {
+    out->key   = -1;
+    out->value = maxVal;
+  }
+
+  DI void init_key(value_t& out, value_idx idx) const { return; }
+  DI void init_key(KVP& out, value_idx idx) const { out.key = idx; }
+
+  DI value_t get_value(KVP& out) const { return out.value; }
+  DI value_t get_value(value_t& out) const { return out; }
+
+  void gather(const raft::resources& handle, value_idx* map)
+  {
+    auto tmp_core_dists = raft::make_device_vector<value_t>(handle, m);
+    thrust::gather(raft::resource::get_thrust_policy(handle),
+                   map,
+                   map + m,
+                   core_dists,
+                   tmp_core_dists.data_handle());
+    raft::copy_async(
+      core_dists, tmp_core_dists.data_handle(), m, raft::resource::get_cuda_stream(handle));
+  }
+
+  void scatter(const raft::resources& handle, value_idx* map)
+  {
+    auto tmp_core_dists = raft::make_device_vector<value_t>(handle, m);
+    thrust::scatter(raft::resource::get_thrust_policy(handle),
+                    core_dists,
+                    core_dists + m,
+                    map,
+                    tmp_core_dists.data_handle());
+    raft::copy_async(
+      core_dists, tmp_core_dists.data_handle(), m, raft::resource::get_cuda_stream(handle));
+  }
 };
 
 /**
@@ -249,8 +336,8 @@ void perform_1nn(raft::resources const& handle,
     colors_group_idxs.data_handle() + 1, n_components);
 
   auto x_norm = raft::make_device_vector<value_t, value_idx>(handle, (value_idx)n_rows);
-  raft::linalg::rowNorm(
-    x_norm.data_handle(), X, n_cols, n_rows, raft::linalg::L2Norm, true, stream);
+  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+    x_norm.data_handle(), X, n_cols, n_rows, stream);
 
   auto adj     = raft::make_device_matrix<bool, value_idx>(handle, row_batch_size, n_components);
   using OutT   = raft::KeyValuePair<value_idx, value_t>;
@@ -449,17 +536,17 @@ void min_components_by_color(raft::sparse::COO<value_t, value_idx>& coo,
  * is done
  * @param[in] metric distance metric
  */
-template <typename value_idx, typename value_t, typename red_op>
+template <typename value_idx, typename value_t, typename red_op, typename nnz_t = size_t>
 void cross_component_nn(
   raft::resources const& handle,
-  raft::sparse::COO<value_t, value_idx>& out,
+  raft::sparse::COO<value_t, value_idx, nnz_t>& out,
   const value_t* X,
   const value_idx* orig_colors,
-  size_t n_rows,
-  size_t n_cols,
+  value_idx n_rows,
+  value_idx n_cols,
   red_op reduction_op,
-  size_t row_batch_size,
-  size_t col_batch_size,
+  value_idx row_batch_size,
+  value_idx col_batch_size,
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2SqrtExpanded)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
@@ -520,13 +607,14 @@ void cross_component_nn(
                          out_index.data());
 
   // compute final size
-  value_idx size = 0;
-  raft::update_host(&size, out_index.data() + (out_index.size() - 1), 1, stream);
+  value_idx size_int = 0;
+  raft::update_host(&size_int, out_index.data() + (out_index.size() - 1), 1, stream);
   raft::resource::sync_stream(handle, stream);
+  nnz_t size = static_cast<nnz_t>(size_int);
 
   size++;
 
-  raft::sparse::COO<value_t, value_idx> min_edges(stream);
+  raft::sparse::COO<value_t, value_idx, nnz_t> min_edges(stream);
   min_edges.allocate(size, n_rows, n_rows, true, stream);
 
   min_components_by_color(

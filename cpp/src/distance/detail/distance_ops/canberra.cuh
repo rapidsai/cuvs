@@ -19,6 +19,8 @@
 #include <raft/core/operators.hpp>            // raft::abs
 #include <raft/util/cuda_dev_essentials.cuh>  // DI
 
+#include <cuda_fp16.h>
+
 namespace cuvs::distance::detail::ops {
 
 /**
@@ -50,17 +52,27 @@ struct canberra_distance_op {
 
   DI void core(AccT& acc, DataT& x, DataT& y) const
   {
-    const auto diff = raft::abs(x - y);
-    const auto add  = raft::abs(x) + raft::abs(y);
-    // deal with potential for 0 in denominator by
-    // forcing 0/1 instead
-    acc += ((add != 0) * diff / (add + (add == 0)));
+    if constexpr ((std::is_same_v<AccT, float> && std::is_same_v<DataT, half>)) {
+      AccT _x         = __half2float(x);
+      AccT _y         = __half2float(y);
+      const auto diff = raft::abs(_x - _y);
+      const auto add  = raft::abs(_x) + raft::abs(_y);
+      // deal with potential for 0 in denominator by
+      // forcing 0/1 instead
+      acc += ((add != 0) * diff / (add + (add == 0)));
+    } else {
+      const auto diff = raft::abs(x - y);
+      const auto add  = raft::abs(x) + raft::abs(y);
+      // deal with potential for 0 in denominator by
+      // forcing 0/1 instead
+      acc += ((add != 0) * diff / (add + (add == 0)));
+    }
   };
 
   template <typename Policy>
   DI void epilog(AccT acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
-                 DataT* regxn,
-                 DataT* regyn,
+                 AccT* regxn,
+                 AccT* regyn,
                  IdxT gridStrideX,
                  IdxT gridStrideY) const
   {

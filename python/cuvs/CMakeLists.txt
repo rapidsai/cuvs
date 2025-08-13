@@ -12,9 +12,9 @@
 # the License.
 # =============================================================================
 
-cmake_minimum_required(VERSION 3.26.4 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
 
-include(../../rapids_config.cmake)
+include(../../cmake/rapids_config.cmake)
 
 # We always need CUDA for cuvs because the cuvs dependency brings in a header-only cuco dependency
 # that enables CUDA unconditionally.
@@ -32,17 +32,6 @@ project(
 )
 
 # ##################################################################################################
-# * User Options  --------------------------------------------------------------
-
-option(FIND_CUVS_CPP "Search for existing CUVS C++ installations before defaulting to local files"
-       OFF
-)
-
-message(
-  "CUVS_PY: Searching for existing cuVS C/C++ installations before defaulting to local files: ${FIND_CUVS_CPP}"
-)
-
-# ##################################################################################################
 # * Process User Options  ------------------------------------------------------
 
 include(rapids-cmake)
@@ -53,27 +42,14 @@ include(rapids-find)
 
 rapids_cpm_init()
 
-# If the user requested it we attempt to find CUVS.
-if(FIND_CUVS_CPP)
-  find_package(cuvs "${RAPIDS_VERSION}" REQUIRED COMPONENTS c_api)
-  include(../../cpp/cmake/thirdparty/get_dlpack.cmake)
-else()
-  set(cuvs_FOUND OFF)
-endif()
+# --- cuVS ---#
+find_package(cuvs "${RAPIDS_VERSION}" REQUIRED COMPONENTS c_api)
 
-if(NOT cuvs_FOUND)
-  set(BUILD_TESTS OFF)
-  set(BUILD_C_LIBRARY ON)
+# --- dlpack ---#
+include(../../cpp/cmake/thirdparty/get_dlpack.cmake)
 
-  # Statically link dependencies if building wheels
-  set(CUDA_STATIC_RUNTIME ON)
-  set(CUVS_USE_RAFT_STATIC ON)
-
-  add_subdirectory(../../cpp cuvs-cpp EXCLUDE_FROM_ALL)
-
-  set(cython_lib_dir cuvs)
-  install(TARGETS cuvs cuvs_c DESTINATION ${cython_lib_dir})
-endif()
+# ensure Cython targets can find dlpack headers (these do not come installed with with cuVS)
+target_include_directories(cuvs::cuvs INTERFACE "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>")
 
 # ##################################################################################################
 # * Build Cython artifacts -----------------------------------------------------
@@ -81,9 +57,7 @@ endif()
 rapids_cython_init()
 
 add_subdirectory(cuvs/common)
+add_subdirectory(cuvs/cluster)
 add_subdirectory(cuvs/distance)
 add_subdirectory(cuvs/neighbors)
-
-if(DEFINED cython_lib_dir)
-  rapids_cython_add_rpath_entries(TARGET cuvs PATHS "${cython_lib_dir}")
-endif()
+add_subdirectory(cuvs/preprocessing)

@@ -17,7 +17,8 @@
 #pragma once
 
 #include <cuvs/distance/distance.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/common/nvtx.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/util/cuda_utils.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <raft/util/integer_utils.hpp>
@@ -25,6 +26,7 @@
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/device_scalar.hpp>
 #include <rmm/device_uvector.hpp>
+#include <rmm/mr/host/pinned_memory_resource.hpp>
 #include <rmm/resource_ref.hpp>
 
 #include <cuda_fp16.hpp>
@@ -61,14 +63,9 @@ struct pointer_residency_count<Type, Types...> {
     auto [on_device, on_host] = pointer_residency_count<Types...>::run(ptrs...);
     cudaPointerAttributes attr;
     RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, ptr));
-    switch (attr.type) {
-      case cudaMemoryTypeUnregistered: return std::make_tuple(on_device, on_host + 1);
-      case cudaMemoryTypeHost:
-        return std::make_tuple(on_device + int(attr.devicePointer == ptr), on_host + 1);
-      case cudaMemoryTypeDevice: return std::make_tuple(on_device + 1, on_host);
-      case cudaMemoryTypeManaged: return std::make_tuple(on_device + 1, on_host + 1);
-      default: return std::make_tuple(on_device, on_host);
-    }
+    if (attr.devicePointer || attr.type == cudaMemoryTypeDevice) { ++on_device; }
+    if (attr.hostPointer || attr.type == cudaMemoryTypeUnregistered) { ++on_host; }
+    return std::make_tuple(on_device, on_host);
   }
 };
 
@@ -198,6 +195,22 @@ struct mapping {
   /** @} */
 };
 
+template <>
+template <>
+HDI constexpr auto mapping<int8_t>::operator()(const uint8_t& x) const -> int8_t
+{
+  // Avoid overflows when converting uint8_t -> int_8
+  return static_cast<int8_t>(x >> 1);
+}
+
+template <>
+template <>
+HDI constexpr auto mapping<int8_t>::operator()(const float& x) const -> int8_t
+{
+  // Carefully clamp floats if out-of-bounds.
+  return static_cast<int8_t>(std::clamp<float>(x * 128.0f, -128.0f, 127.0f));
+}
+
 /**
  * @brief Sets the first num bytes of the block of memory pointed by ptr to the specified value.
  *
@@ -222,7 +235,7 @@ inline void memzero(T* ptr, IdxT n_elems, rmm::cuda_stream_view stream)
 }
 
 template <typename T, typename IdxT>
-RAFT_KERNEL outer_add_kernel(const T* a, IdxT len_a, const T* b, IdxT len_b, T* c)
+static __global__ void outer_add_kernel(const T* a, IdxT len_a, const T* b, IdxT len_b, T* c)
 {
   IdxT gid = threadIdx.x + blockDim.x * static_cast<IdxT>(blockIdx.x);
   IdxT i   = gid / len_b;
@@ -232,12 +245,12 @@ RAFT_KERNEL outer_add_kernel(const T* a, IdxT len_a, const T* b, IdxT len_b, T* 
 }
 
 template <typename T, typename IdxT>
-RAFT_KERNEL block_copy_kernel(const IdxT* in_offsets,
-                              const IdxT* out_offsets,
-                              IdxT n_blocks,
-                              const T* in_data,
-                              T* out_data,
-                              IdxT n_mult)
+static __global__ void block_copy_kernel(const IdxT* in_offsets,
+                                         const IdxT* out_offsets,
+                                         IdxT n_blocks,
+                                         const T* in_data,
+                                         T* out_data,
+                                         IdxT n_mult)
 {
   IdxT i = static_cast<IdxT>(blockDim.x) * static_cast<IdxT>(blockIdx.x) + threadIdx.x;
   // find the source offset using the binary search.
@@ -315,7 +328,7 @@ void outer_add(const T* a, IdxT len_a, const T* b, IdxT len_b, T* c, rmm::cuda_s
 }
 
 template <typename T, typename S, typename IdxT, typename LabelT>
-RAFT_KERNEL copy_selected_kernel(
+static __global__ void copy_selected_kernel(
   IdxT n_rows, IdxT n_cols, const S* src, const LabelT* row_ids, IdxT ld_src, T* dst, IdxT ld_dst)
 {
   IdxT gid   = threadIdx.x + blockDim.x * static_cast<IdxT>(blockIdx.x);
@@ -393,6 +406,12 @@ void copy_selected(IdxT n_rows,
  *
  * The iterator can be reused. If the number of iterations is one, at most one raft::copy will ever
  * be invoked (i.e. small datasets are not reloaded multiple times).
+ *
+ * In the case of pageable host buffer input, the iterator is by default (almost) synchronous due to
+ * the behavior of raft::copy. In order to achieve kernel and copy overlapping, a
+ * prefetch_next_batch (synchronous) API is provided. Note that since prefetch API is synchronous,
+ * user may want to schedule kernel, which is asynchronous, first. User is responsible to properly
+ * manage the order of prefetch and kernel to ensure overlapping.
  */
 template <typename T>
 struct batch_load_iterator {
@@ -400,6 +419,17 @@ struct batch_load_iterator {
 
   /** A single batch of data residing in device memory. */
   struct batch {
+    ~batch() noexcept
+    {
+      /*
+      If there's no copy, there's no allocation owned by the batch.
+      If there's no allocation, there's no guarantee that the device pointer is stream-ordered.
+      If there's no stream order guarantee, we must synchronize with the stream before the batch is
+      destroyed to make sure all GPU operations in that stream finish earlier.
+      */
+      if (!does_copy()) { RAFT_CUDA_TRY_NO_THROW(cudaStreamSynchronize(stream_)); }
+    }
+
     /** Logical width of a single row in a batch, in elements of type `T`. */
     [[nodiscard]] auto row_width() const -> size_type { return row_width_; }
     /** Logical offset of the batch, in rows (`row_width()`) */
@@ -417,41 +447,58 @@ struct batch_load_iterator {
           size_type row_width,
           size_type batch_size,
           rmm::cuda_stream_view stream,
-          rmm::device_async_resource_ref mr)
+          rmm::device_async_resource_ref mr,
+          bool prefetch = false)
       : stream_(stream),
-        buf_(0, stream, mr),
+        buf_0_(0, stream, mr),
+        buf_1_(0, stream, mr),
         source_(source),
         dev_ptr_(nullptr),
         n_rows_(n_rows),
         row_width_(row_width),
         batch_size_(std::min(batch_size, n_rows)),
         pos_(std::nullopt),
+        prefetch_pos_(std::nullopt),
         n_iters_(raft::div_rounding_up_safe(n_rows, batch_size)),
-        needs_copy_(false)
+        needs_copy_(false),
+        prefetch_(prefetch)
     {
       if (source_ == nullptr) { return; }
       cudaPointerAttributes attr;
       RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, source_));
       dev_ptr_ = reinterpret_cast<T*>(attr.devicePointer);
-      if (dev_ptr_ == nullptr) {
-        buf_.resize(row_width_ * batch_size_, stream);
-        dev_ptr_    = buf_.data();
+
+      if (dev_ptr_ == nullptr) { needs_copy_ = true; }
+      if (attr.type != cudaMemoryTypeDevice) {
+        // Although data might be accessible on device through HMM or ATS,
+        // it is preferred to copy the dataset explicitly when it is not device data.
         needs_copy_ = true;
+      }
+      if (needs_copy_) {
+        buf_0_.resize(row_width_ * batch_size_, stream);
+        dev_ptr_ = buf_0_.data();
+        if (prefetch_) {
+          buf_1_.resize(row_width_ * batch_size_, stream);
+          prefetch_dev_ptr_ = buf_1_.data();
+        }
       }
     }
     rmm::cuda_stream_view stream_;
-    rmm::device_uvector<T> buf_;
+    rmm::device_uvector<T> buf_0_;
+    rmm::device_uvector<T> buf_1_;
     const T* source_;
     size_type n_rows_;
     size_type row_width_;
     size_type batch_size_;
     size_type n_iters_;
     bool needs_copy_;
+    bool prefetch_;
 
     std::optional<size_type> pos_;
+    std::optional<size_type> prefetch_pos_;
     size_type batch_len_;
     T* dev_ptr_;
-
+    T* prefetch_dev_ptr_;
     friend class batch_load_iterator<T>;
 
     /**
@@ -471,11 +518,37 @@ struct batch_load_iterator {
                          size_t(offset()),
                          size_t(size()),
                          size_t(row_width()));
-          raft::copy(dev_ptr_, source_ + offset() * row_width(), size() * row_width(), stream_);
+          if (prefetch_ && prefetch_pos_ == pos_) {
+            std::swap(dev_ptr_, prefetch_dev_ptr_);
+          } else {
+            raft::copy(dev_ptr_, source_ + offset() * row_width(), size() * row_width(), stream_);
+          }
         }
       } else {
         dev_ptr_ = const_cast<T*>(source_) + offset() * row_width();
       }
+    }
+
+    /**
+     * Helper function for prefetch. NOP if prefetch option is not enabled. This API is synchronous.
+     */
+    void prefetch(const size_type& pos)
+    {
+      if (pos >= n_iters_ || !prefetch_ || !needs_copy_ || source_ == nullptr) { return; }
+      size_type prefetch_offset = batch_size_ * pos;
+      size_type prefetch_size = std::min(batch_size_, n_rows_ - std::min(prefetch_offset, n_rows_));
+      raft::common::nvtx::push_range(
+        "batch_load_iterator::prefetch(offset = %zu, size = %zu, row_width = %zu)",
+        size_t(prefetch_offset),
+        size_t(prefetch_size),
+        size_t(row_width()));
+      raft::copy(prefetch_dev_ptr_,
+                 source_ + prefetch_offset * row_width(),
+                 prefetch_size * row_width(),
+                 stream_);
+      raft::common::nvtx::pop_range();
+      stream_.synchronize();
+      prefetch_pos_.emplace(pos);
     }
   };
 
@@ -491,20 +564,36 @@ struct batch_load_iterator {
    * row-major matrix of size [n_rows, row_width], and the batches are the sub-matrices of size
    * [x<=batch_size, n_rows].
    *
+   * If prefetch option is enabled, the batch_load_iterator could help to achieve overlapping with
+   * prefetch_next_batch() with other workloads. This is useful if source buffer is in host memory.
+   * To achieve overlapping, the other workloads have to be async and scheduled before
+   * prefetch_next_batch(). Users also need to use a different stream for the workloads. E.g.,
+   * utils::batch_load_iterator<T> batches(..., stream_1, ..., true);
+   * batches.prefetch_next_batch();
+   * for (const auto& batch : batches) {
+   *     // The following kernel and prefetch_next_batch() could be overlapped.
+   *     kernel<<<..., stream_2>>>(...);
+   *     batches.prefetch_next_batch();
+   * }
+   *
    * @param source the input data -- host, device, or nullptr.
    * @param n_rows the size of the input in logical rows.
    * @param row_width the size of the logical row in the elements of type `T`.
    * @param batch_size the desired size of the batch.
    * @param stream the ordering for the host->device copies, if applicable.
    * @param mr a custom memory resource for the intermediate buffer, if applicable.
+   * @param prefetch enable prefetch feature in order to achieve kernel/copy overlapping.
    */
   batch_load_iterator(const T* source,
                       size_type n_rows,
                       size_type row_width,
                       size_type batch_size,
                       rmm::cuda_stream_view stream,
-                      rmm::device_async_resource_ref mr = rmm::mr::get_current_device_resource())
-    : cur_batch_(new batch(source, n_rows, row_width, batch_size, stream, mr)), cur_pos_(0)
+                      rmm::device_async_resource_ref mr = rmm::mr::get_current_device_resource(),
+                      bool prefetch                     = false)
+    : cur_batch_(new batch(source, n_rows, row_width, batch_size, stream, mr, prefetch)),
+      cur_pos_(0),
+      cur_prefetch_pos_(0)
   {
   }
   /**
@@ -512,10 +601,18 @@ struct batch_load_iterator {
    * (i.e. the source is inaccessible from the device).
    */
   [[nodiscard]] auto does_copy() const -> bool { return cur_batch_->does_copy(); }
-  /** Reset the iterator position to `begin()` */
-  void reset() { cur_pos_ = 0; }
-  /** Reset the iterator position to `end()` */
-  void reset_to_end() { cur_pos_ = cur_batch_->n_iters_; }
+  /** Reset the iterator position and prefetch position to `begin()` */
+  void reset()
+  {
+    cur_pos_          = 0;
+    cur_prefetch_pos_ = 0;
+  }
+  /** Reset the iterator position and prefetch position to `end()` */
+  void reset_to_end()
+  {
+    cur_pos_          = cur_batch_->n_iters_;
+    cur_prefetch_pos_ = cur_batch_->n_iters_;
+  }
   [[nodiscard]] auto begin() const -> const batch_load_iterator<T>
   {
     batch_load_iterator<T> x(*this);
@@ -538,6 +635,9 @@ struct batch_load_iterator {
     cur_batch_->load(cur_pos_);
     return cur_batch_.get();
   }
+  /* Prefetch next batch. Users are responsible for calling this method to enable kernel/copy
+   * overlapping. Note that this API is synchronous. */
+  void prefetch_next_batch() { cur_batch_->prefetch(cur_prefetch_pos_++); }
   friend auto operator==(const batch_load_iterator<T>& x, const batch_load_iterator<T>& y) -> bool
   {
     return x.cur_batch_ == y.cur_batch_ && x.cur_pos_ == y.cur_pos_;
@@ -572,6 +672,7 @@ struct batch_load_iterator {
  private:
   std::shared_ptr<value_type> cur_batch_;
   size_type cur_pos_;
+  size_type cur_prefetch_pos_;
 };
 
 }  // namespace cuvs::spatial::knn::detail::utils

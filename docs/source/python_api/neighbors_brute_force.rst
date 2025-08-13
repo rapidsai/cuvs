@@ -20,3 +20,13 @@ Index search
 ############
 
 .. autofunction:: cuvs.neighbors.brute_force.search
+
+Index save
+##########
+
+.. autofunction:: cuvs.neighbors.brute_force.save
+
+Index load
+##########
+
+.. autofunction:: cuvs.neighbors.brute_force.load

@@ -31,9 +31,9 @@ from cuvs.distance_type cimport cuvsDistanceType
 from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
-from pylibraft.neighbors.common import _check_input_array
 
-from cuvs.distance import DISTANCE_TYPES
+from cuvs.distance import DISTANCE_NAMES, DISTANCE_TYPES
+from cuvs.neighbors.common import _check_input_array
 
 from libc.stdint cimport (
     int8_t,
@@ -97,11 +97,27 @@ cdef class IndexParams:
         default, if `dim == rot_dim`, the rotation transform is
         initialized with the identity matrix. When
         `force_random_rotation == True`, a random orthogonal transform
+        matrix is generated regardless of the values of `dim` and `pq_dim`.
     add_data_on_build : bool, default = True
         After training the coarse and fine quantizers, we will populate
         the index with the dataset if add_data_on_build == True, otherwise
         the index is left empty, and the extend method can be used
         to add new vectors to the index.
+    conservative_memory_allocation : bool, default = True
+        By default, the algorithm allocates more space than necessary for
+        individual clusters (`list_data`). This allows to amortize the cost
+        of memory allocation and reduce the number of data copies during
+        repeated calls to `extend` (extending the database).
+        To disable this behavior and use as little GPU memory for the
+        database as possible, set this flat to `True`.
+    max_train_points_per_pq_code : int, default = 256
+        The max number of data points to use per PQ code during PQ codebook
+        training. Using more data points per PQ code may increase the
+        quality of PQ codebook but may also increase the build time. The
+        parameter is applied to both PQ codebook generation methods, i.e.,
+        PER_SUBSPACE and PER_CLUSTER. In both cases, we will use
+        pq_book_size * max_train_points_per_pq_code training points to
+        train each codebook.
     """
 
     cdef cuvsIvfPqIndexParams* params
@@ -124,9 +140,9 @@ cdef class IndexParams:
                  codebook_kind="subspace",
                  force_random_rotation=False,
                  add_data_on_build=True,
-                 conservative_memory_allocation=False):
+                 conservative_memory_allocation=False,
+                 max_train_points_per_pq_code=256):
         self.params.n_lists = n_lists
-        self._metric = metric
         self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
         self.params.metric_arg = metric_arg
         self.params.kmeans_n_iters = kmeans_n_iters
@@ -143,10 +159,15 @@ cdef class IndexParams:
         self.params.add_data_on_build = add_data_on_build
         self.params.conservative_memory_allocation = \
             conservative_memory_allocation
+        self.params.max_train_points_per_pq_code = \
+            max_train_points_per_pq_code
+
+    def get_handle(self):
+        return <size_t> self.params
 
     @property
     def metric(self):
-        return self._metric
+        return DISTANCE_NAMES[self.params.metric]
 
     @property
     def metric_arg(self):
@@ -192,6 +213,12 @@ cdef class IndexParams:
     def conservative_memory_allocation(self):
         return self.params.conservative_memory_allocation
 
+    @property
+    def max_train_points_per_pq_code(self):
+        return self.params.max_train_points_per_pq_code
+
+    def get_handle(self):
+        return <size_t>self.params
 
 cdef class Index:
     """
@@ -216,18 +243,50 @@ cdef class Index:
     def __repr__(self):
         return "Index(type=IvfPq)"
 
+    @property
+    def n_lists(self):
+        """ The number of inverted lists (clusters) """
+        return cuvsIvfPqIndexGetNLists(self.index)
+
+    @property
+    def dim(self):
+        """ dimensionality of the cluster centers """
+        return cuvsIvfPqIndexGetDim(self.index)
+
+    @property
+    def centers(self):
+        """ Get the cluster centers corresponding to the lists in the
+        original space """
+        return self._get_centers()
+
+    @auto_sync_resources
+    def _get_centers(self, resources=None):
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting centers")
+
+        cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+        output = np.empty((self.n_lists, self.dim), dtype='float32')
+        ai = wrap_array(output)
+        cdef cydlpack.DLManagedTensor* output_dlpack = cydlpack.dlpack_c(ai)
+        check_cuvs(cuvsIvfPqIndexGetCenters(res, self.index, output_dlpack))
+        return output
+
 
 @auto_sync_resources
 def build(IndexParams index_params, dataset, resources=None):
     """
     Build the IvfPq index from the dataset for efficient search.
 
+    The input dataset array can be either CUDA array interface compliant matrix
+    or an array interface compliant matrix in host memory.
+
     Parameters
     ----------
     index_params : :py:class:`cuvs.neighbors.ivf_pq.IndexParams`
         Parameters on how to build the index
-    dataset : CUDA array interface compliant matrix shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
+    dataset : Array interface compliant matrix shape (n_samples, dim)
+        Supported dtype [float32, float16, int8, uint8]
     {resources_docstring}
 
     Returns
@@ -255,7 +314,9 @@ def build(IndexParams index_params, dataset, resources=None):
     """
 
     dataset_ai = wrap_array(dataset)
-    _check_input_array(dataset_ai, [np.dtype('float32'), np.dtype('byte'),
+    _check_input_array(dataset_ai, [np.dtype('float32'),
+                                    np.dtype('float16'),
+                                    np.dtype('byte'),
                                     np.dtype('ubyte')])
 
     cdef Index idx = Index()
@@ -283,7 +344,8 @@ cdef _map_dtype_np_to_cuda(dtype, supported_dtypes=None):
         raise TypeError("Type %s is not supported" % str(dtype))
     return {np.float32: cudaDataType_t.CUDA_R_32F,
             np.float16: cudaDataType_t.CUDA_R_16F,
-            np.uint8: cudaDataType_t.CUDA_R_8U}[dtype]
+            np.uint8: cudaDataType_t.CUDA_R_8U,
+            np.int8: cudaDataType_t.CUDA_R_8I}[dtype]
 
 
 cdef class SearchParams:
@@ -304,6 +366,16 @@ cdef class SearchParams:
     internal_distance_dtype: default = np.float32
         Storage data type for distance/similarity computation.
         Possible values [np.float32, np.float16]
+    coarse_search_dtype: default = np.float32
+        [Experimental] The data type to use as the GEMM element type when
+        searching the clusters to probe.
+        Possible values: [np.float32, np.float16, np.int8].
+        - Legacy default: np.float32
+        - Recommended for performance: np.float16 (half)
+        - Experimental/low-precision: np.int8
+    max_internal_batch_size: default = 4096
+        Set the internal batch size to improve GPU utilization at the cost
+        of larger memory footprint.
     """
 
     cdef cuvsIvfPqSearchParams* params
@@ -315,15 +387,19 @@ cdef class SearchParams:
         check_cuvs(cuvsIvfPqSearchParamsDestroy(self.params))
 
     def __init__(self, *, n_probes=20, lut_dtype=np.float32,
-                 internal_distance_dtype=np.float32):
+                 internal_distance_dtype=np.float32,
+                 coarse_search_dtype=np.float32,
+                 max_internal_batch_size=4096):
         self.params.n_probes = n_probes
         self.params.lut_dtype = _map_dtype_np_to_cuda(lut_dtype)
         self.params.internal_distance_dtype = \
             _map_dtype_np_to_cuda(internal_distance_dtype)
+        self.params.coarse_search_dtype = \
+            _map_dtype_np_to_cuda(coarse_search_dtype)
+        self.params.max_internal_batch_size = max_internal_batch_size
 
-    @property
-    def n_probes(self):
-        return self.params.n_probes
+    def get_handle(self):
+        return <size_t> self.params
 
     @property
     def n_probes(self):
@@ -336,6 +412,17 @@ cdef class SearchParams:
     @property
     def internal_distance_dtype(self):
         return self.params.internal_distance_dtype
+
+    @property
+    def coarse_search_dtype(self):
+        return self.params.coarse_search_dtype
+
+    @property
+    def max_internal_batch_size(self):
+        return self.params.max_internal_batch_size
+
+    def get_handle(self):
+        return <size_t>self.params
 
 
 @auto_sync_resources
@@ -393,7 +480,9 @@ def search(SearchParams search_params,
         raise ValueError("Index needs to be built before calling search.")
 
     queries_cai = wrap_array(queries)
-    _check_input_array(queries_cai, [np.dtype('float32'), np.dtype('byte'),
+    _check_input_array(queries_cai, [np.dtype('float32'),
+                                     np.dtype('float16'),
+                                     np.dtype('byte'),
                                      np.dtype('ubyte')])
 
     cdef uint32_t n_queries = queries_cai.shape[0]
@@ -503,3 +592,77 @@ def load(filename, resources=None):
     ))
     idx.trained = True
     return idx
+
+
+@auto_sync_resources
+def extend(Index index, new_vectors, new_indices, resources=None):
+    """
+    Extend an existing index with new vectors.
+
+    The input array can be either CUDA array interface compliant matrix or
+    array interface compliant matrix in host memory.
+
+
+    Parameters
+    ----------
+    index : ivf_pq.Index
+        Trained ivf_pq object.
+    new_vectors : array interface compliant matrix shape (n_samples, dim)
+        Supported dtype [float, int8, uint8]
+    new_indices : array interface compliant vector shape (n_samples)
+        Supported dtype [int64]
+    {resources_docstring}
+
+    Returns
+    -------
+    index: py:class:`cuvs.neighbors.ivf_pq.Index`
+
+    Examples
+    --------
+
+    >>> import cupy as cp
+    >>> from cuvs.neighbors import ivf_pq
+    >>> n_samples = 50000
+    >>> n_features = 50
+    >>> n_queries = 1000
+    >>> dataset = cp.random.random_sample((n_samples, n_features),
+    ...                                   dtype=cp.float32)
+    >>> index = ivf_pq.build(ivf_pq.IndexParams(), dataset)
+    >>> n_rows = 100
+    >>> more_data = cp.random.random_sample((n_rows, n_features),
+    ...                                     dtype=cp.float32)
+    >>> indices = n_samples + cp.arange(n_rows, dtype=cp.int64)
+    >>> index = ivf_pq.extend(index, more_data, indices)
+    >>> # Search using the built index
+    >>> queries = cp.random.random_sample((n_queries, n_features),
+    ...                                   dtype=cp.float32)
+    >>> distances, neighbors = ivf_pq.search(ivf_pq.SearchParams(),
+    ...                                      index, queries,
+    ...                                      k=10)
+    """
+
+    new_vectors_ai = wrap_array(new_vectors)
+    _check_input_array(new_vectors_ai, [np.dtype('float32'),
+                                        np.dtype('float16'),
+                                        np.dtype('byte'),
+                                        np.dtype('ubyte')])
+
+    new_indices_ai = wrap_array(new_indices)
+    _check_input_array(new_indices_ai, [np.dtype('int64')])
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+    cdef cydlpack.DLManagedTensor* new_vectors_dlpack = \
+        cydlpack.dlpack_c(new_vectors_ai)
+
+    cdef cydlpack.DLManagedTensor* new_indices_dlpack = \
+        cydlpack.dlpack_c(new_indices_ai)
+
+    with cuda_interruptible():
+        check_cuvs(cuvsIvfPqExtend(
+            res,
+            new_vectors_dlpack,
+            new_indices_dlpack,
+            index.index
+        ))
+
+    return index

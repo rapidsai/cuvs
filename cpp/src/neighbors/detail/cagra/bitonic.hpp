@@ -26,7 +26,7 @@ namespace bitonic {
 namespace detail {
 
 template <class K, class V>
-_RAFT_DEVICE inline void swap_if_needed(K& k0, V& v0, K& k1, V& v1, const bool asc)
+RAFT_DEVICE_INLINE_FUNCTION void swap_if_needed(K& k0, V& v0, K& k1, V& v1, const bool asc)
 {
   if ((k0 != k1) && ((k0 < k1) != asc)) {
     const auto tmp_k = k0;
@@ -39,7 +39,10 @@ _RAFT_DEVICE inline void swap_if_needed(K& k0, V& v0, K& k1, V& v1, const bool a
 }
 
 template <class K, class V>
-_RAFT_DEVICE inline void swap_if_needed(K& k0, V& v0, const unsigned lane_offset, const bool asc)
+RAFT_DEVICE_INLINE_FUNCTION void swap_if_needed(K& k0,
+                                                V& v0,
+                                                const unsigned lane_offset,
+                                                const bool asc)
 {
   auto k1 = __shfl_xor_sync(~0u, k0, lane_offset);
   auto v1 = __shfl_xor_sync(~0u, v0, lane_offset);
@@ -51,7 +54,10 @@ _RAFT_DEVICE inline void swap_if_needed(K& k0, V& v0, const unsigned lane_offset
 
 template <class K, class V, unsigned N, unsigned warp_size = 32>
 struct warp_merge_core {
-  _RAFT_DEVICE inline void operator()(K k[N], V v[N], const std::uint32_t range, const bool asc)
+  RAFT_DEVICE_INLINE_FUNCTION void operator()(K k[N],
+                                              V v[N],
+                                              const std::uint32_t range,
+                                              const bool asc)
   {
     const auto lane_id = threadIdx.x % warp_size;
 
@@ -93,7 +99,10 @@ struct warp_merge_core {
 
 template <class K, class V, unsigned warp_size>
 struct warp_merge_core<K, V, 6, warp_size> {
-  _RAFT_DEVICE inline void operator()(K k[6], V v[6], const std::uint32_t range, const bool asc)
+  RAFT_DEVICE_INLINE_FUNCTION void operator()(K k[6],
+                                              V v[6],
+                                              const std::uint32_t range,
+                                              const bool asc)
   {
     constexpr unsigned N = 6;
     const auto lane_id   = threadIdx.x % warp_size;
@@ -141,7 +150,10 @@ struct warp_merge_core<K, V, 6, warp_size> {
 
 template <class K, class V, unsigned warp_size>
 struct warp_merge_core<K, V, 3, warp_size> {
-  _RAFT_DEVICE inline void operator()(K k[3], V v[3], const std::uint32_t range, const bool asc)
+  RAFT_DEVICE_INLINE_FUNCTION void operator()(K k[3],
+                                              V v[3],
+                                              const std::uint32_t range,
+                                              const bool asc)
   {
     constexpr unsigned N = 3;
     const auto lane_id   = threadIdx.x % warp_size;
@@ -171,7 +183,10 @@ struct warp_merge_core<K, V, 3, warp_size> {
 
 template <class K, class V, unsigned warp_size>
 struct warp_merge_core<K, V, 2, warp_size> {
-  _RAFT_DEVICE inline void operator()(K k[2], V v[2], const std::uint32_t range, const bool asc)
+  RAFT_DEVICE_INLINE_FUNCTION void operator()(K k[2],
+                                              V v[2],
+                                              const std::uint32_t range,
+                                              const bool asc)
   {
     constexpr unsigned N = 2;
     const auto lane_id   = threadIdx.x % warp_size;
@@ -197,7 +212,10 @@ struct warp_merge_core<K, V, 2, warp_size> {
 
 template <class K, class V, unsigned warp_size>
 struct warp_merge_core<K, V, 1, warp_size> {
-  _RAFT_DEVICE inline void operator()(K k[1], V v[1], const std::uint32_t range, const bool asc)
+  RAFT_DEVICE_INLINE_FUNCTION void operator()(K k[1],
+                                              V v[1],
+                                              const std::uint32_t range,
+                                              const bool asc)
   {
     const auto lane_id    = threadIdx.x % warp_size;
     const std::uint32_t b = range;
@@ -211,14 +229,15 @@ struct warp_merge_core<K, V, 1, warp_size> {
 }  // namespace detail
 
 template <class K, class V, unsigned N, unsigned warp_size = 32>
-__device__ void warp_merge(K k[N], V v[N], unsigned range, const bool asc = true)
+RAFT_DEVICE_INLINE_FUNCTION void warp_merge(K k[N], V v[N], unsigned range, const bool asc = true)
 {
   detail::warp_merge_core<K, V, N, warp_size>{}(k, v, range, asc);
 }
 
 template <class K, class V, unsigned N, unsigned warp_size = 32>
-__device__ void warp_sort(K k[N], V v[N], const bool asc = true)
+RAFT_DEVICE_INLINE_FUNCTION void warp_sort(K k[N], V v[N], const bool asc = true)
 {
+#pragma unroll
   for (std::uint32_t range = 1; range <= warp_size; range <<= 1) {
     warp_merge<K, V, N, warp_size>(k, v, range, asc);
   }

@@ -193,6 +193,7 @@ void index<T, IdxT>::allocate_center_norms(raft::resources const& res)
     case cuvs::distance::DistanceType::L2SqrtExpanded:
     case cuvs::distance::DistanceType::L2Unexpanded:
     case cuvs::distance::DistanceType::L2SqrtUnexpanded:
+    case cuvs::distance::DistanceType::CosineExpanded:
       center_norms_ = raft::make_device_vector<float, uint32_t>(res, n_lists());
       break;
     default: center_norms_ = std::nullopt;
@@ -225,6 +226,7 @@ void index<T, IdxT>::check_consistency()
     "inconsistent number of lists (clusters)");
 }
 
+template struct index<float, uint32_t>;  // Used for refine function
 template struct index<float, int64_t>;
 template struct index<half, int64_t>;
 template struct index<int8_t, int64_t>;

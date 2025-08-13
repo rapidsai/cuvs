@@ -28,6 +28,11 @@ bench/ann/data
 temporary_*.json
 rust/target/
 rust/Cargo.lock
+rmm_log.txt
+
+## example notebooks
+notebooks/simplewiki-2020-11-01-nq-distilbert-base-v1.pt
+notebooks/data/
 
 ## scikit-build
 _skbuild
@@ -70,7 +75,16 @@ compile_commands.json
 .clangd/
 
 # serialized ann indexes
+brute_force_index
 cagra_index
 ivf_flat_index
 ivf_pq_index
 
+# cuvs_bench
+# Leading slash to only ignore top-level `datasets/ directory -- otherwise
+# `python/cuvs_bench/cuvs_bench/config/datasets/` also gets ignored
+/datasets/
+/*.json
+
+# java
+.classpath

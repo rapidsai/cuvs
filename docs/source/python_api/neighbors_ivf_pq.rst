@@ -32,3 +32,18 @@ Index search
 ############
 
 .. autofunction:: cuvs.neighbors.ivf_pq.search
+
+Index save
+##########
+
+.. autofunction:: cuvs.neighbors.ivf_pq.save
+
+Index load
+##########
+
+.. autofunction:: cuvs.neighbors.ivf_pq.load
+
+Index extend
+############
+
+.. autofunction:: cuvs.neighbors.ivf_pq.extend

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2018-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce.cuh>
 #include <raft/linalg/unary_op.cuh>
+#include <raft/util/cuda_dev_essentials.cuh>  // to_float
 
 #include <type_traits>
 
@@ -104,8 +105,8 @@ void distance_impl(raft::resources const& handle,
 {
   ops::canberra_distance_op<DataT, AccT, IdxT> distance_op{};
 
-  const DataT* x_norm = nullptr;
-  const DataT* y_norm = nullptr;
+  const OutT* x_norm = nullptr;
+  const OutT* y_norm = nullptr;
 
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   pairwise_matrix_dispatch<decltype(distance_op), DataT, AccT, OutT, FinOpT, IdxT>(
@@ -140,50 +141,34 @@ void distance_impl(raft::resources const& handle,
   // perhaps the use of stridedSummationKernel could be causing this,
   // need to investigate and fix.
   if (x == y && is_row_major) {
-    raft::linalg::reduce(x_norm,
-                         x,
-                         k,
-                         std::max(m, n),
-                         (AccT)0,
-                         is_row_major,
-                         true,
-                         stream,
-                         false,
-                         raft::identity_op(),
-                         raft::add_op());
+    raft::linalg::reduce<true, true>(
+      x_norm, x, k, std::max(m, n), (AccT)0, stream, false, raft::identity_op(), raft::add_op());
     sq_x_norm += std::max(m, n);
     sq_y_norm = sq_x_norm;
-    raft::linalg::rowNorm(
-      sq_x_norm, x, k, std::max(m, n), raft::linalg::L2Norm, is_row_major, stream);
+    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(sq_x_norm, x, k, std::max(m, n), stream);
   } else {
     y_norm += m;
-    raft::linalg::reduce(x_norm,
-                         x,
-                         k,
-                         m,
-                         (AccT)0,
-                         is_row_major,
-                         true,
-                         stream,
-                         false,
-                         raft::identity_op(),
-                         raft::add_op());
-    raft::linalg::reduce(y_norm,
-                         y,
-                         k,
-                         n,
-                         (AccT)0,
-                         is_row_major,
-                         true,
-                         stream,
-                         false,
-                         raft::identity_op(),
-                         raft::add_op());
+    if (is_row_major) {
+      raft::linalg::reduce<true, true>(
+        x_norm, x, k, m, (AccT)0, stream, false, raft::identity_op(), raft::add_op());
+      raft::linalg::reduce<true, true>(
+        y_norm, y, k, n, (AccT)0, stream, false, raft::identity_op(), raft::add_op());
+    } else {
+      raft::linalg::reduce<false, true>(
+        x_norm, x, k, m, (AccT)0, stream, false, raft::identity_op(), raft::add_op());
+      raft::linalg::reduce<false, true>(
+        y_norm, y, k, n, (AccT)0, stream, false, raft::identity_op(), raft::add_op());
+    }
 
     sq_x_norm += (m + n);
     sq_y_norm = sq_x_norm + m;
-    raft::linalg::rowNorm(sq_x_norm, x, k, m, raft::linalg::L2Norm, is_row_major, stream);
-    raft::linalg::rowNorm(sq_y_norm, y, k, n, raft::linalg::L2Norm, is_row_major, stream);
+    if (is_row_major) {
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(sq_x_norm, x, k, m, stream);
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(sq_y_norm, y, k, n, stream);
+    } else {
+      raft::linalg::rowNorm<raft::linalg::L2Norm, false>(sq_x_norm, x, k, m, stream);
+      raft::linalg::rowNorm<raft::linalg::L2Norm, false>(sq_y_norm, y, k, n, stream);
+    }
   }
 
   using OpT = ops::correlation_distance_op<DataT, AccT, IdxT>;
@@ -217,20 +202,23 @@ void distance_impl(raft::resources const& handle,
 
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
-  DataT* x_norm = workspace;
-  DataT* y_norm = workspace;
+  OutT* x_norm = reinterpret_cast<OutT*>(workspace);
+  OutT* y_norm = reinterpret_cast<OutT*>(workspace);
   // TODO: Column major case looks to have lower accuracy for X == Y,
   // perhaps the use of stridedSummationKernel could be causing this,
   // need to investigate and fix.
   if (x == y && is_row_major) {
-    raft::linalg::rowNorm(
-      x_norm, x, k, std::max(m, n), raft::linalg::L2Norm, is_row_major, stream, raft::sqrt_op{});
+    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+      x_norm, x, k, std::max(m, n), stream, raft::sqrt_op{});
   } else {
     y_norm += m;
-    raft::linalg::rowNorm(
-      x_norm, x, k, m, raft::linalg::L2Norm, is_row_major, stream, raft::sqrt_op{});
-    raft::linalg::rowNorm(
-      y_norm, y, k, n, raft::linalg::L2Norm, is_row_major, stream, raft::sqrt_op{});
+    if (is_row_major) {
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(x_norm, x, k, m, stream, raft::sqrt_op{});
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(y_norm, y, k, n, stream, raft::sqrt_op{});
+    } else {
+      raft::linalg::rowNorm<raft::linalg::L2Norm, false>(x_norm, x, k, m, stream, raft::sqrt_op{});
+      raft::linalg::rowNorm<raft::linalg::L2Norm, false>(y_norm, y, k, n, stream, raft::sqrt_op{});
+    }
   }
 
   ops::cosine_distance_op<DataT, AccT, IdxT> distance_op{};
@@ -255,8 +243,8 @@ void distance_impl(raft::resources const& handle,
 {
   ops::hamming_distance_op<DataT, AccT, IdxT> distance_op{k};
 
-  const DataT* x_norm = nullptr;
-  const DataT* y_norm = nullptr;
+  const OutT* x_norm = nullptr;
+  const OutT* y_norm = nullptr;
 
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
@@ -310,24 +298,49 @@ void distance_impl(raft::resources const& handle,
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
-  // First sqrt x and y
+  // Check if arrays overlap
+  const DataT* x_end  = x + m * k;
+  const DataT* y_end  = y + n * k;
+  bool arrays_overlap = (x < y_end) && (y < x_end);
+
   const auto raft_sqrt = raft::linalg::unaryOp<DataT, raft::sqrt_op, IdxT>;
+  const auto raft_sq   = raft::linalg::unaryOp<DataT, raft::sq_op, IdxT>;
 
-  raft_sqrt((DataT*)x, x, m * k, raft::sqrt_op{}, stream);
-  if (x != y) { raft_sqrt((DataT*)y, y, n * k, raft::sqrt_op{}, stream); }
+  if (!arrays_overlap) {
+    // Arrays don't overlap: sqrt each array independently
+    raft_sqrt((DataT*)x, x, m * k, raft::sqrt_op{}, stream);
+    raft_sqrt((DataT*)y, y, n * k, raft::sqrt_op{}, stream);
+  } else {
+    // Arrays overlap: sqrt the union of both arrays exactly once
+    const DataT* start = (x < y) ? x : y;
+    const DataT* end   = (x_end > y_end) ? x_end : y_end;
+    IdxT union_size    = end - start;
 
-  // Then calculate Hellinger distance
+    raft_sqrt((DataT*)start, start, union_size, raft::sqrt_op{}, stream);
+  }
+
+  // Calculate Hellinger distance
   ops::hellinger_distance_op<DataT, AccT, IdxT> distance_op{};
 
-  const DataT* x_norm = nullptr;
-  const DataT* y_norm = nullptr;
+  const OutT* x_norm = nullptr;
+  const OutT* y_norm = nullptr;
 
   pairwise_matrix_dispatch<decltype(distance_op), DataT, AccT, OutT, FinOpT, IdxT>(
     distance_op, m, n, k, x, y, x_norm, y_norm, out, fin_op, stream, is_row_major);
 
-  // Finally revert sqrt of x and y
-  raft_sqrt((DataT*)x, x, m * k, raft::sqrt_op{}, stream);
-  if (x != y) { raft_sqrt((DataT*)y, y, n * k, raft::sqrt_op{}, stream); }
+  // Restore arrays by squaring back
+  if (!arrays_overlap) {
+    // Arrays don't overlap: square each array independently
+    raft_sq((DataT*)x, x, m * k, raft::sq_op{}, stream);
+    raft_sq((DataT*)y, y, n * k, raft::sq_op{}, stream);
+  } else {
+    // Arrays overlap: square the union back
+    const DataT* start = (x < y) ? x : y;
+    const DataT* end   = (x_end > y_end) ? x_end : y_end;
+    IdxT union_size    = end - start;
+
+    raft_sq((DataT*)start, start, union_size, raft::sq_op{}, stream);
+  }
 
   RAFT_CUDA_TRY(cudaGetLastError());
 }
@@ -349,8 +362,8 @@ void distance_impl(raft::resources const& handle,
 {
   ops::jensen_shannon_distance_op<DataT, AccT, IdxT> distance_op{};
 
-  const DataT* x_norm = nullptr;
-  const DataT* y_norm = nullptr;
+  const OutT* x_norm = nullptr;
+  const OutT* y_norm = nullptr;
 
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
@@ -376,14 +389,24 @@ void distance_impl(raft::resources const& handle,
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
   auto unaryOp_lambda = [] __device__(DataT input) {
-    const bool x_zero = (input == 0);
-    return (!x_zero) * raft::log(input + x_zero);
+    auto input_       = raft::to_float(input);
+    const bool x_zero = (input_ == 0);
+    if constexpr (std::is_same_v<DataT, half>) {
+      return __float2half((!x_zero) * raft::log(input_ + x_zero));
+    } else {
+      return (!x_zero) * raft::log(input_ + x_zero);
+    }
   };
 
   auto unaryOp_lambda_reverse = [] __device__(DataT input) {
     // reverse previous log (x) back to x using (e ^ log(x))
-    const bool x_zero = (input == 0);
-    return (!x_zero) * raft::exp(input);
+    auto input_       = raft::to_float(input);
+    const bool x_zero = (input_ == 0);
+    if constexpr (std::is_same_v<DataT, half>) {
+      return __float2half((!x_zero) * raft::exp(input_));
+    } else {
+      return (!x_zero) * raft::exp(input_);
+    }
   };
 
   if (x != y) {
@@ -391,8 +414,8 @@ void distance_impl(raft::resources const& handle,
       (DataT*)y, y, n * k, unaryOp_lambda, stream);
   }
 
-  const DataT* x_norm = nullptr;
-  const DataT* y_norm = nullptr;
+  const OutT* x_norm = nullptr;
+  const OutT* y_norm = nullptr;
 
   // This op takes some shortcuts when x equals y. So its behavior changes based
   // on this.
@@ -425,8 +448,8 @@ void distance_impl(raft::resources const& handle,
 {
   ops::l1_distance_op<DataT, AccT, IdxT> distance_op{};
 
-  const DataT* x_norm = nullptr;
-  const DataT* y_norm = nullptr;
+  const OutT* x_norm = nullptr;
+  const OutT* y_norm = nullptr;
 
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   pairwise_matrix_dispatch<decltype(distance_op), DataT, AccT, OutT, FinOpT, IdxT>(
@@ -460,26 +483,32 @@ void distance_impl_l2_expanded(  // NOTE: different name
   ASSERT(!(worksize < (m + n) * sizeof(AccT)), "workspace size error");
   ASSERT(workspace != nullptr, "workspace is null");
 
-  DataT* x_norm = workspace;
-  DataT* y_norm = workspace;
+  // TODO: May we have a better method to avoid misalignment?
+  uintptr_t offset = alignof(OutT) - (reinterpret_cast<uintptr_t>(workspace) % alignof(OutT));
+  if (offset == alignof(OutT)) { offset = 0; }
+  OutT* x_norm = reinterpret_cast<OutT*>(reinterpret_cast<char*>(workspace) + offset);
+
+  offset       = (reinterpret_cast<uintptr_t>(x_norm) % alignof(OutT));
+  OutT* y_norm = x_norm;
   // TODO: Column major case looks to have lower accuracy for X == Y,
   // perhaps the use of stridedSummationKernel could be causing this,
   // need to investigate and fix.
   if ((x == y) && is_row_major) {
-    raft::linalg::rowNorm(x_norm,
-                          x,
-                          k,
-                          std::max(m, n),
-                          raft::linalg::L2Norm,
-                          is_row_major,
-                          stream,
-                          raft::identity_op{});
+    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+      x_norm, x, k, std::max(m, n), stream, raft::identity_op{});
   } else {
     y_norm += m;
-    raft::linalg::rowNorm(
-      x_norm, x, k, m, raft::linalg::L2Norm, is_row_major, stream, raft::identity_op{});
-    raft::linalg::rowNorm(
-      y_norm, y, k, n, raft::linalg::L2Norm, is_row_major, stream, raft::identity_op{});
+    if (is_row_major) {
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+        x_norm, x, k, m, stream, raft::identity_op{});
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+        y_norm, y, k, n, stream, raft::identity_op{});
+    } else {
+      raft::linalg::rowNorm<raft::linalg::L2Norm, false>(
+        x_norm, x, k, m, stream, raft::identity_op{});
+      raft::linalg::rowNorm<raft::linalg::L2Norm, false>(
+        y_norm, y, k, n, stream, raft::identity_op{});
+    }
   }
 
   ops::l2_exp_distance_op<DataT, AccT, IdxT> distance_op{perform_sqrt};
@@ -548,8 +577,8 @@ void distance_impl(raft::resources const& handle,
   ops::l2_unexp_distance_op<DataT, AccT, IdxT> l2_op(perform_sqrt);
 
   // The unexpanded L2 does not require the norms of a and b to be calculated.
-  const DataT* x_norm = nullptr;
-  const DataT* y_norm = nullptr;
+  const OutT* x_norm = nullptr;
+  const OutT* y_norm = nullptr;
 
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
@@ -576,8 +605,8 @@ void distance_impl(raft::resources const& handle,
   ops::l2_unexp_distance_op<DataT, AccT, IdxT> l2_op(perform_sqrt);
 
   // The unexpanded L2 does not require the norms of a and b to be calculated.
-  const DataT* x_norm = nullptr;
-  const DataT* y_norm = nullptr;
+  const OutT* x_norm = nullptr;
+  const OutT* y_norm = nullptr;
 
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
@@ -602,8 +631,8 @@ void distance_impl(raft::resources const& handle,
 {
   ops::l_inf_distance_op<DataT, AccT, IdxT> distance_op{};
 
-  const DataT* x_norm = nullptr;
-  const DataT* y_norm = nullptr;
+  const OutT* x_norm = nullptr;
+  const OutT* y_norm = nullptr;
 
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
@@ -628,8 +657,8 @@ void distance_impl(raft::resources const& handle,
 {
   ops::lp_unexp_distance_op<DataT, AccT, IdxT> distance_op{metric_arg};
 
-  const DataT* x_norm = nullptr;
-  const DataT* y_norm = nullptr;
+  const OutT* x_norm = nullptr;
+  const OutT* y_norm = nullptr;
 
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
@@ -654,8 +683,8 @@ void distance_impl(raft::resources const& handle,
 {
   ops::russel_rao_distance_op<DataT, AccT, IdxT> distance_op{k};
 
-  const DataT* x_norm = nullptr;
-  const DataT* y_norm = nullptr;
+  const OutT* x_norm = nullptr;
+  const OutT* y_norm = nullptr;
 
   cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
@@ -705,8 +734,8 @@ void distance(raft::resources const& handle,
               void* workspace,
               size_t worksize,
               FinalLambda fin_op,
-              bool isRowMajor   = true,
-              InType metric_arg = 2.0f)
+              bool isRowMajor    = true,
+              OutType metric_arg = 2.0f)
 {
   // raft distance support inputs as float/double and output as uint8_t/float/double.
   static_assert(!((sizeof(OutType) > 1) && (sizeof(AccType) != sizeof(OutType))),
@@ -762,8 +791,8 @@ void distance(raft::resources const& handle,
               Index_ k,
               void* workspace,
               size_t worksize,
-              bool isRowMajor   = true,
-              InType metric_arg = 2.0f)
+              bool isRowMajor    = true,
+              OutType metric_arg = 2.0f)
 {
   auto fin_op = raft::identity_op();
 

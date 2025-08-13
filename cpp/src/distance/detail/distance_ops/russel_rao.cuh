@@ -52,12 +52,15 @@ struct russel_rao_distance_op {
     return Policy::SmemSize;
   }
 
-  DI void core(AccT& acc, DataT& x, DataT& y) const { acc += x * y; };
+  DI void core(AccT& acc, DataT& x, DataT& y) const
+  {
+    acc += raft::to_float(x) * raft::to_float(y);
+  };
 
   template <typename Policy>
   DI void epilog(AccT acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
-                 DataT* regxn,
-                 DataT* regyn,
+                 AccT* regxn,
+                 AccT* regyn,
                  IdxT gridStrideX,
                  IdxT gridStrideY) const
   {

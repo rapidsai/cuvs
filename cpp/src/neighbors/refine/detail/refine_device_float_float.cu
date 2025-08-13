@@ -43,5 +43,6 @@
   }
 
 instantiate_cuvs_neighbors_refine_d(int64_t, float, float, int64_t);
+instantiate_cuvs_neighbors_refine_d(uint32_t, float, float, int64_t);
 
 #undef instantiate_cuvs_neighbors_refine_d

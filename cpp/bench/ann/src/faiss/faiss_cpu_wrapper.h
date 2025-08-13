@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,10 @@
 #pragma once
 
 #include "../common/ann_types.hpp"
-#include "../common/thread_pool.hpp"
 #include "../common/util.hpp"
 
 #include <faiss/IndexFlat.h>
+#include <faiss/IndexHNSW.h>
 #include <faiss/IndexIVFFlat.h>
 #include <faiss/IndexIVFPQ.h>
 #include <faiss/IndexRefine.h>
@@ -27,7 +27,6 @@
 #include <faiss/index_io.h>
 
 #include <cassert>
-#include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -56,7 +55,16 @@ class faiss_cpu : public algo<T> {
   struct search_param : public search_param_base {
     int nprobe;
     float refine_ratio = 1.0;
-    int num_threads    = omp_get_num_procs();
+    /**
+     * parallel_mode determines how queries are parallelized with OpenMP.
+     *
+     * Options:
+     * 0: Split over queries.
+     * 1: Parallelize over inverted lists.
+     * 2: Parallelize over both queries and inverted lists.
+     * 3: Split over queries with finer granularity.
+     */
+    int parallel_mode = 0;
   };
 
   struct build_param {
@@ -75,7 +83,7 @@ class faiss_cpu : public algo<T> {
 
   void build(const T* dataset, size_t nrow) final;
 
-  void set_search_param(const search_param_base& param) override;
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override;
 
   void init_quantizer(int dim)
   {
@@ -88,11 +96,11 @@ class faiss_cpu : public algo<T> {
 
   // TODO(snanditale): if the number of results is less than k, the remaining elements of
   // 'neighbors' will be filled with (size_t)-1
-  void search(const T* queries,
-              int batch_size,
-              int k,
-              algo_base::index_type* neighbors,
-              float* distances) const final;
+  virtual void search(const T* queries,
+                      int batch_size,
+                      int k,
+                      algo_base::index_type* neighbors,
+                      float* distances) const;
 
   [[nodiscard]] auto get_preference() const -> algo_property override
   {
@@ -116,9 +124,6 @@ class faiss_cpu : public algo<T> {
   faiss::MetricType metric_type_;
   int nlist_;
   double training_sample_fraction_;
-
-  int num_threads_;
-  std::shared_ptr<fixed_thread_pool> thread_pool_;
 };
 
 template <typename T>
@@ -146,6 +151,7 @@ void faiss_cpu<T>::build(const T* dataset, size_t nrow)
     index_ivf->cp.max_points_per_centroid = max_ppc;
     index_ivf->cp.min_points_per_centroid = min_ppc;
   }
+  faiss::IndexHNSWFlat* hnsw_index = dynamic_cast<faiss::IndexHNSWFlat*>(index_.get());
   index_->train(nrow, dataset);  // faiss::IndexFlat::train() will do nothing
   assert(index_->is_trained);
   index_->add(nrow, dataset);
@@ -153,19 +159,19 @@ void faiss_cpu<T>::build(const T* dataset, size_t nrow)
 }
 
 template <typename T>
-void faiss_cpu<T>::set_search_param(const search_param_base& param)
+void faiss_cpu<T>::set_search_param(const search_param_base& param, const void* filter_bitset)
 {
+  if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
   auto sp    = dynamic_cast<const search_param&>(param);
   int nprobe = sp.nprobe;
   assert(nprobe <= nlist_);
-  dynamic_cast<faiss::IndexIVF*>(index_.get())->nprobe = nprobe;
+  auto index_ivf = dynamic_cast<faiss::IndexIVF*>(index_.get());
+  if (index_ivf != nullptr) {
+    index_ivf->nprobe        = nprobe;
+    index_ivf->parallel_mode = sp.parallel_mode;
+  }
 
   if (sp.refine_ratio > 1.0) { this->index_refine_.get()->k_factor = sp.refine_ratio; }
-
-  if (!thread_pool_ || num_threads_ != sp.num_threads) {
-    num_threads_ = sp.num_threads;
-    thread_pool_ = std::make_shared<fixed_thread_pool>(num_threads_);
-  }
 }
 
 template <typename T>
@@ -175,12 +181,7 @@ void faiss_cpu<T>::search(
   static_assert(sizeof(size_t) == sizeof(faiss::idx_t),
                 "sizes of size_t and faiss::idx_t are different");
 
-  thread_pool_->submit(
-    [&](int i) {
-      // Use thread pool for batch size = 1. FAISS multi-threads internally for batch size > 1.
-      index_->search(batch_size, queries, k, distances, reinterpret_cast<faiss::idx_t*>(neighbors));
-    },
-    1);
+  index_->search(batch_size, queries, k, distances, reinterpret_cast<faiss::idx_t*>(neighbors));
 }
 
 template <typename T>
@@ -303,14 +304,12 @@ class faiss_cpu_flat : public faiss_cpu<T> {
   }
 
   // class faiss_cpu is more like a IVF class, so need special treating here
-  void set_search_param(const typename algo<T>::search_param& param) override
+  void set_search_param(const typename algo<T>::search_param& param,
+                        const void* filter_bitset) override
   {
+    if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
     auto search_param = dynamic_cast<const typename faiss_cpu<T>::search_param&>(param);
-    if (!this->thread_pool_ || this->num_threads_ != search_param.num_threads) {
-      this->num_threads_ = search_param.num_threads;
-      this->thread_pool_ = std::make_shared<fixed_thread_pool>(this->num_threads_);
-    }
-  };
+  }
 
   void save(const std::string& file) const override
   {
@@ -322,6 +321,64 @@ class faiss_cpu_flat : public faiss_cpu<T> {
   {
     return std::make_unique<faiss_cpu_flat<T>>(*this);  // use copy constructor
   }
+};
+
+template <typename T>
+class faiss_cpu_hnsw_flat : public faiss_cpu<T> {
+ public:
+  struct build_param : public faiss_cpu<T>::build_param {
+    int M;
+    int efConstruction;
+  };
+  struct search_param : public faiss_cpu<T>::search_param {
+    faiss::SearchParametersHNSW p;
+  };
+  faiss_cpu_hnsw_flat(Metric metric, int dim, const build_param& param)
+    : faiss_cpu<T>(metric, dim, param)
+  {
+    this->index_ = std::make_shared<faiss::IndexHNSWFlat>(dim, param.M, this->metric_type_);
+    faiss::IndexHNSWFlat* hnsw_index = static_cast<faiss::IndexHNSWFlat*>(this->index_.get());
+    hnsw_index->hnsw.efConstruction  = param.efConstruction;
+  }
+
+  void set_search_param(const typename algo<T>::search_param& param,
+                        const void* filter_bitset) override
+  {
+    if (filter_bitset != nullptr) { throw std::runtime_error("Filtering is not supported yet."); }
+    auto sp              = static_cast<const typename faiss_cpu_hnsw_flat<T>::search_param&>(param);
+    this->search_params_ = std::make_shared<faiss::SearchParametersHNSW>(sp.p);
+  };
+
+  void save(const std::string& file) const override
+  {
+    this->template save_<faiss::IndexHNSWFlat>(file);
+  }
+  void load(const std::string& file) override { this->template load_<faiss::IndexHNSWFlat>(file); }
+
+  std::unique_ptr<algo<T>> copy()
+  {
+    return std::make_unique<faiss_cpu_hnsw_flat<T>>(*this);  // use copy constructor
+  }
+
+  void search(const T* queries,
+              int batch_size,
+              int k,
+              algo_base::index_type* neighbors,
+              float* distances) const override
+  {
+    static_assert(sizeof(size_t) == sizeof(faiss::idx_t),
+                  "sizes of size_t and faiss::idx_t are different");
+
+    this->index_->search(batch_size,
+                         queries,
+                         k,
+                         distances,
+                         reinterpret_cast<faiss::idx_t*>(neighbors),
+                         search_params_.get());
+  }
+
+ private:
+  std::shared_ptr<faiss::SearchParameters> search_params_;
 };
 
 }  // namespace cuvs::bench

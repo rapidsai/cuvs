@@ -57,6 +57,7 @@ footer = """
 
 types = dict(
     float_int64_t=("float", "int64_t"),
+    half_int64_t=("half", "int64_t"),
     int8_t_int64_t=("int8_t", "int64_t"),
     uint8_t_int64_t=("uint8_t", "int64_t"),
 )
@@ -67,28 +68,14 @@ search_macro = """
 #define CUVS_INST_IVF_PQ_SEARCH(T, IdxT)                                        \\
   void search(raft::resources const& handle,                                    \\
               const cuvs::neighbors::ivf_pq::search_params& params,             \\
-              cuvs::neighbors::ivf_pq::index<IdxT>& index,                      \\
-              raft::device_matrix_view<const T, IdxT, raft::row_major> queries, \\
-              raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,  \\
-              raft::device_matrix_view<float, IdxT, raft::row_major> distances) \\
-  {                                                                             \\
-    cuvs::neighbors::ivf_pq::detail::search(                                   \\
-      handle, params, index, queries, neighbors, distances);  \\
-  }
-"""
-search_with_filter_macro = """
-#define CUVS_INST_IVF_PQ_SEARCH_FILTER(T, IdxT)                                 \\
-  void search_with_filtering(raft::resources const& handle,                     \\
-              const cuvs::neighbors::ivf_pq::search_params& params,             \\
-              cuvs::neighbors::ivf_pq::index<IdxT>& index,                      \\
+              const cuvs::neighbors::ivf_pq::index<IdxT>& index,                \\
               raft::device_matrix_view<const T, IdxT, raft::row_major> queries, \\
               raft::device_matrix_view<IdxT, IdxT, raft::row_major> neighbors,  \\
               raft::device_matrix_view<float, IdxT, raft::row_major> distances, \\
-              cuvs::neighbors::filtering::bitset_filter<                        \\
-                  uint32_t, IdxT> sample_filter)                                \\
+              const cuvs::neighbors::filtering::base_filter& sample_filter_ref) \\
   {                                                                             \\
-    cuvs::neighbors::ivf_pq::detail::search_with_filtering(                     \\
-      handle, params, index, queries, neighbors, distances, sample_filter);     \\
+    cuvs::neighbors::ivf_pq::detail::search(                                    \\
+      handle, params, index, queries, neighbors, distances, sample_filter_ref); \\
   }
 """
 
@@ -102,11 +89,6 @@ macros = dict(
         include=search_include_macro,
         definition=search_macro,
         name="CUVS_INST_IVF_PQ_SEARCH",
-    ),
-    search_with_filter=dict(
-        include=search_include_macro,
-        definition=search_with_filter_macro,
-        name="CUVS_INST_IVF_PQ_SEARCH_FILTER",
     ),
 )
 

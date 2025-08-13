@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,14 @@
 #pragma once
 
 #include "detail/nn_descent.cuh"
+#include "detail/nn_descent_batch.cuh"
+
+#include <cmath>
+#include <cstdint>
 #include <cuvs/neighbors/nn_descent.hpp>
 
 #include <raft/core/device_mdspan.hpp>
+#include <raft/core/error.hpp>
 #include <raft/core/host_mdspan.hpp>
 
 namespace cuvs::neighbors::nn_descent {
@@ -61,7 +66,19 @@ auto build(raft::resources const& res,
            index_params const& params,
            raft::device_matrix_view<const T, int64_t, raft::row_major> dataset) -> index<IdxT>
 {
-  return detail::build<T, IdxT>(res, params, dataset);
+  if (params.n_clusters > 1) {
+    // related issue: https://github.com/rapidsai/cuvs/issues/1051
+    RAFT_LOG_WARN(
+      "NN Descent batch build (using n_clusters > 1) is deprecated and will be removed in a future "
+      "release. Please use cuvs::all_neighbors::build(...) instead.");
+    if constexpr (std::is_same_v<T, float>) {
+      return detail::experimental::batch_build<T, IdxT>(res, params, dataset);
+    } else {
+      RAFT_FAIL("Batched nn-descent is only supported for float precision");
+    }
+  } else {
+    return detail::build<T, IdxT>(res, params, dataset);
+  }
 }
 
 /**
@@ -100,7 +117,19 @@ void build(raft::resources const& res,
            raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,
            index<IdxT>& idx)
 {
-  detail::build<T, IdxT>(res, params, dataset, idx);
+  if (params.n_clusters > 1) {
+    // related issue: https://github.com/rapidsai/cuvs/issues/1051
+    RAFT_LOG_WARN(
+      "NN Descent batch build (using n_clusters > 1) is deprecated and will be removed in a future "
+      "release. Please use cuvs::all_neighbors::build(...) instead.");
+    if constexpr (std::is_same_v<T, float>) {
+      detail::experimental::batch_build<T, IdxT>(res, params, dataset, idx);
+    } else {
+      RAFT_FAIL("Batched nn-descent is only supported for float precision");
+    }
+  } else {
+    detail::build<T, IdxT>(res, params, dataset, idx);
+  }
 }
 
 /**
@@ -135,7 +164,19 @@ auto build(raft::resources const& res,
            index_params const& params,
            raft::host_matrix_view<const T, int64_t, raft::row_major> dataset) -> index<IdxT>
 {
-  return detail::build<T, IdxT>(res, params, dataset);
+  if (params.n_clusters > 1) {
+    // related issue: https://github.com/rapidsai/cuvs/issues/1051
+    RAFT_LOG_WARN(
+      "NN Descent batch build (using n_clusters > 1) is deprecated and will be removed in a future "
+      "release. Please use cuvs::all_neighbors::build(...) instead.");
+    if constexpr (std::is_same_v<T, float>) {
+      return detail::experimental::batch_build<T, IdxT>(res, params, dataset);
+    } else {
+      RAFT_FAIL("Batched nn-descent is only supported for float precision");
+    }
+  } else {
+    return detail::build<T, IdxT>(res, params, dataset);
+  }
 }
 
 /**
@@ -174,7 +215,19 @@ void build(raft::resources const& res,
            raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,
            index<IdxT>& idx)
 {
-  detail::build<T, IdxT>(res, params, dataset, idx);
+  if (params.n_clusters > 1) {
+    // related issue: https://github.com/rapidsai/cuvs/issues/1051
+    RAFT_LOG_WARN(
+      "NN Descent batch build (using n_clusters > 1) is deprecated and will be removed in a future "
+      "release. Please use cuvs::all_neighbors::build(...) instead.");
+    if constexpr (std::is_same_v<T, float>) {
+      detail::experimental::batch_build<T, IdxT>(res, params, dataset, idx);
+    } else {
+      RAFT_FAIL("Batched nn-descent is only supported for float precision");
+    }
+  } else {
+    detail::build<T, IdxT>(res, params, dataset, idx);
+  }
 }
 
 /** @} */  // end group nn-descent

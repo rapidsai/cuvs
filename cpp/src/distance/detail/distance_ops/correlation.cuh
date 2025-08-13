@@ -18,6 +18,8 @@
 
 #include <raft/util/cuda_dev_essentials.cuh>  // DI
 
+#include <cuda_fp16.h>
+
 namespace cuvs::distance::detail::ops {
 
 /** @brief The correlation distance
@@ -34,20 +36,20 @@ struct correlation_distance_op {
   using AccT  = AccType;
   using IdxT  = IdxType;
 
-  const DataT* x2n;
-  const DataT* y2n;
+  const AccT* x2n;
+  const AccT* y2n;
   IdxT m;
   IdxT n;
   IdxT k;
 
   correlation_distance_op(
-    bool is_row_major, const DataT* x2n_, const DataT* y2n_, IdxT m_, IdxT n_, IdxT k_) noexcept
+    bool is_row_major, const AccT* x2n_, const AccT* y2n_, IdxT m_, IdxT n_, IdxT k_) noexcept
     : x2n(x2n_), y2n(y2n_), m(m_), n(n_), k(k_)
   {
     // The distance op is typically created before the row-major/col-major
     // swapping has been done. So we do it here.
     if (!is_row_major) {
-      std::swap<const DataT*>(x2n, y2n);
+      std::swap<const AccT*>(x2n, y2n);
       std::swap(m, n);
     }
   }
@@ -63,15 +65,18 @@ struct correlation_distance_op {
   template <typename Policy>
   static constexpr size_t shared_mem_size()
   {
-    return Policy::SmemSize + (2 * (Policy::Mblk + Policy::Nblk) * sizeof(DataT));
+    return Policy::SmemSize + (2 * (Policy::Mblk + Policy::Nblk) * sizeof(AccT));
   }
 
-  DI void core(AccT& acc, DataT& x, DataT& y) const { acc += x * y; };
+  DI void core(AccT& acc, DataT& x, DataT& y) const
+  {
+    acc += raft::to_float(x) * raft::to_float(y);
+  };
 
   template <typename Policy>
   DI void epilog(AccT acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
-                 DataT* regxn,
-                 DataT* regyn,
+                 AccT* regxn,
+                 AccT* regyn,
                  IdxT gridStrideX,
                  IdxT gridStrideY) const
   {
@@ -80,23 +85,22 @@ struct correlation_distance_op {
     // changes, this will be where we find the bugs.
     extern __shared__ char smem[];
 
-    DataT regx2n[Policy::AccRowsPerTh], regy2n[Policy::AccColsPerTh];
+    AccT regx2n[Policy::AccRowsPerTh], regy2n[Policy::AccColsPerTh];
 
-    DataT* sx2Norm =
-      (DataT*)(&smem[Policy::SmemSize + (Policy::Mblk + Policy::Nblk) * sizeof(DataT)]);
-    DataT* sy2Norm = (&sx2Norm[Policy::Mblk]);
+    AccT* sx2Norm = (AccT*)(&smem[Policy::SmemSize + (Policy::Mblk + Policy::Nblk) * sizeof(AccT)]);
+    AccT* sy2Norm = (&sx2Norm[Policy::Mblk]);
 
     // Load x & y norms required by this threadblock in shmem buffer
     if (gridStrideX == blockIdx.x * Policy::Nblk) {
       for (int i = threadIdx.x; i < Policy::Mblk; i += Policy::Nthreads) {
         auto idx   = gridStrideY + i;
-        sx2Norm[i] = idx < m ? x2n[idx] : 0;
+        sx2Norm[i] = idx < m ? raft::to_float(x2n[idx]) : 0;
       }
     }
 
     for (int i = threadIdx.x; i < Policy::Nblk; i += Policy::Nthreads) {
       auto idx   = gridStrideX + i;
-      sy2Norm[i] = idx < n ? y2n[idx] : 0;
+      sy2Norm[i] = idx < n ? raft::to_float(y2n[idx]) : 0;
     }
     __syncthreads();
 

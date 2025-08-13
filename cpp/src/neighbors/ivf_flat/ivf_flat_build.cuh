@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,10 +27,11 @@
 #include "../../cluster/kmeans_balanced.cuh"
 #include "../detail/ann_utils.cuh"
 #include <cuvs/distance/distance.hpp>
-#include <raft/core/logger-ext.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/mdarray.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/add.cuh>
@@ -99,8 +100,9 @@ auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T,
  *   there are no dependencies between threads, hence no constraints on the block size.
  *
  * @tparam T      element type.
- * @tparam IdxT   type of the indices in the source source_vecs
+ * @tparam IdxT   type of the vector ids in the index (corresponds to second arg ofindex<T, IdxT>)
  * @tparam LabelT label type
+ * @tparam SourceIndexT input index type (usually same as IdxT)
  * @tparam gather_src if false, then we build the index from vectors source_vecs[i,:], otherwise
  *     we use source_vecs[source_ixs[i],:]. In both cases i=0..n_rows-1.
  *
@@ -117,10 +119,10 @@ auto clone(const raft::resources& res, const index<T, IdxT>& source) -> index<T,
  * @param veclen size of vectorized loads/stores; must satisfy `dim % veclen == 0`.
  *
  */
-template <typename T, typename IdxT, typename LabelT, bool gather_src = false>
+template <typename T, typename IdxT, typename LabelT, typename SourceIdxT, bool gather_src = false>
 RAFT_KERNEL build_index_kernel(const LabelT* labels,
                                const T* source_vecs,
-                               const IdxT* source_ixs,
+                               const SourceIdxT* source_ixs,
                                T** list_data_ptrs,
                                IdxT** list_index_ptrs,
                                uint32_t* list_sizes_ptr,
@@ -131,6 +133,13 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
 {
   const IdxT i = IdxT(blockDim.x) * IdxT(blockIdx.x) + threadIdx.x;
   if (i >= n_rows) { return; }
+  auto source_ix = source_ixs == nullptr ? i + batch_offset : source_ixs[i];
+  // In the context of refinement, some indices may be invalid (the generating NN algorithm does
+  // not return enough valid items). Do not add the item to the index in this case.
+  if (source_ix == ivf::kInvalidRecord<SourceIdxT> ||
+      source_ix == raft::upper_bound<SourceIdxT>()) {
+    return;
+  }
 
   auto list_id     = labels[i];
   auto inlist_id   = atomicAdd(list_sizes_ptr + list_id, 1);
@@ -138,7 +147,7 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
   auto* list_data  = list_data_ptrs[list_id];
 
   // Record the source vector id in the index
-  list_index[inlist_id] = source_ixs == nullptr ? i + batch_offset : source_ixs[i];
+  list_index[inlist_id] = source_ix;
 
   // The data is written in interleaved groups of `index::kGroupSize` vectors
   using interleaved_group = raft::Pow2<kIndexGroupSize>;
@@ -150,7 +159,7 @@ RAFT_KERNEL build_index_kernel(const LabelT* labels,
 
   // Point to the source vector
   if constexpr (gather_src) {
-    source_vecs += source_ixs[i] * dim;
+    source_vecs += source_ix * dim;
   } else {
     source_vecs += i * dim;
   }
@@ -195,13 +204,25 @@ void extend(raft::resources const& handle,
   constexpr size_t kReasonableMaxBatchSize = 65536;
   size_t max_batch_size                    = std::min<size_t>(n_rows, kReasonableMaxBatchSize);
 
+  // Determine if a stream pool exist and make sure there is at least one stream in it so we
+  // could use the stream for kernel/copy overlapping by enabling prefetch.
+  auto copy_stream = raft::resource::get_cuda_stream(handle);  // Using the main stream by default
+  bool enable_prefetch = false;
+  if (handle.has_resource_factory(raft::resource::resource_type::CUDA_STREAM_POOL)) {
+    if (raft::resource::get_stream_pool_size(handle) >= 1) {
+      enable_prefetch = true;
+      copy_stream     = raft::resource::get_stream_from_stream_pool(handle);
+    }
+  }
   // Predict the cluster labels for the new data, in batches if necessary
   utils::batch_load_iterator<T> vec_batches(new_vectors,
                                             n_rows,
                                             index->dim(),
                                             max_batch_size,
-                                            stream,
-                                            raft::resource::get_workspace_resource(handle));
+                                            copy_stream,
+                                            raft::resource::get_workspace_resource(handle),
+                                            enable_prefetch);
+  vec_batches.prefetch_next_batch();
 
   for (const auto& batch : vec_batches) {
     auto batch_data_view =
@@ -214,6 +235,10 @@ void extend(raft::resources const& handle,
                                             orig_centroids_view,
                                             batch_labels_view,
                                             utils::mapping<float>{});
+    vec_batches.prefetch_next_batch();
+    // User needs to make sure kernel finishes its work before we overwrite batch in the next
+    // iteration if different streams are used for kernel and copy.
+    raft::resource::sync_stream(handle);
   }
 
   auto* list_sizes_ptr    = index->list_sizes().data_handle();
@@ -277,6 +302,8 @@ void extend(raft::resources const& handle,
 
   utils::batch_load_iterator<IdxT> vec_indices(
     new_indices, n_rows, 1, max_batch_size, stream, raft::resource::get_workspace_resource(handle));
+  vec_batches.reset();
+  vec_batches.prefetch_next_batch();
   utils::batch_load_iterator<IdxT> idx_batch = vec_indices.begin();
   size_t next_report_offset                  = 0;
   size_t d_report_offset                     = n_rows * 5 / 100;
@@ -297,6 +324,10 @@ void extend(raft::resources const& handle,
                                            dim,
                                            index->veclen(),
                                            batch.offset());
+    vec_batches.prefetch_next_batch();
+    // User needs to make sure kernel finishes its work before we overwrite batch in the next
+    // iteration if different streams are used for kernel and copy.
+    raft::resource::sync_stream(handle);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
 
     if (batch.offset() > next_report_offset) {
@@ -312,23 +343,34 @@ void extend(raft::resources const& handle,
   if (!index->center_norms().has_value()) {
     index->allocate_center_norms(handle);
     if (index->center_norms().has_value()) {
-      raft::linalg::rowNorm(index->center_norms()->data_handle(),
-                            index->centers().data_handle(),
-                            dim,
-                            n_lists,
-                            raft::linalg::L2Norm,
-                            true,
-                            stream);
+      if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
+        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(index->center_norms()->data_handle(),
+                                                          index->centers().data_handle(),
+                                                          dim,
+                                                          n_lists,
+                                                          stream,
+                                                          raft::sqrt_op{});
+      } else {
+        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(index->center_norms()->data_handle(),
+                                                          index->centers().data_handle(),
+                                                          dim,
+                                                          n_lists,
+                                                          stream);
+      }
       RAFT_LOG_TRACE_VEC(index->center_norms()->data_handle(), std::min<uint32_t>(dim, 20));
     }
   } else if (index->center_norms().has_value() && index->adaptive_centers()) {
-    raft::linalg::rowNorm(index->center_norms()->data_handle(),
-                          index->centers().data_handle(),
-                          dim,
-                          n_lists,
-                          raft::linalg::L2Norm,
-                          true,
-                          stream);
+    if (index->metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(index->center_norms()->data_handle(),
+                                                        index->centers().data_handle(),
+                                                        dim,
+                                                        n_lists,
+                                                        stream,
+                                                        raft::sqrt_op{});
+    } else {
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+        index->center_norms()->data_handle(), index->centers().data_handle(), dim, n_lists, stream);
+    }
     RAFT_LOG_TRACE_VEC(index->center_norms()->data_handle(), std::min<uint32_t>(dim, 20));
   }
 }
@@ -357,11 +399,13 @@ inline auto build(raft::resources const& handle,
   auto stream = raft::resource::get_cuda_stream(handle);
   cuvs::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_flat::build(%zu, %u)", size_t(n_rows), dim);
-  static_assert(std::is_same_v<T, float> || std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>,
+  static_assert(std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, uint8_t> ||
+                  std::is_same_v<T, int8_t>,
                 "unsupported data type");
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
-
+  RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::CosineExpanded || dim > 1,
+               "Cosine metric requires more than one dim");
   index<T, IdxT> index(handle, params, dim);
   utils::memzero(
     index.accum_sorted_sizes().data_handle(), index.accum_sorted_sizes().size(), stream);
@@ -391,7 +435,7 @@ inline auto build(raft::resources const& handle,
       index.centers().data_handle(), index.n_lists(), index.dim());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>(index.metric());
+    kmeans_params.metric  = index.metric();
     cuvs::cluster::kmeans_balanced::fit(
       handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
   }
@@ -420,11 +464,11 @@ inline auto build(raft::resources const& handle,
  * @param[in] candidate_idx device pointer to neighbor candidates, size [n_queries, n_candidates]
  * @param[in] n_candidates  of neighbor_candidates
  */
-template <typename T, typename IdxT>
+template <typename T, typename IdxT, typename CandidateIdxT>
 inline void fill_refinement_index(raft::resources const& handle,
                                   index<T, IdxT>* refinement_index,
                                   const T* dataset,
-                                  const IdxT* candidate_idx,
+                                  const CandidateIdxT* candidate_idx,
                                   IdxT n_queries,
                                   uint32_t n_candidates)
 {
@@ -460,7 +504,7 @@ inline void fill_refinement_index(raft::resources const& handle,
 
   const dim3 block_dim(256);
   const dim3 grid_dim(raft::ceildiv<IdxT>(n_queries * n_candidates, block_dim.x));
-  build_index_kernel<T, IdxT, LabelT, true>
+  build_index_kernel<T, IdxT, LabelT, CandidateIdxT, true>
     <<<grid_dim, block_dim, 0, stream>>>(new_labels.data(),
                                          dataset,
                                          candidate_idx,

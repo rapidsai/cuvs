@@ -52,19 +52,21 @@ struct jensen_shannon_distance_op {
 
   DI void core(AccT& acc, DataT& x, DataT& y) const
   {
-    const DataT m     = 0.5f * (x + y);
+    AccT x_           = raft::to_float(x);
+    AccT y_           = raft::to_float(y);
+    const AccT m      = 0.5f * (x_ + y_);
     const bool m_zero = (m == 0);
     const auto logM   = (!m_zero) * raft::log(m + m_zero);
 
-    const bool x_zero = (x == 0);
-    const bool y_zero = (y == 0);
-    acc += (-x * (logM - raft::log(x + x_zero))) + (-y * (logM - raft::log(y + y_zero)));
+    const bool x_zero = (x_ == 0);
+    const bool y_zero = (y_ == 0);
+    acc += (-x_ * (logM - raft::log(x_ + x_zero))) + (-y_ * (logM - raft::log(y_ + y_zero)));
   };
 
   template <typename Policy>
   DI void epilog(AccT acc[Policy::AccRowsPerTh][Policy::AccColsPerTh],
-                 DataT* regxn,
-                 DataT* regyn,
+                 AccT* regxn,
+                 AccT* regyn,
                  IdxT gridStrideX,
                  IdxT gridStrideY) const
   {

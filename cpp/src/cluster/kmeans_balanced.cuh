@@ -71,13 +71,15 @@ namespace cuvs::cluster::kmeans_balanced {
  * @param[out] centroids  The generated centroids [dim = n_clusters x n_features]
  * @param[in]  mapping_op (optional) Functor to convert from the input datatype to the arithmetic
  *                        datatype. If DataT == MathT, this must be the identity.
+ * @param[in]  X_norm        (optional) Dataset's row norms [dim = n_samples]
  */
 template <typename DataT, typename MathT, typename IndexT, typename MappingOpT = raft::identity_op>
 void fit(const raft::resources& handle,
          cuvs::cluster::kmeans::balanced_params const& params,
          raft::device_matrix_view<const DataT, IndexT> X,
          raft::device_matrix_view<MathT, IndexT> centroids,
-         MappingOpT mapping_op = raft::identity_op())
+         MappingOpT mapping_op                                               = raft::identity_op(),
+         std::optional<raft::device_vector_view<const MathT, IndexT>> X_norm = std::nullopt)
 {
   RAFT_EXPECTS(X.extent(1) == centroids.extent(1),
                "Number of features in dataset and centroids are different");
@@ -88,14 +90,16 @@ void fit(const raft::resources& handle,
                "The number of centroids must be strictly positive and cannot exceed the number of "
                "points in the training dataset.");
 
-  cuvs::cluster::kmeans::detail::build_hierarchical(handle,
-                                                    params,
-                                                    X.extent(1),
-                                                    X.data_handle(),
-                                                    X.extent(0),
-                                                    centroids.data_handle(),
-                                                    centroids.extent(0),
-                                                    mapping_op);
+  cuvs::cluster::kmeans::detail::build_hierarchical(
+    handle,
+    params,
+    X.extent(1),
+    X.data_handle(),
+    X.extent(0),
+    centroids.data_handle(),
+    centroids.extent(0),
+    mapping_op,
+    X_norm.has_value() ? X_norm.value().data_handle() : nullptr);
 }
 
 /**
@@ -125,6 +129,7 @@ void fit(const raft::resources& handle,
  * @param[out] labels     The output labels [dim = n_samples]
  * @param[in]  mapping_op (optional) Functor to convert from the input datatype to the arithmetic
  *                        datatype. If DataT == MathT, this must be the identity.
+ * @param[in]  X_norm     (optional) Dataset's row norms [dim = n_samples]
  */
 template <typename DataT,
           typename MathT,
@@ -136,7 +141,8 @@ void predict(const raft::resources& handle,
              raft::device_matrix_view<const DataT, IndexT> X,
              raft::device_matrix_view<const MathT, IndexT> centroids,
              raft::device_vector_view<LabelT, IndexT> labels,
-             MappingOpT mapping_op = raft::identity_op())
+             MappingOpT mapping_op = raft::identity_op(),
+             std::optional<raft::device_vector_view<const MathT, IndexT>> X_norm = std::nullopt)
 {
   RAFT_EXPECTS(X.extent(0) == labels.extent(0),
                "Number of rows in dataset and labels are different");
@@ -149,15 +155,18 @@ void predict(const raft::resources& handle,
                  static_cast<uint64_t>(std::numeric_limits<LabelT>::max()),
                "The chosen label type cannot represent all cluster labels");
 
-  cuvs::cluster::kmeans::detail::predict(handle,
-                                         params,
-                                         centroids.data_handle(),
-                                         centroids.extent(0),
-                                         X.extent(1),
-                                         X.data_handle(),
-                                         X.extent(0),
-                                         labels.data_handle(),
-                                         mapping_op);
+  cuvs::cluster::kmeans::detail::predict(
+    handle,
+    params,
+    centroids.data_handle(),
+    centroids.extent(0),
+    X.extent(1),
+    X.data_handle(),
+    X.extent(0),
+    labels.data_handle(),
+    mapping_op,
+    raft::resource::get_workspace_resource(handle),
+    X_norm.has_value() ? X_norm.value().data_handle() : nullptr);
 }
 
 /**

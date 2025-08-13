@@ -19,7 +19,9 @@
 #include "cuvs_ann_bench_utils.h"
 
 #include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/dynamic_batching.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
+
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
@@ -30,6 +32,7 @@
 #include <raft/linalg/unary_op.cuh>
 #include <raft/neighbors/refine.cuh>
 #include <raft/util/cudart_utils.hpp>
+#include <rmm/cuda_stream_pool.hpp>
 
 #include <type_traits>
 
@@ -45,6 +48,13 @@ class cuvs_ivf_pq : public algo<T>, public algo_gpu {
     cuvs::neighbors::ivf_pq::search_params pq_param;
     float refine_ratio = 1.0f;
     [[nodiscard]] auto needs_dataset() const -> bool override { return refine_ratio > 1.0f; }
+    /* Dynamic batching */
+    bool dynamic_batching = false;
+    int64_t dynamic_batching_k;
+    int64_t dynamic_batching_max_batch_size     = 128;
+    double dynamic_batching_dispatch_timeout_ms = 0.01;
+    size_t dynamic_batching_n_queues            = 3;
+    bool dynamic_batching_conservative_dispatch = true;
   };
 
   using build_param = cuvs::neighbors::ivf_pq::index_params;
@@ -57,7 +67,7 @@ class cuvs_ivf_pq : public algo<T>, public algo_gpu {
 
   void build(const T* dataset, size_t nrow) final;
 
-  void set_search_param(const search_param_base& param) override;
+  void set_search_param(const search_param_base& param, const void* filter_bitset) override;
   void set_search_dataset(const T* dataset, size_t nrow) override;
 
   void search(const T* queries,
@@ -97,6 +107,11 @@ class cuvs_ivf_pq : public algo<T>, public algo_gpu {
   int dimension_;
   float refine_ratio_ = 1.0;
   raft::device_matrix_view<const T, IdxT> dataset_;
+
+  std::shared_ptr<cuvs::neighbors::dynamic_batching::index<T, IdxT>> dynamic_batcher_;
+  cuvs::neighbors::dynamic_batching::search_params dynamic_batcher_sp_{};
+
+  std::shared_ptr<cuvs::neighbors::filtering::base_filter> filter_;
 };
 
 template <typename T, typename IdxT>
@@ -115,6 +130,9 @@ void cuvs_ivf_pq<T, IdxT>::load(const std::string& file)
 template <typename T, typename IdxT>
 void cuvs_ivf_pq<T, IdxT>::build(const T* dataset, size_t nrow)
 {
+  // Create a CUDA stream pool with 1 stream (besides main stream) for kernel/copy overlapping.
+  size_t n_streams = 1;
+  raft::resource::set_cuda_stream_pool(handle_, std::make_shared<rmm::cuda_stream_pool>(n_streams));
   auto dataset_v = raft::make_device_matrix_view<const T, IdxT>(dataset, IdxT(nrow), dim_);
   std::make_shared<cuvs::neighbors::ivf_pq::index<IdxT>>(
     std::move(cuvs::neighbors::ivf_pq::build(handle_, index_params_, dataset_v)))
@@ -128,12 +146,30 @@ std::unique_ptr<algo<T>> cuvs_ivf_pq<T, IdxT>::copy()
 }
 
 template <typename T, typename IdxT>
-void cuvs_ivf_pq<T, IdxT>::set_search_param(const search_param_base& param)
+void cuvs_ivf_pq<T, IdxT>::set_search_param(const search_param_base& param,
+                                            const void* filter_bitset)
 {
+  filter_        = make_cuvs_filter(filter_bitset, index_->size());
   auto sp        = dynamic_cast<const search_param&>(param);
   search_params_ = sp.pq_param;
   refine_ratio_  = sp.refine_ratio;
   assert(search_params_.n_probes <= index_params_.n_lists);
+
+  if (sp.dynamic_batching) {
+    dynamic_batcher_ = std::make_shared<cuvs::neighbors::dynamic_batching::index<T, IdxT>>(
+      handle_,
+      cuvs::neighbors::dynamic_batching::index_params{{},
+                                                      sp.dynamic_batching_k,
+                                                      sp.dynamic_batching_max_batch_size,
+                                                      sp.dynamic_batching_n_queues,
+                                                      sp.dynamic_batching_conservative_dispatch},
+      *index_,
+      search_params_,
+      filter_.get());
+    dynamic_batcher_sp_.dispatch_timeout_ms = sp.dynamic_batching_dispatch_timeout_ms;
+  } else {
+    dynamic_batcher_.reset();
+  }
 }
 
 template <typename T, typename IdxT>
@@ -164,8 +200,17 @@ void cuvs_ivf_pq<T, IdxT>::search_base(
     raft::make_device_matrix_view<IdxT, uint32_t>(neighbors_idx_t, batch_size, k);
   auto distances_view = raft::make_device_matrix_view<float, uint32_t>(distances, batch_size, k);
 
-  cuvs::neighbors::ivf_pq::search(
-    handle_, search_params_, *index_, queries_view, neighbors_view, distances_view);
+  if (dynamic_batcher_) {
+    cuvs::neighbors::dynamic_batching::search(handle_,
+                                              dynamic_batcher_sp_,
+                                              *dynamic_batcher_,
+                                              queries_view,
+                                              neighbors_view,
+                                              distances_view);
+  } else {
+    cuvs::neighbors::ivf_pq::search(
+      handle_, search_params_, *index_, queries_view, neighbors_view, distances_view, *filter_);
+  }
 
   if constexpr (sizeof(IdxT) != sizeof(algo_base::index_type)) {
     raft::linalg::unaryOp(neighbors,

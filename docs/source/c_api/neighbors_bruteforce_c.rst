@@ -32,3 +32,11 @@ Index search
     :project: cuvs
     :members:
     :content-only:
+
+Index serialize
+---------------
+
+.. doxygengroup:: bruteforce_c_index_serialize
+    :project: cuvs
+    :members:
+    :content-only:

@@ -14,9 +14,14 @@
  * limitations under the License.
  */
 #pragma once
+
+#include "../utils.hpp"
 #include "topk.h"
 
 #include <cub/cub.cuh>
+
+#include <raft/core/detail/macros.hpp>
+#include <raft/core/error.hpp>
 
 #include <assert.h>
 #include <float.h>
@@ -25,7 +30,7 @@
 
 namespace cuvs::neighbors::cagra::detail {
 //
-__device__ inline uint32_t convert(uint32_t x)
+RAFT_DEVICE_INLINE_FUNCTION constexpr uint32_t convert(uint32_t x)
 {
   if (x & 0x80000000) {
     return x ^ 0xffffffff;
@@ -35,7 +40,7 @@ __device__ inline uint32_t convert(uint32_t x)
 }
 
 //
-__device__ inline uint16_t convert(uint16_t x)
+RAFT_DEVICE_INLINE_FUNCTION constexpr uint16_t convert(uint16_t x)
 {
   if (x & 0x8000) {
     return x ^ 0xffff;
@@ -62,7 +67,7 @@ struct u16_vector {
 
 //
 template <int vecLen>
-__device__ inline void load_u32_vector(struct u32_vector& vec, const uint32_t* x, int i)
+RAFT_DEVICE_INLINE_FUNCTION void load_u32_vector(struct u32_vector& vec, const uint32_t* x, int i)
 {
   if (vecLen == 1) {
     vec.x1 = ((uint1*)(x + i))[0];
@@ -77,7 +82,7 @@ __device__ inline void load_u32_vector(struct u32_vector& vec, const uint32_t* x
 
 //
 template <int vecLen>
-__device__ inline void load_u16_vector(struct u16_vector& vec, const uint16_t* x, int i)
+RAFT_DEVICE_INLINE_FUNCTION void load_u16_vector(struct u16_vector& vec, const uint16_t* x, int i)
 {
   if (vecLen == 1) {
     vec.x1 = ((ushort1*)(x + i))[0];
@@ -92,7 +97,7 @@ __device__ inline void load_u16_vector(struct u16_vector& vec, const uint16_t* x
 
 //
 template <int vecLen>
-__device__ inline uint32_t get_element_from_u32_vector(struct u32_vector& vec, int i)
+RAFT_DEVICE_INLINE_FUNCTION uint32_t get_element_from_u32_vector(struct u32_vector& vec, int i)
 {
   uint32_t xi;
   if (vecLen == 1) {
@@ -134,7 +139,7 @@ __device__ inline uint32_t get_element_from_u32_vector(struct u32_vector& vec, i
 
 //
 template <int vecLen>
-__device__ inline uint16_t get_element_from_u16_vector(struct u16_vector& vec, int i)
+RAFT_DEVICE_INLINE_FUNCTION uint16_t get_element_from_u16_vector(struct u16_vector& vec, int i)
 {
   uint16_t xi;
   if (vecLen == 1) {
@@ -175,7 +180,7 @@ __device__ inline uint16_t get_element_from_u16_vector(struct u16_vector& vec, i
 }
 
 template <typename T>
-__device__ inline void block_scan(const T input, T& output)
+RAFT_DEVICE_INLINE_FUNCTION void block_scan(const T input, T& output)
 {
   switch (blockDim.x) {
     case 32: {
@@ -214,19 +219,19 @@ __device__ inline void block_scan(const T input, T& output)
 
 //
 template <typename T, int stateBitLen, int vecLen>
-__device__ inline void update_histogram(int itr,
-                                        uint32_t thread_id,
-                                        uint32_t num_threads,
-                                        uint32_t hint,
-                                        uint32_t threshold,
-                                        uint32_t& num_bins,
-                                        uint32_t& shift,
-                                        const T* x,  // [nx,]
-                                        uint32_t nx,
-                                        uint32_t* hist,  // [num_bins]
-                                        uint8_t* state,
-                                        uint32_t* output,  // [topk]
-                                        uint32_t* output_count)
+RAFT_DEVICE_INLINE_FUNCTION void update_histogram(int itr,
+                                                  uint32_t thread_id,
+                                                  uint32_t num_threads,
+                                                  uint32_t hint,
+                                                  uint32_t threshold,
+                                                  uint32_t& num_bins,
+                                                  uint32_t& shift,
+                                                  const T* x,  // [nx,]
+                                                  uint32_t nx,
+                                                  uint32_t* hist,  // [num_bins]
+                                                  uint8_t* state,
+                                                  uint32_t* output,  // [topk]
+                                                  uint32_t* output_count)
 {
   if (sizeof(T) == 4) {
     // 32-bit (uint32_t)
@@ -324,15 +329,16 @@ __device__ inline void update_histogram(int itr,
 }
 
 template <unsigned blockDim_x>
-__device__ inline void select_best_index_for_next_threshold_core(uint32_t& my_index,
-                                                                 uint32_t& my_csum,
-                                                                 const unsigned num_bins,
-                                                                 const uint32_t* const hist,
-                                                                 const uint32_t nx_below_threshold,
-                                                                 const uint32_t max_threshold,
-                                                                 const uint32_t threshold,
-                                                                 const uint32_t shift,
-                                                                 const uint32_t topk)
+RAFT_DEVICE_INLINE_FUNCTION void select_best_index_for_next_threshold_core(
+  uint32_t& my_index,
+  uint32_t& my_csum,
+  const unsigned num_bins,
+  const uint32_t* const hist,
+  const uint32_t nx_below_threshold,
+  const uint32_t max_threshold,
+  const uint32_t threshold,
+  const uint32_t shift,
+  const uint32_t topk)
 {
   typedef cub::BlockScan<uint32_t, blockDim_x> BlockScanT;
   __shared__ typename BlockScanT::TempStorage temp_storage;
@@ -370,7 +376,7 @@ __device__ inline void select_best_index_for_next_threshold_core(uint32_t& my_in
 }
 
 //
-__device__ inline void select_best_index_for_next_threshold(
+RAFT_DEVICE_INLINE_FUNCTION void select_best_index_for_next_threshold(
   const uint32_t topk,
   const uint32_t threshold,
   const uint32_t max_threshold,
@@ -469,17 +475,17 @@ __device__ inline void select_best_index_for_next_threshold(
 
 //
 template <typename T, int stateBitLen, int vecLen>
-__device__ inline void output_index_below_threshold(const uint32_t topk,
-                                                    const uint32_t thread_id,
-                                                    const uint32_t num_threads,
-                                                    const uint32_t threshold,
-                                                    const uint32_t nx_below_threshold,
-                                                    const T* const x,  // [nx,]
-                                                    const uint32_t nx,
-                                                    const uint8_t* state,
-                                                    uint32_t* const output,  // [topk]
-                                                    uint32_t* const output_count,
-                                                    uint32_t* const output_count_eq)
+RAFT_DEVICE_INLINE_FUNCTION void output_index_below_threshold(const uint32_t topk,
+                                                              const uint32_t thread_id,
+                                                              const uint32_t num_threads,
+                                                              const uint32_t threshold,
+                                                              const uint32_t nx_below_threshold,
+                                                              const T* const x,  // [nx,]
+                                                              const uint32_t nx,
+                                                              const uint8_t* state,
+                                                              uint32_t* const output,  // [topk]
+                                                              uint32_t* const output_count,
+                                                              uint32_t* const output_count_eq)
 {
   int ii = 0;
   for (int i = thread_id * vecLen; i < nx; i += num_threads * max(vecLen, stateBitLen), ii++) {
@@ -530,7 +536,7 @@ __device__ inline void output_index_below_threshold(const uint32_t topk,
 
 //
 template <typename T>
-__device__ inline void swap(T& val1, T& val2)
+RAFT_DEVICE_INLINE_FUNCTION constexpr void swap(T& val1, T& val2)
 {
   const T val0 = val1;
   val1         = val2;
@@ -539,7 +545,7 @@ __device__ inline void swap(T& val1, T& val2)
 
 //
 template <typename K>
-__device__ inline bool swap_if_needed(K& key1, K& key2)
+RAFT_DEVICE_INLINE_FUNCTION constexpr bool swap_if_needed(K& key1, K& key2)
 {
   if (key1 > key2) {
     swap<K>(key1, key2);
@@ -550,7 +556,7 @@ __device__ inline bool swap_if_needed(K& key1, K& key2)
 
 //
 template <typename K, typename V>
-__device__ inline bool swap_if_needed(K& key1, K& key2, V& val1, V& val2)
+RAFT_DEVICE_INLINE_FUNCTION constexpr bool swap_if_needed(K& key1, K& key2, V& val1, V& val2)
 {
   if (key1 > key2) {
     swap<K>(key1, key2);
@@ -562,7 +568,8 @@ __device__ inline bool swap_if_needed(K& key1, K& key2, V& val1, V& val2)
 
 //
 template <typename K, typename V>
-__device__ inline bool swap_if_needed(K& key1, K& key2, V& val1, V& val2, bool ascending)
+RAFT_DEVICE_INLINE_FUNCTION constexpr bool swap_if_needed(
+  K& key1, K& key2, V& val1, V& val2, bool ascending)
 {
   if (key1 == key2) { return false; }
   if ((key1 > key2) == ascending) {
@@ -575,20 +582,20 @@ __device__ inline bool swap_if_needed(K& key1, K& key2, V& val1, V& val2, bool a
 
 //
 template <typename T>
-__device__ inline T max_value_of();
+RAFT_DEVICE_INLINE_FUNCTION T max_value_of();
 template <>
-__device__ inline float max_value_of<float>()
+RAFT_DEVICE_INLINE_FUNCTION float max_value_of<float>()
 {
   return FLT_MAX;
 }
 template <>
-__device__ inline uint32_t max_value_of<uint32_t>()
+RAFT_DEVICE_INLINE_FUNCTION uint32_t max_value_of<uint32_t>()
 {
   return ~0u;
 }
 
 template <int stateBitLen, unsigned BLOCK_SIZE = 0>
-__device__ __host__ inline uint32_t get_state_size(uint32_t len_x)
+RAFT_INLINE_FUNCTION constexpr uint32_t get_state_size(uint32_t len_x)
 {
 #ifdef __CUDA_ARCH__
   const uint32_t num_threads = blockDim.x;
@@ -605,16 +612,16 @@ __device__ __host__ inline uint32_t get_state_size(uint32_t len_x)
 
 //
 template <int stateBitLen, int vecLen, int maxTopk, int numSortThreads, class ValT>
-__device__ inline void topk_cta_11_core(uint32_t topk,
-                                        uint32_t len_x,
-                                        const uint32_t* _x,    // [size_batch, ld_x,]
-                                        const ValT* _in_vals,  // [size_batch, ld_iv,]
-                                        uint32_t* _y,          // [size_batch, ld_y,]
-                                        ValT* _out_vals,       // [size_batch, ld_ov,]
-                                        uint8_t* _state,       // [size_batch, ...,]
-                                        uint32_t* _hint,
-                                        bool sort,
-                                        uint32_t* _smem)
+RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
+                                                  uint32_t len_x,
+                                                  const uint32_t* _x,    // [size_batch, ld_x,]
+                                                  const ValT* _in_vals,  // [size_batch, ld_iv,]
+                                                  uint32_t* _y,          // [size_batch, ld_y,]
+                                                  ValT* _out_vals,       // [size_batch, ld_ov,]
+                                                  uint8_t* _state,       // [size_batch, ...,]
+                                                  uint32_t* _hint,
+                                                  bool sort,
+                                                  uint32_t* _smem)
 {
   uint32_t* const smem_out_vals = _smem;
   uint32_t* const hist          = &(_smem[2 * maxTopk]);
@@ -904,137 +911,4 @@ __launch_bounds__(1024, 1) RAFT_KERNEL
     _smem);
 }
 
-//
-size_t inline _cuann_find_topk_bufferSize(uint32_t topK,
-                                          uint32_t sizeBatch,
-                                          uint32_t numElements,
-                                          cudaDataType_t sampleDtype)
-{
-  constexpr int numThreads  = NUM_THREADS;
-  constexpr int stateBitLen = STATE_BIT_LENGTH;
-  assert(stateBitLen == 0 || stateBitLen == 8);
-
-  size_t workspaceSize = 1;
-  // state
-  if (stateBitLen == 8) {
-    workspaceSize = _cuann_aligned(
-      sizeof(uint8_t) * get_state_size<stateBitLen, numThreads>(numElements) * sizeBatch);
-  }
-
-  return workspaceSize;
-}
-
-template <class ValT>
-inline void _cuann_find_topk(uint32_t topK,
-                             uint32_t sizeBatch,
-                             uint32_t numElements,
-                             const float* inputKeys,  // [sizeBatch, ldIK,]
-                             uint32_t ldIK,           // (*) ldIK >= numElements
-                             const ValT* inputVals,   // [sizeBatch, ldIV,]
-                             uint32_t ldIV,           // (*) ldIV >= numElements
-                             float* outputKeys,       // [sizeBatch, ldOK,]
-                             uint32_t ldOK,           // (*) ldOK >= topK
-                             ValT* outputVals,        // [sizeBatch, ldOV,]
-                             uint32_t ldOV,           // (*) ldOV >= topK
-                             void* workspace,
-                             bool sort,
-                             uint32_t* hints,
-                             cudaStream_t stream)
-{
-  assert(ldIK >= numElements);
-  assert(ldIV >= numElements);
-  assert(ldOK >= topK);
-  assert(ldOV >= topK);
-
-  constexpr int numThreads  = NUM_THREADS;
-  constexpr int stateBitLen = STATE_BIT_LENGTH;
-  assert(stateBitLen == 0 || stateBitLen == 8);
-
-  uint8_t* state = NULL;
-  if (stateBitLen == 8) { state = (uint8_t*)workspace; }
-
-  dim3 threads(numThreads, 1, 1);
-  dim3 blocks(sizeBatch, 1, 1);
-
-  void (*cta_kernel)(uint32_t,
-                     uint32_t,
-                     uint32_t,
-                     const uint32_t*,
-                     uint32_t,
-                     const ValT*,
-                     uint32_t,
-                     uint32_t*,
-                     uint32_t,
-                     ValT*,
-                     uint32_t,
-                     uint8_t*,
-                     uint32_t*,
-                     bool) = nullptr;
-
-  // V:vecLen, K:maxTopk, T:numSortThreads
-#define SET_KERNEL_VKT(V, K, T, ValT)                          \
-  do {                                                         \
-    assert(numThreads >= T);                                   \
-    assert((K % T) == 0);                                      \
-    assert((K / T) <= 4);                                      \
-    cta_kernel = kern_topk_cta_11<stateBitLen, V, K, T, ValT>; \
-  } while (0)
-
-  // V: vecLen
-#define SET_KERNEL_V(V, ValT)                                \
-  do {                                                       \
-    if (topK <= 32) {                                        \
-      SET_KERNEL_VKT(V, 32, 32, ValT);                       \
-    } else if (topK <= 64) {                                 \
-      SET_KERNEL_VKT(V, 64, 32, ValT);                       \
-    } else if (topK <= 96) {                                 \
-      SET_KERNEL_VKT(V, 96, 32, ValT);                       \
-    } else if (topK <= 128) {                                \
-      SET_KERNEL_VKT(V, 128, 32, ValT);                      \
-    } else if (topK <= 192) {                                \
-      SET_KERNEL_VKT(V, 192, 64, ValT);                      \
-    } else if (topK <= 256) {                                \
-      SET_KERNEL_VKT(V, 256, 64, ValT);                      \
-    } else if (topK <= 384) {                                \
-      SET_KERNEL_VKT(V, 384, 128, ValT);                     \
-    } else if (topK <= 512) {                                \
-      SET_KERNEL_VKT(V, 512, 128, ValT);                     \
-    } else if (topK <= 768) {                                \
-      SET_KERNEL_VKT(V, 768, 256, ValT);                     \
-    } else if (topK <= 1024) {                               \
-      SET_KERNEL_VKT(V, 1024, 256, ValT);                    \
-    } \
-        /* else if (topK <= 1536) { SET_KERNEL_VKT(V, 1536, 512); } */ \
-        /* else if (topK <= 2048) { SET_KERNEL_VKT(V, 2048, 512); } */ \
-        /* else if (topK <= 3072) { SET_KERNEL_VKT(V, 3072, 1024); } */ \
-        /* else if (topK <= 4096) { SET_KERNEL_VKT(V, 4096, 1024); } */ \
-        else {                                                      \
-      RAFT_FAIL("topk must be lower than or equal to 1024"); \
-    }                                                        \
-  } while (0)
-
-  int _vecLen = _get_vecLen(ldIK, 2);
-  if (_vecLen == 2) {
-    SET_KERNEL_V(2, ValT);
-  } else if (_vecLen == 1) {
-    SET_KERNEL_V(1, ValT);
-  }
-
-  cta_kernel<<<blocks, threads, 0, stream>>>(topK,
-                                             sizeBatch,
-                                             numElements,
-                                             (const uint32_t*)inputKeys,
-                                             ldIK,
-                                             inputVals,
-                                             ldIV,
-                                             (uint32_t*)outputKeys,
-                                             ldOK,
-                                             outputVals,
-                                             ldOV,
-                                             state,
-                                             hints,
-                                             sort);
-
-  return;
-}
 }  // namespace cuvs::neighbors::cagra::detail

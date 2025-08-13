@@ -32,17 +32,17 @@ struct topk_by_radix_sort : topk_by_radix_sort_base<MAX_INTERNAL_TOPK> {};
 template <unsigned MAX_INTERNAL_TOPK, class IdxT>
 struct topk_by_radix_sort<MAX_INTERNAL_TOPK, IdxT, std::enable_if_t<((MAX_INTERNAL_TOPK <= 64))>>
   : topk_by_radix_sort_base<MAX_INTERNAL_TOPK> {
-  __device__ void operator()(uint32_t topk,
-                             uint32_t batch_size,
-                             uint32_t len_x,
-                             const uint32_t* _x,
-                             const IdxT* _in_vals,
-                             uint32_t* _y,
-                             IdxT* _out_vals,
-                             uint32_t* work,
-                             uint32_t* _hints,
-                             bool sort,
-                             uint32_t* _smem)
+  RAFT_DEVICE_INLINE_FUNCTION void operator()(uint32_t topk,
+                                              uint32_t batch_size,
+                                              uint32_t len_x,
+                                              const uint32_t* _x,
+                                              const IdxT* _in_vals,
+                                              uint32_t* _y,
+                                              IdxT* _out_vals,
+                                              uint32_t* work,
+                                              uint32_t* _hints,
+                                              bool sort,
+                                              uint32_t* _smem)
   {
     std::uint8_t* const state = reinterpret_cast<std::uint8_t*>(work);
     topk_cta_11_core<topk_by_radix_sort_base<MAX_INTERNAL_TOPK>::state_bit_lenght,
@@ -60,17 +60,17 @@ struct topk_by_radix_sort<MAX_INTERNAL_TOPK, IdxT, std::enable_if_t<((MAX_INTERN
     IdxT,                                                                            \
     std::enable_if_t<((MAX_INTERNAL_TOPK <= V) && (2 * MAX_INTERNAL_TOPK > V))>>     \
     : topk_by_radix_sort_base<MAX_INTERNAL_TOPK> {                                   \
-    __device__ void operator()(uint32_t topk,                                        \
-                               uint32_t batch_size,                                  \
-                               uint32_t len_x,                                       \
-                               const uint32_t* _x,                                   \
-                               const IdxT* _in_vals,                                 \
-                               uint32_t* _y,                                         \
-                               IdxT* _out_vals,                                      \
-                               uint32_t* work,                                       \
-                               uint32_t* _hints,                                     \
-                               bool sort,                                            \
-                               uint32_t* _smem)                                      \
+    RAFT_DEVICE_INLINE_FUNCTION void operator()(uint32_t topk,                       \
+                                                uint32_t batch_size,                 \
+                                                uint32_t len_x,                      \
+                                                const uint32_t* _x,                  \
+                                                const IdxT* _in_vals,                \
+                                                uint32_t* _y,                        \
+                                                IdxT* _out_vals,                     \
+                                                uint32_t* work,                      \
+                                                uint32_t* _hints,                    \
+                                                bool sort,                           \
+                                                uint32_t* _smem)                     \
     {                                                                                \
       assert(blockDim.x >= V / 4);                                                   \
       std::uint8_t* state = (std::uint8_t*)work;                                     \

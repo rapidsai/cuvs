@@ -12,9 +12,9 @@
 # the License.
 # =============================================================================
 
-cmake_minimum_required(VERSION 3.26.4 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
 
-include(../../rapids_config.cmake)
+include(cmake/rapids_config.cmake)
 include(rapids-cmake)
 include(rapids-cpm)
 include(rapids-export)
@@ -57,7 +57,7 @@ if(NOT cuvs_FOUND)
   add_subdirectory(../../cpp cuvs-cpp EXCLUDE_FROM_ALL)
 endif()
 
-include(../../cpp/cmake/thirdparty/get_dlpack.cmake)
+include(get_dlpack.cmake)
 
 # add a dummy target here,
 add_library(cuvs-rust INTERFACE)

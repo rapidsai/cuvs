@@ -14,8 +14,12 @@
 
 add_subdirectory(brute_force)
 add_subdirectory(cagra)
+add_subdirectory(hnsw)
 add_subdirectory(ivf_flat)
 add_subdirectory(ivf_pq)
+add_subdirectory(filters)
+add_subdirectory(nn_descent)
+add_subdirectory(tiered_index)
 
 # Set the list of Cython files to build
 set(cython_sources refine.pyx)
@@ -25,5 +29,5 @@ set(linked_libraries cuvs::cuvs cuvs::c_api)
 rapids_cython_create_modules(
   CXX
   SOURCE_FILES "${cython_sources}"
-  LINKED_LIBRARIES "${linked_libraries}" ASSOCIATED_TARGETS cuvs MODULE_PREFIX neighbors_refine_
+  LINKED_LIBRARIES "${linked_libraries}" MODULE_PREFIX neighbors_refine_
 )

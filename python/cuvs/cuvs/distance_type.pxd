@@ -38,4 +38,5 @@ cdef extern from "cuvs/distance/distance.h" nogil:
         KLDivergence
         RusselRaoExpanded
         DiceExpanded
+        BitwiseHamming
         Precomputed

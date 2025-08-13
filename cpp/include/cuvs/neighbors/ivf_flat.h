@@ -18,6 +18,7 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.h>
+#include <cuvs/neighbors/common.h>
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -163,6 +164,25 @@ cuvsError_t cuvsIvfFlatIndexCreate(cuvsIvfFlatIndex_t* index);
  * @param[in] index cuvsIvfFlatIndex_t to de-allocate
  */
 cuvsError_t cuvsIvfFlatIndexDestroy(cuvsIvfFlatIndex_t index);
+
+/** Get the number of clusters/inverted lists */
+uint32_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index);
+
+/** Get the dimensionality of the data */
+uint32_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index);
+
+/**
+ * @brief Get the cluster centers corresponding to the lists [n_lists, dim]
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] index cuvsIvfFlatIndex_t Built Ivf-Flat Index
+ * @param[out] centers Preallocated array on host or device memory to store output, [n_lists, dim]
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsResources_t res,
+                                       cuvsIvfFlatIndex_t index,
+                                       DLManagedTensor* centers);
+
 /**
  * @}
  */
@@ -267,13 +287,17 @@ cuvsError_t cuvsIvfFlatBuild(cuvsResources_t res,
  * @param[in] queries DLManagedTensor* queries dataset to search
  * @param[out] neighbors DLManagedTensor* output `k` neighbors for queries
  * @param[out] distances DLManagedTensor* output `k` distances for queries
+ * @param[in] filter cuvsFilter input filter that can be used
+              to filter queries and neighbors based on the given bitset.
  */
 cuvsError_t cuvsIvfFlatSearch(cuvsResources_t res,
                               cuvsIvfFlatSearchParams_t search_params,
                               cuvsIvfFlatIndex_t index,
                               DLManagedTensor* queries,
                               DLManagedTensor* neighbors,
-                              DLManagedTensor* distances);
+                              DLManagedTensor* distances,
+                              cuvsFilter filter);
+
 /**
  * @}
  */
@@ -322,6 +346,26 @@ cuvsError_t cuvsIvfFlatDeserialize(cuvsResources_t res,
  * @}
  */
 
+/**
+ * @defgroup ivf_flat_c_index_extend IVF-Flat index extend
+ * @{
+ */
+/**
+ * @brief Extend the index with the new data.
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] new_vectors DLManagedTensor* the new vectors to add to the index
+ * @param[in] new_indices DLManagedTensor* vector of new indices for the new vectors
+ * @param[inout] index IVF-Flat index to be extended
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfFlatExtend(cuvsResources_t res,
+                              DLManagedTensor* new_vectors,
+                              DLManagedTensor* new_indices,
+                              cuvsIvfFlatIndex_t index);
+/**
+ * @}
+ */
 #ifdef __cplusplus
 }
 #endif

@@ -21,6 +21,7 @@ from libcpp cimport bool
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
 from cuvs.distance_type cimport cuvsDistanceType
+from cuvs.neighbors.filters.filters cimport cuvsFilter
 
 
 cdef extern from "cuvs/neighbors/ivf_flat.h" nogil:
@@ -61,6 +62,14 @@ cdef extern from "cuvs/neighbors/ivf_flat.h" nogil:
 
     cuvsError_t cuvsIvfFlatIndexDestroy(cuvsIvfFlatIndex_t index)
 
+    uint32_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index)
+
+    uint32_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index)
+
+    cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsResources_t res,
+                                           cuvsIvfFlatIndex_t index,
+                                           DLManagedTensor * centers)
+
     cuvsError_t cuvsIvfFlatBuild(cuvsResources_t res,
                                  cuvsIvfFlatIndexParams* params,
                                  DLManagedTensor* dataset,
@@ -71,7 +80,8 @@ cdef extern from "cuvs/neighbors/ivf_flat.h" nogil:
                                   cuvsIvfFlatIndex_t index,
                                   DLManagedTensor* queries,
                                   DLManagedTensor* neighbors,
-                                  DLManagedTensor* distances) except +
+                                  DLManagedTensor* distances,
+                                  cuvsFilter filter) except +
 
     cuvsError_t cuvsIvfFlatSerialize(cuvsResources_t res,
                                      const char * filename,
@@ -80,3 +90,8 @@ cdef extern from "cuvs/neighbors/ivf_flat.h" nogil:
     cuvsError_t cuvsIvfFlatDeserialize(cuvsResources_t res,
                                        const char * filename,
                                        cuvsIvfFlatIndex_t index) except +
+
+    cuvsError_t cuvsIvfFlatExtend(cuvsResources_t res,
+                                  DLManagedTensor* new_vectors,
+                                  DLManagedTensor* new_indices,
+                                  cuvsIvfFlatIndex_t index)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,12 +18,16 @@
 #include "ann_types.hpp"
 #include "cuda_stub.hpp"  // cuda-related utils
 
-#ifdef ANN_BENCH_NVTX3_HEADERS_FOUND
+#if __has_include(<nvtx3/nvToolsExt.h>)
+#define ANN_BENCH_NVTX3_HEADERS_FOUND
 #include <nvtx3/nvToolsExt.h>
 #endif
 
+#include <sched.h>  // sched_getaffinity
 #include <sys/stat.h>
+#include <sys/sysinfo.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include <atomic>
 #include <chrono>
@@ -32,9 +36,11 @@
 #include <cstring>
 #include <ctime>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -193,42 +199,71 @@ inline auto get_stream_from_global_pool() -> cudaStream_t
 #endif
 }
 
-struct result_buffer {
-  explicit result_buffer(size_t size, cudaStream_t stream) : size_{size}, stream_{stream}
+/** The workspace buffer for use thread-locally. */
+struct ws_buffer {
+  explicit ws_buffer(size_t size, cudaStream_t stream) : size_{size}, stream_{stream} {}
+  ws_buffer()                                    = delete;
+  ws_buffer(ws_buffer&&)                         = delete;
+  auto operator=(ws_buffer&&) -> ws_buffer&      = delete;
+  ws_buffer(const ws_buffer&)                    = delete;
+  auto operator=(const ws_buffer&) -> ws_buffer& = delete;
+  ~ws_buffer() noexcept
   {
-    if (size_ == 0) { return; }
-    data_host_ = malloc(size_);
 #ifndef BUILD_CPU_ONLY
-    cudaMallocAsync(&data_device_, size_, stream_);
-    cudaStreamSynchronize(stream_);
+    if (data_device_ != nullptr) {
+      cudaFreeAsync(data_device_, stream_);
+      cudaStreamSynchronize(stream_);
+    }
+    if (data_host_ != nullptr) { cudaFreeHost(data_host_); }
+#else
+    if (data_host_ != nullptr) { free(data_host_); }
 #endif
-  }
-  result_buffer()                                        = delete;
-  result_buffer(result_buffer&&)                         = delete;
-  auto operator=(result_buffer&&) -> result_buffer&      = delete;
-  result_buffer(const result_buffer&)                    = delete;
-  auto operator=(const result_buffer&) -> result_buffer& = delete;
-  ~result_buffer() noexcept
-  {
-    if (size_ == 0) { return; }
-#ifndef BUILD_CPU_ONLY
-    cudaFreeAsync(data_device_, stream_);
-    cudaStreamSynchronize(stream_);
-#endif
-    free(data_host_);
   }
 
   [[nodiscard]] auto size() const noexcept { return size_; }
-  [[nodiscard]] auto data(MemoryType loc) const noexcept
+  [[nodiscard]] auto data(MemoryType loc) const noexcept -> void*
   {
+    if (size_ == 0) { return nullptr; }
     switch (loc) {
-      case MemoryType::kDevice: return data_device_;
-      default: return data_host_;
+#ifndef BUILD_CPU_ONLY
+      case MemoryType::kDevice: {
+        if (data_device_ == nullptr) {
+          cudaMallocAsync(&data_device_, size_, stream_);
+          cudaStreamSynchronize(stream_);
+          needs_cleanup_device_ = false;
+        } else if (needs_cleanup_device_) {
+          cudaMemsetAsync(data_device_, 0, size_, stream_);
+          cudaStreamSynchronize(stream_);
+          needs_cleanup_device_ = false;
+        }
+        return data_device_;
+      }
+#endif
+      default: {
+        if (data_host_ == nullptr) {
+#ifndef BUILD_CPU_ONLY
+          cudaMallocHost(&data_host_, size_);
+#else
+          data_host_ = malloc(size_);
+#endif
+          needs_cleanup_host_ = false;
+        } else if (needs_cleanup_host_) {
+          memset(data_host_, 0, size_);
+          needs_cleanup_host_ = false;
+        }
+        return data_host_;
+      }
     }
   }
 
   void transfer_data(MemoryType dst, MemoryType src)
   {
+    // The destination is overwritten and thus does not need cleanup
+    if (dst == MemoryType::kDevice) {
+      needs_cleanup_device_ = false;
+    } else {
+      needs_cleanup_host_ = false;
+    }
     auto dst_ptr = data(dst);
     auto src_ptr = data(src);
     if (dst_ptr == src_ptr) { return; }
@@ -238,15 +273,25 @@ struct result_buffer {
 #endif
   }
 
+  /** Mark the buffer for reuse - it needs to be cleared to make sure the previous results are not
+   * leaked to the new iteration. */
+  void reuse()
+  {
+    needs_cleanup_host_   = true;
+    needs_cleanup_device_ = true;
+  }
+
  private:
   size_t size_{0};
-  cudaStream_t stream_ = nullptr;
-  void* data_host_     = nullptr;
-  void* data_device_   = nullptr;
+  cudaStream_t stream_               = nullptr;
+  mutable void* data_host_           = nullptr;
+  mutable void* data_device_         = nullptr;
+  mutable bool needs_cleanup_host_   = false;
+  mutable bool needs_cleanup_device_ = false;
 };
 
 namespace detail {
-inline std::vector<std::unique_ptr<result_buffer>> global_result_buffer_pool(0);
+inline std::vector<std::unique_ptr<ws_buffer>> global_result_buffer_pool(0);
 inline std::mutex grp_mutex;
 }  // namespace detail
 
@@ -257,24 +302,47 @@ inline std::mutex grp_mutex;
  * This reduces the setup overhead and number of times the context is being blocked
  * (this is relevant if there is a persistent kernel running across multiples benchmark cases).
  */
-inline auto get_result_buffer_from_global_pool(size_t size) -> result_buffer&
+inline auto get_result_buffer_from_global_pool(size_t size) -> ws_buffer&
 {
   auto stream = get_stream_from_global_pool();
-  auto& rb    = [stream, size]() -> result_buffer& {
+  auto& rb    = [stream, size]() -> ws_buffer& {
     std::lock_guard guard(detail::grp_mutex);
     if (static_cast<int>(detail::global_result_buffer_pool.size()) < benchmark_n_threads) {
       detail::global_result_buffer_pool.resize(benchmark_n_threads);
     }
     auto& rb = detail::global_result_buffer_pool[benchmark_thread_id];
-    if (!rb || rb->size() < size) { rb = std::make_unique<result_buffer>(size, stream); }
+    if (!rb || rb->size() < size) {
+      rb = std::make_unique<ws_buffer>(size, stream);
+    } else {
+      rb->reuse();
+    }
     return *rb;
   }();
+  return rb;
+}
 
-  memset(rb.data(MemoryType::kHost), 0, size);
-#ifndef BUILD_CPU_ONLY
-  cudaMemsetAsync(rb.data(MemoryType::kDevice), 0, size, stream);
-  cudaStreamSynchronize(stream);
-#endif
+namespace detail {
+inline std::vector<std::unique_ptr<ws_buffer>> global_tmp_buffer_pool(0);
+inline std::mutex gtp_mutex;
+}  // namespace detail
+
+/**
+ * Global temporary buffer pool for use by algorithms.
+ * In contrast to `get_result_buffer_from_global_pool`, the content of these buffers is never
+ * initialized.
+ */
+inline auto get_tmp_buffer_from_global_pool(size_t size) -> ws_buffer&
+{
+  auto stream = get_stream_from_global_pool();
+  auto& rb    = [stream, size]() -> ws_buffer& {
+    std::lock_guard guard(detail::gtp_mutex);
+    if (static_cast<int>(detail::global_tmp_buffer_pool.size()) < benchmark_n_threads) {
+      detail::global_tmp_buffer_pool.resize(benchmark_n_threads);
+    }
+    auto& rb = detail::global_tmp_buffer_pool[benchmark_thread_id];
+    if (!rb || rb->size() < size) { rb = std::make_unique<ws_buffer>(size, stream); }
+    return *rb;
+  }();
   return rb;
 }
 
@@ -288,9 +356,70 @@ inline void reset_global_device_resources()
 {
 #ifndef BUILD_CPU_ONLY
   std::lock_guard guard(detail::gsp_mutex);
+  detail::global_tmp_buffer_pool.resize(0);
   detail::global_result_buffer_pool.resize(0);
   detail::global_stream_pool.resize(0);
 #endif
+}
+
+inline auto host_info()
+{
+  std::vector<std::tuple<std::string, std::string>> props;
+
+  // Memory info
+  auto page_size = sysconf(_SC_PAGE_SIZE);
+  props.emplace_back("host_pagesize", std::to_string(page_size));
+
+  struct sysinfo sys_info;
+  if (sysinfo(&sys_info) != -1) {
+    props.emplace_back("host_total_ram_size",
+                       std::to_string(size_t(sys_info.totalram) * size_t(sys_info.mem_unit)));
+    props.emplace_back("host_total_swap_size",
+                       std::to_string(size_t(sys_info.totalswap) * size_t(sys_info.mem_unit)));
+  }
+
+  // CPU info
+  int host_processors_configured = sysconf(_SC_NPROCESSORS_CONF);
+  props.emplace_back("host_processors_sysconf", std::to_string(host_processors_configured));
+  std::vector<uint8_t> affinity_mask_buf(CPU_ALLOC_SIZE(host_processors_configured));
+  cpu_set_t* affinity_mask = reinterpret_cast<cpu_set_t*>(affinity_mask_buf.data());
+  sched_getaffinity(0, affinity_mask_buf.size(), affinity_mask);
+  uint64_t cpu_freq_min    = 0;
+  uint64_t cpu_freq_max    = 0;
+  int host_processors_used = 0;
+  int host_cores_used      = 0;
+  std::set<std::pair<int, int>> host_cores_selected{};  // pairs of (socket_id, core_id)
+  for (int cpu_id = 0; cpu_id < host_processors_configured; cpu_id++) {
+    if (CPU_ISSET_S(cpu_id, affinity_mask_buf.size(), affinity_mask) == 0) { continue; }
+    host_processors_used++;
+    std::string cpu_fpath = "/sys/devices/system/cpu/cpu" + std::to_string(cpu_id);
+    if (!std::filesystem::exists(cpu_fpath)) { continue; }
+
+    int this_cpu_core          = 0;
+    int this_cpu_package       = 0;
+    uint64_t this_cpu_freq_min = 0;
+    uint64_t this_cpu_freq_max = 0;
+    std::ifstream(cpu_fpath + "/topology/core_id") >> this_cpu_core;
+    std::ifstream(cpu_fpath + "/topology/physical_package_id") >> this_cpu_package;
+    std::ifstream(cpu_fpath + "/cpufreq/scaling_min_freq") >> this_cpu_freq_min;
+    std::ifstream(cpu_fpath + "/cpufreq/scaling_max_freq") >> this_cpu_freq_max;
+    host_cores_selected.insert(std::make_pair(this_cpu_package, this_cpu_core));
+    cpu_freq_min = cpu_freq_min == 0
+                     ? (this_cpu_freq_min * 1000ull)
+                     : std::min<uint64_t>(this_cpu_freq_min * 1000ull, cpu_freq_min);
+    cpu_freq_max = std::max<uint64_t>(this_cpu_freq_max * 1000ull, cpu_freq_max);
+  }
+  host_cores_used = host_cores_selected.size();
+  if (host_processors_used != 0) {
+    props.emplace_back("host_processors_used", std::to_string(host_processors_used));
+  }
+  if (host_cores_used != 0) {
+    props.emplace_back("host_cores_used", std::to_string(host_cores_used));
+  }
+  if (cpu_freq_min != 0) { props.emplace_back("host_cpu_freq_min", std::to_string(cpu_freq_min)); }
+  if (cpu_freq_max != 0) { props.emplace_back("host_cpu_freq_max", std::to_string(cpu_freq_max)); }
+
+  return props;
 }
 
 inline auto cuda_info()
@@ -302,8 +431,21 @@ inline auto cuda_info()
   cudaRuntimeGetVersion(&runtime);
 
   cudaDeviceProp device_prop;
-  cudaGetDevice(&dev);
-  cudaGetDeviceProperties(&device_prop, dev);
+  auto err_code = cudaGetDevice(&dev);
+  if (err_code == cudaErrorNoDevice || err_code == cudaErrorInvalidDevice) {
+    throw std::runtime_error{"cuda_info: call to cudaGetDevice failed with code " +
+                             std::to_string(err_code) +
+                             ". If you are running on a CPU-only machine, please "
+                             "use the CPU package instead."};
+  } else if (err_code != cudaSuccess) {
+    throw std::runtime_error{"cuda_info: call to cudaGetDevice failed with code " +
+                             std::to_string(err_code)};
+  }
+  err_code = cudaGetDeviceProperties(&device_prop, dev);
+  if (err_code != cudaSuccess) {
+    throw std::runtime_error{"cuda_info: call to cudaGetDeviceProperties failed with code " +
+                             std::to_string(err_code)};
+  }
   props.emplace_back("gpu_name", std::string(device_prop.name));
   props.emplace_back("gpu_sm_count", std::to_string(device_prop.multiProcessorCount));
   props.emplace_back("gpu_sm_freq", std::to_string(device_prop.clockRate * 1e3));
@@ -315,6 +457,13 @@ inline auto cuda_info()
                      std::to_string(driver / 1000) + "." + std::to_string((driver % 100) / 10));
   props.emplace_back("gpu_runtime_version",
                      std::to_string(runtime / 1000) + "." + std::to_string((runtime % 100) / 10));
+  props.emplace_back("gpu_hostNativeAtomicSupported",
+                     std::to_string(device_prop.hostNativeAtomicSupported));
+  props.emplace_back("gpu_pageableMemoryAccess", std::to_string(device_prop.pageableMemoryAccess));
+  props.emplace_back("gpu_pageableMemoryAccessUsesHostPageTables",
+                     std::to_string(device_prop.pageableMemoryAccessUsesHostPageTables));
+  props.emplace_back("gpu_gpuDirectRDMASupported",
+                     std::to_string(device_prop.gpuDirectRDMASupported));
 #endif
   return props;
 }

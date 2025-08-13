@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -86,7 +86,6 @@ inline MdspanType from_dlpack(DLManagedTensor* managed_tensor)
   RAFT_EXPECTS(to_data_type.lanes == tensor.dtype.lanes,
                "lanes mismatch between return mdspan and DLTensor");
   RAFT_EXPECTS(tensor.dtype.lanes == 1, "More than 1 DLTensor lanes not supported");
-  RAFT_EXPECTS(tensor.strides == nullptr, "Strided memory layout for DLTensor not supported");
 
   auto to_device = accessor_type_to_DLDevice<typename MdspanType::accessor_type>();
   if (to_device.device_type == kDLCUDA) {
@@ -110,4 +109,70 @@ inline MdspanType from_dlpack(DLManagedTensor* managed_tensor)
   return MdspanType{reinterpret_cast<typename MdspanType::data_handle_type>(tensor.data), exts};
 }
 
+inline bool is_f_contiguous(DLManagedTensor* managed_tensor)
+{
+  auto tensor = managed_tensor->dl_tensor;
+
+  if (!tensor.strides) { return false; }
+  int64_t expected_stride = 1;
+  for (int64_t i = 0; i < tensor.ndim; ++i) {
+    if (tensor.strides[i] != expected_stride) { return false; }
+    expected_stride *= tensor.shape[i];
+  }
+
+  return true;
+}
+
+inline bool is_c_contiguous(DLManagedTensor* managed_tensor)
+{
+  auto tensor = managed_tensor->dl_tensor;
+
+  if (!tensor.strides) {
+    // no stride information indicates a row-major tensor according to the dlpack spec
+    return true;
+  }
+
+  int64_t expected_stride = 1;
+  for (int64_t i = tensor.ndim - 1; i >= 0; --i) {
+    if (tensor.strides[i] != expected_stride) { return false; }
+    expected_stride *= tensor.shape[i];
+  }
+
+  return true;
+}
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+static void free_dlmanaged_tensor_metadata(DLManagedTensor* tensor)
+{
+  delete[] tensor->dl_tensor.shape;
+  delete[] tensor->dl_tensor.strides;
+}
+#pragma GCC diagnostic pop
+
+template <typename MdspanType, typename = raft::is_mdspan_t<MdspanType>>
+static void to_dlpack(MdspanType src, DLManagedTensor* dst)
+{
+  auto tensor = &dst->dl_tensor;
+
+  tensor->dtype  = data_type_to_DLDataType<typename MdspanType::value_type>();
+  tensor->device = accessor_type_to_DLDevice<typename MdspanType::accessor_type>();
+  tensor->ndim   = MdspanType::extents_type::rank();
+  tensor->data   = const_cast<typename MdspanType::value_type*>(src.data_handle());
+  tensor->shape  = new int64_t[tensor->ndim];
+  for (int64_t i = 0; i < tensor->ndim; ++i) {
+    tensor->shape[i] = src.extent(i);
+  }
+
+  if constexpr (std::is_same_v<typename MdspanType::layout_type, raft::row_major>) {
+    tensor->strides = nullptr;
+  } else {
+    tensor->strides = new int64_t[tensor->ndim];
+    for (int64_t i = 0; i < tensor->ndim; ++i) {
+      tensor->strides[i] = src.stride(i);
+    }
+  }
+
+  dst->deleter = free_dlmanaged_tensor_metadata;
+}
 }  // namespace cuvs::core::detail

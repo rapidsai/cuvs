@@ -58,8 +58,8 @@ template <typename DataT,
           bool isRowMajor>
 std::enable_if_t<ops::has_cutlass_op<OpT>::value> cutlassDistanceKernel(const DataT* x,
                                                                         const DataT* y,
-                                                                        const DataT* xn,
-                                                                        const DataT* yn,
+                                                                        const OutT* xn,
+                                                                        const OutT* yn,
                                                                         IdxT m,
                                                                         IdxT n,
                                                                         IdxT k,
@@ -77,12 +77,12 @@ std::enable_if_t<ops::has_cutlass_op<OpT>::value> cutlassDistanceKernel(const Da
   auto dist_op     = distance_op.get_cutlass_op();
   using DistanceFn = decltype(dist_op);
   using EpilogueOutputOp =
-    epilogue::thread::PairwiseDistanceEpilogueElementwise<DataT,  // ElementC_
-                                                          AccT,   // ElementAccumulator_
-                                                          DataT,  // ElementCompute_
-                                                          AccT,   // ElementZ_
-                                                          OutT,   // ElementT_
-                                                          1,      // Elements per access 1
+    epilogue::thread::PairwiseDistanceEpilogueElementwise<OutT,  // ElementC_
+                                                          AccT,  // ElementAccumulator_
+                                                          AccT,  // ElementCompute_
+                                                          OutT,  // ElementZ_
+                                                          OutT,  // ElementT_
+                                                          1,     // Elements per access 1
                                                           DistanceFn,
                                                           FinalLambda>;
   constexpr int batch_count = 1;
@@ -143,13 +143,13 @@ std::enable_if_t<ops::has_cutlass_op<OpT>::value> cutlassDistanceKernel(const Da
       epilog_op_param,
       a,
       b,
-      xn,                    // C matrix eq vector param, which here is A norm
-      nullptr,               // tensor_Z,
-      (DataT*)yn + offsetN,  // this is broadcast vec, which is required to be non-const param
-      dOutput + offsetN,     // Output distance matrix
-      (int64_t)0,            // batch stride A
-      (int64_t)0,            // batch stride B
-      (int64_t)0,            // batch stride Norm A
+      xn,                   // C matrix eq vector param, which here is A norm
+      nullptr,              // tensor_Z,
+      (OutT*)yn + offsetN,  // this is broadcast vec, which is required to be non-const param
+      dOutput + offsetN,    // Output distance matrix
+      (int64_t)0,           // batch stride A
+      (int64_t)0,           // batch stride B
+      (int64_t)0,           // batch stride Norm A
       (int64_t)0,
       (int64_t)0,  // batch stride Norm B
       (int64_t)0,  // batch stride Output

@@ -7,7 +7,7 @@ The bruteforce method is running the KNN algorithm. It performs an extensive sea
    :language: c++
    :class: highlight
 
-``#include <cuvs/neighbors/bruteforce.hpp>``
+``#include <cuvs/neighbors/brute_force.hpp>``
 
 namespace *cuvs::neighbors::bruteforce*
 
@@ -31,6 +31,14 @@ Index search
 ------------
 
 .. doxygengroup:: bruteforce_cpp_index_search
+    :project: cuvs
+    :members:
+    :content-only:
+
+Index serialize
+---------------
+
+.. doxygengroup:: bruteforce_cpp_index_serialize
     :project: cuvs
     :members:
     :content-only:

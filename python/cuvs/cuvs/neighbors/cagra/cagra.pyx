@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,14 +28,20 @@ from libcpp cimport bool, cast
 from libcpp.string cimport string
 
 from cuvs.common cimport cydlpack
+from cuvs.common.device_tensor_view import DeviceTensorView
+from cuvs.distance_type cimport cuvsDistanceType
 
 from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
-from pylibraft.neighbors.common import _check_input_array
+
+from cuvs.common.cydlpack import dl_data_type_to_numpy
+from cuvs.distance import DISTANCE_NAMES, DISTANCE_TYPES
+from cuvs.neighbors.common import _check_input_array
 
 from libc.stdint cimport (
     int8_t,
+    int32_t,
     int64_t,
     uint8_t,
     uint32_t,
@@ -44,6 +50,8 @@ from libc.stdint cimport (
 )
 
 from cuvs.common.exceptions import check_cuvs
+from cuvs.neighbors import ivf_pq
+from cuvs.neighbors.filters import no_filter
 
 
 cdef class CompressionParams:
@@ -129,33 +137,49 @@ cdef class IndexParams:
     Parameters
     ----------
     metric : string denoting the metric type, default="sqeuclidean"
-        Valid values for metric: ["sqeuclidean"], where
+        Valid values for metric: ["sqeuclidean", "inner_product"], where
             - sqeuclidean is the euclidean distance without the square root
               operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2
+            - inner_product distance is defined as
+              distance(a, b) = \\sum_i a_i * b_i.
     intermediate_graph_degree : int, default = 128
 
     graph_degree : int, default = 64
 
     build_algo: string denoting the graph building algorithm to use, \
                 default = "ivf_pq"
-        Valid values for algo: ["ivf_pq", "nn_descent"], where
+        Valid values for algo: ["ivf_pq", "nn_descent",
+                                "iterative_cagra_search"], where
             - ivf_pq will use the IVF-PQ algorithm for building the knn graph
             - nn_descent (experimental) will use the NN-Descent algorithm for
               building the knn graph. It is expected to be generally
               faster than ivf_pq.
+            - iterative_cagra_search will iteratively build the knn graph using
+              CAGRA's search() and optimize()
     compression: CompressionParams, optional
         If compression is desired should be a CompressionParams object. If None
         compression will be disabled.
+    ivf_pq_build_params: cuvs.neighbors.ivf_pq.IndexParams, optional
+        Parameters for IVF-PQ algorithm. If provided, it will be used for
+        building the graph.
+    ivf_pq_search_params: cuvs.neighbors.ivf_pq.SearchParams, optional
+        Parameters for IVF-PQ search. If provided, it will be used for
+        searching the graph.
+    refinement_rate: float, default = 1.0
     """
 
     cdef cuvsCagraIndexParams* params
 
     # hold on to a reference to the compression, to keep from being GC'ed
     cdef public object compression
+    cdef public object ivf_pq_build_params
+    cdef public object ivf_pq_search_params
 
     def __cinit__(self):
         check_cuvs(cuvsCagraIndexParamsCreate(&self.params))
         self.compression = None
+        self.ivf_pq_build_params = None
+        self.ivf_pq_search_params = None
 
     def __dealloc__(self):
         check_cuvs(cuvsCagraIndexParamsDestroy(self.params))
@@ -166,27 +190,49 @@ cdef class IndexParams:
                  graph_degree=64,
                  build_algo="ivf_pq",
                  nn_descent_niter=20,
-                 compression=None):
+                 compression=None,
+                 ivf_pq_build_params: ivf_pq.IndexParams = None,
+                 ivf_pq_search_params: ivf_pq.SearchParams = None,
+                 refinement_rate: float = 1.0):
 
-        # todo (dgd): enable once other metrics are present
-        # and exposed in cuVS C API
-        # self.params.metric = _get_metric(metric)
-        # self.params.metric_arg = 0
+        self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
         self.params.intermediate_graph_degree = intermediate_graph_degree
         self.params.graph_degree = graph_degree
         if build_algo == "ivf_pq":
             self.params.build_algo = cuvsCagraGraphBuildAlgo.IVF_PQ
         elif build_algo == "nn_descent":
             self.params.build_algo = cuvsCagraGraphBuildAlgo.NN_DESCENT
+        elif build_algo == "iterative_cagra_search":
+            self.params.build_algo = \
+                cuvsCagraGraphBuildAlgo.ITERATIVE_CAGRA_SEARCH
+        else:
+            raise ValueError(f"Unknown build_algo '{build_algo}'")
+
         self.params.nn_descent_niter = nn_descent_niter
         if compression is not None:
             self.compression = compression
             self.params.compression = \
                 <cuvsCagraCompressionParams_t><size_t>compression.get_handle()
+        if ivf_pq_build_params is not None:
+            if ivf_pq_build_params.metric != self.metric:
+                raise ValueError("Metric mismatch with IVF-PQ build params")
+            self.ivf_pq_build_params = ivf_pq_build_params
+            self.params.graph_build_params.ivf_pq_build_params = \
+                <cuvsIvfPqIndexParams_t><size_t> \
+                ivf_pq_build_params.get_handle()
+        if ivf_pq_search_params is not None:
+            self.ivf_pq_search_params = ivf_pq_search_params
+            self.params.graph_build_params.ivf_pq_search_params = \
+                <cuvsIvfPqSearchParams_t><size_t> \
+                ivf_pq_search_params.get_handle()
+        self.params.graph_build_params.refinement_rate = refinement_rate
 
-    # @property
-    # def metric(self):
-        # return self.params.metric
+    def get_handle(self):
+        return <size_t> self.params
+
+    @property
+    def metric(self):
+        return DISTANCE_NAMES[self.params.metric]
 
     @property
     def intermediate_graph_degree(self):
@@ -204,18 +250,15 @@ cdef class IndexParams:
     def nn_descent_niter(self):
         return self.params.nn_descent_niter
 
+    @property
+    def refinement_rate(self):
+        return self.params.graph_build_params.refinement_rate
+
 
 cdef class Index:
-    """
-    CAGRA index object. This object stores the trained CAGRA index state
-    which can be used to perform nearest neighbors searches.
-    """
-
-    cdef cuvsCagraIndex_t index
-    cdef bool trained
-
     def __cinit__(self):
         self.trained = False
+        self.active_index_type = None
         check_cuvs(cuvsCagraIndexCreate(&self.index))
 
     def __dealloc__(self):
@@ -225,6 +268,57 @@ cdef class Index:
     @property
     def trained(self):
         return self.trained
+
+    @property
+    def dim(self):
+        cdef int32_t dim
+        check_cuvs(cuvsCagraIndexGetDims(self.index, &dim))
+        return dim
+
+    @property
+    def graph_degree(self):
+        cdef uint32_t degree
+        check_cuvs(cuvsCagraIndexGetGraphDegree(self.index, &degree))
+        return degree
+
+    def __len__(self):
+        cdef uint32_t size
+        check_cuvs(cuvsCagraIndexGetSize(self.index, &size))
+        return size
+
+    @property
+    def dtype(self):
+        return dl_data_type_to_numpy(self.index.dtype)
+
+    @property
+    def dataset(self):
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting dataset")
+
+        # get the cagra dataset from the index without copying as dlpack
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsCagraIndexGetDataset(self.index, tensor))
+
+        # since we're referencing memory internal to this cagra index in the
+        # output view, keep the cagra index alive as long as the output view
+        # is to avoid segfaulting
+        output.parent = self
+
+        return output
+
+    @property
+    def graph(self):
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting graph")
+
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsCagraIndexGetGraph(self.index, tensor))
+        output.parent = self
+        return output
 
     def __repr__(self):
         # todo(dgd): update repr as we expose data through C API
@@ -246,6 +340,7 @@ def build(IndexParams index_params, dataset, resources=None):
 
     The following distance metrics are supported:
         - L2
+        - InnerProduct
 
     Parameters
     ----------
@@ -281,7 +376,9 @@ def build(IndexParams index_params, dataset, resources=None):
     # todo(dgd): we can make the check of dtype a parameter of wrap_array
     # in RAFT to make this a single call
     dataset_ai = wrap_array(dataset)
-    _check_input_array(dataset_ai, [np.dtype('float32'), np.dtype('byte'),
+    _check_input_array(dataset_ai, [np.dtype('float32'),
+                                    np.dtype('float16'),
+                                    np.dtype('byte'),
                                     np.dtype('ubyte')])
 
     cdef Index idx = Index()
@@ -299,6 +396,7 @@ def build(IndexParams index_params, dataset, resources=None):
             idx.index
         ))
         idx.trained = True
+        idx.active_index_type = dataset_ai.dtype.name
 
     return idx
 
@@ -357,9 +455,22 @@ cdef class SearchParams:
         more.
     rand_xor_mask: int, default = 0x128394
         Bit mask used for initial random seed node selection.
+    persistent: bool, default = false
+         Whether to use the persistent version of the kernel
+    persistent_lifetime: float
+         Persistent kernel: time in seconds before the kernel stops if no
+         requests are received.
+    persistent_device_usage : float
+        Sets the fraction of maximum grid size used by persistent kernel.
     """
 
-    cdef cuvsCagraSearchParams params
+    cdef cuvsCagraSearchParams * params
+
+    def __cinit__(self):
+        check_cuvs(cuvsCagraSearchParamsCreate(&self.params))
+
+    def __dealloc__(self):
+        check_cuvs(cuvsCagraSearchParamsDestroy(self.params))
 
     def __init__(self, *,
                  max_queries=0,
@@ -374,7 +485,11 @@ cdef class SearchParams:
                  hashmap_min_bitlen=0,
                  hashmap_max_fill_rate=0.5,
                  num_random_samplings=1,
-                 rand_xor_mask=0x128394):
+                 rand_xor_mask=0x128394,
+                 persistent=False,
+                 persistent_lifetime=None,
+                 persistent_device_usage=None
+                 ):
         self.params.max_queries = max_queries
         self.params.itopk_size = itopk_size
         self.params.max_iterations = max_iterations
@@ -406,6 +521,11 @@ cdef class SearchParams:
         self.params.hashmap_max_fill_rate = hashmap_max_fill_rate
         self.params.num_random_samplings = num_random_samplings
         self.params.rand_xor_mask = rand_xor_mask
+        self.params.persistent = persistent
+        if persistent_lifetime is not None:
+            self.params.persistent_lifetime = persistent_lifetime
+        if persistent_device_usage is not None:
+            self.params.persistent_device_usage = persistent_device_usage
 
     def __repr__(self):
         attr_str = [attr + "=" + str(getattr(self, attr))
@@ -416,6 +536,9 @@ cdef class SearchParams:
                         "hashmap_min_bitlen", "hashmap_max_fill_rate",
                         "num_random_samplings", "rand_xor_mask"]]
         return "SearchParams(type=CAGRA, " + (", ".join(attr_str)) + ")"
+
+    def get_handle(self):
+        return <size_t> self.params
 
     @property
     def max_queries(self):
@@ -478,7 +601,8 @@ def search(SearchParams search_params,
            k,
            neighbors=None,
            distances=None,
-           resources=None):
+           resources=None,
+           filter=None):
     """
     Find the k nearest neighbors for each query.
 
@@ -497,6 +621,9 @@ def search(SearchParams search_params,
     distances : Optional CUDA array interface compliant matrix shape
                 (n_queries, k) If supplied, the distances to the
                 neighbors will be written here in-place. (default None)
+    filter:     Optional cuvs.neighbors.cuvsFilter can be used to filter
+                neighbors based on a given bitset.
+        (default None)
     {resources_docstring}
 
     Examples
@@ -532,7 +659,9 @@ def search(SearchParams search_params,
     # todo(dgd): we can make the check of dtype a parameter of wrap_array
     # in RAFT to make this a single call
     queries_cai = wrap_array(queries)
-    _check_input_array(queries_cai, [np.dtype('float32'), np.dtype('byte'),
+    _check_input_array(queries_cai, [np.dtype('float32'),
+                                     np.dtype('float16'),
+                                     np.dtype('byte'),
                                      np.dtype('ubyte')])
 
     cdef uint32_t n_queries = queries_cai.shape[0]
@@ -551,7 +680,10 @@ def search(SearchParams search_params,
     _check_input_array(distances_cai, [np.dtype('float32')],
                        exp_rows=n_queries, exp_cols=k)
 
-    cdef cuvsCagraSearchParams* params = &search_params.params
+    if filter is None:
+        filter = no_filter()
+
+    cdef cuvsCagraSearchParams* params = search_params.params
     cdef cydlpack.DLManagedTensor* queries_dlpack = \
         cydlpack.dlpack_c(queries_cai)
     cdef cydlpack.DLManagedTensor* neighbors_dlpack = \
@@ -567,7 +699,8 @@ def search(SearchParams search_params,
             index.index,
             queries_dlpack,
             neighbors_dlpack,
-            distances_dlpack
+            distances_dlpack,
+            filter.prefilter
         ))
 
     return (distances, neighbors)
@@ -646,5 +779,51 @@ def load(filename, resources=None):
         c_filename.c_str(),
         idx.index
     ))
+    idx.trained = True
+    return idx
+
+
+@auto_sync_resources
+def from_graph(graph, dataset, metric="sqeuclidean", resources=None):
+    """
+    Construct a cagra index from an existing graph and dataset
+
+    Parameters
+    ----------
+    graph : Array interface compliant matrix with shape (n_samples,
+        graph_degree)
+    dataset : Array interface compliant matrix shape (n_samples, dim)
+        Supported dtype [float32, float16, int8, uint8]
+    metric : str
+    {resources_docstring}
+
+    Returns
+    -------
+    index: cuvs.cagra.Index
+    """
+    cdef cuvsDistanceType c_metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
+
+    cdef Index idx = Index()
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+    dataset_ai = wrap_array(dataset)
+    _check_input_array(dataset_ai, [np.dtype('float32'),
+                                    np.dtype('float16'),
+                                    np.dtype('byte'),
+                                    np.dtype('ubyte')])
+    cdef cydlpack.DLManagedTensor* dataset_dlpack = \
+        cydlpack.dlpack_c(dataset_ai)
+
+    graph_ai = wrap_array(graph)
+    _check_input_array(graph_ai, [np.dtype('uint32')])
+    cdef cydlpack.DLManagedTensor* graph_dlpack = \
+        cydlpack.dlpack_c(graph_ai)
+
+    check_cuvs(cuvsCagraIndexFromArgs(
+        res,
+        c_metric,
+        graph_dlpack,
+        dataset_dlpack,
+        idx.index))
     idx.trained = True
     return idx
