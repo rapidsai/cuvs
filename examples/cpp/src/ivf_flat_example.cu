@@ -74,7 +74,7 @@ void ivf_flat_build_extend_search(raft::device_resources const& dev_resources,
   // Define dataset indices.
   auto data_indices = raft::make_device_vector<int64_t, int64_t>(dev_resources, dataset.extent(0));
   raft::linalg::map_offset(
-    dev_resources, data_indices.view(), [] __device__(int64_t i) { return i; });
+    dev_resources, data_indices.view(), raft::identity_op{});
 
   // Sub-sample the dataset to create a training set.
   auto trainset =
