@@ -136,7 +136,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
           idx = cuvs::neighbors::ivf_flat::build(handle_, index_params, database_view);
           auto vector_indices = raft::make_device_vector<IdxT, IdxT>(handle_, ps.num_db_vecs);
           raft::linalg::map_offset(
-            handle_, vector_indices.view(), [] __device__(IdxT i) { return i; });
+            handle_, vector_indices.view(), raft::identity_op{});
           raft::resource::sync_stream(handle_);
 
           IdxT half_of_data = ps.num_db_vecs / 2;
