@@ -93,7 +93,7 @@ public class HnswBuildAndSearchIT extends CuVSTestCase {
         SearchResults results = hnswIndex.search(hnswQuery);
 
         // Check results
-        log.info(results.getResults().toString());
+        log.debug(results.getResults().toString());
         checkResults(expectedResults, results.getResults());
 
         // Cleanup
@@ -121,7 +121,7 @@ public class HnswBuildAndSearchIT extends CuVSTestCase {
     for (int j = 0; j < 10; j++) {
       try (CuVSResources resources = CheckedCuVSResources.create()) {
         HnswQuery hnswQuery =
-            new HnswQuery.Builder()
+            new HnswQuery.Builder(resources)
                 .withMapping(SearchResults.IDENTITY_MAPPING)
                 .withQueryVectors(queries)
                 .withSearchParams(new HnswSearchParams.Builder().build())
@@ -146,7 +146,7 @@ public class HnswBuildAndSearchIT extends CuVSTestCase {
     for (int j = 0; j < 10; j++) {
       try (CuVSResources resources = CheckedCuVSResources.create()) {
         HnswQuery hnswQuery =
-            new HnswQuery.Builder()
+            new HnswQuery.Builder(resources)
                 .withQueryVectors(queries)
                 .withMapping(rotate)
                 .withSearchParams(new HnswSearchParams.Builder().build())
@@ -172,7 +172,7 @@ public class HnswBuildAndSearchIT extends CuVSTestCase {
     for (int j = 0; j < 10; j++) {
       try (CuVSResources resources = CheckedCuVSResources.create()) {
         HnswQuery hnswQuery =
-            new HnswQuery.Builder()
+            new HnswQuery.Builder(resources)
                 .withQueryVectors(queries)
                 .withMapping(rotate)
                 .withSearchParams(new HnswSearchParams.Builder().build())
