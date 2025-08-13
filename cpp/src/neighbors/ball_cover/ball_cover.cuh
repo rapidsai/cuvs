@@ -66,8 +66,7 @@ void sample_landmarks(raft::resources const& handle,
   rmm::device_uvector<value_idx> R_indices(index.n_landmarks,
                                            raft::resource::get_cuda_stream(handle));
 
-  raft::linalg::map_offset(
-    handle, index.get_R_1nn_cols(), raft::identity_op{});
+  raft::linalg::map_offset(handle, index.get_R_1nn_cols(), raft::identity_op{});
 
   thrust::fill(raft::resource::get_thrust_policy(handle),
                R_1nn_ones.data(),

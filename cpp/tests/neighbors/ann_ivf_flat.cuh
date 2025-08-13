@@ -135,8 +135,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
             (const DataT*)database.data(), ps.num_db_vecs, ps.dim);
           idx = cuvs::neighbors::ivf_flat::build(handle_, index_params, database_view);
           auto vector_indices = raft::make_device_vector<IdxT, IdxT>(handle_, ps.num_db_vecs);
-          raft::linalg::map_offset(
-            handle_, vector_indices.view(), raft::identity_op{});
+          raft::linalg::map_offset(handle_, vector_indices.view(), raft::identity_op{});
           raft::resource::sync_stream(handle_);
 
           IdxT half_of_data = ps.num_db_vecs / 2;
@@ -459,8 +458,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         // Create Bitset filter
         auto removed_indices =
           raft::make_device_vector<IdxT, int64_t>(handle_, test_ivf_sample_filter::offset);
-        raft::linalg::map_offset(
-          handle_, removed_indices.view(), raft::identity_op{});
+        raft::linalg::map_offset(handle_, removed_indices.view(), raft::identity_op{});
         raft::resource::sync_stream(handle_);
 
         cuvs::core::bitset<std::uint32_t, IdxT> removed_indices_bitset(
