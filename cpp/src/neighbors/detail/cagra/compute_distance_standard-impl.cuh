@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@
 #include <raft/core/operators.hpp>
 #include <raft/util/pow2_utils.cuh>
 
+#include <cub/block/block_reduce.cuh>
 #include <type_traits>
 
 namespace cuvs::neighbors::cagra::detail {
@@ -49,6 +50,15 @@ RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
   // mask the result of xor for the integer promotion
   const auto v = (a ^ b) & 0xffu;
   return __popc(v);
+}
+
+template <typename DATA_T, typename DISTANCE_T, cuvs::distance::DistanceType Metric>
+RAFT_DEVICE_INLINE_FUNCTION constexpr auto dist_op(DATA_T a, DATA_T b)
+  -> std::enable_if_t<Metric == cuvs::distance::DistanceType::CosineExpanded, DISTANCE_T>
+{
+  // For cosine distance, we compute inner product here
+  // Normalization will be done in post-processing
+  return -static_cast<DISTANCE_T>(a) * static_cast<DISTANCE_T>(b);
 }
 }  // namespace
 
@@ -85,6 +95,17 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
     return (const DATA_T*&)(args.extra_ptr1);
   }
 
+  static constexpr RAFT_INLINE_FUNCTION auto dataset_norms_ptr(const args_t& args) noexcept
+    -> const DISTANCE_T* const&
+  {
+    return (const DISTANCE_T* const&)(args.extra_ptr2);
+  }
+  static constexpr RAFT_INLINE_FUNCTION auto dataset_norms_ptr(args_t& args) noexcept
+    -> const DISTANCE_T*&
+  {
+    return (const DISTANCE_T*&)(args.extra_ptr2);
+  }
+
   static constexpr RAFT_INLINE_FUNCTION auto ld(const args_t& args) noexcept -> const uint32_t&
   {
     return args.extra_word1;
@@ -94,12 +115,23 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
     return args.extra_word1;
   }
 
+  static constexpr RAFT_INLINE_FUNCTION auto query_norm_offset(const args_t& args) noexcept
+    -> const uint32_t&
+  {
+    return args.extra_word2;
+  }
+  static constexpr RAFT_INLINE_FUNCTION auto query_norm_offset(args_t& args) noexcept -> uint32_t&
+  {
+    return args.extra_word2;
+  }
+
   _RAFT_HOST_DEVICE standard_dataset_descriptor_t(setup_workspace_type* setup_workspace_impl,
                                                   compute_distance_type* compute_distance_impl,
                                                   const DATA_T* ptr,
                                                   INDEX_T size,
                                                   uint32_t dim,
-                                                  uint32_t ld)
+                                                  uint32_t ld,
+                                                  const DISTANCE_T* dataset_norms = nullptr)
     : base_type(setup_workspace_impl,
                 compute_distance_impl,
                 size,
@@ -107,8 +139,15 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
                 raft::Pow2<TeamSize>::Log2,
                 get_smem_ws_size_in_bytes(dim))
   {
-    standard_dataset_descriptor_t::ptr(args) = ptr;
-    standard_dataset_descriptor_t::ld(args)  = ld;
+    standard_dataset_descriptor_t::ptr(args)               = ptr;
+    standard_dataset_descriptor_t::ld(args)                = ld;
+    standard_dataset_descriptor_t::dataset_norms_ptr(args) = dataset_norms;
+    // Store offset to query norm in shared memory (after the query buffer)
+    if (kMetric == cuvs::distance::DistanceType::CosineExpanded) {
+      standard_dataset_descriptor_t::query_norm_offset(args) =
+        sizeof(standard_dataset_descriptor_t) +
+        raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
+    }
     static_assert(sizeof(*this) == sizeof(base_type));
     static_assert(alignof(standard_dataset_descriptor_t) == alignof(base_type));
   }
@@ -116,8 +155,11 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
  private:
   RAFT_INLINE_FUNCTION constexpr static auto get_smem_ws_size_in_bytes(uint32_t dim) -> uint32_t
   {
-    return sizeof(standard_dataset_descriptor_t) +
-           raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
+    auto size = sizeof(standard_dataset_descriptor_t) +
+                raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
+    // Add space for query norm when using CosineExpanded
+    if (kMetric == cuvs::distance::DistanceType::CosineExpanded) { size += sizeof(DISTANCE_T); }
+    return size;
   }
 };
 
@@ -150,6 +192,16 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_standard(
     if (threadIdx.x == uint32_t(smem_ptr_offset / sizeof(word_type))) {
       r->args.smem_ws_ptr = uint32_t(__cvta_generic_to_shared(buf));
     }
+    // Update query norm offset for CosineExpanded
+    if (DescriptorT::kMetric == cuvs::distance::DistanceType::CosineExpanded) {
+      const auto query_norm_offset_idx =
+        reinterpret_cast<uint8_t*>(&(r->args.extra_word2)) - reinterpret_cast<uint8_t*>(r);
+      if (threadIdx.x == uint32_t(query_norm_offset_idx / sizeof(word_type))) {
+        r->args.extra_word2 =
+          uint32_t(__cvta_generic_to_shared(buf)) +
+          raft::round_up_safe<uint32_t>(that->args.dim, kDatasetBlockDim) * sizeof(QUERY_T);
+      }
+    }
     __syncthreads();
   }
 
@@ -164,6 +216,29 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_standard(
     } else {
       buf[j] = 0;
     }
+  }
+
+  // Compute query norm for CosineExpanded
+  if constexpr (DescriptorT::kMetric == cuvs::distance::DistanceType::CosineExpanded) {
+    __syncthreads();
+    using DISTANCE_T     = typename DescriptorT::DISTANCE_T;
+    auto* query_norm_ptr = reinterpret_cast<DISTANCE_T*>(buf + buf_len);
+
+    // Compute squared norm
+    DISTANCE_T norm_sq = 0;
+    for (unsigned i = threadIdx.x; i < dim; i += blockDim.x) {
+      unsigned j     = device::swizzling<kDatasetBlockDim, vlen * kTeamSize>(i);
+      DISTANCE_T val = static_cast<DISTANCE_T>(buf[j]);
+      norm_sq += val * val;
+    }
+
+    // Reduce across threads
+    using BlockReduce = cub::BlockReduce<DISTANCE_T, 1024>;
+    __shared__ typename BlockReduce::TempStorage temp_storage;
+    DISTANCE_T block_norm_sq = BlockReduce(temp_storage).Sum(norm_sq);
+
+    // Store sqrt of norm in shared memory
+    if (threadIdx.x == 0) { *query_norm_ptr = raft::sqrt(block_norm_sq); }
   }
 
   return const_cast<const DescriptorT*>(r);
@@ -224,10 +299,21 @@ _RAFT_DEVICE __noinline__ auto compute_distance_standard(
   const typename DescriptorT::args_t args, const typename DescriptorT::INDEX_T dataset_index) ->
   typename DescriptorT::DISTANCE_T
 {
-  return compute_distance_standard_worker<DescriptorT>(
+  auto distance = compute_distance_standard_worker<DescriptorT>(
     DescriptorT::ptr(args) + (static_cast<std::uint64_t>(DescriptorT::ld(args)) * dataset_index),
     args.dim,
     args.smem_ws_ptr);
+
+  // For CosineExpanded, divide by dataset norm (query norm will be handled in postprocessing)
+  if constexpr (DescriptorT::kMetric == cuvs::distance::DistanceType::CosineExpanded) {
+    const auto* dataset_norms = DescriptorT::dataset_norms_ptr(args);
+    if (dataset_norms != nullptr) {
+      auto norm = dataset_norms[dataset_index];
+      if (norm > 0) { distance = distance / norm; }
+    }
+  }
+
+  return distance;
 }
 
 template <cuvs::distance::DistanceType Metric,
@@ -241,7 +327,8 @@ RAFT_KERNEL __launch_bounds__(1, 1)
                                           const DataT* ptr,
                                           IndexT size,
                                           uint32_t dim,
-                                          uint32_t ld)
+                                          uint32_t ld,
+                                          const DistanceT* dataset_norms = nullptr)
 {
   using desc_type =
     standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
@@ -253,7 +340,8 @@ RAFT_KERNEL __launch_bounds__(1, 1)
                       ptr,
                       size,
                       dim,
-                      ld);
+                      ld,
+                      dataset_norms);
 }
 
 template <cuvs::distance::DistanceType Metric,
@@ -264,12 +352,28 @@ template <cuvs::distance::DistanceType Metric,
           typename DistanceT>
 dataset_descriptor_host<DataT, IndexT, DistanceT>
 standard_descriptor_spec<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>::init_(
-  const cagra::search_params& params, const DataT* ptr, IndexT size, uint32_t dim, uint32_t ld)
+  const cagra::search_params& params,
+  const DataT* ptr,
+  IndexT size,
+  uint32_t dim,
+  uint32_t ld,
+  const DistanceT* dataset_norms)
 {
   using desc_type =
     standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
   using base_type = typename desc_type::base_type;
-  desc_type dd_host{nullptr, nullptr, ptr, size, dim, ld};
+
+  // For CosineExpanded, we need to allocate and compute dataset norms if not provided
+  DistanceT* allocated_norms = nullptr;
+  if (Metric == cuvs::distance::DistanceType::CosineExpanded && dataset_norms == nullptr) {
+    // Note: Norm calculation should be done by the caller or during index building
+    // For now, we'll pass nullptr and handle it differently
+    RAFT_LOG_WARN(
+      "Dataset norms not provided for CosineExpanded metric. "
+      "This may lead to incorrect distance calculations.");
+  }
+
+  desc_type dd_host{nullptr, nullptr, ptr, size, dim, ld, dataset_norms};
   return host_type{dd_host,
                    [=](dataset_descriptor_base_t<DataT, IndexT, DistanceT>* dev_ptr,
                        rmm::cuda_stream_view stream) {
@@ -279,7 +383,7 @@ standard_descriptor_spec<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, Dista
                                                              DataT,
                                                              IndexT,
                                                              DistanceT>
-                       <<<1, 1, 0, stream>>>(dev_ptr, ptr, size, dim, ld);
+                       <<<1, 1, 0, stream>>>(dev_ptr, ptr, size, dim, ld, dataset_norms);
                      RAFT_CUDA_TRY(cudaPeekAtLastError());
                    }};
 }

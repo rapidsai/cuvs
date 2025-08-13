@@ -697,11 +697,19 @@ index<T, IdxT> build(
     if (cuvs::neighbors::nn_descent::has_enough_device_memory(
           res, dataset.extents(), sizeof(IdxT))) {
       RAFT_LOG_DEBUG("NN descent solver");
+      // For CosineExpanded, use Cosine metric for graph building
+      auto metric_for_graph_build = params.metric == cuvs::distance::DistanceType::CosineExpanded
+                                      ? cuvs::distance::DistanceType::Cosine
+                                      : params.metric;
       knn_build_params =
-        cagra::graph_build_params::nn_descent_params(intermediate_degree, params.metric);
+        cagra::graph_build_params::nn_descent_params(intermediate_degree, metric_for_graph_build);
     } else {
       RAFT_LOG_DEBUG("Selecting IVF-PQ solver");
-      knn_build_params = cagra::graph_build_params::ivf_pq_params(dataset.extents(), params.metric);
+      // For CosineExpanded, use Cosine metric for graph building
+      auto metric_for_graph_build = params.metric == cuvs::distance::DistanceType::CosineExpanded
+                                      ? cuvs::distance::DistanceType::Cosine
+                                      : params.metric;
+      knn_build_params = cagra::graph_build_params::ivf_pq_params(dataset.extents(), metric_for_graph_build);
     }
   }
   RAFT_EXPECTS(
@@ -731,7 +739,15 @@ index<T, IdxT> build(
     if (std::holds_alternative<cagra::graph_build_params::ivf_pq_params>(knn_build_params)) {
       auto ivf_pq_params =
         std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(knn_build_params);
-      if (ivf_pq_params.build_params.metric != params.metric) {
+      
+      // For CosineExpanded, use Cosine metric for IVF-PQ building
+      if (params.metric == cuvs::distance::DistanceType::CosineExpanded) {
+        if (ivf_pq_params.build_params.metric != cuvs::distance::DistanceType::Cosine) {
+          RAFT_LOG_DEBUG(
+            "Using Cosine metric for IVF-PQ to build CosineExpanded CAGRA index");
+          ivf_pq_params.build_params.metric = cuvs::distance::DistanceType::Cosine;
+        }
+      } else if (ivf_pq_params.build_params.metric != params.metric) {
         RAFT_LOG_WARN(
           "Metric (%lu) for IVF-PQ needs to match cagra metric (%lu), "
           "aligning IVF-PQ metric.",
@@ -744,7 +760,14 @@ index<T, IdxT> build(
       auto nn_descent_params =
         std::get<cagra::graph_build_params::nn_descent_params>(knn_build_params);
 
-      if (nn_descent_params.metric != params.metric) {
+      // For CosineExpanded, use Cosine metric for nn-descent building
+      if (params.metric == cuvs::distance::DistanceType::CosineExpanded) {
+        if (nn_descent_params.metric != cuvs::distance::DistanceType::Cosine) {
+          RAFT_LOG_DEBUG(
+            "Using Cosine metric for nn-descent to build CosineExpanded CAGRA index");
+          nn_descent_params.metric = cuvs::distance::DistanceType::Cosine;
+        }
+      } else if (nn_descent_params.metric != params.metric) {
         RAFT_LOG_WARN(
           "Metric (%lu) for nn-descent needs to match cagra metric (%lu), "
           "aligning nn-descent metric.",
@@ -759,8 +782,12 @@ index<T, IdxT> build(
           "nn-descent graph_degree.",
           nn_descent_params.graph_degree,
           intermediate_degree);
+        // For CosineExpanded, use Cosine metric for graph building
+        auto metric_for_graph_build = params.metric == cuvs::distance::DistanceType::CosineExpanded
+                                        ? cuvs::distance::DistanceType::Cosine
+                                        : params.metric;
         nn_descent_params =
-          cagra::graph_build_params::nn_descent_params(intermediate_degree, params.metric);
+          cagra::graph_build_params::nn_descent_params(intermediate_degree, metric_for_graph_build);
       }
 
       // Use nn-descent to build CAGRA knn graph

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,11 @@
 // TODO: This shouldn't be calling spatial/knn apis
 #include "../ann_utils.cuh"
 
+#include <raft/linalg/map.cuh>
+#include <raft/linalg/norm.cuh>
+#include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
+#include <rmm/device_uvector.hpp>
 
 namespace cuvs::neighbors::cagra::detail {
 
@@ -182,14 +186,61 @@ void search_main(raft::resources const& res,
   // and divide the values by kDivisor. Here we restore the original scale.
   constexpr float kScale = cuvs::spatial::knn::detail::utils::config<T>::kDivisor /
                            cuvs::spatial::knn::detail::utils::config<DistanceT>::kDivisor;
-  cuvs::neighbors::ivf::detail::postprocess_distances(dist_out,
-                                                      dist_in,
-                                                      index.metric(),
-                                                      distances.extent(0),
-                                                      distances.extent(1),
-                                                      kScale,
-                                                      true,
-                                                      raft::resource::get_cuda_stream(res));
+
+  // For CosineExpanded, we need to divide by query norms as the final postprocessing step
+  if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
+    // First, convert inner product to cosine similarity
+    // The distances are currently: -inner_product / dataset_norm
+    // We need to convert to: 1 - inner_product / (query_norm * dataset_norm)
+
+    // Allocate space for query norms
+    auto stream = raft::resource::get_cuda_stream(res);
+    rmm::device_uvector<float> query_norms(queries.extent(0), stream);
+
+    // Compute query norms
+    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(query_norms.data(),
+                                                      queries.data_handle(),
+                                                      queries.extent(1),
+                                                      queries.extent(0),
+                                                      stream,
+                                                      raft::sqrt_op{});
+
+    // Launch kernel to normalize distances by query norms
+    int n_elements = distances.extent(0) * distances.extent(1);
+    int block_size = 256;
+    int grid_size  = raft::div_rounding_up_safe(n_elements, block_size);
+
+    // Define kernel to normalize cosine distances
+    const auto n_queries = distances.extent(0);
+    const auto k         = distances.extent(1);
+    auto query_norms_ptr = query_norms.data();
+
+    auto normalize_cosine_kernel =
+      [dist_out, query_norms_ptr, n_queries, k] __device__(int idx) -> void {
+      if (idx >= n_queries * k) return;
+      int query_idx    = idx / k;
+      float query_norm = query_norms_ptr[query_idx];
+      if (query_norm > 0) {
+        // Convert from negative inner product to cosine distance
+        dist_out[idx] = 1.0f + dist_out[idx] / query_norm;
+      } else {
+        dist_out[idx] = 1.0f;
+      }
+    };
+
+    // Launch the normalization
+    raft::linalg::map_offset(dist_out, n_elements, normalize_cosine_kernel, stream);
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
+  } else {
+    cuvs::neighbors::ivf::detail::postprocess_distances(dist_out,
+                                                        dist_in,
+                                                        index.metric(),
+                                                        distances.extent(0),
+                                                        distances.extent(1),
+                                                        kScale,
+                                                        true,
+                                                        raft::resource::get_cuda_stream(res));
+  }
 }
 /** @} */  // end group cagra
 

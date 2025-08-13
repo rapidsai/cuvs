@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@ import os
 import glob
 
 template = """/*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -87,7 +87,7 @@ for f in glob.glob("compute_distance_vpq_*.cu"):
 for type_path, (data_t, idx_t, distance_t) in search_types.items():
     for (mxdim, team) in mxdim_team:
         # CAGRA
-        for metric in ['L2Expanded', 'InnerProduct']:
+        for metric in ['L2Expanded', 'InnerProduct', 'CosineExpanded']:
             path = f"compute_distance_standard_{metric}_{type_path}_dim{mxdim}_t{team}.cu"
             includes = '#include "compute_distance_standard-impl.cuh"'
             params = f"{metric_prefix}{metric}, {team}, {mxdim}, {data_t}, {idx_t}, {distance_t}"

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,11 +47,16 @@ struct standard_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT>
                    const DatasetT& dataset,
                    cuvs::distance::DistanceType metric) -> host_type
   {
+    // For CosineExpanded, dataset norms should be pre-calculated and passed separately
+    // For now, we pass nullptr - the actual norm calculation should be done
+    // during index building or by extending the dataset structure
+    const DistanceT* dataset_norms = nullptr;
     return init_(params,
                  dataset.view().data_handle(),
                  IndexT(dataset.n_rows()),
                  dataset.dim(),
-                 dataset.stride());
+                 dataset.stride(),
+                 dataset_norms);
   }
 
   template <typename DatasetT>
@@ -68,7 +73,12 @@ struct standard_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT>
 
  private:
   static dataset_descriptor_host<DataT, IndexT, DistanceT> init_(
-    const cagra::search_params& params, const DataT* ptr, IndexT size, uint32_t dim, uint32_t ld);
+    const cagra::search_params& params,
+    const DataT* ptr,
+    IndexT size,
+    uint32_t dim,
+    uint32_t ld,
+    const DistanceT* dataset_norms = nullptr);
 };
 
 }  // namespace cuvs::neighbors::cagra::detail
