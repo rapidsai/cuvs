@@ -72,8 +72,8 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
       // Loading a BRUTEFORCE index from disk.
       Path indexFile = Path.of(indexFileName);
       try (var inputStream = Files.newInputStream(indexFile);
-           BruteForceIndex loadedIndex =
-                   BruteForceIndex.newBuilder(resources).from(inputStream).build()) {
+          BruteForceIndex loadedIndex =
+              BruteForceIndex.newBuilder(resources).from(inputStream).build()) {
 
         // search the loaded index
         SearchResults results = loadedIndex.search(cuvsQuery);
