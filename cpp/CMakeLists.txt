@@ -380,7 +380,6 @@ if(BUILD_SHARED_LIBS)
     src/distance/detail/pairwise_matrix/dispatch_rbf.cu
     src/distance/detail/pairwise_matrix/dispatch_l2_expanded_double_double_double_int64_t.cu
     src/distance/detail/pairwise_matrix/dispatch_l2_expanded_float_float_float_int64_t.cu
-    src/distance/detail/fused_distance_nn.cu
     src/distance/distance.cu
     src/distance/pairwise_distance.cu
     src/distance/sparse_distance.cu
@@ -435,6 +434,14 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/ivf_flat/ivf_flat_search_half_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_search_int8_t_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_search_uint8_t_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_float_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_half_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_int8_t_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_uint8_t_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_float_int64_t_bitset.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_half_int64_t_bitset.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_int8_t_int64_t_bitset.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_uint8_t_int64_t_bitset.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_float_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_half_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_int8_t_int64_t.cu
@@ -461,6 +468,8 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_float_bitset64.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_false_bitset64.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_true_bitset64.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_contiguous_list_data.cu
+    src/neighbors/ivf_pq/detail/ivf_pq_process_and_fill_codes.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_float_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_half_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_int8_t_int64_t.cu
@@ -481,6 +490,8 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/refine/detail/refine_host_half_float.cpp
     src/neighbors/refine/detail/refine_host_int8_t_float.cpp
     src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
+    src/neighbors/scann/scann_build_float.cu
+    src/neighbors/scann/scann_serialize_float.cu
     src/neighbors/sample_filter.cu
     src/neighbors/tiered_index.cu
     src/neighbors/sparse_brute_force.cu
@@ -493,6 +504,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/vamana_serialize_int8.cu
     src/preprocessing/quantize/scalar.cu
     src/preprocessing/quantize/binary.cu
+    src/preprocessing/spectral/spectral_embedding.cu
     src/selection/select_k_float_int64_t.cu
     src/selection/select_k_float_int32_t.cu
     src/selection/select_k_float_uint32_t.cu

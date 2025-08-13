@@ -5,7 +5,7 @@ Build cuVS Bench From Source
 Dependencies
 ============
 
-CUDA 11 and a GPU with Volta architecture or later are required to run the benchmarks.
+CUDA 12 and a GPU with Volta architecture or later are required to run the benchmarks.
 
 Please refer to the  :doc:`installation docs <../build>` for the base requirements to build cuVS.
 

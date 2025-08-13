@@ -337,10 +337,9 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
   void testCagra()
   {
     std::cout << cuvs::generic::to_string(ps) << std::endl;
-    // IVF_PQ and NN_DESCENT graph builds do not support BitwiseHamming
+    // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
-        ((!std::is_same_v<DataT, uint8_t>) ||
-         (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
+        ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ)))
       GTEST_SKIP();
     // If the dataset dimension is small and the dataset size is large, there can be a lot of
     // dataset vectors that have the same distance to the query, especially in the binary Hamming
@@ -531,10 +530,9 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
     // issue: https://github.com/rapidsai/raft/issues/2276
     if (ps.metric == InnerProduct && ps.build_algo == graph_build_algo::NN_DESCENT) GTEST_SKIP();
     if (ps.compression != std::nullopt) GTEST_SKIP();
-    // IVF_PQ and NN_DESCENT graph builds do not support BitwiseHamming
+    // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
-        ((!std::is_same_v<DataT, uint8_t>) ||
-         (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
+        ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ)))
       GTEST_SKIP();
     // If the dataset dimension is small and the dataset size is large, there can be a lot of
     // dataset vectors that have the same distance to the query, especially in the binary Hamming
@@ -741,7 +739,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.metric == cuvs::distance::DistanceType::InnerProduct &&
         ps.build_algo == graph_build_algo::NN_DESCENT)
       GTEST_SKIP();
-    // IVF_PQ and NN_DESCENT graph builds do not support BitwiseHamming
+    // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         ((!std::is_same_v<DataT, uint8_t>) ||
          (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
@@ -952,10 +950,9 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
     // issue: https://github.com/rapidsai/raft/issues/2276
     if (ps.metric == InnerProduct && ps.build_algo == graph_build_algo::NN_DESCENT) GTEST_SKIP();
     if (ps.compression != std::nullopt) GTEST_SKIP();
-    // IVF_PQ and NN_DESCENT graph builds do not support BitwiseHamming
+    // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
-        ((!std::is_same_v<DataT, uint8_t>) ||
-         (ps.build_algo != graph_build_algo::ITERATIVE_CAGRA_SEARCH)))
+        ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ)))
       GTEST_SKIP();
     // If the dataset dimension is small and the dataset size is large, there can be a lot of
     // dataset vectors that have the same distance to the query, especially in the binary Hamming

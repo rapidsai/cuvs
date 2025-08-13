@@ -19,7 +19,6 @@ import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
-import java.lang.invoke.MethodHandles;
 import java.util.BitSet;
 import java.util.List;
 import org.junit.Before;
@@ -31,18 +30,18 @@ import org.slf4j.LoggerFactory;
 @RunWith(RandomizedRunner.class)
 public class CagraRandomizedIT extends CuVSTestCase {
 
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  private static final Logger log = LoggerFactory.getLogger(CagraRandomizedIT.class);
 
   @Before
   public void setup() {
     assumeTrue("not supported on " + System.getProperty("os.name"), isLinuxAmd64());
     initializeRandom();
-    log.info("Random context initialized for test.");
+    log.trace("Random context initialized for test.");
   }
 
   @Test
   public void testResultsTopKWithRandomValues() throws Throwable {
-    boolean useNativeMemoryDatasets[] = {true, false};
+    boolean[] useNativeMemoryDatasets = {true, false};
     for (int i = 0; i < 100; i++) {
       for (boolean use : useNativeMemoryDatasets) {
         tmpResultsTopKWithRandomValues(use);
@@ -88,10 +87,10 @@ public class CagraRandomizedIT extends CuVSTestCase {
     // Generate random query vectors
     float[][] queries = generateData(random, numQueries, dimensions);
 
-    log.info("Dataset size: {}x{}", datasetSize, dimensions);
-    log.info("Query size: {}x{}", numQueries, dimensions);
-    log.info("TopK: {}", topK);
-    log.info("Use native memory dataset? " + useNativeMemoryDataset);
+    log.debug("Dataset size: {}x{}", datasetSize, dimensions);
+    log.debug("Query size: {}x{}", numQueries, dimensions);
+    log.debug("TopK: {}", topK);
+    log.debug("Use native memory dataset? " + useNativeMemoryDataset);
 
     // Debugging: Log dataset and queries
     if (log.isDebugEnabled()) {
@@ -122,7 +121,8 @@ public class CagraRandomizedIT extends CuVSTestCase {
 
       CagraIndex index;
       if (useNativeMemoryDataset) {
-        var datasetBuilder = Dataset.builder(vectors.length, vectors[0].length);
+        var datasetBuilder =
+            CuVSMatrix.builder(vectors.length, vectors[0].length, CuVSMatrix.DataType.FLOAT);
         for (float[] v : vectors) {
           datasetBuilder.addVector(v);
         }
@@ -138,22 +138,22 @@ public class CagraRandomizedIT extends CuVSTestCase {
                 .withIndexParams(indexParams)
                 .build();
       }
-      log.info("Index built successfully.");
+      log.trace("Index built successfully.");
 
       try {
         // Execute search and retrieve results
         CagraQuery.Builder queryBuilder =
-            new CagraQuery.Builder()
+            new CagraQuery.Builder(resources)
                 .withQueryVectors(queries)
                 .withTopK(topK)
-                .withSearchParams(new CagraSearchParams.Builder(resources).build());
+                .withSearchParams(new CagraSearchParams.Builder().build());
 
         if (sharedPrefilter != null) {
           queryBuilder.withPrefilter(sharedPrefilter, datasetSize);
         }
 
         CagraQuery query = queryBuilder.build();
-        log.info("Query built successfully. Executing search...");
+        log.trace("Query built successfully. Executing search...");
         SearchResults results = index.search(query);
 
         compareResults(results, expected, topK, datasetSize, numQueries);
