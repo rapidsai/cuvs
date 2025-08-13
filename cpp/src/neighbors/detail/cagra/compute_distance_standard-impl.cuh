@@ -21,7 +21,6 @@
 #include <raft/core/operators.hpp>
 #include <raft/util/pow2_utils.cuh>
 
-#include <cub/block/block_reduce.cuh>
 #include <type_traits>
 
 namespace cuvs::neighbors::cagra::detail {
@@ -108,15 +107,7 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
     return args.extra_word1;
   }
 
-  static constexpr RAFT_INLINE_FUNCTION auto query_norm_offset(const args_t& args) noexcept
-    -> const uint32_t&
-  {
-    return args.extra_word2;
-  }
-  static constexpr RAFT_INLINE_FUNCTION auto query_norm_offset(args_t& args) noexcept -> uint32_t&
-  {
-    return args.extra_word2;
-  }
+
 
   _RAFT_HOST_DEVICE standard_dataset_descriptor_t(setup_workspace_type* setup_workspace_impl,
                                                   compute_distance_type* compute_distance_impl,
@@ -135,12 +126,6 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
     standard_dataset_descriptor_t::ptr(args)               = ptr;
     standard_dataset_descriptor_t::ld(args)                = ld;
     standard_dataset_descriptor_t::dataset_norms_ptr(args) = dataset_norms;
-    // Store offset to query norm in shared memory (after the query buffer)
-    if (kMetric == cuvs::distance::DistanceType::CosineExpanded) {
-      standard_dataset_descriptor_t::query_norm_offset(args) =
-        sizeof(standard_dataset_descriptor_t) +
-        raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
-    }
     static_assert(sizeof(*this) == sizeof(base_type));
     static_assert(alignof(standard_dataset_descriptor_t) == alignof(base_type));
   }
@@ -148,11 +133,8 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
  private:
   RAFT_INLINE_FUNCTION constexpr static auto get_smem_ws_size_in_bytes(uint32_t dim) -> uint32_t
   {
-    auto size = sizeof(standard_dataset_descriptor_t) +
-                raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
-    // Add space for query norm when using CosineExpanded
-    if (kMetric == cuvs::distance::DistanceType::CosineExpanded) { size += sizeof(DISTANCE_T); }
-    return size;
+    return sizeof(standard_dataset_descriptor_t) +
+           raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) * sizeof(QUERY_T);
   }
 };
 
@@ -185,16 +167,6 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_standard(
     if (threadIdx.x == uint32_t(smem_ptr_offset / sizeof(word_type))) {
       r->args.smem_ws_ptr = uint32_t(__cvta_generic_to_shared(buf));
     }
-    // Update query norm offset for CosineExpanded
-    if (DescriptorT::kMetric == cuvs::distance::DistanceType::CosineExpanded) {
-      const auto query_norm_offset_idx =
-        reinterpret_cast<uint8_t*>(&(r->args.extra_word2)) - reinterpret_cast<uint8_t*>(r);
-      if (threadIdx.x == uint32_t(query_norm_offset_idx / sizeof(word_type))) {
-        r->args.extra_word2 =
-          uint32_t(__cvta_generic_to_shared(buf)) +
-          raft::round_up_safe<uint32_t>(that->args.dim, kDatasetBlockDim) * sizeof(QUERY_T);
-      }
-    }
     __syncthreads();
   }
 
@@ -209,29 +181,6 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_standard(
     } else {
       buf[j] = 0;
     }
-  }
-
-  // Compute query norm for CosineExpanded
-  if constexpr (DescriptorT::kMetric == cuvs::distance::DistanceType::CosineExpanded) {
-    __syncthreads();
-    using DISTANCE_T     = typename DescriptorT::DISTANCE_T;
-    auto* query_norm_ptr = reinterpret_cast<DISTANCE_T*>(buf + buf_len);
-
-    // Compute squared norm
-    DISTANCE_T norm_sq = 0;
-    for (unsigned i = threadIdx.x; i < dim; i += blockDim.x) {
-      unsigned j     = device::swizzling<kDatasetBlockDim, vlen * kTeamSize>(i);
-      DISTANCE_T val = static_cast<DISTANCE_T>(buf[j]);
-      norm_sq += val * val;
-    }
-
-    // Reduce across threads
-    using BlockReduce = cub::BlockReduce<DISTANCE_T, 1024>;
-    __shared__ typename BlockReduce::TempStorage temp_storage;
-    DISTANCE_T block_norm_sq = BlockReduce(temp_storage).Sum(norm_sq);
-
-    // Store sqrt of norm in shared memory
-    if (threadIdx.x == 0) { *query_norm_ptr = raft::sqrt(block_norm_sq); }
   }
 
   return const_cast<const DescriptorT*>(r);
@@ -297,7 +246,6 @@ _RAFT_DEVICE __noinline__ auto compute_distance_standard(
     args.dim,
     args.smem_ws_ptr);
 
-  // For CosineExpanded, divide by dataset norm (query norm will be handled in postprocessing)
   if constexpr (DescriptorT::kMetric == cuvs::distance::DistanceType::CosineExpanded) {
     const auto* dataset_norms = DescriptorT::dataset_norms_ptr(args);
     if (dataset_norms != nullptr) {

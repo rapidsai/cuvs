@@ -202,12 +202,17 @@ void search_main(raft::resources const& res,
     const auto k         = distances.extent(1);
     auto query_norms_ptr = query_norms.data_handle();
 
-    raft::linalg::matrix_vector_op<raft::Apply::ALONG_ROWS>(
-      res,
-      raft::make_const_mdspan(distances),
-      raft::make_const_mdspan(query_norms.view()),
-      distances,
-      raft::div_op{});
+    // Convert from negative inner product to cosine distance
+    // Current distances are: -inner_product / dataset_norm
+    // We need: 1 - inner_product / (query_norm * dataset_norm)
+    // Which is: 1 + distances / query_norm
+    auto cosine_convert_op = [query_norms_ptr, k] __device__(auto idx, auto dist) {
+      auto query_idx = idx / k;
+      auto query_norm = query_norms_ptr[query_idx];
+      return query_norm > 0 ? (1.0f + dist / query_norm) : 1.0f;
+    };
+    
+    raft::linalg::map_offset(dist_out, n_queries * k, cosine_convert_op, stream);
   } else {
     cuvs::neighbors::ivf::detail::postprocess_distances(dist_out,
                                                         dist_in,
