@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -401,7 +401,10 @@ constexpr auto spec_match(const cagra::search_params& params,
 template <typename... Specs>
 struct instance_selector {
   template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
-  static auto select(const cagra::search_params&, const DatasetT&, cuvs::distance::DistanceType, const float*)
+  static auto select(const cagra::search_params&,
+                     const DatasetT&,
+                     cuvs::distance::DistanceType,
+                     const float*)
     -> std::tuple<init_desc_type<DataT, IndexT, DistanceT, DatasetT>, double>
   {
     return std::make_tuple(nullptr, -1.0);

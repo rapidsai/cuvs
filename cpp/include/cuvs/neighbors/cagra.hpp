@@ -476,7 +476,7 @@ struct index : cuvs::neighbors::index {
   void update_dataset(raft::resources const& res,
                       raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
   {
-    dataset_       = make_aligned_dataset(res, dataset, 16);
+    dataset_ = make_aligned_dataset(res, dataset, 16);
     dataset_norms_.reset();
   }
 
@@ -484,7 +484,7 @@ struct index : cuvs::neighbors::index {
   void update_dataset(raft::resources const& res,
                       raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset)
   {
-    dataset_       = make_aligned_dataset(res, dataset, 16);
+    dataset_ = make_aligned_dataset(res, dataset, 16);
     dataset_norms_.reset();
   }
 
@@ -500,7 +500,7 @@ struct index : cuvs::neighbors::index {
   void update_dataset(raft::resources const& res,
                       raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
   {
-    dataset_       = make_aligned_dataset(res, dataset, 16);
+    dataset_ = make_aligned_dataset(res, dataset, 16);
     dataset_norms_.reset();
   }
 
@@ -515,7 +515,7 @@ struct index : cuvs::neighbors::index {
   auto update_dataset(raft::resources const& res, DatasetT&& dataset)
     -> std::enable_if_t<std::is_base_of_v<cuvs::neighbors::dataset<dataset_index_type>, DatasetT>>
   {
-    dataset_       = std::make_unique<DatasetT>(std::move(dataset));
+    dataset_ = std::make_unique<DatasetT>(std::move(dataset));
     dataset_norms_.reset();
   }
 
@@ -523,7 +523,7 @@ struct index : cuvs::neighbors::index {
   auto update_dataset(raft::resources const& res, std::unique_ptr<DatasetT>&& dataset)
     -> std::enable_if_t<std::is_base_of_v<neighbors::dataset<dataset_index_type>, DatasetT>>
   {
-    dataset_       = std::move(dataset);
+    dataset_ = std::move(dataset);
     dataset_norms_.reset();
   }
 

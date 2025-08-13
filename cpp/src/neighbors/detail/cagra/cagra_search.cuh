@@ -212,22 +212,21 @@ void search_main(raft::resources const& res,
     const auto k         = distances.extent(1);
     auto query_norms_ptr = query_norms.data_handle();
 
-
-    raft::linalg::matrix_vector_op<raft::Apply::ALONG_ROWS>(
-      res,
-      raft::make_const_mdspan(distances),
-      raft::make_const_mdspan(query_norms),
-      distances,
-      raft::div_op());
+    raft::linalg::matrix_vector_op<raft::Apply::ALONG_ROWS>(res,
+                                                            raft::make_const_mdspan(distances),
+                                                            raft::make_const_mdspan(query_norms),
+                                                            distances,
+                                                            raft::div_op());
   }
-    cuvs::neighbors::ivf::detail::postprocess_distances(dist_out,
-                                                        dist_in,
-                                                        index.metric(),
-                                                        distances.extent(0),
-                                                        distances.extent(1),
-                                                        kScale,
-                                                        index.metric() != distance::DistanceType::CosineExpanded,
-                                                        raft::resource::get_cuda_stream(res));
+  cuvs::neighbors::ivf::detail::postprocess_distances(
+    dist_out,
+    dist_in,
+    index.metric(),
+    distances.extent(0),
+    distances.extent(1),
+    kScale,
+    index.metric() != distance::DistanceType::CosineExpanded,
+    raft::resource::get_cuda_stream(res));
 }
 /** @} */  // end group cagra
 
