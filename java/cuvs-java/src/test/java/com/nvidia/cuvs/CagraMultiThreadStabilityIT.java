@@ -16,9 +16,7 @@
 package com.nvidia.cuvs;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
@@ -45,29 +43,48 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
+  private final int dimensions = 256;
+  private final int queriesPerThread = 500;
+  private final int queryBatchSize = 1; // Small batch size to increase frequency of calls
+  private final int topK = 10;
+
+  @FunctionalInterface
+  private interface QueryAction {
+    void run(CagraIndex index) throws Throwable;
+  }
+
   @Before
   public void setup() {
     assumeTrue("not supported on " + System.getProperty("os.name"), isLinuxAmd64());
     initializeRandom();
-    log.info("Multi-threaded stability test initialized");
+    log.trace("Multi-threaded stability test initialized");
   }
 
   @Test
-  public void testQueryingUsingMultipleThreads() throws Throwable {
+  public void testQueryingUsingMultipleThreadsWithSharedSynchronizedResources() throws Throwable {
+    try (CuVSResources sharedResources = SynchronizedCuVSResources.create()) {
+      testQueryingUsingMultipleThreads(
+          index -> performQueryWithSharedSynchronizedResource(sharedResources, index));
+    }
+  }
+
+  @Test
+  public void testQueryingUsingMultipleThreadsWithPrivateResources() throws Throwable {
+    testQueryingUsingMultipleThreads(this::performQueryWithPrivateResource);
+  }
+
+  private void testQueryingUsingMultipleThreads(QueryAction queryAction) throws Throwable {
     final int dataSize = 10000;
-    final int dimensions = 256;
-    final int numThreads = 16; // High thread count to increase contention
-    final int queriesPerThread = 500;
-    final int queryBatchSize = 1; // Small batch size to increase frequency of calls
-    final int topK = 10;
+    final int numThreads = 16;
 
-    log.info("  Dataset: {}x{}", dataSize, dimensions);
-    log.info("  Threads: {}, Queries per thread: {}", numThreads, queriesPerThread);
+    log.debug("  Dataset: {}x{}", dataSize, dimensions);
+    // High thread count to increase contention
+    log.debug("  Threads: {}, Queries per thread: {}", numThreads, queriesPerThread);
 
-    float[][] dataset = generateRandomDataset(dataSize, dimensions);
+    float[][] dataset = generateRandomDataset(dataSize);
 
     try (CuVSResources resources = CheckedCuVSResources.create()) {
-      log.info("Creating CAGRA index for MultiThreaded stability test...");
+      log.trace("Creating CAGRA index for MultiThreaded stability test...");
 
       CagraIndexParams indexParams =
           new CagraIndexParams.Builder()
@@ -84,107 +101,127 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
               .withIndexParams(indexParams)
               .build();
 
-      log.info("CAGRA index created, starting high-contention multi-threaded search...");
+      log.trace("CAGRA index created, starting high-contention multi-threaded search...");
 
-      // Create high contention scenario that would fail without using separate resources in every thread
-      ExecutorService executor = Executors.newFixedThreadPool(numThreads);
-      List<Future<?>> futures = new ArrayList<>();
-      CountDownLatch startLatch = new CountDownLatch(1);
-      AtomicInteger successfulQueries = new AtomicInteger(0);
-      AtomicReference<Throwable> firstError = new AtomicReference<>();
+      // Create high contention scenario that would fail without using separate resources in every
+      // thread
+      try (ExecutorService executor = Executors.newFixedThreadPool(numThreads)) {
+        List<Future<?>> futures = new ArrayList<>();
+        CountDownLatch startLatch = new CountDownLatch(1);
+        AtomicInteger successfulQueries = new AtomicInteger(0);
+        AtomicReference<Throwable> firstError = new AtomicReference<>();
 
-      for (int threadId = 0; threadId < numThreads; threadId++) {
-        final int finalThreadId = threadId;
+        for (int threadId = 0; threadId < numThreads; threadId++) {
+          final int finalThreadId = threadId;
 
-        Future<?> future =
-            executor.submit(
-                () -> {
-                  try {
-                    // Wait for all threads to start simultaneously
-                    startLatch.await();
+          Future<?> future =
+              executor.submit(
+                  () -> {
+                    try {
+                      // Wait for all threads to start simultaneously
+                      startLatch.await();
 
-                    for (int queryId = 0; queryId < queriesPerThread; queryId++) {
-                      float[][] queries = generateRandomDataset(queryBatchSize, dimensions);
-
-                      try (CuVSResources threadResources = CheckedCuVSResources.create()) {
-                        CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
-                        CagraQuery query =
-                            new CagraQuery.Builder(threadResources)
-                                .withTopK(topK)
-                                .withSearchParams(searchParams)
-                                .withQueryVectors(queries)
-                                .build();
-
-                        // This call should now work with per-thread resources
-                        SearchResults results = index.search(query);
-                        assertNotNull("Query should return results", results);
-                        assertTrue(
-                            "Query should return some results", !results.getResults().isEmpty());
-
+                      for (int queryId = 0; queryId < queriesPerThread; queryId++) {
+                        queryAction.run(index);
                         successfulQueries.incrementAndGet();
+
+                        // No Thread.yield() - maximize contention
                       }
 
-                      // No Thread.yield() - maximize contention
+                      log.trace("Thread {} completed successfully", finalThreadId);
+
+                    } catch (Throwable t) {
+                      log.error("Thread {} failed: {}", finalThreadId, t.getMessage(), t);
+                      firstError.compareAndSet(null, t);
+                      throw new RuntimeException("Thread failed", t);
                     }
+                  });
 
-                    log.info("Thread {} completed successfully", finalThreadId);
+          futures.add(future);
+        }
 
-                  } catch (Throwable t) {
-                    log.error("Thread {} failed: {}", finalThreadId, t.getMessage(), t);
-                    firstError.compareAndSet(null, t);
-                    throw new RuntimeException("Thread failed", t);
-                  }
-                });
+        // Start all threads simultaneously to maximize contention
+        log.debug("Starting all {} threads simultaneously...", numThreads);
+        startLatch.countDown();
 
-        futures.add(future);
-      }
-
-      // Start all threads simultaneously to maximize contention
-      log.info("Starting all {} threads simultaneously...", numThreads);
-      startLatch.countDown();
-
-      // Wait for all threads to complete
-      boolean allCompleted = true;
-      for (Future<?> future : futures) {
-        try {
-          future.get(120, TimeUnit.SECONDS); // Longer timeout for stress test
-        } catch (Exception e) {
-          allCompleted = false;
-          log.error("Thread failed: {}", e.getMessage(), e);
-          if (firstError.get() == null) {
-            firstError.set(e);
+        // Wait for all threads to complete
+        boolean allCompleted = true;
+        for (Future<?> future : futures) {
+          try {
+            future.get(120, TimeUnit.SECONDS); // Longer timeout for stress test
+          } catch (Exception e) {
+            allCompleted = false;
+            log.error("Thread failed: {}", e.getMessage(), e);
+            if (firstError.get() == null) {
+              firstError.set(e);
+            }
           }
         }
+
+        executor.shutdown();
+        if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
+          executor.shutdownNow();
+        }
+
+        // Verify results
+        int expectedTotalQueries = numThreads * queriesPerThread;
+        int actualSuccessfulQueries = successfulQueries.get();
+
+        log.debug("  Successful queries: {} / {}", actualSuccessfulQueries, expectedTotalQueries);
+
+        if (firstError.get() != null) {
+          fail("MultiThreaded stablity test failed:" + " " + firstError.get().getMessage());
+        }
+
+        assertTrue("All threads should complete successfully", allCompleted);
+        assertEquals(
+            "All queries should complete successfully",
+            expectedTotalQueries,
+            actualSuccessfulQueries);
       }
-
-      executor.shutdown();
-      if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
-        executor.shutdownNow();
-      }
-
-      // Verify results
-      int expectedTotalQueries = numThreads * queriesPerThread;
-      int actualSuccessfulQueries = successfulQueries.get();
-
-      log.info("  Successful queries: {} / {}", actualSuccessfulQueries, expectedTotalQueries);
-
-      if (firstError.get() != null) {
-        fail(
-            "MultiThreaded stablity test failed:"
-                + " "
-                + firstError.get().getMessage());
-      }
-
-      assertTrue("All threads should complete successfully", allCompleted);
-      assertTrue(
-          "All queries should complete successfully",
-          actualSuccessfulQueries == expectedTotalQueries);
 
       index.destroyIndex();
     }
   }
 
-  private float[][] generateRandomDataset(int size, int dimensions) {
+  private void performQueryWithPrivateResource(CagraIndex index) throws Throwable {
+    float[][] queries = generateRandomDataset(queryBatchSize);
+
+    try (CuVSResources threadResources = CheckedCuVSResources.create()) {
+      CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
+      CagraQuery query =
+          new CagraQuery.Builder(threadResources)
+              .withTopK(topK)
+              .withSearchParams(searchParams)
+              .withQueryVectors(queries)
+              .build();
+
+      // This call should now work with per-thread resources
+      SearchResults results = index.search(query);
+      assertNotNull("Query should return results", results);
+      assertFalse("Query should return some results", results.getResults().isEmpty());
+    }
+  }
+
+  private void performQueryWithSharedSynchronizedResource(
+      CuVSResources threadResources, CagraIndex index) throws Throwable {
+    float[][] queries = generateRandomDataset(queryBatchSize);
+
+    CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
+    CagraQuery query =
+        new CagraQuery.Builder(threadResources)
+            .withTopK(topK)
+            .withSearchParams(searchParams)
+            .withQueryVectors(queries)
+            .build();
+
+    // This call should now work with per-thread resources
+    SearchResults results = index.search(query);
+    assertNotNull("Query should return results", results);
+    assertFalse("Query should return some results", results.getResults().isEmpty());
+  }
+
+  private float[][] generateRandomDataset(int size) {
     Random random = new Random(42 + System.nanoTime());
     float[][] data = new float[size][dimensions];
 
