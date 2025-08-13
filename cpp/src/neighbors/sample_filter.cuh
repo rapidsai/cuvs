@@ -66,14 +66,11 @@ struct takes_three_args<
  * @tparam filter_t
  */
 template <typename index_t, typename filter_t>
-_RAFT_HOST_DEVICE ivf_to_sample_filter<index_t, filter_t>::ivf_to_sample_filter(
-  const index_t* const* inds_ptrs, const filter_t next_filter)
+ivf_to_sample_filter<index_t, filter_t>::ivf_to_sample_filter(const index_t* const* inds_ptrs,
+                                                              const filter_t next_filter)
   : inds_ptrs_{inds_ptrs}, next_filter_{next_filter}
 {
 }
-
-template <typename index_t, typename filter_t>
-_RAFT_HOST_DEVICE ivf_to_sample_filter<index_t, filter_t>::~ivf_to_sample_filter() = default;
 
 /** If the original filter takes three arguments, then don't modify the arguments.
  * If the original filter takes two arguments, then we are using `inds_ptr_` to obtain the sample
@@ -101,9 +98,6 @@ _RAFT_HOST_DEVICE bitset_filter<bitset_t, index_t>::bitset_filter(
   : bitset_view_{bitset_for_filtering}
 {
 }
-
-template <typename bitset_t, typename index_t>
-_RAFT_HOST_DEVICE bitset_filter<bitset_t, index_t>::~bitset_filter() = default;
 
 template <typename bitset_t, typename index_t>
 constexpr __forceinline__ _RAFT_HOST_DEVICE bool bitset_filter<bitset_t, index_t>::operator()(
