@@ -171,17 +171,15 @@ struct ivf_filter_dev {
     new (&args_.bitset_filter_args) bitset_filter_args_t(args);
   }
 
-  constexpr inline _RAFT_HOST_DEVICE bool operator()(const uint32_t query_ix,
-                                                     const uint32_t cluster_ix,
-                                                     const uint32_t sample_ix)
+  constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(const uint32_t query_ix,
+                                                              const uint32_t cluster_ix,
+                                                              const uint32_t sample_ix)
   {
     switch (tag_) {
       case FilterType::None:
         return filtering::none_sample_filter{}(query_ix, cluster_ix, sample_ix);
       case FilterType::Bitset: {
-        auto& inds_ptrs_   = std::get<0>(args_.bitset_filter_args);
-        auto& bitset_view_ = std::get<1>(args_.bitset_filter_args);
-
+        auto& [inds_ptrs_, bitset_view_] = args_.bitset_filter_args;
         return filtering::bitset_filter<uint32_t, int64_t>(bitset_view_)(
           query_ix, inds_ptrs_[cluster_ix][sample_ix]);
       }
