@@ -212,23 +212,22 @@ void search_main(raft::resources const& res,
     const auto k         = distances.extent(1);
     auto query_norms_ptr = query_norms.data_handle();
 
-    auto cosine_convert_op = [query_norms_ptr, k] __device__(auto idx, auto dist) {
-      auto query_idx  = idx / k;
-      auto query_norm = query_norms_ptr[query_idx];
-      return query_norm > 0 ? (1.0f + dist / query_norm) : 1.0f;
-    };
 
-    raft::linalg::map_offset(dist_out, n_queries * k, cosine_convert_op, stream);
-  } else {
+    raft::linalg::matrix_vector_op<raft::Apply::ALONG_ROWS>(
+      res,
+      raft::make_const_mdspan(distances),
+      raft::make_const_mdspan(query_norms),
+      distances,
+      raft::div_op());
+  }
     cuvs::neighbors::ivf::detail::postprocess_distances(dist_out,
                                                         dist_in,
                                                         index.metric(),
                                                         distances.extent(0),
                                                         distances.extent(1),
                                                         kScale,
-                                                        true,
+                                                        index.metric() != distance::DistanceType::CosineExpanded,
                                                         raft::resource::get_cuda_stream(res));
-  }
 }
 /** @} */  // end group cagra
 

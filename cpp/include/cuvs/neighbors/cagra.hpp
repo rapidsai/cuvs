@@ -501,7 +501,7 @@ struct index : cuvs::neighbors::index {
                       raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
   {
     dataset_       = make_aligned_dataset(res, dataset, 16);
-    dataset_norms_ = std::nullopt;  // Clear norms as they need to be recomputed
+    dataset_norms_.reset();
   }
 
   /**
@@ -516,7 +516,7 @@ struct index : cuvs::neighbors::index {
     -> std::enable_if_t<std::is_base_of_v<cuvs::neighbors::dataset<dataset_index_type>, DatasetT>>
   {
     dataset_       = std::make_unique<DatasetT>(std::move(dataset));
-    dataset_norms_ = std::nullopt;  // Clear norms as they need to be recomputed
+    dataset_norms_.reset();
   }
 
   template <typename DatasetT>
@@ -524,7 +524,7 @@ struct index : cuvs::neighbors::index {
     -> std::enable_if_t<std::is_base_of_v<neighbors::dataset<dataset_index_type>, DatasetT>>
   {
     dataset_       = std::move(dataset);
-    dataset_norms_ = std::nullopt;  // Clear norms as they need to be recomputed
+    dataset_norms_.reset();
   }
 
   /**
