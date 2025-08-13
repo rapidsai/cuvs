@@ -107,8 +107,6 @@ struct standard_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, I
     return args.extra_word1;
   }
 
-
-
   _RAFT_HOST_DEVICE standard_dataset_descriptor_t(setup_workspace_type* setup_workspace_impl,
                                                   compute_distance_type* compute_distance_impl,
                                                   const DATA_T* ptr,

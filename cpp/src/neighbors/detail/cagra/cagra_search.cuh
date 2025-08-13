@@ -203,11 +203,11 @@ void search_main(raft::resources const& res,
     auto query_norms_ptr = query_norms.data_handle();
 
     auto cosine_convert_op = [query_norms_ptr, k] __device__(auto idx, auto dist) {
-      auto query_idx = idx / k;
+      auto query_idx  = idx / k;
       auto query_norm = query_norms_ptr[query_idx];
       return query_norm > 0 ? (1.0f + dist / query_norm) : 1.0f;
     };
-    
+
     raft::linalg::map_offset(dist_out, n_queries * k, cosine_convert_op, stream);
   } else {
     cuvs::neighbors::ivf::detail::postprocess_distances(dist_out,
