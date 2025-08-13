@@ -45,12 +45,9 @@ struct standard_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT>
   template <typename DatasetT>
   static auto init(const cagra::search_params& params,
                    const DatasetT& dataset,
-                   cuvs::distance::DistanceType metric) -> host_type
+                   cuvs::distance::DistanceType metric,
+                   const float* dataset_norms = nullptr) -> host_type
   {
-    // For CosineExpanded, dataset norms should be pre-calculated and passed separately
-    // For now, we pass nullptr - the actual norm calculation should be done
-    // during index building or by extending the dataset structure
-    const DistanceT* dataset_norms = nullptr;
     return init_(params,
                  dataset.view().data_handle(),
                  IndexT(dataset.n_rows()),

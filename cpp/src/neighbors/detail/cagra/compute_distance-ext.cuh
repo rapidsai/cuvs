@@ -568,7 +568,8 @@ using descriptor_instances = instance_selector<
 template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
 auto dataset_descriptor_init(const cagra::search_params& params,
                              const DatasetT& dataset,
-                             cuvs::distance::DistanceType metric)
+                             cuvs::distance::DistanceType metric,
+                             const float* dataset_norms = nullptr)
   -> dataset_descriptor_host<DataT, IndexT, DistanceT>
 {
   auto [init, priority] =
@@ -576,7 +577,7 @@ auto dataset_descriptor_init(const cagra::search_params& params,
   if (init == nullptr || priority < 0) {
     RAFT_FAIL("No dataset descriptor instance compiled for this parameter combination.");
   }
-  return init(params, dataset, metric);
+  return init(params, dataset, metric, dataset_norms);
 }
 
 }  // namespace cuvs::neighbors::cagra::detail

@@ -302,15 +302,8 @@ standard_descriptor_spec<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, Dista
     standard_dataset_descriptor_t<Metric, TeamSize, DatasetBlockDim, DataT, IndexT, DistanceT>;
   using base_type = typename desc_type::base_type;
 
-  // For CosineExpanded, we need to allocate and compute dataset norms if not provided
-  DistanceT* allocated_norms = nullptr;
-  if (Metric == cuvs::distance::DistanceType::CosineExpanded && dataset_norms == nullptr) {
-    // Note: Norm calculation should be done by the caller or during index building
-    // For now, we'll pass nullptr and handle it differently
-    RAFT_LOG_WARN(
-      "Dataset norms not provided for CosineExpanded metric. "
-      "This may lead to incorrect distance calculations.");
-  }
+  RAFT_EXPECTS(Metric != cuvs::distance::DistanceType::CosineExpanded || dataset_norms != nullptr,
+               "Dataset norms must be provided for CosineExpanded metric");
 
   desc_type dd_host{nullptr, nullptr, ptr, size, dim, ld, dataset_norms};
   return host_type{dd_host,

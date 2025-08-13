@@ -154,8 +154,18 @@ void search_main(raft::resources const& res,
   if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index.data());
       strided_dset != nullptr) {
     // Search using a plain (strided) row-major dataset
+    const float* dataset_norms_ptr = nullptr;
+    if (index.dataset_norms().has_value()) {
+      dataset_norms_ptr = index.dataset_norms()->data_handle();
+    } else if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      // Warn if dataset norms are not available for cosine distance
+      RAFT_LOG_WARN(
+        "Dataset norms not computed for cosine distance. "
+        "Call index.compute_dataset_norms() after building or updating the dataset.");
+    }
+
     auto desc = dataset_descriptor_init_with_cache<T, IdxT, DistanceT>(
-      res, params, *strided_dset, index.metric());
+      res, params, *strided_dset, index.metric(), dataset_norms_ptr);
     search_main_core<T, IdxT, DistanceT, CagraSampleFilterT, OutputIdxT>(
       res, params, desc, index.graph(), queries, neighbors, distances, sample_filter);
   } else if (auto* vpq_dset = dynamic_cast<const vpq_dataset<float, ds_idx_type>*>(&index.data());
@@ -165,7 +175,7 @@ void search_main(raft::resources const& res,
   } else if (auto* vpq_dset = dynamic_cast<const vpq_dataset<half, ds_idx_type>*>(&index.data());
              vpq_dset != nullptr) {
     auto desc = dataset_descriptor_init_with_cache<T, IdxT, DistanceT>(
-      res, params, *vpq_dset, index.metric());
+      res, params, *vpq_dset, index.metric(), nullptr);
     search_main_core<T, IdxT, DistanceT, CagraSampleFilterT, OutputIdxT>(
       res, params, desc, index.graph(), queries, neighbors, distances, sample_filter);
   } else if (auto* empty_dset = dynamic_cast<const empty_dataset<ds_idx_type>*>(&index.data());

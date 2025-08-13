@@ -795,8 +795,15 @@ index<T, IdxT> build(
   }
   if (params.attach_dataset_on_build) {
     try {
-      return index<T, IdxT>(
-        res, params.metric, dataset, raft::make_const_mdspan(cagra_graph.view()));
+      auto idx =
+        index<T, IdxT>(res, params.metric, dataset, raft::make_const_mdspan(cagra_graph.view()));
+
+      // Compute dataset norms for cosine distance
+      if (params.metric == cuvs::distance::DistanceType::CosineExpanded) {
+        idx.compute_dataset_norms(res);
+      }
+
+      return idx;
     } catch (std::bad_alloc& e) {
       RAFT_LOG_WARN(
         "Insufficient GPU memory to construct CAGRA index with dataset on GPU. Only the graph will "
