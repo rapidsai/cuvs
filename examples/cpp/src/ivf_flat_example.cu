@@ -19,15 +19,11 @@
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
-#include <raft/core/resource/thrust_policy.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/mr/device/device_memory_resource.hpp>
 #include <rmm/mr/device/pool_memory_resource.hpp>
-
-#include <thrust/copy.h>
-#include <thrust/device_ptr.h>
-#include <thrust/iterator/counting_iterator.h>
 
 #include <cstdint>
 #include <optional>
@@ -77,10 +73,7 @@ void ivf_flat_build_extend_search(raft::device_resources const& dev_resources,
 
   // Define dataset indices.
   auto data_indices = raft::make_device_vector<int64_t, int64_t>(dev_resources, dataset.extent(0));
-  thrust::counting_iterator<int64_t> first(0);
-  thrust::device_ptr<int64_t> ptr(data_indices.data_handle());
-  thrust::copy(
-    raft::resource::get_thrust_policy(dev_resources), first, first + dataset.extent(0), ptr);
+  raft::linalg::map_offset(dev_resources, data_indices.view(), raft::identity_op{});
 
   // Sub-sample the dataset to create a training set.
   auto trainset =
