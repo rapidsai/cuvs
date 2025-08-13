@@ -189,7 +189,7 @@ void search_main(raft::resources const& res,
 
   if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
     auto stream      = raft::resource::get_cuda_stream(res);
-    auto query_norms = raft::make_device_vector<T, int64_t>(res, queries.extent(0));
+    auto query_norms = raft::make_device_vector<DistanceT, int64_t>(res, queries.extent(0));
 
     raft::linalg::rowNorm<raft::linalg::L2Norm, true>(query_norms.data_handle(),
                                                       queries.data_handle(),
