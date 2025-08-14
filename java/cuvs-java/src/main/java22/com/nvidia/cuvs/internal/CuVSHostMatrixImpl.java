@@ -22,6 +22,7 @@ import com.nvidia.cuvs.CuVSHostMatrix;
 import com.nvidia.cuvs.RowView;
 import java.lang.foreign.*;
 import java.lang.invoke.VarHandle;
+import java.util.Locale;
 
 /**
  * A Dataset implementation backed by host (CPU) memory.
@@ -53,10 +54,13 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
   }
 
   @Override
-  public RowView getRow(long nodeIndex) {
+  public RowView getRow(long index) {
+    assert (index < size)
+        : String.format(Locale.ROOT, "Index out of bound ([%d], size [%d])", index, size);
+
     var valueByteSize = valueLayout.byteSize();
     return new SliceRowView(
-        memorySegment.asSlice(nodeIndex * columns * valueByteSize, columns * valueByteSize),
+        memorySegment.asSlice(index * columns * valueByteSize, columns * valueByteSize),
         columns,
         valueLayout,
         dataType,
@@ -65,9 +69,22 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
 
   @Override
   public void toArray(int[][] array) {
-    assert dataType == DataType.INT;
-    assert (array.length >= size) : "Input array is not large enough";
-    assert (array.length == 0 || array[0].length >= columns) : "Input array is not large enough";
+    assert (array.length >= size)
+        : String.format(
+            Locale.ROOT,
+            "Input array is not large enough (required: [%d], actual [%d])",
+            size,
+            array.length);
+    assert (array.length == 0 || array[0].length >= columns)
+        : String.format(
+            Locale.ROOT,
+            "Input array is not wide enough (required: [%d], actual [%d])",
+            columns,
+            array[0].length);
+    assert dataType == DataType.INT || dataType == DataType.UINT
+        : String.format(
+            Locale.ROOT, "Input array is of the wrong type for dataType [%s]", dataType.toString());
+
     var valueByteSize = valueLayout.byteSize();
     for (int r = 0; r < size; ++r) {
       MemorySegment.copy(
@@ -77,9 +94,22 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
 
   @Override
   public void toArray(float[][] array) {
-    assert dataType == DataType.FLOAT;
-    assert (array.length >= size) : "Input array is not large enough";
-    assert (array.length == 0 || array[0].length >= columns) : "Input array is not large enough";
+    assert (array.length >= size)
+        : String.format(
+            Locale.ROOT,
+            "Input array is not large enough (required: [%d], actual [%d])",
+            size,
+            array.length);
+    assert (array.length == 0 || array[0].length >= columns)
+        : String.format(
+            Locale.ROOT,
+            "Input array is not wide enough (required: [%d], actual [%d])",
+            columns,
+            array[0].length);
+    assert dataType == DataType.FLOAT
+        : String.format(
+            Locale.ROOT, "Input array is of the wrong type for dataType [%s]", dataType.toString());
+
     var valueByteSize = valueLayout.byteSize();
     for (int r = 0; r < size; ++r) {
       MemorySegment.copy(
@@ -89,9 +119,22 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
 
   @Override
   public void toArray(byte[][] array) {
-    assert dataType == DataType.BYTE;
-    assert (array.length >= size) : "Input array is not large enough";
-    assert (array.length == 0 || array[0].length >= columns) : "Input array is not large enough";
+    assert (array.length >= size)
+        : String.format(
+            Locale.ROOT,
+            "Input array is not large enough (required: [%d], actual [%d])",
+            size,
+            array.length);
+    assert (array.length == 0 || array[0].length >= columns)
+        : String.format(
+            Locale.ROOT,
+            "Input array is not wide enough (required: [%d], actual [%d])",
+            columns,
+            array[0].length);
+    assert dataType == DataType.BYTE
+        : String.format(
+            Locale.ROOT, "Input array is of the wrong type for dataType [%s]", dataType.toString());
+
     var valueByteSize = valueLayout.byteSize();
     for (int r = 0; r < size; ++r) {
       MemorySegment.copy(

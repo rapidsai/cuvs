@@ -19,6 +19,7 @@ import com.nvidia.cuvs.CuVSMatrix;
 import com.nvidia.cuvs.RowView;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.util.Locale;
 
 /**
  * A {@link RowView} over a {@link MemorySegment} slice.
@@ -50,40 +51,76 @@ class SliceRowView implements RowView {
 
   @Override
   public float getAsFloat(long index) {
-    assert dataType == CuVSMatrix.DataType.FLOAT;
+    assert (index < size)
+        : String.format(Locale.ROOT, "Index out of bound ([%d], size [%d])", index, size);
+    assert dataType == CuVSMatrix.DataType.FLOAT
+        : String.format(
+            Locale.ROOT, "Input array is of the wrong type for dataType [%s]", dataType.toString());
+
     return memorySegment.get((ValueLayout.OfFloat) valueLayout, index * valueByteSize);
   }
 
   @Override
   public byte getAsByte(long index) {
-    assert dataType == CuVSMatrix.DataType.BYTE;
+    assert (index < size)
+        : String.format(Locale.ROOT, "Index out of bound ([%d], size [%d])", index, size);
+    assert dataType == CuVSMatrix.DataType.BYTE
+        : String.format(
+            Locale.ROOT, "Input array is of the wrong type for dataType [%s]", dataType.toString());
+
     return memorySegment.get((ValueLayout.OfByte) valueLayout, index * valueByteSize);
   }
 
   @Override
   public int getAsInt(long index) {
-    assert dataType == CuVSMatrix.DataType.INT;
+    assert (index < size)
+        : String.format(Locale.ROOT, "Index out of bound ([%d], size [%d])", index, size);
+    assert dataType == CuVSMatrix.DataType.INT || dataType == CuVSMatrix.DataType.UINT
+        : String.format(
+            Locale.ROOT, "Input array is of the wrong type for dataType [%s]", dataType.toString());
+
     return memorySegment.get((ValueLayout.OfInt) valueLayout, index * valueByteSize);
   }
 
   @Override
   public void toArray(int[] array) {
-    assert (array.length >= size) : "Input array is not large enough";
-    assert dataType == CuVSMatrix.DataType.INT;
+    assert (array.length >= size)
+        : String.format(
+            Locale.ROOT,
+            "Input array is not large enough (required: [%d], actual [%d])",
+            size,
+            array.length);
+    assert dataType == CuVSMatrix.DataType.INT || dataType == CuVSMatrix.DataType.UINT
+        : String.format(
+            Locale.ROOT, "Input array is of the wrong type for dataType [%s]", dataType.toString());
     MemorySegment.copy(memorySegment, valueLayout, 0, array, 0, (int) size);
   }
 
   @Override
   public void toArray(float[] array) {
-    assert (array.length >= size) : "Input array is not large enough";
-    assert dataType == CuVSMatrix.DataType.FLOAT;
+    assert (array.length >= size)
+        : String.format(
+            Locale.ROOT,
+            "Input array is not large enough (required: [%d], actual [%d])",
+            size,
+            array.length);
+    assert dataType == CuVSMatrix.DataType.FLOAT
+        : String.format(
+            Locale.ROOT, "Input array is of the wrong type for dataType [%s]", dataType.toString());
     MemorySegment.copy(memorySegment, valueLayout, 0, array, 0, (int) size);
   }
 
   @Override
   public void toArray(byte[] array) {
-    assert (array.length >= size) : "Input array is not large enough";
-    assert dataType == CuVSMatrix.DataType.BYTE;
+    assert (array.length >= size)
+        : String.format(
+            Locale.ROOT,
+            "Input array is not large enough (required: [%d], actual [%d])",
+            size,
+            array.length);
+    assert dataType == CuVSMatrix.DataType.BYTE
+        : String.format(
+            Locale.ROOT, "Input array is of the wrong type for dataType [%s]", dataType.toString());
     MemorySegment.copy(memorySegment, valueLayout, 0, array, 0, (int) size);
   }
 }
