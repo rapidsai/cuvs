@@ -17,9 +17,12 @@
 
 #include "utils.hpp"
 
+#include <cstdint>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
 #include <raft/core/mdspan.hpp>
+#include <raft/core/pinned_mdarray.hpp>
+#include <raft/core/pinned_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 
@@ -29,6 +32,7 @@
 
 #include <raft/util/bitonic_sort.cuh>
 #include <raft/util/cuda_rt_essentials.hpp>
+#include <rmm/mr/pinned_host_memory_resource.hpp>
 
 #include <cuda_fp16.h>
 
@@ -722,7 +726,7 @@ void mst_opt_update_graph(IdxT* mst_graph_ptr,
 template <typename IdxT = uint32_t>
 void mst_optimization(raft::resources const& res,
                       raft::host_matrix_view<IdxT, int64_t, raft::row_major> input_graph,
-                      raft::host_matrix_view<IdxT, int64_t, raft::row_major> output_graph,
+                      raft::pinned_matrix_view<IdxT, int64_t, raft::row_major> output_graph,
                       raft::host_vector_view<uint32_t, int64_t> mst_graph_num_edges,
                       bool use_gpu = true)
 {
@@ -1196,7 +1200,8 @@ void optimize(
     "cagra::graph::optimize(%zu, %zu, %u)", graph_size, knn_graph_degree, output_graph_degree);
 
   // MST optimization
-  auto mst_graph               = raft::make_host_matrix<IdxT, int64_t, raft::row_major>(0, 0);
+  auto mst_graph =
+    raft::make_pinned_matrix<IdxT, int64_t, raft::row_major>(res, IdxT(0), int64_t(0));
   auto mst_graph_num_edges     = raft::make_host_vector<uint32_t, int64_t>(graph_size);
   auto mst_graph_num_edges_ptr = mst_graph_num_edges.data_handle();
 #pragma omp parallel for
@@ -1206,8 +1211,8 @@ void optimize(
   if (guarantee_connectivity) {
     raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
       "cagra::graph::optimize/check_connectivity");
-    mst_graph =
-      raft::make_host_matrix<IdxT, int64_t, raft::row_major>(graph_size, output_graph_degree);
+    mst_graph = raft::make_pinned_matrix<IdxT, int64_t, raft::row_major>(
+      res, graph_size, output_graph_degree);
     RAFT_LOG_INFO("MST optimization is used to guarantee graph connectivity.");
     mst_optimization(res, knn_graph, mst_graph.view(), mst_graph_num_edges.view(), use_gpu);
 
