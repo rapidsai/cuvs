@@ -249,6 +249,30 @@ cuvsError_t cuvsTieredIndexExtend(cuvsResources_t res,
 /**
  * @}
  */
+
+/**
+ * @defgroup tiered_c_index_merge Tiered index merge
+ * @{
+ */
+/**
+ * @brief Merge multiple indices together into a single index
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] index_params Index parameters to use when merging
+ * @param[in] indices pointers to indices to merge together
+ * @param[in] num_indices the number of indices to merge
+ * @param[out] output_index the merged index
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsTieredIndexMerge(cuvsResources_t res,
+                                 cuvsTieredIndexParams_t index_params,
+                                 cuvsTieredIndex_t* indices,
+                                 size_t num_indices,
+                                 cuvsTieredIndex_t output_index);
+
+/**
+ * @}
+ */
 #ifdef __cplusplus
 }
 #endif
