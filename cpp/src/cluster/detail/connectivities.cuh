@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/linalg/unary_op.cuh>
 #include <raft/sparse/convert/csr.cuh>
 #include <raft/sparse/coo.hpp>
@@ -30,10 +31,6 @@
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/device_uvector.hpp>
-
-#include <thrust/iterator/zip_iterator.h>
-#include <thrust/transform.h>
-#include <thrust/tuple.h>
 
 #include <limits>
 
@@ -83,18 +80,25 @@ struct distance_graph_impl<Linkage::KNN_GRAPH, value_idx, value_t> {
     data.resize(knn_graph_coo.nnz, stream);
 
     // self-loops get max distance
-    auto transform_in = thrust::make_zip_iterator(
-      thrust::make_tuple(knn_graph_coo.rows(), knn_graph_coo.cols(), knn_graph_coo.vals()));
+    auto rows_view = raft::make_device_vector_view<const value_idx, value_idx>(knn_graph_coo.rows(),
+                                                                               knn_graph_coo.nnz);
+    auto cols_view = raft::make_device_vector_view<const value_idx, value_idx>(knn_graph_coo.cols(),
+                                                                               knn_graph_coo.nnz);
+    auto vals_in_view = raft::make_device_vector_view<const value_t, value_idx>(
+      knn_graph_coo.vals(), knn_graph_coo.nnz);
+    auto vals_out_view =
+      raft::make_device_vector_view<value_t, value_idx>(knn_graph_coo.vals(), knn_graph_coo.nnz);
 
-    thrust::transform(thrust_policy,
-                      transform_in,
-                      transform_in + knn_graph_coo.nnz,
-                      knn_graph_coo.vals(),
-                      [=] __device__(const thrust::tuple<value_idx, value_idx, value_t>& tup) {
-                        bool self_loop = thrust::get<0>(tup) == thrust::get<1>(tup);
-                        return (self_loop * std::numeric_limits<value_t>::max()) +
-                               (!self_loop * thrust::get<2>(tup));
-                      });
+    raft::linalg::map(
+      handle,
+      vals_out_view,
+      [=] __device__(const value_idx row, const value_idx col, const value_t val) {
+        bool self_loop = row == col;
+        return (self_loop * std::numeric_limits<value_t>::max()) + (!self_loop * val);
+      },
+      rows_view,
+      cols_view,
+      vals_in_view);
 
     raft::sparse::convert::sorted_coo_to_csr(
       knn_graph_coo.rows(), knn_graph_coo.nnz, indptr.data(), m + 1, stream);
@@ -147,7 +151,9 @@ void pairwise_distances(const raft::resources& handle,
   value_idx blocks = raft::ceildiv(nnz, (value_idx)256);
   fill_indices2<value_idx><<<blocks, 256, 0, stream>>>(indices, m, nnz);
 
-  thrust::sequence(exec_policy, indptr, indptr + m, 0, (int)m);
+  raft::linalg::map_offset(handle,
+                           raft::make_device_vector_view<value_idx, value_idx>(indptr, m),
+                           [=] __device__(value_idx idx) { return idx * m; });
 
   raft::update_device(indptr + m, &nnz, 1, stream);
 
@@ -160,19 +166,13 @@ void pairwise_distances(const raft::resources& handle,
     handle, X_view, X_view, raft::make_device_matrix_view<value_t, value_idx>(data, m, m), metric);
 
   // self-loops get max distance
-  auto transform_in =
-    thrust::make_zip_iterator(thrust::make_tuple(thrust::make_counting_iterator(0), data));
+  auto data_view = raft::make_device_vector_view<value_t, value_idx>(data, nnz);
 
-  thrust::transform(exec_policy,
-                    transform_in,
-                    transform_in + nnz,
-                    data,
-                    [=] __device__(const thrust::tuple<value_idx, value_t>& tup) {
-                      value_idx idx  = thrust::get<0>(tup);
-                      bool self_loop = idx % m == idx / m;
-                      return (self_loop * std::numeric_limits<value_t>::max()) +
-                             (!self_loop * thrust::get<1>(tup));
-                    });
+  raft::linalg::map_offset(handle, data_view, [=] __device__(value_idx idx) {
+    value_t val    = data[idx];
+    bool self_loop = idx % m == idx / m;
+    return (self_loop * std::numeric_limits<value_t>::max()) + (!self_loop * val);
+  });
 }
 
 /**
