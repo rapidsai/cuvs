@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,26 +37,25 @@ namespace cuvs::neighbors::nn_descent {
 
 /**
  * @brief Parameters used to build an nn-descent index
- *
- * `graph_degree`: For an input dataset of dimensions (N, D),
+ * - `graph_degree`: For an input dataset of dimensions (N, D),
  * determines the final dimensions of the all-neighbors knn graph
  * which turns out to be of dimensions (N, graph_degree)
- * `intermediate_graph_degree`: Internally, nn-descent builds an
+ * - `intermediate_graph_degree`: Internally, nn-descent builds an
  * all-neighbors knn graph of dimensions (N, intermediate_graph_degree)
  * before selecting the final `graph_degree` neighbors. It's recommended
  * that `intermediate_graph_degree` >= 1.5 * graph_degree
- * `max_iterations`: The number of iterations that nn-descent will refine
+ * - `max_iterations`: The number of iterations that nn-descent will refine
  * the graph for. More iterations produce a better quality graph at cost of performance
- * `termination_threshold`: The delta at which nn-descent will terminate its iterations
- *
+ * - `termination_threshold`: The delta at which nn-descent will terminate its iterations
+ * - `return_distances`: Boolean to decide whether to return distances array
  */
 struct index_params : cuvs::neighbors::index_params {
-  size_t graph_degree              = 64;      // Degree of output graph.
-  size_t intermediate_graph_degree = 128;     // Degree of input graph for pruning.
-  size_t max_iterations            = 20;      // Number of nn-descent iterations.
-  float termination_threshold      = 0.0001;  // Termination threshold of nn-descent.
-  bool return_distances            = true;    // return distances if true
-  size_t n_clusters                = 1;       // defaults to not using any batching
+  size_t graph_degree              = 64;
+  size_t intermediate_graph_degree = 128;
+  size_t max_iterations            = 20;
+  float termination_threshold      = 0.0001;
+  bool return_distances            = true;
+  size_t n_clusters                = 1;
 
   /** @brief Construct NN descent parameters for a specific kNN graph degree
    *
@@ -211,7 +210,10 @@ struct index : cuvs::neighbors::index {
  * @brief Build nn-descent Index with dataset in device memory
  *
  * The following distance metrics are supported:
- * - L2
+ * - L2Expanded
+ * - L2SqrtExpanded
+ * - CosineExpanded
+ * - InnerProduct
  *
  * Usage example:
  * @code{.cpp}
@@ -244,7 +246,10 @@ auto build(raft::resources const& res,
  * @brief Build nn-descent Index with dataset in host memory
  *
  * The following distance metrics are supported:
- * - L2
+ * - L2Expanded
+ * - L2SqrtExpanded
+ * - CosineExpanded
+ * - InnerProduct
  *
  * Usage example:
  * @code{.cpp}
@@ -279,7 +284,10 @@ auto build(raft::resources const& res,
  * @brief Build nn-descent Index with dataset in device memory
  *
  * The following distance metrics are supported:
- * - L2
+ * - L2Expanded
+ * - L2SqrtExpanded
+ * - CosineExpanded
+ * - InnerProduct
  *
  * Usage example:
  * @code{.cpp}
@@ -312,7 +320,10 @@ auto build(raft::resources const& res,
  * @brief Build nn-descent Index with dataset in host memory
  *
  * The following distance metrics are supported:
- * - L2
+ * - L2Expanded
+ * - L2SqrtExpanded
+ * - CosineExpanded
+ * - InnerProduct
  *
  * Usage example:
  * @code{.cpp}
@@ -347,7 +358,11 @@ auto build(raft::resources const& res,
  * @brief Build nn-descent Index with dataset in device memory
  *
  * The following distance metrics are supported:
- * - L2
+ * - L2Expanded
+ * - L2SqrtExpanded
+ * - CosineExpanded
+ * - InnerProduct
+ * - BitwiseHamming
  *
  * Usage example:
  * @code{.cpp}
@@ -380,7 +395,11 @@ auto build(raft::resources const& res,
  * @brief Build nn-descent Index with dataset in host memory
  *
  * The following distance metrics are supported:
- * - L2
+ * - L2Expanded
+ * - L2SqrtExpanded
+ * - CosineExpanded
+ * - InnerProduct
+ * - BitwiseHamming
  *
  * Usage example:
  * @code{.cpp}
@@ -415,7 +434,11 @@ auto build(raft::resources const& res,
  * @brief Build nn-descent Index with dataset in device memory
  *
  * The following distance metrics are supported:
- * - L2
+ * - L2Expanded
+ * - L2SqrtExpanded
+ * - CosineExpanded
+ * - InnerProduct
+ * - BitwiseHamming
  *
  * Usage example:
  * @code{.cpp}
@@ -448,7 +471,11 @@ auto build(raft::resources const& res,
  * @brief Build nn-descent Index with dataset in host memory
  *
  * The following distance metrics are supported:
- * - L2
+ * - L2Expanded
+ * - L2SqrtExpanded
+ * - CosineExpanded
+ * - InnerProduct
+ * - BitwiseHamming
  *
  * Usage example:
  * @code{.cpp}
@@ -479,6 +506,7 @@ auto build(raft::resources const& res,
            std::optional<raft::host_matrix_view<uint32_t, int64_t, raft::row_major>> graph =
              std::nullopt) -> cuvs::neighbors::nn_descent::index<uint32_t>;
 
+/** @} */
 /**
  * @brief Test if we have enough GPU memory to run NN descent algorithm.
  *
