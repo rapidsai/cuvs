@@ -270,7 +270,6 @@ if(BUILD_SHARED_LIBS)
   )
 
   file(GLOB_RECURSE compute_distance_sources "src/neighbors/detail/cagra/compute_distance_*.cu")
-  set_source_files_properties(${compute_distance_sources} PROPERTIES COMPILE_FLAGS)
 
   set_target_properties(
     cuvs-cagra-search
