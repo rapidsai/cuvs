@@ -432,6 +432,14 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/ivf_flat/ivf_flat_search_half_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_search_int8_t_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_search_uint8_t_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_float_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_half_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_int8_t_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_uint8_t_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_float_int64_t_bitset.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_half_int64_t_bitset.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_int8_t_int64_t_bitset.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_uint8_t_int64_t_bitset.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_float_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_half_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_int8_t_int64_t.cu
@@ -480,6 +488,8 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/refine/detail/refine_host_half_float.cpp
     src/neighbors/refine/detail/refine_host_int8_t_float.cpp
     src/neighbors/refine/detail/refine_host_uint8_t_float.cpp
+    src/neighbors/scann/scann_build_float.cu
+    src/neighbors/scann/scann_serialize_float.cu
     src/neighbors/sample_filter.cu
     src/neighbors/tiered_index.cu
     src/neighbors/sparse_brute_force.cu
