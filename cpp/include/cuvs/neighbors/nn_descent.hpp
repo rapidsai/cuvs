@@ -55,7 +55,6 @@ struct index_params : cuvs::neighbors::index_params {
   size_t max_iterations            = 20;
   float termination_threshold      = 0.0001;
   bool return_distances            = true;
-  size_t n_clusters                = 1;
 
   /** @brief Construct NN descent parameters for a specific kNN graph degree
    *
