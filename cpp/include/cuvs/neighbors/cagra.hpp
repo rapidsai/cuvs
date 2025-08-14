@@ -2683,3 +2683,4 @@ auto distribute(const raft::resources& clique, const std::string& filename)
 }  // namespace cuvs::neighbors::cagra
 
 #include <cuvs/neighbors/cagra_index_wrapper.hpp>
+#include <cuvs/neighbors/cagra_optimize.hpp>
