@@ -151,19 +151,22 @@ struct ivf_filter_dev {
     none_filter_args_t none_filter_args;
     bitset_filter_args_t bitset_filter_args;
 
-    _RAFT_HOST_DEVICE ivf_filter_dev_args_variant() {}
-    _RAFT_HOST_DEVICE ~ivf_filter_dev_args_variant() {}
+    _RAFT_HOST_DEVICE explicit ivf_filter_dev_args_variant(const none_filter_args_t& args)
+      : none_filter_args(args)
+    {
+    }
+
+    _RAFT_HOST_DEVICE explicit ivf_filter_dev_args_variant(const bitset_filter_args_t& args)
+      : bitset_filter_args(args)
+    {
+    }
   } args_;
 
-  _RAFT_HOST_DEVICE ivf_filter_dev(none_filter_args_t args = {}) : tag_(FilterType::None)
-  {
-    new (&args_.none_filter_args) none_filter_args_t(args);
-  }
+  _RAFT_HOST_DEVICE ivf_filter_dev(none_filter_args_t args = {})
+    : tag_(FilterType::None), args_(args) {};
 
-  _RAFT_HOST_DEVICE ivf_filter_dev(const bitset_filter_args_t& args) : tag_(FilterType::Bitset)
-  {
-    new (&args_.bitset_filter_args) bitset_filter_args_t(args);
-  }
+  _RAFT_HOST_DEVICE ivf_filter_dev(bitset_filter_args_t args)
+    : tag_(FilterType::Bitset), args_(args) {};
 
   constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(const uint32_t query_ix,
                                                               const uint32_t cluster_ix,
