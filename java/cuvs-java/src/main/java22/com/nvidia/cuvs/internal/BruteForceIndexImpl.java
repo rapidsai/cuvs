@@ -113,7 +113,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    * BRUTEFORCE index
    */
   @Override
-  public void destroyIndex() {
+  public void close() {
     checkNotDestroyed();
     try {
       int returnValue = cuvsBruteForceIndexDestroy(bruteForceIndexReference.indexPtr);

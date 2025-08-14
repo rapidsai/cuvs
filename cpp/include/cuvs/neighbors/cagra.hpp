@@ -1975,6 +1975,9 @@ void serialize_to_hnswlib(
  * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
  * in device memory by default; otherwise, host memory is used automatically.
  *
+ * @note: This API only supports physical merge (`merge_strategy = MERGE_STRATEGY_PHYSICAL`), and
+ * attempting a logical merge here will throw an error.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace raft::neighbors;

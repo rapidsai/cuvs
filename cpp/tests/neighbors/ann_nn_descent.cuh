@@ -236,12 +236,12 @@ class AnnNNDescentDistEpiTest : public ::testing::TestWithParam<AnnNNDescentInpu
       rmm::device_uvector<DistanceT> core_dists_dev(ps.n_rows, stream_);
 
       cuvs::neighbors::detail::reachability::core_distances<IdxT, DistanceT>(
+        handle_,
         distances_naive_dev.data(),
         ps.graph_degree,
         ps.graph_degree,
         ps.n_rows,
-        core_dists_dev.data(),
-        stream_);
+        core_dists_dev.data());
       auto epilogue =
         cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, DistanceT>{
           core_dists_dev.data(), 1.0, static_cast<size_t>(ps.n_rows)};
@@ -289,12 +289,12 @@ class AnnNNDescentDistEpiTest : public ::testing::TestWithParam<AnnNNDescentInpu
 
       rmm::device_uvector<DistanceT> core_dists_dev(ps.n_rows, stream_);
       cuvs::neighbors::detail::reachability::core_distances<IdxT, DistanceT>(
+        handle_,
         index.distances().value().data_handle(),
         ps.graph_degree,
         ps.graph_degree,
         ps.n_rows,
-        core_dists_dev.data(),
-        stream_);
+        core_dists_dev.data());
 
       size_t extended_graph_degree, graph_degree;
       auto build_config = nn_descent::detail::get_build_config(

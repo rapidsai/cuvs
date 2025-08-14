@@ -55,7 +55,9 @@ cdef class IndexParams:
     ----------
     metric : str, default = "sqeuclidean"
         String denoting the metric type.
-        distribution of the newly added data.
+        Supported metrics are `l2`, `euclidean`, `sqeuclidean`,
+        `inner_product`, `cosine`, and `bitwise_hamming`
+        (`bitwise_hamming` is for int8 and uint8 data types only)
     graph_degree :  int
         For an input dataset of dimensions (N, D), determines the final
         dimensions of the all-neighbors knn graph which turns out to be of
