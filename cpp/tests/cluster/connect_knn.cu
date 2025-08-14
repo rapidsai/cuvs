@@ -16,6 +16,7 @@
 
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/handle.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/random/make_blobs.cuh>
 #include <raft/sparse/convert/csr.cuh>
 #include <raft/sparse/coo.hpp>
@@ -25,7 +26,12 @@
 #include <raft/util/itertools.hpp>
 
 #include "../../src/cluster/detail/mst.cuh"
+#include "../../src/neighbors/detail/knn_brute_force.cuh"
+#include "../../src/neighbors/detail/reachability.cuh"
+#include "../../src/sparse/neighbors/cross_component_nn.cuh"
 #include "../neighbors/naive_knn.cuh"
+#include <raft/core/mdspan.hpp>
+#include <raft/core/operators.hpp>
 #include <rmm/device_uvector.hpp>
 
 #include <gtest/gtest.h>
@@ -41,6 +47,7 @@ struct ConnectKNNInputs {
   int n_clusters;
   int k;
   cuvs::distance::DistanceType metric;
+  bool mutual_reach;
 };
 
 template <typename T>
@@ -69,19 +76,47 @@ class ConnectKNNTest : public ::testing::TestWithParam<ConnectKNNInputs> {
                                               ps.k,
                                               ps.metric);
 
+    rmm::device_uvector<T> core_dists(ps.n_rows, stream);
+    if (ps.mutual_reach) {
+      cuvs::neighbors::detail::reachability::core_distances<int64_t, T>(
+        handle, dists.data(), ps.k, ps.k, (size_t)ps.n_rows, core_dists.data());
+
+      auto epilogue = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int64_t, T>{
+        core_dists.data(), 1.0};
+      cuvs::neighbors::detail::tiled_brute_force_knn<
+        T,
+        int64_t,
+        T,
+        cuvs::neighbors::detail::reachability::ReachabilityPostProcess<int64_t, T>>(handle,
+                                                                                    database.data(),
+                                                                                    database.data(),
+                                                                                    ps.n_rows,
+                                                                                    ps.n_rows,
+                                                                                    ps.dim,
+                                                                                    ps.k,
+                                                                                    dists.data(),
+                                                                                    inds.data(),
+                                                                                    ps.metric,
+                                                                                    2.0,
+                                                                                    0,
+                                                                                    0,
+                                                                                    nullptr,
+                                                                                    nullptr,
+                                                                                    nullptr,
+                                                                                    epilogue);
+    }
+
     rmm::device_uvector<int64_t> coo_rows(queries_size, stream);
 
     raft::sparse::COO<T, int64_t> knn_coo(stream, queries_size * 2);
     rmm::device_uvector<int64_t> indptr(ps.n_rows + 1, stream);
 
     // changing inds and dists to sparse format
-    int64_t k                  = ps.k;
-    auto coo_rows_counting_itr = thrust::make_counting_iterator<int64_t>(0);
-    thrust::transform(raft::resource::get_thrust_policy(handle),
-                      coo_rows_counting_itr,
-                      coo_rows_counting_itr + (ps.n_rows * ps.k),
-                      coo_rows.data(),
-                      [k] __device__(int64_t c) -> int64_t { return c / k; });
+    int64_t k = ps.k;
+    auto coo_rows_view =
+      raft::make_device_vector_view<int64_t, int64_t>(coo_rows.data(), ps.n_rows * ps.k);
+    raft::linalg::map_offset(
+      handle, coo_rows_view, [k] __device__(int64_t c) -> int64_t { return c / k; });
 
     raft::sparse::linalg::symmetrize(handle,
                                      coo_rows.data(),
@@ -116,14 +151,29 @@ class ConnectKNNTest : public ::testing::TestWithParam<ConnectKNNInputs> {
     auto database_h = raft::make_host_matrix<T, int64_t>(ps.n_rows, ps.dim);
     raft::copy(database_h.data_handle(), database.data(), ps.n_rows * ps.dim, stream);
 
-    cuvs::cluster::agglomerative::detail::connect_knn_graph<int64_t, T>(handle,
-                                                                        database_h.data_handle(),
-                                                                        mst_coo,
-                                                                        ps.n_rows,
-                                                                        ps.dim,
-                                                                        n_components,
-                                                                        color.data(),
-                                                                        ps.metric);
+    if (ps.mutual_reach) {
+      cuvs::sparse::neighbors::MutualReachabilityFixConnectivitiesRedOp<int64_t, T> reduction_op(
+        core_dists.data(), (int64_t)ps.n_rows);
+      cuvs::cluster::agglomerative::detail::connect_knn_graph<int64_t, T>(
+        handle,
+        raft::make_const_mdspan(database_h.view()),
+        mst_coo,
+        ps.n_rows,
+        ps.dim,
+        color.data(),
+        reduction_op,
+        ps.metric);
+    } else {
+      cuvs::cluster::agglomerative::detail::connect_knn_graph<int64_t, T>(
+        handle,
+        raft::make_const_mdspan(database_h.view()),
+        mst_coo,
+        ps.n_rows,
+        ps.dim,
+        color.data(),
+        raft::identity_op{},
+        ps.metric);
+    }
     n_components = cuvs::sparse::neighbors::get_n_components(color.data(), ps.n_rows, stream);
 
     ASSERT_TRUE(n_components == 1);
@@ -147,12 +197,12 @@ class ConnectKNNTest : public ::testing::TestWithParam<ConnectKNNInputs> {
 };
 
 const std::vector<ConnectKNNInputs> inputs = raft::util::itertools::product<ConnectKNNInputs>(
-  {5000, 7151},                                   // n_rows
-  {64, 137},                                      // dim
-  {5, 10},                                        // n_clusters of make_blobs data
-  {16},                                           // k
-  {cuvs::distance::DistanceType::L2SqrtExpanded}  // metric
-);
+  {5000, 7151},                                    // n_rows
+  {64, 137},                                       // dim
+  {5, 10},                                         // n_clusters of make_blobs data
+  {16},                                            // k
+  {cuvs::distance::DistanceType::L2SqrtExpanded},  // metric
+  {true, false});                                  // mutual_reach
 
 typedef ConnectKNNTest<float> ConnectKNNTestF;
 TEST_P(ConnectKNNTestF, ConnectKNN) { this->basicTest(); }

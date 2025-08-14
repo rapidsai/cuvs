@@ -769,14 +769,14 @@ index<T, IdxT> build(
 
     cagra_graph = raft::make_host_matrix<IdxT, int64_t>(dataset.extent(0), graph_degree);
 
-    RAFT_LOG_INFO("optimizing graph");
+    RAFT_LOG_TRACE("optimizing graph");
     optimize<IdxT>(res, knn_graph->view(), cagra_graph.view(), params.guarantee_connectivity);
 
     // free intermediate graph before trying to create the index
     knn_graph.reset();
   }
 
-  RAFT_LOG_INFO("Graph optimized, creating index");
+  RAFT_LOG_TRACE("Graph optimized, creating index");
 
   // Construct an index from dataset and optimized knn graph.
   if (params.compression.has_value()) {
