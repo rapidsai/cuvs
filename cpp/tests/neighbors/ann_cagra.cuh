@@ -17,12 +17,14 @@
 
 #include "../test_utils.cuh"
 #include "ann_utils.cuh"
+#include "vpq_utils.cuh"
 #include <raft/core/resource/cuda_stream.hpp>
 
 #include "naive_knn.cuh"
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/composite/merge.hpp>
 #include <cuvs/neighbors/index_wrappers.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -446,6 +448,46 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         raft::update_host(indices_Cagra.data(), indices_dev.data(), queries_size, stream_);
 
         raft::resource::sync_stream(handle_);
+
+        reference_recall = 1;
+        if (ps.compression.has_value()) {
+          auto decoded_dataset =
+            raft::make_device_matrix<DataT, int64_t>(handle_, ps.n_rows, ps.dim);
+          cuvs::neighbors::decode_vpq_dataset<DataT, half>(
+            decoded_dataset.view(),
+            dynamic_cast<const cuvs::neighbors::vpq_dataset<half, int64_t>&>(index.data()),
+            raft::resource::get_cuda_stream(handle_));
+          auto indices_out_view = raft::make_device_matrix_view<SearchIdxT, int64_t>(
+            indices_dev.data(), ps.n_queries, ps.k);
+          auto dists_out_view = raft::make_device_matrix_view<DistanceT, int64_t>(
+            distances_dev.data(), ps.n_queries, ps.k);
+
+          cuvs::neighbors::naive_knn<DistanceT, DataT, SearchIdxT>(handle_,
+                                                                   dists_out_view.data_handle(),
+                                                                   indices_out_view.data_handle(),
+                                                                   search_queries.data(),
+                                                                   decoded_dataset.data_handle(),
+                                                                   ps.n_queries,
+                                                                   ps.n_rows,
+                                                                   ps.dim,
+                                                                   ps.k,
+                                                                   ps.metric);
+          std::vector<SearchIdxT> indices_vpq_dataset(queries_size);
+          std::vector<DistanceT> distances_vpq_dataset(queries_size);
+          raft::update_host(
+            distances_vpq_dataset.data(), dists_out_view.data_handle(), queries_size, stream_);
+          raft::update_host(
+            indices_vpq_dataset.data(), indices_out_view.data_handle(), queries_size, stream_);
+
+          reference_recall = std::get<1>(calc_recall(indices_naive,
+                                                     indices_vpq_dataset,
+                                                     distances_naive,
+                                                     distances_vpq_dataset,
+                                                     ps.n_queries,
+                                                     ps.k,
+                                                     0));
+          printf("reference_recall = %e\n", reference_recall);
+        }
       }
 
       // for (int i = 0; i < min(ps.n_queries, 10); i++) {
@@ -455,7 +497,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
       //   print_vector("T", distances_naive.data() + i * ps.k, ps.k, std::cout);
       //   print_vector("C", distances_Cagra.data() + i * ps.k, ps.k, std::cout);
       // }
-      double min_recall = ps.min_recall;
+      double min_recall = ps.min_recall * reference_recall;
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_Cagra,
                                   distances_naive,
@@ -504,6 +546,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
   AnnCagraInputs ps;
   rmm::device_uvector<DataT> database;
   rmm::device_uvector<DataT> search_queries;
+  double reference_recall;
 };
 
 template <typename DistanceT, typename DataT, typename IdxT>
@@ -1325,7 +1368,8 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
      cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});  // don't demand high recall
                                                                 // without refinement
-  for (uint32_t pq_len : {2}) {  // for now, only pq_len = 2 is supported, more options coming  soon
+  for (uint32_t pq_len :
+       {2, 4, 8}) {  // for now, only pq_len = 2 is supported, more options coming  soon
     for (uint32_t vq_n_centers : {100, 1000}) {
       for (auto input : inputs2) {
         vpq_params ps{};
