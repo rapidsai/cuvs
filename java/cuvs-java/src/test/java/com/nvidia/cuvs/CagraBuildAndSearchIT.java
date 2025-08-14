@@ -762,4 +762,52 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
       loadedPhysicalIndex.destroyIndex();
     }
   }
+
+  /**
+   * Test for single vector edge case (GitHub issue #666)
+   * This should not crash with cudaErrorIllegalAddress
+   */
+  @Test
+  public void testIndexAndSearchSingle() throws Throwable {
+    float[][] dataset = {{0.74021935f, 0.9209938f}};
+    float[][] queries = {{0.74021935f, 0.9209938f}};
+
+    try (CuVSResources resources = CuVSResources.create()) {
+      CagraIndexParams indexParams =
+          new CagraIndexParams.Builder()
+              .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
+              .withGraphDegree(1)
+              .withIntermediateGraphDegree(2)
+              .withNumWriterThreads(32)
+              .withMetric(CuvsDistanceType.L2Expanded)
+              .build();
+
+      // This should not crash with cudaErrorIllegalAddress
+      CagraIndex index =
+          CagraIndex.newBuilder(resources)
+              .withDataset(dataset)
+              .withIndexParams(indexParams)
+              .build();
+
+      // If we get here, the fix worked - the index was created successfully without crashing
+      assertNotNull("Index should be created successfully", index);
+
+      // Test search on single vector index
+      CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
+      CagraQuery query =
+          new CagraQuery.Builder(resources)
+              .withTopK(1)
+              .withSearchParams(searchParams)
+              .withQueryVectors(queries)
+              .build();
+
+      SearchResults results = index.search(query);
+      assertNotNull("Search results should not be null", results);
+      assertEquals("Should return 1 result", 1, results.getResults().size());
+      assertEquals("Should find itself", 1, results.getResults().get(0).size());
+      assertTrue("Should find index 0", results.getResults().get(0).containsKey(0));
+
+      index.destroyIndex();
+    }
+  }
 }
