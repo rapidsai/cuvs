@@ -569,7 +569,7 @@ template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT
 auto dataset_descriptor_init(const cagra::search_params& params,
                              const DatasetT& dataset,
                              cuvs::distance::DistanceType metric,
-                             const float* dataset_norms = nullptr)
+                             const DistanceT* dataset_norms = nullptr)
   -> dataset_descriptor_host<DataT, IndexT, DistanceT>
 {
   auto [init, priority] =

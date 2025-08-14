@@ -58,7 +58,7 @@ struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
   static auto init(const cagra::search_params& params,
                    const DatasetT& dataset,
                    cuvs::distance::DistanceType metric,
-                   const float* dataset_norms = nullptr) -> host_type
+                   const DistanceT* dataset_norms = nullptr) -> host_type
   {
     return init_(params,
                  dataset.data.data_handle(),

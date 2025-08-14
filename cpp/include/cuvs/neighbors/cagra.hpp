@@ -29,7 +29,6 @@
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/stream_view.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/linalg/norm.cuh>
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
@@ -354,25 +353,6 @@ struct index : cuvs::neighbors::index {
     dataset_norms_ = std::move(norms);
   }
 
-  /**
-   * Compute dataset norms for cosine distance.
-   */
-  void compute_dataset_norms(raft::resources const& res)
-  {
-    if (metric_ == cuvs::distance::DistanceType::CosineExpanded) {
-      auto dataset_view = dataset();
-      if (dataset_view.extent(0) > 0) {
-        dataset_norms_ = raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
-        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms_->data_handle(),
-                                                          dataset_view.data_handle(),
-                                                          dataset_view.extent(1),
-                                                          dataset_view.extent(0),
-                                                          raft::resource::get_cuda_stream(res),
-                                                          raft::sqrt_op{});
-      }
-    }
-  }
-
   // Don't allow copying the index for performance reasons (try avoiding copying data)
   index(const index&)                    = delete;
   index(index&&)                         = default;
@@ -470,8 +450,7 @@ struct index : cuvs::neighbors::index {
    * dataset. It is the caller's responsibility to ensure that dataset stays alive as long as the
    * index. It is expected that the same set of vectors are used for update_dataset and index build.
    *
-   * Note: This will clear any precomputed dataset norms. If cosine distance is used,
-   * call compute_dataset_norms() after this operation.
+   * Note: This will clear any precomputed dataset norms.
    */
   void update_dataset(raft::resources const& res,
                       raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
@@ -494,8 +473,7 @@ struct index : cuvs::neighbors::index {
    * We create a copy of the dataset on the device. The index manages the lifetime of this copy. It
    * is expected that the same set of vectors are used for update_dataset and index build.
    *
-   * Note: This will clear any precomputed dataset norms. If cosine distance is used,
-   * call compute_dataset_norms() after this operation.
+   * Note: This will clear any precomputed dataset norms.
    */
   void update_dataset(raft::resources const& res,
                       raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
@@ -508,8 +486,7 @@ struct index : cuvs::neighbors::index {
    * Replace the dataset with a new dataset. It is expected that the same set of vectors are used
    * for update_dataset and index build.
    *
-   * Note: This will clear any precomputed dataset norms. If cosine distance is used,
-   * call compute_dataset_norms() after this operation.
+   * Note: This will clear any precomputed dataset norms.
    */
   template <typename DatasetT>
   auto update_dataset(raft::resources const& res, DatasetT&& dataset)
@@ -567,6 +544,7 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix<IdxT, int64_t, raft::row_major> graph_;
   raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
   std::unique_ptr<neighbors::dataset<dataset_index_type>> dataset_;
+  // only float distances supported at the moment
   std::optional<raft::device_vector<float, int64_t>> dataset_norms_;
 };
 /**

@@ -46,7 +46,7 @@ def run_cagra_build_search_test(
     compression=None,
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
-    if metric == "inner_product":
+    if metric == "inner_product" or metric == "cosine":
         if dtype in [np.int8, np.uint8]:
             pytest.skip("skip normalization for int8/uint8 data")
         dataset = normalize(dataset, norm="l2", axis=1)

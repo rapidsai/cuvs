@@ -417,7 +417,7 @@ struct instance_selector<Spec, Specs...> {
   static auto select(const cagra::search_params& params,
                      const DatasetT& dataset,
                      cuvs::distance::DistanceType metric,
-                     const float* dataset_norms)
+                     const DistanceT* dataset_norms)
     -> std::enable_if_t<spec_sound<Spec, DataT, IndexT, DistanceT, DatasetT>,
                         std::tuple<init_desc_type<DataT, IndexT, DistanceT, DatasetT>, double>>
   {
@@ -431,7 +431,7 @@ struct instance_selector<Spec, Specs...> {
   static auto select(const cagra::search_params& params,
                      const DatasetT& dataset,
                      cuvs::distance::DistanceType metric,
-                     const float* dataset_norms)
+                     const DistanceT* dataset_norms)
     -> std::enable_if_t<!spec_sound<Spec, DataT, IndexT, DistanceT, DatasetT>,
                         std::tuple<init_desc_type<DataT, IndexT, DistanceT, DatasetT>, double>>
   {

@@ -33,6 +33,7 @@
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/normalize.cuh>
+#include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/itertools.hpp>
@@ -434,7 +435,22 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         cagra::index<DataT, IdxT> index(handle_);
         cagra::deserialize(handle_, index_file.filename, &index);
 
-        if (!ps.include_serialized_dataset) { index.update_dataset(handle_, database_view); }
+        if (!ps.include_serialized_dataset) { index.update_dataset(handle_, database_view); 
+          // Only compute norms for types that support cosine distance
+        if constexpr (std::is_same_v<DataT, float> || std::is_same_v<DataT, half>) {
+          if (database_view.extent(0) > 0) {
+            auto dataset_norms =
+              raft::make_device_vector<float, int64_t>(handle_, database_view.extent(0));
+            raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms.data_handle(),
+                                                              database_view.data_handle(),
+                                                              database_view.extent(1),
+                                                              database_view.extent(0),
+                                                              stream_,
+                                                              raft::sqrt_op{});
+            index.set_dataset_norms(std::move(dataset_norms));
+          }
+        }
+        }
 
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
           search_queries.data(), ps.n_queries, ps.dim);
@@ -837,7 +853,23 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
           index = cagra::build(handle_, index_params, database_view);
         }
 
-        if (!ps.include_serialized_dataset) { index.update_dataset(handle_, database_view); }
+        if (!ps.include_serialized_dataset)
+        { index.update_dataset(handle_, database_view); 
+          // Only compute norms for types that support cosine distance
+        if constexpr (std::is_same_v<DataT, float> || std::is_same_v<DataT, half>) {
+          if (database_view.extent(0) > 0) {
+            auto dataset_norms =
+              raft::make_device_vector<float, int64_t>(handle_, database_view.extent(0));
+            raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms.data_handle(),
+                                                              database_view.data_handle(),
+                                                              database_view.extent(1),
+                                                              database_view.extent(0),
+                                                              stream_,
+                                                              raft::sqrt_op{});
+            index.set_dataset_norms(std::move(dataset_norms));
+          }
+        }
+        }
 
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
           search_queries.data(), ps.n_queries, ps.dim);

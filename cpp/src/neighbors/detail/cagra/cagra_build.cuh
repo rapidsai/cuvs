@@ -28,6 +28,7 @@
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/linalg/norm.cuh>
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
@@ -800,7 +801,21 @@ index<T, IdxT> build(
 
       // Compute dataset norms for cosine distance
       if (params.metric == cuvs::distance::DistanceType::CosineExpanded) {
-        idx.compute_dataset_norms(res);
+        // Only compute norms for types that support cosine distance
+        if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+          auto dataset_view = idx.dataset();
+          if (dataset_view.extent(0) > 0) {
+            auto dataset_norms =
+              raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
+            raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms.data_handle(),
+                                                              dataset_view.data_handle(),
+                                                              dataset_view.extent(1),
+                                                              dataset_view.extent(0),
+                                                              raft::resource::get_cuda_stream(res),
+                                                              raft::sqrt_op{});
+            idx.set_dataset_norms(std::move(dataset_norms));
+          }
+        }
       }
 
       return idx;
@@ -821,4 +836,5 @@ index<T, IdxT> build(
   idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
   return idx;
 }
+
 }  // namespace cuvs::neighbors::cagra::detail
