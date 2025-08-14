@@ -33,12 +33,13 @@ import java.util.Objects;
  *
  * @since 25.02
  */
-public interface CagraIndex {
+public interface CagraIndex extends AutoCloseable {
 
   /**
    * Invokes the native destroy_cagra_index to de-allocate the CAGRA index
    */
-  void destroyIndex() throws Throwable;
+  @Override
+  void close() throws Exception;
 
   /**
    * Invokes the native search_cagra_index via the Panama API for searching a

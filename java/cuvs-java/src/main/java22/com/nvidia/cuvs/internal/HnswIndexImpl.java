@@ -74,7 +74,7 @@ public class HnswIndexImpl implements HnswIndex {
    * Invokes the native destroy_hnsw_index to de-allocate the HNSW index
    */
   @Override
-  public void destroyIndex() {
+  public void close() {
     int returnValue = cuvsHnswIndexDestroy(hnswIndexReference.getMemorySegment());
     checkCuVSError(returnValue, "cuvsHnswIndexDestroy");
   }
