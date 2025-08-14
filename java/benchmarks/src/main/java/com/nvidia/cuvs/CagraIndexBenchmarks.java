@@ -121,20 +121,20 @@ public class CagraIndexBenchmarks {
                 .build();
 
             // Create the index with the dataset
-            CagraIndex index = CagraIndex.newBuilder(resources)
+            try (CagraIndex index = CagraIndex.newBuilder(resources)
                 .withDataset(arrayDataset)
                 .withIndexParams(indexParams)
-                .build();
+                .build()) {
 
-            // Saving the index on to the disk.
-            var indexFilePath = Path.of(UUID.randomUUID() + ".cag");
-            try (var outputStream = Files.newOutputStream(indexFilePath)) {
+              // Saving the index on to the disk.
+              var indexFilePath = Path.of(UUID.randomUUID() + ".cag");
+              try (var outputStream = Files.newOutputStream(indexFilePath)) {
                 index.serialize(outputStream);
-            }
+              }
 
-            // Cleanup
-            Files.deleteIfExists(indexFilePath);
-            index.destroyIndex();
+              // Cleanup
+              Files.deleteIfExists(indexFilePath);
+            }
         }
     }
 
