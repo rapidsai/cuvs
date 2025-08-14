@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2022-2023, NVIDIA CORPORATION.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION.
 
 set -euo pipefail
 
@@ -29,6 +29,11 @@ rapids-print-env
 
 rapids-logger "Check GPU usage"
 nvidia-smi
+
+# RAPIDS_DATASET_ROOT_DIR is used by test scripts
+RAPIDS_DATASET_ROOT_DIR=${RAPIDS_TESTS_DIR}/dataset
+export RAPIDS_DATASET_ROOT_DIR
+./ci/get_test_data.sh --NEIGHBORS_ANN_VAMANA_TEST
 
 EXITCODE=0
 trap "EXITCODE=1" ERR
