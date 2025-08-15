@@ -24,6 +24,7 @@
 
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
+#include <raft/linalg/unary_op.cuh>
 #include <raft/neighbors/detail/faiss_select/key_value_block_select.cuh>
 #include <raft/util/cuda_utils.cuh>
 
@@ -1458,13 +1459,14 @@ void rbc_eps_pass(raft::resources const& handle,
 
     if (actual_max > max_k_in) {
       // ceil vd to max_k
-      thrust::transform(raft::resource::get_thrust_policy(handle),
-                        vd_ptr,
-                        vd_ptr + n_query_rows,
-                        vd_ptr,
-                        [max_k_in] __device__(value_idx vd_count) {
-                          return vd_count > max_k_in ? max_k_in : vd_count;
-                        });
+      raft::linalg::unaryOp(
+        vd_ptr,
+        vd_ptr,
+        n_query_rows,
+        [max_k_in] __device__(value_idx vd_count) {
+          return vd_count > max_k_in ? max_k_in : vd_count;
+        },
+        raft::resource::get_cuda_stream(handle));
     }
 
     thrust::exclusive_scan(raft::resource::get_thrust_policy(handle),

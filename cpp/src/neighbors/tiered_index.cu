@@ -175,6 +175,33 @@ void search(raft::resources const& res,
     res, search_params, ivf_pq::typed_search, queries, neighbors, distances, sample_filter);
 }
 
+auto merge(raft::resources const& res,
+           const index_params<cagra::index_params>& index_params,
+           const std::vector<tiered_index::index<cagra::index<float, uint32_t>>*>& indices)
+  -> tiered_index::index<cagra::index<float, uint32_t>>
+{
+  auto state = detail::merge(res, index_params, indices);
+  return cuvs::neighbors::tiered_index::index<cagra::index<float, uint32_t>>(state);
+}
+
+auto merge(raft::resources const& res,
+           const index_params<ivf_flat::index_params>& index_params,
+           const std::vector<tiered_index::index<ivf_flat::index<float, int64_t>>*>& indices)
+  -> tiered_index::index<ivf_flat::index<float, int64_t>>
+{
+  auto state = detail::merge(res, index_params, indices);
+  return cuvs::neighbors::tiered_index::index<ivf_flat::index<float, int64_t>>(state);
+}
+
+auto merge(raft::resources const& res,
+           const index_params<ivf_pq::index_params>& index_params,
+           const std::vector<tiered_index::index<ivf_pq::typed_index<float, int64_t>>*>& indices)
+  -> tiered_index::index<ivf_pq::typed_index<float, int64_t>>
+{
+  auto state = detail::merge(res, index_params, indices);
+  return cuvs::neighbors::tiered_index::index<ivf_pq::typed_index<float, int64_t>>(state);
+}
+
 template <typename UpstreamT>
 int64_t index<UpstreamT>::size() const noexcept
 {

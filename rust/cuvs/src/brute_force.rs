@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -109,10 +109,10 @@ impl Drop for Index {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mark_flaky_tests::flaky;
     use ndarray::s;
     use ndarray_rand::rand_distr::Uniform;
     use ndarray_rand::RandomExt;
-    use mark_flaky_tests::flaky;
 
     fn test_bfknn(metric: DistanceType) {
         let res = Resources::new().unwrap();

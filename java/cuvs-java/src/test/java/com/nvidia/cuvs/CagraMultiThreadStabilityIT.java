@@ -95,92 +95,91 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
               .withMetric(CuvsDistanceType.L2Expanded)
               .build();
 
-      CagraIndex index =
+      try (CagraIndex index =
           CagraIndex.newBuilder(resources)
               .withDataset(dataset)
               .withIndexParams(indexParams)
-              .build();
+              .build()) {
 
-      log.trace("CAGRA index created, starting high-contention multi-threaded search...");
+        log.trace("CAGRA index created, starting high-contention multi-threaded search...");
 
-      // Create high contention scenario that would fail without using separate resources in every
-      // thread
-      try (ExecutorService executor = Executors.newFixedThreadPool(numThreads)) {
-        List<Future<?>> futures = new ArrayList<>();
-        CountDownLatch startLatch = new CountDownLatch(1);
-        AtomicInteger successfulQueries = new AtomicInteger(0);
-        AtomicReference<Throwable> firstError = new AtomicReference<>();
+        // Create high contention scenario that would fail without using separate resources in every
+        // thread
+        try (ExecutorService executor = Executors.newFixedThreadPool(numThreads)) {
+          List<Future<?>> futures = new ArrayList<>();
+          CountDownLatch startLatch = new CountDownLatch(1);
+          AtomicInteger successfulQueries = new AtomicInteger(0);
+          AtomicReference<Throwable> firstError = new AtomicReference<>();
 
-        for (int threadId = 0; threadId < numThreads; threadId++) {
-          final int finalThreadId = threadId;
+          for (int threadId = 0; threadId < numThreads; threadId++) {
+            final int finalThreadId = threadId;
 
-          Future<?> future =
-              executor.submit(
-                  () -> {
-                    try {
-                      // Wait for all threads to start simultaneously
-                      startLatch.await();
+            Future<?> future =
+                executor.submit(
+                    () -> {
+                      try {
+                        // Wait for all threads to start simultaneously
+                        startLatch.await();
 
-                      for (int queryId = 0; queryId < queriesPerThread; queryId++) {
-                        queryAction.run(index);
-                        successfulQueries.incrementAndGet();
+                        for (int queryId = 0; queryId < queriesPerThread; queryId++) {
+                          queryAction.run(index);
+                          successfulQueries.incrementAndGet();
 
-                        // No Thread.yield() - maximize contention
+                          // No Thread.yield() - maximize contention
+                        }
+
+                        log.trace("Thread {} completed successfully", finalThreadId);
+
+                      } catch (Throwable t) {
+                        log.error("Thread {} failed: {}", finalThreadId, t.getMessage(), t);
+                        firstError.compareAndSet(null, t);
+                        throw new RuntimeException("Thread failed", t);
                       }
+                    });
 
-                      log.trace("Thread {} completed successfully", finalThreadId);
+            futures.add(future);
+          }
 
-                    } catch (Throwable t) {
-                      log.error("Thread {} failed: {}", finalThreadId, t.getMessage(), t);
-                      firstError.compareAndSet(null, t);
-                      throw new RuntimeException("Thread failed", t);
-                    }
-                  });
+          // Start all threads simultaneously to maximize contention
+          log.debug("Starting all {} threads simultaneously...", numThreads);
+          startLatch.countDown();
 
-          futures.add(future);
-        }
-
-        // Start all threads simultaneously to maximize contention
-        log.debug("Starting all {} threads simultaneously...", numThreads);
-        startLatch.countDown();
-
-        // Wait for all threads to complete
-        boolean allCompleted = true;
-        for (Future<?> future : futures) {
-          try {
-            future.get(120, TimeUnit.SECONDS); // Longer timeout for stress test
-          } catch (Exception e) {
-            allCompleted = false;
-            log.error("Thread failed: {}", e.getMessage(), e);
-            if (firstError.get() == null) {
-              firstError.set(e);
+          // Wait for all threads to complete
+          boolean allCompleted = true;
+          for (Future<?> future : futures) {
+            try {
+              future.get(120, TimeUnit.SECONDS); // Longer timeout for stress test
+            } catch (Exception e) {
+              allCompleted = false;
+              log.error("Thread failed: {}", e.getMessage(), e);
+              if (firstError.get() == null) {
+                firstError.set(e);
+              }
             }
           }
+
+          executor.shutdown();
+          if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
+            executor.shutdownNow();
+          }
+
+          // Verify results
+          int expectedTotalQueries = numThreads * queriesPerThread;
+          int actualSuccessfulQueries = successfulQueries.get();
+
+          log.debug("  Successful queries: {} / {}", actualSuccessfulQueries, expectedTotalQueries);
+
+          if (firstError.get() != null) {
+            fail("MultiThreaded stablity test failed:" + " " + firstError.get().getMessage());
+          }
+
+          assertTrue("All threads should complete successfully", allCompleted);
+          assertEquals(
+              "All queries should complete successfully",
+              expectedTotalQueries,
+              actualSuccessfulQueries);
         }
-
-        executor.shutdown();
-        if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
-          executor.shutdownNow();
-        }
-
-        // Verify results
-        int expectedTotalQueries = numThreads * queriesPerThread;
-        int actualSuccessfulQueries = successfulQueries.get();
-
-        log.debug("  Successful queries: {} / {}", actualSuccessfulQueries, expectedTotalQueries);
-
-        if (firstError.get() != null) {
-          fail("MultiThreaded stablity test failed:" + " " + firstError.get().getMessage());
-        }
-
-        assertTrue("All threads should complete successfully", allCompleted);
-        assertEquals(
-            "All queries should complete successfully",
-            expectedTotalQueries,
-            actualSuccessfulQueries);
       }
-
-      index.destroyIndex();
     }
   }
 
