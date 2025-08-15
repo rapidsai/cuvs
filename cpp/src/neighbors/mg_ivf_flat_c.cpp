@@ -99,6 +99,11 @@ extern "C" cuvsError_t cuvsMultiGpuIvfFlatIndexDestroy(cuvsMultiGpuIvfFlatIndex_
             mg_index<cuvs::neighbors::ivf_flat::index<float, int64_t>, float, int64_t>*>(
           index->addr);
         delete mg_index_ptr;
+      } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+        auto mg_index_ptr = reinterpret_cast<
+          cuvs::neighbors::
+            mg_index<cuvs::neighbors::ivf_flat::index<half, int64_t>, half, int64_t>*>(index->addr);
+        delete mg_index_ptr;
       } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
         auto mg_index_ptr = reinterpret_cast<
           cuvs::neighbors::
@@ -265,6 +270,8 @@ extern "C" cuvsError_t cuvsMultiGpuIvfFlatBuild(cuvsResources_t res,
 
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
       index->addr = reinterpret_cast<uintptr_t>(_mg_build<float>(res, *params, dataset_tensor));
+    } else if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 16) {
+      index->addr = reinterpret_cast<uintptr_t>(_mg_build<half>(res, *params, dataset_tensor));
     } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
       index->addr = reinterpret_cast<uintptr_t>(_mg_build<int8_t>(res, *params, dataset_tensor));
     } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
@@ -289,6 +296,8 @@ extern "C" cuvsError_t cuvsMultiGpuIvfFlatSearch(cuvsResources_t res,
 
     if (queries.dtype.code == kDLFloat && queries.dtype.bits == 32) {
       _mg_search<float>(res, *params, *index, queries_tensor, neighbors_tensor, distances_tensor);
+    } else if (queries.dtype.code == kDLFloat && queries.dtype.bits == 16) {
+      _mg_search<half>(res, *params, *index, queries_tensor, neighbors_tensor, distances_tensor);
     } else if (queries.dtype.code == kDLInt && queries.dtype.bits == 8) {
       _mg_search<int8_t>(res, *params, *index, queries_tensor, neighbors_tensor, distances_tensor);
     } else if (queries.dtype.code == kDLUInt && queries.dtype.bits == 8) {
@@ -311,6 +320,8 @@ extern "C" cuvsError_t cuvsMultiGpuIvfFlatExtend(cuvsResources_t res,
 
     if (vectors.dtype.code == kDLFloat && vectors.dtype.bits == 32) {
       _mg_extend<float>(res, *index, new_vectors_tensor, new_indices_tensor);
+    } else if (vectors.dtype.code == kDLFloat && vectors.dtype.bits == 16) {
+      _mg_extend<half>(res, *index, new_vectors_tensor, new_indices_tensor);
     } else if (vectors.dtype.code == kDLInt && vectors.dtype.bits == 8) {
       _mg_extend<int8_t>(res, *index, new_vectors_tensor, new_indices_tensor);
     } else if (vectors.dtype.code == kDLUInt && vectors.dtype.bits == 8) {
@@ -330,6 +341,8 @@ extern "C" cuvsError_t cuvsMultiGpuIvfFlatSerialize(cuvsResources_t res,
   return cuvs::core::translate_exceptions([=] {
     if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
       _mg_serialize<float>(res, *index, filename);
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      _mg_serialize<half>(res, *index, filename);
     } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
       _mg_serialize<int8_t>(res, *index, filename);
     } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
@@ -356,6 +369,9 @@ extern "C" cuvsError_t cuvsMultiGpuIvfFlatDeserialize(cuvsResources_t res,
     if (dtype.kind == 'f' && dtype.itemsize == 4) {
       index->dtype.code = kDLFloat;
       index->addr       = reinterpret_cast<uintptr_t>(_mg_deserialize<float>(res, filename));
+    } else if (dtype.kind == 'f' && dtype.itemsize == 2) {
+      index->dtype.code = kDLFloat;
+      index->addr       = reinterpret_cast<uintptr_t>(_mg_deserialize<half>(res, filename));
     } else if (dtype.kind == 'i' && dtype.itemsize == 1) {
       index->dtype.code = kDLInt;
       index->addr       = reinterpret_cast<uintptr_t>(_mg_deserialize<int8_t>(res, filename));
@@ -384,6 +400,9 @@ extern "C" cuvsError_t cuvsMultiGpuIvfFlatDistribute(cuvsResources_t res,
     if (dtype.kind == 'f' && dtype.itemsize == 4) {
       index->dtype.code = kDLFloat;
       index->addr       = reinterpret_cast<uintptr_t>(_mg_distribute<float>(res, filename));
+    } else if (dtype.kind == 'f' && dtype.itemsize == 2) {
+      index->dtype.code = kDLFloat;
+      index->addr       = reinterpret_cast<uintptr_t>(_mg_distribute<half>(res, filename));
     } else if (dtype.kind == 'i' && dtype.itemsize == 1) {
       index->dtype.code = kDLInt;
       index->addr       = reinterpret_cast<uintptr_t>(_mg_distribute<int8_t>(res, filename));
