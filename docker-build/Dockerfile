@@ -41,9 +41,8 @@ ARG CCACHE_VERSION=4.11.2
 ARG CMAKE_ARCH=x86_64
 
 ### Install basic requirements
-# pin urllib3<2.0 for https://github.com/psf/requests/issues/6432
 RUN dnf --enablerepo=crb install -y scl-utils gcc-toolset-${TOOLSET_VERSION} python39 \
-    zlib-devel maven tar wget patch ninja-build git zip 
+    zlib-devel maven tar wget patch ninja-build git zip
 
 # Enable the gcc-toolset by default for bash shell if DEV_BUILD is ON
 RUN if [ "$DEV_BUILD" = "ON" ]; then \
