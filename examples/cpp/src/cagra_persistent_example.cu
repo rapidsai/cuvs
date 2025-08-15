@@ -44,6 +44,7 @@ auto slice_matrix(DeviceMatrixOrView source,
 template <typename F, typename... Args>
 void time_it(std::string label, F f, Args&&... xs)
 {
+  std::cout << "[" << label << "] Starting " << std::endl;
   auto start = std::chrono::system_clock::now();
   f(std::forward<Args>(xs)...);
   auto end  = std::chrono::system_clock::now();
@@ -102,6 +103,28 @@ void cagra_build_search_variants(raft::device_resources const& res,
   // rendering GUI).
   search_params_persistent.persistent_device_usage = 0.95;
 
+  // The graph is fine!
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
+  auto graph_host =
+    raft::make_host_matrix<uint32_t>(index.graph().extent(0), index.graph().extent(1));
+  raft::copy(graph_host.data_handle(),
+             index.graph().data_handle(),
+             index.graph().extent(0) * index.graph().extent(1),
+             raft::resource::get_cuda_stream(res));
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
+  uint64_t count = 0;
+  for (int i = 0; i < graph_host.extent(0); i++) {
+    for (int j = 0; j < graph_host.extent(1); j++) {
+      auto v = graph_host(i, j);
+      if (v >= graph_host.extent(0)) {
+        count++;
+        if (count < 10) { RAFT_LOG_INFO("+ Bad graph value: %d, %d, %d", i, j, v); }
+      }
+    }
+  }
+  RAFT_LOG_INFO("+ Bad graph value count: %d", count);
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
+
   /*
   Define the big-batch setting as a baseline for measuring the throughput.
 
@@ -114,7 +137,12 @@ void cagra_build_search_variants(raft::device_resources const& res,
                                      raft::device_matrix_view<const float, int64_t> queries,
                                      raft::device_matrix_view<uint32_t, int64_t> neighbors,
                                      raft::device_matrix_view<float, int64_t> distances) {
-    cagra::search(res, ps, index, queries, neighbors, distances);
+    RAFT_CUDA_TRY(cudaSetDevice(0));
+    RAFT_CUDA_TRY(cudaDeviceSynchronize());
+    RAFT_LOG_INFO("search_batch, graph = %p", index.graph().data_handle());
+    cagra::search(
+      res, ps, index, queries, neighbors, distances);  // The very first search fails here
+    RAFT_CUDA_TRY(cudaDeviceSynchronize());
     /*
     To make a fair comparison, standard implementation needs to synchronize
     with the device to make sure the kernel has finished the work.
@@ -181,6 +209,8 @@ void cagra_build_search_variants(raft::device_resources const& res,
     if (needs_sync) { raft::resource::sync_stream(res); }
   };
 
+  cudaDeviceSynchronize();
+
   // Launch the baseline search: check the big-batch performance
   time_it(
     "standard/batch A", search_batch, true, search_params, queries_a, neighbors_a, distances_a);
@@ -235,10 +265,12 @@ batch size is small. Try explicitly setting the search parameter
 `thread_block_size` to a small value, such as `64` or `128` if this is an issue
 for you. This increases the latency of individual jobs though.
   */
+  cudaDeviceSynchronize();
 }
 
 int main()
 {
+  RAFT_CUDA_TRY(cudaSetDevice(0));
   raft::device_resources res;
 
   // Set pool memory resource with 1 GiB initial pool size. All allocations use
@@ -248,12 +280,13 @@ int main()
   rmm::mr::set_current_device_resource(&pool_mr);
 
   // Create input arrays.
-  int64_t n_samples = 1000000;
+  int64_t n_samples = 100000;
   int64_t n_dim     = 128;
   int64_t n_queries = 100000;
   auto dataset      = raft::make_device_matrix<float, int64_t>(res, n_samples, n_dim);
   auto queries      = raft::make_device_matrix<float, int64_t>(res, n_queries, n_dim);
   generate_dataset(res, dataset.view(), queries.view());
+  RAFT_LOG_INFO("Main, data = %p", dataset.data_handle());
 
   // run the interesting part of the program
   cagra_build_search_variants(

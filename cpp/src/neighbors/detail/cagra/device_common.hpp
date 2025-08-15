@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@
 
 #include <cfloat>
 #include <cstdint>
+#include <cuda/std/atomic>
 
 namespace cuvs::neighbors::cagra::detail {
 namespace device {
@@ -199,7 +200,33 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
     IndexT child_id             = invalid_index;
     if (smem_parent_id != invalid_index) {
       const auto parent_id = internal_topk_list[smem_parent_id] & ~index_msb_1_mask;
-      child_id             = knn_graph[(i % knn_k) + (static_cast<int64_t>(knn_k) * parent_id)];
+      const auto offset    = (i % knn_k) + (static_cast<int64_t>(knn_k) * parent_id);
+      child_id = knn_graph[offset];  // <- read-only knn graph, carefully checked to contain no
+                                     // invalid values
+      static cuda::std::atomic<int> print_count = 0;
+      if (child_id >= IndexT(100000ull) && print_count.fetch_add(1) < 10) {
+        printf(
+          "-------- %u, %u: bad internal_topk_list; child_id = %u, parent_id = %u, offset = %u, "
+          "knn_k = %u, graph_ptr = %p\n",
+          uint32_t(threadIdx.x),
+          uint32_t(blockIdx.x),
+          uint32_t(child_id),
+          uint32_t(parent_id),
+          uint32_t(offset),
+          uint32_t(knn_k),
+          knn_graph);
+        child_id = knn_graph[offset];  // <- read it again an the value is different!
+        printf("--------- (%u), %u, %u, %u, %u, %u, %u, %u, %u\n",
+               uint32_t(child_id),
+               uint32_t(knn_graph[knn_k * parent_id]),
+               uint32_t(knn_graph[knn_k * parent_id + 1]),
+               uint32_t(knn_graph[knn_k * parent_id + 2]),
+               uint32_t(knn_graph[knn_k * parent_id + 3]),
+               uint32_t(knn_graph[knn_k * parent_id + 4]),
+               uint32_t(knn_graph[knn_k * parent_id + 5]),
+               uint32_t(knn_graph[knn_k * parent_id + 6]),
+               uint32_t(knn_graph[knn_k * parent_id + 7]));
+      }
     }
     if (child_id != invalid_index) {
       if (hashmap::insert(visited_hashmap_ptr, visited_hash_bitlen, child_id) == 0) {
