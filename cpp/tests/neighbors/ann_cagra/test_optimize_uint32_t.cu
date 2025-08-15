@@ -14,16 +14,10 @@
  * limitations under the License.
  */
 
-#include <gtest/gtest.h>
-
 #include <cuvs/neighbors/cagra.hpp>
-
-#include <raft/core/device_mdspan.hpp>
+#include <gtest/gtest.h>
 #include <raft/core/host_mdspan.hpp>
-#include <raft/core/mdspan_types.hpp>
-#include <raft/core/resource/stream_view.hpp>
 #include <raft/core/resources.hpp>
-#include <raft/util/integer_utils.hpp>
 
 // This test targets public API exposure and basic invariants only (shapes, in-range indices).
 // Detailed optimization correctness is exercised by CAGRA build tests.

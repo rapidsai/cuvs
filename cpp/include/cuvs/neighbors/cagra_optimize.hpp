@@ -26,22 +26,14 @@ namespace cuvs::neighbors::cagra::helpers {
 /**
  * @brief Optimize a KNN graph into a CAGRA graph.
  *
- * This function prunes and optimizes a k-NN graph to create a more efficient
- * CAGRA search graph. The input graph must be on host memory as the optimization
- * algorithm uses CPU-based processing.
+ * This function optimizes a k-NN graph to create a CAGRA graph.
+ * The input/output graphs must be on host memory.
  *
  * Usage example:
  * @code{.cpp}
  *   raft::resources res;
- *
- *   // If starting with device data, copy to host first:
- *   auto d_knn = raft::make_device_matrix<uint32_t, int64_t>(res, N, K_in);
  *   auto h_knn = raft::make_host_matrix<uint32_t, int64_t>(N, K_in);
- *   raft::copy(h_knn.data_handle(), d_knn.data_handle(), d_knn.size(),
- *              raft::resource::get_cuda_stream(res));
- *   raft::resource::sync_stream(res);
- *
- *   // Optimize the graph:
+ *   // Fill h_knn with KNN graph
  *   auto h_out = raft::make_host_matrix<uint32_t, int64_t>(N, K_out);
  *   cuvs::neighbors::cagra::helpers::optimize(res, h_knn.view(), h_out.view());
  * @endcode
