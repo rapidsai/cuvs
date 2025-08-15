@@ -46,7 +46,7 @@ set(CUVS_USE_RAFT_STATIC OFF)
 
 # --- cuVS ---#
 set(BUILD_TESTS OFF)
-set(BUILD_C_LIBRARY ON)
+set(BUILD_C_LIBRARY OFF)
 set(CUVS_COMPILE_DYNAMIC_ONLY ON)
 
 add_subdirectory(../../cpp cuvs-cpp)

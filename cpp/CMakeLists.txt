@@ -53,9 +53,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BUILD_SHARED_LIBS "Build cuvs shared libraries" ON)
 option(BUILD_TESTS "Build cuvs unit-tests" ON)
-option(BUILD_C_LIBRARY "Build cuVS C API library" ON)
+option(BUILD_C_LIBRARY "Build cuVS C API library" OFF)
 option(BUILD_CUVS_BENCH "Build cuVS ann benchmarks" OFF)
-option(BUILD_CAGRA_HNSWLIB "Build CAGRA+hnswlib interface" ON)
+option(BUILD_CAGRA_HNSWLIB "Build CAGRA+hnswlib interface" OFF)
 option(BUILD_MG_ALGOS "Build with multi-GPU support" ON)
 option(CUDA_ENABLE_KERNELINFO "Enable kernel resource usage info" OFF)
 option(CUDA_ENABLE_LINEINFO
@@ -425,7 +425,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/dynamic_batching.cu
     src/neighbors/cagra_index_wrapper.cu
     src/neighbors/composite/index.cu
-    src/neighbors/composite/merge.cpp
+    src/neighbors/composite/merge.cu
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
     src/neighbors/ivf_flat_index.cpp
     src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
@@ -732,8 +732,8 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
       src/neighbors/brute_force_c.cpp
       src/neighbors/ivf_flat_c.cpp
       src/neighbors/ivf_pq_c.cpp
-      src/neighbors/cagra_c.cpp
-      $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw_c.cpp>
+      # src/neighbors/cagra_c.cpp
+      # $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw_c.cpp>
       src/neighbors/nn_descent_c.cpp
       src/neighbors/refine/refine_c.cpp
       src/neighbors/tiered_index_c.cpp

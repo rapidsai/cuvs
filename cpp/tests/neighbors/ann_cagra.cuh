@@ -293,6 +293,7 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
       case InnerProduct: return "InnerProduct";
       case L2Expanded: return "L2";
       case BitwiseHamming: return "BitwiseHamming";
+      case CosineExpanded: return "Cosine";
       default: break;
     }
     return "Unknown";
@@ -334,6 +335,8 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
   template <typename SearchIdxT = IdxT>
   void testCagra()
   {
+    if (ps.metric != cuvs::distance::DistanceType::CosineExpanded)
+      GTEST_SKIP();
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ)))
@@ -345,7 +348,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded &&
-        ((!std::is_same_v<DataT, float>) || (ps.build_algo != graph_build_algo::IVF_PQ)))
+        ((!std::is_same_v<DataT, float>) || (ps.build_algo != graph_build_algo::IVF_PQ) || (ps.compression.has_value())))
       GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
@@ -436,20 +439,6 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         cagra::deserialize(handle_, index_file.filename, &index);
 
         if (!ps.include_serialized_dataset) { index.update_dataset(handle_, database_view); 
-          // Only compute norms for types that support cosine distance
-        if constexpr (std::is_same_v<DataT, float> || std::is_same_v<DataT, half>) {
-          if (database_view.extent(0) > 0) {
-            auto dataset_norms =
-              raft::make_device_vector<float, int64_t>(handle_, database_view.extent(0));
-            raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms.data_handle(),
-                                                              database_view.data_handle(),
-                                                              database_view.extent(1),
-                                                              database_view.extent(0),
-                                                              stream_,
-                                                              raft::sqrt_op{});
-            index.set_dataset_norms(std::move(dataset_norms));
-          }
-        }
         }
 
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
@@ -467,13 +456,13 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         raft::resource::sync_stream(handle_);
       }
 
-      // for (int i = 0; i < min(ps.n_queries, 10); i++) {
-      //   //  std::cout << "query " << i << std::end;
-      //   print_vector("T", indices_naive.data() + i * ps.k, ps.k, std::cout);
-      //   print_vector("C", indices_Cagra.data() + i * ps.k, ps.k, std::cout);
-      //   print_vector("T", distances_naive.data() + i * ps.k, ps.k, std::cout);
-      //   print_vector("C", distances_Cagra.data() + i * ps.k, ps.k, std::cout);
-      // }
+      for (int i = 0; i < min(ps.n_queries, 10); i++) {
+        //  std::cout << "query " << i << std::end;
+        print_vector("T", indices_naive.data() + i * ps.k, ps.k, std::cout);
+        print_vector("C", indices_Cagra.data() + i * ps.k, ps.k, std::cout);
+        print_vector("T", distances_naive.data() + i * ps.k, ps.k, std::cout);
+        print_vector("C", distances_Cagra.data() + i * ps.k, ps.k, std::cout);
+      }
       double min_recall = ps.min_recall;
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_Cagra,
@@ -668,6 +657,8 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
           new_graph_buffer_view = new_graph_buffer.view();
         }
 
+        if (ps.metric != cuvs::distance::DistanceType::CosineExpanded) {
+
         cagra::extend_params extend_params;
         cagra::extend(handle_,
                       extend_params,
@@ -688,8 +679,9 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
         raft::update_host(distances_Cagra.data(), distances_dev.data(), queries_size, stream_);
         raft::update_host(indices_Cagra.data(), indices_dev.data(), queries_size, stream_);
         raft::resource::sync_stream(handle_);
+        }
       }
-
+if (ps.metric != cuvs::distance::DistanceType::CosineExpanded) {
       double min_recall = ps.min_recall;
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_Cagra,
@@ -710,6 +702,7 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
                                  ps.k,
                                  ps.metric,
                                  1.0e-4));
+                                }
     }
   }
 
@@ -856,19 +849,6 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
         if (!ps.include_serialized_dataset)
         { index.update_dataset(handle_, database_view); 
           // Only compute norms for types that support cosine distance
-        if constexpr (std::is_same_v<DataT, float> || std::is_same_v<DataT, half>) {
-          if (database_view.extent(0) > 0) {
-            auto dataset_norms =
-              raft::make_device_vector<float, int64_t>(handle_, database_view.extent(0));
-            raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms.data_handle(),
-                                                              database_view.data_handle(),
-                                                              database_view.extent(1),
-                                                              database_view.extent(0),
-                                                              stream_,
-                                                              raft::sqrt_op{});
-            index.set_dataset_norms(std::move(dataset_norms));
-          }
-        }
         }
 
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(

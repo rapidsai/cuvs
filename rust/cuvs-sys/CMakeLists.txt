@@ -53,7 +53,7 @@ endif()
 
 if(NOT cuvs_FOUND)
   set(BUILD_TESTS OFF)
-  set(BUILD_C_LIBRARY ON)
+  set(BUILD_C_LIBRARY OFF)
   add_subdirectory(../../cpp cuvs-cpp EXCLUDE_FROM_ALL)
 endif()
 

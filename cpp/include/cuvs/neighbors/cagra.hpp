@@ -29,6 +29,7 @@
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/stream_view.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/norm.cuh>
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
@@ -108,7 +109,7 @@ struct index_params : cuvs::neighbors::index_params {
    *   index_params.attach_dataset_on_build = false;
    *   auto index = cagra::build(res, index_params, dataset.view());
    *   // assert that the dataset is not attached to the index
-   *   ASSERT(index.dataset().extent(0) == 0);
+   *   ASSERT(index.dataset_view.extent(0) == 0);
    *   // update dataset
    *   index.update_dataset(res, dataset.view());
    *   // The index is now ready for search
@@ -457,6 +458,20 @@ struct index : cuvs::neighbors::index {
   {
     dataset_ = make_aligned_dataset(res, dataset, 16);
     dataset_norms_.reset();
+    auto dataset_view = this->dataset();
+    if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+      if (dataset_view.extent(0) > 0) {
+        auto dataset_norms =
+          raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
+        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms.data_handle(),
+                                                          dataset_view.data_handle(),
+                                                          dataset_view.extent(1),
+                                                          dataset_view.extent(0),
+                                                          raft::resource::get_cuda_stream(res),
+                                                          raft::sqrt_op{});
+        set_dataset_norms(std::move(dataset_norms));
+      }
+    }
   }
 
   /** Set the dataset reference explicitly to a device matrix view with padding. */
@@ -465,6 +480,20 @@ struct index : cuvs::neighbors::index {
   {
     dataset_ = make_aligned_dataset(res, dataset, 16);
     dataset_norms_.reset();
+    auto dataset_view = this->dataset();
+    if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+      if (dataset_view.extent(0) > 0) {
+        auto dataset_norms =
+          raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
+        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms.data_handle(),
+                                                          dataset_view.data_handle(),
+                                                          dataset_view.extent(1),
+                                                          dataset_view.extent(0),
+                                                          raft::resource::get_cuda_stream(res),
+                                                          raft::sqrt_op{});
+        set_dataset_norms(std::move(dataset_norms));
+      }
+    }
   }
 
   /**
@@ -480,6 +509,20 @@ struct index : cuvs::neighbors::index {
   {
     dataset_ = make_aligned_dataset(res, dataset, 16);
     dataset_norms_.reset();
+    auto dataset_view = this->dataset();
+    if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+      if (dataset_view.extent(0) > 0) {
+        auto dataset_norms =
+          raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
+        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms.data_handle(),
+                                                          dataset_view.data_handle(),
+                                                          dataset_view.extent(1),
+                                                          dataset_view.extent(0),
+                                                          raft::resource::get_cuda_stream(res),
+                                                          raft::sqrt_op{});
+        set_dataset_norms(std::move(dataset_norms));
+      }
+    }
   }
 
   /**
@@ -494,6 +537,20 @@ struct index : cuvs::neighbors::index {
   {
     dataset_ = std::make_unique<DatasetT>(std::move(dataset));
     dataset_norms_.reset();
+    auto dataset_view = this->dataset();
+    if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+      if (dataset_view.extent(0) > 0) {
+        auto dataset_norms =
+          raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
+        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms.data_handle(),
+                                                          dataset_view.data_handle(),
+                                                          dataset_view.extent(1),
+                                                          dataset_view.extent(0),
+                                                          raft::resource::get_cuda_stream(res),
+                                                          raft::sqrt_op{});
+        set_dataset_norms(std::move(dataset_norms));
+      }
+    }
   }
 
   template <typename DatasetT>
@@ -502,6 +559,20 @@ struct index : cuvs::neighbors::index {
   {
     dataset_ = std::move(dataset);
     dataset_norms_.reset();
+    auto dataset_view = this->dataset();
+    if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+      if (dataset_view.extent(0) > 0) {
+        auto dataset_norms =
+          raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
+        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms.data_handle(),
+                                                          dataset_view.data_handle(),
+                                                          dataset_view.extent(1),
+                                                          dataset_view.extent(0),
+                                                          raft::resource::get_cuda_stream(res),
+                                                          raft::sqrt_op{});
+        set_dataset_norms(std::move(dataset_norms));
+      }
+    }
   }
 
   /**

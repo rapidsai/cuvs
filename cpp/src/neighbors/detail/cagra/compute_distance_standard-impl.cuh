@@ -246,10 +246,8 @@ _RAFT_DEVICE __noinline__ auto compute_distance_standard(
 
   if constexpr (DescriptorT::kMetric == cuvs::distance::DistanceType::CosineExpanded) {
     const auto* dataset_norms = DescriptorT::dataset_norms_ptr(args);
-    if (dataset_norms != nullptr) {
       auto norm = dataset_norms[dataset_index];
       if (norm > 0) { distance = distance / norm; }
-    }
   }
 
   return distance;

@@ -157,8 +157,11 @@ void search_main(raft::resources const& res,
     RAFT_EXPECTS(index.metric() != cuvs::distance::DistanceType::CosineExpanded ||
                    index.dataset_norms().has_value(),
                  "Dataset norms must be provided for CosineExpanded metric");
-    const DistanceT* dataset_norms_ptr = nullptr;
 
+    const float* dataset_norms_ptr = nullptr;
+    if (index.dataset_norms().has_value()) {
+      dataset_norms_ptr = index.dataset_norms().value().data_handle();
+    }
     auto desc = dataset_descriptor_init_with_cache<T, IdxT, DistanceT>(
       res, params, *strided_dset, index.metric(), dataset_norms_ptr);
     search_main_core<T, IdxT, DistanceT, CagraSampleFilterT, OutputIdxT>(
@@ -207,12 +210,12 @@ void search_main(raft::resources const& res,
     const auto k         = distances.extent(1);
     auto query_norms_ptr = query_norms.data_handle();
 
-    raft::linalg::matrix_vector_op<raft::Apply::ALONG_ROWS>(
+    raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
       res,
       raft::make_const_mdspan(distances),
       raft::make_const_mdspan(query_norms.view()),
       distances,
-      raft::div_op());
+      raft::compose_op(raft::add_const_op<DistanceT>{DistanceT(1)}, raft::div_op{}));
   }
   cuvs::neighbors::ivf::detail::postprocess_distances(
     dist_out,
