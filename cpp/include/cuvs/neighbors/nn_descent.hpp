@@ -520,3 +520,7 @@ bool has_enough_device_memory(raft::resources const& res,
                               size_t idx_size = 4);
 
 }  // namespace cuvs::neighbors::nn_descent
+
+namespace cuvs::neighbors::graph_build_params {
+using nn_descent_params = cuvs::neighbors::nn_descent::index_params;
+}
