@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,6 +44,10 @@ index<T, IdxT> merge(raft::resources const& handle,
                      const cagra::merge_params& params,
                      std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices)
 {
+  // we're doing a physical merge here, make sure that this matches the merge_params
+  RAFT_EXPECTS(params.merge_strategy == cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+               "cagra::merge only supports merge_strategy=MERGE_STRATEGY_PHYSICAL");
+
   using cagra_index_t = cuvs::neighbors::cagra::index<T, IdxT>;
   using ds_idx_type   = typename cagra_index_t::dataset_index_type;
 

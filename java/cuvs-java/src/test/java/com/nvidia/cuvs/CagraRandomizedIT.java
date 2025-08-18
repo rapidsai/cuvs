@@ -158,7 +158,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
 
         compareResults(results, expected, topK, datasetSize, numQueries);
       } finally {
-        index.destroyIndex();
+        index.close();
       }
     }
   }

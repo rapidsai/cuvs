@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -129,7 +129,7 @@ impl IndexParams {
     /// time. The parameter is applied to both PQ codebook generation methods, i.e., PER_SUBSPACE and
     /// PER_CLUSTER. In both cases, we will use `pq_book_size * max_train_points_per_pq_code` training
     /// points to train each codebook.
-    pub fn set_max_train_points_per_pq_code(self, max_pq_points: u32)-> IndexParams {
+    pub fn set_max_train_points_per_pq_code(self, max_pq_points: u32) -> IndexParams {
         unsafe {
             (*self.0).max_train_points_per_pq_code = max_pq_points;
         }
