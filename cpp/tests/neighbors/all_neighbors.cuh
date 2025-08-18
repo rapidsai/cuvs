@@ -124,12 +124,7 @@ void get_graphs(raft::resources& handle,
       rmm::device_uvector<DistanceT> core_dists_dev(ps.n_rows, cuda_stream);
 
       cuvs::neighbors::detail::reachability::core_distances<IdxT, DistanceT>(
-        distances_naive_dev.data(),
-        ps.k,
-        ps.k,
-        ps.n_rows,
-        core_dists_dev.data(),
-        raft::resource::get_cuda_stream(handle));
+        handle, distances_naive_dev.data(), ps.k, ps.k, ps.n_rows, core_dists_dev.data());
 
       auto epilogue =
         cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, DistanceT>{
