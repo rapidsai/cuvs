@@ -62,7 +62,6 @@ public class CuVSDeviceMatrixBenchmarks {
       builder0.addVector(array);
     }
 
-
     deviceMatrix = builder0.build();
     hostMatrix = CuVSMatrix.hostBuilder(size, dims, CuVSMatrix.DataType.FLOAT).build();
   }
