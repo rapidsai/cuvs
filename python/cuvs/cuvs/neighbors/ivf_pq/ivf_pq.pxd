@@ -84,15 +84,20 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
 
     cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index)
 
-    uint32_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index)
+    cuvsError_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index,
+                                        uint32_t* n_lists)
 
-    uint32_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index)
+    cuvsError_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index,
+                                     uint32_t* dim)
 
-    uint32_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index)
+    cuvsError_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index,
+                                       uint32_t* pq_dim)
 
-    uint32_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index)
+    cuvsError_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index,
+                                       uint32_t* pq_len)
 
-    uint32_t cuvsIvfPqIndexGetPqBookSize(cuvsIvfPqIndex_t index)
+    cuvsError_t cuvsIvfPqIndexGetPqBookSize(cuvsIvfPqIndex_t index,
+                                            uint32_t* pq_book_size)
 
     cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index,
                                          DLManagedTensor * centers)

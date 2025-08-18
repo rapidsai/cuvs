@@ -393,16 +393,20 @@ extern "C" cuvsError_t cuvsIvfPqExtend(cuvsResources_t res,
   });
 }
 
-extern "C" uint32_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index)
+extern "C" cuvsError_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index, uint32_t* n_lists)
 {
-  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
-  return index_ptr->n_lists();
+  return cuvs::core::translate_exceptions([=] {
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+    *n_lists       = index_ptr->n_lists();
+  });
 }
 
-extern "C" uint32_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index)
+extern "C" cuvsError_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index, uint32_t* dim)
 {
-  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
-  return index_ptr->dim();
+  return cuvs::core::translate_exceptions([=] {
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+    *dim           = index_ptr->dim();
+  });
 }
 
 extern "C" cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* centers)
@@ -439,20 +443,26 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetCentersRot(cuvsIvfPqIndex_t index,
   });
 }
 
-extern "C" uint32_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index)
+extern "C" cuvsError_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index, uint32_t* pq_dim)
 {
-  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
-  return index_ptr->pq_dim();
+  return cuvs::core::translate_exceptions([=] {
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+    *pq_dim        = index_ptr->pq_dim();
+  });
 }
 
-extern "C" uint32_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index)
+extern "C" cuvsError_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index, uint32_t* pq_len)
 {
-  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
-  return index_ptr->pq_len();
+  return cuvs::core::translate_exceptions([=] {
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+    *pq_len        = index_ptr->pq_len();
+  });
 }
 
-extern "C" uint32_t cuvsIvfPqIndexGetPqBookSize(cuvsIvfPqIndex_t index)
+extern "C" cuvsError_t cuvsIvfPqIndexGetPqBookSize(cuvsIvfPqIndex_t index, uint32_t* pq_book_size)
 {
-  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
-  return index_ptr->pq_book_size();
+  return cuvs::core::translate_exceptions([=] {
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+    *pq_book_size  = index_ptr->pq_book_size();
+  });
 }
