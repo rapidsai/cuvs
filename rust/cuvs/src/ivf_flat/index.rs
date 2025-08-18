@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,9 @@
 
 use std::io::{stderr, Write};
 
-use crate::ivf_flat::{IndexParams, SearchParams};
 use crate::dlpack::ManagedTensor;
 use crate::error::{check_cuvs, Result};
+use crate::ivf_flat::{IndexParams, SearchParams};
 use crate::resources::Resources;
 
 /// Ivf-Flat ANN Index
@@ -127,8 +127,8 @@ mod tests {
         let dataset_device = ManagedTensor::from(&dataset).to_device(&res).unwrap();
 
         // build the ivf-flat index
-        let index =
-            Index::build(&res, &build_params, dataset_device).expect("failed to create ivf-flat index");
+        let index = Index::build(&res, &build_params, dataset_device)
+            .expect("failed to create ivf-flat index");
 
         // use the first 4 points from the dataset as queries : will test that we get them back
         // as their own nearest neighbor
