@@ -238,7 +238,7 @@ final class JDKProvider implements CuVSProvider {
       this.columns = columns;
       this.size = size;
       this.matrix = CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType);
-      this.stream = Util.getDefaultStream(resources);
+      this.stream = Util.getStream(resources);
       current = 0;
     }
 
@@ -254,7 +254,7 @@ final class JDKProvider implements CuVSProvider {
       this.matrix =
           CuVSDeviceMatrixRMMImpl.create(
               resources, size, columns, rowStride, columnStride, dataType);
-      this.stream = Util.getDefaultStream(resources);
+      this.stream = Util.getStream(resources);
       current = 0;
     }
 

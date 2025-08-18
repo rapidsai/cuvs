@@ -123,9 +123,9 @@ public class Util {
   }
 
   /**
-   * Helper to get the default CUDA stream associated with a {@link CuVSResources}
+   * Helper to get the CUDA stream associated with a {@link CuVSResources}
    */
-  public static MemorySegment getDefaultStream(CuVSResources resources) {
+  public static MemorySegment getStream(CuVSResources resources) {
     try (var resourcesAccess = resources.access();
         var localArena = Arena.ofConfined()) {
       var streamPointer = localArena.allocate(cudaStream_t);
