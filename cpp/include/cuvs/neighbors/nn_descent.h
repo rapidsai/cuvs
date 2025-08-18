@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,7 +54,6 @@ struct cuvsNNDescentIndexParams {
   size_t max_iterations;
   float termination_threshold;
   bool return_distances;
-  size_t n_clusters;
 };
 
 typedef struct cuvsNNDescentIndexParams* cuvsNNDescentIndexParams_t;
