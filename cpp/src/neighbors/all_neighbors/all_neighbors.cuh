@@ -156,12 +156,12 @@ void build(
     size_t k        = indices.extent(1);
     size_t num_rows = core_distances.value().size();
     cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
+      handle,
       distances.value().data_handle(),
       k,
       k,
       num_rows,
-      core_distances.value().data_handle(),
-      raft::resource::get_cuda_stream(handle));
+      core_distances.value().data_handle());
 
     using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>;
     auto dist_epilogue   = ReachabilityPP{core_distances.value().data_handle(), alpha, num_rows};
@@ -230,12 +230,12 @@ void build(
     size_t k        = indices.extent(1);
     size_t num_rows = core_distances.value().size();
     cuvs::neighbors::detail::reachability::core_distances<IdxT, T>(
+      handle,
       distances.value().data_handle(),
       k,
       k,
       num_rows,
-      core_distances.value().data_handle(),
-      raft::resource::get_cuda_stream(handle));
+      core_distances.value().data_handle());
 
     using ReachabilityPP = cuvs::neighbors::detail::reachability::ReachabilityPostProcess<IdxT, T>;
     auto dist_epilogue   = ReachabilityPP{core_distances.value().data_handle(), alpha, num_rows};
