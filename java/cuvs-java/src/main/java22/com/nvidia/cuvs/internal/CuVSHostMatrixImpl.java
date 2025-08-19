@@ -18,15 +18,14 @@ package com.nvidia.cuvs.internal;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
+import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.CuVSHostMatrix;
 import com.nvidia.cuvs.CuVSMatrix.DataType;
 import com.nvidia.cuvs.CuVSMatrix.MemoryKind;
 import com.nvidia.cuvs.RowView;
-import java.lang.foreign.MemoryLayout;
-import java.lang.foreign.MemorySegment;
-import java.lang.foreign.SequenceLayout;
-import java.lang.foreign.ValueLayout;
+import java.lang.foreign.*;
 import java.lang.invoke.VarHandle;
 
 /**
@@ -63,7 +62,7 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
   protected static ValueLayout valueLayoutFromType(DataType dataType) {
     return switch (dataType) {
       case FLOAT -> C_FLOAT;
-      case INT -> C_INT;
+      case INT, UINT -> C_INT;
       case BYTE -> C_CHAR;
     };
   }
@@ -136,6 +135,12 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
 
   public ValueLayout valueLayout() {
     return valueLayout;
+  }
+
+  @Override
+  public MemorySegment toTensor(Arena arena) {
+    return prepareTensor(
+        arena, memorySegment, new long[] {size, columns}, code(), bits(), kDLCPU(), 1);
   }
 
   private static class SliceRowView implements RowView {

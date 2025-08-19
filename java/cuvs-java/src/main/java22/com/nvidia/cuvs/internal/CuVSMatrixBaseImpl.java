@@ -15,8 +15,11 @@
  */
 package com.nvidia.cuvs.internal;
 
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
+
 import com.nvidia.cuvs.CuVSMatrix;
 import com.nvidia.cuvs.CuVSMatrix.DataType;
+import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 
 public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
@@ -51,4 +54,21 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
   public DataType dataType() {
     return dataType;
   }
+  
+  protected int bits() {
+    return switch (dataType) {
+      case FLOAT, INT, UINT -> 32;
+      case BYTE -> 8;
+    };
+  }
+
+  protected int code() {
+    return switch (dataType) {
+      case FLOAT -> kDLFloat();
+      case INT -> kDLInt();
+      case UINT, BYTE -> kDLUInt();
+    };
+  }
+
+  public abstract MemorySegment toTensor(Arena arena);
 }

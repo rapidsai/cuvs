@@ -19,13 +19,7 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_POINTER;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaGetDeviceCount;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaGetDeviceProperties_v2;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemGetInfo;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaSetDevice;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMAlloc;
-import static com.nvidia.cuvs.internal.panama.headers_h.size_t;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.GPUInfo;
 import com.nvidia.cuvs.internal.panama.DLDataType;
@@ -74,6 +68,13 @@ public class Util {
     if (value != CUDA_SUCCESS) {
       throw new RuntimeException(caller + " returned " + value);
     }
+  }
+
+  private static final long UNSIGNED_INT_MASK = 0xFFFFFFFFL;
+
+  public static long dereferenceUnsignedInt(MemorySegment ptr) {
+    assert ptr.byteSize() == 4;
+    return ptr.get(uint32_t, 0) & UNSIGNED_INT_MASK;
   }
 
   /**
@@ -351,30 +352,5 @@ public class Util {
     DLManagedTensor.dl_tensor(tensor, dlTensor);
 
     return tensor;
-  }
-
-  public static MemorySegment allocateRMMSegment(long resourceHandle, long datasetBytes) {
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment datasetMemorySegment = localArena.allocate(C_POINTER);
-
-      var returnValue = cuvsRMMAlloc(resourceHandle, datasetMemorySegment, datasetBytes);
-      checkCuVSError(returnValue, "cuvsRMMAlloc");
-
-      return datasetMemorySegment.get(C_POINTER, 0);
-    }
-  }
-
-  public static MemorySegment buildMemorySegmentFromBytes(Arena arena, byte[][] data) {
-    long rows = data.length;
-    long cols = rows > 0 ? data[0].length : 0;
-    long totalBytes = rows * cols;
-
-    MemorySegment segment = arena.allocate(totalBytes);
-    for (int i = 0; i < rows; i++) {
-      for (int j = 0; j < cols; j++) {
-        segment.set(ValueLayout.JAVA_BYTE, (long) i * cols + j, data[i][j]);
-      }
-    }
-    return segment;
   }
 }
