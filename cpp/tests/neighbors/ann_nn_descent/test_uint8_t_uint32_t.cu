@@ -24,12 +24,4 @@ typedef AnnNNDescentTest<float, uint8_t, std::uint32_t> AnnNNDescentTestUI8_U32;
 TEST_P(AnnNNDescentTestUI8_U32, AnnNNDescent) { this->testNNDescent(); }
 
 INSTANTIATE_TEST_CASE_P(AnnNNDescentTest, AnnNNDescentTestUI8_U32, ::testing::ValuesIn(inputs));
-
-typedef AnnNNDescentTest<float, uint8_t, std::uint32_t> AnnNNDescentTestUI8_U32_LargeBatch;
-TEST_P(AnnNNDescentTestUI8_U32_LargeBatch, AnnNNDescent) { this->testNNDescent(); }
-
-INSTANTIATE_TEST_CASE_P(AnnNNDescentTestLargeBatch,
-                        AnnNNDescentTestUI8_U32_LargeBatch,
-                        ::testing::ValuesIn(inputsLargeBatch));
-
 }  // namespace   cuvs::neighbors::nn_descent

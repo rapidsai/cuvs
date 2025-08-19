@@ -164,10 +164,10 @@ public class HnswRandomizedIT extends CuVSTestCase {
           SearchResults results = hnswIndex.search(hnswQuery);
           compareResults(results, expected, topK, datasetSize, numQueries);
 
-          hnswIndex.destroyIndex();
+          hnswIndex.close();
         }
       } finally {
-        index.destroyIndex();
+        index.close();
         Files.deleteIfExists(hnswIndexPath);
       }
     }

@@ -94,7 +94,7 @@ public class TieredIndexImpl implements TieredIndex {
    * Invokes the native destroy_tiered_index to de-allocate the Tiered index
    */
   @Override
-  public void destroyIndex() {
+  public void close() {
     checkNotDestroyed();
     try {
       int returnValue = cuvsTieredIndexDestroy(tieredIndexReference.getMemorySegment());
