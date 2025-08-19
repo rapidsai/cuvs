@@ -15,15 +15,14 @@
  */
 package com.nvidia.cuvs.internal;
 
+import static com.nvidia.cuvs.internal.common.CloseableRMMAllocation.allocateRMMSegment;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_POINTER;
 import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.*;
-import static com.nvidia.cuvs.internal.common.Util.allocateRMMSegment;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsScalarQuantizerCreate;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsScalarQuantizerDestroy;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsScalarQuantizerInverseTransform;
@@ -144,20 +143,27 @@ public class Scalar8BitQuantizerImpl {
 
     CuVSMatrix result = new CuVSHostMatrixArenaImpl(rows, cols, DataType.BYTE);
 
-    for (long startRow = 0; startRow < rows; startRow += ROWS_PER_BUFFER) {
-      long endRow = Math.min(startRow + ROWS_PER_BUFFER, rows);
-      long chunkRows = endRow - startRow;
+    // Allocate buffers outside the loop (addressing reviewer feedback)
+    long maxDatasetBytes = FLOAT_SIZE * ROWS_PER_BUFFER * cols;
+    long maxOutputBytes = C_BYTE_SIZE * ROWS_PER_BUFFER * cols;
 
-      long datasetBytes = FLOAT_SIZE * chunkRows * cols;
-      long outputBytes = C_BYTE_SIZE * chunkRows * cols;
+    try (var datasetDP = allocateRMMSegment(cuvsResourcesPtr, maxDatasetBytes);
+        var outputDP = allocateRMMSegment(cuvsResourcesPtr, maxOutputBytes)) {
 
-      MemorySegment datasetPtr = allocateRMMSegment(cuvsResourcesPtr, datasetBytes);
-      MemorySegment outputPtr = allocateRMMSegment(cuvsResourcesPtr, outputBytes);
+      for (long startRow = 0; startRow < rows; startRow += ROWS_PER_BUFFER) {
+        long endRow = Math.min(startRow + ROWS_PER_BUFFER, rows);
+        long chunkRows = endRow - startRow;
+        long actualDatasetBytes = FLOAT_SIZE * chunkRows * cols;
+        long actualOutputBytes = C_BYTE_SIZE * chunkRows * cols;
 
-      try {
+        // Get slices of pre-allocated buffers
+        MemorySegment datasetPtr = datasetDP.handle().asSlice(0, actualDatasetBytes);
+        MemorySegment outputPtr = outputDP.handle().asSlice(0, actualOutputBytes);
+
         MemorySegment chunkData =
-            datasetMemSegment.asSlice(startRow * cols * FLOAT_SIZE, datasetBytes);
-        cudaMemcpy(datasetPtr, chunkData, datasetBytes, INFER_DIRECTION);
+            datasetMemSegment.asSlice(startRow * cols * FLOAT_SIZE, actualDatasetBytes);
+
+        cudaMemcpy(datasetPtr, chunkData, actualDatasetBytes, INFER_DIRECTION);
 
         long datasetShape[] = {chunkRows, cols};
         MemorySegment datasetTensor =
@@ -174,16 +180,12 @@ public class Scalar8BitQuantizerImpl {
         checkCuVSError(returnValue, "cuvsStreamSync");
 
         MemorySegment resultChunk =
-            ((CuVSMatrixBaseImpl) result).memorySegment().asSlice(startRow * cols, outputBytes);
-        cudaMemcpy(resultChunk, outputPtr, outputBytes, DEVICE_TO_HOST);
-
-      } finally {
-        int returnValue = cuvsRMMFree(cuvsResourcesPtr, datasetPtr, datasetBytes);
-        checkCuVSError(returnValue, "cuvsRMMFree");
-        returnValue = cuvsRMMFree(cuvsResourcesPtr, outputPtr, outputBytes);
-        checkCuVSError(returnValue, "cuvsRMMFree");
+            ((CuVSMatrixBaseImpl) result)
+                .memorySegment()
+                .asSlice(startRow * cols, actualOutputBytes);
+        cudaMemcpy(resultChunk, outputPtr, actualOutputBytes, DEVICE_TO_HOST);
       }
-    }
+    } // CloseableRMMAllocation automatically closes here
 
     if (result.dataType() != DataType.BYTE) {
       throw new IllegalStateException(
@@ -307,20 +309,26 @@ public class Scalar8BitQuantizerImpl {
 
     CuVSMatrix result = new CuVSHostMatrixArenaImpl(rows, cols, DataType.FLOAT);
 
-    for (long startRow = 0; startRow < rows; startRow += ROWS_PER_BUFFER) {
-      long endRow = Math.min(startRow + ROWS_PER_BUFFER, rows);
-      long chunkRows = endRow - startRow;
+    // Allocate buffers outside the loop (addressing reviewer feedback)
+    long maxQuantizedBytes = BYTE_SIZE * ROWS_PER_BUFFER * cols;
+    long maxOutputBytes = C_FLOAT_BYTE_SIZE * ROWS_PER_BUFFER * cols;
 
-      long quantizedBytes = BYTE_SIZE * chunkRows * cols;
-      long outputBytes = C_FLOAT_BYTE_SIZE * chunkRows * cols;
+    try (var quantizedDP = allocateRMMSegment(cuvsResourcesPtr, maxQuantizedBytes);
+        var outputDP = allocateRMMSegment(cuvsResourcesPtr, maxOutputBytes)) {
 
-      MemorySegment quantizedPtr = allocateRMMSegment(cuvsResourcesPtr, quantizedBytes);
-      MemorySegment outputPtr = allocateRMMSegment(cuvsResourcesPtr, outputBytes);
+      for (long startRow = 0; startRow < rows; startRow += ROWS_PER_BUFFER) {
+        long endRow = Math.min(startRow + ROWS_PER_BUFFER, rows);
+        long chunkRows = endRow - startRow;
+        long actualQuantizedBytes = BYTE_SIZE * chunkRows * cols;
+        long actualOutputBytes = C_FLOAT_BYTE_SIZE * chunkRows * cols;
 
-      try {
+        // Get slices of pre-allocated buffers
+        MemorySegment quantizedPtr = quantizedDP.handle().asSlice(0, actualQuantizedBytes);
+        MemorySegment outputPtr = outputDP.handle().asSlice(0, actualOutputBytes);
+
         MemorySegment chunkData =
-            quantizedMemSegment.asSlice(startRow * cols * BYTE_SIZE, quantizedBytes);
-        cudaMemcpy(quantizedPtr, chunkData, quantizedBytes, INFER_DIRECTION);
+            quantizedMemSegment.asSlice(startRow * cols * BYTE_SIZE, actualQuantizedBytes);
+        cudaMemcpy(quantizedPtr, chunkData, actualQuantizedBytes, INFER_DIRECTION);
 
         long datasetShape[] = {chunkRows, cols};
         MemorySegment quantizedTensor =
@@ -339,16 +347,10 @@ public class Scalar8BitQuantizerImpl {
         MemorySegment resultChunk =
             ((CuVSMatrixBaseImpl) result)
                 .memorySegment()
-                .asSlice(startRow * cols * C_FLOAT_BYTE_SIZE, outputBytes);
-        cudaMemcpy(resultChunk, outputPtr, outputBytes, DEVICE_TO_HOST);
-
-      } finally {
-        int returnValue = cuvsRMMFree(cuvsResourcesPtr, quantizedPtr, quantizedBytes);
-        checkCuVSError(returnValue, "cuvsRMMFree");
-        returnValue = cuvsRMMFree(cuvsResourcesPtr, outputPtr, outputBytes);
-        checkCuVSError(returnValue, "cuvsRMMFree");
+                .asSlice(startRow * cols * C_FLOAT_BYTE_SIZE, actualOutputBytes);
+        cudaMemcpy(resultChunk, outputPtr, actualOutputBytes, DEVICE_TO_HOST);
       }
-    }
+    } // CloseableRMMAllocation automatically closes here
 
     return result;
   }
@@ -368,18 +370,21 @@ public class Scalar8BitQuantizerImpl {
     final long FLOATS_PER_BUFFER = BUFFER_SIZE_BYTES / FLOAT_SIZE;
     final long ROWS_PER_BUFFER = Math.max(1, FLOATS_PER_BUFFER / cols);
 
-    for (long startRow = 0; startRow < rows; startRow += ROWS_PER_BUFFER) {
-      long endRow = Math.min(startRow + ROWS_PER_BUFFER, rows);
-      long chunkRows = endRow - startRow;
+    // Allocate buffer outside the loop (addressing reviewer feedback)
+    long maxDatasetBytes = FLOAT_SIZE * ROWS_PER_BUFFER * cols;
 
-      long datasetBytes = FLOAT_SIZE * chunkRows * cols;
+    try (var datasetDP = allocateRMMSegment(cuvsResourcesPtr, maxDatasetBytes)) {
+      for (long startRow = 0; startRow < rows; startRow += ROWS_PER_BUFFER) {
+        long endRow = Math.min(startRow + ROWS_PER_BUFFER, rows);
+        long chunkRows = endRow - startRow;
+        long actualDatasetBytes = FLOAT_SIZE * chunkRows * cols;
 
-      MemorySegment datasetPtr = allocateRMMSegment(cuvsResourcesPtr, datasetBytes);
+        // Get slice of pre-allocated buffer
+        MemorySegment datasetPtr = datasetDP.handle().asSlice(0, actualDatasetBytes);
 
-      try {
         MemorySegment chunkData =
-            datasetMemSegment.asSlice(startRow * cols * FLOAT_SIZE, datasetBytes);
-        cudaMemcpy(datasetPtr, chunkData, datasetBytes, INFER_DIRECTION);
+            datasetMemSegment.asSlice(startRow * cols * FLOAT_SIZE, actualDatasetBytes);
+        cudaMemcpy(datasetPtr, chunkData, actualDatasetBytes, INFER_DIRECTION);
 
         long datasetShape[] = {chunkRows, cols};
         MemorySegment datasetTensor =
@@ -391,12 +396,8 @@ public class Scalar8BitQuantizerImpl {
 
         returnValue = cuvsStreamSync(cuvsResourcesPtr);
         checkCuVSError(returnValue, "cuvsStreamSync");
-
-      } finally {
-        int returnValue = cuvsRMMFree(cuvsResourcesPtr, datasetPtr, datasetBytes);
-        checkCuVSError(returnValue, "cuvsRMMFree");
       }
-    }
+    } // CloseableRMMAllocation automatically closes here
   }
 
   private static CuVSMatrix performTransformHost(

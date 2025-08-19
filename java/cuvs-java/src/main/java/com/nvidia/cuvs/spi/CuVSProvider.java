@@ -15,6 +15,7 @@
  */
 package com.nvidia.cuvs.spi;
 
+import com.nvidia.cuvs.BinaryQuantizer;
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CagraMergeParams;
@@ -81,9 +82,6 @@ public interface CuVSProvider {
   /** Create a {@link CuVSMatrix} from an on-heap array **/
   CuVSMatrix newMatrixFromArray(byte[][] vectors);
 
-  /** Create a {@link CuVSMatrix} backed by a on-heap byte array */
-  CuVSMatrix newByteArrayDataset(byte[][] vectors);
-
   /** Creates a new BruteForceIndex Builder. */
   BruteForceIndex.Builder newBruteForceIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;
@@ -128,10 +126,18 @@ public interface CuVSProvider {
 
   CuVSMatrix inverseTransformScalar8Bit(Object impl, CuVSMatrix quantizedData) throws Throwable;
 
-  CuVSMatrix transformBinary(CuVSResources resources, CuVSMatrix input, int thresholdType)
+  /** Creates a new BinaryQuantizer implementation. */
+  Object createBinaryQuantizerImpl(
+      CuVSResources resources,
+      CuVSMatrix trainingDataset,
+      BinaryQuantizer.ThresholdType thresholdType)
       throws Throwable;
 
-  CuVSMatrix transformBinary(CuVSResources resources, CuVSMatrix input) throws Throwable;
+  /** Performs transform using a BinaryQuantizer. */
+  CuVSMatrix transformBinaryWithImpl(Object impl, CuVSMatrix input) throws Throwable;
+
+  /** Closes BinaryQuantizer implementation. */
+  void closeBinaryQuantizer(Object impl) throws Throwable;
 
   /** Transforms dataset using Scalar8BitQuantizer */
   CuVSMatrix transformScalar8Bit(Object impl, CuVSMatrix input) throws Throwable;

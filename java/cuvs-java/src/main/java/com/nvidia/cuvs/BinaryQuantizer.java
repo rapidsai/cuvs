@@ -18,53 +18,46 @@ package com.nvidia.cuvs;
 import com.nvidia.cuvs.CuVSMatrix.DataType;
 import com.nvidia.cuvs.spi.CuVSProvider;
 
-/**
- * Binary quantizer implementation that transforms 32-bit float datasets into 8-bit packed binary datasets.
- *
- * <p>Binary quantization reduces each float32 value to a single bit, which are then packed into 8-bit
- * unsigned integers for efficient storage. This quantizer does not require training and does not
- * support inverse transformation.
- *
- * @since 25.08
- */
+/** Binary quantizer that transforms float datasets into packed binary datasets. */
 public class BinaryQuantizer implements CuVSQuantizer {
   private final CuVSResources resources;
   private final ThresholdType thresholdType;
 
-  /**
-   * The data type used by this quantizer (BYTE for packed binary data).
-   */
+  /** Output data type (BYTE for packed binary data). */
   private final DataType outputDataType = DataType.BYTE;
 
-  /**
-   * Creates a new binary quantizer with the specified resources.
-   *
-   * @param resources The CuVS resources to use for quantization operations
-   */
-  public BinaryQuantizer(CuVSResources resources) {
-    this(resources, ThresholdType.ZERO);
+  private final Object impl;
+
+  /** Creates a binary quantizer with training data. */
+  public BinaryQuantizer(CuVSResources resources, CuVSMatrix trainingDataset) throws Throwable {
+    this(resources, trainingDataset, ThresholdType.MEAN);
   }
 
-  /**
-   * Creates a binary quantizer with specified threshold type.
-   *
-   * @param resources The CuVS resources
-   * @param thresholdType The threshold type for binary conversion (ZERO, MEAN, or SAMPLING_MEDIAN)
-   */
-  public BinaryQuantizer(CuVSResources resources, ThresholdType thresholdType) {
+  /** Creates a binary quantizer with specified threshold type and training data. */
+  public BinaryQuantizer(
+      CuVSResources resources, CuVSMatrix trainingDataset, ThresholdType thresholdType)
+      throws Throwable {
+    if (trainingDataset == null) {
+      throw new IllegalArgumentException("Training dataset cannot be null");
+    }
+    if (trainingDataset.dataType() != DataType.FLOAT) {
+      throw new IllegalArgumentException(
+          "Training dataset must have FLOAT data type, got " + trainingDataset.dataType());
+    }
     this.resources = resources;
     this.thresholdType = thresholdType;
+    this.impl =
+        CuVSProvider.provider()
+            .createBinaryQuantizerImpl(resources, trainingDataset, thresholdType);
   }
 
-  /**
-   * Threshold types supported by binary quantization.
-   */
+  /** Threshold types for binary quantization. */
   public enum ThresholdType {
-    /** Use zero as threshold value */
+    /** Zero threshold */
     ZERO(0),
-    /** Use mean of dataset as threshold */
+    /** Mean threshold */
     MEAN(1),
-    /** Use sampling median as threshold */
+    /** Sampling median threshold */
     SAMPLING_MEDIAN(2);
 
     private final int value;
@@ -78,35 +71,26 @@ public class BinaryQuantizer implements CuVSQuantizer {
     }
   }
 
-  /**
-   * Returns the data type of quantized data produced by this quantizer.
-   *
-   * @return The DataType (BYTE for this binary quantizer)
-   */
+  /** Returns the output data type (BYTE). */
   @Override
   public DataType outputDataType() {
     return outputDataType;
   }
 
-  /**
-   * Gets the threshold value used for binary quantization.
-   */
+  /** Gets the threshold type used for binary quantization. */
   public ThresholdType getThresholdType() {
     return thresholdType;
   }
 
   @Override
   public CuVSMatrix transform(CuVSMatrix input) throws Throwable {
-    // Validate input data type
     if (input.dataType() != DataType.FLOAT) {
       throw new IllegalArgumentException(
           "BinaryQuantizer requires FLOAT input, got " + input.dataType());
     }
 
-    CuVSMatrix result =
-        CuVSProvider.provider().transformBinary(resources, input, thresholdType.getValue());
+    CuVSMatrix result = CuVSProvider.provider().transformBinaryWithImpl(impl, input);
 
-    // Validate output data type
     if (result.dataType() != DataType.BYTE) {
       throw new IllegalStateException(
           "Expected BYTE output from binary quantization, got " + result.dataType());
@@ -117,8 +101,7 @@ public class BinaryQuantizer implements CuVSQuantizer {
 
   @Override
   public void train(CuVSMatrix trainingData) throws Throwable {
-    throw new UnsupportedOperationException(
-        "Binary quantization performs training internally during each transform call");
+    throw new UnsupportedOperationException("Training handled during construction");
   }
 
   @Override
@@ -128,5 +111,15 @@ public class BinaryQuantizer implements CuVSQuantizer {
   }
 
   @Override
-  public void close() throws Exception {}
+  public void close() throws Exception {
+    try {
+      CuVSProvider.provider().closeBinaryQuantizer(impl);
+    } catch (Throwable t) {
+      if (t instanceof Exception) {
+        throw (Exception) t;
+      } else {
+        throw new RuntimeException("Error closing BinaryQuantizer", t);
+      }
+    }
+  }
 }

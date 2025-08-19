@@ -15,6 +15,7 @@
  */
 package com.nvidia.cuvs.spi;
 
+import com.nvidia.cuvs.BinaryQuantizer;
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CuVSMatrix;
@@ -87,11 +88,6 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
-  public CuVSMatrix newByteArrayDataset(byte[][] vectors) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public Object createScalar8BitQuantizerImpl(CuVSResources resources, CuVSMatrix trainingDataset)
       throws Throwable {
     throw new UnsupportedOperationException("CuVS is not supported on this platform");
@@ -104,13 +100,21 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
-  public CuVSMatrix transformBinary(CuVSResources resources, CuVSMatrix input, int thresholdType)
+  public Object createBinaryQuantizerImpl(
+      CuVSResources resources,
+      CuVSMatrix trainingDataset,
+      BinaryQuantizer.ThresholdType thresholdType)
       throws Throwable {
     throw new UnsupportedOperationException("CuVS is not supported on this platform");
   }
 
   @Override
-  public CuVSMatrix transformBinary(CuVSResources resources, CuVSMatrix input) throws Throwable {
+  public CuVSMatrix transformBinaryWithImpl(Object impl, CuVSMatrix input) throws Throwable {
+    throw new UnsupportedOperationException("CuVS is not supported on this platform");
+  }
+
+  @Override
+  public void closeBinaryQuantizer(Object impl) throws Throwable {
     throw new UnsupportedOperationException("CuVS is not supported on this platform");
   }
 

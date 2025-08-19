@@ -65,18 +65,15 @@ public class QuantizationIT extends CuVSTestCase {
     float[][] queries = createSimpleQueries();
 
     try (CuVSResources resources = CheckedCuVSResources.create()) {
-      // Create float32 dataset
       CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
       assertEquals(DataType.FLOAT, trainingDataset.dataType());
       assertEquals(dataset.length, trainingDataset.size());
       assertEquals(dataset[0].length, trainingDataset.columns());
 
-      // Create scalar quantizer
       Scalar8BitQuantizer quantizer = new Scalar8BitQuantizer(resources, trainingDataset);
       assertEquals(DataType.BYTE, quantizer.outputDataType());
       log.info("Created scalar quantizer with BYTE data type");
 
-      // Build index with quantized dataset
       CagraIndexParams indexParams =
           new CagraIndexParams.Builder()
               .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
@@ -95,10 +92,8 @@ public class QuantizationIT extends CuVSTestCase {
 
       log.info("Built index with quantized dataset");
 
-      // Create search parameters
       CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
 
-      // Create quantized query
       CagraQuery query =
           CagraQuery.newBuilder(resources)
               .withQueryVectors(queries)
@@ -134,7 +129,7 @@ public class QuantizationIT extends CuVSTestCase {
           results.getResults().size());
 
       // Cleanup
-      index.destroyIndex();
+      index.close();
       quantizer.close();
       trainingDataset.close();
     }
@@ -146,16 +141,13 @@ public class QuantizationIT extends CuVSTestCase {
     float[][] queries = createSimpleQueries();
 
     try (CuVSResources resources = CheckedCuVSResources.create()) {
-      // Create float32 dataset
       CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
       assertEquals(DataType.FLOAT, trainingDataset.dataType());
 
-      // Create binary quantizer
-      BinaryQuantizer quantizer = new BinaryQuantizer(resources);
+      BinaryQuantizer quantizer = new BinaryQuantizer(resources, trainingDataset);
       assertEquals(DataType.BYTE, quantizer.outputDataType());
       log.info("Created binary quantizer");
 
-      // Build index with quantized dataset
       CagraIndexParams indexParams =
           new CagraIndexParams.Builder()
               .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
@@ -174,10 +166,8 @@ public class QuantizationIT extends CuVSTestCase {
 
       log.info("Built index with binary quantized dataset");
 
-      // Create search parameters
       CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
 
-      // Create quantized query
       CagraQuery query =
           CagraQuery.newBuilder(resources)
               .withQueryVectors(queries)
@@ -209,20 +199,18 @@ public class QuantizationIT extends CuVSTestCase {
 
       log.info("Binary quantized search completed successfully");
 
-      // Test that inverse transform is not supported
       CuVSMatrix quantizedQueries = query.getQuantizedQueries();
       try {
         quantizer.inverseTransform(quantizedQueries);
         fail("Expected UnsupportedOperationException to be thrown");
       } catch (UnsupportedOperationException e) {
-        // Expected exception - test passes
         assertTrue(
             "Exception message should mention inverse transform",
             e.getMessage().contains("inverse"));
       }
 
       // Cleanup
-      index.destroyIndex();
+      index.close();
       quantizer.close();
       trainingDataset.close();
       quantizedQueries.close();
@@ -268,19 +256,16 @@ public class QuantizationIT extends CuVSTestCase {
       CuVSMatrix inputDataset = CuVSMatrix.ofArray(dataset);
       assertEquals(CuVSMatrix.MemoryKind.HOST, inputDataset.memoryKind());
 
-      BinaryQuantizer quantizer = new BinaryQuantizer(resources);
+      BinaryQuantizer quantizer = new BinaryQuantizer(resources, inputDataset);
 
-      // Test binary quantization
       CuVSMatrix quantized = quantizer.transform(inputDataset);
-      assertEquals(DataType.BYTE, quantized.dataType()); // Binary packed into bytes
+      assertEquals(DataType.BYTE, quantized.dataType());
       assertEquals(CuVSMatrix.MemoryKind.HOST, quantized.memoryKind());
 
-      // Test that inverse transform throws
       try {
         quantizer.inverseTransform(quantized);
         fail("Expected UnsupportedOperationException to be thrown");
       } catch (UnsupportedOperationException e) {
-        // Expected exception - test passes
         assertTrue(
             "Exception message should mention inverse transform",
             e.getMessage().contains("inverse"));
@@ -359,7 +344,7 @@ public class QuantizationIT extends CuVSTestCase {
 
         quantizer.close();
         trainingDataset.close();
-        index.destroyIndex();
+        index.close();
       }
     }
   }
@@ -383,13 +368,11 @@ public class QuantizationIT extends CuVSTestCase {
     try (CuVSResources resources = CheckedCuVSResources.create()) {
       CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
 
-      // Test ZERO threshold (0)
       BinaryQuantizer quantizer =
-          new BinaryQuantizer(resources, BinaryQuantizer.ThresholdType.ZERO);
+          new BinaryQuantizer(resources, trainingDataset, BinaryQuantizer.ThresholdType.ZERO);
       assertEquals(DataType.BYTE, quantizer.outputDataType());
       assertEquals(BinaryQuantizer.ThresholdType.ZERO, quantizer.getThresholdType());
 
-      // Build index with binary quantized dataset
       CagraIndexParams indexParams =
           new CagraIndexParams.Builder()
               .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
@@ -408,7 +391,6 @@ public class QuantizationIT extends CuVSTestCase {
 
       log.info("Built index with ZERO threshold binary quantization");
 
-      // Create quantized query
       CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
       CagraQuery query =
           CagraQuery.newBuilder(resources)
@@ -421,29 +403,25 @@ public class QuantizationIT extends CuVSTestCase {
       assertTrue("Query should have quantized vectors", query.hasQuantizedQueries());
       assertEquals(DataType.BYTE, query.getQueryDataType());
 
-      // Perform search
       SearchResults results = index.search(query);
       assertNotNull("Search results should not be null", results);
       assertEquals(
           "Should have results for all queries", queries.length, results.getResults().size());
 
-      // Verify quantization behavior - values > 0 should become 1, values <= 0 should become 0
       CuVSMatrix quantizedDataset = quantizer.transform(trainingDataset);
       byte[][] result = new byte[(int) quantizedDataset.size()][(int) quantizedDataset.columns()];
       quantizedDataset.toArray(result);
 
       byte firstByte = result[0][0];
-      int[] unpackedBits = new int[5]; // Unpack first 5 bits
+      int[] unpackedBits = new int[5];
       for (int i = 0; i < 5; i++) {
         unpackedBits[i] = (firstByte >> i) & 1;
       }
 
-      // Verify first row: [-2.0, -1.0, 0.0, 1.0, 2.0] -> [0, 0, 0, 1, 1]
       int[] expectedRow0 = {0, 0, 0, 1, 1};
       assertArrayEquals("ZERO threshold failed for row 0", expectedRow0, unpackedBits);
 
-      // Cleanup
-      index.destroyIndex();
+      index.close();
       quantizer.close();
       trainingDataset.close();
       quantizedDataset.close();
@@ -471,12 +449,10 @@ public class QuantizationIT extends CuVSTestCase {
     try (CuVSResources resources = CheckedCuVSResources.create()) {
       CuVSMatrix trainingDataset = CuVSMatrix.ofArray(dataset);
 
-      // Test MEAN threshold (1)
       BinaryQuantizer quantizer =
-          new BinaryQuantizer(resources, BinaryQuantizer.ThresholdType.MEAN);
+          new BinaryQuantizer(resources, trainingDataset, BinaryQuantizer.ThresholdType.MEAN);
       assertEquals(BinaryQuantizer.ThresholdType.MEAN, quantizer.getThresholdType());
 
-      // Build index
       CagraIndexParams indexParams =
           new CagraIndexParams.Builder()
               .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
@@ -521,12 +497,11 @@ public class QuantizationIT extends CuVSTestCase {
 
       // Verify that MEAN threshold produces different results than ZERO threshold
       BinaryQuantizer zeroQuantizer =
-          new BinaryQuantizer(resources, BinaryQuantizer.ThresholdType.ZERO);
+          new BinaryQuantizer(resources, trainingDataset, BinaryQuantizer.ThresholdType.ZERO);
       CuVSMatrix zeroQuantized = zeroQuantizer.transform(trainingDataset);
       byte[][] zeroData = new byte[(int) zeroQuantized.size()][(int) zeroQuantized.columns()];
       zeroQuantized.toArray(zeroData);
 
-      // They should produce different results for this dataset
       boolean isDifferent = false;
       for (int i = 0; i < result1.length && !isDifferent; i++) {
         for (int j = 0; j < result1[i].length && !isDifferent; j++) {
@@ -538,7 +513,7 @@ public class QuantizationIT extends CuVSTestCase {
       assertTrue("MEAN and ZERO thresholds should produce different results", isDifferent);
 
       // Cleanup
-      index.destroyIndex();
+      index.close();
       quantizer.close();
       zeroQuantizer.close();
       trainingDataset.close();
@@ -559,7 +534,8 @@ public class QuantizationIT extends CuVSTestCase {
       assertEquals(DataType.FLOAT, trainingDataset.dataType());
 
       BinaryQuantizer quantizer =
-          new BinaryQuantizer(resources, BinaryQuantizer.ThresholdType.SAMPLING_MEDIAN);
+          new BinaryQuantizer(
+              resources, trainingDataset, BinaryQuantizer.ThresholdType.SAMPLING_MEDIAN);
       assertEquals(DataType.BYTE, quantizer.outputDataType());
       log.info("Created binary quantizer with sampling median threshold");
 

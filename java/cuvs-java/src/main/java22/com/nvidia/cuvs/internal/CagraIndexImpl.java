@@ -306,11 +306,6 @@ public class CagraIndexImpl implements CagraIndex {
       SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
       MemorySegment neighborsMemorySegment = localArena.allocate(neighborsSequenceLayout);
       MemorySegment distancesMemorySegment = localArena.allocate(distancesSequenceLayout);
-      MemorySegment floatsSeg = buildMemorySegment(localArena, query.getQueryVectors());
-
-      final long queriesBytes = C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
-      final long neighborsBytes = C_INT_BYTE_SIZE * numQueries * topK;
-      final long distancesBytes = C_FLOAT_BYTE_SIZE * numQueries * topK;
       final boolean hasPreFilter = query.getPrefilter() != null;
       final BitSet[] prefilters =
           hasPreFilter ? new BitSet[] {query.getPrefilter()} : EMPTY_PREFILTER_BITSET;
@@ -334,7 +329,13 @@ public class CagraIndexImpl implements CagraIndex {
           long[] queriesShape = {numQueries, vectorDimension};
           MemorySegment queriesTensor =
               prepareTensor(
-                  localArena, queriesDP.handle(), queriesShape, getDataTypeCode(queryDataType, this.indexQuantizer), getPrecisionFromDataType(queryDataType), kDLCUDA(), 1);
+                  localArena,
+                  queriesDP.handle(),
+                  queriesShape,
+                  getDataTypeCode(queryDataType, this.indexQuantizer),
+                  getPrecisionFromDataType(queryDataType),
+                  kDLCUDA(),
+                  1);
           long[] neighborsShape = {numQueries, topK};
           MemorySegment neighborsTensor =
               prepareTensor(
@@ -924,9 +925,9 @@ public class CagraIndexImpl implements CagraIndex {
 
           CuVSMatrix quantizedDataset = quantizer.transform(dataset);
 
-          return new CagraIndexImpl(cagraIndexParams, quantizedDataset, cuvsResources, quantizer);
+          return new CagraIndexImpl(cagraIndexParams, quantizedDataset, cuvsResources);
         }
-        
+
         if (graph != null) {
           if (cagraIndexParams == null || dataset == null) {
             throw new IllegalArgumentException(
@@ -934,7 +935,7 @@ public class CagraIndexImpl implements CagraIndex {
                     + "you must specify the original dataset and the metric used.");
           }
           return new CagraIndexImpl(
-              cagraIndexParams.getCuvsDistanceType(), graph, dataset, cuvsResources);
+              cagraIndexParams.getCuvsDistanceType(), graph, dataset, cuvsResources, null);
         }
         return new CagraIndexImpl(cagraIndexParams, dataset, cuvsResources);
       }

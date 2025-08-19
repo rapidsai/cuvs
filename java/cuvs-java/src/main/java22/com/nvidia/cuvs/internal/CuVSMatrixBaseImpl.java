@@ -54,7 +54,7 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
   public DataType dataType() {
     return dataType;
   }
-  
+
   protected int bits() {
     return switch (dataType) {
       case FLOAT, INT, UINT -> 32;
