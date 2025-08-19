@@ -164,7 +164,6 @@ final class JDKProvider implements CuVSProvider {
   public CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
       CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType)
       throws UnsupportedOperationException {
-
     return new HeapSegmentBuilder(resources, size, columns, dataType);
   }
 
