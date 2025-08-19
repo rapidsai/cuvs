@@ -62,7 +62,7 @@
         <maven.compiler.source>22</maven.compiler.source>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <native.build.path>${project.build.directory}/../../cpp/build</native.build.path>
+        <native.build.path>${project.build.directory}/../../../cpp/build</native.build.path>
     </properties>
 
     <distributionManagement>
@@ -181,16 +181,17 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <version>3.6.0</version>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
                 <executions>
                     <execution>
                         <id>copy-native-libs</id>
                         <phase>generate-resources</phase>
                         <goals>
-                            <goal>copy-dependencies</goal>
+                            <goal>copy-resources</goal>
                         </goals>
                         <configuration>
+                            <overwrite>true</overwrite>
                             <outputDirectory>${project.build.outputDirectory}/${os.arch}/${os.name}</outputDirectory>
                             <resources>
                                 <resource>
