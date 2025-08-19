@@ -916,7 +916,6 @@ public class CagraIndexImpl implements CagraIndex {
       if (inputStream != null) {
         return new CagraIndexImpl(inputStream, cuvsResources);
       } else {
-<<<<<<< HEAD
         if (quantizer != null && dataset != null) {
           if (dataset.dataType() != DataType.FLOAT) {
             throw new IllegalArgumentException(
@@ -927,8 +926,7 @@ public class CagraIndexImpl implements CagraIndex {
 
           return new CagraIndexImpl(cagraIndexParams, quantizedDataset, cuvsResources, quantizer);
         }
-        return new CagraIndexImpl(cagraIndexParams, dataset, cuvsResources);
-=======
+        
         if (graph != null) {
           if (cagraIndexParams == null || dataset == null) {
             throw new IllegalArgumentException(
@@ -937,10 +935,8 @@ public class CagraIndexImpl implements CagraIndex {
           }
           return new CagraIndexImpl(
               cagraIndexParams.getCuvsDistanceType(), graph, dataset, cuvsResources);
-        } else {
-          return new CagraIndexImpl(cagraIndexParams, dataset, cuvsResources);
         }
->>>>>>> branch-25.10
+        return new CagraIndexImpl(cagraIndexParams, dataset, cuvsResources);
       }
     }
   }
