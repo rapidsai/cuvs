@@ -271,11 +271,14 @@ void make_rotation_matrix(raft::resources const& res,
                           index<int64_t>* index,
                           bool force_random_rotation)
 {
+  auto rotation_matrix_buffer = raft::make_device_matrix<float, uint32_t>(
+    res, index->rotation_matrix().extent(0), index->rotation_matrix().extent(1));
   make_rotation_matrix(res,
                        force_random_rotation,
                        index->rot_dim(),
                        index->dim(),
-                       index->rotation_matrix_owning_view().data_handle());
+                       rotation_matrix_buffer.data_handle());
+  index->update_rotation_matrix(res, rotation_matrix_buffer.view());
 }
 
 void set_centers(raft::resources const& handle,

@@ -449,8 +449,12 @@ struct index : cuvs::neighbors::index {
    *   - codebook_gen::PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
    */
   raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers() const noexcept;
-  /** Owning view of the PQ centers */
-  raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers_owning_view();
+  /** Setter for the PQ centers. The transpose flag will transpose the last two dimensions of the
+   * inputs */
+  void update_pq_centers(
+    raft::resources const& handle,
+    raft::device_mdspan<const float, pq_centers_extents, raft::row_major> new_pq_centers,
+    bool transpose = false);
 
   /** Lists' data and indices. */
   std::vector<std::shared_ptr<list_data<IdxT>>>& lists() noexcept;
@@ -465,8 +469,10 @@ struct index : cuvs::neighbors::index {
   raft::device_vector_view<IdxT*, uint32_t, raft::row_major> inds_ptrs() noexcept;
   raft::device_vector_view<const IdxT* const, uint32_t, raft::row_major> inds_ptrs() const noexcept;
 
-  /** Owning view of the rotation matrix */
-  raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix_owning_view();
+  /** Setter for the rotation matrix */
+  void update_rotation_matrix(
+    raft::resources const& handle,
+    raft::device_matrix_view<const float, uint32_t, raft::row_major> new_rotation_matrix);
   /** The transform matrix (original space -> rotated padded space) [rot_dim, dim] */
   raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix() const noexcept;
 
@@ -493,8 +499,9 @@ struct index : cuvs::neighbors::index {
 
   /** Cluster centers corresponding to the lists in the original space [n_lists, dim_ext] */
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept;
-  /** Owning view of the centers [n_lists, dim_ext] */
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_owning_view();
+  /** Setter for the centers [n_lists, dim_ext] or [n_lists, dim] */
+  void update_centers(raft::resources const& handle,
+                      raft::device_matrix_view<const float, uint32_t, raft::row_major> new_centers);
 
   raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> centers_int8(
     const raft::resources& res) const;
@@ -503,8 +510,10 @@ struct index : cuvs::neighbors::index {
 
   /** Cluster centers corresponding to the lists in the rotated space [n_lists, rot_dim] */
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot() const noexcept;
-  /** Owning view of the cluster centers in the rotated space [n_lists, rot_dim] */
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot_owning_view();
+  /** Setter for the cluster centers in the rotated space [n_lists, rot_dim] */
+  void update_centers_rot(
+    raft::resources const& handle,
+    raft::device_matrix_view<const float, uint32_t, raft::row_major> new_centers_rot);
 
   /** fetch size of a particular IVF list in bytes using the list extents.
    * Usage example:

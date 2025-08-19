@@ -148,10 +148,24 @@ auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT
   auto index = cuvs::neighbors::ivf_pq::index<IdxT>(
     handle_, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, cma);
 
-  raft::deserialize_mdspan(handle_, is, index.pq_centers_owning_view());
-  raft::deserialize_mdspan(handle_, is, index.centers_owning_view());
-  raft::deserialize_mdspan(handle_, is, index.centers_rot_owning_view());
-  raft::deserialize_mdspan(handle_, is, index.rotation_matrix_owning_view());
+  auto pq_centers_buffer = raft::make_host_mdarray<float, uint32_t>(index.pq_centers().extents());
+  auto centers_buffer =
+    raft::make_host_matrix<float, uint32_t>(index.centers().extent(0), index.centers().extent(1));
+  auto centers_rot_buffer = raft::make_host_matrix<float, uint32_t>(index.centers_rot().extent(0),
+                                                                    index.centers_rot().extent(1));
+  auto rotation_matrix_buffer = raft::make_host_matrix<float, uint32_t>(
+    index.rotation_matrix().extent(0), index.rotation_matrix().extent(1));
+
+  raft::deserialize_mdspan(handle_, is, pq_centers_buffer.view());
+  raft::deserialize_mdspan(handle_, is, centers_buffer.view());
+  raft::deserialize_mdspan(handle_, is, centers_rot_buffer.view());
+  raft::deserialize_mdspan(handle_, is, rotation_matrix_buffer.view());
+
+  index.update_pq_centers(handle_, pq_centers_buffer.view());
+  index.update_centers(handle_, centers_buffer.view());
+  index.update_centers_rot(handle_, centers_rot_buffer.view());
+  index.update_rotation_matrix(handle_, rotation_matrix_buffer.view());
+
   raft::deserialize_mdspan(handle_, is, index.list_sizes());
   auto list_device_spec = list_spec<uint32_t, IdxT>{pq_bits, pq_dim, cma};
   auto list_store_spec  = list_spec<uint32_t, IdxT>{pq_bits, pq_dim, true};

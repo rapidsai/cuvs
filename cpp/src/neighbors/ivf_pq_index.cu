@@ -20,6 +20,7 @@
 
 #include <raft/core/operators.hpp>
 #include <raft/linalg/map.cuh>
+#include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce.cuh>
 
 #include <raft/util/cudart_utils.hpp>
@@ -225,15 +226,47 @@ bool index<IdxT>::conservative_memory_allocation() const noexcept
   return conservative_memory_allocation_;
 }
 
-template <typename IdxT>
-raft::device_mdspan<float,
-                    typename cuvs::neighbors::ivf_pq::index<IdxT>::pq_centers_extents,
-                    raft::row_major>
-index<IdxT>::pq_centers_owning_view()
+void transpose_pq_centers(
+  const raft::resources& handle,
+  raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers_source,
+  raft::device_mdspan<float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers_target)
 {
-  RAFT_EXPECTS(pq_centers_.size() != 0,
-               "Empty pq centers mdarray. Index built from args can't be modified");
-  return pq_centers_.view();
+  auto extents         = pq_centers_target.extents();
+  auto pq_centers_view = raft::make_device_vector_view<float, int64_t>(
+    pq_centers_target.data_handle(), pq_centers_target.size());
+  raft::linalg::map_offset(
+    handle, pq_centers_view, [pq_centers_source, extents] __device__(size_t i) {
+      uint32_t ii[3];
+      for (int r = 2; r > 0; r--) {
+        ii[r] = i % extents.extent(r);
+        i /= extents.extent(r);
+      }
+      ii[0] = i;
+      return pq_centers_source(ii[0], ii[2], ii[1]);
+    });
+}
+
+template <typename IdxT>
+void index<IdxT>::update_pq_centers(
+  raft::resources const& handle,
+  raft::device_mdspan<const float,
+                      typename cuvs::neighbors::ivf_pq::index<IdxT>::pq_centers_extents,
+                      raft::row_major> new_pq_centers,
+  bool transpose)
+{
+  if (pq_centers_.size() == 0) {
+    // Replace the existing view
+    pq_centers_view_ = new_pq_centers;
+  } else {
+    if (transpose) {
+      transpose_pq_centers(handle, new_pq_centers, pq_centers_.view());
+    } else {
+      raft::copy(pq_centers_.data_handle(),
+                 new_pq_centers.data_handle(),
+                 new_pq_centers.size(),
+                 raft::resource::get_cuda_stream(handle));
+    }
+  }
 }
 
 template <typename IdxT>
@@ -286,12 +319,19 @@ raft::device_vector_view<const IdxT* const, uint32_t, raft::row_major> index<Idx
 }
 
 template <typename IdxT>
-raft::device_matrix_view<float, uint32_t, raft::row_major>
-index<IdxT>::rotation_matrix_owning_view()
+void index<IdxT>::update_rotation_matrix(
+  raft::resources const& handle,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> new_rotation_matrix)
 {
-  RAFT_EXPECTS(rotation_matrix_.size() != 0,
-               "Empty rotation matrix mdarray. Index built from args can't be modified");
-  return rotation_matrix_.view();
+  if (rotation_matrix_.size() == 0) {
+    // Replace the existing view
+    rotation_matrix_view_ = new_rotation_matrix;
+  } else {
+    raft::copy(rotation_matrix_.data_handle(),
+               new_rotation_matrix.data_handle(),
+               new_rotation_matrix.size(),
+               raft::resource::get_cuda_stream(handle));
+  }
 }
 
 template <typename IdxT>
@@ -327,12 +367,67 @@ raft::device_vector_view<const uint32_t, uint32_t, raft::row_major> index<IdxT>:
   return list_sizes_.view();
 }
 
-template <typename IdxT>
-raft::device_matrix_view<float, uint32_t, raft::row_major> index<IdxT>::centers_owning_view()
+void set_centers_with_norms(
+  raft::resources const& handle,
+  raft::device_matrix_view<float, uint32_t, raft::row_major> target_cluster_centers,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> src_cluster_centers)
 {
-  RAFT_EXPECTS(centers_.size() != 0,
-               "Empty centers mdarray. Index built from args can't be modified");
-  return centers_.view();
+  auto stream         = raft::resource::get_cuda_stream(handle);
+  auto* device_memory = raft::resource::get_workspace_resource(handle);
+  auto n_lists        = target_cluster_centers.extent(0);
+  auto dim            = src_cluster_centers.extent(1);
+  auto dim_ext        = target_cluster_centers.extent(1);
+
+  // Make sure to have trailing zeroes between dim and dim_ext;
+  // We rely on this to enable padded tensor gemm kernels during coarse search.
+  cuvs::spatial::knn::detail::utils::memzero(
+    target_cluster_centers.data_handle(), target_cluster_centers.size(), stream);
+  // combine cluster_centers and their norms
+  RAFT_CUDA_TRY(cudaMemcpy2DAsync(target_cluster_centers.data_handle(),
+                                  sizeof(float) * dim_ext,
+                                  src_cluster_centers.data_handle(),
+                                  sizeof(float) * dim,
+                                  sizeof(float) * dim,
+                                  n_lists,
+                                  cudaMemcpyDefault,
+                                  stream));
+
+  rmm::device_uvector<float> center_norms(n_lists, stream, device_memory);
+  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+    center_norms.data(), src_cluster_centers.data_handle(), dim, n_lists, stream);
+  RAFT_CUDA_TRY(cudaMemcpy2DAsync(target_cluster_centers.data_handle() + dim,
+                                  sizeof(float) * dim_ext,
+                                  center_norms.data(),
+                                  sizeof(float),
+                                  sizeof(float),
+                                  n_lists,
+                                  cudaMemcpyDefault,
+                                  stream));
+}
+
+template <typename IdxT>
+void index<IdxT>::update_centers(
+  raft::resources const& handle,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> new_centers)
+{
+  if (centers_.size() == 0) {
+    // Replace the existing view
+    centers_view_ = new_centers;
+  } else {
+    if (new_centers.extent(1) == dim_ext()) {
+      raft::copy(centers_.data_handle(),
+                 new_centers.data_handle(),
+                 new_centers.size(),
+                 raft::resource::get_cuda_stream(handle));
+    } else if (new_centers.extent(1) == dim()) {
+      set_centers_with_norms(handle, centers_.view(), new_centers);
+    } else {
+      RAFT_FAIL("Invalid number of columns in new_centers. Expected %u or %u, got %u.",
+                dim(),
+                dim_ext(),
+                new_centers.extent(1));
+    }
+  }
 }
 
 template <typename IdxT>
@@ -343,11 +438,19 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::ce
 }
 
 template <typename IdxT>
-raft::device_matrix_view<float, uint32_t, raft::row_major> index<IdxT>::centers_rot_owning_view()
+void index<IdxT>::update_centers_rot(
+  raft::resources const& handle,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> new_centers_rot)
 {
-  RAFT_EXPECTS(centers_rot_.size() != 0,
-               "Empty centers rot mdarray. Index built from args can't be modified");
-  return centers_rot_.view();
+  if (centers_rot_.size() == 0) {
+    // Replace the existing view
+    centers_rot_view_ = new_centers_rot;
+  } else {
+    raft::copy(centers_rot_.data_handle(),
+               new_centers_rot.data_handle(),
+               new_centers_rot.size(),
+               raft::resource::get_cuda_stream(handle));
+  }
 }
 
 template <typename IdxT>
