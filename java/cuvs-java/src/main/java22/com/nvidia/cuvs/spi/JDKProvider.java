@@ -226,6 +226,13 @@ final class JDKProvider implements CuVSProvider {
     return dataset;
   }
 
+  /**
+   * This {@link CuVSDeviceMatrix} builder implementation returns a {@link CuVSDeviceMatrix} backed by managed RMM
+   * device memory. It uses a non-native {@link MemorySegment} created directly from on-heap java arrays to avoid
+   * an intermediate allocation and copy to a native (off-heap) segment.
+   * It requires the copy function ({@code cudaMemcpyAsync}) to have the {@code Critical} linker option in order
+   * to allow the access to on-heap memory (see {@link Native#cudaMemcpyAsync}).
+   */
   private static class HeapSegmentBuilder implements CuVSMatrix.Builder<CuVSDeviceMatrix> {
     private final long columns;
     private final long size;

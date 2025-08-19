@@ -69,23 +69,27 @@ public interface CuVSMatrix extends AutoCloseable {
     return CuVSProvider.provider().newMatrixFromArray(vectors);
   }
 
+  /**
+   * A builder to construct a new matrix one row at a time
+   * @param <T> the CuVSMatrix type to build
+   */
   interface Builder<T extends CuVSMatrix> {
     /**
-     * Add a single vector to the dataset.
+     * Adds a single vector to the matrix.
      *
      * @param vector A float array of as many elements as the dimensions
      */
     void addVector(float[] vector);
 
     /**
-     * Add a single vector to the dataset.
+     * Adds a single vector to the matrix.
      *
      * @param vector A byte array of as many elements as the dimensions
      */
     void addVector(byte[] vector);
 
     /**
-     * Add a single vector to the dataset.
+     * Adds a single vector to the matrix.
      *
      * @param vector An int array of as many elements as the dimensions
      */
