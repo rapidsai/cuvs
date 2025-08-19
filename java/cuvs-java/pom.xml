@@ -306,7 +306,7 @@
                         <version>3.4.2</version>
                         <configuration>
                             <descriptors>
-                                <descriptor>src/assembly/cuda.xml</descriptor>
+                                <descriptor>src/assembly/cuda-specific-native.xml</descriptor>
                             </descriptors>
                             <finalName>${project.artifactId}-${project.version}-${native.classifier}</finalName>
                             <appendAssemblyId>false</appendAssemblyId>
@@ -372,7 +372,7 @@
                         <version>3.4.2</version>
                         <configuration>
                             <descriptors>
-                                <descriptor>src/assembly/cuda.xml</descriptor>
+                                <descriptor>src/assembly/cuda-specific-native.xml</descriptor>
                             </descriptors>
                             <finalName>${project.artifactId}-${project.version}-${native.classifier}</finalName>
                             <appendAssemblyId>false</appendAssemblyId>
