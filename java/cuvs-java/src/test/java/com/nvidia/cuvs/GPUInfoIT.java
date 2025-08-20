@@ -66,7 +66,7 @@ public class GPUInfoIT extends CuVSTestCase {
   public void testMemoryInfo() throws Throwable {
     try (var resources = CheckedCuVSResources.create()) {
       var gpuInfoProvider = CuVSProvider.provider().gpuInfoProvider();
-      var memoryInfo = gpuInfoProvider.getCurrentMemoryInfo(resources);
+      var memoryInfo = gpuInfoProvider.getCurrentInfo(resources);
       assertNotNull(memoryInfo);
       log.trace("Free memory: {}", memoryInfo.freeDeviceMemoryInBytes());
       assertTrue(memoryInfo.freeDeviceMemoryInBytes() > 0);

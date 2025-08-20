@@ -21,8 +21,8 @@ import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemGetInfo;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsDeviceIdGet;
 import static com.nvidia.cuvs.internal.panama.headers_h_1.*;
 
-import com.nvidia.cuvs.CuVSMemoryInfo;
 import com.nvidia.cuvs.CuVSResources;
+import com.nvidia.cuvs.CuVSResourcesInfo;
 import com.nvidia.cuvs.GPUInfo;
 import com.nvidia.cuvs.GPUInfoProvider;
 import com.nvidia.cuvs.internal.common.Util;
@@ -43,7 +43,7 @@ public class GPUInfoProviderImpl implements GPUInfoProvider {
   }
 
   @Override
-  public CuVSMemoryInfo getCurrentMemoryInfo(CuVSResources resources) {
+  public CuVSResourcesInfo getCurrentInfo(CuVSResources resources) {
     try (var resourcesAccess = resources.access()) {
       try (var localArena = Arena.ofConfined()) {
         var deviceIdPtr = localArena.allocate(C_INT);
@@ -65,7 +65,7 @@ public class GPUInfoProviderImpl implements GPUInfoProvider {
           checkCudaError(cudaSetDevice(currentDeviceId), "cudaSetDevice");
         }
 
-        return new CuVSMemoryInfo(freeMemoryPtr.get(size_t, 0));
+        return new CuVSResourcesInfo(freeMemoryPtr.get(size_t, 0));
       }
     }
   }

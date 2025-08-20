@@ -16,10 +16,10 @@
 package com.nvidia.cuvs;
 
 /**
- * Contains memory information associated to a {@link CuVSResources} and its GPU.
+ * Contains performance-related information associated to a {@link CuVSResources} and its GPU.
  * Can be extended to report different types of GPU memory linked to the resources,
  * e.g. the type and capacity of the underlying RMM {@code device_memory_resource}
  *
  * @param freeDeviceMemoryInBytes   free memory in bytes, as reported by the device driver
  */
-public record CuVSMemoryInfo(long freeDeviceMemoryInBytes) {}
+public record CuVSResourcesInfo(long freeDeviceMemoryInBytes) {}

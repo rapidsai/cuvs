@@ -41,7 +41,7 @@ public interface GPUInfoProvider {
   /**
    * Gets memory information relative to a {@link CuVSResources}
    * @param resources from which to obtain memory information
-   * @return a {@link CuVSMemoryInfo} record containing the memory information
+   * @return a {@link CuVSResourcesInfo} record containing the memory information
    */
-  CuVSMemoryInfo getCurrentMemoryInfo(CuVSResources resources);
+  CuVSResourcesInfo getCurrentInfo(CuVSResources resources);
 }
