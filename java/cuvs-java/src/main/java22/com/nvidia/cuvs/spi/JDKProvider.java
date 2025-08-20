@@ -235,7 +235,7 @@ final class JDKProvider implements CuVSProvider {
     private final long size;
     private final CuVSDeviceMatrixImpl matrix;
     private final MemorySegment stream;
-    int current;
+    private int current;
 
     private HeapSegmentBuilder(
         CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType) {
@@ -243,7 +243,7 @@ final class JDKProvider implements CuVSProvider {
       this.size = size;
       this.matrix = CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType);
       this.stream = Util.getStream(resources);
-      current = 0;
+      this.current = 0;
     }
 
     private HeapSegmentBuilder(
@@ -259,7 +259,7 @@ final class JDKProvider implements CuVSProvider {
           CuVSDeviceMatrixRMMImpl.create(
               resources, size, columns, rowStride, columnStride, dataType);
       this.stream = Util.getStream(resources);
-      current = 0;
+      this.current = 0;
     }
 
     @Override
