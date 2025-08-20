@@ -231,6 +231,9 @@ RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_standard_worker(
       }
     }
   }
+  // if (r < -3.5) {
+  //   printf("distance: %f\n", r);
+  // }
   return r;
 }
 
@@ -247,7 +250,11 @@ _RAFT_DEVICE __noinline__ auto compute_distance_standard(
   if constexpr (DescriptorT::kMetric == cuvs::distance::DistanceType::CosineExpanded) {
     const auto* dataset_norms = DescriptorT::dataset_norms_ptr(args);
       auto norm = dataset_norms[dataset_index];
+      // printf("distance prior: %f, norm: %f\n", distance, norm);
       if (norm > 0) { distance = distance / norm; }
+      // if (distance < -3.5) {
+        // printf("distance post: %f, norm: %f\n", distance, norm);
+      // }
   }
 
   return distance;

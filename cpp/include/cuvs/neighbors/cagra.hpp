@@ -25,6 +25,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
 #include <raft/core/host_mdspan.hpp>
+#include <raft/core/logger_macros.hpp>
 #include <raft/core/mdspan.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/stream_view.hpp>
@@ -456,20 +457,27 @@ struct index : cuvs::neighbors::index {
   void update_dataset(raft::resources const& res,
                       raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
   {
+    RAFT_LOG_INFO ("update_dataset 1");
     dataset_ = make_aligned_dataset(res, dataset, 16);
     dataset_norms_.reset();
-    auto dataset_view = this->dataset();
-    if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
-      if (dataset_view.extent(0) > 0) {
-        auto dataset_norms =
-          raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
-        raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms.data_handle(),
-                                                          dataset_view.data_handle(),
-                                                          dataset_view.extent(1),
-                                                          dataset_view.extent(0),
-                                                          raft::resource::get_cuda_stream(res),
-                                                          raft::sqrt_op{});
-        set_dataset_norms(std::move(dataset_norms));
+
+    // Only compute norms for cosine distance
+    if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+        if (dataset.extent(0) > 0) {
+          // Note: The dataset view passed here should be contiguous (not strided)
+          // since it comes from user data. The aligned dataset we create might
+          // have padding, but we compute norms from the original contiguous data.
+          auto dataset_norms =
+            raft::make_device_vector<float, int64_t>(res, dataset.extent(0));
+          raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms.data_handle(),
+                                                            dataset.data_handle(),
+                                                            dataset.extent(1),
+                                                            dataset.extent(0),
+                                                            raft::resource::get_cuda_stream(res),
+                                                            raft::sqrt_op{});
+          set_dataset_norms(std::move(dataset_norms));
+        }
       }
     }
   }
@@ -480,15 +488,17 @@ struct index : cuvs::neighbors::index {
   {
     dataset_ = make_aligned_dataset(res, dataset, 16);
     dataset_norms_.reset();
-    auto dataset_view = this->dataset();
+
     if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
-      if (dataset_view.extent(0) > 0) {
+      if (dataset.extent(0) > 0) {
+        auto p = dynamic_cast<strided_dataset<T, int64_t>*>(dataset_.get());
+        int64_t stride = p->stride();
         auto dataset_norms =
-          raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
+          raft::make_device_vector<float, int64_t>(res, dataset.extent(0));
         raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms.data_handle(),
-                                                          dataset_view.data_handle(),
-                                                          dataset_view.extent(1),
-                                                          dataset_view.extent(0),
+                                                          dataset.data_handle(),
+                                                          stride,
+                                                          dataset.extent(0),
                                                           raft::resource::get_cuda_stream(res),
                                                           raft::sqrt_op{});
         set_dataset_norms(std::move(dataset_norms));
@@ -509,14 +519,15 @@ struct index : cuvs::neighbors::index {
   {
     dataset_ = make_aligned_dataset(res, dataset, 16);
     dataset_norms_.reset();
-    auto dataset_view = this->dataset();
     if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
-      if (dataset_view.extent(0) > 0) {
+      if (dataset.extent(0) > 0) {
+        auto p = dynamic_cast<strided_dataset<T, int64_t>*>(dataset_.get());
+        auto dataset_view = p->view();
         auto dataset_norms =
           raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
         raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms.data_handle(),
                                                           dataset_view.data_handle(),
-                                                          dataset_view.extent(1),
+                                                          static_cast<int64_t>(dataset_view.stride(0)),
                                                           dataset_view.extent(0),
                                                           raft::resource::get_cuda_stream(res),
                                                           raft::sqrt_op{});
@@ -537,17 +548,19 @@ struct index : cuvs::neighbors::index {
   {
     dataset_ = std::make_unique<DatasetT>(std::move(dataset));
     dataset_norms_.reset();
-    auto dataset_view = this->dataset();
+    auto p = dynamic_cast<strided_dataset<T, int64_t>*>(dataset_.get());
+    auto dataset_view = p->view();
     if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
       if (dataset_view.extent(0) > 0) {
         auto dataset_norms =
           raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
         raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms.data_handle(),
                                                           dataset_view.data_handle(),
-                                                          dataset_view.extent(1),
+                                                          static_cast<int64_t>(dataset_view.stride(0)),
                                                           dataset_view.extent(0),
                                                           raft::resource::get_cuda_stream(res),
                                                           raft::sqrt_op{});
+        raft::print_device_vector("dataset_norms", dataset_norms.data_handle(), 10, std::cout);
         set_dataset_norms(std::move(dataset_norms));
       }
     }
@@ -557,19 +570,23 @@ struct index : cuvs::neighbors::index {
   auto update_dataset(raft::resources const& res, std::unique_ptr<DatasetT>&& dataset)
     -> std::enable_if_t<std::is_base_of_v<neighbors::dataset<dataset_index_type>, DatasetT>>
   {
+    RAFT_LOG_INFO ("update_dataset 5");
     dataset_ = std::move(dataset);
     dataset_norms_.reset();
     auto dataset_view = this->dataset();
+    RAFT_LOG_INFO ("extent: %d", dataset_view.extent(1));
+    raft::print_device_vector("dataset_view", dataset_view.data_handle(), dataset_view.extent(1), std::cout);
     if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
       if (dataset_view.extent(0) > 0) {
         auto dataset_norms =
           raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
         raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms.data_handle(),
                                                           dataset_view.data_handle(),
-                                                          dataset_view.extent(1),
+                                                          static_cast<int64_t>(dataset_view.stride(0)),
                                                           dataset_view.extent(0),
                                                           raft::resource::get_cuda_stream(res),
                                                           raft::sqrt_op{});
+        raft::print_device_vector("dataset_norms", dataset_norms.data_handle(), 10, std::cout);
         set_dataset_norms(std::move(dataset_norms));
       }
     }
