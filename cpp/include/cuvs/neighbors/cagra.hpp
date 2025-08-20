@@ -25,7 +25,6 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
 #include <raft/core/host_mdspan.hpp>
-#include <raft/core/logger_macros.hpp>
 #include <raft/core/mdspan.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/stream_view.hpp>
@@ -109,7 +108,7 @@ struct index_params : cuvs::neighbors::index_params {
    *   index_params.attach_dataset_on_build = false;
    *   auto index = cagra::build(res, index_params, dataset.view());
    *   // assert that the dataset is not attached to the index
-   *   ASSERT(index.dataset_view.extent(0) == 0);
+   *   ASSERT(index.dataset().extent(0) == 0);
    *   // update dataset
    *   index.update_dataset(res, dataset.view());
    *   // The index is now ready for search
@@ -472,13 +471,9 @@ struct index : cuvs::neighbors::index {
     dataset_ = make_aligned_dataset(res, dataset, 16);
     dataset_norms_.reset();
 
-    // Only compute norms for cosine distance
-    if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+    if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+      if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
         if (dataset.extent(0) > 0) {
-          // Note: The dataset view passed here should be contiguous (not strided)
-          // since it comes from user data. The aligned dataset we create might
-          // have padding, but we compute norms from the original contiguous data.
           auto dataset_norms = raft::make_device_vector<float, int64_t>(res, dataset.extent(0));
           detail::compute_dataset_norms(res, dataset, dataset_norms.view());
           set_dataset_norms(std::move(dataset_norms));
@@ -494,8 +489,8 @@ struct index : cuvs::neighbors::index {
     dataset_ = make_aligned_dataset(res, dataset, 16);
     dataset_norms_.reset();
 
-    if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+    if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+      if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
         if (dataset.extent(0) > 0) {
           auto dataset_norms = raft::make_device_vector<float, int64_t>(res, dataset.extent(0));
           detail::compute_dataset_norms(res, dataset, dataset_norms.view());
@@ -518,8 +513,8 @@ struct index : cuvs::neighbors::index {
   {
     dataset_ = make_aligned_dataset(res, dataset, 16);
     dataset_norms_.reset();
-    if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+    if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+      if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
         if (dataset.extent(0) > 0) {
           auto p            = dynamic_cast<strided_dataset<T, int64_t>*>(dataset_.get());
           auto dataset_view = p->view();
@@ -544,9 +539,8 @@ struct index : cuvs::neighbors::index {
   {
     dataset_ = std::make_unique<DatasetT>(std::move(dataset));
     dataset_norms_.reset();
-    // Only compute norms for cosine distance
-    if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+    if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+      if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
         auto p = dynamic_cast<strided_dataset<T, int64_t>*>(dataset_.get());
         if (p) {
           auto dataset_view = p->view();
@@ -568,8 +562,8 @@ struct index : cuvs::neighbors::index {
     dataset_ = std::move(dataset);
     dataset_norms_.reset();
     auto dataset_view = this->dataset();
-    if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+    if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+      if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
         if (dataset_view.extent(0) > 0) {
           auto dataset_norms =
             raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));

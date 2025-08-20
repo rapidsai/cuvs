@@ -21,15 +21,12 @@
 #include "sample_filter_utils.cuh"
 #include "search_plan.cuh"
 #include "search_single_cta_inst.cuh"
-#include <cstdio>
-#include <iostream>
 
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/util/cudart_utils.hpp>
-// #include <raft/util/print.hpp>
 
 #include <cuvs/distance/distance.hpp>
 
@@ -43,11 +40,8 @@
 // TODO: This shouldn't be calling spatial/knn apis
 #include "../ann_utils.cuh"
 
-#include <raft/linalg/map.cuh>
+#include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm.cuh>
-#include <raft/util/integer_utils.hpp>
-#include <rmm/cuda_stream_view.hpp>
-#include <rmm/device_uvector.hpp>
 
 namespace cuvs::neighbors::cagra::detail {
 

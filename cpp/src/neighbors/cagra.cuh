@@ -71,7 +71,6 @@ void compute_dataset_norms(raft::resources const& res,
                                                     raft::sqrt_op{});
 }
 
-// Explicit instantiations for supported types
 template void compute_dataset_norms<float>(
   raft::resources const& res,
   raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,

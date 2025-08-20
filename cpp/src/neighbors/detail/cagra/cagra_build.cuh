@@ -800,9 +800,8 @@ index<T, IdxT> build(
         index<T, IdxT>(res, params.metric, dataset, raft::make_const_mdspan(cagra_graph.view()));
 
       // Compute dataset norms for cosine distance
-      if (params.metric == cuvs::distance::DistanceType::CosineExpanded) {
-        // Only compute norms for types that support cosine distance
-        if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+      if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+        if (params.metric == cuvs::distance::DistanceType::CosineExpanded) {
           auto dataset_view = idx.dataset();
           if (dataset_view.extent(0) > 0) {
             auto dataset_norms =

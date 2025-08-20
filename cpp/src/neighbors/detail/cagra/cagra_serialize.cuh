@@ -76,8 +76,6 @@ void serialize(raft::resources const& res,
   if (include_dataset) {
     RAFT_LOG_DEBUG("Saving CAGRA index with dataset");
     neighbors::detail::serialize(res, os, index_.data());
-    // Note: We don't serialize dataset_norms even for cosine distance because
-    // update_dataset will recompute them during deserialization
   } else {
     RAFT_LOG_DEBUG("Saving CAGRA index WITHOUT dataset");
   }
