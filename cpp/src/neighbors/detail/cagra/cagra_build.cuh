@@ -805,39 +805,9 @@ index<T, IdxT> build(
         if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
           auto dataset_view = idx.dataset();
           if (dataset_view.extent(0) > 0) {
-            // Check if the dataset is strided (has padding)
-            bool is_strided = dataset_view.stride(0) > dataset_view.extent(1);
-            if (is_strided) {
-              // rowNorm doesn't support strided data, so we need to create a contiguous copy
-              auto contiguous_data = raft::make_device_matrix<T, int64_t>(res, dataset_view.extent(0), dataset_view.extent(1));
-              RAFT_CUDA_TRY(cudaMemcpy2DAsync(contiguous_data.data_handle(),
-                                             sizeof(T) * dataset_view.extent(1),
-                                             dataset_view.data_handle(),
-                                             sizeof(T) * dataset_view.stride(0),
-                                             sizeof(T) * dataset_view.extent(1),
-                                             dataset_view.extent(0),
-                                             cudaMemcpyDeviceToDevice,
-                                             raft::resource::get_cuda_stream(res)));
-              
-              auto dataset_norms = raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
-              raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms.data_handle(),
-                                                                contiguous_data.data_handle(),
-                                                                dataset_view.extent(1),
-                                                                dataset_view.extent(0),
-                                                                raft::resource::get_cuda_stream(res),
-                                                                raft::sqrt_op{});
-              idx.set_dataset_norms(std::move(dataset_norms));
-            } else {
-              // Data is contiguous, can compute norms directly
-              auto dataset_norms = raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
-              raft::linalg::rowNorm<raft::linalg::L2Norm, true>(dataset_norms.data_handle(),
-                                                                dataset_view.data_handle(),
-                                                                dataset_view.extent(1),
-                                                                dataset_view.extent(0),
-                                                                raft::resource::get_cuda_stream(res),
-                                                                raft::sqrt_op{});
-              idx.set_dataset_norms(std::move(dataset_norms));
-            }
+            auto dataset_norms = raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
+            cuvs::neighbors::cagra::detail::compute_dataset_norms(res, dataset_view, dataset_norms.view());
+            idx.set_dataset_norms(std::move(dataset_norms));
           }
         }
       }

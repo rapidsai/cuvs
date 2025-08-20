@@ -37,6 +37,61 @@
 
 namespace cuvs::neighbors::cagra {
 
+namespace detail {
+// Norm computation helpers - these are declared in cagra.hpp but implemented here
+// to avoid including CUDA headers in the main header file
+
+template <typename T>
+void compute_dataset_norms(raft::resources const& res,
+                          raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,
+                          raft::device_vector_view<float, int64_t> norms)
+{
+  RAFT_EXPECTS(dataset.extent(0) == norms.extent(0),
+               "Dataset rows and norms vector size must match");
+  
+  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(norms.data_handle(),
+                                                    dataset.data_handle(),
+                                                    dataset.extent(1),
+                                                    dataset.extent(0),
+                                                    raft::resource::get_cuda_stream(res),
+                                                    raft::sqrt_op{});
+}
+
+template <typename T>
+void compute_dataset_norms(raft::resources const& res,
+                          raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset,
+                          raft::device_vector_view<float, int64_t> norms)
+{
+  RAFT_EXPECTS(dataset.extent(0) == norms.extent(0),
+               "Dataset rows and norms vector size must match");
+  
+    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(norms.data_handle(),
+                                                      dataset.data_handle(),
+                                                      dataset.stride(0),
+                                                      dataset.extent(0),
+                                                      raft::resource::get_cuda_stream(res),
+                                                      raft::sqrt_op{});
+}
+
+// Explicit instantiations for supported types
+template void compute_dataset_norms<float>(raft::resources const& res,
+                                          raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
+                                          raft::device_vector_view<float, int64_t> norms);
+
+template void compute_dataset_norms<half>(raft::resources const& res,
+                                         raft::device_matrix_view<const half, int64_t, raft::row_major> dataset,
+                                         raft::device_vector_view<float, int64_t> norms);
+
+template void compute_dataset_norms<float>(raft::resources const& res,
+                                          raft::device_matrix_view<const float, int64_t, raft::layout_stride> dataset,
+                                          raft::device_vector_view<float, int64_t> norms);
+
+template void compute_dataset_norms<half>(raft::resources const& res,
+                                         raft::device_matrix_view<const half, int64_t, raft::layout_stride> dataset,
+                                         raft::device_vector_view<float, int64_t> norms);
+
+}  // namespace detail
+
 /**
  * @defgroup cagra CUDA ANN Graph-based nearest neighbor search
  * @{
