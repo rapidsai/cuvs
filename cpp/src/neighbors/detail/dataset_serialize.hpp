@@ -175,11 +175,9 @@ auto deserialize_dataset(raft::resources const& res, std::istream& is)
 {
   switch (raft::deserialize_scalar<dataset_instance_tag>(res, is)) {
     case kSerializeEmptyDataset: {
-      RAFT_LOG_INFO("deserialize_empty");
       return deserialize_empty<IdxT>(res, is);
     }
     case kSerializeStridedDataset:
-      RAFT_LOG_INFO("deserialize_strided");
       switch (raft::deserialize_scalar<cudaDataType_t>(res, is)) {
         case CUDA_R_32F: return deserialize_strided<float, IdxT>(res, is);
         case CUDA_R_16F: return deserialize_strided<half, IdxT>(res, is);

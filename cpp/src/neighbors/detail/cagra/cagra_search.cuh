@@ -155,8 +155,10 @@ void search_main(raft::resources const& res,
                  "Dataset norms must be provided for CosineExpanded metric");
 
     const float* dataset_norms_ptr = nullptr;
-    dataset_norms_ptr              = index.dataset_norms().value().data_handle();
-    auto desc                      = dataset_descriptor_init_with_cache<T, IdxT, DistanceT>(
+    if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      dataset_norms_ptr = index.dataset_norms().value().data_handle();
+    }
+    auto desc = dataset_descriptor_init_with_cache<T, IdxT, DistanceT>(
       res, params, *strided_dset, index.metric(), dataset_norms_ptr);
     search_main_core<T, IdxT, DistanceT, CagraSampleFilterT, OutputIdxT>(
       res, params, desc, index.graph(), queries, neighbors, distances, sample_filter);
