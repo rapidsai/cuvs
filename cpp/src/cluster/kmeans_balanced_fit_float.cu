@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,15 @@ void fit(const raft::resources& handle,
          cuvs::cluster::kmeans::balanced_params const& params,
          raft::device_matrix_view<const float, int> X,
          raft::device_matrix_view<float, int> centroids)
+{
+  cuvs::cluster::kmeans_balanced::fit(
+    handle, params, X, centroids, cuvs::spatial::knn::detail::utils::mapping<float>{});
+}
+
+void fit(const raft::resources& handle,
+         cuvs::cluster::kmeans::balanced_params const& params,
+         raft::device_matrix_view<const float, int64_t> X,
+         raft::device_matrix_view<float, int64_t> centroids)
 {
   cuvs::cluster::kmeans_balanced::fit(
     handle, params, X, centroids, cuvs::spatial::knn::detail::utils::mapping<float>{});

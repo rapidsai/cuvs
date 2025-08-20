@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -196,9 +196,9 @@ KB_TEST((KmeansBalancedTest<float, float, uint32_t, int, raft::identity_op>),
 // KB_TEST((KmeansBalancedTest<double, double, uint32_t, int, raft::identity_op>),
 //         KmeansBalancedTestDDU32I32,
 //         inputsd_i32);
-// KB_TEST((KmeansBalancedTest<float, float, uint32_t, int64_t, raft::identity_op>),
-//         KmeansBalancedTestFFU32I64,
-//         inputsf_i64);
+KB_TEST((KmeansBalancedTest<float, float, uint32_t, int64_t, raft::identity_op>),
+        KmeansBalancedTestFFU32I64,
+        inputsf_i64);
 // KB_TEST((KmeansBalancedTest<double, double, uint32_t, int64_t, raft::identity_op>),
 //         KmeansBalancedTestDDU32I64,
 //         inputsd_i64);
