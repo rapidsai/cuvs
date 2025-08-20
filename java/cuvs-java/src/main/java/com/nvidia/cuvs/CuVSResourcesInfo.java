@@ -21,5 +21,6 @@ package com.nvidia.cuvs;
  * e.g. the type and capacity of the underlying RMM {@code device_memory_resource}
  *
  * @param freeDeviceMemoryInBytes   free memory in bytes, as reported by the device driver
+ * @param totalDeviceMemoryInBytes  total device memory in bytes
  */
-public record CuVSResourcesInfo(long freeDeviceMemoryInBytes) {}
+public record CuVSResourcesInfo(long freeDeviceMemoryInBytes, long totalDeviceMemoryInBytes) {}

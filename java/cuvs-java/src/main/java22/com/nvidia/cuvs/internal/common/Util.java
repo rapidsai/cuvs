@@ -148,7 +148,7 @@ public class Util {
     double minDeviceMemoryB = 1048576.0f * minDeviceMemoryMB;
     for (GPUInfo gpuInfo : availableGPUs()) {
       if (gpuInfo.computeCapability() >= minComputeCapability
-          && gpuInfo.totalMemoryInBytes() >= minDeviceMemoryB) {
+          && gpuInfo.totalDeviceMemoryInBytes() >= minDeviceMemoryB) {
         compatibleGPUs.add(gpuInfo);
       }
     }

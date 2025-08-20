@@ -44,7 +44,7 @@ public class GPUInfoIT extends CuVSTestCase {
       log.info(
           "Available GPU with name [{}], memory [{}MB], compute [{}]",
           gpuInfo.name(),
-          ((float) gpuInfo.totalMemoryInBytes() / 1048576.0f),
+          ((float) gpuInfo.totalDeviceMemoryInBytes() / 1048576.0f),
           gpuInfo.computeCapability());
     }
 
@@ -54,11 +54,12 @@ public class GPUInfoIT extends CuVSTestCase {
       log.info(
           "Compatible GPU with name [{}], memory [{}], compute [{}]",
           gpuInfo.name(),
-          gpuInfo.totalMemoryInBytes(),
+          gpuInfo.totalDeviceMemoryInBytes(),
           gpuInfo.computeCapability());
       assertTrue(gpuInfo.computeCapability() >= GPUInfoProvider.MIN_COMPUTE_CAPABILITY);
       assertTrue(
-          gpuInfo.totalMemoryInBytes() >= GPUInfoProvider.MIN_DEVICE_MEMORY_IN_MB * 1024L * 1024L);
+          gpuInfo.totalDeviceMemoryInBytes()
+              >= GPUInfoProvider.MIN_DEVICE_MEMORY_IN_MB * 1024L * 1024L);
     }
   }
 

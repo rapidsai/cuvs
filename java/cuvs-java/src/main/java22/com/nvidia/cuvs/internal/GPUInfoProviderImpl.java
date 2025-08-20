@@ -65,7 +65,7 @@ public class GPUInfoProviderImpl implements GPUInfoProvider {
           checkCudaError(cudaSetDevice(currentDeviceId), "cudaSetDevice");
         }
 
-        return new CuVSResourcesInfo(freeMemoryPtr.get(size_t, 0));
+        return new CuVSResourcesInfo(freeMemoryPtr.get(size_t, 0), totalMemoryPtr.get(size_t, 0));
       }
     }
   }
