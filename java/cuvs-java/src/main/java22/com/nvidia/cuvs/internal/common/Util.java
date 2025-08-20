@@ -135,16 +135,6 @@ public class Util {
   }
 
   /**
-   * Get the list of compatible GPUs based on compute capability >= 7.0 and total
-   * memory >= 8GB
-   *
-   * @return a list of compatible GPUs. See {@link GPUInfo}
-   */
-  public static List<GPUInfo> compatibleGPUs() throws Throwable {
-    return compatibleGPUs(7.0, 8192);
-  }
-
-  /**
    * Get the list of compatible GPUs based on given compute capability and total
    * memory
    *
@@ -180,7 +170,7 @@ public class Util {
       int numGpuCount = numGpus.get(C_INT, 0);
       List<GPUInfo> gpuInfoArr = new ArrayList<GPUInfo>();
 
-      MemorySegment free = localArena.allocate(size_t);
+      // MemorySegment free = localArena.allocate(size_t);
       MemorySegment total = localArena.allocate(size_t);
       MemorySegment deviceProp = cudaDeviceProp.allocate(localArena);
 
@@ -192,8 +182,8 @@ public class Util {
         returnValue = cudaGetDeviceProperties_v2(deviceProp, i);
         checkCudaError(returnValue, "cudaGetDeviceProperties_v2");
 
-        returnValue = cudaMemGetInfo(free, total);
-        checkCudaError(returnValue, "cudaMemGetInfo");
+        //        returnValue = cudaMemGetInfo(free, total);
+        //        checkCudaError(returnValue, "cudaMemGetInfo");
 
         float computeCapability =
             Float.parseFloat(
@@ -203,7 +193,6 @@ public class Util {
             new GPUInfo(
                 i,
                 cudaDeviceProp.name(deviceProp).getString(0),
-                free.get(C_LONG, 0),
                 total.get(C_LONG, 0),
                 computeCapability);
 

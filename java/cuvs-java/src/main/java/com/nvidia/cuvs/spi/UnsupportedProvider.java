@@ -15,12 +15,7 @@
  */
 package com.nvidia.cuvs.spi;
 
-import com.nvidia.cuvs.BruteForceIndex;
-import com.nvidia.cuvs.CagraIndex;
-import com.nvidia.cuvs.CuVSMatrix;
-import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.HnswIndex;
-import com.nvidia.cuvs.TieredIndex;
+import com.nvidia.cuvs.*;
 import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
 
@@ -56,6 +51,11 @@ final class UnsupportedProvider implements CuVSProvider {
 
   @Override
   public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) throws Throwable {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public GPUInfoProvider gpuInfoProvider() {
     throw new UnsupportedOperationException();
   }
 

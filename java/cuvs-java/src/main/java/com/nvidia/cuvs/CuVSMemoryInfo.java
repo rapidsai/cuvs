@@ -16,11 +16,8 @@
 package com.nvidia.cuvs;
 
 /**
- * Contains GPU information
- *
- * @param gpuId             id of the GPU starting from 0
- * @param name              ASCII string identifying device
- * @param totalMemory       returned total memory in bytes
- * @param computeCapability the compute capability of the device
+ * Contains memory information associated to a {@link CuVSResources} and its GPU.
+ * @param freeDeviceMemory   free memory in bytes, as reported by the device driver
+ * @param freeRMMPoolMemory  free memory in bytes in the RMM memory pool
  */
-public record GPUInfo(int gpuId, String name, long totalMemory, float computeCapability) {}
+public record CuVSMemoryInfo(long freeDeviceMemory, long freeRMMPoolMemory) {}

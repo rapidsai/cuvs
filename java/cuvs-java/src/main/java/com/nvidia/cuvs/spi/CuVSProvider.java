@@ -15,13 +15,7 @@
  */
 package com.nvidia.cuvs.spi;
 
-import com.nvidia.cuvs.BruteForceIndex;
-import com.nvidia.cuvs.CagraIndex;
-import com.nvidia.cuvs.CagraMergeParams;
-import com.nvidia.cuvs.CuVSMatrix;
-import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.HnswIndex;
-import com.nvidia.cuvs.TieredIndex;
+import com.nvidia.cuvs.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 import java.nio.file.Path;
@@ -119,6 +113,9 @@ public interface CuVSProvider {
     // Default implementation falls back to the method without parameters
     return mergeCagraIndexes(indexes);
   }
+
+  /** Returns a {@link GPUInfoProvider} to query the system for GPU related information */
+  GPUInfoProvider gpuInfoProvider();
 
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {
