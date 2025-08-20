@@ -17,7 +17,9 @@ package com.nvidia.cuvs;
 
 /**
  * Contains memory information associated to a {@link CuVSResources} and its GPU.
- * @param freeDeviceMemory   free memory in bytes, as reported by the device driver
- * @param freeRMMPoolMemory  free memory in bytes in the RMM memory pool
+ * Can be extended to report different types of GPU memory linked to the resources,
+ * e.g. the type and capacity of the underlying RMM {@code device_memory_resource}
+ *
+ * @param freeDeviceMemoryInBytes   free memory in bytes, as reported by the device driver
  */
-public record CuVSMemoryInfo(long freeDeviceMemory, long freeRMMPoolMemory) {}
+public record CuVSMemoryInfo(long freeDeviceMemoryInBytes) {}

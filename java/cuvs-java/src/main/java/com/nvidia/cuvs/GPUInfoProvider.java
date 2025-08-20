@@ -39,9 +39,9 @@ public interface GPUInfoProvider {
   List<GPUInfo> compatibleGPUs() throws Throwable;
 
   /**
-   * Gets memory information from pools and device associated with a {@link CuVSResources}
+   * Gets memory information relative to a {@link CuVSResources}
    * @param resources from which to obtain memory information
    * @return a {@link CuVSMemoryInfo} record containing the memory information
    */
-  CuVSMemoryInfo currentMemory(CuVSResources resources);
+  CuVSMemoryInfo getCurrentMemoryInfo(CuVSResources resources);
 }

@@ -145,10 +145,10 @@ public class Util {
   public static List<GPUInfo> compatibleGPUs(double minComputeCapability, int minDeviceMemoryMB)
       throws Throwable {
     List<GPUInfo> compatibleGPUs = new ArrayList<GPUInfo>();
-    double minDeviceMemoryB = Math.pow(2, 20) * minDeviceMemoryMB;
+    double minDeviceMemoryB = 1048576.0f * minDeviceMemoryMB;
     for (GPUInfo gpuInfo : availableGPUs()) {
       if (gpuInfo.computeCapability() >= minComputeCapability
-          && gpuInfo.totalMemory() >= minDeviceMemoryB) {
+          && gpuInfo.totalMemoryInBytes() >= minDeviceMemoryB) {
         compatibleGPUs.add(gpuInfo);
       }
     }
@@ -170,21 +170,11 @@ public class Util {
       int numGpuCount = numGpus.get(C_INT, 0);
       List<GPUInfo> gpuInfoArr = new ArrayList<GPUInfo>();
 
-      // MemorySegment free = localArena.allocate(size_t);
-      MemorySegment total = localArena.allocate(size_t);
       MemorySegment deviceProp = cudaDeviceProp.allocate(localArena);
 
       for (int i = 0; i < numGpuCount; i++) {
-
-        returnValue = cudaSetDevice(i);
-        checkCudaError(returnValue, "cudaSetDevice");
-
         returnValue = cudaGetDeviceProperties_v2(deviceProp, i);
         checkCudaError(returnValue, "cudaGetDeviceProperties_v2");
-
-        //        returnValue = cudaMemGetInfo(free, total);
-        //        checkCudaError(returnValue, "cudaMemGetInfo");
-
         float computeCapability =
             Float.parseFloat(
                 cudaDeviceProp.major(deviceProp) + "." + cudaDeviceProp.minor(deviceProp));
@@ -193,7 +183,7 @@ public class Util {
             new GPUInfo(
                 i,
                 cudaDeviceProp.name(deviceProp).getString(0),
-                total.get(C_LONG, 0),
+                cudaDeviceProp.totalGlobalMem(deviceProp),
                 computeCapability);
 
         gpuInfoArr.add(gpuInfo);

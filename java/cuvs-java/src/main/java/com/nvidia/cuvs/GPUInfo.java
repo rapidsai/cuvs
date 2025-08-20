@@ -20,7 +20,7 @@ package com.nvidia.cuvs;
  *
  * @param gpuId             id of the GPU starting from 0
  * @param name              ASCII string identifying device
- * @param totalMemory       returned total memory in bytes
+ * @param totalMemoryInBytes       returned total memory in bytes
  * @param computeCapability the compute capability of the device
  */
-public record GPUInfo(int gpuId, String name, long totalMemory, float computeCapability) {}
+public record GPUInfo(int gpuId, String name, long totalMemoryInBytes, float computeCapability) {}

@@ -15,11 +15,19 @@
  */
 package com.nvidia.cuvs.internal;
 
+import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
+import static com.nvidia.cuvs.internal.common.Util.checkCudaError;
+import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemGetInfo;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsDeviceIdGet;
+import static com.nvidia.cuvs.internal.panama.headers_h_1.*;
+
 import com.nvidia.cuvs.CuVSMemoryInfo;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.GPUInfo;
 import com.nvidia.cuvs.GPUInfoProvider;
 import com.nvidia.cuvs.internal.common.Util;
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
 import java.util.List;
 
 public class GPUInfoProviderImpl implements GPUInfoProvider {
@@ -35,7 +43,30 @@ public class GPUInfoProviderImpl implements GPUInfoProvider {
   }
 
   @Override
-  public CuVSMemoryInfo currentMemory(CuVSResources resources) {
-    return null; // TODO!
+  public CuVSMemoryInfo getCurrentMemoryInfo(CuVSResources resources) {
+    try (var resourcesAccess = resources.access()) {
+      try (var localArena = Arena.ofConfined()) {
+        var deviceIdPtr = localArena.allocate(C_INT);
+        checkCudaError(cudaGetDevice(deviceIdPtr), "cudaGetDevice");
+        var currentDeviceId = deviceIdPtr.get(C_INT, 0);
+
+        checkCuVSError(cuvsDeviceIdGet(resourcesAccess.handle(), deviceIdPtr), "cuvsDeviceIdGet");
+        var resourcesDeviceId = deviceIdPtr.get(C_INT, 0);
+
+        if (resourcesDeviceId != currentDeviceId) {
+          checkCudaError(cudaSetDevice(resourcesDeviceId), "cudaSetDevice");
+        }
+
+        MemorySegment freeMemoryPtr = localArena.allocate(size_t);
+        MemorySegment totalMemoryPtr = localArena.allocate(size_t);
+        checkCudaError(cudaMemGetInfo(freeMemoryPtr, totalMemoryPtr), "cudaMemGetInfo");
+
+        if (resourcesDeviceId != currentDeviceId) {
+          checkCudaError(cudaSetDevice(currentDeviceId), "cudaSetDevice");
+        }
+
+        return new CuVSMemoryInfo(freeMemoryPtr.get(size_t, 0));
+      }
+    }
   }
 }
