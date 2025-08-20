@@ -719,6 +719,15 @@ index<T, IdxT> build(
                "BitwiseHamming distance is only supported for int8_t and uint8_t data types. "
                "Current data type is not supported.");
 
+  // Validate data type for CosineExpanded metric
+  RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::CosineExpanded ||
+                 (std::is_same_v<T, float> || std::is_same_v<T, half>),
+               "Cosine distance is only supported for float and half data types.");
+
+  RAFT_EXPECTS(params.metric != CosineExpanded ||
+                 std::holds_alternative<cagra::graph_build_params::ivf_pq_params>(knn_build_params),
+               "IVF_PQ is the only supported graph building algorithm for CosineExpanded metric.");
+
   auto cagra_graph = raft::make_host_matrix<IdxT, int64_t>(0, 0);
 
   // Dispatch based on graph_build_params
