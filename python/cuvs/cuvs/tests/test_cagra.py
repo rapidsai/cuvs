@@ -49,7 +49,8 @@ def run_cagra_build_search_test(
     if metric == "inner_product" or metric == "cosine":
         if dtype in [np.int8, np.uint8]:
             pytest.skip("skip normalization for int8/uint8 data")
-        dataset = normalize(dataset, norm="l2", axis=1)
+        if metric == "inner_product":
+            dataset = normalize(dataset, norm="l2", axis=1)
     dataset_device = device_ndarray(dataset)
 
     build_params = cagra.IndexParams(
@@ -114,6 +115,7 @@ def run_cagra_build_search_test(
         "sqeuclidean": "sqeuclidean",
         "inner_product": "cosine",
         "euclidean": "euclidean",
+        "cosine": "cosine",
     }[metric]
     nn_skl = NearestNeighbors(
         n_neighbors=k, algorithm="brute", metric=skl_metric
@@ -159,7 +161,7 @@ def run_cagra_build_search_test(
 @pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
 @pytest.mark.parametrize("array_type", ["device", "host"])
 @pytest.mark.parametrize("build_algo", ["ivf_pq", "nn_descent"])
-@pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product"])
+@pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product", "cosine"])
 def test_cagra_dataset_dtype_host_device(
     dtype, array_type, inplace, build_algo, metric
 ):
@@ -205,6 +207,14 @@ def test_filtered_cagra(sparsity):
             "k": 10,
             "metric": "inner_product",
             "build_algo": "nn_descent",
+        },
+        {
+            "intermediate_graph_degree": 64,
+            "graph_degree": 32,
+            "add_data_on_build": True,
+            "k": 10,
+            "metric": "cosine",
+            "build_algo": "ivf_pq",
         },
     ],
 )
