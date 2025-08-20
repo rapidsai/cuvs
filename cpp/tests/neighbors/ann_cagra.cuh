@@ -335,8 +335,6 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
   template <typename SearchIdxT = IdxT>
   void testCagra()
   {
-    if (ps.compression.has_value()) { GTEST_SKIP(); }
-    if (ps.metric != cuvs::distance::DistanceType::CosineExpanded) GTEST_SKIP();
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ)))
@@ -456,13 +454,13 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         raft::resource::sync_stream(handle_);
       }
 
-      for (int i = 0; i < min(ps.n_queries, 10); i++) {
-        //  std::cout << "query " << i << std::end;
-        print_vector("T", indices_naive.data() + i * ps.k, ps.k, std::cout);
-        print_vector("C", indices_Cagra.data() + i * ps.k, ps.k, std::cout);
-        print_vector("T", distances_naive.data() + i * ps.k, ps.k, std::cout);
-        print_vector("C", distances_Cagra.data() + i * ps.k, ps.k, std::cout);
-      }
+      // for (int i = 0; i < min(ps.n_queries, 10); i++) {
+      //   //  std::cout << "query " << i << std::end;
+      //   print_vector("T", indices_naive.data() + i * ps.k, ps.k, std::cout);
+      //   print_vector("C", indices_Cagra.data() + i * ps.k, ps.k, std::cout);
+      //   print_vector("T", distances_naive.data() + i * ps.k, ps.k, std::cout);
+      //   print_vector("C", distances_Cagra.data() + i * ps.k, ps.k, std::cout);
+      // }
       double min_recall = ps.min_recall;
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_Cagra,
@@ -532,6 +530,9 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
     // CosineExpanded. Reference issue: https://github.com/rapidsai/raft/issues/2276
     if (ps.metric == InnerProduct ||
         ps.metric == CosineExpanded && ps.build_algo != graph_build_algo::IVF_PQ)
+      GTEST_SKIP();
+    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded &&
+        (!std::is_same_v<DataT, float>))
       GTEST_SKIP();
     if (ps.compression != std::nullopt) GTEST_SKIP();
     // IVF_PQ graph build does not support BitwiseHamming
@@ -739,7 +740,9 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
  protected:
   void testCagra()
   {
-    if (ps.metric != cuvs::distance::DistanceType::CosineExpanded) GTEST_SKIP();
+    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded &&
+        (!std::is_same_v<DataT, float> || ps.build_algo != graph_build_algo::IVF_PQ))
+      GTEST_SKIP();
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         ((!std::is_same_v<DataT, uint8_t>) ||
@@ -1200,7 +1203,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},
     {256},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::CosineExpanded},
     {false},
     {true},
     {0.995},
