@@ -805,8 +805,10 @@ index<T, IdxT> build(
         if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
           auto dataset_view = idx.dataset();
           if (dataset_view.extent(0) > 0) {
-            auto dataset_norms = raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
-            cuvs::neighbors::cagra::detail::compute_dataset_norms(res, dataset_view, dataset_norms.view());
+            auto dataset_norms =
+              raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
+            cuvs::neighbors::cagra::detail::compute_dataset_norms(
+              res, dataset_view, dataset_norms.view());
             idx.set_dataset_norms(std::move(dataset_norms));
           }
         }

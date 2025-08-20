@@ -123,7 +123,7 @@ class IndexWrapper : public IndexBase<T, IdxT, OutputIdxT> {
  *      `cpp/include/cuvs/neighbors/<algorithm>.hpp`
  *
  * 4. **Update composite merge support** (if merge is supported):
- *    - Update `cpp/src/neighbors/composite/merge.cu` to handle the algorithm
+ *    - Update `cpp/src/neighbors/composite/merge.cpp` to handle the algorithm
  *
  * Example structure for algorithm "ivf_pq":
  * ```

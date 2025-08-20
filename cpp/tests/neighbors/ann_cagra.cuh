@@ -32,8 +32,8 @@
 #include <raft/core/logger.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/matrix_vector_op.cuh>
-#include <raft/linalg/normalize.cuh>
 #include <raft/linalg/norm.cuh>
+#include <raft/linalg/normalize.cuh>
 #include <raft/linalg/reduce.cuh>
 #include <raft/random/rng.cuh>
 #include <raft/util/itertools.hpp>
@@ -335,11 +335,8 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
   template <typename SearchIdxT = IdxT>
   void testCagra()
   {
-    if (ps.compression.has_value()) {
-      GTEST_SKIP();
-    }
-    if (ps.metric != cuvs::distance::DistanceType::CosineExpanded)
-      GTEST_SKIP();
+    if (ps.compression.has_value()) { GTEST_SKIP(); }
+    if (ps.metric != cuvs::distance::DistanceType::CosineExpanded) GTEST_SKIP();
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ)))
@@ -351,7 +348,8 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded &&
-        ((!std::is_same_v<DataT, float>) || (ps.build_algo != graph_build_algo::IVF_PQ) || (ps.compression.has_value())))
+        ((!std::is_same_v<DataT, float>) || (ps.build_algo != graph_build_algo::IVF_PQ) ||
+         (ps.compression.has_value())))
       GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
@@ -441,8 +439,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         cagra::index<DataT, IdxT> index(handle_);
         cagra::deserialize(handle_, index_file.filename, &index);
 
-        if (!ps.include_serialized_dataset) { index.update_dataset(handle_, database_view); 
-        }
+        if (!ps.include_serialized_dataset) { index.update_dataset(handle_, database_view); }
 
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
           search_queries.data(), ps.n_queries, ps.dim);
@@ -531,9 +528,11 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
  protected:
   void testCagra()
   {
-    // TODO (tarang-jain): remove when NN Descent index building support InnerProduct and CosineExpanded. Reference
-    // issue: https://github.com/rapidsai/raft/issues/2276
-    if (ps.metric == InnerProduct || ps.metric == CosineExpanded && ps.build_algo != graph_build_algo::IVF_PQ) GTEST_SKIP();
+    // TODO (tarang-jain): remove when NN Descent index building support InnerProduct and
+    // CosineExpanded. Reference issue: https://github.com/rapidsai/raft/issues/2276
+    if (ps.metric == InnerProduct ||
+        ps.metric == CosineExpanded && ps.build_algo != graph_build_algo::IVF_PQ)
+      GTEST_SKIP();
     if (ps.compression != std::nullopt) GTEST_SKIP();
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
@@ -677,7 +676,7 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
         raft::update_host(distances_Cagra.data(), distances_dev.data(), queries_size, stream_);
         raft::update_host(indices_Cagra.data(), indices_dev.data(), queries_size, stream_);
         raft::resource::sync_stream(handle_);
-        }
+      }
       double min_recall = ps.min_recall;
       EXPECT_TRUE(eval_neighbours(indices_naive,
                                   indices_Cagra,
@@ -740,8 +739,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
  protected:
   void testCagra()
   {
-    if (ps.metric != cuvs::distance::DistanceType::CosineExpanded)
-      GTEST_SKIP();
+    if (ps.metric != cuvs::distance::DistanceType::CosineExpanded) GTEST_SKIP();
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         ((!std::is_same_v<DataT, uint8_t>) ||
@@ -840,9 +838,7 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
           index = cagra::build(handle_, index_params, database_view);
         }
 
-        if (!ps.include_serialized_dataset)
-        { index.update_dataset(handle_, database_view); 
-        }
+        if (!ps.include_serialized_dataset) { index.update_dataset(handle_, database_view); }
 
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
           search_queries.data(), ps.n_queries, ps.dim);
@@ -953,7 +949,9 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
   {
     // TODO (tarang-jain): remove when NN Descent index building support InnerProduct. Reference
     // issue: https://github.com/rapidsai/raft/issues/2276
-    if ((ps.metric == InnerProduct || ps.metric == CosineExpanded) && ps.build_algo != graph_build_algo::IVF_PQ) GTEST_SKIP();
+    if ((ps.metric == InnerProduct || ps.metric == CosineExpanded) &&
+        ps.build_algo != graph_build_algo::IVF_PQ)
+      GTEST_SKIP();
     if (ps.compression != std::nullopt) GTEST_SKIP();
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
@@ -1430,21 +1428,23 @@ inline std::vector<AnnCagraInputs> generate_addnode_inputs()
                                                    {0.995});
 
   // testing host and device datasets
-  auto inputs2 = raft::util::itertools::product<AnnCagraInputs>(
-    {100},
-    {10000},
-    {32},
-    {10},
-    {graph_build_algo::IVF_PQ},
-    {search_algo::AUTO},
-    {10},
-    {0},  // team_size
-    {64},
-    {1},
-    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct, cuvs::distance::DistanceType::CosineExpanded},
-    {false, true},
-    {false},
-    {0.985});
+  auto inputs2 =
+    raft::util::itertools::product<AnnCagraInputs>({100},
+                                                   {10000},
+                                                   {32},
+                                                   {10},
+                                                   {graph_build_algo::IVF_PQ},
+                                                   {search_algo::AUTO},
+                                                   {10},
+                                                   {0},  // team_size
+                                                   {64},
+                                                   {1},
+                                                   {cuvs::distance::DistanceType::L2Expanded,
+                                                    cuvs::distance::DistanceType::InnerProduct,
+                                                    cuvs::distance::DistanceType::CosineExpanded},
+                                                   {false, true},
+                                                   {false},
+                                                   {0.985});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // a few PQ configurations

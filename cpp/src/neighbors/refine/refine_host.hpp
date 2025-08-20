@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,9 @@
 
 #include "../../core/nvtx.hpp"
 #include "refine_common.hpp"
+#include <omp.h>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/util/integer_utils.hpp>
-#include <omp.h>
 
 #include <algorithm>
 
