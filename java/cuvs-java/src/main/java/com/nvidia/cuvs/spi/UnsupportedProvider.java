@@ -15,12 +15,7 @@
  */
 package com.nvidia.cuvs.spi;
 
-import com.nvidia.cuvs.BruteForceIndex;
-import com.nvidia.cuvs.CagraIndex;
-import com.nvidia.cuvs.CuVSMatrix;
-import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.HnswIndex;
-import com.nvidia.cuvs.TieredIndex;
+import com.nvidia.cuvs.*;
 import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
 
@@ -60,19 +55,19 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
-  public CuVSMatrix.Builder newHostMatrixBuilder(
+  public CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
       long size, long dimensions, CuVSMatrix.DataType dataType) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public CuVSMatrix.Builder newDeviceMatrixBuilder(
+  public CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
       CuVSResources cuVSResources, long size, long dimensions, CuVSMatrix.DataType dataType) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public CuVSMatrix.Builder newDeviceMatrixBuilder(
+  public CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
       CuVSResources cuVSResources,
       long size,
       long dimensions,

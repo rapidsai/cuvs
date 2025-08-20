@@ -16,11 +16,9 @@
 package com.nvidia.cuvs.spi;
 
 import static com.nvidia.cuvs.internal.common.Util.*;
-import static com.nvidia.cuvs.internal.panama.headers_h_1.*;
 
 import com.nvidia.cuvs.*;
 import com.nvidia.cuvs.internal.*;
-import com.nvidia.cuvs.internal.common.Native;
 import com.nvidia.cuvs.internal.common.Util;
 import java.lang.foreign.MemorySegment;
 import java.lang.invoke.MethodHandle;
@@ -230,7 +228,7 @@ final class JDKProvider implements CuVSProvider {
    * device memory. It uses a non-native {@link MemorySegment} created directly from on-heap java arrays to avoid
    * an intermediate allocation and copy to a native (off-heap) segment.
    * It requires the copy function ({@code cudaMemcpyAsync}) to have the {@code Critical} linker option in order
-   * to allow the access to on-heap memory (see {@link Native#cudaMemcpyAsync}).
+   * to allow the access to on-heap memory (see {@link Util#cudaMemcpyAsync}).
    */
   private static class HeapSegmentBuilder implements CuVSMatrix.Builder<CuVSDeviceMatrix> {
     private final long columns;
@@ -303,9 +301,7 @@ final class JDKProvider implements CuVSProvider {
 
       var dstOffset = ((current++) * rowBytes);
       var dst = matrix.memorySegment().asSlice(dstOffset);
-      checkCudaError(
-          Native.cudaMemcpyAsync(dst, vector, rowBytes, cudaMemcpyHostToDevice(), stream),
-          "cudaMemcpyAsync");
+      cudaMemcpyAsync(dst, vector, rowBytes, CudaMemcpyKind.HOST_TO_DEVICE, stream);
     }
 
     @Override
