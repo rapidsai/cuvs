@@ -140,8 +140,21 @@ public class BinaryQuantizerImpl {
     long maxDatasetBytes = FLOAT_SIZE * ROWS_PER_BUFFER * cols;
     long maxOutputBytes = ROWS_PER_BUFFER * cols;
 
+    // Allocate quantizer objects once
+    MemorySegment paramsSegment = localArena.allocate(cuvsBinaryQuantizerParams_t);
+    int returnValue = cuvsBinaryQuantizerParamsCreate(paramsSegment);
+    checkCuVSError(returnValue, "cuvsBinaryQuantizerParamsCreate");
+    MemorySegment paramsPtr = paramsSegment.get(C_POINTER, 0);
+    setBinaryQuantizerThreshold(paramsPtr, thresholdType);
+
+    MemorySegment quantizerSegment = localArena.allocate(cuvsBinaryQuantizer_t);
+    returnValue = cuvsBinaryQuantizerCreate(quantizerSegment);
+    checkCuVSError(returnValue, "cuvsBinaryQuantizerCreate");
+    MemorySegment quantizerPtr = quantizerSegment.get(C_POINTER, 0);
+
     try (var datasetDP = allocateRMMSegment(cuvsResourcesPtr, maxDatasetBytes);
         var outputDP = allocateRMMSegment(cuvsResourcesPtr, maxOutputBytes)) {
+
       for (long startRow = 0; startRow < rows; startRow += ROWS_PER_BUFFER) {
         long endRow = Math.min(startRow + ROWS_PER_BUFFER, rows);
         long chunkRows = endRow - startRow;
@@ -155,53 +168,38 @@ public class BinaryQuantizerImpl {
 
         cudaMemcpy(datasetPtr, chunkData, actualDatasetBytes, memcpyDirection);
 
-        int returnValue = cuvsStreamSync(cuvsResourcesPtr);
+        returnValue = cuvsStreamSync(cuvsResourcesPtr);
         checkCuVSError(returnValue, "cuvsStreamSync before transform");
 
-        // Create and configure quantizer for this chunk
-        MemorySegment paramsSegment = localArena.allocate(cuvsBinaryQuantizerParams_t);
-        returnValue = cuvsBinaryQuantizerParamsCreate(paramsSegment);
-        checkCuVSError(returnValue, "cuvsBinaryQuantizerParamsCreate");
-        MemorySegment paramsPtr = paramsSegment.get(C_POINTER, 0);
-        setBinaryQuantizerThreshold(paramsPtr, thresholdType);
+        long datasetShape[] = {chunkRows, cols};
+        long outputShape[] = {chunkRows, cols};
 
-        MemorySegment quantizerSegment = localArena.allocate(cuvsBinaryQuantizer_t);
-        returnValue = cuvsBinaryQuantizerCreate(quantizerSegment);
-        checkCuVSError(returnValue, "cuvsBinaryQuantizerCreate");
-        MemorySegment quantizerPtr = quantizerSegment.get(C_POINTER, 0);
+        MemorySegment datasetTensor =
+            prepareTensor(localArena, datasetPtr, datasetShape, kDLFloat(), 32, kDLCUDA(), 1);
+        MemorySegment outputTensor =
+            prepareTensor(localArena, outputPtr, outputShape, kDLUInt(), 8, kDLCUDA(), 1);
 
-        try {
-          long datasetShape[] = {chunkRows, cols};
-          long outputShape[] = {chunkRows, cols};
+        returnValue =
+            cuvsBinaryQuantizerTrain(cuvsResourcesPtr, paramsPtr, datasetTensor, quantizerPtr);
+        checkCuVSError(returnValue, "cuvsBinaryQuantizerTrain (GPU)");
 
-          MemorySegment datasetTensor =
-              prepareTensor(localArena, datasetPtr, datasetShape, kDLFloat(), 32, kDLCUDA(), 1);
-          MemorySegment outputTensor =
-              prepareTensor(localArena, outputPtr, outputShape, kDLUInt(), 8, kDLCUDA(), 1);
+        returnValue =
+            cuvsBinaryQuantizerTransformWithParams(
+                cuvsResourcesPtr, quantizerPtr, datasetTensor, outputTensor);
+        checkCuVSError(returnValue, "cuvsBinaryQuantizerTransformWithParams (GPU)");
 
-          returnValue =
-              cuvsBinaryQuantizerTrain(cuvsResourcesPtr, paramsPtr, datasetTensor, quantizerPtr);
-          checkCuVSError(returnValue, "cuvsBinaryQuantizerTrain (GPU)");
+        returnValue = cuvsStreamSync(cuvsResourcesPtr);
+        checkCuVSError(returnValue, "cuvsStreamSync after transform");
 
-          returnValue =
-              cuvsBinaryQuantizerTransformWithParams(
-                  cuvsResourcesPtr, quantizerPtr, datasetTensor, outputTensor);
-          checkCuVSError(returnValue, "cuvsBinaryQuantizerTransformWithParams (GPU)");
-
-          returnValue = cuvsStreamSync(cuvsResourcesPtr);
-          checkCuVSError(returnValue, "cuvsStreamSync after transform");
-
-          MemorySegment resultChunk =
-              ((CuVSMatrixBaseImpl) result)
-                  .memorySegment()
-                  .asSlice(startRow * cols, actualOutputBytes);
-          cudaMemcpy(resultChunk, outputPtr, actualOutputBytes, DEVICE_TO_HOST);
-
-        } finally {
-          cuvsBinaryQuantizerDestroy(quantizerPtr);
-          cuvsBinaryQuantizerParamsDestroy(paramsPtr);
-        }
+        MemorySegment resultChunk =
+            ((CuVSMatrixBaseImpl) result)
+                .memorySegment()
+                .asSlice(startRow * cols, actualOutputBytes);
+        cudaMemcpy(resultChunk, outputPtr, actualOutputBytes, DEVICE_TO_HOST);
       }
+    } finally {
+      cuvsBinaryQuantizerDestroy(quantizerPtr);
+      cuvsBinaryQuantizerParamsDestroy(paramsPtr);
     }
 
     return result;

@@ -121,10 +121,18 @@ public interface CuVSProvider {
     return mergeCagraIndexes(indexes);
   }
 
+  /** Creates a new Scalar8BitQuantizer implementation. */
   Object createScalar8BitQuantizerImpl(CuVSResources resources, CuVSMatrix trainingDataset)
       throws Throwable;
 
+  /** Performs inverse transform using a Scalar8BitQuantizer. */
   CuVSMatrix inverseTransformScalar8Bit(Object impl, CuVSMatrix quantizedData) throws Throwable;
+
+  /** Transforms dataset using Scalar8BitQuantizer */
+  CuVSMatrix transformScalar8Bit(Object impl, CuVSMatrix input) throws Throwable;
+
+  /** Closes Scalar8BitQuantizer implementation */
+  void closeScalar8BitQuantizer(Object impl) throws Throwable;
 
   /** Creates a new BinaryQuantizer implementation. */
   Object createBinaryQuantizerImpl(
@@ -138,12 +146,6 @@ public interface CuVSProvider {
 
   /** Closes BinaryQuantizer implementation. */
   void closeBinaryQuantizer(Object impl) throws Throwable;
-
-  /** Transforms dataset using Scalar8BitQuantizer */
-  CuVSMatrix transformScalar8Bit(Object impl, CuVSMatrix input) throws Throwable;
-
-  /** Closes Scalar8BitQuantizer implementation */
-  void closeScalar8BitQuantizer(Object impl) throws Throwable;
 
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {
