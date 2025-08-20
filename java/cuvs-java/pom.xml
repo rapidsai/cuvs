@@ -295,6 +295,12 @@
                                                 <include>libcuvs_c.so</include>
                                             </includes>
                                         </resource>
+                                        <resource>
+                                            <directory>${native.lib.path}/_deps/rmm-build</directory>
+                                            <includes>
+                                                <include>librmm.so</include>
+                                            </includes>
+                                        </resource>
                                     </resources>
                                 </configuration>
                             </execution>
@@ -306,10 +312,9 @@
                         <version>3.4.2</version>
                         <configuration>
                             <descriptors>
-                                <descriptor>src/assembly/cuda-specific-native.xml</descriptor>
+                                <descriptor>src/assembly/native-with-deps.xml</descriptor>
                             </descriptors>
-                            <finalName>${project.artifactId}-${project.version}-${native.classifier}</finalName>
-                            <appendAssemblyId>false</appendAssemblyId>
+
                         </configuration>
                         <executions>
                             <execution>
@@ -361,6 +366,12 @@
                                                 <include>libcuvs_c.so</include>
                                             </includes>
                                         </resource>
+                                        <resource>
+                                            <directory>${native.lib.path}/_deps/rmm-build</directory>
+                                            <includes>
+                                                <include>librmm.so</include>
+                                            </includes>
+                                        </resource>
                                     </resources>
                                 </configuration>
                             </execution>
@@ -372,10 +383,9 @@
                         <version>3.4.2</version>
                         <configuration>
                             <descriptors>
-                                <descriptor>src/assembly/cuda-specific-native.xml</descriptor>
+                                <descriptor>src/assembly/native-with-deps.xml</descriptor>
                             </descriptors>
-                            <finalName>${project.artifactId}-${project.version}-${native.classifier}</finalName>
-                            <appendAssemblyId>false</appendAssemblyId>
+
                         </configuration>
                         <executions>
                             <execution>
