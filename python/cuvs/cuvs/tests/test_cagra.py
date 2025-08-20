@@ -46,11 +46,12 @@ def run_cagra_build_search_test(
     compression=None,
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
-    if metric == "inner_product" or metric == "cosine":
+    if metric == "inner_product":
         if dtype in [np.int8, np.uint8]:
             pytest.skip("skip normalization for int8/uint8 data")
-        if metric == "inner_product":
-            dataset = normalize(dataset, norm="l2", axis=1)
+        dataset = normalize(dataset, norm="l2", axis=1)
+    if metric == "cosine" and (build_algo != "ivf_pq" or dtype in [np.int8, np.uint8]):
+        pytest.skip("cosine metric only supported with ivf_pq build_algo and float dtypes")
     dataset_device = device_ndarray(dataset)
 
     build_params = cagra.IndexParams(
@@ -165,6 +166,9 @@ def run_cagra_build_search_test(
 def test_cagra_dataset_dtype_host_device(
     dtype, array_type, inplace, build_algo, metric
 ):
+    if metric == "cosine" and (build_algo != "ivf_pq" or dtype in [np.int8, np.uint8]):
+        pytest.skip("cosine metric only supported with ivf_pq build_algo and float dtypes")
+
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.
     run_cagra_build_search_test(
