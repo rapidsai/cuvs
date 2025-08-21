@@ -51,7 +51,8 @@ def run_cagra_build_search_test(
     ):
         print("cosine")
         pytest.skip(
-            "cosine metric only supported with ivf_pq build_algo and float dtypes"
+            "cosine metric only supported with ivf_pq as the"
+            "build algorithm and float dtypes"
         )
     if metric == "inner_product" or metric == "cosine":
         if dtype in [np.int8, np.uint8]:
@@ -175,7 +176,8 @@ def test_cagra_dataset_dtype_host_device(
         build_algo != "ivf_pq" or dtype in [np.int8, np.uint8]
     ):
         pytest.skip(
-            "cosine metric only supported with ivf_pq build_algo and float dtypes"
+            "cosine metric only supported with ivf_pq as the"
+            "build algorithm and float dtypes"
         )
 
     # Note that inner_product tests use normalized input which we cannot
