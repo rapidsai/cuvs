@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -185,12 +185,16 @@ cdef class Index:
     @property
     def n_lists(self):
         """ The number of inverted lists (clusters) """
-        return cuvsIvfFlatIndexGetNLists(self.index)
+        cdef int64_t n_lists = 0
+        cuvsIvfFlatIndexGetNLists(self.index, &n_lists)
+        return n_lists
 
     @property
     def dim(self):
         """ dimensionality of the cluster centers """
-        return cuvsIvfFlatIndexGetDim(self.index)
+        cdef int64_t dim = 0
+        cuvsIvfFlatIndexGetDim(self.index, &dim)
+        return dim
 
     @property
     def centers(self):

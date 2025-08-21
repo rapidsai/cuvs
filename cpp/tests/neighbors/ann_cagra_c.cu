@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -541,7 +541,7 @@ TEST(CagraC, BuildMergeSearch)
   cuvsCagraIndex_t index_array[2] = {index_main, index_add};
   ASSERT_EQ(cuvsCagraMerge(res, merge_params, index_array, 2, index_merged), CUVS_SUCCESS);
 
-  int merged_dim = -1;
+  int64_t merged_dim = -1;
   ASSERT_EQ(cuvsCagraIndexGetDims(index_merged, &merged_dim), CUVS_SUCCESS);
   EXPECT_EQ(merged_dim, 2);
 

@@ -45,7 +45,6 @@ import com.nvidia.cuvs.SearchResults;
 import com.nvidia.cuvs.internal.common.CloseableHandle;
 import com.nvidia.cuvs.internal.common.CloseableRMMAllocation;
 import com.nvidia.cuvs.internal.common.CompositeCloseableHandle;
-import com.nvidia.cuvs.internal.common.Util;
 import com.nvidia.cuvs.internal.panama.cuvsCagraCompressionParams;
 import com.nvidia.cuvs.internal.panama.cuvsCagraIndexParams;
 import com.nvidia.cuvs.internal.panama.cuvsCagraMergeParams;
@@ -413,16 +412,16 @@ public class CagraIndexImpl implements CagraIndex {
   @Override
   public CuVSMatrix getGraph() {
     try (var localArena = Arena.ofConfined()) {
-      var outPtr = localArena.allocate(uint32_t);
+      var outPtr = localArena.allocate(C_LONG);
       checkCuVSError(
           cuvsCagraIndexGetGraphDegree(cagraIndexReference.getMemorySegment(), outPtr),
           "cuvsCagraIndexGetGraphDegree");
-      long graphDegree = Util.dereferenceUnsignedInt(outPtr);
+      long graphDegree = outPtr.get(C_LONG, 0);
 
       checkCuVSError(
           cuvsCagraIndexGetSize(cagraIndexReference.getMemorySegment(), outPtr),
           "cuvsCagraIndexGetSize");
-      long size = Util.dereferenceUnsignedInt(outPtr);
+      long size = outPtr.get(C_LONG, 0);
 
       // TODO: use a "device" graph + tensor, avoid (defer) copy
       var graph = new CuVSHostMatrixArenaImpl(size, graphDegree, CuVSMatrix.DataType.UINT);

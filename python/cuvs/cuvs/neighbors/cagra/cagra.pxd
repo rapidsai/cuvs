@@ -134,10 +134,10 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
     cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index)
 
-    cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int32_t* dim)
-    cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, uint32_t* size)
+    cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int64_t* dim)
+    cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* size)
     cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index,
-                                             uint32_t* degree)
+                                             int64_t* degree)
     cuvsError_t cuvsCagraIndexGetGraph(cuvsCagraIndex_t index,
                                        DLManagedTensor * graph)
     cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index,

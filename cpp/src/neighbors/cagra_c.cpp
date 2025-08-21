@@ -426,7 +426,7 @@ extern "C" cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index_c_ptr)
   });
 }
 
-extern "C" cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int* dim)
+extern "C" cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int64_t* dim)
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index->addr);
@@ -434,7 +434,7 @@ extern "C" cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int* dim)
   });
 }
 
-extern "C" cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, uint32_t* size)
+extern "C" cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* size)
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index->addr);
@@ -442,7 +442,7 @@ extern "C" cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, uint32_t* s
   });
 }
 
-extern "C" cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, uint32_t* graph_degree)
+extern "C" cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int64_t* graph_degree)
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index->addr);

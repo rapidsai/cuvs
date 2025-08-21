@@ -271,18 +271,18 @@ cdef class Index:
 
     @property
     def dim(self):
-        cdef int32_t dim
+        cdef int64_t dim
         check_cuvs(cuvsCagraIndexGetDims(self.index, &dim))
         return dim
 
     @property
     def graph_degree(self):
-        cdef uint32_t degree
+        cdef int64_t degree
         check_cuvs(cuvsCagraIndexGetGraphDegree(self.index, &degree))
         return degree
 
     def __len__(self):
-        cdef uint32_t size
+        cdef int64_t size
         check_cuvs(cuvsCagraIndexGetSize(self.index, &size))
         return size
 

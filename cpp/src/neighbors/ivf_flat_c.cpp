@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -395,50 +395,54 @@ extern "C" cuvsError_t cuvsIvfFlatExtend(cuvsResources_t res,
   });
 }
 
-extern "C" uint32_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index)
+extern "C" cuvsError_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index, int64_t* n_lists)
 {
-  if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
-    auto index_ptr =
-      reinterpret_cast<cuvs::neighbors::ivf_flat::index<float, int64_t>*>(index->addr);
-    return index_ptr->n_lists();
-  } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
-    auto index_ptr =
-      reinterpret_cast<cuvs::neighbors::ivf_flat::index<half, int64_t>*>(index->addr);
-    return index_ptr->n_lists();
-  } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
-    auto index_ptr =
-      reinterpret_cast<cuvs::neighbors::ivf_flat::index<int8_t, int64_t>*>(index->addr);
-    return index_ptr->n_lists();
-  } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
-    auto index_ptr =
-      reinterpret_cast<cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*>(index->addr);
-    return index_ptr->n_lists();
-  } else {
-    return 0;
-  }
+  return cuvs::core::translate_exceptions([=] {
+    if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
+      auto index_ptr =
+        reinterpret_cast<cuvs::neighbors::ivf_flat::index<float, int64_t>*>(index->addr);
+      *n_lists = index_ptr->n_lists();
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      auto index_ptr =
+        reinterpret_cast<cuvs::neighbors::ivf_flat::index<half, int64_t>*>(index->addr);
+      *n_lists = index_ptr->n_lists();
+    } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
+      auto index_ptr =
+        reinterpret_cast<cuvs::neighbors::ivf_flat::index<int8_t, int64_t>*>(index->addr);
+      *n_lists = index_ptr->n_lists();
+    } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
+      auto index_ptr =
+        reinterpret_cast<cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*>(index->addr);
+      *n_lists = index_ptr->n_lists();
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
+    }
+  });
 }
 
-extern "C" uint32_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index)
+extern "C" cuvsError_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index, int64_t* dim)
 {
-  if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
-    auto index_ptr =
-      reinterpret_cast<cuvs::neighbors::ivf_flat::index<float, int64_t>*>(index->addr);
-    return index_ptr->dim();
-  } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
-    auto index_ptr =
-      reinterpret_cast<cuvs::neighbors::ivf_flat::index<half, int64_t>*>(index->addr);
-    return index_ptr->dim();
-  } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
-    auto index_ptr =
-      reinterpret_cast<cuvs::neighbors::ivf_flat::index<int8_t, int64_t>*>(index->addr);
-    return index_ptr->dim();
-  } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
-    auto index_ptr =
-      reinterpret_cast<cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*>(index->addr);
-    return index_ptr->dim();
-  } else {
-    return 0;
-  }
+  return cuvs::core::translate_exceptions([=] {
+    if (index->dtype.code == kDLFloat && index->dtype.bits == 32) {
+      auto index_ptr =
+        reinterpret_cast<cuvs::neighbors::ivf_flat::index<float, int64_t>*>(index->addr);
+      *dim = index_ptr->dim();
+    } else if (index->dtype.code == kDLFloat && index->dtype.bits == 16) {
+      auto index_ptr =
+        reinterpret_cast<cuvs::neighbors::ivf_flat::index<half, int64_t>*>(index->addr);
+      *dim = index_ptr->dim();
+    } else if (index->dtype.code == kDLInt && index->dtype.bits == 8) {
+      auto index_ptr =
+        reinterpret_cast<cuvs::neighbors::ivf_flat::index<int8_t, int64_t>*>(index->addr);
+      *dim = index_ptr->dim();
+    } else if (index->dtype.code == kDLUInt && index->dtype.bits == 8) {
+      auto index_ptr =
+        reinterpret_cast<cuvs::neighbors::ivf_flat::index<uint8_t, int64_t>*>(index->addr);
+      *dim = index_ptr->dim();
+    } else {
+      RAFT_FAIL("Unsupported index dtype: %d and bits: %d", index->dtype.code, index->dtype.bits);
+    }
+  });
 }
 
 extern "C" cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsResources_t res,
