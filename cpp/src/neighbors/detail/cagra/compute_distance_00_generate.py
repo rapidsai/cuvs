@@ -88,9 +88,6 @@ for type_path, (data_t, idx_t, distance_t) in search_types.items():
     for (mxdim, team) in mxdim_team:
         # CAGRA
         for metric in ['L2Expanded', 'InnerProduct', 'CosineExpanded']:
-            # Skip CosineExpanded for int8 and uint8 types
-            if metric == 'CosineExpanded' and data_t in ['int8_t', 'uint8_t']:
-                continue
 
             path = f"compute_distance_standard_{metric}_{type_path}_dim{mxdim}_t{team}.cu"
             includes = '#include "compute_distance_standard-impl.cuh"'

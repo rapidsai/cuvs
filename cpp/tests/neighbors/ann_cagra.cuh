@@ -346,9 +346,6 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
-      if (ps.build_algo == graph_build_algo::IVF_PQ && !std::is_same_v<DataT, float>) {
-        GTEST_SKIP();
-      }
       if (ps.compression.has_value()) { GTEST_SKIP(); }
     }
 
@@ -528,12 +525,7 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
  protected:
   void testCagra()
   {
-    // TODO (tarang-jain): remove when NN Descent index building support InnerProduct and
-    // CosineExpanded. Reference issue: https://github.com/rapidsai/raft/issues/2276
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
-      if (ps.build_algo == graph_build_algo::IVF_PQ && !std::is_same_v<DataT, float>) {
-        GTEST_SKIP();
-      }
       if (ps.compression.has_value()) { GTEST_SKIP(); }
     }
     if (ps.compression != std::nullopt) GTEST_SKIP();
@@ -744,9 +736,6 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
   void testCagra()
   {
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
-      if (ps.build_algo == graph_build_algo::IVF_PQ && !std::is_same_v<DataT, float>) {
-        GTEST_SKIP();
-      }
       if (ps.compression.has_value()) { GTEST_SKIP(); }
     }
     // IVF_PQ graph build does not support BitwiseHamming
