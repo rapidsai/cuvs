@@ -15,10 +15,8 @@
  */
 package com.nvidia.cuvs.internal;
 
-import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.checkCudaError;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemGetInfo;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsDeviceIdGet;
 import static com.nvidia.cuvs.internal.panama.headers_h_1.*;
 
 import com.nvidia.cuvs.CuVSResources;
@@ -45,29 +43,24 @@ public class GPUInfoProviderImpl implements GPUInfoProvider {
 
   @Override
   public CuVSResourcesInfo getCurrentInfo(CuVSResources resources) {
-    try (var resourcesAccess = resources.access()) {
-      try (var localArena = Arena.ofConfined()) {
-        var deviceIdPtr = localArena.allocate(C_INT);
-        checkCudaError(cudaGetDevice(deviceIdPtr), "cudaGetDevice");
-        var currentDeviceId = deviceIdPtr.get(C_INT, 0);
+    try (var localArena = Arena.ofConfined()) {
+      var deviceIdPtr = localArena.allocate(C_INT);
+      checkCudaError(cudaGetDevice(deviceIdPtr), "cudaGetDevice");
+      var currentDeviceId = deviceIdPtr.get(C_INT, 0);
 
-        checkCuVSError(cuvsDeviceIdGet(resourcesAccess.handle(), deviceIdPtr), "cuvsDeviceIdGet");
-        var resourcesDeviceId = deviceIdPtr.get(C_INT, 0);
-
-        if (resourcesDeviceId != currentDeviceId) {
-          checkCudaError(cudaSetDevice(resourcesDeviceId), "cudaSetDevice");
-        }
-
-        MemorySegment freeMemoryPtr = localArena.allocate(size_t);
-        MemorySegment totalMemoryPtr = localArena.allocate(size_t);
-        checkCudaError(cudaMemGetInfo(freeMemoryPtr, totalMemoryPtr), "cudaMemGetInfo");
-
-        if (resourcesDeviceId != currentDeviceId) {
-          checkCudaError(cudaSetDevice(currentDeviceId), "cudaSetDevice");
-        }
-
-        return new CuVSResourcesInfo(freeMemoryPtr.get(size_t, 0), totalMemoryPtr.get(size_t, 0));
+      if (resources.deviceId() != currentDeviceId) {
+        checkCudaError(cudaSetDevice(resources.deviceId()), "cudaSetDevice");
       }
+
+      MemorySegment freeMemoryPtr = localArena.allocate(size_t);
+      MemorySegment totalMemoryPtr = localArena.allocate(size_t);
+      checkCudaError(cudaMemGetInfo(freeMemoryPtr, totalMemoryPtr), "cudaMemGetInfo");
+
+      if (resources.deviceId() != currentDeviceId) {
+        checkCudaError(cudaSetDevice(currentDeviceId), "cudaSetDevice");
+      }
+
+      return new CuVSResourcesInfo(freeMemoryPtr.get(size_t, 0), totalMemoryPtr.get(size_t, 0));
     }
   }
 }
