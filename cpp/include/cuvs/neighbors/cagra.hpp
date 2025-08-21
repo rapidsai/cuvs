@@ -453,6 +453,21 @@ struct index : cuvs::neighbors::index {
                  "Dataset and knn_graph must have equal number of rows");
     update_graph(res, knn_graph);
 
+    if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
+      if (metric_ == cuvs::distance::DistanceType::CosineExpanded) {
+        auto p = dynamic_cast<strided_dataset<T, int64_t>*>(dataset_.get());
+        if (p) {
+          auto dataset_view = p->view();
+          if (dataset_view.extent(0) > 0) {
+            auto dataset_norms =
+              raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
+            detail::compute_dataset_norms(res, dataset_view, dataset_norms.view());
+            set_dataset_norms(std::move(dataset_norms));
+          }
+        }
+      }
+    }
+
     raft::resource::sync_stream(res);
   }
 
@@ -482,7 +497,7 @@ struct index : cuvs::neighbors::index {
     }
   }
 
-  /** Set the dataset reference explicitly to a device matrix view with padding. */
+  /** Set the dataset reference explicitly to a device matrix index with padding. */
   void update_dataset(raft::resources const& res,
                       raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset)
   {

@@ -1268,20 +1268,33 @@ void extend(raft::resources const& handle,
   for (const auto& vec_batch : vec_batches) {
     const auto& idx_batch = *idx_batches++;
     if (index->metric() == CosineExpanded) {
-      auto vec_batch_view = raft::make_device_matrix_view<T, internal_extents_t>(
-        const_cast<T*>(vec_batch.data()), vec_batch.size(), index->dim());
+      auto vec_batch_copy =
+        rmm::device_uvector<T>(vec_batch.size() * index->dim(), stream, batches_mr);
+      raft::copy(vec_batch_copy.data(), vec_batch.data(), vec_batch.size() * index->dim(), stream);
+      auto vec_batch_copy_view = raft::make_device_matrix_view<T, IdxT>(
+        vec_batch_copy.data(), vec_batch.size(), index->dim());
       raft::linalg::row_normalize<raft::linalg::L2Norm>(
-        handle, raft::make_const_mdspan(vec_batch_view), vec_batch_view);
+        handle, raft::make_const_mdspan(vec_batch_copy_view), vec_batch_copy_view);
+      process_and_fill_codes(handle,
+                             *index,
+                             vec_batch_copy.data(),
+                             new_indices != nullptr
+                               ? std::variant<IdxT, const IdxT*>(idx_batch.data())
+                               : std::variant<IdxT, const IdxT*>(IdxT(idx_batch.offset())),
+                             new_data_labels.data() + vec_batch.offset(),
+                             IdxT(vec_batch.size()),
+                             batches_mr);
+    } else {
+      process_and_fill_codes(handle,
+                             *index,
+                             vec_batch.data(),
+                             new_indices != nullptr
+                               ? std::variant<IdxT, const IdxT*>(idx_batch.data())
+                               : std::variant<IdxT, const IdxT*>(IdxT(idx_batch.offset())),
+                             new_data_labels.data() + vec_batch.offset(),
+                             IdxT(vec_batch.size()),
+                             batches_mr);
     }
-    process_and_fill_codes(handle,
-                           *index,
-                           vec_batch.data(),
-                           new_indices != nullptr
-                             ? std::variant<IdxT, const IdxT*>(idx_batch.data())
-                             : std::variant<IdxT, const IdxT*>(IdxT(idx_batch.offset())),
-                           new_data_labels.data() + vec_batch.offset(),
-                           IdxT(vec_batch.size()),
-                           batches_mr);
     vec_batches.prefetch_next_batch();
     // User needs to make sure kernel finishes its work before we overwrite batch in the next
     // iteration if different streams are used for kernel and copy.
