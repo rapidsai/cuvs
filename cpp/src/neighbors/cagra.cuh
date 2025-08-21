@@ -91,6 +91,26 @@ template void compute_dataset_norms<half>(
   raft::device_matrix_view<const half, int64_t, raft::layout_stride> dataset,
   raft::device_vector_view<float, int64_t> norms);
 
+template void compute_dataset_norms<int8_t>(
+  raft::resources const& res,
+  raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
+  raft::device_vector_view<float, int64_t> norms);
+
+template void compute_dataset_norms<uint8_t>(
+  raft::resources const& res,
+  raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
+  raft::device_vector_view<float, int64_t> norms);
+
+template void compute_dataset_norms<int8_t>(
+  raft::resources const& res,
+  raft::device_matrix_view<const int8_t, int64_t, raft::layout_stride> dataset,
+  raft::device_vector_view<float, int64_t> norms);
+
+template void compute_dataset_norms<uint8_t>(
+  raft::resources const& res,
+  raft::device_matrix_view<const uint8_t, int64_t, raft::layout_stride> dataset,
+  raft::device_vector_view<float, int64_t> norms);
+
 }  // namespace detail
 
 /**

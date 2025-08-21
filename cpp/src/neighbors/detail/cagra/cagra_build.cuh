@@ -719,15 +719,6 @@ index<T, IdxT> build(
                "BitwiseHamming distance is only supported for int8_t and uint8_t data types. "
                "Current data type is not supported.");
 
-  // Validate data type for CosineExpanded metric
-  RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::CosineExpanded ||
-                 (std::is_same_v<T, float> || std::is_same_v<T, half>),
-               "Cosine distance is only supported for float and half data types.");
-
-  RAFT_EXPECTS(params.metric != CosineExpanded ||
-                 std::holds_alternative<cagra::graph_build_params::ivf_pq_params>(knn_build_params),
-               "IVF_PQ is the only supported graph building algorithm for CosineExpanded metric.");
-
   auto cagra_graph = raft::make_host_matrix<IdxT, int64_t>(0, 0);
 
   // Dispatch based on graph_build_params
@@ -809,16 +800,14 @@ index<T, IdxT> build(
         index<T, IdxT>(res, params.metric, dataset, raft::make_const_mdspan(cagra_graph.view()));
 
       // Compute dataset norms for cosine distance
-      if constexpr (std::is_same_v<T, float> || std::is_same_v<T, half>) {
-        if (params.metric == cuvs::distance::DistanceType::CosineExpanded) {
-          auto dataset_view = idx.dataset();
-          if (dataset_view.extent(0) > 0) {
-            auto dataset_norms =
-              raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
-            cuvs::neighbors::cagra::detail::compute_dataset_norms(
-              res, dataset_view, dataset_norms.view());
-            idx.set_dataset_norms(std::move(dataset_norms));
-          }
+      if (params.metric == cuvs::distance::DistanceType::CosineExpanded) {
+        auto dataset_view = idx.dataset();
+        if (dataset_view.extent(0) > 0) {
+          auto dataset_norms =
+            raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
+          cuvs::neighbors::cagra::detail::compute_dataset_norms(
+            res, dataset_view, dataset_norms.view());
+          idx.set_dataset_norms(std::move(dataset_norms));
         }
       }
 

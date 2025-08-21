@@ -345,10 +345,12 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
-    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded &&
-        ((!std::is_same_v<DataT, float>) || (ps.build_algo != graph_build_algo::IVF_PQ) ||
-         (ps.compression.has_value())))
-      GTEST_SKIP();
+    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
+      if (ps.build_algo == graph_build_algo::IVF_PQ && !std::is_same_v<DataT, float>) {
+        GTEST_SKIP();
+      }
+      if (ps.compression.has_value()) { GTEST_SKIP(); }
+    }
 
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<SearchIdxT> indices_Cagra(queries_size);
@@ -528,12 +530,12 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
   {
     // TODO (tarang-jain): remove when NN Descent index building support InnerProduct and
     // CosineExpanded. Reference issue: https://github.com/rapidsai/raft/issues/2276
-    if (ps.metric == InnerProduct ||
-        ps.metric == CosineExpanded && ps.build_algo != graph_build_algo::IVF_PQ)
-      GTEST_SKIP();
-    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded &&
-        (!std::is_same_v<DataT, float>))
-      GTEST_SKIP();
+    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
+      if (ps.build_algo == graph_build_algo::IVF_PQ && !std::is_same_v<DataT, float>) {
+        GTEST_SKIP();
+      }
+      if (ps.compression.has_value()) { GTEST_SKIP(); }
+    }
     if (ps.compression != std::nullopt) GTEST_SKIP();
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
@@ -741,9 +743,12 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
  protected:
   void testCagra()
   {
-    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded &&
-        (!std::is_same_v<DataT, float> || ps.build_algo != graph_build_algo::IVF_PQ))
-      GTEST_SKIP();
+    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
+      if (ps.build_algo == graph_build_algo::IVF_PQ && !std::is_same_v<DataT, float>) {
+        GTEST_SKIP();
+      }
+      if (ps.compression.has_value()) { GTEST_SKIP(); }
+    }
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         ((!std::is_same_v<DataT, uint8_t>) ||
@@ -951,11 +956,6 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
   template <typename SearchIdxT = IdxT>
   void testCagra()
   {
-    // TODO (tarang-jain): remove when NN Descent index building support InnerProduct. Reference
-    // issue: https://github.com/rapidsai/raft/issues/2276
-    if ((ps.metric == InnerProduct || ps.metric == CosineExpanded) &&
-        ps.build_algo != graph_build_algo::IVF_PQ)
-      GTEST_SKIP();
     if (ps.compression != std::nullopt) GTEST_SKIP();
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
@@ -1362,7 +1362,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {5000},
     {32, 64},
     {16},
-    {graph_build_algo::IVF_PQ},
+    {graph_build_algo::AUTO},
     {search_algo::AUTO},
     {10},
     {0},  // team_size
@@ -1437,7 +1437,7 @@ inline std::vector<AnnCagraInputs> generate_addnode_inputs()
                                                    {10000},
                                                    {32},
                                                    {10},
-                                                   {graph_build_algo::IVF_PQ},
+                                                   {graph_build_algo::AUTO},
                                                    {search_algo::AUTO},
                                                    {10},
                                                    {0},  // team_size
@@ -1490,7 +1490,7 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
     {1000},
     {1, 8, 17, 102},
     {16},  // k
-    {graph_build_algo::IVF_PQ},
+    {graph_build_algo::AUTO},
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
     {0},  // query size
     {0},
