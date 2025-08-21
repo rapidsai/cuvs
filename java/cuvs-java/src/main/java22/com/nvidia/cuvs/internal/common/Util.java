@@ -138,21 +138,28 @@ public class Util {
    * Get the list of compatible GPUs based on given compute capability and total
    * memory
    *
-   * @param minComputeCapability the minimum compute capability
-   * @param minDeviceMemoryMB    the minimum total available memory in MB
+   * @param minComputeCapabilityMajor the minimum compute capability (major)
+   * @param minComputeCapabilityMinor the minimum compute capability (minor)
+   * @param minDeviceMemoryMB         the minimum total available memory in MB
    * @return a list of compatible GPUs. See {@link GPUInfo}
    */
-  public static List<GPUInfo> compatibleGPUs(double minComputeCapability, int minDeviceMemoryMB)
+  public static List<GPUInfo> compatibleGPUs(
+      int minComputeCapabilityMajor, int minComputeCapabilityMinor, int minDeviceMemoryMB)
       throws Throwable {
     List<GPUInfo> compatibleGPUs = new ArrayList<GPUInfo>();
-    double minDeviceMemoryB = 1048576.0f * minDeviceMemoryMB;
+    long minDeviceMemoryInBytes = 1024L * 1024L * minDeviceMemoryMB;
     for (GPUInfo gpuInfo : availableGPUs()) {
-      if (gpuInfo.computeCapability() >= minComputeCapability
-          && gpuInfo.totalDeviceMemoryInBytes() >= minDeviceMemoryB) {
+      if (hasMinimumCapability(minComputeCapabilityMajor, minComputeCapabilityMinor, gpuInfo)
+          && gpuInfo.totalDeviceMemoryInBytes() >= minDeviceMemoryInBytes) {
         compatibleGPUs.add(gpuInfo);
       }
     }
     return compatibleGPUs;
+  }
+
+  private static boolean hasMinimumCapability(int major, int minor, GPUInfo gpuInfo) {
+    return gpuInfo.computeCapabilityMajor() > major
+        || (gpuInfo.computeCapabilityMajor() == major && gpuInfo.computeCapabilityMinor() >= minor);
   }
 
   /**
@@ -175,16 +182,16 @@ public class Util {
       for (int i = 0; i < numGpuCount; i++) {
         returnValue = cudaGetDeviceProperties_v2(deviceProp, i);
         checkCudaError(returnValue, "cudaGetDeviceProperties_v2");
-        float computeCapability =
-            Float.parseFloat(
-                cudaDeviceProp.major(deviceProp) + "." + cudaDeviceProp.minor(deviceProp));
 
         GPUInfo gpuInfo =
             new GPUInfo(
                 i,
                 cudaDeviceProp.name(deviceProp).getString(0),
                 cudaDeviceProp.totalGlobalMem(deviceProp),
-                computeCapability);
+                cudaDeviceProp.major(deviceProp),
+                cudaDeviceProp.minor(deviceProp),
+                cudaDeviceProp.asyncEngineCount(deviceProp) > 0,
+                cudaDeviceProp.concurrentKernels(deviceProp) > 0);
 
         gpuInfoArr.add(gpuInfo);
       }

@@ -41,22 +41,24 @@ public class GPUInfoIT extends CuVSTestCase {
     assertFalse(availableGpus.isEmpty());
     assertTrue(availableGpus.get(0).gpuId() >= 0);
     for (var gpuInfo : availableGpus) {
-      log.info(
-          "Available GPU with name [{}], memory [{}MB], compute [{}]",
+      log.trace(
+          "Available GPU with name [{}], memory [{}MB], compute [{}.{}]",
           gpuInfo.name(),
-          ((float) gpuInfo.totalDeviceMemoryInBytes() / 1048576.0f),
-          gpuInfo.computeCapability());
+          gpuInfo.totalDeviceMemoryInBytes() / (1024L * 1024L),
+          gpuInfo.computeCapabilityMajor(),
+          gpuInfo.computeCapabilityMinor());
     }
 
     assertTrue(availableGpus.size() >= compatibleGpus.size());
-    log.info("Compatible GPUs: " + compatibleGpus.size());
+    log.trace("Compatible GPUs: [{}]", compatibleGpus.size());
     for (var gpuInfo : compatibleGpus) {
-      log.info(
-          "Compatible GPU with name [{}], memory [{}], compute [{}]",
+      log.trace(
+          "Compatible GPU with name [{}], memory [{}MB], compute [{}.{}]",
           gpuInfo.name(),
-          gpuInfo.totalDeviceMemoryInBytes(),
-          gpuInfo.computeCapability());
-      assertTrue(gpuInfo.computeCapability() >= GPUInfoProvider.MIN_COMPUTE_CAPABILITY);
+          gpuInfo.totalDeviceMemoryInBytes() / (1024L * 1024L),
+          gpuInfo.computeCapabilityMajor(),
+          gpuInfo.computeCapabilityMinor());
+      assertTrue(gpuInfo.computeCapabilityMajor() >= GPUInfoProvider.MIN_COMPUTE_CAPABILITY_MAJOR);
       assertTrue(
           gpuInfo.totalDeviceMemoryInBytes()
               >= GPUInfoProvider.MIN_DEVICE_MEMORY_IN_MB * 1024L * 1024L);

@@ -19,7 +19,8 @@ import java.util.List;
 
 public interface GPUInfoProvider {
 
-  float MIN_COMPUTE_CAPABILITY = 7.0f;
+  int MIN_COMPUTE_CAPABILITY_MAJOR = 7;
+  int MIN_COMPUTE_CAPABILITY_MINOR = 0;
 
   int MIN_DEVICE_MEMORY_IN_MB = 8192;
 

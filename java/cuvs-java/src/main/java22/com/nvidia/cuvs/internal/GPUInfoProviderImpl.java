@@ -39,7 +39,8 @@ public class GPUInfoProviderImpl implements GPUInfoProvider {
 
   @Override
   public List<GPUInfo> compatibleGPUs() throws Throwable {
-    return Util.compatibleGPUs(MIN_COMPUTE_CAPABILITY, MIN_DEVICE_MEMORY_IN_MB);
+    return Util.compatibleGPUs(
+        MIN_COMPUTE_CAPABILITY_MAJOR, MIN_COMPUTE_CAPABILITY_MINOR, MIN_DEVICE_MEMORY_IN_MB);
   }
 
   @Override
