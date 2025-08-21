@@ -24,15 +24,6 @@ namespace cuvs::cluster::kmeans {
 
 void fit(const raft::resources& handle,
          cuvs::cluster::kmeans::balanced_params const& params,
-         raft::device_matrix_view<const int8_t, int> X,
-         raft::device_matrix_view<float, int> centroids)
-{
-  cuvs::cluster::kmeans_balanced::fit(
-    handle, params, X, centroids, cuvs::spatial::knn::detail::utils::mapping<float>{});
-}
-
-void fit(const raft::resources& handle,
-         cuvs::cluster::kmeans::balanced_params const& params,
          raft::device_matrix_view<const int8_t, int64_t> X,
          raft::device_matrix_view<float, int64_t> centroids)
 {
