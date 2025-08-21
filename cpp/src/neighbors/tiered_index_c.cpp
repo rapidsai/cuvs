@@ -38,46 +38,59 @@ namespace {
 using namespace cuvs::neighbors;
 
 template <typename T>
+void convert_c_index_params(cuvsTieredIndexParams params,
+                            int64_t n_rows,
+                            int64_t dim,
+                            tiered_index::index_params<T>* out)
+{
+  out->min_ann_rows               = params.min_ann_rows;
+  out->create_ann_index_on_extend = params.create_ann_index_on_extend;
+  out->metric                     = params.metric;
+
+  if constexpr (std::is_same_v<T, cagra::index_params>) {
+    if (params.cagra_params != NULL) {
+      cagra::convert_c_index_params(*params.cagra_params, n_rows, dim, out);
+    }
+  } else if constexpr (std::is_same_v<T, ivf_flat::index_params>) {
+    if (params.ivf_flat_params != NULL) {
+      ivf_flat::convert_c_index_params(*params.ivf_flat_params, out);
+    }
+  } else if constexpr (std::is_same_v<T, ivf_pq::index_params>) {
+    if (params.ivf_pq_params != NULL) {
+      ivf_pq::convert_c_index_params(*params.ivf_pq_params, out);
+    }
+  } else {
+    RAFT_FAIL("unhandled index params type");
+  }
+}
+
+template <typename T>
 void* _build(cuvsResources_t res, cuvsTieredIndexParams params, DLManagedTensor* dataset_tensor)
 {
   auto res_ptr      = reinterpret_cast<raft::resources*>(res);
   using mdspan_type = raft::device_matrix_view<const T, int64_t, raft::row_major>;
   auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
 
+  auto dataset = dataset_tensor->dl_tensor;
+  RAFT_EXPECTS(dataset.ndim == 2, "dataset should be a 2-dimensional tensor");
+  RAFT_EXPECTS(dataset.shape != nullptr, "dataset should have an initialized shape");
+
   switch (params.algo) {
     case CUVS_TIERED_INDEX_ALGO_CAGRA: {
       auto build_params = tiered_index::index_params<cagra::index_params>();
-      if (params.cagra_params != NULL) {
-        auto dataset = dataset_tensor->dl_tensor;
-        cagra::convert_c_index_params(
-          *params.cagra_params, dataset.shape[0], dataset.shape[1], &build_params);
-      }
-      build_params.min_ann_rows               = params.min_ann_rows;
-      build_params.create_ann_index_on_extend = params.create_ann_index_on_extend;
-      build_params.metric                     = params.metric;
+      convert_c_index_params(params, dataset.shape[0], dataset.shape[1], &build_params);
       return new tiered_index::index<cagra::index<T, uint32_t>>(
         tiered_index::build(*res_ptr, build_params, mds));
     }
     case CUVS_TIERED_INDEX_ALGO_IVF_FLAT: {
       auto build_params = tiered_index::index_params<ivf_flat::index_params>();
-      if (params.ivf_flat_params != NULL) {
-        ivf_flat::convert_c_index_params(*params.ivf_flat_params, &build_params);
-      }
-      build_params.metric                     = params.metric;
-      build_params.min_ann_rows               = params.min_ann_rows;
-      build_params.create_ann_index_on_extend = params.create_ann_index_on_extend;
+      convert_c_index_params(params, dataset.shape[0], dataset.shape[1], &build_params);
       return new tiered_index::index<ivf_flat::index<T, int64_t>>(
         tiered_index::build(*res_ptr, build_params, mds));
     }
     case CUVS_TIERED_INDEX_ALGO_IVF_PQ: {
-      auto build_params   = tiered_index::index_params<ivf_pq::index_params>();
-      build_params.metric = params.metric;
-      if (params.ivf_pq_params != NULL) {
-        ivf_pq::convert_c_index_params(*params.ivf_pq_params, &build_params);
-      }
-      build_params.metric                     = params.metric;
-      build_params.min_ann_rows               = params.min_ann_rows;
-      build_params.create_ann_index_on_extend = params.create_ann_index_on_extend;
+      auto build_params = tiered_index::index_params<ivf_pq::index_params>();
+      convert_c_index_params(params, dataset.shape[0], dataset.shape[1], &build_params);
       return new tiered_index::index<ivf_pq::typed_index<T, int64_t>>(
         tiered_index::build(*res_ptr, build_params, mds));
     }
@@ -156,6 +169,47 @@ void _extend(cuvsResources_t res, DLManagedTensor* new_vectors, cuvsTieredIndex 
   auto vectors_mds = cuvs::core::from_dlpack<vectors_mdspan_type>(new_vectors);
 
   tiered_index::extend(*res_ptr, vectors_mds, index_ptr);
+}
+template <typename UpstreamT>
+void _merge(cuvsResources_t res,
+            cuvsTieredIndexParams params,
+            cuvsTieredIndex_t* indices,
+            size_t num_indices,
+            cuvsTieredIndex_t output_index)
+{
+  auto res_ptr = reinterpret_cast<raft::resources*>(res);
+
+  std::vector<cuvs::neighbors::tiered_index::index<UpstreamT>*> cpp_indices;
+
+  int64_t n_rows = 0, dim = 0;
+  for (size_t i = 0; i < num_indices; ++i) {
+    RAFT_EXPECTS(indices[i]->dtype.code == indices[0]->dtype.code,
+                 "indices must all have the same dtype");
+    RAFT_EXPECTS(indices[i]->dtype.bits == indices[0]->dtype.bits,
+                 "indices must all have the same dtype");
+    RAFT_EXPECTS(indices[i]->algo == indices[0]->algo,
+                 "indices must all have the same index algorithm");
+
+    auto idx_ptr =
+      reinterpret_cast<cuvs::neighbors::tiered_index::index<UpstreamT>*>(indices[i]->addr);
+    n_rows += idx_ptr->size();
+    if (dim) {
+      RAFT_EXPECTS(dim == idx_ptr->dim(), "indices must all have the same dimensionality");
+    } else {
+      dim = idx_ptr->dim();
+    }
+    cpp_indices.push_back(idx_ptr);
+  }
+
+  auto build_params = tiered_index::index_params<typename UpstreamT::index_params_type>();
+  convert_c_index_params(params, n_rows, dim, &build_params);
+
+  auto ptr = new cuvs::neighbors::tiered_index::index<UpstreamT>(
+    cuvs::neighbors::tiered_index::merge(*res_ptr, build_params, cpp_indices));
+
+  output_index->addr  = reinterpret_cast<uintptr_t>(ptr);
+  output_index->dtype = indices[0]->dtype;
+  output_index->algo  = indices[0]->algo;
 }
 
 }  // namespace
@@ -299,6 +353,34 @@ extern "C" cuvsError_t cuvsTieredIndexExtend(cuvsResources_t res,
       }
       case CUVS_TIERED_INDEX_ALGO_IVF_PQ: {
         _extend<ivf_pq::typed_index<float, int64_t>>(res, new_vectors, index);
+        break;
+      }
+      default: RAFT_FAIL("unsupported tiered index algorithm");
+    }
+  });
+}
+
+extern "C" cuvsError_t cuvsTieredIndexMerge(cuvsResources_t res,
+                                            cuvsTieredIndexParams_t params,
+                                            cuvsTieredIndex_t* indices,
+                                            size_t num_indices,
+                                            cuvsTieredIndex_t output_index)
+{
+  return cuvs::core::translate_exceptions([=] {
+    RAFT_EXPECTS(num_indices >= 1, "must have at least one index to merge");
+
+    switch (indices[0]->algo) {
+      case CUVS_TIERED_INDEX_ALGO_CAGRA: {
+        _merge<cagra::index<float, uint32_t>>(res, *params, indices, num_indices, output_index);
+        break;
+      }
+      case CUVS_TIERED_INDEX_ALGO_IVF_FLAT: {
+        _merge<ivf_flat::index<float, int64_t>>(res, *params, indices, num_indices, output_index);
+        break;
+      }
+      case CUVS_TIERED_INDEX_ALGO_IVF_PQ: {
+        _merge<ivf_pq::typed_index<float, int64_t>>(
+          res, *params, indices, num_indices, output_index);
         break;
       }
       default: RAFT_FAIL("unsupported tiered index algorithm");

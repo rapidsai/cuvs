@@ -57,37 +57,34 @@ public class BruteForceAndSearchIT extends CuVSTestCase {
         new BruteForceIndexParams.Builder().withNumWriterThreads(32).build();
 
     // Create the index with the dataset
-    BruteForceIndex index =
+    try (BruteForceIndex index =
         BruteForceIndex.newBuilder(resources)
             .withDataset(dataset)
             .withIndexParams(indexParams)
-            .build();
+            .build()) {
 
-    // Saving the index on to the disk.
-    String indexFileName = UUID.randomUUID() + ".bf";
-    try (var outputStream = new FileOutputStream(indexFileName)) {
-      index.serialize(outputStream);
+      // Saving the index on to the disk.
+      String indexFileName = UUID.randomUUID() + ".bf";
+      try (var outputStream = new FileOutputStream(indexFileName)) {
+        index.serialize(outputStream);
+      }
+
+      // Loading a BRUTEFORCE index from disk.
+      Path indexFile = Path.of(indexFileName);
+      try (var inputStream = Files.newInputStream(indexFile);
+          BruteForceIndex loadedIndex =
+              BruteForceIndex.newBuilder(resources).from(inputStream).build()) {
+
+        // search the loaded index
+        SearchResults results = loadedIndex.search(cuvsQuery);
+        checkResults(expectedResults, results.getResults());
+
+        // search the first index
+        results = index.search(cuvsQuery);
+        checkResults(expectedResults, results.getResults());
+      }
+      Files.deleteIfExists(indexFile);
     }
-
-    // Loading a BRUTEFORCE index from disk.
-    Path indexFile = Path.of(indexFileName);
-    try (var inputStream = Files.newInputStream(indexFile)) {
-      BruteForceIndex loadedIndex = BruteForceIndex.newBuilder(resources).from(inputStream).build();
-
-      // search the loaded index
-      SearchResults results = loadedIndex.search(cuvsQuery);
-      checkResults(expectedResults, results.getResults());
-
-      // search the first index
-      results = index.search(cuvsQuery);
-      checkResults(expectedResults, results.getResults());
-
-      // Cleanup
-      index.destroyIndex();
-      loadedIndex.destroyIndex();
-    }
-
-    Files.deleteIfExists(indexFile);
   }
 
   /**
