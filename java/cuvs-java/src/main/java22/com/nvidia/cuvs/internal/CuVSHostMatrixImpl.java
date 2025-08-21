@@ -84,7 +84,7 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
 
   @Override
   public void toArray(int[][] array) {
-    assert dataType == DataType.INT;
+    assert (dataType == DataType.UINT || dataType == DataType.INT);
     assert (array.length >= size) : "Input array is not large enough";
     assert (array.length == 0 || array[0].length >= columns) : "Input array is not large enough";
     var valueByteSize = valueLayout.byteSize();
