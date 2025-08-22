@@ -22,8 +22,6 @@ import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.CuVSHostMatrix;
-import com.nvidia.cuvs.CuVSMatrix.DataType;
-import com.nvidia.cuvs.CuVSMatrix.MemoryKind;
 import com.nvidia.cuvs.RowView;
 import java.lang.foreign.*;
 import java.lang.invoke.VarHandle;
@@ -118,11 +116,6 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
       MemorySegment.copy(
           memorySegment, valueLayout, r * columns * valueByteSize, array[r], 0, (int) columns);
     }
-  }
-
-  @Override
-  public MemoryKind memoryKind() {
-    return MemoryKind.HOST;
   }
 
   @Override
