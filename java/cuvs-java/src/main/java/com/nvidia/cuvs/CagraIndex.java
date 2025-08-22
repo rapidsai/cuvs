@@ -248,6 +248,14 @@ public interface CagraIndex extends AutoCloseable {
     Builder withIndexParams(CagraIndexParams cagraIndexParameters);
 
     /**
+     * Sets the quantizer to use for building the index with quantized data.
+     *
+     * @param quantizer The quantizer to apply to the dataset during index construction
+     * @return An instance of this Builder
+     */
+    Builder withQuantizer(CuVSQuantizer quantizer);
+
+    /**
      * Builds and returns an instance of CagraIndex.
      *
      * @return an instance of CagraIndex
