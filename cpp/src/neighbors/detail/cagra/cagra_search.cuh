@@ -42,6 +42,7 @@
 
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm.cuh>
+#include <raft/linalg/unary_op.cuh>
 
 namespace cuvs::neighbors::cagra::detail {
 
@@ -202,6 +203,17 @@ void search_main(raft::resources const& res,
                                                       stream,
                                                       raft::sqrt_op{});
 
+    // Adjust query norms for 8-bit types to match runtime scaling used in distance kernels
+    if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) {
+      constexpr float kDiv = static_cast<float>(
+        cuvs::spatial::knn::detail::utils::config<T>::kDivisor);
+      raft::linalg::unaryOp(query_norms.data_handle(),
+                            query_norms.data_handle(),
+                            query_norms.extent(0),
+                            raft::mul_const_op<float>{1.0f / kDiv},
+                            stream);
+    }
+
     const auto n_queries = distances.extent(0);
     const auto k         = distances.extent(1);
     auto query_norms_ptr = query_norms.data_handle();
@@ -213,13 +225,15 @@ void search_main(raft::resources const& res,
       distances,
       raft::compose_op(raft::add_const_op<DistanceT>{DistanceT(1)}, raft::div_op{}));
   }
+  const float scale_for_post =
+    (index.metric() == cuvs::distance::DistanceType::CosineExpanded) ? 1.0f : kScale;
   cuvs::neighbors::ivf::detail::postprocess_distances(
     dist_out,
     dist_in,
     index.metric(),
     distances.extent(0),
     distances.extent(1),
-    kScale,
+    scale_for_post,
     index.metric() != distance::DistanceType::CosineExpanded,
     raft::resource::get_cuda_stream(res));
 }

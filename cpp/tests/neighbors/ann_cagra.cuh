@@ -347,6 +347,10 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
       GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
+      // Degenerate for integral types with dim=1: all cosine distances are 0 → undefined top-k
+      if (ps.dim == 1 && (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>)) {
+        GTEST_SKIP();
+      }
     }
 
     size_t queries_size = ps.n_queries * ps.k;

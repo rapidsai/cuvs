@@ -27,6 +27,7 @@
 #include <raft/core/mdspan.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/norm.cuh>
+#include "detail/ann_utils.cuh"
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
@@ -53,6 +54,15 @@ void compute_dataset_norms(raft::resources const& res,
                                                     dataset.extent(0),
                                                     raft::resource::get_cuda_stream(res),
                                                     raft::sqrt_op{});
+  if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) {
+    constexpr float kDiv = static_cast<float>(
+      cuvs::spatial::knn::detail::utils::config<T>::kDivisor);
+    raft::linalg::unaryOp(norms.data_handle(),
+                          norms.data_handle(),
+                          norms.extent(0),
+                          raft::mul_const_op<float>{1.0f / kDiv},
+                          raft::resource::get_cuda_stream(res));
+  }
 }
 
 template <typename T>
@@ -69,6 +79,15 @@ void compute_dataset_norms(raft::resources const& res,
                                                     dataset.extent(0),
                                                     raft::resource::get_cuda_stream(res),
                                                     raft::sqrt_op{});
+  if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) {
+    constexpr float kDiv = static_cast<float>(
+      cuvs::spatial::knn::detail::utils::config<T>::kDivisor);
+    raft::linalg::unaryOp(norms.data_handle(),
+                          norms.data_handle(),
+                          norms.extent(0),
+                          raft::mul_const_op<float>{1.0f / kDiv},
+                          raft::resource::get_cuda_stream(res));
+  }
 }
 
 template void compute_dataset_norms<float>(
