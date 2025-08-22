@@ -18,7 +18,6 @@ package com.nvidia.cuvs.internal;
 import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.CuVSMatrix;
-import com.nvidia.cuvs.CuVSMatrix.DataType;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 
@@ -48,11 +47,6 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
 
   public MemorySegment memorySegment() {
     return memorySegment;
-  }
-
-  @Override
-  public DataType dataType() {
-    return dataType;
   }
 
   protected int bits() {
