@@ -22,12 +22,12 @@
 #include "detail/cagra/cagra_search.cuh"
 #include "detail/cagra/graph_core.cuh"
 
+#include "detail/ann_utils.cuh"
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
 #include <raft/core/mdspan.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/norm.cuh>
-#include "detail/ann_utils.cuh"
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
@@ -55,8 +55,8 @@ void compute_dataset_norms(raft::resources const& res,
                                                     raft::resource::get_cuda_stream(res),
                                                     raft::sqrt_op{});
   if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) {
-    constexpr float kDiv = static_cast<float>(
-      cuvs::spatial::knn::detail::utils::config<T>::kDivisor);
+    constexpr float kDiv =
+      static_cast<float>(cuvs::spatial::knn::detail::utils::config<T>::kDivisor);
     raft::linalg::unaryOp(norms.data_handle(),
                           norms.data_handle(),
                           norms.extent(0),
@@ -80,8 +80,8 @@ void compute_dataset_norms(raft::resources const& res,
                                                     raft::resource::get_cuda_stream(res),
                                                     raft::sqrt_op{});
   if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) {
-    constexpr float kDiv = static_cast<float>(
-      cuvs::spatial::knn::detail::utils::config<T>::kDivisor);
+    constexpr float kDiv =
+      static_cast<float>(cuvs::spatial::knn::detail::utils::config<T>::kDivisor);
     raft::linalg::unaryOp(norms.data_handle(),
                           norms.data_handle(),
                           norms.extent(0),

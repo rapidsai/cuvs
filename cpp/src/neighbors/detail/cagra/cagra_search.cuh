@@ -205,8 +205,8 @@ void search_main(raft::resources const& res,
 
     // Adjust query norms for 8-bit types to match runtime scaling used in distance kernels
     if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) {
-      constexpr float kDiv = static_cast<float>(
-        cuvs::spatial::knn::detail::utils::config<T>::kDivisor);
+      constexpr float kDiv =
+        static_cast<float>(cuvs::spatial::knn::detail::utils::config<T>::kDivisor);
       raft::linalg::unaryOp(query_norms.data_handle(),
                             query_norms.data_handle(),
                             query_norms.extent(0),
