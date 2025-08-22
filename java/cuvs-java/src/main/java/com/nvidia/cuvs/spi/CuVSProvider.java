@@ -15,7 +15,6 @@
  */
 package com.nvidia.cuvs.spi;
 
-import com.nvidia.cuvs.BinaryQuantizer;
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.CagraIndex;
 import com.nvidia.cuvs.CagraMergeParams;
@@ -120,32 +119,6 @@ public interface CuVSProvider {
     // Default implementation falls back to the method without parameters
     return mergeCagraIndexes(indexes);
   }
-
-  /** Creates a new Scalar8BitQuantizer implementation. */
-  Object createScalar8BitQuantizerImpl(CuVSResources resources, CuVSMatrix trainingDataset)
-      throws Throwable;
-
-  /** Performs inverse transform using a Scalar8BitQuantizer. */
-  CuVSMatrix inverseTransformScalar8Bit(Object impl, CuVSMatrix quantizedData) throws Throwable;
-
-  /** Transforms dataset using Scalar8BitQuantizer */
-  CuVSMatrix transformScalar8Bit(Object impl, CuVSMatrix input) throws Throwable;
-
-  /** Closes Scalar8BitQuantizer implementation */
-  void closeScalar8BitQuantizer(Object impl) throws Throwable;
-
-  /** Creates a new BinaryQuantizer implementation. */
-  Object createBinaryQuantizerImpl(
-      CuVSResources resources,
-      CuVSMatrix trainingDataset,
-      BinaryQuantizer.ThresholdType thresholdType)
-      throws Throwable;
-
-  /** Performs transform using a BinaryQuantizer. */
-  CuVSMatrix transformBinaryWithImpl(Object impl, CuVSMatrix input) throws Throwable;
-
-  /** Closes BinaryQuantizer implementation. */
-  void closeBinaryQuantizer(Object impl) throws Throwable;
 
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {

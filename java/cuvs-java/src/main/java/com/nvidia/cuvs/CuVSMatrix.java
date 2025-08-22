@@ -69,17 +69,6 @@ public interface CuVSMatrix extends AutoCloseable {
     return CuVSProvider.provider().newMatrixFromArray(vectors);
   }
 
-  /**
-   * Returns the data type of this matrix.
-   *
-   * <p>DataType provides the fundamental type information needed for all operations.
-   * FLOAT represents 32-bit floating point data, INT represents 32-bit integer data,
-   * and BYTE represents 8-bit data (used for quantized values).
-   *
-   * @return The DataType of this matrix
-   */
-  DataType dataType();
-
   interface Builder {
     /**
      * Add a single vector to the dataset.
@@ -162,13 +151,6 @@ public interface CuVSMatrix extends AutoCloseable {
    *              and each element must be of length {@link CuVSMatrix#columns()} or bigger.
    */
   void toArray(byte[][] array);
-
-  /**
-   * Gets where the content is stored
-   *
-   * @return MemoryKind whether HOST or DEVICE
-   */
-  CuVSMatrix.MemoryKind memoryKind();
 
   @Override
   void close();
