@@ -61,7 +61,7 @@ For CUDA 12 packages:
 
 .. code-block:: bash
 
-    pip install cuvs-cu12 --extra-index-url=https://pypi.nvidia.com
+    pip install cuvs-cu13 --extra-index-url=https://pypi.nvidia.com
 
 Note: these packages statically link the C and C++ libraries so the `libcuvs` and `libcuvs_c` shared libraries won't be readily available to use in your code.
 
