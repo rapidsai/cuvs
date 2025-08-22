@@ -188,4 +188,45 @@ final class JDKProvider implements CuVSProvider {
     Util.copy(dataset.memorySegment(), vectors);
     return dataset;
   }
+
+  @Override
+  public Object createScalar8BitQuantizerImpl(CuVSResources resources, CuVSMatrix trainingDataset)
+      throws Throwable {
+    return Scalar8BitQuantizerImpl.create(resources, trainingDataset);
+  }
+
+  @Override
+  public CuVSMatrix transformScalar8Bit(Object impl, CuVSMatrix input) throws Throwable {
+    return ((Scalar8BitQuantizerImpl) impl).transform(input);
+  }
+
+  @Override
+  public CuVSMatrix inverseTransformScalar8Bit(Object impl, CuVSMatrix quantizedData)
+      throws Throwable {
+    return ((Scalar8BitQuantizerImpl) impl).inverseTransform(quantizedData);
+  }
+
+  @Override
+  public Object createBinaryQuantizerImpl(
+      CuVSResources resources,
+      CuVSMatrix trainingDataset,
+      BinaryQuantizer.ThresholdType thresholdType)
+      throws Throwable {
+    return BinaryQuantizerImpl.create(resources, trainingDataset, thresholdType);
+  }
+
+  @Override
+  public CuVSMatrix transformBinaryWithImpl(Object impl, CuVSMatrix input) throws Throwable {
+    return BinaryQuantizerImpl.transformWithImpl(impl, input);
+  }
+
+  @Override
+  public void closeBinaryQuantizer(Object impl) throws Throwable {
+    BinaryQuantizerImpl.close(impl);
+  }
+
+  @Override
+  public void closeScalar8BitQuantizer(Object impl) throws Throwable {
+    ((Scalar8BitQuantizerImpl) impl).close();
+  }
 }
