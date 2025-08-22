@@ -43,14 +43,14 @@ C/C++ Package
 
 .. code-block:: bash
 
-   conda install -c rapidsai -c conda-forge libcuvs cuda-version=12.9
+   conda install -c rapidsai -c conda-forge libcuvs cuda-version=13.0
 
 Python Package
 ~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-   conda install -c rapidsai -c conda-forge cuvs cuda-version=12.9
+   conda install -c rapidsai -c conda-forge cuvs cuda-version=13.0
 
 Python through Pip
 ^^^^^^^^^^^^^^^^^^
@@ -86,7 +86,7 @@ Conda environment scripts are provided for installing the necessary dependencies
 
 .. code-block:: bash
 
-    conda env create --name cuvs -f conda/environments/all_cuda-128_arch-x86_64.yaml
+    conda env create --name cuvs -f conda/environments/all_cuda-130_arch-x86_64.yaml
     conda activate cuvs
 
 The recommended way to build and install cuVS from source is to use the `build.sh` script in the root of the repository. This script can build both the C++ and Python artifacts and provides CMake options for building and installing the headers, tests, benchmarks, and the pre-compiled shared library.
