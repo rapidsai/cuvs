@@ -196,23 +196,13 @@ void search_main(raft::resources const& res,
     auto stream      = raft::resource::get_cuda_stream(res);
     auto query_norms = raft::make_device_vector<DistanceT, int64_t>(res, queries.extent(0));
 
-    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(query_norms.data_handle(),
-                                                      queries.data_handle(),
-                                                      queries.extent(1),
-                                                      queries.extent(0),
-                                                      stream,
-                                                      raft::sqrt_op{});
-
-    // Adjust query norms for 8-bit types to match runtime scaling used in distance kernels
-    if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) {
-      constexpr float kDiv =
-        static_cast<float>(cuvs::spatial::knn::detail::utils::config<T>::kDivisor);
-      raft::linalg::unaryOp(query_norms.data_handle(),
-                            query_norms.data_handle(),
-                            query_norms.extent(0),
-                            raft::mul_const_op<float>{1.0f / kDiv},
-                            stream);
-    }
+    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+      query_norms.data_handle(),
+      queries.data_handle(),
+      queries.extent(1),
+      queries.extent(0),
+      stream,
+      raft::compose_op(raft::div_const_op<DistanceT>{DistanceT(kScale)}, raft::sqrt_op{}));
 
     const auto n_queries = distances.extent(0);
     const auto k         = distances.extent(1);

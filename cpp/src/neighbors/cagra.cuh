@@ -47,22 +47,16 @@ void compute_dataset_norms(raft::resources const& res,
 {
   RAFT_EXPECTS(dataset.extent(0) == norms.extent(0),
                "Dataset rows and norms vector size must match");
+  constexpr float kScale = cuvs::spatial::knn::detail::utils::config<T>::kDivisor /
+                           cuvs::spatial::knn::detail::utils::config<float>::kDivisor;
 
-  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(norms.data_handle(),
-                                                    dataset.data_handle(),
-                                                    dataset.extent(1),
-                                                    dataset.extent(0),
-                                                    raft::resource::get_cuda_stream(res),
-                                                    raft::sqrt_op{});
-  if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) {
-    constexpr float kDiv =
-      static_cast<float>(cuvs::spatial::knn::detail::utils::config<T>::kDivisor);
-    raft::linalg::unaryOp(norms.data_handle(),
-                          norms.data_handle(),
-                          norms.extent(0),
-                          raft::mul_const_op<float>{1.0f / kDiv},
-                          raft::resource::get_cuda_stream(res));
-  }
+  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+    norms.data_handle(),
+    dataset.data_handle(),
+    dataset.extent(1),
+    dataset.extent(0),
+    raft::resource::get_cuda_stream(res),
+    raft::compose_op(raft::div_const_op<float>{kScale}, raft::sqrt_op{}));
 }
 
 template <typename T>
@@ -72,22 +66,16 @@ void compute_dataset_norms(raft::resources const& res,
 {
   RAFT_EXPECTS(dataset.extent(0) == norms.extent(0),
                "Dataset rows and norms vector size must match");
+  constexpr float kScale = cuvs::spatial::knn::detail::utils::config<T>::kDivisor /
+                           cuvs::spatial::knn::detail::utils::config<float>::kDivisor;
 
-  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(norms.data_handle(),
-                                                    dataset.data_handle(),
-                                                    dataset.stride(0),
-                                                    dataset.extent(0),
-                                                    raft::resource::get_cuda_stream(res),
-                                                    raft::sqrt_op{});
-  if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) {
-    constexpr float kDiv =
-      static_cast<float>(cuvs::spatial::knn::detail::utils::config<T>::kDivisor);
-    raft::linalg::unaryOp(norms.data_handle(),
-                          norms.data_handle(),
-                          norms.extent(0),
-                          raft::mul_const_op<float>{1.0f / kDiv},
-                          raft::resource::get_cuda_stream(res));
-  }
+  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+    norms.data_handle(),
+    dataset.data_handle(),
+    dataset.stride(0),
+    dataset.extent(0),
+    raft::resource::get_cuda_stream(res),
+    raft::compose_op(raft::div_const_op<float>{kScale}, raft::sqrt_op{}));
 }
 
 template void compute_dataset_norms<float>(
