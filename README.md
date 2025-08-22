@@ -97,7 +97,7 @@ The cuVS Python package can also be `installed through pip <https://docs.rapids.
 
 ```bash
 # CUDA 13
-pip install cuvs-cu12 --extra-index-url=https://pypi.nvidia.com
+pip install cuvs-cu13 --extra-index-url=https://pypi.nvidia.com
 
 # CUDA 12
 pip install cuvs-cu12 --extra-index-url=https://pypi.nvidia.com
