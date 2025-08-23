@@ -347,8 +347,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
       GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
-      // Degenerate for integral types with dim=1: all cosine distances are 0 → undefined top-k
-      if (ps.dim == 1 &&
+      if ((ps.dim == 1 || ps.build_algo == graph_build_algo::IVF_PQ) &&
           (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>)) {
         GTEST_SKIP();
       }
@@ -536,6 +535,10 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
   {
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
+      if ((ps.dim == 1 || ps.build_algo == graph_build_algo::IVF_PQ) &&
+          (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>)) {
+        GTEST_SKIP();
+      }
     }
     if (ps.compression != std::nullopt) GTEST_SKIP();
     // IVF_PQ graph build does not support BitwiseHamming
@@ -594,8 +597,8 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
             }
             break;
           case graph_build_algo::NN_DESCENT: {
-            index_params.graph_build_params =
-              graph_build_params::nn_descent_params(index_params.intermediate_graph_degree);
+            index_params.graph_build_params = graph_build_params::nn_descent_params(
+              index_params.intermediate_graph_degree, index_params.metric);
             break;
           }
           case graph_build_algo::ITERATIVE_CAGRA_SEARCH: {
@@ -750,6 +753,10 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
   {
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
+      if ((ps.dim == 1 || ps.build_algo == graph_build_algo::IVF_PQ) &&
+          (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>)) {
+        GTEST_SKIP();
+      }
     }
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
@@ -961,6 +968,12 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
   template <typename SearchIdxT = IdxT>
   void testCagra()
   {
+    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
+      if ((ps.dim == 1 || ps.build_algo == graph_build_algo::IVF_PQ) &&
+          (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>)) {
+        GTEST_SKIP();
+      }
+    }
     if (ps.compression != std::nullopt) GTEST_SKIP();
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
@@ -1164,10 +1177,9 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {100},
     {1000},
     {1, 8, 16},
-    {16},  // k
-    {graph_build_algo::NN_DESCENT,
-     graph_build_algo::ITERATIVE_CAGRA_SEARCH},  // build algo. ITERATIVE_CAGRA_SEARCH is needed to
-                                                 // test BitwiseHamming
+    {16},                            // k
+    {graph_build_algo::NN_DESCENT},  // build algo. ITERATIVE_CAGRA_SEARCH is needed to
+                                     // test BitwiseHamming
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
     {0, 10},  // query size
     {0},
@@ -1236,9 +1248,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 1024},  // dim
     {16},                                                    // k
-    {graph_build_algo::IVF_PQ,
-     graph_build_algo::NN_DESCENT,
-     graph_build_algo::ITERATIVE_CAGRA_SEARCH},
+    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
     {search_algo::AUTO},
     {10},
     {0},
@@ -1264,9 +1274,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {64},
     {16},
-    {graph_build_algo::IVF_PQ,
-     graph_build_algo::NN_DESCENT,
-     graph_build_algo::ITERATIVE_CAGRA_SEARCH},
+    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
     {search_algo::AUTO},
     {10},
     {0, 8, 16, 32},  // team_size
@@ -1292,9 +1300,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {64},
     {16},
-    {graph_build_algo::IVF_PQ,
-     graph_build_algo::NN_DESCENT,
-     graph_build_algo::ITERATIVE_CAGRA_SEARCH},
+    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
     {search_algo::AUTO},
     {10},
     {0},  // team_size

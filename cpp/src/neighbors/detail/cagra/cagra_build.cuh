@@ -579,6 +579,12 @@ auto iterative_build_graph(
   memset(neighbors_ptr, 0, byte_size);
 
   auto curr_graph_size = initial_graph_size;
+
+  // Ensure dataset norms are available for cosine distance before search for iterative search
+  auto dataset_norms = raft::make_device_vector<float, int64_t>(res, (int64_t)dataset.extent(0));
+  if (params.metric == cuvs::distance::DistanceType::CosineExpanded) {
+    cuvs::neighbors::cagra::detail::compute_dataset_norms(res, dev_dataset, dataset_norms.view());
+  }
   while (true) {
     RAFT_LOG_DEBUG("# graph_size = %lu (%.3lf)",
                    (uint64_t)curr_graph_size,
@@ -606,18 +612,12 @@ auto iterative_build_graph(
 
     auto idx = index<T, IdxT>(
       res, params.metric, dev_dataset_view, raft::make_const_mdspan(cagra_graph.view()));
-
-    // Ensure dataset norms are available for cosine distance before search for iterative search
-    if (params.metric == cuvs::distance::DistanceType::CosineExpanded) {
-      auto dataset_view_for_norms = idx.dataset();
-      if (dataset_view_for_norms.extent(0) > 0) {
-        auto dataset_norms =
-          raft::make_device_vector<float, int64_t>(res, dataset_view_for_norms.extent(0));
-        cuvs::neighbors::cagra::detail::compute_dataset_norms(
-          res, dataset_view_for_norms, dataset_norms.view());
-        idx.set_dataset_norms(std::move(dataset_norms));
-      }
-    }
+    auto idx_norms = raft::make_device_vector<float, int64_t>(res, (int64_t)curr_graph_size);
+    raft::copy(idx_norms.data_handle(),
+               dataset_norms.data_handle(),
+               (int64_t)curr_graph_size,
+               raft::resource::get_cuda_stream(res));
+    idx.set_dataset_norms(std::move(idx_norms));
 
     auto dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
       dev_dataset.data_handle(), (int64_t)curr_query_size, dev_dataset.extent(1));
@@ -813,9 +813,7 @@ index<T, IdxT> build(
 
       // Compute dataset norms for cosine distance (iterative search already computes norms in the
       // graph build)
-      if (params.metric == cuvs::distance::DistanceType::CosineExpanded &&
-          !std::holds_alternative<cagra::graph_build_params::iterative_search_params>(
-            knn_build_params)) {
+      if (params.metric == cuvs::distance::DistanceType::CosineExpanded) {
         auto dataset_view = idx.dataset();
         if (dataset_view.extent(0) > 0) {
           auto dataset_norms =
