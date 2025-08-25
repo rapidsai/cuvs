@@ -102,6 +102,7 @@ jobs:
       date: ${{ inputs.date }}
       container_image: "rapidsai/ci-conda:25.10-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
       script: "ci/build_java.sh"
+      artifact-name: "cuvs-java-cuda${{ matrix.cuda_version }}"
       file_to_upload: "java/cuvs-java/target/"
       sha: ${{ inputs.sha }}
   python-build:

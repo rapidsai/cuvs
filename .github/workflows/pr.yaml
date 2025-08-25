@@ -167,6 +167,7 @@ jobs:
       arch: "amd64"
       container_image: "rapidsai/ci-conda:25.10-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
       script: "ci/test_java.sh"
+      artifact-name: "cuvs-java-cuda${{ matrix.cuda_version }}"
       file_to_upload: "java/cuvs-java/target/"
   docs-build:
     needs: conda-python-build
