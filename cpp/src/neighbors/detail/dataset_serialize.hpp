@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * Copyright (c) 2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -174,9 +174,7 @@ auto deserialize_dataset(raft::resources const& res, std::istream& is)
   -> std::unique_ptr<dataset<IdxT>>
 {
   switch (raft::deserialize_scalar<dataset_instance_tag>(res, is)) {
-    case kSerializeEmptyDataset: {
-      return deserialize_empty<IdxT>(res, is);
-    }
+    case kSerializeEmptyDataset: return deserialize_empty<IdxT>(res, is);
     case kSerializeStridedDataset:
       switch (raft::deserialize_scalar<cudaDataType_t>(res, is)) {
         case CUDA_R_32F: return deserialize_strided<float, IdxT>(res, is);
