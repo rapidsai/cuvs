@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ impl ManagedTensor {
                 res.get_cuda_stream()?,
             ))?;
 
-            let mut ret = self.0.clone();
+            let mut ret = self.0;
             ret.dl_tensor.data = device_data;
             ret.deleter = Some(rmm_free_tensor);
             ret.dl_tensor.device.device_type = ffi::DLDeviceType::kDLCUDA;
@@ -205,5 +205,9 @@ mod tests {
         // make sure we can get the shape ok
         assert_eq!(unsafe { *tensor.shape }, 8);
         assert_eq!(unsafe { *tensor.shape.add(1) }, 4);
+
+        let arr = ndarray::Array::<f32, _>::zeros((8,));
+        let tensor = unsafe { (*(ManagedTensor::from(&arr).as_ptr())).dl_tensor };
+        assert_eq!(tensor.ndim, 1);
     }
 }
