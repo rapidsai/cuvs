@@ -36,6 +36,10 @@ namespace cuvs::preprocessing::quantize::product {
  * @brief Product Quantizer parameters.
  */
 struct params {
+  /**
+   * The number of inverted lists (clusters).
+   */
+  uint32_t n_lists = 1;
   /*
    * The bit length of the vector element after compression by PQ.
    *
@@ -87,40 +91,6 @@ quantizer train(raft::resources const& res,
                 const params params,
                 raft::device_matrix_view<const float, int64_t> dataset);
 
-/** @copydoc train */
-/*quantizer train(raft::resources const& res,
-  const params params,
-  raft::device_matrix_view<const half, int64_t> dataset);*/
-
-quantizer train(
-  raft::resources const& res,
-  const params params,
-  const uint32_t dim,
-  raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
-  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
-  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix);
-
-/**
- * @brief Initializes a product quantizer to be used later for quantizing the dataset.
- *
- * Usage example:
- * @code{.cpp}
- * raft::handle_t handle;
- * cuvs::preprocessing::quantize::product::params params;
- * auto quantizer = cuvs::preprocessing::quantize::product::train(handle, params, dataset);
- * @endcode
- *
- * @param[in] res raft resource
- * @param[in] params configure product quantizer, e.g. quantile
- * @param[in] dataset a row-major matrix view on host
- *
- * @return quantizer
- */
-/*quantizer train(raft::resources const& res,
-                       const params params,
-                       raft::host_matrix_view<const float, int64_t> dataset);*/
-
 /**
  * @brief Applies quantization transform to given dataset
  *
@@ -146,18 +116,6 @@ void transform(raft::resources const& res,
                const quantizer& quantizer,
                raft::device_matrix_view<const float, int64_t> dataset,
                raft::device_matrix_view<uint8_t, int64_t> out);
-
-/** @copydoc transform */
-/*void transform(raft::resources const& res,
-               const quantizer& quantizer,
-               raft::device_matrix_view<const half, int64_t> dataset,
-               raft::device_matrix_view<uint8_t, int64_t> out);*/
-
-/** @copydoc transform */
-/*void transform(raft::resources const& res,
-               const quantizer& quantizer,
-               raft::host_matrix_view<const float, int64_t> dataset,
-               raft::host_matrix_view<uint8_t, int64_t> out);*/
 
 /** @} */  // end of group product
 

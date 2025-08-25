@@ -30,6 +30,7 @@ template <typename T>
 struct ProductQuantizationInputs {
   int n_samples;                                        // Number of samples in the dataset
   int n_features;                                       // Number of features in the dataset
+  uint32_t n_lists;                                     // Number of lists
   int pq_bits;                                          // PQ bits
   int pq_dim;                                           // PQ dimension
   cuvs::neighbors::ivf_pq::codebook_gen codebook_kind;  // Codebook generation method
@@ -42,68 +43,13 @@ template <typename T>
 std::ostream& operator<<(std::ostream& os, const ProductQuantizationInputs<T>& inputs)
 {
   return os << "n_samples:" << inputs.n_samples << " n_features:" << inputs.n_features
-            << " pq_bits:" << inputs.pq_bits << " pq_dim:" << inputs.pq_dim
+            << " n_lists:" << inputs.n_lists << " pq_bits:" << inputs.pq_bits
+            << " pq_dim:" << inputs.pq_dim
             << " codebook_kind:" << static_cast<int>(inputs.codebook_kind)
             << " force_random_rotation:" << inputs.force_random_rotation
             << " max_train_points_per_pq_code:" << inputs.max_train_points_per_pq_code
             << " seed:" << inputs.seed;
 }
-
-template <typename T>
-struct config {};
-
-template <>
-struct config<double> {
-  using value_t                    = double;
-  static constexpr double kDivisor = 1.0;
-};
-template <>
-struct config<float> {
-  using value_t                    = float;
-  static constexpr double kDivisor = 1.0;
-};
-template <>
-struct config<half> {
-  using value_t                    = half;
-  static constexpr double kDivisor = 1.0;
-};
-template <>
-struct config<uint8_t> {
-  using value_t                    = uint32_t;
-  static constexpr double kDivisor = 256.0;
-};
-template <>
-struct config<int8_t> {
-  using value_t                    = int32_t;
-  static constexpr double kDivisor = 128.0;
-};
-
-template <typename T>
-struct mapping {
-  /**
-   * @defgroup
-   * @brief Cast and possibly scale a value of the source type `S` to the target type `T`.
-   *
-   * @tparam S source type
-   * @param x source value
-   * @{
-   */
-  template <typename S>
-  HDI constexpr auto operator()(const S& x) const -> std::enable_if_t<std::is_same_v<S, T>, T>
-  {
-    return x;
-  };
-
-  template <typename S>
-  HDI constexpr auto operator()(const S& x) const -> std::enable_if_t<!std::is_same_v<S, T>, T>
-  {
-    constexpr double kMult = config<T>::kDivisor / config<S>::kDivisor;
-    if constexpr (std::is_floating_point_v<S>) { return static_cast<T>(x * static_cast<S>(kMult)); }
-    if constexpr (std::is_floating_point_v<T>) { return static_cast<T>(x) * static_cast<T>(kMult); }
-    return static_cast<T>(static_cast<float>(x) * static_cast<float>(kMult));
-  };
-  /** @} */
-};
 
 template <typename T>
 void compare_vectors_l2(const raft::resources& res,
@@ -120,10 +66,9 @@ void compare_vectors_l2(const raft::resources& res,
   auto dist =
     raft::make_device_mdarray<double>(res, &managed_memory, raft::make_extents<uint32_t>(n_rows));
   raft::linalg::map_offset(res, dist.view(), [a, b, dim] __device__(uint32_t i) {
-    mapping<float> f{};
     double d = 0.0f;
     for (uint32_t j = 0; j < dim; j++) {
-      double t = f(a(i, j)) - f(b(i, j));
+      double t = static_cast<float>(a(i, j)) - static_cast<float>(b(i, j));
       d += t * t;
     }
     return sqrt(d / double(dim));
@@ -220,6 +165,13 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
 
   void testProductQuantizationFromDataset()
   {
+    config_ = {params_.n_lists,
+               params_.pq_bits,
+               params_.pq_dim,
+               params_.codebook_kind,
+               params_.force_random_rotation,
+               false,
+               params_.max_train_points_per_pq_code};
     auto pq = train(handle, config_, dataset_.view());
     auto d_quantized_output =
       raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, pq_dim_);
@@ -278,23 +230,26 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
 template <typename T>
 const std::vector<ProductQuantizationInputs<T>> inputs = {
   // Small dataset
-  {100, 30, 4, 4, cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE, false, 10, 42ULL},
+  {100, 30, 1, 4, 4, cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE, false, 256, 42ULL},
 
   // Small dataset with bigger dims
-  {100, 90, 6, 8, cuvs::neighbors::ivf_pq::codebook_gen::PER_CLUSTER, true, 10, 42ULL},
+  {100, 90, 1, 6, 8, cuvs::neighbors::ivf_pq::codebook_gen::PER_CLUSTER, true, 10, 42ULL},
 
   // Medium dataset
-  {500, 40, 5, 8, cuvs::neighbors::ivf_pq::codebook_gen::PER_CLUSTER, false, 10, 42ULL},
-  {500, 60, 7, 8, cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE, false, 10, 42ULL},
+  {500, 40, 8, 5, 8, cuvs::neighbors::ivf_pq::codebook_gen::PER_CLUSTER, false, 256, 42ULL},
+  {500, 60, 8, 7, 8, cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE, false, 10, 42ULL},
 
   // Larger dataset
-  {1000, 40, 4, 4, cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE, true, 20, 42ULL},
-  {3000, 1024, 4, 20, cuvs::neighbors::ivf_pq::codebook_gen::PER_CLUSTER, false, 10, 42ULL},
-  {1000, 2048, 4, 20, cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE, false, 10, 42ULL},
+  {1000, 40, 80, 4, 4, cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE, true, 20, 42ULL},
+  {3000, 1024, 40, 4, 20, cuvs::neighbors::ivf_pq::codebook_gen::PER_CLUSTER, false, 10, 42ULL},
+  {1000, 2048, 1, 4, 20, cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE, false, 10, 42ULL},
 
   // Benchmark datasets
-  //{500000, 2048, 8, 20, cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE, false, 1000, 42ULL},
-  //{500000, 2048, 8, 20, cuvs::neighbors::ivf_pq::codebook_gen::PER_CLUSTER, false, 1000, 42ULL}
+  // {10000, 1024, 1, 4, 20, cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE, false, 10, 42ULL},
+  // {1000000, 1024, 1024, 8, 20, cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE, false, 1000,
+  // 42ULL},
+  // {500000, 2048, 512, 8, 20, cuvs::neighbors::ivf_pq::codebook_gen::PER_CLUSTER, false, 1000,
+  // 42ULL}
 };
 
 typedef ProductQuantizationTest<float> ProductQuantizationTestF;
