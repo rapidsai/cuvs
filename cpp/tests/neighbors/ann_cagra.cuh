@@ -335,15 +335,6 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
   template <typename SearchIdxT = IdxT>
   void testCagra()
   {
-    // Skip tests unless metric is CosineExpanded AND build_algo is ITERATIVE_CAGRA_SEARCH
-    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded &&
-        ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH) {
-      GTEST_SKIP();
-    }
-
-    // Skip if metric is CosineExpanded and dimension is 1 (all vectors have same distance)
-    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded && ps.dim == 1) { GTEST_SKIP(); }
-
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ)))
@@ -358,6 +349,9 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
       if ((ps.build_algo == graph_build_algo::IVF_PQ) &&
           (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>)) {
+        GTEST_SKIP();
+      }
+      if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
         GTEST_SKIP();
       }
     }
@@ -542,17 +536,13 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
  protected:
   void testCagra()
   {
-    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded &&
-        ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH) {
-      GTEST_SKIP();
-    }
-    // Skip if metric is CosineExpanded and dimension is 1 (all vectors have same distance)
-    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded && ps.dim == 1) { GTEST_SKIP(); }
-
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
       if ((ps.build_algo == graph_build_algo::IVF_PQ) &&
           (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>)) {
+        GTEST_SKIP();
+      }
+      if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
         GTEST_SKIP();
       }
     }
@@ -767,18 +757,13 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
  protected:
   void testCagra()
   {
-    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded &&
-        ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH) {
-      GTEST_SKIP();
-    }
-
-    // Skip if metric is CosineExpanded and dimension is 1 (all vectors have same distance)
-    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded && ps.dim == 1) { GTEST_SKIP(); }
-
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
       if ((ps.build_algo == graph_build_algo::IVF_PQ) &&
           (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>)) {
+        GTEST_SKIP();
+      }
+      if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
         GTEST_SKIP();
       }
     }
@@ -992,16 +977,12 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
   template <typename SearchIdxT = IdxT>
   void testCagra()
   {
-    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded &&
-        ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH) {
-      GTEST_SKIP();
-    }
-    // Skip if metric is CosineExpanded and dimension is 1 (all vectors have same distance)
-    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded && ps.dim == 1) { GTEST_SKIP(); }
-
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if ((ps.build_algo == graph_build_algo::IVF_PQ) &&
           (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>)) {
+        GTEST_SKIP();
+      }
+      if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
         GTEST_SKIP();
       }
     }
