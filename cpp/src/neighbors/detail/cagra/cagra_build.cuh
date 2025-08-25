@@ -580,11 +580,6 @@ auto iterative_build_graph(
 
   auto curr_graph_size = initial_graph_size;
 
-  // Ensure dataset norms are available for cosine distance before search for iterative search
-  auto dataset_norms = raft::make_device_vector<float, int64_t>(res, (int64_t)dataset.extent(0));
-  if (params.metric == cuvs::distance::DistanceType::CosineExpanded) {
-    cuvs::neighbors::cagra::detail::compute_dataset_norms(res, dev_dataset, dataset_norms.view());
-  }
   while (true) {
     RAFT_LOG_DEBUG("# graph_size = %lu (%.3lf)",
                    (uint64_t)curr_graph_size,
@@ -612,12 +607,6 @@ auto iterative_build_graph(
 
     auto idx = index<T, IdxT>(
       res, params.metric, dev_dataset_view, raft::make_const_mdspan(cagra_graph.view()));
-    auto idx_norms = raft::make_device_vector<float, int64_t>(res, (int64_t)curr_graph_size);
-    raft::copy(idx_norms.data_handle(),
-               dataset_norms.data_handle(),
-               (int64_t)curr_graph_size,
-               raft::resource::get_cuda_stream(res));
-    idx.set_dataset_norms(std::move(idx_norms));
 
     auto dev_query_view = raft::make_device_matrix_view<const T, int64_t>(
       dev_dataset.data_handle(), (int64_t)curr_query_size, dev_dataset.extent(1));
@@ -724,6 +713,11 @@ index<T, IdxT> build(
       std::holds_alternative<cagra::graph_build_params::nn_descent_params>(knn_build_params),
     "IVF_PQ for CAGRA graph build does not support BitwiseHamming as a metric. Please "
     "use nn-descent or the iterative CAGRA search build.");
+  RAFT_EXPECTS(
+    params.metric != cuvs::distance::DistanceType::CosineExpanded ||
+      std::holds_alternative<cagra::graph_build_params::ivf_pq_params>(knn_build_params) ||
+      std::holds_alternative<cagra::graph_build_params::nn_descent_params>(knn_build_params),
+    "CosineExpanded distance is not supported for iterative CAGRA graph build.");
 
   // Validate data type for BitwiseHamming metric
   RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::BitwiseHamming ||
