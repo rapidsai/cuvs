@@ -393,7 +393,7 @@ extern "C" cuvsError_t cuvsIvfPqExtend(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index, uint32_t* n_lists)
+extern "C" cuvsError_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index, int64_t* n_lists)
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
@@ -401,7 +401,7 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index, uint32_t*
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index, uint32_t* dim)
+extern "C" cuvsError_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index, int64_t* dim)
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
@@ -443,7 +443,7 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetCentersRot(cuvsIvfPqIndex_t index,
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index, uint32_t* pq_dim)
+extern "C" cuvsError_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index, int64_t* pq_dim)
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
@@ -451,7 +451,7 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index, uint32_t* 
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index, uint32_t* pq_len)
+extern "C" cuvsError_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index, int64_t* pq_len)
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
@@ -459,7 +459,7 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index, uint32_t* 
   });
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetPqBookSize(cuvsIvfPqIndex_t index, uint32_t* pq_book_size)
+extern "C" cuvsError_t cuvsIvfPqIndexGetPqBookSize(cuvsIvfPqIndex_t index, int64_t* pq_book_size)
 {
   return cuvs::core::translate_exceptions([=] {
     auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);

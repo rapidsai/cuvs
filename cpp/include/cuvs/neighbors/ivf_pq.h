@@ -262,19 +262,19 @@ cuvsError_t cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index);
 cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index);
 
 /** Get the number of clusters/inverted lists */
-cuvsError_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index, uint32_t* n_lists);
+cuvsError_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index, int64_t* n_lists);
 
 /** Get the dimensionality */
-cuvsError_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index, uint32_t* dim);
+cuvsError_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index, int64_t* dim);
 
 /** Get the pq_dim */
-cuvsError_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index, uint32_t* pq_dim);
+cuvsError_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index, int64_t* pq_dim);
 
 /** Get the pq_len */
-cuvsError_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index, uint32_t* pq_len);
+cuvsError_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index, int64_t* pq_len);
 
 /** Get the pq_book_size */
-cuvsError_t cuvsIvfPqIndexGetPqBookSize(cuvsIvfPqIndex_t index, uint32_t* pq_book_size);
+cuvsError_t cuvsIvfPqIndexGetPqBookSize(cuvsIvfPqIndex_t index, int64_t* pq_book_size);
 
 /**
  * @brief Get the cluster centers corresponding to the lists in the original space
