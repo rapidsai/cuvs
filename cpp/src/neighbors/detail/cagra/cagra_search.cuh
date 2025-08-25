@@ -196,13 +196,19 @@ void search_main(raft::resources const& res,
     auto stream      = raft::resource::get_cuda_stream(res);
     auto query_norms = raft::make_device_vector<DistanceT, int64_t>(res, queries.extent(0));
 
-    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-      query_norms.data_handle(),
-      queries.data_handle(),
-      queries.extent(1),
-      queries.extent(0),
-      stream,
-      raft::compose_op(raft::div_const_op<DistanceT>{DistanceT(kScale)}, raft::sqrt_op{}));
+    // first scale the queries and then compute norms
+    auto scaled_sq_op = raft::compose_op(
+      raft::sq_op{}, raft::div_const_op<DistanceT>{DistanceT(kScale)}, raft::cast_op<DistanceT>());
+    raft::linalg::reduce<true, true, T, DistanceT, int64_t>(query_norms.data_handle(),
+                                                            queries.data_handle(),
+                                                            queries.extent(1),
+                                                            queries.extent(0),
+                                                            (DistanceT)0,
+                                                            stream,
+                                                            false,
+                                                            scaled_sq_op,
+                                                            raft::add_op(),
+                                                            raft::sqrt_op{});
 
     const auto n_queries = distances.extent(0);
     const auto k         = distances.extent(1);
@@ -214,18 +220,16 @@ void search_main(raft::resources const& res,
       raft::make_const_mdspan(query_norms.view()),
       distances,
       raft::compose_op(raft::add_const_op<DistanceT>{DistanceT(1)}, raft::div_op{}));
+  } else {
+    cuvs::neighbors::ivf::detail::postprocess_distances(dist_out,
+                                                        dist_in,
+                                                        index.metric(),
+                                                        distances.extent(0),
+                                                        distances.extent(1),
+                                                        kScale,
+                                                        true,
+                                                        raft::resource::get_cuda_stream(res));
   }
-  const float scale_for_post =
-    (index.metric() == cuvs::distance::DistanceType::CosineExpanded) ? 1.0f : kScale;
-  cuvs::neighbors::ivf::detail::postprocess_distances(
-    dist_out,
-    dist_in,
-    index.metric(),
-    distances.extent(0),
-    distances.extent(1),
-    scale_for_post,
-    index.metric() != distance::DistanceType::CosineExpanded,
-    raft::resource::get_cuda_stream(res));
 }
 /** @} */  // end group cagra
 

@@ -50,13 +50,19 @@ void compute_dataset_norms(raft::resources const& res,
   constexpr float kScale = cuvs::spatial::knn::detail::utils::config<T>::kDivisor /
                            cuvs::spatial::knn::detail::utils::config<float>::kDivisor;
 
-  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-    norms.data_handle(),
-    dataset.data_handle(),
-    dataset.extent(1),
-    dataset.extent(0),
-    raft::resource::get_cuda_stream(res),
-    raft::compose_op(raft::div_const_op<float>{kScale}, raft::sqrt_op{}));
+  // first scale the dataset and then compute norms
+  auto scaled_sq_op = raft::compose_op(
+    raft::sq_op{}, raft::div_const_op<float>{float(kScale)}, raft::cast_op<float>());
+  raft::linalg::reduce<true, true, T, float, int64_t>(norms.data_handle(),
+                                                      dataset.data_handle(),
+                                                      dataset.extent(1),
+                                                      dataset.extent(0),
+                                                      (float)0,
+                                                      raft::resource::get_cuda_stream(res),
+                                                      false,
+                                                      scaled_sq_op,
+                                                      raft::add_op(),
+                                                      raft::sqrt_op{});
 }
 
 template <typename T>
@@ -68,14 +74,19 @@ void compute_dataset_norms(raft::resources const& res,
                "Dataset rows and norms vector size must match");
   constexpr float kScale = cuvs::spatial::knn::detail::utils::config<T>::kDivisor /
                            cuvs::spatial::knn::detail::utils::config<float>::kDivisor;
-
-  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-    norms.data_handle(),
-    dataset.data_handle(),
-    dataset.stride(0),
-    dataset.extent(0),
-    raft::resource::get_cuda_stream(res),
-    raft::compose_op(raft::div_const_op<float>{kScale}, raft::sqrt_op{}));
+  // first scale the dataset and then compute norms
+  auto scaled_sq_op = raft::compose_op(
+    raft::sq_op{}, raft::div_const_op<float>{float(kScale)}, raft::cast_op<float>());
+  raft::linalg::reduce<true, true, T, float, int64_t>(norms.data_handle(),
+                                                      dataset.data_handle(),
+                                                      dataset.stride(0),
+                                                      dataset.extent(0),
+                                                      (float)0,
+                                                      raft::resource::get_cuda_stream(res),
+                                                      false,
+                                                      scaled_sq_op,
+                                                      raft::add_op(),
+                                                      raft::sqrt_op{});
 }
 
 template void compute_dataset_norms<float>(
