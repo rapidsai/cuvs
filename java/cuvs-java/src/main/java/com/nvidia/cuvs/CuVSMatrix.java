@@ -70,39 +70,32 @@ public interface CuVSMatrix extends AutoCloseable {
   }
 
   /**
-   * Returns the data type of this matrix.
-   *
-   * <p>DataType provides the fundamental type information needed for all operations.
-   * FLOAT represents 32-bit floating point data, INT represents 32-bit integer data,
-   * and BYTE represents 8-bit data (used for quantized values).
-   *
-   * @return The DataType of this matrix
+   * A builder to construct a new matrix one row at a time
+   * @param <T> the CuVSMatrix type to build
    */
-  DataType dataType();
-
-  interface Builder {
+  interface Builder<T extends CuVSMatrix> {
     /**
-     * Add a single vector to the dataset.
+     * Adds a single vector to the matrix.
      *
      * @param vector A float array of as many elements as the dimensions
      */
     void addVector(float[] vector);
 
     /**
-     * Add a single vector to the dataset.
+     * Adds a single vector to the matrix.
      *
      * @param vector A byte array of as many elements as the dimensions
      */
     void addVector(byte[] vector);
 
     /**
-     * Add a single vector to the dataset.
+     * Adds a single vector to the matrix.
      *
-     * @param vector A int array of as many elements as the dimensions
+     * @param vector An int array of as many elements as the dimensions
      */
     void addVector(int[] vector);
 
-    CuVSMatrix build();
+    T build();
   }
 
   /**
@@ -111,10 +104,24 @@ public interface CuVSMatrix extends AutoCloseable {
    * @param size     Number of vectors in the dataset
    * @param columns  Size of each vector in the dataset
    * @param dataType The data type of the dataset elements
-   * @return new instance of {@link CuVSMatrix}
+   * @return a builder for creating a {@link CuVSHostMatrix}
    */
-  static CuVSMatrix.Builder builder(int size, int columns, DataType dataType) {
-    return CuVSProvider.provider().newMatrixBuilder(size, columns, dataType);
+  static Builder<CuVSHostMatrix> hostBuilder(long size, long columns, DataType dataType) {
+    return CuVSProvider.provider().newHostMatrixBuilder(size, columns, dataType);
+  }
+
+  /**
+   * Returns a builder to create a new instance of a dataset
+   *
+   * @param resources CuVS resources used to allocate the device memory needed
+   * @param size      Number of vectors in the dataset
+   * @param columns   Size of each vector in the dataset
+   * @param dataType  The data type of the dataset elements
+   * @return a builder for creating a {@link CuVSDeviceMatrix}
+   */
+  static Builder<CuVSDeviceMatrix> deviceBuilder(
+      CuVSResources resources, long size, long columns, DataType dataType) {
+    return CuVSProvider.provider().newDeviceMatrixBuilder(resources, size, columns, dataType);
   }
 
   /**
@@ -131,6 +138,13 @@ public interface CuVSMatrix extends AutoCloseable {
    * @return Dimensions of the vectors in the dataset
    */
   long columns();
+
+  /**
+   * Gets the element type
+   *
+   * @return a {@link DataType} describing the matrix element type
+   */
+  DataType dataType();
 
   /**
    * Get a view (0-copy) of the row data, as a list of integers (32 bit)
@@ -162,13 +176,6 @@ public interface CuVSMatrix extends AutoCloseable {
    *              and each element must be of length {@link CuVSMatrix#columns()} or bigger.
    */
   void toArray(byte[][] array);
-
-  /**
-   * Gets where the content is stored
-   *
-   * @return MemoryKind whether HOST or DEVICE
-   */
-  CuVSMatrix.MemoryKind memoryKind();
 
   @Override
   void close();
