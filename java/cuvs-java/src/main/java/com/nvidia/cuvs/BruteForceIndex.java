@@ -28,13 +28,14 @@ import java.util.Objects;
  *
  * @since 25.02
  */
-public interface BruteForceIndex {
+public interface BruteForceIndex extends AutoCloseable {
 
   /**
    * Invokes the native destroy_brute_force_index function to de-allocate
    * BRUTEFORCE index
    */
-  void destroyIndex() throws Throwable;
+  @Override
+  void close() throws Exception;
 
   /**
    * Invokes the native search_brute_force_index via the Panama API for searching

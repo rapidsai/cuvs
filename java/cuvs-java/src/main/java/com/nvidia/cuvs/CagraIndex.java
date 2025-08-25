@@ -33,12 +33,13 @@ import java.util.Objects;
  *
  * @since 25.02
  */
-public interface CagraIndex {
+public interface CagraIndex extends AutoCloseable {
 
   /**
    * Invokes the native destroy_cagra_index to de-allocate the CAGRA index
    */
-  void destroyIndex() throws Throwable;
+  @Override
+  void close() throws Exception;
 
   /**
    * Invokes the native search_cagra_index via the Panama API for searching a
@@ -52,10 +53,10 @@ public interface CagraIndex {
 
   /** Returns the CAGRA graph
    *
-   * @return a {@link CuVSMatrix} encapsulating the native int (uint32_t) array used to represent
+   * @return a {@link CuVSDeviceMatrix} encapsulating the native int (uint32_t) array used to represent
    * the cagra graph
    */
-  CuVSMatrix getGraph();
+  CuVSDeviceMatrix getGraph();
 
   /**
    * A method to persist a CAGRA index using an instance of {@link OutputStream}

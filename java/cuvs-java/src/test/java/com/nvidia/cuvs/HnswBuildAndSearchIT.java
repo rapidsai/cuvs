@@ -97,10 +97,10 @@ public class HnswBuildAndSearchIT extends CuVSTestCase {
         checkResults(expectedResults, results.getResults());
 
         // Cleanup
-        hnswIndex.destroyIndex();
+        hnswIndex.close();
       }
     } finally {
-      index.destroyIndex();
+      index.close();
       Files.deleteIfExists(hnswIndexPath);
     }
   }

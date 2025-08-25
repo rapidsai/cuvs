@@ -31,7 +31,6 @@ import java.lang.foreign.Linker;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
-import java.lang.invoke.MethodHandles;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -56,7 +55,7 @@ import org.slf4j.LoggerFactory;
 @RunWith(RandomizedRunner.class)
 public class CagraBuildAndSearchIT extends CuVSTestCase {
 
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  private static final Logger log = LoggerFactory.getLogger(CagraBuildAndSearchIT.class);
 
   @Before
   public void setup() {
@@ -233,7 +232,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
               () -> {
                 try (CuVSResources resources = CheckedCuVSResources.create()) {
                   var index = indexOnce(CuVSMatrix.ofArray(dataset), resources);
-                  index.destroyIndex();
+                  index.close();
                 } catch (Throwable e) {
                   throw new RuntimeException(e);
                 }
@@ -250,11 +249,10 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
           numTestsRuns,
           () ->
               () -> {
-                try (CuVSResources resources = CheckedCuVSResources.create()) {
-                  var index = indexOnce(CuVSMatrix.ofArray(dataset), resources);
+                try (CuVSResources resources = CheckedCuVSResources.create();
+                    var index = indexOnce(CuVSMatrix.ofArray(dataset), resources)) {
                   var indexPath = serializeOnce(index);
                   Files.deleteIfExists(indexPath);
-                  index.destroyIndex();
                 } catch (Throwable e) {
                   throw new RuntimeException(e);
                 }
@@ -272,7 +270,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
           () ->
               () -> {
                 try (CuVSResources resources = CheckedCuVSResources.create()) {
-                  deserializeOnce(indexPath, resources).destroyIndex();
+                  deserializeOnce(indexPath, resources).close();
                 } catch (Throwable e) {
                   throw new RuntimeException(e);
                 }
@@ -282,11 +280,9 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
   }
 
   private Path createSerializedIndex(CuVSMatrix dataset) throws Throwable {
-    try (CuVSResources resources = CheckedCuVSResources.create()) {
-      var index = indexOnce(dataset, resources);
-      var indexPath = serializeOnce(index);
-      index.destroyIndex();
-      return indexPath;
+    try (CuVSResources resources = CheckedCuVSResources.create();
+        var index = indexOnce(dataset, resources)) {
+      return serializeOnce(index);
     }
   }
 
@@ -296,38 +292,36 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
       var queries = createSampleQueries();
       List<Map<Integer, Float>> expectedResults = getExpectedResults();
 
-      try (CuVSResources resources = CuVSResources.create()) {
-        var index = indexOnce(dataset, resources);
+      try (CuVSResources resources = CuVSResources.create();
+          var index = indexOnce(dataset, resources)) {
         var graph = index.getGraph();
 
-        var reconstructedIndex =
+        try (var reconstructedIndex =
             CagraIndex.newBuilder(resources)
                 .from(graph)
                 .withDataset(dataset)
                 .withIndexParams(
                     new CagraIndexParams.Builder().withMetric(CuvsDistanceType.L2Expanded).build())
-                .build();
-        queryAndCompare(
-            index,
-            reconstructedIndex,
-            SearchResults.IDENTITY_MAPPING,
-            queries,
-            expectedResults,
-            resources);
+                .build()) {
+          queryAndCompare(
+              index,
+              reconstructedIndex,
+              SearchResults.IDENTITY_MAPPING,
+              queries,
+              expectedResults,
+              resources);
 
-        var originalIndexPath = serializeOnce(index);
-        var reconstructedIndexPath = serializeOnce(reconstructedIndex);
+          var originalIndexPath = serializeOnce(index);
+          var reconstructedIndexPath = serializeOnce(reconstructedIndex);
 
-        var originalBytes = Files.readAllBytes(originalIndexPath);
-        var reconstructedBytes = Files.readAllBytes(reconstructedIndexPath);
+          var originalBytes = Files.readAllBytes(originalIndexPath);
+          var reconstructedBytes = Files.readAllBytes(reconstructedIndexPath);
 
-        assertArrayEquals(originalBytes, reconstructedBytes);
+          assertArrayEquals(originalBytes, reconstructedBytes);
 
-        index.destroyIndex();
-        reconstructedIndex.destroyIndex();
-
-        Files.deleteIfExists(originalIndexPath);
-        Files.deleteIfExists(reconstructedIndexPath);
+          Files.deleteIfExists(originalIndexPath);
+          Files.deleteIfExists(reconstructedIndexPath);
+        }
       }
     }
   }
@@ -516,8 +510,8 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
   private void cleanup(CagraIndex index, CagraIndex loadedIndex) throws Throwable {
     // Cleanup
-    index.destroyIndex();
-    loadedIndex.destroyIndex();
+    index.close();
+    loadedIndex.close();
   }
 
   @Test
@@ -644,10 +638,10 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
       if (indexFile.exists()) {
         indexFile.delete();
       }
-      index1.destroyIndex();
-      index2.destroyIndex();
-      mergedIndex.destroyIndex();
-      loadedMergedIndex.destroyIndex();
+      index1.close();
+      index2.close();
+      mergedIndex.close();
+      loadedMergedIndex.close();
     }
   }
 
@@ -756,10 +750,10 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
       if (physicalIndexFile.exists()) {
         physicalIndexFile.delete();
       }
-      index1.destroyIndex();
-      index2.destroyIndex();
-      physicalMergedIndex.destroyIndex();
-      loadedPhysicalIndex.destroyIndex();
+      index1.close();
+      index2.close();
+      physicalMergedIndex.close();
+      loadedPhysicalIndex.close();
     }
   }
 }

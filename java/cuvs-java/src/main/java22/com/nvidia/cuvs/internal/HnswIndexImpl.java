@@ -74,7 +74,7 @@ public class HnswIndexImpl implements HnswIndex {
    * Invokes the native destroy_hnsw_index to de-allocate the HNSW index
    */
   @Override
-  public void destroyIndex() {
+  public void close() {
     int returnValue = cuvsHnswIndexDestroy(hnswIndexReference.getMemorySegment());
     checkCuVSError(returnValue, "cuvsHnswIndexDestroy");
   }
@@ -98,18 +98,23 @@ public class HnswIndexImpl implements HnswIndex {
 
       SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_LONG);
       SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
+      // TODO: these could be CuVSHostMatrix
       MemorySegment neighborsMemorySegment = localArena.allocate(neighborsSequenceLayout);
       MemorySegment distancesMemorySegment = localArena.allocate(distancesSequenceLayout);
       MemorySegment querySeg = buildMemorySegment(localArena, queryVectors);
 
       long[] queriesShape = {numQueries, vectorDimension};
-      MemorySegment queriesTensor = prepareTensor(localArena, querySeg, queriesShape, 2, 32, 1, 1);
+      MemorySegment queriesTensor =
+          prepareTensor(localArena, querySeg, queriesShape, kDLFloat(), 32, kDLCPU());
       long[] neighborsShape = {numQueries, topK};
+      // TODO: check type code and bits across all implementations -- they are inconsistent
       MemorySegment neighborsTensor =
-          prepareTensor(localArena, neighborsMemorySegment, neighborsShape, 1, 64, 1, 1);
+          prepareTensor(
+              localArena, neighborsMemorySegment, neighborsShape, kDLUInt(), 64, kDLCPU());
       long[] distancesShape = {numQueries, topK};
       MemorySegment distancesTensor =
-          prepareTensor(localArena, distancesMemorySegment, distancesShape, 2, 32, 1, 1);
+          prepareTensor(
+              localArena, distancesMemorySegment, distancesShape, kDLFloat(), 32, kDLCPU());
 
       try (var resourcesAccessor = query.getResources().access()) {
         var cuvsRes = resourcesAccessor.handle();
