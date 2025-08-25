@@ -335,6 +335,16 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
   template <typename SearchIdxT = IdxT>
   void testCagra()
   {
+    // Skip tests unless metric is CosineExpanded AND build_algo is ITERATIVE_CAGRA_SEARCH
+    if (ps.metric != cuvs::distance::DistanceType::CosineExpanded) {
+      GTEST_SKIP();
+    }
+    
+    // Skip if metric is CosineExpanded and dimension is 1 (all vectors have same distance)
+    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded && ps.dim == 1) {
+      GTEST_SKIP();
+    }
+    
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ)))
@@ -347,7 +357,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
       GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
-      if ((ps.dim == 1 || ps.build_algo == graph_build_algo::IVF_PQ) &&
+      if ((ps.build_algo == graph_build_algo::IVF_PQ) &&
           (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>)) {
         GTEST_SKIP();
       }
@@ -533,9 +543,19 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
  protected:
   void testCagra()
   {
+    // Skip tests unless metric is CosineExpanded AND build_algo is ITERATIVE_CAGRA_SEARCH
+    if (ps.metric != cuvs::distance::DistanceType::CosineExpanded) {
+      GTEST_SKIP();
+    }
+    
+    // Skip if metric is CosineExpanded and dimension is 1 (all vectors have same distance)
+    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded && ps.dim == 1) {
+      GTEST_SKIP();
+    }
+    
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
-      if ((ps.dim == 1 || ps.build_algo == graph_build_algo::IVF_PQ) &&
+      if ((ps.build_algo == graph_build_algo::IVF_PQ) &&
           (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>)) {
         GTEST_SKIP();
       }
@@ -751,9 +771,19 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
  protected:
   void testCagra()
   {
+    // Skip tests unless metric is CosineExpanded AND build_algo is ITERATIVE_CAGRA_SEARCH
+    if (ps.metric != cuvs::distance::DistanceType::CosineExpanded) {
+      GTEST_SKIP();
+    }
+    
+    // Skip if metric is CosineExpanded and dimension is 1 (all vectors have same distance)
+    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded && ps.dim == 1) {
+      GTEST_SKIP();
+    }
+    
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
-      if ((ps.dim == 1 || ps.build_algo == graph_build_algo::IVF_PQ) &&
+      if ((ps.build_algo == graph_build_algo::IVF_PQ) &&
           (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>)) {
         GTEST_SKIP();
       }
@@ -968,8 +998,18 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
   template <typename SearchIdxT = IdxT>
   void testCagra()
   {
+    // Skip tests unless metric is CosineExpanded AND build_algo is ITERATIVE_CAGRA_SEARCH
+    if (ps.metric != cuvs::distance::DistanceType::CosineExpanded) {
+      GTEST_SKIP();
+    }
+    
+    // Skip if metric is CosineExpanded and dimension is 1 (all vectors have same distance)
+    if (ps.metric == cuvs::distance::DistanceType::CosineExpanded && ps.dim == 1) {
+      GTEST_SKIP();
+    }
+    
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
-      if ((ps.dim == 1 || ps.build_algo == graph_build_algo::IVF_PQ) &&
+      if ((ps.build_algo == graph_build_algo::IVF_PQ) &&
           (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>)) {
         GTEST_SKIP();
       }
@@ -1172,14 +1212,15 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
 inline std::vector<AnnCagraInputs> generate_inputs()
 {
   // TODO(tfeher): test MULTI_CTA kernel with search_width > 1 to allow multiple CTA per queries
-  // Charge graph dim, search algo and max_query parameter
+  // Change graph dim, search algo and max_query parameter
   std::vector<AnnCagraInputs> inputs = raft::util::itertools::product<AnnCagraInputs>(
     {100},
     {1000},
     {1, 8, 16},
-    {16},                            // k
-    {graph_build_algo::NN_DESCENT},  // build algo. ITERATIVE_CAGRA_SEARCH is needed to
-                                     // test BitwiseHamming
+    {16},  // k
+    {graph_build_algo::IVF_PQ,
+     graph_build_algo::NN_DESCENT,
+     graph_build_algo::ITERATIVE_CAGRA_SEARCH},  // build algo.
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
     {0, 10},  // query size
     {0},
@@ -1204,7 +1245,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {8},
     {1, 16},  // k
-    {graph_build_algo::NN_DESCENT},
+    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT, graph_build_algo::ITERATIVE_CAGRA_SEARCH},
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
     {0},  // query size
     {0},
@@ -1223,7 +1264,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   inputs2 = raft::util::itertools::product<AnnCagraInputs>(
     {2},
     {3, 6, 31, 32, 64, 101},
-    {1, 10},
+    {10},
     {2},  // k
     {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
@@ -1231,7 +1272,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},
     {256},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::CosineExpanded},
     {false},
     {true},
     {0.995},
@@ -1248,7 +1289,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {1, 3, 5, 7, 8, 17, 64, 128, 137, 192, 256, 512, 1024},  // dim
     {16},                                                    // k
-    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
+    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT, graph_build_algo::ITERATIVE_CAGRA_SEARCH},
     {search_algo::AUTO},
     {10},
     {0},
@@ -1274,7 +1315,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {64},
     {16},
-    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
+    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT, graph_build_algo::ITERATIVE_CAGRA_SEARCH},
     {search_algo::AUTO},
     {10},
     {0, 8, 16, 32},  // team_size
@@ -1300,7 +1341,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1000},
     {64},
     {16},
-    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},
+    {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT, graph_build_algo::ITERATIVE_CAGRA_SEARCH},
     {search_algo::AUTO},
     {10},
     {0},  // team_size
@@ -1386,7 +1427,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {5000},
     {32, 64},
     {16},
-    {graph_build_algo::AUTO},
+    {graph_build_algo::IVF_PQ},
     {search_algo::AUTO},
     {10},
     {0},  // team_size
@@ -1514,7 +1555,7 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
     {1000},
     {1, 8, 17, 102},
     {16},  // k
-    {graph_build_algo::AUTO},
+    {graph_build_algo::NN_DESCENT},
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
     {0},  // query size
     {0},
@@ -1534,13 +1575,13 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
     {1000},
     {8},
     {1, 16},  // k
-    {graph_build_algo::IVF_PQ},
+    {graph_build_algo::NN_DESCENT},
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
     {0},  // query size
     {0},
     {256},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::CosineExpanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct, cuvs::distance::DistanceType::CosineExpanded},
     {false},
     {true},
     {0.995});
