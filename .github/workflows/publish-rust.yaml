@@ -11,6 +11,7 @@ jobs:
   rust-publish:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         cuda_version:
           - '12.9.1'

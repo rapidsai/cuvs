@@ -156,6 +156,7 @@ jobs:
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
     strategy:
+      fail-fast: false
       matrix:
         cuda_version:
           - '12.9.1'
@@ -184,6 +185,7 @@ jobs:
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
     strategy:
+      fail-fast: false
       matrix:
         cuda_version:
           - '12.9.1'
@@ -201,6 +203,7 @@ jobs:
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
     strategy:
+      fail-fast: false
       matrix:
         cuda_version:
           - '12.9.1'
