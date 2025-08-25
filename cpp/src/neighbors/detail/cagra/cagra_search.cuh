@@ -219,7 +219,7 @@ void search_main(raft::resources const& res,
       raft::make_const_mdspan(distances),
       raft::make_const_mdspan(query_norms.view()),
       distances,
-      raft::compose_op(raft::add_const_op<DistanceT>{DistanceT(1)}, raft::div_op{}));
+      raft::compose_op(raft::add_const_op<DistanceT>{DistanceT(1)}, raft::div_checkzero_op{}));
   } else {
     cuvs::neighbors::ivf::detail::postprocess_distances(dist_out,
                                                         dist_in,
