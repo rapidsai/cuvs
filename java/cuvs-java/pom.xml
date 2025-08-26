@@ -109,10 +109,11 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.13.0</version>
+                <version>3.11.0</version>
                 <executions>
                     <execution>
                         <id>default-compile</id>
+                        <phase>compile</phase>
                         <goals>
                             <goal>compile</goal>
                         </goals>
@@ -125,7 +126,7 @@
                     </execution>
                     <execution>
                         <id>compile-java-22</id>
-                        <phase>compile</phase>
+                        <phase>process-classes</phase>
                         <goals>
                             <goal>compile</goal>
                         </goals>
@@ -135,6 +136,9 @@
                                 <compileSourceRoot>${project.basedir}/src/main/java22</compileSourceRoot>
                             </compileSourceRoots>
                             <multiReleaseOutput>true</multiReleaseOutput>
+                            <excludes>
+                                <exclude>module-info.java</exclude>
+                            </excludes>
                         </configuration>
                     </execution>
                 </executions>
