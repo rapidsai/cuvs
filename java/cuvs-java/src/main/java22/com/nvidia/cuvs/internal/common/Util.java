@@ -23,12 +23,10 @@ import static com.nvidia.cuvs.internal.panama.headers_h.*;
 import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaStream_t;
 
 import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.GPUInfo;
 import com.nvidia.cuvs.internal.panama.DLDataType;
 import com.nvidia.cuvs.internal.panama.DLDevice;
 import com.nvidia.cuvs.internal.panama.DLManagedTensor;
 import com.nvidia.cuvs.internal.panama.DLTensor;
-import com.nvidia.cuvs.internal.panama.cudaDeviceProp;
 import com.nvidia.cuvs.internal.panama.headers_h;
 import java.lang.foreign.Arena;
 import java.lang.foreign.Linker;
@@ -37,9 +35,7 @@ import java.lang.foreign.MemoryLayout.PathElement;
 import java.lang.foreign.MemorySegment;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
-import java.util.ArrayList;
 import java.util.BitSet;
-import java.util.List;
 
 public class Util {
 
@@ -184,71 +180,6 @@ public class Util {
       return seg.reinterpret(MAX_ERROR_TEXT).getString(0);
     } catch (Throwable t) {
       throw new RuntimeException(t);
-    }
-  }
-
-  /**
-   * Get the list of compatible GPUs based on given compute capability and total
-   * memory
-   *
-   * @param minComputeCapabilityMajor the minimum compute capability (major)
-   * @param minComputeCapabilityMinor the minimum compute capability (minor)
-   * @param minDeviceMemoryMB         the minimum total available memory in MB
-   * @return a list of compatible GPUs. See {@link GPUInfo}
-   */
-  public static List<GPUInfo> compatibleGPUs(
-      int minComputeCapabilityMajor, int minComputeCapabilityMinor, int minDeviceMemoryMB)
-      throws Throwable {
-    List<GPUInfo> compatibleGPUs = new ArrayList<GPUInfo>();
-    long minDeviceMemoryInBytes = 1024L * 1024L * minDeviceMemoryMB;
-    for (GPUInfo gpuInfo : availableGPUs()) {
-      if (hasMinimumCapability(minComputeCapabilityMajor, minComputeCapabilityMinor, gpuInfo)
-          && gpuInfo.totalDeviceMemoryInBytes() >= minDeviceMemoryInBytes) {
-        compatibleGPUs.add(gpuInfo);
-      }
-    }
-    return compatibleGPUs;
-  }
-
-  private static boolean hasMinimumCapability(int major, int minor, GPUInfo gpuInfo) {
-    return gpuInfo.computeCapabilityMajor() > major
-        || (gpuInfo.computeCapabilityMajor() == major && gpuInfo.computeCapabilityMinor() >= minor);
-  }
-
-  /**
-   * Gets all the available GPUs
-   *
-   * @return a list of {@link GPUInfo} objects with GPU details
-   */
-  public static List<GPUInfo> availableGPUs() throws Throwable {
-    try (var localArena = Arena.ofConfined()) {
-
-      MemorySegment numGpus = localArena.allocate(C_INT);
-      int returnValue = cudaGetDeviceCount(numGpus);
-      checkCudaError(returnValue, "cudaGetDeviceCount");
-
-      int numGpuCount = numGpus.get(C_INT, 0);
-      List<GPUInfo> gpuInfoArr = new ArrayList<GPUInfo>();
-
-      MemorySegment deviceProp = cudaDeviceProp.allocate(localArena);
-
-      for (int i = 0; i < numGpuCount; i++) {
-        returnValue = cudaGetDeviceProperties_v2(deviceProp, i);
-        checkCudaError(returnValue, "cudaGetDeviceProperties_v2");
-
-        GPUInfo gpuInfo =
-            new GPUInfo(
-                i,
-                cudaDeviceProp.name(deviceProp).getString(0),
-                cudaDeviceProp.totalGlobalMem(deviceProp),
-                cudaDeviceProp.major(deviceProp),
-                cudaDeviceProp.minor(deviceProp),
-                cudaDeviceProp.asyncEngineCount(deviceProp) > 0,
-                cudaDeviceProp.concurrentKernels(deviceProp) > 0);
-
-        gpuInfoArr.add(gpuInfo);
-      }
-      return gpuInfoArr;
     }
   }
 

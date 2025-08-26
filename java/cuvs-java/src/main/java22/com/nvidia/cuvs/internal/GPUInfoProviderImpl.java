@@ -15,6 +15,7 @@
  */
 package com.nvidia.cuvs.internal;
 
+import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 import static com.nvidia.cuvs.internal.common.Util.checkCudaError;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemGetInfo;
 import static com.nvidia.cuvs.internal.panama.headers_h_1.*;
@@ -23,22 +24,76 @@ import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.CuVSResourcesInfo;
 import com.nvidia.cuvs.GPUInfo;
 import com.nvidia.cuvs.GPUInfoProvider;
-import com.nvidia.cuvs.internal.common.Util;
+import com.nvidia.cuvs.internal.panama.cudaDeviceProp;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import java.util.ArrayList;
 import java.util.List;
 
 public class GPUInfoProviderImpl implements GPUInfoProvider {
 
-  @Override
-  public List<GPUInfo> availableGPUs() throws Throwable {
-    return Util.availableGPUs();
+  // Lazy initialization for list of available GPUs.
+  private static class AvailableGpuInitializer {
+
+    // Available GPUs are initialized only once when first accessed.
+    // This is assumed to be invariant for the lifetime of the program.
+    static final List<GPUInfo> AVAILABLE_GPUS = getAvailableGpusInfo();
+
+    private static List<GPUInfo> getAvailableGpusInfo() {
+      try (var localArena = Arena.ofConfined()) {
+
+        MemorySegment numGpus = localArena.allocate(C_INT);
+        int returnValue = cudaGetDeviceCount(numGpus);
+        checkCudaError(returnValue, "cudaGetDeviceCount");
+
+        int numGpuCount = numGpus.get(C_INT, 0);
+        List<GPUInfo> gpuInfoArr = new ArrayList<GPUInfo>();
+
+        MemorySegment deviceProp = cudaDeviceProp.allocate(localArena);
+
+        for (int i = 0; i < numGpuCount; i++) {
+          returnValue = cudaGetDeviceProperties_v2(deviceProp, i);
+          checkCudaError(returnValue, "cudaGetDeviceProperties_v2");
+
+          GPUInfo gpuInfo =
+              new GPUInfo(
+                  i,
+                  cudaDeviceProp.name(deviceProp).getString(0),
+                  cudaDeviceProp.totalGlobalMem(deviceProp),
+                  cudaDeviceProp.major(deviceProp),
+                  cudaDeviceProp.minor(deviceProp),
+                  cudaDeviceProp.asyncEngineCount(deviceProp) > 0,
+                  cudaDeviceProp.concurrentKernels(deviceProp) > 0);
+
+          gpuInfoArr.add(gpuInfo);
+        }
+        return gpuInfoArr;
+      }
+    }
+  }
+
+  private static boolean hasMinimumCapability(GPUInfo gpuInfo) {
+    return gpuInfo.computeCapabilityMajor() > GPUInfoProvider.MIN_COMPUTE_CAPABILITY_MAJOR
+        || (gpuInfo.computeCapabilityMajor() == GPUInfoProvider.MIN_COMPUTE_CAPABILITY_MAJOR
+            && gpuInfo.computeCapabilityMinor() >= GPUInfoProvider.MIN_COMPUTE_CAPABILITY_MINOR);
   }
 
   @Override
-  public List<GPUInfo> compatibleGPUs() throws Throwable {
-    return Util.compatibleGPUs(
-        MIN_COMPUTE_CAPABILITY_MAJOR, MIN_COMPUTE_CAPABILITY_MINOR, MIN_DEVICE_MEMORY_IN_MB);
+  public List<GPUInfo> availableGPUs() {
+    return AvailableGpuInitializer.AVAILABLE_GPUS;
+  }
+
+  @Override
+  public List<GPUInfo> compatibleGPUs() {
+    List<GPUInfo> compatibleGPUs = new ArrayList<>();
+    long minDeviceMemoryInBytes = 1024L * 1024L * GPUInfoProvider.MIN_DEVICE_MEMORY_IN_MB;
+    for (GPUInfo gpuInfo : AvailableGpuInitializer.AVAILABLE_GPUS) {
+      if (hasMinimumCapability(gpuInfo)
+          && gpuInfo.totalDeviceMemoryInBytes() >= minDeviceMemoryInBytes) {
+        compatibleGPUs.add(gpuInfo);
+      }
+    }
+    return compatibleGPUs;
   }
 
   @Override

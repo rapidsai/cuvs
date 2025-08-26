@@ -29,7 +29,7 @@ public interface GPUInfoProvider {
    *
    * @return a list of {@link GPUInfo} objects with GPU details
    */
-  List<GPUInfo> availableGPUs() throws Throwable;
+  List<GPUInfo> availableGPUs();
 
   /**
    * Get the list of compatible GPUs based on compute capability >= 7.0 and total
@@ -37,7 +37,7 @@ public interface GPUInfoProvider {
    *
    * @return a list of compatible GPUs. See {@link GPUInfo}
    */
-  List<GPUInfo> compatibleGPUs() throws Throwable;
+  List<GPUInfo> compatibleGPUs();
 
   /**
    * Gets memory information relative to a {@link CuVSResources}
