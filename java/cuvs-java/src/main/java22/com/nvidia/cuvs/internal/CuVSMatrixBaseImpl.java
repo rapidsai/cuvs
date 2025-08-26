@@ -83,6 +83,10 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
    * DLTensor data type {@code code} for the element type of this matrix
    */
   protected int code() {
+    return code(dataType);
+  }
+
+  static int code(DataType dataType) {
     return switch (dataType) {
       case FLOAT -> kDLFloat();
       case INT -> kDLInt();
