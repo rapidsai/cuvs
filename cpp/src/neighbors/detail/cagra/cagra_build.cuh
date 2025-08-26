@@ -28,7 +28,6 @@
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/linalg/norm.cuh>
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
@@ -579,7 +578,6 @@ auto iterative_build_graph(
   memset(neighbors_ptr, 0, byte_size);
 
   auto curr_graph_size = initial_graph_size;
-
   while (true) {
     RAFT_LOG_DEBUG("# graph_size = %lu (%.3lf)",
                    (uint64_t)curr_graph_size,
@@ -821,5 +819,4 @@ index<T, IdxT> build(
   idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
   return idx;
 }
-
 }  // namespace cuvs::neighbors::cagra::detail
