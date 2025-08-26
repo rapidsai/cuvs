@@ -119,7 +119,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
               .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
               .build();
 
-      CagraIndex index;
+      final CagraIndex index;
       if (useNativeMemoryDataset) {
         var datasetBuilder =
             CuVSMatrix.hostBuilder(vectors.length, vectors[0].length, CuVSMatrix.DataType.FLOAT);
@@ -140,11 +140,11 @@ public class CagraRandomizedIT extends CuVSTestCase {
       }
       log.trace("Index built successfully.");
 
-      try {
+      try (var queryVectors = CuVSMatrix.ofArray(queries)) {
         // Execute search and retrieve results
         CagraQuery.Builder queryBuilder =
             new CagraQuery.Builder(resources)
-                .withQueryVectors(queries)
+                .withQueryVectors(queryVectors)
                 .withTopK(topK)
                 .withSearchParams(new CagraSearchParams.Builder().build());
 
