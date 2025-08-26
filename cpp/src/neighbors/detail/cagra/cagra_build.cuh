@@ -802,23 +802,8 @@ index<T, IdxT> build(
   }
   if (params.attach_dataset_on_build) {
     try {
-      auto idx =
-        index<T, IdxT>(res, params.metric, dataset, raft::make_const_mdspan(cagra_graph.view()));
-
-      // Compute dataset norms for cosine distance (iterative search already computes norms in the
-      // graph build)
-      if (params.metric == cuvs::distance::DistanceType::CosineExpanded) {
-        auto dataset_view = idx.dataset();
-        if (dataset_view.extent(0) > 0) {
-          auto dataset_norms =
-            raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
-          cuvs::neighbors::cagra::detail::compute_dataset_norms(
-            res, dataset_view, dataset_norms.view());
-          idx.set_dataset_norms(std::move(dataset_norms));
-        }
-      }
-
-      return idx;
+      return index<T, IdxT>(
+        res, params.metric, dataset, raft::make_const_mdspan(cagra_graph.view()));
     } catch (std::bad_alloc& e) {
       RAFT_LOG_WARN(
         "Insufficient GPU memory to construct CAGRA index with dataset on GPU. Only the graph will "
