@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -190,11 +190,12 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   const auto cta_id            = blockIdx.x;  // local CTA ID
 
 #ifdef _CLK_BREAKDOWN
-  uint64_t clk_init                 = 0;
-  uint64_t clk_compute_1st_distance = 0;
-  uint64_t clk_topk                 = 0;
-  uint64_t clk_pickup_parents       = 0;
-  uint64_t clk_compute_distance     = 0;
+  uint64_t clk_init                    = 0;
+  uint64_t clk_compute_1st_distance    = 0;
+  uint64_t clk_topk                    = 0;
+  uint64_t clk_pickup_parents          = 0;
+  uint64_t clk_compute_distance        = 0;
+  uint64_t clk_compute_actual_distance = 0;
   uint64_t clk_start;
 #define _CLK_START() clk_start = clock64()
 #define _CLK_REC(V)  V += clock64() - clk_start;
@@ -330,6 +331,9 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
       parent_indices_buffer,
       result_indices_buffer,
       1,
+#ifdef _CLK_BREAKDOWN
+      clk_compute_actual_distance,
+#endif
       result_position,
       result_buffer_size_32);
     // __syncthreads();
@@ -443,6 +447,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
       ", topk, %lu"
       ", pickup_parents, %lu"
       ", distance, %lu"
+      ", hash, %lu"
       "\n",
       __FILE__,
       __LINE__,
@@ -452,7 +457,8 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
       clk_compute_1st_distance,
       clk_topk,
       clk_pickup_parents,
-      clk_compute_distance);
+      clk_compute_actual_distance,
+      clk_compute_distance - clk_compute_actual_distance);
   }
 #endif
 }

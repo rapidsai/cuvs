@@ -15,6 +15,8 @@
  */
 #pragma once
 
+// #define _CLK_BREAKDOWN
+
 #include "hashmap.hpp"
 #include "utils.hpp"
 
@@ -186,6 +188,9 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
   const IndexT* __restrict__ parent_indices,
   const IndexT* __restrict__ internal_topk_list,
   const uint32_t search_width,
+#ifdef _CLK_BREAKDOWN
+  std::uint64_t& clk_compute_actual_distance,
+#endif
   int* __restrict__ result_position = nullptr,
   const int max_result_position     = 0)
 {
@@ -238,11 +243,17 @@ RAFT_DEVICE_INLINE_FUNCTION void compute_distance_to_child_nodes(
     // > const auto child_dist = dataset_desc.compute_distance(child_id, child_id != invalid_index);
     // Instead, we manually inline this function for performance reasons.
     // This allows us to move the fetching of the arguments from shared memory out of the loop.
+#ifdef _CLK_BREAKDOWN
+    const auto start_clock = clock64();
+#endif
     const DistanceT child_dist = device::team_sum(
       (child_id != invalid_index) ? compute_distance(args, child_id)
                                   : (lead_lane ? raft::upper_bound<DistanceT>() : 0),
       team_size_bits);
     __syncwarp();
+#ifdef _CLK_BREAKDOWN
+    clk_compute_actual_distance += clock64() - start_clock;
+#endif
 
     // Store the distance
     if (valid_i && lead_lane) { result_child_distances_ptr[j] = child_dist; }

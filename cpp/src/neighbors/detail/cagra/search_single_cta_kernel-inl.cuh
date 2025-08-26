@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,8 +65,6 @@
 
 namespace cuvs::neighbors::cagra::detail {
 namespace single_cta_search {
-
-// #define _CLK_BREAKDOWN
 
 template <unsigned TOPK_BY_BITONIC_SORT, class INDEX_T>
 RAFT_DEVICE_INLINE_FUNCTION void pickup_next_parents(std::uint32_t* const terminate_flag,
@@ -581,13 +579,14 @@ __device__ void search_core(
   using DISTANCE_T = typename DATASET_DESCRIPTOR_T::DISTANCE_T;
 
 #ifdef _CLK_BREAKDOWN
-  std::uint64_t clk_init                 = 0;
-  std::uint64_t clk_compute_1st_distance = 0;
-  std::uint64_t clk_topk                 = 0;
-  std::uint64_t clk_reset_hash           = 0;
-  std::uint64_t clk_pickup_parents       = 0;
-  std::uint64_t clk_restore_hash         = 0;
-  std::uint64_t clk_compute_distance     = 0;
+  std::uint64_t clk_init                    = 0;
+  std::uint64_t clk_compute_1st_distance    = 0;
+  std::uint64_t clk_topk                    = 0;
+  std::uint64_t clk_reset_hash              = 0;
+  std::uint64_t clk_pickup_parents          = 0;
+  std::uint64_t clk_restore_hash            = 0;
+  std::uint64_t clk_compute_distance        = 0;
+  std::uint64_t clk_compute_actual_distance = 0;
   std::uint64_t clk_start;
 #define _CLK_START() clk_start = clock64()
 #define _CLK_REC(V)  V += clock64() - clk_start;
@@ -788,7 +787,12 @@ __device__ void search_core(
                                             0,
                                             parent_list_buffer,
                                             result_indices_buffer,
-                                            search_width);
+                                            search_width
+#ifdef _CLK_BREAKDOWN
+                                            ,
+                                            clk_compute_actual_distance
+#endif
+    );
     __syncthreads();
     _CLK_REC(clk_compute_distance);
 
@@ -945,6 +949,7 @@ __device__ void search_core(
       ", pickup_parents, %lu"
       ", restore_hash, %lu"
       ", distance, %lu"
+      ", hash, %lu"
       "\n",
       __FILE__,
       __LINE__,
@@ -956,7 +961,8 @@ __device__ void search_core(
       clk_reset_hash,
       clk_pickup_parents,
       clk_restore_hash,
-      clk_compute_distance);
+      clk_compute_actual_distance,
+      clk_compute_distance - clk_compute_actual_distance);
   }
 #endif
 }
