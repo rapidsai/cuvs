@@ -7,7 +7,6 @@ set -e -u -o pipefail
 ARGS="$*"
 NUMARGS=$#
 
-CURDIR=$(cd "$(dirname "$0")"; pwd)
 VERSION="25.10.0" # Note: The version is updated automatically when ci/release/update-version.sh is invoked
 GROUP_ID="com.nvidia.cuvs"
 
@@ -33,12 +32,11 @@ fi
 
 # Build the java layer
 if [ -z ${LD_LIBRARY_PATH+x} ]
-then export LD_LIBRARY_PATH=${CURDIR}/../cpp/build
-else export LD_LIBRARY_PATH=${CURDIR}/../cpp/build:${LD_LIBRARY_PATH}
+then export LD_LIBRARY_PATH=$CMAKE_PREFIX_PATH
+else export LD_LIBRARY_PATH=$CMAKE_PREFIX_PATH:${LD_LIBRARY_PATH}
 fi
 
-export LD_LIBRARY_PATH=${CURDIR}/../cpp/build:${LD_LIBRARY_PATH}
 cd cuvs-java
-mvn verify "${MAVEN_VERIFY_ARGS[@]}" \
+mvn verify "${MAVEN_VERIFY_ARGS[@]}" -P x86-cuda12 \
   && mvn install:install-file -Dfile=./target/cuvs-java-$VERSION.jar -DgroupId=$GROUP_ID -DartifactId=cuvs-java -Dversion=$VERSION -Dpackaging=jar \
   && cp pom.xml ./target/
