@@ -206,6 +206,7 @@ cdef class AllNeighborsParams:
 # setting resources from within the function as data on host/device differ
 @auto_convert_output
 def build(dataset, k, params, *,
+          indices=None,
           distances=None,
           core_distances=None,
           alpha=1.0,
@@ -223,12 +224,15 @@ def build(dataset, k, params, *,
     params : AllNeighborsParams
         Parameters object containing all build settings including algorithm
         choice and algorithm-specific parameters.
+    indices : array_like, optional
+        Optional output buffer for indices [num_rows x k] on device
+        (int64). If not provided, will be allocated automatically.
     distances : array_like, optional
         Optional output buffer for distances [num_rows x k] on device
         (float32)
     core_distances : array_like, optional
         Optional output buffer for core distances [num_rows] on device
-        (float32)
+        (float32). Requires distances parameter to be provided.
     alpha : float, default=1.0
         Mutual-reachability scaling; used only when core_distances is
         provided
@@ -239,9 +243,13 @@ def build(dataset, k, params, *,
     Returns
     -------
     indices : array_like
-        k-NN indices for each point [num_rows x k], always on device
+        k-NN indices for each point [num_rows x k], always on device.
+        If indices buffer was provided, returns the same array filled
+        with results.
     distances : array_like or None
         k-NN distances if distances buffer was provided, None otherwise
+    core_distances : array_like or None
+        Core distances if core_distances buffer was provided, None otherwise
     """
     if not isinstance(params, AllNeighborsParams):
         raise TypeError("params must be an instance of AllNeighborsParams")
@@ -272,7 +280,19 @@ def build(dataset, k, params, *,
     dataset_ai = wrap_array(dataset)
     n_rows, n_cols = dataset_ai.shape
 
+    # Check dependencies between parameters
+    if core_distances is not None and distances is None:
+        raise ValueError(
+            "distances must be provided when core_distances is provided"
+        )
+
     # Validate user-provided outputs (must be device arrays if provided)
+    if indices is not None and not hasattr(
+        indices, "__cuda_array_interface__"
+    ):
+        raise ValueError(
+            "indices must be a device array (CUDA array interface)"
+        )
     if distances is not None and not hasattr(
         distances, "__cuda_array_interface__"
     ):
@@ -285,6 +305,15 @@ def build(dataset, k, params, *,
         raise ValueError(
             "core_distances must be a device array (CUDA array interface)"
         )
+
+    # Handle indices array (create if not provided)
+    if indices is None:
+        indices = device_ndarray.empty((n_rows, k), dtype="int64")
+
+    indices_out = wrap_array(indices)
+    _check_input_array(
+        indices_out, [np.dtype("int64")], exp_rows=n_rows, exp_cols=k
+    )
 
     distances_out = None
     if distances is not None:
@@ -300,12 +329,8 @@ def build(dataset, k, params, *,
             core_out, [np.dtype("float32")], exp_rows=n_rows, exp_cols=None
         )
 
-    # Indices must always be on device (even for host dataset)
-    indices = device_ndarray.empty((n_rows, k), dtype="int64")
-
-    indices_ai = wrap_array(indices)
     cdef cydlpack.DLManagedTensor* indices_dlpack = cydlpack.dlpack_c(
-        indices_ai
+        indices_out
     )
 
     cdef cydlpack.DLManagedTensor* distances_dlpack = NULL
@@ -352,4 +377,15 @@ def build(dataset, k, params, *,
                 <float>alpha,
             ))
 
-    return indices, (distances if distances is not None else None)
+    # Build return tuple based on provided parameters
+    result = [indices]
+    if distances is not None:
+        result.append(distances)
+    if core_distances is not None:
+        result.append(core_distances)
+
+    # Return single element if only indices, otherwise return tuple
+    if len(result) == 1:
+        return result[0]
+    else:
+        return tuple(result)
