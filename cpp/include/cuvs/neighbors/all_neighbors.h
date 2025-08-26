@@ -1,0 +1,121 @@
+/*
+ * Copyright (c) 2025, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#pragma once
+
+#include <cuvs/core/c_api.h>
+#include <cuvs/distance/distance.h>
+#include <cuvs/neighbors/ivf_pq.h>
+#include <cuvs/neighbors/nn_descent.h>
+#include <dlpack/dlpack.h>
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @defgroup all_neighbors_c_build All-neighbors C-API build (SNMG only)
+ * @{
+ *
+ * All-neighbors constructs an approximate k-NN graph for all vectors in a dataset.
+ * This SNMG C API always expects a multi-GPU resources handle (`cuvsSNMGResources_t`)
+ * created from `raft::device_resources_snmg` and will distribute work across GPUs.
+ *
+ * Notes:
+ * - Outputs (indices, distances, core_distances) are expected to be on device memory.
+ * - Host variant accepts host-resident dataset; device variant accepts device-resident dataset.
+ * - For batching, `overlap_factor < n_clusters` must hold.
+ * - When `core_distances` is provided, mutual-reachability distances are produced (see alpha).
+ */
+
+/**
+ * @brief Graph build algorithm selection.
+ */
+typedef enum {
+  CUVS_ALL_NEIGHBORS_ALGO_BRUTE_FORCE = 0,  ///< Use Brute Force for local kNN subgraphs
+  CUVS_ALL_NEIGHBORS_ALGO_IVF_PQ = 1,  ///< Use IVF-PQ for local kNN subgraphs (host dataset only)
+  CUVS_ALL_NEIGHBORS_ALGO_NN_DESCENT = 2  ///< Use NN-Descent for local kNN subgraphs
+} cuvsAllNeighborsAlgo;
+
+/**
+ * @brief Parameters controlling SNMG all-neighbors build.
+ */
+struct cuvsAllNeighborsIndexParams {
+  cuvsAllNeighborsAlgo algo;  ///< Local kNN graph build algorithm
+  size_t overlap_factor;  ///< Number of clusters each point is assigned to (must be < n_clusters)
+  size_t
+    n_clusters;  ///< Number of clusters/batches to partition the dataset into (> overlap_factor)
+  cuvsDistanceType metric;  ///< Distance metric used for graph construction
+
+  // Algorithm-specific parameters (only one should be set based on algo)
+  cuvsIvfPqIndexParams_t ivf_pq_params;          ///< Parameters for IVF-PQ algorithm (when algo ==
+                                                 ///< CUVS_ALL_NEIGHBORS_ALGO_IVF_PQ)
+  cuvsNNDescentIndexParams_t nn_descent_params;  ///< Parameters for NN-Descent algorithm (when algo
+                                                 ///< == CUVS_ALL_NEIGHBORS_ALGO_NN_DESCENT)
+};
+
+typedef struct cuvsAllNeighborsIndexParams* cuvsAllNeighborsIndexParams_t;
+
+/**
+ * @brief Build an all-neighbors k-NN graph from a host-resident dataset (SNMG).
+ *
+ * @param[in] snmg_res        SNMG multi-GPU resources (raft::device_resources_snmg)
+ * @param[in] params          Build parameters (see cuvsAllNeighborsIndexParams)
+ * @param[in] dataset         2D tensor [num_rows x dim] on host (CPU or CUDAHost)
+ * @param[out] indices        2D tensor [num_rows x k] on device (int64)
+ * @param[out] distances      Optional 2D tensor [num_rows x k] on device (float32); can be NULL
+ * @param[out] core_distances Optional 1D tensor [num_rows] on device (float32); can be NULL
+ * @param[in] alpha           Mutual-reachability scaling; used only when core_distances is provided
+ *
+ * The function partitions data into `n_clusters` clusters and assigns each row to
+ * `overlap_factor` nearest clusters. Work is balanced across GPUs according to the
+ * number of available ranks in `snmg`. Outputs always reside in device memory.
+ */
+cuvsError_t cuvsAllNeighborsBuildHost(cuvsSNMGResources_t snmg_res,
+                                      cuvsAllNeighborsIndexParams_t params,
+                                      DLManagedTensor* dataset,
+                                      DLManagedTensor* indices,
+                                      DLManagedTensor* distances,
+                                      DLManagedTensor* core_distances,
+                                      float alpha);
+
+/**
+ * @brief Build an all-neighbors k-NN graph from a device-resident dataset (single-GPU, no
+ * batching).
+ *
+ * @param[in] res             Single-GPU resources (raft::device_resources)
+ * @param[in] params          Build parameters (see cuvsAllNeighborsIndexParams). For device
+ * datasets, `n_clusters` must be 1 (no batching); `overlap_factor` is ignored.
+ * @param[in] dataset         2D tensor [num_rows x dim] on device (CUDA/CUDAManaged)
+ * @param[out] indices        2D tensor [num_rows x k] on device (int64)
+ * @param[out] distances      Optional 2D tensor [num_rows x k] on device (float32); can be NULL
+ * @param[out] core_distances Optional 1D tensor [num_rows] on device (float32); can be NULL
+ * @param[in] alpha           Mutual-reachability scaling; used only when core_distances is provided
+ */
+cuvsError_t cuvsAllNeighborsBuildDevice(cuvsResources_t res,
+                                        cuvsAllNeighborsIndexParams_t params,
+                                        DLManagedTensor* dataset,
+                                        DLManagedTensor* indices,
+                                        DLManagedTensor* distances,
+                                        DLManagedTensor* core_distances,
+                                        float alpha);
+
+/** @} */
+
+#ifdef __cplusplus
+}
+#endif

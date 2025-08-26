@@ -1,4 +1,4 @@
-# Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# Copyright (c) 2025, NVIDIA CORPORATION.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .all_neighbors import AllNeighborsParams, build
 
-from .resources import Resources, SNMGResources, auto_sync_resources
-
-__all__ = ["auto_sync_resources", "Resources", "SNMGResources"]
+__all__ = ["AllNeighborsParams", "build"]

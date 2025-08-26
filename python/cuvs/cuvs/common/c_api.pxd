@@ -24,6 +24,7 @@ from cuvs.common.cydlpack cimport DLManagedTensor
 
 cdef extern from "cuvs/core/c_api.h":
     ctypedef uintptr_t cuvsResources_t
+    ctypedef uintptr_t cuvsSNMGResources_t
 
     ctypedef enum cuvsError_t:
         CUVS_ERROR,
@@ -33,6 +34,14 @@ cdef extern from "cuvs/core/c_api.h":
     cuvsError_t cuvsResourcesDestroy(cuvsResources_t res)
     cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream)
     cuvsError_t cuvsStreamSync(cuvsResources_t res)
+
+    cuvsError_t cuvsSNMGResourcesCreate(cuvsSNMGResources_t* res)
+    cuvsError_t cuvsSNMGResourcesCreateWithDevices(cuvsSNMGResources_t* res,
+                                                   const int* device_ids,
+                                                   int num_ids)
+    cuvsError_t cuvsSNMGResourcesDestroy(cuvsSNMGResources_t res)
+    cuvsError_t cuvsSNMGResourcesSync(cuvsSNMGResources_t res)
+
     const char * cuvsGetLastErrorText()
 
     cuvsError_t cuvsMatrixCopy(cuvsResources_t res, DLManagedTensor * src,

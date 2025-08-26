@@ -18,6 +18,7 @@
 #include <cuvs/core/exceptions.hpp>
 #include <cuvs/version_config.h>
 
+#include <raft/core/device_resources_snmg.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/util/cudart_utils.hpp>
@@ -279,5 +280,40 @@ extern "C" cuvsError_t cuvsMatrixSliceRows(cuvsResources_t res,
 
     dst.data = static_cast<char*>(src.data) + start * row_strides * (dst.dtype.bits / 8);
     dst_managed->deleter = cuvsMatrixDestroy;
+  });
+}
+
+extern "C" cuvsError_t cuvsSNMGResourcesCreate(cuvsSNMGResources_t* res)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = new raft::device_resources_snmg{};
+    *res         = reinterpret_cast<uintptr_t>(res_ptr);
+  });
+}
+
+extern "C" cuvsError_t cuvsSNMGResourcesCreateWithDevices(cuvsSNMGResources_t* res,
+                                                          const int* device_ids,
+                                                          int num_ids)
+{
+  return cuvs::core::translate_exceptions([=] {
+    std::vector<int> ids(device_ids, device_ids + num_ids);
+    auto res_ptr = new raft::device_resources_snmg{ids};
+    *res         = reinterpret_cast<uintptr_t>(res_ptr);
+  });
+}
+
+extern "C" cuvsError_t cuvsSNMGResourcesDestroy(cuvsSNMGResources_t res)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = reinterpret_cast<raft::device_resources_snmg*>(res);
+    delete res_ptr;
+  });
+}
+
+extern "C" cuvsError_t cuvsSNMGResourcesSync(cuvsSNMGResources_t res)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = reinterpret_cast<raft::device_resources_snmg*>(res);
+    res_ptr->sync_stream();
   });
 }
