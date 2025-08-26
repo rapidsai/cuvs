@@ -38,25 +38,28 @@
 
 namespace cuvs::neighbors::cagra {
 
-namespace detail {
-
-template <typename T>
-void compute_dataset_norms(raft::resources const& res,
-                           raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,
-                           raft::device_vector_view<float, int64_t> norms)
+// Member function implementations for cagra::index
+template <typename T, typename IdxT>
+void index<T, IdxT>::compute_dataset_norms(raft::resources const& res)
 {
-  RAFT_EXPECTS(dataset.extent(0) == norms.extent(0),
-               "Dataset rows and norms vector size must match");
+  // Get the dataset view
+  auto dataset_view = this->dataset();
+
+  // Allocate norms vector if not already allocated
+  if (!dataset_norms_.has_value() || dataset_norms_->extent(0) != dataset_view.extent(0)) {
+    dataset_norms_ = raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
+  }
+
   constexpr float kScale = cuvs::spatial::knn::detail::utils::config<T>::kDivisor /
                            cuvs::spatial::knn::detail::utils::config<float>::kDivisor;
 
   // first scale the dataset and then compute norms
   auto scaled_sq_op = raft::compose_op(
     raft::sq_op{}, raft::div_const_op<float>{float(kScale)}, raft::cast_op<float>());
-  raft::linalg::reduce<true, true, T, float, int64_t>(norms.data_handle(),
-                                                      dataset.data_handle(),
-                                                      dataset.extent(1),
-                                                      dataset.extent(0),
+  raft::linalg::reduce<true, true, T, float, int64_t>(dataset_norms_->data_handle(),
+                                                      dataset_view.data_handle(),
+                                                      dataset_view.stride(0),
+                                                      dataset_view.extent(0),
                                                       (float)0,
                                                       raft::resource::get_cuda_stream(res),
                                                       false,
@@ -64,72 +67,6 @@ void compute_dataset_norms(raft::resources const& res,
                                                       raft::add_op(),
                                                       raft::sqrt_op{});
 }
-
-template <typename T>
-void compute_dataset_norms(raft::resources const& res,
-                           raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset,
-                           raft::device_vector_view<float, int64_t> norms)
-{
-  RAFT_EXPECTS(dataset.extent(0) == norms.extent(0),
-               "Dataset rows and norms vector size must match");
-  constexpr float kScale = cuvs::spatial::knn::detail::utils::config<T>::kDivisor /
-                           cuvs::spatial::knn::detail::utils::config<float>::kDivisor;
-  // first scale the dataset and then compute norms
-  auto scaled_sq_op = raft::compose_op(
-    raft::sq_op{}, raft::div_const_op<float>{float(kScale)}, raft::cast_op<float>());
-  raft::linalg::reduce<true, true, T, float, int64_t>(norms.data_handle(),
-                                                      dataset.data_handle(),
-                                                      dataset.stride(0),
-                                                      dataset.extent(0),
-                                                      (float)0,
-                                                      raft::resource::get_cuda_stream(res),
-                                                      false,
-                                                      scaled_sq_op,
-                                                      raft::add_op(),
-                                                      raft::sqrt_op{});
-}
-
-template void compute_dataset_norms<float>(
-  raft::resources const& res,
-  raft::device_matrix_view<const float, int64_t, raft::row_major> dataset,
-  raft::device_vector_view<float, int64_t> norms);
-
-template void compute_dataset_norms<half>(
-  raft::resources const& res,
-  raft::device_matrix_view<const half, int64_t, raft::row_major> dataset,
-  raft::device_vector_view<float, int64_t> norms);
-
-template void compute_dataset_norms<float>(
-  raft::resources const& res,
-  raft::device_matrix_view<const float, int64_t, raft::layout_stride> dataset,
-  raft::device_vector_view<float, int64_t> norms);
-
-template void compute_dataset_norms<half>(
-  raft::resources const& res,
-  raft::device_matrix_view<const half, int64_t, raft::layout_stride> dataset,
-  raft::device_vector_view<float, int64_t> norms);
-
-template void compute_dataset_norms<int8_t>(
-  raft::resources const& res,
-  raft::device_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
-  raft::device_vector_view<float, int64_t> norms);
-
-template void compute_dataset_norms<uint8_t>(
-  raft::resources const& res,
-  raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
-  raft::device_vector_view<float, int64_t> norms);
-
-template void compute_dataset_norms<int8_t>(
-  raft::resources const& res,
-  raft::device_matrix_view<const int8_t, int64_t, raft::layout_stride> dataset,
-  raft::device_vector_view<float, int64_t> norms);
-
-template void compute_dataset_norms<uint8_t>(
-  raft::resources const& res,
-  raft::device_matrix_view<const uint8_t, int64_t, raft::layout_stride> dataset,
-  raft::device_vector_view<float, int64_t> norms);
-
-}  // namespace detail
 
 /**
  * @defgroup cagra CUDA ANN Graph-based nearest neighbor search

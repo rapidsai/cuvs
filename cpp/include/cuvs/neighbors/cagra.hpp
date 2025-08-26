@@ -269,19 +269,6 @@ struct merge_params : cuvs::neighbors::merge_params {
 static_assert(std::is_aggregate_v<index_params>);
 static_assert(std::is_aggregate_v<search_params>);
 
-// Forward declarations for norm computation helpers (implemented in .cu files)
-namespace detail {
-template <typename T>
-void compute_dataset_norms(raft::resources const& res,
-                           raft::device_matrix_view<const T, int64_t, raft::row_major> dataset,
-                           raft::device_vector_view<float, int64_t> norms);
-
-template <typename T>
-void compute_dataset_norms(raft::resources const& res,
-                           raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset,
-                           raft::device_vector_view<float, int64_t> norms);
-}  // namespace detail
-
 /**
  * @defgroup cagra_cpp_index CAGRA index type
  * @{
@@ -360,11 +347,7 @@ struct index : cuvs::neighbors::index {
     return std::nullopt;
   }
 
-  /** Set dataset norms for cosine distance */
-  inline void set_dataset_norms(std::optional<raft::device_vector<float, int64_t>>&& norms)
-  {
-    dataset_norms_ = std::move(norms);
-  }
+  void compute_dataset_norms(raft::resources const& res);
 
   // Don't allow copying the index for performance reasons (try avoiding copying data)
   index(const index&)                    = delete;
@@ -457,12 +440,7 @@ struct index : cuvs::neighbors::index {
       auto p = dynamic_cast<strided_dataset<T, int64_t>*>(dataset_.get());
       if (p) {
         auto dataset_view = p->view();
-        if (dataset_view.extent(0) > 0) {
-          auto dataset_norms =
-            raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
-          detail::compute_dataset_norms(res, dataset_view, dataset_norms.view());
-          set_dataset_norms(std::move(dataset_norms));
-        }
+        if (dataset_view.extent(0) > 0) { compute_dataset_norms(res); }
       }
     }
 
@@ -485,11 +463,7 @@ struct index : cuvs::neighbors::index {
     dataset_norms_.reset();
 
     if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      if (dataset.extent(0) > 0) {
-        auto dataset_norms = raft::make_device_vector<float, int64_t>(res, dataset.extent(0));
-        detail::compute_dataset_norms(res, dataset, dataset_norms.view());
-        set_dataset_norms(std::move(dataset_norms));
-      }
+      if (dataset.extent(0) > 0) { compute_dataset_norms(res); }
     }
   }
 
@@ -501,11 +475,7 @@ struct index : cuvs::neighbors::index {
     dataset_norms_.reset();
 
     if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      if (dataset.extent(0) > 0) {
-        auto dataset_norms = raft::make_device_vector<float, int64_t>(res, dataset.extent(0));
-        detail::compute_dataset_norms(res, dataset, dataset_norms.view());
-        set_dataset_norms(std::move(dataset_norms));
-      }
+      if (dataset.extent(0) > 0) { compute_dataset_norms(res); }
     }
   }
 
@@ -523,13 +493,7 @@ struct index : cuvs::neighbors::index {
     dataset_ = make_aligned_dataset(res, dataset, 16);
     dataset_norms_.reset();
     if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      if (dataset.extent(0) > 0) {
-        auto p             = dynamic_cast<strided_dataset<T, int64_t>*>(dataset_.get());
-        auto dataset_view  = p->view();
-        auto dataset_norms = raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
-        detail::compute_dataset_norms(res, dataset_view, dataset_norms.view());
-        set_dataset_norms(std::move(dataset_norms));
-      }
+      if (dataset.extent(0) > 0) { compute_dataset_norms(res); }
     }
   }
 
@@ -549,12 +513,7 @@ struct index : cuvs::neighbors::index {
       auto p = dynamic_cast<strided_dataset<T, int64_t>*>(dataset_.get());
       if (p) {
         auto dataset_view = p->view();
-        if (dataset_view.extent(0) > 0) {
-          auto dataset_norms =
-            raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
-          detail::compute_dataset_norms(res, dataset_view, dataset_norms.view());
-          set_dataset_norms(std::move(dataset_norms));
-        }
+        if (dataset_view.extent(0) > 0) { compute_dataset_norms(res); }
       }
     }
   }
@@ -565,13 +524,9 @@ struct index : cuvs::neighbors::index {
   {
     dataset_ = std::move(dataset);
     dataset_norms_.reset();
-    auto dataset_view = this->dataset();
     if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      if (dataset_view.extent(0) > 0) {
-        auto dataset_norms = raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
-        detail::compute_dataset_norms(res, dataset_view, dataset_norms.view());
-        set_dataset_norms(std::move(dataset_norms));
-      }
+      auto dataset_view = this->dataset();
+      if (dataset_view.extent(0) > 0) { compute_dataset_norms(res); }
     }
   }
 
