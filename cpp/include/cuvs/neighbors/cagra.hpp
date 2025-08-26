@@ -493,7 +493,7 @@ struct index : cuvs::neighbors::index {
     }
   }
 
-  /** Set the dataset reference explicitly to a device matrix index with padding. */
+  /** Set the dataset reference explicitly to a device matrix view with padding. */
   void update_dataset(raft::resources const& res,
                       raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset)
   {

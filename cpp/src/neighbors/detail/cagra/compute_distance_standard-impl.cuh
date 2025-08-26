@@ -231,9 +231,6 @@ RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_standard_worker(
       }
     }
   }
-  // if (r < -3.5) {
-  //   printf("distance: %f\n", r);
-  // }
   return r;
 }
 
