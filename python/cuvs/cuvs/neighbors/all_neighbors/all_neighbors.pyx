@@ -218,7 +218,8 @@ def build(dataset, k, params, *,
     Parameters
     ----------
     dataset : array_like
-        Training dataset to build the k-NN graph for
+        Training dataset to build the k-NN graph for.
+        Supported dtype: float32
     k : int
         Number of nearest neighbors to find for each point
     params : AllNeighborsParams
@@ -278,6 +279,7 @@ def build(dataset, k, params, *,
     resources.sync()
 
     dataset_ai = wrap_array(dataset)
+    _check_input_array(dataset_ai, [np.dtype('float32')])
     n_rows, n_cols = dataset_ai.shape
 
     # Check dependencies between parameters

@@ -129,6 +129,11 @@ void _build_host(cuvsSNMGResources_t snmg_res,
   ensure_optional_distance_dtype(distances_tensor);
   ensure_optional_core_distance_dtype(core_distances_tensor);
 
+  // Check dependencies between parameters
+  if (core_distances_tensor != nullptr && distances_tensor == nullptr) {
+    RAFT_FAIL("distances tensor must be provided when core_distances tensor is provided");
+  }
+
   int64_t n_rows = dlt.shape[0];
   int64_t n_cols = dlt.shape[1];
 
@@ -174,6 +179,11 @@ void _build_device(cuvsResources_t device_res,
   ensure_indices_dtype(indices_tensor);
   ensure_optional_distance_dtype(distances_tensor);
   ensure_optional_core_distance_dtype(core_distances_tensor);
+
+  // Check dependencies between parameters
+  if (core_distances_tensor != nullptr && distances_tensor == nullptr) {
+    RAFT_FAIL("distances tensor must be provided when core_distances tensor is provided");
+  }
 
   int64_t n_rows = dlt.shape[0];
   int64_t n_cols = dlt.shape[1];
