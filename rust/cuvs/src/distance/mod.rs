@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 
 use crate::distance_type::DistanceType;
 use crate::dlpack::ManagedTensor;
@@ -72,8 +71,15 @@ mod tests {
             .to_device(&res)
             .unwrap();
 
-        pairwise_distance(&res, &dataset_device, &dataset_device, &distances, DistanceType::L2Expanded,
-        None).unwrap();
+        pairwise_distance(
+            &res,
+            &dataset_device,
+            &dataset_device,
+            &distances,
+            DistanceType::L2Expanded,
+            None,
+        )
+        .unwrap();
 
         // Copy back to host memory
         distances.to_host(&res, &mut distances_host).unwrap();
