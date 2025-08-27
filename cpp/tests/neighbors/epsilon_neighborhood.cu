@@ -121,7 +121,7 @@ TEST_P(EpsNeighTestFI, ResultBruteForce)
     auto y_view =
       raft::make_device_matrix_view<float, int64_t>(data.data(), param.n_row, param.n_col);
 
-    cuvs::neighbors::epsilon_neighborhood::eps_neighbors_l2sq<float, int64_t, int64_t>(
+    cuvs::neighbors::epsilon_neighborhood::compute<float, int64_t, int64_t>(
       handle, x_view, y_view, adj_view, vd_view, param.eps * param.eps);
 
     ASSERT_TRUE(cuvs::devArrMatch(
@@ -182,7 +182,7 @@ TEST_P(EpsNeighRbcTestFI, DenseRbc)
       param.n_row / param.n_centers, vd.data(), batchSize, cuvs::Compare<int64_t>(), stream));
 
     // compute baseline via brute force + compare
-    cuvs::neighbors::epsilon_neighborhood::eps_neighbors_l2sq<float, int64_t, int64_t>(
+    cuvs::neighbors::epsilon_neighborhood::compute<float, int64_t, int64_t>(
       handle,
       raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
         query, batchSize, param.n_col),

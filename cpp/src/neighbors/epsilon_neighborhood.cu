@@ -34,12 +34,12 @@ void epsUnexpL2SqNeighborhood(bool* adj,
 }
 
 template <typename value_t, typename idx_t, typename matrix_idx_t>
-void eps_neighbors_l2sq(raft::resources const& handle,
-                        raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> x,
-                        raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> y,
-                        raft::device_matrix_view<bool, matrix_idx_t, raft::row_major> adj,
-                        raft::device_vector_view<idx_t, matrix_idx_t> vd,
-                        value_t eps)
+void compute(raft::resources const& handle,
+             raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> x,
+             raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> y,
+             raft::device_matrix_view<bool, matrix_idx_t, raft::row_major> adj,
+             raft::device_vector_view<idx_t, matrix_idx_t> vd,
+             value_t eps)
 {
   epsUnexpL2SqNeighborhood<value_t, idx_t>(adj.data_handle(),
                                            vd.data_handle(),
@@ -53,7 +53,7 @@ void eps_neighbors_l2sq(raft::resources const& handle,
 }
 
 // Explicit template instantiations
-template void eps_neighbors_l2sq<float, int64_t, int64_t>(
+template void compute<float, int64_t, int64_t>(
   raft::resources const& handle,
   raft::device_matrix_view<const float, int64_t, raft::row_major> x,
   raft::device_matrix_view<const float, int64_t, raft::row_major> y,
@@ -61,7 +61,7 @@ template void eps_neighbors_l2sq<float, int64_t, int64_t>(
   raft::device_vector_view<int64_t, int64_t> vd,
   float eps);
 
-template void eps_neighbors_l2sq<float, int, int64_t>(
+template void compute<float, int, int64_t>(
   raft::resources const& handle,
   raft::device_matrix_view<const float, int64_t, raft::row_major> x,
   raft::device_matrix_view<const float, int64_t, raft::row_major> y,
@@ -69,7 +69,7 @@ template void eps_neighbors_l2sq<float, int, int64_t>(
   raft::device_vector_view<int, int64_t> vd,
   float eps);
 
-template void eps_neighbors_l2sq<double, int, int64_t>(
+template void compute<double, int, int64_t>(
   raft::resources const& handle,
   raft::device_matrix_view<const double, int64_t, raft::row_major> x,
   raft::device_matrix_view<const double, int64_t, raft::row_major> y,
@@ -77,7 +77,7 @@ template void eps_neighbors_l2sq<double, int, int64_t>(
   raft::device_vector_view<int, int64_t> vd,
   double eps);
 
-template void eps_neighbors_l2sq<double, int64_t, int64_t>(
+template void compute<double, int64_t, int64_t>(
   raft::resources const& handle,
   raft::device_matrix_view<const double, int64_t, raft::row_major> x,
   raft::device_matrix_view<const double, int64_t, raft::row_major> y,

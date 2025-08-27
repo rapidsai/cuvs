@@ -43,7 +43,7 @@ namespace cuvs::neighbors::epsilon_neighborhood {
  *  auto y = raft::make_device_matrix<float, int64_t>(handle, n, k);
  *  auto adj = raft::make_device_matrix<bool, int64_t>(handle, m, n);
  *  auto vd = raft::make_device_vector<int, int64_t>(handle, m + 1);
- *  epsilon_neighborhood::eps_neighbors_l2sq(handle, x.view(), y.view(), adj.view(), vd.view(),
+ *  epsilon_neighborhood::compute(handle, x.view(), y.view(), adj.view(), vd.view(),
  * eps);
  * @endcode
  *
@@ -62,12 +62,12 @@ namespace cuvs::neighbors::epsilon_neighborhood {
  *                    squared as we compute L2-squared distance in this method)
  */
 template <typename value_t, typename idx_t, typename matrix_idx_t>
-void eps_neighbors_l2sq(raft::resources const& handle,
-                        raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> x,
-                        raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> y,
-                        raft::device_matrix_view<bool, matrix_idx_t, raft::row_major> adj,
-                        raft::device_vector_view<idx_t, matrix_idx_t> vd,
-                        value_t eps);
+void compute(raft::resources const& handle,
+             raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> x,
+             raft::device_matrix_view<const value_t, matrix_idx_t, raft::row_major> y,
+             raft::device_matrix_view<bool, matrix_idx_t, raft::row_major> adj,
+             raft::device_vector_view<idx_t, matrix_idx_t> vd,
+             value_t eps);
 
 /** @} */  // end group epsilon_neighborhood_cpp_l2
 
