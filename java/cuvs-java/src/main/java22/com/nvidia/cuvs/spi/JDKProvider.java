@@ -103,6 +103,11 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
+  public GPUInfoProvider gpuInfoProvider() {
+    return new GPUInfoProviderImpl();
+  }
+
+  @Override
   public CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
       long size, long columns, CuVSMatrix.DataType dataType) throws UnsupportedOperationException {
 
