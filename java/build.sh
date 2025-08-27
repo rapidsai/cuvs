@@ -10,6 +10,19 @@ NUMARGS=$#
 VERSION="25.10.0" # Note: The version is updated automatically when ci/release/update-version.sh is invoked
 GROUP_ID="com.nvidia.cuvs"
 
+# Identify CUDA major version.
+CUDA_VERSION_FROM_NVCC=$(nvcc --version | grep -oP 'release [0-9]+' | awk '{print $2}')
+CUDA_MAJOR_VERSION=${CUDA_VERSION_FROM_NVCC:-12}
+
+# Identify architecture.
+if [[ $(uname -m) == "aarch64" ]]; then
+  ARCH="arm64"
+else
+  ARCH="x86"
+fi
+
+BUILD_PROFILE="$ARCH-cuda$CUDA_MAJOR_VERSION"
+
 if [ -z "${CMAKE_PREFIX_PATH:=}" ]; then
   CMAKE_PREFIX_PATH="$(pwd)/../cpp/build"
   export CMAKE_PREFIX_PATH
@@ -37,6 +50,7 @@ else export LD_LIBRARY_PATH=$CMAKE_PREFIX_PATH:${LD_LIBRARY_PATH}
 fi
 
 cd cuvs-java
-mvn clean verify "${MAVEN_VERIFY_ARGS[@]}" -P x86-cuda12 \
+mvn clean verify "${MAVEN_VERIFY_ARGS[@]}" -P "$BUILD_PROFILE" \
   && mvn install:install-file -Dfile=./target/cuvs-java-$VERSION.jar -DgroupId=$GROUP_ID -DartifactId=cuvs-java -Dversion=$VERSION -Dpackaging=jar \
+  && mvn install:install-file -Dfile=./target/cuvs-java-$VERSION-"$BUILD_PROFILE".jar -DgroupId=$GROUP_ID -DartifactId=cuvs-java -Dversion=$VERSION -Dclassifier="$BUILD_PROFILE" -Dpackaging=jar \
   && cp pom.xml ./target/
