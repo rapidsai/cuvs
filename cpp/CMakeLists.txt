@@ -459,13 +459,6 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_float.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_false.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_true.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_fp8_false_bitset64.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_fp8_true_bitset64.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_half_bitset64.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_half_bitset64.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_float_bitset64.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_false_bitset64.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_true_bitset64.cu
     src/neighbors/ivf_pq/detail/ivf_pq_contiguous_list_data.cu
     src/neighbors/ivf_pq/detail/ivf_pq_process_and_fill_codes.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_float_int64_t.cu
