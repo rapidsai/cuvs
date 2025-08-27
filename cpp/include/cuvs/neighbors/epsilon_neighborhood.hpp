@@ -22,7 +22,7 @@
 namespace cuvs::neighbors::epsilon_neighborhood {
 
 /**
- * @defgroup epsilon_neighbors Epislon Neighborhood Operations
+ * @defgroup epsilon_neighborhood_cpp_l2 Epsilon Neighborhood L2 Operations
  * @{
  */
 
@@ -68,5 +68,7 @@ void eps_neighbors_l2sq(raft::resources const& handle,
                         raft::device_matrix_view<bool, matrix_idx_t, raft::row_major> adj,
                         raft::device_vector_view<idx_t, matrix_idx_t> vd,
                         value_t eps);
+
+/** @} */  // end group epsilon_neighborhood_cpp_l2
 
 }  // namespace cuvs::neighbors::epsilon_neighborhood
