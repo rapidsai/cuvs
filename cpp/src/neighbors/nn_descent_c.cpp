@@ -52,7 +52,6 @@ void* _build(cuvsResources_t res,
   build_params.max_iterations            = params.max_iterations;
   build_params.termination_threshold     = params.termination_threshold;
   build_params.return_distances          = params.return_distances;
-  build_params.n_clusters                = params.n_clusters;
 
   using graph_type = raft::host_matrix_view<IdxT, int64_t, raft::row_major>;
   std::optional<graph_type> graph;
@@ -187,8 +186,7 @@ extern "C" cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t
       .intermediate_graph_degree = cpp_params.intermediate_graph_degree,
       .max_iterations            = cpp_params.max_iterations,
       .termination_threshold     = cpp_params.termination_threshold,
-      .return_distances          = cpp_params.return_distances,
-      .n_clusters                = cpp_params.n_clusters};
+      .return_distances          = cpp_params.return_distances};
   });
 }
 

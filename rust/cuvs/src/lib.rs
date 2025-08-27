@@ -20,6 +20,7 @@
 //! approximate nearest neighbors search on the GPU.
 pub mod brute_force;
 pub mod cagra;
+pub mod cluster;
 pub mod distance;
 pub mod distance_type;
 mod dlpack;
