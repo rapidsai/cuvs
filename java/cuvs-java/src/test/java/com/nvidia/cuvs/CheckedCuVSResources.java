@@ -62,6 +62,11 @@ public class CheckedCuVSResources implements CuVSResources {
   }
 
   @Override
+  public int deviceId() {
+    return inner.deviceId();
+  }
+
+  @Override
   public void close() {
     destroyed = true;
     inner.close();
