@@ -18,17 +18,76 @@ package com.nvidia.cuvs.spi;
 import com.nvidia.cuvs.*;
 import com.nvidia.cuvs.internal.*;
 import com.nvidia.cuvs.internal.common.Util;
+import java.io.*;
 import java.lang.foreign.MemorySegment;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 final class JDKProvider implements CuVSProvider {
 
+  private static class LibraryLoader {
+    private static final ClassLoader loader = JDKProvider.class.getClassLoader();
+
+    private static boolean loaded = false;
+
+    private static String[] filesToLoad = {
+      "rmm", "cuvs", "cuvs_c",
+    };
+
+    static synchronized void loadLibraries() throws IOException {
+      if (!loaded) {
+        String os = System.getProperty("os.name");
+        String arch = System.getProperty("os.arch");
+        List<File> files = new ArrayList<>();
+        for (String file : filesToLoad) {
+          files.add(createFile(os, arch, file));
+        }
+        for (File file : files) {
+          System.load(file.getAbsolutePath());
+        }
+        loaded = true;
+      }
+    }
+
+    /** Extract the contents of a library resource into a temporary file */
+    private static File createFile(String os, String arch, String baseName) throws IOException {
+      String path = arch + "/" + os + "/" + System.mapLibraryName(baseName);
+      File loc;
+      URL resource = loader.getResource(path);
+      if (resource == null) {
+        throw new FileNotFoundException("Could not locate native dependency " + path);
+      }
+      try (InputStream in = resource.openStream()) {
+        loc = File.createTempFile(baseName, ".so");
+        loc.deleteOnExit();
+        try (OutputStream out = new FileOutputStream(loc)) {
+          byte[] buffer = new byte[1024 * 16];
+          int read = 0;
+          while ((read = in.read(buffer)) >= 0) {
+            out.write(buffer, 0, read);
+          }
+        }
+      }
+      return loc;
+    }
+  }
+
   private static final MethodHandle createNativeDataset$mh = createNativeDatasetBuilder();
+
+  static {
+    try {
+      LibraryLoader.loadLibraries();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
 
   static MethodHandle createNativeDatasetBuilder() {
     try {
