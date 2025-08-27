@@ -61,4 +61,28 @@ template void eps_neighbors_l2sq<float, int64_t, int64_t>(
   raft::device_vector_view<int64_t, int64_t> vd,
   float eps);
 
+template void eps_neighbors_l2sq<float, int, int64_t>(
+  raft::resources const& handle,
+  raft::device_matrix_view<const float, int64_t, raft::row_major> x,
+  raft::device_matrix_view<const float, int64_t, raft::row_major> y,
+  raft::device_matrix_view<bool, int64_t, raft::row_major> adj,
+  raft::device_vector_view<int, int64_t> vd,
+  float eps);
+
+template void eps_neighbors_l2sq<double, int, int64_t>(
+  raft::resources const& handle,
+  raft::device_matrix_view<const double, int64_t, raft::row_major> x,
+  raft::device_matrix_view<const double, int64_t, raft::row_major> y,
+  raft::device_matrix_view<bool, int64_t, raft::row_major> adj,
+  raft::device_vector_view<int, int64_t> vd,
+  double eps);
+
+template void eps_neighbors_l2sq<double, int64_t, int64_t>(
+  raft::resources const& handle,
+  raft::device_matrix_view<const double, int64_t, raft::row_major> x,
+  raft::device_matrix_view<const double, int64_t, raft::row_major> y,
+  raft::device_matrix_view<bool, int64_t, raft::row_major> adj,
+  raft::device_vector_view<int64_t, int64_t> vd,
+  double eps);
+
 }  // namespace cuvs::neighbors::epsilon_neighborhood
