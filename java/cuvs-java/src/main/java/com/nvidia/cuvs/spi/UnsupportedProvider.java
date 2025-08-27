@@ -67,6 +67,11 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
+  public GPUInfoProvider gpuInfoProvider() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
       CuVSResources cuVSResources,
       long size,
