@@ -87,16 +87,14 @@ void build_mr_linkage(
     handle, all_neighbors_p, X, inds.view(), dists.view(), core_dists, alpha);
 
   // self-loops get max distance
-  rmm::device_uvector<value_idx> coo_rows(min_samples * m, stream);
-  auto coo_rows_counting_itr = thrust::make_counting_iterator<value_idx>(0);
-  thrust::transform(exec_policy,
-                    coo_rows_counting_itr,
-                    coo_rows_counting_itr + (m * min_samples),
-                    coo_rows.data(),
-                    [min_samples] __device__(value_idx c) -> value_idx { return c / min_samples; });
+  auto coo_rows = raft::make_device_vector<value_idx, value_idx>(handle, min_samples * m);
+  raft::linalg::map_offset(
+    handle, coo_rows.view(), [min_samples] __device__(value_idx c) -> value_idx {
+      return c / min_samples;
+    });
 
   raft::sparse::linalg::symmetrize(handle,
-                                   coo_rows.data(),
+                                   coo_rows.data_handle(),
                                    inds.data_handle(),
                                    dists.data_handle(),
                                    static_cast<value_idx>(m),
@@ -107,18 +105,21 @@ void build_mr_linkage(
   raft::sparse::convert::sorted_coo_to_csr(
     mr_coo.rows(), mr_coo.nnz, mr_indptr.data_handle(), m + 1, stream);
 
-  auto transform_in =
-    thrust::make_zip_iterator(thrust::make_tuple(mr_coo.rows(), mr_coo.cols(), mr_coo.vals()));
+  auto rows_view = raft::make_device_vector_view<const value_idx, nnz_t>(mr_coo.rows(), mr_coo.nnz);
+  auto cols_view = raft::make_device_vector_view<const value_idx, nnz_t>(mr_coo.cols(), mr_coo.nnz);
+  auto vals_in_view =
+    raft::make_device_vector_view<const value_t, nnz_t>(mr_coo.vals(), mr_coo.nnz);
+  auto vals_out_view = raft::make_device_vector_view<value_t, nnz_t>(mr_coo.vals(), mr_coo.nnz);
 
-  thrust::transform(exec_policy,
-                    transform_in,
-                    transform_in + mr_coo.nnz,
-                    mr_coo.vals(),
-                    [=] __device__(const thrust::tuple<value_idx, value_idx, value_t>& tup) {
-                      return thrust::get<0>(tup) == thrust::get<1>(tup)
-                               ? std::numeric_limits<value_t>::max()
-                               : thrust::get<2>(tup);
-                    });
+  raft::linalg::map(
+    handle,
+    vals_out_view,
+    [=] __device__(const value_idx row, const value_idx col, const value_t val) {
+      return row == col ? std::numeric_limits<value_t>::max() : val;
+    },
+    rows_view,
+    cols_view,
+    vals_in_view);
 
   rmm::device_uvector<value_idx> color(m, raft::resource::get_cuda_stream(handle));
   cuvs::sparse::neighbors::MutualReachabilityFixConnectivitiesRedOp<value_idx, value_t>

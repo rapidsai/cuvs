@@ -78,7 +78,7 @@ void build_linkage(
                                              out_dendrogram,
                                              out_distances,
                                              out_sizes,
-                                             mr_params.all_neighbors_p);
+                                             mr_params.all_neighbors_params);
   } else {
     auto dist_params =
       std::get<cuvs::cluster::agglomerative::helpers::linkage_graph_params::distance_params>(
@@ -134,7 +134,7 @@ void build_linkage(
                                              out_dendrogram,
                                              out_distances,
                                              out_sizes,
-                                             mr_params.all_neighbors_p);
+                                             mr_params.all_neighbors_params);
   } else {
     RAFT_FAIL("data must be on device memory to build linkage with distance params");
   }

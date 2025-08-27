@@ -145,7 +145,9 @@ struct mutual_reachability_params {
   /** weight applied when internal distance is chosen for mutual reachability (value of 1.0 disables
    * the weighting) */
   float alpha = 1.0;
-  cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_p{
+
+  /** params to build the knn graph */
+  cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_params{
     cuvs::neighbors::graph_build_params::brute_force_params{}};
 };
 }  // namespace linkage_graph_params
