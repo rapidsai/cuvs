@@ -22,36 +22,6 @@
 namespace cuvs::neighbors::epsilon_neighborhood {
 
 /**
- * @brief Computes epsilon neighborhood for the L2-Squared distance metric
- *
- * @tparam value_t   IO and math type
- * @tparam idx_t    Index type
- *
- * @param[out] adj    adjacency matrix [row-major] [on device] [dim = m x n]
- * @param[out] vd     vertex degree array [on device] [len = m + 1]
- *                    `vd + m` stores the total number of edges in the adjacency
- *                    matrix. Pass a nullptr if you don't need this info.
- * @param[in]  x      first matrix [row-major] [on device] [dim = m x k]
- * @param[in]  y      second matrix [row-major] [on device] [dim = n x k]
- * @param[in]  m      number of rows in x
- * @param[in]  n      number of rows in y
- * @param[in]  k      number of columns in x and k
- * @param[in]  eps    defines epsilon neighborhood radius (should be passed as
- *                    squared as we compute L2-squared distance in this method)
- * @param[in]  stream cuda stream
- */
-template <typename value_t, typename idx_t>
-void epsUnexpL2SqNeighborhood(bool* adj,
-                              idx_t* vd,
-                              const value_t* x,
-                              const value_t* y,
-                              idx_t m,
-                              idx_t n,
-                              idx_t k,
-                              value_t eps,
-                              cudaStream_t stream);
-
-/**
  * @defgroup epsilon_neighbors Epislon Neighborhood Operations
  * @{
  */

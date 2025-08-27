@@ -182,16 +182,16 @@ TEST_P(EpsNeighRbcTestFI, DenseRbc)
       param.n_row / param.n_centers, vd.data(), batchSize, cuvs::Compare<int64_t>(), stream));
 
     // compute baseline via brute force + compare
-    cuvs::neighbors::epsilon_neighborhood::epsUnexpL2SqNeighborhood<float, int64_t>(
-      adj_baseline.data_handle(),
-      nullptr,
-      query,
-      data.data(),
-      batchSize,
-      param.n_row,
-      param.n_col,
-      param.eps * param.eps,
-      stream);
+    cuvs::neighbors::epsilon_neighborhood::eps_neighbors_l2sq<float, int64_t, int64_t>(
+      handle,
+      raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
+        query, batchSize, param.n_col),
+      raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
+        data.data(), param.n_row, param.n_col),
+      raft::make_device_matrix_view<bool, int64_t, raft::row_major>(
+        adj_baseline.data_handle(), batchSize, param.n_row),
+      raft::make_device_vector_view<int64_t, int64_t>(vd.data(), batchSize + 1),
+      param.eps * param.eps);
 
     ASSERT_TRUE(cuvs::devArrMatch(adj_baseline.data_handle(),
                                   adj.data(),

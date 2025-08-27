@@ -53,16 +53,6 @@ void eps_neighbors_l2sq(raft::resources const& handle,
 }
 
 // Explicit template instantiations
-template void epsUnexpL2SqNeighborhood<float, int64_t>(bool* adj,
-                                                       int64_t* vd,
-                                                       const float* x,
-                                                       const float* y,
-                                                       int64_t m,
-                                                       int64_t n,
-                                                       int64_t k,
-                                                       float eps,
-                                                       cudaStream_t stream);
-
 template void eps_neighbors_l2sq<float, int64_t, int64_t>(
   raft::resources const& handle,
   raft::device_matrix_view<const float, int64_t, raft::row_major> x,
