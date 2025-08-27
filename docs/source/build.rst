@@ -57,11 +57,13 @@ Python through Pip
 
 The cuVS Python package can also be `installed through pip <https://docs.rapids.ai/install#pip>`_.
 
-For CUDA 12 packages:
-
 .. code-block:: bash
 
+    # CUDA 13
     pip install cuvs-cu13 --extra-index-url=https://pypi.nvidia.com
+
+    # CUDA 12
+    pip install cuvs-cu12 --extra-index-url=https://pypi.nvidia.com
 
 Note: these packages statically link the C and C++ libraries so the `libcuvs` and `libcuvs_c` shared libraries won't be readily available to use in your code.
 
