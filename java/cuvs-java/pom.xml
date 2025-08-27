@@ -318,7 +318,13 @@
                             <descriptors>
                                 <descriptor>src/assembly/native-with-deps.xml</descriptor>
                             </descriptors>
-
+                            <archive>
+                                <manifestEntries>
+                                    <Multi-Release>true</Multi-Release>
+                                    <addClasspath>true</addClasspath>
+                                    <mainClass>com.nvidia.cuvs.examples.CagraExample</mainClass>
+                                </manifestEntries>
+                            </archive>
                         </configuration>
                         <executions>
                             <execution>
@@ -395,7 +401,13 @@
                             <descriptors>
                                 <descriptor>src/assembly/native-with-deps.xml</descriptor>
                             </descriptors>
-
+                            <archive>
+                                <manifestEntries>
+                                    <Multi-Release>true</Multi-Release>
+                                    <addClasspath>true</addClasspath>
+                                    <mainClass>com.nvidia.cuvs.examples.CagraExample</mainClass>
+                                </manifestEntries>
+                            </archive>
                         </configuration>
                         <executions>
                             <execution>
