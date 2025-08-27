@@ -33,15 +33,18 @@ namespace cuvs::neighbors::epsilon_neighborhood {
  * indptr array.
  *
  * @code{.cpp}
- *  #include <raft/neighbors/epsilon_neighborhood.cuh>
+ *  #include <cuvs/neighbors/epsilon_neighborhood.hpp>
  *  #include <raft/core/resources.hpp>
  *  #include <raft/core/device_mdarray.hpp>
- *  using namespace raft::neighbors;
+ *  using namespace cuvs::neighbors;
  *  raft::resources handle;
  *  ...
- *  auto adj = raft::make_device_matrix<bool>(handle, m * n);
- *  auto vd = raft::make_device_vector<int>(handle, m+1);
- *  epsilon_neighborhood::eps_neighbors_l2sq(handle, x, y, adj.view(), vd.view(), eps);
+ *  auto x = raft::make_device_matrix<float, int64_t>(handle, m, k);
+ *  auto y = raft::make_device_matrix<float, int64_t>(handle, n, k);
+ *  auto adj = raft::make_device_matrix<bool, int64_t>(handle, m, n);
+ *  auto vd = raft::make_device_vector<int, int64_t>(handle, m + 1);
+ *  epsilon_neighborhood::eps_neighbors_l2sq(handle, x.view(), y.view(), adj.view(), vd.view(),
+ * eps);
  * @endcode
  *
  * @tparam value_t   IO and math type
