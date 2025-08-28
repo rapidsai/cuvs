@@ -101,10 +101,9 @@ Memory footprint
 ================
 
 CAGRA stores the dataset (raw vectors) and nearest-neighbor graph (neighbor IDs) in memory.
-The dataset can be on **host or device**; the graph is **pinned to host memory** (staged to device during search).
-Use the formulas below to estimate baseline and peak memory needs.
+The dataset can be on **host or device**; the graph is **pinned to host memory**.
 
-Baseline sizes
+Baseline Memory Footprint
 --------------
 
 These are the steady-state sizes of the stored data structures.
@@ -123,18 +122,18 @@ These are the steady-state sizes of the stored data structures.
 
 **Example** (1,000,000 vectors, dim = 1024, fp32, graph\_degree = 64, IdxT = int32):
 
-- dataset\_size = 4,096,000,000 B = **3906.25 MiB** (~4096 MB)
-- graph\_size   =   256,000,000 B = **244.14 MiB** (~256 MB)
+- dataset\_size = 4,096,000,000 B = **3906.25 MiB**
+- graph\_size   = 256,000,000 B = **244.14 MiB**
 
 Build peak memory usage
 -----------------------
 
-Index build has two phases: (1) construct an **intermediate graph**, then (2) **optimize** it (prune/reorder).
-The initial graph can be built with **IVF-PQ** (supports out-of-core, so datasets larger than GPU memory can be streamed)
-or **NN-descent**. The steps below are sequential (*not additive* across steps).
+Index build has two phases: (1) construct an intermediate graph, then (2) optimize it (prune/reorder).
+The initial graph can be built with IVF-PQ (supports out-of-core, so datasets larger than GPU memory can be streamed)
+or NN-descent. The steps below are sequential with distinct peak memory consumption. The overall peak memory utilization depends on the configured memory resource.
 
-Out-of-core IVF-PQ (sequential; not additive)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Out-of-core IVF-PQ
+~~~~~~~~~~~~~~~~~~~~~~~
 
 **IVF-PQ Build (centroid training)** — uses a training subset to compute cluster centroids and assignments.
 
@@ -148,7 +147,7 @@ Out-of-core IVF-PQ (sequential; not additive)
    \;+\;
    \frac{n\_{\text{vectors}}}{\text{train\_set\_ratio}} \times \operatorname{sizeof}(\mathrm{uint32\_t})
 
-**Example** (n = 1e6; dim = 1024; n\_clusters = 1024; train\_set\_ratio = 10): **395.01 MiB** (~414.19 MB)
+**Example** (n = 1e6; dim = 1024; n\_clusters = 1024; train\_set\_ratio = 10): **395.01 MiB**
 
 **IVF-PQ Search (forms the intermediate graph)** — batches vectors to the GPU, finds nearest lists, and records
 per-query candidate neighbors (IDs + distances). Max batch size is 1024.
@@ -163,7 +162,7 @@ per-query candidate neighbors (IDs + distances). Max batch size is 1024.
    \;+\;
    \text{batch\_size} \times \text{intermediate\_degree} \times 4
 
-**Example** (batch = 1024, dim = 1024, intermediate\_degree = 128): **5.00 MiB** (~5.24 MB)
+**Example** (batch = 1024, dim = 1024, intermediate\_degree = 128): **5.00 MiB**
 
 **NN-descent peak memory** — *TBD* (depends on implementation details and parameters).
 
@@ -179,7 +178,7 @@ Pruning/reordering the intermediate graph; peak scales linearly with intermediat
    n\_{\text{vectors}} \times
    \Big( 4 + \big(\operatorname{sizeof}(\mathrm{IdxT}) + 1\big)\times \text{intermediate\_degree} \Big)
 
-**Example** (n = 1e6, intermediate\_degree = 128, IdxT = int32): **614.17 MiB** (~644 MB)
+**Example** (n = 1e6, intermediate\_degree = 128, IdxT = int32): **614.17 MiB**
 
 Overall Index Build peak (device)
 ---------------------
@@ -214,8 +213,7 @@ peaks from sequential steps are additive;
 Search peak memory usage
 ------------------------
 
-During search, the dataset and graph are staged to the GPU and per-batch buffers hold the current queries
-and their top-*k* results. If multiple batches run concurrently/overlapped, add one **result\_size**
+During search, the dataset and graph are staged to the GPU and per-batch buffers hold the current queries and their top-k results. If multiple batches run concurrently/overlapped, add one result\_size
 (and any per-batch scratch) per extra in-flight batch. Distances are fp32 by default.
 
 .. math::
@@ -240,5 +238,5 @@ and their top-*k* results. If multiple batches run concurrently/overlapped, add 
 **Example** (dim = 1024, batch\_size = 100, topk = 10, IdxT = int32):
 
 - query\_size  = 409,600 B = **0.3906 MiB**
-- result\_size =   8,000 B = **0.0076 MiB**
-- **Total search memory** ≈ 3906.25 + 244.14 + 0.3906 + 0.0076 = **4150.79 MiB** (~4.05 GiB)
+- result\_size = 8,000 B = **0.0076 MiB**
+- **Total search memory** ≈ 3906.25 + 244.14 + 0.3906 + 0.0076 = **4150.79 MiB**
