@@ -164,7 +164,10 @@ per-query candidate neighbors (IDs + distances). Max batch size is 1024.
 
 **Example** (batch = 1024, dim = 1024, intermediate\_degree = 128): **5.00 MiB**
 
-**NN-descent peak memory** — *TBD* (depends on implementation details and parameters).
+**NN-descent peak memory** 
+~~~~~~~~~~~~~~~~~~~~~~~
+
+*TBD* (depends on implementation details and parameters).
 
 Optimize phase (device)
 ~~~~~~~~~~~~~~~~~~~~~~~
