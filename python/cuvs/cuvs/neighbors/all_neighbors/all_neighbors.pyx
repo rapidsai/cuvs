@@ -238,6 +238,10 @@ def build(dataset, k, params, *,
     alpha : float, default=1.0
         Mutual-reachability scaling; used only when core_distances is
         provided
+    resources : Resources or SNMGResources, optional
+        CUDA resources to use for the operation. If not provided, a default
+        Resources object will be created. Use SNMGResources to enable
+        multi-GPU execution across multiple devices.
 
     Returns
     -------
