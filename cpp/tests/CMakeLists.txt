@@ -167,6 +167,11 @@ if(BUILD_TESTS)
   )
 
   ConfigureTest(
+    NAME NEIGHBORS_ANN_CAGRA_HELPERS_TEST PATH neighbors/ann_cagra/test_optimize_uint32_t.cu GPUS 1
+    PERCENT 100
+  )
+
+  ConfigureTest(
     NAME NEIGHBORS_ANN_CAGRA_HALF_UINT32_TEST PATH neighbors/ann_cagra/test_half_uint32_t.cu GPUS 1
     PERCENT 100
   )
@@ -211,8 +216,12 @@ if(BUILD_TESTS)
   ConfigureTest(NAME NEIGHBORS_BALL_COVER_TEST PATH neighbors/ball_cover.cu GPUS 1 PERCENT 100)
 
   ConfigureTest(
+    NAME NEIGHBORS_EPSILON_NEIGHBORHOOD_TEST PATH neighbors/epsilon_neighborhood.cu GPUS 1 PERCENT
+    100
+  )
+
+  ConfigureTest(
     NAME NEIGHBORS_ALL_NEIGHBORS_TEST PATH neighbors/all_neighbors/test_float.cu GPUS 1 PERCENT 100
-    ADDITIONAL_DEP NCCL::NCCL
   )
 
   ConfigureTest(

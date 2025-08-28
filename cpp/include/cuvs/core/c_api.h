@@ -86,7 +86,7 @@ cuvsError_t cuvsResourcesDestroy(cuvsResources_t res);
 cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream);
 
 /**
- * @brief Get the cudaStream_t from a cuvsResources_t t
+ * @brief Get the cudaStream_t from a cuvsResources_t
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[out] stream cudaStream_t stream to queue CUDA kernels
@@ -101,6 +101,15 @@ cuvsError_t cuvsStreamGet(cuvsResources_t res, cudaStream_t* stream);
  * @return cuvsError_t
  */
 cuvsError_t cuvsStreamSync(cuvsResources_t res);
+
+/**
+ * @brief Get the id of the device associated with this cuvsResources_t
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[out] device_id int the id of the device associated with res
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsDeviceIdGet(cuvsResources_t res, int* device_id);
 /** @} */
 
 /**

@@ -16,9 +16,8 @@
 package com.nvidia.cuvs.internal;
 
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResourcesCreate;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResourcesDestroy;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsResources_t;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
+import static com.nvidia.cuvs.internal.panama.headers_h_1.C_INT;
 
 import com.nvidia.cuvs.CuVSResources;
 import java.lang.foreign.Arena;
@@ -34,6 +33,7 @@ public class CuVSResourcesImpl implements CuVSResources {
   private final Path tempDirectory;
   private final long resourceHandle;
   private final ScopedAccess access;
+  private final int deviceId;
 
   /**
    * Constructor that allocates the resources needed for cuVS
@@ -43,9 +43,11 @@ public class CuVSResourcesImpl implements CuVSResources {
     this.tempDirectory = tempDirectory;
     try (var localArena = Arena.ofConfined()) {
       var resourcesMemorySegment = localArena.allocate(cuvsResources_t);
-      int returnValue = cuvsResourcesCreate(resourcesMemorySegment);
-      checkCuVSError(returnValue, "cuvsResourcesCreate");
+      checkCuVSError(cuvsResourcesCreate(resourcesMemorySegment), "cuvsResourcesCreate");
       this.resourceHandle = resourcesMemorySegment.get(cuvsResources_t, 0);
+      var deviceIdPtr = localArena.allocate(C_INT);
+      checkCuVSError(cuvsDeviceIdGet(resourceHandle, deviceIdPtr), "cuvsDeviceIdGet");
+      this.deviceId = deviceIdPtr.get(C_INT, 0);
       this.access =
           new ScopedAccess() {
             @Override
@@ -62,6 +64,11 @@ public class CuVSResourcesImpl implements CuVSResources {
   @Override
   public ScopedAccess access() {
     return this.access;
+  }
+
+  @Override
+  public int deviceId() {
+    return this.deviceId;
   }
 
   @Override
