@@ -58,8 +58,10 @@ def test_all_neighbors_device_build_quality(algo, cluster, metric):
 
     if cluster == "single_cluster":
         n_clusters = 1
+        overlap_factor = 0
     else:
         n_clusters = 8
+        overlap_factor = 3
 
     np.random.seed(42)
     from sklearn.datasets import make_blobs
@@ -101,7 +103,7 @@ def test_all_neighbors_device_build_quality(algo, cluster, metric):
 
     params = all_neighbors.AllNeighborsParams(
         algo=algo,
-        overlap_factor=0,
+        overlap_factor=overlap_factor,
         n_clusters=1,
         metric=metric,
         ivf_pq_params=ivf_pq_params,

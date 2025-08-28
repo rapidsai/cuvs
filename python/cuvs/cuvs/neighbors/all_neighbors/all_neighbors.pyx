@@ -262,16 +262,7 @@ def build(dataset, k, params, *,
             "device. Put data on host for batch build."
         )
 
-    # Host builds use SNMG resources for multi-GPU, device builds use regular
-    # resources for single-GPU by default
-    if not on_device and (
-        resources is None or not isinstance(resources, (Resources, SNMGResources))  # noqa: E501
-    ):
-        resources = SNMGResources()
-
-    if on_device and (
-        resources is None or not isinstance(resources, (Resources, SNMGResources))  # noqa: E501
-    ):
+    if not isinstance(resources, (Resources, SNMGResources)):
         resources = Resources()
 
     resources.sync()
