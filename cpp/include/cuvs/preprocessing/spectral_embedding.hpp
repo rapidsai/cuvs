@@ -43,14 +43,43 @@ struct params {
   uint64_t seed;
 };
 
+// Template function declarations
+template <typename IndexTypeT>
 void transform(raft::resources const& handle,
                params config,
-               raft::device_matrix_view<float, int, raft::row_major> dataset,
-               raft::device_matrix_view<float, int, raft::col_major> embedding);
+               raft::device_matrix_view<float, IndexTypeT, raft::row_major> dataset,
+               raft::device_matrix_view<float, IndexTypeT, raft::col_major> embedding);
 
-void transform(raft::resources const& handle,
-               params config,
-               raft::device_coo_matrix_view<float, int, int, int> connectivity_graph,
-               raft::device_matrix_view<float, int, raft::col_major> embedding);
+template <typename IndexTypeT>
+void transform(
+  raft::resources const& handle,
+  params config,
+  raft::device_coo_matrix_view<float, IndexTypeT, IndexTypeT, IndexTypeT> connectivity_graph,
+  raft::device_matrix_view<float, IndexTypeT, raft::col_major> embedding);
+
+// Explicit instantiations for common index types
+extern template void transform<int32_t>(
+  raft::resources const& handle,
+  params config,
+  raft::device_matrix_view<float, int32_t, raft::row_major> dataset,
+  raft::device_matrix_view<float, int32_t, raft::col_major> embedding);
+
+extern template void transform<int64_t>(
+  raft::resources const& handle,
+  params config,
+  raft::device_matrix_view<float, int64_t, raft::row_major> dataset,
+  raft::device_matrix_view<float, int64_t, raft::col_major> embedding);
+
+extern template void transform<int32_t>(
+  raft::resources const& handle,
+  params config,
+  raft::device_coo_matrix_view<float, int32_t, int32_t, int32_t> connectivity_graph,
+  raft::device_matrix_view<float, int32_t, raft::col_major> embedding);
+
+extern template void transform<int64_t>(
+  raft::resources const& handle,
+  params config,
+  raft::device_coo_matrix_view<float, int64_t, int64_t, int64_t> connectivity_graph,
+  raft::device_matrix_view<float, int64_t, raft::col_major> embedding);
 
 }  // namespace cuvs::preprocessing::spectral_embedding
