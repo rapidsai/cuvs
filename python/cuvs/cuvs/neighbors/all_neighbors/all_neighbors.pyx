@@ -24,7 +24,7 @@ from cuvs.common.resources import Resources, SNMGResources
 from cython.operator cimport dereference as deref
 
 from cuvs.common cimport cydlpack
-from cuvs.common.c_api cimport cuvsResources_t, cuvsSNMGResources_t
+from cuvs.common.c_api cimport cuvsResources_t
 from cuvs.distance_type cimport cuvsDistanceType
 
 from pylibraft.common import auto_convert_output, device_ndarray
@@ -212,8 +212,9 @@ def build(dataset, k, params, *,
           alpha=1.0,
           resources=None):
     """
-    SNMG all-neighbors: always uses multi-GPU resources. If resources is None,
-    an SNMGResources will be created for all available GPUs.
+    All-neighbors allows building an approximate all-neighbors knn graph.
+    Given a full dataset, it finds nearest neighbors for all the training
+    vectors in the dataset.
 
     Parameters
     ----------
@@ -237,9 +238,6 @@ def build(dataset, k, params, *,
     alpha : float, default=1.0
         Mutual-reachability scaling; used only when core_distances is
         provided
-    resources : SNMGResources, optional
-        SNMG multi-GPU resources. If None, will be created for all available
-        GPUs.
 
     Returns
     -------
@@ -265,14 +263,14 @@ def build(dataset, k, params, *,
         )
 
     # Host builds use SNMG resources for multi-GPU, device builds use regular
-    # resources for single-GPU
+    # resources for single-GPU by default
     if not on_device and (
-        resources is None or not isinstance(resources, SNMGResources)
+        resources is None or not isinstance(resources, (Resources, SNMGResources))  # noqa: E501
     ):
         resources = SNMGResources()
 
     if on_device and (
-        resources is None or not isinstance(resources, Resources)
+        resources is None or not isinstance(resources, (Resources, SNMGResources))  # noqa: E501
     ):
         resources = Resources()
 
@@ -351,15 +349,12 @@ def build(dataset, k, params, *,
         <cuvsAllNeighborsIndexParams_t><size_t>params.get_handle()
     )
 
-    # Host builds use SNMG resources, device builds use regular resources
-    cdef cuvsResources_t device_res
-    cdef cuvsSNMGResources_t snmg_res
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
     with cuda_interruptible():
         if on_device:
-            device_res = <cuvsResources_t>resources.get_c_obj()
             check_cuvs(cuvsAllNeighborsBuildDevice(
-                device_res,
+                res,
                 params_ptr,
                 dataset_dlpack,
                 indices_dlpack,
@@ -368,9 +363,8 @@ def build(dataset, k, params, *,
                 <float>alpha,
             ))
         else:
-            snmg_res = <cuvsSNMGResources_t>resources.get_c_obj()
             check_cuvs(cuvsAllNeighborsBuildHost(
-                snmg_res,
+                res,
                 params_ptr,
                 dataset_dlpack,
                 indices_dlpack,

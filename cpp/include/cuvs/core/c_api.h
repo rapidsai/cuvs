@@ -101,15 +101,11 @@ cuvsError_t cuvsStreamGet(cuvsResources_t res, cudaStream_t* stream);
  * @return cuvsError_t
  */
 cuvsError_t cuvsStreamSync(cuvsResources_t res);
-/**
- * @brief An opaque C handle for C++ type `raft::device_resources_snmg`
- */
-typedef uintptr_t cuvsSNMGResources_t;
 
 /**
  * @brief Create a SNMG resources handle with all available GPUs
  */
-cuvsError_t cuvsSNMGResourcesCreate(cuvsSNMGResources_t* res);
+cuvsError_t cuvsSNMGResourcesCreate(cuvsResources_t* res);
 
 /**
  * @brief Create a SNMG resources handle with a subset of GPUs
@@ -117,19 +113,9 @@ cuvsError_t cuvsSNMGResourcesCreate(cuvsSNMGResources_t* res);
  * @param[in] device_ids pointer to device ids array
  * @param[in] num_ids number of device ids
  */
-cuvsError_t cuvsSNMGResourcesCreateWithDevices(cuvsSNMGResources_t* res,
+cuvsError_t cuvsSNMGResourcesCreateWithDevices(cuvsResources_t* res,
                                                const int* device_ids,
                                                int num_ids);
-
-/**
- * @brief Destroy a SNMG resources handle
- */
-cuvsError_t cuvsSNMGResourcesDestroy(cuvsSNMGResources_t res);
-
-/**
- * @brief Synchronize all streams in a SNMG resources handle
- */
-cuvsError_t cuvsSNMGResourcesSync(cuvsSNMGResources_t res);
 /** @} */
 
 /**

@@ -32,8 +32,8 @@ extern "C" {
  * @{
  *
  * All-neighbors constructs an approximate k-NN graph for all vectors in a dataset.
- * This SNMG C API always expects a multi-GPU resources handle (`cuvsSNMGResources_t`)
- * created from `raft::device_resources_snmg` and will distribute work across GPUs.
+ * This SNMG C API can be used with a multi-GPU resources handle (`cuvsSNMGResources_t`)
+ * created from `raft::device_resources_snmg` to distribute work across GPUs.
  *
  * Notes:
  * - Outputs (indices, distances, core_distances) are expected to be on device memory.
@@ -73,7 +73,7 @@ typedef struct cuvsAllNeighborsIndexParams* cuvsAllNeighborsIndexParams_t;
 /**
  * @brief Build an all-neighbors k-NN graph from a host-resident dataset (SNMG).
  *
- * @param[in] snmg_res        SNMG multi-GPU resources (raft::device_resources_snmg)
+ * @param[in] res             Can be a SNMG multi-GPU resources (`cuvsSNMGResources_t`)
  * @param[in] params          Build parameters (see cuvsAllNeighborsIndexParams)
  * @param[in] dataset         2D tensor [num_rows x dim] on host (CPU or CUDAHost)
  * @param[out] indices        2D tensor [num_rows x k] on device (int64)
@@ -85,7 +85,7 @@ typedef struct cuvsAllNeighborsIndexParams* cuvsAllNeighborsIndexParams_t;
  * `overlap_factor` nearest clusters. Work is balanced across GPUs according to the
  * number of available ranks in `snmg`. Outputs always reside in device memory.
  */
-cuvsError_t cuvsAllNeighborsBuildHost(cuvsSNMGResources_t snmg_res,
+cuvsError_t cuvsAllNeighborsBuildHost(cuvsResources_t res,
                                       cuvsAllNeighborsIndexParams_t params,
                                       DLManagedTensor* dataset,
                                       DLManagedTensor* indices,
@@ -97,7 +97,7 @@ cuvsError_t cuvsAllNeighborsBuildHost(cuvsSNMGResources_t snmg_res,
  * @brief Build an all-neighbors k-NN graph from a device-resident dataset (single-GPU, no
  * batching).
  *
- * @param[in] res             Single-GPU resources (raft::device_resources)
+ * @param[in] res             Single-GPU resources
  * @param[in] params          Build parameters (see cuvsAllNeighborsIndexParams). For device
  * datasets, `n_clusters` must be 1 (no batching); `overlap_factor` is ignored.
  * @param[in] dataset         2D tensor [num_rows x dim] on device (CUDA/CUDAManaged)

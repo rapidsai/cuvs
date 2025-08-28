@@ -45,8 +45,18 @@ extern "C" cuvsError_t cuvsResourcesCreate(cuvsResources_t* res)
 extern "C" cuvsError_t cuvsResourcesDestroy(cuvsResources_t res)
 {
   return cuvs::core::translate_exceptions([=] {
-    auto res_ptr = reinterpret_cast<raft::resources*>(res);
-    delete res_ptr;
+    // Try to cast as device_resources_snmg first and check if it's valid
+    auto snmg_res_ptr = reinterpret_cast<raft::device_resources_snmg*>(res);
+    auto base_res_ptr = dynamic_cast<raft::resources*>(snmg_res_ptr);
+
+    if (base_res_ptr != nullptr) {
+      // It's a device_resources_snmg
+      delete snmg_res_ptr;
+    } else {
+      // It's a regular raft::resources
+      auto regular_res_ptr = reinterpret_cast<raft::resources*>(res);
+      delete regular_res_ptr;
+    }
   });
 }
 
@@ -283,7 +293,7 @@ extern "C" cuvsError_t cuvsMatrixSliceRows(cuvsResources_t res,
   });
 }
 
-extern "C" cuvsError_t cuvsSNMGResourcesCreate(cuvsSNMGResources_t* res)
+extern "C" cuvsError_t cuvsSNMGResourcesCreate(cuvsResources_t* res)
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = new raft::device_resources_snmg{};
@@ -291,7 +301,7 @@ extern "C" cuvsError_t cuvsSNMGResourcesCreate(cuvsSNMGResources_t* res)
   });
 }
 
-extern "C" cuvsError_t cuvsSNMGResourcesCreateWithDevices(cuvsSNMGResources_t* res,
+extern "C" cuvsError_t cuvsSNMGResourcesCreateWithDevices(cuvsResources_t* res,
                                                           const int* device_ids,
                                                           int num_ids)
 {
@@ -299,21 +309,5 @@ extern "C" cuvsError_t cuvsSNMGResourcesCreateWithDevices(cuvsSNMGResources_t* r
     std::vector<int> ids(device_ids, device_ids + num_ids);
     auto res_ptr = new raft::device_resources_snmg{ids};
     *res         = reinterpret_cast<uintptr_t>(res_ptr);
-  });
-}
-
-extern "C" cuvsError_t cuvsSNMGResourcesDestroy(cuvsSNMGResources_t res)
-{
-  return cuvs::core::translate_exceptions([=] {
-    auto res_ptr = reinterpret_cast<raft::device_resources_snmg*>(res);
-    delete res_ptr;
-  });
-}
-
-extern "C" cuvsError_t cuvsSNMGResourcesSync(cuvsSNMGResources_t res)
-{
-  return cuvs::core::translate_exceptions([=] {
-    auto res_ptr = reinterpret_cast<raft::device_resources_snmg*>(res);
-    res_ptr->sync_stream();
   });
 }

@@ -17,7 +17,6 @@
 #include <cstdint>
 #include <dlpack/dlpack.h>
 
-#include <raft/core/device_resources_snmg.hpp>
 #include <raft/core/error.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/util/cudart_utils.hpp>
@@ -111,7 +110,7 @@ static void ensure_optional_core_distance_dtype(DLManagedTensor* core_distances)
 }
 
 template <typename T>
-void _build_host(cuvsSNMGResources_t snmg_res,
+void _build_host(cuvsResources_t res,
                  cuvsAllNeighborsIndexParams_t params,
                  DLManagedTensor* dataset_tensor,
                  DLManagedTensor* indices_tensor,
@@ -119,7 +118,7 @@ void _build_host(cuvsSNMGResources_t snmg_res,
                  DLManagedTensor* core_distances_tensor,
                  float alpha)
 {
-  auto& res = *reinterpret_cast<raft::device_resources_snmg*>(snmg_res);
+  auto& cpp_res = *reinterpret_cast<raft::device_resources*>(res);
 
   auto& dlt = dataset_tensor->dl_tensor;
   RAFT_EXPECTS(cuvs::core::is_dlpack_host_compatible(dlt),
@@ -158,7 +157,7 @@ void _build_host(cuvsSNMGResources_t snmg_res,
   }
 
   cuvs::neighbors::all_neighbors::build(
-    res, cpp_params, dataset, indices, distances, core_distances, alpha);
+    cpp_res, cpp_params, dataset, indices, distances, core_distances, alpha);
 }
 
 template <typename T>
@@ -170,7 +169,7 @@ void _build_device(cuvsResources_t device_res,
                    DLManagedTensor* core_distances_tensor,
                    float alpha)
 {
-  auto& res = *reinterpret_cast<raft::device_resources*>(device_res);
+  auto& cpp_res = *reinterpret_cast<raft::device_resources*>(device_res);
 
   auto& dlt = dataset_tensor->dl_tensor;
   RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(dlt),
@@ -209,12 +208,12 @@ void _build_device(cuvsResources_t device_res,
   }
 
   cuvs::neighbors::all_neighbors::build(
-    res, cpp_params, dataset, indices, distances, core_distances, alpha);
+    cpp_res, cpp_params, dataset, indices, distances, core_distances, alpha);
 }
 
 }  // namespace
 
-extern "C" cuvsError_t cuvsAllNeighborsBuildHost(cuvsSNMGResources_t snmg_res,
+extern "C" cuvsError_t cuvsAllNeighborsBuildHost(cuvsResources_t res,
                                                  cuvsAllNeighborsIndexParams_t params,
                                                  DLManagedTensor* dataset_tensor,
                                                  DLManagedTensor* indices_tensor,
@@ -226,7 +225,7 @@ extern "C" cuvsError_t cuvsAllNeighborsBuildHost(cuvsSNMGResources_t snmg_res,
     auto dataset = dataset_tensor->dl_tensor;
 
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      _build_host<float>(snmg_res,
+      _build_host<float>(res,
                          params,
                          dataset_tensor,
                          indices_tensor,

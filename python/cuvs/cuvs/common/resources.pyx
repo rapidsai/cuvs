@@ -24,11 +24,8 @@ from cuvs.common.c_api cimport (
     cuvsResources_t,
     cuvsResourcesCreate,
     cuvsResourcesDestroy,
-    cuvsSNMGResources_t,
     cuvsSNMGResourcesCreate,
     cuvsSNMGResourcesCreateWithDevices,
-    cuvsSNMGResourcesDestroy,
-    cuvsSNMGResourcesSync,
     cuvsStreamSet,
     cuvsStreamSync,
 )
@@ -100,7 +97,7 @@ cdef class SNMGResources:
         with all available GPUs.
     """
 
-    cdef cuvsSNMGResources_t c_obj
+    cdef cuvsResources_t c_obj
 
     def __cinit__(self, device_ids=None):
         """
@@ -145,7 +142,7 @@ cdef class SNMGResources:
         """
         Synchronize all device streams for the SNMG resources object.
         """
-        check_cuvs(cuvsSNMGResourcesSync(self.c_obj))
+        check_cuvs(cuvsStreamSync(self.c_obj))
 
     def get_c_obj(self):
         """
@@ -158,7 +155,7 @@ cdef class SNMGResources:
         # If c_obj is 0 / NULL this call should be harmless (but depends on
         # C API)
         try:
-            check_cuvs(cuvsSNMGResourcesDestroy(self.c_obj))
+            check_cuvs(cuvsResourcesDestroy(self.c_obj))
         except Exception:
             # Suppress exceptions in dealloc to avoid raising during
             # GC/finalize
