@@ -160,8 +160,6 @@
                     </execution>
                 </executions>
             </plugin>
-
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -380,12 +378,6 @@
                                             <directory>${native.lib.path}/_deps/rmm-build</directory>
                                             <includes>
                                                 <include>librmm.so</include>
-                                            </includes>
-                                        </resource>
-                                        <resource>
-                                            <directory>${native.lib.path}/_deps/rapid_logger-build</directory>
-                                            <includes>
-                                                <include>librapids_logger.so</include>
                                             </includes>
                                         </resource>
                                     </resources>
