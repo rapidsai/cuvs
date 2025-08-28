@@ -222,7 +222,6 @@ if(BUILD_TESTS)
 
   ConfigureTest(
     NAME NEIGHBORS_ALL_NEIGHBORS_TEST PATH neighbors/all_neighbors/test_float.cu GPUS 1 PERCENT 100
-    ADDITIONAL_DEP NCCL::NCCL
   )
 
   ConfigureTest(
