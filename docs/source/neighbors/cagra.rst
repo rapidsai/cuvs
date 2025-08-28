@@ -181,6 +181,36 @@ Pruning/reordering the intermediate graph; peak scales linearly with intermediat
 
 **Example** (n = 1e6, intermediate\_degree = 128, IdxT = int32): **614.17 MiB** (~644 MB)
 
+Overall Index Build peak (device)
+---------------------
+
+Depending on the selected rmm memory resource, the overall peak memory footprint on the device would be different. For ``cuda_memory_resource``, peak is the maximum allocation across each step; For ``managed_memory_resource memory``, the
+peaks from sequential steps are additive;
+
+``cuda_memory_resource``:
+
+.. math::
+
+   \text{dataset\_size}
+   \;+\;
+   \max\!\big(\text{IVFPQ\_build\_peak},\ \text{IVFPQ\_search\_peak},\ \text{optimize\_peak}\big)
+
+**Example:** 3906.25 + max(395.01, 5.00, 614.17) = **4520.42 MiB**
+
+``managed_memory_resource``:
+
+.. math::
+
+   \text{dataset\_size}
+   \;+\;
+   \text{IVFPQ\_build\_peak}
+   \;+\;
+   \text{IVFPQ\_search\_peak}
+   \;+\;
+   \text{optimize\_peak}
+
+**Example:** 3906.25 + 395.01 + 5.00 + 614.17 = **4920.43 MiB**
+
 Search peak memory usage
 ------------------------
 
@@ -212,33 +242,3 @@ and their top-*k* results. If multiple batches run concurrently/overlapped, add 
 - query\_size  = 409,600 B = **0.3906 MiB**
 - result\_size =   8,000 B = **0.0076 MiB**
 - **Total search memory** ≈ 3906.25 + 244.14 + 0.3906 + 0.0076 = **4150.79 MiB** (~4.05 GiB)
-
-Overall peak (device)
----------------------
-
-Use these to size your largest safe batch / avoid OOM. For **managed** memory, the
-peaks from sequential steps are additive; for **cuda** (device-only accounting), take the maximum step.
-
-``cuda_memory_resource``:
-
-.. math::
-
-   \text{dataset\_size}
-   \;+\;
-   \max\!\big(\text{IVFPQ\_build\_peak},\ \text{IVFPQ\_search\_peak},\ \text{optimize\_peak}\big)
-
-**Example:** 3906.25 + max(395.01, 5.00, 614.17) = **4520.42 MiB**
-
-``managed_memory_resource``:
-
-.. math::
-
-   \text{dataset\_size}
-   \;+\;
-   \text{IVFPQ\_build\_peak}
-   \;+\;
-   \text{IVFPQ\_search\_peak}
-   \;+\;
-   \text{optimize\_peak}
-
-**Example:** 3906.25 + 395.01 + 5.00 + 614.17 = **4920.43 MiB**
