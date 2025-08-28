@@ -43,14 +43,22 @@ C/C++ Package
 
 .. code-block:: bash
 
+   # CUDA 13
    conda install -c rapidsai -c conda-forge libcuvs cuda-version=13.0
+
+   # CUDA 12
+   conda install -c rapidsai -c conda-forge libcuvs cuda-version=12.9
 
 Python Package
 ~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
+   # CUDA 13
    conda install -c rapidsai -c conda-forge cuvs cuda-version=13.0
+
+   # CUDA 12
+   conda install -c rapidsai -c conda-forge cuvs cuda-version=12.9
 
 Python through Pip
 ^^^^^^^^^^^^^^^^^^
