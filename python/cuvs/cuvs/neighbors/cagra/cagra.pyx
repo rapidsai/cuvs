@@ -156,6 +156,7 @@ cdef class IndexParams:
               faster than ivf_pq.
             - iterative_cagra_search will iteratively build the knn graph using
               CAGRA's search() and optimize()
+
     compression: CompressionParams, optional
         If compression is desired should be a CompressionParams object. If None
         compression will be disabled.
@@ -456,10 +457,10 @@ cdef class SearchParams:
     rand_xor_mask: int, default = 0x128394
         Bit mask used for initial random seed node selection.
     persistent: bool, default = false
-         Whether to use the persistent version of the kernel
+        Whether to use the persistent version of the kernel
     persistent_lifetime: float
-         Persistent kernel: time in seconds before the kernel stops if no
-         requests are received.
+        Persistent kernel: time in seconds before the kernel stops if no
+        requests are received.
     persistent_device_usage : float
         Sets the fraction of maximum grid size used by persistent kernel.
     """
@@ -628,6 +629,7 @@ def search(SearchParams search_params,
 
     Examples
     --------
+
     >>> import cupy as cp
     >>> from cuvs.neighbors import cagra
     >>> n_samples = 50000
@@ -652,6 +654,7 @@ def search(SearchParams search_params,
     ...                                     k)
     >>> neighbors = cp.asarray(neighbors)
     >>> distances = cp.asarray(distances)
+
     """
     if not index.trained:
         raise ValueError("Index needs to be built before calling search.")

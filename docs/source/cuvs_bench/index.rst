@@ -212,6 +212,7 @@ The steps below demonstrate how to download, install, and run benchmarks on a su
 The usage of `python -m cuvs_bench.split_groundtruth` is:
 
 .. code-block:: bash
+
     usage: split_groundtruth.py [-h] --groundtruth GROUNDTRUTH
 
     options:
@@ -481,6 +482,7 @@ Implementation of a new algorithm should be a C++ class that inherits `class ANN
 In addition, it should define two `struct`s for building and searching parameters. The searching parameter class should inherit `struct ANN<T>::AnnSearchParam`. Take `class HnswLib` as an example, its definition is:
 
 .. code-block:: c++
+
     template<typename T>
     class HnswLib : public ANN<T> {
     public:
@@ -503,6 +505,7 @@ In addition, it should define two `struct`s for building and searching parameter
 The benchmark program uses JSON format natively in a configuration file to specify indexes to build, along with the build and search parameters. However the JSON config files are overly verbose and are not meant to be used directly. Instead, the Python scripts parse YAML and create these json files automatically. It's important to realize that these json objects align with the yaml objects for `build_param`, whose value is a JSON object, and `search_param`, whose value is an array of JSON objects. Take the json configuration for `HnswLib` as an example of the json after it's been parsed from yaml:
 
 .. code-block:: json
+
     {
       "name" : "hnswlib.M12.ef500.th32",
       "algo" : "hnswlib",
@@ -546,6 +549,7 @@ The build and search params are ultimately passed to the C++ layer as json objec
 2. Next, add corresponding `if` case to functions `create_algo()` (in `cpp/bench/ann/) and `create_search_param()` by calling parsing functions. The string literal in `if` condition statement must be the same as the value of `algo` in configuration file. For example,
 
 .. code-block:: c++
+
       // JSON configuration file contains a line like:  "algo" : "hnswlib"
       if (algo == "hnswlib") {
          // ...
@@ -558,6 +562,7 @@ In `cuvs/cpp/bench/ann/CMakeLists.txt`, we provide a `CMake` function to configu
 
 
 .. code-block:: cmake
+
     ConfigureAnnBench(
       NAME <algo_name>
       PATH </path/to/algo/benchmark/source/file>
@@ -580,6 +585,7 @@ This will create an executable called `HNSWLIB_ANN_BENCH`, which can then be use
 Add a new entry to `algos.yaml` to map the name of the algorithm to its binary executable and specify whether the algorithm requires GPU support.
 
 .. code-block:: yaml
+
     cuvs_ivf_pq:
       executable: CUVS_IVF_PQ_ANN_BENCH
       requires_gpu: true
