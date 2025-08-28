@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
 
+from cuvs.common.device_tensor_view import DeviceTensorView
 from cuvs.distance import DISTANCE_NAMES, DISTANCE_TYPES
 from cuvs.neighbors.common import _check_input_array
 
@@ -270,6 +271,20 @@ cdef class Index:
         ai = wrap_array(output)
         cdef cydlpack.DLManagedTensor* output_dlpack = cydlpack.dlpack_c(ai)
         check_cuvs(cuvsIvfPqIndexGetCenters(res, self.index, output_dlpack))
+        return output
+
+    @property
+    def pq_centers(self):
+        """ Get the PQ cluster centers """
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting"
+                             " pq centers")
+
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetPqCenters(self.index, tensor))
+        output.parent = self
         return output
 
 
