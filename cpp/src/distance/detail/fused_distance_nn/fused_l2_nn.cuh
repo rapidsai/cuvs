@@ -64,7 +64,6 @@ void fusedL2NNImpl(OutT* min,
   constexpr auto maxVal = std::numeric_limits<DataT>::max();
   typedef raft::KeyValuePair<IdxT, DataT> KVPair;
 
-  RAFT_CUDA_TRY(cudaMemsetAsync(workspace, 0, sizeof(int) * m, stream));
   if (initOutBuffer) {
     initKernel<DataT, OutT, IdxT, ReduceOpT>
       <<<nblks, P::Nthreads, 0, stream>>>(min, m, maxVal, redOp);
