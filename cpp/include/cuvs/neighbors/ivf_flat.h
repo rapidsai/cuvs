@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -174,14 +174,11 @@ uint32_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index);
 /**
  * @brief Get the cluster centers corresponding to the lists [n_lists, dim]
  *
- * @param[in] res cuvsResources_t opaque C handle
  * @param[in] index cuvsIvfFlatIndex_t Built Ivf-Flat Index
  * @param[out] centers Preallocated array on host or device memory to store output, [n_lists, dim]
  * @return cuvsError_t
  */
-cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsResources_t res,
-                                       cuvsIvfFlatIndex_t index,
-                                       DLManagedTensor* centers);
+cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsIvfFlatIndex_t index, DLManagedTensor* centers);
 
 /**
  * @}

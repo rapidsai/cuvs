@@ -157,14 +157,18 @@ void _extend(cuvsResources_t res,
   }
 }
 
-template <typename output_mdspan_type, typename IdxT>
-void _get_centers(cuvsResources_t res, cuvsIvfPqIndex index, DLManagedTensor* centers)
+template <typename IdxT>
+void _get_centers(cuvsIvfPqIndex index, DLManagedTensor* output)
 {
-  auto res_ptr   = reinterpret_cast<raft::resources*>(res);
   auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
-  auto dst       = cuvs::core::from_dlpack<output_mdspan_type>(centers);
 
-  cuvs::neighbors::ivf_pq::helpers::extract_centers(*res_ptr, *index_ptr, dst);
+  auto centers = index_ptr->centers();
+
+  // mimic the behaviour of `extract_centers` without performing a copy of the data
+  auto strided_centers = raft::make_device_strided_matrix_view(
+    centers.data_handle(), centers.extent(0), index_ptr->dim(), index_ptr->dim_ext());
+
+  cuvs::core::to_dlpack(strided_centers, output);
 }
 
 template <typename IdxT>
@@ -355,19 +359,9 @@ extern "C" uint32_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index)
   return index_ptr->dim();
 }
 
-extern "C" cuvsError_t cuvsIvfPqIndexGetCenters(cuvsResources_t res,
-                                                cuvsIvfPqIndex_t index,
-                                                DLManagedTensor* centers)
+extern "C" cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* centers)
 {
-  return cuvs::core::translate_exceptions([=] {
-    if (cuvs::core::is_dlpack_device_compatible(centers->dl_tensor)) {
-      using output_mdspan_type = raft::device_matrix_view<float, int64_t, raft::row_major>;
-      _get_centers<output_mdspan_type, int64_t>(res, *index, centers);
-    } else {
-      using output_mdspan_type = raft::host_matrix_view<float, int64_t, raft::row_major>;
-      _get_centers<output_mdspan_type, int64_t>(res, *index, centers);
-    }
-  });
+  return cuvs::core::translate_exceptions([=] { _get_centers<int64_t>(*index, centers); });
 }
 
 extern "C" cuvsError_t cuvsIvfPqIndexGetPqCenters(cuvsIvfPqIndex_t index,

@@ -258,19 +258,14 @@ cdef class Index:
     def centers(self):
         """ Get the cluster centers corresponding to the lists in the
         original space """
-        return self._get_centers()
-
-    @auto_sync_resources
-    def _get_centers(self, resources=None):
         if not self.trained:
             raise ValueError("Index needs to be built before getting centers")
 
-        cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
-
-        output = np.empty((self.n_lists, self.dim), dtype='float32')
-        ai = wrap_array(output)
-        cdef cydlpack.DLManagedTensor* output_dlpack = cydlpack.dlpack_c(ai)
-        check_cuvs(cuvsIvfPqIndexGetCenters(res, self.index, output_dlpack))
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetCenters(self.index, tensor))
+        output.parent = self
         return output
 
     @property

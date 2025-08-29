@@ -112,6 +112,7 @@ def run_ivf_pq_build_search_test(
 
     centers = index.centers
     assert centers.shape[0] == n_lists
+    assert centers.shape[1] == index.dim
 
     pq_centers = index.pq_centers
     assert len(pq_centers.shape) == 3
