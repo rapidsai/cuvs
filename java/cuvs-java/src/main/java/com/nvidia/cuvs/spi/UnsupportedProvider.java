@@ -15,19 +15,12 @@
  */
 package com.nvidia.cuvs.spi;
 
-import com.nvidia.cuvs.BinaryQuantizer;
-import com.nvidia.cuvs.BruteForceIndex;
-import com.nvidia.cuvs.CagraIndex;
-import com.nvidia.cuvs.CuVSMatrix;
-import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.HnswIndex;
-import com.nvidia.cuvs.TieredIndex;
+import com.nvidia.cuvs.*;
 import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
 
 /**
- * A provider that throws UnsupportedOperationException for all operations.
- * Used as a fallback when no proper implementation is available.
+ * A provider that unconditionally throws UnsupportedOperationException.
  */
 final class UnsupportedProvider implements CuVSProvider {
 
@@ -57,13 +50,35 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
-  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) throws Throwable {
+  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public CuVSMatrix.Builder newMatrixBuilder(
-      int size, int dimensions, CuVSMatrix.DataType dataType) {
+  public CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
+      long size, long dimensions, CuVSMatrix.DataType dataType) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
+      CuVSResources cuVSResources, long size, long dimensions, CuVSMatrix.DataType dataType) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public GPUInfoProvider gpuInfoProvider() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
+      CuVSResources cuVSResources,
+      long size,
+      long dimensions,
+      int rowStride,
+      int columnStride,
+      CuVSMatrix.DataType dataType) {
     throw new UnsupportedOperationException();
   }
 
@@ -85,46 +100,5 @@ final class UnsupportedProvider implements CuVSProvider {
   @Override
   public CuVSMatrix newMatrixFromArray(byte[][] vectors) {
     throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public Object createScalar8BitQuantizerImpl(CuVSResources resources, CuVSMatrix trainingDataset)
-      throws Throwable {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
-  }
-
-  @Override
-  public CuVSMatrix inverseTransformScalar8Bit(Object impl, CuVSMatrix quantizedData)
-      throws Throwable {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
-  }
-
-  @Override
-  public Object createBinaryQuantizerImpl(
-      CuVSResources resources,
-      CuVSMatrix trainingDataset,
-      BinaryQuantizer.ThresholdType thresholdType)
-      throws Throwable {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
-  }
-
-  @Override
-  public CuVSMatrix transformBinaryWithImpl(Object impl, CuVSMatrix input) throws Throwable {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
-  }
-
-  @Override
-  public void closeBinaryQuantizer(Object impl) throws Throwable {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
-  }
-
-  @Override
-  public CuVSMatrix transformScalar8Bit(Object impl, CuVSMatrix input) throws Throwable {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
-  }
-
-  @Override
-  public void closeScalar8BitQuantizer(Object impl) throws Throwable {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
   }
 }

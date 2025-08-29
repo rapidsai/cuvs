@@ -15,6 +15,8 @@
  */
 package com.nvidia.cuvs.spi;
 
+import static com.nvidia.cuvs.internal.common.Util.*;
+
 import com.nvidia.cuvs.*;
 import com.nvidia.cuvs.internal.*;
 import com.nvidia.cuvs.internal.common.Util;
@@ -24,6 +26,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Objects;
 
 final class JDKProvider implements CuVSProvider {
@@ -84,7 +87,7 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) throws Throwable {
+  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) {
     if (indexes == null || indexes.length == 0) {
       throw new IllegalArgumentException("At least one index must be provided for merging");
     }
@@ -92,8 +95,7 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraMergeParams mergeParams)
-      throws Throwable {
+  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraMergeParams mergeParams) {
     if (indexes == null || indexes.length == 0) {
       throw new IllegalArgumentException("At least one index must be provided for merging");
     }
@@ -101,26 +103,45 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public CuVSMatrix.Builder newMatrixBuilder(int size, int dimensions, CuVSMatrix.DataType dataType)
-      throws UnsupportedOperationException {
+  public GPUInfoProvider gpuInfoProvider() {
+    return new GPUInfoProviderImpl();
+  }
 
-    var dataset = new CuVSHostMatrixArenaImpl(size, dimensions, dataType);
+  @Override
+  public CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
+      long size, long columns, CuVSMatrix.DataType dataType) throws UnsupportedOperationException {
 
-    return new CuVSMatrix.Builder() {
+    return new CuVSMatrix.Builder<>() {
+      final CuVSHostMatrixArenaImpl matrix = new CuVSHostMatrixArenaImpl(size, columns, dataType);
       int current = 0;
 
       @Override
       public void addVector(float[] vector) {
+        if (vector.length != columns) {
+          throw new IllegalArgumentException(
+              String.format(
+                  Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+        }
         internalAddVector(vector);
       }
 
       @Override
       public void addVector(byte[] vector) {
+        if (vector.length != columns) {
+          throw new IllegalArgumentException(
+              String.format(
+                  Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+        }
         internalAddVector(vector);
       }
 
       @Override
       public void addVector(int[] vector) {
+        if (vector.length != columns) {
+          throw new IllegalArgumentException(
+              String.format(
+                  Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+        }
         internalAddVector(vector);
       }
 
@@ -129,17 +150,35 @@ final class JDKProvider implements CuVSProvider {
         MemorySegment.copy(
             vector,
             0,
-            dataset.memorySegment(),
-            dataset.valueLayout(),
-            ((current++) * dimensions * dataset.valueLayout().byteSize()),
-            dimensions);
+            matrix.memorySegment(),
+            matrix.valueLayout(),
+            ((current++) * columns * matrix.valueLayout().byteSize()),
+            (int) columns);
       }
 
       @Override
-      public CuVSMatrix build() {
-        return dataset;
+      public CuVSHostMatrix build() {
+        return matrix;
       }
     };
+  }
+
+  @Override
+  public CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
+      CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType)
+      throws UnsupportedOperationException {
+    return new HeapSegmentBuilder(resources, size, columns, dataType);
+  }
+
+  @Override
+  public CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
+      CuVSResources resources,
+      long size,
+      long columns,
+      int rowStride,
+      int columnStride,
+      CuVSMatrix.DataType dataType) {
+    return new HeapSegmentBuilder(resources, size, columns, rowStride, columnStride, dataType);
   }
 
   @Override
@@ -189,44 +228,90 @@ final class JDKProvider implements CuVSProvider {
     return dataset;
   }
 
-  @Override
-  public Object createScalar8BitQuantizerImpl(CuVSResources resources, CuVSMatrix trainingDataset)
-      throws Throwable {
-    return Scalar8BitQuantizerImpl.create(resources, trainingDataset);
-  }
+  /**
+   * This {@link CuVSDeviceMatrix} builder implementation returns a {@link CuVSDeviceMatrix} backed by managed RMM
+   * device memory. It uses a non-native {@link MemorySegment} created directly from on-heap java arrays to avoid
+   * an intermediate allocation and copy to a native (off-heap) segment.
+   * It requires the copy function ({@code cudaMemcpyAsync}) to have the {@code Critical} linker option in order
+   * to allow the access to on-heap memory (see {@link Util#cudaMemcpyAsync}).
+   */
+  private static class HeapSegmentBuilder implements CuVSMatrix.Builder<CuVSDeviceMatrix> {
+    private final long columns;
+    private final long size;
+    private final CuVSDeviceMatrixImpl matrix;
+    private final MemorySegment stream;
+    private int current;
 
-  @Override
-  public CuVSMatrix transformScalar8Bit(Object impl, CuVSMatrix input) throws Throwable {
-    return ((Scalar8BitQuantizerImpl) impl).transform(input);
-  }
+    private HeapSegmentBuilder(
+        CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType) {
+      this.columns = columns;
+      this.size = size;
+      this.matrix = CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType);
+      this.stream = Util.getStream(resources);
+      this.current = 0;
+    }
 
-  @Override
-  public CuVSMatrix inverseTransformScalar8Bit(Object impl, CuVSMatrix quantizedData)
-      throws Throwable {
-    return ((Scalar8BitQuantizerImpl) impl).inverseTransform(quantizedData);
-  }
+    private HeapSegmentBuilder(
+        CuVSResources resources,
+        long size,
+        long columns,
+        int rowStride,
+        int columnStride,
+        CuVSMatrix.DataType dataType) {
+      this.columns = columns;
+      this.size = size;
+      this.matrix =
+          CuVSDeviceMatrixRMMImpl.create(
+              resources, size, columns, rowStride, columnStride, dataType);
+      this.stream = Util.getStream(resources);
+      this.current = 0;
+    }
 
-  @Override
-  public Object createBinaryQuantizerImpl(
-      CuVSResources resources,
-      CuVSMatrix trainingDataset,
-      BinaryQuantizer.ThresholdType thresholdType)
-      throws Throwable {
-    return BinaryQuantizerImpl.create(resources, trainingDataset, thresholdType);
-  }
+    @Override
+    public void addVector(float[] vector) {
+      if (vector.length != columns) {
+        throw new IllegalArgumentException(
+            String.format(
+                Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+      }
+      internalAddVector(MemorySegment.ofArray(vector));
+    }
 
-  @Override
-  public CuVSMatrix transformBinaryWithImpl(Object impl, CuVSMatrix input) throws Throwable {
-    return BinaryQuantizerImpl.transformWithImpl(impl, input);
-  }
+    @Override
+    public void addVector(byte[] vector) {
+      if (vector.length != columns) {
+        throw new IllegalArgumentException(
+            String.format(
+                Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+      }
+      internalAddVector(MemorySegment.ofArray(vector));
+    }
 
-  @Override
-  public void closeBinaryQuantizer(Object impl) throws Throwable {
-    BinaryQuantizerImpl.close(impl);
-  }
+    @Override
+    public void addVector(int[] vector) {
+      if (vector.length != columns) {
+        throw new IllegalArgumentException(
+            String.format(
+                Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+      }
+      internalAddVector(MemorySegment.ofArray(vector));
+    }
 
-  @Override
-  public void closeScalar8BitQuantizer(Object impl) throws Throwable {
-    ((Scalar8BitQuantizerImpl) impl).close();
+    private void internalAddVector(MemorySegment vector) {
+      if (current >= size) {
+        throw new ArrayIndexOutOfBoundsException();
+      }
+
+      long rowBytes = columns * matrix.valueLayout().byteSize();
+
+      var dstOffset = ((current++) * rowBytes);
+      var dst = matrix.memorySegment().asSlice(dstOffset);
+      cudaMemcpyAsync(dst, vector, rowBytes, CudaMemcpyKind.HOST_TO_DEVICE, stream);
+    }
+
+    @Override
+    public CuVSDeviceMatrix build() {
+      return matrix;
+    }
   }
 }

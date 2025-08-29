@@ -16,7 +16,7 @@
 package com.nvidia.cuvs;
 
 /**
- * Represent a contiguous list of integers (32-bit) backed by off-heap memory.
+ * Represent a contiguous list of elements backed by off-heap memory.
  *
  * @since 25.08
  */

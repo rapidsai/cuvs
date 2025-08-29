@@ -53,10 +53,10 @@ public interface CagraIndex extends AutoCloseable {
 
   /** Returns the CAGRA graph
    *
-   * @return a {@link CuVSMatrix} encapsulating the native int (uint32_t) array used to represent
+   * @return a {@link CuVSDeviceMatrix} encapsulating the native int (uint32_t) array used to represent
    * the cagra graph
    */
-  CuVSMatrix getGraph();
+  CuVSDeviceMatrix getGraph();
 
   /**
    * A method to persist a CAGRA index using an instance of {@link OutputStream}
@@ -246,14 +246,6 @@ public interface CagraIndex extends AutoCloseable {
      * @return An instance of this Builder.
      */
     Builder withIndexParams(CagraIndexParams cagraIndexParameters);
-
-    /**
-     * Sets the quantizer to use for building the index with quantized data.
-     *
-     * @param quantizer The quantizer to apply to the dataset during index construction
-     * @return An instance of this Builder
-     */
-    Builder withQuantizer(CuVSQuantizer quantizer);
 
     /**
      * Builds and returns an instance of CagraIndex.
