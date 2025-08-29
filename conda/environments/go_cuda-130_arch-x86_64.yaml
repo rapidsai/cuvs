@@ -6,7 +6,6 @@ channels:
 - conda-forge
 dependencies:
 - _go_select *=cgo
-- breathe>=4.35.0
 - c-compiler
 - clang-tools==20.1.4
 - clang==20.1.4
@@ -15,42 +14,19 @@ dependencies:
 - cuda-nvcc
 - cuda-nvtx-dev
 - cuda-profiler-api
-- cuda-python>=12.9.2,<13.0a0
-- cuda-version=12.9
-- cupy>=13.6.0
+- cuda-version=13.0
 - cxx-compiler
-- cython>=3.0.0
 - dlpack>=0.8,<1.0
-- doxygen>=1.8.20
 - gcc_linux-64=14.*
 - go
-- graphviz
-- ipython
 - libclang==20.1.4
 - libcublas-dev
 - libcurand-dev
 - libcusolver-dev
 - libcusparse-dev
-- librmm==25.10.*,>=0.0.0a0
-- make
+- libcuvs==25.10.*,>=0.0.0a0
+- libraft==25.10.*,>=0.0.0a0
 - nccl>=2.19
 - ninja
-- numpy>=1.23,<3.0a0
-- numpydoc
-- openblas
-- pre-commit
-- pylibraft==25.10.*,>=0.0.0a0
-- pytest
-- pytest-cov
-- rapids-build-backend>=0.4.0,<0.5.0.dev0
-- recommonmark
-- rust
-- scikit-build-core>=0.10.0
-- scikit-learn
-- sphinx-copybutton
-- sphinx-markdown-tables
-- sphinx>=8.0.0
 - sysroot_linux-64==2.28
-- pip:
-  - nvidia-sphinx-theme
-name: all_cuda-129_arch-x86_64
+name: go_cuda-130_arch-x86_64
