@@ -86,7 +86,7 @@ cuvsError_t cuvsResourcesDestroy(cuvsResources_t res);
 cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream);
 
 /**
- * @brief Get the cudaStream_t from a cuvsResources_t t
+ * @brief Get the cudaStream_t from a cuvsResources_t
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[out] stream cudaStream_t stream to queue CUDA kernels
@@ -103,7 +103,18 @@ cuvsError_t cuvsStreamGet(cuvsResources_t res, cudaStream_t* stream);
 cuvsError_t cuvsStreamSync(cuvsResources_t res);
 
 /**
+ * @brief Get the id of the device associated with this cuvsResources_t
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[out] device_id int the id of the device associated with res
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsDeviceIdGet(cuvsResources_t res, int* device_id);
+
+/**
  * @brief Create a SNMG resources handle with all available GPUs
+ * @param[out] res output handle
+ * @return cuvsError_t
  */
 cuvsError_t cuvsSNMGResourcesCreate(cuvsResources_t* res);
 
@@ -112,6 +123,7 @@ cuvsError_t cuvsSNMGResourcesCreate(cuvsResources_t* res);
  * @param[in] res output handle
  * @param[in] device_ids pointer to device ids array
  * @param[in] num_ids number of device ids
+ * @return cuvsError_t
  */
 cuvsError_t cuvsSNMGResourcesCreateWithDevices(cuvsResources_t* res,
                                                const int* device_ids,

@@ -10,6 +10,7 @@ Nearest Neighbor Indexes
    ivfflat.rst
    ivfpq.rst
    vamana.rst
+   all_neighbors.rst
 
 
 Indices and tables

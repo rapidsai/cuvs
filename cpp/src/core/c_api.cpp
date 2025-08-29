@@ -20,6 +20,8 @@
 
 #include <raft/core/device_resources_snmg.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resource/device_id.hpp>
+#include <raft/core/resource/resource_types.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
@@ -81,6 +83,14 @@ extern "C" cuvsError_t cuvsStreamSync(cuvsResources_t res)
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
     raft::resource::sync_stream(*res_ptr);
+  });
+}
+
+extern "C" cuvsError_t cuvsDeviceIdGet(cuvsResources_t res, int* device_id)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = reinterpret_cast<raft::resources*>(res);
+    *device_id   = raft::resource::get_device_id(*res_ptr);
   });
 }
 
