@@ -87,7 +87,8 @@ cdef class AllNeighborsParams:
         Number of clusters each point is assigned to (must be < n_clusters)
     n_clusters : int, default=1
         Number of clusters/batches to partition the dataset into
-        (> overlap_factor)
+        (> overlap_factor). Use n_clusters>1 to distribute the work
+        across GPUs.
     metric : str or cuvsDistanceType, default="sqeuclidean"
         Distance metric to use for graph construction
     ivf_pq_params : cuvs.neighbors.ivf_pq.IndexParams, optional
@@ -219,7 +220,8 @@ def build(dataset, k, params, *,
     Parameters
     ----------
     dataset : array_like
-        Training dataset to build the k-NN graph for.
+        Training dataset to build the k-NN graph for. Provide the data
+        on host for multi-GPU build.
         Supported dtype: float32
     k : int
         Number of nearest neighbors to find for each point
