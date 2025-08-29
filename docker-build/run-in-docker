@@ -35,6 +35,8 @@ WORKDIR=${WORKDIR:-$REPODIR}
 TZ=${TZ:-UTC}
 
 CUDA_VERSION=${CUDA_VERSION:-12.9.1}
+CUDA_CLASSIFIER=cuda${CUDA_VERSION%%.*}
+
 DOCKER_CMD=${DOCKER_CMD:-docker}
 DOCKER_BUILD_EXTRA_ARGS=${DOCKER_BUILD_EXTRA_ARGS:-""}
 if [ "$(uname -m)" == "aarch64" ]; then
@@ -61,7 +63,7 @@ $DOCKER_CMD build $DOCKER_BUILD_EXTRA_ARGS -f $REPODIR/docker-build/Dockerfile \
   --build-arg CUDA_VERSION=$CUDA_VERSION \
   --build-arg DEV_BUILD=$JNI_DOCKER_DEV_BUILD \
   -t $JNI_DOCKER_IMAGE \
-  $REPODIR/build
+  $REPODIR/docker-build
 
 if [[ "$DOCKER_CMD" == "docker" ]]; then
   DOCKER_GPU_OPTS=${DOCKER_GPU_OPTS:-"--gpus all"}
@@ -110,6 +112,8 @@ $DOCKER_CMD run $DOCKER_GPU_OPTS $DOCKER_RUN_EXTRA_ARGS -u $(id -u):$(id -g) --r
   -e CMAKE_CXX_COMPILER_LAUNCHER="ccache" \
   -e CMAKE_CUDA_COMPILER_LAUNCHER="ccache" \
   -e CMAKE_CXX_LINKER_LAUNCHER="ccache" \
+  -e CMAKE_PREFIX_PATH="${WORKDIR}/cpp/build/$CUDA_CLASSIFIER" \
+  -e LIBCUVS_BUILD_DIR="${WORKDIR}/cpp/build/$CUDA_CLASSIFIER" \
   -e CMAKE_GENERATOR \
   -e CUDA_VISIBLE_DEVICES \
   -e PARALLEL_LEVEL \
