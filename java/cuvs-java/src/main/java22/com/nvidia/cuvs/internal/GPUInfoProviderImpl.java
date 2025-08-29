@@ -17,10 +17,10 @@ package com.nvidia.cuvs.internal;
 
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 import static com.nvidia.cuvs.internal.common.Util.checkCudaError;
+import static com.nvidia.cuvs.internal.common.Util.cudaGetDeviceProperties;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemGetInfo;
 import static com.nvidia.cuvs.internal.panama.headers_h_1.*;
 
-import com.nvidia.cuvs.internal.common.Util.cudaGetDeviceProperties;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.CuVSResourcesInfo;
 import com.nvidia.cuvs.GPUInfo;
