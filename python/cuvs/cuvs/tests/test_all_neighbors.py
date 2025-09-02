@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 from pylibraft.common import device_ndarray
 
-from cuvs.common import Resources, SNMGResources
+from cuvs.common import MultiGpuResources, Resources
 from cuvs.neighbors import all_neighbors, brute_force, ivf_pq, nn_descent
 from cuvs.tests.ann_utils import calc_recall
 
@@ -194,7 +194,7 @@ def test_all_neighbors_host_build_quality(algo, cluster, snmg):
     )
 
     if snmg:
-        res = SNMGResources()
+        res = MultiGpuResources()
     else:
         res = Resources()
 

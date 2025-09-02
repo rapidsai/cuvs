@@ -32,7 +32,7 @@ extern "C" {
  * @{
  *
  * All-neighbors constructs an approximate k-NN graph for all vectors in a dataset.
- * This SNMG C API can be used with a multi-GPU resources handle (`cuvsSNMGResources_t`)
+ * This SNMG C API can be used with a multi-GPU resources handle (`cuvsResources_t`)
  * created from `raft::device_resources_snmg` to distribute work across GPUs.
  *
  * Notes:
@@ -71,48 +71,30 @@ struct cuvsAllNeighborsIndexParams {
 typedef struct cuvsAllNeighborsIndexParams* cuvsAllNeighborsIndexParams_t;
 
 /**
- * @brief Build an all-neighbors k-NN graph from a host-resident dataset (SNMG).
+ * @brief Build an all-neighbors k-NN graph automatically detecting host vs device dataset.
  *
- * @param[in] res             Can be a SNMG multi-GPU resources (`cuvsSNMGResources_t`)
+ * @param[in] res             Can be a SNMG multi-GPU resources (`cuvsResources_t`) or single-GPU
+ * resources
  * @param[in] params          Build parameters (see cuvsAllNeighborsIndexParams)
- * @param[in] dataset         2D tensor [num_rows x dim] on host (CPU or CUDAHost)
+ * @param[in] dataset         2D tensor [num_rows x dim] on host or device (auto-detected)
  * @param[out] indices        2D tensor [num_rows x k] on device (int64)
  * @param[out] distances      Optional 2D tensor [num_rows x k] on device (float32); can be NULL
  * @param[out] core_distances Optional 1D tensor [num_rows] on device (float32); can be NULL
  * @param[in] alpha           Mutual-reachability scaling; used only when core_distances is provided
  *
- * The function partitions data into `n_clusters` clusters and assigns each row to
- * `overlap_factor` nearest clusters. Work is balanced across GPUs according to the
- * number of available ranks in `snmg`. Outputs always reside in device memory.
- */
-cuvsError_t cuvsAllNeighborsBuildHost(cuvsResources_t res,
-                                      cuvsAllNeighborsIndexParams_t params,
-                                      DLManagedTensor* dataset,
-                                      DLManagedTensor* indices,
-                                      DLManagedTensor* distances,
-                                      DLManagedTensor* core_distances,
-                                      float alpha);
-
-/**
- * @brief Build an all-neighbors k-NN graph from a device-resident dataset (single-GPU, no
- * batching).
- *
- * @param[in] res             Single-GPU resources
- * @param[in] params          Build parameters (see cuvsAllNeighborsIndexParams). For device
+ * The function automatically detects whether the dataset is host-resident or device-resident
+ * and calls the appropriate implementation. For host datasets, it partitions data into
+ * `n_clusters` clusters and assigns each row to `overlap_factor` nearest clusters. For device
  * datasets, `n_clusters` must be 1 (no batching); `overlap_factor` is ignored.
- * @param[in] dataset         2D tensor [num_rows x dim] on device (CUDA/CUDAManaged)
- * @param[out] indices        2D tensor [num_rows x k] on device (int64)
- * @param[out] distances      Optional 2D tensor [num_rows x k] on device (float32); can be NULL
- * @param[out] core_distances Optional 1D tensor [num_rows] on device (float32); can be NULL
- * @param[in] alpha           Mutual-reachability scaling; used only when core_distances is provided
+ * Outputs always reside in device memory.
  */
-cuvsError_t cuvsAllNeighborsBuildDevice(cuvsResources_t res,
-                                        cuvsAllNeighborsIndexParams_t params,
-                                        DLManagedTensor* dataset,
-                                        DLManagedTensor* indices,
-                                        DLManagedTensor* distances,
-                                        DLManagedTensor* core_distances,
-                                        float alpha);
+cuvsError_t cuvsAllNeighborsBuild(cuvsResources_t res,
+                                  cuvsAllNeighborsIndexParams_t params,
+                                  DLManagedTensor* dataset,
+                                  DLManagedTensor* indices,
+                                  DLManagedTensor* distances,
+                                  DLManagedTensor* core_distances,
+                                  float alpha);
 
 /** @} */
 

@@ -47,18 +47,52 @@ extern "C" cuvsError_t cuvsResourcesCreate(cuvsResources_t* res)
 extern "C" cuvsError_t cuvsResourcesDestroy(cuvsResources_t res)
 {
   return cuvs::core::translate_exceptions([=] {
-    // Try to cast as device_resources_snmg first and check if it's valid
-    auto snmg_res_ptr = reinterpret_cast<raft::device_resources_snmg*>(res);
-    auto base_res_ptr = dynamic_cast<raft::resources*>(snmg_res_ptr);
+    auto res_ptr = reinterpret_cast<raft::resources*>(res);
+    delete res_ptr;
+  });
+}
 
-    if (base_res_ptr != nullptr) {
-      // It's a device_resources_snmg
-      delete snmg_res_ptr;
-    } else {
-      // It's a regular raft::resources
-      auto regular_res_ptr = reinterpret_cast<raft::resources*>(res);
-      delete regular_res_ptr;
+extern "C" cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = new raft::device_resources_snmg{};
+    *res         = reinterpret_cast<uintptr_t>(res_ptr);
+  });
+}
+
+extern "C" cuvsError_t cuvsMultiGpuResourcesCreateWithDeviceIds(cuvsResources_t* res,
+                                                                DLManagedTensor* device_ids)
+{
+  return cuvs::core::translate_exceptions([=] {
+    // Basic validation
+    if (device_ids == nullptr || device_ids->dl_tensor.data == nullptr) {
+      throw std::invalid_argument("device_ids cannot be null");
     }
+
+    // Check data type is int32
+    if (device_ids->dl_tensor.dtype.code != kDLInt || device_ids->dl_tensor.dtype.bits != 32) {
+      throw std::invalid_argument("device_ids must be int32");
+    }
+
+    // Check data is on host
+    if (device_ids->dl_tensor.device.device_type != kDLCPU) {
+      throw std::invalid_argument("device_ids must be on host memory");
+    }
+
+    // Cast void* to int* to perform pointer arithmetic
+    int* data_ptr = static_cast<int*>(device_ids->dl_tensor.data);
+    std::vector<int> ids(data_ptr, data_ptr + device_ids->dl_tensor.shape[0]);
+
+    auto res_ptr = new raft::device_resources_snmg{ids};
+    *res         = reinterpret_cast<uintptr_t>(res_ptr);
+  });
+}
+
+extern "C" cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = reinterpret_cast<raft::device_resources_snmg*>(res);
+    delete res_ptr;
   });
 }
 
@@ -300,24 +334,5 @@ extern "C" cuvsError_t cuvsMatrixSliceRows(cuvsResources_t res,
 
     dst.data = static_cast<char*>(src.data) + start * row_strides * (dst.dtype.bits / 8);
     dst_managed->deleter = cuvsMatrixDestroy;
-  });
-}
-
-extern "C" cuvsError_t cuvsSNMGResourcesCreate(cuvsResources_t* res)
-{
-  return cuvs::core::translate_exceptions([=] {
-    auto res_ptr = new raft::device_resources_snmg{};
-    *res         = reinterpret_cast<uintptr_t>(res_ptr);
-  });
-}
-
-extern "C" cuvsError_t cuvsSNMGResourcesCreateWithDevices(cuvsResources_t* res,
-                                                          const int* device_ids,
-                                                          int num_ids)
-{
-  return cuvs::core::translate_exceptions([=] {
-    std::vector<int> ids(device_ids, device_ids + num_ids);
-    auto res_ptr = new raft::device_resources_snmg{ids};
-    *res         = reinterpret_cast<uintptr_t>(res_ptr);
   });
 }

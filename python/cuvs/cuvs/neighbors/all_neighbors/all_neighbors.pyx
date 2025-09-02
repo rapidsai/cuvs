@@ -19,7 +19,8 @@ import numpy as np
 
 cimport cuvs.common.cydlpack
 
-from cuvs.common.resources import Resources, SNMGResources
+from cuvs.common.mg_resources import MultiGpuResources
+from cuvs.common.resources import Resources
 
 from cython.operator cimport dereference as deref
 
@@ -46,8 +47,7 @@ from .all_neighbors cimport (
     CUVS_ALL_NEIGHBORS_ALGO_IVF_PQ,
     CUVS_ALL_NEIGHBORS_ALGO_NN_DESCENT,
     cuvsAllNeighborsAlgo,
-    cuvsAllNeighborsBuildDevice,
-    cuvsAllNeighborsBuildHost,
+    cuvsAllNeighborsBuild,
     cuvsAllNeighborsIndexParams,
     cuvsAllNeighborsIndexParams_t,
 )
@@ -203,8 +203,6 @@ cdef class AllNeighborsParams:
         return self.params.metric
 
 
-# @auto_sync_snmg_resources
-# setting resources from within the function as data on host/device differ
 @auto_convert_output
 def build(dataset, k, params, *,
           indices=None,
@@ -220,8 +218,9 @@ def build(dataset, k, params, *,
     Parameters
     ----------
     dataset : array_like
-        Training dataset to build the k-NN graph for. Provide the data
-        on host for multi-GPU build.
+        Training dataset to build the k-NN graph for. Can be provided
+        on host (for multi-GPU build) or device (for single-GPU build).
+        Host vs device location is automatically detected.
         Supported dtype: float32
     k : int
         Number of nearest neighbors to find for each point
@@ -240,9 +239,9 @@ def build(dataset, k, params, *,
     alpha : float, default=1.0
         Mutual-reachability scaling; used only when core_distances is
         provided
-    resources : Resources or SNMGResources, optional
+    resources : Resources or MultiGpuResources, optional
         CUDA resources to use for the operation. If not provided, a default
-        Resources object will be created. Use SNMGResources to enable
+        Resources object will be created. Use MultiGpuResources to enable
         multi-GPU execution across multiple devices.
 
     Returns
@@ -259,7 +258,7 @@ def build(dataset, k, params, *,
     if not isinstance(params, AllNeighborsParams):
         raise TypeError("params must be an instance of AllNeighborsParams")
 
-    # Ensure SNMG resources
+    # Check if data is on device for validation purposes
     on_device = hasattr(dataset, "__cuda_array_interface__")
 
     if on_device and params.n_clusters > 1:
@@ -268,7 +267,7 @@ def build(dataset, k, params, *,
             "device. Put data on host for batch build."
         )
 
-    if not isinstance(resources, (Resources, SNMGResources)):
+    if not isinstance(resources, (Resources, MultiGpuResources)):
         resources = Resources()
 
     resources.sync()
@@ -349,26 +348,16 @@ def build(dataset, k, params, *,
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
     with cuda_interruptible():
-        if on_device:
-            check_cuvs(cuvsAllNeighborsBuildDevice(
-                res,
-                params_ptr,
-                dataset_dlpack,
-                indices_dlpack,
-                distances_dlpack,
-                core_dlpack,
-                <float>alpha,
-            ))
-        else:
-            check_cuvs(cuvsAllNeighborsBuildHost(
-                res,
-                params_ptr,
-                dataset_dlpack,
-                indices_dlpack,
-                distances_dlpack,
-                core_dlpack,
-                <float>alpha,
-            ))
+        # Use unified function that auto-detects host vs device
+        check_cuvs(cuvsAllNeighborsBuild(
+            res,
+            params_ptr,
+            dataset_dlpack,
+            indices_dlpack,
+            distances_dlpack,
+            core_dlpack,
+            <float>alpha,
+        ))
 
     # Build return tuple based on provided parameters
     result = [indices]

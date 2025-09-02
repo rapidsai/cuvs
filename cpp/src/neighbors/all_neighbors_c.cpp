@@ -213,52 +213,38 @@ void _build_device(cuvsResources_t device_res,
 
 }  // namespace
 
-extern "C" cuvsError_t cuvsAllNeighborsBuildHost(cuvsResources_t res,
-                                                 cuvsAllNeighborsIndexParams_t params,
-                                                 DLManagedTensor* dataset_tensor,
-                                                 DLManagedTensor* indices_tensor,
-                                                 DLManagedTensor* distances_tensor,
-                                                 DLManagedTensor* core_distances_tensor,
-                                                 float alpha)
+extern "C" cuvsError_t cuvsAllNeighborsBuild(cuvsResources_t res,
+                                             cuvsAllNeighborsIndexParams_t params,
+                                             DLManagedTensor* dataset_tensor,
+                                             DLManagedTensor* indices_tensor,
+                                             DLManagedTensor* distances_tensor,
+                                             DLManagedTensor* core_distances_tensor,
+                                             float alpha)
 {
   return cuvs::core::translate_exceptions([=] {
     auto dataset = dataset_tensor->dl_tensor;
 
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      _build_host<float>(res,
-                         params,
-                         dataset_tensor,
-                         indices_tensor,
-                         distances_tensor,
-                         core_distances_tensor,
-                         alpha);
-    } else {
-      RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
-                dataset.dtype.code,
-                dataset.dtype.bits);
-    }
-  });
-}
-
-extern "C" cuvsError_t cuvsAllNeighborsBuildDevice(cuvsResources_t res,
-                                                   cuvsAllNeighborsIndexParams_t params,
-                                                   DLManagedTensor* dataset_tensor,
-                                                   DLManagedTensor* indices_tensor,
-                                                   DLManagedTensor* distances_tensor,
-                                                   DLManagedTensor* core_distances_tensor,
-                                                   float alpha)
-{
-  return cuvs::core::translate_exceptions([=] {
-    auto dataset = dataset_tensor->dl_tensor;
-
-    if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
-      _build_device<float>(res,
+      // Check if dataset is host-compatible or device-compatible
+      if (cuvs::core::is_dlpack_host_compatible(dataset)) {
+        _build_host<float>(res,
                            params,
                            dataset_tensor,
                            indices_tensor,
                            distances_tensor,
                            core_distances_tensor,
                            alpha);
+      } else if (cuvs::core::is_dlpack_device_compatible(dataset)) {
+        _build_device<float>(res,
+                             params,
+                             dataset_tensor,
+                             indices_tensor,
+                             distances_tensor,
+                             core_distances_tensor,
+                             alpha);
+      } else {
+        RAFT_FAIL("Dataset tensor must be either host-compatible or device-compatible");
+      }
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,

@@ -41,17 +41,7 @@ cdef extern from "cuvs/neighbors/all_neighbors.h" nogil:
 
     ctypedef cuvsAllNeighborsIndexParams* cuvsAllNeighborsIndexParams_t
 
-    cuvsError_t cuvsAllNeighborsBuildHost(
-        cuvsResources_t res,
-        cuvsAllNeighborsIndexParams_t params,
-        DLManagedTensor* dataset,
-        DLManagedTensor* indices,
-        DLManagedTensor* distances,
-        DLManagedTensor* core_distances,
-        float alpha
-    )
-
-    cuvsError_t cuvsAllNeighborsBuildDevice(
+    cuvsError_t cuvsAllNeighborsBuild(
         cuvsResources_t res,
         cuvsAllNeighborsIndexParams_t params,
         DLManagedTensor* dataset,
