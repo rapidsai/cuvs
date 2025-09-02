@@ -384,6 +384,7 @@ if(BUILD_SHARED_LIBS)
     src/embed/spectral.cu
     src/neighbors/all_neighbors/all_neighbors.cu
     src/neighbors/ball_cover.cu
+    src/neighbors/epsilon_neighborhood.cu
     src/neighbors/ball_cover/detail/ball_cover/registers_eps_pass_euclidean.cu
     src/neighbors/ball_cover/detail/ball_cover/registers_pass_one.cu
     src/neighbors/ball_cover/detail/ball_cover/registers_pass_two.cu

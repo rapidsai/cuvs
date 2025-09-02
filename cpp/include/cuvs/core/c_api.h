@@ -128,8 +128,8 @@ cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res);
  * @param[in] device_ids DLManagedTensor* containing device IDs to use
  * @return cuvsError_t
  */
-cuvsError_t cuvsMultiGpuResourcesCreateWithDevices(cuvsResources_t* res,
-                                                   DLManagedTensor* device_ids);
+cuvsError_t cuvsMultiGpuResourcesCreateWithDeviceIds(cuvsResources_t* res,
+                                                     DLManagedTensor* device_ids);
 
 /**
  * @brief Destroy and de-allocate opaque C handle for C++ type `raft::device_resources_snmg`

@@ -19,7 +19,7 @@ from cuda.bindings.cyruntime cimport cudaStream_t
 
 from cuvs.common.c_api cimport (
     cuvsMultiGpuResourcesCreate,
-    cuvsMultiGpuResourcesCreateWithDevices,
+    cuvsMultiGpuResourcesCreateWithDeviceIds,
     cuvsMultiGpuResourcesDestroy,
     cuvsResources_t,
     cuvsStreamSet,
@@ -90,7 +90,7 @@ cdef class MultiGpuResources:
             device_ids_array = np.asarray(device_ids, dtype=np.int32)
             ai = wrap_array(device_ids_array)
             device_ids_dlpack = dlpack_c(ai)
-            check_cuvs(cuvsMultiGpuResourcesCreateWithDevices(
+            check_cuvs(cuvsMultiGpuResourcesCreateWithDeviceIds(
                 &self.c_obj, device_ids_dlpack))
         else:
             check_cuvs(cuvsMultiGpuResourcesCreate(&self.c_obj))

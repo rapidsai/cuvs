@@ -60,8 +60,8 @@ extern "C" cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res)
   });
 }
 
-extern "C" cuvsError_t cuvsMultiGpuResourcesCreateWithDevices(cuvsResources_t* res,
-                                                              DLManagedTensor* device_ids)
+extern "C" cuvsError_t cuvsMultiGpuResourcesCreateWithDeviceIds(cuvsResources_t* res,
+                                                                DLManagedTensor* device_ids)
 {
   return cuvs::core::translate_exceptions([=] {
     // Basic validation

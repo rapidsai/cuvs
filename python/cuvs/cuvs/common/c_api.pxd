@@ -36,7 +36,7 @@ cdef extern from "cuvs/core/c_api.h":
     const char * cuvsGetLastErrorText()
 
     cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res)
-    cuvsError_t cuvsMultiGpuResourcesCreateWithDevices(
+    cuvsError_t cuvsMultiGpuResourcesCreateWithDeviceIds(
         cuvsResources_t* res,
         DLManagedTensor* device_ids)
     cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res)
