@@ -295,6 +295,7 @@ if(BUILD_SHARED_LIBS)
   if(BUILD_MG_ALGOS)
     set(CUVS_MG_ALGOS
         src/neighbors/mg/mg_flat_float_int64_t.cu
+        src/neighbors/mg/mg_flat_half_int64_t.cu
         src/neighbors/mg/mg_flat_int8_t_int64_t.cu
         src/neighbors/mg/mg_flat_uint8_t_int64_t.cu
         src/neighbors/mg/mg_pq_float_int64_t.cu
@@ -410,6 +411,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/iface/iface_cagra_int8_t_uint32_t.cu
     src/neighbors/iface/iface_cagra_uint8_t_uint32_t.cu
     src/neighbors/iface/iface_flat_float_int64_t.cu
+    src/neighbors/iface/iface_flat_half_int64_t.cu
     src/neighbors/iface/iface_flat_int8_t_int64_t.cu
     src/neighbors/iface/iface_flat_uint8_t_int64_t.cu
     src/neighbors/iface/iface_pq_float_int64_t.cu
@@ -712,6 +714,13 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
 
   # ################################################################################################
   # * cuvs_c -------------------------------------------------------------------------------
+
+  if(BUILD_MG_ALGOS)
+    set(CUVS_C_MG_ALGOS src/neighbors/mg_ivf_pq_c.cpp src/neighbors/mg_ivf_flat_c.cpp
+                        src/neighbors/mg_cagra_c.cpp
+    )
+  endif()
+
   if(BUILD_C_LIBRARY)
     add_library(
       cuvs_c SHARED
@@ -728,6 +737,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
       src/preprocessing/quantize/binary_c.cpp
       src/preprocessing/quantize/scalar_c.cpp
       src/distance/pairwise_distance_c.cpp
+      ${CUVS_C_MG_ALGOS}
     )
 
     if(BUILD_CAGRA_HNSWLIB)
