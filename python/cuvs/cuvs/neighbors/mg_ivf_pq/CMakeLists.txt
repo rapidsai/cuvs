@@ -1,4 +1,4 @@
-# =============================================================================
+#
 # Copyright (c) 2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
@@ -10,17 +10,15 @@
 # is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing permissions and limitations under
 # the License.
-# =============================================================================
+#
 
 # Set the list of Cython files to build
-set(cython_sources cydlpack.pyx exceptions.pyx resources.pyx mg_resources.pyx
-                   device_tensor_view.pyx
-)
+set(cython_sources mg_ivf_pq.pyx)
 set(linked_libraries cuvs::cuvs cuvs::c_api)
 
 # Build all of the Cython targets
 rapids_cython_create_modules(
   CXX
   SOURCE_FILES "${cython_sources}"
-  LINKED_LIBRARIES "${linked_libraries}" MODULE_PREFIX common_
+  LINKED_LIBRARIES "${linked_libraries}" MODULE_PREFIX neighbors_mg_ivf_pq_
 )

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -96,13 +96,12 @@ cdef class IndexParams:
         distribution of the newly added data.
     """
 
-    cdef cuvsIvfFlatIndexParams* params
-
     def __cinit__(self):
         cuvsIvfFlatIndexParamsCreate(&self.params)
 
     def __dealloc__(self):
-        check_cuvs(cuvsIvfFlatIndexParamsDestroy(self.params))
+        if self.params != NULL:
+            check_cuvs(cuvsIvfFlatIndexParamsDestroy(self.params))
 
     def __init__(self, *,
                  n_lists=1024,
@@ -281,10 +280,9 @@ cdef class SearchParams:
         The number of clusters to search.
     """
 
-    cdef cuvsIvfFlatSearchParams* params
-
     def __cinit__(self):
-        cuvsIvfFlatSearchParamsCreate(&self.params)
+        if self.params != NULL:
+            cuvsIvfFlatSearchParamsCreate(&self.params)
 
     def __dealloc__(self):
         check_cuvs(cuvsIvfFlatSearchParamsDestroy(self.params))

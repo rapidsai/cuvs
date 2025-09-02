@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -116,3 +116,11 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
                                 DLManagedTensor* new_vectors,
                                 DLManagedTensor* new_indices,
                                 cuvsIvfPqIndex_t index)
+
+
+cdef class IndexParams:
+    cdef cuvsIvfPqIndexParams* params
+    cdef object _metric
+
+cdef class SearchParams:
+    cdef cuvsIvfPqSearchParams* params

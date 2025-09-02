@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -119,9 +119,6 @@ cdef class IndexParams:
         pq_book_size * max_train_points_per_pq_code training points to
         train each codebook.
     """
-
-    cdef cuvsIvfPqIndexParams* params
-    cdef object _metric
 
     def __cinit__(self):
         cuvsIvfPqIndexParamsCreate(&self.params)
@@ -377,8 +374,6 @@ cdef class SearchParams:
         Set the internal batch size to improve GPU utilization at the cost
         of larger memory footprint.
     """
-
-    cdef cuvsIvfPqSearchParams* params
 
     def __cinit__(self):
         cuvsIvfPqSearchParamsCreate(&self.params)
