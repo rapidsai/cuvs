@@ -40,7 +40,7 @@ struct bitwise_hamming_distance_op {
   bitwise_hamming_distance_op(IdxT k_) noexcept : k(k_) {}
 
   static constexpr bool use_norms            = false;
-  static constexpr bool expensive_inner_loop = false;
+  static constexpr bool expensive_inner_loop = true;  // Force vec_len=1 to reduce shared memory usage
 
   template <typename Policy>
   static constexpr size_t shared_mem_size()

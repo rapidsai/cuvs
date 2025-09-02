@@ -18,7 +18,7 @@
 
 #include "distance_ops/l2_exp.cuh"  // ops::l2_exp_distance_op
 #include "fused_distance_nn/cutlass_base.cuh"
-#include "fused_distance_nn/fused_bitwise_hamming_nn.cuh"  // Add this include!
+#include "fused_distance_nn/fused_bitwise_hamming_nn.cuh"
 #include "fused_distance_nn/fused_cosine_nn.cuh"
 #include "fused_distance_nn/fused_l2_nn.cuh"
 #include "fused_distance_nn/helper_structs.cuh"
@@ -90,11 +90,8 @@ void fusedDistanceNNImpl(OutT* min,
     case cuvs::distance::DistanceType::L2SqrtExpanded:
     case cuvs::distance::DistanceType::L2Expanded:
       if constexpr (std::is_same_v<DataT, uint8_t> || std::is_same_v<DataT, int8_t>) {
-        // This should never be reached at runtime for uint8_t/int8_t
-        // The caller should ensure proper metric selection for the data type
         assert(false && "L2 distance is not supported for uint8_t/int8_t data types");
       } else {
-        // initOutBuffer is take care by fusedDistanceNNImpl() so we set it false to fusedL2NNImpl.
         fusedL2NNImpl<DataT, OutT, IdxT, P, ReduceOpT, KVPReduceOpT>(
           min, x, y, xn, yn, m, n, k, workspace, redOp, pairRedOp, sqrt, false, stream);
       }

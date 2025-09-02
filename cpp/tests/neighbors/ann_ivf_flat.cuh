@@ -77,6 +77,9 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
 
   void testIVFFlat()
   {
+    if (ps.metric != cuvs::distance::DistanceType::BitwiseHamming) {
+      GTEST_SKIP();
+    }
     // Skip BitwiseHamming tests for non-uint8 data types
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         !std::is_same_v<DataT, uint8_t>) {
@@ -195,24 +198,24 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
                            &index_2);
         }
 
-        // auto search_queries_view = raft::make_device_matrix_view<const DataT, IdxT>(
-        //   search_queries.data(), ps.num_queries, ps.dim);
-        // auto indices_out_view = raft::make_device_matrix_view<IdxT, IdxT>(
-        //   indices_ivfflat_dev.data(), ps.num_queries, ps.k);
-        // auto dists_out_view = raft::make_device_matrix_view<T, IdxT>(
-        //   distances_ivfflat_dev.data(), ps.num_queries, ps.k);
+        auto search_queries_view = raft::make_device_matrix_view<const DataT, IdxT>(
+          search_queries.data(), ps.num_queries, ps.dim);
+        auto indices_out_view = raft::make_device_matrix_view<IdxT, IdxT>(
+          indices_ivfflat_dev.data(), ps.num_queries, ps.k);
+        auto dists_out_view = raft::make_device_matrix_view<T, IdxT>(
+          distances_ivfflat_dev.data(), ps.num_queries, ps.k);
         tmp_index_file index_file;
         cuvs::neighbors::ivf_flat::serialize(handle_, index_file.filename, index_2);
         cuvs::neighbors::ivf_flat::index<DataT, IdxT> index_loaded(handle_);
         cuvs::neighbors::ivf_flat::deserialize(handle_, index_file.filename, &index_loaded);
         ASSERT_EQ(index_2.size(), index_loaded.size());
 
-        // cuvs::neighbors::ivf_flat::search(handle_,
-        //                                   search_params,
-        //                                   index_loaded,
-        //                                   search_queries_view,
-        //                                   indices_out_view,
-        //                                   dists_out_view);
+        cuvs::neighbors::ivf_flat::search(handle_,
+                                          search_params,
+                                          index_loaded,
+                                          search_queries_view,
+                                          indices_out_view,
+                                          dists_out_view);
 
         raft::update_host(
           distances_ivfflat.data(), distances_ivfflat_dev.data(), queries_size, stream_);
@@ -244,35 +247,38 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
                                                                     stream_);
             raft::stats::mean<true, float, uint32_t>(
               centroid.data(), cluster_data.data(), ps.dim, list_sizes[l], false, stream_);
-            // ASSERT_TRUE(cuvs::devArrMatch(index_2.centers().data_handle() + ps.dim * l,
-            //                               centroid.data(),
-            //                               ps.dim,
-            //                               cuvs::CompareApprox<float>(0.001),
-            //                               stream_));
+            ASSERT_TRUE(cuvs::devArrMatch(index_2.centers().data_handle() + ps.dim * l,
+                                          centroid.data(),
+                                          ps.dim,
+                                          cuvs::CompareApprox<float>(0.001),
+                                          stream_));
           }
         } else {
           // The centers must be immutable
-          // ASSERT_TRUE(cuvs::devArrMatch(index_2.centers().data_handle(),
-          //                               idx.centers().data_handle(),
-          //                               index_2.centers().size(),
-          //                               cuvs::Compare<float>(),
-          //                               stream_));
+          ASSERT_TRUE(cuvs::devArrMatch(index_2.centers().data_handle(),
+                                        idx.centers().data_handle(),
+                                        index_2.centers().size(),
+                                        cuvs::Compare<float>(),
+                                        stream_));
         }
       }
-      // float eps = std::is_same_v<DataT, half> ? 0.005 : 0.001;
-      // ASSERT_TRUE(eval_neighbours(indices_naive,
-      //                             indices_ivfflat,
-      //                             distances_naive,
-      //                             distances_ivfflat,
-      //                             ps.num_queries,
-      //                             ps.k,
-      //                             eps,
-      //                             min_recall));
+      float eps = std::is_same_v<DataT, half> ? 0.005 : 0.001;
+      ASSERT_TRUE(eval_neighbours(indices_naive,
+                                  indices_ivfflat,
+                                  distances_naive,
+                                  distances_ivfflat,
+                                  ps.num_queries,
+                                  ps.k,
+                                  eps,
+                                  min_recall));
     }
   }
 
   void testPacker()
   {
+    if (ps.metric != cuvs::distance::DistanceType::BitwiseHamming) {
+      GTEST_SKIP();
+    }
     // Skip BitwiseHamming tests for non-uint8 data types
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         !std::is_same_v<DataT, uint8_t>) {
@@ -411,6 +417,9 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
 
   void testFilter()
   {
+    if (ps.metric != cuvs::distance::DistanceType::BitwiseHamming) {
+      GTEST_SKIP();
+    }
     // Skip BitwiseHamming tests for non-uint8 data types
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         !std::is_same_v<DataT, uint8_t>) {
@@ -485,15 +494,15 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
           cuvs::neighbors::filtering::bitset_filter(removed_indices_bitset.view());
 
         // Search with the filter
-        // auto search_queries_view = raft::make_device_matrix_view<const DataT, IdxT>(
-        //   search_queries.data(), ps.num_queries, ps.dim);
-        // ivf_flat::search(handle_,
-        //                  search_params,
-        //                  index,
-        //                  search_queries_view,
-        //                  indices_ivfflat_dev.view(),
-        //                  distances_ivfflat_dev.view(),
-        //                  bitset_filter_obj);
+        auto search_queries_view = raft::make_device_matrix_view<const DataT, IdxT>(
+          search_queries.data(), ps.num_queries, ps.dim);
+        ivf_flat::search(handle_,
+                         search_params,
+                         index,
+                         search_queries_view,
+                         indices_ivfflat_dev.view(),
+                         distances_ivfflat_dev.view(),
+                         bitset_filter_obj);
 
         raft::update_host(
           distances_ivfflat.data(), distances_ivfflat_dev.data_handle(), queries_size, stream_);
@@ -501,15 +510,15 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
           indices_ivfflat.data(), indices_ivfflat_dev.data_handle(), queries_size, stream_);
         raft::resource::sync_stream(handle_);
       }
-      // float eps = std::is_same_v<DataT, half> ? 0.005 : 0.001;
-      // ASSERT_TRUE(eval_neighbours(indices_naive,
-      //                             indices_ivfflat,
-      //                             distances_naive,
-      //                             distances_ivfflat,
-      //                             ps.num_queries,
-      //                             ps.k,
-      //                             eps,
-      //                             min_recall));
+      float eps = std::is_same_v<DataT, half> ? 0.005 : 0.001;
+      ASSERT_TRUE(eval_neighbours(indices_naive,
+                                  indices_ivfflat,
+                                  distances_naive,
+                                  distances_ivfflat,
+                                  ps.num_queries,
+                                  ps.k,
+                                  eps,
+                                  min_recall));
     }
   }
 

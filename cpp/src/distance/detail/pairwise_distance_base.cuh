@@ -17,6 +17,7 @@
 #include <raft/linalg/contractions.cuh>       // raft::linalg::Contractions_NT
 #include <raft/util/cuda_dev_essentials.cuh>  // ceildiv
 #include <raft/util/cuda_rt_essentials.hpp>   // RAFT_CUDA_TRY
+#include <raft/core/logger.hpp>              // RAFT_LOG_INFO
 
 #include <cstddef>  // size_t
 
@@ -303,6 +304,11 @@ dim3 launchConfigGenerator(IdxT m, IdxT n, std::size_t sMemSize, T func)
   int numBlocksPerSm = 0;
   dim3 grid;
 
+  RAFT_LOG_INFO("sMemSize=%zu, numSMs=%d, numBlocksPerSm=%d, Nthreads=%d", sMemSize, numSMs, numBlocksPerSm, P::Nthreads);
+
+  RAFT_CUDA_TRY(cudaFuncSetAttribute(func,
+    cudaFuncAttributeMaxDynamicSharedMemorySize,
+    98304));  // allow up to 96 KB
   RAFT_CUDA_TRY(
     cudaOccupancyMaxActiveBlocksPerMultiprocessor(&numBlocksPerSm, func, P::Nthreads, sMemSize));
   std::size_t minGridSize = numSMs * numBlocksPerSm;

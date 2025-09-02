@@ -53,6 +53,8 @@ void fusedBitwiseHammingNN(OutT* min,
 {
   typedef Policy P;
 
+  RAFT_LOG_INFO("inside fusedBitwiseHammingNN, Nthreads=%d", P::Nthreads);
+
   dim3 blk(P::Nthreads);
   constexpr auto maxVal = std::numeric_limits<DataT>::max();
   typedef ::raft::KeyValuePair<IdxT, OutT> KVPair;

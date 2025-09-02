@@ -600,6 +600,13 @@ inline auto build(raft::resources const& handle,
                                             decoded_centers_view,
                                             utils::mapping<float>{});
         RAFT_LOG_INFO("kmeans_balanced::fit completed");
+        
+        // Convert decoded centers back to binary format
+        RAFT_LOG_INFO("Converting centers back to binary format");
+        cuvs::preprocessing::quantize::binary::quantizer<float> temp_quantizer(handle);
+        cuvs::preprocessing::quantize::binary::transform(
+          handle, temp_quantizer, decoded_centers_view, index.binary_centers());
+        RAFT_LOG_INFO("Binary centers conversion completed");
       } else {
         // For non-binary data, use standard clustering
         auto centers_view = raft::make_device_matrix_view<float, IdxT>(
