@@ -50,6 +50,13 @@ public interface CuVSResources extends AutoCloseable {
   ScopedAccess access();
 
   /**
+   * Get the logical id of the device associated with this resources object.
+   * Information about the device id is immutable, so it is safe to expose it without getting {@link ScopedAccess}
+   * to the enclosing resources.
+   */
+  int deviceId();
+
+  /**
    * Closes this CuVSResources object and releases any resources associated with it.
    */
   @Override
