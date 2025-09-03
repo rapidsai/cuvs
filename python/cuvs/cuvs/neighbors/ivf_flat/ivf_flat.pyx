@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -60,6 +60,7 @@ cdef class IndexParams:
         String denoting the metric type.
         Valid values for metric: ["sqeuclidean", "inner_product",
         "euclidean", "cosine"], where
+
             - sqeuclidean is the euclidean distance without the square root
               operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2,
             - euclidean is the euclidean distance
@@ -67,6 +68,7 @@ cdef class IndexParams:
               distance(a, b) = \\sum_i a_i * b_i.
             - cosine distance is defined as
               distance(a, b) = 1 - \\sum_i a_i * b_i / ( ||a||_2 * ||b||_2).
+
     kmeans_n_iters : int, default = 20
         The number of iterations searching for kmeans centers during index
         building.

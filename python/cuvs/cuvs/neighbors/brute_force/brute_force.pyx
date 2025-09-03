@@ -161,11 +161,12 @@ def search(Index index,
                 - `n_prefilter_rows == 1` when using a bitset prefilter.
                 Each bit in `n_samples` determines whether `queries[i]`
                 should be considered for distance computation with the index.
-        (default None)
+                (default None)
     {resources_docstring}
 
     Examples
     --------
+
     >>> # Example without pre-filter
     >>> import cupy as cp
     >>> from cuvs.neighbors import brute_force
@@ -221,6 +222,7 @@ def search(Index index,
     ...                                           prefilter=bitmap_prefilter)
     >>> neighbors = cp.asarray(neighbors)
     >>> distances = cp.asarray(distances)
+
     """
     if not index.trained:
         raise ValueError("Index needs to be built before calling search.")

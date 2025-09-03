@@ -129,7 +129,7 @@ struct index : cuvs::neighbors::index {
   /**
   @brief Get underlying index
   */
-  virtual auto get_index() const -> void const* = 0;
+  virtual void const* get_index() const = 0;
 
   auto dim() const -> int const { return dim_; }
 
@@ -423,7 +423,7 @@ void extend(raft::resources const& res,
             raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> additional_dataset,
             index<uint8_t>& idx);
 
-/*
+/**
  * @brief Add new vectors to an HNSW index
  * NOTE: The HNSW index can only be extended when the `hnsw::index_params.hierarchy` is `CPU`
  *       when converting from a CAGRA index.

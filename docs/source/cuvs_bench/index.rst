@@ -181,7 +181,7 @@ All of the datasets above contain ground test datasets with 100 neighbors. Thus 
 End-to-end: large-scale benchmarks (>10M vectors)
 -------------------------------------------------
 
-`cuvs_bench.get_dataset` cannot be used to download the `billion-scale datasets`_ due to their size. You should instead use our billion-scale datasets guide to download and prepare them.
+`cuvs_bench.get_dataset` cannot be used to download the billion-scale datasets due to their size. You should instead use our billion-scale datasets guide to download and prepare them.
 All other python commands mentioned below work as intended once the billion-scale dataset has been downloaded.
 
 To download billion-scale datasets, visit `big-ann-benchmarks <http://big-ann-benchmarks.com/neurips21.html>`_
@@ -592,3 +592,12 @@ Add a new entry to `algos.yaml` to map the name of the algorithm to its binary e
 
 `executable` : specifies the name of the binary that will build/search the index. It is assumed to be available in `cuvs/cpp/build/`.
 `requires_gpu` : denotes whether an algorithm requires GPU to run.
+
+
+.. toctree::
+   :maxdepth: 4
+
+   build.rst
+   datasets.rst
+   param_tuning.rst
+   wiki_all_dataset.rst
