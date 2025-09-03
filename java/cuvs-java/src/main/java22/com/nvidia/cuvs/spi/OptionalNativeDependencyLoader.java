@@ -17,8 +17,7 @@ package com.nvidia.cuvs.spi;
 
 import java.io.*;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.stream.*;
 
 /**
  * A class that loads native dependencies if they are available in the jar.
@@ -30,30 +29,30 @@ public class OptionalNativeDependencyLoader {
   private static boolean loaded = false;
 
   private static String[] filesToLoad = {
-    "rmm", "cuvs", "cuvs_c",
+    "rapids_logger", "rmm", "cuvs", "cuvs_c",
   };
 
-  static synchronized void loadLibraries() {
-    try {
-      loadLibrariesImpl();
-    } catch (IOException e) {
-      System.err.println("Failed to load native dependencies from jar. " + e.getMessage());
-      System.err.println("Continuing execution without native dependencies.");
-    }
-  }
-
-  private static void loadLibrariesImpl() throws IOException {
+  public static void loadLibraries() {
     if (!loaded) {
       String os = System.getProperty("os.name");
       String arch = System.getProperty("os.arch");
-      List<File> files = new ArrayList<>();
-      for (String file : filesToLoad) {
-        files.add(createFile(os, arch, file));
-      }
-      for (File file : files) {
-        System.out.println("Loading native dependency: " + file.getName());
-        System.load(file.getAbsolutePath());
-      }
+
+      Stream.of(filesToLoad)
+          .forEach(
+              file -> {
+                // Uncomment the following line to trace the loading of native dependencies.
+                // System.out.println("Loading native dependency: " + file);
+                try {
+                  System.load(createFile(os, arch, file).getAbsolutePath());
+                } catch (Throwable t) {
+                  System.err.println(
+                      "Continuing despite failure to load native dependency: "
+                          + System.mapLibraryName(file)
+                          + ".so: "
+                          + t.getMessage());
+                }
+              });
+
       loaded = true;
     }
   }

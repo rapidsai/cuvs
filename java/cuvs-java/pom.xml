@@ -303,6 +303,12 @@
                                                 <include>librmm.so</include>
                                             </includes>
                                         </resource>
+                                        <resource>
+                                            <directory>${native.lib.path}/_deps/rapids_logger-build</directory>
+                                            <includes>
+                                                <include>librapids_logger.so</include>
+                                            </includes>
+                                        </resource>
                                     </resources>
                                 </configuration>
                             </execution>
@@ -378,6 +384,12 @@
                                             <directory>${native.lib.path}/_deps/rmm-build</directory>
                                             <includes>
                                                 <include>librmm.so</include>
+                                            </includes>
+                                        </resource>
+                                        <resource>
+                                            <directory>${native.lib.path}/_deps/rapids_logger-build</directory>
+                                            <includes>
+                                                <include>librapids_logger.so</include>
                                             </includes>
                                         </resource>
                                     </resources>
