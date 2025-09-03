@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,7 +60,12 @@ template <typename MathT, typename IdxT>
   return os;
 }
 
-template <typename DataT, typename MathT, typename LabelT, typename IdxT, typename MappingOpT>
+template <typename DataT,
+          typename MathT,
+          typename LabelT,
+          typename IdxT,
+          typename MappingOpT,
+          bool SeparateFitPredict>
 class KmeansBalancedTest : public ::testing::TestWithParam<KmeansBalancedInputs<MathT, IdxT>> {
  protected:
   KmeansBalancedTest()
@@ -123,8 +128,14 @@ class KmeansBalancedTest : public ::testing::TestWithParam<KmeansBalancedInputs<
       raft::make_device_matrix_view<MathT, IdxT>(d_centroids.data(), p.n_clusters, p.n_cols);
     auto d_labels_view = raft::make_device_vector_view<LabelT, IdxT>(d_labels.data(), p.n_rows);
 
-    cuvs::cluster::kmeans::fit_predict(
-      handle, p.kb_params, X_view, d_centroids_view, d_labels_view);
+    if constexpr (SeparateFitPredict) {
+      cuvs::cluster::kmeans::fit(handle, p.kb_params, X_view, d_centroids_view);
+      cuvs::cluster::kmeans::predict(
+        handle, p.kb_params, X_view, raft::make_const_mdspan(d_centroids_view), d_labels_view);
+    } else {
+      cuvs::cluster::kmeans::fit_predict(
+        handle, p.kb_params, X_view, d_centroids_view, d_labels_view);
+    }
 
     raft::resource::sync_stream(handle, stream);
 
@@ -161,12 +172,15 @@ std::vector<KmeansBalancedInputs<MathT, IdxT>> get_kmeans_balanced_inputs()
   p.kb_params.n_iters = 20;
   p.kb_params.metric  = cuvs::distance::DistanceType::L2Expanded;
   p.tol               = MathT{0.0001};
-  std::vector<std::tuple<size_t, size_t, size_t>> row_cols_k = {{1000, 32, 5},
-                                                                {1000, 100, 20},
-                                                                {10000, 32, 10},
-                                                                {10000, 100, 50},
-                                                                {10000, 500, 100},
-                                                                {1000000, 128, 10}};
+  std::vector<std::tuple<size_t, size_t, size_t>> row_cols_k = {
+    {1000, 32, 5},
+    {1000, 100, 20},
+    {10000, 32, 10},
+    {10000, 100, 50},
+    {10000, 500, 100},
+    {1000000, 128, 10},
+    {10000000, 128, 10},
+  };
   for (auto& rck : row_cols_k) {
     p.n_rows     = static_cast<IdxT>(std::get<0>(rck));
     p.n_cols     = static_cast<IdxT>(std::get<1>(rck));
@@ -190,15 +204,21 @@ const auto inputsf_i64 = get_kmeans_balanced_inputs<float, int64_t>();
  * First set of tests: no conversion
  */
 
-KB_TEST((KmeansBalancedTest<float, float, uint32_t, int, raft::identity_op>),
+KB_TEST((KmeansBalancedTest<float, float, uint32_t, int, raft::identity_op, false>),
         KmeansBalancedTestFFU32I32,
+        inputsf_i32);
+KB_TEST((KmeansBalancedTest<float, float, int, int, raft::identity_op, true>),
+        KmeansBalancedTestFFI32I32_SEP,
         inputsf_i32);
 // KB_TEST((KmeansBalancedTest<double, double, uint32_t, int, raft::identity_op>),
 //         KmeansBalancedTestDDU32I32,
 //         inputsd_i32);
-// KB_TEST((KmeansBalancedTest<float, float, uint32_t, int64_t, raft::identity_op>),
-//         KmeansBalancedTestFFU32I64,
-//         inputsf_i64);
+KB_TEST((KmeansBalancedTest<float, float, uint32_t, int64_t, raft::identity_op, false>),
+        KmeansBalancedTestFFU32I64,
+        inputsf_i64);
+KB_TEST((KmeansBalancedTest<float, float, int, int64_t, raft::identity_op, true>),
+        KmeansBalancedTestFFI32I64_SEP,
+        inputsf_i64);
 // KB_TEST((KmeansBalancedTest<double, double, uint32_t, int64_t, raft::identity_op>),
 //         KmeansBalancedTestDDU32I64,
 //         inputsd_i64);
@@ -231,8 +251,11 @@ struct i2f_scaler {
   RAFT_INLINE_FUNCTION auto operator()(const DataT& x) const { return op(x); };
 };
 
-KB_TEST((KmeansBalancedTest<int8_t, float, uint32_t, int, i2f_scaler<int8_t, float>>),
+KB_TEST((KmeansBalancedTest<int8_t, float, uint32_t, int, i2f_scaler<int8_t, float>, false>),
         KmeansBalancedTestFI8U32I32,
+        inputsf_i32);
+KB_TEST((KmeansBalancedTest<int8_t, float, int, int, i2f_scaler<int8_t, float>, true>),
+        KmeansBalancedTestFI8I32I32_SEP,
         inputsf_i32);
 
 }  // namespace cuvs
