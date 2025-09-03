@@ -241,6 +241,7 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
   constexpr uint32_t vlen = utils::size_of<PQ_CODEBOOK_LOAD_T>() / utils::size_of<uint8_t>();
   constexpr uint32_t nelem =
     raft::div_rounding_up_unsafe<uint32_t>(DatasetBlockDim / PQ_LEN, TeamSize * vlen);
+  static_assert(DatasetBlockDim / PQ_LEN >= TeamSize * vlen, "DatasetBlockDim is too small");
 
   constexpr auto kTeamMask = DescriptorT::kTeamSize - 1;
   constexpr auto kTeamVLen = TeamSize * vlen;
