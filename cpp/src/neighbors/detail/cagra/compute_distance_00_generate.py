@@ -50,6 +50,9 @@ using namespace cuvs::distance;
 """
 
 mxdim_team = [(128, 8), (256, 16), (512, 32)]
+vpq_2_4_mxdim_team = [(64, 4), (128, 8), (256, 16), (512, 32)]
+vpq_8_mxdim_team = [(128, 4), (256, 8), (512, 16), (1024, 32)]
+vrq_mxdim_team = [(64, 4), (128, 8), (256, 16), (512, 32)]
 #mxdim_team = [(64, 8), (128, 16), (256, 32)]
 #mxdim_team = [(32, 8), (64, 16), (128, 32)]
 
@@ -98,9 +101,11 @@ for type_path, (data_t, idx_t, distance_t) in search_types.items():
                 f.write(template.format(includes=includes, content=content))
                 cmake_list.append(f"  src/neighbors/detail/cagra/{path}")
 
-        # CAGRA-Q
-        for code_book_t in code_book_types:
-            for pq_len in pq_lens:
+    for pq_len in pq_lens:
+        vpq_mxdim_team = vpq_8_mxdim_team if pq_len == 8 else vpq_2_4_mxdim_team
+        for (mxdim, team) in vpq_mxdim_team:
+            # CAGRA-Q
+            for code_book_t in code_book_types:
                 for pq_bit in pq_bits:
                     for metric in ['L2Expanded']:
                         path = f"compute_distance_vpq_{metric}_{type_path}_dim{mxdim}_t{team}_{pq_bit}pq_{pq_len}subd_{code_book_t}.cu"
@@ -112,6 +117,24 @@ for type_path, (data_t, idx_t, distance_t) in search_types.items():
                         with open(path, "w") as f:
                             f.write(template.format(includes=includes, content=content))
                             cmake_list.append(f"  src/neighbors/detail/cagra/{path}")
+
+# CAGRA-RaBitQ
+for (mxdim, team) in vrq_mxdim_team:
+    for vq_code_t in ['uint32_t']:
+        for rabitq_code_t in ['uint64_t']:
+            for metric in ['L2Expanded']:
+                data_t = 'float'
+                idx_t = 'uint32_t'
+                distance_t = 'float'
+                path = f"compute_distance_vrabitq_{metric}_dim{mxdim}_t{team}_{vq_code_t}_{rabitq_code_t}.cu"
+                includes = '#include "compute_distance_vrabitq-impl.cuh"'
+                params = f"{metric_prefix}{metric}, {team}, {mxdim}, {data_t}, {idx_t}, {vq_code_t}, {rabitq_code_t}, float, {distance_t}"
+                spec = f"vrabitq_descriptor_spec<{params}>"
+                content = f"""template struct {spec};"""
+                specs.append(spec)
+                with open(path, "w") as f:
+                    f.write(template.format(includes=includes, content=content))
+                    cmake_list.append(f"  src/neighbors/detail/cagra/{path}")
 
 # CAGRA (Binary Hamming distance)
 for (mxdim, team) in mxdim_team:
@@ -137,6 +160,7 @@ with open("compute_distance-ext.cuh", "w") as f:
 
 #include "compute_distance_standard.hpp"
 #include "compute_distance_vpq.hpp"
+#include "compute_distance_vrabitq.hpp"
 '''
     newline = "\n"
     contents = f'''

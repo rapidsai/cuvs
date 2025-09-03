@@ -23,19 +23,19 @@
  *
  */
 
-#include "compute_distance_vpq-impl.cuh"
+#include "compute_distance_vrabitq-impl.cuh"
 
 namespace cuvs::neighbors::cagra::detail {
 
 using namespace cuvs::distance;
-template struct vpq_descriptor_spec<DistanceType::L2Expanded,
-                                    8,
-                                    128,
-                                    8,
-                                    8,
-                                    half,
-                                    half,
-                                    uint32_t,
-                                    float>;
+template struct vrabitq_descriptor_spec<DistanceType::L2Expanded,
+                                        4,
+                                        64,
+                                        float,
+                                        uint32_t,
+                                        uint32_t,
+                                        uint64_t,
+                                        float,
+                                        float>;
 
 }  // namespace cuvs::neighbors::cagra::detail

@@ -29,10 +29,10 @@ namespace cuvs::neighbors::cagra::detail {
 
 using namespace cuvs::distance;
 template struct vpq_descriptor_spec<DistanceType::L2Expanded,
-                                    32,
-                                    512,
+                                    4,
+                                    64,
                                     8,
-                                    8,
+                                    4,
                                     half,
                                     int8_t,
                                     uint32_t,
