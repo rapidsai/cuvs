@@ -506,7 +506,7 @@ def load(filename, resources=None):
 @auto_sync_multi_gpu_resources
 def distribute(filename, resources=None):
     """
-    Distribute the multi-GPU IVF-PQ index across multiple GPUs from a file.
+    Distribute a single-GPU IVF-PQ index across multiple GPUs from a file.
 
     Parameters
     ----------
@@ -523,7 +523,7 @@ def distribute(filename, resources=None):
     --------
 
     >>> from cuvs.neighbors import mg_ivf_pq
-    >>> index = mg_ivf_pq.distribute("index.bin")
+    >>> index = mg_ivf_pq.distribute("single_gpu_index.bin")
     """
 
     cdef MultiGpuIndex index = MultiGpuIndex()

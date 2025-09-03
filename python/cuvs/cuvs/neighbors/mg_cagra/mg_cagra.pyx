@@ -430,7 +430,7 @@ def load(filename, resources=None):
 @auto_sync_multi_gpu_resources
 def distribute(filename, resources=None):
     """
-    Distribute the multi-GPU CAGRA index across multiple GPUs from a file.
+    Distribute a single-GPU CAGRA index across multiple GPUs from a file.
 
     Parameters
     ----------
@@ -447,7 +447,7 @@ def distribute(filename, resources=None):
     --------
 
     >>> from cuvs.neighbors import mg_cagra
-    >>> index = mg_cagra.distribute("index.bin")
+    >>> index = mg_cagra.distribute("single_gpu_index.bin")
     """
 
     cdef MultiGpuIndex index = MultiGpuIndex()
