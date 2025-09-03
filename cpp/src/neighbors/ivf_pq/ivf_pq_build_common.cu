@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -271,11 +271,14 @@ void make_rotation_matrix(raft::resources const& res,
                           index<int64_t>* index,
                           bool force_random_rotation)
 {
+  auto rotation_matrix_buffer = raft::make_device_matrix<float, uint32_t>(
+    res, index->rotation_matrix().extent(0), index->rotation_matrix().extent(1));
   make_rotation_matrix(res,
                        force_random_rotation,
                        index->rot_dim(),
                        index->dim(),
-                       index->rotation_matrix().data_handle());
+                       rotation_matrix_buffer.data_handle());
+  index->update_rotation_matrix(res, rotation_matrix_buffer.view());
 }
 
 void set_centers(raft::resources const& handle,
@@ -310,3 +313,33 @@ void recompute_internal_state(const raft::resources& res, index<int64_t>* index)
 }
 
 }  // namespace cuvs::neighbors::ivf_pq::helpers
+
+namespace cuvs::neighbors::ivf_pq {
+auto build(
+  raft::resources const& handle,
+  const cuvs::neighbors::ivf_pq::index_params& index_params,
+  const uint32_t dim,
+  raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
+  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
+  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix)
+  -> cuvs::neighbors::ivf_pq::index<int64_t>
+{
+  return detail::build<int64_t>(
+    handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix);
+}
+
+void build(
+  raft::resources const& handle,
+  const cuvs::neighbors::ivf_pq::index_params& index_params,
+  const uint32_t dim,
+  raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
+  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
+  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix,
+  cuvs::neighbors::ivf_pq::index<int64_t>* idx)
+{
+  *idx = detail::build<int64_t>(
+    handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix);
+}
+}  // namespace cuvs::neighbors::ivf_pq

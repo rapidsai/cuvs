@@ -27,6 +27,7 @@ Index build
 ###########
 
 .. autofunction:: cuvs.neighbors.ivf_pq.build
+.. autofunction:: cuvs.neighbors.ivf_pq.build_from_args
 
 Index search
 ############

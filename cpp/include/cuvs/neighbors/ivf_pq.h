@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -262,23 +262,60 @@ cuvsError_t cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index);
 cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index);
 
 /** Get the number of clusters/inverted lists */
-uint32_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index);
+cuvsError_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index, int64_t* n_lists);
 
 /** Get the dimensionality */
-uint32_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index);
+cuvsError_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index, int64_t* dim);
+
+/** Get the pq_dim */
+cuvsError_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index, int64_t* pq_dim);
+
+/** Get the pq_len */
+cuvsError_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index, int64_t* pq_len);
+
+/** Get the pq_book_size */
+cuvsError_t cuvsIvfPqIndexGetPqBookSize(cuvsIvfPqIndex_t index, int64_t* pq_book_size);
 
 /**
  * @brief Get the cluster centers corresponding to the lists in the original space
  *
- * @param[in] res cuvsResources_t opaque C handle
  * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
- * @param[out] centers Preallocated array on host or device memory to store output,
- * dimensions [n_lists, dim]
+ * @param[out] centers View of the centers array on device memory,
+ * dimensions [n_lists, dim_ext].
  * @return cuvsError_t
  */
-cuvsError_t cuvsIvfPqIndexGetCenters(cuvsResources_t res,
-                                     cuvsIvfPqIndex_t index,
-                                     DLManagedTensor* centers);
+cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* centers);
+
+/**
+ * @brief Get the codebook corresponding to the lists in the original space
+ *
+ * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
+ * @param[out] codebook View of the array on device memory,
+ * dimensions [n_lists or pq_dim, pq_len, pq_book_size]
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqIndexGetCodebook(cuvsIvfPqIndex_t index, DLManagedTensor* codebook);
+
+/**
+ * @brief Get the codebook corresponding to the lists in the original space
+ *
+ * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
+ * @param[out] rotation_matrix View of the array on device memory, dimensions
+ * [dim, rot_dim]
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqIndexGetRotationMatrix(cuvsIvfPqIndex_t index,
+                                            DLManagedTensor* rotation_matrix);
+
+/**
+ * @brief Get the cluster centers in the rotated space
+ *
+ * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
+ * @param[out] centers_rot View of the array on device memory, dimensions
+ * [n_lists, rot_dim]
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqIndexGetCentersRot(cuvsIvfPqIndex_t index, DLManagedTensor* centers_rot);
 /**
  * @}
  */
@@ -334,6 +371,60 @@ cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
                            cuvsIvfPqIndexParams_t params,
                            DLManagedTensor* dataset,
                            cuvsIvfPqIndex_t index);
+
+/**
+ * @brief Build a IVF-PQ index from existing centroids and codebook. The input tensors must be on
+ *        device memory.
+ *
+ * @code {.c}
+ * #include <cuvs/core/c_api.h>
+ * #include <cuvs/neighbors/ivf_pq.h>
+ *
+ * // Create cuvsResources_t
+ * cuvsResources_t res;
+ * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
+ *
+ * // Assume populated `DLManagedTensor` types here
+ * DLManagedTensor pq_centers;
+ * DLManagedTensor centers;
+ * DLManagedTensor rotation_matrix;
+ *
+ * // Create default index params
+ * cuvsIvfPqIndexParams_t index_params;
+ * cuvsError_t params_create_status = cuvsIvfPqIndexParamsCreate(&index_params);
+ *
+ * // Create IVF-PQ index
+ * cuvsIvfPqIndex_t index;
+ * cuvsError_t index_create_status = cuvsIvfPqIndexCreate(&index);
+ *
+ * // Build the IVF-PQ Index
+ * cuvsError_t build_status = cuvsIvfPqBuildFromArgs(res, index_params, dim, &pq_centers,
+ *   &centers, &rotation_matrix, index);
+ *
+ * // de-allocate `index_params`, `index` and `res`
+ * cuvsError_t params_destroy_status = cuvsIvfPqIndexParamsDestroy(index_params);
+ * cuvsError_t index_destroy_status = cuvsIvfPqIndexDestroy(index);
+ * cuvsError_t res_destroy_status = cuvsResourcesDestroy(res);
+ * @endcode
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] params cuvsIvfPqIndexParams_t used to build IVF-PQ index
+ * @param[in] dim dimensionality of the input data
+ * @param[in] pq_centers DLManagedTensor* PQ codebook
+ * @param[in] centers DLManagedTensor* cluster centers
+ * @param[in] centers_rot DLManagedTensor* cluster centers in the rotated space (optional)
+ * @param[in] rotation_matrix DLManagedTensor* rotation matrix (optional)
+ * @param[out] index cuvsIvfPqIndex_t Newly built IVF-PQ index
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqBuildFromArgs(cuvsResources_t res,
+                                   cuvsIvfPqIndexParams_t params,
+                                   uint32_t dim,
+                                   DLManagedTensor* pq_centers,
+                                   DLManagedTensor* centers,
+                                   DLManagedTensor* centers_rot,
+                                   DLManagedTensor* rotation_matrix,
+                                   cuvsIvfPqIndex_t index);
 /**
  * @}
  */
