@@ -1,2 +1,4 @@
 # Disable file checks (otherwise every use of `gha-tools` will get flagged)
 disable=SC1091
+# Disable checks saying that 'pushd' / 'popd' should be followed by '|| exit' or similar in case they don't exist
+disable=SC2164

@@ -17,7 +17,7 @@ export RAPIDS_CUDA_MAJOR
 
 # TODO: switch to installing pre-built artifacts instead of rebuilding in test jobs
 #       ref: https://github.com/rapidsai/cuvs/issues/868
-ci/build_java.sh --run-java-tests
+ci/build_java_portable_fat_jar.sh --run-java-tests
 
 rapids-logger "Test script exiting with value: $EXITCODE"
 exit ${EXITCODE}
