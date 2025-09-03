@@ -30,29 +30,13 @@ import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
-import com.nvidia.cuvs.CagraCompressionParams;
-import com.nvidia.cuvs.CagraIndex;
-import com.nvidia.cuvs.CagraIndexParams;
+import com.nvidia.cuvs.*;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
-import com.nvidia.cuvs.CagraMergeParams;
-import com.nvidia.cuvs.CagraQuery;
-import com.nvidia.cuvs.CagraSearchParams;
-import com.nvidia.cuvs.CuVSIvfPqIndexParams;
-import com.nvidia.cuvs.CuVSIvfPqSearchParams;
-import com.nvidia.cuvs.CuVSMatrix;
-import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.SearchResults;
 import com.nvidia.cuvs.internal.common.CloseableHandle;
 import com.nvidia.cuvs.internal.common.CloseableRMMAllocation;
 import com.nvidia.cuvs.internal.common.CompositeCloseableHandle;
-import com.nvidia.cuvs.internal.panama.cuvsCagraCompressionParams;
-import com.nvidia.cuvs.internal.panama.cuvsCagraIndexParams;
-import com.nvidia.cuvs.internal.panama.cuvsCagraMergeParams;
-import com.nvidia.cuvs.internal.panama.cuvsCagraSearchParams;
-import com.nvidia.cuvs.internal.panama.cuvsFilter;
-import com.nvidia.cuvs.internal.panama.cuvsIvfPqIndexParams;
-import com.nvidia.cuvs.internal.panama.cuvsIvfPqParams;
-import com.nvidia.cuvs.internal.panama.cuvsIvfPqSearchParams;
+import com.nvidia.cuvs.internal.panama.*;
+
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -179,7 +163,6 @@ public class CagraIndexImpl implements CagraIndex {
    */
   private IndexReference build(CagraIndexParams indexParameters, CuVSMatrixBaseImpl dataset) {
     long rows = dataset.size();
-    long cols = dataset.columns();
 
     try (var indexParams = segmentFromIndexParams(indexParameters);
         var localArena = Arena.ofConfined()) {
@@ -188,14 +171,7 @@ public class CagraIndexImpl implements CagraIndex {
       int numWriterThreads = indexParameters != null ? indexParameters.getNumWriterThreads() : 1;
       omp_set_num_threads(numWriterThreads);
 
-      MemorySegment dataSeg = dataset.memorySegment();
-      // TODO: type kDLCPU()/kDLCUDA() should be aligned with the CuVSMatrixBaseImpl type (host or
-      // device?)
-
-      long[] datasetShape = {rows, cols};
-      MemorySegment datasetTensor =
-          prepareTensor(localArena, dataSeg, datasetShape, kDLFloat(), 32, kDLCPU(), 1);
-
+      var datasetTensor = dataset.toTensor(localArena);
       var index = createCagraIndex();
 
       if (cuvsCagraIndexParams.build_algo(indexParamsMemorySegment)
@@ -211,6 +187,7 @@ public class CagraIndexImpl implements CagraIndex {
       try (var resourcesAccessor = resources.access()) {
         var cuvsRes = resourcesAccessor.handle();
 
+        // TODO: do we need a stream sync here?
         var returnValue = cuvsStreamSync(cuvsRes);
         checkCuVSError(returnValue, "cuvsStreamSync");
 
@@ -292,15 +269,15 @@ public class CagraIndexImpl implements CagraIndex {
           long[] queriesShape = {numQueries, vectorDimension};
           MemorySegment queriesTensor =
               prepareTensor(
-                  localArena, queriesDP.handle(), queriesShape, kDLFloat(), 32, kDLCUDA(), 1);
+                  localArena, queriesDP.handle(), queriesShape, kDLFloat(), 32, kDLCUDA());
           long[] neighborsShape = {numQueries, topK};
           MemorySegment neighborsTensor =
               prepareTensor(
-                  localArena, neighborsDP.handle(), neighborsShape, kDLUInt(), 32, kDLCUDA(), 1);
+                  localArena, neighborsDP.handle(), neighborsShape, kDLUInt(), 32, kDLCUDA());
           long[] distancesShape = {numQueries, topK};
           MemorySegment distancesTensor =
               prepareTensor(
-                  localArena, distancesDP.handle(), distancesShape, kDLFloat(), 32, kDLCUDA(), 1);
+                  localArena, distancesDP.handle(), distancesShape, kDLFloat(), 32, kDLCUDA());
 
           var returnValue = cuvsStreamSync(cuvsRes);
           checkCuVSError(returnValue, "cuvsStreamSync");
@@ -327,7 +304,7 @@ public class CagraIndexImpl implements CagraIndex {
 
             prefilterTensor =
                 prepareTensor(
-                    localArena, prefilterDP.handle(), prefilterShape, kDLUInt(), 32, kDLCUDA(), 1);
+                    localArena, prefilterDP.handle(), prefilterShape, kDLUInt(), 32, kDLCUDA());
 
             cuvsFilter.type(prefilter, 1);
             cuvsFilter.addr(prefilter, prefilterTensor.address());
@@ -410,46 +387,24 @@ public class CagraIndexImpl implements CagraIndex {
   }
 
   @Override
-  public CuVSMatrix getGraph() {
+  public CuVSDeviceMatrix getGraph() {
     try (var localArena = Arena.ofConfined()) {
-      var outPtr = localArena.allocate(C_LONG);
-      checkCuVSError(
-          cuvsCagraIndexGetGraphDegree(cagraIndexReference.getMemorySegment(), outPtr),
-          "cuvsCagraIndexGetGraphDegree");
-      long graphDegree = outPtr.get(C_LONG, 0);
+      // Use a "device" graph + tensor, avoid (defer) copy
+      MemorySegment graphDeviceTensor = DLManagedTensor.allocate(localArena);
+      DLManagedTensor.dl_tensor(graphDeviceTensor, DLTensor.allocate(localArena));
 
-      checkCuVSError(
-          cuvsCagraIndexGetSize(cagraIndexReference.getMemorySegment(), outPtr),
-          "cuvsCagraIndexGetSize");
-      long size = outPtr.get(C_LONG, 0);
-
-      // TODO: use a "device" graph + tensor, avoid (defer) copy
-      var graph = new CuVSHostMatrixArenaImpl(size, graphDegree, CuVSMatrix.DataType.UINT);
-      var graphHostTensor = graph.toTensor(localArena);
-      var graphDeviceTensor =
-          prepareTensor(
-              localArena,
-              MemorySegment.NULL,
-              new long[] {size, graphDegree},
-              kDLUInt(),
-              32,
-              kDLCUDA(),
-              1);
       checkCuVSError(
           cuvsCagraIndexGetGraph(cagraIndexReference.getMemorySegment(), graphDeviceTensor),
           "cuvsCagraIndexGetGraph");
 
-      try (var resourceAccess = resources.access()) {
-        var cuvsRes = resourceAccess.handle();
-        checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync");
+      assert DLTensor.ndim(DLManagedTensor.dl_tensor(graphDeviceTensor)) == 2;
+      assert DLTensor.shape(DLManagedTensor.dl_tensor(graphDeviceTensor)).get(int64_t, 0) > 0;
+      assert DLTensor.shape(DLManagedTensor.dl_tensor(graphDeviceTensor)).getAtIndex(int64_t, 1)
+          > 0;
 
-        checkCuVSError(
-            cuvsMatrixCopy(cuvsRes, graphDeviceTensor, graphHostTensor), "cuvsMatrixCopy");
-
-        checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync");
-      }
-
-      return graph;
+      var graph = CuVSMatrixBaseImpl.fromTensor(graphDeviceTensor, resources);
+      assert graph instanceof CuVSDeviceMatrix;
+      return (CuVSDeviceMatrix) graph;
     }
   }
 
@@ -458,28 +413,17 @@ public class CagraIndexImpl implements CagraIndex {
       CuVSMatrixBaseImpl graph,
       CuVSMatrixBaseImpl dataset) {
     try (var localArena = Arena.ofConfined()) {
-      long rows = dataset.size();
-      long cols = dataset.columns();
-
       var index = createCagraIndex();
       try (var resourcesAccess = resources.access()) {
         long cuvsRes = resourcesAccess.handle();
 
-        long[] datasetShape = {rows, cols};
-        MemorySegment datasetTensor =
-            prepareTensor(
-                localArena, dataset.memorySegment(), datasetShape, kDLFloat(), 32, kDLCPU(), 1);
-
-        long[] graphShape = {graph.size(), graph.columns()};
-        MemorySegment graphTensor =
-            prepareTensor(
-                localArena, graph.memorySegment(), graphShape, kDLUInt(), 32, kDLCPU(), 1);
+        MemorySegment datasetTensor = dataset.toTensor(localArena);
+        MemorySegment graphTensor = graph.toTensor(localArena);
 
         checkCuVSError(
             cuvsCagraIndexFromArgs(cuvsRes, metric.value, graphTensor, datasetTensor, index),
             "cuvsCagraIndexFromArgs");
       }
-
       return new IndexReference(index, dataset);
     }
   }

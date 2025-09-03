@@ -174,14 +174,11 @@ cuvsError_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index, int64_t* dim);
 /**
  * @brief Get the cluster centers corresponding to the lists [n_lists, dim]
  *
- * @param[in] res cuvsResources_t opaque C handle
  * @param[in] index cuvsIvfFlatIndex_t Built Ivf-Flat Index
  * @param[out] centers Preallocated array on host or device memory to store output, [n_lists, dim]
  * @return cuvsError_t
  */
-cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsResources_t res,
-                                       cuvsIvfFlatIndex_t index,
-                                       DLManagedTensor* centers);
+cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsIvfFlatIndex_t index, DLManagedTensor* centers);
 
 /**
  * @}
