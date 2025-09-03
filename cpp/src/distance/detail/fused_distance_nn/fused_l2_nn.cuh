@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,7 +64,6 @@ void fusedL2NNImpl(OutT* min,
   constexpr auto maxVal = std::numeric_limits<DataT>::max();
   typedef raft::KeyValuePair<IdxT, DataT> KVPair;
 
-  RAFT_CUDA_TRY(cudaMemsetAsync(workspace, 0, sizeof(int) * m, stream));
   if (initOutBuffer) {
     initKernel<DataT, OutT, IdxT, ReduceOpT>
       <<<nblks, P::Nthreads, 0, stream>>>(min, m, maxVal, redOp);

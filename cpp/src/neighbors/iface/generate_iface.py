@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # limitations under the License.
 
 header = """/*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -253,6 +253,7 @@ cagra_macros = dict (
 
 flat_types = dict(
     float_int64_t=("float", "int64_t"),
+    half_int64_t=("half", "int64_t"),
     int8_t_int64_t=("int8_t", "int64_t"),
     uint8_t_int64_t=("uint8_t", "int64_t"),
 )

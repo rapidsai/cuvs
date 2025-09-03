@@ -40,7 +40,7 @@ requirements:
     - benchmark
     - click
     - cuda-cudart
-    - cupy >=12.0.0
+    - cupy >=13.6.0
     - cuvs =${{ version }}
     - glog ${{ glog_version }}
     - h5py ${{ h5py_version }}
