@@ -6,6 +6,11 @@
 # Intentionally does not use environment-management tools like 'conda', to ensure
 # the built binaries are portable to other environments not using those tools.
 #
+set -e -u -o pipefail
+
+export CMAKE_VERSION='3.30.4'
+export JDK_VERSION='22.0.2'
+export MAVEN_VERSION='3.9.11'
 
 source rapids-configure-sccache
 

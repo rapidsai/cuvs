@@ -24,10 +24,6 @@ jobs:
         cuda_version:
           - '12.9.1'
           # - '13.0.0'
-    env:
-      CMAKE_VERSION: '3.30.4'
-      JDK_VERSION: '22.0.2'
-      MAVEN_VERSION: '3.9.11'
     with:
       build_type: pull-request
       node_type: "gpu-l4-latest-1"
@@ -36,6 +32,6 @@ jobs:
       # respect RAPIDS minimum GLIBC version and are portable for re-use in environments not using
       # 'conda' or 'pip'
       container_image: "rapidsai/ci-wheel:25.10-cuda${{ matrix.cuda_version }}-rockylinux8-py3.13"
-      script: "ci/test_java.sh"
+      script: "ci/build_java_portable_fat_jar.sh"
       artifact-name: "cuvs-java-cuda${{ matrix.cuda_version }}"
       file_to_upload: "java/cuvs-java/target/"
