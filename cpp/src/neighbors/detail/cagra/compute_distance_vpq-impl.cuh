@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -234,10 +234,11 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
   constexpr auto DatasetBlockDim = DescriptorT::kDatasetBlockDim;
   constexpr auto PQ_BITS         = DescriptorT::kPqBits;
   constexpr auto PQ_LEN          = DescriptorT::kPqLen;
+  using PQ_CODEBOOK_LOAD_T       = uint32_t;
 
   const uint32_t query_ptr = pq_codebook_ptr + DescriptorT::kSMemCodeBookSizeInBytes;
   static_assert(PQ_BITS == 8, "Only pq_bits == 8 is supported at the moment.");
-  constexpr uint32_t vlen = 4;  // **** DO NOT CHANGE ****
+  constexpr uint32_t vlen = utils::size_of<PQ_CODEBOOK_LOAD_T>() / utils::size_of<uint8_t>();
   constexpr uint32_t nelem =
     raft::div_rounding_up_unsafe<uint32_t>(DatasetBlockDim / PQ_LEN, TeamSize * vlen);
 
@@ -250,13 +251,12 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
   for (uint32_t elem_offset = 0; elem_offset * PQ_LEN < dim;
        elem_offset += DatasetBlockDim / PQ_LEN) {
     // Loading PQ codes
-    uint32_t pq_codes[nelem];
+    PQ_CODEBOOK_LOAD_T pq_codes[nelem];
 #pragma unroll
     for (std::uint32_t e = 0; e < nelem; e++) {
       const std::uint32_t k = e * kTeamVLen + elem_offset + laneId * vlen;
       if (k >= n_subspace) break;
-      // Loading 4 x 8-bit PQ-codes using 32-bit load ops (from device memory)
-      device::ldg_cg(pq_codes[e], reinterpret_cast<const std::uint32_t*>(dataset_ptr + 4 + k));
+      device::ldg_cg(pq_codes[e], reinterpret_cast<const PQ_CODEBOOK_LOAD_T*>(dataset_ptr + 4 + k));
     }
     //
     if constexpr (PQ_LEN % 2 == 0) {
@@ -274,7 +274,7 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
           device::ldg_ca(vq_vals[m], vq_code_book_ptr + d);
         }
         // Compute distance
-        std::uint32_t pq_code = pq_codes[e];
+        PQ_CODEBOOK_LOAD_T pq_code = pq_codes[e];
 #pragma unroll
         for (std::uint32_t v = 0; v < vlen; v++) {
           if (PQ_LEN * (v + k) >= dim) break;
