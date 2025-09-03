@@ -18,6 +18,7 @@
 #include <cuvs/core/exceptions.hpp>
 #include <cuvs/version_config.h>
 
+#include <raft/core/device_resources_snmg.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_id.hpp>
 #include <raft/core/resource/resource_types.hpp>
@@ -47,6 +48,22 @@ extern "C" cuvsError_t cuvsResourcesDestroy(cuvsResources_t res)
 {
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
+    delete res_ptr;
+  });
+}
+
+extern "C" cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = new raft::device_resources_snmg{};
+    *res         = reinterpret_cast<uintptr_t>(res_ptr);
+  });
+}
+
+extern "C" cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = reinterpret_cast<raft::device_resources_snmg*>(res);
     delete res_ptr;
   });
 }
