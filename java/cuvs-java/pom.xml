@@ -262,7 +262,7 @@
 
     <profiles>
         <profile>
-            <id>x86-cuda12</id>
+            <id>x86_64-cuda12</id>
             <activation>
                 <property>
                     <name>cuda.version</name>
@@ -270,7 +270,7 @@
                 </property>
             </activation>
             <properties>
-                <native.classifier>x86-cuda12</native.classifier>
+                <native.classifier>x86_64-cuda12</native.classifier>
                 <native.lib.path>${native.build.path}/cuda12</native.lib.path>
             </properties>
             <build>
@@ -345,7 +345,7 @@
         </profile>
 
         <profile>
-            <id>x86-cuda13</id>
+            <id>x86_64-cuda13</id>
             <activation>
                 <property>
                     <name>cuda.version</name>
@@ -353,7 +353,7 @@
                 </property>
             </activation>
             <properties>
-                <native.classifier>x86-cuda13</native.classifier>
+                <native.classifier>x86_64-cuda13</native.classifier>
                 <native.lib.path>${native.build.path}/cuda13</native.lib.path>
             </properties>
             <build>

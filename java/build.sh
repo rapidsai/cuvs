@@ -15,11 +15,7 @@ CUDA_VERSION_FROM_NVCC=$(nvcc --version | grep -oP 'release [0-9]+' | awk '{prin
 CUDA_MAJOR_VERSION=${CUDA_VERSION_FROM_NVCC:-12}
 
 # Identify architecture.
-if [[ $(uname -m) == "aarch64" ]]; then
-  ARCH="arm64"
-else
-  ARCH="x86"
-fi
+ARCH=$(uname -m)
 
 BUILD_PROFILE="$ARCH-cuda$CUDA_MAJOR_VERSION"
 
