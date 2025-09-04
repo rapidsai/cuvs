@@ -388,6 +388,8 @@ auto quantize_all_vectors(raft::resources const& res,
 {
   auto dim         = residuals.extent(1);
   auto vq_codebook = raft::make_device_matrix<float, uint32_t, raft::row_major>(res, 1, dim);
+  raft::linalg::map_offset(res, vq_codebook.view(), [] __device__(size_t i) { return 0; });
+
 
   auto codes = cuvs::neighbors::detail::process_and_fill_codes_subspaces<float, int64_t>(
     res, ps, residuals, raft::make_const_mdspan(vq_codebook.view()), pq_codebook);
