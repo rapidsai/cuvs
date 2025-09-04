@@ -13,7 +13,7 @@
 #
 
 # Set the list of Cython files to build
-set(cython_sources mg_ivf_pq.pyx)
+set(cython_sources ivf_pq.pyx)
 set(linked_libraries cuvs::cuvs cuvs::c_api)
 
 # Build all of the Cython targets

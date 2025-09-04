@@ -6,7 +6,7 @@ Nearest Neighbors
    :class: highlight
 
 Single-GPU Algorithms
-######################
+#####################
 
 .. toctree::
    :maxdepth: 2

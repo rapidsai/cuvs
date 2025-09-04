@@ -90,7 +90,7 @@ Basic Multi-GPU Usage
    dataset = np.random.random_sample((n_samples, n_features), dtype=np.float32)
 
    # Build multi-GPU index
-   build_params = mg_cagra.MultiGpuIndexParams(
+   build_params = mg_cagra.IndexParams(
        distribution_mode="sharded",
        metric="sqeuclidean"
    )
@@ -98,7 +98,7 @@ Basic Multi-GPU Usage
 
    # Search with multi-GPU
    queries = np.random.random_sample((1000, n_features), dtype=np.float32)
-   search_params = mg_cagra.MultiGpuSearchParams(
+   search_params = mg_cagra.SearchParams(
        search_mode="load_balancer",
        merge_mode="merge_on_root_rank"
    )

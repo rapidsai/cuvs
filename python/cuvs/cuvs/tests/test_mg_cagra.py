@@ -22,7 +22,7 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 
 from cuvs.common import MultiGpuResources
-from cuvs.neighbors import mg_cagra
+from cuvs.neighbors.mg import cagra as mg_cagra
 from cuvs.tests.ann_utils import calc_recall, generate_data
 
 
@@ -78,7 +78,7 @@ def run_mg_cagra_build_search_test(
     resources = MultiGpuResources()
 
     # Build parameters
-    build_params = mg_cagra.MultiGpuIndexParams(
+    build_params = mg_cagra.IndexParams(
         metric=metric,
         distribution_mode=distribution_mode,
         graph_degree=graph_degree,
@@ -92,7 +92,7 @@ def run_mg_cagra_build_search_test(
     # Search parameters
     if search_params is None:
         search_params = {}
-    search_params_obj = mg_cagra.MultiGpuSearchParams(
+    search_params_obj = mg_cagra.SearchParams(
         search_mode=search_mode,
         merge_mode=merge_mode,
         n_rows_per_batch=n_rows_per_batch,
@@ -260,13 +260,13 @@ def test_mg_cagra_serialize():
     resources = MultiGpuResources()
 
     # Build original index
-    build_params = mg_cagra.MultiGpuIndexParams(
+    build_params = mg_cagra.IndexParams(
         graph_degree=32, intermediate_graph_degree=64
     )
     original_index = mg_cagra.build(build_params, dataset, resources=resources)
 
     # Search with original index
-    search_params = mg_cagra.MultiGpuSearchParams(itopk_size=32)
+    search_params = mg_cagra.SearchParams(itopk_size=32)
     orig_distances, orig_neighbors = mg_cagra.search(
         search_params, original_index, queries, k, resources=resources
     )
@@ -346,7 +346,7 @@ def test_mg_cagra_distribute():
         assert distributed_index.trained
 
         # Search should work with distributed index (using host memory arrays)
-        search_params = mg_cagra.MultiGpuSearchParams(itopk_size=32)
+        search_params = mg_cagra.SearchParams(itopk_size=32)
         distances, neighbors = mg_cagra.search(
             search_params, distributed_index, queries, k, resources=resources
         )
@@ -373,7 +373,7 @@ def test_memory_location_validation():
     device_data = cp.asarray(host_data)
 
     resources = MultiGpuResources()
-    build_params = mg_cagra.MultiGpuIndexParams(
+    build_params = mg_cagra.IndexParams(
         graph_degree=32, intermediate_graph_degree=64
     )
 
@@ -387,7 +387,7 @@ def test_memory_location_validation():
     # Test that device arrays are rejected for search
     queries = generate_data((20, n_cols), np.float32)
     device_queries = cp.asarray(queries)
-    search_params = mg_cagra.MultiGpuSearchParams(itopk_size=32)
+    search_params = mg_cagra.SearchParams(itopk_size=32)
 
     with pytest.raises(ValueError, match="host memory"):
         mg_cagra.search(
@@ -406,28 +406,28 @@ def test_parameter_validation():
     """Test parameter validation for multi-GPU CAGRA."""
     # Test invalid distribution mode
     with pytest.raises(ValueError, match="distribution_mode must be"):
-        mg_cagra.MultiGpuIndexParams(distribution_mode="invalid")
+        mg_cagra.IndexParams(distribution_mode="invalid")
 
     # Test invalid search mode
     with pytest.raises(ValueError, match="search_mode must be"):
-        mg_cagra.MultiGpuSearchParams(search_mode="invalid")
+        mg_cagra.SearchParams(search_mode="invalid")
 
     # Test invalid merge mode
     with pytest.raises(ValueError, match="merge_mode must be"):
-        mg_cagra.MultiGpuSearchParams(merge_mode="invalid")
+        mg_cagra.SearchParams(merge_mode="invalid")
 
 
 def test_parameter_properties():
     """Test that parameters can be accessed via properties."""
     # Test IndexParams properties
-    params = mg_cagra.MultiGpuIndexParams(distribution_mode="replicated")
+    params = mg_cagra.IndexParams(distribution_mode="replicated")
     assert params.distribution_mode == "replicated"
 
-    params = mg_cagra.MultiGpuIndexParams(distribution_mode="sharded")
+    params = mg_cagra.IndexParams(distribution_mode="sharded")
     assert params.distribution_mode == "sharded"
 
     # Test SearchParams creation with different parameters
-    mg_cagra.MultiGpuSearchParams(
+    mg_cagra.SearchParams(
         search_mode="round_robin",
         merge_mode="tree_merge",
         n_rows_per_batch=2000,
@@ -440,11 +440,11 @@ def test_untrained_index_error():
     resources = MultiGpuResources()
 
     # Create untrained index
-    index = mg_cagra.MultiGpuIndex()
+    index = mg_cagra.Index()
     assert not index.trained
 
     queries = generate_data((100, 10), np.float32)
-    search_params = mg_cagra.MultiGpuSearchParams()
+    search_params = mg_cagra.SearchParams()
 
     # Test that search on untrained index fails
     with pytest.raises(ValueError, match="Index needs to be built"):
@@ -469,7 +469,7 @@ def test_mg_cagra_with_prealloc_output():
     resources = MultiGpuResources()
 
     # Build index
-    build_params = mg_cagra.MultiGpuIndexParams(
+    build_params = mg_cagra.IndexParams(
         graph_degree=32, intermediate_graph_degree=64
     )
     index = mg_cagra.build(build_params, dataset, resources=resources)
@@ -479,7 +479,7 @@ def test_mg_cagra_with_prealloc_output():
     distances = np.empty((n_queries, k), dtype=np.float32)
 
     # Search with pre-allocated arrays
-    search_params = mg_cagra.MultiGpuSearchParams(itopk_size=32)
+    search_params = mg_cagra.SearchParams(itopk_size=32)
     ret_distances, ret_neighbors = mg_cagra.search(
         search_params,
         index,
@@ -498,8 +498,8 @@ def test_mg_cagra_with_prealloc_output():
 
 
 def test_index_repr():
-    """Test string representation of MultiGpuIndex."""
-    index = mg_cagra.MultiGpuIndex()
+    """Test string representation of Index."""
+    index = mg_cagra.Index()
     assert repr(index) == "Index(type=MultiGpuCagra)"
 
 
@@ -521,7 +521,7 @@ def test_mg_cagra_simple():
     resources = MultiGpuResources()
 
     # Use small graph for reliable testing
-    build_params = mg_cagra.MultiGpuIndexParams(
+    build_params = mg_cagra.IndexParams(
         metric="sqeuclidean",
         graph_degree=16,
         intermediate_graph_degree=32,
@@ -531,7 +531,7 @@ def test_mg_cagra_simple():
     index = mg_cagra.build(build_params, dataset, resources=resources)
 
     # Search with basic parameters
-    search_params = mg_cagra.MultiGpuSearchParams(itopk_size=16)
+    search_params = mg_cagra.SearchParams(itopk_size=16)
     distances, neighbors = mg_cagra.search(
         search_params, index, queries, k, resources=resources
     )
@@ -568,7 +568,7 @@ def test_mg_cagra_integration():
     resources = MultiGpuResources()
 
     # Build initial index
-    build_params = mg_cagra.MultiGpuIndexParams(
+    build_params = mg_cagra.IndexParams(
         distribution_mode="sharded",
         metric="sqeuclidean",
         graph_degree=32,
@@ -577,7 +577,7 @@ def test_mg_cagra_integration():
     index = mg_cagra.build(build_params, dataset, resources=resources)
 
     # Initial search
-    search_params = mg_cagra.MultiGpuSearchParams(
+    search_params = mg_cagra.SearchParams(
         itopk_size=32,
         search_mode="load_balancer",
         merge_mode="merge_on_root_rank",

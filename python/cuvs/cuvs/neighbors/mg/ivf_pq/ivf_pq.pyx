@@ -31,14 +31,15 @@ from cuvs.neighbors.common import _check_input_array, _check_memory_location
 from cuvs.common cimport cydlpack
 from cuvs.common.c_api cimport cuvsResources_t
 from cuvs.neighbors.ivf_pq.ivf_pq cimport (
-    IndexParams,
-    SearchParams,
+    IndexParams as SingleGpuIndexParams,
+    SearchParams as SingleGpuSearchParams,
     cuvsIvfPqIndexParams_t,
     cuvsIvfPqIndexParamsDestroy,
     cuvsIvfPqSearchParams_t,
     cuvsIvfPqSearchParamsDestroy,
 )
-from cuvs.neighbors.mg_ivf_pq.mg_ivf_pq cimport (
+
+from .ivf_pq cimport (
     cuvsMultiGpuDistributionMode,
     cuvsMultiGpuIvfPqBuild,
     cuvsMultiGpuIvfPqDeserialize,
@@ -63,7 +64,7 @@ from cuvs.neighbors.mg_ivf_pq.mg_ivf_pq cimport (
 )
 
 
-cdef class MultiGpuIndexParams(IndexParams):
+cdef class IndexParams(SingleGpuIndexParams):
     """
     Parameters to build multi-GPU IVF-PQ index for efficient search.
     Extends single-GPU IndexParams with multi-GPU specific parameters.
@@ -112,7 +113,7 @@ cdef class MultiGpuIndexParams(IndexParams):
                 CUVS_NEIGHBORS_MG_REPLICATED else "sharded")
 
 
-cdef class MultiGpuIndex:
+cdef class Index:
     """
     Multi-GPU IVF-PQ index object. Stores the trained multi-GPU IVF-PQ
     index state which can be used to perform nearest neighbors searches
@@ -137,13 +138,13 @@ cdef class MultiGpuIndex:
 
 
 @auto_sync_multi_gpu_resources
-def build(MultiGpuIndexParams index_params, dataset, resources=None):
+def build(IndexParams index_params, dataset, resources=None):
     """
     Build the multi-GPU IVF-PQ index from the dataset for efficient search.
 
     Parameters
     ----------
-    index_params : :py:class:`cuvs.neighbors.mg_ivf_pq.MultiGpuIndexParams`
+    index_params : :py:class:`cuvs.neighbors.ivf_pq.IndexParams`
     dataset : Array interface compliant matrix shape (n_samples, dim)
         Supported dtype [float32, float16, int8, uint8]
         **IMPORTANT**: For multi-GPU IVF-PQ, the dataset MUST be
@@ -154,13 +155,13 @@ def build(MultiGpuIndexParams index_params, dataset, resources=None):
 
     Returns
     -------
-    index: py:class:`cuvs.neighbors.mg_ivf_pq.MultiGpuIndex`
+    index: py:class:`cuvs.neighbors.ivf_pq.Index`
 
     Examples
     --------
 
     >>> import numpy as np
-    >>> from cuvs.neighbors import mg_ivf_pq
+    >>> from cuvs.neighbors.mg import ivf_pq
     >>> n_samples = 50000
     >>> n_features = 50
     >>> n_queries = 1000
@@ -168,10 +169,10 @@ def build(MultiGpuIndexParams index_params, dataset, resources=None):
     >>> # For multi-GPU IVF-PQ, use host (NumPy) arrays
     >>> dataset = np.random.random_sample((n_samples, n_features),
     ...                                   dtype=np.float32)
-    >>> build_params = mg_ivf_pq.MultiGpuIndexParams(metric="sqeuclidean")
-    >>> index = mg_ivf_pq.build(build_params, dataset)
-    >>> distances, neighbors = mg_ivf_pq.search(
-    ...     mg_ivf_pq.MultiGpuSearchParams(),
+    >>> build_params = ivf_pq.IndexParams(metric="sqeuclidean")
+    >>> index = ivf_pq.build(build_params, dataset)
+    >>> distances, neighbors = ivf_pq.search(
+    ...     ivf_pq.SearchParams(),
     ...     index, dataset, k)
     >>> # Results are already in host memory (NumPy arrays)
     """
@@ -183,7 +184,7 @@ def build(MultiGpuIndexParams index_params, dataset, resources=None):
     # Multi-GPU IVF-PQ requires dataset in host memory
     _check_memory_location(dataset, expected_host=True, name="dataset")
 
-    cdef MultiGpuIndex idx = MultiGpuIndex()
+    cdef Index idx = Index()
     cdef cydlpack.DLManagedTensor* dataset_dlpack = \
         cydlpack.dlpack_c(dataset_ai)
     cdef cuvsMultiGpuIvfPqIndexParams_t params = index_params.mg_params
@@ -200,7 +201,7 @@ def build(MultiGpuIndexParams index_params, dataset, resources=None):
     return idx
 
 
-cdef class MultiGpuSearchParams(SearchParams):
+cdef class SearchParams(SingleGpuSearchParams):
     """
     Parameters to search multi-GPU IVF-PQ index.
     """
@@ -226,30 +227,64 @@ cdef class MultiGpuSearchParams(SearchParams):
                  merge_mode="merge_on_root_rank", n_rows_per_batch=1000,
                  **kwargs):
         super().__init__(n_probes=n_probes, **kwargs)
-        if search_mode == "load_balancer":
-            self.mg_params.search_mode = CUVS_NEIGHBORS_MG_LOAD_BALANCER
-        elif search_mode == "round_robin":
-            self.mg_params.search_mode = CUVS_NEIGHBORS_MG_ROUND_ROBIN
-        else:
-            raise ValueError(
-                "search_mode must be 'load_balancer' or 'round_robin'")
-        if merge_mode == "merge_on_root_rank":
-            self.mg_params.merge_mode = CUVS_NEIGHBORS_MG_MERGE_ON_ROOT_RANK
-        elif merge_mode == "tree_merge":
-            self.mg_params.merge_mode = CUVS_NEIGHBORS_MG_TREE_MERGE
-        else:
-            raise ValueError(
-                "merge_mode must be 'merge_on_root_rank' or 'tree_merge'"
-            )
-        self.mg_params.n_rows_per_batch = n_rows_per_batch
+        # Use the property setters for consistent validation
+        self.search_mode = search_mode
+        self.merge_mode = merge_mode
+        self.n_rows_per_batch = n_rows_per_batch
 
     def get_handle(self):
         return <size_t> self.mg_params
 
+    @property
+    def search_mode(self):
+        """Get the search mode for multi-GPU search."""
+        return ("load_balancer" if self.mg_params.search_mode ==
+                CUVS_NEIGHBORS_MG_LOAD_BALANCER else "round_robin")
+
+    @search_mode.setter
+    def search_mode(self, value):
+        """Set the search mode for multi-GPU search."""
+        if value == "load_balancer":
+            self.mg_params.search_mode = CUVS_NEIGHBORS_MG_LOAD_BALANCER
+        elif value == "round_robin":
+            self.mg_params.search_mode = CUVS_NEIGHBORS_MG_ROUND_ROBIN
+        else:
+            raise ValueError(
+                "search_mode must be 'load_balancer' or 'round_robin'")
+
+    @property
+    def merge_mode(self):
+        """Get the merge mode for multi-GPU search."""
+        return ("merge_on_root_rank" if self.mg_params.merge_mode ==
+                CUVS_NEIGHBORS_MG_MERGE_ON_ROOT_RANK else "tree_merge")
+
+    @merge_mode.setter
+    def merge_mode(self, value):
+        """Set the merge mode for multi-GPU search."""
+        if value == "merge_on_root_rank":
+            self.mg_params.merge_mode = CUVS_NEIGHBORS_MG_MERGE_ON_ROOT_RANK
+        elif value == "tree_merge":
+            self.mg_params.merge_mode = CUVS_NEIGHBORS_MG_TREE_MERGE
+        else:
+            raise ValueError(
+                "merge_mode must be 'merge_on_root_rank' or 'tree_merge'")
+
+    @property
+    def n_rows_per_batch(self):
+        """Get the number of rows per batch for multi-GPU search."""
+        return self.mg_params.n_rows_per_batch
+
+    @n_rows_per_batch.setter
+    def n_rows_per_batch(self, value):
+        """Set the number of rows per batch for multi-GPU search."""
+        if not isinstance(value, int) or value <= 0:
+            raise ValueError("n_rows_per_batch must be a positive integer")
+        self.mg_params.n_rows_per_batch = value
+
 
 @auto_sync_multi_gpu_resources
 @auto_convert_output
-def search(MultiGpuSearchParams search_params, MultiGpuIndex index, queries,
+def search(SearchParams search_params, Index index, queries,
            k, neighbors=None, distances=None, resources=None):
     """
     Search the multi-GPU IVF-PQ index for the k-nearest neighbors
@@ -257,8 +292,8 @@ def search(MultiGpuSearchParams search_params, MultiGpuIndex index, queries,
 
     Parameters
     ----------
-    search_params : :py:class:`cuvs.neighbors.mg_ivf_pq.MultiGpuSearchParams`
-    index : :py:class:`cuvs.neighbors.mg_ivf_pq.MultiGpuIndex`
+    search_params : :py:class:`cuvs.neighbors.ivf_pq.SearchParams`
+    index : :py:class:`cuvs.neighbors.ivf_pq.Index`
     queries : Array interface compliant matrix shape (n_queries, dim)
         Supported dtype [float32, float16, int8, uint8]
         **IMPORTANT**: For multi-GPU IVF-PQ, queries MUST be
@@ -292,7 +327,7 @@ def search(MultiGpuSearchParams search_params, MultiGpuIndex index, queries,
     --------
 
     >>> import numpy as np
-    >>> from cuvs.neighbors import mg_ivf_pq
+    >>> from cuvs.neighbors.mg import ivf_pq
     >>> n_samples = 50000
     >>> n_features = 50
     >>> n_queries = 1000
@@ -302,10 +337,10 @@ def search(MultiGpuSearchParams search_params, MultiGpuIndex index, queries,
     ...                                   dtype=np.float32)
     >>> queries = np.random.random_sample((n_queries, n_features),
     ...                                   dtype=np.float32)
-    >>> build_params = mg_ivf_pq.MultiGpuIndexParams(metric="sqeuclidean")
-    >>> index = mg_ivf_pq.build(build_params, dataset)
+    >>> build_params = ivf_pq.IndexParams(metric="sqeuclidean")
+    >>> index = ivf_pq.build(build_params, dataset)
     >>> distances, neighbors = \
-    ... mg_ivf_pq.search(mg_ivf_pq.MultiGpuSearchParams(),
+    ... ivf_pq.search(ivf_pq.SearchParams(),
     ...                  index, queries, k)
     >>> # Results are already in host memory (NumPy arrays)
     """
@@ -360,14 +395,14 @@ def search(MultiGpuSearchParams search_params, MultiGpuIndex index, queries,
 
 
 @auto_sync_multi_gpu_resources
-def extend(MultiGpuIndex index, new_vectors, new_indices=None,
+def extend(Index index, new_vectors, new_indices=None,
            resources=None):
     """
     Extend the multi-GPU IVF-PQ index with new vectors.
 
     Parameters
     ----------
-    index : :py:class:`cuvs.neighbors.mg_ivf_pq.MultiGpuIndex`
+    index : :py:class:`cuvs.neighbors.ivf_pq.Index`
     new_vectors : Array interface compliant matrix shape (n_new_vectors, dim)
         Supported dtype [float32, float16, int8, uint8]
         **IMPORTANT**: For multi-GPU IVF-PQ, new_vectors MUST be
@@ -385,7 +420,7 @@ def extend(MultiGpuIndex index, new_vectors, new_indices=None,
     --------
 
     >>> import numpy as np
-    >>> from cuvs.neighbors import mg_ivf_pq
+    >>> from cuvs.neighbors.mg import ivf_pq
     >>> n_samples = 50000
     >>> n_features = 50
     >>> n_new_vectors = 1000
@@ -394,9 +429,9 @@ def extend(MultiGpuIndex index, new_vectors, new_indices=None,
     ...                                   dtype=np.float32)
     >>> new_vectors = np.random.random_sample((n_new_vectors, n_features),
     ...                                        dtype=np.float32)
-    >>> build_params = mg_ivf_pq.MultiGpuIndexParams(metric="sqeuclidean")
-    >>> index = mg_ivf_pq.build(build_params, dataset)
-    >>> mg_ivf_pq.extend(index, new_vectors)
+    >>> build_params = ivf_pq.IndexParams(metric="sqeuclidean")
+    >>> index = ivf_pq.build(build_params, dataset)
+    >>> ivf_pq.extend(index, new_vectors)
     """
 
     if not index.trained:
@@ -432,13 +467,13 @@ def extend(MultiGpuIndex index, new_vectors, new_indices=None,
 
 
 @auto_sync_multi_gpu_resources
-def save(MultiGpuIndex index, filename, resources=None):
+def save(Index index, filename, resources=None):
     """
     Serialize the multi-GPU IVF-PQ index to a file.
 
     Parameters
     ----------
-    index : :py:class:`cuvs.neighbors.mg_ivf_pq.MultiGpuIndex`
+    index : :py:class:`cuvs.neighbors.ivf_pq.Index`
     filename : str
         The filename to serialize the index to.
     {resources_docstring}
@@ -447,15 +482,15 @@ def save(MultiGpuIndex index, filename, resources=None):
     --------
 
     >>> import numpy as np
-    >>> from cuvs.neighbors import mg_ivf_pq
+    >>> from cuvs.neighbors.mg import ivf_pq
     >>> n_samples = 50000
     >>> n_features = 50
     >>> # For multi-GPU IVF-PQ, use host (NumPy) arrays
     >>> dataset = np.random.random_sample((n_samples, n_features),
     ...                                   dtype=np.float32)
-    >>> build_params = mg_ivf_pq.MultiGpuIndexParams(metric="sqeuclidean")
-    >>> index = mg_ivf_pq.build(build_params, dataset)
-    >>> mg_ivf_pq.save(index, "index.bin")
+    >>> build_params = ivf_pq.IndexParams(metric="sqeuclidean")
+    >>> index = ivf_pq.build(build_params, dataset)
+    >>> ivf_pq.save(index, "index.bin")
     """
 
     if not index.trained:
@@ -482,17 +517,17 @@ def load(filename, resources=None):
 
     Returns
     -------
-    index : MultiGpuIndex
+    index : Index
         The deserialized index.
 
     Examples
     --------
 
-    >>> from cuvs.neighbors import mg_ivf_pq
-    >>> index = mg_ivf_pq.load("index.bin")
+    >>> from cuvs.neighbors.mg import ivf_pq
+    >>> index = ivf_pq.load("index.bin")
     """
 
-    cdef MultiGpuIndex index = MultiGpuIndex()
+    cdef Index index = Index()
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
     cdef string filename_str = filename.encode('utf-8')
@@ -516,17 +551,17 @@ def distribute(filename, resources=None):
 
     Returns
     -------
-    index : MultiGpuIndex
+    index : Index
         The distributed index.
 
     Examples
     --------
 
-    >>> from cuvs.neighbors import mg_ivf_pq
-    >>> index = mg_ivf_pq.distribute("single_gpu_index.bin")
+    >>> from cuvs.neighbors.mg import ivf_pq
+    >>> index = ivf_pq.distribute("single_gpu_index.bin")
     """
 
-    cdef MultiGpuIndex index = MultiGpuIndex()
+    cdef Index index = Index()
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
 
     cdef string filename_str = filename.encode('utf-8')

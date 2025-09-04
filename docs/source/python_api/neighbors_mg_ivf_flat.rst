@@ -14,19 +14,19 @@ Multi-GPU IVF-Flat extends the IVF-Flat algorithm to work across multiple GPUs, 
 Index build parameters
 ######################
 
-.. autoclass:: cuvs.neighbors.mg_ivf_flat.MultiGpuIndexParams
+.. autoclass:: cuvs.neighbors.mg_ivf_flat.IndexParams
     :members:
 
 Index search parameters
 #######################
 
-.. autoclass:: cuvs.neighbors.mg_ivf_flat.MultiGpuSearchParams
+.. autoclass:: cuvs.neighbors.mg_ivf_flat.SearchParams
     :members:
 
 Index
 #####
 
-.. autoclass:: cuvs.neighbors.mg_ivf_flat.MultiGpuIndex
+.. autoclass:: cuvs.neighbors.mg_ivf_flat.Index
     :members:
 
 Index build

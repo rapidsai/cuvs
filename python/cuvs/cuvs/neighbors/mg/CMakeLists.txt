@@ -12,13 +12,6 @@
 # the License.
 #
 
-# Set the list of Cython files to build
-set(cython_sources mg_ivf_flat.pyx)
-set(linked_libraries cuvs::cuvs cuvs::c_api)
-
-# Build all of the Cython targets
-rapids_cython_create_modules(
-  CXX
-  SOURCE_FILES "${cython_sources}"
-  LINKED_LIBRARIES "${linked_libraries}" MODULE_PREFIX neighbors_mg_ivf_flat_
-)
+add_subdirectory(cagra)
+add_subdirectory(ivf_flat)
+add_subdirectory(ivf_pq)

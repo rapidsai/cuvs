@@ -14,19 +14,19 @@ Multi-GPU CAGRA extends the graph-based CAGRA algorithm to work across multiple 
 Index build parameters
 ######################
 
-.. autoclass:: cuvs.neighbors.mg_cagra.MultiGpuIndexParams
+.. autoclass:: cuvs.neighbors.mg_cagra.IndexParams
     :members:
 
 Index search parameters
 #######################
 
-.. autoclass:: cuvs.neighbors.mg_cagra.MultiGpuSearchParams
+.. autoclass:: cuvs.neighbors.mg_cagra.SearchParams
     :members:
 
 Index
 #####
 
-.. autoclass:: cuvs.neighbors.mg_cagra.MultiGpuIndex
+.. autoclass:: cuvs.neighbors.mg_cagra.Index
     :members:
 
 Index build

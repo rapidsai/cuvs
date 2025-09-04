@@ -14,19 +14,19 @@ Multi-GPU IVF-PQ extends the IVF-PQ (Inverted File with Product Quantization) al
 Index build parameters
 ######################
 
-.. autoclass:: cuvs.neighbors.mg_ivf_pq.MultiGpuIndexParams
+.. autoclass:: cuvs.neighbors.mg_ivf_pq.IndexParams
     :members:
 
 Index search parameters
 #######################
 
-.. autoclass:: cuvs.neighbors.mg_ivf_pq.MultiGpuSearchParams
+.. autoclass:: cuvs.neighbors.mg_ivf_pq.SearchParams
     :members:
 
 Index
 #####
 
-.. autoclass:: cuvs.neighbors.mg_ivf_pq.MultiGpuIndex
+.. autoclass:: cuvs.neighbors.mg_ivf_pq.Index
     :members:
 
 Index build

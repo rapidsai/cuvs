@@ -11,23 +11,14 @@
 # or implied. See the License for the specific language governing permissions and limitations under
 # the License.
 #
-add_subdirectory(brute_force)
-add_subdirectory(cagra)
-add_subdirectory(hnsw)
-add_subdirectory(ivf_flat)
-add_subdirectory(ivf_pq)
-add_subdirectory(filters)
-add_subdirectory(nn_descent)
-add_subdirectory(tiered_index)
-add_subdirectory(mg)
 
 # Set the list of Cython files to build
-set(cython_sources refine.pyx)
+set(cython_sources ivf_flat.pyx)
 set(linked_libraries cuvs::cuvs cuvs::c_api)
 
 # Build all of the Cython targets
 rapids_cython_create_modules(
   CXX
   SOURCE_FILES "${cython_sources}"
-  LINKED_LIBRARIES "${linked_libraries}" MODULE_PREFIX neighbors_refine_
+  LINKED_LIBRARIES "${linked_libraries}" MODULE_PREFIX neighbors_mg_ivf_flat_
 )

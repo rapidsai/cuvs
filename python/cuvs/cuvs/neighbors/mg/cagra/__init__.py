@@ -1,4 +1,3 @@
-#
 # Copyright (c) 2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,12 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
 
-from .mg_ivf_pq import (
-    MultiGpuIndex,
-    MultiGpuIndexParams,
-    MultiGpuSearchParams,
+from .cagra import (
+    Index,
+    IndexParams,
+    SearchParams,
     build,
     distribute,
     extend,
@@ -27,13 +25,13 @@ from .mg_ivf_pq import (
 )
 
 __all__ = [
-    "MultiGpuIndex",
-    "MultiGpuIndexParams",
-    "MultiGpuSearchParams",
+    "Index",
+    "IndexParams",
+    "SearchParams",
     "build",
-    "distribute",
     "extend",
-    "load",
-    "save",
     "search",
+    "save",
+    "load",
+    "distribute",
 ]

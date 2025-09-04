@@ -22,7 +22,7 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 
 from cuvs.common import MultiGpuResources
-from cuvs.neighbors import mg_ivf_flat
+from cuvs.neighbors.mg import ivf_flat as mg_ivf_flat
 from cuvs.tests.ann_utils import calc_recall, generate_data
 
 
@@ -84,7 +84,7 @@ def run_mg_ivf_flat_build_search_test(
         # per cluster
         n_lists = min(1024, max(64, n_rows // 50))
 
-    build_params = mg_ivf_flat.MultiGpuIndexParams(
+    build_params = mg_ivf_flat.IndexParams(
         metric=metric,
         distribution_mode=distribution_mode,
         add_data_on_build=add_data_on_build,
@@ -112,7 +112,7 @@ def run_mg_ivf_flat_build_search_test(
     if "n_probes" not in search_params:
         # Use many clusters for good recall - search majority of clusters
         search_params["n_probes"] = min(n_lists, max(20, (n_lists * 3) // 4))
-    search_params_obj = mg_ivf_flat.MultiGpuSearchParams(
+    search_params_obj = mg_ivf_flat.SearchParams(
         search_mode=search_mode,
         merge_mode=merge_mode,
         n_rows_per_batch=n_rows_per_batch,
@@ -288,13 +288,13 @@ def test_mg_ivf_flat_serialize():
     resources = MultiGpuResources()
 
     # Build original index
-    build_params = mg_ivf_flat.MultiGpuIndexParams(n_lists=50)
+    build_params = mg_ivf_flat.IndexParams(n_lists=50)
     original_index = mg_ivf_flat.build(
         build_params, dataset, resources=resources
     )
 
     # Search with original index
-    search_params = mg_ivf_flat.MultiGpuSearchParams(n_probes=37)
+    search_params = mg_ivf_flat.SearchParams(n_probes=37)
     orig_distances, orig_neighbors = mg_ivf_flat.search(
         search_params, original_index, queries, k, resources=resources
     )
@@ -376,7 +376,7 @@ def test_mg_ivf_flat_distribute():
         assert distributed_index.trained
 
         # Search should work with distributed index (using host memory arrays)
-        search_params = mg_ivf_flat.MultiGpuSearchParams(n_probes=37)
+        search_params = mg_ivf_flat.SearchParams(n_probes=37)
         distances, neighbors = mg_ivf_flat.search(
             search_params, distributed_index, queries, k, resources=resources
         )
@@ -403,7 +403,7 @@ def test_memory_location_validation():
     device_data = cp.asarray(host_data)
 
     resources = MultiGpuResources()
-    build_params = mg_ivf_flat.MultiGpuIndexParams(n_lists=30)
+    build_params = mg_ivf_flat.IndexParams(n_lists=30)
 
     # Test that device arrays are rejected for build
     with pytest.raises(ValueError, match="host memory"):
@@ -415,7 +415,7 @@ def test_memory_location_validation():
     # Test that device arrays are rejected for search
     queries = generate_data((20, n_cols), np.float32)
     device_queries = cp.asarray(queries)
-    search_params = mg_ivf_flat.MultiGpuSearchParams(n_probes=22)
+    search_params = mg_ivf_flat.SearchParams(n_probes=22)
 
     with pytest.raises(ValueError, match="host memory"):
         mg_ivf_flat.search(
@@ -434,28 +434,28 @@ def test_parameter_validation():
     """Test parameter validation for multi-GPU IVF-Flat."""
     # Test invalid distribution mode
     with pytest.raises(ValueError, match="distribution_mode must be"):
-        mg_ivf_flat.MultiGpuIndexParams(distribution_mode="invalid")
+        mg_ivf_flat.IndexParams(distribution_mode="invalid")
 
     # Test invalid search mode
     with pytest.raises(ValueError, match="search_mode must be"):
-        mg_ivf_flat.MultiGpuSearchParams(search_mode="invalid")
+        mg_ivf_flat.SearchParams(search_mode="invalid")
 
     # Test invalid merge mode
     with pytest.raises(ValueError, match="merge_mode must be"):
-        mg_ivf_flat.MultiGpuSearchParams(merge_mode="invalid")
+        mg_ivf_flat.SearchParams(merge_mode="invalid")
 
 
 def test_parameter_properties():
     """Test that parameters can be accessed via properties."""
     # Test IndexParams properties
-    params = mg_ivf_flat.MultiGpuIndexParams(distribution_mode="replicated")
+    params = mg_ivf_flat.IndexParams(distribution_mode="replicated")
     assert params.distribution_mode == "replicated"
 
-    params = mg_ivf_flat.MultiGpuIndexParams(distribution_mode="sharded")
+    params = mg_ivf_flat.IndexParams(distribution_mode="sharded")
     assert params.distribution_mode == "sharded"
 
     # Test SearchParams creation with different parameters
-    mg_ivf_flat.MultiGpuSearchParams(
+    mg_ivf_flat.SearchParams(
         search_mode="round_robin",
         merge_mode="tree_merge",
         n_rows_per_batch=2000,
@@ -468,11 +468,11 @@ def test_untrained_index_error():
     resources = MultiGpuResources()
 
     # Create untrained index
-    index = mg_ivf_flat.MultiGpuIndex()
+    index = mg_ivf_flat.Index()
     assert not index.trained
 
     queries = generate_data((100, 10), np.float32)
-    search_params = mg_ivf_flat.MultiGpuSearchParams(n_probes=20)
+    search_params = mg_ivf_flat.SearchParams(n_probes=20)
 
     # Test that search on untrained index fails
     with pytest.raises(ValueError, match="Index needs to be built"):
@@ -504,7 +504,7 @@ def test_mg_ivf_flat_with_prealloc_output():
     resources = MultiGpuResources()
 
     # Build index with fewer clusters to avoid n_rows < n_lists error
-    build_params = mg_ivf_flat.MultiGpuIndexParams(n_lists=30)
+    build_params = mg_ivf_flat.IndexParams(n_lists=30)
     index = mg_ivf_flat.build(build_params, dataset, resources=resources)
 
     # Pre-allocate output arrays in host memory
@@ -512,7 +512,7 @@ def test_mg_ivf_flat_with_prealloc_output():
     distances = np.empty((n_queries, k), dtype=np.float32)
 
     # Search with pre-allocated arrays
-    search_params = mg_ivf_flat.MultiGpuSearchParams(n_probes=20)
+    search_params = mg_ivf_flat.SearchParams(n_probes=20)
     ret_distances, ret_neighbors = mg_ivf_flat.search(
         search_params,
         index,
@@ -531,8 +531,8 @@ def test_mg_ivf_flat_with_prealloc_output():
 
 
 def test_index_repr():
-    """Test string representation of MultiGpuIndex."""
-    index = mg_ivf_flat.MultiGpuIndex()
+    """Test string representation of Index."""
+    index = mg_ivf_flat.Index()
     assert repr(index) == "Index(type=MultiGpuIvfFlat)"
 
 
@@ -554,7 +554,7 @@ def test_mg_ivf_flat_simple():
     resources = MultiGpuResources()
 
     # Use very few clusters for high recall
-    build_params = mg_ivf_flat.MultiGpuIndexParams(
+    build_params = mg_ivf_flat.IndexParams(
         metric="sqeuclidean",
         n_lists=32,  # Very few clusters
     )
@@ -563,7 +563,7 @@ def test_mg_ivf_flat_simple():
     index = mg_ivf_flat.build(build_params, dataset, resources=resources)
 
     # Search with many probes for maximum recall
-    search_params = mg_ivf_flat.MultiGpuSearchParams(
+    search_params = mg_ivf_flat.SearchParams(
         n_probes=32
     )  # Search all clusters
     distances, neighbors = mg_ivf_flat.search(
@@ -602,13 +602,13 @@ def test_mg_ivf_flat_integration():
     resources = MultiGpuResources()
 
     # Build initial index
-    build_params = mg_ivf_flat.MultiGpuIndexParams(
+    build_params = mg_ivf_flat.IndexParams(
         distribution_mode="sharded", metric="sqeuclidean", n_lists=50
     )
     index = mg_ivf_flat.build(build_params, dataset, resources=resources)
 
     # Initial search
-    search_params = mg_ivf_flat.MultiGpuSearchParams(
+    search_params = mg_ivf_flat.SearchParams(
         n_probes=37,
         search_mode="load_balancer",
         merge_mode="merge_on_root_rank",

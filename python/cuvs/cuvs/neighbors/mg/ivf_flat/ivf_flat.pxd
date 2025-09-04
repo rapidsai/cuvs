@@ -19,12 +19,11 @@ from libc.stdint cimport int64_t, uintptr_t
 from libcpp cimport bool
 
 # Import base single-GPU extension module for subclassing
-cimport cuvs.neighbors.ivf_flat.ivf_flat as _ivf_flat
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
 from cuvs.neighbors.ivf_flat.ivf_flat cimport (
-    IndexParams,
-    SearchParams,
+    IndexParams as SingleGpuIndexParams,
+    SearchParams as SingleGpuSearchParams,
     cuvsIvfFlatIndexParams_t,
     cuvsIvfFlatSearchParams_t,
 )
@@ -118,12 +117,12 @@ cdef extern from "cuvs/neighbors/mg_ivf_flat.h" nogil:
         cuvsMultiGpuIvfFlatIndex_t index) except +
 
 
-cdef class MultiGpuIndexParams(IndexParams):
+cdef class IndexParams(SingleGpuIndexParams):
     cdef cuvsMultiGpuIvfFlatIndexParams_t mg_params
 
-cdef class MultiGpuSearchParams(SearchParams):
+cdef class SearchParams(SingleGpuSearchParams):
     cdef cuvsMultiGpuIvfFlatSearchParams_t mg_params
 
-cdef class MultiGpuIndex:
+cdef class Index:
     cdef cuvsMultiGpuIvfFlatIndex_t mg_index
     cdef bool mg_trained

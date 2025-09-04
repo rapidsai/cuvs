@@ -20,14 +20,14 @@ from libcpp cimport bool
 
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
-# Import base single-GPU extension module for subclassing
 from cuvs.neighbors.ivf_pq.ivf_pq cimport (
-    IndexParams,
-    SearchParams,
+    IndexParams as SingleGpuIndexParams,
+    SearchParams as SingleGpuSearchParams,
     cuvsIvfPqIndexParams_t,
     cuvsIvfPqSearchParams_t,
 )
 
+# Import base single-GPU extension module for subclassing
 
 # Multi-GPU distribution modes
 cdef extern from "cuvs/neighbors/mg_common.h" nogil:
@@ -114,12 +114,12 @@ cdef extern from "cuvs/neighbors/mg_ivf_pq.h" nogil:
         cuvsMultiGpuIvfPqIndex_t index) except +
 
 
-cdef class MultiGpuIndexParams(IndexParams):
+cdef class IndexParams(SingleGpuIndexParams):
     cdef cuvsMultiGpuIvfPqIndexParams_t mg_params
 
-cdef class MultiGpuSearchParams(SearchParams):
+cdef class SearchParams(SingleGpuSearchParams):
     cdef cuvsMultiGpuIvfPqSearchParams_t mg_params
 
-cdef class MultiGpuIndex:
+cdef class Index:
     cdef cuvsMultiGpuIvfPqIndex_t mg_index
     cdef bool mg_trained

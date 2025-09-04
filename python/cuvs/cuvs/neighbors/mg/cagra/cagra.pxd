@@ -23,8 +23,8 @@ cimport cuvs.neighbors.cagra.cagra as _cagra
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLManagedTensor
 from cuvs.neighbors.cagra.cagra cimport (
-    IndexParams,
-    SearchParams,
+    IndexParams as SingleGpuIndexParams,
+    SearchParams as SingleGpuSearchParams,
     cuvsCagraIndexParams_t,
     cuvsCagraSearchParams_t,
 )
@@ -108,13 +108,19 @@ cdef extern from "cuvs/neighbors/mg_cagra.h" nogil:
         const char* filename,
         cuvsMultiGpuCagraIndex_t index) except +
 
+    cuvsError_t cuvsMultiGpuCagraExtend(
+        cuvsResources_t res,
+        cuvsMultiGpuCagraIndex_t index,
+        DLManagedTensor* new_vectors_tensor,
+        DLManagedTensor* new_indices_tensor) except +
 
-cdef class MultiGpuIndexParams(IndexParams):
+
+cdef class IndexParams(SingleGpuIndexParams):
     cdef cuvsMultiGpuCagraIndexParams_t mg_params
 
-cdef class MultiGpuSearchParams(SearchParams):
+cdef class SearchParams(SingleGpuSearchParams):
     cdef cuvsMultiGpuCagraSearchParams_t mg_params
 
-cdef class MultiGpuIndex:
+cdef class Index:
     cdef cuvsMultiGpuCagraIndex_t mg_index
     cdef bool mg_trained

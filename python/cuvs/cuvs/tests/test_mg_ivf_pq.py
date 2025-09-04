@@ -22,7 +22,7 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 
 from cuvs.common import MultiGpuResources
-from cuvs.neighbors import mg_ivf_pq
+from cuvs.neighbors.mg import ivf_pq as mg_ivf_pq
 from cuvs.tests.ann_utils import calc_recall, generate_data
 
 
@@ -87,7 +87,7 @@ def run_mg_ivf_pq_build_search_test(
         # cluster
         n_lists = min(1024, max(64, n_rows // 50))
 
-    build_params = mg_ivf_pq.MultiGpuIndexParams(
+    build_params = mg_ivf_pq.IndexParams(
         metric=metric,
         distribution_mode=distribution_mode,
         add_data_on_build=add_data_on_build,
@@ -118,7 +118,7 @@ def run_mg_ivf_pq_build_search_test(
     if "n_probes" not in search_params:
         # Use many clusters for good recall - search majority of clusters
         search_params["n_probes"] = min(n_lists, max(20, (n_lists * 3) // 4))
-    search_params_obj = mg_ivf_pq.MultiGpuSearchParams(
+    search_params_obj = mg_ivf_pq.SearchParams(
         search_mode=search_mode,
         merge_mode=merge_mode,
         n_rows_per_batch=n_rows_per_batch,
@@ -309,7 +309,7 @@ def test_mg_ivf_pq_serialize():
     resources = MultiGpuResources()
 
     # Build index
-    build_params = mg_ivf_pq.MultiGpuIndexParams(
+    build_params = mg_ivf_pq.IndexParams(
         metric="euclidean",
         n_lists=100,
         pq_bits=8,
@@ -318,7 +318,7 @@ def test_mg_ivf_pq_serialize():
     index = mg_ivf_pq.build(build_params, dataset, resources=resources)
 
     # Search before serialization
-    search_params = mg_ivf_pq.MultiGpuSearchParams(n_probes=50)
+    search_params = mg_ivf_pq.SearchParams(n_probes=50)
     distances_1, neighbors_1 = mg_ivf_pq.search(
         search_params, index, queries, 10, resources=resources
     )
@@ -401,7 +401,7 @@ def test_mg_ivf_pq_distribute():
         assert distributed_index.trained
 
         # Search using the distributed index
-        search_params = mg_ivf_pq.MultiGpuSearchParams(n_probes=25)
+        search_params = mg_ivf_pq.SearchParams(n_probes=25)
         distances, neighbors = mg_ivf_pq.search(
             search_params, distributed_index, queries, k, resources=resources
         )
@@ -427,10 +427,10 @@ def test_memory_location_validation():
     queries_gpu = cp.random.random((100, 32), dtype=cp.float32)
 
     # Create parameters with smaller n_lists for the small dataset
-    build_params = mg_ivf_pq.MultiGpuIndexParams(
+    build_params = mg_ivf_pq.IndexParams(
         n_lists=20
     )  # Smaller n_lists for 1000 points
-    search_params = mg_ivf_pq.MultiGpuSearchParams()
+    search_params = mg_ivf_pq.SearchParams()
 
     # These should raise ValueError about memory location
     with pytest.raises(ValueError, match="host memory"):
@@ -452,38 +452,38 @@ def test_parameter_validation():
     """Test parameter validation for multi-GPU IVF-PQ."""
     # Test invalid distribution mode
     with pytest.raises(ValueError, match="distribution_mode must be"):
-        mg_ivf_pq.MultiGpuIndexParams(distribution_mode="invalid")
+        mg_ivf_pq.IndexParams(distribution_mode="invalid")
 
     # Test invalid search mode
     with pytest.raises(ValueError, match="search_mode must be"):
-        mg_ivf_pq.MultiGpuSearchParams(search_mode="invalid")
+        mg_ivf_pq.SearchParams(search_mode="invalid")
 
     # Test invalid merge mode
     with pytest.raises(ValueError, match="merge_mode must be"):
-        mg_ivf_pq.MultiGpuSearchParams(merge_mode="invalid")
+        mg_ivf_pq.SearchParams(merge_mode="invalid")
 
     # Test invalid codebook kind
     with pytest.raises(ValueError, match="Incorrect codebook kind"):
-        mg_ivf_pq.MultiGpuIndexParams(codebook_kind="invalid")
+        mg_ivf_pq.IndexParams(codebook_kind="invalid")
 
 
 def test_parameter_properties():
     """Test that parameters can be accessed via properties."""
     # Test IndexParams properties
-    params = mg_ivf_pq.MultiGpuIndexParams(distribution_mode="replicated")
+    params = mg_ivf_pq.IndexParams(distribution_mode="replicated")
     assert params.distribution_mode == "replicated"
 
-    params = mg_ivf_pq.MultiGpuIndexParams(distribution_mode="sharded")
+    params = mg_ivf_pq.IndexParams(distribution_mode="sharded")
     assert params.distribution_mode == "sharded"
 
     # Test PQ-specific parameters
-    params = mg_ivf_pq.MultiGpuIndexParams(
+    params = mg_ivf_pq.IndexParams(
         pq_bits=4, pq_dim=16, codebook_kind="cluster"
     )
     # These don't have properties exposed, but creation should work
 
     # Test SearchParams creation with different parameters
-    mg_ivf_pq.MultiGpuSearchParams(
+    mg_ivf_pq.SearchParams(
         search_mode="round_robin",
         merge_mode="tree_merge",
         n_rows_per_batch=2000,
@@ -496,11 +496,11 @@ def test_untrained_index_error():
     resources = MultiGpuResources()
 
     # Create untrained index
-    index = mg_ivf_pq.MultiGpuIndex()
+    index = mg_ivf_pq.Index()
     assert not index.trained
 
     queries = generate_data((100, 10), np.float32)
-    search_params = mg_ivf_pq.MultiGpuSearchParams(n_probes=20)
+    search_params = mg_ivf_pq.SearchParams(n_probes=20)
 
     # Test that search on untrained index fails
     with pytest.raises(ValueError, match="Index needs to be built"):
@@ -532,9 +532,7 @@ def test_mg_ivf_pq_with_prealloc_output():
     resources = MultiGpuResources()
 
     # Build index with fewer clusters to avoid n_rows < n_lists error
-    build_params = mg_ivf_pq.MultiGpuIndexParams(
-        n_lists=30, pq_bits=8, pq_dim=16
-    )
+    build_params = mg_ivf_pq.IndexParams(n_lists=30, pq_bits=8, pq_dim=16)
     index = mg_ivf_pq.build(build_params, dataset, resources=resources)
 
     # Pre-allocate output arrays in host memory
@@ -542,7 +540,7 @@ def test_mg_ivf_pq_with_prealloc_output():
     distances = np.empty((n_queries, k), dtype=np.float32)
 
     # Search with pre-allocated arrays
-    search_params = mg_ivf_pq.MultiGpuSearchParams(n_probes=20)
+    search_params = mg_ivf_pq.SearchParams(n_probes=20)
     ret_distances, ret_neighbors = mg_ivf_pq.search(
         search_params,
         index,
@@ -561,8 +559,8 @@ def test_mg_ivf_pq_with_prealloc_output():
 
 
 def test_index_repr():
-    """Test string representation of MultiGpuIndex."""
-    index = mg_ivf_pq.MultiGpuIndex()
+    """Test string representation of Index."""
+    index = mg_ivf_pq.Index()
     assert repr(index) == "Index(type=MultiGpuIvfPq)"
 
 
@@ -584,7 +582,7 @@ def test_mg_ivf_pq_simple():
     resources = MultiGpuResources()
 
     # Use very few clusters for high recall
-    build_params = mg_ivf_pq.MultiGpuIndexParams(
+    build_params = mg_ivf_pq.IndexParams(
         metric="sqeuclidean",
         n_lists=32,  # Very few clusters
         pq_bits=8,
@@ -595,9 +593,7 @@ def test_mg_ivf_pq_simple():
     index = mg_ivf_pq.build(build_params, dataset, resources=resources)
 
     # Search with many probes for maximum recall
-    search_params = mg_ivf_pq.MultiGpuSearchParams(
-        n_probes=32
-    )  # Search all clusters
+    search_params = mg_ivf_pq.SearchParams(n_probes=32)  # Search all clusters
     distances, neighbors = mg_ivf_pq.search(
         search_params, index, queries, k, resources=resources
     )
@@ -634,7 +630,7 @@ def test_mg_ivf_pq_integration():
     resources = MultiGpuResources()
 
     # Build initial index
-    build_params = mg_ivf_pq.MultiGpuIndexParams(
+    build_params = mg_ivf_pq.IndexParams(
         distribution_mode="sharded",
         metric="sqeuclidean",
         n_lists=50,
@@ -644,7 +640,7 @@ def test_mg_ivf_pq_integration():
     index = mg_ivf_pq.build(build_params, dataset, resources=resources)
 
     # Initial search
-    search_params = mg_ivf_pq.MultiGpuSearchParams(
+    search_params = mg_ivf_pq.SearchParams(
         n_probes=37,
         search_mode="load_balancer",
         merge_mode="merge_on_root_rank",
