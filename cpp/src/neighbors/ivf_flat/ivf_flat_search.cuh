@@ -96,11 +96,7 @@ void search_impl(raft::resources const& handle,
   if constexpr (std::is_same_v<T, float>) {
     float_query_size = 0;
   } else {
-    if (index.metric() == cuvs::distance::DistanceType::BitwiseHamming) {
-      float_query_size = 0;
-    } else {
-      float_query_size = n_queries * index.dim();
-    }
+    float_query_size = n_queries * index.dim();
   }
   rmm::device_uvector<float> converted_queries_dev(float_query_size, stream, search_mr);
   float* converted_queries_ptr = converted_queries_dev.data();
@@ -120,6 +116,11 @@ void search_impl(raft::resources const& handle,
       rmm::device_uvector<uint32_t> uint32_distances(
         n_queries * index.n_lists(), stream, search_mr);
 
+      
+      RAFT_LOG_INFO("index.dim() = %u", index.dim());
+      
+      // raft::print_device_vector("queries", queries, index.dim(), std::cout);
+      // raft::print_device_vector("index.binary_centers().data_handle()", index.binary_centers().data_handle(), index.dim(), std::cout);
       cuvs::distance::detail::pairwise_matrix_dispatch<decltype(distance_op),
                                                        uint8_t,
                                                        uint32_t,
@@ -137,6 +138,9 @@ void search_impl(raft::resources const& handle,
                                                              raft::identity_op{},
                                                              stream,
                                                              true);
+      cudaDeviceSynchronize();
+      RAFT_LOG_INFO("completed pairwise matrix dispatch");
+      // raft::print_device_vector("uint32_distances", uint32_distances.data(), index.n_lists(), std::cout);
 
       // Convert uint32_t distances to float for compatibility with rest of pipeline
       raft::linalg::unaryOp(
@@ -145,6 +149,9 @@ void search_impl(raft::resources const& handle,
         n_queries * index.n_lists(),
         [] __device__(uint32_t val) { return static_cast<float>(val); },
         stream);
+        cudaDeviceSynchronize();
+        RAFT_LOG_INFO("completed unaryOp");
+        raft::print_device_vector("distance_buffer_dev", distance_buffer_dev.data(), index.n_lists(), std::cout);
     }
   } else {
     float alpha = 1.0f;
@@ -230,6 +237,8 @@ void search_impl(raft::resources const& handle,
     raft::make_device_matrix_view<uint32_t, int64_t>(
       coarse_indices_dev.data(), n_queries, n_probes),
     select_min);
+  cudaDeviceSynchronize();
+  RAFT_LOG_INFO("completed select_k");
 
   RAFT_LOG_TRACE_VEC(coarse_indices_dev.data(), n_probes);
   RAFT_LOG_TRACE_VEC(coarse_distances_dev.data(), n_probes);
@@ -254,6 +263,8 @@ void search_impl(raft::resources const& handle,
       nullptr,
       grid_dim_x,
       stream);
+      cudaDeviceSynchronize();
+  RAFT_LOG_INFO("completed ivfflat_interleaved_scan");
   } else {
     grid_dim_x = 1;
   }
@@ -309,6 +320,8 @@ void search_impl(raft::resources const& handle,
     distances_dev_ptr,
     grid_dim_x,
     stream);
+  cudaDeviceSynchronize();
+  RAFT_LOG_INFO("completed second ivfflat_interleaved_scan");
 
   RAFT_LOG_TRACE_VEC(distances_dev_ptr, 2 * k);
   if (indices_dev_ptr != nullptr) { RAFT_LOG_TRACE_VEC(indices_dev_ptr, 2 * k); }
@@ -349,6 +362,8 @@ void search_impl(raft::resources const& handle,
                                      n_probes,
                                      k,
                                      stream);
+  cudaDeviceSynchronize();
+  RAFT_LOG_INFO("completed postprocess_neighbors");
 }
 
 /** See raft::neighbors::ivf_flat::search docs */

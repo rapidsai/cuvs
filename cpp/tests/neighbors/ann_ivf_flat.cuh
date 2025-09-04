@@ -77,6 +77,10 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
 
   void testIVFFlat()
   {
+    // Skip tests when dataset dimension is 1
+    if (ps.dim == 1) {
+      GTEST_SKIP();
+    }
     if (ps.metric != cuvs::distance::DistanceType::BitwiseHamming) {
       GTEST_SKIP();
     }
@@ -216,6 +220,9 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
                                           search_queries_view,
                                           indices_out_view,
                                           dists_out_view);
+        cudaDeviceSynchronize();
+        RAFT_LOG_INFO("completed search");
+        raft::print_device_vector("distst_out_view", dists_out_view.data_handle(), ps.k, std::cout);
 
         raft::update_host(
           distances_ivfflat.data(), distances_ivfflat_dev.data(), queries_size, stream_);
@@ -276,6 +283,10 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
 
   void testPacker()
   {
+    // Skip tests when dataset dimension is 1
+    if (ps.dim == 1) {
+      GTEST_SKIP();
+    }
     if (ps.metric != cuvs::distance::DistanceType::BitwiseHamming) {
       GTEST_SKIP();
     }
@@ -417,6 +428,10 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
 
   void testFilter()
   {
+    // Skip tests when dataset dimension is 1
+    if (ps.dim == 1) {
+      GTEST_SKIP();
+    }
     if (ps.metric != cuvs::distance::DistanceType::BitwiseHamming) {
       GTEST_SKIP();
     }

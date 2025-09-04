@@ -792,6 +792,7 @@ void balancing_em_iters(const raft::resources& handle,
         n_iters++;
       }
     }
+    // raft::print_device_vector("cluster_centers after balancing step", cluster_centers, dim, std::cout);
     switch (params.metric) {
       // For some metrics, cluster calculation and adjustment tends to favor zero center vectors.
       // To avoid converging to zero, we normalize the center vectors on every iteration.
@@ -820,6 +821,7 @@ void balancing_em_iters(const raft::resources& handle,
             mapping_op,
             device_memory,
             dataset_norm);
+    // raft::print_device_vector("cluster_labels after expectation step", cluster_labels, 20, std::cout);
     // M: Maximization step - calculate optimal cluster centers
     calc_centers_and_sizes(handle,
                            cluster_centers,
@@ -833,6 +835,8 @@ void balancing_em_iters(const raft::resources& handle,
                            mapping_op,
                            device_memory);
   }
+  // raft::print_device_vector("cluster_centers after balancing_em_iters", cluster_centers, dim, std::cout);
+
 }
 
 /** Randomly initialize cluster centers and then call `balancing_em_iters`. */
@@ -876,6 +880,7 @@ void build_clusters(const raft::resources& handle,
                          true,
                          mapping_op,
                          device_memory);
+  // raft::print_device_vector("cluster_centers before balancing_em_iters", cluster_centers, dim, std::cout);
 
   // run EM
   balancing_em_iters(handle,

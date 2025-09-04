@@ -86,6 +86,20 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
   // #if __CUDA_ARCH__ < 800
   extern __shared__ char smem[];
 
+  // Debug: Check input parameters
+  // if (blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0) {
+  //   if (m <= 0 || n <= 0 || k <= 0) {
+  //     printf("ERROR: Invalid dimensions in fusedDistanceNNkernel: m=%d, n=%d, k=%d\n",
+  //            static_cast<int>(m), static_cast<int>(n), static_cast<int>(k));
+  //   }
+  //   if (x == nullptr || y == nullptr) {
+  //     printf("ERROR: Null pointer in fusedDistanceNNkernel: x=%p, y=%p\n", x, y);
+  //   }
+  //   if (min == nullptr) {
+  //     printf("ERROR: Output pointer is null in fusedDistanceNNkernel\n");
+  //   }
+  // }
+
   using AccT = std::conditional_t<std::is_same_v<DataT, uint8_t>, uint32_t, DataT>;
   typedef raft::KeyValuePair<IdxT, AccT> KVPair;
   KVPair val[P::AccRowsPerTh];

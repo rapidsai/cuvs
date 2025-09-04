@@ -226,8 +226,15 @@ struct bitwise_decode_op {
   {
     IdxT row_id = i / uncompressed_dim;
     IdxT col_id = i % uncompressed_dim;
+    if (row_id == 0) {
+        // printf("row_id = %ld, col_id = %ld\n", row_id, col_id);
+        // printf("binary_vecs[row_id * compressed_dim + (col_id) >> 3] = %u\n", static_cast<unsigned int>(binary_vecs[row_id * compressed_dim + (col_id) >> 3]));
+        // printf("(col_id & 7) = %ld\n", (col_id & 7));
+        // printf("((binary_vecs[row_id * compressed_dim + (col_id) >> 3] >> (col_id & 7)) & 1) = %u\n", ((binary_vecs[row_id * compressed_dim + (col_id) >> 3] >> (col_id & 7)) & 1));
+        // printf("-1 + 2 * ((binary_vecs[row_id * compressed_dim + (col_id) >> 3] >> (col_id & 7)) & 1) = %d\n", static_cast<int>(-1 + 2 * static_cast<int>((binary_vecs[row_id * compressed_dim + (col_id) >> 3] >> (col_id & 7)) & 1)));
+    }
     return static_cast<OutT>(
-      -1 + 2 * ((binary_vecs[(row_id * compressed_dim + col_id) >> 3] >> (col_id & 7)) & 1));
+      -1 + 2 * static_cast<OutT>((binary_vecs[row_id * compressed_dim + (col_id >> 3)] >> (col_id & 7)) & 1));
   };
 };
 

@@ -76,10 +76,23 @@ void fusedBitwiseHammingNN(OutT* min,
 
   constexpr size_t shmemSize = P::SmemSize;
 
+  // Check for any prior CUDA errors before kernel configuration
+  cudaError_t prior_error = cudaGetLastError();
+  if (prior_error != cudaSuccess) {
+    RAFT_LOG_INFO("Prior CUDA error before fusedDistanceNN: %s", cudaGetErrorString(prior_error));
+    RAFT_CUDA_TRY(prior_error);
+  }
+
   dim3 grid = launchConfigGenerator<P>(m, n, shmemSize, kernel);
+  
+  RAFT_LOG_INFO("Launching fusedDistanceNNkernel: grid=(%d,%d,%d), block=(%d,%d,%d), shmem=%zu, m=%d, n=%d, k=%d",
+                grid.x, grid.y, grid.z, blk.x, blk.y, blk.z, shmemSize, static_cast<int>(m), static_cast<int>(n), static_cast<int>(k));
+  
   kernel<<<grid, blk, shmemSize, stream>>>(
     min, x, y, nullptr, nullptr, m, n, k, maxVal, workspace, redOp, pairRedOp, distance_op, fin_op);
-  cudaGetLastError();
+  
+  // Properly check for launch errors
+  RAFT_CUDA_TRY(cudaGetLastError());
 }
 
 }  // namespace detail

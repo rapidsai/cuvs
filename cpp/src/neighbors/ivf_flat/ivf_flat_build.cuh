@@ -340,10 +340,13 @@ void extend(raft::resources const& handle,
             raft::identity_op{});
         }
 
+        // raft::print_device_vector("expanded_centers_view", expanded_centers_view.data_handle(), index->dim() * 8, std::cout);
+
         // Convert updated centroids back to binary format
         cuvs::preprocessing::quantize::binary::quantizer<float> temp_quantizer(handle);
-        cuvs::preprocessing::quantize::binary::transform(
-          handle, temp_quantizer, expanded_centers_view, index->binary_centers());
+        cuvs::preprocessing::quantize::binary::transform(handle, temp_quantizer, expanded_centers_view, index->binary_centers());
+        // raft::print_device_vector("index->binary_centers()", index->binary_centers().data_handle(), index->dim(), std::cout);
+  
       } else {
         // Error: BitwiseHamming with non-uint8_t type
         RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t data type, got %s",
@@ -573,18 +576,26 @@ inline auto build(raft::resources const& handle,
         RAFT_LOG_INFO("Original dim=%u, expanded dim=%u", index.dim(), index.dim() * 8);
         
         // For binary data, we need to decode to expanded representation for clustering
-        rmm::device_uvector<uint8_t> decoded_trainset(
+        rmm::device_uvector<int8_t> decoded_trainset(
           n_rows_train * index.dim() * 8,
           stream,
           raft::resource::get_large_workspace_resource(handle));
-        auto decoded_trainset_view = raft::make_device_matrix_view<uint8_t, IdxT>(
+        auto decoded_trainset_view = raft::make_device_matrix_view<int8_t, IdxT>(
           decoded_trainset.data(), n_rows_train, index.dim() * 8);
+        
+        // rmm::device_uvector<uint32_t> decoded_trainset_uint32(
+        //   n_rows_train * index.dim() * 8,
+        //   stream,
+        //   raft::resource::get_large_workspace_resource(handle));
+        // auto decoded_trainset_uint32_view = raft::make_device_matrix_view<uint32_t, IdxT>(
+        //   decoded_trainset_uint32.data(), n_rows_train, index.dim() * 8);
+        
 
         // Decode binary trainset to expanded representation
         raft::linalg::map_offset(
           handle,
           decoded_trainset_view,
-          utils::bitwise_decode_op<uint8_t, IdxT>(trainset.data(), index.dim()));
+          utils::bitwise_decode_op<int8_t, IdxT>(trainset.data(), index.dim()));
         trainset.release();
 
         rmm::device_uvector<float> decoded_centers(index.n_lists() * index.dim() * 8,
@@ -598,7 +609,7 @@ inline auto build(raft::resources const& handle,
                                             kmeans_params,
                                             raft::make_const_mdspan(decoded_trainset_view),
                                             decoded_centers_view,
-                                            utils::mapping<float>{});
+                                            raft::cast_op<float>());
         RAFT_LOG_INFO("kmeans_balanced::fit completed");
         
         // Convert decoded centers back to binary format

@@ -40,7 +40,7 @@ struct bitwise_hamming_distance_op {
   bitwise_hamming_distance_op(IdxT k_) noexcept : k(k_) {}
 
   static constexpr bool use_norms            = false;
-  static constexpr bool expensive_inner_loop = true;  // Force vec_len=1 to reduce shared memory usage
+  static constexpr bool expensive_inner_loop = false;
 
   template <typename Policy>
   static constexpr size_t shared_mem_size()
@@ -51,7 +51,11 @@ struct bitwise_hamming_distance_op {
   __device__ __forceinline__ void core(AccT& acc, DataT& x, DataT& y) const
   {
     static_assert(std::is_same_v<DataT, uint8_t>, "BitwiseHamming only supports uint8_t");
-    acc += static_cast<AccT>(__popc(static_cast<uint32_t>(x ^ y) & 0xffu));
+    // Ensure proper masking and casting to avoid undefined behavior
+    uint32_t xor_val = static_cast<uint32_t>(static_cast<uint8_t>(x ^ y));
+    uint32_t masked_val = xor_val & 0xffu;
+    int popcount = __popc(masked_val);
+    acc += static_cast<AccT>(popcount);
   }
 
   template <typename Policy>
