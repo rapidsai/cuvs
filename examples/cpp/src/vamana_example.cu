@@ -45,8 +45,8 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
   index_params.visited_size = visited_size;
   index_params.graph_degree = degree;
   index_params.vamana_iters = iters;
-  if(codebook_prefix != "") {
-    index_params.codebooks    = vamana::deserialize_codebooks(codebook_prefix, dataset.extent(1));
+  if (codebook_prefix != "") {
+    index_params.codebooks = vamana::deserialize_codebooks(codebook_prefix, dataset.extent(1));
   }
 
   std::cout << "Building Vamana index (search graph)" << std::endl;
@@ -62,12 +62,10 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
 
   std::cout << "Time to build index: " << elapsed_seconds.count() << "s\n";
 
-
-  if(codebook_prefix != "") {
+  if (codebook_prefix != "") {
     // Output index to file (disk sector-aligned format)
     serialize(dev_resources, out_fname, index, false, true);
-  }
-  else {
+  } else {
     // Output index to file (in-memory format)
     serialize(dev_resources, out_fname, index);
   }
@@ -122,24 +120,23 @@ int main(int argc, char* argv[])
   if (argc >= 9)
     codebook_prefix = (std::string)argv[8];  // Path prefix to pq pivots and rotation matrix files
 
-  if(dtype == "int8") {
+  if (dtype == "int8") {
     // Read in binary dataset file
     auto dataset = read_bin_dataset<int8_t, int64_t>(dev_resources, data_fname, INT_MAX);
-  
+
     // Simple build example to create graph and write to a file
     vamana_build_and_write<int8_t>(dev_resources,
-                                  raft::make_const_mdspan(dataset.view()),
-                                  out_fname,
-                                  degree,
-                                  max_visited,
-                                  max_fraction,
-                                  iters,
-                                  codebook_prefix);
-  }
-  else if(dtype == "float") {
+                                   raft::make_const_mdspan(dataset.view()),
+                                   out_fname,
+                                   degree,
+                                   max_visited,
+                                   max_fraction,
+                                   iters,
+                                   codebook_prefix);
+  } else if (dtype == "float") {
     // Read in binary dataset file
     auto dataset = read_bin_dataset<float, int64_t>(dev_resources, data_fname, INT_MAX);
-  
+
     // Simple build example to create graph and write to a file
     vamana_build_and_write<float>(dev_resources,
                                   raft::make_const_mdspan(dataset.view()),
