@@ -346,12 +346,12 @@ if(CUVS_ANN_BENCH_USE_DISKANN)
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_VAMANA)
-  ConfigureAnnBench(NAME CUVS_VAMANA PATH src/cuvs/cuvs_vamana.cu LINKS diskann::diskann aio cuvs)
+  ConfigureAnnBench(NAME CUVS_VAMANA PATH src/cuvs/cuvs_vamana.cu LINKS cuvs diskann::diskann aio)
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN)
   ConfigureAnnBench(
-    NAME CUVS_CAGRA_DISKANN PATH src/cuvs/cuvs_cagra_diskann.cu LINKS diskann::diskann aio cuvs
+    NAME CUVS_CAGRA_DISKANN PATH src/cuvs/cuvs_cagra_diskann.cu LINKS cuvs diskann::diskann aio
   )
 endif()
 
