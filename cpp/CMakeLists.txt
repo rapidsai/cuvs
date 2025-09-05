@@ -83,12 +83,12 @@ elseif(NOT BUILD_SHARED_LIBS)
   set(BUILD_CAGRA_HNSWLIB OFF)
 endif()
 
-if(NOT BUILD_SHARED_LIBS and CUVS_COMPILE_DYNAMIC_ONLY)
+if(NOT BUILD_SHARED_LIBS AND CUVS_COMPILE_DYNAMIC_ONLY)
   message(
     VERBOSE
-    "cuVS: Ignorning `BUILD_SHARED_LIBS` and forcing shared library due to `CUVS_COMPILE_DYNAMIC_ONLY`"
+    "cuVS: Ignoring `BUILD_SHARED_LIBS` and forcing shared library due to `CUVS_COMPILE_DYNAMIC_ONLY`"
   )
- endif()
+endif()
 
 set(cuvs_compile_mode = "both")
 set(_cuvs_lib_targets cuvs cuvs_static)
@@ -577,7 +577,7 @@ if(NOT BUILD_CPU_ONLY)
   endif()
 
   if(BUILD_CAGRA_HNSWLIB)
-    target_link_libraries(cuvs_objs PUBLIC $<BUILD_LOCAL_INTERFACE:hnswlib::hnswlibL>)
+    target_link_libraries(cuvs_objs PUBLIC $<BUILD_LOCAL_INTERFACE:hnswlib::hnswlib>)
     target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
   endif()
 
