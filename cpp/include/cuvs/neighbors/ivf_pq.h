@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -270,15 +270,23 @@ uint32_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index);
 /**
  * @brief Get the cluster centers corresponding to the lists in the original space
  *
- * @param[in] res cuvsResources_t opaque C handle
  * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
- * @param[out] centers Preallocated array on host or device memory to store output,
- * dimensions [n_lists, dim]
+ * @param[out] centers Output tensor that will be populated with a non-owning view of the data
  * @return cuvsError_t
  */
-cuvsError_t cuvsIvfPqIndexGetCenters(cuvsResources_t res,
-                                     cuvsIvfPqIndex_t index,
-                                     DLManagedTensor* centers);
+cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* centers);
+
+/**
+ * @brief Get the PQ cluster centers
+ *
+ *   - codebook_gen::PER_SUBSPACE: [pq_dim , pq_len, pq_book_size]
+ *   - codebook_gen::PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
+ *
+ * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
+ * @param[out] pq_centers Output tensor that will be populated with a non-owning view of the data
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqIndexGetPqCenters(cuvsIvfPqIndex_t index, DLManagedTensor* pq_centers);
 /**
  * @}
  */
