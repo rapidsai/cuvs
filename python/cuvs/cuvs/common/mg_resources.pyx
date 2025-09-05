@@ -73,8 +73,7 @@ cdef class MultiGpuResources:
     Using specific device IDs:
 
     >>> from cuvs.common import MultiGpuResources
-    >>> # Use only GPUs 0 and 2
-    >>> handle = MultiGpuResources(device_ids=[0, 2])
+    >>> handle = MultiGpuResources(device_ids=[0])
     >>>
     >>> # call multi-GPU algos here
     >>>
