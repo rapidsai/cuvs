@@ -84,8 +84,11 @@ elseif(NOT BUILD_SHARED_LIBS)
 endif()
 
 if(NOT BUILD_SHARED_LIBS and CUVS_COMPILE_DYNAMIC_ONLY)
-  message(VERBOSE "cuVS: Ignoring `BUILD_SHARED_LIBS` and forcing shared library due to `CUVS_COMPILE_DYNAMIC_ONLY`")
-endif()
+  message(
+    VERBOSE
+    "cuVS: Ignorning `BUILD_SHARED_LIBS` and forcing shared library due to `CUVS_COMPILE_DYNAMIC_ONLY`"
+  )
+ endif()
 
 set(cuvs_compile_mode = "both")
 set(_cuvs_lib_targets cuvs cuvs_static)
@@ -96,7 +99,6 @@ elseif(NOT BUILD_SHARED_LIBS)
   set(cuvs_compile_mode = "static_only")
   set(_cuvs_lib_targets cuvs_static)
 endif()
-
 
 # Needed because GoogleBenchmark changes the state of FindThreads.cmake, causing subsequent runs to
 # have different values for the `Threads::Threads` target. Setting this flag ensures
@@ -579,16 +581,14 @@ if(NOT BUILD_CPU_ONLY)
     target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
   endif()
 
-
   set(CUVS_CUSOLVER_DEPENDENCY CUDA::cusolver${_ctk_static_suffix})
   set(CUVS_CUBLAS_DEPENDENCY CUDA::cublas${_ctk_static_suffix})
   set(CUVS_CURAND_DEPENDENCY CUDA::curand${_ctk_static_suffix})
   set(CUVS_CUSPARSE_DEPENDENCY CUDA::cusparse${_ctk_static_suffix})
 
   set(CUVS_CTK_MATH_DEPENDENCIES ${CUVS_CUBLAS_DEPENDENCY} ${CUVS_CUSOLVER_DEPENDENCY}
-                                  ${CUVS_CUSPARSE_DEPENDENCY} ${CUVS_CURAND_DEPENDENCY}
+                                 ${CUVS_CUSPARSE_DEPENDENCY} ${CUVS_CURAND_DEPENDENCY}
   )
-
 
   if(NOT cuvs_compile_mode STREQUAL "static_only")
     add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs>)
@@ -596,19 +596,20 @@ if(NOT BUILD_CPU_ONLY)
     set_target_properties(
       cuvs
       PROPERTIES BUILD_RPATH "\$ORIGIN"
-                INSTALL_RPATH "\$ORIGIN"
-                CXX_STANDARD 17
-                CXX_STANDARD_REQUIRED ON
-                CUDA_STANDARD 17
-                CUDA_STANDARD_REQUIRED ON
-                INTERFACE_POSITION_INDEPENDENT_CODE ON
-                POSITION_INDEPENDENT_CODE ON
+                 INSTALL_RPATH "\$ORIGIN"
+                 CXX_STANDARD 17
+                 CXX_STANDARD_REQUIRED ON
+                 CUDA_STANDARD 17
+                 CUDA_STANDARD_REQUIRED ON
+                 INTERFACE_POSITION_INDEPENDENT_CODE ON
+                 POSITION_INDEPENDENT_CODE ON
     )
     target_compile_options(
-      cuvs INTERFACE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--expt-extended-lambda
-                    --expt-relaxed-constexpr>
-           PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
-                  "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+      cuvs
+      INTERFACE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--expt-extended-lambda
+                --expt-relaxed-constexpr>
+      PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+              "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
     )
 
     target_include_directories(
@@ -625,8 +626,8 @@ if(NOT BUILD_CPU_ONLY)
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
     file(
-    WRITE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld"
-[=[
+      WRITE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld"
+      [=[
 SECTIONS
 {
 .nvFatBinSegment : { *(.nvFatBinSegment) }
@@ -674,7 +675,7 @@ SECTIONS
       PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
     )
-    endif()
+  endif()
 
   # ################################################################################################
   # * NVTX support in cuvs -----------------------------------------------------
