@@ -55,14 +55,14 @@ cdef extern from "cuvs/neighbors/vamana.h" nogil:
     cuvsError_t cuvsVamanaIndexGetDims(cuvsVamanaIndex_t index, int* dim)
 
     cuvsError_t cuvsVamanaBuild(cuvsResources_t res,
-                               cuvsVamanaIndexParams_t params,
-                               DLManagedTensor* dataset,
-                               cuvsVamanaIndex_t index)
+                                cuvsVamanaIndexParams_t params,
+                                DLManagedTensor* dataset,
+                                cuvsVamanaIndex_t index)
 
     cuvsError_t cuvsVamanaSerialize(cuvsResources_t res,
-                                   const char* filename,
-                                   cuvsVamanaIndex_t index,
-                                   bool include_dataset)
+                                    const char* filename,
+                                    cuvsVamanaIndex_t index,
+                                    bool include_dataset)
 
 
 cdef class Index:

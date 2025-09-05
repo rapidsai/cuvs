@@ -173,11 +173,13 @@ def build(IndexParams index_params, dataset, resources=None):
     """
     Build the Vamana index from the dataset for efficient search.
 
-    The build utilities the Vamana insertion-based algorithm to create the graph. The algorithm
-    starts with an empty graph and iteratively inserts batches of nodes. Each batch involves
-    performing a greedy search for each vector to be inserted, and inserting it with edges to
-    all nodes traversed during the search. Reverse edges are also inserted and robustPrune is applied
-    to improve graph quality. The index_params struct controls the degree of the final graph.
+    The build utilities the Vamana insertion-based algorithm to create
+    the graph. The algorithm starts with an empty graph and iteratively
+    inserts batches of nodes. Each batch involves performing a greedy
+    search for each vector to be inserted, and inserting it with edges to
+    all nodes traversed during the search. Reverse edges are also inserted
+    and robustPrune is applied to improve graph quality. The index_params
+    struct controls the degree of the final graph.
 
     The following distance metrics are supported:
         - L2Expanded
@@ -240,7 +242,8 @@ def save(filename, Index index, bool include_dataset=True, resources=None):
     """
     Saves the index to a file.
 
-    Matches the file format used by the DiskANN open-source repository, allowing cross-compatibility.
+    Matches the file format used by the DiskANN open-source repository,
+    allowing cross-compatibility.
 
     Parameters
     ----------
@@ -271,9 +274,9 @@ def save(filename, Index index, bool include_dataset=True, resources=None):
     cdef string c_filename = filename.encode('utf-8')
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
     check_cuvs(cuvsVamanaSerialize(res,
-                                  c_filename.c_str(),
-                                  index.index,
-                                  include_dataset))
+                                   c_filename.c_str(),
+                                   index.index,
+                                   include_dataset))
 
 
 # Note: Vamana index currently only supports build and serialize operations.
