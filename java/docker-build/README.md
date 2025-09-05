@@ -82,7 +82,7 @@ CUDA_VERSION=13.1.0 JNI_DOCKER_DEV_BUILD=ON ./build-in-docker libcuvs java
 CUDA_VERSION=12.9.1 DOCKER_BUILD_EXTRA_ARGS="--no-cache" ./build-in-docker libcuvs java --allgpuarch
 ```
 
-### Build with Custom Maven Repository and ccache
+### Build with Custom Maven Repository and ccache, for local GPU's architecture.
 
 ```bash
 LOCAL_MAVEN_REPO=/custom/maven/repo LOCAL_CCACHE_DIR=/custom/ccache CUDA_VERSION=13.0.0 ./build-in-docker libcuvs java
@@ -124,9 +124,9 @@ If you encounter GPU access problems, verify:
 
 ### Build Performance
 
-For faster builds:
-1. Use ccache: Ensure `LOCAL_CCACHE_DIR` is set to a persistent directory
-2. Increase parallelism: Set `PARALLEL_LEVEL` to match your CPU cores
+For tweaking build performance:
+1. Use ccache: Ensure `LOCAL_CCACHE_DIR` is set to a persistent directory. (By default, the build uses ccache.)
+2. Change parallelism: Set `PARALLEL_LEVEL` to match your CPU cores. (This happens by default.)
 3. Use development builds: Set `JNI_DOCKER_DEV_BUILD=ON` for development
 
 ### Memory Requirements
