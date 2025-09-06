@@ -111,7 +111,6 @@ jobs:
       enable_check_generated_files: false
       ignored_pr_jobs: "telemetry-summarize"
   conda-cpp-build:
-    needs: checks
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-build.yaml@cuda13.0
     with:
