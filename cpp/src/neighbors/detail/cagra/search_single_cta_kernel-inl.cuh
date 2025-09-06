@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 #pragma once
+
+#include "jit_lto_kernels/kernel_tags.hpp"
+#include "jit_lto_kernels/search_single_cta_bitset_filter_planner.hpp"
+#include "sample_filter_utils.cuh"
 
 #include "search_single_cta_kernel.cuh"
 
@@ -61,7 +65,10 @@
 #include <numeric>
 #include <stdint.h>
 #include <thread>
+#include <type_traits>
 #include <vector>
+
+#include <cuda_runtime.h>
 
 namespace cuvs::neighbors::cagra::detail {
 namespace single_cta_search {
@@ -1287,6 +1294,58 @@ struct search_kernel_config {
   }
 };
 
+template <>
+struct search_kernel_config<false,
+                            dataset_descriptor_base_t<unsigned char, unsigned int, float>,
+                            CagraSampleFilterWithQueryIdOffset<
+                              cuvs::neighbors::filtering::bitset_filter<unsigned int, long>>> {
+  template <typename Tag1, typename Tag2>
+  using launcher_type = SearchSingleCtaBitsetFilterPlanner<
+    dataset_descriptor_base_t<unsigned char, unsigned int, float>,
+    Tag1,
+    Tag2>;
+
+  template <unsigned MAX_CANDIDATES, unsigned USE_BITONIC_SORT>
+  static auto choose_search_kernel(unsigned itopk_size)
+  {
+    if (itopk_size <= 64) {
+      return launcher_type<_64_tag, typename get_tag<MAX_CANDIDATES>::type>{}.get_launcher();
+    } else if (itopk_size <= 128) {
+      return launcher_type<_128_tag, typename get_tag<MAX_CANDIDATES>::type>{}.get_launcher();
+    } else if (itopk_size <= 256) {
+      return launcher_type<_256_tag, typename get_tag<MAX_CANDIDATES>::type>{}.get_launcher();
+    } else if (itopk_size <= 512) {
+      return launcher_type<_512_tag, typename get_tag<MAX_CANDIDATES>::type>{}.get_launcher();
+    }
+    THROW("No kernel for parametels itopk_size %u, max_candidates %u", itopk_size, MAX_CANDIDATES);
+  }
+
+  static auto choose_itopk_and_mx_candidates(unsigned itopk_size,
+                                             unsigned num_itopk_candidates,
+                                             unsigned block_size)
+  {
+    if (num_itopk_candidates <= 64) {
+      // use bitonic sort based topk
+      return choose_search_kernel<64, 1>(itopk_size);
+    } else if (num_itopk_candidates <= 128) {
+      return choose_search_kernel<128, 1>(itopk_size);
+    } else if (num_itopk_candidates <= 256) {
+      return choose_search_kernel<256, 1>(itopk_size);
+    } else {
+      // Radix-based topk is used
+      constexpr unsigned max_candidates = 32;  // to avoid build failure
+      if (itopk_size <= 256) {
+        return launcher_type<_256_tag, typename get_tag<max_candidates>::type>{}.get_launcher();
+      } else if (itopk_size <= 512) {
+        return launcher_type<_512_tag, typename get_tag<max_candidates>::type>{}.get_launcher();
+      }
+    }
+    THROW("No kernel for parametels itopk_size %u, num_itopk_candidates %u",
+          itopk_size,
+          num_itopk_candidates);
+  }
+};
+
 /**
  * @brief Resource queue
  *
@@ -1949,7 +2008,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
                         worker_handles.data(),
                         num_queries,
                         this->lifetime,
-                        [=](uint32_t job_ix) {
+                        [&](uint32_t job_ix) {
                           auto& jd                = job_descriptors.data()[job_ix].input.value;
                           auto* cflag             = &job_descriptors.data()[job_ix].completion_flag;
                           jd.result_indices_ptr   = result_indices_ptr;
@@ -2126,36 +2185,74 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
                             ps.persistent_device_usage)
       ->launch(topk_indices_ptr, topk_distances_ptr, queries_ptr, num_queries, topk);
   } else {
-    using descriptor_base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
-    auto kernel                = search_kernel_config<false, descriptor_base_type, SampleFilterT>::
-      choose_itopk_and_mx_candidates(ps.itopk_size, num_itopk_candidates, block_size);
-    RAFT_CUDA_TRY(
-      cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
     dim3 thread_dims(block_size, 1, 1);
     dim3 block_dims(1, num_queries, 1);
-    RAFT_LOG_DEBUG(
-      "Launching kernel with %u threads, %u block %u smem", block_size, num_queries, smem_size);
-    kernel<<<block_dims, thread_dims, smem_size, stream>>>(topk_indices_ptr,
-                                                           topk_distances_ptr,
-                                                           topk,
-                                                           dataset_desc.dev_ptr(stream),
-                                                           queries_ptr,
-                                                           graph.data_handle(),
-                                                           graph.extent(1),
-                                                           ps.num_random_samplings,
-                                                           ps.rand_xor_mask,
-                                                           dev_seed_ptr,
-                                                           num_seeds,
-                                                           hashmap_ptr,
-                                                           ps.itopk_size,
-                                                           ps.search_width,
-                                                           ps.min_iterations,
-                                                           ps.max_iterations,
-                                                           num_executed_iterations,
-                                                           hash_bitlen,
-                                                           small_hash_bitlen,
-                                                           small_hash_reset_interval,
-                                                           sample_filter);
+    using descriptor_base_type = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
+
+    if constexpr (std::is_same_v<descriptor_base_type,
+                                 dataset_descriptor_base_t<unsigned char, unsigned int, float>> &&
+                  std::is_same_v<
+                    SampleFilterT,
+                    CagraSampleFilterWithQueryIdOffset<
+                      cuvs::neighbors::filtering::bitset_filter<unsigned int, long>>>) {
+      if (ps.itopk_size <= 64 && num_itopk_candidates <= 64) {
+        auto kernel_launcher = search_kernel_config<false, descriptor_base_type, SampleFilterT>::
+          choose_itopk_and_mx_candidates(ps.itopk_size, num_itopk_candidates, block_size);
+        kernel_launcher(stream,
+                        block_dims,
+                        thread_dims,
+                        smem_size,
+                        topk_indices_ptr,
+                        topk_distances_ptr,
+                        topk,
+                        dataset_desc.dev_ptr(stream),
+                        queries_ptr,
+                        graph.data_handle(),
+                        graph.extent(1),
+                        ps.num_random_samplings,
+                        ps.rand_xor_mask,
+                        dev_seed_ptr,
+                        num_seeds,
+                        hashmap_ptr,
+                        ps.itopk_size,
+                        ps.search_width,
+                        ps.min_iterations,
+                        ps.max_iterations,
+                        num_executed_iterations,
+                        hash_bitlen,
+                        small_hash_bitlen,
+                        small_hash_reset_interval,
+                        sample_filter);
+      }
+    } else {
+      auto kernel = search_kernel_config<false, descriptor_base_type, SampleFilterT>::
+        choose_itopk_and_mx_candidates(ps.itopk_size, num_itopk_candidates, block_size);
+      RAFT_CUDA_TRY(
+        cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
+      RAFT_LOG_DEBUG(
+        "Launching kernel with %u threads, %u block %u smem", block_size, num_queries, smem_size);
+      kernel<<<block_dims, thread_dims, smem_size, stream>>>(topk_indices_ptr,
+                                                             topk_distances_ptr,
+                                                             topk,
+                                                             dataset_desc.dev_ptr(stream),
+                                                             queries_ptr,
+                                                             graph.data_handle(),
+                                                             graph.extent(1),
+                                                             ps.num_random_samplings,
+                                                             ps.rand_xor_mask,
+                                                             dev_seed_ptr,
+                                                             num_seeds,
+                                                             hashmap_ptr,
+                                                             ps.itopk_size,
+                                                             ps.search_width,
+                                                             ps.min_iterations,
+                                                             ps.max_iterations,
+                                                             num_executed_iterations,
+                                                             hash_bitlen,
+                                                             small_hash_bitlen,
+                                                             small_hash_reset_interval,
+                                                             sample_filter);
+    }
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 }

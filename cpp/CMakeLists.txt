@@ -45,6 +45,8 @@ rapids_cmake_write_version_file(include/cuvs/version_config.h)
 # Set a default build type if none was specified
 rapids_cmake_build_type(Release)
 
+include(cmake/modules/embed_fatbins.cmake)
+
 # this is needed for clang-tidy runs
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -292,6 +294,55 @@ if(BUILD_SHARED_LIBS)
                               "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
   )
 
+  add_library(
+    jit_lto_fatbins OBJECT
+    src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_uint8_bitset_filter_64_64.cu
+    src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_uint8_bitset_filter_64_128.cu
+    src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_uint8_bitset_filter_64_256.cu
+    src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_uint8_bitset_filter_128_64.cu
+    src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_uint8_bitset_filter_128_128.cu
+    src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_uint8_bitset_filter_128_256.cu
+    src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_uint8_bitset_filter_256_32.cu
+    src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_uint8_bitset_filter_256_64.cu
+    src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_uint8_bitset_filter_256_128.cu
+    src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_uint8_bitset_filter_256_256.cu
+    src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_uint8_bitset_filter_512_32.cu
+    src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_uint8_bitset_filter_512_64.cu
+    src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_uint8_bitset_filter_512_128.cu
+    src/neighbors/detail/cagra/jit_lto_kernels/search_single_cta_uint8_bitset_filter_512_256.cu
+  )
+  target_compile_definitions(jit_lto_fatbins PRIVATE BUILD_KERNEL)
+  target_include_directories(jit_lto_fatbins PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
+  target_compile_options(jit_lto_fatbins PRIVATE -Xfatbin=--compress-all --compress-mode=size)
+  target_compile_options(
+    jit_lto_fatbins PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+                              "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+  )
+  set_target_properties(jit_lto_fatbins PROPERTIES
+    CUDA_ARCHITECTURES "60-real"
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CUDA_STANDARD 17
+    CUDA_STANDARD_REQUIRED ON
+    CUDA_SEPARABLE_COMPILATION ON
+    CUDA_FATBIN_COMPILATION ON
+    POSITION_INDEPENDENT_CODE ON
+    INTERPROCEDURAL_OPTIMIZATION ON)
+  target_link_libraries(jit_lto_fatbins PRIVATE rmm::rmm raft::raft CCCL::CCCL)
+
+  add_library(jit_lto_fatbins_as_cpp_sources STATIC
+    src/detail/jit_lto/AlgorithmPlanner.cu
+  )
+  target_include_directories(jit_lto_fatbins_as_cpp_sources PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
+  target_compile_options(
+    jit_lto_fatbins_as_cpp_sources PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+                              "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+  )
+  target_link_libraries(jit_lto_fatbins_as_cpp_sources PRIVATE CUDA::cuda_driver rmm::rmm raft::raft CCCL::CCCL)
+
+  embed_fatbins(jit_lto_fatbins_as_cpp_sources jit_lto_fatbins)
+
+
   if(BUILD_MG_ALGOS)
     set(CUVS_MG_ALGOS
         src/neighbors/mg/mg_flat_float_int64_t.cu
@@ -309,6 +360,13 @@ if(BUILD_SHARED_LIBS)
         src/neighbors/mg/omp_checks.cpp
     )
   endif()
+
+  set(JIT_LTO_FILES
+    src/detail/jit_lto/AlgorithmLauncher.cu
+    src/detail/jit_lto/FragmentDatabase.cu
+    src/detail/jit_lto/FragmentEntry.cu
+    src/detail/jit_lto/MakeFragmentKey.cu
+  )
 
   add_library(
     cuvs_objs OBJECT
@@ -505,6 +563,7 @@ if(BUILD_SHARED_LIBS)
     src/stats/silhouette_score.cu
     src/stats/trustworthiness_score.cu
     ${CUVS_MG_ALGOS}
+    ${JIT_LTO_FILES}
   )
 
   set_target_properties(
@@ -615,7 +674,8 @@ if(BUILD_SHARED_LIBS)
       cuvs
       PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              cuvs-cagra-search
+              cuvs-cagra-search $<LINK_LIBRARY:WHOLE_ARCHIVE,jit_lto_fatbins_as_cpp_sources>
+              CUDA::nvJitLink
     )
 
     if(NOT CUVS_COMPILE_DYNAMIC_ONLY)

@@ -30,6 +30,7 @@ authors = [
 license = { text = "Apache-2.0" }
 requires-python = ">=3.10"
 dependencies = [
+    "libnvjitlink-dev",
     "libraft==25.10.*,>=0.0.0a0",
     "librmm==25.10.*,>=0.0.0a0",
     "nvidia-cublas",
@@ -93,6 +94,7 @@ regex = "(?P<value>.*)"
 build-backend = "scikit_build_core.build"
 requires = [
     "cmake>=3.30.4",
+    "libnvjitlink-dev",
     "libraft==25.10.*,>=0.0.0a0",
     "librmm==25.10.*,>=0.0.0a0",
     "ninja",
