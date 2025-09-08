@@ -32,14 +32,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.Properties;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
 
 final class JDKProvider implements CuVSProvider {
 
   private static final MethodHandle createNativeDataset$mh = createNativeDatasetBuilder();
 
   static CuVSProvider create() throws Throwable {
-    var mavenVersion = readMavenVersionFromPropertiesOrNull();
+    var mavenVersion = readCuVSVersionFromManifest();
 
     try (var localArena = Arena.ofConfined()) {
       var majorPtr = localArena.allocate(uint16_t);
@@ -64,14 +65,14 @@ final class JDKProvider implements CuVSProvider {
   }
 
   /**
-   * Read cuvs-java version from Maven generated properties, or null if these are not available
+   * Read cuvs-java version from this Jar Manifest, or null if these are not available
    */
-  private static String readMavenVersionFromPropertiesOrNull() {
-    var properties = new Properties();
-
-    try (var is = JDKProvider.class.getClassLoader().getResourceAsStream("version.properties")) {
-      properties.load(is);
-      return properties.getProperty("version");
+  private static String readCuVSVersionFromManifest() {
+    try (var jarFile =
+        new JarFile(
+            JDKProvider.class.getProtectionDomain().getCodeSource().getLocation().getPath())) {
+      Manifest manifest = jarFile.getManifest();
+      return manifest.getMainAttributes().getValue("Implementation-Version");
     } catch (IOException e) {
       return null;
     }
