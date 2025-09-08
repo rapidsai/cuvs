@@ -16,7 +16,7 @@
 #pragma once
 
 #include "jit_lto_kernels/kernel_tags.hpp"
-#include "jit_lto_kernels/search_single_cta_bitset_filter_planner.hpp"
+#include "jit_lto_kernels/search_single_cta_uint8_bitset_filter_planner.hpp"
 #include "sample_filter_utils.cuh"
 
 #include "search_single_cta_kernel.cuh"
@@ -1299,8 +1299,10 @@ struct search_kernel_config<false,
                             dataset_descriptor_base_t<unsigned char, unsigned int, float>,
                             CagraSampleFilterWithQueryIdOffset<
                               cuvs::neighbors::filtering::bitset_filter<unsigned int, long>>> {
-  template <typename Tag1, typename Tag2>
+  template <int N1, int N2, typename Tag1, typename Tag2>
   using launcher_type = SearchSingleCtaBitsetFilterPlanner<
+    N1,
+    N2,
     dataset_descriptor_base_t<unsigned char, unsigned int, float>,
     Tag1,
     Tag2>;
@@ -1309,13 +1311,17 @@ struct search_kernel_config<false,
   static auto choose_search_kernel(unsigned itopk_size)
   {
     if (itopk_size <= 64) {
-      return launcher_type<_64_tag, typename get_tag<MAX_CANDIDATES>::type>{}.get_launcher();
+      return launcher_type<64, MAX_CANDIDATES, _64_tag, typename get_tag<MAX_CANDIDATES>::type>{}
+        .get_launcher();
     } else if (itopk_size <= 128) {
-      return launcher_type<_128_tag, typename get_tag<MAX_CANDIDATES>::type>{}.get_launcher();
+      return launcher_type<128, MAX_CANDIDATES, _128_tag, typename get_tag<MAX_CANDIDATES>::type>{}
+        .get_launcher();
     } else if (itopk_size <= 256) {
-      return launcher_type<_256_tag, typename get_tag<MAX_CANDIDATES>::type>{}.get_launcher();
+      return launcher_type<256, MAX_CANDIDATES, _256_tag, typename get_tag<MAX_CANDIDATES>::type>{}
+        .get_launcher();
     } else if (itopk_size <= 512) {
-      return launcher_type<_512_tag, typename get_tag<MAX_CANDIDATES>::type>{}.get_launcher();
+      return launcher_type<512, MAX_CANDIDATES, _512_tag, typename get_tag<MAX_CANDIDATES>::type>{}
+        .get_launcher();
     }
     THROW("No kernel for parametels itopk_size %u, max_candidates %u", itopk_size, MAX_CANDIDATES);
   }
@@ -1335,9 +1341,17 @@ struct search_kernel_config<false,
       // Radix-based topk is used
       constexpr unsigned max_candidates = 32;  // to avoid build failure
       if (itopk_size <= 256) {
-        return launcher_type<_256_tag, typename get_tag<max_candidates>::type>{}.get_launcher();
+        return launcher_type<256,
+                             max_candidates,
+                             _256_tag,
+                             typename get_tag<max_candidates>::type>{}
+          .get_launcher();
       } else if (itopk_size <= 512) {
-        return launcher_type<_512_tag, typename get_tag<max_candidates>::type>{}.get_launcher();
+        return launcher_type<512,
+                             max_candidates,
+                             _512_tag,
+                             typename get_tag<max_candidates>::type>{}
+          .get_launcher();
       }
     }
     THROW("No kernel for parametels itopk_size %u, num_itopk_candidates %u",
@@ -2195,35 +2209,34 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
                     SampleFilterT,
                     CagraSampleFilterWithQueryIdOffset<
                       cuvs::neighbors::filtering::bitset_filter<unsigned int, long>>>) {
-      if (ps.itopk_size <= 64 && num_itopk_candidates <= 64) {
-        auto kernel_launcher = search_kernel_config<false, descriptor_base_type, SampleFilterT>::
-          choose_itopk_and_mx_candidates(ps.itopk_size, num_itopk_candidates, block_size);
-        kernel_launcher(stream,
-                        block_dims,
-                        thread_dims,
-                        smem_size,
-                        topk_indices_ptr,
-                        topk_distances_ptr,
-                        topk,
-                        dataset_desc.dev_ptr(stream),
-                        queries_ptr,
-                        graph.data_handle(),
-                        graph.extent(1),
-                        ps.num_random_samplings,
-                        ps.rand_xor_mask,
-                        dev_seed_ptr,
-                        num_seeds,
-                        hashmap_ptr,
-                        ps.itopk_size,
-                        ps.search_width,
-                        ps.min_iterations,
-                        ps.max_iterations,
-                        num_executed_iterations,
-                        hash_bitlen,
-                        small_hash_bitlen,
-                        small_hash_reset_interval,
-                        sample_filter);
-      }
+      std::cout << "Launching JIT-LTO kernel" << std::endl;
+      auto kernel_launcher = search_kernel_config<false, descriptor_base_type, SampleFilterT>::
+        choose_itopk_and_mx_candidates(ps.itopk_size, num_itopk_candidates, block_size);
+      kernel_launcher(stream,
+                      block_dims,
+                      thread_dims,
+                      smem_size,
+                      topk_indices_ptr,
+                      topk_distances_ptr,
+                      topk,
+                      dataset_desc.dev_ptr(stream),
+                      queries_ptr,
+                      graph.data_handle(),
+                      graph.extent(1),
+                      ps.num_random_samplings,
+                      ps.rand_xor_mask,
+                      dev_seed_ptr,
+                      num_seeds,
+                      hashmap_ptr,
+                      ps.itopk_size,
+                      ps.search_width,
+                      ps.min_iterations,
+                      ps.max_iterations,
+                      num_executed_iterations,
+                      hash_bitlen,
+                      small_hash_bitlen,
+                      small_hash_reset_interval,
+                      sample_filter);
     } else {
       auto kernel = search_kernel_config<false, descriptor_base_type, SampleFilterT>::
         choose_itopk_and_mx_candidates(ps.itopk_size, num_itopk_candidates, block_size);

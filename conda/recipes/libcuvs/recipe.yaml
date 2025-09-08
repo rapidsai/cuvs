@@ -128,6 +128,7 @@ outputs:
           - libcurand
           - libcusolver
           - libcusparse
+          - libcuda.so.1
           - libnvjitlink-dev
           - librmm
           - mkl
@@ -186,6 +187,7 @@ outputs:
           - libcurand
           - libcusolver
           - libcusparse
+          - libcuda.so.1
           - libnvjitlink-dev
           - librmm
           - mkl
@@ -274,6 +276,7 @@ outputs:
           - libcurand
           - libcusolver
           - libcusparse
+          - libcuda.so.1
           - librmm
           - mkl
           - nccl

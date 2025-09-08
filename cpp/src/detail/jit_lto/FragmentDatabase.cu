@@ -45,5 +45,6 @@ void registerFatbinFragment(std::string const& algo,
   auto& planner     = fragment_database();
   auto entry_exists = planner.make_cache_entry(algo, params);
   if (entry_exists) { return; }
+  std::cout << "Caching fatbin fragment: " << algo + "_" + params << std::endl;
   planner.cache[algo + "_" + params] = std::make_unique<FatbinFragmentEntry>(params, blob, size);
 }

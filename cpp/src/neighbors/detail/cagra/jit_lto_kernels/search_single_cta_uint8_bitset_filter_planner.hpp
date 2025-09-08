@@ -16,13 +16,18 @@
 
 #pragma once
 
+#include <iostream>
+
 #include <cuvs/detail/jit_lto/AlgorithmPlanner.h>
 #include <cuvs/detail/jit_lto/MakeFragmentKey.h>
 
-template <typename... Args>
+template <int N1, int N2, typename... Args>
 struct SearchSingleCtaBitsetFilterPlanner : AlgorithmPlanner {
   SearchSingleCtaBitsetFilterPlanner()
-    : AlgorithmPlanner("search_single_cta_bitset_filter", make_fragment_key<Args...>())
+    : AlgorithmPlanner(
+        "search_single_cta_uint8_bitset_filter_" + std::to_string(N1) + "_" + std::to_string(N2),
+        make_fragment_key<Args...>())
   {
+    std::cout << "In the planner" << std::endl;
   }
 };
