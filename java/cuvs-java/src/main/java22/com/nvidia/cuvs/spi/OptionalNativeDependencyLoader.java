@@ -28,7 +28,7 @@ public class OptionalNativeDependencyLoader {
 
   private static boolean loaded = false;
 
-  private static String[] filesToLoad = {
+  private static final String[] FILES_TO_LOAD = {
     "rapids_logger", "rmm", "cuvs", "cuvs_c",
   };
 
@@ -37,7 +37,7 @@ public class OptionalNativeDependencyLoader {
       String os = System.getProperty("os.name");
       String arch = System.getProperty("os.arch");
 
-      Stream.of(filesToLoad)
+      Stream.of(FILES_TO_LOAD)
           .forEach(
               file -> {
                 // Uncomment the following line to trace the loading of native dependencies.
