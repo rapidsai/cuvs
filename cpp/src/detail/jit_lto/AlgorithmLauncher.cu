@@ -18,7 +18,7 @@
 
 #include <iostream>
 
-AlgorithmLauncher::AlgorithmLauncher(CUlibrary l, CUfunction k) : library{l}, kernel{k}
+AlgorithmLauncher::AlgorithmLauncher(CUlibrary l, CUkernel k) : library{l}, kernel{k}
 {
   // Validate that we have a valid kernel
   if (kernel == nullptr) {
@@ -163,7 +163,7 @@ void AlgorithmLauncher::call(
   // Try to get kernel attributes
   int max_threads = 0;
   CUresult attr_result =
-    cuFuncGetAttribute(&max_threads, CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK, kernel);
+    cuFuncGetAttribute(&max_threads, CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK, (CUfunction)kernel);
   if (attr_result == CUDA_SUCCESS) {
     std::cout << "Kernel function appears to be valid, max threads per block: " << max_threads
               << std::endl;
@@ -174,7 +174,7 @@ void AlgorithmLauncher::call(
 
   // Try to get kernel name
   const char* kernel_name = nullptr;
-  CUresult name_result    = cuFuncGetName(&kernel_name, kernel);
+  CUresult name_result    = cuFuncGetName(&kernel_name, (CUfunction)kernel);
   if (name_result == CUDA_SUCCESS && kernel_name != nullptr) {
     std::cout << "Kernel name: " << kernel_name << std::endl;
   } else {

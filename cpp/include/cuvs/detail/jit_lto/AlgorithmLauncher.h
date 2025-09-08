@@ -28,7 +28,7 @@
 struct AlgorithmLauncher {
   AlgorithmLauncher() = default;
 
-  AlgorithmLauncher(CUlibrary l, CUfunction k);
+  AlgorithmLauncher(CUlibrary l, CUkernel k);
 
   template <typename... Args>
   void operator()(
@@ -41,7 +41,7 @@ struct AlgorithmLauncher {
  private:
   void call(cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, void** args);
   CUlibrary library;
-  CUfunction kernel;
+  CUkernel kernel;
 };
 
 std::unordered_map<std::string, AlgorithmLauncher>& get_cached_launchers();
