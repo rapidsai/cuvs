@@ -537,15 +537,15 @@ if(NOT BUILD_CPU_ONLY)
                       "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
   )
 
-  target_compile_definitions(cuvs_objs PRIVATE
-    $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
-    $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
+  target_compile_definitions(
+    cuvs_objs PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+                      $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
   )
 
   target_link_libraries(
-    cuvs_objs PRIVATE raft::raft rmm::rmm ${CUVS_CTK_MATH_DEPENDENCIES}
-                     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-                     $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
+    cuvs_objs
+    PRIVATE raft::raft rmm::rmm ${CUVS_CTK_MATH_DEPENDENCIES}
+            $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
   )
 
   target_include_directories(
@@ -607,9 +607,9 @@ if(NOT BUILD_CPU_ONLY)
       PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
               "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
     )
-    target_compile_definitions(cuvs PUBLIC
-      $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
-      $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
+    target_compile_definitions(
+      cuvs PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+                  $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
     )
 
     target_include_directories(
@@ -619,7 +619,9 @@ if(NOT BUILD_CPU_ONLY)
 
     target_link_libraries(
       cuvs
-      PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
+      PUBLIC rmm::rmm
+             raft::raft
+             ${CUVS_CTK_MATH_DEPENDENCIES}
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
@@ -658,9 +660,9 @@ SECTIONS
     )
 
     target_compile_options(cuvs_static PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
-    target_compile_definitions(cuvs_static PUBLIC
-      $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
-      $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
+    target_compile_definitions(
+      cuvs_static PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+                         $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
     )
 
     target_include_directories(
@@ -678,7 +680,9 @@ SECTIONS
     )
     target_link_libraries(
       cuvs_static
-      PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
+      PUBLIC rmm::rmm
+             raft::raft
+             ${CUVS_CTK_MATH_DEPENDENCIES}
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
@@ -750,7 +754,9 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
                  EXPORT_NAME c_api
     )
 
-    target_compile_definitions(cuvs_c PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>)
+    target_compile_definitions(
+      cuvs_c PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+    )
 
     target_compile_options(cuvs_c PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
 
