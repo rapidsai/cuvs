@@ -543,8 +543,9 @@ if(NOT BUILD_CPU_ONLY)
   )
 
   target_link_libraries(
-    cuvs_objs PUBLIC raft::raft rmm::rmm ${CUVS_CTK_MATH_DEPENDENCIES}
+    cuvs_objs PRIVATE raft::raft rmm::rmm ${CUVS_CTK_MATH_DEPENDENCIES}
                      $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+                     $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
   )
 
   target_include_directories(
@@ -737,14 +738,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
       src/distance/pairwise_distance_c.cpp
       ${CUVS_C_MG_ALGOS}
     )
-
-    if(BUILD_CAGRA_HNSWLIB)
-      target_link_libraries(cuvs_c PRIVATE hnswlib::hnswlib)
-      target_compile_definitions(cuvs_c PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
-    endif()
-
     add_library(cuvs::c_api ALIAS cuvs_c)
-
     set_target_properties(
       cuvs_c
       PROPERTIES BUILD_RPATH "\$ORIGIN"
@@ -755,6 +749,8 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
                  INTERFACE_POSITION_INDEPENDENT_CODE ON
                  EXPORT_NAME c_api
     )
+
+    target_compile_definitions(cuvs_c PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>)
 
     target_compile_options(cuvs_c PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
 
@@ -768,7 +764,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     target_link_libraries(
       cuvs_c
       PUBLIC cuvs::cuvs ${CUVS_CTK_MATH_DEPENDENCIES}
-      PRIVATE raft::raft
+      PRIVATE raft::raft $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
