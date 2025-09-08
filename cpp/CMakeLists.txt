@@ -557,12 +557,6 @@ if(NOT BUILD_CPU_ONLY)
     target_compile_definitions(cuvs_objs PRIVATE CUVS_SYSTEM_LITTLE_ENDIAN=1)
   endif()
 
-  rapids_find_package(
-    OpenMP REQUIRED
-    BUILD_EXPORT_SET cuvs-exports
-    INSTALL_EXPORT_SET cuvs-exports
-  )
-
   if(BUILD_MG_ALGOS)
     rapids_find_generate_module(
       NCCL
@@ -620,6 +614,7 @@ if(NOT BUILD_CPU_ONLY)
     target_link_libraries(
       cuvs
       PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
+             $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
               cuvs-cagra-search
     )
@@ -672,7 +667,7 @@ SECTIONS
 
     target_link_libraries(
       cuvs_static
-      PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
+      PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES} $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
     )
   endif()
