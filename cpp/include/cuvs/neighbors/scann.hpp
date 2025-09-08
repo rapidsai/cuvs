@@ -30,6 +30,7 @@
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
+#include <cmath>
 #include <optional>
 #include <variant>
 
@@ -74,8 +75,12 @@ struct index_params : cuvs::neighbors::index_params {
   uint32_t pq_train_iters = 10;
 
   /** whether to apply bf16 quantization of dataset vectors **/
-  bool bf16_enabled = false;
+  bool reordering_bf16_enabled = false;
 
+  /** Threshold for computing AVQ eta va Theorem 3.4 in https://arxiv.org/abs/1908.10396
+   * If the threshold is NAN, AVQ is not performed during bfloat16 quant
+   */
+  float reordering_noise_shaping_threshold = NAN;
   // TODO - add other scann build params
 };
 
@@ -136,7 +141,7 @@ struct index : cuvs::neighbors::index {
         IdxT dim,
         uint32_t pq_clusters,
         uint32_t pq_num_subspaces,
-        bool bf16_enabled)
+        bool reordering_bf16_enabled)
     : cuvs::neighbors::index(),
       metric_(metric),
       pq_dim_(pq_dim),
@@ -154,7 +159,7 @@ struct index : cuvs::neighbors::index {
       n_rows_(n_rows),
       dim_(dim),
       bf16_dataset_(raft::make_host_matrix<int16_t, IdxT, raft::row_major>(
-        bf16_enabled ? n_rows : 0, bf16_enabled ? dim : 0))
+        reordering_bf16_enabled ? n_rows : 0, reordering_bf16_enabled ? dim : 0))
 
   {
   }
@@ -169,7 +174,7 @@ struct index : cuvs::neighbors::index {
             dim,
             1 << params.pq_bits,
             dim / params.pq_dim,
-            params.bf16_enabled)
+            params.reordering_bf16_enabled)
   {
     RAFT_EXPECTS(params.pq_bits == 4 || params.pq_bits == 8, "ScaNN only supports 4 or 8 bit PQ");
     RAFT_EXPECTS(dim >= params.pq_dim,

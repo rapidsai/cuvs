@@ -313,16 +313,9 @@ index<T, IdxT> build(
     // TODO (rmaschal): Might be more efficient to do on CPU, to avoid DtoH copy
     auto bf16_dataset = raft::make_device_matrix<int16_t, int64_t>(res, batch_view.extent(0), dim);
 
-    if (params.bf16_enabled) {
-      raft::linalg::unaryOp(
-        bf16_dataset.data_handle(),
-        batch_view.data_handle(),
-        batch_view.size(),
-        [] __device__(T x) {
-          nv_bfloat16 val = __float2bfloat16(x);
-          return reinterpret_cast<int16_t&>(val);
-        },
-        resource::get_cuda_stream(res));
+    if (params.reordering_bf16_enabled) {
+      quantize_bfloat16(
+        res, batch_view, bf16_dataset.view(), params.reordering_noise_shaping_threshold);
     }
 
     // Prefetch next batch
@@ -340,7 +333,7 @@ index<T, IdxT> build(
                quantized_soar_residuals.size(),
                stream);
 
-    if (params.bf16_enabled) {
+    if (params.reordering_bf16_enabled) {
       raft::copy(idx.bf16_dataset().data_handle() + batch.offset() * dim,
                  bf16_dataset.data_handle(),
                  bf16_dataset.size(),
