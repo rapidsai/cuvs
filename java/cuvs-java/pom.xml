@@ -126,7 +126,7 @@
                     </execution>
                     <execution>
                         <id>compile-java-22</id>
-                        <phase>process-classes</phase>
+                        <phase>compile</phase>
                         <goals>
                             <goal>compile</goal>
                         </goals>
