@@ -167,8 +167,8 @@ IndexParams`
     >>> n_queries = 1000
     >>> k = 10
     >>> # For multi-GPU IVF-Flat, use host (NumPy) arrays
-    >>> dataset = np.random.random_sample((n_samples, n_features),
-    ...                                   dtype=np.float32)
+    >>> dataset = np.random.random_sample((n_samples, n_features)).astype(
+    ...     np.float32)
     >>> build_params = ivf_flat.IndexParams(metric="sqeuclidean")
     >>> index = ivf_flat.build(build_params, dataset)
     >>> distances, neighbors = ivf_flat.search(
@@ -332,10 +332,10 @@ def search(SearchParams search_params, Index index, queries,
     >>> n_queries = 1000
     >>> k = 10
     >>> # For multi-GPU IVF-Flat, use host (NumPy) arrays
-    >>> dataset = np.random.random_sample((n_samples, n_features),
-    ...                                   dtype=np.float32)
-    >>> queries = np.random.random_sample((n_queries, n_features),
-    ...                                   dtype=np.float32)
+    >>> dataset = np.random.random_sample((n_samples, n_features)).astype(
+    ...     np.float32)
+    >>> queries = np.random.random_sample((n_queries, n_features)).astype(
+    ...     np.float32)
     >>> build_params = ivf_flat.IndexParams(metric="sqeuclidean")
     >>> index = ivf_flat.build(build_params, dataset)
     >>> distances, neighbors = ivf_flat.search(
@@ -424,13 +424,14 @@ def extend(Index index, new_vectors, new_indices=None,
     >>> n_features = 50
     >>> n_new_vectors = 1000
     >>> # For multi-GPU IVF-Flat, use host (NumPy) arrays
-    >>> dataset = np.random.random_sample((n_samples, n_features),
-    ...                                   dtype=np.float32)
-    >>> new_vectors = np.random.random_sample((n_new_vectors, n_features),
-    ...                                        dtype=np.float32)
+    >>> dataset = np.random.random_sample((n_samples, n_features)).astype(
+    ...     np.float32)
+    >>> new_vectors = np.random.random_sample(
+    ...     (n_new_vectors, n_features)).astype(np.float32)
+    >>> new_indices = np.arange(n_samples, n_new_vectors, dtype=np.int64)
     >>> build_params = ivf_flat.IndexParams(metric="sqeuclidean")
     >>> index = ivf_flat.build(build_params, dataset)
-    >>> ivf_flat.extend(index, new_vectors)
+    >>> ivf_flat.extend(index, new_vectors, new_indices)
     """
 
     if not index.trained:
@@ -485,8 +486,8 @@ def save(Index index, filename, resources=None):
     >>> n_samples = 50000
     >>> n_features = 50
     >>> # For multi-GPU IVF-Flat, use host (NumPy) arrays
-    >>> dataset = np.random.random_sample((n_samples, n_features),
-    ...                                   dtype=np.float32)
+    >>> dataset = np.random.random_sample((n_samples, n_features)).astype(
+    ...     np.float32)
     >>> build_params = ivf_flat.IndexParams(metric="sqeuclidean")
     >>> index = ivf_flat.build(build_params, dataset)
     >>> ivf_flat.save(index, "index.bin")
@@ -524,7 +525,7 @@ def load(filename, resources=None):
     --------
 
     >>> from cuvs.neighbors.mg import ivf_flat
-    >>> index = ivf_flat.load("index.bin")
+    >>> index = ivf_flat.load("index.bin")  # doctest: +SKIP
     """
 
     cdef Index index = Index()
@@ -559,7 +560,7 @@ def distribute(filename, resources=None):
     --------
 
     >>> from cuvs.neighbors.mg import ivf_flat
-    >>> index = ivf_flat.distribute("single_gpu_index.bin")
+    >>> index = ivf_flat.distribute("single_gpu_index.bin")  # doctest: +SKIP
     """
 
     cdef Index index = Index()

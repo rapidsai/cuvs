@@ -124,7 +124,8 @@ cdef class IndexParams:
         cuvsIvfPqIndexParamsCreate(&self.params)
 
     def __dealloc__(self):
-        check_cuvs(cuvsIvfPqIndexParamsDestroy(self.params))
+        if self.params != NULL:
+            check_cuvs(cuvsIvfPqIndexParamsDestroy(self.params))
 
     def __init__(self, *,
                  n_lists=1024,
@@ -379,7 +380,8 @@ cdef class SearchParams:
         cuvsIvfPqSearchParamsCreate(&self.params)
 
     def __dealloc__(self):
-        check_cuvs(cuvsIvfPqSearchParamsDestroy(self.params))
+        if self.params != NULL:
+            check_cuvs(cuvsIvfPqSearchParamsDestroy(self.params))
 
     def __init__(self, *, n_probes=20, lut_dtype=np.float32,
                  internal_distance_dtype=np.float32,

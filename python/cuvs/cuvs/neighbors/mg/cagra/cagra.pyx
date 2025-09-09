@@ -167,8 +167,8 @@ def build(IndexParams index_params, dataset, resources=None):
     >>> n_queries = 1000
     >>> k = 10
     >>> # For multi-GPU CAGRA, use host (NumPy) arrays
-    >>> dataset = np.random.random_sample((n_samples, n_features),
-    ...                                   dtype=np.float32)
+    >>> dataset = np.random.random_sample((n_samples, n_features)).astype(
+    ...     np.float32)
     >>> build_params = cagra.IndexParams(metric="sqeuclidean")
     >>> index = cagra.build(build_params, dataset)
     >>> distances, neighbors = cagra.search(cagra.SearchParams(),
@@ -330,10 +330,10 @@ def search(SearchParams search_params, Index index, queries,
     >>> n_queries = 1000
     >>> k = 10
     >>> # For multi-GPU CAGRA, use host (NumPy) arrays
-    >>> dataset = np.random.random_sample((n_samples, n_features),
-    ...                                   dtype=np.float32)
-    >>> queries = np.random.random_sample((n_queries, n_features),
-    ...                                   dtype=np.float32)
+    >>> dataset = np.random.random_sample((n_samples, n_features)).astype(
+    ...     np.float32)
+    >>> queries = np.random.random_sample((n_queries, n_features)).astype(
+    ...     np.float32)
     >>> build_params = cagra.IndexParams(metric="sqeuclidean")
     >>> index = cagra.build(build_params, dataset)
     >>> distances, neighbors = cagra.search(cagra.SearchParams(),
@@ -410,7 +410,7 @@ def extend(Index index, new_vectors, new_indices=None, resources=None):
         If provided, these indices will be used for the new vectors.
         If not provided, indices will be automatically assigned.
         **IMPORTANT**: Must be in host memory (CPU) for multi-GPU CAGRA.
-        Expected dtype: int64
+        Expected dtype: uint32
     {resources_docstring}
 
     Examples
@@ -422,13 +422,15 @@ def extend(Index index, new_vectors, new_indices=None, resources=None):
     >>> n_features = 50
     >>> n_new_vectors = 1000
     >>> # For multi-GPU CAGRA, use host (NumPy) arrays
-    >>> dataset = np.random.random_sample((n_samples, n_features),
-    ...                                   dtype=np.float32)
-    >>> new_vectors = np.random.random_sample((n_new_vectors, n_features),
-    ...                                        dtype=np.float32)
+    >>> dataset = np.random.random_sample((n_samples, n_features)).astype(
+    ...     np.float32)
+    >>> new_vectors = np.random.random_sample(
+    ...     (n_new_vectors, n_features)).astype(np.float32)
+    >>> new_indices = np.arange(n_samples, n_samples + n_new_vectors,
+    ...                         dtype=np.uint32)
     >>> build_params = cagra.IndexParams(metric="sqeuclidean")
     >>> index = cagra.build(build_params, dataset)
-    >>> cagra.extend(index, new_vectors)
+    >>> cagra.extend(index, new_vectors, new_indices)  # doctest: +SKIP
     """
 
     if not index.trained:
@@ -451,7 +453,7 @@ def extend(Index index, new_vectors, new_indices=None, resources=None):
 
     if new_indices is not None:
         new_indices_ai = wrap_array(new_indices)
-        _check_input_array(new_indices_ai, [np.dtype('int64')])
+        _check_input_array(new_indices_ai, [np.dtype('uint32')])
         # Multi-GPU CAGRA requires new_indices in host memory
         _check_memory_location(new_indices, expected_host=True,
                                name="new_indices")
@@ -483,8 +485,8 @@ def save(Index index, filename, resources=None):
     >>> n_samples = 50000
     >>> n_features = 50
     >>> # For multi-GPU CAGRA, use host (NumPy) arrays
-    >>> dataset = np.random.random_sample((n_samples, n_features),
-    ...                                   dtype=np.float32)
+    >>> dataset = np.random.random_sample((n_samples, n_features)).astype(
+    ...     np.float32)
     >>> build_params = cagra.IndexParams(metric="sqeuclidean")
     >>> index = cagra.build(build_params, dataset)
     >>> cagra.save(index, "index.bin")
@@ -521,7 +523,7 @@ def load(filename, resources=None):
     --------
 
     >>> from cuvs.neighbors.mg import cagra
-    >>> index = cagra.load("index.bin")
+    >>> index = cagra.load("index.bin")  # doctest: +SKIP
     """
 
     cdef Index index = Index()
@@ -555,7 +557,7 @@ def distribute(filename, resources=None):
     --------
 
     >>> from cuvs.neighbors.mg import cagra
-    >>> index = cagra.distribute("single_gpu_index.bin")
+    >>> index = cagra.distribute("single_gpu_index.bin")  # doctest: +SKIP
     """
 
     cdef Index index = Index()
