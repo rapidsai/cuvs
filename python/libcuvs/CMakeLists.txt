@@ -52,13 +52,20 @@ set(CUVS_COMPILE_DYNAMIC_ONLY ON)
 add_subdirectory(../../cpp cuvs-cpp)
 
 # assumes libcuvs.so is installed 2 levels deep, e.g. site-packages/libcuvs/lib64/libcuvs.so
-set(rpaths
+if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL 13.0)
+  # starting with CTK 13 wheels, all libraries are grouped in this 'nvidia/cu13/lib' directory
+  set(rpaths
+    "$ORIGIN/../../nvidia/cu13/lib"
+  )
+else()
+  set(rpaths
     "$ORIGIN/../../nvidia/cublas/lib"
     "$ORIGIN/../../nvidia/curand/lib"
     "$ORIGIN/../../nvidia/cusolver/lib"
     "$ORIGIN/../../nvidia/cusparse/lib"
     "$ORIGIN/../../nvidia/nvjitlink/lib"
-)
+  )
+endif()
 
 if(USE_NCCL_RUNTIME_WHEEL)
   list(APPEND rpaths "$ORIGIN/../../nvidia/nccl/lib")
