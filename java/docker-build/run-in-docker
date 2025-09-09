@@ -42,6 +42,7 @@ TZ=${TZ:-UTC}
 
 CUDA_VERSION=${CUDA_VERSION:-12.9.1}
 CUDA_CLASSIFIER=cuda${CUDA_VERSION%%.*}
+OS_VERSION=${OS_VERSION:-9}  # Default to 9
 
 DOCKER_CMD=${DOCKER_CMD:-docker}
 
@@ -70,10 +71,10 @@ LOCAL_MAVEN_REPO=${LOCAL_MAVEN_REPO:-"$HOME/.m2/repository"}
 
 if [ "$JNI_DOCKER_DEV_BUILD" == "ON" ]; then
   echo "Building docker image for local development, gcc-toolset is enabled by default..."
-  JNI_DOCKER_IMAGE="cuvs-jni-build:${CUDA_VERSION}-devel-rockylinux8"
+  JNI_DOCKER_IMAGE="cuvs-jni-build:${CUDA_VERSION}-devel-rockylinux${OS_VERSION}"
 else
   echo "Building docker image for production, gcc-toolset is NOT enabled by default..."
-  JNI_DOCKER_IMAGE="cuvs-jni-build:${CUDA_VERSION}-rockylinux8"
+  JNI_DOCKER_IMAGE="cuvs-jni-build:${CUDA_VERSION}-rockylinux${OS_VERSION}"
 fi
 
 # ensure directories exist
@@ -81,6 +82,7 @@ mkdir -p "$LOCAL_CCACHE_DIR" "$LOCAL_MAVEN_REPO"
 
 $DOCKER_CMD build "${DOCKER_BUILD_EXTRA_ARGS[@]}" -f "$REPODIR/java/docker-build/Dockerfile" \
   --build-arg CUDA_VERSION="$CUDA_VERSION" \
+  --build-arg OS_RELEASE="$OS_VERSION" \
   --build-arg DEV_BUILD="$JNI_DOCKER_DEV_BUILD" \
   -t "$JNI_DOCKER_IMAGE" \
   "$REPODIR/java/docker-build"

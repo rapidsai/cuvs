@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 
-# Build the spark-rapids-jni artifact in a Docker container with devtoolset
+# Build the cuVS Java API artifact in a Docker container with devtoolset
 
 set -e
 

@@ -15,7 +15,7 @@
 #
 
 ###
-# Build the image for spark-rapids-jni development environment.
+# Build the image for cuVS Java API development environment.
 #
 # Arguments: CUDA_VERSION=[12.X.Y], OS_RELEASE=[8, 9], TARGETPLATFORM=[linux/amd64, linux/arm64]
 #
@@ -27,6 +27,11 @@ ARG TARGETPLATFORM=linux/amd64
 # multi-platform build with: docker buildx build --platform linux/arm64,linux/amd64 <ARGS> on either amd64 or arm64 host
 # check available official arm-based docker images at https://hub.docker.com/r/nvidia/cuda/tags (OS/ARCH)
 FROM --platform=$TARGETPLATFORM nvidia/cuda:$CUDA_VERSION-devel-rockylinux$OS_RELEASE
+
+# Re-declare ARGs after FROM since they don't persist across FROM boundary
+ARG CUDA_VERSION=12.9.1
+ARG OS_RELEASE=9
+ARG TARGETPLATFORM=linux/amd64
 
 # If DEV_BUILD is ON, the gcc-toolset will be enabled by default for bash shell
 ARG DEV_BUILD=OFF
@@ -41,8 +46,15 @@ ARG CCACHE_VERSION=4.11.2
 ARG CMAKE_ARCH=x86_64
 
 ### Install basic requirements
-RUN dnf --enablerepo=crb install -y scl-utils gcc-toolset-${TOOLSET_VERSION} python39 \
-    zlib-devel maven tar wget patch ninja-build git zip
+RUN if [ "$OS_RELEASE" = "9" ]; then \
+    dnf --enablerepo=crb install -y scl-utils gcc-toolset-${TOOLSET_VERSION} python39 \
+      zlib-devel maven tar wget patch ninja-build git zip; \
+  elif [ "$OS_RELEASE" = "8" ]; then \
+    dnf --enablerepo=devel install -y scl-utils gcc-toolset-${TOOLSET_VERSION} python39 \
+      zlib-devel maven tar wget patch ninja-build git zip; \
+  else \
+    echo "Unsupported OS version: $OS_RELEASE"; \
+  fi
 
 # Enable the gcc-toolset by default for bash shell if DEV_BUILD is ON
 RUN if [ "$DEV_BUILD" = "ON" ]; then \
