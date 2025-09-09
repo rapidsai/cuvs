@@ -66,8 +66,7 @@ cdef extern from "cuvs/neighbors/ivf_flat.h" nogil:
 
     uint32_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index)
 
-    cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsResources_t res,
-                                           cuvsIvfFlatIndex_t index,
+    cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsIvfFlatIndex_t index,
                                            DLManagedTensor * centers)
 
     cuvsError_t cuvsIvfFlatBuild(cuvsResources_t res,
