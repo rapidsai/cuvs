@@ -175,6 +175,19 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
                                        DLManagedTensor * dataset,
                                        cuvsCagraIndex_t index)
 
+    ctypedef struct cuvsCagraExtendParams:
+        uint32_t max_chunk_size
+
+    ctypedef cuvsCagraExtendParams* cuvsCagraExtendParams_t
+
+    cuvsError_t cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params)
+    cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t params)
+    cuvsError_t cuvsCagraExtend(cuvsResources_t res,
+                                cuvsCagraExtendParams_t params,
+                                DLManagedTensor* additional_dataset,
+                                cuvsCagraIndex_t index)
+
+
 cdef class Index:
     """
     CAGRA index object. This object stores the trained CAGRA index state
