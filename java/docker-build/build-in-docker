@@ -35,4 +35,10 @@ if [ "$(uname -m)" == "aarch64" ]; then
 fi
 
 # TODO: Settings to build for different CUDA versions, different GPU archs, CPU archs, etc.
-"$SCRIPTDIR/run-in-docker" "./build.sh" "$@"
+
+# Default to building libcuvs java with all GPU architectures if no arguments provided
+if [ $# -eq 0 ]; then
+  "$SCRIPTDIR/run-in-docker" "./build.sh" "libcuvs" "java" "--allgpuarch"
+else
+  "$SCRIPTDIR/run-in-docker" "./build.sh" "$@"
+fi

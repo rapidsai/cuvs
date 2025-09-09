@@ -12,24 +12,27 @@ The Docker build system provides:
 
 ## Quick Start
 
-### Building for CUDA 12 (Default), for local GPU arch (Default)
+### Default Build (CUDA 12, Rocky Linux 9, All GPU Architectures)
+
+```bash
+./build-in-docker
+```
+
+This builds using the defaults:
+- CUDA version: 12.9.1
+- OS version: Rocky Linux 9
+- Target: libcuvs java with all GPU architectures (`--allgpuarch`)
+
+### Building for CUDA 13, All GPU Architectures
+
+```bash
+CUDA_VERSION=13.0.0 ./build-in-docker
+```
+
+### Building for Local GPU Architecture Only
 
 ```bash
 ./build-in-docker libcuvs java
-```
-
-This builds using the default CUDA version (12.9.1).
-
-### Building for CUDA 13, for all GPU architectures.
-
-```bash
-CUDA_VERSION=13.0.0 ./build-in-docker libcuvs java --allgpuarch
-```
-
-### Building for Specific CUDA 12 Version, for all GPU architectures
-
-```bash
-CUDA_VERSION=12.9.1 ./build-in-docker libcuvs java --allgpuarch
 ```
 
 ## Environment Variables
@@ -38,6 +41,8 @@ CUDA_VERSION=12.9.1 ./build-in-docker libcuvs java --allgpuarch
 
 - **`CUDA_VERSION`**: CUDA toolkit version to use (default: `12.9.1`)
   - Examples: `12.9.1`, `13.0.0`, `13.1.0`
+- **`OS_VERSION`**: Rocky Linux OS version to use (default: `9`)
+  - Supported values: `8`, `9`
 - **`CMAKE_GENERATOR`**: CMake generator to use (default: `Ninja`)
 - **`LOCAL_MAVEN_REPO`**: Local Maven repository path (default: `$HOME/.m2/repository`)
 
@@ -70,22 +75,28 @@ The build system automatically detects the host architecture:
 
 ## Examples
 
-### Development Build with Custom CUDA Version, for local GPU's architecture.
+### Development Build with Custom CUDA Version (Default: All GPU Architectures)
 
 ```bash
-CUDA_VERSION=13.1.0 JNI_DOCKER_DEV_BUILD=ON ./build-in-docker libcuvs java
+CUDA_VERSION=13.1.0 JNI_DOCKER_DEV_BUILD=ON ./build-in-docker
 ```
 
-### Production Build with Additional Docker Arguments, for all supported GPU architectures
+### Production Build with Rocky Linux 8
 
 ```bash
-CUDA_VERSION=12.9.1 DOCKER_BUILD_EXTRA_ARGS="--no-cache" ./build-in-docker libcuvs java --allgpuarch
+OS_VERSION=8 ./build-in-docker
 ```
 
-### Build with Custom Maven Repository and ccache, for local GPU's architecture.
+### Build with Custom Maven Repository and ccache
 
 ```bash
-LOCAL_MAVEN_REPO=/custom/maven/repo LOCAL_CCACHE_DIR=/custom/ccache CUDA_VERSION=13.0.0 ./build-in-docker libcuvs java
+LOCAL_MAVEN_REPO=/custom/maven/repo LOCAL_CCACHE_DIR=/custom/ccache CUDA_VERSION=13.0.0 ./build-in-docker
+```
+
+### Build with Additional Docker Arguments
+
+```bash
+DOCKER_BUILD_EXTRA_ARGS="--no-cache" ./build-in-docker
 ```
 
 ### Interactive Development Session
