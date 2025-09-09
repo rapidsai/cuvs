@@ -69,7 +69,7 @@ template <typename LabelT, typename IdxT>
 void compute_cluster_offsets(raft::resources const& dev_resources,
                              raft::device_vector_view<const LabelT, IdxT> clusters,
                              raft::device_vector_view<LabelT, int64_t> cluster_sizes,
-                             raft::host_scalar_view<int64_t> max_cluster_size)
+                             int64_t& max_cluster_size)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(dev_resources);
   rmm::device_async_resource_ref device_memory =
@@ -107,27 +107,24 @@ void compute_cluster_offsets(raft::resources const& dev_resources,
   int num_items = cluster_sizes.extent(0);
 
   // Compute max cluster size
-  auto d_max_cluster_size = raft::make_device_scalar<int64_t>(dev_resources, 0);
-  temp_storage_bytes      = 0;
+  // auto d_max_cluster_size = rmmo::make_device_scalar<int64_t>(dev_resources, 0);
+  rmm::device_scalar<int64_t> d_max_cluster_size(stream);
 
-  cub::DeviceReduce::Max(nullptr,
-                         temp_storage_bytes,
-                         cluster_sizes.data_handle(),
-                         d_max_cluster_size.data_handle(),
-                         num_items);
+  temp_storage_bytes = 0;
+
+  cub::DeviceReduce::Max(
+    nullptr, temp_storage_bytes, cluster_sizes.data_handle(), d_max_cluster_size.data(), num_items);
 
   rmm::device_uvector<int64_t> temp_storage_max(temp_storage_bytes, stream, device_memory);
 
   cub::DeviceReduce::Max(temp_storage_max.data(),
                          temp_storage_bytes,
                          cluster_sizes.data_handle(),
-                         d_max_cluster_size.data_handle(),
+                         d_max_cluster_size.data(),
                          num_items);
 
-  raft::copy(max_cluster_size.data_handle(),
-             d_max_cluster_size.data_handle(),
-             d_max_cluster_size.size(),
-             stream);
+  max_cluster_size = d_max_cluster_size.value(stream);
+
   // Scan to sum cluster sizes and get cluster start ptrs in flat array
   // Done in place
   temp_storage_bytes = 0;
@@ -605,16 +602,16 @@ void apply_avq(raft::resources const& res,
                raft::device_matrix_view<T, IdxT> centroids_view,
                raft::device_vector_view<const LabelT, IdxT> labels_view,
                float eta,
-               cudaStream_t gather_stream)
+               cudaStream_t copy_stream)
 {
   // Compute clusters
 
   cudaStream_t stream  = raft::resource::get_cuda_stream(res);
   auto cluster_offsets = raft::make_device_vector<uint32_t, int64_t>(res, centroids_view.extent(0));
   auto clusters        = raft::make_device_vector<uint32_t, int64_t>(res, dataset.extent(0));
-  auto max_cluster_size = raft::make_host_scalar<int64_t>(0);
+  int64_t max_cluster_size = 0;
 
-  compute_cluster_offsets(res, labels_view, cluster_offsets.view(), max_cluster_size.view());
+  compute_cluster_offsets(res, labels_view, cluster_offsets.view(), max_cluster_size);
   auto h_cluster_offsets = raft::make_host_vector<uint32_t, int64_t>(cluster_offsets.extent(0));
 
   raft::copy(
@@ -634,7 +631,7 @@ void apply_avq(raft::resources const& res,
   auto rescale_denom = raft::make_device_vector<float, int64_t>(res, centroids_view.extent(0));
 
   cluster_loader<T, LabelT> loader(
-    res, dataset, h_cluster_offsets.view(), clusters.view(), max_cluster_size(0), gather_stream);
+    res, dataset, h_cluster_offsets.view(), clusters.view(), max_cluster_size, copy_stream);
   raft::resource::sync_stream(res);
 
   RAFT_LOG_DEBUG("Compute AVQ centroids\n");
