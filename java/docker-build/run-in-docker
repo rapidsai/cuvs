@@ -1,0 +1,161 @@
+#!/bin/bash
+
+#
+# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Run a command in a Docker container with devtoolset
+
+set -e
+
+# Convert sclCMD to array for proper argument handling
+if [[ -n "${sclCMD:-}" ]]; then
+  # Convert existing string to array by splitting on whitespace
+  read -ra sclCMD <<< "$sclCMD"
+else
+  sclCMD=(scl enable gcc-toolset-14)
+fi
+
+# Set this environment variable to ON to build the docker image for local development,
+# with gcc-toolset enabled by default.
+# This is necessary especially if the docker container is used for local development with an IDE.
+JNI_DOCKER_DEV_BUILD=${JNI_DOCKER_DEV_BUILD:-OFF}
+
+REPODIR_REL=$(git rev-parse --show-toplevel)
+REPODIR=$(realpath "$REPODIR_REL")
+GIT_COMMON_DIR_REL=$(git rev-parse --git-common-dir)
+GIT_COMMON_DIR=$(realpath "$GIT_COMMON_DIR_REL")
+WORKDIR=${WORKDIR:-$REPODIR}
+TZ=${TZ:-UTC}
+
+CUDA_VERSION=${CUDA_VERSION:-12.9.1}
+CUDA_CLASSIFIER=cuda${CUDA_VERSION%%.*}
+OS_VERSION=${OS_VERSION:-9}  # Default to 9
+
+DOCKER_CMD=${DOCKER_CMD:-docker}
+
+# Initialize DOCKER_BUILD_EXTRA_ARGS as an array
+if [[ -n "${DOCKER_BUILD_EXTRA_ARGS:-}" ]]; then
+    # Convert existing string to array by splitting on whitespace
+    read -ra DOCKER_BUILD_EXTRA_ARGS <<< "$DOCKER_BUILD_EXTRA_ARGS"
+else
+    DOCKER_BUILD_EXTRA_ARGS=()
+fi
+
+if [ "$(uname -m)" == "aarch64" ]; then
+    DOCKER_BUILD_EXTRA_ARGS=(--build-arg TARGETPLATFORM=linux/arm64 --build-arg CMAKE_ARCH=aarch64 "${DOCKER_BUILD_EXTRA_ARGS[@]}")
+else
+    DOCKER_BUILD_EXTRA_ARGS=(--build-arg TARGETPLATFORM=linux/amd64 --build-arg CMAKE_ARCH=x86_64 "${DOCKER_BUILD_EXTRA_ARGS[@]}")
+fi
+# Initialize DOCKER_RUN_EXTRA_ARGS as an array
+if [[ -n "${DOCKER_RUN_EXTRA_ARGS:-}" ]]; then
+  # Convert existing string to array by splitting on whitespace
+  read -ra DOCKER_RUN_EXTRA_ARGS <<< "$DOCKER_RUN_EXTRA_ARGS"
+else
+  DOCKER_RUN_EXTRA_ARGS=()
+fi
+LOCAL_CCACHE_DIR=${LOCAL_CCACHE_DIR:-"$HOME/.ccache"}
+LOCAL_MAVEN_REPO=${LOCAL_MAVEN_REPO:-"$HOME/.m2/repository"}
+
+if [ "$JNI_DOCKER_DEV_BUILD" == "ON" ]; then
+  echo "Building docker image for local development, gcc-toolset is enabled by default..."
+  JNI_DOCKER_IMAGE="cuvs-jni-build:${CUDA_VERSION}-devel-rockylinux${OS_VERSION}"
+else
+  echo "Building docker image for production, gcc-toolset is NOT enabled by default..."
+  JNI_DOCKER_IMAGE="cuvs-jni-build:${CUDA_VERSION}-rockylinux${OS_VERSION}"
+fi
+
+# ensure directories exist
+mkdir -p "$LOCAL_CCACHE_DIR" "$LOCAL_MAVEN_REPO"
+
+$DOCKER_CMD build "${DOCKER_BUILD_EXTRA_ARGS[@]}" -f "$REPODIR/java/docker-build/Dockerfile" \
+  --build-arg CUDA_VERSION="$CUDA_VERSION" \
+  --build-arg OS_RELEASE="$OS_VERSION" \
+  --build-arg DEV_BUILD="$JNI_DOCKER_DEV_BUILD" \
+  -t "$JNI_DOCKER_IMAGE" \
+  "$REPODIR/java/docker-build"
+
+if [[ "$DOCKER_CMD" == "docker" ]]; then
+  # Initialize DOCKER_GPU_OPTS as an array
+  if [[ -n "${DOCKER_GPU_OPTS:-}" ]]; then
+    # Convert existing string to array by splitting on whitespace
+    read -ra DOCKER_GPU_OPTS <<< "$DOCKER_GPU_OPTS"
+  else
+    DOCKER_GPU_OPTS=(--gpus all)
+  fi
+else
+  DOCKER_GPU_OPTS=()
+fi
+
+# Initialize DOCKER_OPTS as an array
+if [[ -n "${DOCKER_OPTS:-}" ]]; then
+  # Convert existing string to array by splitting on whitespace
+  read -ra DOCKER_OPTS <<< "$DOCKER_OPTS"
+else
+  DOCKER_OPTS=()
+fi
+
+if (( $# == 0 )); then
+  # no arguments gets an interactive shell
+  DOCKER_OPTS+=(-it)
+  RUN_CMD=("/bin/bash")
+else
+  RUN_CMD=("$@")
+fi
+
+MNT_ARGS=()
+
+RO_SRC=(
+  "/etc/group"
+  "/etc/passwd"
+  "/etc/shadow"
+  "/etc/sudoers.d"
+)
+RO_DST=("${RO_SRC[@]}")
+if [[ "$HOST_CUDA_PATH" != "" ]]; then
+  RO_SRC+=("$HOST_CUDA_PATH")
+  RO_DST+=("/usr/local/cuda")
+fi
+for (( i=0; i<${#RO_SRC[@]}; i++)); do
+  MNT_ARGS+=(--mount "type=bind,src=${RO_SRC[$i]},dst=${RO_DST[$i]},ro")
+done
+
+RW_SRC=(
+  "$GIT_COMMON_DIR"
+  "$WORKDIR"
+  "$LOCAL_CCACHE_DIR"
+  "$LOCAL_MAVEN_REPO"
+)
+for (( i=0; i<${#RW_SRC[@]}; i++)); do
+  MNT_ARGS+=(--mount "type=bind,src=${RW_SRC[$i]},dst=${RW_SRC[$i]}")
+done
+
+$DOCKER_CMD run "${DOCKER_GPU_OPTS[@]}" "${DOCKER_RUN_EXTRA_ARGS[@]}" -u "$(id -u):$(id -g)" --rm \
+  "${MNT_ARGS[@]}" \
+  --workdir "$WORKDIR" \
+  -e CCACHE_DIR="$LOCAL_CCACHE_DIR" \
+  -e CMAKE_C_COMPILER_LAUNCHER="ccache" \
+  -e CMAKE_CXX_COMPILER_LAUNCHER="ccache" \
+  -e CMAKE_CUDA_COMPILER_LAUNCHER="ccache" \
+  -e CMAKE_CXX_LINKER_LAUNCHER="ccache" \
+  -e CMAKE_PREFIX_PATH="${WORKDIR}/cpp/build/$CUDA_CLASSIFIER" \
+  -e LIBCUVS_BUILD_DIR="${WORKDIR}/cpp/build/$CUDA_CLASSIFIER" \
+  -e CMAKE_GENERATOR \
+  -e CUDA_VISIBLE_DEVICES \
+  -e PARALLEL_LEVEL \
+  -e VERBOSE \
+  "${DOCKER_OPTS[@]}" \
+  "$JNI_DOCKER_IMAGE" \
+  "${sclCMD[@]}" -- "${RUN_CMD[@]}"
