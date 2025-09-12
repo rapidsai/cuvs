@@ -38,6 +38,10 @@ import java.util.Properties;
 
 final class JDKProvider implements CuVSProvider {
 
+  static {
+    OptionalNativeDependencyLoader.loadLibraries();
+  }
+
   private static final MethodHandle createNativeDataset$mh = createNativeDatasetBuilder();
 
   static CuVSProvider create() throws Throwable {
