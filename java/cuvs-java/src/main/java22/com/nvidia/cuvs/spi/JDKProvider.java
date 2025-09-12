@@ -15,17 +15,11 @@
  */
 package com.nvidia.cuvs.spi;
 
-import static com.nvidia.cuvs.internal.common.NativeLibraryUtils.JVM_LoadLibrary$mh;
-import static com.nvidia.cuvs.internal.common.NativeLibraryUtils.JVM_UnloadLibrary$mh;
 import static com.nvidia.cuvs.internal.common.Util.*;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsVersionGet;
-import static com.nvidia.cuvs.internal.panama.headers_h.uint16_t;
 
 import com.nvidia.cuvs.*;
 import com.nvidia.cuvs.internal.*;
 import com.nvidia.cuvs.internal.common.Util;
-import java.io.IOException;
-import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -34,79 +28,19 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.Properties;
 
 final class JDKProvider implements CuVSProvider {
 
-  static {
-    OptionalNativeDependencyLoader.loadLibraries();
-  }
-
   private static final MethodHandle createNativeDataset$mh = createNativeDatasetBuilder();
 
+  private JDKProvider() {}
+
   static CuVSProvider create() throws Throwable {
-    var mavenVersion = readMavenVersionFromPropertiesOrNull();
+    NativeDependencyLoader.loadLibraries();
 
-    try (var localArena = Arena.ofConfined()) {
-      var majorPtr = localArena.allocate(uint16_t);
-      var minorPtr = localArena.allocate(uint16_t);
-      var patchPtr = localArena.allocate(uint16_t);
-      checkCuVSError(cuvsVersionGet(majorPtr, minorPtr, patchPtr), "cuvsVersionGet");
-      var major = majorPtr.get(uint16_t, 0);
-      var minor = minorPtr.get(uint16_t, 0);
-      var patch = patchPtr.get(uint16_t, 0);
+    // TODO: version check from #1315
 
-      var cuvsVersionString = String.format(Locale.ROOT, "%02d.%02d.%d", major, minor, patch);
-      if (mavenVersion != null && !cuvsVersionString.equals(mavenVersion)) {
-        throw new ProviderInitializationException(
-            String.format(
-                Locale.ROOT,
-                "libcuvs_c version mismatch: expected [%s], found [%s]",
-                mavenVersion,
-                cuvsVersionString));
-      }
-    } catch (ExceptionInInitializerError e) {
-      if (e.getCause() instanceof IllegalArgumentException) {
-        // Try to find if we failed to load libcuvs and why
-        // jextract loads the dynamic library with SymbolLookup.libraryLookup; this uses
-        // RawNativeLibraries::load
-        // https://github.com/openjdk/jdk/blob/master/src/java.base/share/native/libjava/RawNativeLibraries.c#L58
-        // RawNativeLibraries::load in turn calls JVM_LoadLibrary. Unfortunately, it calls it with a
-        // JNI_FALSE parameter for throwException, which means that the detailed error messages are
-        // not surfaced.
-        // Here we try and load it again, with throwException true, so we can see what's broken
-        try (var localArena = Arena.ofConfined()) {
-          var name = localArena.allocateFrom(System.mapLibraryName("cuvs_c"));
-          Object lib = JVM_LoadLibrary$mh.invoke(name, true);
-          if (lib != null) {
-            // It wasn't a problem with library loading, so undo what we did
-            JVM_UnloadLibrary$mh.invoke(lib);
-          }
-        } catch (Throwable ex) {
-          if (ex instanceof UnsatisfiedLinkError ulex) {
-            throw new ProviderInitializationException(ulex.getMessage(), ulex);
-          }
-          throw new ProviderInitializationException("error while loading libcuvs", ex);
-        }
-      } else {
-        throw e.getCause() != null ? e.getCause() : e;
-      }
-    }
     return new JDKProvider();
-  }
-
-  /**
-   * Read cuvs-java version from Maven generated properties, or null if these are not available
-   */
-  private static String readMavenVersionFromPropertiesOrNull() {
-    var properties = new Properties();
-
-    try (var is = JDKProvider.class.getClassLoader().getResourceAsStream("version.properties")) {
-      properties.load(is);
-      return properties.getProperty("version");
-    } catch (IOException e) {
-      return null;
-    }
   }
 
   static MethodHandle createNativeDatasetBuilder() {
