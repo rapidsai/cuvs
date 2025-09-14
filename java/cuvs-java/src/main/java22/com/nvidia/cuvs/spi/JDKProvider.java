@@ -41,7 +41,7 @@ final class JDKProvider implements CuVSProvider {
 
   private JDKProvider() {}
 
-  static CuVSProvider create() throws Throwable {
+  static CuVSProvider create() throws ProviderInitializationException {
     NativeDependencyLoader.loadLibraries();
 
     var mavenVersion = readCuVSVersionFromManifest();

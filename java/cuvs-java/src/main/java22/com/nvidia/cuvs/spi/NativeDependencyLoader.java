@@ -20,16 +20,18 @@ import static com.nvidia.cuvs.internal.common.NativeLibraryUtils.JVM_LoadLibrary
 import java.io.*;
 import java.lang.foreign.Arena;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 
 /**
  * A class that loads native dependencies if they are available in the jar.
  */
-public class NativeDependencyLoader {
+class NativeDependencyLoader {
 
   interface NativeDependencyLoaderStrategy {
-    void loadLibraries();
+    void loadLibraries() throws ProviderInitializationException;
   }
 
   private static final NativeDependencyLoaderStrategy LOADER_STRATEGY = createLoaderStrategy();
@@ -47,8 +49,8 @@ public class NativeDependencyLoader {
         new JarFile(
             JDKProvider.class.getProtectionDomain().getCodeSource().getLocation().getPath())) {
       Manifest manifest = jarFile.getManifest();
-      // TODO: use this to add a check on the installed CUDA version (which will be system-loaded in
-      // any case)
+      // TODO: use this variable to add a check on the installed CUDA version
+      // (which will be system-loaded in any case, even with the fat-jar)
       var embeddedLibrariesCudaVersion =
           manifest.getMainAttributes().getValue("Embedded-Libraries-Cuda-Version");
       return embeddedLibrariesCudaVersion != null;
@@ -59,7 +61,7 @@ public class NativeDependencyLoader {
 
   private static boolean loaded = false;
 
-  public static void loadLibraries() {
+  static void loadLibraries() throws ProviderInitializationException {
     if (!loaded) {
       try {
         LOADER_STRATEGY.loadLibraries();
@@ -81,21 +83,19 @@ public class NativeDependencyLoader {
     };
 
     @Override
-    public void loadLibraries() {
+    public void loadLibraries() throws ProviderInitializationException {
       for (String file : FILES_TO_LOAD) {
         // Uncomment the following line to trace the loading of native dependencies.
         // System.out.println("Loading native dependency: " + file);
         try {
           System.load(createFile(file).getAbsolutePath());
         } catch (Throwable t) {
-          var ex =
-              new UnsatisfiedLinkError(
-                  "Failed to load native dependency: "
-                      + System.mapLibraryName(file)
-                      + ".so: "
-                      + t.getMessage());
-          ex.initCause(t);
-          throw ex;
+          throw new ProviderInitializationException(
+              "Failed to load native dependency: "
+                  + System.mapLibraryName(file)
+                  + ".so: "
+                  + t.getMessage(),
+              t);
         }
       }
     }
@@ -118,13 +118,8 @@ public class NativeDependencyLoader {
       try (InputStream in = resource.openStream()) {
         loc = File.createTempFile(baseName, ".so");
         loc.deleteOnExit();
-        try (OutputStream out = new FileOutputStream(loc)) {
-          byte[] buffer = new byte[1024 * 16];
-          int read = 0;
-          while ((read = in.read(buffer)) >= 0) {
-            out.write(buffer, 0, read);
-          }
-        }
+
+        Files.copy(in, loc.toPath(), StandardCopyOption.REPLACE_EXISTING);
       }
       return loc;
     }
@@ -134,7 +129,7 @@ public class NativeDependencyLoader {
       implements NativeDependencyLoaderStrategy {
 
     @Override
-    public void loadLibraries() {
+    public void loadLibraries() throws ProviderInitializationException {
       // Try load libcuvs using directly JVM_LoadLibrary with the correct flags for in-depth failure
       // diagnosis.
       //
@@ -147,20 +142,21 @@ public class NativeDependencyLoader {
       // not surfaced.
       //
       // Here we invoke it with throwException true, so in case of error we can see what's broken
+      String cuvsLibraryName = System.mapLibraryName("cuvs_c");
+
+      final Object lib;
       try (var localArena = Arena.ofConfined()) {
-        var name = localArena.allocateFrom(System.mapLibraryName("cuvs_c"));
-        Object lib = JVM_LoadLibrary$mh.invoke(name, true);
-        if (lib == null) {
-          throw new UnsatisfiedLinkError("Unspecified failure loading libcuvs");
-        }
+        var name = localArena.allocateFrom(cuvsLibraryName);
+        lib = JVM_LoadLibrary$mh.invoke(name, true);
       } catch (Throwable ex) {
         if (ex instanceof UnsatisfiedLinkError ulex) {
-          throw ulex; // new ProviderInitializationException(ulex.getMessage(), ulex);
+          throw new ProviderInitializationException(ulex.getMessage(), ulex);
+        } else {
+          throw new ProviderInitializationException("Error while loading " + cuvsLibraryName, ex);
         }
-        // throw new ProviderInitializationException("error while loading libcuvs", ex);
-        var ulex = new UnsatisfiedLinkError("Unspecified failure loading libcuvs");
-        ulex.initCause(ex);
-        throw ulex;
+      }
+      if (lib == null) {
+        throw new ProviderInitializationException("Unspecified failure loading " + cuvsLibraryName);
       }
     }
   }
