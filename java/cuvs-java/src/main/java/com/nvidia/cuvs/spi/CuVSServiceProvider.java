@@ -51,8 +51,12 @@ public abstract class CuVSServiceProvider {
       if (supportedJavaRuntime && supportedOs && supportedArchitecture) {
         try {
           var cls = Class.forName("com.nvidia.cuvs.spi.JDKProvider");
-          var ctr = MethodHandles.lookup().findConstructor(cls, MethodType.methodType(void.class));
+          var ctr =
+              MethodHandles.lookup()
+                  .findStatic(cls, "create", MethodType.methodType(CuVSProvider.class));
           return (CuVSProvider) ctr.invoke();
+        } catch (ProviderInitializationException e) {
+          return new UnsupportedProvider("cannot create JDKProvider: " + e.getMessage());
         } catch (Throwable e) {
           throw new AssertionError(e);
         }
