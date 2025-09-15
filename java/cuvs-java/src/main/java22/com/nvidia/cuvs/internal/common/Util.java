@@ -65,15 +65,11 @@ public class Util {
       LINKER.downcallHandle(
           cudaMemcpyAsync$address(), cudaMemcpyAsync$descriptor(), Linker.Option.critical(true));
 
-  private static final String cudaGetDevicePropertiesSymbolName =
-      "12".equals(System.getenv("RAPIDS_CUDA_MAJOR"))
-          ? "cudaGetDeviceProperties_v2"
-          : "cudaGetDeviceProperties";
-
   private static final MethodHandle cudaGetDeviceProperties$mh =
       LINKER.downcallHandle(
           SYMBOL_LOOKUP
-              .find(cudaGetDevicePropertiesSymbolName)
+              .find("cudaGetDeviceProperties") // CUDA 13+ symbol name
+              .or(() -> SYMBOL_LOOKUP.find("cudaGetDeviceProperties_v2")) // CUDA 12 symbol name
               .orElseThrow(UnsatisfiedLinkError::new),
           FunctionDescriptor.of(headers_h.C_INT, headers_h.C_POINTER, headers_h.C_INT));
 
