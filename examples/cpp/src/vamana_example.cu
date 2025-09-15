@@ -34,7 +34,7 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
                             int degree,
                             int visited_size,
                             float max_fraction,
-                            int iters,
+                            float iters,
                             std::string codebook_prefix)
 {
   using namespace cuvs::neighbors;
@@ -45,6 +45,7 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
   index_params.visited_size = visited_size;
   index_params.graph_degree = degree;
   index_params.vamana_iters = iters;
+
   if (codebook_prefix != "") {
     index_params.codebooks = vamana::deserialize_codebooks(codebook_prefix, dataset.extent(1));
   }
@@ -74,15 +75,16 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
 void usage()
 {
   printf(
-    "Usage: ./vamana_example <data filename> <output filename> <datatype> <graph "
-    "degree> <visited_size> <max_fraction> <iterations> <(optional) "
+    "Usage: ./vamana_example <data filename> <output filename> <datatype> "
+    "<graph degree> <visited_size> <max_fraction> <iterations> <(optional) "
     "codebook prefix>\n");
-  printf("Input file expected to be binary file of vectors.\n");
-  printf("Datatype options int8 or float for this example.\n");
+
+  printf("Input file expected to be binary file of fp32 vectors.\n");
+  printf("Datatype of input dataset (int8 or float)\n");
   printf("Graph degree sizes supported: 32, 64, 128, 256\n");
   printf("Visited_size must be > degree and a power of 2.\n");
   printf("max_fraction > 0 and <= 1. Typical values are 0.06 or 0.1.\n");
-  printf("Default iterations = 1, increase for better quality graph.\n");
+  printf("Default iterations = 1.0, increase for better quality graph.\n");
   printf(
     "Optional path prefix to pq pivots and rotation matrix files. Expects pq pivots file at "
     "${codebook_prefix}_pq_pivots.bin and rotation matrix file at "
@@ -115,7 +117,7 @@ int main(int argc, char* argv[])
   int degree                  = atoi(argv[4]);
   int max_visited             = atoi(argv[5]);
   float max_fraction          = atof(argv[6]);
-  int iters                   = atoi(argv[7]);
+  float iters                 = atof(argv[7]);
   std::string codebook_prefix = "";
   if (argc >= 9)
     codebook_prefix = (std::string)argv[8];  // Path prefix to pq pivots and rotation matrix files
@@ -146,5 +148,7 @@ int main(int argc, char* argv[])
                                   max_fraction,
                                   iters,
                                   codebook_prefix);
+  } else {
+    usage();
   }
 }

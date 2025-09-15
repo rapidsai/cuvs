@@ -295,6 +295,7 @@ if(BUILD_SHARED_LIBS)
   if(BUILD_MG_ALGOS)
     set(CUVS_MG_ALGOS
         src/neighbors/mg/mg_flat_float_int64_t.cu
+        src/neighbors/mg/mg_flat_half_int64_t.cu
         src/neighbors/mg/mg_flat_int8_t_int64_t.cu
         src/neighbors/mg/mg_flat_uint8_t_int64_t.cu
         src/neighbors/mg/mg_pq_float_int64_t.cu
@@ -377,13 +378,13 @@ if(BUILD_SHARED_LIBS)
     src/distance/detail/pairwise_matrix/dispatch_rbf.cu
     src/distance/detail/pairwise_matrix/dispatch_l2_expanded_double_double_double_int64_t.cu
     src/distance/detail/pairwise_matrix/dispatch_l2_expanded_float_float_float_int64_t.cu
-    src/distance/detail/fused_distance_nn.cu
     src/distance/distance.cu
     src/distance/pairwise_distance.cu
     src/distance/sparse_distance.cu
     src/embed/spectral.cu
     src/neighbors/all_neighbors/all_neighbors.cu
     src/neighbors/ball_cover.cu
+    src/neighbors/epsilon_neighborhood.cu
     src/neighbors/ball_cover/detail/ball_cover/registers_eps_pass_euclidean.cu
     src/neighbors/ball_cover/detail/ball_cover/registers_pass_one.cu
     src/neighbors/ball_cover/detail/ball_cover/registers_pass_two.cu
@@ -410,6 +411,7 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/iface/iface_cagra_int8_t_uint32_t.cu
     src/neighbors/iface/iface_cagra_uint8_t_uint32_t.cu
     src/neighbors/iface/iface_flat_float_int64_t.cu
+    src/neighbors/iface/iface_flat_half_int64_t.cu
     src/neighbors/iface/iface_flat_int8_t_int64_t.cu
     src/neighbors/iface/iface_flat_uint8_t_int64_t.cu
     src/neighbors/iface/iface_pq_float_int64_t.cu
@@ -459,13 +461,6 @@ if(BUILD_SHARED_LIBS)
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_float.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_false.cu
     src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_true.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_fp8_false_bitset64.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_fp8_true_bitset64.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_half_half_bitset64.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_half_bitset64.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_float_bitset64.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_false_bitset64.cu
-    src/neighbors/ivf_pq/detail/ivf_pq_compute_similarity_float_fp8_true_bitset64.cu
     src/neighbors/ivf_pq/detail/ivf_pq_contiguous_list_data.cu
     src/neighbors/ivf_pq/detail/ivf_pq_process_and_fill_codes.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_float_int64_t.cu
@@ -719,6 +714,13 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
 
   # ################################################################################################
   # * cuvs_c -------------------------------------------------------------------------------
+
+  if(BUILD_MG_ALGOS)
+    set(CUVS_C_MG_ALGOS src/neighbors/mg_ivf_pq_c.cpp src/neighbors/mg_ivf_flat_c.cpp
+                        src/neighbors/mg_cagra_c.cpp
+    )
+  endif()
+
   if(BUILD_C_LIBRARY)
     add_library(
       cuvs_c SHARED
@@ -735,6 +737,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
       src/preprocessing/quantize/binary_c.cpp
       src/preprocessing/quantize/scalar_c.cpp
       src/distance/pairwise_distance_c.cpp
+      ${CUVS_C_MG_ALGOS}
     )
 
     if(BUILD_CAGRA_HNSWLIB)

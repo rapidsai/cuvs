@@ -13,6 +13,7 @@ Nearest Neighbors
    neighbors_bruteforce.rst
    neighbors_cagra.rst
    neighbors_dynamic_batching.rst
+   neighbors_epsilon_neighborhood.rst
    neighbors_filter.rst
    neighbors_hnsw.rst
    neighbors_ivf_flat.rst

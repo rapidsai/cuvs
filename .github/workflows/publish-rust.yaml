@@ -10,8 +10,13 @@ defaults:
 jobs:
   rust-publish:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cuda_version:
+          - '12.9.1'
     container:
-      image: rapidsai/ci-conda:25.08-latest
+      image: "rapidsai/ci-conda:25.10-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
     steps:
       - uses: actions/checkout@v4
       - name: Check if release build

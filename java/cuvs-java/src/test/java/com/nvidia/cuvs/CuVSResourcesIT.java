@@ -18,7 +18,6 @@ package com.nvidia.cuvs;
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 import static org.junit.Assert.*;
 
-import java.lang.invoke.MethodHandles;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import org.junit.Before;
@@ -28,7 +27,7 @@ import org.slf4j.LoggerFactory;
 
 public class CuVSResourcesIT extends CuVSTestCase {
 
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  private static final Logger log = LoggerFactory.getLogger(CuVSResourcesIT.class);
 
   @Before
   public void setup() {
@@ -43,7 +42,7 @@ public class CuVSResourcesIT extends CuVSTestCase {
         var executor = Executors.newFixedThreadPool(1)) {
 
       try (var access1 = resources.access()) {
-        log.info(
+        log.debug(
             "Outer access to resource {} from {}",
             access1.handle(),
             Thread.currentThread().threadId());
@@ -56,18 +55,18 @@ public class CuVSResourcesIT extends CuVSTestCase {
                       executor.submit(
                           () -> {
                             try (var access2 = resources.access()) {
-                              log.info(
+                              log.debug(
                                   "Nested access to resource {} from {}",
                                   access2.handle(),
                                   Thread.currentThread().threadId());
-                              log.info("Nested access finished");
+                              log.debug("Nested access finished");
                             }
                           });
                   future.get();
                 });
         assertEquals(IllegalStateException.class, exception.getCause().getClass());
         assertEquals(expectedError, exception.getCause().getMessage());
-        log.info("Outer access finished");
+        log.debug("Outer access finished");
       }
     }
   }
@@ -78,7 +77,7 @@ public class CuVSResourcesIT extends CuVSTestCase {
         var executor = Executors.newFixedThreadPool(1)) {
 
       try (var access1 = resources.access()) {
-        log.info(
+        log.debug(
             "Access 1 to resource {} from {}", access1.handle(), Thread.currentThread().threadId());
       }
 
@@ -86,7 +85,7 @@ public class CuVSResourcesIT extends CuVSTestCase {
           executor.submit(
               () -> {
                 try (var access2 = resources.access()) {
-                  log.info(
+                  log.debug(
                       "Access 2 to resource {} from {}",
                       access2.handle(),
                       Thread.currentThread().threadId());
