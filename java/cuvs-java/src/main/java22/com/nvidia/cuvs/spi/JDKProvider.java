@@ -37,13 +37,13 @@ import java.util.jar.Manifest;
 
 final class JDKProvider implements CuVSProvider {
 
-  static {
-    OptionalNativeDependencyLoader.loadLibraries();
-  }
-
   private static final MethodHandle createNativeDataset$mh = createNativeDatasetBuilder();
 
-  static CuVSProvider create() throws Throwable {
+  private JDKProvider() {}
+
+  static CuVSProvider create() throws ProviderInitializationException {
+    NativeDependencyLoader.loadLibraries();
+
     var mavenVersion = readCuVSVersionFromManifest();
 
     try (var localArena = Arena.ofConfined()) {

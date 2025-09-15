@@ -56,7 +56,7 @@ public abstract class CuVSServiceProvider {
                   .findStatic(cls, "create", MethodType.methodType(CuVSProvider.class));
           return (CuVSProvider) ctr.invoke();
         } catch (ProviderInitializationException e) {
-          return new UnsupportedProvider("cannot create JDKProvider: " + e.getMessage());
+          return new UnsupportedProvider("Cannot create JDKProvider: " + e.getMessage());
         } catch (Throwable e) {
           throw new AssertionError(e);
         }
