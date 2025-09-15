@@ -347,8 +347,6 @@ struct index : cuvs::neighbors::index {
     return std::nullopt;
   }
 
-  void compute_dataset_norms(raft::resources const& res);
-
   // Don't allow copying the index for performance reasons (try avoiding copying data)
   index(const index&)                    = delete;
   index(index&&)                         = default;
@@ -440,7 +438,7 @@ struct index : cuvs::neighbors::index {
       auto p = dynamic_cast<strided_dataset<T, int64_t>*>(dataset_.get());
       if (p) {
         auto dataset_view = p->view();
-        if (dataset_view.extent(0) > 0) { compute_dataset_norms(res); }
+        if (dataset_view.extent(0) > 0) { compute_dataset_norms_(res); }
       }
     }
 
@@ -463,7 +461,7 @@ struct index : cuvs::neighbors::index {
     dataset_norms_.reset();
 
     if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      if (dataset.extent(0) > 0) { compute_dataset_norms(res); }
+      if (dataset.extent(0) > 0) { compute_dataset_norms_(res); }
     }
   }
 
@@ -475,7 +473,7 @@ struct index : cuvs::neighbors::index {
     dataset_norms_.reset();
 
     if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      if (dataset.extent(0) > 0) { compute_dataset_norms(res); }
+      if (dataset.extent(0) > 0) { compute_dataset_norms_(res); }
     }
   }
 
@@ -493,7 +491,7 @@ struct index : cuvs::neighbors::index {
     dataset_ = make_aligned_dataset(res, dataset, 16);
     dataset_norms_.reset();
     if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
-      if (dataset.extent(0) > 0) { compute_dataset_norms(res); }
+      if (dataset.extent(0) > 0) { compute_dataset_norms_(res); }
     }
   }
 
@@ -513,7 +511,7 @@ struct index : cuvs::neighbors::index {
       auto p = dynamic_cast<strided_dataset<T, int64_t>*>(dataset_.get());
       if (p) {
         auto dataset_view = p->view();
-        if (dataset_view.extent(0) > 0) { compute_dataset_norms(res); }
+        if (dataset_view.extent(0) > 0) { compute_dataset_norms_(res); }
       }
     }
   }
@@ -526,7 +524,7 @@ struct index : cuvs::neighbors::index {
     dataset_norms_.reset();
     if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
       auto dataset_view = this->dataset();
-      if (dataset_view.extent(0) > 0) { compute_dataset_norms(res); }
+      if (dataset_view.extent(0) > 0) { compute_dataset_norms_(res); }
     }
   }
 
@@ -572,6 +570,8 @@ struct index : cuvs::neighbors::index {
   std::unique_ptr<neighbors::dataset<dataset_index_type>> dataset_;
   // only float distances supported at the moment
   std::optional<raft::device_vector<float, int64_t>> dataset_norms_;
+
+  void compute_dataset_norms_(raft::resources const& res);
 };
 /**
  * @}

@@ -40,7 +40,7 @@ namespace cuvs::neighbors::cagra {
 
 // Member function implementations for cagra::index
 template <typename T, typename IdxT>
-void index<T, IdxT>::compute_dataset_norms(raft::resources const& res)
+void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
 {
   // Get the dataset view
   auto dataset_view = this->dataset();
