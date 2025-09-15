@@ -31,6 +31,8 @@ The cuVS software development kit provides APIs for C, C++, Python, and Rust lan
 Installing Pre-compiled Packages
 --------------------------------
 
+**Note:** The cuVS pre-compiled packages are available for **Linux** only (x86_64 and aarch64 architectures). Native Windows support is not available at this time. On Windows, use **WSL2** with GPU passthrough. See the `RAPIDS WSL2 guide <https://rapids.ai/start.html#wsl2>`_.
+
 C, C++, and Python through Conda
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
