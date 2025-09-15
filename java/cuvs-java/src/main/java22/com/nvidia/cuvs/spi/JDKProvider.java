@@ -16,10 +16,14 @@
 package com.nvidia.cuvs.spi;
 
 import static com.nvidia.cuvs.internal.common.Util.*;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsVersionGet;
+import static com.nvidia.cuvs.internal.panama.headers_h.uint16_t;
 
 import com.nvidia.cuvs.*;
 import com.nvidia.cuvs.internal.*;
 import com.nvidia.cuvs.internal.common.Util;
+import java.io.IOException;
+import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -28,10 +32,55 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
 
 final class JDKProvider implements CuVSProvider {
 
   private static final MethodHandle createNativeDataset$mh = createNativeDatasetBuilder();
+
+  private JDKProvider() {}
+
+  static CuVSProvider create() throws ProviderInitializationException {
+    NativeDependencyLoader.loadLibraries();
+
+    var mavenVersion = readCuVSVersionFromManifest();
+
+    try (var localArena = Arena.ofConfined()) {
+      var majorPtr = localArena.allocate(uint16_t);
+      var minorPtr = localArena.allocate(uint16_t);
+      var patchPtr = localArena.allocate(uint16_t);
+      checkCuVSError(cuvsVersionGet(majorPtr, minorPtr, patchPtr), "cuvsVersionGet");
+      var major = majorPtr.get(uint16_t, 0);
+      var minor = minorPtr.get(uint16_t, 0);
+      var patch = patchPtr.get(uint16_t, 0);
+
+      var cuvsVersionString = String.format(Locale.ROOT, "%02d.%02d.%d", major, minor, patch);
+      if (mavenVersion != null && !cuvsVersionString.equals(mavenVersion)) {
+        throw new ProviderInitializationException(
+            String.format(
+                Locale.ROOT,
+                "libcuvs_c version mismatch: expected [%s], found [%s]",
+                mavenVersion,
+                cuvsVersionString));
+      }
+    }
+    return new JDKProvider();
+  }
+
+  /**
+   * Read cuvs-java version from this Jar Manifest, or null if these are not available
+   */
+  private static String readCuVSVersionFromManifest() {
+    try (var jarFile =
+        new JarFile(
+            JDKProvider.class.getProtectionDomain().getCodeSource().getLocation().getPath())) {
+      Manifest manifest = jarFile.getManifest();
+      return manifest.getMainAttributes().getValue("Implementation-Version");
+    } catch (IOException e) {
+      return null;
+    }
+  }
 
   static MethodHandle createNativeDatasetBuilder() {
     try {

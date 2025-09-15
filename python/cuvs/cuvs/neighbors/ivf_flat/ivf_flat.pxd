@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -66,8 +66,7 @@ cdef extern from "cuvs/neighbors/ivf_flat.h" nogil:
 
     uint32_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index)
 
-    cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsResources_t res,
-                                           cuvsIvfFlatIndex_t index,
+    cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsIvfFlatIndex_t index,
                                            DLManagedTensor * centers)
 
     cuvsError_t cuvsIvfFlatBuild(cuvsResources_t res,

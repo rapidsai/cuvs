@@ -45,12 +45,20 @@ jobs:
     needs: cpp-build
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.10
+    # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
+    # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
+    strategy:
+      fail-fast: false
+      matrix:
+        cuda_version:
+          - '12.9.1'
+          - '13.0.0'
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
       arch: "amd64"
       date: ${{ inputs.date }}
-      container_image: "rapidsai/ci-conda:25.10-latest"
+      container_image: "rapidsai/ci-conda:25.10-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
       node_type: "gpu-l4-latest-1"
       script: "ci/build_rust.sh"
       sha: ${{ inputs.sha }}
@@ -58,12 +66,20 @@ jobs:
     needs: cpp-build
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.10
+    # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
+    # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
+    strategy:
+      fail-fast: false
+      matrix:
+        cuda_version:
+          - '12.9.1'
+          - '13.0.0'
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
       arch: "amd64"
       date: ${{ inputs.date }}
-      container_image: "rapidsai/ci-conda:25.10-latest"
+      container_image: "rapidsai/ci-conda:25.10-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
       node_type: "gpu-l4-latest-1"
       script: "ci/build_go.sh"
       sha: ${{ inputs.sha }}
@@ -71,13 +87,22 @@ jobs:
     needs: cpp-build
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.10
+    # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
+    # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
+    strategy:
+      fail-fast: false
+      matrix:
+        cuda_version:
+          - '12.9.1'
+          - '13.0.0'
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
       arch: "amd64"
       date: ${{ inputs.date }}
-      container_image: "rapidsai/ci-conda:25.10-latest"
+      container_image: "rapidsai/ci-conda:25.10-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
       script: "ci/build_java.sh"
+      artifact-name: "cuvs-java-cuda${{ matrix.cuda_version }}"
       file_to_upload: "java/cuvs-java/target/"
       sha: ${{ inputs.sha }}
   python-build:
