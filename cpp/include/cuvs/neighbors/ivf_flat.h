@@ -300,7 +300,7 @@ cuvsError_t cuvsIvfFlatSearch(cuvsResources_t res,
  */
 
 /**
- * @defgroup ivf_flat_c_serialize IVF-Flat C-API serialize functions
+ * @defgroup ivf_flat_c_index_serialize IVF-Flat C-API serialize functions
  * @{
  */
 /**
