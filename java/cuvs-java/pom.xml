@@ -166,11 +166,12 @@
                 <version>3.4.2</version>
                 <configuration>
                     <archive>
+                        <manifest>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                        </manifest>
                         <manifestEntries>
                             <Multi-Release>true</Multi-Release>
                             <addClasspath>true</addClasspath>
-                            <mainClass>
-                                com.nvidia.cuvs.examples.CagraExample</mainClass>
                         </manifestEntries>
                     </archive>
                 </configuration>
@@ -326,7 +327,7 @@
                                 <manifestEntries>
                                     <Multi-Release>true</Multi-Release>
                                     <addClasspath>true</addClasspath>
-                                    <mainClass>com.nvidia.cuvs.examples.CagraExample</mainClass>
+                                    <Embedded-Libraries-Cuda-Version>12</Embedded-Libraries-Cuda-Version>
                                 </manifestEntries>
                             </archive>
                         </configuration>
@@ -409,7 +410,7 @@
                                 <manifestEntries>
                                     <Multi-Release>true</Multi-Release>
                                     <addClasspath>true</addClasspath>
-                                    <mainClass>com.nvidia.cuvs.examples.CagraExample</mainClass>
+                                    <Embedded-Libraries-Cuda-Version>13</Embedded-Libraries-Cuda-Version>
                                 </manifestEntries>
                             </archive>
                         </configuration>
