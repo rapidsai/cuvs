@@ -314,8 +314,8 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
       if (list_size > 0) {
         uint32_t padded_list_size = interleaved_group::roundUp(list_size);
         uint32_t n_elems          = padded_list_size * idx.dim();
-        auto list_data            = lists[label]->data;
-        auto list_inds            = extend_index.lists()[label]->indices;
+        auto& list_data           = lists[label]->data;
+        auto& list_inds           = extend_index.lists()[label]->indices;
 
         // fetch the flat codes
         auto flat_codes = raft::make_device_matrix<DataT, uint32_t>(handle_, list_size, idx.dim());
@@ -364,7 +364,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
                                      return DataT{0};
                                    });
 
-          auto extend_data          = extend_index.lists()[label]->data;
+          auto& extend_data         = extend_index.lists()[label]->data;
           auto extend_data_filtered = raft::make_device_vector<DataT, uint32_t>(handle_, n_elems);
           raft::linalg::map_offset(
             handle_,

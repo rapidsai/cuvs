@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2024, NVIDIA CORPORATION.
+# Copyright (c) 2018-2025, NVIDIA CORPORATION.
 
 import os
 import sys
@@ -206,3 +206,5 @@ linkcode_resolve = make_linkcode_resolve(
 # backticks`) to be a python object. See
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-default_role
 default_role = "py:obj"
+
+suppress_warnings = ["duplicate_declaration.cpp"]
