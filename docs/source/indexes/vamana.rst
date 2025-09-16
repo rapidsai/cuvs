@@ -11,7 +11,7 @@ There are many algorithmic details that are outlined in the `paper <https://pape
 
 The current implementation of DiskANN in cuVS only includes the 'in-memory' graph construction and a serialization step that writes the index to a file. This index file can be then used by the `open-source DiskANN <https://github.com/microsoft/DiskANN>` library to perform efficient search. Additional DiskANN functionality, including GPU-accelerated search and 'ssd' index build are planned for future cuVS releases.
 
-[ :doc:`C++ API <../cpp_api/neighbors_vamana>` | :doc:`Python API <../python_api/neighbors_vamana>` ]
+[ :doc:`C++ API <../cpp_api/neighbors_vamana>` ]
 
 Interoperability with CPU DiskANN
 ---------------------------------

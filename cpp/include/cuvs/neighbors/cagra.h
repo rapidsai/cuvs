@@ -603,7 +603,7 @@ cuvsError_t cuvsCagraSearch(cuvsResources_t res,
  */
 
 /**
- * @defgroup cagra_c_serialize CAGRA C-API serialize functions
+ * @defgroup cagra_c_index_serialize CAGRA C-API serialize functions
  * @{
  */
 /**
