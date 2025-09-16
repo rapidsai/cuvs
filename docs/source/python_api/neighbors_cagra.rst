@@ -44,8 +44,3 @@ Index load
 ##########
 
 .. autofunction:: cuvs.neighbors.cagra.load
-
-Index extend
-###########
-
-.. autofunction:: cuvs.neighbors.cagra.extend
