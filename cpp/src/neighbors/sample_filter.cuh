@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@
 namespace cuvs::neighbors::filtering {
 
 /* A filter that filters nothing. This is the default behavior. */
-inline _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
+constexpr __forceinline__ _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
   // query index
   const uint32_t query_ix,
   // the current inverted list index
@@ -40,7 +40,7 @@ inline _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
 }
 
 /* A filter that filters nothing. This is the default behavior. */
-inline _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
+constexpr __forceinline__ _RAFT_HOST_DEVICE bool none_sample_filter::operator()(
   // query index
   const uint32_t query_ix,
   // the index of the current sample
@@ -93,14 +93,14 @@ inline _RAFT_HOST_DEVICE bool ivf_to_sample_filter<index_t, filter_t>::operator(
 }
 
 template <typename bitset_t, typename index_t>
-bitset_filter<bitset_t, index_t>::bitset_filter(
+_RAFT_HOST_DEVICE bitset_filter<bitset_t, index_t>::bitset_filter(
   const cuvs::core::bitset_view<bitset_t, index_t> bitset_for_filtering)
   : bitset_view_{bitset_for_filtering}
 {
 }
 
 template <typename bitset_t, typename index_t>
-inline _RAFT_HOST_DEVICE bool bitset_filter<bitset_t, index_t>::operator()(
+constexpr __forceinline__ _RAFT_HOST_DEVICE bool bitset_filter<bitset_t, index_t>::operator()(
   // query index
   const uint32_t query_ix,
   // the index of the current sample
@@ -139,5 +139,50 @@ void bitmap_filter<bitmap_t, index_t>::to_csr(raft::resources const& handle, csr
 {
   raft::sparse::convert::bitmap_to_csr(handle, bitmap_view_, csr);
 }
+
+struct none_filter_args_t {};
+using bitset_filter_args_t =
+  std::tuple<const int64_t* const*, cuvs::core::bitset_view<uint32_t, int64_t>>;
+
+struct ivf_filter_dev {
+  filtering::FilterType tag_;
+
+  union ivf_filter_dev_args_variant {
+    none_filter_args_t none_filter_args;
+    bitset_filter_args_t bitset_filter_args;
+
+    _RAFT_HOST_DEVICE explicit ivf_filter_dev_args_variant(const none_filter_args_t& args)
+      : none_filter_args(args)
+    {
+    }
+
+    _RAFT_HOST_DEVICE explicit ivf_filter_dev_args_variant(const bitset_filter_args_t& args)
+      : bitset_filter_args(args)
+    {
+    }
+  } args_;
+
+  _RAFT_HOST_DEVICE ivf_filter_dev(none_filter_args_t args = {})
+    : tag_(FilterType::None), args_(args) {};
+
+  _RAFT_HOST_DEVICE ivf_filter_dev(bitset_filter_args_t args)
+    : tag_(FilterType::Bitset), args_(args) {};
+
+  constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(const uint32_t query_ix,
+                                                              const uint32_t cluster_ix,
+                                                              const uint32_t sample_ix)
+  {
+    switch (tag_) {
+      case FilterType::None:
+        return filtering::none_sample_filter{}(query_ix, cluster_ix, sample_ix);
+      case FilterType::Bitset: {
+        auto& [inds_ptrs_, bitset_view_] = args_.bitset_filter_args;
+        return filtering::bitset_filter<uint32_t, int64_t>(bitset_view_)(
+          query_ix, inds_ptrs_[cluster_ix][sample_ix]);
+      }
+      default: return true;
+    }
+  }
+};
 
 }  // namespace cuvs::neighbors::filtering

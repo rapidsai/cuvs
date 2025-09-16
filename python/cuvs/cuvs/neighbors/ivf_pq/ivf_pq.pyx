@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ from pylibraft.common import auto_convert_output, cai_wrapper, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 from pylibraft.common.interruptible import cuda_interruptible
 
+from cuvs.common.device_tensor_view import DeviceTensorView
 from cuvs.distance import DISTANCE_NAMES, DISTANCE_TYPES
 from cuvs.neighbors.common import _check_input_array
 
@@ -59,11 +60,13 @@ cdef class IndexParams:
         String denoting the metric type.
         Valid values for metric: ["sqeuclidean", "inner_product", "euclidean"],
         where:
+
             - sqeuclidean is the euclidean distance without the square root
               operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2,
             - euclidean is the euclidean distance
             - inner product distance is defined as
               distance(a, b) = \\sum_i a_i * b_i.
+
     kmeans_n_iters : int, default = 20
         The number of iterations searching for kmeans centers during index
         building.
@@ -257,19 +260,28 @@ cdef class Index:
     def centers(self):
         """ Get the cluster centers corresponding to the lists in the
         original space """
-        return self._get_centers()
-
-    @auto_sync_resources
-    def _get_centers(self, resources=None):
         if not self.trained:
             raise ValueError("Index needs to be built before getting centers")
 
-        cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetCenters(self.index, tensor))
+        output.parent = self
+        return output
 
-        output = np.empty((self.n_lists, self.dim), dtype='float32')
-        ai = wrap_array(output)
-        cdef cydlpack.DLManagedTensor* output_dlpack = cydlpack.dlpack_c(ai)
-        check_cuvs(cuvsIvfPqIndexGetCenters(res, self.index, output_dlpack))
+    @property
+    def pq_centers(self):
+        """ Get the PQ cluster centers """
+        if not self.trained:
+            raise ValueError("Index needs to be built before getting"
+                             " pq centers")
+
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetPqCenters(self.index, tensor))
+        output.parent = self
         return output
 
 

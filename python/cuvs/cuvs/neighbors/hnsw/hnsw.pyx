@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -303,21 +303,22 @@ def from_cagra(IndexParams index_params, cagra.Index cagra_index,
     Returns an HNSW index from a CAGRA index.
 
     NOTE: When `index_params.hierarchy` is:
-          1. `NONE`: This method uses the filesystem to write the CAGRA index
-                     in `/tmp/<random_number>.bin` before reading it as an
-                     hnswlib index, then deleting the temporary file. The
-                     returned index is immutable and can only be searched by
-                     the hnswlib wrapper in cuVS, as the format is not
-                    compatible with the original hnswlib.
-          2. `CPU`: The returned index is mutable and can be extended with
-                    additional vectors. The serialized index is also compatible
-                    with the original hnswlib library.
+
+    1. `NONE`: This method uses the filesystem to write the CAGRA index in
+    `/tmp/<random_number>.bin` before reading it as an hnswlib index, then
+    deleting the temporary file. The returned index is immutable and can only
+    be searched by the hnswlib wrapper in cuVS, as the format is not
+    compatible with the original hnswlib.
+    2. `CPU`: The returned index is mutable and can be extended with additional
+    vectors. The serialized index is also compatible with the original hnswlib
+    library.
 
     Saving / loading the index is experimental. The serialization format is
     subject to change.
 
     Parameters
     ----------
+
     index_params : IndexParams
         Parameters to convert the CAGRA index to HNSW index.
     cagra_index : cagra.Index
@@ -329,6 +330,7 @@ def from_cagra(IndexParams index_params, cagra.Index cagra_index,
 
     Examples
     --------
+
     >>> import cupy as cp
     >>> from cuvs.neighbors import cagra
     >>> from cuvs.neighbors import hnsw
@@ -340,6 +342,7 @@ def from_cagra(IndexParams index_params, cagra.Index cagra_index,
     >>> index = cagra.build(cagra.IndexParams(), dataset)
     >>> # Serialize the CAGRA index to hnswlib base layer only index format
     >>> hnsw_index = hnsw.from_cagra(hnsw.IndexParams(), index)
+
     """
 
     cdef Index hnsw_index = Index()

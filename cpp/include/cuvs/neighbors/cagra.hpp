@@ -340,11 +340,13 @@ struct index : cuvs::neighbors::index {
   }
 
   // Don't allow copying the index for performance reasons (try avoiding copying data)
+  /** \cond */
   index(const index&)                    = delete;
   index(index&&)                         = default;
   auto operator=(const index&) -> index& = delete;
   auto operator=(index&&) -> index&      = default;
   ~index()                               = default;
+  /** \endcond */
 
   /** Construct an empty index. */
   index(raft::resources const& res,
@@ -1975,6 +1977,9 @@ void serialize_to_hnswlib(
  * @note: When device memory is sufficient, the dataset attached to the returned index is allocated
  * in device memory by default; otherwise, host memory is used automatically.
  *
+ * @note: This API only supports physical merge (`merge_strategy = MERGE_STRATEGY_PHYSICAL`), and
+ * attempting a logical merge here will throw an error.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace raft::neighbors;
@@ -2683,3 +2688,4 @@ auto distribute(const raft::resources& clique, const std::string& filename)
 }  // namespace cuvs::neighbors::cagra
 
 #include <cuvs/neighbors/cagra_index_wrapper.hpp>
+#include <cuvs/neighbors/cagra_optimize.hpp>
