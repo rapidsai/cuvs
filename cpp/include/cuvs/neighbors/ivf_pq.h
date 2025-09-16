@@ -405,7 +405,7 @@ cuvsError_t cuvsIvfPqSearch(cuvsResources_t res,
  */
 
 /**
- * @defgroup ivf_pq_c_serialize IVF-PQ C-API serialize functions
+ * @defgroup ivf_pq_c_index_serialize IVF-PQ C-API serialize functions
  * @{
  */
 /**

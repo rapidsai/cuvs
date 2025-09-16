@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -89,10 +89,10 @@ RAFT_KERNEL init_adj(AdjacencyPattern pattern,
 
 template <typename DataT, typename ReduceOpT, int NWARPS>
 __launch_bounds__(32 * NWARPS, 2) RAFT_KERNEL referenceKernel(raft::KeyValuePair<int, DataT>* min,
-                                                              DataT* x,
-                                                              DataT* y,
-                                                              bool* adj,
-                                                              int* group_idxs,
+                                                              const DataT* x,
+                                                              const DataT* y,
+                                                              const bool* adj,
+                                                              const int* group_idxs,
                                                               int m,
                                                               int n,
                                                               int k,
@@ -196,7 +196,7 @@ struct Inputs {
 };
 
 template <typename DataT, typename OutT = raft::KeyValuePair<int, DataT>>
-auto reference(const raft::handle_t& handle, Inputs<DataT> inp, const Params& p)
+auto reference(const raft::handle_t& handle, const Inputs<DataT>& inp, const Params& p)
   -> raft::device_vector<OutT, int>
 {
   int m          = inp.x.extent(0);
@@ -244,7 +244,7 @@ auto reference(const raft::handle_t& handle, Inputs<DataT> inp, const Params& p)
 }
 
 template <typename DataT, typename OutT = raft::KeyValuePair<int, DataT>>
-auto run_masked_nn(const raft::handle_t& handle, Inputs<DataT> inp, const Params& p)
+auto run_masked_nn(const raft::handle_t& handle, const Inputs<DataT>& inp, const Params& p)
   -> raft::device_vector<OutT, int>
 {
   // Compute norms:
