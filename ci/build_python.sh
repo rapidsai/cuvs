@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2022-2024, NVIDIA CORPORATION.
+# Copyright (c) 2022-2025, NVIDIA CORPORATION.
 
 set -euo pipefail
 
@@ -54,7 +54,7 @@ sccache --zero-stats
 # Build cuvs-bench-cpu only in one CUDA major version since it only depends on
 # python version
 RAPIDS_CUDA_MAJOR="${RAPIDS_CUDA_VERSION%%.*}"
-if [[ ${RAPIDS_CUDA_MAJOR} == "12" ]]; then
+if [[ ${RAPIDS_CUDA_MAJOR} == "13" ]]; then
   rattler-build build --recipe conda/recipes/cuvs-bench-cpu \
                       "${RATTLER_ARGS[@]}" \
                       "${RATTLER_CHANNELS[@]}"
