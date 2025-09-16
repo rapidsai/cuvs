@@ -63,12 +63,12 @@ void vamana_build_and_write(raft::device_resources const& dev_resources,
 
   std::cout << "Time to build index: " << elapsed_seconds.count() << "s\n";
 
-  // Output index to file (in-memory format)
-  serialize(dev_resources, out_fname, index);
-
-  // Output index to file (disk sector-aligned format)
   if (codebook_prefix != "") {
-    serialize(dev_resources, out_fname + ".sector_aligned", index, false, true);
+    // Output index to file (disk sector-aligned format)
+    serialize(dev_resources, out_fname, index, false, true);
+  } else {
+    // Output index to file (in-memory format)
+    serialize(dev_resources, out_fname, index);
   }
 }
 
@@ -80,8 +80,8 @@ void usage()
     "codebook prefix>\n");
 
   printf("Input file expected to be binary file of fp32 vectors.\n");
-  printf("Graph degree sizes supported: 32, 64, 128, 256\n");
   printf("Datatype of input dataset (int8 or float)\n");
+  printf("Graph degree sizes supported: 32, 64, 128, 256\n");
   printf("Visited_size must be > degree and a power of 2.\n");
   printf("max_fraction > 0 and <= 1. Typical values are 0.06 or 0.1.\n");
   printf("Default iterations = 1.0, increase for better quality graph.\n");

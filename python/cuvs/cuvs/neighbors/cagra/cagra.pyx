@@ -136,26 +136,29 @@ cdef class IndexParams:
 
     Parameters
     ----------
-    metric : string denoting the metric type, default="sqeuclidean"
-        Valid values for metric: ["sqeuclidean", "inner_product"], where
+
+    metric : str, default = "sqeuclidean"
+        String denoting the metric type, valid values for metric are
+        ["sqeuclidean", "inner_product"], where:
+
             - sqeuclidean is the euclidean distance without the square root
               operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2
             - inner_product distance is defined as
               distance(a, b) = \\sum_i a_i * b_i.
+
     intermediate_graph_degree : int, default = 128
-
     graph_degree : int, default = 64
+    build_algo: str, default = "ivf_pq"
+        string denoting the graph building algorithm to use. Valid values for
+        algo: ["ivf_pq", "nn_descent", "iterative_cagra_search"], where
 
-    build_algo: string denoting the graph building algorithm to use, \
-                default = "ivf_pq"
-        Valid values for algo: ["ivf_pq", "nn_descent",
-                                "iterative_cagra_search"], where
             - ivf_pq will use the IVF-PQ algorithm for building the knn graph
             - nn_descent (experimental) will use the NN-Descent algorithm for
               building the knn graph. It is expected to be generally
               faster than ivf_pq.
             - iterative_cagra_search will iteratively build the knn graph using
               CAGRA's search() and optimize()
+
     compression: CompressionParams, optional
         If compression is desired should be a CompressionParams object. If None
         compression will be disabled.
@@ -166,6 +169,7 @@ cdef class IndexParams:
         Parameters for IVF-PQ search. If provided, it will be used for
         searching the graph.
     refinement_rate: float, default = 1.0
+
     """
 
     cdef cuvsCagraIndexParams* params
@@ -413,6 +417,7 @@ cdef class SearchParams:
 
     Parameters
     ----------
+
     max_queries: int, default = 0
         Maximum number of queries to search at the same time (batch size).
         Auto select when 0.
@@ -422,12 +427,15 @@ cdef class SearchParams:
         search speed. Higher values improve the search accuracy.
     max_iterations: int, default = 0
         Upper limit of search iterations. Auto select when 0.
-    algo: string denoting the search algorithm to use, default = "auto"
-        Valid values for algo: ["auto", "single_cta", "multi_cta"], where
+    algo: str, default = "auto"
+        String denoting the search algorithm to use
+        Valid values for algo: ["auto", "single_cta", "multi_cta"], where:
+
             - auto will automatically select the best value based on query size
             - single_cta is better when query contains larger number of
               vectors (e.g >10)
             - multi_cta is better when query contains only a few vectors
+
     team_size: int, default = 0
         Number of threads used to calculate a single distance. 4, 8, 16,
         or 32.
@@ -439,13 +447,15 @@ cdef class SearchParams:
     thread_block_size: int, default = 0
         Thread block size. 0, 64, 128, 256, 512, 1024.
         Auto selection when 0.
-    hashmap_mode: string denoting the type of hash map to use.
+    hashmap_mode: str, default = "auto"
+        String denoting the type of hash map to use.
         It's usually better to allow the algorithm to select this value,
-        default = "auto".
-        Valid values for hashmap_mode: ["auto", "small", "hash"], where
+        Valid values for hashmap_mode: ["auto", "small", "hash"], where:
+
             - auto will automatically select the best value based on algo
             - small will use the small shared memory hash table with resetting.
             - hash will use a single hash table in global memory.
+
     hashmap_min_bitlen: int, default = 0
         Upper limit of hashmap fill rate. More than 0.1, less than 0.9.
     hashmap_max_fill_rate: float, default = 0.5
@@ -456,12 +466,13 @@ cdef class SearchParams:
     rand_xor_mask: int, default = 0x128394
         Bit mask used for initial random seed node selection.
     persistent: bool, default = false
-         Whether to use the persistent version of the kernel
+        Whether to use the persistent version of the kernel
     persistent_lifetime: float
-         Persistent kernel: time in seconds before the kernel stops if no
-         requests are received.
+        Persistent kernel: time in seconds before the kernel stops if no
+        requests are received.
     persistent_device_usage : float
         Sets the fraction of maximum grid size used by persistent kernel.
+
     """
 
     cdef cuvsCagraSearchParams * params
@@ -608,6 +619,7 @@ def search(SearchParams search_params,
 
     Parameters
     ----------
+
     search_params : SearchParams
     index : Index
         Trained CAGRA index.
@@ -623,11 +635,12 @@ def search(SearchParams search_params,
                 neighbors will be written here in-place. (default None)
     filter:     Optional cuvs.neighbors.cuvsFilter can be used to filter
                 neighbors based on a given bitset.
-        (default None)
+                (default None)
     {resources_docstring}
 
     Examples
     --------
+
     >>> import cupy as cp
     >>> from cuvs.neighbors import cagra
     >>> n_samples = 50000
@@ -652,6 +665,7 @@ def search(SearchParams search_params,
     ...                                     k)
     >>> neighbors = cp.asarray(neighbors)
     >>> distances = cp.asarray(distances)
+
     """
     if not index.trained:
         raise ValueError("Index needs to be built before calling search.")

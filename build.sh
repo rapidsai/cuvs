@@ -517,7 +517,7 @@ if hasArg docs; then
     cd "${DOXYGEN_BUILD_DIR}"
     doxygen Doxyfile
     cd "${SPHINX_BUILD_DIR}"
-    sphinx-build -b html source _html
+    sphinx-build -W -b html source _html
     cd "${REPODIR}"/rust
     cargo doc -p cuvs --no-deps
     rsync -av "${RUST_BUILD_DIR}"/doc/ "${SPHINX_BUILD_DIR}"/_html/_static/rust
