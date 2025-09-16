@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -192,9 +192,9 @@ inline auto configured_raft_resources::operator=(configured_raft_resources&&)
 /** A helper to refine the neighbors when the data is on device or on host. */
 template <typename DatasetT, typename QueriesT, typename CandidatesT>
 void refine_helper(const raft::resources& res,
-                   DatasetT dataset,
-                   QueriesT queries,
-                   CandidatesT candidates,
+                   const DatasetT& dataset,
+                   const QueriesT& queries,
+                   const CandidatesT& candidates,
                    int k,
                    algo_base::index_type* neighbors,
                    float* distances,
