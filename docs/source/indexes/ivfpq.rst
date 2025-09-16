@@ -58,7 +58,7 @@ Build parameters
 
 
 Search parameters
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
 
 .. list-table::
    :widths: 25 25 50

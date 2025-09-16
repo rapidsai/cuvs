@@ -39,6 +39,18 @@ namespace cuvs::neighbors::vamana {
  */
 
 /**
+ * @brief Parameters used to build quantized DiskANN index; to be generated using
+ * deserialize_codebooks()
+ */
+template <typename T = float>
+struct codebook_params {
+  int pq_codebook_size;
+  int pq_dim;
+  std::vector<T> pq_encoding_table;
+  std::vector<T> rotation_matrix;
+};
+
+/**
  * @brief Parameters used to build DiskANN index
  *
  * `graph_degree`: Maximum degree of graph; correspods to the R parameter of
@@ -53,17 +65,6 @@ namespace cuvs::neighbors::vamana {
  */
 
 struct index_params : cuvs::neighbors::index_params {
-  /**
-   * @brief Parameters used to build quantized DiskANN index; to be generated using
-   * deserialize_codebooks()
-   */
-  template <typename T = float>
-  struct codebook_params {
-    int pq_codebook_size;
-    int pq_dim;
-    std::vector<T> pq_encoding_table;
-    std::vector<T> rotation_matrix;
-  };
   /** Maximum degree of output graph corresponds to the R parameter in the original Vamana
    * literature. */
   uint32_t graph_degree = 32;
@@ -159,11 +160,13 @@ struct index : cuvs::neighbors::index {
   [[nodiscard]] inline auto medoid() const noexcept -> IdxT { return medoid_id_; }
 
   // Don't allow copying the index for performance reasons (try avoiding copying data)
+  /** \cond */
   index(const index&)                    = delete;
   index(index&&)                         = default;
   auto operator=(const index&) -> index& = delete;
   auto operator=(index&&) -> index&      = default;
   ~index()                               = default;
+  /** \endcond */
 
   /** Construct an empty index. */
   index(raft::resources const& res,
@@ -613,7 +616,7 @@ void serialize(raft::resources const& handle,
  *
  */
 auto deserialize_codebooks(const std::string& codebook_prefix, const int dim)
-  -> index_params::codebook_params<float>;
+  -> codebook_params<float>;
 
 /**
  * @}
