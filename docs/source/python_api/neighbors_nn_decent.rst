@@ -1,5 +1,5 @@
 NN-Descent
-======
+==========
 
 .. role:: py(code)
    :language: python

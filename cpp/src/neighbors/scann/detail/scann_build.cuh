@@ -179,8 +179,12 @@ index<T, IdxT> build(
   }
 
   // AVQ update of KMeans centroids
-  apply_avq(
-    res, dataset, centroids_view, raft::make_const_mdspan(labels_view), params.partitioning_eta);
+  apply_avq(res,
+            dataset,
+            centroids_view,
+            raft::make_const_mdspan(labels_view),
+            params.partitioning_eta,
+            copy_stream);
 
   raft::device_vector_view<uint32_t, int64_t> soar_labels_view = idx.soar_labels();
 
