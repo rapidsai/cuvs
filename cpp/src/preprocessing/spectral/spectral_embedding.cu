@@ -22,6 +22,7 @@
 #include <raft/core/handle.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/linalg/matrix_vector_op.cuh>
+#include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/gather.cuh>
 #include <raft/matrix/init.cuh>
 #include <raft/sparse/coo.hpp>
@@ -35,6 +36,8 @@
 
 #include <thrust/sequence.h>
 #include <thrust/tabulate.h>
+
+#include <type_traits>
 
 namespace cuvs::preprocessing::spectral_embedding {
 
@@ -150,6 +153,55 @@ raft::device_csr_matrix_view<float, IndexTypeT, IndexTypeT, IndexTypeT> coo_to_c
   return csr_matrix_view;
 }
 
+template <typename IndexTypeT, typename NNZTypeT>
+raft::device_csr_matrix_view<float, NNZTypeT, NNZTypeT, NNZTypeT> coo_to_csr_matrix(
+  raft::resources const& handle,
+  const IndexTypeT n_samples,
+  raft::device_vector_view<NNZTypeT> sym_coo_row_ind,
+  raft::device_vector_view<NNZTypeT> sym_coo_col_ind,
+  raft::device_coo_matrix_view<float, IndexTypeT, IndexTypeT, NNZTypeT> sym_coo_matrix_view)
+{
+  auto stream = raft::resource::get_cuda_stream(handle);
+
+  raft::sparse::op::coo_sort<float, IndexTypeT, NNZTypeT>(
+    n_samples,
+    n_samples,
+    sym_coo_matrix_view.structure_view().get_nnz(),
+    sym_coo_matrix_view.structure_view().get_rows().data(),
+    sym_coo_matrix_view.structure_view().get_cols().data(),
+    sym_coo_matrix_view.get_elements().data(),
+    stream);
+
+  raft::sparse::convert::sorted_coo_to_csr<IndexTypeT, NNZTypeT, NNZTypeT>(
+    sym_coo_matrix_view.structure_view().get_rows().data(),
+    sym_coo_matrix_view.structure_view().get_nnz(),
+    sym_coo_row_ind.data_handle(),
+    n_samples,
+    stream);
+
+  auto sym_coo_nnz = sym_coo_matrix_view.structure_view().get_nnz();
+  raft::copy(sym_coo_row_ind.data_handle() + sym_coo_row_ind.size() - 1, &sym_coo_nnz, 1, stream);
+
+  // Copy and cast column indices from IndexTypeT to NNZTypeT
+  auto cols_span = sym_coo_matrix_view.structure_view().get_cols();
+  auto input_view =
+    raft::make_device_vector_view<const IndexTypeT, IndexTypeT>(cols_span.data(), cols_span.size());
+
+  raft::linalg::unary_op(handle, input_view, sym_coo_col_ind, [] __device__(IndexTypeT val) {
+    return static_cast<NNZTypeT>(val);
+  });
+
+  auto csr_matrix_view = raft::make_device_csr_matrix_view<float, NNZTypeT, NNZTypeT, NNZTypeT>(
+    const_cast<float*>(sym_coo_matrix_view.get_elements().data()),
+    raft::make_device_compressed_structure_view<NNZTypeT, NNZTypeT, NNZTypeT>(
+      const_cast<NNZTypeT*>(sym_coo_row_ind.data_handle()),
+      const_cast<NNZTypeT*>(sym_coo_col_ind.data_handle()),
+      n_samples,
+      n_samples,
+      sym_coo_matrix_view.structure_view().get_nnz()));
+  return csr_matrix_view;
+}
+
 template <typename IndexTypeT>
 raft::device_csr_matrix<float, IndexTypeT, IndexTypeT, IndexTypeT> create_laplacian(
   raft::resources const& handle,
@@ -172,14 +224,14 @@ raft::device_csr_matrix<float, IndexTypeT, IndexTypeT, IndexTypeT> create_laplac
   return laplacian;
 }
 
-template <typename IndexTypeT>
+template <typename IndexTypeT, typename OutTypeT>
 void compute_eigenpairs(
   raft::resources const& handle,
   params spectral_embedding_config,
   const IndexTypeT n_samples,
   raft::device_csr_matrix<float, IndexTypeT, IndexTypeT, IndexTypeT> laplacian,
-  raft::device_vector_view<float, IndexTypeT> diagonal,
-  raft::device_matrix_view<float, IndexTypeT, raft::col_major> embedding)
+  raft::device_vector_view<float, OutTypeT> diagonal,
+  raft::device_matrix_view<float, OutTypeT, raft::col_major> embedding)
 {
   auto config           = raft::sparse::solver::lanczos_solver_config<float>();
   config.n_components   = spectral_embedding_config.n_components;
@@ -190,8 +242,8 @@ void compute_eigenpairs(
   config.seed      = spectral_embedding_config.seed;
 
   auto eigenvalues =
-    raft::make_device_vector<float, IndexTypeT, raft::col_major>(handle, config.n_components);
-  auto eigenvectors = raft::make_device_matrix<float, IndexTypeT, raft::col_major>(
+    raft::make_device_vector<float, OutTypeT, raft::col_major>(handle, config.n_components);
+  auto eigenvectors = raft::make_device_matrix<float, OutTypeT, raft::col_major>(
     handle, n_samples, config.n_components);
 
   raft::sparse::solver::lanczos_compute_smallest_eigenvectors<IndexTypeT, float>(
@@ -215,7 +267,7 @@ void compute_eigenpairs(
   // Create a sequence of reversed column indices
   config.n_components =
     spectral_embedding_config.drop_first ? config.n_components - 1 : config.n_components;
-  auto col_indices = raft::make_device_vector<IndexTypeT>(handle, config.n_components);
+  auto col_indices = raft::make_device_vector<OutTypeT>(handle, config.n_components);
 
   // TODO: https://github.com/rapidsai/raft/issues/2661
   thrust::sequence(thrust::device,
@@ -227,17 +279,17 @@ void compute_eigenpairs(
 
   // Create row-major views of the column-major matrices
   // This is just a view re-interpretation, no data movement
-  auto eigenvectors_row_view = raft::make_device_matrix_view<float, IndexTypeT, raft::row_major>(
+  auto eigenvectors_row_view = raft::make_device_matrix_view<float, OutTypeT, raft::row_major>(
     eigenvectors.data_handle(),
     eigenvectors.extent(1),  // Swap dimensions for the view
     eigenvectors.extent(0));
 
-  auto embedding_row_view = raft::make_device_matrix_view<float, IndexTypeT, raft::row_major>(
+  auto embedding_row_view = raft::make_device_matrix_view<float, OutTypeT, raft::row_major>(
     embedding.data_handle(),
     embedding.extent(1),  // Swap dimensions for the view
     embedding.extent(0));
 
-  raft::matrix::gather<float, IndexTypeT, IndexTypeT>(
+  raft::matrix::gather<float, OutTypeT, OutTypeT>(
     handle,
     raft::make_const_mdspan(eigenvectors_row_view),  // Source matrix (as row-major view)
     raft::make_const_mdspan(col_indices.view()),     // Column indices to gather
@@ -268,24 +320,38 @@ void transform(raft::resources const& handle,
     handle, spectral_embedding_config, n_samples, laplacian, diagonal.view(), embedding);
 }
 
-template <typename IndexTypeT>
+template <typename IndexTypeT, typename NNZTypeT>
 void transform(
   raft::resources const& handle,
   params spectral_embedding_config,
-  raft::device_coo_matrix_view<float, IndexTypeT, IndexTypeT, IndexTypeT> connectivity_graph,
+  raft::device_coo_matrix_view<float, IndexTypeT, IndexTypeT, NNZTypeT> connectivity_graph,
   raft::device_matrix_view<float, IndexTypeT, raft::col_major> embedding)
 {
   const IndexTypeT n_samples = connectivity_graph.structure_view().get_n_rows();
 
-  auto sym_coo_row_ind = raft::make_device_vector<IndexTypeT>(handle, n_samples + 1);
+  auto sym_coo_row_ind = raft::make_device_vector<NNZTypeT>(handle, n_samples + 1);
   auto diagonal        = raft::make_device_vector<float, IndexTypeT>(handle, n_samples);
+  if constexpr (std::numeric_limits<NNZTypeT>::max() > std::numeric_limits<IndexTypeT>::max()) {
+    auto sym_coo_col_ind =
+      raft::make_device_vector<NNZTypeT>(handle, connectivity_graph.structure_view().get_nnz());
 
-  auto csr_matrix_view =
-    coo_to_csr_matrix<IndexTypeT>(handle, n_samples, sym_coo_row_ind.view(), connectivity_graph);
-  auto laplacian = create_laplacian<IndexTypeT>(
-    handle, spectral_embedding_config, csr_matrix_view, diagonal.view());
-  compute_eigenpairs<IndexTypeT>(
-    handle, spectral_embedding_config, n_samples, laplacian, diagonal.view(), embedding);
+    auto csr_matrix_view = coo_to_csr_matrix<IndexTypeT, NNZTypeT>(
+      handle, n_samples, sym_coo_row_ind.view(), sym_coo_col_ind.view(), connectivity_graph);
+    auto laplacian = create_laplacian<NNZTypeT>(
+      handle, spectral_embedding_config, csr_matrix_view, diagonal.view());
+    compute_eigenpairs<NNZTypeT, IndexTypeT>(
+      handle, spectral_embedding_config, n_samples, laplacian, diagonal.view(), embedding);
+    return;
+  }
+
+  if constexpr (std::is_same_v<IndexTypeT, NNZTypeT>) {
+    auto csr_matrix_view =
+      coo_to_csr_matrix<IndexTypeT>(handle, n_samples, sym_coo_row_ind.view(), connectivity_graph);
+    auto laplacian = create_laplacian<IndexTypeT>(
+      handle, spectral_embedding_config, csr_matrix_view, diagonal.view());
+    compute_eigenpairs<IndexTypeT>(
+      handle, spectral_embedding_config, n_samples, laplacian, diagonal.view(), embedding);
+  }
 }
 
 // Explicit template instantiations for int32_t
@@ -295,7 +361,7 @@ template void transform<int32_t>(
   raft::device_matrix_view<float, int32_t, raft::row_major> dataset,
   raft::device_matrix_view<float, int32_t, raft::col_major> embedding);
 
-template void transform<int32_t>(
+template void transform<int32_t, int32_t>(
   raft::resources const& handle,
   params spectral_embedding_config,
   raft::device_coo_matrix_view<float, int32_t, int32_t, int32_t> connectivity_graph,
@@ -307,7 +373,13 @@ template void transform<int64_t>(
   raft::device_matrix_view<float, int64_t, raft::row_major> dataset,
   raft::device_matrix_view<float, int64_t, raft::col_major> embedding);
 
-template void transform<int64_t>(
+template void transform<int32_t, int64_t>(
+  raft::resources const& handle,
+  params spectral_embedding_config,
+  raft::device_coo_matrix_view<float, int32_t, int32_t, int64_t> connectivity_graph,
+  raft::device_matrix_view<float, int32_t, raft::col_major> embedding);
+
+template void transform<int64_t, int64_t>(
   raft::resources const& handle,
   params spectral_embedding_config,
   raft::device_coo_matrix_view<float, int64_t, int64_t, int64_t> connectivity_graph,
