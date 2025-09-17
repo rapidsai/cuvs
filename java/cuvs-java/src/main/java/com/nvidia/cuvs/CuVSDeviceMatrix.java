@@ -37,6 +37,12 @@ public interface CuVSDeviceMatrix extends CuVSMatrix {
 
   class CuVSDeviceMatrixDelegate implements CuVSDeviceMatrix {
 
+    private final CuVSDeviceMatrix deviceMatrix;
+
+    private CuVSDeviceMatrixDelegate(CuVSDeviceMatrix deviceMatrix) {
+      this.deviceMatrix = deviceMatrix;
+    }
+
     @Override
     public long size() {
       return deviceMatrix.size();
@@ -84,13 +90,7 @@ public interface CuVSDeviceMatrix extends CuVSMatrix {
 
     @Override
     public void close() {
-      deviceMatrix.close();
-    }
-
-    private final CuVSDeviceMatrix deviceMatrix;
-
-    private CuVSDeviceMatrixDelegate(CuVSDeviceMatrix deviceMatrix) {
-      this.deviceMatrix = deviceMatrix;
+      // Do nothing
     }
   }
 }
