@@ -821,7 +821,6 @@ void balancing_em_iters(const raft::resources& handle,
             mapping_op,
             device_memory,
             dataset_norm);
-    // raft::print_device_vector("cluster_labels after expectation step", cluster_labels, 20, std::cout);
     // M: Maximization step - calculate optimal cluster centers
     calc_centers_and_sizes(handle,
                            cluster_centers,
@@ -835,7 +834,6 @@ void balancing_em_iters(const raft::resources& handle,
                            mapping_op,
                            device_memory);
   }
-  // raft::print_device_vector("cluster_centers after balancing_em_iters", cluster_centers, dim, std::cout);
 
 }
 

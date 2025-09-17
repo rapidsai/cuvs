@@ -109,10 +109,11 @@ void fusedDistanceNN(OutT* min,
   auto py      = reinterpret_cast<uintptr_t>(y);
   if (16 % sizeof(DataT) == 0 && bytes % 16 == 0 && px % 16 == 0 && py % 16 == 0) {
     if (is_skinny) {
+      constexpr int max_veclen = std::min<int>(4, 16 / sizeof(DataT));
       detail::fusedDistanceNNImpl<DataT,
                                   OutT,
                                   IdxT,
-                                  typename raft::linalg::Policy4x4Skinny<DataT, 1>::Policy,
+                                  typename raft::linalg::Policy4x4Skinny<DataT, max_veclen>::Policy,
                                   ReduceOpT>(min,
                                              x,
                                              y,
@@ -131,10 +132,11 @@ void fusedDistanceNN(OutT* min,
                                              metric_arg,
                                              stream);
     } else {
+      constexpr int max_veclen = std::min<int>(4, 16 / sizeof(DataT));
       detail::fusedDistanceNNImpl<DataT,
                                   OutT,
                                   IdxT,
-                                  typename raft::linalg::Policy4x4<DataT, 1>::Policy,
+                                  typename raft::linalg::Policy4x4<DataT, max_veclen>::Policy,
                                   ReduceOpT>(min,
                                              x,
                                              y,
@@ -155,10 +157,11 @@ void fusedDistanceNN(OutT* min,
     }
   } else if (8 % sizeof(DataT) == 0 && bytes % 8 == 0 && px % 8 == 0 && py % 8 == 0) {
     if (is_skinny) {
+      constexpr int max_veclen = std::min<int>(4, 8 / sizeof(DataT));
       detail::fusedDistanceNNImpl<DataT,
                                   OutT,
                                   IdxT,
-                                  typename raft::linalg::Policy4x4Skinny<DataT, 1>::Policy,
+                                  typename raft::linalg::Policy4x4Skinny<DataT, max_veclen>::Policy,
                                   ReduceOpT>(min,
                                              x,
                                              y,
@@ -177,10 +180,11 @@ void fusedDistanceNN(OutT* min,
                                              metric_arg,
                                              stream);
     } else {
+      constexpr int max_veclen = std::min<int>(4, 8 / sizeof(DataT));
       detail::fusedDistanceNNImpl<DataT,
                                   OutT,
                                   IdxT,
-                                  typename raft::linalg::Policy4x4<DataT, 1>::Policy,
+                                  typename raft::linalg::Policy4x4<DataT, max_veclen>::Policy,
                                   ReduceOpT>(min,
                                              x,
                                              y,
@@ -201,10 +205,11 @@ void fusedDistanceNN(OutT* min,
     }
   } else {
     if (is_skinny) {
+      constexpr int max_veclen = std::min<int>(4, 16 / sizeof(DataT));
       detail::fusedDistanceNNImpl<DataT,
                                   OutT,
                                   IdxT,
-                                  typename raft::linalg::Policy4x4Skinny<DataT, 1>::Policy,
+                                  typename raft::linalg::Policy4x4Skinny<DataT, max_veclen>::Policy,
                                   ReduceOpT>(min,
                                              x,
                                              y,
@@ -223,10 +228,11 @@ void fusedDistanceNN(OutT* min,
                                              metric_arg,
                                              stream);
     } else {
+      constexpr int max_veclen = std::min<int>(4, 16 / sizeof(DataT));
       detail::fusedDistanceNNImpl<DataT,
                                   OutT,
                                   IdxT,
-                                  typename raft::linalg::Policy4x4<DataT, 1>::Policy,
+                                  typename raft::linalg::Policy4x4<DataT, max_veclen>::Policy,
                                   ReduceOpT>(min,
                                              x,
                                              y,

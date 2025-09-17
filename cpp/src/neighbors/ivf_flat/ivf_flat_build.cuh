@@ -201,8 +201,6 @@ void extend(raft::resources const& handle,
   cuvs::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_flat::extend(%zu, %u)", size_t(n_rows), dim);
 
-  RAFT_LOG_INFO("ivf_flat::extend starting - n_rows=%zu, dim=%u, n_lists=%u, binary_index=%d",
-                 static_cast<size_t>(n_rows), dim, n_lists, index->binary_index());
 
   RAFT_EXPECTS(new_indices != nullptr || index->size() == 0,
                "You must pass data indices when the index is non-empty.");
@@ -248,13 +246,9 @@ void extend(raft::resources const& handle,
         index->binary_centers().data_handle(), n_lists, dim);
 
       if (index->binary_index()) {
-        RAFT_LOG_INFO("Using predict_bitwise_hamming for batch - batch.size=%zu, batch.offset=%zu", 
-                       batch.size(), batch.offset());
         cuvs::cluster::kmeans::detail::predict_bitwise_hamming(
           handle, batch_data_view, centroids_view, batch_labels_view);
       } else {
-        RAFT_LOG_INFO("Using standard predict for uint8_t batch - batch.size=%zu, batch.offset=%zu", 
-                       batch.size(), batch.offset());
         auto orig_centroids_view = raft::make_device_matrix_view<const float, IdxT>(
           index->centers().data_handle(), n_lists, dim);
         cuvs::cluster::kmeans_balanced::predict(handle,
@@ -299,14 +293,12 @@ void extend(raft::resources const& handle,
 
   // Calculate the centers and sizes on the new data, starting from the original values
   if (index->adaptive_centers()) {
-    RAFT_LOG_INFO("Updating adaptive centers");
     auto list_sizes_view =
       raft::make_device_vector_view<std::remove_pointer_t<decltype(list_sizes_ptr)>, IdxT>(
         list_sizes_ptr, n_lists);
 
     if (index->binary_index()) {
       if constexpr (std::is_same_v<T, uint8_t>) {
-        RAFT_LOG_INFO("Updating adaptive centers for binary index");
         // For binary data, we need to work in the expanded space and then convert back
         rmm::device_uvector<float> temp_expanded_centers(
           n_lists * dim * 8, stream, raft::resource::get_workspace_resource(handle));
@@ -321,12 +313,12 @@ void extend(raft::resources const& handle,
 
         vec_batches.reset();  // Reset for second pass through the data
         for (const auto& batch : vec_batches) {
-          rmm::device_uvector<uint8_t> decoded_batch(
+          rmm::device_uvector<int8_t> decoded_batch(
             batch.size() * dim * 8, stream, raft::resource::get_workspace_resource(handle));
-          auto decoded_batch_view = raft::make_device_matrix_view<uint8_t, IdxT>(
+          auto decoded_batch_view = raft::make_device_matrix_view<int8_t, IdxT>(
             decoded_batch.data(), batch.size(), dim * 8);
           raft::linalg::map_offset(
-            handle, decoded_batch_view, utils::bitwise_decode_op<uint8_t, IdxT>(batch.data(), dim));
+            handle, decoded_batch_view, utils::bitwise_decode_op<int8_t, IdxT>(batch.data(), dim));
 
           auto batch_labels_view = raft::make_device_vector_view<const LabelT, IdxT>(
             new_labels.data_handle() + batch.offset(), batch.size());
@@ -340,12 +332,9 @@ void extend(raft::resources const& handle,
             raft::identity_op{});
         }
 
-        // raft::print_device_vector("expanded_centers_view", expanded_centers_view.data_handle(), index->dim() * 8, std::cout);
-
         // Convert updated centroids back to binary format
         cuvs::preprocessing::quantize::binary::quantizer<float> temp_quantizer(handle);
         cuvs::preprocessing::quantize::binary::transform(handle, temp_quantizer, expanded_centers_view, index->binary_centers());
-        // raft::print_device_vector("index->binary_centers()", index->binary_centers().data_handle(), index->dim(), std::cout);
   
       } else {
         // Error: BitwiseHamming with non-uint8_t type
@@ -415,9 +404,6 @@ void extend(raft::resources const& handle,
     auto batch_data_view =
       raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
     
-    RAFT_LOG_INFO("Inserting batch - size=%zu, offset=%zu, dim=%u, veclen=%u", 
-                   batch.size(), batch.offset(), dim, index->veclen());
-    
     // Kernel to insert the new vectors
     const dim3 block_dim(256);
     const dim3 grid_dim(raft::ceildiv<IdxT>(batch.size(), block_dim.x));
@@ -481,8 +467,6 @@ void extend(raft::resources const& handle,
     }
     RAFT_LOG_TRACE_VEC(index->center_norms()->data_handle(), std::min<uint32_t>(dim, 20));
   }
-  
-  RAFT_LOG_INFO("ivf_flat::extend completed successfully");
 }
 
 /** See raft::neighbors::ivf_flat::extend docs */
@@ -510,9 +494,6 @@ inline auto build(raft::resources const& handle,
   cuvs::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_flat::build(%zu, %u)", size_t(n_rows), dim);
   
-  RAFT_LOG_INFO("ivf_flat::build starting - n_rows=%zu, dim=%u, n_lists=%u, metric=%d", 
-                 static_cast<size_t>(n_rows), dim, params.n_lists, static_cast<int>(params.metric));
-  
   if (params.metric == cuvs::distance::DistanceType::BitwiseHamming &&
       !std::is_same_v<T, uint8_t>) {
     RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t input type, got %s",
@@ -528,9 +509,6 @@ inline auto build(raft::resources const& handle,
                "Cosine metric requires more than one dim");
   index<T, IdxT> index(handle, params, dim);
   
-  RAFT_LOG_INFO("Created index - binary_index=%d, add_data_on_build=%d", 
-                 index.binary_index(), params.add_data_on_build);
-  
   utils::memzero(
     index.accum_sorted_sizes().data_handle(), index.accum_sorted_sizes().size(), stream);
   utils::memzero(index.list_sizes().data_handle(), index.list_sizes().size(), stream);
@@ -542,9 +520,6 @@ inline auto build(raft::resources const& handle,
     auto trainset_ratio = std::max<size_t>(
       1, n_rows / std::max<size_t>(params.kmeans_trainset_fraction * n_rows, index.n_lists()));
     auto n_rows_train = n_rows / trainset_ratio;
-    
-    RAFT_LOG_INFO("Training kmeans - trainset_ratio=%zu, n_rows_train=%zu", 
-                   trainset_ratio, n_rows_train);
     
     rmm::device_uvector<T> trainset(
       n_rows_train * index.dim(), stream, raft::resource::get_large_workspace_resource(handle));
@@ -564,17 +539,9 @@ inline auto build(raft::resources const& handle,
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric =
       index.binary_index() ? cuvs::distance::DistanceType::L2Expanded : index.metric();
-    
-    RAFT_LOG_INFO("Kmeans params - n_iters=%d, metric=%d (original metric=%d)", 
-                   kmeans_params.n_iters, 
-                   static_cast<int>(kmeans_params.metric),
-                   static_cast<int>(index.metric()));
 
     if constexpr (std::is_same_v<T, uint8_t>) {
       if (index.binary_index()) {
-        RAFT_LOG_INFO("Using BitwiseHamming binary path - decoding to expanded representation");
-        RAFT_LOG_INFO("Original dim=%u, expanded dim=%u", index.dim(), index.dim() * 8);
-        
         // For binary data, we need to decode to expanded representation for clustering
         rmm::device_uvector<int8_t> decoded_trainset(
           n_rows_train * index.dim() * 8,
@@ -583,19 +550,13 @@ inline auto build(raft::resources const& handle,
         auto decoded_trainset_view = raft::make_device_matrix_view<int8_t, IdxT>(
           decoded_trainset.data(), n_rows_train, index.dim() * 8);
         
-        // rmm::device_uvector<uint32_t> decoded_trainset_uint32(
-        //   n_rows_train * index.dim() * 8,
-        //   stream,
-        //   raft::resource::get_large_workspace_resource(handle));
-        // auto decoded_trainset_uint32_view = raft::make_device_matrix_view<uint32_t, IdxT>(
-        //   decoded_trainset_uint32.data(), n_rows_train, index.dim() * 8);
-        
 
         // Decode binary trainset to expanded representation
         raft::linalg::map_offset(
           handle,
           decoded_trainset_view,
           utils::bitwise_decode_op<int8_t, IdxT>(trainset.data(), index.dim()));
+        
         trainset.release();
 
         rmm::device_uvector<float> decoded_centers(index.n_lists() * index.dim() * 8,
@@ -604,20 +565,16 @@ inline auto build(raft::resources const& handle,
         auto decoded_centers_view = raft::make_device_matrix_view<float, IdxT>(
           decoded_centers.data(), index.n_lists(), index.dim() * 8);
 
-        RAFT_LOG_INFO("Calling kmeans_balanced::fit with decoded data");
         cuvs::cluster::kmeans_balanced::fit(handle,
                                             kmeans_params,
                                             raft::make_const_mdspan(decoded_trainset_view),
                                             decoded_centers_view,
                                             raft::cast_op<float>());
-        RAFT_LOG_INFO("kmeans_balanced::fit completed");
         
         // Convert decoded centers back to binary format
-        RAFT_LOG_INFO("Converting centers back to binary format");
         cuvs::preprocessing::quantize::binary::quantizer<float> temp_quantizer(handle);
         cuvs::preprocessing::quantize::binary::transform(
           handle, temp_quantizer, decoded_centers_view, index.binary_centers());
-        RAFT_LOG_INFO("Binary centers conversion completed");
       } else {
         // For non-binary data, use standard clustering
         auto centers_view = raft::make_device_matrix_view<float, IdxT>(
@@ -634,16 +591,11 @@ inline auto build(raft::resources const& handle,
     }
   }
 
-  RAFT_LOG_INFO("Kmeans training completed");
 
   // add the data if necessary
   if (params.add_data_on_build) {
-    RAFT_LOG_INFO("Adding data to index with extend");
     detail::extend<T, IdxT>(handle, &index, dataset, nullptr, n_rows);
-    RAFT_LOG_INFO("Data added to index");
   }
-  
-  RAFT_LOG_INFO("ivf_flat::build completed successfully");
   return index;
 }
 
