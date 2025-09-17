@@ -155,7 +155,7 @@ struct mutual_reachability_params {
  * Given a dataset, builds the KNN graph, connects graph components and builds a linkage
  * (dendrogram). Returns the Minimum Spanning Tree edges sorted by weight and the dendrogram.
  * @param[in] handle raft handle for resource reuse
- * @param[in] X data points (size n_rows * d)
+ * @param[in] X data points on device memory (size n_rows * d)
  * @param[in] linkage_graph_params linkage params or mutual reachability params for building the KNN
  * graph
  * @param[in] metric distance metric to use
@@ -178,6 +178,21 @@ void build_linkage(
   raft::device_vector_view<int64_t, int64_t> out_sizes,
   std::optional<raft::device_vector_view<float, int64_t>> core_dists);
 
+/**
+ * Given a dataset, builds the KNN graph, connects graph components and builds a linkage
+ * (dendrogram). Returns the Minimum Spanning Tree edges sorted by weight and the dendrogram.
+ * @param[in] handle raft handle for resource reuse
+ * @param[in] X data points on host memory (size n_rows * d)
+ * @param[in] linkage_graph_params linkage params or mutual reachability params for building the KNN
+ * graph
+ * @param[in] metric distance metric to use
+ * @param[out] out_mst output MST sorted by edge weights (size n_rows - 1)
+ * @param[out] dendrogram output dendrogram (size [n_rows - 1] * 2)
+ * @param[out] out_distances distances for output
+ * @param[out] out_sizes cluster sizes of output
+ * @param[out] core_dists (optional) core distances (size m). Must be supplied in the Mutual
+ * Reachability space
+ */
 void build_linkage(
   raft::resources const& handle,
   raft::host_matrix_view<const float, int64_t, raft::row_major> X,
