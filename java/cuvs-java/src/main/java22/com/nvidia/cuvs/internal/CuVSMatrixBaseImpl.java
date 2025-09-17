@@ -18,6 +18,7 @@ package com.nvidia.cuvs.internal;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
+import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.CuVSMatrix;
@@ -47,6 +48,29 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
     this.valueLayout = valueLayout;
     this.size = size;
     this.columns = columns;
+  }
+
+  protected static void copyMatrix(
+      CuVSMatrixBaseImpl sourceMatrix, CuVSMatrixBaseImpl targetMatrix, CuVSResources resources) {
+    if (targetMatrix.columns() != sourceMatrix.columns
+        || targetMatrix.size() != sourceMatrix.size) {
+      throw new IllegalArgumentException(
+          "Source and target matrices must have the same dimensions");
+    }
+    if (targetMatrix.dataType() != sourceMatrix.dataType) {
+      throw new IllegalArgumentException("Source and target matrices must have the same dataType");
+    }
+
+    try (var localArena = Arena.ofConfined()) {
+      var targetTensor = targetMatrix.toTensor(localArena);
+
+      try (var resourceAccess = resources.access()) {
+        var cuvsRes = resourceAccess.handle();
+        var sourceTensor = sourceMatrix.toTensor(localArena);
+        checkCuVSError(cuvsMatrixCopy(cuvsRes, sourceTensor, targetTensor), "cuvsMatrixCopy");
+        checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync");
+      }
+    }
   }
 
   @Override
