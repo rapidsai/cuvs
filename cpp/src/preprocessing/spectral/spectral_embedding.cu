@@ -225,12 +225,13 @@ raft::device_csr_matrix<float, IndexTypeT, IndexTypeT, IndexTypeT> create_laplac
   return laplacian;
 }
 
+
 template <typename IndexTypeT, typename OutTypeT>
 void compute_eigenpairs(
   raft::resources const& handle,
   params spectral_embedding_config,
   const IndexTypeT n_samples,
-  raft::device_csr_matrix<float, IndexTypeT, IndexTypeT, IndexTypeT> laplacian,
+  raft::device_csr_matrix<float, IndexTypeT, IndexTypeT, IndexTypeT>& laplacian,
   raft::device_vector_view<float, OutTypeT> diagonal,
   raft::device_matrix_view<float, OutTypeT, raft::col_major> embedding)
 {

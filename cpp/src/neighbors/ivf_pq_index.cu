@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -302,7 +302,7 @@ uint32_t index<IdxT>::get_list_size_in_bytes(uint32_t label)
 {
   RAFT_EXPECTS(label < this->n_lists(),
                "Expected label to be less than number of lists in the index");
-  auto list_data = this->lists()[label]->data;
+  auto& list_data = this->lists()[label]->data;
   return list_data.size();
 }
 
