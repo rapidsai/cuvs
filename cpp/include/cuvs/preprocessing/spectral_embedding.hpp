@@ -71,7 +71,6 @@ struct params {
   uint64_t seed;
 };
 
-
 /**
  * @brief Perform spectral embedding on input dataset
  *
@@ -96,17 +95,20 @@ struct params {
  * params.seed = 42;
  *
  * // Create input dataset (n_samples x n_features)
- * auto dataset = raft::make_device_matrix<float, int>(handle, n_samples, n_features);
+ * // Using int32_t as the index type
+ * auto dataset = raft::make_device_matrix<float, int32_t>(handle, n_samples, n_features);
  * // ... fill dataset ...
  *
  * // Create output embedding matrix (n_samples x n_components)
- * auto embedding = raft::make_device_matrix<float, int, raft::col_major>(
+ * auto embedding = raft::make_device_matrix<float, int32_t, raft::col_major>(
  *     handle, n_samples, params.n_components);
  *
  * // Perform spectral embedding
- * cuvs::preprocessing::spectral_embedding::transform(
+ * cuvs::preprocessing::spectral_embedding::transform<int32_t>(
  *     handle, params, dataset.view(), embedding.view());
  * @endcode
+ *
+ * @tparam IndexTypeT Type for matrix indices (int32_t or int64_t)
  *
  * @param[in] handle RAFT resource handle for managing CUDA resources
  * @param[in] config Parameters controlling the spectral embedding algorithm
@@ -114,14 +116,12 @@ struct params {
  * @param[out] embedding Output embedding in column-major format [n_samples x n_components]
  *
  */
-// Template function declarations
 template <typename IndexTypeT>
 void transform(raft::resources const& handle,
                params config,
                raft::device_matrix_view<float, IndexTypeT, raft::row_major> dataset,
                raft::device_matrix_view<float, IndexTypeT, raft::col_major> embedding);
 
-  
 /**
  * @brief Perform spectral embedding using a precomputed connectivity graph
  *
@@ -150,22 +150,29 @@ void transform(raft::resources const& handle,
  *
  * // Assume we have a precomputed connectivity graph as COO matrix
  * // connectivity_graph represents weighted edges between samples
- * raft::device_coo_matrix<float, int, int, int> connectivity_graph(...);
+ * // Template parameters: <value_type, row_index_type, col_index_type, nnz_type>
+ * raft::device_coo_matrix<float, int32_t, int32_t, int32_t> connectivity_graph(...);
  *
  * // Create output embedding matrix (n_samples x n_components)
- * auto embedding = raft::make_device_matrix<float, int, raft::col_major>(
+ * auto embedding = raft::make_device_matrix<float, int32_t, raft::col_major>(
  *     handle, n_samples, params.n_components);
  *
  * // Perform spectral embedding
- * cuvs::preprocessing::spectral_embedding::transform(
+ * // Template explicitly specified: <IndexTypeT, NNZTypeT>
+ * cuvs::preprocessing::spectral_embedding::transform<int32_t, int32_t>(
  *     handle, params, connectivity_graph.view(), embedding.view());
  * @endcode
+ *
+ * @tparam IndexTypeT Type for matrix row/column indices (int32_t or int64_t)
+ * @tparam NNZTypeT Type for the number of non-zero elements (defaults to IndexTypeT)
  *
  * @param[in] handle RAFT resource handle for managing CUDA resources
  * @param[in] config Parameters controlling the spectral embedding algorithm
  *                   (n_neighbors parameter is ignored when using precomputed graph)
  * @param[in] connectivity_graph Precomputed sparse connectivity/affinity graph in COO format
- *                               representing weighted connections between samples
+ *                               representing weighted connections between samples.
+ *                               The COO matrix uses IndexTypeT for both row and column indices,
+ *                               and NNZTypeT for the number of non-zero elements.
  * @param[out] embedding Output embedding in column-major format [n_samples x n_components]
  *
  */
@@ -178,7 +185,7 @@ void transform(
 /**
  * @}
  */
-  
+
 extern template void transform<int32_t>(
   raft::resources const& handle,
   params config,
