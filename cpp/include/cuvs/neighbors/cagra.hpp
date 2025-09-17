@@ -351,11 +351,13 @@ struct index : cuvs::neighbors::index {
   }
 
   // Don't allow copying the index for performance reasons (try avoiding copying data)
+  /** \cond */
   index(const index&)                    = delete;
   index(index&&)                         = default;
   auto operator=(const index&) -> index& = delete;
   auto operator=(index&&) -> index&      = default;
   ~index()                               = default;
+  /** \endcond */
 
   /** Construct an empty index. */
   index(raft::resources const& res,

@@ -17,6 +17,7 @@ package com.nvidia.cuvs.internal;
 
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 import static com.nvidia.cuvs.internal.common.Util.checkCudaError;
+import static com.nvidia.cuvs.internal.common.Util.cudaGetDeviceProperties;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemGetInfo;
 import static com.nvidia.cuvs.internal.panama.headers_h_1.*;
 
@@ -52,8 +53,8 @@ public class GPUInfoProviderImpl implements GPUInfoProvider {
         MemorySegment deviceProp = cudaDeviceProp.allocate(localArena);
 
         for (int i = 0; i < numGpuCount; i++) {
-          returnValue = cudaGetDeviceProperties_v2(deviceProp, i);
-          checkCudaError(returnValue, "cudaGetDeviceProperties_v2");
+          returnValue = cudaGetDeviceProperties(deviceProp, i);
+          checkCudaError(returnValue, "cudaGetDeviceProperties");
 
           GPUInfo gpuInfo =
               new GPUInfo(
