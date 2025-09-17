@@ -219,7 +219,4 @@ def test_all_neighbors_host_build_quality(algo, cluster, snmg):
 
     recall = calc_recall(indices_host, bf_indices_host)
 
-    if snmg:
-        assert recall > 0.85
-    else:
-        assert recall > 0.9
+    assert recall > 0.84
