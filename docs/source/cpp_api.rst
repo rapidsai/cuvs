@@ -13,3 +13,4 @@ C++ API Documentation
    cpp_api/preprocessing.rst
    cpp_api/selection.rst
    cpp_api/stats.rst
+   cpp_api/core_interop

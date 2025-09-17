@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -210,20 +210,6 @@ TEST(CagraC, BuildExtendSearch)
   additional_dataset_tensor.dl_tensor.shape              = additional_dataset_shape;
   additional_dataset_tensor.dl_tensor.strides            = nullptr;
 
-  // create tensor for that points to the extended dataset
-  rmm::device_uvector<float> extend_return_d((additional_data_size + main_data_size) * dimensions,
-                                             stream);
-  DLManagedTensor additional_dataset_return_tensor;
-  additional_dataset_return_tensor.dl_tensor.data               = extend_return_d.data();
-  additional_dataset_return_tensor.dl_tensor.device.device_type = kDLCUDA;
-  additional_dataset_return_tensor.dl_tensor.ndim               = 2;
-  additional_dataset_return_tensor.dl_tensor.dtype.code         = kDLFloat;
-  additional_dataset_return_tensor.dl_tensor.dtype.bits         = 32;
-  additional_dataset_return_tensor.dl_tensor.dtype.lanes        = 1;
-  int64_t additional_return_dataset_shape[2] = {additional_data_size + main_data_size, dimensions};
-  additional_dataset_return_tensor.dl_tensor.shape   = additional_return_dataset_shape;
-  additional_dataset_return_tensor.dl_tensor.strides = nullptr;
-
   // create index
   cuvsCagraIndex_t index;
   cuvsCagraIndexCreate(&index);
@@ -238,8 +224,7 @@ TEST(CagraC, BuildExtendSearch)
   // extend index
   cuvsCagraExtendParams_t extend_params;
   cuvsCagraExtendParamsCreate(&extend_params);
-  cuvsCagraExtend(
-    res, extend_params, &additional_dataset_tensor, index, &additional_dataset_return_tensor);
+  cuvsCagraExtend(res, extend_params, &additional_dataset_tensor, index);
 
   // create queries DLTensor
   rmm::device_uvector<float> queries_d(num_queries * dimensions, stream);
@@ -341,15 +326,6 @@ TEST(CagraC, BuildExtendSearch)
   cuvsCagraSearchParamsCreate(&search_params);
   cuvsCagraSearch(
     res, search_params, index, &queries_tensor, &neighbors_tensor, &distances_tensor, filter);
-
-  // make sure that extend_return_d points to the extended dataset
-  ASSERT_TRUE(cuvs::devArrMatch(
-    main_d.data(), extend_return_d.data(), main_d.size(), cuvs::Compare<float>()));
-
-  ASSERT_TRUE(cuvs::devArrMatch(additional_d.data(),
-                                extend_return_d.data() + main_d.size(),
-                                additional_d.size(),
-                                cuvs::Compare<float>()));
 
   // check neighbors
   ASSERT_TRUE(
@@ -541,7 +517,7 @@ TEST(CagraC, BuildMergeSearch)
   cuvsCagraIndex_t index_array[2] = {index_main, index_add};
   ASSERT_EQ(cuvsCagraMerge(res, merge_params, index_array, 2, index_merged), CUVS_SUCCESS);
 
-  int merged_dim = -1;
+  int64_t merged_dim = -1;
   ASSERT_EQ(cuvsCagraIndexGetDims(index_merged, &merged_dim), CUVS_SUCCESS);
   EXPECT_EQ(merged_dim, 2);
 
