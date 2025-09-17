@@ -51,13 +51,12 @@ func BuildIndex[T any](Resources cuvs.Resource, params *IndexParams, dataset *cu
 // * `Resources` - Resources to use
 // * `params` - Parameters for extending the index
 // * `additional_dataset` - A row-major Tensor on the device to extend the index with
-// * `return_dataset` - A row-major Tensor on the device that will receive the extended dataset
 // * `index` - CagraIndex to extend
-func ExtendIndex[T any](Resources cuvs.Resource, params *ExtendParams, additional_dataset *cuvs.Tensor[T], return_dataset *cuvs.Tensor[T], index *CagraIndex) error {
+func ExtendIndex[T any](Resources cuvs.Resource, params *ExtendParams, additional_dataset *cuvs.Tensor[T], index *CagraIndex) error {
 	if !index.trained {
 		return errors.New("index needs to be built before calling extend")
 	}
-	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraExtend(C.ulong(Resources.Resource), params.params, (*C.DLManagedTensor)(unsafe.Pointer(additional_dataset.C_tensor)), index.index, (*C.DLManagedTensor)(unsafe.Pointer(return_dataset.C_tensor)))))
+	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraExtend(C.ulong(Resources.Resource), params.params, (*C.DLManagedTensor)(unsafe.Pointer(additional_dataset.C_tensor)), index.index)))
 	if err != nil {
 		return err
 	}
