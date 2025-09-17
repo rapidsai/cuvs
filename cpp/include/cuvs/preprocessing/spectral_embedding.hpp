@@ -170,9 +170,7 @@ void transform(raft::resources const& handle,
  * @param[in] config Parameters controlling the spectral embedding algorithm
  *                   (n_neighbors parameter is ignored when using precomputed graph)
  * @param[in] connectivity_graph Precomputed sparse connectivity/affinity graph in COO format
- *                               representing weighted connections between samples.
- *                               The COO matrix uses IndexTypeT for both row and column indices,
- *                               and NNZTypeT for the number of non-zero elements.
+ *                               representing weighted connections between samples
  * @param[out] embedding Output embedding in column-major format [n_samples x n_components]
  *
  */
