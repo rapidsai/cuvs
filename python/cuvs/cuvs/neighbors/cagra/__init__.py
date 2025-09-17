@@ -15,10 +15,12 @@
 
 from .cagra import (
     CompressionParams,
+    ExtendParams,
     Index,
     IndexParams,
     SearchParams,
     build,
+    extend,
     from_graph,
     load,
     save,
@@ -27,10 +29,12 @@ from .cagra import (
 
 __all__ = [
     "CompressionParams",
+    "ExtendParams",
     "Index",
     "IndexParams",
     "SearchParams",
     "build",
+    "extend",
     "from_graph",
     "load",
     "save",
