@@ -28,12 +28,13 @@ extern "C" {
 #endif
 
 /**
- * @defgroup all_neighbors_c_build All-neighbors C-API build (SNMG only)
+ * @defgroup all_neighbors_c_build All-neighbors C-API build
  * @{
  *
  * All-neighbors constructs an approximate k-NN graph for all vectors in a dataset.
- * This SNMG C API can be used with a multi-GPU resources handle (`cuvsResources_t`)
- * created from `raft::device_resources_snmg` to distribute work across GPUs.
+ * The All-neighbors API can either be used in single-GPU or multi-GPU mode.
+ * For multi-GPU deployment, please pass a multi-GPU resources handle and
+ * provide the dataset on host.
  *
  * Notes:
  * - Outputs (indices, distances, core_distances) are expected to be on device memory.

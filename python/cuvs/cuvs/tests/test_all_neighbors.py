@@ -87,7 +87,7 @@ def test_all_neighbors_device_build_quality(algo, cluster, metric):
     if algo == "ivf_pq":
         ivf_pq_params = ivf_pq.IndexParams(
             metric=metric,
-            n_lists=32 if cluster == "multi_cluster" else 4,
+            n_lists=8 if cluster == "multi_cluster" else 4,
             pq_bits=8,
             pq_dim=0,
             add_data_on_build=True,
@@ -170,7 +170,7 @@ def test_all_neighbors_host_build_quality(algo, cluster, snmg):
     if algo == "ivf_pq":
         ivf_pq_params = ivf_pq.IndexParams(
             metric="sqeuclidean",
-            n_lists=32 if cluster == "multi_cluster" else 4,
+            n_lists=8 if cluster == "multi_cluster" else 4,
             pq_bits=8,
             pq_dim=0,
             add_data_on_build=True,

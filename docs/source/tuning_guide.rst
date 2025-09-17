@@ -12,7 +12,7 @@ For more information on the various different types of vector search indexes, pl
 Why automated tuning?
 =====================
 
-As much as 75% of users have told us they will not be able to tune a vector database beyond one or two simple knobs and we suggest that an ideal “knob” would be to balance training time and search time with search quality. The more time, the higher the quality, and the more needed to find an acceptable search performance. Even the 25% of users that want to tune are still asking for simple tools for doing so. These users also ask for some simple guidelines for setting tuning parameters, like :doc:`this guide <indexes/indexes>`.
+As much as 75% of users have told us they will not be able to tune a vector database beyond one or two simple knobs and we suggest that an ideal “knob” would be to balance training time and search time with search quality. The more time, the higher the quality, and the more needed to find an acceptable search performance. Even the 25% of users that want to tune are still asking for simple tools for doing so. These users also ask for some simple guidelines for setting tuning parameters, like :doc:`this guide <neighbors/neighbors>`.
 
 Since vector search indexes are more closely related to machine learning models than traditional databases indexes, one option for easing the parameter tuning burden is to use hyper-parameter optimization tools like `Ray Tune <https://medium.com/rapids-ai/30x-faster-hyperparameter-search-with-raytune-and-rapids-403013fbefc5>`_ and `Optuna <https://docs.rapids.ai/deployment/stable/examples/rapids-optuna-hpo/notebook/>`_. to verify this.
 

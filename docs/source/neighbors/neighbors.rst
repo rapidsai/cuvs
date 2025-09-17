@@ -1,5 +1,5 @@
-Nearest Neighbor Indexes
-========================
+Nearest Neighbor
+================
 
 .. toctree::
    :maxdepth: 3

@@ -87,26 +87,33 @@ static cuvs::neighbors::all_neighbors::all_neighbors_params convert_params(
   return out;
 }
 
-static void ensure_indices_dtype(DLManagedTensor* indices)
+static void ensure_indices_dtype_and_device_compatibility(DLManagedTensor* indices)
 {
   auto dtype = indices->dl_tensor.dtype;
   RAFT_EXPECTS(dtype.code == kDLInt && dtype.bits == 64, "indices must be int64 output tensor");
+  RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(indices->dl_tensor),
+               "indices tensor must be device-compatible");
 }
 
-static void ensure_optional_distance_dtype(DLManagedTensor* distances)
+static void ensure_optional_distance_dtype_and_device_compatibility(DLManagedTensor* distances)
 {
   if (distances == nullptr) { return; }
   auto dtype = distances->dl_tensor.dtype;
   RAFT_EXPECTS(dtype.code == kDLFloat && dtype.bits == 32,
                "distances must be float32 output tensor");
+  RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(distances->dl_tensor),
+               "distances tensor must be device-compatible");
 }
 
-static void ensure_optional_core_distance_dtype(DLManagedTensor* core_distances)
+static void ensure_optional_core_distance_dtype_and_device_compatibility(
+  DLManagedTensor* core_distances)
 {
   if (core_distances == nullptr) { return; }
   auto dtype = core_distances->dl_tensor.dtype;
   RAFT_EXPECTS(dtype.code == kDLFloat && dtype.bits == 32,
                "core_distances must be float32 output tensor");
+  RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(core_distances->dl_tensor),
+               "core_distances tensor must be device-compatible");
 }
 
 template <typename T>
@@ -124,9 +131,9 @@ void _build_host(cuvsResources_t res,
   RAFT_EXPECTS(cuvs::core::is_dlpack_host_compatible(dlt),
                "Host build expects host-compatible dataset tensor");
 
-  ensure_indices_dtype(indices_tensor);
-  ensure_optional_distance_dtype(distances_tensor);
-  ensure_optional_core_distance_dtype(core_distances_tensor);
+  ensure_indices_dtype_and_device_compatibility(indices_tensor);
+  ensure_optional_distance_dtype_and_device_compatibility(distances_tensor);
+  ensure_optional_core_distance_dtype_and_device_compatibility(core_distances_tensor);
 
   // Check dependencies between parameters
   if (core_distances_tensor != nullptr && distances_tensor == nullptr) {
@@ -175,9 +182,9 @@ void _build_device(cuvsResources_t device_res,
   RAFT_EXPECTS(cuvs::core::is_dlpack_device_compatible(dlt),
                "Device build expects device-compatible dataset tensor");
 
-  ensure_indices_dtype(indices_tensor);
-  ensure_optional_distance_dtype(distances_tensor);
-  ensure_optional_core_distance_dtype(core_distances_tensor);
+  ensure_indices_dtype_and_device_compatibility(indices_tensor);
+  ensure_optional_distance_dtype_and_device_compatibility(distances_tensor);
+  ensure_optional_core_distance_dtype_and_device_compatibility(core_distances_tensor);
 
   // Check dependencies between parameters
   if (core_distances_tensor != nullptr && distances_tensor == nullptr) {
