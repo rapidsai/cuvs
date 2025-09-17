@@ -525,14 +525,12 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
  * @param[in] params cuvsCagraExtendParams_t used to extend CAGRA index
  * @param[in] additional_dataset DLManagedTensor* additional dataset
  * @param[in,out] index cuvsCagraIndex_t CAGRA index
- * @param[out] return_dataset DLManagedTensor* extended dataset
  * @return cuvsError_t
  */
 cuvsError_t cuvsCagraExtend(cuvsResources_t res,
                             cuvsCagraExtendParams_t params,
                             DLManagedTensor* additional_dataset,
-                            cuvsCagraIndex_t index,
-                            DLManagedTensor* return_dataset);
+                            cuvsCagraIndex_t index);
 
 /**
  * @}

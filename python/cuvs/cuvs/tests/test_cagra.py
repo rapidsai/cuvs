@@ -41,7 +41,7 @@ def run_cagra_build_search_test(
     array_type="device",
     compare=True,
     inplace=True,
-    add_data_on_build=True,
+    test_extend=False,
     search_params={},
     compression=None,
 ):
@@ -60,26 +60,24 @@ def run_cagra_build_search_test(
         compression=compression,
     )
 
-    if array_type == "device":
-        index = cagra.build(build_params, dataset_device)
-    else:
-        index = cagra.build(build_params, dataset)
-
-    if not add_data_on_build:
+    if test_extend:
         dataset_1 = dataset[: n_rows // 2, :]
         dataset_2 = dataset[n_rows // 2 :, :]
-        indices_1 = np.arange(n_rows // 2, dtype=np.uint32)
-        indices_2 = np.arange(n_rows // 2, n_rows, dtype=np.uint32)
+        extend_params = cagra.ExtendParams()
         if array_type == "device":
             dataset_1_device = device_ndarray(dataset_1)
             dataset_2_device = device_ndarray(dataset_2)
-            indices_1_device = device_ndarray(indices_1)
-            indices_2_device = device_ndarray(indices_2)
-            index = cagra.extend(index, dataset_1_device, indices_1_device)
-            index = cagra.extend(index, dataset_2_device, indices_2_device)
+
+            index = cagra.build(build_params, dataset_1_device)
+            index = cagra.extend(extend_params, index, dataset_2_device)
         else:
-            index = cagra.extend(index, dataset_1, indices_1)
-            index = cagra.extend(index, dataset_2, indices_2)
+            index = cagra.build(build_params, dataset_1)
+            index = cagra.extend(index, dataset_2)
+    else:
+        if array_type == "device":
+            index = cagra.build(build_params, dataset_device)
+        else:
+            index = cagra.build(build_params, dataset)
 
     queries = generate_data((n_queries, n_cols), dtype)
     out_idx = np.zeros((n_queries, k), dtype=np.uint32)
@@ -185,7 +183,7 @@ def test_filtered_cagra(sparsity):
         {
             "intermediate_graph_degree": 64,
             "graph_degree": 32,
-            "add_data_on_build": True,
+            "test_extend": False,
             "k": 1,
             "metric": "sqeuclidean",
             "build_algo": "ivf_pq",
@@ -193,7 +191,7 @@ def test_filtered_cagra(sparsity):
         {
             "intermediate_graph_degree": 32,
             "graph_degree": 16,
-            "add_data_on_build": False,
+            "test_extend": True,
             "k": 5,
             "metric": "sqeuclidean",
             "build_algo": "ivf_pq",
@@ -201,7 +199,7 @@ def test_filtered_cagra(sparsity):
         {
             "intermediate_graph_degree": 128,
             "graph_degree": 32,
-            "add_data_on_build": True,
+            "test_extend": False,
             "k": 10,
             "metric": "inner_product",
             "build_algo": "nn_descent",
@@ -212,6 +210,7 @@ def test_cagra_index_params(params):
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.
     run_cagra_build_search_test(
+        test_extend=params["test_extend"],
         k=params["k"],
         metric=params["metric"],
         graph_degree=params["graph_degree"],
