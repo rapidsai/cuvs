@@ -50,14 +50,13 @@ void transform(raft::resources const& handle,
                raft::device_matrix_view<float, IndexTypeT, raft::row_major> dataset,
                raft::device_matrix_view<float, IndexTypeT, raft::col_major> embedding);
 
-template <typename IndexTypeT, typename NNZTypeT>
+template <typename IndexTypeT, typename NNZTypeT = IndexTypeT>
 void transform(
   raft::resources const& handle,
   params config,
   raft::device_coo_matrix_view<float, IndexTypeT, IndexTypeT, NNZTypeT> connectivity_graph,
   raft::device_matrix_view<float, IndexTypeT, raft::col_major> embedding);
 
-// Explicit instantiations for common index types
 extern template void transform<int32_t>(
   raft::resources const& handle,
   params config,
@@ -81,11 +80,4 @@ extern template void transform<int32_t, int64_t>(
   params config,
   raft::device_coo_matrix_view<float, int32_t, int32_t, int64_t> connectivity_graph,
   raft::device_matrix_view<float, int32_t, raft::col_major> embedding);
-
-extern template void transform<int64_t, int64_t>(
-  raft::resources const& handle,
-  params config,
-  raft::device_coo_matrix_view<float, int64_t, int64_t, int64_t> connectivity_graph,
-  raft::device_matrix_view<float, int64_t, raft::col_major> embedding);
-
 }  // namespace cuvs::preprocessing::spectral_embedding
