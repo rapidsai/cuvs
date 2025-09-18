@@ -12,13 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .all_neighbors import AllNeighborsParams, build
 
-from .mg_resources import MultiGpuResources, auto_sync_multi_gpu_resources
-from .resources import Resources, auto_sync_resources
-
-__all__ = [
-    "auto_sync_resources",
-    "Resources",
-    "MultiGpuResources",
-    "auto_sync_multi_gpu_resources",
-]
+__all__ = ["AllNeighborsParams", "build"]
