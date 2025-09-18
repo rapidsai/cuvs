@@ -1,5 +1,5 @@
 All-neighbors KNN
-================
+=================
 
 .. role:: py(code)
    :language: python

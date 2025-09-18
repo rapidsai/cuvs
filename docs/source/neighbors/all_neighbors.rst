@@ -1,5 +1,5 @@
 All-neighbors
-============
+=============
 
 All-neighbors is a specialized algorithm for building approximate all-neighbors k-NN graphs. Unlike traditional nearest neighbor indexes that are designed for searching, all-neighbors focuses on constructing complete k-NN graphs for entire datasets.
 
@@ -16,10 +16,10 @@ All-neighbors supports multiple underlying algorithms:
 
 The algorithm partitions the dataset into clusters and distributes the work across multiple GPUs when possible, making it suitable for large-scale graph construction tasks.
 
-[ :doc:`C++ API <../cpp_api/neighbors_all_neighbors>` | :doc:`Python API <../python_api/neighbors_all_neighbors>` ]
+[ :doc:`C API <../c_api/neighbors_all_neighbors_c>` |:doc:`C++ API <../cpp_api/neighbors_all_neighbors>` | :doc:`Python API <../python_api/neighbors_all_neighbors>` ]
 
 Algorithm Overview
------------------
+------------------
 
 All-neighbors works by:
 
@@ -61,11 +61,10 @@ Parameters
 - **algorithm-specific parameters**: IVF-PQ or NN-Descent specific settings
 
 Performance Characteristics
--------------------------
+---------------------------
 
 - **Build Time**: Scales with dataset size and chosen algorithm
 - **Memory Usage**: Depends on cluster size and overlap factor
-- **Accuracy**: Varies by algorithm (brute_force = exact, others = approximate)
 - **Scalability**: Linear scaling with number of GPUs when n_clusters > 1
 
 The algorithm automatically chooses between single-GPU and multi-GPU execution based on the n_clusters parameter and available resources.

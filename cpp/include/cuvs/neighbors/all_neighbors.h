@@ -72,6 +72,24 @@ struct cuvsAllNeighborsIndexParams {
 typedef struct cuvsAllNeighborsIndexParams* cuvsAllNeighborsIndexParams_t;
 
 /**
+ * @brief Create a default all-neighbors index parameters struct.
+ *
+ * @param[out] index_params  Pointer to allocated index_params struct
+ *
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsAllNeighborsIndexParamsCreate(cuvsAllNeighborsIndexParams_t* index_params);
+
+/**
+ * @brief Destroy an all-neighbors index parameters struct.
+ *
+ * @param[in] index_params  Index parameters struct to destroy
+ *
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsAllNeighborsIndexParamsDestroy(cuvsAllNeighborsIndexParams_t index_params);
+
+/**
  * @brief Build an all-neighbors k-NN graph automatically detecting host vs device dataset.
  *
  * @param[in] res             Can be a SNMG multi-GPU resources (`cuvsResources_t`) or single-GPU

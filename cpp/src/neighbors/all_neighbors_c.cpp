@@ -220,6 +220,32 @@ void _build_device(cuvsResources_t device_res,
 
 }  // namespace
 
+extern "C" cuvsError_t cuvsAllNeighborsIndexParamsCreate(cuvsAllNeighborsIndexParams_t* params)
+{
+  return cuvs::core::translate_exceptions([=] {
+    *params                      = new cuvsAllNeighborsIndexParams{};
+    (*params)->algo              = CUVS_ALL_NEIGHBORS_ALGO_BRUTE_FORCE;
+    (*params)->overlap_factor    = 1;
+    (*params)->n_clusters        = 1;
+    (*params)->metric            = L2Expanded;
+    (*params)->ivf_pq_params     = nullptr;
+    (*params)->nn_descent_params = nullptr;
+  });
+}
+
+extern "C" cuvsError_t cuvsAllNeighborsIndexParamsDestroy(cuvsAllNeighborsIndexParams_t params)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (params != nullptr) {
+      if (params->ivf_pq_params != nullptr) { cuvsIvfPqIndexParamsDestroy(params->ivf_pq_params); }
+      if (params->nn_descent_params != nullptr) {
+        cuvsNNDescentIndexParamsDestroy(params->nn_descent_params);
+      }
+      delete params;
+    }
+  });
+}
+
 extern "C" cuvsError_t cuvsAllNeighborsBuild(cuvsResources_t res,
                                              cuvsAllNeighborsIndexParams_t params,
                                              DLManagedTensor* dataset_tensor,

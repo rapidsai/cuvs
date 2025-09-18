@@ -317,6 +317,11 @@ if(TARGET cuvs::c_api)
 
   ConfigureTest(NAME MG_C_TEST PATH neighbors/run_mg_c.c neighbors/ann_mg_c.cu C_LIB)
 
+  ConfigureTest(
+    NAME ALL_NEIGHBORS_C_TEST PATH neighbors/run_all_neighbors_c.c neighbors/all_neighbors_c.cu
+    C_LIB
+  )
+
   if(BUILD_CAGRA_HNSWLIB)
     ConfigureTest(NAME HNSW_C_TEST PATH neighbors/ann_hnsw_c.cu C_LIB)
     target_link_libraries(NEIGHBORS_HNSW_TEST PRIVATE hnswlib::hnswlib)
