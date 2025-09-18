@@ -60,11 +60,13 @@ cdef class IndexParams:
         String denoting the metric type.
         Valid values for metric: ["sqeuclidean", "inner_product", "euclidean"],
         where:
+
             - sqeuclidean is the euclidean distance without the square root
               operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2,
             - euclidean is the euclidean distance
             - inner product distance is defined as
               distance(a, b) = \\sum_i a_i * b_i.
+
     kmeans_n_iters : int, default = 20
         The number of iterations searching for kmeans centers during index
         building.
@@ -247,12 +249,21 @@ cdef class Index:
     @property
     def n_lists(self):
         """ The number of inverted lists (clusters) """
-        return cuvsIvfPqIndexGetNLists(self.index)
+        cdef int64_t n_lists
+        check_cuvs(cuvsIvfPqIndexGetNLists(self.index, &n_lists))
+        return n_lists
 
     @property
     def dim(self):
         """ dimensionality of the cluster centers """
-        return cuvsIvfPqIndexGetDim(self.index)
+        cdef int64_t dim
+        check_cuvs(cuvsIvfPqIndexGetDim(self.index, &dim))
+        return dim
+
+    def __len__(self):
+        cdef int64_t size
+        check_cuvs(cuvsIvfPqIndexGetSize(self.index, &size))
+        return size
 
     @property
     def centers(self):

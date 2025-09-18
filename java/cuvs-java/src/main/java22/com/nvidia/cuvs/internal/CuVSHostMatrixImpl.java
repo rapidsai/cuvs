@@ -18,7 +18,9 @@ package com.nvidia.cuvs.internal;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
+import com.nvidia.cuvs.CuVSDeviceMatrix;
 import com.nvidia.cuvs.CuVSHostMatrix;
+import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.RowView;
 import java.lang.foreign.*;
 import java.lang.invoke.VarHandle;
@@ -140,6 +142,19 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
       MemorySegment.copy(
           memorySegment, valueLayout, r * columns * valueByteSize, array[r], 0, (int) columns);
     }
+  }
+
+  @Override
+  public void toHost(CuVSHostMatrix hostMatrix) {
+    var targetMatrix = (CuVSHostMatrixImpl) hostMatrix;
+    var valueByteSize = valueLayout.byteSize();
+    MemorySegment.copy(
+        this.memorySegment, 0L, targetMatrix.memorySegment, 0L, size * columns * valueByteSize);
+  }
+
+  @Override
+  public void toDevice(CuVSDeviceMatrix deviceMatrix, CuVSResources cuVSResources) {
+    copyMatrix(this, (CuVSMatrixBaseImpl) deviceMatrix, cuVSResources);
   }
 
   @Override
