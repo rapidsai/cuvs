@@ -540,7 +540,7 @@ RAFT_DEVICE_INLINE_FUNCTION void hashmap_restore(INDEX_T* const hashmap_ptr,
  * @param max_iteration Maximum number of iterations.
  * @param num_executed_iterations Pointer to the number of executed iterations [num_queries].
  * @param hash_bitlen Bit length of the hash.
- * @param small_hash_bitlen Bit length of the small hash.
+ * @param use_small_hash Whether to use local small hash table (1) or global hash table (0).
  * @param small_hash_reset_interval Interval for resetting the small hash.
  * @param query_id sequential id of the query in the batch
  */
@@ -569,7 +569,7 @@ __device__ void search_core(
   const std::uint32_t max_iteration,
   std::uint32_t* const num_executed_iterations,  // [num_queries]
   const std::uint32_t hash_bitlen,
-  const std::uint32_t small_hash_bitlen,
+  const std::uint32_t use_small_hash,
   const std::uint32_t small_hash_reset_interval,
   const std::uint32_t query_id,
   SAMPLE_FILTER_T sample_filter)
@@ -607,7 +607,7 @@ __device__ void search_core(
   // |<---             result_buffer_size              --->|
   const auto result_buffer_size    = internal_topk + (search_width * graph_degree);
   const auto result_buffer_size_32 = raft::round_up_safe<uint32_t>(result_buffer_size, 32);
-  const auto small_hash_size       = hashmap::get_size(small_hash_bitlen);
+  const auto small_hash_size       = use_small_hash ? hashmap::get_size(hash_bitlen) : 0;
 
   // Set smem working buffer for the distance calculation
   dataset_desc = dataset_desc->setup_workspace(smem, queries_ptr, query_id);
@@ -634,7 +634,7 @@ __device__ void search_core(
 
   // Init hashmap
   INDEX_T* local_visited_hashmap_ptr;
-  if (small_hash_bitlen) {
+  if (use_small_hash) {
     local_visited_hashmap_ptr = visited_hash_buffer;
   } else {
     local_visited_hashmap_ptr = visited_hashmap_ptr + (hashmap::get_size(hash_bitlen) * blockIdx.y);
@@ -986,7 +986,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   const std::uint32_t max_iteration,
   std::uint32_t* const num_executed_iterations,  // [num_queries]
   const std::uint32_t hash_bitlen,
-  const std::uint32_t small_hash_bitlen,
+  const std::uint32_t use_small_hash,
   const std::uint32_t small_hash_reset_interval,
   SAMPLE_FILTER_T sample_filter)
 {
@@ -1013,7 +1013,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
                                max_iteration,
                                num_executed_iterations,
                                hash_bitlen,
-                               small_hash_bitlen,
+                               use_small_hash,
                                small_hash_reset_interval,
                                query_id,
                                sample_filter);
@@ -1102,7 +1102,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_p(
   const std::uint32_t max_iteration,
   std::uint32_t* const num_executed_iterations,  // [num_queries]
   const std::uint32_t hash_bitlen,
-  const std::uint32_t small_hash_bitlen,
+  const std::uint32_t use_small_hash,
   const std::uint32_t small_hash_reset_interval,
   SAMPLE_FILTER_T sample_filter)
 {
@@ -1169,7 +1169,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel_p(
                                  max_iteration,
                                  num_executed_iterations,
                                  hash_bitlen,
-                                 small_hash_bitlen,
+                                 use_small_hash,
                                  small_hash_reset_interval,
                                  query_id,
                                  sample_filter);
@@ -1779,7 +1779,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     uint32_t block_size,  //
     uint32_t smem_size,
     int64_t hash_bitlen,
-    size_t small_hash_bitlen,
+    uint32_t use_small_hash,
     size_t small_hash_reset_interval,
     uint32_t num_random_samplings,
     uint64_t rand_xor_mask,
@@ -1793,7 +1793,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     float persistent_device_usage) -> uint64_t
   {
     return uint64_t(graph.data_handle()) ^ dataset_desc.get().team_size ^ num_itopk_candidates ^
-           block_size ^ smem_size ^ hash_bitlen ^ small_hash_reset_interval ^ num_random_samplings ^
+           block_size ^ smem_size ^ hash_bitlen ^ use_small_hash ^ small_hash_reset_interval ^ num_random_samplings ^
            rand_xor_mask ^ num_seeds ^ itopk_size ^ search_width ^ min_iterations ^ max_iterations ^
            uint64_t(persistent_lifetime * 1000) ^ uint64_t(persistent_device_usage * 1000);
   }
@@ -1805,7 +1805,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     uint32_t block_size,  //
     uint32_t smem_size,
     int64_t hash_bitlen,
-    size_t small_hash_bitlen,
+    uint32_t use_small_hash,
     size_t small_hash_reset_interval,
     uint32_t num_random_samplings,
     uint64_t rand_xor_mask,
@@ -1832,7 +1832,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
                                           block_size,
                                           smem_size,
                                           hash_bitlen,
-                                          small_hash_bitlen,
+                                          use_small_hash,
                                           small_hash_reset_interval,
                                           num_random_samplings,
                                           rand_xor_mask,
@@ -1883,7 +1883,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
     }
 
     index_type* hashmap_ptr = nullptr;
-    if (small_hash_bitlen == 0) {
+    if (!use_small_hash) {
       hashmap.resize(gs.y * hashmap::get_size(hash_bitlen), stream);
       hashmap_ptr = hashmap.data();
     }
@@ -1912,7 +1912,7 @@ struct alignas(kCacheLineBytes) persistent_runner_t : public persistent_runner_b
        &max_iterations,
        &num_executed_iterations,
        &hash_bitlen,
-       &small_hash_bitlen,
+       &use_small_hash,
        &small_hash_reset_interval,
        &sample_filter};
     cuda::atomic_thread_fence(cuda::memory_order_seq_cst, cuda::thread_scope_system);
@@ -2092,7 +2092,7 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                     uint32_t smem_size,
                     int64_t hash_bitlen,
                     IndexT* hashmap_ptr,
-                    size_t small_hash_bitlen,
+                    uint32_t use_small_hash,
                     size_t small_hash_reset_interval,
                     uint32_t num_seeds,
                     SampleFilterT sample_filter,
@@ -2112,7 +2112,7 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
                             block_size,
                             smem_size,
                             hash_bitlen,
-                            small_hash_bitlen,
+                            use_small_hash,
                             small_hash_reset_interval,
                             ps.num_random_samplings,
                             ps.rand_xor_mask,
@@ -2153,7 +2153,7 @@ control is returned in this thread (in persistent_runner_t constructor), so we'r
                                                            ps.max_iterations,
                                                            num_executed_iterations,
                                                            hash_bitlen,
-                                                           small_hash_bitlen,
+                                                           use_small_hash,
                                                            small_hash_reset_interval,
                                                            sample_filter);
     RAFT_CUDA_TRY(cudaPeekAtLastError());

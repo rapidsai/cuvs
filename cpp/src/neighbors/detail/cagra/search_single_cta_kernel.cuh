@@ -37,7 +37,7 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                     uint32_t smem_size,
                     int64_t hash_bitlen,
                     IndexT* hashmap_ptr,
-                    size_t small_hash_bitlen,
+                    uint32_t use_small_hash,
                     size_t small_hash_reset_interval,
                     uint32_t num_seeds,
                     SampleFilterT sample_filter,
