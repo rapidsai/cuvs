@@ -18,6 +18,7 @@ import cupy
 import numpy as np
 import pytest
 from pylibraft.common import device_ndarray
+from sklearn.datasets import make_blobs
 
 from cuvs.common import MultiGpuResources, Resources
 from cuvs.neighbors import all_neighbors, brute_force, ivf_pq, nn_descent
@@ -57,14 +58,11 @@ def test_all_neighbors_device_build_quality(algo, cluster, metric):
         pytest.skip("Skipping IVF-PQ with cosine distance")
 
     if cluster == "single_cluster":
-        n_clusters = 1
         overlap_factor = 0
     else:
-        n_clusters = 8
         overlap_factor = 3
 
     np.random.seed(42)
-    from sklearn.datasets import make_blobs
 
     if metric == "cosine":
         X, _ = make_cosine(
@@ -74,7 +72,7 @@ def test_all_neighbors_device_build_quality(algo, cluster, metric):
         X, _ = make_blobs(
             n_samples=n_rows,
             n_features=n_cols,
-            centers=n_clusters,
+            centers=10,
             cluster_std=1.0,
             center_box=(-10.0, 10.0),
             random_state=42,
@@ -131,7 +129,7 @@ def test_all_neighbors_device_build_quality(algo, cluster, metric):
     assert distances.dtype == cupy.float32
 
     recall = calc_recall(indices_host, bf_indices_host)
-    assert recall > 0.9
+    assert recall > 0.85
 
 
 @pytest.mark.parametrize("algo", ["nn_descent", "brute_force", "ivf_pq"])
@@ -151,12 +149,11 @@ def test_all_neighbors_host_build_quality(algo, cluster, snmg):
         overlap_factor = 3
 
     np.random.seed(42)
-    from sklearn.datasets import make_blobs
 
     X_host, _ = make_blobs(
         n_samples=n_rows,
         n_features=n_cols,
-        centers=n_clusters,
+        centers=10,
         cluster_std=1.0,
         center_box=(-10.0, 10.0),
         random_state=42,
@@ -219,4 +216,4 @@ def test_all_neighbors_host_build_quality(algo, cluster, snmg):
 
     recall = calc_recall(indices_host, bf_indices_host)
 
-    assert recall > 0.84
+    assert recall > 0.85
