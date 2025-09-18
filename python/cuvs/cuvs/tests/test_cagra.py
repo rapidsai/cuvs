@@ -209,7 +209,7 @@ def test_filtered_cagra(sparsity):
         {
             "intermediate_graph_degree": 64,
             "graph_degree": 32,
-            "add_data_on_build": True,
+            "test_extend": True,
             "k": 10,
             "metric": "cosine",
             "build_algo": "ivf_pq",
