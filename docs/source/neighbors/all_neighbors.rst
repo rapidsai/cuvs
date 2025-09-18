@@ -65,6 +65,7 @@ Performance Characteristics
 
 - **Build Time**: Scales with dataset size and chosen algorithm
 - **Memory Usage**: Depends on cluster size and overlap factor
+- **Accuracy**: Varies by algorithm (brute_force, others) and also according to the number of clusters (n_clusters). n_clusters>1 will result in an approximation.
 - **Scalability**: Linear scaling with number of GPUs when n_clusters > 1
 
 The algorithm automatically chooses between single-GPU and multi-GPU execution based on the n_clusters parameter and available resources.
