@@ -1,24 +1,24 @@
+#
 # Copyright (c) 2025, NVIDIA CORPORATION.
-
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# cython: language_level=3
+
+from cuda.bindings.cyruntime cimport cudaStream_t
+
+from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 
 
-from .mg_resources import MultiGpuResources, auto_sync_multi_gpu_resources
-from .resources import Resources, auto_sync_resources
-
-__all__ = [
-    "auto_sync_resources",
-    "Resources",
-    "MultiGpuResources",
-    "auto_sync_multi_gpu_resources",
-]
+cdef class MultiGpuResources:
+    cdef cuvsResources_t c_obj

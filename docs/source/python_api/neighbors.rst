@@ -15,3 +15,4 @@ Nearest Neighbors
    neighbors_ivf_flat.rst
    neighbors_ivf_pq.rst
    neighbors_nn_decent.rst
+   neighbors_all_neighbors.rst
