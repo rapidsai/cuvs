@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# Copyright (c) 2021-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -72,16 +72,9 @@ function(find_and_configure_cutlass)
   rapids_export_package(
           BUILD NvidiaCutlass cuvs-exports GLOBAL_TARGETS nvidia::cutlass::cutlass
   )
-  rapids_export_package(
-          INSTALL NvidiaCutlass cuvs-exports GLOBAL_TARGETS nvidia::cutlass::cutlass
-  )
 
   # Tell cmake where it can find the generated NvidiaCutlass-config.cmake we wrote.
   include("${rapids-cmake-dir}/export/find_package_root.cmake")
-  rapids_export_find_package_root(
-          INSTALL NvidiaCutlass [=[${CMAKE_CURRENT_LIST_DIR}/../]=]
-          EXPORT_SET cuvs-exports
-  )
   rapids_export_find_package_root(
           BUILD NvidiaCutlass [=[${CMAKE_CURRENT_LIST_DIR}]=]
           EXPORT_SET cuvs-exports
