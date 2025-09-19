@@ -814,27 +814,44 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
   )
 
   if(BUILD_C_LIBRARY)
+    # Add CUDAToolkit as an export dependency
+    rapids_export_package(INSTALL CUDAToolkit cuvs-c-exports)
+    rapids_export_package(BUILD CUDAToolkit cuvs-c-exports)
+    # Add raft as an export dependency when built shared
+    if(NOT CUVS_STATIC_RAPIDS_LIBRARIES)
+      rapids_export_package(INSTALL raft cuvs-c-exports)
+      rapids_export_package(BUILD raft cuvs-c-exports)
+    endif()
     install(
-      TARGETS cuvs_c cuvs
+      TARGETS cuvs_c
       DESTINATION ${lib_dir}
-      COMPONENT c_api
+      COMPONENT cuvs_c
       EXPORT cuvs-c-exports
     )
+    install(
+      TARGETS cuvs
+      DESTINATION ${lib_dir}
+      COMPONENT cuvs_c
+    )
+
+    # Fixme: Not getting cuvs-c-dependencies
     rapids_export(
       INSTALL cuvs_c
+      VERSION "${RAPIDS_VERSION}"
       EXPORT_SET cuvs-c-exports
       GLOBAL_TARGETS cuvs_c
       NAMESPACE cuvs::
     )
     rapids_export(
       BUILD cuvs_c
+      VERSION "${RAPIDS_VERSION}"
       EXPORT_SET cuvs-c-exports
       GLOBAL_TARGETS cuvs_c
       NAMESPACE cuvs::
     )
     install(
       DIRECTORY include/cuvs/c/
-      COMPONENT c_api
+      COMPONENT cuvs_c
       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )
   endif()
