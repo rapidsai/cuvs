@@ -33,9 +33,9 @@ extern "C" {
  * @brief Enum to hold which ANN algorithm is being used in the tiered index
  */
 typedef enum {
-  CUVS_TIERED_INDEX_ALGO_CAGRA,
-  CUVS_TIERED_INDEX_ALGO_IVF_FLAT,
-  CUVS_TIERED_INDEX_ALGO_IVF_PQ
+  CUVS_TIERED_INDEX_ALGO_CAGRA    = 0,
+  CUVS_TIERED_INDEX_ALGO_IVF_FLAT = 1,
+  CUVS_TIERED_INDEX_ALGO_IVF_PQ   = 2
 } cuvsTieredIndexANNAlgo;
 
 /**

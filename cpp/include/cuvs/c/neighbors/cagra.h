@@ -39,13 +39,13 @@ extern "C" {
  */
 enum cuvsCagraGraphBuildAlgo {
   /* Select build algorithm automatically */
-  AUTO_SELECT,
+  AUTO_SELECT = 0,
   /* Use IVF-PQ to build all-neighbors knn graph */
-  IVF_PQ,
+  IVF_PQ = 1,
   /* Experimental, use NN-Descent to build all-neighbors knn graph */
-  NN_DESCENT,
+  NN_DESCENT = 200,
   /* Experimental, use iterative cagra search and optimize to build the knn graph */
-  ITERATIVE_CAGRA_SEARCH
+  ITERATIVE_CAGRA_SEARCH = 300
 };
 
 /** Parameters for VPQ compression. */
@@ -210,18 +210,18 @@ cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t params);
  */
 enum cuvsCagraSearchAlgo {
   /** For large batch sizes. */
-  SINGLE_CTA,
+  SINGLE_CTA = 0,
   /** For small batch sizes. */
-  MULTI_CTA,
-  MULTI_KERNEL,
-  AUTO
+  MULTI_CTA    = 1,
+  MULTI_KERNEL = 2,
+  AUTO         = 100
 };
 
 /**
  * @brief Enum to denote Hash Mode used while searching CAGRA index
  *
  */
-enum cuvsCagraHashMode { HASH, SMALL, AUTO_HASH };
+enum cuvsCagraHashMode { HASH = 0, SMALL = 1, AUTO_HASH = 100 };
 
 /**
  * @brief Supplemental parameters to search CAGRA index

@@ -34,11 +34,11 @@ extern "C" {
  */
 enum cuvsFilterType {
   /* No filter */
-  NO_FILTER,
+  NO_FILTER = 0,
   /* Filter an index with a bitset */
-  BITSET,
+  BITSET = 1,
   /* Filter an index with a bitmap */
-  BITMAP
+  BITMAP = 2
 };
 
 /**

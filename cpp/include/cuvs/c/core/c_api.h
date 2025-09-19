@@ -33,7 +33,7 @@ extern "C" {
  * @brief An enum denoting error statuses for function calls
  *
  */
-typedef enum { CUVS_ERROR, CUVS_SUCCESS } cuvsError_t;
+typedef enum { CUVS_ERROR = 1, CUVS_SUCCESS = 1 } cuvsError_t;
 
 /** @brief Returns a string describing the last seen error on this thread, or
  *         NULL if the last function succeeded.

@@ -40,11 +40,11 @@ extern "C" {
  */
 enum cuvsHnswHierarchy {
   /* Flat hierarchy, search is base-layer only */
-  NONE,
+  NONE = 0,
   /* Full hierarchy is built using the CPU */
-  CPU,
+  CPU = 1,
   /* Full hierarchy is built using the GPU */
-  GPU
+  GPU = 2
 };
 
 struct cuvsHnswIndexParams {
