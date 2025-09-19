@@ -177,6 +177,42 @@ public interface CuVSMatrix extends AutoCloseable {
    */
   void toArray(byte[][] array);
 
+  /**
+   * Fills the provided, pre-allocated host matrix with data from this matrix.
+   * The content of the provided host matrix will be overwritten; the 2 matrices must have the
+   * same element type and dimension.
+   *
+   * @param hostMatrix  the host-memory-backed matrix to fill.
+   */
+  void toHost(CuVSHostMatrix hostMatrix);
+
+  /**
+   * Returns a host matrix; if the matrix is already a host matrix, a "weak" reference to the same host memory
+   * is returned. If the matrix is a device matrix, a newly allocated matrix will be populated with data from
+   * the device matrix.
+   * The returned host matrix will need to be managed by the caller, which will be
+   * responsible to call {@link CuVSMatrix#close()} to free its resources when done.
+   */
+  CuVSHostMatrix toHost();
+
+  /**
+   * Fills the provided, pre-allocated device matrix with data from this matrix.
+   * The content of the provided device matrix will be overwritten; the 2 matrices must have the
+   * same element type and dimension.
+   *
+   * @param deviceMatrix  the device-memory-backed matrix to fill.
+   */
+  void toDevice(CuVSDeviceMatrix deviceMatrix, CuVSResources cuVSResources);
+
+  /**
+   * Returns a device matrix; if this matrix is already a device matrix, a "weak" reference to the same host memory
+   * is returned. If the matrix is a host matrix, a newly allocated matrix will be populated with data from
+   * the host matrix.
+   * The returned device matrix will need to be managed by the caller, which will be
+   * responsible to call {@link CuVSMatrix#close()} to free its resources when done.
+   */
+  CuVSDeviceMatrix toDevice(CuVSResources cuVSResources);
+
   @Override
   void close();
 }

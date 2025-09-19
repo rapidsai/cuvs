@@ -247,12 +247,21 @@ cdef class Index:
     @property
     def n_lists(self):
         """ The number of inverted lists (clusters) """
-        return cuvsIvfPqIndexGetNLists(self.index)
+        cdef int64_t n_lists
+        check_cuvs(cuvsIvfPqIndexGetNLists(self.index, &n_lists))
+        return n_lists
 
     @property
     def dim(self):
         """ dimensionality of the cluster centers """
-        return cuvsIvfPqIndexGetDim(self.index)
+        cdef int64_t dim
+        check_cuvs(cuvsIvfPqIndexGetDim(self.index, &dim))
+        return dim
+
+    def __len__(self):
+        cdef int64_t size
+        check_cuvs(cuvsIvfPqIndexGetSize(self.index, &size))
+        return size
 
     @property
     def centers(self):

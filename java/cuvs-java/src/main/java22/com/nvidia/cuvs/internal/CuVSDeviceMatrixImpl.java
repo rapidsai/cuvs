@@ -237,6 +237,11 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
   }
 
   @Override
+  public void toDevice(CuVSDeviceMatrix targetMatrix, CuVSResources cuVSResources) {
+    copyMatrix(this, (CuVSMatrixBaseImpl) targetMatrix, cuVSResources);
+  }
+
+  @Override
   public void close() {
     if (hostBuffer != MemorySegment.NULL) {
       destroyPinnedBuffer(hostBuffer);

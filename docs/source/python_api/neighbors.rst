@@ -27,3 +27,4 @@ Multi-GPU Algorithms
    :caption: Multi-GPU Distributed ANN:
 
    neighbors_multi_gpu.rst
+   neighbors_all_neighbors.rst
