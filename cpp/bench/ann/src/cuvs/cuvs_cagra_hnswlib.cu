@@ -62,6 +62,8 @@ auto parse_build_param(const nlohmann::json& conf) ->
       auto ps = cuvs::neighbors::hnsw::to_cagra_params(
         extents, conf.at("M"), hnsw_params.ef_construction, dist_type);
       ps.metric = dist_type;
+      if (conf.contains("disk_enabled")) { ps.disk_enabled = conf.at("disk_enabled"); }
+      if (conf.contains("graph_build_dir")) { ps.graph_build_dir = conf.at("graph_build_dir"); }
       // NB: above, we only provide the defaults. Below we parse the explicit parameters as usual.
       ::parse_build_param<T, uint32_t>(conf, ps);
       return ps;

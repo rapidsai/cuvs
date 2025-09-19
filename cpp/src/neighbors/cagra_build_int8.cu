@@ -34,6 +34,15 @@ namespace cuvs::neighbors::cagra {
     -> cuvs::neighbors::cagra::index<T, IdxT>                                     \
   {                                                                               \
     return cuvs::neighbors::cagra::build<T, IdxT>(handle, params, dataset);       \
+  }                                                                               \
+                                                                                  \
+  auto build_ace(raft::resources const& handle,                                   \
+                 const cuvs::neighbors::cagra::index_params& params,              \
+                 raft::host_matrix_view<const T, int64_t, raft::row_major> dataset, \
+                 size_t num_clusters)                                             \
+    -> cuvs::neighbors::cagra::index<T, IdxT>                                     \
+  {                                                                               \
+    return cuvs::neighbors::cagra::detail::build_ace<T, IdxT>(handle, params, dataset, num_clusters); \
   }
 
 RAFT_INST_CAGRA_BUILD(int8_t, uint32_t);

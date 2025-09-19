@@ -33,6 +33,7 @@
 #include <rmm/cuda_stream_view.hpp>
 
 #include <optional>
+#include <string>
 #include <variant>
 
 namespace cuvs::neighbors::cagra {
@@ -48,6 +49,12 @@ struct index_params : cuvs::neighbors::index_params {
   size_t intermediate_graph_degree = 128;
   /** Degree of output graph. */
   size_t graph_degree = 64;
+  /**
+   * Enable disk-backed graph build for very large graphs. When enabled and a
+   * valid `graph_build_dir` is provided in the chosen graph build parameters,
+   * the build will use files to spill intermediate graphs.
+   */
+  bool disk_enabled = false;
   /**
    * Specify compression parameters if compression is desired. If set, overrides the
    * attach_dataset_on_build (and the compressed dataset is always added to the index).
@@ -80,7 +87,11 @@ struct index_params : cuvs::neighbors::index_params {
                graph_build_params::nn_descent_params,
                graph_build_params::iterative_search_params>
     graph_build_params;
-
+  /**
+   * Directory to store disk-backed build artifacts (e.g., KNN graph,
+   * optimized graph). Used when `disk_enabled` is true.
+   */
+  std::string graph_build_dir = "";
   /**
    * Whether to use MST optimization to guarantee graph connectivity.
    */
@@ -822,6 +833,165 @@ auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
+
+/**
+ * @defgroup cagra_cpp_index_build_ace CAGRA Augmented Core Extraction build functions
+ * @{
+ */
+
+/**
+ * @brief Build the Augmented Core Extraction index from the dataset for very large graphs.
+ *
+ * ACE (Augmented Core Extraction) is a disk-based approach for building CAGRA indices
+ * on very large datasets that may not fit in GPU memory. It partitions the dataset using k-means
+ * clustering and builds sub-indices for each partition, then combines them into a single index.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset using ACE with 10 clusters
+ *   auto index = cagra::build_ace(res, index_params, dataset, 10);
+ *   // use default search parameters
+ *   cagra::search_params search_params;
+ *   // search K nearest neighbours
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ * @param[in] num_clusters number of clusters for partitioning (default: 16)
+ *
+ * @return the constructed cagra index
+ */
+auto build_ace(raft::resources const& res,
+               const cuvs::neighbors::cagra::index_params& params,
+               raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
+               size_t num_clusters = 16) -> cuvs::neighbors::cagra::index<float, uint32_t>;
+
+/**
+ * @brief Build the Augmented Core Extraction index from the dataset for very large graphs.
+ *
+ * ACE (Augmented Core Extraction) is a disk-based approach for building CAGRA indices
+ * on very large datasets that may not fit in GPU memory. It partitions the dataset using k-means
+ * clustering and builds sub-indices for each partition, then combines them into a single index.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset using ACE with 10 clusters
+ *   auto index = cagra::build_ace(res, index_params, dataset, 10);
+ *   // use default search parameters
+ *   cagra::search_params search_params;
+ *   // search K nearest neighbours
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ * @param[in] num_clusters number of clusters for partitioning (default: 16)
+ *
+ * @return the constructed cagra index
+ */
+auto build_ace(raft::resources const& res,
+               const cuvs::neighbors::cagra::index_params& params,
+               raft::host_matrix_view<const half, int64_t, raft::row_major> dataset,
+               size_t num_clusters = 16) -> cuvs::neighbors::cagra::index<half, uint32_t>;
+
+/**
+ * @brief Build the Augmented Core Extraction index from the dataset for very large graphs.
+ *
+ * ACE (Augmented Core Extraction) is a disk-based approach for building CAGRA indices
+ * on very large datasets that may not fit in GPU memory. It partitions the dataset using k-means
+ * clustering and builds sub-indices for each partition, then combines them into a single index.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset using ACE with 10 clusters
+ *   auto index = cagra::build_ace(res, index_params, dataset, 10);
+ *   // use default search parameters
+ *   cagra::search_params search_params;
+ *   // search K nearest neighbours
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ * @param[in] num_clusters number of clusters for partitioning (default: 16)
+ *
+ * @return the constructed cagra index
+ */
+auto build_ace(raft::resources const& res,
+               const cuvs::neighbors::cagra::index_params& params,
+               raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
+               size_t num_clusters = 16) -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
+
+/**
+ * @brief Build the Augmented Core Extraction index from the dataset for very large graphs.
+ *
+ * ACE (Augmented Core Extraction) is a disk-based approach for building CAGRA indices
+ * on very large datasets that may not fit in GPU memory. It partitions the dataset using k-means
+ * clustering and builds sub-indices for each partition, then combines them into a single index.
+ *
+ * The following distance metrics are supported:
+ * - L2
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters
+ *   cagra::index_params index_params;
+ *   // create and fill the index from a [N, D] dataset using ACE with 10 clusters
+ *   auto index = cagra::build_ace(res, index_params, dataset, 10);
+ *   // use default search parameters
+ *   cagra::search_params search_params;
+ *   // search K nearest neighbours
+ *   auto neighbors = raft::make_device_matrix<uint32_t>(res, n_queries, k);
+ *   auto distances = raft::make_device_matrix<float>(res, n_queries, k);
+ *   cagra::search(res, search_params, index, queries, neighbors.view(), distances.view());
+ * @endcode
+ *
+ * @param[in] res
+ * @param[in] params parameters for building the index
+ * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
+ * @param[in] num_clusters number of clusters for partitioning (default: 16)
+ *
+ * @return the constructed cagra index
+ */
+auto build_ace(raft::resources const& res,
+               const cuvs::neighbors::cagra::index_params& params,
+               raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
+               size_t num_clusters = 16) -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
+
+/**
+ * @}
+ */
+
 /**
  * @}
  */

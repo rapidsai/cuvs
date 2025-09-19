@@ -18,7 +18,6 @@
 #include "../../../core/nvtx.hpp"
 #include "../../vpq_dataset.cuh"
 #include "graph_core.cuh"
-#include <cuvs/neighbors/cagra.hpp>
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -29,11 +28,12 @@
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 
+#include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
-#include <cuvs/neighbors/refine.hpp>
-
 #include <cuvs/neighbors/nn_descent.hpp>
+#include <cuvs/neighbors/refine.hpp>
 
 // TODO: This shouldn't be calling spatial/knn APIs
 #include "../ann_utils.cuh"
@@ -42,12 +42,373 @@
 
 #include <chrono>
 #include <cstdio>
+#include <omp.h>
 #include <type_traits>
 #include <vector>
 
 #include <sys/mman.h>
 
 namespace cuvs::neighbors::cagra::detail {
+
+// ACE: Get cluster labels for partitioned approach
+template <typename DataT, typename IdxT, typename Accessor>
+void get_cluster_labels(
+  raft::resources const& res,
+  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> labels,
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> cluster_histogram,
+  double sampling_rate = 0.01)
+{
+  uint64_t dataset_size = dataset.extent(0);
+  uint64_t dataset_dim  = dataset.extent(1);
+  uint64_t labels_size  = labels.extent(0);
+  uint64_t labels_dim   = labels.extent(1);
+  RAFT_EXPECTS(dataset_size == labels_size, "Dataset size must match labels extent");
+  uint64_t n_clusters = cluster_histogram.extent(0);
+  RAFT_EXPECTS(labels_dim == 2, "Labels must have 2 columns");
+  RAFT_EXPECTS(cluster_histogram.extent(1) == 2, "Cluster histogram must have 2 columns");
+  cudaStream_t stream = raft::resource::get_cuda_stream(res);
+
+  // Sampling vectors from dataset
+  RAFT_LOG_INFO("ACE: Sampling vectors from dataset ...");
+  uint64_t n_samples = dataset_size * sampling_rate;
+  if (n_samples < 100 * n_clusters) { n_samples = 100 * n_clusters; }
+  if (n_samples > dataset_size) { n_samples = dataset_size; }
+  RAFT_LOG_INFO("ACE: n_samples: %lu", n_samples);
+
+  auto sample_db = raft::make_host_matrix<float>(n_samples, dataset_dim);
+#pragma omp parallel for
+  for (uint64_t i = 0; i < n_samples; i++) {
+    uint64_t j = i * dataset_size / n_samples;
+    for (uint64_t k = 0; k < dataset_dim; k++) {
+      sample_db(i, k) = static_cast<float>(dataset(j, k));
+    }
+  }
+  auto sample_db_dev = raft::make_device_matrix<float, int64_t>(res, n_samples, dataset_dim);
+  raft::update_device(
+    sample_db_dev.data_handle(), sample_db.data_handle(), sample_db.size(), stream);
+
+  // K-means: partitioning dataset vectors and compute centroid for each cluster
+  RAFT_LOG_INFO("ACE: Running k-means clustering ...");
+  cuvs::cluster::kmeans::params params;
+  params.n_clusters  = n_clusters;
+  params.max_iter    = 100;
+  params.init        = cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus;
+  float inertia      = 0.0;
+  int n_iter         = 0;
+  auto centroids_dev = raft::make_device_matrix<float, int64_t>(res, n_clusters, dataset_dim);
+  cuvs::cluster::kmeans::fit(res,
+                             params,
+                             sample_db_dev.view(),
+                             std::nullopt,
+                             centroids_dev.view(),
+                             raft::make_host_scalar_view(&inertia),
+                             raft::make_host_scalar_view(&n_iter));
+  RAFT_LOG_INFO("ACE: K-means inertia: %f, iterations: %d", inertia, n_iter);
+
+  auto cluster_relations = raft::make_host_matrix<IdxT, int64_t>(n_clusters, n_clusters);
+  for (uint64_t c0 = 0; c0 < n_clusters; c0++) {
+    for (uint64_t c1 = 0; c1 < n_clusters; c1++) {
+      cluster_relations(c0, c1) = 0;
+    }
+  }
+
+  // Compute distances between dataset and centroid vectors
+  RAFT_LOG_INFO("ACE: Computing distances between dataset and centroid vectors ...");
+  const uint64_t chunk_size = 32 * 1024;
+  auto _sub_dataset         = raft::make_host_matrix<float, int64_t>(chunk_size, dataset_dim);
+  auto _sub_distances       = raft::make_host_matrix<float, int64_t>(chunk_size, n_clusters);
+  auto _sub_dataset_dev   = raft::make_device_matrix<float, int64_t>(res, chunk_size, dataset_dim);
+  auto _sub_distances_dev = raft::make_device_matrix<float, int64_t>(res, chunk_size, n_clusters);
+
+  for (uint64_t i_base = 0; i_base < dataset_size; i_base += chunk_size) {
+    const uint64_t sub_dataset_size = std::min(chunk_size, dataset_size - i_base);
+    if (i_base % (dataset_size / 10) == 0) {
+      RAFT_LOG_INFO("ACE: Processing chunk %lu / %lu (%.1f%%)",
+                    i_base,
+                    dataset_size,
+                    static_cast<double>(100 * i_base) / dataset_size);
+    }
+
+    auto sub_dataset = raft::make_host_matrix_view<float, int64_t>(
+      _sub_dataset.data_handle(), sub_dataset_size, dataset_dim);
+#pragma omp parallel for
+    for (uint64_t i_sub = 0; i_sub < sub_dataset_size; i_sub++) {
+      uint64_t i = i_base + i_sub;
+      for (uint64_t k = 0; k < dataset_dim; k++) {
+        sub_dataset(i_sub, k) = static_cast<float>(dataset(i, k));
+      }
+    }
+    auto sub_dataset_dev = raft::make_device_matrix_view<const float, int64_t>(
+      _sub_dataset_dev.data_handle(), sub_dataset_size, dataset_dim);
+    raft::update_device(
+      _sub_dataset_dev.data_handle(), sub_dataset.data_handle(), sub_dataset.size(), stream);
+
+    auto sub_distances = raft::make_host_matrix_view<float, int64_t>(
+      _sub_distances.data_handle(), sub_dataset_size, n_clusters);
+    auto sub_distances_dev = raft::make_device_matrix_view<float, int64_t>(
+      _sub_distances_dev.data_handle(), sub_dataset_size, n_clusters);
+
+    cuvs::distance::pairwise_distance(res,
+                                      sub_dataset_dev,
+                                      centroids_dev.view(),
+                                      sub_distances_dev,
+                                      cuvs::distance::DistanceType::L2Expanded);
+
+    raft::update_host(
+      sub_distances.data_handle(), sub_distances_dev.data_handle(), sub_distances.size(), stream);
+    raft::resource::sync_stream(res, stream);
+
+    // Find two closest clusters to each dataset vector
+#pragma omp parallel for
+    for (uint64_t i_sub = 0; i_sub < sub_dataset_size; i_sub++) {
+      IdxT label_0 = 0;
+      IdxT label_1 = 1;
+      if (sub_distances(i_sub, 0) > sub_distances(i_sub, 1)) {
+        label_0 = 1;
+        label_1 = 0;
+      }
+      for (uint64_t c = 2; c < n_clusters; c++) {
+        if (sub_distances(i_sub, c) < sub_distances(i_sub, label_0)) {
+          label_1 = label_0;
+          label_0 = c;
+        } else if (sub_distances(i_sub, c) < sub_distances(i_sub, label_1)) {
+          label_1 = c;
+        }
+      }
+      uint64_t i   = i_base + i_sub;
+      labels(i, 0) = label_0;
+      labels(i, 1) = label_1;
+
+#pragma omp atomic update
+      cluster_histogram(label_0, 0) += 1;
+#pragma omp atomic update
+      cluster_histogram(label_1, 1) += 1;
+#pragma omp atomic update
+      cluster_relations(label_0, label_1) += 1;
+    }
+  }
+
+  RAFT_LOG_INFO("ACE: Cluster labeling completed");
+}
+
+// ACE: Build partitioned CAGRA index for very large graphs. Dataset must be on host.
+template <typename T, typename IdxT, typename Accessor>
+index<T, IdxT> build_ace(
+  raft::resources const& res,
+  const index_params& params,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
+  size_t num_clusters = 10)
+{
+  common::nvtx::range<common::nvtx::domain::cuvs> function_scope(
+    "cagra::build_ace<%s>(%zu, %zu, %zu)",
+    Accessor::is_managed_type::value ? "managed"
+    : Accessor::is_host_type::value  ? "host"
+                                     : "device",
+    params.intermediate_graph_degree,
+    params.graph_degree,
+    num_clusters);
+
+  RAFT_LOG_INFO("ACE: Starting partitioned CAGRA build with %zu clusters", num_clusters);
+
+  size_t intermediate_degree = params.intermediate_graph_degree;
+  size_t graph_degree        = params.graph_degree;
+  uint64_t dataset_size      = dataset.extent(0);
+  uint64_t dataset_dim       = dataset.extent(1);
+  uint64_t n_clusters        = num_clusters;
+
+  if (intermediate_degree >= dataset_size) {
+    RAFT_LOG_WARN(
+      "Intermediate graph degree cannot be larger than dataset size, reducing it to %lu",
+      dataset_size);
+    intermediate_degree = dataset_size - 1;
+  }
+  if (intermediate_degree < graph_degree) {
+    RAFT_LOG_WARN(
+      "Graph degree (%lu) cannot be larger than intermediate graph degree (%lu), reducing "
+      "graph_degree.",
+      graph_degree,
+      intermediate_degree);
+    graph_degree = intermediate_degree;
+  }
+
+  // Get cluster labels
+  auto labels            = raft::make_host_matrix<IdxT, int64_t>(dataset_size, 2);
+  auto cluster_histogram = raft::make_host_matrix<IdxT, int64_t>(n_clusters, 2);
+  for (uint64_t c = 0; c < n_clusters; c++) {
+    cluster_histogram(c, 0) = 0;
+    cluster_histogram(c, 1) = 0;
+  }
+  get_cluster_labels<T, IdxT, Accessor>(res, dataset, labels.view(), cluster_histogram.view());
+
+  // Create vector lists for each cluster
+  RAFT_LOG_INFO("ACE: Creating vector lists by cluster labels ...");
+  auto vector_fwd_list_0 = raft::make_host_vector<IdxT, int64_t>(dataset_size);
+  auto vector_fwd_list_1 = raft::make_host_vector<IdxT, int64_t>(dataset_size);
+  auto vector_bwd_list_0 = raft::make_host_vector<IdxT, int64_t>(dataset_size);
+  auto vector_bwd_list_1 = raft::make_host_vector<IdxT, int64_t>(dataset_size);
+  auto idxptr_0          = raft::make_host_vector<IdxT, int64_t>(n_clusters + 1);
+  auto idxptr_1          = raft::make_host_vector<IdxT, int64_t>(n_clusters + 1);
+
+  idxptr_0(0) = 0;
+  idxptr_1(0) = 0;
+  for (uint64_t c = 1; c < n_clusters; c++) {
+    idxptr_0(c) = idxptr_0(c - 1) + cluster_histogram(c - 1, 0);
+    idxptr_1(c) = idxptr_1(c - 1) + cluster_histogram(c - 1, 1);
+  }
+
+#pragma omp parallel for
+  for (uint64_t i = 0; i < dataset_size; i++) {
+    uint64_t c_0 = labels(i, 0);
+    uint64_t j_0;
+#pragma omp atomic capture
+    j_0 = idxptr_0(c_0)++;
+    RAFT_EXPECTS(j_0 < dataset_size, "Vector ID must be smaller than dataset_size");
+    vector_fwd_list_0(i)   = j_0;
+    vector_bwd_list_0(j_0) = i;
+
+    uint64_t c_1 = labels(i, 1);
+    uint64_t j_1;
+#pragma omp atomic capture
+    j_1 = idxptr_1(c_1)++;
+    RAFT_EXPECTS(j_1 < dataset_size, "Vector ID must be smaller than dataset_size");
+    vector_fwd_list_1(i)   = j_1;
+    vector_bwd_list_1(j_1) = i;
+  }
+
+  // Restore idxptr arrays
+  for (uint64_t c = n_clusters + 1; c > 0; c--) {
+    idxptr_0(c) = idxptr_0(c - 1);
+    idxptr_1(c) = idxptr_1(c - 1);
+  }
+  idxptr_0(0) = 0;
+  idxptr_1(0) = 0;
+
+  auto search_graph_0 = raft::make_host_matrix<IdxT, int64_t>(dataset_size, graph_degree);
+
+  // Process each cluster
+  for (uint64_t c = 0; c < n_clusters; c++) {
+    RAFT_LOG_INFO("ACE: Processing partition %lu/%lu", c + 1, n_clusters);
+    auto start = std::chrono::high_resolution_clock::now();
+
+    // Extract vectors for this partition
+    uint64_t sub_dataset_size_0 = idxptr_0(c + 1) - idxptr_0(c);
+    uint64_t sub_dataset_size_1 = idxptr_1(c + 1) - idxptr_1(c);
+    uint64_t sub_dataset_size   = sub_dataset_size_0 + sub_dataset_size_1;
+    auto sub_dataset            = raft::make_host_matrix<T, int64_t>(sub_dataset_size, dataset_dim);
+
+    RAFT_LOG_INFO("ACE: Sub-dataset size: %lu (%lu + %lu)",
+                  sub_dataset_size,
+                  sub_dataset_size_0,
+                  sub_dataset_size_1);
+
+    // Copy vectors belonging to this as closest partition
+#pragma omp parallel for
+    for (uint64_t j = 0; j < sub_dataset_size_0; j++) {
+      uint64_t i = vector_bwd_list_0(j + idxptr_0(c));
+      RAFT_EXPECTS(labels(i, 0) == c, "Vector does not belong to cluster");
+      for (uint64_t k = 0; k < dataset_dim; k++) {
+        sub_dataset(j, k) = dataset(i, k);
+      }
+    }
+
+    // Copy vectors belonging to this as 2nd closest partition
+#pragma omp parallel for
+    for (uint64_t j = 0; j < sub_dataset_size_1; j++) {
+      uint64_t i = vector_bwd_list_1(j + idxptr_1(c));
+      RAFT_EXPECTS(labels(i, 1) == c, "Vector does not belong to cluster");
+      for (uint64_t k = 0; k < dataset_dim; k++) {
+        sub_dataset(j + sub_dataset_size_0, k) = dataset(i, k);
+      }
+    }
+
+    // Create index for this partition
+    cuvs::neighbors::cagra::index_params sub_index_params;
+    sub_index_params.graph_degree              = graph_degree;
+    sub_index_params.intermediate_graph_degree = intermediate_degree;
+    sub_index_params.guarantee_connectivity    = params.guarantee_connectivity;
+    sub_index_params.metric                    = params.metric;
+    sub_index_params.graph_build_params        = params.graph_build_params;
+
+    // Set default build params if not specified
+    if (std::holds_alternative<std::monostate>(sub_index_params.graph_build_params)) {
+      if (cuvs::neighbors::nn_descent::has_enough_device_memory(
+            res, raft::make_extents<int64_t>(sub_dataset_size, dataset_dim), sizeof(IdxT))) {
+        sub_index_params.graph_build_params =
+          cagra::graph_build_params::nn_descent_params(intermediate_degree, params.metric);
+      } else {
+        sub_index_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
+          raft::make_extents<int64_t>(sub_dataset_size, dataset_dim), params.metric);
+      }
+    }
+
+    auto sub_index = cuvs::neighbors::cagra::build(
+      res, sub_index_params, raft::make_const_mdspan(sub_dataset.view()));
+
+    // Copy graph edges for core members of this partition
+    auto sub_search_graph = raft::make_host_matrix<IdxT, int64_t>(sub_dataset_size_0, graph_degree);
+    cudaStream_t stream   = raft::resource::get_cuda_stream(res);
+    raft::update_host(sub_search_graph.data_handle(),
+                      sub_index.graph().data_handle(),
+                      sub_search_graph.size(),
+                      stream);
+    raft::resource::sync_stream(res, stream);
+
+    // Adjust IDs in sub_search_graph and save to search_graph_0
+#pragma omp parallel for
+    for (uint64_t i_0 = 0; i_0 < sub_dataset_size_0; i_0++) {
+      for (uint64_t k = 0; k < graph_degree; k++) {
+        uint64_t j_0 = sub_search_graph(i_0, k);
+        RAFT_EXPECTS(j_0 < sub_dataset_size, "Invalid neighbor ID");
+        if (j_0 < sub_dataset_size_0) {
+          search_graph_0(i_0 + idxptr_0(c), k) = j_0 + idxptr_0(c);
+        } else {
+          uint64_t j_1 = j_0 - sub_dataset_size_0;
+          RAFT_EXPECTS(j_1 < sub_dataset_size_1, "Invalid secondary neighbor ID");
+          uint64_t j                           = vector_bwd_list_1(j_1 + idxptr_1(c));
+          search_graph_0(i_0 + idxptr_0(c), k) = vector_fwd_list_0(j);
+        }
+      }
+    }
+
+    auto end        = std::chrono::high_resolution_clock::now();
+    auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    RAFT_LOG_INFO(
+      "ACE: Partition %lu completed in %.3f sec", c + 1, static_cast<double>(elapsed_ms) / 1000);
+  }
+
+  // Convert IDs in search_graph_0 to create final search_graph
+  auto search_graph = raft::make_host_matrix<IdxT, int64_t>(dataset_size, graph_degree);
+  RAFT_LOG_INFO("ACE: Converting graph IDs to final format ...");
+#pragma omp parallel for
+  for (uint64_t i = 0; i < dataset_size; i++) {
+    uint64_t i_0 = vector_fwd_list_0(i);
+    for (uint64_t k = 0; k < graph_degree; k++) {
+      uint64_t j_0       = search_graph_0(i_0, k);
+      uint64_t j         = vector_bwd_list_0(j_0);
+      search_graph(i, k) = j;
+    }
+  }
+
+  RAFT_LOG_INFO("ACE: Creating final index ...");
+  index<T, IdxT> idx(res, params.metric);
+  idx.update_graph(res, raft::make_const_mdspan(search_graph.view()));
+
+  if (params.attach_dataset_on_build) {
+    try {
+      idx.update_dataset(res, dataset);
+    } catch (std::bad_alloc& e) {
+      RAFT_LOG_WARN(
+        "Insufficient GPU memory to attach dataset to ACE index. Only the graph will be stored.");
+    } catch (raft::logic_error& e) {
+      RAFT_LOG_WARN(
+        "Insufficient GPU memory to attach dataset to ACE index. Only the graph will be stored.");
+    }
+  }
+
+  RAFT_LOG_INFO("ACE: Partitioned CAGRA build completed");
+  return idx;
+}
 
 template <typename IdxT>
 void write_to_graph(raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
@@ -540,26 +901,23 @@ auto iterative_build_graph(
 
   // Determine graph degree and number of search results while increasing
   // graph size.
-  auto small_graph_degree = std::max(graph_degree / 2, std::min(graph_degree, (uint64_t)32));
-  auto small_topk         = topk * small_graph_degree / graph_degree;
-  RAFT_LOG_DEBUG("# graph_degree = %lu", (uint64_t)graph_degree);
+  auto small_graph_degree = std::max(graph_degree / 2, std::min(graph_degree, (uint64_t)24));
   RAFT_LOG_DEBUG("# small_graph_degree = %lu", (uint64_t)small_graph_degree);
+  RAFT_LOG_DEBUG("# graph_degree = %lu", (uint64_t)graph_degree);
   RAFT_LOG_DEBUG("# topk = %lu", (uint64_t)topk);
-  RAFT_LOG_DEBUG("# small_topk = %lu", (uint64_t)small_topk);
 
   // Create an initial graph. The initial graph created here is not suitable for
   // searching, but connectivity is guaranteed.
-  auto offset       = raft::make_host_vector<IdxT, int64_t>(small_graph_degree);
-  const double base = sqrt((double)2.0);
+  auto offset = raft::make_host_vector<IdxT, int64_t>(small_graph_degree);
   for (uint64_t j = 0; j < small_graph_degree; j++) {
     if (j == 0) {
       offset(j) = 1;
     } else {
       offset(j) = offset(j - 1) + 1;
     }
-    IdxT ofst = initial_graph_size * pow(base, (double)j - small_graph_degree - 1);
+    IdxT ofst = pow((double)(initial_graph_size - 1) / 2, (double)(j + 1) / small_graph_degree);
     if (offset(j) < ofst) { offset(j) = ofst; }
-    RAFT_LOG_DEBUG("# offset(%lu) = %lu\n", (uint64_t)j, (uint64_t)offset(j));
+    RAFT_LOG_DEBUG("# offset(%lu) = %lu", (uint64_t)j, (uint64_t)offset(j));
   }
   cagra_graph = raft::make_host_matrix<IdxT, int64_t>(initial_graph_size, small_graph_degree);
   for (uint64_t i = 0; i < initial_graph_size; i++) {
@@ -576,21 +934,33 @@ auto iterative_build_graph(
   IdxT* neighbors_ptr = (IdxT*)neighbors_list.data();
   memset(neighbors_ptr, 0, byte_size);
 
+  bool flag_last       = false;
   auto curr_graph_size = initial_graph_size;
   while (true) {
-    RAFT_LOG_DEBUG("# graph_size = %lu (%.3lf)",
-                   (uint64_t)curr_graph_size,
-                   (double)curr_graph_size / final_graph_size);
+    auto start           = std::chrono::high_resolution_clock::now();
+    auto curr_query_size = std::min(2 * curr_graph_size, final_graph_size);
 
-    auto curr_query_size   = std::min(2 * curr_graph_size, final_graph_size);
-    auto curr_topk         = small_topk;
-    auto curr_itopk_size   = small_topk * 3 / 2;
-    auto curr_graph_degree = small_graph_degree;
-    if (curr_query_size == final_graph_size) {
-      curr_topk         = topk;
-      curr_itopk_size   = topk * 2;
-      curr_graph_degree = graph_degree;
+    auto next_graph_degree = small_graph_degree;
+    if (curr_graph_size == final_graph_size) { next_graph_degree = graph_degree; }
+
+    // The search count (topk) is set to the next graph degree + 1, because
+    // pruning is not used except in the last iteration.
+    // (*) The appropriate setting for itopk_size requires careful consideration.
+    auto curr_topk       = next_graph_degree + 1;
+    auto curr_itopk_size = next_graph_degree + 32;
+    if (flag_last) {
+      curr_topk       = topk;
+      curr_itopk_size = curr_topk + 32;
     }
+
+    RAFT_LOG_INFO(
+      "# graph_size = %lu (%.3lf), graph_degree = %lu, query_size = %lu, itopk = %lu, topk = %lu",
+      (uint64_t)cagra_graph.extent(0),
+      (double)cagra_graph.extent(0) / final_graph_size,
+      (uint64_t)cagra_graph.extent(1),
+      (uint64_t)curr_query_size,
+      (uint64_t)curr_itopk_size,
+      (uint64_t)curr_topk);
 
     cuvs::neighbors::cagra::search_params search_params;
     search_params.algo        = cuvs::neighbors::cagra::search_algo::AUTO;
@@ -644,13 +1014,19 @@ auto iterative_build_graph(
     }
 
     // Optimize graph
-    bool flag_last  = (curr_graph_size == final_graph_size);
-    curr_graph_size = curr_query_size;
-    cagra_graph     = raft::make_host_matrix<IdxT, int64_t>(0, 0);  // delete existing grahp
-    cagra_graph     = raft::make_host_matrix<IdxT, int64_t>(curr_graph_size, curr_graph_degree);
+    auto next_graph_size = curr_query_size;
+    cagra_graph          = raft::make_host_matrix<IdxT, int64_t>(0, 0);  // delete existing grahp
+    cagra_graph = raft::make_host_matrix<IdxT, int64_t>(next_graph_size, next_graph_degree);
     optimize<IdxT>(
       res, neighbors_view, cagra_graph.view(), flag_last ? params.guarantee_connectivity : 0);
+
+    auto end        = std::chrono::high_resolution_clock::now();
+    auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    RAFT_LOG_INFO("# elapsed time: %.3lf sec", (double)elapsed_ms / 1000);
+
     if (flag_last) { break; }
+    flag_last       = (curr_graph_size == final_graph_size);
+    curr_graph_size = next_graph_size;
   }
 
   return cagra_graph;
