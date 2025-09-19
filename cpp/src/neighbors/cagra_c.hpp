@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <cuvs/neighbors/cagra.h>
+#include <cuvs/c/neighbors/cagra.h>
 #include <cuvs/neighbors/cagra.hpp>
 
 namespace cuvs::neighbors::cagra {

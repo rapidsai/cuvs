@@ -25,10 +25,10 @@
 #include <raft/core/serialize.hpp>
 #include <raft/util/cudart_utils.hpp>
 
-#include <cuvs/core/c_api.h>
+#include <cuvs/c/core/c_api.h>
+#include <cuvs/c/neighbors/nn_descent.h>
 #include <cuvs/core/exceptions.hpp>
 #include <cuvs/core/interop.hpp>
-#include <cuvs/neighbors/nn_descent.h>
 #include <cuvs/neighbors/nn_descent.hpp>
 
 #include <fstream>

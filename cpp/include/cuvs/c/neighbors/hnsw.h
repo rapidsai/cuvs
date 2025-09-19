@@ -18,8 +18,8 @@
 
 #include "cagra.h"
 
-#include <cuvs/core/c_api.h>
-#include <cuvs/distance/distance.h>
+#include <cuvs/c/core/c_api.h>
+#include <cuvs/c/distance/distance.h>
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -176,8 +176,8 @@ cuvsError_t cuvsHnswExtendParamsDestroy(cuvsHnswExtendParams_t params);
  * @return cuvsError_t
  *
  * @code{.c}
- * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/cagra.h>
+ * #include <cuvs/c/core/c_api.h>
+ * #include <cuvs/c/neighbors/cagra.h>
  * #include <cuvs/neighbors/hnsw.h>
  *
  * // Create cuvsResources_t
@@ -232,8 +232,8 @@ cuvsError_t cuvsHnswFromCagraWithDataset(cuvsResources_t res,
   * @return cuvsError_t
   *
   * @code{.c}
-  * #include <cuvs/core/c_api.h>
-  * #include <cuvs/neighbors/cagra.h>
+  * #include <cuvs/c/core/c_api.h>
+  * #include <cuvs/c/neighbors/cagra.h>
   * #include <cuvs/neighbors/hnsw.h>
   *
   * // Create cuvsResources_t
@@ -325,7 +325,7 @@ cuvsError_t cuvsHnswSearchParamsDestroy(cuvsHnswSearchParams_t params);
  * cuVS, as the format is not compatible with the original hnswlib.
  *
  * @code {.c}
- * #include <cuvs/core/c_api.h>
+ * #include <cuvs/c/core/c_api.h>
  * #include <cuvs/neighbors/hnsw.h>
  *
  * // Create cuvsResources_t
@@ -386,8 +386,8 @@ cuvsError_t cuvsHnswSearch(cuvsResources_t res,
  * @return cuvsError_t
  *
  * @code{.c}
- * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/cagra.h>
+ * #include <cuvs/c/core/c_api.h>
+ * #include <cuvs/c/neighbors/cagra.h>
  * #include <cuvs/neighbors/hnsw.h>
  *
  * // Create cuvsResources_t
@@ -421,8 +421,8 @@ cuvsError_t cuvsHnswSerialize(cuvsResources_t res, const char* filename, cuvsHns
  * hnswlib. Experimental, both the API and the serialization format are subject to change.
  *
  * @code{.c}
- * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/cagra.h>
+ * #include <cuvs/c/core/c_api.h>
+ * #include <cuvs/c/neighbors/cagra.h>
  * #include <cuvs/neighbors/hnsw.h>
  *
  * // Create cuvsResources_t

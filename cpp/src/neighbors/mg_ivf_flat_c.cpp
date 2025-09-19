@@ -15,12 +15,12 @@
  */
 
 #include "ivf_flat_c.hpp"
+#include <cuvs/c/neighbors/ivf_flat.h>
+#include <cuvs/c/neighbors/mg_ivf_flat.h>
 #include <cuvs/core/exceptions.hpp>
 #include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/common.hpp>
-#include <cuvs/neighbors/ivf_flat.h>
 #include <cuvs/neighbors/ivf_flat.hpp>
-#include <cuvs/neighbors/mg_ivf_flat.h>
 #include <dlpack/dlpack.h>
 #include <raft/core/error.hpp>
 #include <raft/core/serialize.hpp>

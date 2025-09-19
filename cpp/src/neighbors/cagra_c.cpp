@@ -22,12 +22,12 @@
 #include <raft/core/resources.hpp>
 #include <raft/core/serialize.hpp>
 
-#include <cuvs/core/c_api.h>
+#include <cuvs/c/core/c_api.h>
+#include <cuvs/c/neighbors/cagra.h>
+#include <cuvs/c/neighbors/common.h>
 #include <cuvs/core/exceptions.hpp>
 #include <cuvs/core/interop.hpp>
-#include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/cagra.hpp>
-#include <cuvs/neighbors/common.h>
 
 #include "cagra_c.hpp"
 #include <fstream>

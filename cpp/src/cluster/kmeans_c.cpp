@@ -17,9 +17,9 @@
 #include <cstdint>
 #include <dlpack/dlpack.h>
 
-#include <cuvs/cluster/kmeans.h>
+#include <cuvs/c/cluster/kmeans.h>
+#include <cuvs/c/core/c_api.h>
 #include <cuvs/cluster/kmeans.hpp>
-#include <cuvs/core/c_api.h>
 #include <cuvs/core/exceptions.hpp>
 #include <cuvs/core/interop.hpp>
 

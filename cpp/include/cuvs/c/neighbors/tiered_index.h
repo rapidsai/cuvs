@@ -16,12 +16,12 @@
 
 #pragma once
 
-#include <cuvs/core/c_api.h>
-#include <cuvs/distance/distance.h>
-#include <cuvs/neighbors/cagra.h>
-#include <cuvs/neighbors/common.h>
-#include <cuvs/neighbors/ivf_flat.h>
-#include <cuvs/neighbors/ivf_pq.h>
+#include <cuvs/c/core/c_api.h>
+#include <cuvs/c/distance/distance.h>
+#include <cuvs/c/neighbors/cagra.h>
+#include <cuvs/c/neighbors/common.h>
+#include <cuvs/c/neighbors/ivf_flat.h>
+#include <cuvs/c/neighbors/ivf_pq.h>
 #include <dlpack/dlpack.h>
 #include <stdint.h>
 
@@ -138,8 +138,8 @@ cuvsError_t cuvsTieredIndexParamsDestroy(cuvsTieredIndexParams_t index_params);
  *        2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
  *
  * @code {.c}
- * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/tiered_index.h>
+ * #include <cuvs/c/core/c_api.h>
+ * #include <cuvs/c/neighbors/tiered_index.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;
@@ -186,8 +186,8 @@ cuvsError_t cuvsTieredIndexBuild(cuvsResources_t res,
  * @brief Search a TieredIndex index with a `DLManagedTensor`
  *
  * @code {.c}
- * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/tiered_index.h>
+ * #include <cuvs/c/core/c_api.h>
+ * #include <cuvs/c/neighbors/tiered_index.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;

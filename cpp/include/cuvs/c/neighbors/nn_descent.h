@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include <cuvs/core/c_api.h>
-#include <cuvs/distance/distance.h>
+#include <cuvs/c/core/c_api.h>
+#include <cuvs/c/distance/distance.h>
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -124,8 +124,8 @@ cuvsError_t cuvsNNDescentIndexDestroy(cuvsNNDescentIndex_t index);
  *        4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
  *
  * @code {.c}
- * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/nn_descent.h>
+ * #include <cuvs/c/core/c_api.h>
+ * #include <cuvs/c/neighbors/nn_descent.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;

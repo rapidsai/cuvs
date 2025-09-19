@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include <cuvs/core/c_api.h>
-#include <cuvs/neighbors/cagra.h>
-#include <cuvs/neighbors/mg_common.h>
+#include <cuvs/c/core/c_api.h>
+#include <cuvs/c/neighbors/cagra.h>
+#include <cuvs/c/neighbors/mg_common.h>
 #include <dlpack/dlpack.h>
 #include <stdint.h>
 

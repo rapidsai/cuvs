@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#include <cuvs/core/c_api.h>
-#include <cuvs/neighbors/cagra.h>
-#include <cuvs/neighbors/tiered_index.h>
+#include <cuvs/c/core/c_api.h>
+#include <cuvs/c/neighbors/cagra.h>
+#include <cuvs/c/neighbors/tiered_index.h>
 
 #include <dlpack/dlpack.h>
 

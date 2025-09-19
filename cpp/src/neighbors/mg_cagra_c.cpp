@@ -15,12 +15,12 @@
  */
 
 #include "cagra_c.hpp"
+#include <cuvs/c/neighbors/cagra.h>
+#include <cuvs/c/neighbors/mg_cagra.h>
 #include <cuvs/core/exceptions.hpp>
 #include <cuvs/core/interop.hpp>
-#include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.hpp>
-#include <cuvs/neighbors/mg_cagra.h>
 #include <dlpack/dlpack.h>
 #include <raft/core/error.hpp>
 #include <raft/core/serialize.hpp>

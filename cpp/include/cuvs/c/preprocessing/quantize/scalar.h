@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <cuvs/core/c_api.h>
+#include <cuvs/c/core/c_api.h>
 #include <dlpack/dlpack.h>
 #include <stdint.h>
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <cuvs/core/c_api.h>
+#include <cuvs/c/core/c_api.h>
 #include <cuvs/core/exceptions.hpp>
 #include <cuvs/version_config.h>
 

@@ -17,10 +17,10 @@
 #include <cstdint>
 #include <dlpack/dlpack.h>
 
-#include <cuvs/core/c_api.h>
+#include <cuvs/c/core/c_api.h>
+#include <cuvs/c/preprocessing/quantize/scalar.h>
 #include <cuvs/core/exceptions.hpp>
 #include <cuvs/core/interop.hpp>
-#include <cuvs/preprocessing/quantize/scalar.h>
 #include <cuvs/preprocessing/quantize/scalar.hpp>
 
 namespace {

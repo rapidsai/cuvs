@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include <cuvs/core/c_api.h>
-#include <cuvs/distance/distance.h>
-#include <cuvs/neighbors/common.h>
-#include <cuvs/neighbors/ivf_pq.h>
+#include <cuvs/c/core/c_api.h>
+#include <cuvs/c/distance/distance.h>
+#include <cuvs/c/neighbors/common.h>
+#include <cuvs/c/neighbors/ivf_pq.h>
 #include <dlpack/dlpack.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -464,8 +464,8 @@ cuvsError_t cuvsCagraMergeParamsDestroy(cuvsCagraMergeParams_t params);
  *        4. `kDLDataType.code == kDLUInt` and `kDLDataType.bits = 8`
  *
  * @code {.c}
- * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/cagra.h>
+ * #include <cuvs/c/core/c_api.h>
+ * #include <cuvs/c/neighbors/cagra.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;
@@ -556,8 +556,8 @@ cuvsError_t cuvsCagraExtend(cuvsResources_t res,
  *        3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *
  * @code {.c}
- * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/cagra.h>
+ * #include <cuvs/c/core/c_api.h>
+ * #include <cuvs/c/neighbors/cagra.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;
@@ -612,7 +612,7 @@ cuvsError_t cuvsCagraSearch(cuvsResources_t res,
  * Experimental, both the API and the serialization format are subject to change.
  *
  * @code{.c}
- * #include <cuvs/neighbors/cagra.h>
+ * #include <cuvs/c/neighbors/cagra.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;
@@ -641,8 +641,8 @@ cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
  * Experimental, both the API and the serialization format are subject to change.
  *
  * @code{.c}
- * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/cagra.h>
+ * #include <cuvs/c/core/c_api.h>
+ * #include <cuvs/c/neighbors/cagra.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;
@@ -685,8 +685,8 @@ cuvsError_t cuvsCagraDeserialize(cuvsResources_t res, const char* filename, cuvs
  *                                      cuvsCagraIndexCreate.
  *
  * @code {.c}
- * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/cagra.h>
+ * #include <cuvs/c/core/c_api.h>
+ * #include <cuvs/c/neighbors/cagra.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;
@@ -732,8 +732,8 @@ cuvsError_t cuvsCagraIndexFromArgs(cuvsResources_t res,
  *
  * Example:
  * @code{.c}
- * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/cagra.h>
+ * #include <cuvs/c/core/c_api.h>
+ * #include <cuvs/c/neighbors/cagra.h>
  *
  * cuvsResources_t res;
  * cuvsError_t res_create_status = cuvsResourcesCreate(&res);

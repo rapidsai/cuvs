@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include <cuvs/core/c_api.h>
-#include <cuvs/distance/distance.h>
-#include <cuvs/neighbors/common.h>
+#include <cuvs/c/core/c_api.h>
+#include <cuvs/c/distance/distance.h>
+#include <cuvs/c/neighbors/common.h>
 #include <dlpack/dlpack.h>
 #include <stdint.h>
 
@@ -71,8 +71,8 @@ cuvsError_t cuvsBruteForceIndexDestroy(cuvsBruteForceIndex_t index);
  *        2. `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 16`
  *
  * @code {.c}
- * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/brute_force.h>
+ * #include <cuvs/c/core/c_api.h>
+ * #include <cuvs/c/neighbors/brute_force.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;
@@ -125,8 +125,8 @@ cuvsError_t cuvsBruteForceBuild(cuvsResources_t res,
  *        3. `distances`: `kDLDataType.code == kDLFloat` and `kDLDataType.bits = 32`
  *
  * @code {.c}
- * #include <cuvs/core/c_api.h>
- * #include <cuvs/neighbors/brute_force.h>
+ * #include <cuvs/c/core/c_api.h>
+ * #include <cuvs/c/neighbors/brute_force.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;
@@ -177,7 +177,7 @@ cuvsError_t cuvsBruteForceSearch(cuvsResources_t res,
  * to work.
  *
  * @code{.c}
- * #include <cuvs/neighbors/brute_force.h>
+ * #include <cuvs/c/neighbors/brute_force.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;
@@ -203,7 +203,7 @@ cuvsError_t cuvsBruteForceSerialize(cuvsResources_t res,
  * to work.
  *
  * @code{.c}
- * #include <cuvs/neighbors/brute_force.h>
+ * #include <cuvs/c/neighbors/brute_force.h>
  *
  * // Create cuvsResources_t
  * cuvsResources_t res;

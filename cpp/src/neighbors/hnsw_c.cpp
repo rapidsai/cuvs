@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-#include "cuvs/distance/distance.h"
 #include <cstdint>
 #include <dlpack/dlpack.h>
 
@@ -24,10 +23,11 @@
 #include <raft/core/resources.hpp>
 #include <raft/core/serialize.hpp>
 
-#include <cuvs/core/c_api.h>
+#include <cuvs/c/core/c_api.h>
+#include <cuvs/c/distance/distance.h>
+#include <cuvs/c/neighbors/hnsw.h>
 #include <cuvs/core/exceptions.hpp>
 #include <cuvs/core/interop.hpp>
-#include <cuvs/neighbors/hnsw.h>
 #include <cuvs/neighbors/hnsw.hpp>
 
 namespace {

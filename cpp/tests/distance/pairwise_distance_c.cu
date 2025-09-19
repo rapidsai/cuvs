@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@
 #include <raft/core/handle.hpp>
 #include <raft/random/rng.cuh>
 
-#include <cuvs/distance/distance.h>
+#include <cuvs/c/distance/distance.h>
 
 extern "C" void run_pairwise_distance(int64_t n_rows,
                                       int64_t n_queries,

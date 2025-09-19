@@ -763,14 +763,15 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     target_include_directories(
       cuvs_c
       PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
+             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
              "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
       INTERFACE "$<INSTALL_INTERFACE:include>"
     )
 
     target_link_libraries(
       cuvs_c
-      PUBLIC cuvs::cuvs ${CUVS_CTK_MATH_DEPENDENCIES}
-      PRIVATE raft::raft $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
+      PUBLIC CUDA::toolkit
+      PRIVATE cuvs::cuvs raft::raft ${CUVS_CTK_MATH_DEPENDENCIES} $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -789,54 +790,54 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     COMPONENT cuvs
     EXPORT cuvs-exports
   )
-
   install(
     DIRECTORY include/cuvs
     COMPONENT cuvs
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   )
-
-  if(BUILD_C_LIBRARY)
-    install(
-      TARGETS cuvs_c
-      DESTINATION ${lib_dir}
-      COMPONENT c_api
-      EXPORT cuvs-c-exports
-    )
-  endif()
-
   install(
     FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.h
     COMPONENT cuvs
     DESTINATION include/cuvs
   )
-
-  if(TARGET cuvs_c)
-    list(APPEND cuvs_components c_api)
-    list(APPEND cuvs_export_sets cuvs-c-exports)
-    set(CUVS_C_TARGET cuvs_c)
-  endif()
-
-  # Use `rapids_export` for 22.04 as it will have COMPONENT support
   rapids_export(
     INSTALL cuvs
     EXPORT_SET cuvs-exports
-    COMPONENTS ${cuvs_components}
-    COMPONENTS_EXPORT_SET ${cuvs_export_sets}
-    GLOBAL_TARGETS cuvs ${CUVS_C_TARGET}
+    GLOBAL_TARGETS cuvs
     NAMESPACE cuvs::
   )
-
-  # ################################################################################################
-  # * build export -------------------------------------------------------------
   rapids_export(
     BUILD cuvs
     EXPORT_SET cuvs-exports
-    COMPONENTS ${cuvs_components}
-    COMPONENTS_EXPORT_SET ${cuvs_export_sets}
-    GLOBAL_TARGETS cuvs ${CUVS_C_TARGET}
+    GLOBAL_TARGETS cuvs
     NAMESPACE cuvs::
   )
+
+  if(BUILD_C_LIBRARY)
+    install(
+      TARGETS cuvs_c cuvs
+      DESTINATION ${lib_dir}
+      COMPONENT c_api
+      EXPORT cuvs-c-exports
+    )
+    rapids_export(
+      INSTALL cuvs_c
+      EXPORT_SET cuvs-c-exports
+      GLOBAL_TARGETS cuvs_c
+      NAMESPACE cuvs::
+    )
+    rapids_export(
+      BUILD cuvs_c
+      EXPORT_SET cuvs-c-exports
+      GLOBAL_TARGETS cuvs_c
+      NAMESPACE cuvs::
+    )
+    install(
+      DIRECTORY include/cuvs/c/
+      COMPONENT c_api
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+  endif()
 endif()
 
 # ##################################################################################################
