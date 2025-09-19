@@ -16,6 +16,7 @@
 package com.nvidia.cuvs.spi;
 
 import static com.nvidia.cuvs.internal.common.Util.*;
+import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemcpy2DAsync;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsVersionGet;
 import static com.nvidia.cuvs.internal.panama.headers_h.uint16_t;
 import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaStreamSynchronize;
@@ -288,6 +289,8 @@ final class JDKProvider implements CuVSProvider {
     private final long columns;
     private final long size;
     private final CuVSDeviceMatrixImpl matrix;
+    private final long elementSize;
+    private final long rowSize;
     private final MemorySegment stream;
 
     private final long rowBytes;
@@ -302,6 +305,8 @@ final class JDKProvider implements CuVSProvider {
       this.columns = columns;
       this.size = size;
       this.matrix = CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType);
+      this.elementSize = matrix.valueLayout().byteSize();
+      this.rowSize = columns * elementSize;
       this.stream = Util.getStream(resources);
       this.currentRow = 0;
 
@@ -324,6 +329,8 @@ final class JDKProvider implements CuVSProvider {
       this.matrix =
           CuVSDeviceMatrixRMMImpl.create(
               resources, size, columns, rowStride, columnStride, dataType);
+      this.elementSize = matrix.valueLayout().byteSize();
+      this.rowSize = rowStride == 0 ? columns * elementSize : rowStride * elementSize;
       this.stream = Util.getStream(resources);
       this.currentRow = 0;
 
@@ -382,12 +389,19 @@ final class JDKProvider implements CuVSProvider {
       if (currentBufferRow > 0) {
         var deviceMemoryOffset = (currentRow - currentBufferRow) * rowBytes;
         var dst = matrix.memorySegment().asSlice(deviceMemoryOffset);
-        cudaMemcpyAsync(
-            dst,
-            hostBuffer.address(),
-            currentBufferRow * rowBytes,
-            CudaMemcpyKind.HOST_TO_DEVICE,
-            stream);
+        final var width = columns * elementSize;
+        checkCudaError(
+            cudaMemcpy2DAsync(
+                dst,
+                rowSize,
+                hostBuffer.address(),
+                width,
+                width,
+                size,
+                CudaMemcpyKind.HOST_TO_DEVICE.kind,
+                stream),
+            "cudaMemcpy2DAsync");
+
         currentBufferRow = 0;
         checkCudaError(cudaStreamSynchronize(stream), "cudaStreamSynchronize");
       }
