@@ -67,3 +67,6 @@ diskann_ssd:
 cuvs_vamana:
   executable: CUVS_VAMANA_ANN_BENCH
   requires_gpu: true
+cuvs_cagra_diskann:
+  executable: CUVS_CAGRA_DISKANN_ANN_BENCH
+  requires_gpu: true

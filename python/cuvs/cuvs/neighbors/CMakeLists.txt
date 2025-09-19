@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -20,6 +20,7 @@ add_subdirectory(ivf_pq)
 add_subdirectory(filters)
 add_subdirectory(nn_descent)
 add_subdirectory(tiered_index)
+add_subdirectory(all_neighbors)
 
 # Set the list of Cython files to build
 set(cython_sources refine.pyx)
