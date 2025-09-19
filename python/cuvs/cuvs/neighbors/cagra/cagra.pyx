@@ -172,13 +172,6 @@ cdef class IndexParams:
 
     """
 
-    cdef cuvsCagraIndexParams* params
-
-    # hold on to a reference to the compression, to keep from being GC'ed
-    cdef public object compression
-    cdef public object ivf_pq_build_params
-    cdef public object ivf_pq_search_params
-
     def __cinit__(self):
         check_cuvs(cuvsCagraIndexParamsCreate(&self.params))
         self.compression = None
@@ -186,7 +179,8 @@ cdef class IndexParams:
         self.ivf_pq_search_params = None
 
     def __dealloc__(self):
-        check_cuvs(cuvsCagraIndexParamsDestroy(self.params))
+        if self.params != NULL:
+            check_cuvs(cuvsCagraIndexParamsDestroy(self.params))
 
     def __init__(self, *,
                  metric="sqeuclidean",
@@ -475,13 +469,12 @@ cdef class SearchParams:
 
     """
 
-    cdef cuvsCagraSearchParams * params
-
     def __cinit__(self):
         check_cuvs(cuvsCagraSearchParamsCreate(&self.params))
 
     def __dealloc__(self):
-        check_cuvs(cuvsCagraSearchParamsDestroy(self.params))
+        if self.params != NULL:
+            check_cuvs(cuvsCagraSearchParamsDestroy(self.params))
 
     def __init__(self, *,
                  max_queries=0,
