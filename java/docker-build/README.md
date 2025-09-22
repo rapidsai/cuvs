@@ -26,7 +26,7 @@ This builds using the defaults:
 ### Building for CUDA 13, All GPU Architectures
 
 ```bash
-CUDA_VERSION=13.0.0 ./build-in-docker
+CUDA_VERSION=13.0.1 ./build-in-docker
 ```
 
 ### Building for Local GPU Architecture Only
@@ -90,7 +90,7 @@ OS_VERSION=8 ./build-in-docker
 ### Build with Custom Maven Repository and ccache
 
 ```bash
-LOCAL_MAVEN_REPO=/custom/maven/repo LOCAL_CCACHE_DIR=/custom/ccache CUDA_VERSION=13.0.0 ./build-in-docker
+LOCAL_MAVEN_REPO=/custom/maven/repo LOCAL_CCACHE_DIR=/custom/ccache CUDA_VERSION=13.0.1 ./build-in-docker
 ```
 
 ### Build with Additional Docker Arguments
