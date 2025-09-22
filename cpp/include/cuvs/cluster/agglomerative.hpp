@@ -146,18 +146,48 @@ struct mutual_reachability_params {
    * the weighting) */
   float alpha = 1.0;
 
-  /** params to build the knn graph */
+  /**
+   * Parameters for building the mutual reachability graph using an underlying KNN algorithm.
+   *
+   * The all-neighbors graph construction algorithm enables building the mutual reachability
+   * graph on datasets larger than device memory by:
+   *   1. Partitioning the dataset into overlapping clusters,
+   *   2. Computing local KNN graphs within each cluster, and
+   *   3. Merging the local graphs into a single global graph.
+   *
+   * Key fields:
+   * - graph_build_params: Selects the KNN construction method (Brute Force or NN Descent)
+   *   and controls algorithm-specific parameters.
+   *
+   * - n_clusters: Number of partitions (batches) to split the data into. Larger `n_clusters`
+   *   reduces memory usage but may reduce accuracy if `overlap_factor` is too low.
+   *   Recommended starting value: `n_clusters = 4`. Increase progressively (4 → 8 → 16 ...)
+   *   to reduce memory usage at the cost of some accuracy. This is independent of `overlap_factor`
+   *   as long as `overlap_factor < n_clusters`.
+   *
+   * - overlap_factor: Number of nearest clusters each data point is assigned to. Higher
+   *   `overlap_factor` improves accuracy at the cost of memory and performance.
+   *   Recommended starting value: `overlap_factor = 2`. Increase gradually (2 → 3 → 4 ...)
+   *   for better accuracy with higher device memory usage.
+   *
+   * - metric: Distance metric to use when computing nearest neighbors.
+   */
   cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_params{
     cuvs::neighbors::graph_build_params::brute_force_params{}};
 };
 }  // namespace linkage_graph_params
+
 /**
  * Given a dataset, builds the KNN graph, connects graph components and builds a linkage
  * (dendrogram). Returns the Minimum Spanning Tree edges sorted by weight and the dendrogram.
  * @param[in] handle raft handle for resource reuse
  * @param[in] X data points on device memory (size n_rows * d)
- * @param[in] linkage_graph_params linkage params or mutual reachability params for building the KNN
- * graph
+ * @param[in] linkage_graph_params
+ *   Parameters controlling how the KNN graph is built. This can be either:
+ *   - distance_params: standard distance-based KNN graph construction for traditional
+ *     agglomerative clustering.
+ *   - mutual_reachability_params: parameters to compute a mutual reachability graph for
+ *     density-aware hierarchical clustering (e.g. HDBSCAN).
  * @param[in] metric distance metric to use
  * @param[out] out_mst output MST sorted by edge weights (size n_rows - 1)
  * @param[out] dendrogram output dendrogram (size [n_rows - 1] * 2)
@@ -183,8 +213,12 @@ void build_linkage(
  * (dendrogram). Returns the Minimum Spanning Tree edges sorted by weight and the dendrogram.
  * @param[in] handle raft handle for resource reuse
  * @param[in] X data points on host memory (size n_rows * d)
- * @param[in] linkage_graph_params linkage params or mutual reachability params for building the KNN
- * graph
+ * @param[in] linkage_graph_params
+ *   Parameters controlling how the KNN graph is built. This can be either:
+ *   - distance_params: standard distance-based KNN graph construction for traditional
+ *     agglomerative clustering.
+ *   - mutual_reachability_params: parameters to compute a mutual reachability graph for
+ *     density-aware hierarchical clustering (e.g. HDBSCAN).
  * @param[in] metric distance metric to use
  * @param[out] out_mst output MST sorted by edge weights (size n_rows - 1)
  * @param[out] dendrogram output dendrogram (size [n_rows - 1] * 2)
