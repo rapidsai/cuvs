@@ -15,20 +15,72 @@
  */
 package com.nvidia.cuvs.spi;
 
+import static com.nvidia.cuvs.internal.common.Util.*;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsVersionGet;
+import static com.nvidia.cuvs.internal.panama.headers_h.uint16_t;
+
 import com.nvidia.cuvs.*;
 import com.nvidia.cuvs.internal.*;
 import com.nvidia.cuvs.internal.common.Util;
+import java.io.IOException;
+import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
 
 final class JDKProvider implements CuVSProvider {
 
   private static final MethodHandle createNativeDataset$mh = createNativeDatasetBuilder();
+
+  private JDKProvider() {}
+
+  static CuVSProvider create() throws ProviderInitializationException {
+    NativeDependencyLoader.loadLibraries();
+
+    var mavenVersion = readCuVSVersionFromManifest();
+
+    try (var localArena = Arena.ofConfined()) {
+      var majorPtr = localArena.allocate(uint16_t);
+      var minorPtr = localArena.allocate(uint16_t);
+      var patchPtr = localArena.allocate(uint16_t);
+      checkCuVSError(cuvsVersionGet(majorPtr, minorPtr, patchPtr), "cuvsVersionGet");
+      var major = majorPtr.get(uint16_t, 0);
+      var minor = minorPtr.get(uint16_t, 0);
+      var patch = patchPtr.get(uint16_t, 0);
+
+      var cuvsVersionString = String.format(Locale.ROOT, "%02d.%02d.%d", major, minor, patch);
+      if (mavenVersion != null && !cuvsVersionString.equals(mavenVersion)) {
+        throw new ProviderInitializationException(
+            String.format(
+                Locale.ROOT,
+                "libcuvs_c version mismatch: expected [%s], found [%s]",
+                mavenVersion,
+                cuvsVersionString));
+      }
+    }
+    return new JDKProvider();
+  }
+
+  /**
+   * Read cuvs-java version from this Jar Manifest, or null if these are not available
+   */
+  private static String readCuVSVersionFromManifest() {
+    try (var jarFile =
+        new JarFile(
+            JDKProvider.class.getProtectionDomain().getCodeSource().getLocation().getPath())) {
+      Manifest manifest = jarFile.getManifest();
+      return manifest.getMainAttributes().getValue("Implementation-Version");
+    } catch (IOException e) {
+      return null;
+    }
+  }
 
   static MethodHandle createNativeDatasetBuilder() {
     try {
@@ -84,7 +136,7 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) throws Throwable {
+  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes) {
     if (indexes == null || indexes.length == 0) {
       throw new IllegalArgumentException("At least one index must be provided for merging");
     }
@@ -92,8 +144,7 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraMergeParams mergeParams)
-      throws Throwable {
+  public CagraIndex mergeCagraIndexes(CagraIndex[] indexes, CagraMergeParams mergeParams) {
     if (indexes == null || indexes.length == 0) {
       throw new IllegalArgumentException("At least one index must be provided for merging");
     }
@@ -101,26 +152,45 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public CuVSMatrix.Builder newMatrixBuilder(int size, int dimensions, CuVSMatrix.DataType dataType)
-      throws UnsupportedOperationException {
+  public GPUInfoProvider gpuInfoProvider() {
+    return new GPUInfoProviderImpl();
+  }
 
-    var dataset = new CuVSHostMatrixArenaImpl(size, dimensions, dataType);
+  @Override
+  public CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
+      long size, long columns, CuVSMatrix.DataType dataType) throws UnsupportedOperationException {
 
-    return new CuVSMatrix.Builder() {
+    return new CuVSMatrix.Builder<>() {
+      final CuVSHostMatrixArenaImpl matrix = new CuVSHostMatrixArenaImpl(size, columns, dataType);
       int current = 0;
 
       @Override
       public void addVector(float[] vector) {
+        if (vector.length != columns) {
+          throw new IllegalArgumentException(
+              String.format(
+                  Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+        }
         internalAddVector(vector);
       }
 
       @Override
       public void addVector(byte[] vector) {
+        if (vector.length != columns) {
+          throw new IllegalArgumentException(
+              String.format(
+                  Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+        }
         internalAddVector(vector);
       }
 
       @Override
       public void addVector(int[] vector) {
+        if (vector.length != columns) {
+          throw new IllegalArgumentException(
+              String.format(
+                  Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+        }
         internalAddVector(vector);
       }
 
@@ -129,17 +199,35 @@ final class JDKProvider implements CuVSProvider {
         MemorySegment.copy(
             vector,
             0,
-            dataset.memorySegment(),
-            dataset.valueLayout(),
-            ((current++) * dimensions * dataset.valueLayout().byteSize()),
-            dimensions);
+            matrix.memorySegment(),
+            matrix.valueLayout(),
+            ((current++) * columns * matrix.valueLayout().byteSize()),
+            (int) columns);
       }
 
       @Override
-      public CuVSMatrix build() {
-        return dataset;
+      public CuVSHostMatrix build() {
+        return matrix;
       }
     };
+  }
+
+  @Override
+  public CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
+      CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType)
+      throws UnsupportedOperationException {
+    return new HeapSegmentBuilder(resources, size, columns, dataType);
+  }
+
+  @Override
+  public CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
+      CuVSResources resources,
+      long size,
+      long columns,
+      int rowStride,
+      int columnStride,
+      CuVSMatrix.DataType dataType) {
+    return new HeapSegmentBuilder(resources, size, columns, rowStride, columnStride, dataType);
   }
 
   @Override
@@ -228,5 +316,93 @@ final class JDKProvider implements CuVSProvider {
   @Override
   public void closeScalar8BitQuantizer(Object impl) throws Throwable {
     ((Scalar8BitQuantizerImpl) impl).close();
+  }
+
+  /**
+   * This {@link CuVSDeviceMatrix} builder implementation returns a {@link CuVSDeviceMatrix} backed by managed RMM
+   * device memory. It uses a non-native {@link MemorySegment} created directly from on-heap java arrays to avoid
+   * an intermediate allocation and copy to a native (off-heap) segment.
+   * It requires the copy function ({@code cudaMemcpyAsync}) to have the {@code Critical} linker option in order
+   * to allow the access to on-heap memory (see {@link Util#cudaMemcpyAsync}).
+   */
+  private static class HeapSegmentBuilder implements CuVSMatrix.Builder<CuVSDeviceMatrix> {
+    private final long columns;
+    private final long size;
+    private final CuVSDeviceMatrixImpl matrix;
+    private final MemorySegment stream;
+    private int current;
+
+    private HeapSegmentBuilder(
+        CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType) {
+      this.columns = columns;
+      this.size = size;
+      this.matrix = CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType);
+      this.stream = Util.getStream(resources);
+      this.current = 0;
+    }
+
+    private HeapSegmentBuilder(
+        CuVSResources resources,
+        long size,
+        long columns,
+        int rowStride,
+        int columnStride,
+        CuVSMatrix.DataType dataType) {
+      this.columns = columns;
+      this.size = size;
+      this.matrix =
+          CuVSDeviceMatrixRMMImpl.create(
+              resources, size, columns, rowStride, columnStride, dataType);
+      this.stream = Util.getStream(resources);
+      this.current = 0;
+    }
+
+    @Override
+    public void addVector(float[] vector) {
+      if (vector.length != columns) {
+        throw new IllegalArgumentException(
+            String.format(
+                Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+      }
+      internalAddVector(MemorySegment.ofArray(vector));
+    }
+
+    @Override
+    public void addVector(byte[] vector) {
+      if (vector.length != columns) {
+        throw new IllegalArgumentException(
+            String.format(
+                Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+      }
+      internalAddVector(MemorySegment.ofArray(vector));
+    }
+
+    @Override
+    public void addVector(int[] vector) {
+      if (vector.length != columns) {
+        throw new IllegalArgumentException(
+            String.format(
+                Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
+      }
+      internalAddVector(MemorySegment.ofArray(vector));
+    }
+
+    private void internalAddVector(MemorySegment vector) {
+      if (current >= size) {
+        throw new ArrayIndexOutOfBoundsException();
+      }
+
+      long rowBytes = columns * matrix.valueLayout().byteSize();
+
+      var dstOffset = ((current++) * rowBytes);
+      var dst = matrix.memorySegment().asSlice(dstOffset);
+      cudaMemcpyAsync(dst, vector, rowBytes, CudaMemcpyKind.HOST_TO_DEVICE, stream);
+    }
+
+    @Override
+    public CuVSDeviceMatrix build() {
+      return matrix;
+    }
+>>>>>>> branch-25.10
   }
 }

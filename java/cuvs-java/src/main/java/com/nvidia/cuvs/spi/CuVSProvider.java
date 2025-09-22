@@ -15,14 +15,7 @@
  */
 package com.nvidia.cuvs.spi;
 
-import com.nvidia.cuvs.BinaryQuantizer;
-import com.nvidia.cuvs.BruteForceIndex;
-import com.nvidia.cuvs.CagraIndex;
-import com.nvidia.cuvs.CagraMergeParams;
-import com.nvidia.cuvs.CuVSMatrix;
-import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.HnswIndex;
-import com.nvidia.cuvs.TieredIndex;
+import com.nvidia.cuvs.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 import java.nio.file.Path;
@@ -53,23 +46,37 @@ public interface CuVSProvider {
   /** Creates a new CuVSResources. */
   CuVSResources newCuVSResources(Path tempDirectory) throws Throwable;
 
-  /** Create a {@link CuVSMatrix.Builder} instance **/
-  CuVSMatrix.Builder newMatrixBuilder(int size, int dimensions, CuVSMatrix.DataType dataType);
+  /** Create a {@link CuVSMatrix.Builder} instance for a host memory matrix **/
+  CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
+      long size, long dimensions, CuVSMatrix.DataType dataType);
+
+  /** Create a {@link CuVSMatrix.Builder} instance for a device memory matrix **/
+  CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
+      CuVSResources cuVSResources, long size, long dimensions, CuVSMatrix.DataType dataType);
+
+  /** Create a {@link CuVSMatrix.Builder} instance for a device memory matrix **/
+  CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
+      CuVSResources cuVSResources,
+      long size,
+      long dimensions,
+      int rowStride,
+      int columnStride,
+      CuVSMatrix.DataType dataType);
 
   /**
-   * Returns the factory method used to build a Dataset from native memory.
+   * Returns the factory method used to build a CuVSMatrix from native memory.
    * The factory method will have this signature:
-   * {@code Dataset createNativeDataset(memorySegment, size, dimensions, dataType)},
+   * {@code CuVSMatrix createNativeMatrix(memorySegment, size, dimensions, dataType)},
    * where {@code memorySegment} is a {@code java.lang.foreign.MemorySegment} containing {@code int size} vectors of
    * {@code int dimensions} length of type {@link CuVSMatrix.DataType}.
    * <p>
    * In order to expose this factory in a way that is compatible with Java 21, the factory method is returned as a
    * {@link MethodHandle} with {@link MethodType} equal to
-   * {@code (Dataset.class, MemorySegment.class, int.class, int.class, Dataset.DataType.class)}.
+   * {@code (CuVSMatrix.class, MemorySegment.class, int.class, int.class, CuVSMatrix.DataType.class)}.
    * The caller will need to invoke the factory via the {@link MethodHandle#invokeExact} method:
-   * {@code Dataset dataset = (Dataset)newNativeDatasetBuilder().invokeExact(memorySegment, size, dimensions, dataType)}
+   * {@code var matrix = (CuVSMatrix)newNativeMatrixBuilder().invokeExact(memorySegment, size, dimensions, dataType)}
    * </p>
-   * @return a MethodHandle which can be invoked to build a Dataset from an external {@code MemorySegment}
+   * @return a MethodHandle which can be invoked to build a CuVSMatrix from an external {@code MemorySegment}
    */
   MethodHandle newNativeMatrixBuilder();
 
@@ -146,6 +153,9 @@ public interface CuVSProvider {
 
   /** Closes BinaryQuantizer implementation. */
   void closeBinaryQuantizer(Object impl) throws Throwable;
+
+  /** Returns a {@link GPUInfoProvider} to query the system for GPU related information */
+  GPUInfoProvider gpuInfoProvider();
 
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {

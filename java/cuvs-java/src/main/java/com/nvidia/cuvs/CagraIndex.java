@@ -53,10 +53,10 @@ public interface CagraIndex extends AutoCloseable {
 
   /** Returns the CAGRA graph
    *
-   * @return a {@link CuVSMatrix} encapsulating the native int (uint32_t) array used to represent
+   * @return a {@link CuVSDeviceMatrix} encapsulating the native int (uint32_t) array used to represent
    * the cagra graph
    */
-  CuVSMatrix getGraph();
+  CuVSDeviceMatrix getGraph();
 
   /**
    * A method to persist a CAGRA index using an instance of {@link OutputStream}
