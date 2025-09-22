@@ -50,13 +50,13 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
-// ACE: Get cluster labels for partitioned approach
+// ACE: Get partition labels for partitioned approach
 template <typename DataT, typename IdxT, typename Accessor>
-void get_cluster_labels(
+void get_partition_labels(
   raft::resources const& res,
   raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> labels,
-  raft::host_matrix_view<IdxT, int64_t, raft::row_major> cluster_histogram,
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_histogram,
   double sampling_rate = 0.01)
 {
   uint64_t dataset_size = dataset.extent(0);
@@ -64,15 +64,15 @@ void get_cluster_labels(
   uint64_t labels_size  = labels.extent(0);
   uint64_t labels_dim   = labels.extent(1);
   RAFT_EXPECTS(dataset_size == labels_size, "Dataset size must match labels extent");
-  uint64_t n_clusters = cluster_histogram.extent(0);
+  uint64_t n_partitions = partition_histogram.extent(0);
   RAFT_EXPECTS(labels_dim == 2, "Labels must have 2 columns");
-  RAFT_EXPECTS(cluster_histogram.extent(1) == 2, "Cluster histogram must have 2 columns");
+  RAFT_EXPECTS(partition_histogram.extent(1) == 2, "Partition histogram must have 2 columns");
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
 
   // Sampling vectors from dataset
   RAFT_LOG_INFO("ACE: Sampling vectors from dataset ...");
   uint64_t n_samples = dataset_size * sampling_rate;
-  if (n_samples < 100 * n_clusters) { n_samples = 100 * n_clusters; }
+  if (n_samples < 100 * n_partitions) { n_samples = 100 * n_partitions; }
   if (n_samples > dataset_size) { n_samples = dataset_size; }
   RAFT_LOG_INFO("ACE: n_samples: %lu", n_samples);
 
@@ -88,15 +88,15 @@ void get_cluster_labels(
   raft::update_device(
     sample_db_dev.data_handle(), sample_db.data_handle(), sample_db.size(), stream);
 
-  // K-means: partitioning dataset vectors and compute centroid for each cluster
-  RAFT_LOG_INFO("ACE: Running k-means clustering ...");
+  // K-means: partitioning dataset vectors and compute centroid for each partition
+  RAFT_LOG_INFO("ACE: Running k-means partitioning ...");
   cuvs::cluster::kmeans::params params;
-  params.n_clusters  = n_clusters;
+  params.n_clusters  = n_partitions;
   params.max_iter    = 100;
   params.init        = cuvs::cluster::kmeans::params::InitMethod::KMeansPlusPlus;
   float inertia      = 0.0;
   int n_iter         = 0;
-  auto centroids_dev = raft::make_device_matrix<float, int64_t>(res, n_clusters, dataset_dim);
+  auto centroids_dev = raft::make_device_matrix<float, int64_t>(res, n_partitions, dataset_dim);
   cuvs::cluster::kmeans::fit(res,
                              params,
                              sample_db_dev.view(),
@@ -106,10 +106,10 @@ void get_cluster_labels(
                              raft::make_host_scalar_view(&n_iter));
   RAFT_LOG_INFO("ACE: K-means inertia: %f, iterations: %d", inertia, n_iter);
 
-  auto cluster_relations = raft::make_host_matrix<IdxT, int64_t>(n_clusters, n_clusters);
-  for (uint64_t c0 = 0; c0 < n_clusters; c0++) {
-    for (uint64_t c1 = 0; c1 < n_clusters; c1++) {
-      cluster_relations(c0, c1) = 0;
+  auto partition_relations = raft::make_host_matrix<IdxT, int64_t>(n_partitions, n_partitions);
+  for (uint64_t c0 = 0; c0 < n_partitions; c0++) {
+    for (uint64_t c1 = 0; c1 < n_partitions; c1++) {
+      partition_relations(c0, c1) = 0;
     }
   }
 
@@ -117,9 +117,9 @@ void get_cluster_labels(
   RAFT_LOG_INFO("ACE: Computing distances between dataset and centroid vectors ...");
   const uint64_t chunk_size = 32 * 1024;
   auto _sub_dataset         = raft::make_host_matrix<float, int64_t>(chunk_size, dataset_dim);
-  auto _sub_distances       = raft::make_host_matrix<float, int64_t>(chunk_size, n_clusters);
+  auto _sub_distances       = raft::make_host_matrix<float, int64_t>(chunk_size, n_partitions);
   auto _sub_dataset_dev   = raft::make_device_matrix<float, int64_t>(res, chunk_size, dataset_dim);
-  auto _sub_distances_dev = raft::make_device_matrix<float, int64_t>(res, chunk_size, n_clusters);
+  auto _sub_distances_dev = raft::make_device_matrix<float, int64_t>(res, chunk_size, n_partitions);
 
   for (uint64_t i_base = 0; i_base < dataset_size; i_base += chunk_size) {
     const uint64_t sub_dataset_size = std::min(chunk_size, dataset_size - i_base);
@@ -145,9 +145,9 @@ void get_cluster_labels(
       _sub_dataset_dev.data_handle(), sub_dataset.data_handle(), sub_dataset.size(), stream);
 
     auto sub_distances = raft::make_host_matrix_view<float, int64_t>(
-      _sub_distances.data_handle(), sub_dataset_size, n_clusters);
+      _sub_distances.data_handle(), sub_dataset_size, n_partitions);
     auto sub_distances_dev = raft::make_device_matrix_view<float, int64_t>(
-      _sub_distances_dev.data_handle(), sub_dataset_size, n_clusters);
+      _sub_distances_dev.data_handle(), sub_dataset_size, n_partitions);
 
     cuvs::distance::pairwise_distance(res,
                                       sub_dataset_dev,
@@ -159,7 +159,7 @@ void get_cluster_labels(
       sub_distances.data_handle(), sub_distances_dev.data_handle(), sub_distances.size(), stream);
     raft::resource::sync_stream(res, stream);
 
-    // Find two closest clusters to each dataset vector
+    // Find two closest partitions to each dataset vector
 #pragma omp parallel for
     for (uint64_t i_sub = 0; i_sub < sub_dataset_size; i_sub++) {
       IdxT label_0 = 0;
@@ -168,7 +168,7 @@ void get_cluster_labels(
         label_0 = 1;
         label_1 = 0;
       }
-      for (uint64_t c = 2; c < n_clusters; c++) {
+      for (uint64_t c = 2; c < n_partitions; c++) {
         if (sub_distances(i_sub, c) < sub_distances(i_sub, label_0)) {
           label_1 = label_0;
           label_0 = c;
@@ -181,15 +181,15 @@ void get_cluster_labels(
       labels(i, 1) = label_1;
 
 #pragma omp atomic update
-      cluster_histogram(label_0, 0) += 1;
+      partition_histogram(label_0, 0) += 1;
 #pragma omp atomic update
-      cluster_histogram(label_1, 1) += 1;
+      partition_histogram(label_1, 1) += 1;
 #pragma omp atomic update
-      cluster_relations(label_0, label_1) += 1;
+      partition_relations(label_0, label_1) += 1;
     }
   }
 
-  RAFT_LOG_INFO("ACE: Cluster labeling completed");
+  RAFT_LOG_INFO("ACE: Partition labeling completed");
 }
 
 // ACE: Build partitioned CAGRA index for very large graphs. Dataset must be on host.
@@ -198,7 +198,7 @@ index<T, IdxT> build_ace(
   raft::resources const& res,
   const index_params& params,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
-  size_t num_clusters = 10)
+  size_t num_partitions = 10)
 {
   common::nvtx::range<common::nvtx::domain::cuvs> function_scope(
     "cagra::build_ace<%s>(%zu, %zu, %zu)",
@@ -207,15 +207,15 @@ index<T, IdxT> build_ace(
                                      : "device",
     params.intermediate_graph_degree,
     params.graph_degree,
-    num_clusters);
+    num_partitions);
 
-  RAFT_LOG_INFO("ACE: Starting partitioned CAGRA build with %zu clusters", num_clusters);
+  RAFT_LOG_INFO("ACE: Starting partitioned CAGRA build with %zu partitions", num_partitions);
 
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
   uint64_t dataset_size      = dataset.extent(0);
   uint64_t dataset_dim       = dataset.extent(1);
-  uint64_t n_clusters        = num_clusters;
+  uint64_t n_partitions      = num_partitions;
 
   if (intermediate_degree >= dataset_size) {
     RAFT_LOG_WARN(
@@ -232,29 +232,29 @@ index<T, IdxT> build_ace(
     graph_degree = intermediate_degree;
   }
 
-  // Get cluster labels
-  auto labels            = raft::make_host_matrix<IdxT, int64_t>(dataset_size, 2);
-  auto cluster_histogram = raft::make_host_matrix<IdxT, int64_t>(n_clusters, 2);
-  for (uint64_t c = 0; c < n_clusters; c++) {
-    cluster_histogram(c, 0) = 0;
-    cluster_histogram(c, 1) = 0;
+  // Get partition labels
+  auto labels              = raft::make_host_matrix<IdxT, int64_t>(dataset_size, 2);
+  auto partition_histogram = raft::make_host_matrix<IdxT, int64_t>(n_partitions, 2);
+  for (uint64_t c = 0; c < n_partitions; c++) {
+    partition_histogram(c, 0) = 0;
+    partition_histogram(c, 1) = 0;
   }
-  get_cluster_labels<T, IdxT, Accessor>(res, dataset, labels.view(), cluster_histogram.view());
+  get_partition_labels<T, IdxT, Accessor>(res, dataset, labels.view(), partition_histogram.view());
 
-  // Create vector lists for each cluster
-  RAFT_LOG_INFO("ACE: Creating vector lists by cluster labels ...");
+  // Create vector lists for each partition
+  RAFT_LOG_INFO("ACE: Creating vector lists by partition labels ...");
   auto vector_fwd_list_0 = raft::make_host_vector<IdxT, int64_t>(dataset_size);
   auto vector_fwd_list_1 = raft::make_host_vector<IdxT, int64_t>(dataset_size);
   auto vector_bwd_list_0 = raft::make_host_vector<IdxT, int64_t>(dataset_size);
   auto vector_bwd_list_1 = raft::make_host_vector<IdxT, int64_t>(dataset_size);
-  auto idxptr_0          = raft::make_host_vector<IdxT, int64_t>(n_clusters + 1);
-  auto idxptr_1          = raft::make_host_vector<IdxT, int64_t>(n_clusters + 1);
+  auto idxptr_0          = raft::make_host_vector<IdxT, int64_t>(n_partitions + 1);
+  auto idxptr_1          = raft::make_host_vector<IdxT, int64_t>(n_partitions + 1);
 
   idxptr_0(0) = 0;
   idxptr_1(0) = 0;
-  for (uint64_t c = 1; c < n_clusters; c++) {
-    idxptr_0(c) = idxptr_0(c - 1) + cluster_histogram(c - 1, 0);
-    idxptr_1(c) = idxptr_1(c - 1) + cluster_histogram(c - 1, 1);
+  for (uint64_t c = 1; c < n_partitions; c++) {
+    idxptr_0(c) = idxptr_0(c - 1) + partition_histogram(c - 1, 0);
+    idxptr_1(c) = idxptr_1(c - 1) + partition_histogram(c - 1, 1);
   }
 
 #pragma omp parallel for
@@ -277,7 +277,7 @@ index<T, IdxT> build_ace(
   }
 
   // Restore idxptr arrays
-  for (uint64_t c = n_clusters + 1; c > 0; c--) {
+  for (uint64_t c = n_partitions + 1; c > 0; c--) {
     idxptr_0(c) = idxptr_0(c - 1);
     idxptr_1(c) = idxptr_1(c - 1);
   }
@@ -286,9 +286,9 @@ index<T, IdxT> build_ace(
 
   auto search_graph_0 = raft::make_host_matrix<IdxT, int64_t>(dataset_size, graph_degree);
 
-  // Process each cluster
-  for (uint64_t c = 0; c < n_clusters; c++) {
-    RAFT_LOG_INFO("ACE: Processing partition %lu/%lu", c + 1, n_clusters);
+  // Process each partition
+  for (uint64_t c = 0; c < n_partitions; c++) {
+    RAFT_LOG_INFO("ACE: Processing partition %lu/%lu", c + 1, n_partitions);
     auto start = std::chrono::high_resolution_clock::now();
 
     // Extract vectors for this partition
@@ -306,7 +306,7 @@ index<T, IdxT> build_ace(
 #pragma omp parallel for
     for (uint64_t j = 0; j < sub_dataset_size_0; j++) {
       uint64_t i = vector_bwd_list_0(j + idxptr_0(c));
-      RAFT_EXPECTS(labels(i, 0) == c, "Vector does not belong to cluster");
+      RAFT_EXPECTS(labels(i, 0) == c, "Vector does not belong to partition");
       for (uint64_t k = 0; k < dataset_dim; k++) {
         sub_dataset(j, k) = dataset(i, k);
       }
@@ -316,7 +316,7 @@ index<T, IdxT> build_ace(
 #pragma omp parallel for
     for (uint64_t j = 0; j < sub_dataset_size_1; j++) {
       uint64_t i = vector_bwd_list_1(j + idxptr_1(c));
-      RAFT_EXPECTS(labels(i, 1) == c, "Vector does not belong to cluster");
+      RAFT_EXPECTS(labels(i, 1) == c, "Vector does not belong to partition");
       for (uint64_t k = 0; k < dataset_dim; k++) {
         sub_dataset(j + sub_dataset_size_0, k) = dataset(i, k);
       }

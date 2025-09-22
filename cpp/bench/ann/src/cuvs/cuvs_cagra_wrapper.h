@@ -201,17 +201,21 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
   // ACE: Use disk-based partitioned approach if enabled.
   // Assumes large datasets on disk.
   if (params.disk_enabled) {
-    RAFT_LOG_INFO("ACE: Using disk-based partitioned CAGRA build with 10 clusters");
+    RAFT_LOG_INFO("ACE: Using disk-based partitioned CAGRA build with 100 partitions");
     if (dataset_is_on_host) {
-      index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(
-        cuvs::neighbors::cagra::build_ace(handle_, params, dataset_view_host, 10)));
+      index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(
+        std::move(cuvs::neighbors::cagra::build_ace(handle_, params, dataset_view_host, 100)));
     } else {
       RAFT_LOG_INFO("ACE: Dataset is on device. Moving to host...");
-      auto dataset_host = raft::make_host_matrix<T, int64_t>(dataset_view_device.extent(0), dataset_view_device.extent(1));
-      raft::copy(dataset_host.data_handle(), dataset_view_device.data_handle(), dataset_view_device.size(), raft::resource::get_cuda_stream(handle_));
+      auto dataset_host = raft::make_host_matrix<T, int64_t>(dataset_view_device.extent(0),
+                                                             dataset_view_device.extent(1));
+      raft::copy(dataset_host.data_handle(),
+                 dataset_view_device.data_handle(),
+                 dataset_view_device.size(),
+                 raft::resource::get_cuda_stream(handle_));
       raft::resource::sync_stream(handle_);
-      index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(
-        cuvs::neighbors::cagra::build_ace(handle_, params, dataset_host.view(), 10)));
+      index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(
+        std::move(cuvs::neighbors::cagra::build_ace(handle_, params, dataset_host.view(), 100)));
     }
   } else if (index_params_.num_dataset_splits <= 1) {
     index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(
