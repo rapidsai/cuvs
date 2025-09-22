@@ -47,6 +47,7 @@ void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
 
   // Allocate norms vector if not already allocated
   if (!dataset_norms_.has_value() || dataset_norms_->extent(0) != dataset_view.extent(0)) {
+    dataset_norms_ = raft::make_device_vector<float, int64_t>(res, 0);
     dataset_norms_ = raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
   }
 
