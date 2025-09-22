@@ -34,6 +34,8 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
 
   private final int rowStride;
   private final int columnStride;
+  private final long rowBytes;
+  private final long rowSize;
 
   public CuVSHostMatrixImpl(
       MemorySegment memorySegment, long size, long columns, DataType dataType) {
@@ -83,6 +85,11 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
 
     this.rowStride = rowStride;
     this.columnStride = columnStride;
+
+    var elementSize = valueLayout.byteSize();
+    this.rowSize = rowStride > 0 ? rowStride * elementSize : columns * elementSize;
+    this.rowBytes = columns * elementSize;
+
     this.accessor$vh = sequenceLayout.varHandle(MemoryLayout.PathElement.sequenceElement());
   }
 
@@ -118,10 +125,8 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
         : String.format(
             Locale.ROOT, "Input array is of the wrong type for dataType [%s]", dataType.toString());
 
-    var valueByteSize = valueLayout.byteSize();
     for (int r = 0; r < size; ++r) {
-      MemorySegment.copy(
-          memorySegment, valueLayout, r * columns * valueByteSize, array[r], 0, (int) columns);
+      MemorySegment.copy(memorySegment, valueLayout, r * rowSize, array[r], 0, (int) columns);
     }
   }
 
@@ -143,10 +148,8 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
         : String.format(
             Locale.ROOT, "Input array is of the wrong type for dataType [%s]", dataType.toString());
 
-    var valueByteSize = valueLayout.byteSize();
     for (int r = 0; r < size; ++r) {
-      MemorySegment.copy(
-          memorySegment, valueLayout, r * columns * valueByteSize, array[r], 0, (int) columns);
+      MemorySegment.copy(memorySegment, valueLayout, r * rowSize, array[r], 0, (int) columns);
     }
   }
 
@@ -168,19 +171,37 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
         : String.format(
             Locale.ROOT, "Input array is of the wrong type for dataType [%s]", dataType.toString());
 
-    var valueByteSize = valueLayout.byteSize();
     for (int r = 0; r < size; ++r) {
-      MemorySegment.copy(
-          memorySegment, valueLayout, r * columns * valueByteSize, array[r], 0, (int) columns);
+      MemorySegment.copy(memorySegment, valueLayout, r * rowSize, array[r], 0, (int) columns);
     }
   }
 
   @Override
   public void toHost(CuVSHostMatrix hostMatrix) {
     var targetMatrix = (CuVSHostMatrixImpl) hostMatrix;
-    var valueByteSize = valueLayout.byteSize();
-    MemorySegment.copy(
-        this.memorySegment, 0L, targetMatrix.memorySegment, 0L, size * columns * valueByteSize);
+
+    if (targetMatrix.columns() != this.columns || targetMatrix.size() != this.size) {
+      throw new IllegalArgumentException(
+          "Source and target matrices must have the same dimensions");
+    }
+    if (targetMatrix.dataType() != this.dataType) {
+      throw new IllegalArgumentException("Source and target matrices must have the same dataType");
+    }
+
+    if (this.rowStride <= 0 && targetMatrix.rowStride <= 0) {
+      // copy whole matrix
+      MemorySegment.copy(this.memorySegment, 0L, targetMatrix.memorySegment, 0L, size * rowSize);
+    } else {
+      // copy row-by-row
+      for (int r = 0; r < size; ++r) {
+        MemorySegment.copy(
+            this.memorySegment,
+            r * rowSize,
+            targetMatrix.memorySegment,
+            r * targetMatrix.rowSize,
+            rowBytes);
+      }
+    }
   }
 
   @Override
@@ -193,7 +214,7 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
 
   @Override
   public int get(int row, int col) {
-    return (int) accessor$vh.get(memorySegment, 0L, (long) row * columns + col);
+    return (int) accessor$vh.get(memorySegment, 0L, (long) row * rowStride + col);
   }
 
   @Override

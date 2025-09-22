@@ -393,15 +393,14 @@ final class JDKProvider implements CuVSProvider {
       if (currentBufferRow > 0) {
         var deviceMemoryOffset = (currentRow - currentBufferRow) * rowBytes;
         var dst = matrix.memorySegment().asSlice(deviceMemoryOffset);
-        final var width = columns * elementSize;
         checkCudaError(
             cudaMemcpy2DAsync(
                 dst,
                 rowSize,
                 hostBuffer.address(),
-                width,
-                width,
-                size,
+                rowBytes,
+                rowBytes,
+                currentBufferRow,
                 CudaMemcpyKind.HOST_TO_DEVICE.kind,
                 stream),
             "cudaMemcpy2DAsync");
