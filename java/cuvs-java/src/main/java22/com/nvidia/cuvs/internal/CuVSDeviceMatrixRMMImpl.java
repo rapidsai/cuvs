@@ -84,16 +84,16 @@ public class CuVSDeviceMatrixRMMImpl extends CuVSDeviceMatrixImpl implements CuV
     var elementSize = valueLayout.byteSize();
 
     final long rowSize;
-    if (rowStride == 0) {
+    if (rowStride <= 0) {
       rowSize = columns * elementSize;
     } else if (rowStride >= columns) {
       rowSize = rowStride * elementSize;
     } else {
       throw new IllegalArgumentException("Row stride cannot be less than the number of columns");
     }
-    if (columnStride != 1) {
+    if (columnStride != -1) {
       throw new IllegalArgumentException(
-          "Stridden columns are currently not supported; columnStride must be equal to 1");
+          "Stridden columns are currently not supported; columnStride must be equal to -1");
     }
 
     try (var resourcesAccess = resources.access()) {

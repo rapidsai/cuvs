@@ -123,8 +123,9 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
   }
 
   protected static SequenceLayout sequenceLayoutFromType(
-      long size, long columns, DataType dataType) {
-    return MemoryLayout.sequenceLayout(size * columns, valueLayoutFromType(dataType))
+      long size, long columns, int rowStride, DataType dataType) {
+    return MemoryLayout.sequenceLayout(
+            size * rowStride > 0 ? rowStride : columns, valueLayoutFromType(dataType))
         .withByteAlignment(32);
   }
 

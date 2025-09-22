@@ -32,26 +32,57 @@ import java.util.Locale;
 public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMatrix {
   protected final VarHandle accessor$vh;
 
+  private final int rowStride;
+  private final int columnStride;
+
   public CuVSHostMatrixImpl(
       MemorySegment memorySegment, long size, long columns, DataType dataType) {
     this(
         memorySegment,
         size,
         columns,
+        -1,
+        -1,
         dataType,
         valueLayoutFromType(dataType),
-        MemoryLayout.sequenceLayout(size * columns, valueLayoutFromType(dataType))
-            .withByteAlignment(32));
+        sequenceLayoutFromType(size, columns, -1, dataType));
+  }
+
+  public CuVSHostMatrixImpl(
+      MemorySegment memorySegment,
+      long size,
+      long columns,
+      int rowStride,
+      int columnStride,
+      DataType dataType) {
+    this(
+        memorySegment,
+        size,
+        columns,
+        rowStride,
+        columnStride,
+        dataType,
+        valueLayoutFromType(dataType),
+        sequenceLayoutFromType(size, columns, rowStride, dataType));
   }
 
   protected CuVSHostMatrixImpl(
       MemorySegment memorySegment,
       long size,
       long columns,
+      int rowStride,
+      int columnStride,
       DataType dataType,
       ValueLayout valueLayout,
       MemoryLayout sequenceLayout) {
     super(memorySegment, dataType, valueLayout, size, columns);
+
+    if (rowStride > 0 && rowStride < columns) {
+      throw new IllegalArgumentException("Row stride cannot be less than the number of columns");
+    }
+
+    this.rowStride = rowStride;
+    this.columnStride = columnStride;
     this.accessor$vh = sequenceLayout.varHandle(MemoryLayout.PathElement.sequenceElement());
   }
 
@@ -167,7 +198,8 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
 
   @Override
   public MemorySegment toTensor(Arena arena) {
+    var strides = rowStride >= 0 ? new long[] {rowStride, columnStride} : null;
     return prepareTensor(
-        arena, memorySegment, new long[] {size, columns}, code(), bits(), kDLCPU());
+        arena, memorySegment, new long[] {size, columns}, strides, code(), bits(), kDLCPU());
   }
 }
