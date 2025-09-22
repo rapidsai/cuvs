@@ -294,7 +294,7 @@ final class JDKProvider implements CuVSProvider {
       this.size = size;
       this.matrix = matrix;
       this.elementSize = matrix.valueLayout().byteSize();
-      this.rowSize = rowStride == 0 ? columns * elementSize : rowStride * elementSize;
+      this.rowSize = rowStride > 0 ? rowStride * elementSize : columns * elementSize;
       this.rowBytes = columns * elementSize;
 
       this.currentRow = 0;
@@ -391,7 +391,7 @@ final class JDKProvider implements CuVSProvider {
 
     private void flushBuffer() {
       if (currentBufferRow > 0) {
-        var deviceMemoryOffset = (currentRow - currentBufferRow) * rowBytes;
+        var deviceMemoryOffset = (currentRow - currentBufferRow) * rowSize;
         var dst = matrix.memorySegment().asSlice(deviceMemoryOffset);
         checkCudaError(
             cudaMemcpy2DAsync(
