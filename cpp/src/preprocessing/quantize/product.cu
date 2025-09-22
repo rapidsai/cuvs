@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * Copyright (c) 2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,19 +20,19 @@
 
 namespace cuvs::preprocessing::quantize::product {
 
-#define CUVS_INST_QUANTIZATION(T, QuantI)                                     \
-  auto train(raft::resources const& res,                                      \
-             const params params,                                             \
-             raft::device_matrix_view<const T, int64_t> dataset) -> quantizer \
-  {                                                                           \
-    return detail::train(res, params, dataset);                               \
-  }                                                                           \
-  void transform(raft::resources const& res,                                  \
-                 const quantizer& quantizer,                                  \
-                 raft::device_matrix_view<const T, int64_t> dataset,          \
-                 raft::device_matrix_view<QuantI, int64_t> out)               \
-  {                                                                           \
-    detail::transform(res, quantizer, dataset, out);                          \
+#define CUVS_INST_QUANTIZATION(T, QuantI)                                        \
+  auto train(raft::resources const& res,                                         \
+             const params params,                                                \
+             raft::device_matrix_view<const T, int64_t> dataset) -> quantizer<T> \
+  {                                                                              \
+    return detail::train(res, params, dataset);                                  \
+  }                                                                              \
+  void transform(raft::resources const& res,                                     \
+                 const quantizer<T>& quantizer,                                  \
+                 raft::device_matrix_view<const T, int64_t> dataset,             \
+                 raft::device_matrix_view<QuantI, int64_t> out)                  \
+  {                                                                              \
+    detail::transform(res, quantizer, dataset, out);                             \
   }
 
 CUVS_INST_QUANTIZATION(float, uint8_t);

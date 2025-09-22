@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * Copyright (c) 2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,31 +35,7 @@ namespace cuvs::preprocessing::quantize::product {
 /**
  * @brief Product Quantizer parameters.
  */
-struct params {
-  /**
-   * The number of inverted lists (clusters).
-   */
-  uint32_t n_lists = 1;
-  /*
-   * The bit length of the vector element after compression by PQ.
-   *
-   * Possible values: [4, 5, 6, 7, 8].
-   */
-  int64_t pq_bits = 8;
-  int64_t pq_dim  = 0;
-  cuvs::neighbors::ivf_pq::codebook_gen codebook_kind =
-    cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE;
-  bool force_random_rotation          = false;
-  bool conservative_memory_allocation = false;
-  /**
-   * The max number of data points to use per PQ code during PQ codebook training. Using more data
-   * points per PQ code may increase the quality of PQ codebook but may also increase the build
-   * time. The parameter is applied to both PQ codebook generation methods, i.e., PER_SUBSPACE and
-   * PER_CLUSTER. In both cases, we will use `pq_book_size * max_train_points_per_pq_code` training
-   * points to train each codebook.
-   */
-  uint32_t max_train_points_per_pq_code = 256;
-};
+using params = cuvs::neighbors::vpq_params;
 
 /**
  * @brief Defines and stores PQ index upon training
@@ -67,8 +43,10 @@ struct params {
  * @tparam T data element type
  *
  */
+template <typename T>
 struct quantizer {
-  cuvs::neighbors::ivf_pq::index<int64_t> pq_index;
+  params params;
+  cuvs::neighbors::vpq_dataset<T, int64_t> vpq_dataset;
 };
 
 /**
@@ -87,9 +65,9 @@ struct quantizer {
  *
  * @return quantizer
  */
-quantizer train(raft::resources const& res,
-                const params params,
-                raft::device_matrix_view<const float, int64_t> dataset);
+quantizer<float> train(raft::resources const& res,
+                       const params params,
+                       raft::device_matrix_view<const float, int64_t> dataset);
 
 /**
  * @brief Applies quantization transform to given dataset
@@ -113,7 +91,7 @@ quantizer train(raft::resources const& res,
  *
  */
 void transform(raft::resources const& res,
-               const quantizer& quantizer,
+               const quantizer<float>& quantizer,
                raft::device_matrix_view<const float, int64_t> dataset,
                raft::device_matrix_view<uint8_t, int64_t> out);
 

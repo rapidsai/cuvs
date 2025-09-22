@@ -15,11 +15,13 @@
  */
 
 #include "../test_utils.cuh"
+#include <chrono>
 #include <cuvs/preprocessing/quantize/product.hpp>
 #include <cuvs/stats/trustworthiness_score.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/matrix/gather.cuh>
+#include <raft/matrix/init.cuh>
 #include <raft/random/make_blobs.cuh>
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/mr/device/managed_memory_resource.hpp>
@@ -28,26 +30,18 @@ namespace cuvs::preprocessing::quantize::product {
 
 template <typename T>
 struct ProductQuantizationInputs {
-  int n_samples;                                        // Number of samples in the dataset
-  int n_features;                                       // Number of features in the dataset
-  uint32_t n_lists;                                     // Number of lists
-  int pq_bits;                                          // PQ bits
-  int pq_dim;                                           // PQ dimension
-  cuvs::neighbors::ivf_pq::codebook_gen codebook_kind;  // Codebook generation method
-  bool force_random_rotation;                           // Whether to force random rotation
-  uint32_t max_train_points_per_pq_code;                // Max training points per PQ code
-  uint64_t seed;                                        // Random seed
+  int n_samples;     // Number of samples in the dataset
+  int n_features;    // Number of features in the dataset
+  uint32_t pq_bits;  // PQ bits
+  uint32_t pq_dim;   // PQ dimension
+  uint64_t seed;     // Random seed
 };
 
 template <typename T>
 std::ostream& operator<<(std::ostream& os, const ProductQuantizationInputs<T>& inputs)
 {
   return os << "n_samples:" << inputs.n_samples << " n_features:" << inputs.n_features
-            << " n_lists:" << inputs.n_lists << " pq_bits:" << inputs.pq_bits
-            << " pq_dim:" << inputs.pq_dim
-            << " codebook_kind:" << static_cast<int>(inputs.codebook_kind)
-            << " force_random_rotation:" << inputs.force_random_rotation
-            << " max_train_points_per_pq_code:" << inputs.max_train_points_per_pq_code
+            << " pq_bits:" << inputs.pq_bits << " pq_dim:" << inputs.pq_dim
             << " seed:" << inputs.seed;
 }
 
@@ -55,7 +49,6 @@ template <typename T>
 void compare_vectors_l2(const raft::resources& res,
                         T a,
                         T b,
-                        uint32_t label,
                         double compression_ratio,
                         double eps,
                         bool print_data = false)
@@ -76,17 +69,151 @@ void compare_vectors_l2(const raft::resources& res,
   raft::resource::sync_stream(res);
   for (uint32_t i = 0; i < n_rows; i++) {
     double d = dist(i);
-    // The theoretical estimate of the error is hard to come up with,
-    // the estimate below is based on experimentation + curse of dimensionality
-    ASSERT_LE(d, 1.2 * eps * std::pow(2.0, compression_ratio))
-      << " (label = " << label << ", ix = " << i << ", eps = " << eps << ")";
     if (print_data && i < 5) {
       auto dim_print = std::min<uint32_t>(dim, 10);
       raft::print_vector("original", a.data_handle() + i * dim, dim_print, std::cout);
       raft::print_vector("reconstructed", b.data_handle() + i * dim, dim_print, std::cout);
-      std::cout << "dist: " << d << std::endl;
+      std::cout << "dist: " << d << ", compression_ratio: " << compression_ratio << std::endl;
+    }
+    // The theoretical estimate of the error is hard to come up with,
+    // the estimate below is based on experimentation + curse of dimensionality
+    ASSERT_LE(d, 1.2 * eps * std::pow(2.0, compression_ratio))
+      << " (ix = " << i << ", eps = " << eps << ", compression_ratio = " << compression_ratio
+      << ")";
+  }
+}
+
+template <uint32_t Bits>
+struct bitfield_ref_t {
+  static_assert(Bits <= 8 && Bits > 0, "Bit code must fit one byte");
+  constexpr static uint8_t kMask = static_cast<uint8_t>((1u << Bits) - 1u);
+  uint8_t* ptr;
+  uint32_t offset;
+
+  constexpr operator uint8_t()  // NOLINT
+  {
+    auto pair = static_cast<uint16_t>(ptr[0]);
+    if (offset + Bits > 8) { pair |= static_cast<uint16_t>(ptr[1]) << 8; }
+    return static_cast<uint8_t>((pair >> offset) & kMask);
+  }
+
+  constexpr auto operator=(uint8_t code) -> bitfield_ref_t&
+  {
+    if (offset + Bits > 8) {
+      auto pair = static_cast<uint16_t>(ptr[0]);
+      pair |= static_cast<uint16_t>(ptr[1]) << 8;
+      pair &= ~(static_cast<uint16_t>(kMask) << offset);
+      pair |= static_cast<uint16_t>(code) << offset;
+      ptr[0] = static_cast<uint8_t>(raft::Pow2<256>::mod(pair));
+      ptr[1] = static_cast<uint8_t>(raft::Pow2<256>::div(pair));
+    } else {
+      ptr[0] = (ptr[0] & ~(kMask << offset)) | (code << offset);
+    }
+    return *this;
+  }
+};
+
+/**
+ * Copy from cuvs::neighbors::ivf_pq::detail::bitfield_view_t to be used in this test.
+ */
+template <uint32_t Bits>
+struct bitfield_view_t {
+  static_assert(Bits <= 8 && Bits > 0, "Bit code must fit one byte");
+  uint8_t* raw;
+
+  constexpr auto operator[](uint32_t i) -> bitfield_ref_t<Bits>
+  {
+    uint32_t bit_offset = i * Bits;
+    return bitfield_ref_t<Bits>{raw + raft::Pow2<8>::div(bit_offset),
+                                raft::Pow2<8>::mod(bit_offset)};
+  }
+};
+
+template <uint32_t BlockSize, uint32_t PqBits, typename DataT, typename MathT, typename IdxT
+          // typename LabelT
+          >
+__launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_vectors_kernel(
+  raft::device_matrix_view<uint8_t, IdxT, raft::row_major> codes,
+  raft::device_matrix_view<DataT, IdxT, raft::row_major> dataset,
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers,
+  // raft::device_vector_view<const LabelT, IdxT, raft::row_major> vq_labels,
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers)
+{
+  constexpr uint32_t kSubWarpSize = std::min<uint32_t>(raft::WarpSize, 1u << PqBits);
+  using subwarp_align             = raft::Pow2<kSubWarpSize>;
+  const IdxT row_ix = subwarp_align::div(IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x});
+  if (row_ix >= codes.extent(0)) { return; }
+
+  const uint32_t pq_dim = raft::div_rounding_up_unsafe(vq_centers.extent(1), pq_centers.extent(1));
+  // const uint32_t lane_id = raft::Pow2<kSubWarpSize>::mod(threadIdx.x);
+  // const LabelT vq_label  = vq_labels(row_ix);
+
+  auto* out_codes_ptr = &codes(row_ix, 0);
+  bitfield_view_t<PqBits> code_view{out_codes_ptr};
+  for (uint32_t j = 0; j < pq_dim; j++) {
+    uint8_t code = code_view[j];
+    for (uint32_t k = 0; k < pq_centers.extent(1); k++) {
+      dataset(row_ix, j * pq_centers.extent(1) + k) = pq_centers(code, k);
     }
   }
+}
+
+template <typename DataT, typename MathT, typename IdxT>
+auto reconstruct_vectors(
+  const raft::resources& res,
+  const params& params,
+  raft::device_matrix_view<uint8_t, IdxT, raft::row_major> codes,
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers,
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
+  raft::device_matrix_view<DataT, IdxT, raft::row_major> out_vectors)
+{
+  using data_t = DataT;
+  // using label_t    = uint32_t;
+  using ix_t = IdxT;
+
+  const ix_t n_rows       = out_vectors.extent(0);
+  const ix_t dim          = out_vectors.extent(1);
+  const ix_t pq_dim       = params.pq_dim;
+  const ix_t pq_bits      = params.pq_bits;
+  const ix_t pq_n_centers = ix_t{1} << pq_bits;
+  // NB: codes must be aligned at least to sizeof(label_t) to be able to read labels.
+  const ix_t codes_rowlen = raft::div_rounding_up_safe<ix_t>(pq_dim * pq_bits, 8);
+  // sizeof(label_t) * (1 + raft::div_rounding_up_safe<ix_t>(pq_dim * pq_bits, 8 *
+  // sizeof(label_t)));
+
+  // auto codes = raft::make_device_matrix<uint8_t, IdxT, raft::row_major>(res, n_rows,
+  // codes_rowlen);
+
+  auto stream = raft::resource::get_cuda_stream(res);
+
+  // TODO: with scaling workspace we could choose the batch size dynamically
+  constexpr ix_t kReasonableMaxBatchSize = 65536;
+  constexpr ix_t kBlockSize              = 256;
+  const ix_t threads_per_vec             = std::min<ix_t>(raft::WarpSize, pq_n_centers);
+  dim3 threads(kBlockSize, 1, 1);
+  // ix_t max_batch_size = std::min<ix_t>(n_rows, kReasonableMaxBatchSize);
+  auto kernel = [](uint32_t pq_bits) {
+    switch (pq_bits) {
+      case 4: return reconstruct_vectors_kernel<kBlockSize, 4, data_t, MathT, IdxT>;
+      case 5: return reconstruct_vectors_kernel<kBlockSize, 5, data_t, MathT, IdxT>;
+      case 6: return reconstruct_vectors_kernel<kBlockSize, 6, data_t, MathT, IdxT>;
+      case 7: return reconstruct_vectors_kernel<kBlockSize, 7, data_t, MathT, IdxT>;
+      case 8: return reconstruct_vectors_kernel<kBlockSize, 8, data_t, MathT, IdxT>;
+      default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
+    }
+  }(pq_bits);
+  // auto labels = predict_vq<label_t>(res, batch_view, vq_centers);
+  // auto labels     = raft::make_device_vector<label_t, IdxT>(res, n_rows);
+  // raft::matrix::fill(res, labels.view(), 0.0f);
+  dim3 blocks(raft::div_rounding_up_safe<ix_t>(n_rows, kBlockSize / threads_per_vec), 1, 1);
+  kernel<<<blocks, threads, 0, stream>>>(codes,
+                                         out_vectors,
+                                         vq_centers,
+                                         // raft::make_const_mdspan(labels.view()),
+                                         pq_centers);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+
+  return codes;
 }
 
 template <typename T>
@@ -98,7 +225,6 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
       dataset_(raft::make_device_matrix<T, int64_t, raft::row_major>(
         handle, params_.n_samples, params_.n_features)),
       labels_(raft::make_device_vector<int64_t, int64_t>(handle, params_.n_samples)),
-      pq_dim_(params_.pq_dim),
       n_samples_(params_.n_samples),
       n_features_(params_.n_features)
   {
@@ -129,60 +255,63 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
 
   void TearDown() override {}
 
-  void check_reconstruction(const cuvs::neighbors::ivf_pq::index<int64_t>& index,
+  void check_reconstruction(const cuvs::preprocessing::quantize::product::quantizer<T>& quantizer,
+                            raft::device_matrix_view<uint8_t, int64_t, raft::row_major> codes,
                             double compression_ratio,
-                            uint32_t label,
                             uint32_t n_take,
                             uint32_t n_skip)
   {
     // the original data cannot be reconstructed since the dataset was normalized
-    if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) { return; }
-    auto& rec_list = index.lists()[label];
-    // If the data is unbalanced the list might be empty, which is actually nullptr
-    if (!rec_list) { return; }
-    auto dim = index.dim();
-    n_take   = std::min<uint32_t>(n_take, rec_list->size.load());
-    n_skip   = std::min<uint32_t>(n_skip, rec_list->size.load() - n_take);
+    // if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) { return; }
+    auto dim = n_features_;
 
     if (n_take == 0) { return; }
 
-    auto rec_data  = raft::make_device_matrix<T>(handle, n_take, dim);
-    auto orig_data = raft::make_device_matrix<T>(handle, n_take, dim);
+    auto rec_data  = raft::make_device_matrix<T, int64_t>(handle, n_take, dim);
+    auto orig_data = raft::make_device_matrix_view<T, int64_t>(dataset_.data_handle(), n_take, dim);
 
-    cuvs::neighbors::ivf_pq::helpers::codepacker::reconstruct_list_data(
-      handle, index, rec_data.view(), label, n_skip);
+    reconstruct_vectors(handle,
+                        quantizer.params,
+                        codes,
+                        raft::make_const_mdspan(quantizer.vpq_dataset.vq_code_book.view()),
+                        raft::make_const_mdspan(quantizer.vpq_dataset.pq_code_book.view()),
+                        rec_data.view());
 
-    raft::matrix::gather(dataset_.data_handle(),
-                         int64_t{dim},
-                         int64_t{n_take},
-                         rec_list->indices.data_handle() + n_skip,
-                         int64_t{n_take},
-                         orig_data.data_handle(),
-                         raft::resource::get_cuda_stream(handle));
-    compare_vectors_l2(
-      handle, rec_data.view(), orig_data.view(), label, compression_ratio, 0.04, false);
+    compare_vectors_l2(handle, rec_data.view(), orig_data, compression_ratio, 0.04, true);
   }
 
   void testProductQuantizationFromDataset()
   {
-    config_ = {params_.n_lists,
-               params_.pq_bits,
-               params_.pq_dim,
-               params_.codebook_kind,
-               params_.force_random_rotation,
-               false,
-               params_.max_train_points_per_pq_code};
-    auto pq = train(handle, config_, dataset_.view());
+    // auto n_lists = 1; // params_.n_lists
+    config_ = {params_.pq_bits, params_.pq_dim, 1};
+    raft::resource::sync_stream(handle);
+    auto start = std::chrono::high_resolution_clock::now();
+    auto pq    = train(handle, config_, dataset_.view());
+    raft::resource::sync_stream(handle);
+    auto end = std::chrono::high_resolution_clock::now();
+    std::cout << "Time taken to train: "
+              << std::chrono::duration<double, std::milli>(end - start).count() << " ms"
+              << std::endl;
+
+    auto n_encoded_cols = raft::div_rounding_up_safe(pq.params.pq_dim * pq.params.pq_bits, 8u);
+
+    start = std::chrono::high_resolution_clock::now();
+
     auto d_quantized_output =
-      raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, pq_dim_);
+      raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
     transform(handle, pq, dataset_.view(), d_quantized_output.view());
+    raft::resource::sync_stream(handle);
+    end = std::chrono::high_resolution_clock::now();
+    std::cout << "Time taken to transform: "
+              << std::chrono::duration<double, std::milli>(end - start).count() << " ms"
+              << std::endl;
 
     // 1. Verify that the quantized output is not all zeros or NaNs
     auto h_quantized_output =
-      raft::make_host_matrix<uint8_t, int, raft::col_major>(n_samples_, pq_dim_);
+      raft::make_host_matrix<uint8_t, int, raft::col_major>(n_samples_, n_encoded_cols);
     raft::update_host(h_quantized_output.data_handle(),
                       d_quantized_output.data_handle(),
-                      n_samples_ * pq_dim_,
+                      n_samples_ * n_encoded_cols,
                       stream);
     raft::resource::sync_stream(handle, stream);
 
@@ -200,15 +329,11 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
     ASSERT_FALSE(all_zeros) << "Quantized output contains all zeros";
     ASSERT_FALSE(has_nan) << "Quantized output contains NaN values";
 
-    // 3. Verify that the quantized output is consistent with the input
-    double compression_ratio =
-      static_cast<double>(n_features_ * 8) / static_cast<double>(pq_dim_ * config_.pq_bits);
-    std::optional<raft::device_vector_view<const int64_t, int64_t>> indices_view_opt = std::nullopt;
-    auto reconstruction_index = cuvs::neighbors::ivf_pq::extend(
-      handle, raft::make_const_mdspan(dataset_.view()), indices_view_opt, pq.pq_index);
-    for (uint32_t i = 0; i < reconstruction_index.n_lists(); i++) {
-      check_reconstruction(reconstruction_index, compression_ratio, i, 800, 0);
-    }
+    // 2. Verify that the quantized output is consistent with the input
+    double compression_ratio = static_cast<double>(n_features_ * 8) /
+                               static_cast<double>(pq.params.pq_dim * pq.params.pq_bits);
+
+    check_reconstruction(pq, d_quantized_output.view(), compression_ratio, 500, 0);
   }
 
  private:
@@ -218,7 +343,6 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
   ProductQuantizationInputs<T> params_;
   int n_samples_;
   int n_features_;
-  int pq_dim_;
 
   raft::device_matrix<T, int64_t, raft::row_major> dataset_;
   raft::device_vector<int64_t, int64_t, raft::row_major> labels_;
@@ -230,27 +354,25 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
 template <typename T>
 const std::vector<ProductQuantizationInputs<T>> inputs = {
   // Small dataset
-  {100, 30, 1, 4, 4, cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE, false, 256, 42ULL},
+  {100, 32, 4, 4, 42ULL},
 
   // Small dataset with bigger dims
-  {100, 90, 1, 6, 8, cuvs::neighbors::ivf_pq::codebook_gen::PER_CLUSTER, true, 10, 42ULL},
+  {100, 90, 6, 10, 42ULL},
+  {100, 91, 7, 7, 42ULL},
 
   // Medium dataset
-  {500, 40, 8, 5, 8, cuvs::neighbors::ivf_pq::codebook_gen::PER_CLUSTER, false, 256, 42ULL},
-  {500, 60, 8, 7, 8, cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE, false, 10, 42ULL},
+  {500, 40, 5, 8, 42ULL},
+  {500, 60, 6, 6, 42ULL},
 
   // Larger dataset
-  {1000, 40, 80, 4, 4, cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE, true, 20, 42ULL},
-  {3000, 1024, 40, 4, 20, cuvs::neighbors::ivf_pq::codebook_gen::PER_CLUSTER, false, 10, 42ULL},
-  {1000, 2048, 1, 4, 20, cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE, false, 10, 42ULL},
+  {1000, 40, 4, 10, 42ULL},
+  {3000, 1024, 4, 32, 42ULL},
+  {1000, 2048, 4, 128, 42ULL},
 
   // Benchmark datasets
-  // {10000, 1024, 1, 4, 20, cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE, false, 10, 42ULL},
-  // {1000000, 1024, 1024, 8, 20, cuvs::neighbors::ivf_pq::codebook_gen::PER_SUBSPACE, false, 1000,
-  // 42ULL},
-  // {500000, 2048, 512, 8, 20, cuvs::neighbors::ivf_pq::codebook_gen::PER_CLUSTER, false, 1000,
-  // 42ULL}
-};
+  {10000, 1024, 4, 32, 42ULL},
+  {1000000, 1024, 8, 64, 42ULL},
+  {50000, 2048, 8, 16, 42ULL}};
 
 typedef ProductQuantizationTest<float> ProductQuantizationTestF;
 TEST_P(ProductQuantizationTestF, Result) { this->testProductQuantizationFromDataset(); }

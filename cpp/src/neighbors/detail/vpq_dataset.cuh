@@ -191,7 +191,8 @@ template <typename MathT, typename DatasetT>
 auto train_pq(const raft::resources& res,
               const vpq_params& params,
               const DatasetT& dataset,
-              const raft::device_matrix_view<const MathT, uint32_t, raft::row_major>& vq_centers)
+              const raft::device_matrix_view<const MathT, uint32_t, raft::row_major>& vq_centers,
+              std::optional<ix_t> max_train_points_per_pq_code = std::nullopt)
   -> raft::device_matrix<MathT, uint32_t, raft::row_major>
 {
   const ix_t n_rows       = dataset.extent(0);
@@ -200,8 +201,12 @@ auto train_pq(const raft::resources& res,
   const ix_t pq_bits      = params.pq_bits;
   const ix_t pq_n_centers = ix_t{1} << pq_bits;
   const ix_t pq_len       = raft::div_rounding_up_safe(dim, pq_dim);
-  const ix_t n_rows_train = n_rows * params.pq_kmeans_trainset_fraction;
+  RAFT_EXPECTS((dim % pq_dim) == 0, "Dimension must be divisible by pq_dim");
+  ix_t n_rows_train = n_rows * params.pq_kmeans_trainset_fraction;
 
+  if (max_train_points_per_pq_code) {
+    n_rows_train = std::min(*max_train_points_per_pq_code * pq_n_centers, n_rows_train);
+  }
   // Subsample the dataset and transform into the required type if necessary
   auto pq_trainset = transform_data<MathT>(res, util::subsample(res, dataset, n_rows_train));
 
