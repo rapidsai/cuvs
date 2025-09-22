@@ -122,6 +122,16 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
+  public CuVSMatrix transformScalar8Bit(Object impl, CuVSMatrix input) throws Throwable {
+    throw new UnsupportedOperationException("CuVS is not supported on this platform");
+  }
+
+  @Override
+  public void closeScalar8BitQuantizer(Object impl) throws Throwable {
+    throw new UnsupportedOperationException("CuVS is not supported on this platform");
+  }
+
+  @Override
   public Object createBinaryQuantizerImpl(
       CuVSResources resources,
       CuVSMatrix trainingDataset,
@@ -137,16 +147,6 @@ final class UnsupportedProvider implements CuVSProvider {
 
   @Override
   public void closeBinaryQuantizer(Object impl) throws Throwable {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
-  }
-
-  @Override
-  public CuVSMatrix transformScalar8Bit(Object impl, CuVSMatrix input) throws Throwable {
-    throw new UnsupportedOperationException("CuVS is not supported on this platform");
-  }
-
-  @Override
-  public void closeScalar8BitQuantizer(Object impl) throws Throwable {
     throw new UnsupportedOperationException("CuVS is not supported on this platform");
   }
 }
