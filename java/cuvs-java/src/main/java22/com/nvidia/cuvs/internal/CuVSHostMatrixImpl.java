@@ -163,7 +163,6 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
   public void toDevice(CuVSDeviceMatrix deviceMatrix, CuVSResources cuVSResources) {
     copyMatrix(this, (CuVSMatrixBaseImpl) deviceMatrix, cuVSResources);
   }
-  }
 
   @Override
   public void close() {}

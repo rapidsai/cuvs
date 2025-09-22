@@ -167,9 +167,9 @@ public class Scalar8BitQuantizerImpl {
 
         long datasetShape[] = {chunkRows, cols};
         MemorySegment datasetTensor =
-            prepareTensor(localArena, datasetPtr, datasetShape, kDLFloat(), 32, kDLCUDA(), 1);
+            prepareTensor(localArena, datasetPtr, datasetShape, kDLFloat(), 32, kDLCUDA());
         MemorySegment outputTensor =
-            prepareTensor(localArena, outputPtr, datasetShape, kDLInt(), 8, kDLCUDA(), 1);
+            prepareTensor(localArena, outputPtr, datasetShape, kDLInt(), 8, kDLCUDA());
 
         int returnValue =
             cuvsScalarQuantizerTransform(
@@ -238,7 +238,7 @@ public class Scalar8BitQuantizerImpl {
       if (trainingDataset.memoryKind() == MemoryKind.HOST) {
         long datasetShape[] = {rows, cols};
         MemorySegment datasetTensor =
-            prepareTensor(localArena, datasetMemSegment, datasetShape, kDLFloat(), 32, kDLCPU(), 1);
+            prepareTensor(localArena, datasetMemSegment, datasetShape, kDLFloat(), 32, kDLCPU());
 
         returnValue =
             cuvsScalarQuantizerTrain(cuvsResourcesPtr, paramsPtr, datasetTensor, quantizerPtr);
@@ -332,9 +332,9 @@ public class Scalar8BitQuantizerImpl {
 
         long datasetShape[] = {chunkRows, cols};
         MemorySegment quantizedTensor =
-            prepareTensor(localArena, quantizedPtr, datasetShape, kDLInt(), 8, kDLCUDA(), 1);
+            prepareTensor(localArena, quantizedPtr, datasetShape, kDLInt(), 8, kDLCUDA());
         MemorySegment outputTensor =
-            prepareTensor(localArena, outputPtr, datasetShape, kDLFloat(), 32, kDLCUDA(), 1);
+            prepareTensor(localArena, outputPtr, datasetShape, kDLFloat(), 32, kDLCUDA());
 
         int returnValue =
             cuvsScalarQuantizerInverseTransform(
@@ -388,7 +388,7 @@ public class Scalar8BitQuantizerImpl {
 
         long datasetShape[] = {chunkRows, cols};
         MemorySegment datasetTensor =
-            prepareTensor(localArena, datasetPtr, datasetShape, kDLFloat(), 32, kDLCUDA(), 1);
+            prepareTensor(localArena, datasetPtr, datasetShape, kDLFloat(), 32, kDLCUDA());
 
         int returnValue =
             cuvsScalarQuantizerTrain(cuvsResourcesPtr, paramsPtr, datasetTensor, quantizerPtr);
@@ -412,7 +412,7 @@ public class Scalar8BitQuantizerImpl {
     var result = new CuVSHostMatrixArenaImpl(rows, cols, DataType.BYTE);
 
     long[] shape = {rows, cols};
-    MemorySegment inTensor = prepareTensor(localArena, dataSeg, shape, kDLFloat(), 32, kDLCPU(), 1);
+    MemorySegment inTensor = prepareTensor(localArena, dataSeg, shape, kDLFloat(), 32, kDLCPU());
     MemorySegment outTensor =
         prepareTensor(
             localArena,
@@ -420,8 +420,7 @@ public class Scalar8BitQuantizerImpl {
             shape,
             kDLInt(),
             8,
-            kDLCPU(),
-            1);
+            kDLCPU());
 
     int rv = cuvsScalarQuantizerTransform(resPtr, quantizerSeg, inTensor, outTensor);
     checkCuVSError(rv, "cuvsScalarQuantizerTransform (host)");
@@ -441,8 +440,7 @@ public class Scalar8BitQuantizerImpl {
     var result = new CuVSHostMatrixArenaImpl(rows, cols, DataType.FLOAT);
 
     long[] shape = {rows, cols};
-    MemorySegment inTensor =
-        prepareTensor(localArena, quantizedSeg, shape, kDLInt(), 8, kDLCPU(), 1);
+    MemorySegment inTensor = prepareTensor(localArena, quantizedSeg, shape, kDLInt(), 8, kDLCPU());
     MemorySegment outTensor =
         prepareTensor(
             localArena,
@@ -450,8 +448,7 @@ public class Scalar8BitQuantizerImpl {
             shape,
             kDLFloat(),
             32,
-            kDLCPU(),
-            1);
+            kDLCPU());
 
     int rv = cuvsScalarQuantizerInverseTransform(resPtr, quantizerSeg, inTensor, outTensor);
     checkCuVSError(rv, "cuvsScalarQuantizerInverseTransform (host)");

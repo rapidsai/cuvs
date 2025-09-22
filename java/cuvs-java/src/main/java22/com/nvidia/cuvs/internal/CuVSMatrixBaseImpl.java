@@ -93,18 +93,6 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
     return memorySegment;
   }
 
-  @Override
-  public DataType dataType() {
-    return dataType;
-  }
-
-  protected int bits() {
-    return switch (dataType) {
-      case FLOAT, INT, UINT -> 32;
-      case BYTE -> 8;
-    };
-  }
-
   public ValueLayout valueLayout() {
     return valueLayout;
   }

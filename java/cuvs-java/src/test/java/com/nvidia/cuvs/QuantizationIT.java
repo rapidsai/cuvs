@@ -275,7 +275,7 @@ public class QuantizationIT extends CuVSTestCase {
       inputDataset.close();
       quantized.close();
 
-      log.info("✓ Binary CPU quantization test passed");
+      log.info("Binary CPU quantization test passed");
     }
   }
 
@@ -426,7 +426,7 @@ public class QuantizationIT extends CuVSTestCase {
       trainingDataset.close();
       quantizedDataset.close();
 
-      log.info("✓ ZERO threshold binary quantization test passed");
+      log.info("ZERO threshold binary quantization test passed");
     }
   }
 
@@ -520,7 +520,7 @@ public class QuantizationIT extends CuVSTestCase {
       quantizedDataset.close();
       zeroQuantized.close();
 
-      log.info("✓ MEAN threshold binary quantization test passed");
+      log.info("MEAN threshold binary quantization test passed");
     }
   }
 
@@ -582,7 +582,7 @@ public class QuantizationIT extends CuVSTestCase {
         assertTrue("Should return at most topK results", result.size() <= 3);
       }
 
-      log.info("✓ Binary quantization with sampling median threshold test passed");
+      log.info("Binary quantization with sampling median threshold test passed");
     }
   }
 }

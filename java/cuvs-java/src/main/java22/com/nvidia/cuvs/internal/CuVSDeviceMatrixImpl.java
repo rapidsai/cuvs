@@ -242,6 +242,11 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
   }
 
   @Override
+  public MemoryKind memoryKind() {
+    return MemoryKind.DEVICE;
+  }
+
+  @Override
   public void close() {
     if (hostBuffer != MemorySegment.NULL) {
       destroyPinnedBuffer(hostBuffer);

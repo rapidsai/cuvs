@@ -175,9 +175,9 @@ public class BinaryQuantizerImpl {
         long outputShape[] = {chunkRows, cols};
 
         MemorySegment datasetTensor =
-            prepareTensor(localArena, datasetPtr, datasetShape, kDLFloat(), 32, kDLCUDA(), 1);
+            prepareTensor(localArena, datasetPtr, datasetShape, kDLFloat(), 32, kDLCUDA());
         MemorySegment outputTensor =
-            prepareTensor(localArena, outputPtr, outputShape, kDLUInt(), 8, kDLCUDA(), 1);
+            prepareTensor(localArena, outputPtr, outputShape, kDLUInt(), 8, kDLCUDA());
 
         returnValue =
             cuvsBinaryQuantizerTrain(cuvsResourcesPtr, paramsPtr, datasetTensor, quantizerPtr);
@@ -232,7 +232,7 @@ public class BinaryQuantizerImpl {
     try {
       long[] datasetShape = {rows, cols};
       MemorySegment datasetTensor =
-          prepareTensor(localArena, datasetMemSegment, datasetShape, kDLFloat(), 32, kDLCPU(), 1);
+          prepareTensor(localArena, datasetMemSegment, datasetShape, kDLFloat(), 32, kDLCPU());
 
       returnValue =
           cuvsBinaryQuantizerTrain(cuvsResourcesPtr, paramsPtr, datasetTensor, quantizerPtr);
@@ -245,8 +245,7 @@ public class BinaryQuantizerImpl {
               datasetShape,
               kDLUInt(),
               8,
-              kDLCPU(),
-              1);
+              kDLCPU());
 
       returnValue =
           cuvsBinaryQuantizerTransformWithParams(

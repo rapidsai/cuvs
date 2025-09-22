@@ -79,6 +79,11 @@ public interface CuVSDeviceMatrix extends CuVSMatrix {
     }
 
     @Override
+    public MemoryKind memoryKind() {
+      return deviceMatrix.memoryKind();
+    }
+
+    @Override
     public void toHost(CuVSHostMatrix hostMatrix) {
       deviceMatrix.toHost(hostMatrix);
     }

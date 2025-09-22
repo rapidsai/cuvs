@@ -36,7 +36,6 @@ import com.nvidia.cuvs.internal.common.CloseableHandle;
 import com.nvidia.cuvs.internal.common.CloseableRMMAllocation;
 import com.nvidia.cuvs.internal.common.CompositeCloseableHandle;
 import com.nvidia.cuvs.internal.panama.*;
-
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -170,7 +169,7 @@ public class CagraIndexImpl implements CagraIndex {
   private IndexReference build(CagraIndexParams indexParameters, CuVSMatrixBaseImpl dataset) {
     long rows = dataset.size();
     long cols = dataset.columns();
-    DataType datasetDataType = dataset.dataType();
+    CuVSMatrix.DataType datasetDataType = dataset.dataType();
 
     try (var indexParams = segmentFromIndexParams(indexParameters);
         var localArena = Arena.ofConfined()) {
@@ -191,8 +190,7 @@ public class CagraIndexImpl implements CagraIndex {
               datasetShape,
               getDataTypeCode(datasetDataType, this.indexQuantizer),
               getPrecisionFromDataType(datasetDataType),
-              kDLCPU(),
-              1);
+              kDLCPU());
       var index = createCagraIndex();
 
       if (cuvsCagraIndexParams.build_algo(indexParamsMemorySegment)
@@ -257,7 +255,7 @@ public class CagraIndexImpl implements CagraIndex {
       // Extract query information upfront to avoid "mutually-null" fields
       long numQueries;
       int vectorDimension;
-      DataType queryDataType;
+      CuVSMatrix.DataType queryDataType;
       MemorySegment floatsSeg;
 
       if (query.hasQuantizedQueries()) {
@@ -270,7 +268,7 @@ public class CagraIndexImpl implements CagraIndex {
         float[][] queryVectors = query.getQueryVectors();
         numQueries = queryVectors.length;
         vectorDimension = numQueries > 0 ? queryVectors[0].length : 0;
-        queryDataType = DataType.FLOAT; // Float queries are always FLOAT
+        queryDataType = CuVSMatrix.DataType.FLOAT;
         floatsSeg = buildMemorySegment(localArena, queryVectors);
       }
 
@@ -314,8 +312,7 @@ public class CagraIndexImpl implements CagraIndex {
                   queriesShape,
                   getDataTypeCode(queryDataType, this.indexQuantizer),
                   getPrecisionFromDataType(queryDataType),
-                  kDLCUDA(),
-                  1);
+                  kDLCUDA());
           long[] neighborsShape = {numQueries, topK};
           MemorySegment neighborsTensor =
               prepareTensor(
@@ -763,7 +760,7 @@ public class CagraIndexImpl implements CagraIndex {
   }
 
   // Helper method to map DataType to data type codes
-  private int getDataTypeCode(DataType dataType, CuVSQuantizer quantizer) {
+  private int getDataTypeCode(CuVSMatrix.DataType dataType, CuVSQuantizer quantizer) {
     switch (dataType) {
       case FLOAT:
         return kDLFloat();
@@ -781,7 +778,7 @@ public class CagraIndexImpl implements CagraIndex {
   }
 
   // Helper method to convert DataType to precision
-  private int getPrecisionFromDataType(DataType dataType) {
+  private int getPrecisionFromDataType(CuVSMatrix.DataType dataType) {
     switch (dataType) {
       case FLOAT:
         return 32;
@@ -794,7 +791,8 @@ public class CagraIndexImpl implements CagraIndex {
     }
   }
 
-  private long getQueryBytesSize(long numQueries, int vectorDimension, DataType dataType) {
+  private long getQueryBytesSize(
+      long numQueries, int vectorDimension, CuVSMatrix.DataType dataType) {
     switch (dataType) {
       case FLOAT:
         return C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
@@ -865,7 +863,7 @@ public class CagraIndexImpl implements CagraIndex {
         return new CagraIndexImpl(inputStream, cuvsResources);
       } else {
         if (quantizer != null && dataset != null) {
-          if (dataset.dataType() != DataType.FLOAT) {
+          if (dataset.dataType() != CuVSMatrix.DataType.FLOAT) {
             throw new IllegalArgumentException(
                 "Quantizer input requires FLOAT data type, dataset has " + dataset.dataType());
           }

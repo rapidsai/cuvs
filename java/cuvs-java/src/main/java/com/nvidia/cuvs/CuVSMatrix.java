@@ -151,13 +151,6 @@ public interface CuVSMatrix extends AutoCloseable {
   long columns();
 
   /**
-   * Gets the element type
-   *
-   * @return a {@link DataType} describing the matrix element type
-   */
-  DataType dataType();
-
-  /**
    * Get a view (0-copy) of the row data, as a list of integers (32 bit)
    *
    * @param row the row for which to return the data

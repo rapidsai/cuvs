@@ -403,6 +403,5 @@ final class JDKProvider implements CuVSProvider {
     public CuVSDeviceMatrix build() {
       return matrix;
     }
->>>>>>> branch-25.10
   }
 }
