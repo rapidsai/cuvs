@@ -125,7 +125,7 @@ IVF-pq is an inverted-file index, which partitions the vectors into a series of 
    - N
    - [`cluster`, `subspace`]
    - `subspace`
-   - Type of codebook. See :doc:`IVF-PQ index overview <../indexes/ivfpq>` for more detail
+   - Type of codebook. See :doc:`IVF-PQ index overview <../neighbors/ivfpq>` for more detail
 
  * - `dataset_memory_type`
    - `build`
@@ -314,7 +314,7 @@ To fine tune CAGRA index building we can customize IVF-PQ index builder options 
    - N
    - [`cluster`, `subspace`]
    - `subspace`
-   - Type of codebook. See :doc:`IVF-PQ index overview <../indexes/ivfpq>` for more detail
+   - Type of codebook. See :doc:`IVF-PQ index overview <../neighbors/ivfpq>` for more detail
 
  * - `ivf_pq_build_nprobe`
    - `search`

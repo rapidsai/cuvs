@@ -35,6 +35,12 @@ cdef extern from "cuvs/core/c_api.h":
     cuvsError_t cuvsStreamSync(cuvsResources_t res)
     const char * cuvsGetLastErrorText()
 
+    cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res)
+    cuvsError_t cuvsMultiGpuResourcesCreateWithDeviceIds(
+        cuvsResources_t* res,
+        DLManagedTensor* device_ids)
+    cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res)
+
     cuvsError_t cuvsMatrixCopy(cuvsResources_t res, DLManagedTensor * src,
                                DLManagedTensor * dst)
 
