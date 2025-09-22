@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <cuvs/neighbors/all_neighbors.h>
+#include <cuvs/c/neighbors/all_neighbors.h>
 #include <stdint.h>
 
 void run_all_neighbors(int64_t n_rows,

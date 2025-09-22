@@ -717,32 +717,27 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
 
   # ################################################################################################
   # * cuvs_c -------------------------------------------------------------------------------
-
-  if(BUILD_MG_ALGOS)
-    set(CUVS_C_MG_ALGOS src/neighbors/mg_ivf_pq_c.cpp src/neighbors/mg_ivf_flat_c.cpp
-                        src/neighbors/mg_cagra_c.cpp
-    )
-  endif()
-
   if(BUILD_C_LIBRARY)
     add_library(
       cuvs_c SHARED
-      src/core/c_api.cpp
-      src/cluster/kmeans_c.cpp
-      src/neighbors/brute_force_c.cpp
-      src/neighbors/ivf_flat_c.cpp
-      src/neighbors/ivf_pq_c.cpp
-      src/neighbors/cagra_c.cpp
-      $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw_c.cpp>
-      src/neighbors/nn_descent_c.cpp
-      src/neighbors/vamana_c.cpp
-      src/neighbors/refine/refine_c.cpp
-      src/neighbors/tiered_index_c.cpp
-      src/neighbors/all_neighbors_c.cpp
-      src/preprocessing/quantize/binary_c.cpp
-      src/preprocessing/quantize/scalar_c.cpp
-      src/distance/pairwise_distance_c.cpp
-      ${CUVS_C_MG_ALGOS}
+      src/c/core/c_api.cpp
+      src/c/cluster/kmeans.cpp
+      src/c/neighbors/brute_force.cpp
+      src/c/neighbors/ivf_flat.cpp
+      src/c/neighbors/ivf_pq.cpp
+      src/c/neighbors/cagra.cpp
+      $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/c/neighbors/hnsw.cpp>
+      $<$<BOOL:${BUILD_MG_ALGOS}>:src/c/neighbors/mg_ivf_pq.cpp>
+      $<$<BOOL:${BUILD_MG_ALGOS}>:src/c/neighbors/mg_ivf_flat.cpp>
+      $<$<BOOL:${BUILD_MG_ALGOS}>:src/c/neighbors/mg_cagra.cpp>
+      src/c/neighbors/nn_descent.cpp
+      src/c/neighbors/vamana.cpp
+      src/c/neighbors/refine.cpp
+      src/c/neighbors/tiered_index.cpp
+      src/c/neighbors/all_neighbors.cpp
+      src/c/preprocessing/quantize/binary.cpp
+      src/c/preprocessing/quantize/scalar.cpp
+      src/c/distance/pairwise_distance.cpp
     )
     add_library(cuvs::c_api ALIAS cuvs_c)
     set_target_properties(
@@ -765,6 +760,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     target_include_directories(
       cuvs_c
       PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
+             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
              "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
       INTERFACE "$<INSTALL_INTERFACE:include>"
     )

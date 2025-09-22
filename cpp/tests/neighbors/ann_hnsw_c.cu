@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,13 @@
  */
 
 #include "../test_utils.cuh"
-#include <cuvs/core/c_api.h>
-#include <cuvs/distance/distance.h>
+#include <cuvs/c/core/c_api.h>
+#include <cuvs/c/distance/distance.h>
+#include <cuvs/c/neighbors/cagra.h>
+#include <cuvs/c/neighbors/hnsw.h>
 #include <dlpack/dlpack.h>
 
 #include <cstdint>
-#include <cuvs/neighbors/cagra.h>
-#include <cuvs/neighbors/hnsw.h>
 
 #include <cuda_runtime.h>
 #include <gtest/gtest.h>

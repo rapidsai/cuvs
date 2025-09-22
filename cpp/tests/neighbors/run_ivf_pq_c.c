@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <cuvs/neighbors/ivf_pq.h>
+#include <cuvs/c/neighbors/ivf_pq.h>
 
 void run_ivf_pq(int64_t n_rows,
                 int64_t n_queries,
