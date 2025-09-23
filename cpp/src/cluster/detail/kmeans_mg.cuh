@@ -176,7 +176,7 @@ void initKMeansPlusPlus(const raft::resources& handle,
   //    1.3 - Communicate the initial centroid chosen by rank-r' to all other
   //          ranks
   // Choose rp on rank 0 and broadcast to all ranks to guarantee agreement
-  int rp      = 0;
+  int rp = 0;
   if (my_rank == KMEANS_COMM_ROOT) {
     std::mt19937 gen(params.rng_state.seed);
     std::uniform_int_distribution<> dis(0, n_rank - 1);
