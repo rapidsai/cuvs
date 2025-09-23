@@ -67,19 +67,26 @@ void compare_vectors_l2(const raft::resources& res,
     return sqrt(d / double(dim));
   });
   raft::resource::sync_stream(res);
+  double mean_dist = 0.0;
   for (uint32_t i = 0; i < n_rows; i++) {
     double d = dist(i);
-    if (print_data && i < 5) {
+    if ((print_data && i < 5) || (d > 1.2 * eps * std::pow(2.0, compression_ratio))) {
       auto dim_print = std::min<uint32_t>(dim, 10);
       raft::print_vector("original", a.data_handle() + i * dim, dim_print, std::cout);
       raft::print_vector("reconstructed", b.data_handle() + i * dim, dim_print, std::cout);
-      std::cout << "dist: " << d << ", compression_ratio: " << compression_ratio << std::endl;
+      std::cout << "dist: " << d << std::endl;
     }
+    mean_dist += d;
     // The theoretical estimate of the error is hard to come up with,
     // the estimate below is based on experimentation + curse of dimensionality
     ASSERT_LE(d, 1.2 * eps * std::pow(2.0, compression_ratio))
       << " (ix = " << i << ", eps = " << eps << ", compression_ratio = " << compression_ratio
       << ")";
+  }
+  mean_dist /= n_rows;
+  if (print_data) {
+    std::cout << "mean_dist: " << mean_dist << ", compression_ratio = " << compression_ratio
+              << std::endl;
   }
 }
 
@@ -129,24 +136,17 @@ struct bitfield_view_t {
   }
 };
 
-template <uint32_t BlockSize, uint32_t PqBits, typename DataT, typename MathT, typename IdxT
-          // typename LabelT
-          >
+template <uint32_t BlockSize, uint32_t PqBits, typename DataT, typename MathT, typename IdxT>
 __launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_vectors_kernel(
   raft::device_matrix_view<uint8_t, IdxT, raft::row_major> codes,
   raft::device_matrix_view<DataT, IdxT, raft::row_major> dataset,
-  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers,
-  // raft::device_vector_view<const LabelT, IdxT, raft::row_major> vq_labels,
-  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers)
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
+  const uint32_t pq_dim)
 {
   constexpr uint32_t kSubWarpSize = std::min<uint32_t>(raft::WarpSize, 1u << PqBits);
   using subwarp_align             = raft::Pow2<kSubWarpSize>;
   const IdxT row_ix = subwarp_align::div(IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x});
   if (row_ix >= codes.extent(0)) { return; }
-
-  const uint32_t pq_dim = raft::div_rounding_up_unsafe(vq_centers.extent(1), pq_centers.extent(1));
-  // const uint32_t lane_id = raft::Pow2<kSubWarpSize>::mod(threadIdx.x);
-  // const LabelT vq_label  = vq_labels(row_ix);
 
   auto* out_codes_ptr = &codes(row_ix, 0);
   bitfield_view_t<PqBits> code_view{out_codes_ptr};
@@ -163,26 +163,18 @@ auto reconstruct_vectors(
   const raft::resources& res,
   const params& params,
   raft::device_matrix_view<uint8_t, IdxT, raft::row_major> codes,
-  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
   raft::device_matrix_view<DataT, IdxT, raft::row_major> out_vectors)
 {
   using data_t = DataT;
-  // using label_t    = uint32_t;
-  using ix_t = IdxT;
+  using ix_t   = IdxT;
 
   const ix_t n_rows       = out_vectors.extent(0);
   const ix_t dim          = out_vectors.extent(1);
   const ix_t pq_dim       = params.pq_dim;
   const ix_t pq_bits      = params.pq_bits;
   const ix_t pq_n_centers = ix_t{1} << pq_bits;
-  // NB: codes must be aligned at least to sizeof(label_t) to be able to read labels.
   const ix_t codes_rowlen = raft::div_rounding_up_safe<ix_t>(pq_dim * pq_bits, 8);
-  // sizeof(label_t) * (1 + raft::div_rounding_up_safe<ix_t>(pq_dim * pq_bits, 8 *
-  // sizeof(label_t)));
-
-  // auto codes = raft::make_device_matrix<uint8_t, IdxT, raft::row_major>(res, n_rows,
-  // codes_rowlen);
 
   auto stream = raft::resource::get_cuda_stream(res);
 
@@ -191,7 +183,6 @@ auto reconstruct_vectors(
   constexpr ix_t kBlockSize              = 256;
   const ix_t threads_per_vec             = std::min<ix_t>(raft::WarpSize, pq_n_centers);
   dim3 threads(kBlockSize, 1, 1);
-  // ix_t max_batch_size = std::min<ix_t>(n_rows, kReasonableMaxBatchSize);
   auto kernel = [](uint32_t pq_bits) {
     switch (pq_bits) {
       case 4: return reconstruct_vectors_kernel<kBlockSize, 4, data_t, MathT, IdxT>;
@@ -202,15 +193,8 @@ auto reconstruct_vectors(
       default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
     }
   }(pq_bits);
-  // auto labels = predict_vq<label_t>(res, batch_view, vq_centers);
-  // auto labels     = raft::make_device_vector<label_t, IdxT>(res, n_rows);
-  // raft::matrix::fill(res, labels.view(), 0.0f);
   dim3 blocks(raft::div_rounding_up_safe<ix_t>(n_rows, kBlockSize / threads_per_vec), 1, 1);
-  kernel<<<blocks, threads, 0, stream>>>(codes,
-                                         out_vectors,
-                                         vq_centers,
-                                         // raft::make_const_mdspan(labels.view()),
-                                         pq_centers);
+  kernel<<<blocks, threads, 0, stream>>>(codes, out_vectors, pq_centers, pq_dim);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   return codes;
@@ -258,8 +242,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
   void check_reconstruction(const cuvs::preprocessing::quantize::product::quantizer<T>& quantizer,
                             raft::device_matrix_view<uint8_t, int64_t, raft::row_major> codes,
                             double compression_ratio,
-                            uint32_t n_take,
-                            uint32_t n_skip)
+                            uint32_t n_take)
   {
     // the original data cannot be reconstructed since the dataset was normalized
     // if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) { return; }
@@ -267,73 +250,79 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
 
     if (n_take == 0) { return; }
 
+    n_take = std::min<uint32_t>(n_take, codes.extent(0));
+
     auto rec_data  = raft::make_device_matrix<T, int64_t>(handle, n_take, dim);
     auto orig_data = raft::make_device_matrix_view<T, int64_t>(dataset_.data_handle(), n_take, dim);
 
     reconstruct_vectors(handle,
                         quantizer.params,
                         codes,
-                        raft::make_const_mdspan(quantizer.vpq_dataset.vq_code_book.view()),
                         raft::make_const_mdspan(quantizer.vpq_dataset.pq_code_book.view()),
                         rec_data.view());
 
-    compare_vectors_l2(handle, rec_data.view(), orig_data, compression_ratio, 0.04, true);
+    compare_vectors_l2(handle, orig_data, rec_data.view(), compression_ratio, 0.04, false);
   }
 
   void testProductQuantizationFromDataset()
   {
-    // auto n_lists = 1; // params_.n_lists
-    config_ = {params_.pq_bits, params_.pq_dim, 1};
+    bool print_timer = false;
+    config_          = {params_.pq_bits, params_.pq_dim, 1};
     raft::resource::sync_stream(handle);
     auto start = std::chrono::high_resolution_clock::now();
     auto pq    = train(handle, config_, dataset_.view());
     raft::resource::sync_stream(handle);
     auto end = std::chrono::high_resolution_clock::now();
-    std::cout << "Time taken to train: "
-              << std::chrono::duration<double, std::milli>(end - start).count() << " ms"
-              << std::endl;
+    if (print_timer) {
+      std::cout << "Time taken to train: "
+                << std::chrono::duration<double, std::milli>(end - start).count() << " ms"
+                << std::endl;
+    }
 
     auto n_encoded_cols = raft::div_rounding_up_safe(pq.params.pq_dim * pq.params.pq_bits, 8u);
+    auto d_quantized_output =
+      raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
 
     start = std::chrono::high_resolution_clock::now();
 
-    auto d_quantized_output =
-      raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
     transform(handle, pq, dataset_.view(), d_quantized_output.view());
     raft::resource::sync_stream(handle);
     end = std::chrono::high_resolution_clock::now();
-    std::cout << "Time taken to transform: "
-              << std::chrono::duration<double, std::milli>(end - start).count() << " ms"
-              << std::endl;
-
-    // 1. Verify that the quantized output is not all zeros or NaNs
-    auto h_quantized_output =
-      raft::make_host_matrix<uint8_t, int, raft::col_major>(n_samples_, n_encoded_cols);
-    raft::update_host(h_quantized_output.data_handle(),
-                      d_quantized_output.data_handle(),
-                      n_samples_ * n_encoded_cols,
-                      stream);
-    raft::resource::sync_stream(handle, stream);
-
-    bool all_zeros = true;
-    bool has_nan   = false;
-
-    for (int i = 0; i < h_quantized_output.extent(0) * h_quantized_output.extent(1); i++) {
-      if (h_quantized_output.data_handle()[i] != 0) { all_zeros = false; }
-      if (std::isnan(h_quantized_output.data_handle()[i])) {
-        has_nan = true;
-        break;
-      }
+    if (print_timer) {
+      std::cout << "Time taken to transform: "
+                << std::chrono::duration<double, std::milli>(end - start).count() << " ms"
+                << std::endl;
     }
 
-    ASSERT_FALSE(all_zeros) << "Quantized output contains all zeros";
-    ASSERT_FALSE(has_nan) << "Quantized output contains NaN values";
+    // 1. Verify that the quantized output is not all zeros or NaNs
+    {
+      auto h_quantized_output =
+        raft::make_host_matrix<uint8_t, int, raft::col_major>(n_samples_, n_encoded_cols);
+      raft::update_host(h_quantized_output.data_handle(),
+                        d_quantized_output.data_handle(),
+                        n_samples_ * n_encoded_cols,
+                        stream);
+      raft::resource::sync_stream(handle, stream);
+
+      bool all_zeros = true;
+      bool has_nan   = false;
+
+      for (int i = 0; i < h_quantized_output.extent(0) * h_quantized_output.extent(1); i++) {
+        if (h_quantized_output.data_handle()[i] != 0) { all_zeros = false; }
+        if (std::isnan(h_quantized_output.data_handle()[i])) {
+          has_nan = true;
+          break;
+        }
+      }
+      ASSERT_FALSE(all_zeros) << "Quantized output contains all zeros";
+      ASSERT_FALSE(has_nan) << "Quantized output contains NaN values";
+    }
 
     // 2. Verify that the quantized output is consistent with the input
     double compression_ratio = static_cast<double>(n_features_ * 8) /
                                static_cast<double>(pq.params.pq_dim * pq.params.pq_bits);
 
-    check_reconstruction(pq, d_quantized_output.view(), compression_ratio, 500, 0);
+    check_reconstruction(pq, d_quantized_output.view(), compression_ratio, 500);
   }
 
  private:

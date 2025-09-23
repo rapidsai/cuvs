@@ -188,11 +188,11 @@ auto predict_vq(const raft::resources& res, const DatasetT& dataset, const VqCen
 }
 
 template <typename MathT, typename DatasetT>
-auto train_pq(const raft::resources& res,
-              const vpq_params& params,
-              const DatasetT& dataset,
-              const raft::device_matrix_view<const MathT, uint32_t, raft::row_major>& vq_centers,
-              std::optional<ix_t> max_train_points_per_pq_code = std::nullopt)
+auto train_pq(
+  const raft::resources& res,
+  const vpq_params& params,
+  const DatasetT& dataset,
+  std::optional<const raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers)
   -> raft::device_matrix<MathT, uint32_t, raft::row_major>
 {
   const ix_t n_rows       = dataset.extent(0);
@@ -202,22 +202,20 @@ auto train_pq(const raft::resources& res,
   const ix_t pq_n_centers = ix_t{1} << pq_bits;
   const ix_t pq_len       = raft::div_rounding_up_safe(dim, pq_dim);
   RAFT_EXPECTS((dim % pq_dim) == 0, "Dimension must be divisible by pq_dim");
-  ix_t n_rows_train = n_rows * params.pq_kmeans_trainset_fraction;
+  const ix_t n_rows_train = n_rows * params.pq_kmeans_trainset_fraction;
 
-  if (max_train_points_per_pq_code) {
-    n_rows_train = std::min(*max_train_points_per_pq_code * pq_n_centers, n_rows_train);
-  }
   // Subsample the dataset and transform into the required type if necessary
   auto pq_trainset = transform_data<MathT>(res, util::subsample(res, dataset, n_rows_train));
 
   // Subtract VQ centers
-  {
-    auto vq_labels   = predict_vq<uint32_t>(res, pq_trainset, vq_centers);
+  if (vq_centers) {
+    auto vq_labels   = predict_vq<uint32_t>(res, pq_trainset, vq_centers.value());
     using index_type = typename DatasetT::index_type;
     raft::linalg::map_offset(
       res,
       pq_trainset.view(),
-      [labels = vq_labels.view(), centers = vq_centers, dim] __device__(index_type off, MathT x) {
+      [labels = vq_labels.view(), centers = vq_centers.value(), dim] __device__(index_type off,
+                                                                                MathT x) {
         index_type i = off / dim;
         index_type j = off % dim;
         return x - centers(labels(i), j);
@@ -528,8 +526,8 @@ auto vpq_build(const raft::resources& res, const vpq_params& params, const Datas
 
   // Train codes
   auto vq_code_book = train_vq<MathT>(res, ps, dataset);
-  auto pq_code_book =
-    train_pq<MathT>(res, ps, dataset, raft::make_const_mdspan(vq_code_book.view()));
+  auto pq_code_book = train_pq<MathT>(
+    res, ps, dataset, std::make_optional(raft::make_const_mdspan(vq_code_book.view())));
 
   // Encode dataset
   auto codes = process_and_fill_codes<MathT, IdxT>(res,

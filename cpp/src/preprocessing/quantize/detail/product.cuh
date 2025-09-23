@@ -56,7 +56,6 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_no_id_kernel(
   const LabelT vq_label  = vq_labels(row_ix);
 
   // write codes
-
   auto* out_codes_ptr = &out_codes(row_ix, 0);
   cuvs::neighbors::ivf_pq::detail::bitfield_view_t<PqBits> code_view{out_codes_ptr};
   for (uint32_t j = 0; j < pq_dim; j++) {
@@ -123,8 +122,9 @@ void process_and_fill_codes_no_id(
          stream,
          rmm::mr::get_current_device_resource())) {
     auto batch_view = raft::make_device_matrix_view(batch.data(), ix_t(batch.size()), dim);
-    // TODO: Only one VQ cluster so we could skip predict_vq
-    auto labels = predict_vq<label_t>(res, batch_view, vq_centers);
+
+    auto labels = raft::make_device_vector<label_t, ix_t>(res, batch.size());
+    raft::matrix::fill(res, labels.view(), uint32_t{0});
     dim3 blocks(raft::div_rounding_up_safe<ix_t>(n_rows, kBlockSize / threads_per_vec), 1, 1);
     kernel<<<blocks, threads, 0, stream>>>(
       raft::make_device_matrix_view<uint8_t, IdxT>(
@@ -144,27 +144,19 @@ quantizer<T> train(raft::resources const& res,
                    const cuvs::preprocessing::quantize::product::params params,
                    raft::device_matrix_view<const T, int64_t> dataset)
 {
+  RAFT_EXPECTS(params.vq_n_centers == 1, "Only vq_n_centers = 1 is supported");
+
   auto n_rows = dataset.extent(0);
   auto dim    = dataset.extent(1);
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "preprocessing::quantize::product::train(%zu, %u)", size_t(n_rows), dim);
 
-  RAFT_EXPECTS(params.vq_n_centers == 1, "Only vq_n_centers = 1 is supported");
   auto ps = cuvs::neighbors::detail::fill_missing_params_heuristics(params, dataset);
   auto vq_code_book =
     raft::make_device_matrix<T, uint32_t, raft::row_major>(res, ps.vq_n_centers, dim);
-  if (ps.vq_n_centers == 1) {
-    raft::matrix::fill(res, vq_code_book.view(), 0.0f);
-  } else {
-    vq_code_book = cuvs::neighbors::detail::train_vq<T>(res, ps, dataset);
-  }
-  auto pq_code_book =
-    cuvs::neighbors::detail::train_pq<T>(res,
-                                         ps,
-                                         dataset,
-                                         raft::make_const_mdspan(vq_code_book.view()),
-                                         std::make_optional<int64_t>(256));
-  auto empty_codes = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, 0, 0);
+  raft::matrix::fill(res, vq_code_book.view(), 0.0f);
+  auto pq_code_book = cuvs::neighbors::detail::train_pq<T>(res, ps, dataset, std::nullopt);
+  auto empty_codes  = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, 0, 0);
   return {ps,
           cuvs::neighbors::vpq_dataset<T, int64_t>{
             std::move(vq_code_book), std::move(pq_code_book), std::move(empty_codes)}};
