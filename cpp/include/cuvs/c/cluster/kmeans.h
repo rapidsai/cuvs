@@ -34,17 +34,17 @@ typedef enum {
   /**
    * Sample the centroids using the kmeans++ strategy
    */
-  KMeansPlusPlus,
+  KMeansPlusPlus = 0,
 
   /**
    * Sample the centroids uniformly at random
    */
-  Random,
+  Random = 1,
 
   /**
    * User provides the array of initial centroids
    */
-  Array
+  Array = 2
 } cuvsKMeansInitMethod;
 
 /**
