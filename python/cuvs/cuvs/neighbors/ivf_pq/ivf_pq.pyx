@@ -123,14 +123,12 @@ cdef class IndexParams:
         train each codebook.
     """
 
-    cdef cuvsIvfPqIndexParams* params
-    cdef object _metric
-
     def __cinit__(self):
         cuvsIvfPqIndexParamsCreate(&self.params)
 
     def __dealloc__(self):
-        check_cuvs(cuvsIvfPqIndexParamsDestroy(self.params))
+        if self.params != NULL:
+            check_cuvs(cuvsIvfPqIndexParamsDestroy(self.params))
 
     def __init__(self, *,
                  n_lists=1024,
@@ -399,13 +397,12 @@ cdef class SearchParams:
         of larger memory footprint.
     """
 
-    cdef cuvsIvfPqSearchParams* params
-
     def __cinit__(self):
         cuvsIvfPqSearchParamsCreate(&self.params)
 
     def __dealloc__(self):
-        check_cuvs(cuvsIvfPqSearchParamsDestroy(self.params))
+        if self.params != NULL:
+            check_cuvs(cuvsIvfPqSearchParamsDestroy(self.params))
 
     def __init__(self, *, n_probes=20, lut_dtype=np.float32,
                  internal_distance_dtype=np.float32,
