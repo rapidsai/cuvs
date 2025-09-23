@@ -63,7 +63,7 @@ option(CUDA_ENABLE_LINEINFO
 )
 option(CUDA_STATIC_RUNTIME "Statically link the CUDA runtime" OFF)
 option(CUDA_STATIC_MATH_LIBRARIES "Statically link the CUDA math libraries" OFF)
-option(CUVS_USE_RAFT_STATIC "Build and statically link the RAFT libraries" OFF)
+option(CUVS_STATIC_RAPIDS_LIBRARIES "Build and statically link RAPIDS libraries" OFF)
 option(CUDA_LOG_COMPILE_TIME "Write a log of compilation times to nvcc_compile_log.csv" OFF)
 option(DETECT_CONDA_ENV "Enable detection of conda environment for dependencies" ON)
 option(DISABLE_DEPRECATION_WARNINGS "Disable deprecaction warnings " ON)
@@ -81,6 +81,23 @@ elseif(NOT BUILD_SHARED_LIBS)
   set(BUILD_TESTS OFF)
   set(BUILD_C_LIBRARY OFF)
   set(BUILD_CAGRA_HNSWLIB OFF)
+endif()
+
+if(NOT BUILD_SHARED_LIBS AND CUVS_COMPILE_DYNAMIC_ONLY)
+  message(
+    VERBOSE
+    "cuVS: Ignoring `BUILD_SHARED_LIBS` and forcing shared library due to `CUVS_COMPILE_DYNAMIC_ONLY`"
+  )
+endif()
+
+set(cuvs_compile_mode "both")
+set(_cuvs_lib_targets cuvs cuvs_static)
+if(CUVS_COMPILE_DYNAMIC_ONLY)
+  set(cuvs_compile_mode "shared_only")
+  set(_cuvs_lib_targets cuvs)
+elseif(NOT BUILD_SHARED_LIBS)
+  set(cuvs_compile_mode "static_only")
+  set(_cuvs_lib_targets cuvs_static)
 endif()
 
 # Needed because GoogleBenchmark changes the state of FindThreads.cmake, causing subsequent runs to
@@ -104,7 +121,7 @@ message(VERBOSE "cuVS: Enable lineinfo in nvcc: ${CUDA_ENABLE_LINEINFO}")
 message(VERBOSE "cuVS: Enable nvtx markers: ${CUVS_NVTX}")
 message(VERBOSE "cuVS: Statically link the CUDA runtime: ${CUDA_STATIC_RUNTIME}")
 message(VERBOSE "cuVS: Statically link the CUDA math libraries: ${CUDA_STATIC_MATH_LIBRARIES}")
-message(VERBOSE "cuVS: Build and statically link RAFT libraries: ${CUVS_USE_RAFT_STATIC}")
+message(VERBOSE "cuVS: Build and statically link RAPIDS libraries: ${CUVS_STATIC_RAPIDS_LIBRARIES}")
 
 # Set RMM logging level
 set(RMM_LOGGING_LEVEL
@@ -200,7 +217,7 @@ endif()
 
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
-if(BUILD_SHARED_LIBS)
+if(NOT BUILD_CPU_ONLY)
   add_library(
     cuvs-cagra-search STATIC
     src/neighbors/cagra_search_float.cu
@@ -519,25 +536,116 @@ if(BUILD_SHARED_LIBS)
     cuvs_objs PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
                       "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
   )
-  target_link_libraries(
-    cuvs_objs PUBLIC raft::raft rmm::rmm ${CUVS_CTK_MATH_DEPENDENCIES}
-                     $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+
+  target_compile_definitions(
+    cuvs_objs PRIVATE $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+                      $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
   )
 
-  add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs>)
+  target_link_libraries(
+    cuvs_objs
+    PRIVATE raft::raft rmm::rmm ${CUVS_CTK_MATH_DEPENDENCIES}
+            $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
+  )
 
-  if(NOT CUVS_COMPILE_DYNAMIC_ONLY)
-    add_library(cuvs_static STATIC $<TARGET_OBJECTS:cuvs_objs>)
+  target_include_directories(
+    cuvs_objs
+    PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
+           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    INTERFACE "$<INSTALL_INTERFACE:include>"
+  )
+
+  # Endian detection
+  include(TestBigEndian)
+  test_big_endian(BIG_ENDIAN)
+  if(BIG_ENDIAN)
+    target_compile_definitions(cuvs_objs PRIVATE CUVS_SYSTEM_LITTLE_ENDIAN=0)
+  else()
+    target_compile_definitions(cuvs_objs PRIVATE CUVS_SYSTEM_LITTLE_ENDIAN=1)
   endif()
 
-  target_compile_options(
-    cuvs INTERFACE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--expt-extended-lambda
-                   --expt-relaxed-constexpr>
+  if(BUILD_MG_ALGOS)
+    rapids_find_generate_module(
+      NCCL
+      HEADER_NAMES nccl.h
+      LIBRARY_NAMES nccl
+    )
+    find_package(NCCL REQUIRED)
+    target_link_libraries(cuvs_objs PUBLIC $<BUILD_LOCAL_INTERFACE:NCCL::NCCL>)
+
+    target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_MG_ALGOS)
+    target_compile_definitions(cuvs-cagra-search PUBLIC CUVS_BUILD_MG_ALGOS)
+  endif()
+
+  set(CUVS_CUSOLVER_DEPENDENCY CUDA::cusolver${_ctk_static_suffix})
+  set(CUVS_CUBLAS_DEPENDENCY CUDA::cublas${_ctk_static_suffix})
+  set(CUVS_CURAND_DEPENDENCY CUDA::curand${_ctk_static_suffix})
+  set(CUVS_CUSPARSE_DEPENDENCY CUDA::cusparse${_ctk_static_suffix})
+
+  set(CUVS_CTK_MATH_DEPENDENCIES ${CUVS_CUBLAS_DEPENDENCY} ${CUVS_CUSOLVER_DEPENDENCY}
+                                 ${CUVS_CUSPARSE_DEPENDENCY} ${CUVS_CURAND_DEPENDENCY}
   )
 
-  add_library(cuvs::cuvs ALIAS cuvs)
+  if(NOT cuvs_compile_mode STREQUAL "static_only")
+    add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs>)
+    add_library(cuvs::cuvs ALIAS cuvs)
+    set_target_properties(
+      cuvs
+      PROPERTIES BUILD_RPATH "\$ORIGIN"
+                 INSTALL_RPATH "\$ORIGIN"
+                 CXX_STANDARD 17
+                 CXX_STANDARD_REQUIRED ON
+                 CUDA_STANDARD 17
+                 CUDA_STANDARD_REQUIRED ON
+                 INTERFACE_POSITION_INDEPENDENT_CODE ON
+                 POSITION_INDEPENDENT_CODE ON
+    )
+    target_compile_options(
+      cuvs
+      INTERFACE $<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--expt-extended-lambda
+                --expt-relaxed-constexpr>
+      PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+              "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+    )
+    target_compile_definitions(
+      cuvs PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+                  $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
+    )
 
-  if(NOT CUVS_COMPILE_DYNAMIC_ONLY)
+    target_include_directories(
+      cuvs PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+                  "$<INSTALL_INTERFACE:include>"
+    )
+
+    target_link_libraries(
+      cuvs
+      PUBLIC rmm::rmm
+             raft::raft
+             ${CUVS_CTK_MATH_DEPENDENCIES}
+             $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
+             $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
+             $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
+      PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+              cuvs-cagra-search
+    )
+
+    # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
+    file(
+      WRITE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld"
+      [=[
+SECTIONS
+{
+.nvFatBinSegment : { *(.nvFatBinSegment) }
+.nv_fatbin : { *(.nv_fatbin) }
+}
+]=]
+    )
+    target_link_options(cuvs PRIVATE $<HOST_LINK:${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld>)
+
+  endif()
+
+  if(NOT cuvs_compile_mode STREQUAL "shared_only")
+    add_library(cuvs_static STATIC $<TARGET_OBJECTS:cuvs_objs>)
     add_library(cuvs::cuvs_static ALIAS cuvs_static)
 
     set_target_properties(
@@ -552,16 +660,11 @@ if(BUILD_SHARED_LIBS)
     )
 
     target_compile_options(cuvs_static PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
-  endif()
+    target_compile_definitions(
+      cuvs_static PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+                         $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
+    )
 
-  target_include_directories(
-    cuvs_objs
-    PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
-           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-    INTERFACE "$<INSTALL_INTERFACE:include>"
-  )
-
-  if(NOT CUVS_COMPILE_DYNAMIC_ONLY)
     target_include_directories(
       cuvs_static
       PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
@@ -575,102 +678,21 @@ if(BUILD_SHARED_LIBS)
       cuvs_static PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
                          "$<INSTALL_INTERFACE:include>"
     )
-  endif()
-
-  target_include_directories(
-    cuvs PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-                "$<INSTALL_INTERFACE:include>"
-  )
-
-  rapids_find_package(
-    OpenMP REQUIRED
-    BUILD_EXPORT_SET cuvs-exports
-    INSTALL_EXPORT_SET cuvs-exports
-  )
-
-  if(NOT BUILD_CPU_ONLY)
-
-    set(CUVS_CUSOLVER_DEPENDENCY CUDA::cusolver${_ctk_static_suffix})
-    set(CUVS_CUBLAS_DEPENDENCY CUDA::cublas${_ctk_static_suffix})
-    set(CUVS_CURAND_DEPENDENCY CUDA::curand${_ctk_static_suffix})
-    set(CUVS_CUSPARSE_DEPENDENCY CUDA::cusparse${_ctk_static_suffix})
-
-    set(CUVS_CTK_MATH_DEPENDENCIES ${CUVS_CUBLAS_DEPENDENCY} ${CUVS_CUSOLVER_DEPENDENCY}
-                                   ${CUVS_CUSPARSE_DEPENDENCY} ${CUVS_CURAND_DEPENDENCY}
-    )
-
-    if(BUILD_MG_ALGOS)
-      rapids_find_generate_module(
-        NCCL
-        HEADER_NAMES nccl.h
-        LIBRARY_NAMES nccl
-      )
-      find_package(NCCL REQUIRED)
-      target_link_libraries(cuvs_objs PRIVATE NCCL::NCCL)
-      target_link_libraries(cuvs PRIVATE NCCL::NCCL)
-    endif()
-
-    # Keep cuVS as lightweight as possible. Only CUDA libs and rmm should be used in global target.
     target_link_libraries(
-      cuvs
-      PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
+      cuvs_static
+      PUBLIC rmm::rmm
+             raft::raft
+             ${CUVS_CTK_MATH_DEPENDENCIES}
+             $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
+             $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
+             $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              cuvs-cagra-search
     )
-
-    if(NOT CUVS_COMPILE_DYNAMIC_ONLY)
-      target_link_libraries(
-        cuvs_static
-        PUBLIC rmm::rmm raft::raft ${CUVS_CTK_MATH_DEPENDENCIES}
-        PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-      )
-    endif()
   endif()
-
-  if(BUILD_MG_ALGOS)
-    target_compile_definitions(cuvs PUBLIC CUVS_BUILD_MG_ALGOS)
-    target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_MG_ALGOS)
-    target_compile_definitions(cuvs-cagra-search PUBLIC CUVS_BUILD_MG_ALGOS)
-  endif()
-
-  if(BUILD_CAGRA_HNSWLIB)
-    target_link_libraries(cuvs_objs PRIVATE hnswlib::hnswlib)
-    target_compile_definitions(cuvs PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
-    target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
-  endif()
-
-  # Endian detection
-  include(TestBigEndian)
-  test_big_endian(BIG_ENDIAN)
-  if(BIG_ENDIAN)
-    target_compile_definitions(cuvs PRIVATE CUVS_SYSTEM_LITTLE_ENDIAN=0)
-  else()
-    target_compile_definitions(cuvs PRIVATE CUVS_SYSTEM_LITTLE_ENDIAN=1)
-  endif()
-
-  file(
-    WRITE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld"
-    [=[
-SECTIONS
-{
-.nvFatBinSegment : { *(.nvFatBinSegment) }
-.nv_fatbin : { *(.nv_fatbin) }
-}
-]=]
-  )
 
   # ################################################################################################
   # * NVTX support in cuvs -----------------------------------------------------
-
-  if(CUVS_NVTX)
-    # This enables NVTX within the project with no option to disable it downstream.
-    target_link_libraries(cuvs PUBLIC CUDA::nvtx3)
-    target_compile_definitions(cuvs_objs PUBLIC NVTX_ENABLED)
-    target_compile_definitions(cuvs PUBLIC NVTX_ENABLED)
-
-    target_link_libraries(cuvs-cagra-search PUBLIC CUDA::nvtx3)
-    target_compile_definitions(cuvs-cagra-search PUBLIC NVTX_ENABLED)
-  else()
+  if(NOT CUVS_NVTX)
     # Allow enable NVTX downstream if not set here. This creates a new option at build/install time,
     # which is set by default to OFF, but can be enabled in the dependent project.
     get_property(
@@ -692,25 +714,6 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
   ]=]
     )
   endif()
-
-  set_target_properties(
-    cuvs
-    PROPERTIES BUILD_RPATH "\$ORIGIN"
-               INSTALL_RPATH "\$ORIGIN"
-               CXX_STANDARD 17
-               CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 17
-               CUDA_STANDARD_REQUIRED ON
-               INTERFACE_POSITION_INDEPENDENT_CODE ON
-               POSITION_INDEPENDENT_CODE ON
-  )
-
-  target_compile_options(
-    cuvs PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
-                 "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
-  )
-  # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
-  target_link_options(cuvs PRIVATE $<HOST_LINK:${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld>)
 
   # ################################################################################################
   # * cuvs_c -------------------------------------------------------------------------------
@@ -734,19 +737,13 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
       src/neighbors/nn_descent_c.cpp
       src/neighbors/refine/refine_c.cpp
       src/neighbors/tiered_index_c.cpp
+      src/neighbors/all_neighbors_c.cpp
       src/preprocessing/quantize/binary_c.cpp
       src/preprocessing/quantize/scalar_c.cpp
       src/distance/pairwise_distance_c.cpp
       ${CUVS_C_MG_ALGOS}
     )
-
-    if(BUILD_CAGRA_HNSWLIB)
-      target_link_libraries(cuvs_c PRIVATE hnswlib::hnswlib)
-      target_compile_definitions(cuvs_c PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
-    endif()
-
     add_library(cuvs::c_api ALIAS cuvs_c)
-
     set_target_properties(
       cuvs_c
       PROPERTIES BUILD_RPATH "\$ORIGIN"
@@ -756,6 +753,10 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
                  POSITION_INDEPENDENT_CODE ON
                  INTERFACE_POSITION_INDEPENDENT_CODE ON
                  EXPORT_NAME c_api
+    )
+
+    target_compile_definitions(
+      cuvs_c PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
     )
 
     target_compile_options(cuvs_c PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
@@ -770,7 +771,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     target_link_libraries(
       cuvs_c
       PUBLIC cuvs::cuvs ${CUVS_CTK_MATH_DEPENDENCIES}
-      PRIVATE raft::raft
+      PRIVATE raft::raft $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -782,11 +783,6 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
   rapids_cmake_install_lib_dir(lib_dir)
   include(GNUInstallDirs)
   include(CPack)
-
-  set(_cuvs_lib_targets cuvs)
-  if(NOT CUVS_COMPILE_DYNAMIC_ONLY)
-    list(APPEND _cuvs_lib_targets cuvs_static)
-  endif()
 
   install(
     TARGETS ${_cuvs_lib_targets}
