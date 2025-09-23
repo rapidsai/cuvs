@@ -58,7 +58,8 @@ cdef class IndexParams:
         The number of clusters used in the coarse quantizer.
     metric : str, default="sqeuclidean"
         String denoting the metric type.
-        Valid values for metric: ["sqeuclidean", "inner_product", "euclidean", "cosine"],
+        Valid values for metric: ["sqeuclidean", "inner_product",
+        "euclidean", "cosine"],
         where:
 
             - sqeuclidean is the euclidean distance without the square root
