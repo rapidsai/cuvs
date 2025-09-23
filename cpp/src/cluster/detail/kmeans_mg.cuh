@@ -177,18 +177,17 @@ void initKMeansPlusPlus(const raft::resources& handle,
   //          ranks
   // Choose rp on rank 0 and broadcast to all ranks to guarantee agreement
   int rp      = 0;
-  int rp_host = 0;
   if (my_rank == KMEANS_COMM_ROOT) {
     std::mt19937 gen(params.rng_state.seed);
     std::uniform_int_distribution<> dis(0, n_rank - 1);
-    rp_host = dis(gen);
+    rp = dis(gen);
   }
   {
     rmm::device_scalar<int> rp_d(stream);
-    raft::copy(rp_d.data(), &rp_host, 1, stream);
+    raft::copy(rp_d.data(), &rp, 1, stream);
     comm.bcast<int>(rp_d.data(), 1, /*root=*/KMEANS_COMM_ROOT, stream);
     raft::copy(&rp, rp_d.data(), 1, stream);
-    raft::resource::sync_stream(handle, stream);
+    raft::resource::sync_stream(handle);
   }
 
   // buffer to flag the sample that is chosen as initial centroids
