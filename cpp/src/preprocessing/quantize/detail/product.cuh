@@ -20,15 +20,7 @@
 #include "../../../neighbors/detail/vpq_dataset.cuh"
 #include <cuvs/preprocessing/quantize/product.hpp>
 #include <raft/core/operators.hpp>
-#include <raft/linalg/init.cuh>
-#include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/init.cuh>
-#include <raft/matrix/sample_rows.cuh>
-#include <raft/matrix/scatter.cuh>
-#include <raft/random/rng.cuh>
-#include <thrust/execution_policy.h>
-#include <thrust/sort.h>
-#include <thrust/system/omp/execution_policy.h>
 
 namespace cuvs::neighbors::detail {
 

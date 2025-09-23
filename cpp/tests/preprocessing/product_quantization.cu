@@ -181,10 +181,8 @@ auto reconstruct_vectors(
 
   auto stream = raft::resource::get_cuda_stream(res);
 
-  // TODO: with scaling workspace we could choose the batch size dynamically
-  constexpr ix_t kReasonableMaxBatchSize = 65536;
-  constexpr ix_t kBlockSize              = 256;
-  const ix_t threads_per_vec             = std::min<ix_t>(raft::WarpSize, pq_n_centers);
+  constexpr ix_t kBlockSize  = 256;
+  const ix_t threads_per_vec = std::min<ix_t>(raft::WarpSize, pq_n_centers);
   dim3 threads(kBlockSize, 1, 1);
   auto kernel = [](uint32_t pq_bits) {
     switch (pq_bits) {
@@ -247,8 +245,6 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
                             double compression_ratio,
                             uint32_t n_take)
   {
-    // the original data cannot be reconstructed since the dataset was normalized
-    // if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) { return; }
     auto dim = n_features_;
 
     if (n_take == 0) { return; }

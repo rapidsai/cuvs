@@ -16,14 +16,10 @@
 
 #pragma once
 
-#include <cuvs/neighbors/ivf_pq.hpp>
-#include <raft/core/device_mdarray.hpp>
+#include <cuvs/neighbors/common.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/handle.hpp>
-#include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
-
-#include <cuda_fp16.h>
 
 namespace cuvs::preprocessing::quantize::product {
 
