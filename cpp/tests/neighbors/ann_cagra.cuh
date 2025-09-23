@@ -347,10 +347,6 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
       GTEST_SKIP();
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
-      if ((ps.build_algo == graph_build_algo::IVF_PQ) &&
-          (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>)) {
-        GTEST_SKIP();
-      }
       if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
         GTEST_SKIP();
       }
@@ -538,10 +534,6 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
   {
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
-      if ((ps.build_algo == graph_build_algo::IVF_PQ) &&
-          (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>)) {
-        GTEST_SKIP();
-      }
       if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
         GTEST_SKIP();
       }
@@ -759,10 +751,6 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
   {
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
       if (ps.compression.has_value()) { GTEST_SKIP(); }
-      if ((ps.build_algo == graph_build_algo::IVF_PQ) &&
-          (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>)) {
-        GTEST_SKIP();
-      }
       if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
         GTEST_SKIP();
       }
@@ -978,10 +966,6 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
   void testCagra()
   {
     if (ps.metric == cuvs::distance::DistanceType::CosineExpanded) {
-      if ((ps.build_algo == graph_build_algo::IVF_PQ) &&
-          (std::is_same_v<DataT, std::uint8_t> || std::is_same_v<DataT, std::int8_t>)) {
-        GTEST_SKIP();
-      }
       if (ps.build_algo == graph_build_algo::ITERATIVE_CAGRA_SEARCH || ps.dim == 1) {
         GTEST_SKIP();
       }
