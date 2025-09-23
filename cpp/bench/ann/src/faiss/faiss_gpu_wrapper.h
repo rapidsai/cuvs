@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -550,7 +550,7 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
     config.graph_degree              = param.graph_degree;
     config.intermediate_graph_degree = param.intermediate_graph_degree;
     config.device                    = this->device_;
-    config.store_dataset             = false;
+    config.store_dataset             = true;
     if (param.cagra_build_algo == "IVF_PQ") {
       config.build_algo           = faiss::gpu::graph_build_algo::IVF_PQ;
       this->ivf_pq_build_params_  = param.ivf_pq_build_params;
@@ -655,9 +655,17 @@ class faiss_gpu_cagra_hnsw : public faiss_gpu<T> {
     omp_single_thread_scope omp_single_thread;
     this->search_index_.reset(static_cast<faiss::IndexHNSWCagra*>(faiss::read_index(file.c_str())));
   }
+
+  [[nodiscard]] auto get_sync_stream() const noexcept -> cudaStream_t override
+  {
+    if (this->gpu_resource_ == nullptr) { return 0; }
+    return this->gpu_resource_->getDefaultStream(this->device_);
+  }
   std::unique_ptr<algo<T>> copy() override
   {
-    return std::make_unique<faiss_gpu_cagra_hnsw<T>>(*this);
+    auto new_instance          = std::make_unique<faiss_gpu_cagra_hnsw<T>>(*this);
+    new_instance->build_index_ = nullptr;
+    return new_instance;
   };
 
  private:

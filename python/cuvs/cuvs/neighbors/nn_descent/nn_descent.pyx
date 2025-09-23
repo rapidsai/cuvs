@@ -131,6 +131,10 @@ cdef class IndexParams:
     def termination_threshold(self):
         return self.params.termination_threshold
 
+    def get_handle(self):
+        """Get a pointer to the underlying C object."""
+        return <size_t>self.params
+
 cdef class Index:
     """
     NN-Descent index object. This object stores the trained NN-Descent index,

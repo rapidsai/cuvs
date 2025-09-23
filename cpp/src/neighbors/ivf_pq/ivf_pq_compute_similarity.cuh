@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,8 @@
 #include "../sample_filter.cuh"  // none_sample_filter
 #include "ivf_pq_fp_8bit.cuh"    // cuvs::neighbors::ivf_pq::detail::fp_8bit
 
-#include <cuvs/distance/distance.hpp>   // cuvs::distance::DistanceType
+#include <cuvs/distance/distance.hpp>  // cuvs::distance::DistanceType
+#include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>    // cuvs::neighbors::ivf_pq::codebook_gen
 #include <raft/core/detail/macros.hpp>  // RAFT_WEAK_FUNCTION
 #include <rmm/cuda_stream_view.hpp>     // rmm::cuda_stream_view
@@ -36,7 +37,6 @@ auto RAFT_WEAK_FUNCTION is_local_topk_feasible(uint32_t k, uint32_t n_probes, ui
 
 template <typename OutT,
           typename LutT,
-          typename IvfSampleFilterT,
           uint32_t PqBits,
           int Capacity,
           bool PrecompBaseDiff,
@@ -58,27 +58,27 @@ RAFT_KERNEL compute_similarity_kernel(uint32_t dim,
                                       const float* queries,
                                       const uint32_t* index_list,
                                       float* query_kths,
-                                      IvfSampleFilterT sample_filter,
+                                      filtering::ivf_filter_dev sample_filter,
                                       LutT* lut_scores,
                                       OutT* _out_scores,
                                       uint32_t* _out_indices);
 
 // The signature of the kernel defined by a minimal set of template parameters
-template <typename OutT, typename LutT, typename IvfSampleFilterT>
+template <typename OutT, typename LutT>
 using compute_similarity_kernel_t =
-  decltype(&compute_similarity_kernel<OutT, LutT, IvfSampleFilterT, 8, 0, true, true>);
+  decltype(&compute_similarity_kernel<OutT, LutT, 8, 0, true, true>);
 
-template <typename OutT, typename LutT, typename IvfSampleFilterT>
+template <typename OutT, typename LutT>
 struct selected {
-  compute_similarity_kernel_t<OutT, LutT, IvfSampleFilterT> kernel;
+  compute_similarity_kernel_t<OutT, LutT> kernel;
   dim3 grid_dim;
   dim3 block_dim;
   size_t smem_size;
   size_t device_lut_size;
 };
 
-template <typename OutT, typename LutT, typename IvfSampleFilterT>
-void compute_similarity_run(selected<OutT, LutT, IvfSampleFilterT> s,
+template <typename OutT, typename LutT>
+void compute_similarity_run(selected<OutT, LutT> s,
                             rmm::cuda_stream_view stream,
                             uint32_t dim,
                             uint32_t n_probes,
@@ -97,7 +97,7 @@ void compute_similarity_run(selected<OutT, LutT, IvfSampleFilterT> s,
                             const float* queries,
                             const uint32_t* index_list,
                             float* query_kths,
-                            IvfSampleFilterT sample_filter,
+                            const filtering::base_filter& sample_filter,
                             LutT* lut_scores,
                             OutT* _out_scores,
                             uint32_t* _out_indices);
@@ -116,7 +116,7 @@ void compute_similarity_run(selected<OutT, LutT, IvfSampleFilterT> s,
  *    beyond this limit do not consider increasing the number of active blocks per SM
  *    would improve locality anymore.
  */
-template <typename OutT, typename LutT, typename IvfSampleFilterT>
+template <typename OutT, typename LutT>
 auto compute_similarity_select(const cudaDeviceProp& dev_props,
                                bool manage_local_topk,
                                int locality_hint,
@@ -126,14 +126,12 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
                                uint32_t precomp_data_count,
                                uint32_t n_queries,
                                uint32_t n_probes,
-                               uint32_t topk) -> selected<OutT, LutT, IvfSampleFilterT>;
+                               uint32_t topk) -> selected<OutT, LutT>;
 
 }  // namespace cuvs::neighbors::ivf_pq::detail
 
-#define instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(                    \
-  OutT, LutT, IvfSampleFilterT)                                                                \
-  extern template auto                                                                         \
-  cuvs::neighbors::ivf_pq::detail::compute_similarity_select<OutT, LutT, IvfSampleFilterT>(    \
+#define instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(OutT, LutT)         \
+  extern template auto cuvs::neighbors::ivf_pq::detail::compute_similarity_select<OutT, LutT>( \
     const cudaDeviceProp& dev_props,                                                           \
     bool manage_local_topk,                                                                    \
     int locality_hint,                                                                         \
@@ -143,11 +141,10 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
     uint32_t precomp_data_count,                                                               \
     uint32_t n_queries,                                                                        \
     uint32_t n_probes,                                                                         \
-    uint32_t topk) -> cuvs::neighbors::ivf_pq::detail::selected<OutT, LutT, IvfSampleFilterT>; \
+    uint32_t topk) -> cuvs::neighbors::ivf_pq::detail::selected<OutT, LutT>;                   \
                                                                                                \
-  extern template void                                                                         \
-  cuvs::neighbors::ivf_pq::detail::compute_similarity_run<OutT, LutT, IvfSampleFilterT>(       \
-    cuvs::neighbors::ivf_pq::detail::selected<OutT, LutT, IvfSampleFilterT> s,                 \
+  extern template void cuvs::neighbors::ivf_pq::detail::compute_similarity_run<OutT, LutT>(    \
+    cuvs::neighbors::ivf_pq::detail::selected<OutT, LutT> s,                                   \
     rmm::cuda_stream_view stream,                                                              \
     uint32_t dim,                                                                              \
     uint32_t n_probes,                                                                         \
@@ -166,82 +163,23 @@ auto compute_similarity_select(const cudaDeviceProp& dev_props,
     const float* queries,                                                                      \
     const uint32_t* index_list,                                                                \
     float* query_kths,                                                                         \
-    IvfSampleFilterT sample_filter,                                                            \
+    const filtering::base_filter& sample_filter,                                               \
     LutT* lut_scores,                                                                          \
     OutT* _out_scores,                                                                         \
     uint32_t* _out_indices);
 
 #define COMMA ,
 instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
-  half,
-  cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>,
-  cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>);
+  half, cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>);
 instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
-  half,
-  cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>,
-  cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>);
+  half, cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>);
+instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(half, half);
+instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(float, half);
+instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(float, float);
 instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
-  half,
-  half,
-  cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>);
+  float, cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>);
 instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
-  float,
-  half,
-  cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>);
-instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
-  float,
-  float,
-  cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>);
-instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
-  float,
-  cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>,
-  cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>);
-instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
-  float,
-  cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>,
-  cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>);
-instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
-  half,
-  cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>,
-  cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::bitset_filter<uint32_t COMMA int64_t>>);
-instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
-  half,
-  cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>,
-  cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::bitset_filter<uint32_t COMMA int64_t>>);
-instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
-  half,
-  half,
-  cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::bitset_filter<uint32_t COMMA int64_t>>);
-instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
-  float,
-  half,
-  cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::bitset_filter<uint32_t COMMA int64_t>>);
-instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
-  float,
-  float,
-  cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::bitset_filter<uint32_t COMMA int64_t>>);
-instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
-  float,
-  cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>,
-  cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::bitset_filter<uint32_t COMMA int64_t>>);
-instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select(
-  float,
-  cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>,
-  cuvs::neighbors::filtering::ivf_to_sample_filter<
-    int64_t COMMA cuvs::neighbors::filtering::bitset_filter<uint32_t COMMA int64_t>>);
+  float, cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>);
 
 #undef COMMA
 
