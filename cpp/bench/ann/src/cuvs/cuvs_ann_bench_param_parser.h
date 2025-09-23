@@ -340,10 +340,10 @@ void parse_build_param(const nlohmann::json& conf,
           conf.value("intermediate_graph_degree", cagra_params.intermediate_graph_degree),
           dist_type);
     }
-    if (conf.contains("disk_enabled")) { cagra_params.disk_enabled = conf.at("disk_enabled"); }
-    if (conf.contains("graph_build_dir")) {
-      cagra_params.graph_build_dir = conf.at("graph_build_dir");
+    if (conf.contains("ace_npartitions")) {
+      cagra_params.ace_npartitions = conf.at("ace_npartitions");
     }
+    if (conf.contains("ace_build_dir")) { cagra_params.ace_build_dir = conf.at("ace_build_dir"); }
     ::parse_build_param<T, IdxT>(conf, cagra_params);
     return cagra_params;
   };

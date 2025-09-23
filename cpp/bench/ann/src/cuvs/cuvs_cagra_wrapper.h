@@ -198,13 +198,14 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
     raft::make_mdspan<const T, IdxT, raft::row_major, false, true>(dataset, dataset_extents);
   bool dataset_is_on_host = raft::get_device_for_address(dataset) == -1;
 
-  // ACE: Use disk-based partitioned approach if enabled.
+  // ACE: Use partitioned approach if enabled.
   // Assumes large datasets on disk.
-  if (params.disk_enabled) {
-    RAFT_LOG_INFO("ACE: Using disk-based partitioned CAGRA build with 100 partitions");
+  if (params.ace_npartitions > 1) {
+    RAFT_LOG_INFO("ACE: Using partitioned CAGRA build with %zu partitions", params.ace_npartitions);
     if (dataset_is_on_host) {
       index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(
-        std::move(cuvs::neighbors::cagra::build_ace(handle_, params, dataset_view_host, 100)));
+        std::move(cuvs::neighbors::cagra::build_ace(
+          handle_, params, dataset_view_host, params.ace_npartitions)));
     } else {
       RAFT_LOG_INFO("ACE: Dataset is on device. Moving to host...");
       auto dataset_host = raft::make_host_matrix<T, int64_t>(dataset_view_device.extent(0),
@@ -215,7 +216,8 @@ void cuvs_cagra<T, IdxT>::build(const T* dataset, size_t nrow)
                  raft::resource::get_cuda_stream(handle_));
       raft::resource::sync_stream(handle_);
       index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(
-        std::move(cuvs::neighbors::cagra::build_ace(handle_, params, dataset_host.view(), 100)));
+        std::move(cuvs::neighbors::cagra::build_ace(
+          handle_, params, dataset_host.view(), params.ace_npartitions)));
     }
   } else if (index_params_.num_dataset_splits <= 1) {
     index_ = std::make_shared<cuvs::neighbors::cagra::index<T, IdxT>>(std::move(

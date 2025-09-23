@@ -198,7 +198,7 @@ index<T, IdxT> build_ace(
   raft::resources const& res,
   const index_params& params,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
-  size_t num_partitions = 10)
+  size_t num_partitions = 0)
 {
   common::nvtx::range<common::nvtx::domain::cuvs> function_scope(
     "cagra::build_ace<%s>(%zu, %zu, %zu)",
@@ -209,13 +209,16 @@ index<T, IdxT> build_ace(
     params.graph_degree,
     num_partitions);
 
-  RAFT_LOG_INFO("ACE: Starting partitioned CAGRA build with %zu partitions", num_partitions);
+  // Use num_partitions parameter if provided, otherwise use params.ace_npartitions
+  uint64_t n_partitions = (num_partitions > 0) ? num_partitions : params.ace_npartitions;
+  RAFT_EXPECTS(n_partitions > 0, "num_partitions must be greater than 0");
+
+  RAFT_LOG_INFO("ACE: Starting partitioned CAGRA build with %zu partitions", n_partitions);
 
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
   uint64_t dataset_size      = dataset.extent(0);
   uint64_t dataset_dim       = dataset.extent(1);
-  uint64_t n_partitions      = num_partitions;
 
   if (intermediate_degree >= dataset_size) {
     RAFT_LOG_WARN(

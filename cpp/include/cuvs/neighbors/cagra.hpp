@@ -50,11 +50,11 @@ struct index_params : cuvs::neighbors::index_params {
   /** Degree of output graph. */
   size_t graph_degree = 64;
   /**
-   * Enable disk-backed graph build for very large graphs. When enabled and a
-   * valid `graph_build_dir` is provided in the chosen graph build parameters,
-   * the build will use files to spill intermediate graphs.
+   * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
+   * When set to a value > 1, enables the ACE partitioned approach for very large graphs.
+   * Set to 0 or 1 to disable ACE and use standard build.
    */
-  bool disk_enabled = false;
+  size_t ace_npartitions = 0;
   /**
    * Specify compression parameters if compression is desired. If set, overrides the
    * attach_dataset_on_build (and the compressed dataset is always added to the index).
@@ -88,10 +88,10 @@ struct index_params : cuvs::neighbors::index_params {
                graph_build_params::iterative_search_params>
     graph_build_params;
   /**
-   * Directory to store disk-backed build artifacts (e.g., KNN graph,
-   * optimized graph). Used when `disk_enabled` is true.
+   * Directory to store ACE build artifacts (e.g., KNN graph,
+   * optimized graph). Used when `ace_npartitions` > 1.
    */
-  std::string graph_build_dir = "";
+  std::string ace_build_dir = "";
   /**
    * Whether to use MST optimization to guarantee graph connectivity.
    */
@@ -868,14 +868,15 @@ auto build(raft::resources const& res,
  * @param[in] res
  * @param[in] params parameters for building the index
  * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
- * @param[in] num_partitions number of partitions for partitioning (default: 16)
+ * @param[in] num_partitions number of partitions for partitioning (default: 0, uses
+ * params.ace_npartitions)
  *
  * @return the constructed cagra index
  */
 auto build_ace(raft::resources const& res,
                const cuvs::neighbors::cagra::index_params& params,
                raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
-               size_t num_partitions = 16) -> cuvs::neighbors::cagra::index<float, uint32_t>;
+               size_t num_partitions = 0) -> cuvs::neighbors::cagra::index<float, uint32_t>;
 
 /**
  * @brief Build the Augmented Core Extraction index from the dataset for very large graphs.
@@ -905,14 +906,15 @@ auto build_ace(raft::resources const& res,
  * @param[in] res
  * @param[in] params parameters for building the index
  * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
- * @param[in] num_partitions number of partitions for partitioning (default: 16)
+ * @param[in] num_partitions number of partitions for partitioning (default: 0, uses
+ * params.ace_npartitions)
  *
  * @return the constructed cagra index
  */
 auto build_ace(raft::resources const& res,
                const cuvs::neighbors::cagra::index_params& params,
                raft::host_matrix_view<const half, int64_t, raft::row_major> dataset,
-               size_t num_partitions = 16) -> cuvs::neighbors::cagra::index<half, uint32_t>;
+               size_t num_partitions = 0) -> cuvs::neighbors::cagra::index<half, uint32_t>;
 
 /**
  * @brief Build the Augmented Core Extraction index from the dataset for very large graphs.
@@ -942,14 +944,15 @@ auto build_ace(raft::resources const& res,
  * @param[in] res
  * @param[in] params parameters for building the index
  * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
- * @param[in] num_partitions number of partitions for partitioning (default: 16)
+ * @param[in] num_partitions number of partitions for partitioning (default: 0, uses
+ * params.ace_npartitions)
  *
  * @return the constructed cagra index
  */
 auto build_ace(raft::resources const& res,
                const cuvs::neighbors::cagra::index_params& params,
                raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
-               size_t num_partitions = 16) -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
+               size_t num_partitions = 0) -> cuvs::neighbors::cagra::index<int8_t, uint32_t>;
 
 /**
  * @brief Build the Augmented Core Extraction index from the dataset for very large graphs.
@@ -979,14 +982,15 @@ auto build_ace(raft::resources const& res,
  * @param[in] res
  * @param[in] params parameters for building the index
  * @param[in] dataset a matrix view (host) to a row-major matrix [n_rows, dim]
- * @param[in] num_partitions number of partitions for partitioning (default: 16)
+ * @param[in] num_partitions number of partitions for partitioning (default: 0, uses
+ * params.ace_npartitions)
  *
  * @return the constructed cagra index
  */
 auto build_ace(raft::resources const& res,
                const cuvs::neighbors::cagra::index_params& params,
                raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
-               size_t num_partitions = 16) -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
+               size_t num_partitions = 0) -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
 
 /**
  * @}
