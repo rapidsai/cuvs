@@ -241,6 +241,70 @@ index<T, IdxT> build_ace(
   }
   get_partition_labels<T, IdxT, Accessor>(res, dataset, labels.view(), partition_histogram.view());
 
+  // ACE: Check for very small partitions and merge them with the next closest partition
+  // A partition is considered too small if it has fewer vectors than the minimum required
+  // for stable KNN graph construction (below n_lists)
+  uint64_t min_partition_size =
+    std::max<uint64_t>(intermediate_degree * 2, std::sqrt(dataset_size));
+  RAFT_LOG_INFO("ACE: Checking for small partitions (min_size: %lu)", min_partition_size);
+
+  // Find partitions that are too small and need to be merged
+  std::vector<uint64_t> small_partitions;
+  for (uint64_t c = 0; c < n_partitions; c++) {
+    uint64_t partition_size = partition_histogram(c, 0) + partition_histogram(c, 1);
+    if (partition_size < min_partition_size) {
+      small_partitions.push_back(c);
+      RAFT_LOG_INFO(
+        "ACE: Partition %lu is too small (%lu vectors), will be merged", c, partition_size);
+    }
+  }
+
+  if (!small_partitions.empty()) {
+    RAFT_LOG_INFO("ACE: Found %zu small partitions, merging with closest partitions",
+                  small_partitions.size());
+
+    // For each small partition, find the closest non-small partition to merge with
+    for (uint64_t small_partition : small_partitions) {
+      uint64_t target_partition = small_partition;
+
+      // Find the closest partition that is not small
+      // We'll use a simple heuristic: merge with the next partition (modulo n_partitions)
+      // that is not also small
+      for (uint64_t offset = 1; offset < n_partitions; offset++) {
+        uint64_t candidate = (small_partition + offset) % n_partitions;
+        uint64_t candidate_size =
+          partition_histogram(candidate, 0) + partition_histogram(candidate, 1);
+
+        // Skip if this candidate is also small
+        if (candidate_size < min_partition_size) continue;
+
+        target_partition = candidate;
+        break;
+      }
+
+      // If we couldn't find a non-small partition, merge with the next partition anyway
+      if (target_partition == small_partition) {
+        target_partition = (small_partition + 1) % n_partitions;
+      }
+
+      RAFT_LOG_INFO(
+        "ACE: Merging small partition %lu into partition %lu", small_partition, target_partition);
+
+      // Update all labels that point to the small partition
+#pragma omp parallel for
+      for (uint64_t i = 0; i < dataset_size; i++) {
+        if (labels(i, 0) == small_partition) { labels(i, 0) = target_partition; }
+        if (labels(i, 1) == small_partition) { labels(i, 1) = target_partition; }
+      }
+
+      // Update the partition histogram
+      partition_histogram(target_partition, 0) += partition_histogram(small_partition, 0);
+      partition_histogram(target_partition, 1) += partition_histogram(small_partition, 1);
+      partition_histogram(small_partition, 0) = 0;
+      partition_histogram(small_partition, 1) = 0;
+    }
+  }
+
   // Create vector lists for each partition
   RAFT_LOG_INFO("ACE: Creating vector lists by partition labels ...");
   auto vector_fwd_list_0 = raft::make_host_vector<IdxT, int64_t>(dataset_size);
@@ -288,6 +352,13 @@ index<T, IdxT> build_ace(
 
   // Process each partition
   for (uint64_t c = 0; c < n_partitions; c++) {
+    // Skip partitions that have been merged (empty partitions)
+    uint64_t partition_size = partition_histogram(c, 0) + partition_histogram(c, 1);
+    if (partition_size == 0) {
+      RAFT_LOG_INFO("ACE: Skipping empty partition %lu (merged into another partition)", c);
+      continue;
+    }
+
     RAFT_LOG_INFO("ACE: Processing partition %lu/%lu", c + 1, n_partitions);
     auto start = std::chrono::high_resolution_clock::now();
 
