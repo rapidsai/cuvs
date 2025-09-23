@@ -330,15 +330,61 @@ index<T, IdxT> build_ace(
     sub_index_params.metric                    = params.metric;
     sub_index_params.graph_build_params        = params.graph_build_params;
 
-    // Set default build params if not specified
-    if (std::holds_alternative<std::monostate>(sub_index_params.graph_build_params)) {
+    if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
+          sub_index_params.graph_build_params)) {
+      // If IVF-PQ is used, set nprobes and nlists based on the number of vectors in the partition
+      // to ensure correct KNN graph construction. Here, we use the same parameters as in hnsw.cpp
+      auto ivf_pq_params = cuvs::neighbors::graph_build_params::ivf_pq_params(
+        raft::make_extents<int64_t>(sub_dataset_size, dataset_dim), params.metric);
+      int ef_construction = 120;  // TODO: Might be a user-specified parameter
+      ivf_pq_params.search_params.n_probes =
+        std::round(std::sqrt(ivf_pq_params.build_params.n_lists) / 20 + ef_construction / 16);
+      sub_index_params.graph_build_params = ivf_pq_params;
+      RAFT_LOG_INFO(
+        "ACE: IVF-PQ nlists: %u, pq_bits: %u, pq_dim: %u, nprobes: %u, refinement_rate: %.2f",
+        ivf_pq_params.build_params.n_lists,
+        ivf_pq_params.build_params.pq_bits,
+        ivf_pq_params.build_params.pq_dim,
+        ivf_pq_params.search_params.n_probes,
+        ivf_pq_params.refinement_rate);
+    } else if (std::holds_alternative<
+                 cuvs::neighbors::cagra::graph_build_params::nn_descent_params>(
+                 sub_index_params.graph_build_params)) {
+      sub_index_params.graph_build_params =
+        cuvs::neighbors::cagra::graph_build_params::nn_descent_params(
+          sub_index_params.intermediate_graph_degree, sub_index_params.metric);
+      auto nn_descent_params =
+        std::get<cuvs::neighbors::cagra::graph_build_params::nn_descent_params>(
+          sub_index_params.graph_build_params);
+      RAFT_LOG_INFO("ACE: NN-Descent max_iterations: %u, termination_threshold: %u",
+                    nn_descent_params.max_iterations,
+                    nn_descent_params.termination_threshold);
+    } else if (std::holds_alternative<std::monostate>(sub_index_params.graph_build_params)) {
+      // Set default build params if not specified
       if (cuvs::neighbors::nn_descent::has_enough_device_memory(
             res, raft::make_extents<int64_t>(sub_dataset_size, dataset_dim), sizeof(IdxT))) {
         sub_index_params.graph_build_params =
           cagra::graph_build_params::nn_descent_params(intermediate_degree, params.metric);
+        auto nn_descent_params =
+          std::get<cuvs::neighbors::cagra::graph_build_params::nn_descent_params>(
+            sub_index_params.graph_build_params);
+        RAFT_LOG_INFO(
+          "ACE: NN-Descent with default params: max_iterations: %u, termination_threshold: %.2f",
+          nn_descent_params.max_iterations,
+          nn_descent_params.termination_threshold);
       } else {
         sub_index_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
           raft::make_extents<int64_t>(sub_dataset_size, dataset_dim), params.metric);
+        auto ivf_pq_params = std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
+          sub_index_params.graph_build_params);
+        RAFT_LOG_INFO(
+          "ACE: IVF-PQ with default params: nlists: %u, pq_bits: %u, pq_dim: %u, nprobes: %u, "
+          "refinement_rate: %.2f",
+          ivf_pq_params.build_params.n_lists,
+          ivf_pq_params.build_params.pq_bits,
+          ivf_pq_params.build_params.pq_dim,
+          ivf_pq_params.search_params.n_probes,
+          ivf_pq_params.refinement_rate);
       }
     }
 
