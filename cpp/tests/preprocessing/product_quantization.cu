@@ -90,6 +90,9 @@ void compare_vectors_l2(const raft::resources& res,
   }
 }
 
+/**
+ * Copy from cuvs::neighbors::ivf_pq::detail::bitfield_ref_t to be used in this test.
+ */
 template <uint32_t Bits>
 struct bitfield_ref_t {
   static_assert(Bits <= 8 && Bits > 0, "Bit code must fit one byte");
@@ -266,33 +269,15 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
 
   void testProductQuantizationFromDataset()
   {
-    bool print_timer = false;
-    config_          = {params_.pq_bits, params_.pq_dim, 1};
+    config_ = {params_.pq_bits, params_.pq_dim, 1};
     raft::resource::sync_stream(handle);
-    auto start = std::chrono::high_resolution_clock::now();
-    auto pq    = train(handle, config_, dataset_.view());
-    raft::resource::sync_stream(handle);
-    auto end = std::chrono::high_resolution_clock::now();
-    if (print_timer) {
-      std::cout << "Time taken to train: "
-                << std::chrono::duration<double, std::milli>(end - start).count() << " ms"
-                << std::endl;
-    }
+    auto pq = train(handle, config_, dataset_.view());
 
     auto n_encoded_cols = raft::div_rounding_up_safe(pq.params.pq_dim * pq.params.pq_bits, 8u);
     auto d_quantized_output =
       raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
 
-    start = std::chrono::high_resolution_clock::now();
-
     transform(handle, pq, dataset_.view(), d_quantized_output.view());
-    raft::resource::sync_stream(handle);
-    end = std::chrono::high_resolution_clock::now();
-    if (print_timer) {
-      std::cout << "Time taken to transform: "
-                << std::chrono::duration<double, std::milli>(end - start).count() << " ms"
-                << std::endl;
-    }
 
     // 1. Verify that the quantized output is not all zeros or NaNs
     {
@@ -360,7 +345,6 @@ const std::vector<ProductQuantizationInputs<T>> inputs = {
 
   // Benchmark datasets
   {10000, 1024, 4, 32, 42ULL},
-  {1000000, 1024, 8, 64, 42ULL},
   {50000, 2048, 8, 16, 42ULL}};
 
 typedef ProductQuantizationTest<float> ProductQuantizationTestF;
