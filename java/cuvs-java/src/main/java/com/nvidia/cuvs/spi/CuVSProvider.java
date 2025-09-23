@@ -128,6 +128,9 @@ public interface CuVSProvider {
     return mergeCagraIndexes(indexes);
   }
 
+  /** Returns a {@link GPUInfoProvider} to query the system for GPU related information */
+  GPUInfoProvider gpuInfoProvider();
+
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {
     return CuVSServiceProvider.Holder.INSTANCE;

@@ -52,6 +52,11 @@ public class SynchronizedCuVSResources implements CuVSResources {
   }
 
   @Override
+  public int deviceId() {
+    return inner.deviceId();
+  }
+
+  @Override
   public void close() {
     inner.close();
   }

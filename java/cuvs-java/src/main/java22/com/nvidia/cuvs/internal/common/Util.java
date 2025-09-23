@@ -23,23 +23,21 @@ import static com.nvidia.cuvs.internal.panama.headers_h.*;
 import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaStream_t;
 
 import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.GPUInfo;
 import com.nvidia.cuvs.internal.panama.DLDataType;
 import com.nvidia.cuvs.internal.panama.DLDevice;
 import com.nvidia.cuvs.internal.panama.DLManagedTensor;
 import com.nvidia.cuvs.internal.panama.DLTensor;
-import com.nvidia.cuvs.internal.panama.cudaDeviceProp;
 import com.nvidia.cuvs.internal.panama.headers_h;
 import java.lang.foreign.Arena;
+import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemoryLayout.PathElement;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.SymbolLookup;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
-import java.util.ArrayList;
 import java.util.BitSet;
-import java.util.List;
 
 public class Util {
 
@@ -49,6 +47,11 @@ public class Util {
   private Util() {}
 
   private static final Linker LINKER = Linker.nativeLinker();
+
+  static final SymbolLookup SYMBOL_LOOKUP =
+      SymbolLookup.libraryLookup(System.mapLibraryName("cuvs_c"), Arena.ofAuto())
+          .or(SymbolLookup.loaderLookup())
+          .or(Linker.nativeLinker().defaultLookup());
 
   /**
    * Bindings for {@code cudaMemcpyAsync}; differently from the {@code headers_h} bindings (which are
@@ -61,6 +64,22 @@ public class Util {
   private static final MethodHandle cudaMemcpyAsync$mh =
       LINKER.downcallHandle(
           cudaMemcpyAsync$address(), cudaMemcpyAsync$descriptor(), Linker.Option.critical(true));
+
+  private static final MethodHandle cudaGetDeviceProperties$mh =
+      LINKER.downcallHandle(
+          SYMBOL_LOOKUP
+              .find("cudaGetDeviceProperties") // CUDA 13+ symbol name
+              .or(() -> SYMBOL_LOOKUP.find("cudaGetDeviceProperties_v2")) // CUDA 12 symbol name
+              .orElseThrow(UnsatisfiedLinkError::new),
+          FunctionDescriptor.of(headers_h.C_INT, headers_h.C_POINTER, headers_h.C_INT));
+
+  public static int cudaGetDeviceProperties(MemorySegment prop, int device) {
+    try {
+      return (int) cudaGetDeviceProperties$mh.invokeExact(prop, device);
+    } catch (Throwable ex$) {
+      throw new AssertionError("should not reach here", ex$);
+    }
+  }
 
   /**
    * Checks the result value of a (CuVS) native method handle call.
@@ -85,13 +104,6 @@ public class Util {
     if (value != CUDA_SUCCESS) {
       throw new RuntimeException(caller + " returned " + value);
     }
-  }
-
-  private static final long UNSIGNED_INT_MASK = 0xFFFFFFFFL;
-
-  public static long dereferenceUnsignedInt(MemorySegment ptr) {
-    assert ptr.byteSize() == 4;
-    return ptr.get(uint32_t, 0) & UNSIGNED_INT_MASK;
   }
 
   /**
@@ -192,85 +204,6 @@ public class Util {
       return seg.reinterpret(MAX_ERROR_TEXT).getString(0);
     } catch (Throwable t) {
       throw new RuntimeException(t);
-    }
-  }
-
-  /**
-   * Get the list of compatible GPUs based on compute capability >= 7.0 and total
-   * memory >= 8GB
-   *
-   * @return a list of compatible GPUs. See {@link GPUInfo}
-   */
-  public static List<GPUInfo> compatibleGPUs() throws Throwable {
-    return compatibleGPUs(7.0, 8192);
-  }
-
-  /**
-   * Get the list of compatible GPUs based on given compute capability and total
-   * memory
-   *
-   * @param minComputeCapability the minimum compute capability
-   * @param minDeviceMemoryMB    the minimum total available memory in MB
-   * @return a list of compatible GPUs. See {@link GPUInfo}
-   */
-  public static List<GPUInfo> compatibleGPUs(double minComputeCapability, int minDeviceMemoryMB)
-      throws Throwable {
-    List<GPUInfo> compatibleGPUs = new ArrayList<GPUInfo>();
-    double minDeviceMemoryB = Math.pow(2, 20) * minDeviceMemoryMB;
-    for (GPUInfo gpuInfo : availableGPUs()) {
-      if (gpuInfo.computeCapability() >= minComputeCapability
-          && gpuInfo.totalMemory() >= minDeviceMemoryB) {
-        compatibleGPUs.add(gpuInfo);
-      }
-    }
-    return compatibleGPUs;
-  }
-
-  /**
-   * Gets all the available GPUs
-   *
-   * @return a list of {@link GPUInfo} objects with GPU details
-   */
-  public static List<GPUInfo> availableGPUs() throws Throwable {
-    try (var localArena = Arena.ofConfined()) {
-
-      MemorySegment numGpus = localArena.allocate(C_INT);
-      int returnValue = cudaGetDeviceCount(numGpus);
-      checkCudaError(returnValue, "cudaGetDeviceCount");
-
-      int numGpuCount = numGpus.get(C_INT, 0);
-      List<GPUInfo> gpuInfoArr = new ArrayList<GPUInfo>();
-
-      MemorySegment free = localArena.allocate(size_t);
-      MemorySegment total = localArena.allocate(size_t);
-      MemorySegment deviceProp = cudaDeviceProp.allocate(localArena);
-
-      for (int i = 0; i < numGpuCount; i++) {
-
-        returnValue = cudaSetDevice(i);
-        checkCudaError(returnValue, "cudaSetDevice");
-
-        returnValue = cudaGetDeviceProperties_v2(deviceProp, i);
-        checkCudaError(returnValue, "cudaGetDeviceProperties_v2");
-
-        returnValue = cudaMemGetInfo(free, total);
-        checkCudaError(returnValue, "cudaMemGetInfo");
-
-        float computeCapability =
-            Float.parseFloat(
-                cudaDeviceProp.major(deviceProp) + "." + cudaDeviceProp.minor(deviceProp));
-
-        GPUInfo gpuInfo =
-            new GPUInfo(
-                i,
-                cudaDeviceProp.name(deviceProp).getString(0),
-                free.get(C_LONG, 0),
-                total.get(C_LONG, 0),
-                computeCapability);
-
-        gpuInfoArr.add(gpuInfo);
-      }
-      return gpuInfoArr;
     }
   }
 
