@@ -86,7 +86,7 @@ cuvsError_t cuvsResourcesDestroy(cuvsResources_t res);
 cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream);
 
 /**
- * @brief Get the cudaStream_t from a cuvsResources_t t
+ * @brief Get the cudaStream_t from a cuvsResources_t
  *
  * @param[in] res cuvsResources_t opaque C handle
  * @param[out] stream cudaStream_t stream to queue CUDA kernels
@@ -101,6 +101,43 @@ cuvsError_t cuvsStreamGet(cuvsResources_t res, cudaStream_t* stream);
  * @return cuvsError_t
  */
 cuvsError_t cuvsStreamSync(cuvsResources_t res);
+
+/**
+ * @brief Get the id of the device associated with this cuvsResources_t
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[out] device_id int the id of the device associated with res
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsDeviceIdGet(cuvsResources_t res, int* device_id);
+
+/**
+ * @brief Create an Initialized opaque C handle for C++ type `raft::device_resources_snmg`
+ *        for multi-GPU operations
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res);
+
+/**
+ * @brief Create an Initialized opaque C handle for C++ type `raft::device_resources_snmg`
+ *        for multi-GPU operations with specific device IDs
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[in] device_ids DLManagedTensor* containing device IDs to use
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsMultiGpuResourcesCreateWithDeviceIds(cuvsResources_t* res,
+                                                     DLManagedTensor* device_ids);
+
+/**
+ * @brief Destroy and de-allocate opaque C handle for C++ type `raft::device_resources_snmg`
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res);
 /** @} */
 
 /**

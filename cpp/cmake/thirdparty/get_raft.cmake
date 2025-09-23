@@ -17,16 +17,17 @@ set(RAFT_FORK "rapidsai")
 set(RAFT_PINNED_TAG "${rapids-cmake-checkout-tag}")
 
 function(find_and_configure_raft)
-    set(oneValueArgs VERSION FORK PINNED_TAG USE_RAFT_STATIC ENABLE_NVTX ENABLE_MNMG_DEPENDENCIES CLONE_ON_PIN)
+    set(oneValueArgs VERSION FORK PINNED_TAG BUILD_STATIC_DEPS ENABLE_NVTX ENABLE_MNMG_DEPENDENCIES CLONE_ON_PIN)
     cmake_parse_arguments(PKG "${options}" "${oneValueArgs}"
             "${multiValueArgs}" ${ARGN} )
 
     if(PKG_CLONE_ON_PIN AND NOT PKG_PINNED_TAG STREQUAL "${rapids-cmake-checkout-tag}")
         message(STATUS "cuVS: RAFT pinned tag found: ${PKG_PINNED_TAG}. Cloning raft locally.")
         set(CPM_DOWNLOAD_raft ON)
-    elseif(PKG_USE_RAFT_STATIC AND (NOT CPM_raft_SOURCE))
+    elseif(PKG_BUILD_STATIC_DEPS AND (NOT CPM_raft_SOURCE))
         message(STATUS "cuVS: Cloning raft locally to build static libraries.")
         set(CPM_DOWNLOAD_raft ON)
+        set(BUILD_SHARED_LIBS OFF)
     endif()
 
     set(RAFT_COMPONENTS "")
@@ -65,7 +66,7 @@ find_and_configure_raft(VERSION  ${RAFT_VERSION}.00
         PINNED_TAG               ${RAFT_PINNED_TAG}
         ENABLE_MNMG_DEPENDENCIES OFF
         ENABLE_NVTX              OFF
-        USE_RAFT_STATIC ${CUVS_USE_RAFT_STATIC}
+        BUILD_STATIC_DEPS ${CUVS_STATIC_RAPIDS_LIBRARIES}
         # When PINNED_TAG above doesn't match the default rapids branch,
         # force local raft clone in build directory
         # even if it's already installed.

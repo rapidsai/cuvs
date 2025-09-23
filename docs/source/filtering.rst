@@ -24,7 +24,7 @@ A bitmap is based on the same principle as a bitset, but in two dimensions. This
 being searched. Check out RAFT's `bitmap API documentation <https://docs.rapids.ai/api/raft/stable/cpp_api/core_bitmap/>`.
 
 Examples
-=======
+========
 
 Using a Bitset filter on a CAGRA index
 --------------------------------------

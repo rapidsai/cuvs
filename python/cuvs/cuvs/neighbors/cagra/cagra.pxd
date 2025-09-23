@@ -134,10 +134,10 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
     cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index)
 
-    cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int32_t* dim)
-    cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, uint32_t* size)
+    cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int64_t* dim)
+    cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* size)
     cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index,
-                                             uint32_t* degree)
+                                             int64_t* degree)
     cuvsError_t cuvsCagraIndexGetGraph(cuvsCagraIndex_t index,
                                        DLManagedTensor * graph)
     cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index,
@@ -175,6 +175,19 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
                                        DLManagedTensor * dataset,
                                        cuvsCagraIndex_t index)
 
+    ctypedef struct cuvsCagraExtendParams:
+        uint32_t max_chunk_size
+
+    ctypedef cuvsCagraExtendParams* cuvsCagraExtendParams_t
+
+    cuvsError_t cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params)
+    cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t params)
+    cuvsError_t cuvsCagraExtend(cuvsResources_t res,
+                                cuvsCagraExtendParams_t params,
+                                DLManagedTensor* additional_dataset,
+                                cuvsCagraIndex_t index)
+
+
 cdef class Index:
     """
     CAGRA index object. This object stores the trained CAGRA index state
@@ -184,3 +197,13 @@ cdef class Index:
     cdef cuvsCagraIndex_t index
     cdef bool trained
     cdef str active_index_type
+
+
+cdef class IndexParams:
+    cdef cuvsCagraIndexParams* params
+    cdef public object compression
+    cdef public object ivf_pq_build_params
+    cdef public object ivf_pq_search_params
+
+cdef class SearchParams:
+    cdef cuvsCagraSearchParams * params

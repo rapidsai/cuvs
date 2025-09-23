@@ -30,6 +30,7 @@ public interface CuVSMatrix extends AutoCloseable {
   enum DataType {
     FLOAT,
     INT,
+    UINT,
     BYTE
   }
 
@@ -68,29 +69,33 @@ public interface CuVSMatrix extends AutoCloseable {
     return CuVSProvider.provider().newMatrixFromArray(vectors);
   }
 
-  interface Builder {
+  /**
+   * A builder to construct a new matrix one row at a time
+   * @param <T> the CuVSMatrix type to build
+   */
+  interface Builder<T extends CuVSMatrix> {
     /**
-     * Add a single vector to the dataset.
+     * Adds a single vector to the matrix.
      *
      * @param vector A float array of as many elements as the dimensions
      */
     void addVector(float[] vector);
 
     /**
-     * Add a single vector to the dataset.
+     * Adds a single vector to the matrix.
      *
      * @param vector A byte array of as many elements as the dimensions
      */
     void addVector(byte[] vector);
 
     /**
-     * Add a single vector to the dataset.
+     * Adds a single vector to the matrix.
      *
-     * @param vector A int array of as many elements as the dimensions
+     * @param vector An int array of as many elements as the dimensions
      */
     void addVector(int[] vector);
 
-    CuVSMatrix build();
+    T build();
   }
 
   /**
@@ -99,10 +104,24 @@ public interface CuVSMatrix extends AutoCloseable {
    * @param size     Number of vectors in the dataset
    * @param columns  Size of each vector in the dataset
    * @param dataType The data type of the dataset elements
-   * @return new instance of {@link CuVSMatrix}
+   * @return a builder for creating a {@link CuVSHostMatrix}
    */
-  static CuVSMatrix.Builder builder(int size, int columns, DataType dataType) {
-    return CuVSProvider.provider().newMatrixBuilder(size, columns, dataType);
+  static Builder<CuVSHostMatrix> hostBuilder(long size, long columns, DataType dataType) {
+    return CuVSProvider.provider().newHostMatrixBuilder(size, columns, dataType);
+  }
+
+  /**
+   * Returns a builder to create a new instance of a dataset
+   *
+   * @param resources CuVS resources used to allocate the device memory needed
+   * @param size      Number of vectors in the dataset
+   * @param columns   Size of each vector in the dataset
+   * @param dataType  The data type of the dataset elements
+   * @return a builder for creating a {@link CuVSDeviceMatrix}
+   */
+  static Builder<CuVSDeviceMatrix> deviceBuilder(
+      CuVSResources resources, long size, long columns, DataType dataType) {
+    return CuVSProvider.provider().newDeviceMatrixBuilder(resources, size, columns, dataType);
   }
 
   /**
@@ -119,6 +138,13 @@ public interface CuVSMatrix extends AutoCloseable {
    * @return Dimensions of the vectors in the dataset
    */
   long columns();
+
+  /**
+   * Gets the element type
+   *
+   * @return a {@link DataType} describing the matrix element type
+   */
+  DataType dataType();
 
   /**
    * Get a view (0-copy) of the row data, as a list of integers (32 bit)
@@ -150,6 +176,42 @@ public interface CuVSMatrix extends AutoCloseable {
    *              and each element must be of length {@link CuVSMatrix#columns()} or bigger.
    */
   void toArray(byte[][] array);
+
+  /**
+   * Fills the provided, pre-allocated host matrix with data from this matrix.
+   * The content of the provided host matrix will be overwritten; the 2 matrices must have the
+   * same element type and dimension.
+   *
+   * @param hostMatrix  the host-memory-backed matrix to fill.
+   */
+  void toHost(CuVSHostMatrix hostMatrix);
+
+  /**
+   * Returns a host matrix; if the matrix is already a host matrix, a "weak" reference to the same host memory
+   * is returned. If the matrix is a device matrix, a newly allocated matrix will be populated with data from
+   * the device matrix.
+   * The returned host matrix will need to be managed by the caller, which will be
+   * responsible to call {@link CuVSMatrix#close()} to free its resources when done.
+   */
+  CuVSHostMatrix toHost();
+
+  /**
+   * Fills the provided, pre-allocated device matrix with data from this matrix.
+   * The content of the provided device matrix will be overwritten; the 2 matrices must have the
+   * same element type and dimension.
+   *
+   * @param deviceMatrix  the device-memory-backed matrix to fill.
+   */
+  void toDevice(CuVSDeviceMatrix deviceMatrix, CuVSResources cuVSResources);
+
+  /**
+   * Returns a device matrix; if this matrix is already a device matrix, a "weak" reference to the same host memory
+   * is returned. If the matrix is a host matrix, a newly allocated matrix will be populated with data from
+   * the host matrix.
+   * The returned device matrix will need to be managed by the caller, which will be
+   * responsible to call {@link CuVSMatrix#close()} to free its resources when done.
+   */
+  CuVSDeviceMatrix toDevice(CuVSResources cuVSResources);
 
   @Override
   void close();

@@ -3,8 +3,6 @@ Working with ANN Indexes in C++
 
 - `Building an index`_
 - `Searching an index`_
-- `CPU/GPU Interoperability`_
-- `Serializing an index`_
 
 Building an index
 -----------------

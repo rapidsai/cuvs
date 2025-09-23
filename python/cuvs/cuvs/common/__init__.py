@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2025, NVIDIA CORPORATION.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,12 @@
 # limitations under the License.
 
 
+from .mg_resources import MultiGpuResources, auto_sync_multi_gpu_resources
 from .resources import Resources, auto_sync_resources
 
-__all__ = ["auto_sync_resources", "Resources"]
+__all__ = [
+    "auto_sync_resources",
+    "Resources",
+    "MultiGpuResources",
+    "auto_sync_multi_gpu_resources",
+]
