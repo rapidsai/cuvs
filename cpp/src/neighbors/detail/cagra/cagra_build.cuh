@@ -70,7 +70,6 @@ void get_partition_labels(
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
 
   // Sampling vectors from dataset
-  RAFT_LOG_INFO("ACE: Sampling vectors from dataset ...");
   uint64_t n_samples = dataset_size * sampling_rate;
   if (n_samples < 100 * n_partitions) { n_samples = 100 * n_partitions; }
   if (n_samples > dataset_size) { n_samples = dataset_size; }
@@ -89,7 +88,6 @@ void get_partition_labels(
     sample_db_dev.data_handle(), sample_db.data_handle(), sample_db.size(), stream);
 
   // K-means: partitioning dataset vectors and compute centroid for each partition
-  RAFT_LOG_INFO("ACE: Running k-means partitioning ...");
   cuvs::cluster::kmeans::params params;
   params.n_clusters  = n_partitions;
   params.max_iter    = 100;
@@ -114,16 +112,17 @@ void get_partition_labels(
   }
 
   // Compute distances between dataset and centroid vectors
-  RAFT_LOG_INFO("ACE: Computing distances between dataset and centroid vectors ...");
   const uint64_t chunk_size = 32 * 1024;
   auto _sub_dataset         = raft::make_host_matrix<float, int64_t>(chunk_size, dataset_dim);
   auto _sub_distances       = raft::make_host_matrix<float, int64_t>(chunk_size, n_partitions);
   auto _sub_dataset_dev   = raft::make_device_matrix<float, int64_t>(res, chunk_size, dataset_dim);
   auto _sub_distances_dev = raft::make_device_matrix<float, int64_t>(res, chunk_size, n_partitions);
+  uint64_t report_interval = dataset_size / 10;
+  report_interval          = (report_interval / chunk_size) * chunk_size;
 
   for (uint64_t i_base = 0; i_base < dataset_size; i_base += chunk_size) {
     const uint64_t sub_dataset_size = std::min(chunk_size, dataset_size - i_base);
-    if (i_base % (dataset_size / 10) == 0) {
+    if (i_base % report_interval == 0) {
       RAFT_LOG_INFO("ACE: Processing chunk %lu / %lu (%.1f%%)",
                     i_base,
                     dataset_size,
@@ -188,8 +187,6 @@ void get_partition_labels(
       partition_relations(label_0, label_1) += 1;
     }
   }
-
-  RAFT_LOG_INFO("ACE: Partition labeling completed");
 }
 
 // ACE: Build partitioned CAGRA index for very large graphs. Dataset must be on host.
@@ -213,6 +210,7 @@ index<T, IdxT> build_ace(
   uint64_t n_partitions = (num_partitions > 0) ? num_partitions : params.ace_npartitions;
   RAFT_EXPECTS(n_partitions > 0, "num_partitions must be greater than 0");
 
+  auto total_start = std::chrono::high_resolution_clock::now();
   RAFT_LOG_INFO("ACE: Starting partitioned CAGRA build with %zu partitions", n_partitions);
 
   size_t intermediate_degree = params.intermediate_graph_degree;
@@ -236,6 +234,7 @@ index<T, IdxT> build_ace(
   }
 
   // Get partition labels
+  auto partition_start     = std::chrono::high_resolution_clock::now();
   auto labels              = raft::make_host_matrix<IdxT, int64_t>(dataset_size, 2);
   auto partition_histogram = raft::make_host_matrix<IdxT, int64_t>(n_partitions, 2);
   for (uint64_t c = 0; c < n_partitions; c++) {
@@ -243,6 +242,11 @@ index<T, IdxT> build_ace(
     partition_histogram(c, 1) = 0;
   }
   get_partition_labels<T, IdxT, Accessor>(res, dataset, labels.view(), partition_histogram.view());
+
+  auto partition_end = std::chrono::high_resolution_clock::now();
+  auto partition_elapsed =
+    std::chrono::duration_cast<std::chrono::milliseconds>(partition_end - partition_start).count();
+  RAFT_LOG_INFO("ACE: Partition labeling completed in %ld ms", partition_elapsed);
 
   // ACE: Check for very small partitions and merge them with the next closest partition
   // A partition is considered too small if it has fewer vectors than the minimum required
@@ -263,6 +267,7 @@ index<T, IdxT> build_ace(
   }
 
   if (!small_partitions.empty()) {
+    auto merge_start = std::chrono::high_resolution_clock::now();
     RAFT_LOG_INFO("ACE: Found %zu small partitions, merging with closest partitions",
                   small_partitions.size());
 
@@ -306,9 +311,15 @@ index<T, IdxT> build_ace(
       partition_histogram(small_partition, 0) = 0;
       partition_histogram(small_partition, 1) = 0;
     }
+
+    auto merge_end = std::chrono::high_resolution_clock::now();
+    auto merge_elapsed =
+      std::chrono::duration_cast<std::chrono::milliseconds>(merge_end - merge_start).count();
+    RAFT_LOG_INFO("ACE: Small partition merging completed in %ld ms", merge_elapsed);
   }
 
   // Create vector lists for each partition
+  auto vectorlist_start = std::chrono::high_resolution_clock::now();
   RAFT_LOG_INFO("ACE: Creating vector lists by partition labels ...");
   auto vector_fwd_list_0 = raft::make_host_vector<IdxT, int64_t>(dataset_size);
   auto vector_fwd_list_1 = raft::make_host_vector<IdxT, int64_t>(dataset_size);
@@ -351,9 +362,17 @@ index<T, IdxT> build_ace(
   idxptr_0(0) = 0;
   idxptr_1(0) = 0;
 
+  auto vectorlist_end = std::chrono::high_resolution_clock::now();
+  auto vectorlist_elapsed =
+    std::chrono::duration_cast<std::chrono::milliseconds>(vectorlist_end - vectorlist_start)
+      .count();
+  RAFT_LOG_INFO("ACE: Vector list creation completed in %ld ms", vectorlist_elapsed);
+
   auto search_graph_0 = raft::make_host_matrix<IdxT, int64_t>(dataset_size, graph_degree);
 
   // Process each partition
+  auto partition_processing_start = std::chrono::high_resolution_clock::now();
+  uint64_t processed_partitions   = 0;
   for (uint64_t c = 0; c < n_partitions; c++) {
     // Skip partitions that have been merged (empty partitions)
     uint64_t partition_size = partition_histogram(c, 0) + partition_histogram(c, 1);
@@ -362,7 +381,11 @@ index<T, IdxT> build_ace(
       continue;
     }
 
-    RAFT_LOG_INFO("ACE: Processing partition %lu/%lu", c + 1, n_partitions);
+    processed_partitions++;
+    RAFT_LOG_INFO("ACE: Processing partition %lu/%lu (active partition %lu)",
+                  c + 1,
+                  n_partitions,
+                  processed_partitions);
     auto start = std::chrono::high_resolution_clock::now();
 
     // Extract vectors for this partition
@@ -493,13 +516,20 @@ index<T, IdxT> build_ace(
 
     auto end        = std::chrono::high_resolution_clock::now();
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    RAFT_LOG_INFO(
-      "ACE: Partition %lu completed in %.3f sec", c + 1, static_cast<double>(elapsed_ms) / 1000);
+    RAFT_LOG_INFO("ACE: Partition %lu completed in %ld ms", c + 1, elapsed_ms);
   }
 
+  auto partition_processing_end     = std::chrono::high_resolution_clock::now();
+  auto partition_processing_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                        partition_processing_end - partition_processing_start)
+                                        .count();
+  RAFT_LOG_INFO("ACE: All partition processing completed in %ld ms (%lu active partitions)",
+                partition_processing_elapsed,
+                processed_partitions);
+
   // Convert IDs in search_graph_0 to create final search_graph
-  auto search_graph = raft::make_host_matrix<IdxT, int64_t>(dataset_size, graph_degree);
-  RAFT_LOG_INFO("ACE: Converting graph IDs to final format ...");
+  auto conversion_start = std::chrono::high_resolution_clock::now();
+  auto search_graph     = raft::make_host_matrix<IdxT, int64_t>(dataset_size, graph_degree);
 #pragma omp parallel for
   for (uint64_t i = 0; i < dataset_size; i++) {
     uint64_t i_0 = vector_fwd_list_0(i);
@@ -510,7 +540,13 @@ index<T, IdxT> build_ace(
     }
   }
 
-  RAFT_LOG_INFO("ACE: Creating final index ...");
+  auto conversion_end = std::chrono::high_resolution_clock::now();
+  auto conversion_elapsed =
+    std::chrono::duration_cast<std::chrono::milliseconds>(conversion_end - conversion_start)
+      .count();
+  RAFT_LOG_INFO("ACE: Graph ID conversion completed in %ld ms", conversion_elapsed);
+
+  auto index_creation_start = std::chrono::high_resolution_clock::now();
   index<T, IdxT> idx(res, params.metric);
   idx.update_graph(res, raft::make_const_mdspan(search_graph.view()));
 
@@ -526,7 +562,17 @@ index<T, IdxT> build_ace(
     }
   }
 
-  RAFT_LOG_INFO("ACE: Partitioned CAGRA build completed");
+  auto index_creation_end = std::chrono::high_resolution_clock::now();
+  auto index_creation_elapsed =
+    std::chrono::duration_cast<std::chrono::milliseconds>(index_creation_end - index_creation_start)
+      .count();
+  RAFT_LOG_INFO("ACE: Final index creation completed in %ld ms", index_creation_elapsed);
+
+  auto total_end = std::chrono::high_resolution_clock::now();
+  auto total_elapsed =
+    std::chrono::duration_cast<std::chrono::milliseconds>(total_end - total_start).count();
+  RAFT_LOG_INFO("ACE: Partitioned CAGRA build completed in %ld ms total", total_elapsed);
+
   return idx;
 }
 
