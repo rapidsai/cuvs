@@ -15,6 +15,7 @@
  */
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/neighbors/all_neighbors.h>
 #include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/tiered_index.h>
 
@@ -57,12 +58,27 @@ void test_compile_tiered_index()
   cuvsTieredIndexExtend(resources, &dataset, tiered_index);
 }
 
+void test_compile_all_neighbors()
+{
+  // Smoke test to ensure that the all_neighbors.h API compiles correctly
+  // using a c compiler. Not a full test.
+  assert(!"test_compile_all_neighbors is not meant to be run");
+
+  cuvsAllNeighborsIndexParams_t params;
+  cuvsResources_t resources;
+  DLManagedTensor dataset, indices, distances, core_distances;
+  cuvsAllNeighborsIndexParamsCreate(&params);
+  cuvsAllNeighborsIndexParamsDestroy(params);
+  cuvsAllNeighborsBuild(resources, params, &dataset, &indices, &distances, &core_distances, 1.0f);
+}
+
 int main()
 {
   // These are smoke tests that check that the C-APIs compile with a C compiler.
   // These are not meant to be run.
   test_compile_cagra();
   test_compile_tiered_index();
+  test_compile_all_neighbors();
 
   return 0;
 }
