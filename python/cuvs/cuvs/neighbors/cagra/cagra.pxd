@@ -197,3 +197,13 @@ cdef class Index:
     cdef cuvsCagraIndex_t index
     cdef bool trained
     cdef str active_index_type
+
+
+cdef class IndexParams:
+    cdef cuvsCagraIndexParams* params
+    cdef public object compression
+    cdef public object ivf_pq_build_params
+    cdef public object ivf_pq_search_params
+
+cdef class SearchParams:
+    cdef cuvsCagraSearchParams * params
