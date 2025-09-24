@@ -78,8 +78,8 @@ public class BruteForceIndexImpl implements BruteForceIndex {
     Objects.requireNonNull(dataset);
     try (dataset) {
       this.resources = resources;
-      assert dataset instanceof CuVSMatrixBaseImpl;
-      this.bruteForceIndexReference = build((CuVSMatrixBaseImpl) dataset, bruteForceIndexParams);
+      assert dataset instanceof CuVSMatrixInternal;
+      this.bruteForceIndexReference = build((CuVSMatrixInternal) dataset, bruteForceIndexParams);
     }
   }
 
@@ -124,7 +124,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    * index
    */
   private IndexReference build(
-      CuVSMatrixBaseImpl dataset, BruteForceIndexParams bruteForceIndexParams) {
+      CuVSMatrixInternal dataset, BruteForceIndexParams bruteForceIndexParams) {
     long rows = dataset.size();
     long cols = dataset.columns();
 

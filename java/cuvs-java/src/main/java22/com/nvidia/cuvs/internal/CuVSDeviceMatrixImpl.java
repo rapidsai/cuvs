@@ -224,7 +224,7 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
       throw new IllegalArgumentException("[hostMatrix] must have the same dataType");
     }
     try (var localArena = Arena.ofConfined()) {
-      var hostMatrixTensor = ((CuVSHostMatrixImpl) hostMatrix).toTensor(localArena);
+      var hostMatrixTensor = ((CuVSMatrixInternal) hostMatrix).toTensor(localArena);
 
       try (var resourceAccess = resources.access()) {
         var cuvsRes = resourceAccess.handle();
@@ -237,8 +237,13 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
   }
 
   @Override
+  public CuVSDeviceMatrix toDevice(CuVSResources resources) {
+    return new CuVSDeviceMatrixDelegate(this);
+  }
+
+  @Override
   public void toDevice(CuVSDeviceMatrix targetMatrix, CuVSResources cuVSResources) {
-    copyMatrix(this, (CuVSMatrixBaseImpl) targetMatrix, cuVSResources);
+    copyMatrix(this, (CuVSMatrixInternal) targetMatrix, cuVSResources);
   }
 
   @Override
@@ -246,6 +251,94 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
     if (hostBuffer != MemorySegment.NULL) {
       destroyPinnedBuffer(hostBuffer);
       hostBuffer = MemorySegment.NULL;
+    }
+  }
+
+  private static class CuVSDeviceMatrixDelegate implements CuVSDeviceMatrix, CuVSMatrixInternal {
+    private final CuVSDeviceMatrixImpl deviceMatrix;
+
+    private CuVSDeviceMatrixDelegate(CuVSDeviceMatrixImpl deviceMatrix) {
+      this.deviceMatrix = deviceMatrix;
+    }
+
+    @Override
+    public long size() {
+      return deviceMatrix.size();
+    }
+
+    @Override
+    public long columns() {
+      return deviceMatrix.columns();
+    }
+
+    @Override
+    public DataType dataType() {
+      return deviceMatrix.dataType();
+    }
+
+    @Override
+    public RowView getRow(long row) {
+      return deviceMatrix.getRow(row);
+    }
+
+    @Override
+    public void toArray(int[][] array) {
+      deviceMatrix.toArray(array);
+    }
+
+    @Override
+    public void toArray(float[][] array) {
+      deviceMatrix.toArray(array);
+    }
+
+    @Override
+    public void toArray(byte[][] array) {
+      deviceMatrix.toArray(array);
+    }
+
+    @Override
+    public void toHost(CuVSHostMatrix hostMatrix) {
+      deviceMatrix.toHost(hostMatrix);
+    }
+
+    @Override
+    public void toDevice(CuVSDeviceMatrix deviceMatrix, CuVSResources cuVSResources) {
+      deviceMatrix.toDevice(deviceMatrix, cuVSResources);
+    }
+
+    @Override
+    public CuVSDeviceMatrix toDevice(CuVSResources cuVSResources) {
+      return this;
+    }
+
+    @Override
+    public MemorySegment memorySegment() {
+      return deviceMatrix.memorySegment();
+    }
+
+    @Override
+    public ValueLayout valueLayout() {
+      return deviceMatrix.valueLayout();
+    }
+
+    @Override
+    public int bits() {
+      return deviceMatrix.bits();
+    }
+
+    @Override
+    public int code() {
+      return 0;
+    }
+
+    @Override
+    public MemorySegment toTensor(Arena arena) {
+      return deviceMatrix.toTensor(arena);
+    }
+
+    @Override
+    public void close() {
+      // Do nothing
     }
   }
 }
