@@ -330,6 +330,42 @@ void ace_set_index_params(raft::resources const& res,
   }
 }
 
+// ACE: Gather partition dataset
+template <typename T, typename IdxT, typename Accessor>
+void ace_gather_partition_dataset(
+  uint64_t sub_dataset_size_0,
+  uint64_t sub_dataset_size_1,
+  uint64_t dataset_dim,
+  uint64_t partition_id,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> vector_bwd_list_0,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> vector_bwd_list_1,
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> labels,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> idxptr_0,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> idxptr_1,
+  raft::host_matrix_view<T, int64_t, raft::row_major> sub_dataset)
+{
+  // Copy vectors belonging to this as closest partition
+#pragma omp parallel for
+  for (uint64_t j = 0; j < sub_dataset_size_0; j++) {
+    uint64_t i = vector_bwd_list_0(j + idxptr_0(partition_id));
+    RAFT_EXPECTS(labels(i, 0) == partition_id, "Vector does not belong to partition");
+    for (uint64_t k = 0; k < dataset_dim; k++) {
+      sub_dataset(j, k) = dataset(i, k);
+    }
+  }
+
+// Copy vectors belonging to this as 2nd closest partition
+#pragma omp parallel for
+  for (uint64_t j = 0; j < sub_dataset_size_1; j++) {
+    uint64_t i = vector_bwd_list_1(j + idxptr_1(partition_id));
+    RAFT_EXPECTS(labels(i, 1) == partition_id, "Vector does not belong to partition");
+    for (uint64_t k = 0; k < dataset_dim; k++) {
+      sub_dataset(j + sub_dataset_size_0, k) = dataset(i, k);
+    }
+  }
+}
+
 // ACE: Build partitioned CAGRA index for very large graphs. Dataset must be on host.
 template <typename T, typename IdxT, typename Accessor>
 index<T, IdxT> build_ace(
@@ -398,7 +434,8 @@ index<T, IdxT> build_ace(
   use_disk      = true;  // TODO: Remove after testing
 
   if (use_disk) {
-    RAFT_EXPECTS(!params.ace_build_dir.empty(), "ACE: ace_build_dir must be specified when using disk storage");
+    RAFT_EXPECTS(!params.ace_build_dir.empty(),
+                 "ACE: ace_build_dir must be specified when using disk storage");
     RAFT_LOG_INFO("ACE: Graph does not fit in host memory, using disk at %s",
                   params.ace_build_dir.c_str());
     RAFT_LOG_INFO("ACE: Estimated memory required: %.2f GB, available: %.2f GB",
@@ -521,25 +558,17 @@ index<T, IdxT> build_ace(
                   sub_dataset_size_0,
                   sub_dataset_size_1);
 
-    // Copy vectors belonging to this as closest partition
-#pragma omp parallel for
-    for (uint64_t j = 0; j < sub_dataset_size_0; j++) {
-      uint64_t i = vector_bwd_list_0(j + idxptr_0(c));
-      RAFT_EXPECTS(labels(i, 0) == c, "Vector does not belong to partition");
-      for (uint64_t k = 0; k < dataset_dim; k++) {
-        sub_dataset(j, k) = dataset(i, k);
-      }
-    }
-
-    // Copy vectors belonging to this as 2nd closest partition
-#pragma omp parallel for
-    for (uint64_t j = 0; j < sub_dataset_size_1; j++) {
-      uint64_t i = vector_bwd_list_1(j + idxptr_1(c));
-      RAFT_EXPECTS(labels(i, 1) == c, "Vector does not belong to partition");
-      for (uint64_t k = 0; k < dataset_dim; k++) {
-        sub_dataset(j + sub_dataset_size_0, k) = dataset(i, k);
-      }
-    }
+    ace_gather_partition_dataset<T, IdxT, Accessor>(sub_dataset_size_0,
+                                                    sub_dataset_size_1,
+                                                    dataset_dim,
+                                                    c,
+                                                    dataset,
+                                                    vector_bwd_list_0.view(),
+                                                    vector_bwd_list_1.view(),
+                                                    labels.view(),
+                                                    idxptr_0.view(),
+                                                    idxptr_1.view(),
+                                                    sub_dataset.view());
 
     // Create index for this partition
     cuvs::neighbors::cagra::index_params sub_index_params;
