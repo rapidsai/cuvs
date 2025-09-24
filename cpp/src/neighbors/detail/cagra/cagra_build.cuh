@@ -233,6 +233,42 @@ index<T, IdxT> build_ace(
     graph_degree = intermediate_degree;
   }
 
+  // Check if the graph fits in host memory
+  size_t available_memory = 0;
+  // Check using /proc/meminfo
+  std::ifstream meminfo("/proc/meminfo");
+  std::string line;
+  while (std::getline(meminfo, line)) {
+    if (line.find("MemAvailable:") != std::string::npos) {
+      available_memory = std::stoi(line.substr(line.find(":") + 1));
+    }
+  }
+  meminfo.close();
+  RAFT_EXPECTS(available_memory > 0, "ACE: Failed to get available memory from /proc/meminfo");
+
+  // Optimistic memory model: focus on largest arrays, assumes all partitions are of equal size
+  size_t ace_memory_size = 5ULL * dataset_size * sizeof(IdxT);  // labels, forward, backward lists
+  size_t ace_graph_memory_size = dataset_size * sizeof(IdxT) *
+                                 (params.graph_degree + params.intermediate_graph_degree) /
+                                 params.ace_npartitions;
+  size_t total_memory_size = ace_memory_size + ace_graph_memory_size;
+  // TODO: Adjust overhead factor if needed
+  bool use_disk            = static_cast<size_t>(0.8 * available_memory) < total_memory_size;
+  use_disk                 = true;  // TODO: Remove after testing
+
+  if (use_disk) {
+    if (params.ace_build_dir.empty()) {
+      throw std::invalid_argument("ACE: ace_build_dir must be specified when using disk storage");
+    }
+    RAFT_LOG_INFO("ACE: Graph does not fit in host memory, using disk at %s",
+                  params.ace_build_dir.c_str());
+    RAFT_LOG_INFO("ACE: Estimated memory required: %.2f GB, available: %.2f GB",
+                  total_memory_size / (1024.0 * 1024.0 * 1024.0),
+                  available_memory / (1024.0 * 1024.0));
+  } else {
+    RAFT_LOG_INFO("ACE: Graph fits in host memory");
+  }
+
   // Get partition labels
   auto partition_start     = std::chrono::high_resolution_clock::now();
   auto labels              = raft::make_host_matrix<IdxT, int64_t>(dataset_size, 2);
