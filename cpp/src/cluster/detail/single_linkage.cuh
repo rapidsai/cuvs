@@ -68,10 +68,9 @@ void build_mr_linkage(
   raft::device_vector_view<value_idx, value_idx> out_sizes,
   cuvs::neighbors::all_neighbors::all_neighbors_params all_neighbors_p)
 {
-  size_t m         = X.extent(0);
-  size_t n         = X.extent(1);
-  auto stream      = raft::resource::get_cuda_stream(handle);
-  auto exec_policy = raft::resource::get_thrust_policy(handle);
+  size_t m    = X.extent(0);
+  size_t n    = X.extent(1);
+  auto stream = raft::resource::get_cuda_stream(handle);
 
   auto mr_indptr = raft::make_device_vector<value_idx, value_idx>(handle, m + 1);
   raft::sparse::COO<value_t, value_idx, nnz_t> mr_coo(stream, min_samples * m * 2);
@@ -88,10 +87,7 @@ void build_mr_linkage(
 
   // self-loops get max distance
   auto coo_rows = raft::make_device_vector<value_idx, value_idx>(handle, min_samples * m);
-  raft::linalg::map_offset(
-    handle, coo_rows.view(), [min_samples] __device__(value_idx c) -> value_idx {
-      return c / min_samples;
-    });
+  raft::linalg::map_offset(handle, coo_rows.view(), raft::div_const_op<value_idx>(min_samples));
 
   raft::sparse::linalg::symmetrize(handle,
                                    coo_rows.data_handle(),
