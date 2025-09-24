@@ -346,8 +346,14 @@ const std::vector<ProductQuantizationInputs<T>> inputs = {
 typedef ProductQuantizationTest<float> ProductQuantizationTestF;
 TEST_P(ProductQuantizationTestF, Result) { this->testProductQuantizationFromDataset(); }
 
+typedef ProductQuantizationTest<double> ProductQuantizationTestD;
+TEST_P(ProductQuantizationTestD, Result) { this->testProductQuantizationFromDataset(); }
+
 INSTANTIATE_TEST_CASE_P(ProductQuantizationTests,
                         ProductQuantizationTestF,
                         ::testing::ValuesIn(inputs<float>));
+INSTANTIATE_TEST_CASE_P(ProductQuantizationTests,
+                        ProductQuantizationTestD,
+                        ::testing::ValuesIn(inputs<double>));
 
 }  // namespace cuvs::preprocessing::quantize::product

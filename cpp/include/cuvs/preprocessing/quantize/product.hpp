@@ -65,6 +65,11 @@ quantizer<float> train(raft::resources const& res,
                        const params params,
                        raft::device_matrix_view<const float, int64_t> dataset);
 
+/** @copydoc train */
+quantizer<double> train(raft::resources const& res,
+                        const params params,
+                        raft::device_matrix_view<const double, int64_t> dataset);
+
 /**
  * @brief Applies quantization transform to given dataset
  *
@@ -89,6 +94,12 @@ quantizer<float> train(raft::resources const& res,
 void transform(raft::resources const& res,
                const quantizer<float>& quantizer,
                raft::device_matrix_view<const float, int64_t> dataset,
+               raft::device_matrix_view<uint8_t, int64_t> out);
+
+/** @copydoc transform */
+void transform(raft::resources const& res,
+               const quantizer<double>& quantizer,
+               raft::device_matrix_view<const double, int64_t> dataset,
                raft::device_matrix_view<uint8_t, int64_t> out);
 
 /** @} */  // end of group product

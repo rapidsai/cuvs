@@ -146,7 +146,7 @@ quantizer<T> train(raft::resources const& res,
   auto ps = cuvs::neighbors::detail::fill_missing_params_heuristics(params, dataset);
   auto vq_code_book =
     raft::make_device_matrix<T, uint32_t, raft::row_major>(res, ps.vq_n_centers, dim);
-  raft::matrix::fill(res, vq_code_book.view(), 0.0f);
+  raft::matrix::fill(res, vq_code_book.view(), T{0.0f});
   auto pq_code_book = cuvs::neighbors::detail::train_pq<T>(res, ps, dataset, std::nullopt);
   auto empty_codes  = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, 0, 0);
   return {ps,
