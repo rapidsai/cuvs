@@ -52,7 +52,7 @@ namespace cuvs::neighbors::cagra::detail {
 
 // ACE: Get partition labels for partitioned approach
 template <typename DataT, typename IdxT, typename Accessor>
-void get_partition_labels(
+void ace_get_partition_labels(
   raft::resources const& res,
   raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> labels,
@@ -189,6 +189,80 @@ void get_partition_labels(
   }
 }
 
+// ACE: Set index parameters for each partition
+template <typename IdxT>
+void ace_set_index_params(raft::resources const& res,
+                          const index_params& params,
+                          size_t sub_dataset_size,
+                          size_t dataset_dim,
+                          size_t graph_degree,
+                          size_t intermediate_degree,
+                          cuvs::neighbors::cagra::index_params& sub_index_params)
+{
+  sub_index_params.graph_degree              = graph_degree;
+  sub_index_params.intermediate_graph_degree = intermediate_degree;
+  sub_index_params.guarantee_connectivity    = params.guarantee_connectivity;
+  sub_index_params.metric                    = params.metric;
+  sub_index_params.graph_build_params        = params.graph_build_params;
+
+  if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
+        sub_index_params.graph_build_params)) {
+    // If IVF-PQ is used, set nprobes and nlists based on the number of vectors in the partition
+    // to ensure correct KNN graph construction. Here, we use the same parameters as in hnsw.cpp
+    auto ivf_pq_params = cuvs::neighbors::graph_build_params::ivf_pq_params(
+      raft::make_extents<int64_t>(sub_dataset_size, dataset_dim), params.metric);
+    int ef_construction = 120;  // TODO: Might be a user-specified parameter
+    ivf_pq_params.search_params.n_probes =
+      std::round(std::sqrt(ivf_pq_params.build_params.n_lists) / 20 + ef_construction / 16);
+    sub_index_params.graph_build_params = ivf_pq_params;
+    RAFT_LOG_INFO(
+      "ACE: IVF-PQ nlists: %u, pq_bits: %u, pq_dim: %u, nprobes: %u, refinement_rate: %.2f",
+      ivf_pq_params.build_params.n_lists,
+      ivf_pq_params.build_params.pq_bits,
+      ivf_pq_params.build_params.pq_dim,
+      ivf_pq_params.search_params.n_probes,
+      ivf_pq_params.refinement_rate);
+  } else if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::nn_descent_params>(
+               sub_index_params.graph_build_params)) {
+    sub_index_params.graph_build_params =
+      cuvs::neighbors::cagra::graph_build_params::nn_descent_params(
+        sub_index_params.intermediate_graph_degree, sub_index_params.metric);
+    auto nn_descent_params =
+      std::get<cuvs::neighbors::cagra::graph_build_params::nn_descent_params>(
+        sub_index_params.graph_build_params);
+    RAFT_LOG_INFO("ACE: NN-Descent max_iterations: %u, termination_threshold: %u",
+                  nn_descent_params.max_iterations,
+                  nn_descent_params.termination_threshold);
+  } else if (std::holds_alternative<std::monostate>(sub_index_params.graph_build_params)) {
+    // Set default build params if not specified
+    if (cuvs::neighbors::nn_descent::has_enough_device_memory(
+          res, raft::make_extents<int64_t>(sub_dataset_size, dataset_dim), sizeof(IdxT))) {
+      sub_index_params.graph_build_params =
+        cagra::graph_build_params::nn_descent_params(intermediate_degree, params.metric);
+      auto nn_descent_params =
+        std::get<cuvs::neighbors::cagra::graph_build_params::nn_descent_params>(
+          sub_index_params.graph_build_params);
+      RAFT_LOG_INFO(
+        "ACE: NN-Descent with default params: max_iterations: %u, termination_threshold: %.2f",
+        nn_descent_params.max_iterations,
+        nn_descent_params.termination_threshold);
+    } else {
+      sub_index_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
+        raft::make_extents<int64_t>(sub_dataset_size, dataset_dim), params.metric);
+      auto ivf_pq_params = std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
+        sub_index_params.graph_build_params);
+      RAFT_LOG_INFO(
+        "ACE: IVF-PQ with default params: nlists: %u, pq_bits: %u, pq_dim: %u, nprobes: %u, "
+        "refinement_rate: %.2f",
+        ivf_pq_params.build_params.n_lists,
+        ivf_pq_params.build_params.pq_bits,
+        ivf_pq_params.build_params.pq_dim,
+        ivf_pq_params.search_params.n_probes,
+        ivf_pq_params.refinement_rate);
+    }
+  }
+}
+
 // ACE: Build partitioned CAGRA index for very large graphs. Dataset must be on host.
 template <typename T, typename IdxT, typename Accessor>
 index<T, IdxT> build_ace(
@@ -253,8 +327,8 @@ index<T, IdxT> build_ace(
                                  params.ace_npartitions;
   size_t total_memory_size = ace_memory_size + ace_graph_memory_size;
   // TODO: Adjust overhead factor if needed
-  bool use_disk            = static_cast<size_t>(0.8 * available_memory) < total_memory_size;
-  use_disk                 = true;  // TODO: Remove after testing
+  bool use_disk = static_cast<size_t>(0.8 * available_memory) < total_memory_size;
+  use_disk      = true;  // TODO: Remove after testing
 
   if (use_disk) {
     if (params.ace_build_dir.empty()) {
@@ -277,7 +351,8 @@ index<T, IdxT> build_ace(
     partition_histogram(c, 0) = 0;
     partition_histogram(c, 1) = 0;
   }
-  get_partition_labels<T, IdxT, Accessor>(res, dataset, labels.view(), partition_histogram.view());
+  ace_get_partition_labels<T, IdxT, Accessor>(
+    res, dataset, labels.view(), partition_histogram.view());
 
   auto partition_end = std::chrono::high_resolution_clock::now();
   auto partition_elapsed =
@@ -455,69 +530,13 @@ index<T, IdxT> build_ace(
 
     // Create index for this partition
     cuvs::neighbors::cagra::index_params sub_index_params;
-    sub_index_params.graph_degree              = graph_degree;
-    sub_index_params.intermediate_graph_degree = intermediate_degree;
-    sub_index_params.guarantee_connectivity    = params.guarantee_connectivity;
-    sub_index_params.metric                    = params.metric;
-    sub_index_params.graph_build_params        = params.graph_build_params;
-
-    if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
-          sub_index_params.graph_build_params)) {
-      // If IVF-PQ is used, set nprobes and nlists based on the number of vectors in the partition
-      // to ensure correct KNN graph construction. Here, we use the same parameters as in hnsw.cpp
-      auto ivf_pq_params = cuvs::neighbors::graph_build_params::ivf_pq_params(
-        raft::make_extents<int64_t>(sub_dataset_size, dataset_dim), params.metric);
-      int ef_construction = 120;  // TODO: Might be a user-specified parameter
-      ivf_pq_params.search_params.n_probes =
-        std::round(std::sqrt(ivf_pq_params.build_params.n_lists) / 20 + ef_construction / 16);
-      sub_index_params.graph_build_params = ivf_pq_params;
-      RAFT_LOG_INFO(
-        "ACE: IVF-PQ nlists: %u, pq_bits: %u, pq_dim: %u, nprobes: %u, refinement_rate: %.2f",
-        ivf_pq_params.build_params.n_lists,
-        ivf_pq_params.build_params.pq_bits,
-        ivf_pq_params.build_params.pq_dim,
-        ivf_pq_params.search_params.n_probes,
-        ivf_pq_params.refinement_rate);
-    } else if (std::holds_alternative<
-                 cuvs::neighbors::cagra::graph_build_params::nn_descent_params>(
-                 sub_index_params.graph_build_params)) {
-      sub_index_params.graph_build_params =
-        cuvs::neighbors::cagra::graph_build_params::nn_descent_params(
-          sub_index_params.intermediate_graph_degree, sub_index_params.metric);
-      auto nn_descent_params =
-        std::get<cuvs::neighbors::cagra::graph_build_params::nn_descent_params>(
-          sub_index_params.graph_build_params);
-      RAFT_LOG_INFO("ACE: NN-Descent max_iterations: %u, termination_threshold: %u",
-                    nn_descent_params.max_iterations,
-                    nn_descent_params.termination_threshold);
-    } else if (std::holds_alternative<std::monostate>(sub_index_params.graph_build_params)) {
-      // Set default build params if not specified
-      if (cuvs::neighbors::nn_descent::has_enough_device_memory(
-            res, raft::make_extents<int64_t>(sub_dataset_size, dataset_dim), sizeof(IdxT))) {
-        sub_index_params.graph_build_params =
-          cagra::graph_build_params::nn_descent_params(intermediate_degree, params.metric);
-        auto nn_descent_params =
-          std::get<cuvs::neighbors::cagra::graph_build_params::nn_descent_params>(
-            sub_index_params.graph_build_params);
-        RAFT_LOG_INFO(
-          "ACE: NN-Descent with default params: max_iterations: %u, termination_threshold: %.2f",
-          nn_descent_params.max_iterations,
-          nn_descent_params.termination_threshold);
-      } else {
-        sub_index_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
-          raft::make_extents<int64_t>(sub_dataset_size, dataset_dim), params.metric);
-        auto ivf_pq_params = std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
-          sub_index_params.graph_build_params);
-        RAFT_LOG_INFO(
-          "ACE: IVF-PQ with default params: nlists: %u, pq_bits: %u, pq_dim: %u, nprobes: %u, "
-          "refinement_rate: %.2f",
-          ivf_pq_params.build_params.n_lists,
-          ivf_pq_params.build_params.pq_bits,
-          ivf_pq_params.build_params.pq_dim,
-          ivf_pq_params.search_params.n_probes,
-          ivf_pq_params.refinement_rate);
-      }
-    }
+    ace_set_index_params<IdxT>(res,
+                               params,
+                               sub_dataset_size,
+                               dataset_dim,
+                               graph_degree,
+                               intermediate_degree,
+                               sub_index_params);
 
     auto sub_index = cuvs::neighbors::cagra::build(
       res, sub_index_params, raft::make_const_mdspan(sub_dataset.view()));
