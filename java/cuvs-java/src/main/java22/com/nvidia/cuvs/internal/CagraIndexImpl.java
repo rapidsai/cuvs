@@ -36,7 +36,6 @@ import com.nvidia.cuvs.internal.common.CloseableHandle;
 import com.nvidia.cuvs.internal.common.CloseableRMMAllocation;
 import com.nvidia.cuvs.internal.common.CompositeCloseableHandle;
 import com.nvidia.cuvs.internal.panama.*;
-
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -64,6 +63,7 @@ import java.util.*;
 public class CagraIndexImpl implements CagraIndex {
   private final CuVSResources resources;
   private final IndexReference cagraIndexReference;
+  private final CuVSQuantizer indexQuantizer;
   private boolean destroyed;
 
   /**
@@ -78,6 +78,7 @@ public class CagraIndexImpl implements CagraIndex {
       CagraIndexParams indexParameters, CuVSMatrix dataset, CuVSResources resources) {
     Objects.requireNonNull(dataset);
     this.resources = resources;
+    this.indexQuantizer = null;
     assert dataset instanceof CuVSMatrixBaseImpl;
     this.cagraIndexReference = build(indexParameters, (CuVSMatrixBaseImpl) dataset);
   }
@@ -90,6 +91,7 @@ public class CagraIndexImpl implements CagraIndex {
    */
   private CagraIndexImpl(InputStream inputStream, CuVSResources resources) throws Throwable {
     this.resources = resources;
+    this.indexQuantizer = null;
     this.cagraIndexReference = deserialize(inputStream);
   }
 
@@ -102,6 +104,7 @@ public class CagraIndexImpl implements CagraIndex {
    */
   private CagraIndexImpl(IndexReference indexReference, CuVSResources resources) {
     this.resources = resources;
+    this.indexQuantizer = null;
     this.cagraIndexReference = indexReference;
     this.destroyed = false;
   }
@@ -118,11 +121,13 @@ public class CagraIndexImpl implements CagraIndex {
       CagraIndexParams.CuvsDistanceType metric,
       CuVSMatrix graph,
       CuVSMatrix dataset,
-      CuVSResources resources) {
+      CuVSResources resources,
+      CuVSQuantizer quantizer) {
     Objects.requireNonNull(graph);
     Objects.requireNonNull(dataset);
 
     this.resources = resources;
+    this.indexQuantizer = quantizer;
 
     assert graph instanceof CuVSMatrixBaseImpl;
     assert dataset instanceof CuVSMatrixBaseImpl;
@@ -163,6 +168,8 @@ public class CagraIndexImpl implements CagraIndex {
    */
   private IndexReference build(CagraIndexParams indexParameters, CuVSMatrixBaseImpl dataset) {
     long rows = dataset.size();
+    long cols = dataset.columns();
+    CuVSMatrix.DataType datasetDataType = dataset.dataType();
 
     try (var indexParams = segmentFromIndexParams(indexParameters);
         var localArena = Arena.ofConfined()) {
@@ -171,7 +178,19 @@ public class CagraIndexImpl implements CagraIndex {
       int numWriterThreads = indexParameters != null ? indexParameters.getNumWriterThreads() : 1;
       omp_set_num_threads(numWriterThreads);
 
-      var datasetTensor = dataset.toTensor(localArena);
+      MemorySegment dataSeg = dataset.memorySegment();
+      // TODO: type kDLCPU()/kDLCUDA() should be aligned with the CuVSMatrixBaseImpl type (host or
+      // device?)
+
+      long[] datasetShape = {rows, cols};
+      MemorySegment datasetTensor =
+          prepareTensor(
+              localArena,
+              dataSeg,
+              datasetShape,
+              getDataTypeCode(datasetDataType, this.indexQuantizer),
+              getPrecisionFromDataType(datasetDataType),
+              kDLCPU());
       var index = createCagraIndex();
 
       if (cuvsCagraIndexParams.build_algo(indexParamsMemorySegment)
@@ -232,20 +251,39 @@ public class CagraIndexImpl implements CagraIndex {
   public SearchResults search(CagraQuery query) throws Throwable {
     try (var localArena = Arena.ofConfined()) {
       checkNotDestroyed();
+
+      // Extract query information upfront to avoid "mutually-null" fields
+      long numQueries;
+      int vectorDimension;
+      CuVSMatrix.DataType queryDataType;
+      MemorySegment floatsSeg;
+
+      if (query.hasQuantizedQueries()) {
+        CuVSMatrix quantizedQueries = query.getQuantizedQueries();
+        numQueries = quantizedQueries.size();
+        vectorDimension = (int) quantizedQueries.columns();
+        queryDataType = quantizedQueries.dataType();
+        floatsSeg = ((CuVSMatrixBaseImpl) quantizedQueries).memorySegment();
+      } else {
+        float[][] queryVectors = query.getQueryVectors();
+        numQueries = queryVectors.length;
+        vectorDimension = numQueries > 0 ? queryVectors[0].length : 0;
+        queryDataType = CuVSMatrix.DataType.FLOAT;
+        floatsSeg = buildMemorySegment(localArena, queryVectors);
+      }
+
       int topK = query.getTopK();
-      long numQueries = query.getQueryVectors().length;
+
+      // Calculate bytes based on actual data type
+      long queriesBytes = getQueryBytesSize(numQueries, vectorDimension, queryDataType);
       long numBlocks = topK * numQueries;
-      int vectorDimension = numQueries > 0 ? query.getQueryVectors()[0].length : 0;
+      long neighborsBytes = C_INT_BYTE_SIZE * numQueries * topK;
+      long distancesBytes = C_FLOAT_BYTE_SIZE * numQueries * topK;
 
       SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_INT);
       SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
       MemorySegment neighborsMemorySegment = localArena.allocate(neighborsSequenceLayout);
       MemorySegment distancesMemorySegment = localArena.allocate(distancesSequenceLayout);
-      MemorySegment floatsSeg = buildMemorySegment(localArena, query.getQueryVectors());
-
-      final long queriesBytes = C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
-      final long neighborsBytes = C_INT_BYTE_SIZE * numQueries * topK;
-      final long distancesBytes = C_FLOAT_BYTE_SIZE * numQueries * topK;
       final boolean hasPreFilter = query.getPrefilter() != null;
       final BitSet[] prefilters =
           hasPreFilter ? new BitSet[] {query.getPrefilter()} : EMPTY_PREFILTER_BITSET;
@@ -269,7 +307,12 @@ public class CagraIndexImpl implements CagraIndex {
           long[] queriesShape = {numQueries, vectorDimension};
           MemorySegment queriesTensor =
               prepareTensor(
-                  localArena, queriesDP.handle(), queriesShape, kDLFloat(), 32, kDLCUDA());
+                  localArena,
+                  queriesDP.handle(),
+                  queriesShape,
+                  getDataTypeCode(queryDataType, this.indexQuantizer),
+                  getPrecisionFromDataType(queryDataType),
+                  kDLCUDA());
           long[] neighborsShape = {numQueries, topK};
           MemorySegment neighborsTensor =
               prepareTensor(
@@ -716,6 +759,52 @@ public class CagraIndexImpl implements CagraIndex {
     return new CompositeCloseableHandle(seg, handles);
   }
 
+  // Helper method to map DataType to data type codes
+  private int getDataTypeCode(CuVSMatrix.DataType dataType, CuVSQuantizer quantizer) {
+    switch (dataType) {
+      case FLOAT:
+        return kDLFloat();
+      case BYTE:
+        if (quantizer instanceof BinaryQuantizer) {
+          return kDLUInt();
+        } else {
+          return kDLInt();
+        }
+      case INT:
+        return kDLInt();
+      default:
+        throw new IllegalArgumentException("Unsupported data type: " + dataType);
+    }
+  }
+
+  // Helper method to convert DataType to precision
+  private int getPrecisionFromDataType(CuVSMatrix.DataType dataType) {
+    switch (dataType) {
+      case FLOAT:
+        return 32;
+      case BYTE:
+        return 8;
+      case INT:
+        return 32;
+      default:
+        throw new IllegalArgumentException("Unsupported data type: " + dataType);
+    }
+  }
+
+  private long getQueryBytesSize(
+      long numQueries, int vectorDimension, CuVSMatrix.DataType dataType) {
+    switch (dataType) {
+      case FLOAT:
+        return C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
+      case BYTE:
+        return numQueries * vectorDimension;
+      case INT:
+        return C_INT_BYTE_SIZE * numQueries * vectorDimension;
+      default:
+        throw new IllegalArgumentException("Unsupported query data type: " + dataType);
+    }
+  }
+
   /**
    * Builder helps configure and create an instance of {@link CagraIndex}.
    */
@@ -725,6 +814,7 @@ public class CagraIndexImpl implements CagraIndex {
     private CagraIndexParams cagraIndexParams;
     private final CuVSResources cuvsResources;
     private InputStream inputStream;
+    private CuVSQuantizer quantizer;
     private CuVSMatrix graph;
 
     public Builder(CuVSResources cuvsResources) {
@@ -762,10 +852,27 @@ public class CagraIndexImpl implements CagraIndex {
     }
 
     @Override
+    public Builder withQuantizer(CuVSQuantizer quantizer) {
+      this.quantizer = quantizer;
+      return this;
+    }
+
+    @Override
     public CagraIndexImpl build() throws Throwable {
       if (inputStream != null) {
         return new CagraIndexImpl(inputStream, cuvsResources);
       } else {
+        if (quantizer != null && dataset != null) {
+          if (dataset.dataType() != CuVSMatrix.DataType.FLOAT) {
+            throw new IllegalArgumentException(
+                "Quantizer input requires FLOAT data type, dataset has " + dataset.dataType());
+          }
+
+          CuVSMatrix quantizedDataset = quantizer.transform(dataset);
+
+          return new CagraIndexImpl(cagraIndexParams, quantizedDataset, cuvsResources);
+        }
+
         if (graph != null) {
           if (cagraIndexParams == null || dataset == null) {
             throw new IllegalArgumentException(
@@ -773,10 +880,9 @@ public class CagraIndexImpl implements CagraIndex {
                     + "you must specify the original dataset and the metric used.");
           }
           return new CagraIndexImpl(
-              cagraIndexParams.getCuvsDistanceType(), graph, dataset, cuvsResources);
-        } else {
-          return new CagraIndexImpl(cagraIndexParams, dataset, cuvsResources);
+              cagraIndexParams.getCuvsDistanceType(), graph, dataset, cuvsResources, null);
         }
+        return new CagraIndexImpl(cagraIndexParams, dataset, cuvsResources);
       }
     }
   }

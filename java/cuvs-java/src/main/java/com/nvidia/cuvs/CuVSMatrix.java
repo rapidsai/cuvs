@@ -70,6 +70,17 @@ public interface CuVSMatrix extends AutoCloseable {
   }
 
   /**
+   * Returns the data type of this matrix.
+   *
+   * <p>DataType provides the fundamental type information needed for all operations.
+   * FLOAT represents 32-bit floating point data, INT represents 32-bit integer data,
+   * and BYTE represents 8-bit data (used for quantized values).
+   *
+   * @return The DataType of this matrix
+   */
+  DataType dataType();
+
+  /**
    * A builder to construct a new matrix one row at a time
    * @param <T> the CuVSMatrix type to build
    */
@@ -140,13 +151,6 @@ public interface CuVSMatrix extends AutoCloseable {
   long columns();
 
   /**
-   * Gets the element type
-   *
-   * @return a {@link DataType} describing the matrix element type
-   */
-  DataType dataType();
-
-  /**
    * Get a view (0-copy) of the row data, as a list of integers (32 bit)
    *
    * @param row the row for which to return the data
@@ -176,6 +180,13 @@ public interface CuVSMatrix extends AutoCloseable {
    *              and each element must be of length {@link CuVSMatrix#columns()} or bigger.
    */
   void toArray(byte[][] array);
+
+  /**
+   * Gets where the content is stored
+   *
+   * @return MemoryKind whether HOST or DEVICE
+   */
+  CuVSMatrix.MemoryKind memoryKind();
 
   /**
    * Fills the provided, pre-allocated host matrix with data from this matrix.

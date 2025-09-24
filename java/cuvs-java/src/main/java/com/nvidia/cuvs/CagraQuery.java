@@ -15,14 +15,15 @@
  */
 package com.nvidia.cuvs;
 
+import com.nvidia.cuvs.CuVSMatrix.DataType;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Objects;
 import java.util.function.LongToIntFunction;
 
 /**
- * CagraQuery holds the CagraSearchParams and the query vectors to be used while
- * invoking search.
+ * CagraQuery holds the search parameters plus either raw float[][] vectors
+ * or a quantized {@link CuVSMatrix} for querying a CAGRA index.
  *
  * <p><strong>Thread Safety:</strong> Each CagraQuery instance should use its own
  * CuVSResources object that is not shared with other threads. Sharing CuVSResources
@@ -33,8 +34,9 @@ import java.util.function.LongToIntFunction;
 public class CagraQuery {
 
   private final CagraSearchParams cagraSearchParameters;
-  private final LongToIntFunction mapping;
   private final float[][] queryVectors;
+  private final CuVSMatrix quantizedQueries;
+  private final LongToIntFunction mapping;
   private final int topK;
   private final BitSet prefilter;
   private final int numDocs;
@@ -47,28 +49,35 @@ public class CagraQuery {
    * @param cagraSearchParameters an instance of {@link CagraSearchParams} holding
    *                              the search parameters
    * @param queryVectors          2D float query vector array
+   * @param quantizedQueries      2D quantized query vector array
    * @param mapping               a function mapping ordinals (neighbor IDs) to custom user IDs
    * @param topK                  the top k results to return
    * @param prefilter             A single BitSet to use as filter while searching the CAGRA index
    * @param numDocs               Total number of dataset vectors; used to align the prefilter correctly
    * @param resources             CuVSResources instance to use for this query
    */
-  public CagraQuery(
+  private CagraQuery(
       CagraSearchParams cagraSearchParameters,
       float[][] queryVectors,
+      CuVSMatrix quantizedQueries,
       LongToIntFunction mapping,
       int topK,
       BitSet prefilter,
       int numDocs,
       CuVSResources resources) {
-    super();
     this.cagraSearchParameters = cagraSearchParameters;
     this.queryVectors = queryVectors;
+    this.quantizedQueries = quantizedQueries;
     this.mapping = mapping;
     this.topK = topK;
     this.prefilter = prefilter;
     this.numDocs = numDocs;
     this.resources = resources;
+  }
+
+  /** Start building a new CagraQuery. */
+  public static Builder newBuilder(CuVSResources resources) {
+    return new Builder(resources);
   }
 
   /**
@@ -81,12 +90,33 @@ public class CagraQuery {
   }
 
   /**
-   * Gets the query vector 2D float array.
-   *
-   * @return 2D float array
+   * If this query was built without a quantizer, returns the original float vectors.
+   * Otherwise returns null.
    */
   public float[][] getQueryVectors() {
     return queryVectors;
+  }
+
+  /**
+   * If this query was built with a quantizer, returns the quantized Dataset.
+   * Otherwise returns null.
+   */
+  public CuVSMatrix getQuantizedQueries() {
+    return quantizedQueries;
+  }
+
+  /** True if this query carries a quantized Dataset instead of float[][] */
+  public boolean hasQuantizedQueries() {
+    return quantizedQueries != null;
+  }
+
+  /**
+   * Returns the data type of the query payload:
+   * - 32 for float32 queries
+   * - 8 for quantized queries
+   */
+  public DataType getQueryDataType() {
+    return quantizedQueries != null ? quantizedQueries.dataType() : DataType.FLOAT;
   }
 
   /**
@@ -134,10 +164,13 @@ public class CagraQuery {
 
   @Override
   public String toString() {
-    return "CuVSQuery [cagraSearchParameters="
+    return "CagraQuery["
+        + "params="
         + cagraSearchParameters
-        + ", queryVectors="
-        + Arrays.toString(queryVectors)
+        + ", floatVectors="
+        + (queryVectors != null ? Arrays.toString(queryVectors) : "null")
+        + ", quantized="
+        + (quantizedQueries != null ? ("Dataset@" + quantizedQueries.dataType() + "-bit") : "false")
         + ", mapping="
         + mapping
         + ", topK="
@@ -156,6 +189,7 @@ public class CagraQuery {
     private int topK = 2;
     private BitSet prefilter;
     private int numDocs;
+    private CuVSQuantizer quantizer;
     private final CuVSResources resources;
 
     /**
@@ -174,12 +208,12 @@ public class CagraQuery {
     /**
      * Sets the instance of configured CagraSearchParams to be passed for search.
      *
-     * @param cagraSearchParams an instance of the configured CagraSearchParams to
-     *                          be used for this query
+     * @param params an instance of the configured CagraSearchParams to
+     *               be used for this query
      * @return an instance of this Builder
      */
-    public Builder withSearchParams(CagraSearchParams cagraSearchParams) {
-      this.cagraSearchParams = cagraSearchParams;
+    public Builder withSearchParams(CagraSearchParams params) {
+      this.cagraSearchParams = params;
       return this;
     }
 
@@ -233,13 +267,47 @@ public class CagraQuery {
     }
 
     /**
-     * Builds an instance of CuVSQuery.
-     *
-     * @return an instance of CuVSQuery
+     * Specify a quantizer to automatically transform the float[][] queryVectors
+     * into a quantized {@link CuVSMatrix} using the same quantizer used for training.
      */
-    public CagraQuery build() {
+    public Builder withQuantizer(CuVSQuantizer quantizer) {
+      this.quantizer = quantizer;
+      return this;
+    }
+
+    /**
+     * Builds the CagraQuery. If a quantizer was provided, queryVectors is ignored
+     * and a quantized Dataset is produced instead.
+     */
+    public CagraQuery build() throws Throwable {
+      if (queryVectors == null) {
+        throw new IllegalArgumentException("Query vectors must be provided");
+      }
+
+      CuVSMatrix quantized = null;
+      float[][] floatsForQuery = queryVectors;
+
+      if (quantizer != null) {
+        // wrap float[][] in a CuVSMatrix and quantize
+        try (CuVSMatrix tmp = CuVSMatrix.ofArray(queryVectors)) {
+          if (tmp.dataType() != DataType.FLOAT) {
+            throw new IllegalArgumentException(
+                "Query quantization requires FLOAT input, got " + tmp.dataType());
+          }
+          quantized = quantizer.transform(tmp);
+        }
+        floatsForQuery = null;
+      }
+
       return new CagraQuery(
-          cagraSearchParams, queryVectors, mapping, topK, prefilter, numDocs, resources);
+          cagraSearchParams,
+          floatsForQuery,
+          quantized,
+          mapping,
+          topK,
+          prefilter,
+          numDocs,
+          resources);
     }
   }
 }
