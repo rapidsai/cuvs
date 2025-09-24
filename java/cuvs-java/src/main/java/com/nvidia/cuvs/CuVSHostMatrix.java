@@ -21,76 +21,9 @@ package com.nvidia.cuvs;
 public interface CuVSHostMatrix extends CuVSMatrix {
   int get(int row, int col);
 
-  default CuVSHostMatrix toHost() {
-    return new CuVSHostMatrixDelegate(this);
-  }
-
   default CuVSDeviceMatrix toDevice(CuVSResources resources) {
     var deviceMatrix = CuVSMatrix.deviceBuilder(resources, size(), columns(), dataType()).build();
     toDevice(deviceMatrix, resources);
     return deviceMatrix;
-  }
-
-  class CuVSHostMatrixDelegate implements CuVSHostMatrix {
-    private final CuVSHostMatrix hostMatrix;
-
-    public CuVSHostMatrixDelegate(CuVSHostMatrix cuVSHostMatrix) {
-      this.hostMatrix = cuVSHostMatrix;
-    }
-
-    @Override
-    public int get(int row, int col) {
-      return hostMatrix.get(row, col);
-    }
-
-    @Override
-    public long size() {
-      return hostMatrix.size();
-    }
-
-    @Override
-    public long columns() {
-      return hostMatrix.columns();
-    }
-
-    @Override
-    public DataType dataType() {
-      return hostMatrix.dataType();
-    }
-
-    @Override
-    public RowView getRow(long row) {
-      return hostMatrix.getRow(row);
-    }
-
-    @Override
-    public void toArray(int[][] array) {
-      hostMatrix.toArray(array);
-    }
-
-    @Override
-    public void toArray(float[][] array) {
-      hostMatrix.toArray(array);
-    }
-
-    @Override
-    public void toArray(byte[][] array) {
-      hostMatrix.toArray(array);
-    }
-
-    @Override
-    public void toHost(CuVSHostMatrix hostMatrix) {
-      this.hostMatrix.toHost(hostMatrix);
-    }
-
-    @Override
-    public void toDevice(CuVSDeviceMatrix deviceMatrix, CuVSResources cuVSResources) {
-      hostMatrix.toDevice(deviceMatrix, cuVSResources);
-    }
-
-    @Override
-    public void close() {
-      // Do nothing
-    }
   }
 }
