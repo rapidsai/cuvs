@@ -322,7 +322,6 @@ index<T, IdxT> build_ace(
   auto vectorlist_start = std::chrono::high_resolution_clock::now();
   RAFT_LOG_INFO("ACE: Creating vector lists by partition labels ...");
   auto vector_fwd_list_0 = raft::make_host_vector<IdxT, int64_t>(dataset_size);
-  auto vector_fwd_list_1 = raft::make_host_vector<IdxT, int64_t>(dataset_size);
   auto vector_bwd_list_0 = raft::make_host_vector<IdxT, int64_t>(dataset_size);
   auto vector_bwd_list_1 = raft::make_host_vector<IdxT, int64_t>(dataset_size);
   auto idxptr_0          = raft::make_host_vector<IdxT, int64_t>(n_partitions + 1);
@@ -350,7 +349,6 @@ index<T, IdxT> build_ace(
 #pragma omp atomic capture
     j_1 = idxptr_1(c_1)++;
     RAFT_EXPECTS(j_1 < dataset_size, "Vector ID must be smaller than dataset_size");
-    vector_fwd_list_1(i)   = j_1;
     vector_bwd_list_1(j_1) = i;
   }
 
