@@ -256,7 +256,12 @@ extern "C" cuvsError_t cuvsMultiGpuIvfPqBuild(cuvsResources_t res,
                                               cuvsMultiGpuIvfPqIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] {
-    auto dataset      = dataset_tensor->dl_tensor;
+    auto dataset = dataset_tensor->dl_tensor;
+
+    // Multi-GPU IVF-PQ requires dataset to be in host memory
+    RAFT_EXPECTS(cuvs::core::is_dlpack_host_compatible(dataset),
+                 "Multi-GPU IVF-PQ build requires dataset to have host compatible memory");
+
     index->dtype.code = dataset.dtype.code;
     index->dtype.bits = dataset.dtype.bits;
 
@@ -284,7 +289,29 @@ extern "C" cuvsError_t cuvsMultiGpuIvfPqSearch(cuvsResources_t res,
                                                DLManagedTensor* distances_tensor)
 {
   return cuvs::core::translate_exceptions([=] {
-    auto queries = queries_tensor->dl_tensor;
+    auto queries   = queries_tensor->dl_tensor;
+    auto neighbors = neighbors_tensor->dl_tensor;
+    auto distances = distances_tensor->dl_tensor;
+
+    // Multi-GPU IVF-PQ requires all tensors to be in host memory
+    RAFT_EXPECTS(cuvs::core::is_dlpack_host_compatible(queries),
+                 "Multi-GPU IVF-PQ search requires queries to have host compatible memory");
+    RAFT_EXPECTS(cuvs::core::is_dlpack_host_compatible(neighbors),
+                 "Multi-GPU IVF-PQ search requires neighbors to have host compatible memory");
+    RAFT_EXPECTS(cuvs::core::is_dlpack_host_compatible(distances),
+                 "Multi-GPU IVF-PQ search requires distances to have host compatible memory");
+
+    // Validate data types
+    RAFT_EXPECTS(neighbors.dtype.code == kDLInt && neighbors.dtype.bits == 64,
+                 "neighbors should be of type int64_t");
+    RAFT_EXPECTS(distances.dtype.code == kDLFloat && distances.dtype.bits == 32,
+                 "distances should be of type float32");
+
+    // Check type compatibility between index and queries
+    RAFT_EXPECTS(queries.dtype.code == index->dtype.code,
+                 "type mismatch between index and queries");
+    RAFT_EXPECTS(queries.dtype.bits == index->dtype.bits,
+                 "type mismatch between index and queries");
 
     if (queries.dtype.code == kDLFloat && queries.dtype.bits == 32) {
       _mg_search<float>(res, *params, *index, queries_tensor, neighbors_tensor, distances_tensor);
@@ -309,6 +336,25 @@ extern "C" cuvsError_t cuvsMultiGpuIvfPqExtend(cuvsResources_t res,
 {
   return cuvs::core::translate_exceptions([=] {
     auto vectors = new_vectors_tensor->dl_tensor;
+
+    // Multi-GPU IVF-PQ requires vectors to be in host memory
+    RAFT_EXPECTS(cuvs::core::is_dlpack_host_compatible(vectors),
+                 "Multi-GPU IVF-PQ extend requires new_vectors to have host compatible memory");
+
+    // Check type compatibility between index and vectors
+    RAFT_EXPECTS(vectors.dtype.code == index->dtype.code,
+                 "type mismatch between index and new_vectors");
+    RAFT_EXPECTS(vectors.dtype.bits == index->dtype.bits,
+                 "type mismatch between index and new_vectors");
+
+    // If indices are provided, they should also be in host memory
+    if (new_indices_tensor != nullptr) {
+      auto indices = new_indices_tensor->dl_tensor;
+      RAFT_EXPECTS(cuvs::core::is_dlpack_host_compatible(indices),
+                   "Multi-GPU IVF-PQ extend requires new_indices to have host compatible memory");
+      RAFT_EXPECTS(indices.dtype.code == kDLInt && indices.dtype.bits == 64,
+                   "new_indices should be of type int64_t");
+    }
 
     if (vectors.dtype.code == kDLFloat && vectors.dtype.bits == 32) {
       _mg_extend<float>(res, *index, new_vectors_tensor, new_indices_tensor);
@@ -381,28 +427,8 @@ extern "C" cuvsError_t cuvsMultiGpuIvfPqDistribute(cuvsResources_t res,
                                                    cuvsMultiGpuIvfPqIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] {
-    std::ifstream is(filename, std::ios::in | std::ios::binary);
-    if (!is) { RAFT_FAIL("Cannot open file %s", filename); }
-    char dtype_string[4];
-    is.read(dtype_string, 4);
-    auto dtype = raft::detail::numpy_serializer::parse_descr(std::string(dtype_string, 4));
-    is.close();
-
-    index->dtype.bits = dtype.itemsize * 8;
-    if (dtype.kind == 'f' && dtype.itemsize == 4) {
-      index->dtype.code = kDLFloat;
-      index->addr       = reinterpret_cast<uintptr_t>(_mg_distribute<float>(res, filename));
-    } else if (dtype.kind == 'f' && dtype.itemsize == 2) {
-      index->dtype.code = kDLFloat;
-      index->addr       = reinterpret_cast<uintptr_t>(_mg_distribute<half>(res, filename));
-    } else if (dtype.kind == 'i' && dtype.itemsize == 1) {
-      index->dtype.code = kDLInt;
-      index->addr       = reinterpret_cast<uintptr_t>(_mg_distribute<int8_t>(res, filename));
-    } else if (dtype.kind == 'u' && dtype.itemsize == 1) {
-      index->dtype.code = kDLUInt;
-      index->addr       = reinterpret_cast<uintptr_t>(_mg_distribute<uint8_t>(res, filename));
-    } else {
-      RAFT_FAIL("Unsupported index dtype");
-    }
+    index->dtype.code = kDLFloat;
+    index->dtype.bits = 32;
+    index->addr       = reinterpret_cast<uintptr_t>(_mg_distribute<float>(res, filename));
   });
 }
