@@ -445,6 +445,28 @@ void ace_adjust_sub_graph_ids(
     }
   }
 }
+
+// ACE: Adjust search graph ids
+template <typename IdxT>
+void ace_adjust_final_graph_ids(
+  uint64_t dataset_size,
+  uint64_t graph_degree,
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> search_graph_0,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> vector_fwd_list_0,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> vector_bwd_list_0,
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> search_graph)
+{
+#pragma omp parallel for
+  for (uint64_t i = 0; i < dataset_size; i++) {
+    uint64_t i_0 = vector_fwd_list_0(i);
+    for (uint64_t k = 0; k < graph_degree; k++) {
+      uint64_t j_0       = search_graph_0(i_0, k);
+      uint64_t j         = vector_bwd_list_0(j_0);
+      search_graph(i, k) = j;
+    }
+  }
+}
+
 // ACE: Build partitioned CAGRA index for very large graphs. Dataset must be on host.
 template <typename T, typename IdxT, typename Accessor>
 index<T, IdxT> build_ace(
@@ -678,15 +700,12 @@ index<T, IdxT> build_ace(
   // Convert IDs in search_graph_0 to create final search_graph
   auto conversion_start = std::chrono::high_resolution_clock::now();
   auto search_graph     = raft::make_host_matrix<IdxT, int64_t>(dataset_size, graph_degree);
-#pragma omp parallel for
-  for (uint64_t i = 0; i < dataset_size; i++) {
-    uint64_t i_0 = vector_fwd_list_0(i);
-    for (uint64_t k = 0; k < graph_degree; k++) {
-      uint64_t j_0       = search_graph_0(i_0, k);
-      uint64_t j         = vector_bwd_list_0(j_0);
-      search_graph(i, k) = j;
-    }
-  }
+  ace_adjust_final_graph_ids<IdxT>(dataset_size,
+                                   graph_degree,
+                                   search_graph_0.view(),
+                                   vector_fwd_list_0.view(),
+                                   vector_bwd_list_0.view(),
+                                   search_graph.view());
 
   auto conversion_end = std::chrono::high_resolution_clock::now();
   auto conversion_elapsed =
