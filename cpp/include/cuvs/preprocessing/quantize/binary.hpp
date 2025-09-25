@@ -234,7 +234,6 @@ void transform(raft::resources const& res,
  * Usage example:
  * @code{.cpp}
  * raft::handle_t handle;
- * @param[in] params quantization params
  * cuvs::preprocessing::quantize::binary::params params;
  * raft::host_matrix<float, uint64_t> dataset = read_dataset(filename);
  * int64_t quantized_dim = raft::div_rounding_up_safe(dataset.extent(1), sizeof(uint8_t) * 8);

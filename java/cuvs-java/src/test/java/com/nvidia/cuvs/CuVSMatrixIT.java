@@ -211,11 +211,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
     try (var dataset = CuVSMatrix.ofArray(intData)) {
       var intDataCopy = new int[(int) dataset.size()][(int) dataset.columns()];
       dataset.toArray(intDataCopy);
-      for (int n = 0; n < dataset.size(); ++n) {
-        for (int i = 0; i < dataset.columns(); ++i) {
-          assertEquals(intData[n][i], intDataCopy[n][i]);
-        }
-      }
+      assertSame2dArray(dataset.size(), dataset.columns(), intData, intDataCopy);
     }
   }
 
@@ -254,15 +250,37 @@ public class CuVSMatrixIT extends CuVSTestCase {
     try (var dataset = CuVSMatrix.ofArray(floatData)) {
       var dataCopy = new float[(int) dataset.size()][(int) dataset.columns()];
       dataset.toArray(dataCopy);
-      for (int n = 0; n < dataset.size(); ++n) {
-        for (int i = 0; i < dataset.columns(); ++i) {
-          assertEquals(floatData[n][i], dataCopy[n][i], DELTA);
-        }
+      assertSame2dArray(dataset.size(), dataset.columns(), floatData, dataCopy);
+    }
+  }
+
+  static void assertSame2dArray(long rows, long cols, float[][] array1, float[][] array2) {
+    assertEquals(rows, array1.length);
+    assertEquals(cols, array1[0].length);
+    assertEquals(rows, array2.length);
+    assertEquals(cols, array2[0].length);
+
+    for (int n = 0; n < rows; ++n) {
+      for (int i = 0; i < cols; ++i) {
+        assertEquals(array1[n][i], array2[n][i], DELTA);
       }
     }
   }
 
-  private void testFloatDatasetBuilder(int rows, int cols, CuVSMatrix.Builder builder) {
+  static void assertSame2dArray(long rows, long cols, int[][] array1, int[][] array2) {
+    assertEquals(rows, array1.length);
+    assertEquals(cols, array1[0].length);
+    assertEquals(rows, array2.length);
+    assertEquals(cols, array2[0].length);
+
+    for (int n = 0; n < rows; ++n) {
+      for (int i = 0; i < cols; ++i) {
+        assertEquals(array1[n][i], array2[n][i]);
+      }
+    }
+  }
+
+  private void testFloatDatasetBuilder(int rows, int cols, CuVSMatrix.Builder<?> builder) {
 
     float[][] data = new float[rows][cols];
     for (int r = 0; r < rows; ++r) {
@@ -280,11 +298,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
     try (var dataset = builder.build()) {
       dataset.toArray(roundTripData);
 
-      for (int n = 0; n < dataset.size(); ++n) {
-        for (int i = 0; i < dataset.columns(); ++i) {
-          assertEquals(data[n][i], roundTripData[n][i], DELTA);
-        }
-      }
+      assertSame2dArray(dataset.size(), dataset.columns(), data, roundTripData);
     }
   }
 
@@ -306,7 +320,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
     }
   }
 
-  private void testIntDatasetBuilder(int rows, int cols, CuVSMatrix.Builder builder) {
+  private void testIntDatasetBuilder(int rows, int cols, CuVSMatrix.Builder<?> builder) {
 
     var data = new int[rows][cols];
     for (int r = 0; r < rows; ++r) {
@@ -323,12 +337,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
 
     try (var dataset = builder.build()) {
       dataset.toArray(roundTripData);
-
-      for (int n = 0; n < dataset.size(); ++n) {
-        for (int i = 0; i < dataset.columns(); ++i) {
-          assertEquals(data[n][i], roundTripData[n][i]);
-        }
-      }
+      assertSame2dArray(dataset.size(), dataset.columns(), data, roundTripData);
     }
   }
 
@@ -349,7 +358,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
     }
   }
 
-  private void testByteDatasetBuilder(int rows, int cols, CuVSMatrix.Builder builder) {
+  private void testByteDatasetBuilder(int rows, int cols, CuVSMatrix.Builder<?> builder) {
 
     var data = new byte[rows][cols];
     for (int r = 0; r < rows; ++r) {
@@ -408,7 +417,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
         builder.addVector(array);
       }
 
-      try (var deviceMatrix = (CuVSDeviceMatrix) builder.build();
+      try (var deviceMatrix = builder.build();
           var hostMatrix = deviceMatrix.toHost()) {
 
         assertEquals(data.length, deviceMatrix.size());
@@ -421,11 +430,91 @@ public class CuVSMatrixIT extends CuVSTestCase {
 
         hostMatrix.toArray(roundTripData);
 
-        for (int n = 0; n < hostMatrix.size(); ++n) {
-          for (int i = 0; i < hostMatrix.columns(); ++i) {
-            assertEquals(data[n][i], roundTripData[n][i], 1e-9);
-          }
-        }
+        assertSame2dArray(hostMatrix.size(), hostMatrix.columns(), data, roundTripData);
+      }
+    }
+  }
+
+  @Test
+  public void testHostToDevice() throws Throwable {
+
+    final int size = 16 * 1024;
+    final int columns = 2048;
+    final float[][] data = createFloatMatrix(size, columns);
+
+    try (var resources = CuVSResources.create()) {
+
+      try (var hostMatrix = CuVSMatrix.ofArray(data);
+          var deviceMatrix = hostMatrix.toDevice(resources)) {
+
+        assertEquals(data.length, deviceMatrix.size());
+        assertEquals(data[0].length, deviceMatrix.columns());
+
+        assertEquals(deviceMatrix.size(), hostMatrix.size());
+        assertEquals(deviceMatrix.columns(), hostMatrix.columns());
+
+        var roundTripData = new float[size][columns];
+
+        deviceMatrix.toArray(roundTripData);
+
+        assertSame2dArray(deviceMatrix.size(), deviceMatrix.columns(), data, roundTripData);
+      }
+    }
+  }
+
+  @Test
+  public void testHostToHostReturnsWeakReferenceSameData() {
+
+    final int size = 16 * 1024;
+    final int columns = 2048;
+    final float[][] data = createFloatMatrix(size, columns);
+
+    try (var hostMatrix = CuVSMatrix.ofArray(data);
+        var hostMatrix2 = hostMatrix.toHost()) {
+
+      assertEquals(data.length, hostMatrix2.size());
+      assertEquals(data[0].length, hostMatrix2.columns());
+
+      assertEquals(hostMatrix2.size(), hostMatrix.size());
+      assertEquals(hostMatrix2.columns(), hostMatrix.columns());
+
+      var roundTripData = new float[size][columns];
+
+      hostMatrix2.toArray(roundTripData);
+
+      assertSame2dArray(hostMatrix2.size(), hostMatrix2.columns(), data, roundTripData);
+    }
+  }
+
+  @Test
+  public void testDeviceToDeviceReturnsWeakReferenceSameData() throws Throwable {
+
+    final int size = 16 * 1024;
+    final int columns = 2048;
+    final float[][] data = createFloatMatrix(size, columns);
+
+    try (var resources = CuVSResources.create()) {
+
+      var builder = CuVSMatrix.deviceBuilder(resources, size, columns, CuVSMatrix.DataType.FLOAT);
+      for (int i = 0; i < size; ++i) {
+        var array = data[i];
+        builder.addVector(array);
+      }
+
+      try (var deviceMatrix = builder.build();
+          var deviceMatrix2 = deviceMatrix.toDevice(resources)) {
+
+        assertEquals(data.length, deviceMatrix.size());
+        assertEquals(data[0].length, deviceMatrix.columns());
+
+        assertEquals(deviceMatrix.size(), deviceMatrix2.size());
+        assertEquals(deviceMatrix.columns(), deviceMatrix2.columns());
+
+        var roundTripData = new float[size][columns];
+
+        deviceMatrix2.toArray(roundTripData);
+
+        assertSame2dArray(deviceMatrix2.size(), deviceMatrix2.columns(), data, roundTripData);
       }
     }
   }

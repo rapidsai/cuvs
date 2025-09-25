@@ -262,10 +262,13 @@ cuvsError_t cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index);
 cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index);
 
 /** Get the number of clusters/inverted lists */
-uint32_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index);
+cuvsError_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index, int64_t* n_lists);
 
 /** Get the dimensionality */
-uint32_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index);
+cuvsError_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index, int64_t* dim);
+
+/** Get the size of the index */
+cuvsError_t cuvsIvfPqIndexGetSize(cuvsIvfPqIndex_t index, int64_t* size);
 
 /**
  * @brief Get the cluster centers corresponding to the lists in the original space
@@ -405,7 +408,7 @@ cuvsError_t cuvsIvfPqSearch(cuvsResources_t res,
  */
 
 /**
- * @defgroup ivf_pq_c_serialize IVF-PQ C-API serialize functions
+ * @defgroup ivf_pq_c_index_serialize IVF-PQ C-API serialize functions
  * @{
  */
 /**

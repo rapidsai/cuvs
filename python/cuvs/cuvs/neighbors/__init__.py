@@ -14,11 +14,13 @@
 
 
 from cuvs.neighbors import (
+    all_neighbors,
     brute_force,
     cagra,
     filters,
     ivf_flat,
     ivf_pq,
+    mg,
     nn_descent,
     vamana,
 )
@@ -31,7 +33,9 @@ __all__ = [
     "filters",
     "ivf_flat",
     "ivf_pq",
+    "mg",
     "nn_descent",
+    "all_neighbors",
     "refine",
     "vamana",
 ]

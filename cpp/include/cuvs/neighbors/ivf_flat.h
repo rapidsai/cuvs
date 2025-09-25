@@ -166,10 +166,10 @@ cuvsError_t cuvsIvfFlatIndexCreate(cuvsIvfFlatIndex_t* index);
 cuvsError_t cuvsIvfFlatIndexDestroy(cuvsIvfFlatIndex_t index);
 
 /** Get the number of clusters/inverted lists */
-uint32_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index);
+cuvsError_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index, int64_t* n_lists);
 
 /** Get the dimensionality of the data */
-uint32_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index);
+cuvsError_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index, int64_t* dim);
 
 /**
  * @brief Get the cluster centers corresponding to the lists [n_lists, dim]
@@ -300,7 +300,7 @@ cuvsError_t cuvsIvfFlatSearch(cuvsResources_t res,
  */
 
 /**
- * @defgroup ivf_flat_c_serialize IVF-Flat C-API serialize functions
+ * @defgroup ivf_flat_c_index_serialize IVF-Flat C-API serialize functions
  * @{
  */
 /**

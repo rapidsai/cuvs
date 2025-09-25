@@ -30,7 +30,7 @@
 
 // A helper to split the dataset into chunks
 template <typename DeviceMatrixOrView>
-auto slice_matrix(DeviceMatrixOrView source,
+auto slice_matrix(DeviceMatrixOrView& source,
                   typename DeviceMatrixOrView::index_type offset_rows,
                   typename DeviceMatrixOrView::index_type count_rows)
 {

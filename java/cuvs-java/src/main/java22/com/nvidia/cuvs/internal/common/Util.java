@@ -65,15 +65,11 @@ public class Util {
       LINKER.downcallHandle(
           cudaMemcpyAsync$address(), cudaMemcpyAsync$descriptor(), Linker.Option.critical(true));
 
-  private static final String cudaGetDevicePropertiesSymbolName =
-      "12".equals(System.getenv("RAPIDS_CUDA_MAJOR"))
-          ? "cudaGetDeviceProperties_v2"
-          : "cudaGetDeviceProperties";
-
   private static final MethodHandle cudaGetDeviceProperties$mh =
       LINKER.downcallHandle(
           SYMBOL_LOOKUP
-              .find(cudaGetDevicePropertiesSymbolName)
+              .find("cudaGetDeviceProperties") // CUDA 13+ symbol name
+              .or(() -> SYMBOL_LOOKUP.find("cudaGetDeviceProperties_v2")) // CUDA 12 symbol name
               .orElseThrow(UnsatisfiedLinkError::new),
           FunctionDescriptor.of(headers_h.C_INT, headers_h.C_POINTER, headers_h.C_INT));
 
@@ -108,13 +104,6 @@ public class Util {
     if (value != CUDA_SUCCESS) {
       throw new RuntimeException(caller + " returned " + value);
     }
-  }
-
-  private static final long UNSIGNED_INT_MASK = 0xFFFFFFFFL;
-
-  public static long dereferenceUnsignedInt(MemorySegment ptr) {
-    assert ptr.byteSize() == 4;
-    return ptr.get(uint32_t, 0) & UNSIGNED_INT_MASK;
   }
 
   /**
