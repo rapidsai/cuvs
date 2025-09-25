@@ -154,6 +154,10 @@ public interface CuVSProvider {
   /** Returns a {@link GPUInfoProvider} to query the system for GPU related information */
   GPUInfoProvider gpuInfoProvider();
 
+  void setLogLevel(java.util.logging.Level level);
+
+  java.util.logging.Level getLogLevel();
+
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {
     return CuVSServiceProvider.Holder.INSTANCE;

@@ -18,6 +18,7 @@ package com.nvidia.cuvs.spi;
 import com.nvidia.cuvs.*;
 import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
+import java.util.logging.Level;
 
 /**
  * A provider that unconditionally throws UnsupportedOperationException.
@@ -80,6 +81,16 @@ final class UnsupportedProvider implements CuVSProvider {
 
   @Override
   public GPUInfoProvider gpuInfoProvider() {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
+  public void setLogLevel(Level level) {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
+  public Level getLogLevel() {
     throw new UnsupportedOperationException(reasons);
   }
 
