@@ -134,9 +134,9 @@ extern "C" cuvsError_t cuvsVamanaBuild(cuvsResources_t res,
     if (dataset.dtype.code == kDLFloat && dataset.dtype.bits == 32) {
       index->addr = reinterpret_cast<uintptr_t>(_build<float>(res, params, dataset_tensor));
     } else if (dataset.dtype.code == kDLInt && dataset.dtype.bits == 8) {
-      _build<int8_t>(res, params, dataset_tensor);
+      index->addr = reinterpret_cast<uintptr_t>(_build<int8_t>(res, params, dataset_tensor));
     } else if (dataset.dtype.code == kDLUInt && dataset.dtype.bits == 8) {
-      _build<uint8_t>(res, params, dataset_tensor);
+      index->addr = reinterpret_cast<uintptr_t>(_build<uint8_t>(res, params, dataset_tensor));
     } else {
       RAFT_FAIL("Unsupported dataset DLtensor dtype: %d and bits: %d",
                 dataset.dtype.code,
