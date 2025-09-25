@@ -66,7 +66,7 @@ typedef enum {
    CUVS_LOG_LEVEL_ERROR = RAPIDS_LOGGER_LOG_LEVEL_ERROR,
    CUVS_LOG_LEVEL_CRITICAL = RAPIDS_LOGGER_LOG_LEVEL_CRITICAL,
    CUVS_LOG_LEVEL_OFF = RAPIDS_LOGGER_LOG_LEVEL_OFF
-} cuvsLogLevel_t
+} cuvsLogLevel_t;
 
 /** @brief Returns the current log level
  */

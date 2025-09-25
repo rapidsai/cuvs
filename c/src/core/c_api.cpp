@@ -216,12 +216,12 @@ extern "C" const char* cuvsGetLastErrorText()
 
 extern "C" void cuvsSetLogLevel(cuvsLogLevel_t verbosity)
 {
-  raft::default_logger().set_level(reinterpret_cast<rapids_logger::level_enum>(verbosity));
+  raft::default_logger().set_level(static_cast<rapids_logger::level_enum>(verbosity));
 }
 
 extern "C" cuvsLogLevel_t cuvsGetLogLevel()
 {
-  return reinterpret_cast<cuvsLogLevel_t>(raft::default_logger().level());
+  return static_cast<cuvsLogLevel_t>(raft::default_logger().level());
 }
 
 extern "C" void cuvsSetLastErrorText(const char* error) { last_error_text = error ? error : ""; }
