@@ -24,6 +24,7 @@
 #include <raft/core/resource/resource_types.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/util/cudart_utils.hpp>
+#include <rapids_logger/logger.hpp>
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/mr/device/device_memory_resource.hpp>
 #include <rmm/mr/device/managed_memory_resource.hpp>
@@ -210,6 +211,16 @@ thread_local std::string last_error_text = "";
 extern "C" const char* cuvsGetLastErrorText()
 {
   return last_error_text.empty() ? NULL : last_error_text.c_str();
+}
+
+extern "C" void cuvsSetLogLevel(cuvsLogLevel_t verbosity)
+{
+  raft::default_logger().set_level(reinterpret_cast<rapids_logger::level_enum>(verbosity));
+}
+
+extern "C" cuvsLogLevel_t cuvsGetLogLevel()
+{
+  return reinterpret_cast<cuvsLogLevel_t>(raft::default_logger().level());
 }
 
 extern "C" void cuvsSetLastErrorText(const char* error) { last_error_text = error ? error : ""; }
