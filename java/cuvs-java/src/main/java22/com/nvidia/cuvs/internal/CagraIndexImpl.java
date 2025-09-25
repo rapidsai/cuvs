@@ -230,18 +230,18 @@ public class CagraIndexImpl implements CagraIndex {
     try (var localArena = Arena.ofConfined()) {
       checkNotDestroyed();
       int topK = query.getTopK();
-      var queryVectors = (CuVSMatrixBaseImpl) query.getQueryVectors();
+      var queryVectors = (CuVSMatrixInternal) query.getQueryVectors();
       long numQueries = queryVectors.size();
       long numBlocks = topK * numQueries;
 
       SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_INT);
       SequenceLayout distancesSequenceLayout =
-          MemoryLayout.sequenceLayout(numBlocks, queryVectors.valueLayout);
+          MemoryLayout.sequenceLayout(numBlocks, queryVectors.valueLayout());
       MemorySegment neighborsMemorySegment = localArena.allocate(neighborsSequenceLayout);
       MemorySegment distancesMemorySegment = localArena.allocate(distancesSequenceLayout);
 
       final long neighborsBytes = C_INT_BYTE_SIZE * numQueries * topK;
-      final long distancesBytes = queryVectors.valueLayout.byteSize() * numQueries * topK;
+      final long distancesBytes = queryVectors.valueLayout().byteSize() * numQueries * topK;
       final boolean hasPreFilter = query.getPrefilter() != null;
       final BitSet[] prefilters =
           hasPreFilter ? new BitSet[] {query.getPrefilter()} : EMPTY_PREFILTER_BITSET;
@@ -254,7 +254,7 @@ public class CagraIndexImpl implements CagraIndex {
         var cuvsStream = Util.getStream(cuvsRes);
 
         try (var deviceQueryVectors =
-                (CuVSMatrixBaseImpl) queryVectors.toDevice(query.getResources());
+                (CuVSMatrixInternal) queryVectors.toDevice(query.getResources());
             var neighborsDP = allocateRMMSegment(cuvsRes, neighborsBytes);
             var distancesDP = allocateRMMSegment(cuvsRes, distancesBytes);
             var prefilterDP =
