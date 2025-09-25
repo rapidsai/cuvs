@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2023-2024, NVIDIA CORPORATION.
+# Copyright (c) 2023-2025, NVIDIA CORPORATION.
 
 set -euo pipefail
 
@@ -48,7 +48,7 @@ popd
 
 rapids-logger "Build Python docs"
 pushd docs
-sphinx-build -b dirhtml source _html
+sphinx-build -W -b dirhtml source _html
 mv ../rust/target/doc ./_html/_static/rust
 mkdir -p "${RAPIDS_DOCS_DIR}/cuvs/"html
 mv _html/* "${RAPIDS_DOCS_DIR}/cuvs/html"
