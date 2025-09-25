@@ -95,3 +95,10 @@ cdef extern from "cuvs/neighbors/ivf_flat.h" nogil:
                                   DLManagedTensor* new_vectors,
                                   DLManagedTensor* new_indices,
                                   cuvsIvfFlatIndex_t index)
+
+
+cdef class IndexParams:
+    cdef cuvsIvfFlatIndexParams* params
+
+cdef class SearchParams:
+    cdef cuvsIvfFlatSearchParams* params

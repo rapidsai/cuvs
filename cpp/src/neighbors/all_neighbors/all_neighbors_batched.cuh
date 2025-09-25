@@ -126,13 +126,15 @@ void single_gpu_assign_clusters(
   std::optional<raft::device_vector_view<const T, int64_t>> norms_view;
   cuvs::neighbors::brute_force::index<T> brute_force_index(res, centroids, norms_view, metric);
 
+  auto stream = resource::get_cuda_stream(res);
+
   for (size_t i = 0; i < num_batches; i++) {
     size_t row_offset              = n_rows_per_batch * i + base_row_offset;
     size_t n_rows_of_current_batch = std::min(n_rows_per_batch, num_rows - row_offset);
     raft::copy(dataset_batch_d.data_handle(),
                dataset.data_handle() + row_offset * num_cols,
                n_rows_of_current_batch * num_cols,
-               resource::get_cuda_stream(res));
+               stream);
 
     // n_clusters is usually not large, so okay to do this brute-force
     cuvs::neighbors::brute_force::search(res,
@@ -143,7 +145,7 @@ void single_gpu_assign_clusters(
     raft::copy(global_nearest_cluster.data_handle() + row_offset * overlap_factor,
                nearest_clusters_idx_d.data_handle(),
                n_rows_of_current_batch * overlap_factor,
-               resource::get_cuda_stream(res));
+               stream);
   }
 }
 
@@ -185,7 +187,8 @@ void assign_clusters(raft::resources const& res,
     for (int rank = 0; rank < num_ranks; rank++) {
       auto dev_res = raft::resource::set_current_device_to_rank(res, rank);
 
-      auto centroids_matrix = raft::make_device_matrix<T, IdxT>(res, params.n_clusters, num_cols);
+      auto centroids_matrix =
+        raft::make_device_matrix<T, IdxT>(dev_res, params.n_clusters, num_cols);
       raft::copy(centroids_matrix.data_handle(),
                  centroids_h.data_handle(),
                  params.n_clusters * num_cols,
