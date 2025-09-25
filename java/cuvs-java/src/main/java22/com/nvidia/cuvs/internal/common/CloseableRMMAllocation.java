@@ -79,6 +79,7 @@ public class CloseableRMMAllocation implements CloseableHandle {
   public void close() {
     if (mustClose()) {
       checkCuVSError(cuvsRMMFree(cuvsResourceHandle, pointer, numBytes), "cuvsRMMFree");
+      pointer = MemorySegment.NULL;
     }
   }
 
