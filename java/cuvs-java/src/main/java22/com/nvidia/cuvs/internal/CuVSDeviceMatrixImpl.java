@@ -15,20 +15,16 @@
  */
 package com.nvidia.cuvs.internal;
 
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_POINTER;
 import static com.nvidia.cuvs.internal.common.Util.*;
 import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.*;
+import com.nvidia.cuvs.internal.common.PinnedMemoryBuffer;
 import com.nvidia.cuvs.internal.panama.DLManagedTensor;
 import com.nvidia.cuvs.internal.panama.DLTensor;
 import java.lang.foreign.*;
 
 public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDeviceMatrix {
-
-  private static final int CHUNK_BYTES =
-      8 * 1024 * 1024; // Based on benchmarks, 8MB seems the minimum size to optimize PCIe bandwidth
-  private final long hostBufferBytes;
 
   private long bufferedMatrixRowStart = 0;
   private long bufferedMatrixRowEnd = 0;
@@ -38,7 +34,7 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
   private final long rowStride;
   private final long columnStride;
 
-  private MemorySegment hostBuffer = MemorySegment.NULL;
+  private final PinnedMemoryBuffer hostBuffer;
 
   protected CuVSDeviceMatrixImpl(
       CuVSResources resources,
@@ -63,18 +59,7 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
     this.resources = resources;
     this.rowStride = rowStride;
     this.columnStride = columnStride;
-
-    long rowBytes = columns * valueLayout.byteSize();
-    long matrixBytes = size * rowBytes;
-    if (matrixBytes < CHUNK_BYTES) {
-      this.hostBufferBytes = matrixBytes;
-    } else if (rowBytes > CHUNK_BYTES) {
-      // We need to buffer at least one row at time
-      this.hostBufferBytes = rowBytes;
-    } else {
-      var rowCount = (CHUNK_BYTES / rowBytes);
-      this.hostBufferBytes = rowBytes * rowCount;
-    }
+    this.hostBuffer = new PinnedMemoryBuffer(size, columns, valueLayout);
   }
 
   @Override
@@ -84,27 +69,10 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
         arena, memorySegment, new long[] {size, columns}, strides, code(), bits(), kDLCUDA());
   }
 
-  private static MemorySegment createPinnedBuffer(long bufferBytes) {
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment pointer = localArena.allocate(C_POINTER);
-      checkCudaError(cudaMallocHost(pointer, bufferBytes), "cudaMallocHost");
-      return pointer.get(C_POINTER, 0);
-    }
-  }
-
-  private static void destroyPinnedBuffer(MemorySegment bufferSegment) {
-    checkCudaError(cudaFreeHost(bufferSegment), "cudaFreeHost");
-  }
-
   private void populateBuffer(long startRow) {
-    if (hostBuffer == MemorySegment.NULL) {
-      //      System.out.println("Creating a buffer of size " + hostBufferBytes);
-      hostBuffer = createPinnedBuffer(hostBufferBytes);
-    }
-
     try (var localArena = Arena.ofConfined()) {
       long rowBytes = columns * valueLayout.byteSize();
-      var endRow = Math.min(startRow + (hostBufferBytes / rowBytes), size);
+      var endRow = Math.min(startRow + (hostBuffer.size() / rowBytes), size);
       var rowCount = endRow - startRow;
 
       //      System.out.printf(
@@ -123,7 +91,12 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
 
       MemorySegment bufferTensor =
           prepareTensor(
-              localArena, hostBuffer, new long[] {rowCount, columns}, code(), bits(), kDLCPU());
+              localArena,
+              hostBuffer.address(),
+              new long[] {rowCount, columns},
+              code(),
+              bits(),
+              kDLCPU());
 
       try (var resourceAccess = resources.access()) {
         checkCuVSError(
@@ -146,7 +119,7 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
     var startRow = row - bufferedMatrixRowStart;
 
     return new SliceRowView(
-        hostBuffer.asSlice(startRow * columns * valueByteSize, columns * valueByteSize),
+        hostBuffer.address().asSlice(startRow * columns * valueByteSize, columns * valueByteSize),
         columns,
         valueLayout,
         dataType,
@@ -224,7 +197,7 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
       throw new IllegalArgumentException("[hostMatrix] must have the same dataType");
     }
     try (var localArena = Arena.ofConfined()) {
-      var hostMatrixTensor = ((CuVSHostMatrixImpl) hostMatrix).toTensor(localArena);
+      var hostMatrixTensor = ((CuVSMatrixInternal) hostMatrix).toTensor(localArena);
 
       try (var resourceAccess = resources.access()) {
         var cuvsRes = resourceAccess.handle();
@@ -237,15 +210,105 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
   }
 
   @Override
+  public CuVSDeviceMatrix toDevice(CuVSResources resources) {
+    return new CuVSDeviceMatrixDelegate(this);
+  }
+
+  @Override
   public void toDevice(CuVSDeviceMatrix targetMatrix, CuVSResources cuVSResources) {
-    copyMatrix(this, (CuVSMatrixBaseImpl) targetMatrix, cuVSResources);
+    copyMatrix(this, (CuVSMatrixInternal) targetMatrix, cuVSResources);
   }
 
   @Override
   public void close() {
-    if (hostBuffer != MemorySegment.NULL) {
-      destroyPinnedBuffer(hostBuffer);
-      hostBuffer = MemorySegment.NULL;
+    hostBuffer.close();
+  }
+
+  private static class CuVSDeviceMatrixDelegate implements CuVSDeviceMatrix, CuVSMatrixInternal {
+    private final CuVSDeviceMatrixImpl deviceMatrix;
+
+    private CuVSDeviceMatrixDelegate(CuVSDeviceMatrixImpl deviceMatrix) {
+      this.deviceMatrix = deviceMatrix;
+    }
+
+    @Override
+    public long size() {
+      return deviceMatrix.size();
+    }
+
+    @Override
+    public long columns() {
+      return deviceMatrix.columns();
+    }
+
+    @Override
+    public DataType dataType() {
+      return deviceMatrix.dataType();
+    }
+
+    @Override
+    public RowView getRow(long row) {
+      return deviceMatrix.getRow(row);
+    }
+
+    @Override
+    public void toArray(int[][] array) {
+      deviceMatrix.toArray(array);
+    }
+
+    @Override
+    public void toArray(float[][] array) {
+      deviceMatrix.toArray(array);
+    }
+
+    @Override
+    public void toArray(byte[][] array) {
+      deviceMatrix.toArray(array);
+    }
+
+    @Override
+    public void toHost(CuVSHostMatrix hostMatrix) {
+      deviceMatrix.toHost(hostMatrix);
+    }
+
+    @Override
+    public void toDevice(CuVSDeviceMatrix deviceMatrix, CuVSResources cuVSResources) {
+      deviceMatrix.toDevice(deviceMatrix, cuVSResources);
+    }
+
+    @Override
+    public CuVSDeviceMatrix toDevice(CuVSResources cuVSResources) {
+      return this;
+    }
+
+    @Override
+    public MemorySegment memorySegment() {
+      return deviceMatrix.memorySegment();
+    }
+
+    @Override
+    public ValueLayout valueLayout() {
+      return deviceMatrix.valueLayout();
+    }
+
+    @Override
+    public int bits() {
+      return deviceMatrix.bits();
+    }
+
+    @Override
+    public int code() {
+      return 0;
+    }
+
+    @Override
+    public MemorySegment toTensor(Arena arena) {
+      return deviceMatrix.toTensor(arena);
+    }
+
+    @Override
+    public void close() {
+      // Do nothing
     }
   }
 }
