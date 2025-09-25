@@ -1,5 +1,5 @@
 Agglomerative
-=======
+=============
 
 .. role:: py(code)
    :language: c++
