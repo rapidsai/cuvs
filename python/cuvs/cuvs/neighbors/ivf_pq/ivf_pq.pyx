@@ -58,7 +58,8 @@ cdef class IndexParams:
         The number of clusters used in the coarse quantizer.
     metric : str, default="sqeuclidean"
         String denoting the metric type.
-        Valid values for metric: ["sqeuclidean", "inner_product", "euclidean"],
+        Valid values for metric: ["sqeuclidean", "inner_product",
+        "euclidean", "cosine"],
         where:
 
             - sqeuclidean is the euclidean distance without the square root
@@ -66,6 +67,8 @@ cdef class IndexParams:
             - euclidean is the euclidean distance
             - inner product distance is defined as
               distance(a, b) = \\sum_i a_i * b_i.
+            - cosine distance is defined as
+              distance(a, b) = 1 - \\sum_i a_i * b_i / ( ||a||_2 * ||b||_2).
 
     kmeans_n_iters : int, default = 20
         The number of iterations searching for kmeans centers during index
