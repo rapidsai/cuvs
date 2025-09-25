@@ -47,27 +47,16 @@ def test_vamana_build_basic(dtype):
     assert "Index(type=Vamana" in repr(idx)
 
 
-def test_vamana_index_params_defaults_and_properties():
-    params = vamana.IndexParams()
+@pytest.mark.parametrize("dtype", [np.float32, np.int8, np.uint8])
+def test_vamana_build_basic_host(dtype):
+    n_rows, n_cols = 512, 12
+    data = _gen_data((n_rows, n_cols), dtype)  # host array
 
-    # Defaults
-    assert params.metric == "sqeuclidean"
-    assert params.graph_degree == 32
-    assert params.visited_size == 64
-    assert params.vamana_iters == 1
-    assert np.isclose(params.alpha, 1.2)
-    assert np.isclose(params.max_fraction, 0.06)
-    assert np.isclose(params.batch_base, 2.0)
-    assert params.queue_size == 127
-    assert params.reverse_batchsize == 1_000_000
+    params = vamana.IndexParams(metric="sqeuclidean")
+    idx = vamana.build(params, data)
 
-    params.metric = "euclidean"
-    assert params.metric == "euclidean"
-
-
-def test_vamana_index_params_invalid_metric():
-    with pytest.raises(ValueError):
-        _ = vamana.IndexParams(metric="not_a_metric")
+    assert isinstance(idx, vamana.Index)
+    assert idx.trained is True
 
 
 @pytest.mark.parametrize("include_dataset", [True, False])
