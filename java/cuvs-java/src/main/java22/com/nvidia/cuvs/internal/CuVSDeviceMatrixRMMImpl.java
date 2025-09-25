@@ -92,7 +92,7 @@ public class CuVSDeviceMatrixRMMImpl extends CuVSDeviceMatrixImpl implements CuV
       throw new IllegalArgumentException("Row stride cannot be less than the number of columns");
     }
     if (columnStride != -1) {
-      throw new IllegalArgumentException(
+      throw new UnsupportedOperationException(
           "Stridden columns are currently not supported; columnStride must be equal to -1");
     }
 

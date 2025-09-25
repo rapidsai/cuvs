@@ -214,7 +214,8 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
 
   @Override
   public int get(int row, int col) {
-    return (int) accessor$vh.get(memorySegment, 0L, (long) row * rowStride + col);
+    var rowPitch = rowStride > 0 ? rowStride : columns;
+    return (int) accessor$vh.get(memorySegment, 0L, (long) row * rowPitch + col);
   }
 
   @Override
