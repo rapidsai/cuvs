@@ -211,11 +211,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
     try (var dataset = CuVSMatrix.ofArray(intData)) {
       var intDataCopy = new int[(int) dataset.size()][(int) dataset.columns()];
       dataset.toArray(intDataCopy);
-      for (int n = 0; n < dataset.size(); ++n) {
-        for (int i = 0; i < dataset.columns(); ++i) {
-          assertEquals(intData[n][i], intDataCopy[n][i]);
-        }
-      }
+      assertSame2dArray(dataset.size(), dataset.columns(), intData, intDataCopy);
     }
   }
 
@@ -254,10 +250,32 @@ public class CuVSMatrixIT extends CuVSTestCase {
     try (var dataset = CuVSMatrix.ofArray(floatData)) {
       var dataCopy = new float[(int) dataset.size()][(int) dataset.columns()];
       dataset.toArray(dataCopy);
-      for (int n = 0; n < dataset.size(); ++n) {
-        for (int i = 0; i < dataset.columns(); ++i) {
-          assertEquals(floatData[n][i], dataCopy[n][i], DELTA);
-        }
+      assertSame2dArray(dataset.size(), dataset.columns(), floatData, dataCopy);
+    }
+  }
+
+  static void assertSame2dArray(long rows, long cols, float[][] array1, float[][] array2) {
+    assertEquals(rows, array1.length);
+    assertEquals(cols, array1[0].length);
+    assertEquals(rows, array2.length);
+    assertEquals(cols, array2[0].length);
+
+    for (int n = 0; n < rows; ++n) {
+      for (int i = 0; i < cols; ++i) {
+        assertEquals(array1[n][i], array2[n][i], DELTA);
+      }
+    }
+  }
+
+  static void assertSame2dArray(long rows, long cols, int[][] array1, int[][] array2) {
+    assertEquals(rows, array1.length);
+    assertEquals(cols, array1[0].length);
+    assertEquals(rows, array2.length);
+    assertEquals(cols, array2[0].length);
+
+    for (int n = 0; n < rows; ++n) {
+      for (int i = 0; i < cols; ++i) {
+        assertEquals(array1[n][i], array2[n][i]);
       }
     }
   }
@@ -280,11 +298,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
     try (var dataset = builder.build()) {
       dataset.toArray(roundTripData);
 
-      for (int n = 0; n < dataset.size(); ++n) {
-        for (int i = 0; i < dataset.columns(); ++i) {
-          assertEquals(data[n][i], roundTripData[n][i], DELTA);
-        }
-      }
+      assertSame2dArray(dataset.size(), dataset.columns(), data, roundTripData);
     }
   }
 
@@ -323,12 +337,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
 
     try (var dataset = builder.build()) {
       dataset.toArray(roundTripData);
-
-      for (int n = 0; n < dataset.size(); ++n) {
-        for (int i = 0; i < dataset.columns(); ++i) {
-          assertEquals(data[n][i], roundTripData[n][i]);
-        }
-      }
+      assertSame2dArray(dataset.size(), dataset.columns(), data, roundTripData);
     }
   }
 
@@ -421,11 +430,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
 
         hostMatrix.toArray(roundTripData);
 
-        for (int n = 0; n < hostMatrix.size(); ++n) {
-          for (int i = 0; i < hostMatrix.columns(); ++i) {
-            assertEquals(data[n][i], roundTripData[n][i], 1e-9);
-          }
-        }
+        assertSame2dArray(hostMatrix.size(), hostMatrix.columns(), data, roundTripData);
       }
     }
   }
@@ -452,11 +457,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
 
         deviceMatrix.toArray(roundTripData);
 
-        for (int n = 0; n < deviceMatrix.size(); ++n) {
-          for (int i = 0; i < deviceMatrix.columns(); ++i) {
-            assertEquals(data[n][i], roundTripData[n][i], 1e-9);
-          }
-        }
+        assertSame2dArray(deviceMatrix.size(), deviceMatrix.columns(), data, roundTripData);
       }
     }
   }
@@ -481,11 +482,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
 
       hostMatrix2.toArray(roundTripData);
 
-      for (int n = 0; n < hostMatrix2.size(); ++n) {
-        for (int i = 0; i < hostMatrix2.columns(); ++i) {
-          assertEquals(data[n][i], roundTripData[n][i], 1e-9);
-        }
-      }
+      assertSame2dArray(hostMatrix2.size(), hostMatrix2.columns(), data, roundTripData);
     }
   }
 
@@ -517,11 +514,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
 
         deviceMatrix2.toArray(roundTripData);
 
-        for (int n = 0; n < deviceMatrix2.size(); ++n) {
-          for (int i = 0; i < deviceMatrix2.columns(); ++i) {
-            assertEquals(data[n][i], roundTripData[n][i], 1e-9);
-          }
-        }
+        assertSame2dArray(deviceMatrix2.size(), deviceMatrix2.columns(), data, roundTripData);
       }
     }
   }
