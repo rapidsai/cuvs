@@ -413,6 +413,38 @@ void ace_gather_partition_dataset(
   }
 }
 
+// ACE: Adjust ids in sub search graph
+template <typename IdxT>
+void ace_adjust_sub_graph_ids(
+  uint64_t n_partitions,
+  uint64_t sub_dataset_size_0,
+  uint64_t sub_dataset_size_1,
+  uint64_t graph_degree,
+  uint64_t partition_id,
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> labels,
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> sub_search_graph,
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> search_graph_0,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> idxptr_0,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> idxptr_1,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> vector_bwd_list_1,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> vector_fwd_list_0)
+{
+#pragma omp parallel for
+  for (uint64_t i_0 = 0; i_0 < sub_dataset_size_0; i_0++) {
+    for (uint64_t k = 0; k < graph_degree; k++) {
+      uint64_t j_0 = sub_search_graph(i_0, k);
+      RAFT_EXPECTS(j_0 < sub_dataset_size_0 + sub_dataset_size_1, "Invalid neighbor ID");
+      if (j_0 < sub_dataset_size_0) {
+        search_graph_0(i_0 + idxptr_0(partition_id), k) = j_0 + idxptr_0(partition_id);
+      } else {
+        uint64_t j_1 = j_0 - sub_dataset_size_0;
+        RAFT_EXPECTS(j_1 < sub_dataset_size_1, "Invalid secondary neighbor ID");
+        uint64_t j = vector_bwd_list_1(j_1 + idxptr_1(partition_id));
+        search_graph_0(i_0 + idxptr_0(partition_id), k) = vector_fwd_list_0(j);
+      }
+    }
+  }
+}
 // ACE: Build partitioned CAGRA index for very large graphs. Dataset must be on host.
 template <typename T, typename IdxT, typename Accessor>
 index<T, IdxT> build_ace(
@@ -617,21 +649,18 @@ index<T, IdxT> build_ace(
     raft::resource::sync_stream(res, stream);
 
     // Adjust IDs in sub_search_graph and save to search_graph_0
-#pragma omp parallel for
-    for (uint64_t i_0 = 0; i_0 < sub_dataset_size_0; i_0++) {
-      for (uint64_t k = 0; k < graph_degree; k++) {
-        uint64_t j_0 = sub_search_graph(i_0, k);
-        RAFT_EXPECTS(j_0 < sub_dataset_size, "Invalid neighbor ID");
-        if (j_0 < sub_dataset_size_0) {
-          search_graph_0(i_0 + idxptr_0(c), k) = j_0 + idxptr_0(c);
-        } else {
-          uint64_t j_1 = j_0 - sub_dataset_size_0;
-          RAFT_EXPECTS(j_1 < sub_dataset_size_1, "Invalid secondary neighbor ID");
-          uint64_t j                           = vector_bwd_list_1(j_1 + idxptr_1(c));
-          search_graph_0(i_0 + idxptr_0(c), k) = vector_fwd_list_0(j);
-        }
-      }
-    }
+    ace_adjust_sub_graph_ids<IdxT>(n_partitions,
+                                   sub_dataset_size_0,
+                                   sub_dataset_size_1,
+                                   graph_degree,
+                                   c,
+                                   labels.view(),
+                                   sub_search_graph.view(),
+                                   search_graph_0.view(),
+                                   idxptr_0.view(),
+                                   idxptr_1.view(),
+                                   vector_bwd_list_1.view(),
+                                   vector_fwd_list_0.view());
 
     auto end        = std::chrono::high_resolution_clock::now();
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
