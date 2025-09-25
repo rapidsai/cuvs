@@ -256,6 +256,53 @@ void ace_check_small_partitions(
   }
 }
 
+// ACE: Create forward and backward lists
+template <typename IdxT>
+void ace_create_forward_and_backward_lists(
+  uint64_t dataset_size,
+  uint64_t n_partitions,
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> labels,
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_histogram,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> vector_fwd_list_0,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> vector_bwd_list_0,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> vector_bwd_list_1,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> idxptr_0,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> idxptr_1)
+{
+  idxptr_0(0) = 0;
+  idxptr_1(0) = 0;
+  for (uint64_t c = 1; c < n_partitions; c++) {
+    idxptr_0(c) = idxptr_0(c - 1) + partition_histogram(c - 1, 0);
+    idxptr_1(c) = idxptr_1(c - 1) + partition_histogram(c - 1, 1);
+  }
+
+#pragma omp parallel for
+  for (uint64_t i = 0; i < dataset_size; i++) {
+    uint64_t c_0 = labels(i, 0);
+    uint64_t j_0;
+#pragma omp atomic capture
+    j_0 = idxptr_0(c_0)++;
+    RAFT_EXPECTS(j_0 < dataset_size, "Vector ID must be smaller than dataset_size");
+    vector_fwd_list_0(i)   = j_0;
+    vector_bwd_list_0(j_0) = i;
+
+    uint64_t c_1 = labels(i, 1);
+    uint64_t j_1;
+#pragma omp atomic capture
+    j_1 = idxptr_1(c_1)++;
+    RAFT_EXPECTS(j_1 < dataset_size, "Vector ID must be smaller than dataset_size");
+    vector_bwd_list_1(j_1) = i;
+  }
+
+  // Restore idxptr arrays
+  for (uint64_t c = n_partitions + 1; c > 0; c--) {
+    idxptr_0(c) = idxptr_0(c - 1);
+    idxptr_1(c) = idxptr_1(c - 1);
+  }
+  idxptr_0(0) = 0;
+  idxptr_1(0) = 0;
+}
+
 // ACE: Set index parameters for each partition
 template <typename IdxT>
 void ace_set_index_params(raft::resources const& res,
@@ -488,38 +535,15 @@ index<T, IdxT> build_ace(
   auto idxptr_0          = raft::make_host_vector<IdxT, int64_t>(n_partitions + 1);
   auto idxptr_1          = raft::make_host_vector<IdxT, int64_t>(n_partitions + 1);
 
-  idxptr_0(0) = 0;
-  idxptr_1(0) = 0;
-  for (uint64_t c = 1; c < n_partitions; c++) {
-    idxptr_0(c) = idxptr_0(c - 1) + partition_histogram(c - 1, 0);
-    idxptr_1(c) = idxptr_1(c - 1) + partition_histogram(c - 1, 1);
-  }
-
-#pragma omp parallel for
-  for (uint64_t i = 0; i < dataset_size; i++) {
-    uint64_t c_0 = labels(i, 0);
-    uint64_t j_0;
-#pragma omp atomic capture
-    j_0 = idxptr_0(c_0)++;
-    RAFT_EXPECTS(j_0 < dataset_size, "Vector ID must be smaller than dataset_size");
-    vector_fwd_list_0(i)   = j_0;
-    vector_bwd_list_0(j_0) = i;
-
-    uint64_t c_1 = labels(i, 1);
-    uint64_t j_1;
-#pragma omp atomic capture
-    j_1 = idxptr_1(c_1)++;
-    RAFT_EXPECTS(j_1 < dataset_size, "Vector ID must be smaller than dataset_size");
-    vector_bwd_list_1(j_1) = i;
-  }
-
-  // Restore idxptr arrays
-  for (uint64_t c = n_partitions + 1; c > 0; c--) {
-    idxptr_0(c) = idxptr_0(c - 1);
-    idxptr_1(c) = idxptr_1(c - 1);
-  }
-  idxptr_0(0) = 0;
-  idxptr_1(0) = 0;
+  ace_create_forward_and_backward_lists<IdxT>(dataset_size,
+                                              n_partitions,
+                                              labels.view(),
+                                              partition_histogram.view(),
+                                              vector_fwd_list_0.view(),
+                                              vector_bwd_list_0.view(),
+                                              vector_bwd_list_1.view(),
+                                              idxptr_0.view(),
+                                              idxptr_1.view());
 
   auto vectorlist_end = std::chrono::high_resolution_clock::now();
   auto vectorlist_elapsed =
