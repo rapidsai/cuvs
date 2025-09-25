@@ -16,13 +16,13 @@
 package com.nvidia.cuvs;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
+import static com.nvidia.cuvs.CuVSMatrixIT.assertSame2dArray;
 import static org.junit.Assert.*;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
 import com.nvidia.cuvs.CagraMergeParams.MergeStrategy;
-import java.io.FileOutputStream;
 import java.lang.foreign.Arena;
 import java.lang.foreign.Linker;
 import java.lang.foreign.MemoryLayout;
@@ -401,6 +401,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
                 .withIndexParams(indexParams)
                 .build()) {
 
+      // No prefilter (all points allowed)
       CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
 
       // No prefilter (all points allowed)
@@ -516,6 +517,10 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     loadedIndex.close();
   }
 
+  /**
+   * Tests that an index built starting from a native MemorySegment is identical to one built from
+   * Java heap arrays
+   */
   @Test
   public void testNativeDatasetEquivalent() throws Throwable {
     float[][] sampleData = createSampleData();
@@ -554,6 +559,37 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             resources);
         cleanup(javaIndex, nativeIndex);
       }
+    }
+  }
+
+  /**
+   * Tests that an index built starting from device memory ({@link CuVSDeviceMatrix}) is identical to one
+   * built from Java heap arrays
+   */
+  @Test
+  public void testDeviceDatasetEquivalent() throws Throwable {
+    float[][] sampleData = createSampleData();
+
+    try (var resources = CuVSResources.create();
+        var javaDataset = CuVSMatrix.ofArray(sampleData);
+        var deviceDataset = javaDataset.toDevice(resources)) {
+
+      // Indexing with an on-heap and native datasets produce the same results
+      var javaIndex = indexOnce(javaDataset, resources);
+      var deviceIndex = indexOnce(deviceDataset, resources);
+
+      int size = (int) javaIndex.getGraph().size();
+      assertEquals(size, (int) deviceIndex.getGraph().size());
+
+      int columns = (int) javaIndex.getGraph().columns();
+      assertEquals(columns, (int) deviceIndex.getGraph().columns());
+
+      var javaIndexGraph = new int[size][columns];
+      var deviceIndexGraph = new int[size][columns];
+      javaIndex.getGraph().toArray(javaIndexGraph);
+      deviceIndex.getGraph().toArray(deviceIndexGraph);
+
+      assertSame2dArray(size, columns, javaIndexGraph, deviceIndexGraph);
     }
   }
 
@@ -629,21 +665,24 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
         // --- Serialization/deserialization check ---
         String indexFileName = UUID.randomUUID() + ".cag";
-        mergedIndex.serialize(new FileOutputStream(indexFileName));
-
         var indexFile = Path.of(indexFileName);
+
+        try (var out = Files.newOutputStream(indexFile)) {
+          mergedIndex.serialize(out);
+        }
+
         try (var inputStream = Files.newInputStream(indexFile)) {
           CagraIndex loadedMergedIndex = CagraIndex.newBuilder(resources).from(inputStream).build();
 
           SearchResults resultsFromLoaded = loadedMergedIndex.search(query);
           assertEquals(expectedResults, resultsFromLoaded.getResults());
+          mergedIndex.close();
           loadedMergedIndex.close();
+        } finally {
+          Files.deleteIfExists(indexFile);
         }
-
-        Files.deleteIfExists(indexFile);
         index1.close();
         index2.close();
-        mergedIndex.close();
       }
     }
   }
@@ -713,49 +752,52 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
               .build();
 
       log.trace("Merging indexes with PHYSICAL strategy...");
-      CagraIndex physicalMergedIndex =
-          CagraIndex.merge(new CagraIndex[] {index1, index2}, physicalMergeParams);
-      log.trace("Physical merge completed successfully");
+      try (CagraIndex physicalMergedIndex =
+          CagraIndex.merge(new CagraIndex[] {index1, index2}, physicalMergeParams)) {
+        log.trace("Physical merge completed successfully");
 
-      CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
+        CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
 
-      try (var queryVectors = CuVSMatrix.ofArray(queries)) {
-        CagraQuery query =
-            new CagraQuery.Builder(resources)
-                .withTopK(3)
-                .withSearchParams(searchParams)
-                .withQueryVectors(queryVectors)
-                .withMapping(SearchResults.IDENTITY_MAPPING)
-                .build();
+        try (var queryVectors = CuVSMatrix.ofArray(queries)) {
+          CagraQuery query =
+              new CagraQuery.Builder(resources)
+                  .withTopK(3)
+                  .withSearchParams(searchParams)
+                  .withQueryVectors(queryVectors)
+                  .withMapping(SearchResults.IDENTITY_MAPPING)
+                  .build();
 
-        log.trace("Searching physically merged index...");
-        SearchResults physicalResults = physicalMergedIndex.search(query);
-        assertNotNull("Physical merge search results should not be null", physicalResults);
-        assertEquals(
-            "Physical merge search results should match expected",
-            expectedResults,
-            physicalResults.getResults());
-
-        // --- Serialization/deserialization check for both merged indexes ---
-        String physicalIndexFileName = UUID.randomUUID() + ".cag";
-        physicalMergedIndex.serialize(new FileOutputStream(physicalIndexFileName));
-
-        var physicalIndexFile = Path.of(physicalIndexFileName);
-        try (var physicalInputStream = Files.newInputStream(physicalIndexFile);
-            CagraIndex loadedPhysicalIndex =
-                CagraIndex.newBuilder(resources).from(physicalInputStream).build()) {
-
-          SearchResults resultsFromLoadedPhysical = loadedPhysicalIndex.search(query);
+          log.trace("Searching physically merged index...");
+          SearchResults physicalResults = physicalMergedIndex.search(query);
+          assertNotNull("Physical merge search results should not be null", physicalResults);
           assertEquals(
-              "Loaded physical index search results should match expected",
+              "Physical merge search results should match expected",
               expectedResults,
-              resultsFromLoadedPhysical.getResults());
-        }
+              physicalResults.getResults());
 
-        Files.deleteIfExists(physicalIndexFile);
+          // --- Serialization/deserialization check for both merged indexes ---
+          String physicalIndexFileName = UUID.randomUUID() + ".cag";
+          var physicalIndexFile = Path.of(physicalIndexFileName);
+
+          try (var out = Files.newOutputStream(physicalIndexFile)) {
+            physicalMergedIndex.serialize(out);
+          }
+
+          try (var physicalInputStream = Files.newInputStream(physicalIndexFile);
+              CagraIndex loadedPhysicalIndex =
+                  CagraIndex.newBuilder(resources).from(physicalInputStream).build()) {
+
+            SearchResults resultsFromLoadedPhysical = loadedPhysicalIndex.search(query);
+            assertEquals(
+                "Loaded physical index search results should match expected",
+                expectedResults,
+                resultsFromLoadedPhysical.getResults());
+          } finally {
+            Files.deleteIfExists(physicalIndexFile);
+          }
+        }
         index1.close();
         index2.close();
-        physicalMergedIndex.close();
       }
     }
   }

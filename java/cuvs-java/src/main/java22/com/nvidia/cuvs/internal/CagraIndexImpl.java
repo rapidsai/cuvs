@@ -75,8 +75,8 @@ public class CagraIndexImpl implements CagraIndex {
       CagraIndexParams indexParameters, CuVSMatrix dataset, CuVSResources resources) {
     Objects.requireNonNull(dataset);
     this.resources = resources;
-    assert dataset instanceof CuVSMatrixBaseImpl;
-    this.cagraIndexReference = build(indexParameters, (CuVSMatrixBaseImpl) dataset);
+    assert dataset instanceof CuVSMatrixInternal;
+    this.cagraIndexReference = build(indexParameters, (CuVSMatrixInternal) dataset);
   }
 
   /**
@@ -121,11 +121,11 @@ public class CagraIndexImpl implements CagraIndex {
 
     this.resources = resources;
 
-    assert graph instanceof CuVSMatrixBaseImpl;
-    assert dataset instanceof CuVSMatrixBaseImpl;
+    assert graph instanceof CuVSMatrixInternal;
+    assert dataset instanceof CuVSMatrixInternal;
 
     this.cagraIndexReference =
-        fromGraph(metric, (CuVSMatrixBaseImpl) graph, (CuVSMatrixBaseImpl) dataset);
+        fromGraph(metric, (CuVSMatrixInternal) graph, (CuVSMatrixInternal) dataset);
   }
 
   private void checkNotDestroyed() {
@@ -158,7 +158,7 @@ public class CagraIndexImpl implements CagraIndex {
    * @return an instance of {@link IndexReference} that holds the pointer to the
    *         index
    */
-  private IndexReference build(CagraIndexParams indexParameters, CuVSMatrixBaseImpl dataset) {
+  private IndexReference build(CagraIndexParams indexParameters, CuVSMatrixInternal dataset) {
     long rows = dataset.size();
 
     try (var indexParams = segmentFromIndexParams(indexParameters);
@@ -416,8 +416,8 @@ public class CagraIndexImpl implements CagraIndex {
 
   private IndexReference fromGraph(
       CagraIndexParams.CuvsDistanceType metric,
-      CuVSMatrixBaseImpl graph,
-      CuVSMatrixBaseImpl dataset) {
+      CuVSMatrixInternal graph,
+      CuVSMatrixInternal dataset) {
     try (var localArena = Arena.ofConfined()) {
       var index = createCagraIndex();
       try (var resourcesAccess = resources.access()) {
