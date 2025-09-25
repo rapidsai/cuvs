@@ -269,7 +269,7 @@ final class JDKProvider implements CuVSProvider {
     return dataset;
   }
 
-  private abstract static class MatrixBuilder<T extends CuVSMatrixBaseImpl> {
+  private abstract static class MatrixBuilder<T extends CuVSMatrixInternal> {
 
     protected final long columns;
     protected final long size;

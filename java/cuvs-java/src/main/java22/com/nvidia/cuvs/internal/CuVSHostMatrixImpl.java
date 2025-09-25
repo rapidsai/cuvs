@@ -36,6 +36,7 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
   private final int columnStride;
   private final long rowBytes;
   private final long rowSize;
+  private final long elementSize;
 
   public CuVSHostMatrixImpl(
       MemorySegment memorySegment, long size, long columns, DataType dataType) {
@@ -86,7 +87,7 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
     this.rowStride = rowStride;
     this.columnStride = columnStride;
 
-    var elementSize = valueLayout.byteSize();
+    this.elementSize = valueLayout.byteSize();
     this.rowSize = rowStride > 0 ? rowStride * elementSize : columns * elementSize;
     this.rowBytes = columns * elementSize;
 
@@ -193,17 +194,21 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
       throw new IllegalArgumentException("Source and target matrices must have the same dataType");
     }
 
-    if (this.rowStride <= 0 && targetMatrix.rowStride <= 0) {
+    if (this.rowStride <= 0 && targetMatrix.rowStride() <= 0) {
       // copy whole matrix
       MemorySegment.copy(this.memorySegment, 0L, targetMatrix.memorySegment(), 0L, size * rowSize);
     } else {
       // copy row-by-row
+      long targetRowSize =
+          targetMatrix.rowStride() > 0
+              ? targetMatrix.rowStride() * elementSize
+              : columns * elementSize;
       for (int r = 0; r < size; ++r) {
         MemorySegment.copy(
             this.memorySegment,
             r * rowSize,
             targetMatrix.memorySegment(),
-            r * targetMatrix.rowSize,
+            r * targetRowSize,
             rowBytes);
       }
     }
@@ -221,6 +226,11 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
   public int get(int row, int col) {
     var rowPitch = rowStride > 0 ? rowStride : columns;
     return (int) accessor$vh.get(memorySegment, 0L, (long) row * rowPitch + col);
+  }
+
+  @Override
+  public long rowStride() {
+    return rowStride;
   }
 
   @Override
@@ -300,6 +310,11 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
     @Override
     public ValueLayout valueLayout() {
       return hostMatrix.valueLayout();
+    }
+
+    @Override
+    public long rowStride() {
+      return hostMatrix.rowStride();
     }
 
     @Override
