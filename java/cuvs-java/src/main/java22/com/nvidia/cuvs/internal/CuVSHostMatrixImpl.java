@@ -177,8 +177,13 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
   }
 
   @Override
+  public CuVSHostMatrix toHost() {
+    return new CuVSHostMatrixDelegate(this);
+  }
+
+  @Override
   public void toHost(CuVSHostMatrix hostMatrix) {
-    var targetMatrix = (CuVSHostMatrixImpl) hostMatrix;
+    var targetMatrix = (CuVSMatrixInternal) hostMatrix;
 
     if (targetMatrix.columns() != this.columns || targetMatrix.size() != this.size) {
       throw new IllegalArgumentException(
@@ -190,14 +195,14 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
 
     if (this.rowStride <= 0 && targetMatrix.rowStride <= 0) {
       // copy whole matrix
-      MemorySegment.copy(this.memorySegment, 0L, targetMatrix.memorySegment, 0L, size * rowSize);
+      MemorySegment.copy(this.memorySegment, 0L, targetMatrix.memorySegment(), 0L, size * rowSize);
     } else {
       // copy row-by-row
       for (int r = 0; r < size; ++r) {
         MemorySegment.copy(
             this.memorySegment,
             r * rowSize,
-            targetMatrix.memorySegment,
+            targetMatrix.memorySegment(),
             r * targetMatrix.rowSize,
             rowBytes);
       }
@@ -206,7 +211,7 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
 
   @Override
   public void toDevice(CuVSDeviceMatrix deviceMatrix, CuVSResources cuVSResources) {
-    copyMatrix(this, (CuVSMatrixBaseImpl) deviceMatrix, cuVSResources);
+    copyMatrix(this, (CuVSMatrixInternal) deviceMatrix, cuVSResources);
   }
 
   @Override
@@ -223,5 +228,88 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
     var strides = rowStride >= 0 ? new long[] {rowStride, columnStride} : null;
     return prepareTensor(
         arena, memorySegment, new long[] {size, columns}, strides, code(), bits(), kDLCPU());
+  }
+
+  private static class CuVSHostMatrixDelegate implements CuVSHostMatrix, CuVSMatrixInternal {
+    private final CuVSHostMatrixImpl hostMatrix;
+
+    public CuVSHostMatrixDelegate(CuVSHostMatrixImpl cuVSHostMatrix) {
+      this.hostMatrix = cuVSHostMatrix;
+    }
+
+    @Override
+    public int get(int row, int col) {
+      return hostMatrix.get(row, col);
+    }
+
+    @Override
+    public long size() {
+      return hostMatrix.size();
+    }
+
+    @Override
+    public long columns() {
+      return hostMatrix.columns();
+    }
+
+    @Override
+    public DataType dataType() {
+      return hostMatrix.dataType();
+    }
+
+    @Override
+    public RowView getRow(long row) {
+      return hostMatrix.getRow(row);
+    }
+
+    @Override
+    public void toArray(int[][] array) {
+      hostMatrix.toArray(array);
+    }
+
+    @Override
+    public void toArray(float[][] array) {
+      hostMatrix.toArray(array);
+    }
+
+    @Override
+    public void toArray(byte[][] array) {
+      hostMatrix.toArray(array);
+    }
+
+    @Override
+    public void toHost(CuVSHostMatrix hostMatrix) {
+      this.hostMatrix.toHost(hostMatrix);
+    }
+
+    @Override
+    public CuVSHostMatrix toHost() {
+      return this;
+    }
+
+    @Override
+    public void toDevice(CuVSDeviceMatrix deviceMatrix, CuVSResources cuVSResources) {
+      hostMatrix.toDevice(deviceMatrix, cuVSResources);
+    }
+
+    @Override
+    public MemorySegment memorySegment() {
+      return hostMatrix.memorySegment();
+    }
+
+    @Override
+    public ValueLayout valueLayout() {
+      return hostMatrix.valueLayout();
+    }
+
+    @Override
+    public MemorySegment toTensor(Arena arena) {
+      return hostMatrix.toTensor(arena);
+    }
+
+    @Override
+    public void close() {
+      // Do nothing
+    }
   }
 }
