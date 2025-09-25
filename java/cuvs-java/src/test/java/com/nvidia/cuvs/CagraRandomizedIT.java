@@ -39,17 +39,26 @@ public class CagraRandomizedIT extends CuVSTestCase {
     log.trace("Random context initialized for test.");
   }
 
+  enum TestDatasetMemoryKind {
+    HEAP,
+    NATIVE,
+    DEVICE
+  }
+
   @Test
   public void testResultsTopKWithRandomValues() throws Throwable {
-    boolean[] useNativeMemoryDatasets = {true, false};
+    TestDatasetMemoryKind[] testDatasetMemoryKinds = {
+      TestDatasetMemoryKind.HEAP, TestDatasetMemoryKind.NATIVE, TestDatasetMemoryKind.DEVICE
+    };
     for (int i = 0; i < 100; i++) {
-      for (boolean use : useNativeMemoryDatasets) {
-        tmpResultsTopKWithRandomValues(use);
+      for (var datasetMemoryKind : testDatasetMemoryKinds) {
+        tmpResultsTopKWithRandomValues(datasetMemoryKind);
       }
     }
   }
 
-  private void tmpResultsTopKWithRandomValues(boolean useNativeMemoryDataset) throws Throwable {
+  private void tmpResultsTopKWithRandomValues(TestDatasetMemoryKind datasetMemoryKind)
+      throws Throwable {
     int DATASET_SIZE_LIMIT = 10_000;
     int DIMENSIONS_LIMIT = 2048;
     int NUM_QUERIES_LIMIT = 10;
@@ -90,7 +99,7 @@ public class CagraRandomizedIT extends CuVSTestCase {
     log.debug("Dataset size: {}x{}", datasetSize, dimensions);
     log.debug("Query size: {}x{}", numQueries, dimensions);
     log.debug("TopK: {}", topK);
-    log.debug("Use native memory dataset? " + useNativeMemoryDataset);
+    log.debug("Use memory dataset: " + datasetMemoryKind.name());
 
     // Debugging: Log dataset and queries
     if (log.isDebugEnabled()) {
@@ -119,8 +128,8 @@ public class CagraRandomizedIT extends CuVSTestCase {
               .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.NN_DESCENT)
               .build();
 
-      CagraIndex index;
-      if (useNativeMemoryDataset) {
+      final CagraIndex index;
+      if (datasetMemoryKind == TestDatasetMemoryKind.NATIVE) {
         var datasetBuilder =
             CuVSMatrix.hostBuilder(vectors.length, vectors[0].length, CuVSMatrix.DataType.FLOAT);
         for (float[] v : vectors) {
@@ -131,7 +140,20 @@ public class CagraRandomizedIT extends CuVSTestCase {
                 .withDataset(datasetBuilder.build())
                 .withIndexParams(indexParams)
                 .build();
+      } else if (datasetMemoryKind == TestDatasetMemoryKind.DEVICE) {
+        var datasetBuilder =
+            CuVSMatrix.deviceBuilder(
+                resources, vectors.length, vectors[0].length, CuVSMatrix.DataType.FLOAT);
+        for (float[] v : vectors) {
+          datasetBuilder.addVector(v);
+        }
+        index =
+            CagraIndex.newBuilder(resources)
+                .withDataset(datasetBuilder.build())
+                .withIndexParams(indexParams)
+                .build();
       } else {
+        assert datasetMemoryKind == TestDatasetMemoryKind.HEAP;
         index =
             CagraIndex.newBuilder(resources)
                 .withDataset(vectors)
