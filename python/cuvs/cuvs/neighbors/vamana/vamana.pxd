@@ -74,3 +74,7 @@ cdef class Index:
     cdef cuvsVamanaIndex_t index
     cdef bool trained
     cdef str active_index_type
+
+
+cdef class IndexParams:
+    cdef cuvsVamanaIndexParams* params

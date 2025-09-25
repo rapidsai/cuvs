@@ -99,8 +99,6 @@ cdef class IndexParams:
         Max batchsize of reverse edge processing (reduces memory footprint).
     """
 
-    cdef cuvsVamanaIndexParams* params
-
     def __cinit__(self):
         check_cuvs(cuvsVamanaIndexParamsCreate(&self.params))
 

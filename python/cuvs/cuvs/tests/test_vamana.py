@@ -14,7 +14,6 @@
 
 import numpy as np
 import pytest
-
 from pylibraft.common import device_ndarray
 
 from cuvs.neighbors import vamana
@@ -97,5 +96,3 @@ def test_vamana_build_rejects_unsupported_dtype():
 
     with pytest.raises(Exception):
         _ = vamana.build(params, data_dev)
-
-
