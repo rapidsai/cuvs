@@ -1,4 +1,4 @@
-# Copyright (c) 2023, NVIDIA CORPORATION.
+# Copyright (c) 2023-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 # NOTE: this template is not perfectly formatted. Use pre-commit to get
 # everything in shape again.
 header = """/*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,7 +64,8 @@ macro = """
       bool is_row_major)
 """
 
-data_type_instances = [
+# Default floating-point types for most distance operations
+default_data_type_instances = [
     dict(
         DataT="float",
         AccT="float",
@@ -85,72 +86,113 @@ data_type_instances = [
     ),
 ]
 
+# Integer types for bitwise operations
+bitwise_data_type_instances = [
+    dict(
+        DataT="uint8_t",
+        AccT="uint32_t",
+        OutT="uint32_t",
+        IdxT="int",
+    ),
+    dict(
+        DataT="uint32_t",
+        AccT="uint32_t",
+        OutT="uint32_t",
+        IdxT="int",
+    ),
+    dict(
+        DataT="uint64_t",
+        AccT="uint64_t",
+        OutT="uint64_t",
+        IdxT="int",
+    ),
+]
+
 op_instances = [
     dict(
         path_prefix="canberra",
         OpT="cuvs::distance::detail::ops::canberra_distance_op",
         archs = [60],
+        data_types="default",
     ),
     dict(
         path_prefix="correlation",
         OpT="cuvs::distance::detail::ops::correlation_distance_op",
         archs = [60],
+        data_types="default",
     ),
     dict(
         path_prefix="cosine",
         OpT="cuvs::distance::detail::ops::cosine_distance_op",
         archs = [60, 80],
+        data_types="default",
     ),
     dict(
         path_prefix="hamming_unexpanded",
         OpT="cuvs::distance::detail::ops::hamming_distance_op",
         archs = [60],
+        data_types="default",
+    ),
+    dict(
+        path_prefix="bitwise_hamming",
+        OpT="cuvs::distance::detail::ops::bitwise_hamming_distance_op",
+        archs = [60],
+        data_types="bitwise",
     ),
     dict(
         path_prefix="hellinger_expanded",
         OpT="cuvs::distance::detail::ops::hellinger_distance_op",
         archs = [60],
+        data_types="default",
     ),
     # inner product is handled by cublas.
     dict(
         path_prefix="jensen_shannon",
         OpT="cuvs::distance::detail::ops::jensen_shannon_distance_op",
         archs = [60],
+        data_types="default",
     ),
     dict(
         path_prefix="kl_divergence",
         OpT="cuvs::distance::detail::ops::kl_divergence_op",
         archs = [60],
+        data_types="default",
     ),
     dict(
         path_prefix="l1",
         OpT="cuvs::distance::detail::ops::l1_distance_op",
         archs = [60],
+        data_types="default",
     ),
     dict(
         path_prefix="l2_expanded",
         OpT="cuvs::distance::detail::ops::l2_exp_distance_op",
         archs = [60, 80],
+        data_types="default",
     ),
     dict(
         path_prefix="l2_unexpanded",
         OpT="cuvs::distance::detail::ops::l2_unexp_distance_op",
         archs = [60],
+        data_types="default",
     ),
     dict(
         path_prefix="l_inf",
         OpT="cuvs::distance::detail::ops::l_inf_distance_op",
         archs = [60],
+        data_types="default",
     ),
     dict(
         path_prefix="lp_unexpanded",
         OpT="cuvs::distance::detail::ops::lp_unexp_distance_op",
         archs = [60],
+        data_types="default",
     ),
     dict(
         path_prefix="russel_rao",
         OpT="cuvs::distance::detail::ops::russel_rao_distance_op",
         archs = [60],
+        data_types="default",
      ),
 ]
 
@@ -164,6 +206,12 @@ def arch_headers(archs):
 
 
 for op in op_instances:
+    # Select appropriate data types based on the operation
+    if op.get("data_types", "default") == "bitwise":
+        data_type_instances = bitwise_data_type_instances
+    else:
+        data_type_instances = default_data_type_instances
+
     for dt in data_type_instances:
         DataT, AccT, OutT, IdxT = (dt[k] for k in ["DataT", "AccT", "OutT", "IdxT"]);
         path = f"dispatch_{op['path_prefix']}_{DataT}_{AccT}_{OutT}_{IdxT}.cu"
@@ -188,7 +236,7 @@ with open("dispatch_rbf.cu", "w") as f:
         f.write(arch_headers(archs))
         f.write(macro)
 
-        for dt in data_type_instances:
+        for dt in default_data_type_instances:
             DataT, AccT, OutT, IdxT = (dt[k] for k in ["DataT", "AccT", "OutT", "IdxT"]);
             IdxT = "int64_t"    # overwrite IdxT
 
@@ -209,7 +257,7 @@ int64_t_op_instances = [
     )]
 
 for op in int64_t_op_instances:
-    for dt in data_type_instances:
+    for dt in default_data_type_instances:
         DataT, AccT, OutT, IdxT = (dt[k] for k in ["DataT", "AccT", "OutT", "IdxT"]);
 
         IdxT = "int64_t"

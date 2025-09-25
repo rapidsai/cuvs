@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@
 #include "cutlass.cuh"
 
 // The distance operations:
+#include "../distance_ops/bitwise_hamming.cuh"
 #include "../distance_ops/canberra.cuh"
 #include "../distance_ops/correlation.cuh"
 #include "../distance_ops/cosine.cuh"

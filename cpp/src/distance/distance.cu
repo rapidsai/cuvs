@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2018-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -89,6 +89,31 @@ instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::Canberr
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::CorrelationExpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::CosineExpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::HammingUnexpanded);
+// BitwiseHamming with integer types
+#define instantiate_cuvs_distance_distance_bitwise_hamming(DataT, AccT, OutT, IdxT)            \
+  template void cuvs::distance::detail::distance<cuvs::distance::DistanceType::BitwiseHamming, \
+                                                 DataT,                                        \
+                                                 AccT,                                         \
+                                                 OutT,                                         \
+                                                 raft::identity_op,                            \
+                                                 IdxT>(raft::resources const&,                 \
+                                                       DataT const*,                           \
+                                                       DataT const*,                           \
+                                                       OutT*,                                  \
+                                                       IdxT,                                   \
+                                                       IdxT,                                   \
+                                                       IdxT,                                   \
+                                                       void*,                                  \
+                                                       size_t,                                 \
+                                                       raft::identity_op,                      \
+                                                       bool,                                   \
+                                                       OutT);
+
+instantiate_cuvs_distance_distance_bitwise_hamming(uint8_t, uint32_t, uint32_t, int);
+instantiate_cuvs_distance_distance_bitwise_hamming(uint32_t, uint32_t, uint32_t, int);
+instantiate_cuvs_distance_distance_bitwise_hamming(uint64_t, uint64_t, uint64_t, int);
+
+#undef instantiate_cuvs_distance_distance_bitwise_hamming
 
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::HellingerExpanded);
 instantiate_cuvs_distance_distance_by_algo(cuvs::distance::DistanceType::InnerProduct);
@@ -249,5 +274,12 @@ instantiate_cuvs_distance_pairwise_distance(double, raft::layout_c_contiguous, i
 instantiate_cuvs_distance_pairwise_distance(double, raft::layout_f_contiguous, int, double);
 instantiate_cuvs_distance_pairwise_distance(half, raft::layout_c_contiguous, int, float);
 instantiate_cuvs_distance_pairwise_distance(half, raft::layout_f_contiguous, int, float);
+
+instantiate_cuvs_distance_pairwise_distance(uint8_t, raft::layout_c_contiguous, int, uint32_t);
+instantiate_cuvs_distance_pairwise_distance(uint8_t, raft::layout_f_contiguous, int, uint32_t);
+instantiate_cuvs_distance_pairwise_distance(uint32_t, raft::layout_c_contiguous, int, uint32_t);
+instantiate_cuvs_distance_pairwise_distance(uint32_t, raft::layout_f_contiguous, int, uint32_t);
+instantiate_cuvs_distance_pairwise_distance(uint64_t, raft::layout_c_contiguous, int, uint64_t);
+instantiate_cuvs_distance_pairwise_distance(uint64_t, raft::layout_f_contiguous, int, uint64_t);
 
 #undef instantiate_cuvs_distance_pairwise_distance

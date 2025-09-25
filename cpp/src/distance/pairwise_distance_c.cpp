@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,8 +62,19 @@ extern "C" cuvsError_t cuvsPairwiseDistance(cuvsResources_t res,
     auto y_dt    = x_tensor->dl_tensor.dtype;
     auto dist_dt = x_tensor->dl_tensor.dtype;
 
-    if ((x_dt.code != kDLFloat) || (y_dt.code != kDLFloat) || (dist_dt.code != kDLFloat)) {
-      RAFT_FAIL("Inputs to cuvsPairwiseDistance must all be floating point tensors");
+    // Type validation based on metric
+    if (metric == cuvsDistanceType::BitwiseHamming) {
+      // BitwiseHamming requires integer types
+      if ((x_dt.code != kDLUInt) || (y_dt.code != kDLUInt) || (dist_dt.code != kDLUInt)) {
+        RAFT_FAIL("BitwiseHamming metric requires unsigned integer tensors");
+      }
+    } else {
+      // All other metrics require floating point types
+      if ((x_dt.code != kDLFloat) || (y_dt.code != kDLFloat) || (dist_dt.code != kDLFloat)) {
+        RAFT_FAIL(
+          "Inputs to cuvsPairwiseDistance must all be floating point tensors (except "
+          "BitwiseHamming which requires unsigned integers)");
+      }
     }
 
     if ((x_dt.bits != y_dt.bits) || (x_dt.bits != dist_dt.bits)) {
@@ -103,30 +114,54 @@ extern "C" cuvsError_t cuvsPairwiseDistance(cuvsResources_t res,
     }
 
     if (x_row_major) {
-      if (x_dt.bits == 32) {
-        _pairwise_distance<float, float>(
-          res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
-      } else if (x_dt.bits == 16) {
-        _pairwise_distance<half, float>(
-          res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
-      } else if (x_dt.bits == 64) {
-        _pairwise_distance<double, double>(
-          res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
+      if (metric == cuvsDistanceType::BitwiseHamming) {
+        // Only uint8_t supported for BitwiseHamming (with internal optimization)
+        if (x_dt.bits == 8) {
+          _pairwise_distance<uint8_t, uint32_t>(
+            res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
+        } else {
+          RAFT_FAIL("BitwiseHamming only supports 8-bit unsigned integer input. Received: %d bits",
+                    x_dt.bits);
+        }
       } else {
-        RAFT_FAIL("Unsupported DLtensor dtype: %d and bits: %d", x_dt.code, x_dt.bits);
+        // Float types for other metrics
+        if (x_dt.bits == 32) {
+          _pairwise_distance<float, float>(
+            res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
+        } else if (x_dt.bits == 16) {
+          _pairwise_distance<half, float>(
+            res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
+        } else if (x_dt.bits == 64) {
+          _pairwise_distance<double, double>(
+            res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
+        } else {
+          RAFT_FAIL("Unsupported DLtensor dtype: %d and bits: %d", x_dt.code, x_dt.bits);
+        }
       }
     } else {
-      if (x_dt.bits == 32) {
-        _pairwise_distance<float, float, raft::col_major>(
-          res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
-      } else if (x_dt.bits == 16) {
-        _pairwise_distance<half, float, raft::col_major>(
-          res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
-      } else if (x_dt.bits == 64) {
-        _pairwise_distance<double, double, raft::col_major>(
-          res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
+      if (metric == cuvsDistanceType::BitwiseHamming) {
+        // Only uint8_t supported for BitwiseHamming (column major)
+        if (x_dt.bits == 8) {
+          _pairwise_distance<uint8_t, uint32_t, raft::col_major>(
+            res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
+        } else {
+          RAFT_FAIL("BitwiseHamming only supports 8-bit unsigned integer input. Received: %d bits",
+                    x_dt.bits);
+        }
       } else {
-        RAFT_FAIL("Unsupported DLtensor dtype: %d and bits: %d", x_dt.code, x_dt.bits);
+        // Float types for other metrics (column major)
+        if (x_dt.bits == 32) {
+          _pairwise_distance<float, float, raft::col_major>(
+            res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
+        } else if (x_dt.bits == 16) {
+          _pairwise_distance<half, float, raft::col_major>(
+            res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
+        } else if (x_dt.bits == 64) {
+          _pairwise_distance<double, double, raft::col_major>(
+            res, x_tensor, y_tensor, distances_tensor, metric, metric_arg);
+        } else {
+          RAFT_FAIL("Unsupported DLtensor dtype: %d and bits: %d", x_dt.code, x_dt.bits);
+        }
       }
     }
   });
