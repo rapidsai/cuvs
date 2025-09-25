@@ -17,8 +17,7 @@ package com.nvidia.cuvs.internal.common;
 
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_POINTER;
 import static com.nvidia.cuvs.internal.common.Util.checkCudaError;
-import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaFreeHost;
-import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaMallocHost;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
