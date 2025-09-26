@@ -17,6 +17,8 @@
 #pragma once
 
 #include "../../distance/fused_distance_nn.cuh"
+#include "../../distance/unfused_distance_nn.cuh"
+
 #include "kmeans_common.cuh"
 #include <cuvs/cluster/kmeans.hpp>
 
@@ -27,6 +29,7 @@
 #include <raft/core/cudart_utils.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
+#include <raft/core/resource/cublas_handle.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
@@ -62,6 +65,37 @@ namespace cuvs::cluster::kmeans::detail {
 
 constexpr static inline float kAdjustCentersWeight = 7.0f;
 
+template <typename MathT, typename IdxT, typename LabelT>
+bool use_fused(IdxT m, IdxT n, IdxT k)
+{
+  // TODO: @tfeher Try using helpers from Try using the helpers from raft/util/arch.cuh
+  // https://github.com/rapidsai/cuvs/blob/1155a3a427cd1d1bfaf8fe74a937ed6dfa797ec7/cpp/src/neighbors/detail/nn_descent.cuh#L1210-L1222
+/*#if __CUDA_ARCH__ > 800
+  // Use fused if unfused workspace size is great than 100 MB
+  if (size_t(m) * n * sizeof(MathT) > 100 * 1024 * 1024) {
+    return true;
+  } else {
+    return false;
+  }
+#else
+  return true;
+#endif*/
+  static bool init_done = false;
+  static bool ret = true;
+
+  if (init_done == false) {
+    const char* NV_DEBUG = getenv("NV_DEBUG");
+    if (strcmp(NV_DEBUG, "unfused") == 0) {
+      ret = false;
+    }
+    if (strcmp(NV_DEBUG, "fused") == 0) {
+      ret = true;
+    }
+    init_done = true;
+  }
+  return ret;
+}
+
 /**
  * @brief Predict labels for the dataset; floating-point types only.
  *
@@ -96,42 +130,80 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
   LabelT* labels,
   rmm::device_async_resource_ref mr)
 {
-  auto stream = raft::resource::get_cuda_stream(handle);
+  nvtxRangePushA("predict_core");
+  auto stream           = raft::resource::get_cuda_stream(handle);
+  bool should_use_fused = use_fused<MathT, IdxT, LabelT>(n_rows, n_clusters, dim);
+
   switch (params.metric) {
     case cuvs::distance::DistanceType::L2Expanded:
     case cuvs::distance::DistanceType::L2SqrtExpanded: {
-      auto workspace = raft::make_device_mdarray<char, IdxT>(
-        handle, mr, raft::make_extents<IdxT>((sizeof(int)) * n_rows));
-
+      nvtxRangePushA("pc::workspace_alloc");
+      size_t workspace_size =
+        should_use_fused ? sizeof(IdxT) * n_rows : sizeof(MathT) * n_rows * n_clusters;
+      auto workspace =
+        raft::make_device_mdarray<char, IdxT>(handle, mr, raft::make_extents<IdxT>(workspace_size));
+      nvtxRangePop();
+      nvtxRangePushA("pc::output_alloc");
       auto minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, MathT>, IdxT>(
         handle, mr, raft::make_extents<IdxT>(n_rows));
+      nvtxRangePop();
+      /*auto unf_minClusterAndDistance =
+        raft::make_device_mdarray<raft::KeyValuePair<IdxT, MathT>, IdxT>(
+          handle, mr, raft::make_extents<IdxT>(n_rows));*/
+
+      nvtxRangePushA("pc::output_init");
       raft::KeyValuePair<IdxT, MathT> initial_value(0, std::numeric_limits<MathT>::max());
       thrust::fill(raft::resource::get_thrust_policy(handle),
                    minClusterAndDistance.data_handle(),
                    minClusterAndDistance.data_handle() + minClusterAndDistance.size(),
                    initial_value);
+      nvtxRangePop();
 
+      nvtxRangePushA("pc::row_norm");
       auto centroidsNorm =
         raft::make_device_mdarray<MathT, IdxT>(handle, mr, raft::make_extents<IdxT>(n_clusters));
       raft::linalg::rowNorm<raft::linalg::L2Norm, true, MathT, IdxT>(
         centroidsNorm.data_handle(), centers, dim, n_clusters, stream);
 
-      cuvs::distance::fusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
-        minClusterAndDistance.data_handle(),
-        dataset,
-        centers,
-        dataset_norm,
-        centroidsNorm.data_handle(),
-        n_rows,
-        n_clusters,
-        dim,
-        (void*)workspace.data_handle(),
-        (params.metric == cuvs::distance::DistanceType::L2Expanded) ? false : true,
-        false,
-        true,
-        params.metric,
-        0.0f,
-        stream);
+      nvtxRangePop();
+      if (should_use_fused) {
+        nvtxRangePushA("pc::fused_call");
+        cuvs::distance::fusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
+          minClusterAndDistance.data_handle(),
+          dataset,
+          centers,
+          dataset_norm,
+          centroidsNorm.data_handle(),
+          n_rows,
+          n_clusters,
+          dim,
+          (void*)workspace.data_handle(),
+          (params.metric == cuvs::distance::DistanceType::L2Expanded) ? false : true,
+          false,
+          true,
+          params.metric,
+          0.0f,
+          stream);
+        nvtxRangePop();
+      } else {
+        cuvs::distance::unfusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
+          handle,
+          minClusterAndDistance.data_handle(),
+          dataset,
+          centers,
+          dataset_norm,
+          centroidsNorm.data_handle(),
+          n_rows,
+          n_clusters,
+          dim,
+          (void*)workspace.data_handle(),
+          (params.metric == cuvs::distance::DistanceType::L2Expanded) ? false : true,
+          false,
+          true,
+          params.metric,
+          0.0f,
+          stream);
+      }
 
       // todo(lsugy): use KVP + iterator in caller.
       // Copy keys to output labels
@@ -216,6 +288,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
       RAFT_FAIL("The chosen distance metric is not supported (%d)", int(params.metric));
     }
   }
+  nvtxRangePop();
 }
 
 /**
