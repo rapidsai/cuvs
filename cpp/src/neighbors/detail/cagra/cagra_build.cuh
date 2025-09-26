@@ -54,6 +54,47 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
+// ACE: Write large file in chunks
+template <typename DataT, typename IdxT>
+void ace_write_large_file(std::string file_path,
+                          const size_t total_bytes,
+                          const void* data_ptr,
+                          size_t offset = 0)
+{
+  auto start                    = std::chrono::high_resolution_clock::now();
+  const size_t write_chunk_size = 1024 * 1024 * 1024;
+  size_t bytes_remaining        = total_bytes;
+  int fd                        = open(file_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
+  RAFT_EXPECTS(fd != -1, "Failed to create file: %s", file_path.c_str());
+
+  int n_chunks = total_bytes / write_chunk_size + 1;
+  RAFT_LOG_INFO("ACE: Writing file (%zu bytes) in %lu chunks of size %lu",
+                total_bytes,
+                n_chunks,
+                write_chunk_size);
+
+  while (bytes_remaining > 0) {
+    size_t chunk_size     = std::min(write_chunk_size, bytes_remaining);
+    ssize_t chunk_written = write(fd, reinterpret_cast<const char*>(data_ptr) + offset, chunk_size);
+
+    RAFT_EXPECTS(chunk_written == static_cast<ssize_t>(chunk_size),
+                 "Failed to write file chunk. Expected %zu bytes, wrote %zd",
+                 chunk_size,
+                 chunk_written);
+
+    bytes_remaining -= chunk_size;
+    offset += chunk_size;
+  }
+  close(fd);
+  auto end     = std::chrono::high_resolution_clock::now();
+  auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  RAFT_LOG_INFO("ACE: Writing file %s (%.4f GB) completed in %ld ms (%.1f MB/s)",
+                file_path.c_str(),
+                total_bytes / (1024.0 * 1024.0 * 1024.0),
+                elapsed,
+                total_bytes / (1024.0 * 1024.0) / (elapsed / 1000.0));
+}
+
 // ACE: Get partition labels for partitioned approach
 template <typename DataT, typename IdxT, typename Accessor>
 void ace_get_partition_labels(
@@ -526,9 +567,9 @@ void ace_reorder_and_store_dataset(
   const size_t disk_write_size    = 1024 * 1024;
   const size_t vector_size        = dataset_dim * sizeof(T);
   const size_t vectors_per_buffer = std::max<size_t>(1, disk_write_size / vector_size);
-  const size_t BUFFER_SIZE        = vectors_per_buffer * vector_size;
+  const size_t buffer_size        = vectors_per_buffer * vector_size;
 
-  RAFT_LOG_INFO("ACE: Using %zu vectors per buffer (%zu bytes)", vectors_per_buffer, BUFFER_SIZE);
+  RAFT_LOG_INFO("ACE: Using %zu vectors per buffer (%zu bytes)", vectors_per_buffer, buffer_size);
 
   // Create build directory if it doesn't exist
   if (mkdir(build_dir.c_str(), 0755) != 0 && errno != EEXIST) {
@@ -620,48 +661,62 @@ void ace_reorder_and_store_dataset(
     augmented_buffer_counts(p) = 0;
   }
 
-  // Lambda to flush primary buffer for a partition
-  auto flush_primary_buffer = [&](uint64_t partition_id) {
-    if (primary_buffer_counts(partition_id) > 0) {
-      size_t bytes_to_write = primary_buffer_counts(partition_id) * vector_size;
+  // Generalized buffer flushing routine
+  auto ace_flush_buffer = [&](uint64_t partition_id,
+                              bool is_primary,
+                              int file_fd,
+                              std::vector<raft::host_matrix<T, int64_t>>& buffers,
+                              raft::host_vector<uint64_t, int64_t>& buffer_counts,
+                              raft::host_vector<uint64_t, int64_t>& partition_starts,
+                              raft::host_vector<uint64_t, int64_t>& partition_current,
+                              const char* buffer_type) {
+    if (buffer_counts(partition_id) > 0) {
+      size_t bytes_to_write = buffer_counts(partition_id) * vector_size;
       uint64_t file_offset =
-        (primary_partition_starts(partition_id) + primary_partition_current(partition_id)) *
-        vector_size;
+        (partition_starts(partition_id) + partition_current(partition_id)) * vector_size;
 
-      ssize_t bytes_written = pwrite(
-        reordered_fd, primary_buffers[partition_id].data_handle(), bytes_to_write, file_offset);
+      ssize_t bytes_written =
+        pwrite(file_fd, buffers[partition_id].data_handle(), bytes_to_write, file_offset);
       RAFT_EXPECTS(bytes_written == static_cast<ssize_t>(bytes_to_write),
-                   "Failed to write primary buffer for partition %lu",
-                   partition_id);
+                   "Failed to write %s buffer for partition %lu. Expected %lu bytes, wrote %ld",
+                   buffer_type,
+                   partition_id,
+                   bytes_to_write,
+                   bytes_written);
 
-      primary_partition_current(partition_id) += primary_buffer_counts(partition_id);
-      primary_buffer_counts(partition_id) = 0;
+      partition_current(partition_id) += buffer_counts(partition_id);
+      buffer_counts(partition_id) = 0;
     }
   };
 
-  // Lambda to flush augmented buffer for a partition
+  // Convenience lambdas using the generalized routine
+  auto flush_primary_buffer = [&](uint64_t partition_id) {
+    ace_flush_buffer(partition_id,
+                     true,
+                     reordered_fd,
+                     primary_buffers,
+                     primary_buffer_counts,
+                     primary_partition_starts,
+                     primary_partition_current,
+                     "primary");
+  };
+
   auto flush_augmented_buffer = [&](uint64_t partition_id) {
-    if (augmented_buffer_counts(partition_id) > 0) {
-      size_t bytes_to_write = augmented_buffer_counts(partition_id) * vector_size;
-      uint64_t file_offset =
-        (augmented_partition_starts(partition_id) + augmented_partition_current(partition_id)) *
-        vector_size;
-
-      ssize_t bytes_written = pwrite(
-        augmented_fd, augmented_buffers[partition_id].data_handle(), bytes_to_write, file_offset);
-      RAFT_EXPECTS(bytes_written == static_cast<ssize_t>(bytes_to_write),
-                   "Failed to write augmented buffer for partition %lu",
-                   partition_id);
-
-      augmented_partition_current(partition_id) += augmented_buffer_counts(partition_id);
-      augmented_buffer_counts(partition_id) = 0;
-    }
+    ace_flush_buffer(partition_id,
+                     false,
+                     augmented_fd,
+                     augmented_buffers,
+                     augmented_buffer_counts,
+                     augmented_partition_starts,
+                     augmented_partition_current,
+                     "augmented");
   };
 
   // Process dataset sequentially - single pass through the data
   RAFT_LOG_INFO("ACE: Processing dataset sequentially to fill partition buffers...");
 
-  uint64_t vectors_processed = 0;
+  uint64_t vectors_processed  = 0;
+  const uint64_t log_interval = dataset_size / 100;
   for (uint64_t i = 0; i < dataset_size; i++) {
     uint64_t primary_partition   = partition_labels(i, 0);
     uint64_t secondary_partition = partition_labels(i, 1);
@@ -691,7 +746,7 @@ void ace_reorder_and_store_dataset(
     }
 
     vectors_processed++;
-    if (vectors_processed % 100000 == 0) {
+    if (vectors_processed % log_interval == 0) {
       RAFT_LOG_INFO("ACE: Processed %lu/%lu vectors (%.1f%%)",
                     vectors_processed,
                     dataset_size,
@@ -711,24 +766,32 @@ void ace_reorder_and_store_dataset(
   close(augmented_fd);
 
   // Create mapping file to store the reordering information
-  std::string mapping_file_path = build_dir + "/dataset_mapping.bin";
-  int mapping_fd = open(mapping_file_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
-  RAFT_EXPECTS(
-    mapping_fd != -1, "Failed to create dataset mapping file: %s", mapping_file_path.c_str());
+  std::string mapping_file_path    = build_dir + "/dataset_mapping.bin";
+  const uint64_t mapping_file_size = dataset_size * sizeof(IdxT);
+  ace_write_large_file<T, IdxT>(
+    mapping_file_path, mapping_file_size, forward_mapping_0.data_handle());
 
-  // Write vector forward list for reconstruction
-  ssize_t fwd_list_written =
-    write(mapping_fd, forward_mapping_0.data_handle(), dataset_size * sizeof(IdxT));
-  RAFT_EXPECTS(fwd_list_written == static_cast<ssize_t>(dataset_size * sizeof(IdxT)),
-               "Failed to write forward mapping list");
+  std::string graph_file_path = build_dir + "/cagra_graph.bin";
+  int graph_fd                = open(graph_file_path.c_str(), O_WRONLY | O_CREAT, 0644);
+  RAFT_EXPECTS(graph_fd != -1, "Failed to open/create graph file: %s", graph_file_path.c_str());
 
-  close(mapping_fd);
+  // Pre-allocate the graph file for the entire dataset
+  uint64_t total_file_size = dataset_size * params.graph_degree * sizeof(IdxT);
+
+  int result = posix_fallocate(graph_fd, 0, total_file_size);
+  if (result != 0) {
+    RAFT_LOG_WARN("ACE: Failed to pre-allocate graph file space: %s", strerror(result));
+  } else {
+    RAFT_LOG_INFO("ACE: Pre-allocated %.2f GB for graph file",
+                  total_file_size / (1024.0 * 1024.0 * 1024.0));
+  }
+  close(graph_fd);
 
   auto end        = std::chrono::high_resolution_clock::now();
   auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
   // Calculate total bytes written
-  uint64_t total_bytes_written = reordered_file_size + augmented_file_size;
+  uint64_t total_bytes_written = reordered_file_size + augmented_file_size + mapping_file_size;
   double throughput_mb_s       = (total_bytes_written / (1024.0 * 1024.0)) / (elapsed_ms / 1000.0);
 
   RAFT_LOG_INFO("ACE: Dataset reordering completed in %ld ms", elapsed_ms);
@@ -736,152 +799,6 @@ void ace_reorder_and_store_dataset(
                 total_bytes_written / (1024.0 * 1024.0 * 1024.0),
                 reordered_file_size / (1024.0 * 1024.0 * 1024.0),
                 augmented_file_size / (1024.0 * 1024.0 * 1024.0),
-                throughput_mb_s);
-}
-
-// ACE: Write sub-search graph to disk in partitioned format
-template <typename IdxT>
-void ace_write_sub_search_graph_to_disk(
-  raft::resources const& res,
-  const index_params& params,
-  raft::host_matrix_view<IdxT, int64_t, raft::row_major> sub_search_graph,
-  uint64_t partition_id,
-  uint64_t sub_dataset_size_0,
-  uint64_t graph_degree,
-  raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_labels,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> primary_partition_offsets)
-{
-  auto start = std::chrono::high_resolution_clock::now();
-
-  std::string build_dir       = params.ace_build_dir;
-  std::string graph_file_path = build_dir + "/cagra_graph.bin";
-
-  // NVMe optimization parameters
-  const size_t disk_write_size = 1 * 1024 * 1024;
-  const size_t row_size        = graph_degree * sizeof(IdxT);
-  const size_t rows_per_write  = std::max<size_t>(1, disk_write_size / row_size);
-
-  RAFT_LOG_INFO("ACE: Writing partition %lu sub-graph (%lu primary vectors, degree %lu) to %s",
-                partition_id,
-                sub_dataset_size_0,
-                graph_degree,
-                graph_file_path.c_str());
-
-  // Open graph file for writing (create if it doesn't exist)
-  int graph_fd = open(graph_file_path.c_str(), O_WRONLY | O_CREAT, 0644);
-  RAFT_EXPECTS(graph_fd != -1, "Failed to open/create graph file: %s", graph_file_path.c_str());
-
-  // Pre-allocate the graph file for the entire dataset if this is the first partition
-  if (partition_id == 0) {
-    uint64_t dataset_size    = partition_labels.extent(0);
-    uint64_t total_file_size = dataset_size * row_size;
-
-    int result = posix_fallocate(graph_fd, 0, total_file_size);
-    if (result != 0) {
-      RAFT_LOG_WARN("ACE: Failed to pre-allocate graph file space: %s", strerror(result));
-    } else {
-      RAFT_LOG_INFO("ACE: Pre-allocated %.2f GB for graph file",
-                    total_file_size / (1024.0 * 1024.0 * 1024.0));
-    }
-  }
-
-  // Create buffer for efficient writing
-  auto write_buffer     = raft::make_host_matrix<IdxT, int64_t>(rows_per_write, graph_degree);
-  uint64_t buffer_count = 0;
-
-  // Build mapping from local partition indices to global dataset indices
-  // This matches the disk-based ordering used in ace_load_partition_dataset_from_disk
-  auto local_to_global_mapping = raft::make_host_vector<uint64_t, int64_t>(sub_dataset_size_0);
-  uint64_t mapping_count       = 0;
-  uint64_t dataset_size        = partition_labels.extent(0);
-
-  // Iterate through dataset in order and collect indices for this partition's primary vectors
-  for (uint64_t i = 0; i < dataset_size && mapping_count < sub_dataset_size_0; i++) {
-    if (partition_labels(i, 0) == static_cast<IdxT>(partition_id)) {
-      local_to_global_mapping(mapping_count) = i;
-      mapping_count++;
-    }
-  }
-
-  RAFT_EXPECTS(mapping_count == sub_dataset_size_0,
-               "Expected %lu primary vectors for partition %lu, found %lu",
-               sub_dataset_size_0,
-               partition_id,
-               mapping_count);
-
-  // Lambda to flush buffer to disk at the correct positions
-  auto flush_buffer = [&](uint64_t base_local_idx) {
-    if (buffer_count == 0) return;
-
-    // Write each row in the buffer to its correct position in the file
-    for (uint64_t buf_row = 0; buf_row < buffer_count; buf_row++) {
-      uint64_t local_idx = base_local_idx + buf_row;
-      RAFT_EXPECTS(local_idx < sub_dataset_size_0,
-                   "Local index %lu exceeds partition size %lu",
-                   local_idx,
-                   sub_dataset_size_0);
-
-      uint64_t global_idx = local_to_global_mapping(local_idx);
-      uint64_t file_pos   = global_idx * row_size;
-
-      // Write the row data
-      const IdxT* row_data  = write_buffer.data_handle() + (buf_row * graph_degree);
-      ssize_t bytes_written = pwrite(graph_fd, row_data, row_size, file_pos);
-
-      RAFT_EXPECTS(bytes_written == static_cast<ssize_t>(row_size),
-                   "Failed to write graph row for global vector %lu at offset %lu",
-                   global_idx,
-                   file_pos);
-    }
-
-    buffer_count = 0;
-  };
-
-  // Process only primary partition vectors (first sub_dataset_size_0 rows)
-  uint64_t vectors_written = 0;
-  for (uint64_t i = 0; i < sub_dataset_size_0; i++) {
-    // Copy row to buffer
-    for (uint64_t k = 0; k < graph_degree; k++) {
-      write_buffer(buffer_count, k) = sub_search_graph(i, k);
-    }
-    buffer_count++;
-    vectors_written++;
-
-    // Flush buffer when full
-    if (buffer_count >= rows_per_write) {
-      uint64_t base_idx = vectors_written - buffer_count;
-      flush_buffer(base_idx);
-    }
-
-    // Progress logging
-    if (vectors_written % 50000 == 0) {
-      RAFT_LOG_INFO("ACE: Written %lu/%lu graph rows for partition %lu (%.1f%%)",
-                    vectors_written,
-                    sub_dataset_size_0,
-                    partition_id,
-                    100.0 * vectors_written / sub_dataset_size_0);
-    }
-  }
-
-  // Flush remaining buffer
-  if (buffer_count > 0) {
-    uint64_t base_idx = vectors_written - buffer_count;
-    flush_buffer(base_idx);
-  }
-
-  close(graph_fd);
-
-  auto end        = std::chrono::high_resolution_clock::now();
-  auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-  // Calculate throughput
-  uint64_t total_bytes_written = sub_dataset_size_0 * row_size;
-  double throughput_mb_s       = (total_bytes_written / (1024.0 * 1024.0)) / (elapsed_ms / 1000.0);
-
-  RAFT_LOG_INFO("ACE: Partition %lu graph written in %ld ms (%.2f MB at %.1f MB/s)",
-                partition_id,
-                elapsed_ms,
-                total_bytes_written / (1024.0 * 1024.0),
                 throughput_mb_s);
 }
 
@@ -1297,14 +1214,11 @@ index<T, IdxT> build_ace(
 
     if (use_disk) {
       // Write sub_search_graph to cagra_graph.bin on disk
-      ace_write_sub_search_graph_to_disk<IdxT>(res,
-                                               params,
-                                               sub_search_graph.view(),
-                                               partition_id,
-                                               sub_dataset_size_0,
-                                               graph_degree,
-                                               partition_labels.view(),
-                                               primary_partition_offsets.view());
+      std::string mapping_file_path = params.ace_build_dir + "/cagra_graph.bin";
+      ace_write_large_file<T, IdxT>(mapping_file_path,
+                                    sub_dataset_size * sizeof(IdxT),
+                                    sub_search_graph.data_handle(),
+                                    sub_dataset_size_0 * sizeof(IdxT));
     } else {
       // Adjust IDs in sub_search_graph and save to search_graph_0
       ace_adjust_sub_graph_ids<IdxT>(sub_dataset_size_0,
