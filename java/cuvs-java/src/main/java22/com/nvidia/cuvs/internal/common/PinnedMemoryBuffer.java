@@ -17,8 +17,7 @@ package com.nvidia.cuvs.internal.common;
 
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_POINTER;
 import static com.nvidia.cuvs.internal.common.Util.checkCudaError;
-import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaFreeHost;
-import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaMallocHost;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -32,10 +31,10 @@ public class PinnedMemoryBuffer implements AutoCloseable {
 
   private MemorySegment hostBuffer = MemorySegment.NULL;
 
-  public PinnedMemoryBuffer(long size, long columns, ValueLayout valueLayout) {
+  public PinnedMemoryBuffer(long rows, long columns, ValueLayout valueLayout) {
 
     long rowBytes = columns * valueLayout.byteSize();
-    long matrixBytes = size * rowBytes;
+    long matrixBytes = rows * rowBytes;
     if (matrixBytes < CHUNK_BYTES) {
       this.hostBufferBytes = matrixBytes;
     } else if (rowBytes > CHUNK_BYTES) {
@@ -61,7 +60,6 @@ public class PinnedMemoryBuffer implements AutoCloseable {
 
   public MemorySegment address() {
     if (hostBuffer == MemorySegment.NULL) {
-      //      System.out.println("Creating a buffer of size " + hostBufferBytes);
       hostBuffer = createPinnedBuffer(hostBufferBytes);
     }
     return hostBuffer;
