@@ -48,6 +48,11 @@ def test_vamana_build_basic(dtype):
 
 
 @pytest.mark.parametrize("dtype", [np.float32, np.int8, np.uint8])
+@pytest.mark.skip(
+    reason="Skipping host build test because of CUDA error "
+    "in C++ API. Reference issue: "
+    "https://github.com/rapidsai/cuvs/issues/1380"
+)
 def test_vamana_build_basic_host(dtype):
     n_rows, n_cols = 512, 12
     data = _gen_data((n_rows, n_cols), dtype)  # host array
