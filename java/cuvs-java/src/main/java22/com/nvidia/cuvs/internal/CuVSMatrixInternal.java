@@ -44,7 +44,11 @@ interface CuVSMatrixInternal extends CuVSMatrix {
    * DLTensor data type {@code code} for the element type of this matrix
    */
   default int code() {
-    return switch (dataType()) {
+    return code(dataType());
+  }
+
+  static int code(DataType dataType) {
+    return switch (dataType) {
       case FLOAT -> kDLFloat();
       case INT -> kDLInt();
       case UINT, BYTE -> kDLUInt();
