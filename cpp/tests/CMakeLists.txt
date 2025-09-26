@@ -21,9 +21,9 @@ rapids_test_init()
 
 function(ConfigureTest)
 
-  set(options OPTIONAL NOCUDA C_LIB FETCH_CODEBOOKS)
+  set(options NOCUDA C_LIB FETCH_CODEBOOKS)
   set(oneValueArgs NAME GPUS PERCENT ADDITIONAL_DEP)
-  set(multiValueArgs PATH TARGETS CONFIGURATIONS)
+  set(multiValueArgs PATH)
 
   cmake_parse_arguments(_CUVS_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
   if(NOT DEFINED _CUVS_TEST_GPUS AND NOT DEFINED _CUVS_TEST_PERCENT)
@@ -109,221 +109,274 @@ endfunction()
 
 if(BUILD_TESTS)
   ConfigureTest(
-    NAME NEIGHBORS_TEST PATH neighbors/brute_force.cu neighbors/brute_force_prefiltered.cu
-    neighbors/sparse_brute_force.cu neighbors/refine.cu GPUS 1 PERCENT 100
-  )
-
-  ConfigureTest(NAME NEIGHBORS_TIERED_INDEX_TEST PATH neighbors/tiered_index.cu GPUS 1 PERCENT 100)
-
-  ConfigureTest(
-    NAME CLUSTER_TEST PATH cluster/kmeans.cu cluster/kmeans_balanced.cu cluster/kmeans_find_k.cu
-    cluster/linkage.cu cluster/connect_knn.cu GPUS 1 PERCENT 100
-  )
-
-  ConfigureTest(
-    NAME
-    NEIGHBORS_ANN_IVF_FLAT_TEST
-    PATH
-    neighbors/ann_ivf_flat/test_float_int64_t.cu
-    neighbors/ann_ivf_flat/test_half_int64_t.cu
-    neighbors/ann_ivf_flat/test_int8_t_int64_t.cu
-    neighbors/ann_ivf_flat/test_uint8_t_int64_t.cu
-    GPUS
-    1
-    PERCENT
-    100
-  )
-
-  ConfigureTest(
-    NAME
-    NEIGHBORS_ANN_IVF_PQ_TEST
-    PATH
-    neighbors/ann_ivf_pq/test_float_int64_t.cu
-    neighbors/ann_ivf_pq/test_int8_t_int64_t.cu
-    neighbors/ann_ivf_pq/test_uint8_t_int64_t.cu
-    GPUS
-    1
-    PERCENT
-    100
-  )
-
-  ConfigureTest(
-    NAME NEIGHBORS_ANN_SCANN_TEST PATH neighbors/ann_scann/test_float_int64_t.cu GPUS 1 PERCENT 1
-  )
-
-  ConfigureTest(
-    NAME NEIGHBORS_ANN_BRUTE_FORCE_TEST PATH neighbors/ann_brute_force/test_float.cu
-    neighbors/ann_brute_force/test_half.cu GPUS 1 PERCENT 100
-  )
-
-  ConfigureTest(
-    NAME NEIGHBORS_ANN_CAGRA_TEST_BUGS PATH neighbors/ann_cagra/bug_extreme_inputs_oob.cu
-    neighbors/ann_cagra/bug_multi_cta_crash.cu GPUS 1 PERCENT 100
-  )
-
-  ConfigureTest(
-    NAME NEIGHBORS_ANN_CAGRA_FLOAT_UINT32_TEST PATH neighbors/ann_cagra/test_float_uint32_t.cu GPUS
-    1 PERCENT 100
-  )
-
-  ConfigureTest(
-    NAME NEIGHBORS_ANN_CAGRA_HELPERS_TEST PATH neighbors/ann_cagra/test_optimize_uint32_t.cu GPUS 1
+    NAME NEIGHBORS_TEST
+    PATH neighbors/brute_force.cu neighbors/brute_force_prefiltered.cu
+         neighbors/sparse_brute_force.cu neighbors/refine.cu
+    GPUS 1
     PERCENT 100
   )
 
   ConfigureTest(
-    NAME NEIGHBORS_ANN_CAGRA_HALF_UINT32_TEST PATH neighbors/ann_cagra/test_half_uint32_t.cu GPUS 1
+    NAME NEIGHBORS_TIERED_INDEX_TEST
+    PATH neighbors/tiered_index.cu
+    GPUS 1
     PERCENT 100
   )
 
   ConfigureTest(
-    NAME NEIGHBORS_ANN_CAGRA_INT8_UINT32_TEST PATH neighbors/ann_cagra/test_int8_t_uint32_t.cu GPUS
-    1 PERCENT 100
+    NAME CLUSTER_TEST
+    PATH cluster/kmeans.cu cluster/kmeans_balanced.cu cluster/kmeans_find_k.cu cluster/linkage.cu
+         cluster/connect_knn.cu
+    GPUS 1
+    PERCENT 100
   )
 
   ConfigureTest(
-    NAME NEIGHBORS_ANN_CAGRA_UINT8_UINT32_TEST PATH neighbors/ann_cagra/test_uint8_t_uint32_t.cu
-    GPUS 1 PERCENT 100
+    NAME NEIGHBORS_ANN_IVF_FLAT_TEST
+    PATH neighbors/ann_ivf_flat/test_float_int64_t.cu
+         neighbors/ann_ivf_flat/test_half_int64_t.cu
+         neighbors/ann_ivf_flat/test_int8_t_int64_t.cu
+         neighbors/ann_ivf_flat/test_uint8_t_int64_t.cu
+    GPUS 1
+    PERCENT 100
   )
 
   ConfigureTest(
-    NAME
-    NEIGHBORS_ANN_NN_DESCENT_TEST
-    PATH
-    neighbors/ann_nn_descent/test_float_uint32_t.cu
-    neighbors/ann_nn_descent/test_int8_t_uint32_t.cu
-    neighbors/ann_nn_descent/test_uint8_t_uint32_t.cu
-    GPUS
-    1
-    PERCENT
-    100
+    NAME NEIGHBORS_ANN_IVF_PQ_TEST
+    PATH neighbors/ann_ivf_pq/test_float_int64_t.cu neighbors/ann_ivf_pq/test_int8_t_int64_t.cu
+         neighbors/ann_ivf_pq/test_uint8_t_int64_t.cu
+    GPUS 1
+    PERCENT 100
   )
 
   ConfigureTest(
-    NAME
-    NEIGHBORS_ANN_VAMANA_TEST
-    PATH
-    neighbors/ann_vamana/test_float_uint32_t.cu
-    neighbors/ann_vamana/test_int8_t_uint32_t.cu
-    neighbors/ann_vamana/test_uint8_t_uint32_t.cu
-    GPUS
-    1
-    PERCENT
-    100
+    NAME NEIGHBORS_ANN_SCANN_TEST
+    PATH neighbors/ann_scann/test_float_int64_t.cu
+    GPUS 1
+    PERCENT 1
+  )
+
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_BRUTE_FORCE_TEST
+    PATH neighbors/ann_brute_force/test_float.cu neighbors/ann_brute_force/test_half.cu
+    GPUS 1
+    PERCENT 100
+  )
+
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_CAGRA_TEST_BUGS
+    PATH neighbors/ann_cagra/bug_extreme_inputs_oob.cu neighbors/ann_cagra/bug_multi_cta_crash.cu
+    GPUS 1
+    PERCENT 100
+  )
+
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_CAGRA_FLOAT_UINT32_TEST
+    PATH neighbors/ann_cagra/test_float_uint32_t.cu
+    GPUS 1
+    PERCENT 100
+  )
+
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_CAGRA_HELPERS_TEST
+    PATH neighbors/ann_cagra/test_optimize_uint32_t.cu
+    GPUS 1
+    PERCENT 100
+  )
+
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_CAGRA_HALF_UINT32_TEST
+    PATH neighbors/ann_cagra/test_half_uint32_t.cu
+    GPUS 1
+    PERCENT 100
+  )
+
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_CAGRA_INT8_UINT32_TEST
+    PATH neighbors/ann_cagra/test_int8_t_uint32_t.cu
+    GPUS 1
+    PERCENT 100
+  )
+
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_CAGRA_UINT8_UINT32_TEST
+    PATH neighbors/ann_cagra/test_uint8_t_uint32_t.cu
+    GPUS 1
+    PERCENT 100
+  )
+
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_NN_DESCENT_TEST
+    PATH neighbors/ann_nn_descent/test_float_uint32_t.cu
+         neighbors/ann_nn_descent/test_int8_t_uint32_t.cu
+         neighbors/ann_nn_descent/test_uint8_t_uint32_t.cu
+    GPUS 1
+    PERCENT 100
+  )
+
+  ConfigureTest(
+    NAME NEIGHBORS_ANN_VAMANA_TEST
+    PATH neighbors/ann_vamana/test_float_uint32_t.cu neighbors/ann_vamana/test_int8_t_uint32_t.cu
+         neighbors/ann_vamana/test_uint8_t_uint32_t.cu
+    GPUS 1
+    PERCENT 100
     FETCH_CODEBOOKS
   )
 
-  ConfigureTest(NAME NEIGHBORS_BALL_COVER_TEST PATH neighbors/ball_cover.cu GPUS 1 PERCENT 100)
-
   ConfigureTest(
-    NAME NEIGHBORS_EPSILON_NEIGHBORHOOD_TEST PATH neighbors/epsilon_neighborhood.cu GPUS 1 PERCENT
-    100
+    NAME NEIGHBORS_BALL_COVER_TEST
+    PATH neighbors/ball_cover.cu
+    GPUS 1
+    PERCENT 100
   )
 
   ConfigureTest(
-    NAME NEIGHBORS_ALL_NEIGHBORS_TEST PATH neighbors/all_neighbors/test_float.cu GPUS 1 PERCENT 100
+    NAME NEIGHBORS_EPSILON_NEIGHBORHOOD_TEST
+    PATH neighbors/epsilon_neighborhood.cu
+    GPUS 1
+    PERCENT 100
   )
 
   ConfigureTest(
-    NAME
-    NEIGHBORS_DYNAMIC_BATCHING_TEST
-    PATH
-    neighbors/dynamic_batching/test_brute_force.cu
-    neighbors/dynamic_batching/test_cagra.cu
-    neighbors/dynamic_batching/test_ivf_flat.cu
-    neighbors/dynamic_batching/test_ivf_pq.cu
-    GPUS
-    1
-    PERCENT
-    100
+    NAME NEIGHBORS_ALL_NEIGHBORS_TEST
+    PATH neighbors/all_neighbors/test_float.cu
+    GPUS 1
+    PERCENT 100
+  )
+
+  ConfigureTest(
+    NAME NEIGHBORS_DYNAMIC_BATCHING_TEST
+    PATH neighbors/dynamic_batching/test_brute_force.cu neighbors/dynamic_batching/test_cagra.cu
+         neighbors/dynamic_batching/test_ivf_flat.cu neighbors/dynamic_batching/test_ivf_pq.cu
+    GPUS 1
+    PERCENT 100
   )
 
   if(BUILD_CAGRA_HNSWLIB)
-    ConfigureTest(NAME NEIGHBORS_HNSW_TEST PATH neighbors/hnsw.cu GPUS 1 PERCENT 100)
+    ConfigureTest(
+      NAME NEIGHBORS_HNSW_TEST
+      PATH neighbors/hnsw.cu
+      GPUS 1
+      PERCENT 100
+    )
     target_link_libraries(NEIGHBORS_HNSW_TEST PRIVATE hnswlib::hnswlib)
     target_compile_definitions(NEIGHBORS_HNSW_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
   endif()
 
   if(BUILD_MG_ALGOS)
     ConfigureTest(
-      NAME NEIGHBORS_MG_TEST PATH neighbors/mg/test_float.cu GPUS 1 PERCENT 100 ADDITIONAL_DEP
-      NCCL::NCCL
+      NAME NEIGHBORS_MG_TEST
+      PATH neighbors/mg/test_float.cu
+      GPUS 1
+      PERCENT 100
+      ADDITIONAL_DEP NCCL::NCCL
     )
   endif()
 
   ConfigureTest(
-    NAME
-    DISTANCE_TEST
-    PATH
-    distance/dist_canberra.cu
-    distance/dist_correlation.cu
-    distance/dist_cos.cu
-    distance/dist_hamming.cu
-    distance/dist_hellinger.cu
-    distance/dist_inner_product.cu
-    distance/dist_jensen_shannon.cu
-    distance/dist_kl_divergence.cu
-    distance/dist_l1.cu
-    distance/dist_l2_exp.cu
-    distance/dist_l2_sqrt_exp.cu
-    distance/dist_l_inf.cu
-    distance/dist_lp_unexp.cu
-    distance/dist_russell_rao.cu
-    distance/gram.cu
-    distance/masked_nn.cu
-    distance/sparse_distance.cu
-    sparse/neighbors/cross_component_nn.cu
-    GPUS
-    1
-    PERCENT
-    100
+    NAME DISTANCE_TEST
+    PATH distance/dist_canberra.cu
+         distance/dist_correlation.cu
+         distance/dist_cos.cu
+         distance/dist_hamming.cu
+         distance/dist_hellinger.cu
+         distance/dist_inner_product.cu
+         distance/dist_jensen_shannon.cu
+         distance/dist_kl_divergence.cu
+         distance/dist_l1.cu
+         distance/dist_l2_exp.cu
+         distance/dist_l2_sqrt_exp.cu
+         distance/dist_l_inf.cu
+         distance/dist_lp_unexp.cu
+         distance/dist_russell_rao.cu
+         distance/gram.cu
+         distance/masked_nn.cu
+         distance/sparse_distance.cu
+         sparse/neighbors/cross_component_nn.cu
+    GPUS 1
+    PERCENT 100
   )
 
   ConfigureTest(
-    NAME SPARSE_TEST PATH sparse/cluster/cluster_solvers.cu sparse/cluster/eigen_solvers.cu
-    sparse/cluster/spectral.cu GPUS 1 PERCENT 100
+    NAME SPARSE_TEST
+    PATH sparse/cluster/cluster_solvers.cu sparse/cluster/eigen_solvers.cu
+         sparse/cluster/spectral.cu
+    GPUS 1
+    PERCENT 100
   )
 
   ConfigureTest(
-    NAME PREPROCESSING_TEST PATH preprocessing/scalar_quantization.cu
-    preprocessing/binary_quantization.cu preprocessing/spectral_embedding.cu GPUS 1 PERCENT 100
+    NAME PREPROCESSING_TEST
+    PATH preprocessing/scalar_quantization.cu preprocessing/binary_quantization.cu
+         preprocessing/spectral_embedding.cu
+    GPUS 1
+    PERCENT 100
   )
 
   ConfigureTest(
-    NAME STATS_TEST PATH stats/trustworthiness.cu stats/silhouette_score.cu GPUS 1 PERCENT 100
+    NAME STATS_TEST
+    PATH stats/trustworthiness.cu stats/silhouette_score.cu
+    GPUS 1
+    PERCENT 100
   )
 endif()
 
 if(TARGET cuvs::c_api)
   enable_language(C)
 
-  ConfigureTest(NAME INTEROP_TEST PATH core/interop.cu C_LIB)
   ConfigureTest(
-    NAME DISTANCE_C_TEST PATH distance/run_pairwise_distance_c.c distance/pairwise_distance_c.cu
+    NAME INTEROP_TEST
+    PATH core/interop.cu
+    C_LIB
+  )
+  ConfigureTest(
+    NAME DISTANCE_C_TEST
+    PATH distance/run_pairwise_distance_c.c distance/pairwise_distance_c.cu
     C_LIB
   )
 
   ConfigureTest(
-    NAME BRUTEFORCE_C_TEST PATH neighbors/run_brute_force_c.c neighbors/brute_force_c.cu C_LIB
+    NAME BRUTEFORCE_C_TEST
+    PATH neighbors/run_brute_force_c.c neighbors/brute_force_c.cu
+    C_LIB
   )
 
   ConfigureTest(
-    NAME IVF_FLAT_C_TEST PATH neighbors/run_ivf_flat_c.c neighbors/ann_ivf_flat_c.cu C_LIB
+    NAME IVF_FLAT_C_TEST
+    PATH neighbors/run_ivf_flat_c.c neighbors/ann_ivf_flat_c.cu
+    C_LIB
   )
 
-  ConfigureTest(NAME IVF_PQ_C_TEST PATH neighbors/run_ivf_pq_c.c neighbors/ann_ivf_pq_c.cu C_LIB)
-
-  ConfigureTest(NAME CAGRA_C_TEST PATH neighbors/ann_cagra_c.cu C_LIB)
-
-  ConfigureTest(NAME MG_C_TEST PATH neighbors/run_mg_c.c neighbors/ann_mg_c.cu C_LIB)
+  ConfigureTest(
+    NAME IVF_PQ_C_TEST
+    PATH neighbors/run_ivf_pq_c.c neighbors/ann_ivf_pq_c.cu
+    C_LIB
+  )
 
   ConfigureTest(
-    NAME ALL_NEIGHBORS_C_TEST PATH neighbors/run_all_neighbors_c.c neighbors/all_neighbors_c.cu
+    NAME CAGRA_C_TEST
+    PATH neighbors/ann_cagra_c.cu
+    C_LIB
+  )
+
+  ConfigureTest(
+    NAME MG_C_TEST
+    PATH neighbors/run_mg_c.c neighbors/ann_mg_c.cu
+    C_LIB
+  )
+
+  ConfigureTest(
+    NAME ALL_NEIGHBORS_C_TEST
+    PATH neighbors/run_all_neighbors_c.c neighbors/all_neighbors_c.cu
     C_LIB
   )
 
   if(BUILD_CAGRA_HNSWLIB)
-    ConfigureTest(NAME HNSW_C_TEST PATH neighbors/ann_hnsw_c.cu C_LIB)
+    ConfigureTest(
+      NAME HNSW_C_TEST
+      PATH neighbors/ann_hnsw_c.cu
+      C_LIB
+    )
     target_link_libraries(NEIGHBORS_HNSW_TEST PRIVATE hnswlib::hnswlib)
     target_compile_definitions(NEIGHBORS_HNSW_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
   endif()
