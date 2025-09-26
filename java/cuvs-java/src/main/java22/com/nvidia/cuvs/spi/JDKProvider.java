@@ -18,9 +18,11 @@ package com.nvidia.cuvs.spi;
 import static com.nvidia.cuvs.internal.common.Util.*;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsVersionGet;
 import static com.nvidia.cuvs.internal.panama.headers_h.uint16_t;
+import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaStreamSynchronize;
 
 import com.nvidia.cuvs.*;
 import com.nvidia.cuvs.internal.*;
+import com.nvidia.cuvs.internal.common.PinnedMemoryBuffer;
 import com.nvidia.cuvs.internal.common.Util;
 import java.io.IOException;
 import java.lang.foreign.Arena;
@@ -216,7 +218,7 @@ final class JDKProvider implements CuVSProvider {
   public CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
       CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType)
       throws UnsupportedOperationException {
-    return new HeapSegmentBuilder(resources, size, columns, dataType);
+    return new BufferedSegmentBuilder(resources, size, columns, dataType);
   }
 
   @Override
@@ -227,7 +229,7 @@ final class JDKProvider implements CuVSProvider {
       int rowStride,
       int columnStride,
       CuVSMatrix.DataType dataType) {
-    return new HeapSegmentBuilder(resources, size, columns, rowStride, columnStride, dataType);
+    return new BufferedSegmentBuilder(resources, size, columns, rowStride, columnStride, dataType);
   }
 
   @Override
@@ -279,28 +281,38 @@ final class JDKProvider implements CuVSProvider {
 
   /**
    * This {@link CuVSDeviceMatrix} builder implementation returns a {@link CuVSDeviceMatrix} backed by managed RMM
-   * device memory. It uses a non-native {@link MemorySegment} created directly from on-heap java arrays to avoid
-   * an intermediate allocation and copy to a native (off-heap) segment.
-   * It requires the copy function ({@code cudaMemcpyAsync}) to have the {@code Critical} linker option in order
-   * to allow the access to on-heap memory (see {@link Util#cudaMemcpyAsync}).
+   * device memory. It uses a {@link PinnedMemoryBuffer} to batch data before copying it to the GPU.
    */
-  private static class HeapSegmentBuilder implements CuVSMatrix.Builder<CuVSDeviceMatrix> {
+  private static class BufferedSegmentBuilder implements CuVSMatrix.Builder<CuVSDeviceMatrix> {
+
     private final long columns;
     private final long size;
     private final CuVSDeviceMatrixImpl matrix;
     private final MemorySegment stream;
-    private int current;
 
-    private HeapSegmentBuilder(
+    private final long rowBytes;
+    private int currentRow;
+
+    private final PinnedMemoryBuffer hostBuffer;
+    private final long bufferRowCount;
+    private int currentBufferRow;
+
+    private BufferedSegmentBuilder(
         CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType) {
       this.columns = columns;
       this.size = size;
       this.matrix = CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType);
       this.stream = Util.getStream(resources);
-      this.current = 0;
+      this.currentRow = 0;
+
+      this.hostBuffer = new PinnedMemoryBuffer(size, columns, matrix.valueLayout());
+
+      this.rowBytes = columns * matrix.valueLayout().byteSize();
+      this.bufferRowCount = Math.min((hostBuffer.size() / rowBytes), size);
+      this.currentBufferRow = 0;
     }
 
-    private HeapSegmentBuilder(
+    private BufferedSegmentBuilder(
         CuVSResources resources,
         long size,
         long columns,
@@ -313,7 +325,13 @@ final class JDKProvider implements CuVSProvider {
           CuVSDeviceMatrixRMMImpl.create(
               resources, size, columns, rowStride, columnStride, dataType);
       this.stream = Util.getStream(resources);
-      this.current = 0;
+      this.currentRow = 0;
+
+      this.hostBuffer = new PinnedMemoryBuffer(size, columns, matrix.valueLayout());
+
+      this.rowBytes = columns * matrix.valueLayout().byteSize();
+      this.bufferRowCount = Math.min((hostBuffer.size() / rowBytes), size);
+      this.currentBufferRow = 0;
     }
 
     @Override
@@ -347,19 +365,38 @@ final class JDKProvider implements CuVSProvider {
     }
 
     private void internalAddVector(MemorySegment vector) {
-      if (current >= size) {
+      if (currentRow >= size) {
         throw new ArrayIndexOutOfBoundsException();
       }
+      var hostBufferOffset = currentBufferRow * rowBytes;
+      MemorySegment.copy(vector, 0, hostBuffer.address(), hostBufferOffset, rowBytes);
 
-      long rowBytes = columns * matrix.valueLayout().byteSize();
+      currentRow++;
+      currentBufferRow++;
+      if (currentBufferRow == bufferRowCount) {
+        flushBuffer();
+      }
+    }
 
-      var dstOffset = ((current++) * rowBytes);
-      var dst = matrix.memorySegment().asSlice(dstOffset);
-      cudaMemcpyAsync(dst, vector, rowBytes, CudaMemcpyKind.HOST_TO_DEVICE, stream);
+    private void flushBuffer() {
+      if (currentBufferRow > 0) {
+        var deviceMemoryOffset = (currentRow - currentBufferRow) * rowBytes;
+        var dst = matrix.memorySegment().asSlice(deviceMemoryOffset);
+        cudaMemcpyAsync(
+            dst,
+            hostBuffer.address(),
+            currentBufferRow * rowBytes,
+            CudaMemcpyKind.HOST_TO_DEVICE,
+            stream);
+        currentBufferRow = 0;
+        checkCudaError(cudaStreamSynchronize(stream), "cudaStreamSynchronize");
+      }
     }
 
     @Override
     public CuVSDeviceMatrix build() {
+      flushBuffer();
+      hostBuffer.close();
       return matrix;
     }
   }

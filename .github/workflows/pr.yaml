@@ -159,8 +159,8 @@ jobs:
       fail-fast: false
       matrix:
         cuda_version:
-          - '12.9.1'
-          - '13.0.0'
+          - &latest_cuda12 '12.9.1'
+          - &latest_cuda13 '13.0.1'
     with:
       build_type: pull-request
       node_type: "gpu-l4-latest-1"
@@ -189,8 +189,8 @@ jobs:
       fail-fast: false
       matrix:
         cuda_version:
-          - '12.9.1'
-          - '13.0.0'
+          - *latest_cuda12
+          - *latest_cuda13
     with:
       build_type: pull-request
       node_type: "gpu-l4-latest-1"
@@ -207,8 +207,8 @@ jobs:
       fail-fast: false
       matrix:
         cuda_version:
-          - '12.9.1'
-          - '13.0.0'
+          - *latest_cuda12
+          - *latest_cuda13
     with:
       build_type: pull-request
       node_type: "gpu-l4-latest-1"
