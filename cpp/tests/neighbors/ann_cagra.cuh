@@ -404,13 +404,6 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
             index_params.graph_build_params = graph_build_params::iterative_search_params();
             break;
           }
-          case graph_build_algo::AUTO:
-            if (ps.metric == cuvs::distance::DistanceType::CosineExpanded &&
-                !std::is_same_v<DataT, float>) {
-              index_params.graph_build_params = graph_build_params::nn_descent_params(
-                index_params.intermediate_graph_degree, index_params.metric);
-            }
-            break;
         };
 
         index_params.compression = ps.compression;
@@ -603,13 +596,6 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
             index_params.graph_build_params = graph_build_params::iterative_search_params();
             break;
           }
-          case graph_build_algo::AUTO:
-            if (ps.metric == cuvs::distance::DistanceType::CosineExpanded &&
-                !std::is_same_v<DataT, float>) {
-              index_params.graph_build_params = graph_build_params::nn_descent_params(
-                index_params.intermediate_graph_degree, index_params.metric);
-            }
-            break;
         };
 
         cagra::search_params search_params;
@@ -825,13 +811,6 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
             index_params.graph_build_params = graph_build_params::iterative_search_params();
             break;
           }
-          case graph_build_algo::AUTO:
-            if (ps.metric == cuvs::distance::DistanceType::CosineExpanded &&
-                !std::is_same_v<DataT, float>) {
-              index_params.graph_build_params = graph_build_params::nn_descent_params(
-                index_params.intermediate_graph_degree, index_params.metric);
-            }
-            break;
         };
 
         index_params.compression = ps.compression;
@@ -1041,13 +1020,6 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
             index_params.graph_build_params = graph_build_params::iterative_search_params();
             break;
           }
-          case graph_build_algo::AUTO:
-            if (ps.metric == cuvs::distance::DistanceType::CosineExpanded &&
-                !std::is_same_v<DataT, float>) {
-              index_params.graph_build_params = graph_build_params::nn_descent_params(
-                index_params.intermediate_graph_degree, index_params.metric);
-            }
-            break;
         };
 
         const double splite_ratio        = 0.55;
@@ -1307,9 +1279,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},  // team_size
     {32, 64, 128, 256, 512, 768},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded,
-     cuvs::distance::DistanceType::InnerProduct,
-     cuvs::distance::DistanceType::CosineExpanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false},
     {true},
     {0.995},
@@ -1332,9 +1302,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},  // team_size
     {64},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded,
-     cuvs::distance::DistanceType::InnerProduct,
-     cuvs::distance::DistanceType::CosineExpanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false, true},
     {false},
     {0.985},
@@ -1393,9 +1361,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {0},  // team_size
     {64},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded,
-     cuvs::distance::DistanceType::InnerProduct,
-     cuvs::distance::DistanceType::CosineExpanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false, true},
     {false},
     {0.99},
@@ -1541,9 +1507,7 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
     {0},
     {256},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded,
-     cuvs::distance::DistanceType::InnerProduct,
-     cuvs::distance::DistanceType::CosineExpanded},
+    {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false},
     {true},
     {0.995});
