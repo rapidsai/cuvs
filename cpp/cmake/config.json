@@ -13,7 +13,16 @@
         }
       },
       "ConfigureTest": {
-        "flags": ["TEST_NAME", "TEST_SRC"]
+        "flags": ["OPTIONAL", "NOCUDA", "C_LIB", "FETCH_CODEBOOKS"],
+        "kwargs": {
+          "NAME": 1,
+          "GPUS": "?",
+          "PERCENT": "?",
+          "ADDITIONAL_DEP": "?",
+          "PATH": "*",
+          "TARGETS": "+",
+          "CONFIGURATIONS": "*"
+        }
       },
       "ConfigureBench": {
         "flags": ["BENCH_NAME", "BENCH_SRC"]
