@@ -255,9 +255,9 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
     auto orig_data = raft::make_device_matrix_view<T, int64_t>(dataset_.data_handle(), n_take, dim);
 
     reconstruct_vectors(handle,
-                        quantizer.params,
+                        quantizer.params_quantizer,
                         codes,
-                        raft::make_const_mdspan(quantizer.vpq_dataset.pq_code_book.view()),
+                        raft::make_const_mdspan(quantizer.vpq_codebooks.pq_code_book.view()),
                         rec_data.view());
 
     compare_vectors_l2(handle, orig_data, rec_data.view(), compression_ratio, 0.04, false);
@@ -269,7 +269,8 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
     raft::resource::sync_stream(handle);
     auto pq = train(handle, config_, dataset_.view());
 
-    auto n_encoded_cols = raft::div_rounding_up_safe(pq.params.pq_dim * pq.params.pq_bits, 8u);
+    auto n_encoded_cols =
+      raft::div_rounding_up_safe(pq.params_quantizer.pq_dim * pq.params_quantizer.pq_bits, 8u);
     auto d_quantized_output =
       raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
 
@@ -300,8 +301,9 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
     }
 
     // 2. Verify that the quantized output is consistent with the input
-    double compression_ratio = static_cast<double>(n_features_ * 8) /
-                               static_cast<double>(pq.params.pq_dim * pq.params.pq_bits);
+    double compression_ratio =
+      static_cast<double>(n_features_ * 8) /
+      static_cast<double>(pq.params_quantizer.pq_dim * pq.params_quantizer.pq_bits);
 
     check_reconstruction(pq, d_quantized_output.view(), compression_ratio, 500);
   }

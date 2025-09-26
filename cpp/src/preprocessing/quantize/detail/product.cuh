@@ -62,15 +62,14 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_no_id_kernel(
 template <typename MathT, typename IdxT, typename DatasetT>
 void process_and_fill_codes_no_id(
   const raft::resources& res,
-  const vpq_params& params,
+  const cuvs::preprocessing::quantize::product::params& params,
   const DatasetT& dataset,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
   raft::device_matrix_view<uint8_t, IdxT, raft::row_major> codes)
 {
-  using data_t     = typename DatasetT::value_type;
-  using cdataset_t = vpq_dataset<MathT, IdxT>;
-  using label_t    = uint32_t;
+  using data_t  = typename DatasetT::value_type;
+  using label_t = uint32_t;
 
   const ix_t n_rows       = dataset.extent(0);
   const ix_t dim          = dataset.extent(1);
@@ -164,15 +163,15 @@ void transform(raft::resources const& res,
                "Output matrix must have the same number of rows as the input dataset");
   RAFT_EXPECTS(
     out.extent(1) == raft::div_rounding_up_safe<int64_t>(
-                       quantizer.vpq_dataset.pq_bits() * quantizer.vpq_dataset.pq_dim(), 8),
+                       quantizer.vpq_codebooks.pq_bits() * quantizer.vpq_codebooks.pq_dim(), 8),
     "Output matrix must have (pq_dim * pq_bits / 8) columns");
   // Encode dataset
   cuvs::neighbors::detail::process_and_fill_codes_no_id<T, int64_t>(
     res,
-    quantizer.params,
+    quantizer.params_quantizer,
     dataset,
-    raft::make_const_mdspan(quantizer.vpq_dataset.vq_code_book.view()),
-    raft::make_const_mdspan(quantizer.vpq_dataset.pq_code_book.view()),
+    raft::make_const_mdspan(quantizer.vpq_codebooks.vq_code_book.view()),
+    raft::make_const_mdspan(quantizer.vpq_codebooks.pq_code_book.view()),
     out);
 }
 }  // namespace cuvs::preprocessing::quantize::product::detail

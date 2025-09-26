@@ -41,8 +41,8 @@ using params = cuvs::neighbors::vpq_params;
  */
 template <typename T>
 struct quantizer {
-  params params;
-  cuvs::neighbors::vpq_dataset<T, int64_t> vpq_dataset;
+  params params_quantizer;
+  cuvs::neighbors::vpq_dataset<T, int64_t> vpq_codebooks;
 };
 
 /**

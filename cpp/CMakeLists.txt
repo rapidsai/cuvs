@@ -740,6 +740,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
       src/neighbors/tiered_index_c.cpp
       src/neighbors/all_neighbors_c.cpp
       src/preprocessing/quantize/binary_c.cpp
+      src/preprocessing/quantize/product_c.cpp
       src/preprocessing/quantize/scalar_c.cpp
       src/distance/pairwise_distance_c.cpp
       ${CUVS_C_MG_ALGOS}

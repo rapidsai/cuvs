@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .product import Quantizer, QuantizerParams, train, transform
 
-from cuvs.preprocessing.quantize import binary, product, scalar
-
-__all__ = ["binary", "product", "scalar"]
+__all__ = [
+    "QuantizerParams",
+    "Quantizer",
+    "train",
+    "transform",
+]
