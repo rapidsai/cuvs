@@ -22,3 +22,12 @@ Error Handling
     :project: cuvs
     :members:
     :content-only:
+
+Logging
+-------
+
+.. doxygengroup:: log_c
+    :project: cuvs
+    :members:
+    :content-only:
+
