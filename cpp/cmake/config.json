@@ -13,15 +13,13 @@
         }
       },
       "ConfigureTest": {
-        "flags": ["OPTIONAL", "NOCUDA", "C_LIB", "FETCH_CODEBOOKS"],
+        "flags": ["NOCUDA", "C_LIB", "FETCH_CODEBOOKS"],
         "kwargs": {
           "NAME": 1,
           "GPUS": "?",
           "PERCENT": "?",
           "ADDITIONAL_DEP": "?",
-          "PATH": "*",
-          "TARGETS": "+",
-          "CONFIGURATIONS": "*"
+          "PATH": "*"
         }
       },
       "ConfigureBench": {

@@ -21,9 +21,9 @@ rapids_test_init()
 
 function(ConfigureTest)
 
-  set(options OPTIONAL NOCUDA C_LIB FETCH_CODEBOOKS)
+  set(options NOCUDA C_LIB FETCH_CODEBOOKS)
   set(oneValueArgs NAME GPUS PERCENT ADDITIONAL_DEP)
-  set(multiValueArgs PATH TARGETS CONFIGURATIONS)
+  set(multiValueArgs PATH)
 
   cmake_parse_arguments(_CUVS_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
   if(NOT DEFINED _CUVS_TEST_GPUS AND NOT DEFINED _CUVS_TEST_PERCENT)
