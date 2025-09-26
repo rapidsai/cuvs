@@ -404,6 +404,9 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
             index_params.graph_build_params = graph_build_params::iterative_search_params();
             break;
           }
+          case graph_build_algo::AUTO:
+            // do nothing
+            break;
         };
 
         index_params.compression = ps.compression;
@@ -596,6 +599,9 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
             index_params.graph_build_params = graph_build_params::iterative_search_params();
             break;
           }
+          case graph_build_algo::AUTO:
+            // do nothing
+            break;
         };
 
         cagra::search_params search_params;
@@ -811,6 +817,9 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
             index_params.graph_build_params = graph_build_params::iterative_search_params();
             break;
           }
+          case graph_build_algo::AUTO:
+            // do nothing
+            break;
         };
 
         index_params.compression = ps.compression;
@@ -1020,6 +1029,9 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
             index_params.graph_build_params = graph_build_params::iterative_search_params();
             break;
           }
+          case graph_build_algo::AUTO:
+            // do nothing
+            break;
         };
 
         const double splite_ratio        = 0.55;
