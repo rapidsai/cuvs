@@ -1,5 +1,5 @@
-Cluster
-=======
+Agglomerative
+=============
 
 .. role:: py(code)
    :language: c++
