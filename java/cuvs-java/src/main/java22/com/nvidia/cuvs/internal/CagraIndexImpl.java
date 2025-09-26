@@ -17,16 +17,13 @@ package com.nvidia.cuvs.internal;
 
 import static com.nvidia.cuvs.internal.CuVSParamsHelper.*;
 import static com.nvidia.cuvs.internal.common.CloseableRMMAllocation.allocateRMMSegment;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
-import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT_BYTE_SIZE;
+import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.DEVICE_TO_HOST;
 import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.HOST_TO_DEVICE;
-import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.INFER_DIRECTION;
 import static com.nvidia.cuvs.internal.common.Util.buildMemorySegment;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.concatenate;
-import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
@@ -35,6 +32,7 @@ import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.internal.common.CloseableHandle;
 import com.nvidia.cuvs.internal.common.CloseableRMMAllocation;
 import com.nvidia.cuvs.internal.common.CompositeCloseableHandle;
+import com.nvidia.cuvs.internal.common.Util;
 import com.nvidia.cuvs.internal.panama.*;
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -232,19 +230,18 @@ public class CagraIndexImpl implements CagraIndex {
     try (var localArena = Arena.ofConfined()) {
       checkNotDestroyed();
       int topK = query.getTopK();
-      long numQueries = query.getQueryVectors().length;
+      var queryVectors = (CuVSMatrixInternal) query.getQueryVectors();
+      long numQueries = queryVectors.size();
       long numBlocks = topK * numQueries;
-      int vectorDimension = numQueries > 0 ? query.getQueryVectors()[0].length : 0;
 
       SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_INT);
-      SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
+      SequenceLayout distancesSequenceLayout =
+          MemoryLayout.sequenceLayout(numBlocks, queryVectors.valueLayout());
       MemorySegment neighborsMemorySegment = localArena.allocate(neighborsSequenceLayout);
       MemorySegment distancesMemorySegment = localArena.allocate(distancesSequenceLayout);
-      MemorySegment floatsSeg = buildMemorySegment(localArena, query.getQueryVectors());
 
-      final long queriesBytes = C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
       final long neighborsBytes = C_INT_BYTE_SIZE * numQueries * topK;
-      final long distancesBytes = C_FLOAT_BYTE_SIZE * numQueries * topK;
+      final long distancesBytes = queryVectors.valueLayout().byteSize() * numQueries * topK;
       final boolean hasPreFilter = query.getPrefilter() != null;
       final BitSet[] prefilters =
           hasPreFilter ? new BitSet[] {query.getPrefilter()} : EMPTY_PREFILTER_BITSET;
@@ -254,8 +251,10 @@ public class CagraIndexImpl implements CagraIndex {
 
       try (var resourcesAccessor = query.getResources().access()) {
         var cuvsRes = resourcesAccessor.handle();
+        var cuvsStream = Util.getStream(cuvsRes);
 
-        try (var queriesDP = allocateRMMSegment(cuvsRes, queriesBytes);
+        try (var deviceQueryVectors =
+                (CuVSMatrixInternal) queryVectors.toDevice(query.getResources());
             var neighborsDP = allocateRMMSegment(cuvsRes, neighborsBytes);
             var distancesDP = allocateRMMSegment(cuvsRes, distancesBytes);
             var prefilterDP =
@@ -263,12 +262,7 @@ public class CagraIndexImpl implements CagraIndex {
                     ? allocateRMMSegment(cuvsRes, prefilterBytes)
                     : CloseableRMMAllocation.EMPTY) {
 
-          cudaMemcpy(queriesDP.handle(), floatsSeg, queriesBytes, INFER_DIRECTION);
-
-          long[] queriesShape = {numQueries, vectorDimension};
-          MemorySegment queriesTensor =
-              prepareTensor(
-                  localArena, queriesDP.handle(), queriesShape, kDLFloat(), 32, kDLCUDA());
+          var queryTensor = deviceQueryVectors.toTensor(localArena);
           long[] neighborsShape = {numQueries, topK};
           MemorySegment neighborsTensor =
               prepareTensor(
@@ -276,32 +270,34 @@ public class CagraIndexImpl implements CagraIndex {
           long[] distancesShape = {numQueries, topK};
           MemorySegment distancesTensor =
               prepareTensor(
-                  localArena, distancesDP.handle(), distancesShape, kDLFloat(), 32, kDLCUDA());
-
-          var returnValue = cuvsStreamSync(cuvsRes);
-          checkCuVSError(returnValue, "cuvsStreamSync");
+                  localArena,
+                  distancesDP.handle(),
+                  distancesShape,
+                  deviceQueryVectors.code(),
+                  deviceQueryVectors.bits(),
+                  kDLCUDA());
 
           // prepare the prefiltering data
-          MemorySegment prefilterDataMemorySegment = MemorySegment.NULL;
-          if (hasPreFilter) {
-            BitSet concatenatedFilters = concatenate(prefilters, query.getNumDocs());
-            long[] filters = concatenatedFilters.toLongArray();
-            prefilterDataMemorySegment = buildMemorySegment(localArena, filters);
-          }
-
           MemorySegment prefilter = cuvsFilter.allocate(localArena);
-          MemorySegment prefilterTensor;
 
           if (!hasPreFilter) {
             cuvsFilter.type(prefilter, 0); // NO_FILTER
             cuvsFilter.addr(prefilter, 0);
           } else {
+            BitSet concatenatedFilters = concatenate(prefilters, query.getNumDocs());
+            long[] filters = concatenatedFilters.toLongArray();
+            var prefilterDataMemorySegment = buildMemorySegment(localArena, filters);
+
             long[] prefilterShape = {prefilterLen};
 
-            cudaMemcpy(
-                prefilterDP.handle(), prefilterDataMemorySegment, prefilterBytes, HOST_TO_DEVICE);
+            Util.cudaMemcpyAsync(
+                prefilterDP.handle(),
+                prefilterDataMemorySegment,
+                prefilterBytes,
+                HOST_TO_DEVICE,
+                cuvsStream);
 
-            prefilterTensor =
+            MemorySegment prefilterTensor =
                 prepareTensor(
                     localArena, prefilterDP.handle(), prefilterShape, kDLUInt(), 32, kDLCUDA());
 
@@ -309,25 +305,36 @@ public class CagraIndexImpl implements CagraIndex {
             cuvsFilter.addr(prefilter, prefilterTensor.address());
           }
 
-          returnValue = cuvsStreamSync(cuvsRes);
-          checkCuVSError(returnValue, "cuvsStreamSync");
+          // TODO: do we need this stream sync here?
+          checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync");
 
-          returnValue =
+          var returnValue =
               cuvsCagraSearch(
                   cuvsRes,
                   segmentFromSearchParams(localArena, query.getCagraSearchParameters()),
                   cagraIndexReference.getMemorySegment(),
-                  queriesTensor,
+                  queryTensor,
                   neighborsTensor,
                   distancesTensor,
                   prefilter);
           checkCuVSError(returnValue, "cuvsCagraSearch");
 
-          returnValue = cuvsStreamSync(cuvsRes);
-          checkCuVSError(returnValue, "cuvsStreamSync");
+          // TODO: we can avoid/defer this using CuVSDeviceMatrix for neighborsDP and distancesDP
+          // TODO: also, should we use cuvsMatrixCopy instead?
+          Util.cudaMemcpyAsync(
+              neighborsMemorySegment,
+              neighborsDP.handle(),
+              neighborsBytes,
+              DEVICE_TO_HOST,
+              cuvsStream);
+          Util.cudaMemcpyAsync(
+              distancesMemorySegment,
+              distancesDP.handle(),
+              distancesBytes,
+              DEVICE_TO_HOST,
+              cuvsStream);
 
-          cudaMemcpy(neighborsMemorySegment, neighborsDP.handle(), neighborsBytes, INFER_DIRECTION);
-          cudaMemcpy(distancesMemorySegment, distancesDP.handle(), distancesBytes, INFER_DIRECTION);
+          checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync");
         }
       }
 
