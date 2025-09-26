@@ -55,7 +55,7 @@ struct cuvsVamanaIndexParams {
    * literature **/
   uint32_t visited_size;
   /** Number of Vamana vector insertion iterations (each iteration inserts all vectors). */
-  uint32_t vamana_iters;
+  float vamana_iters;
   /** Alpha for pruning parameter */
   float alpha;
   /** Maximum fraction of dataset inserted per batch.              *

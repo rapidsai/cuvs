@@ -82,7 +82,7 @@ cdef class IndexParams:
     visited_size : int, default=64
         Maximum number of visited nodes per search during Vamana algorithm.
         Loosely corresponds to the L parameter in the literature.
-    vamana_iters : int, default=1
+    vamana_iters : float, default=1
         Number of Vamana vector insertion iterations (each iteration inserts
         all vectors).
     alpha : float, default=1.2

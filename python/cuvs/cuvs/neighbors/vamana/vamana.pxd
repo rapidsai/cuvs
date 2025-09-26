@@ -29,7 +29,7 @@ cdef extern from "cuvs/neighbors/vamana.h" nogil:
         cuvsDistanceType metric
         uint32_t graph_degree
         uint32_t visited_size
-        uint32_t vamana_iters
+        float vamana_iters
         float alpha
         float max_fraction
         float batch_base
