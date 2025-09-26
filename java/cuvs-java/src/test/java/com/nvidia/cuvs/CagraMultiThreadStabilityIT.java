@@ -186,13 +186,14 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
   private void performQueryWithPrivateResource(CagraIndex index) throws Throwable {
     float[][] queries = generateRandomDataset(queryBatchSize);
 
-    try (CuVSResources threadResources = CheckedCuVSResources.create()) {
-      CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
+    CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
+    try (CuVSResources threadResources = CheckedCuVSResources.create();
+        var queryVectors = CuVSMatrix.ofArray(queries)) {
       CagraQuery query =
           new CagraQuery.Builder(threadResources)
               .withTopK(topK)
               .withSearchParams(searchParams)
-              .withQueryVectors(queries)
+              .withQueryVectors(queryVectors)
               .build();
 
       // This call should now work with per-thread resources
@@ -207,17 +208,19 @@ public class CagraMultiThreadStabilityIT extends CuVSTestCase {
     float[][] queries = generateRandomDataset(queryBatchSize);
 
     CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
-    CagraQuery query =
-        new CagraQuery.Builder(threadResources)
-            .withTopK(topK)
-            .withSearchParams(searchParams)
-            .withQueryVectors(queries)
-            .build();
+    try (var queryVectors = CuVSMatrix.ofArray(queries)) {
+      CagraQuery query =
+          new CagraQuery.Builder(threadResources)
+              .withTopK(topK)
+              .withSearchParams(searchParams)
+              .withQueryVectors(queryVectors)
+              .build();
 
-    // This call should now work with per-thread resources
-    SearchResults results = index.search(query);
-    assertNotNull("Query should return results", results);
-    assertFalse("Query should return some results", results.getResults().isEmpty());
+      // This call should now work with per-thread resources
+      SearchResults results = index.search(query);
+      assertNotNull("Query should return results", results);
+      assertFalse("Query should return some results", results.getResults().isEmpty());
+    }
   }
 
   private float[][] generateRandomDataset(int size) {

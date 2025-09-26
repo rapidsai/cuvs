@@ -162,11 +162,11 @@ public class CagraRandomizedIT extends CuVSTestCase {
       }
       log.trace("Index built successfully.");
 
-      try {
+      try (var queryVectors = CuVSMatrix.ofArray(queries)) {
         // Execute search and retrieve results
         CagraQuery.Builder queryBuilder =
             new CagraQuery.Builder(resources)
-                .withQueryVectors(queries)
+                .withQueryVectors(queryVectors)
                 .withTopK(topK)
                 .withSearchParams(new CagraSearchParams.Builder().build());
 

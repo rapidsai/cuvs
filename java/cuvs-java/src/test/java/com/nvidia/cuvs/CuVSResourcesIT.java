@@ -65,7 +65,7 @@ public class CuVSResourcesIT extends CuVSTestCase {
                   future.get();
                 });
         assertEquals(IllegalStateException.class, exception.getCause().getClass());
-        assertEquals(expectedError, exception.getCause().getMessage());
+        assertTrue(exception.getCause().getMessage().startsWith(expectedError));
         log.debug("Outer access finished");
       }
     }

@@ -177,10 +177,18 @@ public class Util {
    * Helper to get the CUDA stream associated with a {@link CuVSResources}
    */
   public static MemorySegment getStream(CuVSResources resources) {
-    try (var resourcesAccess = resources.access();
-        var localArena = Arena.ofConfined()) {
+    try (var resourcesAccess = resources.access()) {
+      return getStream(resourcesAccess.handle());
+    }
+  }
+
+  /**
+   * Helper to get the CUDA stream associated with a {@link CuVSResources} handle
+   */
+  public static MemorySegment getStream(long resourcesHandle) {
+    try (var localArena = Arena.ofConfined()) {
       var streamPointer = localArena.allocate(cudaStream_t);
-      checkCuVSError(cuvsStreamGet(resourcesAccess.handle(), streamPointer), "cuvsStreamGet");
+      checkCuVSError(cuvsStreamGet(resourcesHandle, streamPointer), "cuvsStreamGet");
       return streamPointer.get(cudaStream_t, 0);
     }
   }
