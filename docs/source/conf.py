@@ -192,6 +192,7 @@ def setup(app):
     app.add_js_file(
         "https://docs.rapids.ai/assets/js/custom.js", loading_method="defer"
     )
+    app.add_js_file("collapse_overloads.js")
 
 
 # The following is used by sphinx.ext.linkcode to provide links to github

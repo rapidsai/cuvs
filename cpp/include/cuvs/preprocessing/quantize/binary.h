@@ -95,7 +95,7 @@ cuvsError_t cuvsBinaryQuantizerCreate(cuvsBinaryQuantizer_t* quantizer);
 cuvsError_t cuvsBinaryQuantizerDestroy(cuvsBinaryQuantizer_t quantizer);
 
 /**
- * @brief Trains a scalar quantizer to be used later for quantizing the dataset.
+ * @brief Trains a binary quantizer to be used later for quantizing the dataset.
  *
  * @param[in] res raft resource
  * @param[in] params configure binary quantizer, e.g. threshold
