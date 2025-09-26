@@ -292,16 +292,6 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
     }
 
     @Override
-    public int bits() {
-      return deviceMatrix.bits();
-    }
-
-    @Override
-    public int code() {
-      return 0;
-    }
-
-    @Override
     public MemorySegment toTensor(Arena arena) {
       return deviceMatrix.toTensor(arena);
     }
