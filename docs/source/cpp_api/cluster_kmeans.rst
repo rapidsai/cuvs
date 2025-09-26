@@ -1,4 +1,4 @@
-Cluster
+K-Means
 =======
 
 .. role:: py(code)
