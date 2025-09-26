@@ -48,10 +48,10 @@ popd
 
 rapids-logger "Build Python docs"
 pushd docs
-sphinx-build -W -b dirhtml source _html
-mv ../rust/target/doc ./_html/_static/rust
+make dirhtml
+mv ../rust/target/doc ./build/dirhtml/_static/rust
 mkdir -p "${RAPIDS_DOCS_DIR}/cuvs/"html
-mv _html/* "${RAPIDS_DOCS_DIR}/cuvs/html"
+mv build/dirhtml/* "${RAPIDS_DOCS_DIR}/cuvs/html"
 popd
 
 RAPIDS_VERSION_NUMBER="${RAPIDS_VERSION_MAJOR_MINOR}" rapids-upload-docs
