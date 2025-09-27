@@ -31,20 +31,51 @@ public class CuVSHostMatrixArenaImpl extends CuVSHostMatrixImpl {
     this(
         size,
         columns,
+        -1,
+        -1,
         dataType,
         valueLayoutFromType(dataType),
-        sequenceLayoutFromType(size, columns, dataType),
+        sequenceLayoutFromType(size, columns, -1, dataType),
+        Arena.ofShared());
+  }
+
+  public CuVSHostMatrixArenaImpl(
+      long size, long columns, int rowStride, int columnStride, DataType dataType) {
+    this(
+        size,
+        columns,
+        rowStride,
+        columnStride,
+        dataType,
+        valueLayoutFromType(dataType),
+        sequenceLayoutFromType(size, columns, rowStride, dataType),
         Arena.ofShared());
   }
 
   private CuVSHostMatrixArenaImpl(
       long size,
       long columns,
+      int rowStride,
+      int columnStride,
       DataType dataType,
       ValueLayout valueLayout,
       SequenceLayout layout,
       Arena arena) {
-    super(arena.allocate(layout), size, columns, dataType, valueLayout, layout);
+    super(
+        arena.allocate(layout),
+        size,
+        columns,
+        rowStride,
+        columnStride,
+        dataType,
+        valueLayout,
+        layout);
+
+    if (columnStride != -1) {
+      throw new UnsupportedOperationException(
+          "Stridden columns are currently not supported; columnStride must be equal to -1");
+    }
+
     this.arenaReference = new AtomicReference<>(arena);
   }
 

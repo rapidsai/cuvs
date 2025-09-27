@@ -32,26 +32,65 @@ import java.util.Locale;
 public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMatrix {
   protected final VarHandle accessor$vh;
 
+  private final int rowStride;
+  private final int columnStride;
+  private final long rowBytes;
+  private final long rowSize;
+  private final long elementSize;
+
   public CuVSHostMatrixImpl(
       MemorySegment memorySegment, long size, long columns, DataType dataType) {
     this(
         memorySegment,
         size,
         columns,
+        -1,
+        -1,
         dataType,
         valueLayoutFromType(dataType),
-        MemoryLayout.sequenceLayout(size * columns, valueLayoutFromType(dataType))
-            .withByteAlignment(32));
+        sequenceLayoutFromType(size, columns, -1, dataType));
+  }
+
+  public CuVSHostMatrixImpl(
+      MemorySegment memorySegment,
+      long size,
+      long columns,
+      int rowStride,
+      int columnStride,
+      DataType dataType) {
+    this(
+        memorySegment,
+        size,
+        columns,
+        rowStride,
+        columnStride,
+        dataType,
+        valueLayoutFromType(dataType),
+        sequenceLayoutFromType(size, columns, rowStride, dataType));
   }
 
   protected CuVSHostMatrixImpl(
       MemorySegment memorySegment,
       long size,
       long columns,
+      int rowStride,
+      int columnStride,
       DataType dataType,
       ValueLayout valueLayout,
       MemoryLayout sequenceLayout) {
     super(memorySegment, dataType, valueLayout, size, columns);
+
+    if (rowStride > 0 && rowStride < columns) {
+      throw new IllegalArgumentException("Row stride cannot be less than the number of columns");
+    }
+
+    this.rowStride = rowStride;
+    this.columnStride = columnStride;
+
+    this.elementSize = valueLayout.byteSize();
+    this.rowSize = rowStride > 0 ? rowStride * elementSize : columns * elementSize;
+    this.rowBytes = columns * elementSize;
+
     this.accessor$vh = sequenceLayout.varHandle(MemoryLayout.PathElement.sequenceElement());
   }
 
@@ -87,10 +126,8 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
         : String.format(
             Locale.ROOT, "Input array is of the wrong type for dataType [%s]", dataType.toString());
 
-    var valueByteSize = valueLayout.byteSize();
     for (int r = 0; r < size; ++r) {
-      MemorySegment.copy(
-          memorySegment, valueLayout, r * columns * valueByteSize, array[r], 0, (int) columns);
+      MemorySegment.copy(memorySegment, valueLayout, r * rowSize, array[r], 0, (int) columns);
     }
   }
 
@@ -112,10 +149,8 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
         : String.format(
             Locale.ROOT, "Input array is of the wrong type for dataType [%s]", dataType.toString());
 
-    var valueByteSize = valueLayout.byteSize();
     for (int r = 0; r < size; ++r) {
-      MemorySegment.copy(
-          memorySegment, valueLayout, r * columns * valueByteSize, array[r], 0, (int) columns);
+      MemorySegment.copy(memorySegment, valueLayout, r * rowSize, array[r], 0, (int) columns);
     }
   }
 
@@ -137,10 +172,8 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
         : String.format(
             Locale.ROOT, "Input array is of the wrong type for dataType [%s]", dataType.toString());
 
-    var valueByteSize = valueLayout.byteSize();
     for (int r = 0; r < size; ++r) {
-      MemorySegment.copy(
-          memorySegment, valueLayout, r * columns * valueByteSize, array[r], 0, (int) columns);
+      MemorySegment.copy(memorySegment, valueLayout, r * rowSize, array[r], 0, (int) columns);
     }
   }
 
@@ -152,9 +185,33 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
   @Override
   public void toHost(CuVSHostMatrix hostMatrix) {
     var targetMatrix = (CuVSMatrixInternal) hostMatrix;
-    var valueByteSize = valueLayout.byteSize();
-    MemorySegment.copy(
-        this.memorySegment, 0L, targetMatrix.memorySegment(), 0L, size * columns * valueByteSize);
+
+    if (targetMatrix.columns() != this.columns || targetMatrix.size() != this.size) {
+      throw new IllegalArgumentException(
+          "Source and target matrices must have the same dimensions");
+    }
+    if (targetMatrix.dataType() != this.dataType) {
+      throw new IllegalArgumentException("Source and target matrices must have the same dataType");
+    }
+
+    if (this.rowStride <= 0 && targetMatrix.rowStride() <= 0) {
+      // copy whole matrix
+      MemorySegment.copy(this.memorySegment, 0L, targetMatrix.memorySegment(), 0L, size * rowSize);
+    } else {
+      // copy row-by-row
+      long targetRowSize =
+          targetMatrix.rowStride() > 0
+              ? targetMatrix.rowStride() * elementSize
+              : columns * elementSize;
+      for (int r = 0; r < size; ++r) {
+        MemorySegment.copy(
+            this.memorySegment,
+            r * rowSize,
+            targetMatrix.memorySegment(),
+            r * targetRowSize,
+            rowBytes);
+      }
+    }
   }
 
   @Override
@@ -167,13 +224,20 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
 
   @Override
   public int get(int row, int col) {
-    return (int) accessor$vh.get(memorySegment, 0L, (long) row * columns + col);
+    var rowPitch = rowStride > 0 ? rowStride : columns;
+    return (int) accessor$vh.get(memorySegment, 0L, (long) row * rowPitch + col);
+  }
+
+  @Override
+  public long rowStride() {
+    return rowStride;
   }
 
   @Override
   public MemorySegment toTensor(Arena arena) {
+    var strides = rowStride >= 0 ? new long[] {rowStride, columnStride} : null;
     return prepareTensor(
-        arena, memorySegment, new long[] {size, columns}, code(), bits(), kDLCPU());
+        arena, memorySegment, new long[] {size, columns}, strides, code(), bits(), kDLCPU());
   }
 
   private static class CuVSHostMatrixDelegate implements CuVSHostMatrix, CuVSMatrixInternal {
@@ -246,6 +310,11 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
     @Override
     public ValueLayout valueLayout() {
       return hostMatrix.valueLayout();
+    }
+
+    @Override
+    public long rowStride() {
+      return hostMatrix.rowStride();
     }
 
     @Override

@@ -20,6 +20,8 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
+import java.lang.foreign.*;
+import java.util.Locale;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -71,9 +73,11 @@ public class CuVSMatrixIT extends CuVSTestCase {
   private float[][] createFloatMatrix(int rows, int cols) {
     float[][] result = new float[rows][cols];
 
+    float value = 1;
     for (int r = 0; r < rows; ++r) {
       for (int c = 0; c < cols; ++c) {
-        result[r][c] = randomFloat();
+        result[r][c] = value;
+        value += 1;
       }
     }
     return result;
@@ -419,18 +423,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
 
       try (var deviceMatrix = builder.build();
           var hostMatrix = deviceMatrix.toHost()) {
-
-        assertEquals(data.length, deviceMatrix.size());
-        assertEquals(data[0].length, deviceMatrix.columns());
-
-        assertEquals(deviceMatrix.size(), hostMatrix.size());
-        assertEquals(deviceMatrix.columns(), hostMatrix.columns());
-
-        var roundTripData = new float[size][columns];
-
-        hostMatrix.toArray(roundTripData);
-
-        assertSame2dArray(hostMatrix.size(), hostMatrix.columns(), data, roundTripData);
+        checkSameData(deviceMatrix, hostMatrix, data, size, columns);
       }
     }
   }
@@ -446,18 +439,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
 
       try (var hostMatrix = CuVSMatrix.ofArray(data);
           var deviceMatrix = hostMatrix.toDevice(resources)) {
-
-        assertEquals(data.length, deviceMatrix.size());
-        assertEquals(data[0].length, deviceMatrix.columns());
-
-        assertEquals(deviceMatrix.size(), hostMatrix.size());
-        assertEquals(deviceMatrix.columns(), hostMatrix.columns());
-
-        var roundTripData = new float[size][columns];
-
-        deviceMatrix.toArray(roundTripData);
-
-        assertSame2dArray(deviceMatrix.size(), deviceMatrix.columns(), data, roundTripData);
+        checkSameData(hostMatrix, deviceMatrix, data, size, columns);
       }
     }
   }
@@ -471,18 +453,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
 
     try (var hostMatrix = CuVSMatrix.ofArray(data);
         var hostMatrix2 = hostMatrix.toHost()) {
-
-      assertEquals(data.length, hostMatrix2.size());
-      assertEquals(data[0].length, hostMatrix2.columns());
-
-      assertEquals(hostMatrix2.size(), hostMatrix.size());
-      assertEquals(hostMatrix2.columns(), hostMatrix.columns());
-
-      var roundTripData = new float[size][columns];
-
-      hostMatrix2.toArray(roundTripData);
-
-      assertSame2dArray(hostMatrix2.size(), hostMatrix2.columns(), data, roundTripData);
+      checkSameData(hostMatrix, hostMatrix2, data, size, columns);
     }
   }
 
@@ -503,18 +474,268 @@ public class CuVSMatrixIT extends CuVSTestCase {
 
       try (var deviceMatrix = builder.build();
           var deviceMatrix2 = deviceMatrix.toDevice(resources)) {
+        checkSameData(deviceMatrix, deviceMatrix2, data, size, columns);
+      }
+    }
+  }
 
-        assertEquals(data.length, deviceMatrix.size());
-        assertEquals(data[0].length, deviceMatrix.columns());
+  @Test
+  public void testHostToHostWithDifferentStrides() {
 
-        assertEquals(deviceMatrix.size(), deviceMatrix2.size());
-        assertEquals(deviceMatrix.columns(), deviceMatrix2.columns());
+    int size = randomIntBetween(1, 32 * 1024);
+    int columns = randomIntBetween(16, 2048);
+    int rowStride1 = randomIntBetween(columns, columns * 2);
+    int rowStride2 = randomIntBetween(columns, columns * 2);
+    final float[][] data = createFloatMatrix(size, columns);
+
+    var builder1 = CuVSMatrix.hostBuilder(size, columns, rowStride1, -1, CuVSMatrix.DataType.FLOAT);
+    for (int i = 0; i < size; ++i) {
+      var array = data[i];
+      builder1.addVector(array);
+    }
+
+    var builder2 = CuVSMatrix.hostBuilder(size, columns, rowStride2, -1, CuVSMatrix.DataType.FLOAT);
+
+    try (var matrix1 = builder1.build();
+        var matrix2 = builder2.build()) {
+
+      matrix1.toHost(matrix2);
+      checkSameData(matrix1, matrix2, data, size, columns);
+    }
+  }
+
+  @Test
+  public void testHostBuilderWithDifferentStrides() throws Throwable {
+
+    int size = randomIntBetween(1, 32 * 1024);
+    int columns = randomIntBetween(16, 2048);
+    int rowStride1 = randomIntBetween(columns, columns * 2);
+    int rowStride2 = randomIntBetween(columns, columns * 2);
+    final float[][] data = createFloatMatrix(size, columns);
+
+    var builder1 = CuVSMatrix.hostBuilder(size, columns, rowStride1, -1, CuVSMatrix.DataType.FLOAT);
+    for (int i = 0; i < size; ++i) {
+      var array = data[i];
+      builder1.addVector(array);
+    }
+
+    var builder2 = CuVSMatrix.hostBuilder(size, columns, rowStride2, -1, CuVSMatrix.DataType.FLOAT);
+    for (int i = 0; i < size; ++i) {
+      var array = data[i];
+      builder2.addVector(array);
+    }
+
+    try (var matrix1 = builder1.build();
+        var matrix2 = builder2.build()) {
+      checkSameData(matrix1, matrix2, data, size, columns);
+    }
+  }
+
+  @Test
+  public void testDeviceToHostWithDifferentStrides() throws Throwable {
+
+    int size = randomIntBetween(1, 32 * 1024);
+    int columns = randomIntBetween(16, 2048);
+    int rowStride1 = randomIntBetween(columns, columns * 2);
+    int rowStride2 = randomIntBetween(columns, columns * 2);
+    final float[][] data = createFloatMatrix(size, columns);
+
+    try (var resources = CuVSResources.create()) {
+      var builder1 =
+          CuVSMatrix.deviceBuilder(
+              resources, size, columns, rowStride1, -1, CuVSMatrix.DataType.FLOAT);
+      for (int i = 0; i < size; ++i) {
+        var array = data[i];
+        builder1.addVector(array);
+      }
+
+      var builder2 =
+          CuVSMatrix.hostBuilder(size, columns, rowStride2, -1, CuVSMatrix.DataType.FLOAT);
+
+      try (var matrix1 = builder1.build();
+          var matrix2 = builder2.build()) {
+
+        matrix1.toHost(matrix2);
+        checkSameData(matrix1, matrix2, data, size, columns);
+      }
+    }
+  }
+
+  @Test
+  public void testDeviceToDeviceWithDifferentStrides() throws Throwable {
+
+    int size = randomIntBetween(1, 32 * 1024);
+    int columns = randomIntBetween(16, 2048);
+    int rowStride1 = randomIntBetween(columns, columns * 2);
+    int rowStride2 = randomIntBetween(columns, columns * 2);
+    final float[][] data = createFloatMatrix(size, columns);
+
+    try (var resources = CuVSResources.create()) {
+      var builder1 =
+          CuVSMatrix.deviceBuilder(
+              resources, size, columns, rowStride1, -1, CuVSMatrix.DataType.FLOAT);
+      for (int i = 0; i < size; ++i) {
+        var array = data[i];
+        builder1.addVector(array);
+      }
+
+      var builder2 =
+          CuVSMatrix.deviceBuilder(
+              resources, size, columns, rowStride2, -1, CuVSMatrix.DataType.FLOAT);
+
+      try (var matrix1 = builder1.build();
+          var matrix2 = builder2.build()) {
+
+        matrix1.toDevice(matrix2, resources);
+        checkSameData(matrix1, matrix2, data, size, columns);
+      }
+    }
+  }
+
+  private static void checkSameData(
+      CuVSMatrix matrix1, CuVSMatrix matrix2, float[][] data, int size, int columns) {
+    assertEquals(data.length, matrix1.size());
+    assertEquals(data[0].length, matrix1.columns());
+
+    assertEquals(matrix1.size(), matrix2.size());
+    assertEquals(matrix1.columns(), matrix2.columns());
+
+    var roundTripData1 = new float[size][columns];
+    var roundTripData2 = new float[size][columns];
+
+    matrix1.toArray(roundTripData1);
+    matrix2.toArray(roundTripData2);
+
+    for (int n = 0; n < matrix2.size(); ++n) {
+      for (int i = 0; i < matrix2.columns(); ++i) {
+        var diff1 = Math.abs(data[n][i] - roundTripData1[n][i]);
+        if (diff1 > DELTA) {
+          throw new AssertionError(
+              String.format(
+                  Locale.ROOT,
+                  "Matrix1 mismatch. Expected:<%f> but was:<%f> at row [%d]of[%d], col [%d]of[%d]",
+                  data[n][i],
+                  roundTripData2[n][i],
+                  n,
+                  size,
+                  i,
+                  columns));
+        }
+        var diff2 = Math.abs(data[n][i] - roundTripData2[n][i]);
+        if (diff2 > DELTA) {
+          throw new AssertionError(
+              String.format(
+                  Locale.ROOT,
+                  "Matrix2 mismatch. Expected:<%f> but was:<%f> at row [%d]of[%d], col [%d]of[%d]",
+                  data[n][i],
+                  roundTripData2[n][i],
+                  n,
+                  size,
+                  i,
+                  columns));
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testDeviceBuilderWithDifferentStrides() throws Throwable {
+
+    int size = randomIntBetween(1, 32 * 1024);
+    int columns = randomIntBetween(16, 2048);
+    int rowStride1 = randomIntBetween(columns, columns * 2);
+    int rowStride2 = randomIntBetween(columns, columns * 2);
+    final float[][] data = createFloatMatrix(size, columns);
+
+    try (var resources = CuVSResources.create()) {
+      var builder1 =
+          CuVSMatrix.deviceBuilder(
+              resources, size, columns, rowStride1, -1, CuVSMatrix.DataType.FLOAT);
+      for (int i = 0; i < size; ++i) {
+        var array = data[i];
+        builder1.addVector(array);
+      }
+
+      var builder2 =
+          CuVSMatrix.deviceBuilder(
+              resources, size, columns, rowStride2, -1, CuVSMatrix.DataType.FLOAT);
+      for (int i = 0; i < size; ++i) {
+        var array = data[i];
+        builder2.addVector(array);
+      }
+
+      try (var matrix1 = builder1.build();
+          var matrix2 = builder2.build()) {
+        checkSameData(matrix1, matrix2, data, size, columns);
+      }
+    }
+  }
+
+  @Test
+  public void testHostMatrixFromNativeDataset() {
+    int size = randomIntBetween(1, 32 * 1024);
+    int columns = randomIntBetween(16, 2048);
+    final float[][] data = createFloatMatrix(size, columns);
+
+    ValueLayout.OfFloat C_FLOAT =
+        (ValueLayout.OfFloat) Linker.nativeLinker().canonicalLayouts().get("float");
+
+    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout((long) size * columns, C_FLOAT);
+
+    try (Arena arena = Arena.ofShared()) {
+      MemorySegment dataMemorySegment = arena.allocate(dataMemoryLayout);
+      for (int r = 0; r < size; r++) {
+        MemorySegment.copy(
+            data[r], 0, dataMemorySegment, C_FLOAT, (r * columns * C_FLOAT.byteSize()), columns);
+      }
+
+      try (var nativeDataset =
+          DatasetHelper.fromMemorySegment(
+              dataMemorySegment, size, columns, CuVSMatrix.DataType.FLOAT)) {
 
         var roundTripData = new float[size][columns];
+        nativeDataset.toArray(roundTripData);
 
-        deviceMatrix2.toArray(roundTripData);
+        for (int n = 0; n < nativeDataset.size(); ++n) {
+          for (int i = 0; i < nativeDataset.columns(); ++i) {
+            assertEquals(data[n][i], roundTripData[n][i], DELTA);
+          }
+        }
+      }
+    }
+  }
 
-        assertSame2dArray(deviceMatrix2.size(), deviceMatrix2.columns(), data, roundTripData);
+  @Test
+  public void testHostMatrixFromNativeDatasetWithStride() {
+    int size = randomIntBetween(1, 32 * 1024);
+    int columns = randomIntBetween(16, 2048);
+    int rowStride = randomIntBetween(columns, columns * 2);
+    final float[][] data = createFloatMatrix(size, columns);
+
+    ValueLayout.OfFloat C_FLOAT =
+        (ValueLayout.OfFloat) Linker.nativeLinker().canonicalLayouts().get("float");
+
+    MemoryLayout dataMemoryLayout = MemoryLayout.sequenceLayout((long) size * rowStride, C_FLOAT);
+
+    try (Arena arena = Arena.ofShared()) {
+      MemorySegment dataMemorySegment = arena.allocate(dataMemoryLayout);
+      for (int r = 0; r < size; r++) {
+        MemorySegment.copy(
+            data[r], 0, dataMemorySegment, C_FLOAT, (r * rowStride * C_FLOAT.byteSize()), columns);
+      }
+
+      try (var nativeDataset =
+          DatasetHelper.fromMemorySegment(
+              dataMemorySegment, size, columns, rowStride, -1, CuVSMatrix.DataType.FLOAT)) {
+
+        var roundTripData = new float[size][columns];
+        nativeDataset.toArray(roundTripData);
+
+        for (int n = 0; n < nativeDataset.size(); ++n) {
+          for (int i = 0; i < nativeDataset.columns(); ++i) {
+            assertEquals(data[n][i], roundTripData[n][i], DELTA);
+          }
+        }
       }
     }
   }
