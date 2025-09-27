@@ -1,4 +1,4 @@
-# Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# Copyright (c) 2025, NVIDIA CORPORATION.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,29 +13,11 @@
 # limitations under the License.
 
 
-from cuvs.neighbors import (
-    all_neighbors,
-    brute_force,
-    cagra,
-    filters,
-    ivf_flat,
-    ivf_pq,
-    mg,
-    nn_descent,
-    vamana,
-)
-
-from .refine import refine
+from .vamana import Index, IndexParams, build, save
 
 __all__ = [
-    "brute_force",
-    "cagra",
-    "filters",
-    "ivf_flat",
-    "ivf_pq",
-    "mg",
-    "nn_descent",
-    "all_neighbors",
-    "refine",
-    "vamana",
+    "Index",
+    "IndexParams",
+    "build",
+    "save",
 ]

@@ -735,6 +735,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
       src/neighbors/cagra_c.cpp
       $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw_c.cpp>
       src/neighbors/nn_descent_c.cpp
+      src/neighbors/vamana_c.cpp
       src/neighbors/refine/refine_c.cpp
       src/neighbors/tiered_index_c.cpp
       src/neighbors/all_neighbors_c.cpp
