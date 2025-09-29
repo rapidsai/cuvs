@@ -25,6 +25,7 @@
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
+#include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
@@ -228,18 +229,33 @@ auto train_pq(
 
   // Train PQ centers
   {
-    cuvs::cluster::kmeans::balanced_params kmeans_params;
-    kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
-
     auto pq_centers_view =
       raft::make_device_matrix_view<MathT, ix_t>(pq_centers.data_handle(), pq_n_centers, pq_len);
-
     auto pq_trainset_view = raft::make_device_matrix_view<const MathT, ix_t>(
       pq_trainset.data_handle(), n_rows_train * pq_dim, pq_len);
 
-    cuvs::cluster::kmeans_balanced::fit<MathT, MathT, ix_t>(
-      res, kmeans_params, pq_trainset_view, pq_centers_view);
+    if (params.pq_kmeans_type == cuvs::cluster::kmeans::kmeans_type::KMeansBalanced) {
+      cuvs::cluster::kmeans::balanced_params kmeans_params;
+      kmeans_params.n_iters = params.kmeans_n_iters;
+      kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
+      cuvs::cluster::kmeans_balanced::fit<MathT, MathT, ix_t>(
+        res, kmeans_params, pq_trainset_view, pq_centers_view);
+    } else {
+      cuvs::cluster::kmeans::params kmeans_params;
+      kmeans_params.n_clusters = pq_n_centers;
+      kmeans_params.max_iter   = params.kmeans_n_iters;
+      kmeans_params.metric     = cuvs::distance::DistanceType::L2Expanded;
+      std::optional<raft::device_vector_view<const MathT, ix_t>> sample_weight = std::nullopt;
+      MathT inertia;
+      ix_t n_iter;
+      cuvs::cluster::kmeans::fit(res,
+                                 kmeans_params,
+                                 pq_trainset_view,
+                                 sample_weight,
+                                 pq_centers_view,
+                                 raft::make_host_scalar_view<MathT, ix_t>(&inertia),
+                                 raft::make_host_scalar_view<ix_t, ix_t>(&n_iter));
+    }
   }
 
   return pq_centers;
