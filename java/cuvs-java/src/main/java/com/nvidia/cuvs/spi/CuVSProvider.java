@@ -50,6 +50,10 @@ public interface CuVSProvider {
   CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
       long size, long dimensions, CuVSMatrix.DataType dataType);
 
+  /** Create a {@link CuVSMatrix.Builder} instance for a host memory matrix **/
+  CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
+      long size, long columns, int rowStride, int columnStride, CuVSMatrix.DataType dataType);
+
   /** Create a {@link CuVSMatrix.Builder} instance for a device memory matrix **/
   CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
       CuVSResources cuVSResources, long size, long dimensions, CuVSMatrix.DataType dataType);
@@ -79,6 +83,25 @@ public interface CuVSProvider {
    * @return a MethodHandle which can be invoked to build a CuVSMatrix from an external {@code MemorySegment}
    */
   MethodHandle newNativeMatrixBuilder();
+
+  /**
+   * Returns the factory method used to build a CuVSMatrix from native memory, with strides.
+   * The factory method will have this signature:
+   * {@code CuVSMatrix createNativeMatrix(memorySegment, size, dimensions, rowStride, columnStride, dataType)},
+   * where {@code memorySegment} is a {@code java.lang.foreign.MemorySegment} containing {@code int size} vectors of
+   * {@code int dimensions} length of type {@link CuVSMatrix.DataType}. Rows have a stride of {@code rowStride},
+   * where 0 indicates "no stride" (a stride equal to the number of columns), and columns have a stride of
+   * {@code columnStride}
+   * <p>
+   * In order to expose this factory in a way that is compatible with Java 21, the factory method is returned as a
+   * {@link MethodHandle} with {@link MethodType} equal to
+   * {@code (CuVSMatrix.class, MemorySegment.class, int.class, int.class, int.class, int.class, DataType.class)}.
+   * The caller will need to invoke the factory via the {@link MethodHandle#invokeExact} method:
+   * {@code var matrix = (CuVSMatrix)newNativeMatrixBuilder().invokeExact(memorySegment, size, dimensions, rowStride, columnStride, dataType)}
+   * </p>
+   * @return a MethodHandle which can be invoked to build a CuVSMatrix from an external {@code MemorySegment}
+   */
+  MethodHandle newNativeMatrixBuilderWithStrides();
 
   /** Create a {@link CuVSMatrix} from an on-heap array **/
   CuVSMatrix newMatrixFromArray(float[][] vectors);
