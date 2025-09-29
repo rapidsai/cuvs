@@ -24,11 +24,6 @@
 namespace cuvs::preprocessing::spectral_embedding {
 
 /**
- * @defgroup spectral_embedding Spectral Embedding
- * @{
- */
-
-/**
  * @brief Parameters for spectral embedding algorithm
  *
  * Spectral embedding is a dimensionality reduction technique that uses the
@@ -70,6 +65,11 @@ struct params {
    */
   uint64_t seed;
 };
+
+/**
+ * @defgroup spectral_embedding Spectral Embedding
+ * @{
+ */
 
 /**
  * @brief Perform spectral embedding on input dataset
