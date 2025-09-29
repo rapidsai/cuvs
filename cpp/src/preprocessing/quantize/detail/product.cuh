@@ -33,19 +33,18 @@ template <uint32_t BlockSize,
 __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_no_id_kernel(
   raft::device_matrix_view<uint8_t, IdxT, raft::row_major> out_codes,
   raft::device_matrix_view<const DataT, IdxT, raft::row_major> dataset,
-  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers,
-  raft::device_vector_view<const LabelT, IdxT, raft::row_major> vq_labels,
-  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers)
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
+  const uint32_t pq_dim)
 {
   constexpr uint32_t kSubWarpSize = std::min<uint32_t>(raft::WarpSize, 1u << PqBits);
   using subwarp_align             = raft::Pow2<kSubWarpSize>;
   const IdxT row_ix = subwarp_align::div(IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x});
   if (row_ix >= out_codes.extent(0)) { return; }
 
-  const uint32_t pq_dim = raft::div_rounding_up_unsafe(vq_centers.extent(1), pq_centers.extent(1));
-
   const uint32_t lane_id = raft::Pow2<kSubWarpSize>::mod(threadIdx.x);
-  const LabelT vq_label  = vq_labels(row_ix);
+  const LabelT vq_label  = 0;
+  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers =
+    std::nullopt;
 
   // write codes
   auto* out_codes_ptr = &out_codes(row_ix, 0);
@@ -64,7 +63,6 @@ void process_and_fill_codes_no_id(
   const raft::resources& res,
   const cuvs::preprocessing::quantize::product::params& params,
   const DatasetT& dataset,
-  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
   raft::device_matrix_view<uint8_t, IdxT, raft::row_major> codes)
 {
@@ -114,16 +112,13 @@ void process_and_fill_codes_no_id(
          rmm::mr::get_current_device_resource())) {
     auto batch_view = raft::make_device_matrix_view(batch.data(), ix_t(batch.size()), dim);
 
-    auto labels = raft::make_device_vector<label_t, ix_t>(res, batch.size());
-    raft::matrix::fill(res, labels.view(), uint32_t{0});
     dim3 blocks(raft::div_rounding_up_safe<ix_t>(n_rows, kBlockSize / threads_per_vec), 1, 1);
     kernel<<<blocks, threads, 0, stream>>>(
       raft::make_device_matrix_view<uint8_t, IdxT>(
         codes.data_handle() + batch.offset() * codes_rowlen, batch.size(), codes_rowlen),
       batch_view,
-      vq_centers,
-      raft::make_const_mdspan(labels.view()),
-      pq_centers);
+      pq_centers,
+      raft::div_rounding_up_unsafe(dataset.extent(1), pq_centers.extent(1)));
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 }
@@ -142,10 +137,8 @@ quantizer<T> train(raft::resources const& res,
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "preprocessing::quantize::product::train(%zu, %u)", size_t(n_rows), dim);
 
-  auto ps = cuvs::neighbors::detail::fill_missing_params_heuristics(params, dataset);
-  auto vq_code_book =
-    raft::make_device_matrix<T, uint32_t, raft::row_major>(res, ps.vq_n_centers, dim);
-  raft::matrix::fill(res, vq_code_book.view(), T{0.0f});
+  auto ps           = cuvs::neighbors::detail::fill_missing_params_heuristics(params, dataset);
+  auto vq_code_book = raft::make_device_matrix<T, uint32_t, raft::row_major>(res, 0, 0);
   auto pq_code_book = cuvs::neighbors::detail::train_pq<T>(res, ps, dataset, std::nullopt);
   auto empty_codes  = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, 0, 0);
   return {ps,
@@ -163,14 +156,13 @@ void transform(raft::resources const& res,
                "Output matrix must have the same number of rows as the input dataset");
   RAFT_EXPECTS(
     out.extent(1) == raft::div_rounding_up_safe<int64_t>(
-                       quantizer.vpq_codebooks.pq_bits() * quantizer.vpq_codebooks.pq_dim(), 8),
+                       quantizer.params_quantizer.pq_bits * quantizer.params_quantizer.pq_dim, 8),
     "Output matrix must have (pq_dim * pq_bits / 8) columns");
   // Encode dataset
   cuvs::neighbors::detail::process_and_fill_codes_no_id<T, int64_t>(
     res,
     quantizer.params_quantizer,
     dataset,
-    raft::make_const_mdspan(quantizer.vpq_codebooks.vq_code_book.view()),
     raft::make_const_mdspan(quantizer.vpq_codebooks.pq_code_book.view()),
     out);
 }

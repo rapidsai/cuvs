@@ -248,7 +248,7 @@ auto train_pq(
 template <uint32_t SubWarpSize, typename DataT, typename MathT, typename IdxT, typename LabelT>
 __device__ auto compute_code(
   raft::device_matrix_view<const DataT, IdxT, raft::row_major> dataset,
-  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> vq_centers,
+  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
   IdxT i,
   uint32_t j,
@@ -267,8 +267,9 @@ __device__ auto compute_code(
     float d = 0.0f;
     for (uint32_t k = 0; k < pq_len; k++) {
       auto jk = j * pq_len + k;
-      auto x  = data_mapping(dataset(i, jk)) - vq_centers(vq_label, jk);
-      auto t  = x - pq_centers(l, k);
+      auto x  = data_mapping(dataset(i, jk));
+      if (vq_centers) { x -= vq_centers.value()(vq_label, jk); }
+      auto t = x - pq_centers(l, k);
       d += t * t;
     }
     if (d < min_dist) {
@@ -320,7 +321,8 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
   cuvs::neighbors::ivf_pq::detail::bitfield_view_t<PqBits> code_view{out_codes_ptr};
   for (uint32_t j = 0; j < pq_dim; j++) {
     // find PQ label
-    uint8_t code = compute_code<kSubWarpSize>(dataset, vq_centers, pq_centers, row_ix, j, vq_label);
+    uint8_t code = compute_code<kSubWarpSize>(
+      dataset, std::make_optional(vq_centers), pq_centers, row_ix, j, vq_label);
     // TODO: this writes in global memory one byte per warp, which is very slow.
     //  It's better to keep the codes in the shared memory or registers and dump them at once.
     if (lane_id == 0) { code_view[j] = code; }
@@ -445,8 +447,8 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_subspaces_kernel
     int subspace_offset   = j * pq_centers.extent(1) * (1 << PqBits);
     auto pq_subspace_view = raft::make_device_matrix_view(
       pq_centers.data_handle() + subspace_offset, (uint32_t)(1 << PqBits), pq_centers.extent(1));
-    uint8_t code =
-      compute_code<kSubWarpSize>(dataset, vq_centers, pq_subspace_view, row_ix, j, vq_label);
+    uint8_t code = compute_code<kSubWarpSize>(
+      dataset, std::make_optional(vq_centers), pq_subspace_view, row_ix, j, vq_label);
     // TODO: this writes in global memory one byte per warp, which is very slow.
     //  It's better to keep the codes in the shared memory or registers and dump them at once.
     if (lane_id == 0) { code_view[j] = code; }

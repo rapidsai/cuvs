@@ -62,7 +62,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_subspaces_kernel
     auto pq_subspace_view = raft::make_device_matrix_view(
       pq_centers.data_handle() + subspace_offset, (uint32_t)(1 << PqBits), pq_centers.extent(1));
     uint8_t code = cuvs::neighbors::detail::compute_code<kSubWarpSize>(
-      dataset, vq_centers, pq_subspace_view, row_ix, j, vq_label);
+      dataset, std::make_optional(vq_centers), pq_subspace_view, row_ix, j, vq_label);
     // TODO: this writes in global memory one byte per warp, which is very slow.
     //  It's better to keep the codes in the shared memory or registers and dump them at once.
     if (lane_id == 0) { code_view[j] = code; }
