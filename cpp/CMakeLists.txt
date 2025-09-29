@@ -571,7 +571,7 @@ if(NOT BUILD_CPU_ONLY)
       LIBRARY_NAMES nccl
     )
     find_package(NCCL REQUIRED)
-    target_link_libraries(cuvs_objs PUBLIC $<BUILD_LOCAL_INTERFACE:NCCL::NCCL>)
+    target_link_libraries(cuvs_objs PRIVATE $<BUILD_LOCAL_INTERFACE:NCCL::NCCL>)
 
     target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_MG_ALGOS)
     target_compile_definitions(cuvs-cagra-search PUBLIC CUVS_BUILD_MG_ALGOS)
@@ -622,11 +622,10 @@ if(NOT BUILD_CPU_ONLY)
       PUBLIC rmm::rmm
              raft::raft
              ${CUVS_CTK_MATH_DEPENDENCIES}
-             $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              cuvs-cagra-search
+              cuvs-cagra-search $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -683,10 +682,10 @@ SECTIONS
       PUBLIC rmm::rmm
              raft::raft
              ${CUVS_CTK_MATH_DEPENDENCIES}
-             $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
     )
   endif()
 
