@@ -99,10 +99,10 @@ public interface CuVSMatrix extends AutoCloseable {
   }
 
   /**
-   * Returns a builder to create a new instance of a dataset
+   * Returns a builder to create a new instance of a host-memory matrix
    *
-   * @param size     Number of vectors in the dataset
-   * @param columns  Size of each vector in the dataset
+   * @param size      Number of rows (e.g. vectors in a dataset)
+   * @param columns   Number of columns (e.g. dimension of each vector in the dataset)
    * @param dataType The data type of the dataset elements
    * @return a builder for creating a {@link CuVSHostMatrix}
    */
@@ -111,17 +111,55 @@ public interface CuVSMatrix extends AutoCloseable {
   }
 
   /**
+   * Returns a builder to create a new instance of a host-memory matrix
+   *
+   * @param size      Number of rows (e.g. vectors in a dataset)
+   * @param columns   Number of columns (e.g. dimension of each vector in the dataset)
+   * @param rowStride The stride (in number of elements) for each row. Must be -1 or > than {@code columns}
+   * @param columnStride The stride for each column. Currently, it is not supported (must be -1)
+   * @param dataType  The data type of the dataset elements
+   * @return a builder for creating a {@link CuVSDeviceMatrix}
+   */
+  static Builder<CuVSHostMatrix> hostBuilder(
+      long size, long columns, int rowStride, int columnStride, DataType dataType) {
+    return CuVSProvider.provider()
+        .newHostMatrixBuilder(size, columns, rowStride, columnStride, dataType);
+  }
+
+  /**
    * Returns a builder to create a new instance of a dataset
    *
    * @param resources CuVS resources used to allocate the device memory needed
-   * @param size      Number of vectors in the dataset
-   * @param columns   Size of each vector in the dataset
+   * @param size      Number of rows (e.g. vectors in a dataset)
+   * @param columns   Number of columns (e.g. dimension of each vector in the dataset)
    * @param dataType  The data type of the dataset elements
    * @return a builder for creating a {@link CuVSDeviceMatrix}
    */
   static Builder<CuVSDeviceMatrix> deviceBuilder(
       CuVSResources resources, long size, long columns, DataType dataType) {
     return CuVSProvider.provider().newDeviceMatrixBuilder(resources, size, columns, dataType);
+  }
+
+  /**
+   * Returns a builder to create a new instance of a dataset
+   *
+   * @param resources CuVS resources used to allocate the device memory needed
+   * @param size      Number of rows (e.g. vectors in a dataset)
+   * @param columns   Number of columns (e.g. dimension of each vector in the dataset)
+   * @param rowStride The stride (in number of elements) for each row. Must be -1 or > than {@code columns}
+   * @param columnStride The stride for each column. Currently, it is not supported (must be -1)
+   * @param dataType  The data type of the dataset elements
+   * @return a builder for creating a {@link CuVSDeviceMatrix}
+   */
+  static Builder<CuVSDeviceMatrix> deviceBuilder(
+      CuVSResources resources,
+      long size,
+      long columns,
+      int rowStride,
+      int columnStride,
+      DataType dataType) {
+    return CuVSProvider.provider()
+        .newDeviceMatrixBuilder(resources, size, columns, rowStride, columnStride, dataType);
   }
 
   /**

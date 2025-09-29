@@ -15,3 +15,4 @@ Nearest Neighbors
    neighbors_cagra_c.rst
    neighbors_hnsw_c.rst
    neighbors_mg.rst
+   neighbors_all_neighbors_c.rst
