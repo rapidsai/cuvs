@@ -489,6 +489,10 @@ auto build(raft::resources const& res,
   -> cuvs::neighbors::vamana::index<uint8_t, uint32_t>;
 
 /**
+ * @}
+ */
+
+/**
  * @defgroup vamana_cpp_serialize Vamana serialize functions
  * @{
  */

@@ -1965,6 +1965,10 @@ void serialize_to_hnswlib(
     std::nullopt);
 
 /**
+ * @}
+ */
+
+/**
  * @defgroup cagra_cpp_index_merge CAGRA index build functions
  * @{
  */

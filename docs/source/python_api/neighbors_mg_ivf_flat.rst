@@ -14,47 +14,47 @@ Multi-GPU IVF-Flat extends the IVF-Flat algorithm to work across multiple GPUs, 
 Index build parameters
 ######################
 
-.. autoclass:: cuvs.neighbors.mg_ivf_flat.IndexParams
+.. autoclass:: cuvs.neighbors.mg.ivf_flat.IndexParams
     :members:
 
 Index search parameters
 #######################
 
-.. autoclass:: cuvs.neighbors.mg_ivf_flat.SearchParams
+.. autoclass:: cuvs.neighbors.mg.ivf_flat.SearchParams
     :members:
 
 Index
 #####
 
-.. autoclass:: cuvs.neighbors.mg_ivf_flat.Index
+.. autoclass:: cuvs.neighbors.mg.ivf_flat.Index
     :members:
 
 Index build
 ###########
 
-.. autofunction:: cuvs.neighbors.mg_ivf_flat.build
+.. autofunction:: cuvs.neighbors.mg.ivf_flat.build
 
 Index search
 ############
 
-.. autofunction:: cuvs.neighbors.mg_ivf_flat.search
+.. autofunction:: cuvs.neighbors.mg.ivf_flat.search
 
 Index extend
 ############
 
-.. autofunction:: cuvs.neighbors.mg_ivf_flat.extend
+.. autofunction:: cuvs.neighbors.mg.ivf_flat.extend
 
 Index save
 ##########
 
-.. autofunction:: cuvs.neighbors.mg_ivf_flat.save
+.. autofunction:: cuvs.neighbors.mg.ivf_flat.save
 
 Index load
 ##########
 
-.. autofunction:: cuvs.neighbors.mg_ivf_flat.load
+.. autofunction:: cuvs.neighbors.mg.ivf_flat.load
 
 Index distribute
 ################
 
-.. autofunction:: cuvs.neighbors.mg_ivf_flat.distribute
+.. autofunction:: cuvs.neighbors.mg.ivf_flat.distribute

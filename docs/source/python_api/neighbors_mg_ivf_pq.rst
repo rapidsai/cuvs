@@ -14,47 +14,47 @@ Multi-GPU IVF-PQ extends the IVF-PQ (Inverted File with Product Quantization) al
 Index build parameters
 ######################
 
-.. autoclass:: cuvs.neighbors.mg_ivf_pq.IndexParams
+.. autoclass:: cuvs.neighbors.mg.ivf_pq.IndexParams
     :members:
 
 Index search parameters
 #######################
 
-.. autoclass:: cuvs.neighbors.mg_ivf_pq.SearchParams
+.. autoclass:: cuvs.neighbors.mg.ivf_pq.SearchParams
     :members:
 
 Index
 #####
 
-.. autoclass:: cuvs.neighbors.mg_ivf_pq.Index
+.. autoclass:: cuvs.neighbors.mg.ivf_pq.Index
     :members:
 
 Index build
 ###########
 
-.. autofunction:: cuvs.neighbors.mg_ivf_pq.build
+.. autofunction:: cuvs.neighbors.mg.ivf_pq.build
 
 Index search
 ############
 
-.. autofunction:: cuvs.neighbors.mg_ivf_pq.search
+.. autofunction:: cuvs.neighbors.mg.ivf_pq.search
 
 Index extend
 ############
 
-.. autofunction:: cuvs.neighbors.mg_ivf_pq.extend
+.. autofunction:: cuvs.neighbors.mg.ivf_pq.extend
 
 Index save
 ##########
 
-.. autofunction:: cuvs.neighbors.mg_ivf_pq.save
+.. autofunction:: cuvs.neighbors.mg.ivf_pq.save
 
 Index load
 ##########
 
-.. autofunction:: cuvs.neighbors.mg_ivf_pq.load
+.. autofunction:: cuvs.neighbors.mg.ivf_pq.load
 
 Index distribute
 ################
 
-.. autofunction:: cuvs.neighbors.mg_ivf_pq.distribute
+.. autofunction:: cuvs.neighbors.mg.ivf_pq.distribute
