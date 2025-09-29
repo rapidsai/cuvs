@@ -107,8 +107,9 @@ abstract class CuVSMatrixBaseImpl implements CuVSMatrixInternal {
   }
 
   protected static SequenceLayout sequenceLayoutFromType(
-      long size, long columns, DataType dataType) {
-    return MemoryLayout.sequenceLayout(size * columns, valueLayoutFromType(dataType))
+      long size, long columns, int rowStride, DataType dataType) {
+    var elements = rowStride > 0 ? rowStride * size : columns * size;
+    return MemoryLayout.sequenceLayout(elements, valueLayoutFromType(dataType))
         .withByteAlignment(32);
   }
 
