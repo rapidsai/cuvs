@@ -1,22 +1,15 @@
 {
   "parse": {
     "additional_commands": {
-      "CPMFindPackage": {
+      "ConfigureTest": {
+        "flags": ["NOCUDA", "C_LIB", "FETCH_CODEBOOKS"],
         "kwargs": {
           "NAME": 1,
-          "GITHUB_REPOSITORY": "?",
-          "GIT_TAG": "?",
-          "VERSION": "?",
-          "GIT_SHALLOW": "?",
-          "OPTIONS": "*",
-          "FIND_PACKAGE_ARGUMENTS": "*"
+          "GPUS": "?",
+          "PERCENT": "?",
+          "ADDITIONAL_DEP": "?",
+          "PATH": "*"
         }
-      },
-      "ConfigureTest": {
-        "flags": ["TEST_NAME", "TEST_SRC"]
-      },
-      "ConfigureBench": {
-        "flags": ["BENCH_NAME", "BENCH_SRC"]
       }
     }
   },

@@ -16,16 +16,13 @@
 package com.nvidia.cuvs;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
+import static com.nvidia.cuvs.CuVSMatrixIT.assertSame2dArray;
 import static org.junit.Assert.*;
 
 import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
 import com.nvidia.cuvs.CagraMergeParams.MergeStrategy;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
 import java.lang.foreign.Arena;
 import java.lang.foreign.Linker;
 import java.lang.foreign.MemoryLayout;
@@ -397,45 +394,49 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             .withMetric(CuvsDistanceType.L2Expanded)
             .build();
 
-    try (CuVSResources resources = CheckedCuVSResources.create()) {
-      CagraIndex index =
-          CagraIndex.newBuilder(resources)
-              .withDataset(dataset)
-              .withIndexParams(indexParams)
-              .build();
+    try (CuVSResources resources = CheckedCuVSResources.create();
+        CagraIndex index =
+            CagraIndex.newBuilder(resources)
+                .withDataset(dataset)
+                .withIndexParams(indexParams)
+                .build()) {
 
       // No prefilter (all points allowed)
       CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
-      CagraQuery fullQuery =
-          new CagraQuery.Builder(resources)
-              .withTopK(2)
-              .withSearchParams(searchParams)
-              .withQueryVectors(queries)
-              .build();
 
-      SearchResults fullSearchResults = index.search(fullQuery);
-      List<Map<Integer, Float>> fullResults = fullSearchResults.getResults();
-      log.debug("Full results: {}", fullResults);
+      // No prefilter (all points allowed)
+      try (var queryVectors = CuVSMatrix.ofArray(queries)) {
+        CagraQuery fullQuery =
+            new CagraQuery.Builder(resources)
+                .withTopK(2)
+                .withSearchParams(searchParams)
+                .withQueryVectors(queryVectors)
+                .build();
 
-      // Apply prefilter: only allow ids 0 and 2 (bitset: 1100)
-      BitSet prefilter = new BitSet(4);
-      prefilter.set(0);
-      prefilter.set(2);
+        SearchResults fullSearchResults = index.search(fullQuery);
+        List<Map<Integer, Float>> fullResults = fullSearchResults.getResults();
+        log.debug("Full results: {}", fullResults);
 
-      CagraQuery filteredQuery =
-          new CagraQuery.Builder(resources)
-              .withTopK(2)
-              .withSearchParams(searchParams)
-              .withQueryVectors(queries)
-              .withPrefilter(prefilter, 4)
-              .build();
+        // Apply prefilter: only allow ids 0 and 2 (bitset: 1100)
+        BitSet prefilter = new BitSet(4);
+        prefilter.set(0);
+        prefilter.set(2);
 
-      SearchResults filteredSearchResults = index.search(filteredQuery);
-      List<Map<Integer, Float>> filteredResults = filteredSearchResults.getResults();
-      log.debug("Filtered results: {}", filteredResults);
+        CagraQuery filteredQuery =
+            new CagraQuery.Builder(resources)
+                .withTopK(2)
+                .withSearchParams(searchParams)
+                .withQueryVectors(queryVectors)
+                .withPrefilter(prefilter, 4)
+                .build();
 
-      assertEquals(expectedResults, fullResults);
-      assertEquals(expectedFilteredResults, filteredResults);
+        SearchResults filteredSearchResults = index.search(filteredQuery);
+        List<Map<Integer, Float>> filteredResults = filteredSearchResults.getResults();
+        log.debug("Filtered results: {}", filteredResults);
+
+        assertEquals(expectedResults, fullResults);
+        assertEquals(expectedFilteredResults, filteredResults);
+      }
     }
   }
 
@@ -485,27 +486,29 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
 
     // Create a query object with the query vectors
-    CagraQuery cuvsQuery =
-        new CagraQuery.Builder(resources)
-            .withTopK(3)
-            .withSearchParams(searchParams)
-            .withQueryVectors(queries)
-            .withMapping(mapping)
-            .build();
+    try (var queryVectors = CuVSMatrix.ofArray(queries)) {
+      CagraQuery cuvsQuery =
+          new CagraQuery.Builder(resources)
+              .withTopK(3)
+              .withSearchParams(searchParams)
+              .withQueryVectors(queryVectors)
+              .withMapping(mapping)
+              .build();
 
-    // Perform the search
-    SearchResults results = index1.search(cuvsQuery);
+      // Perform the search
+      SearchResults results = index1.search(cuvsQuery);
 
-    // Check results
-    log.debug(results.getResults().toString());
-    checkResults(expectedResults, results.getResults());
+      // Check results
+      log.debug(results.getResults().toString());
+      checkResults(expectedResults, results.getResults());
 
-    // Search from the second index
-    results = index2.search(cuvsQuery);
+      // Search from the second index
+      results = index2.search(cuvsQuery);
 
-    // Check results
-    log.debug(results.getResults().toString());
-    checkResults(expectedResults, results.getResults());
+      // Check results
+      log.debug(results.getResults().toString());
+      checkResults(expectedResults, results.getResults());
+    }
   }
 
   private void cleanup(CagraIndex index, CagraIndex loadedIndex) throws Throwable {
@@ -514,6 +517,10 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     loadedIndex.close();
   }
 
+  /**
+   * Tests that an index built starting from a native MemorySegment is identical to one built from
+   * Java heap arrays
+   */
   @Test
   public void testNativeDatasetEquivalent() throws Throwable {
     float[][] sampleData = createSampleData();
@@ -552,6 +559,37 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             resources);
         cleanup(javaIndex, nativeIndex);
       }
+    }
+  }
+
+  /**
+   * Tests that an index built starting from device memory ({@link CuVSDeviceMatrix}) is identical to one
+   * built from Java heap arrays
+   */
+  @Test
+  public void testDeviceDatasetEquivalent() throws Throwable {
+    float[][] sampleData = createSampleData();
+
+    try (var resources = CuVSResources.create();
+        var javaDataset = CuVSMatrix.ofArray(sampleData);
+        var deviceDataset = javaDataset.toDevice(resources)) {
+
+      // Indexing with an on-heap and native datasets produce the same results
+      var javaIndex = indexOnce(javaDataset, resources);
+      var deviceIndex = indexOnce(deviceDataset, resources);
+
+      int size = (int) javaIndex.getGraph().size();
+      assertEquals(size, (int) deviceIndex.getGraph().size());
+
+      int columns = (int) javaIndex.getGraph().columns();
+      assertEquals(columns, (int) deviceIndex.getGraph().columns());
+
+      var javaIndexGraph = new int[size][columns];
+      var deviceIndexGraph = new int[size][columns];
+      javaIndex.getGraph().toArray(javaIndexGraph);
+      deviceIndex.getGraph().toArray(deviceIndexGraph);
+
+      assertSame2dArray(size, columns, javaIndexGraph, deviceIndexGraph);
     }
   }
 
@@ -610,38 +648,42 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
       CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
 
-      CagraQuery query =
-          new CagraQuery.Builder(resources)
-              .withTopK(3)
-              .withSearchParams(searchParams)
-              .withQueryVectors(queries)
-              .withMapping(SearchResults.IDENTITY_MAPPING)
-              .build();
+      try (var queryVectors = CuVSMatrix.ofArray(queries)) {
+        CagraQuery query =
+            new CagraQuery.Builder(resources)
+                .withTopK(3)
+                .withSearchParams(searchParams)
+                .withQueryVectors(queryVectors)
+                .withMapping(SearchResults.IDENTITY_MAPPING)
+                .build();
 
-      log.trace("Searching merged index...");
-      SearchResults results = mergedIndex.search(query);
-      log.debug("Search results: " + results.getResults().toString());
+        log.trace("Searching merged index...");
+        SearchResults results = mergedIndex.search(query);
+        log.debug("Search results: " + results.getResults().toString());
 
-      assertEquals(expectedResults, results.getResults());
+        assertEquals(expectedResults, results.getResults());
 
-      // --- Serialization/deserialization check ---
-      String indexFileName = UUID.randomUUID() + ".cag";
-      mergedIndex.serialize(new FileOutputStream(indexFileName));
+        // --- Serialization/deserialization check ---
+        String indexFileName = UUID.randomUUID() + ".cag";
+        var indexFile = Path.of(indexFileName);
 
-      File indexFile = new File(indexFileName);
-      InputStream inputStream = new FileInputStream(indexFile);
-      CagraIndex loadedMergedIndex = CagraIndex.newBuilder(resources).from(inputStream).build();
+        try (var out = Files.newOutputStream(indexFile)) {
+          mergedIndex.serialize(out);
+        }
 
-      SearchResults resultsFromLoaded = loadedMergedIndex.search(query);
-      assertEquals(expectedResults, resultsFromLoaded.getResults());
+        try (var inputStream = Files.newInputStream(indexFile)) {
+          CagraIndex loadedMergedIndex = CagraIndex.newBuilder(resources).from(inputStream).build();
 
-      if (indexFile.exists()) {
-        indexFile.delete();
+          SearchResults resultsFromLoaded = loadedMergedIndex.search(query);
+          assertEquals(expectedResults, resultsFromLoaded.getResults());
+          mergedIndex.close();
+          loadedMergedIndex.close();
+        } finally {
+          Files.deleteIfExists(indexFile);
+        }
+        index1.close();
+        index2.close();
       }
-      index1.close();
-      index2.close();
-      mergedIndex.close();
-      loadedMergedIndex.close();
     }
   }
 
@@ -710,50 +752,53 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
               .build();
 
       log.trace("Merging indexes with PHYSICAL strategy...");
-      CagraIndex physicalMergedIndex =
-          CagraIndex.merge(new CagraIndex[] {index1, index2}, physicalMergeParams);
-      log.trace("Physical merge completed successfully");
+      try (CagraIndex physicalMergedIndex =
+          CagraIndex.merge(new CagraIndex[] {index1, index2}, physicalMergeParams)) {
+        log.trace("Physical merge completed successfully");
 
-      CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
+        CagraSearchParams searchParams = new CagraSearchParams.Builder().build();
 
-      CagraQuery query =
-          new CagraQuery.Builder(resources)
-              .withTopK(3)
-              .withSearchParams(searchParams)
-              .withQueryVectors(queries)
-              .withMapping(SearchResults.IDENTITY_MAPPING)
-              .build();
+        try (var queryVectors = CuVSMatrix.ofArray(queries)) {
+          CagraQuery query =
+              new CagraQuery.Builder(resources)
+                  .withTopK(3)
+                  .withSearchParams(searchParams)
+                  .withQueryVectors(queryVectors)
+                  .withMapping(SearchResults.IDENTITY_MAPPING)
+                  .build();
 
-      log.trace("Searching physically merged index...");
-      SearchResults physicalResults = physicalMergedIndex.search(query);
-      assertNotNull("Physical merge search results should not be null", physicalResults);
-      assertEquals(
-          "Physical merge search results should match expected",
-          expectedResults,
-          physicalResults.getResults());
+          log.trace("Searching physically merged index...");
+          SearchResults physicalResults = physicalMergedIndex.search(query);
+          assertNotNull("Physical merge search results should not be null", physicalResults);
+          assertEquals(
+              "Physical merge search results should match expected",
+              expectedResults,
+              physicalResults.getResults());
 
-      // --- Serialization/deserialization check for both merged indexes ---
-      String physicalIndexFileName = UUID.randomUUID().toString() + ".cag";
-      physicalMergedIndex.serialize(new FileOutputStream(physicalIndexFileName));
+          // --- Serialization/deserialization check for both merged indexes ---
+          String physicalIndexFileName = UUID.randomUUID() + ".cag";
+          var physicalIndexFile = Path.of(physicalIndexFileName);
 
-      File physicalIndexFile = new File(physicalIndexFileName);
-      InputStream physicalInputStream = new FileInputStream(physicalIndexFile);
-      CagraIndex loadedPhysicalIndex =
-          CagraIndex.newBuilder(resources).from(physicalInputStream).build();
+          try (var out = Files.newOutputStream(physicalIndexFile)) {
+            physicalMergedIndex.serialize(out);
+          }
 
-      SearchResults resultsFromLoadedPhysical = loadedPhysicalIndex.search(query);
-      assertEquals(
-          "Loaded physical index search results should match expected",
-          expectedResults,
-          resultsFromLoadedPhysical.getResults());
+          try (var physicalInputStream = Files.newInputStream(physicalIndexFile);
+              CagraIndex loadedPhysicalIndex =
+                  CagraIndex.newBuilder(resources).from(physicalInputStream).build()) {
 
-      if (physicalIndexFile.exists()) {
-        physicalIndexFile.delete();
+            SearchResults resultsFromLoadedPhysical = loadedPhysicalIndex.search(query);
+            assertEquals(
+                "Loaded physical index search results should match expected",
+                expectedResults,
+                resultsFromLoadedPhysical.getResults());
+          } finally {
+            Files.deleteIfExists(physicalIndexFile);
+          }
+        }
+        index1.close();
+        index2.close();
       }
-      index1.close();
-      index2.close();
-      physicalMergedIndex.close();
-      loadedPhysicalIndex.close();
     }
   }
 }
