@@ -1422,7 +1422,7 @@ void optimize(
       "overflows occur during the norm computation between the dataset vectors.");
 
     const double time_prune_end = cur_time();
-    RAFT_LOG_INFO("# Pruning time: %.1lf ms", (time_prune_end - time_prune_start) * 1000.0);
+    RAFT_LOG_DEBUG("# Pruning time: %.1lf ms", (time_prune_end - time_prune_start) * 1000.0);
   }
 
   auto rev_graph       = raft::make_host_matrix<IdxT, int64_t>(graph_size, output_graph_degree);
@@ -1492,8 +1492,8 @@ void optimize(
                raft::resource::get_cuda_stream(res));
 
     const double time_make_end = cur_time();
-    RAFT_LOG_INFO("# Making reverse graph time: %.1lf ms",
-                  (time_make_end - time_make_start) * 1000.0);
+    RAFT_LOG_DEBUG("# Making reverse graph time: %.1lf ms",
+                   (time_make_end - time_make_start) * 1000.0);
   }
 
   {
@@ -1580,8 +1580,8 @@ void optimize(
                  "many MST optimization edges.");
 
     const double time_replace_end = cur_time();
-    RAFT_LOG_INFO("# Replacing edges time: %.1lf ms",
-                  (time_replace_end - time_replace_start) * 1000.0);
+    RAFT_LOG_DEBUG("# Replacing edges time: %.1lf ms",
+                   (time_replace_end - time_replace_start) * 1000.0);
 
     /* stats */
     uint64_t num_replaced_edges = 0;
