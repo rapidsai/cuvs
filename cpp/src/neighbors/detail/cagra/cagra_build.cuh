@@ -304,6 +304,8 @@ void ace_create_forward_and_backward_lists(
   raft::host_vector_view<IdxT, int64_t, raft::row_major> primary_partition_offsets,
   raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_partition_offsets)
 {
+  RAFT_EXPECTS(static_cast<uint64_t>(backward_mapping_0.extent(0)) == dataset_size,
+               "backward_mapping_0 must be of size dataset_size");
   primary_partition_offsets(0)   = 0;
   augmented_partition_offsets(0) = 0;
   for (uint64_t c = 1; c < n_partitions; c++) {
@@ -313,7 +315,11 @@ void ace_create_forward_and_backward_lists(
   }
 
   // The disk version doesn't map vectors to their original ids. Skip backward mappings.
-  if (backward_mapping_0.extent(0) > 0 && backward_mapping_1.extent(0) > 0) {
+  if (forward_mapping_0.extent(0) > 0 && backward_mapping_1.extent(0) > 0) {
+    RAFT_EXPECTS(static_cast<uint64_t>(forward_mapping_0.extent(0)) == dataset_size,
+                 "forward_mapping_0 must be of size dataset_size");
+    RAFT_EXPECTS(static_cast<uint64_t>(backward_mapping_1.extent(0)) == dataset_size,
+                 "backward_mapping_1 must be of size dataset_size");
 #pragma omp parallel for
     for (uint64_t i = 0; i < dataset_size; i++) {
       uint64_t c_0 = partition_labels(i, 0);
@@ -339,7 +345,7 @@ void ace_create_forward_and_backward_lists(
 #pragma omp atomic capture
       j_0 = primary_partition_offsets(c_0)++;
       RAFT_EXPECTS(j_0 < dataset_size, "Vector ID must be smaller than dataset_size");
-      forward_mapping_0(i) = j_0;
+      backward_mapping_0(j_0) = i;
 
       uint64_t c_1 = partition_labels(i, 1);
       uint64_t j_1;
@@ -507,7 +513,7 @@ void ace_reorder_and_store_dataset(
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_labels,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_histogram,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> forward_mapping_0,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> backward_mapping_0,
   raft::host_vector_view<IdxT, int64_t, raft::row_major> primary_partition_offsets,
   raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_partition_offsets)
 {
@@ -729,7 +735,7 @@ void ace_reorder_and_store_dataset(
   std::string mapping_file_path    = build_dir + "/dataset_mapping.bin";
   const uint64_t mapping_file_size = dataset_size * sizeof(IdxT);
   ace_write_large_file<T, IdxT>(
-    mapping_file_path, mapping_file_size, forward_mapping_0.data_handle());
+    mapping_file_path, mapping_file_size, backward_mapping_0.data_handle());
 
   std::string graph_file_path = build_dir + "/cagra_graph.bin";
   int graph_fd                = open(graph_file_path.c_str(), O_WRONLY | O_CREAT, 0644);
@@ -1034,11 +1040,10 @@ index<T, IdxT> build_ace(
                 check_small_partitions_elapsed);
 
   // Create vector lists for each partition
-  auto vectorlist_start  = std::chrono::high_resolution_clock::now();
-  auto forward_mapping_0 = raft::make_host_vector<IdxT, int64_t>(dataset_size);
-  // Placeholder backward mappings for in-memory version
-  auto backward_mapping_0          = use_disk ? raft::make_host_vector<IdxT, int64_t>(0)
+  auto vectorlist_start            = std::chrono::high_resolution_clock::now();
+  auto forward_mapping_0           = use_disk ? raft::make_host_vector<IdxT, int64_t>(0)
                                               : raft::make_host_vector<IdxT, int64_t>(dataset_size);
+  auto backward_mapping_0          = raft::make_host_vector<IdxT, int64_t>(dataset_size);
   auto backward_mapping_1          = use_disk ? raft::make_host_vector<IdxT, int64_t>(0)
                                               : raft::make_host_vector<IdxT, int64_t>(dataset_size);
   auto primary_partition_offsets   = raft::make_host_vector<IdxT, int64_t>(n_partitions + 1);
@@ -1068,7 +1073,7 @@ index<T, IdxT> build_ace(
                                                      dataset,
                                                      partition_labels.view(),
                                                      partition_histogram.view(),
-                                                     forward_mapping_0.view(),
+                                                     backward_mapping_0.view(),
                                                      primary_partition_offsets.view(),
                                                      augmented_partition_offsets.view());
   }
