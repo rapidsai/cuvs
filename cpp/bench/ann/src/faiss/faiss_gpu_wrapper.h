@@ -325,7 +325,7 @@ class faiss_gpu_ivf_flat : public faiss_gpu<T> {
   using typename faiss_gpu<T>::search_param_base;
 
   faiss_gpu_ivf_flat(Metric metric, int dim, const build_param& param)
-    : faiss_gpu<T>(metric, dim, param)
+    : faiss_gpu<T>(metric, dim, param), build_param_(param)
   {
     faiss::gpu::GpuIndexIVFFlatConfig config;
     config.device   = this->device_;
@@ -349,16 +349,34 @@ class faiss_gpu_ivf_flat : public faiss_gpu<T> {
 
   void save(const std::string& file) const override
   {
-    this->template save_<faiss::gpu::GpuIndexIVFFlat, faiss::IndexIVFFlat>(file);
+    omp_single_thread_scope omp_single_thread;
+    // Snapshot GPU index to CPU and persist; keep CPU snapshot for thread-local copies
+    auto self = const_cast<faiss_gpu_ivf_flat<T>*>(this);
+    self->cpu_index_ = std::make_shared<faiss::IndexIVFFlat>();
+    static_cast<faiss::gpu::GpuIndexIVFFlat*>(this->index_.get())->copyTo(self->cpu_index_.get());
+    faiss::write_index(self->cpu_index_.get(), file.c_str());
   }
   void load(const std::string& file) override
   {
-    this->template load_<faiss::gpu::GpuIndexIVFFlat, faiss::IndexIVFFlat>(file);
+    omp_single_thread_scope omp_single_thread;
+    cpu_index_.reset(dynamic_cast<faiss::IndexIVFFlat*>(faiss::read_index(file.c_str())));
+    assert(cpu_index_);
+    static_cast<faiss::gpu::GpuIndexIVFFlat*>(this->index_.get())->copyFrom(cpu_index_.get());
   }
   std::unique_ptr<algo<T>> copy() override
   {
-    return std::make_unique<faiss_gpu_ivf_flat<T>>(*this);
+    // Create an isolated copy with a fresh GPU resource; rebuild GPU index from CPU snapshot
+    auto copied = std::make_unique<faiss_gpu_ivf_flat<T>>(this->metric_, this->dim_, build_param_);
+    copied->dataset_       = this->dataset_;
+    copied->search_params_ = this->search_params_;
+    copied->cpu_index_ = cpu_index_;
+    static_cast<faiss::gpu::GpuIndexIVFFlat*>(copied->index_.get())
+      ->copyFrom(copied->cpu_index_.get());
+    return copied;
   }
+ private:
+  build_param build_param_;
+  std::shared_ptr<faiss::IndexIVFFlat> cpu_index_{nullptr};
 };
 
 template <typename T>
@@ -374,7 +392,7 @@ class faiss_gpu_ivfpq : public faiss_gpu<T> {
   using typename faiss_gpu<T>::search_param_base;
 
   faiss_gpu_ivfpq(Metric metric, int dim, const build_param& param)
-    : faiss_gpu<T>(metric, dim, param)
+    : faiss_gpu<T>(metric, dim, param), build_param_(param)
   {
     faiss::gpu::GpuIndexIVFPQConfig config;
     config.useFloat16LookupTables = param.use_float16;
@@ -418,13 +436,43 @@ class faiss_gpu_ivfpq : public faiss_gpu<T> {
 
   void save(const std::string& file) const override
   {
-    this->template save_<faiss::gpu::GpuIndexIVFPQ, faiss::IndexIVFPQ>(file);
+    omp_single_thread_scope omp_single_thread;
+    auto self = const_cast<faiss_gpu_ivfpq<T>*>(this);
+    self->cpu_index_ = std::make_shared<faiss::IndexIVFPQ>();
+    static_cast<faiss::gpu::GpuIndexIVFPQ*>(this->index_.get())->copyTo(self->cpu_index_.get());
+    faiss::write_index(self->cpu_index_.get(), file.c_str());
   }
   void load(const std::string& file) override
   {
-    this->template load_<faiss::gpu::GpuIndexIVFPQ, faiss::IndexIVFPQ>(file);
+    omp_single_thread_scope omp_single_thread;
+    cpu_index_.reset(dynamic_cast<faiss::IndexIVFPQ*>(faiss::read_index(file.c_str())));
+    assert(cpu_index_);
+    static_cast<faiss::gpu::GpuIndexIVFPQ*>(this->index_.get())->copyFrom(cpu_index_.get());
   }
-  std::unique_ptr<algo<T>> copy() override { return std::make_unique<faiss_gpu_ivfpq<T>>(*this); };
+  std::unique_ptr<algo<T>> copy() override
+  {
+    auto copied = std::make_unique<faiss_gpu_ivfpq<T>>(this->metric_, this->dim_, build_param_);
+    copied->dataset_       = this->dataset_;
+    copied->refine_ratio_  = this->refine_ratio_;
+    copied->search_params_ = this->search_params_;
+    copied->cpu_index_ = cpu_index_;
+    static_cast<faiss::gpu::GpuIndexIVFPQ*>(copied->index_.get())
+      ->copyFrom(copied->cpu_index_.get());
+    if (copied->refine_ratio_ > 1.0f) {
+      copied->index_refine_ =
+        std::make_shared<faiss::IndexRefineFlat>(copied->index_.get(), copied->dataset_);
+      copied->index_refine_.get()->k_factor = copied->refine_ratio_;
+      faiss::IndexRefineSearchParameters faiss_refine_search_params;
+      faiss_refine_search_params.k_factor          = copied->index_refine_.get()->k_factor;
+      faiss_refine_search_params.base_index_params = copied->search_params_.get();
+      copied->refine_search_params_ =
+        std::make_unique<faiss::IndexRefineSearchParameters>(faiss_refine_search_params);
+    }
+    return copied;
+  };
+ private:
+  build_param build_param_;
+  std::shared_ptr<faiss::IndexIVFPQ> cpu_index_{nullptr};
 };
 
 // TODO(snanditale): Enable this in cmake
@@ -544,7 +592,7 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
   };
 
   faiss_gpu_cagra(Metric metric, int dim, const build_param& param)
-    : faiss_gpu<T>(metric, dim, param)
+    : faiss_gpu<T>(metric, dim, param), build_param_(param)
   {
     faiss::gpu::GpuIndexCagraConfig config;
     config.graph_degree              = param.graph_degree;
@@ -577,22 +625,36 @@ class faiss_gpu_cagra : public faiss_gpu<T> {
   void save(const std::string& file) const override
   {
     omp_single_thread_scope omp_single_thread;
-
-    auto cpu_hnsw_index = std::make_unique<faiss::IndexHNSWCagra>();
+    auto self        = const_cast<faiss_gpu_cagra<T>*>(this);
+    self->cpu_index_ = std::make_shared<faiss::IndexHNSWCagra>();
     // Only add the base HNSW layer to serialize the CAGRA index.
-    cpu_hnsw_index->base_level_only = true;
-    static_cast<faiss::gpu::GpuIndexCagra*>(this->index_.get())->copyTo(cpu_hnsw_index.get());
-    faiss::write_index(cpu_hnsw_index.get(), file.c_str());
+    self->cpu_index_->base_level_only = true;
+    static_cast<faiss::gpu::GpuIndexCagra*>(this->index_.get())->copyTo(self->cpu_index_.get());
+    faiss::write_index(self->cpu_index_.get(), file.c_str());
   }
   void load(const std::string& file) override
   {
-    this->template load_<faiss::gpu::GpuIndexCagra, faiss::IndexHNSWCagra>(file);
+    omp_single_thread_scope omp_single_thread;
+    cpu_index_.reset(static_cast<faiss::IndexHNSWCagra*>(faiss::read_index(file.c_str())));
+    assert(cpu_index_);
+    static_cast<faiss::gpu::GpuIndexCagra*>(this->index_.get())->copyFrom(cpu_index_.get());
   }
-  std::unique_ptr<algo<T>> copy() override { return std::make_unique<faiss_gpu_cagra<T>>(*this); };
+  std::unique_ptr<algo<T>> copy() override
+  {
+    auto copied = std::make_unique<faiss_gpu_cagra<T>>(this->metric_, this->dim_, build_param_);
+    copied->dataset_       = this->dataset_;
+    copied->search_params_ = this->search_params_;
+    copied->cpu_index_     = cpu_index_;
+    static_cast<faiss::gpu::GpuIndexCagra*>(copied->index_.get())
+      ->copyFrom(copied->cpu_index_.get());
+    return copied;
+  };
 
   std::shared_ptr<faiss::gpu::GpuIndex> faiss_index() { return this->index_; }
 
  private:
+  build_param build_param_;
+  std::shared_ptr<faiss::IndexHNSWCagra> cpu_index_{nullptr};
   std::shared_ptr<faiss::gpu::IVFPQBuildCagraConfig> ivf_pq_build_params_;
   std::shared_ptr<faiss::gpu::IVFPQSearchCagraConfig> ivf_pq_search_params_;
 };
