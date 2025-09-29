@@ -983,7 +983,6 @@ index<T, IdxT> build_ace(
   size_t total_memory_size = ace_memory_size + ace_graph_memory_size;
   // TODO: Adjust overhead factor if needed
   bool use_disk = static_cast<size_t>(0.8 * available_memory) < total_memory_size;
-  use_disk      = true;  // TODO: Remove after testing
 
   if (use_disk) {
     RAFT_EXPECTS(!params.ace_build_dir.empty(),
@@ -1191,12 +1190,12 @@ index<T, IdxT> build_ace(
       std::chrono::duration_cast<std::chrono::milliseconds>(end - optimize_end).count();
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     double read_throughput =
-      sub_dataset_size * sizeof(T) / (1024.0 * 1024.0) / (read_elapsed / 1000.0);
+      sub_dataset_size * dataset_dim * sizeof(T) / (1024.0 * 1024.0) / (read_elapsed / 1000.0);
     double write_throughput =
-      sub_dataset_size * sizeof(T) / (1024.0 * 1024.0) / (write_elapsed / 1000.0);
+      sub_dataset_size_0 * dataset_dim * sizeof(T) / (1024.0 * 1024.0) / (write_elapsed / 1000.0);
     RAFT_LOG_INFO(
       "ACE: Partition %4lu (%8lu + %8lu) completed in %6ld ms: read %6ld ms (%4.1f MB/s), optimize "
-      "%6ld ms (%4.1f MB/s), write %5ld ms (%4.1f MB/s)",
+      "%6ld ms, write %5ld ms (%4.1f MB/s)",
       partition_id,
       sub_dataset_size_0,
       sub_dataset_size_1,
