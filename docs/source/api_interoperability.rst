@@ -36,7 +36,7 @@ Here's an example on how to represent device memory using `DLManagedTensor`:
     // free memory after use
     cuvsRMMFree(dataset_dev);
 
-Please refer to cuVS C API `documentation <c_api.rst>`_ to learn more.
+Please refer to `cuVS C API documentation <c_api.rst>`_ to learn more.
 
 Multi-dimensional span (C++)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -99,7 +99,7 @@ Of course, RAFT's `mdspan`/`mdarray` APIs aren't just limited to the `device`. Y
     auto vector_view = raft::make_host_vector_view(vector.data_handle(), vector.extent(0));
     auto matrix_view = raft::make_host_matrix_view(matrix.data_handle(), matrix.extent(0), matrix.extent(1));
 
-Please refer to RAFT's `mdspan` `documentation <https://docs.rapids.ai/api/raft/stable/cpp_api/mdspan/>`_ to learn more.
+Please refer to RAFT's `mdspan documentation <https://docs.rapids.ai/api/raft/stable/cpp_api/mdspan/>`_ to learn more.
 
 
 CUDA array interface (Python)

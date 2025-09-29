@@ -23,15 +23,16 @@ import java.util.Objects;
  * {@link TieredIndex} encapsulates a Tiered index, along with methods to
  * interact with it.
  */
-public interface TieredIndex {
+public interface TieredIndex extends AutoCloseable {
 
   /**
    * Destroys the underlying native TieredIndex object and releases associated
    * resources.
    *
-   * @throws Throwable if an error occurs during index destruction
+   * @throws Exception if an error occurs during index destruction
    */
-  void destroyIndex() throws Throwable;
+  @Override
+  void close() throws Exception;
 
   /**
    * Searches the index with the specified query and search parameters.

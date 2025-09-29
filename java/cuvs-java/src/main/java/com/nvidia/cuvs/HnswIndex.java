@@ -25,12 +25,13 @@ import java.util.Objects;
  *
  * @since 25.02
  */
-public interface HnswIndex {
+public interface HnswIndex extends AutoCloseable {
 
   /**
    * Invokes the native destroy_hnsw_index to de-allocate the HNSW index
    */
-  void destroyIndex() throws Throwable;
+  @Override
+  void close() throws Exception;
 
   /**
    * Invokes the native search_hnsw_index via the Panama API for searching a HNSW

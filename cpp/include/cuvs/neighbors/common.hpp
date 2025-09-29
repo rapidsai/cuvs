@@ -485,13 +485,14 @@ namespace filtering {
 enum class FilterType { None, Bitmap, Bitset };
 
 struct base_filter {
-  virtual ~base_filter()                     = default;
+  ~base_filter()                             = default;
   virtual FilterType get_filter_type() const = 0;
 };
 
 /* A filter that filters nothing. This is the default behavior. */
 struct none_sample_filter : public base_filter {
-  inline _RAFT_HOST_DEVICE bool operator()(
+  /** \cond */
+  constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
     // the current inverted list index
@@ -499,12 +500,12 @@ struct none_sample_filter : public base_filter {
     // the index of the current sample inside the current inverted list
     const uint32_t sample_ix) const;
 
-  inline _RAFT_HOST_DEVICE bool operator()(
+  constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
     // the index of the current sample
     const uint32_t sample_ix) const;
-
+  /** \endcond */
   FilterType get_filter_type() const override { return FilterType::None; }
 };
 
@@ -517,12 +518,13 @@ struct none_sample_filter : public base_filter {
  * @tparam filter_t
  */
 template <typename index_t, typename filter_t>
-struct ivf_to_sample_filter {
+struct ivf_to_sample_filter : public base_filter {
   const index_t* const* inds_ptrs_;
   const filter_t next_filter_;
 
   ivf_to_sample_filter(const index_t* const* inds_ptrs, const filter_t next_filter);
 
+  /** \cond */
   /** If the original filter takes three arguments, then don't modify the arguments.
    * If the original filter takes two arguments, then we are using `inds_ptr_` to obtain the sample
    * index.
@@ -534,6 +536,9 @@ struct ivf_to_sample_filter {
     const uint32_t cluster_ix,
     // the index of the current sample inside the current inverted list
     const uint32_t sample_ix) const;
+
+  FilterType get_filter_type() const override { return next_filter_.get_filter_type(); }
+  /** \endcond */
 };
 
 /**
@@ -550,11 +555,13 @@ struct bitmap_filter : public base_filter {
   const view_t bitmap_view_;
 
   bitmap_filter(const view_t bitmap_for_filtering);
+  /** \cond */
   inline _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
     // the index of the current sample
     const uint32_t sample_ix) const;
+  /** \endcond */
 
   FilterType get_filter_type() const override { return FilterType::Bitmap; }
 
@@ -577,12 +584,14 @@ struct bitset_filter : public base_filter {
   // View of the bitset to use as a filter
   const view_t bitset_view_;
 
-  bitset_filter(const view_t bitset_for_filtering);
-  inline _RAFT_HOST_DEVICE bool operator()(
+  /** \cond */
+  _RAFT_HOST_DEVICE bitset_filter(const view_t bitset_for_filtering);
+  constexpr __forceinline__ _RAFT_HOST_DEVICE bool operator()(
     // query index
     const uint32_t query_ix,
     // the index of the current sample
     const uint32_t sample_ix) const;
+  /** \endcond */
 
   FilterType get_filter_type() const override { return FilterType::Bitset; }
 

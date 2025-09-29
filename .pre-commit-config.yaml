@@ -92,6 +92,12 @@ repos:
                 pass_filenames: false
                 language: python
                 additional_dependencies: [gitpython]
+              - id: cargo-fmt
+                name: cargo-fmt
+                entry: cargo fmt --manifest-path rust/Cargo.toml --all
+                pass_filenames: false
+                files: rust/.*
+                language: rust
       - repo: https://github.com/codespell-project/codespell
         rev: v2.2.2
         hooks:
@@ -120,10 +126,10 @@ repos:
           - id: verify-codeowners
             args: [--fix, --project-prefix=cuvs]
       - repo: https://github.com/rapidsai/dependency-file-generator
-        rev: v1.19.0
+        rev: v1.20.0
         hooks:
             - id: rapids-dependency-file-generator
-              args: ["--clean"]
+              args: ["--clean", "--warn-all", "--strict"]
       - repo: https://github.com/shellcheck-py/shellcheck-py
         rev: v0.10.0.1
         hooks:

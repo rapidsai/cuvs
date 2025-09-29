@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -762,8 +762,6 @@ const std::vector<AnnMGInputs> inputs = {
    1024,
    cuvs::distance::DistanceType::L2Expanded,
    true},
-   */
-
   {7000,
    10000,
    8,

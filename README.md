@@ -95,8 +95,11 @@ conda install -c rapidsai -c conda-forge cuvs
 
 The cuVS Python package can also be `installed through pip <https://docs.rapids.ai/install#pip>`_.
 
-For CUDA 12 packages:
 ```bash
+# CUDA 13
+pip install cuvs-cu13 --extra-index-url=https://pypi.nvidia.com
+
+# CUDA 12
 pip install cuvs-cu12 --extra-index-url=https://pypi.nvidia.com
 ```
 
@@ -104,7 +107,11 @@ pip install cuvs-cu12 --extra-index-url=https://pypi.nvidia.com
 If installing a version that has not yet been released, the `rapidsai` channel can be replaced with `rapidsai-nightly`:
 
 ```bash
-conda install -c rapidsai-nightly -c conda-forge cuvs=25.10
+# CUDA 13
+conda install -c rapidsai-nightly -c conda-forge cuvs=25.10 cuda-version=13.0
+
+# CUDA 12
+conda install -c rapidsai-nightly -c conda-forge cuvs=25.10 cuda-version=12.9
 ```
 
 cuVS also has `pip` wheel packages that can be installed. Please see the [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build/) for more information on installing the available cuVS packages and building from source.
