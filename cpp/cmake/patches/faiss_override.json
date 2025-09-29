@@ -6,7 +6,7 @@
       "git_tag": "v1.12.0",
       "patches" : [
         {
-          "file" : "${current_json_dir}/faiss/thrust_includes.patch",
+          "file" : "${current_json_dir}/faiss/fix-missing-includes-for-thrust-copy.patch",
           "issue" : "Fix missing Thrust includes",
           "fixed_in" : ""
         }
