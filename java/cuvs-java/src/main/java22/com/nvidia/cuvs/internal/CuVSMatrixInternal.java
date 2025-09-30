@@ -27,7 +27,7 @@ import java.lang.foreign.ValueLayout;
  * Internal interface for {@link CuVSMatrix}, for shared functionality that
  * require/expose Panama types or internal cuvs types.
  */
-interface CuVSMatrixInternal extends CuVSMatrix {
+public interface CuVSMatrixInternal extends CuVSMatrix {
 
   MemorySegment memorySegment();
 
@@ -44,12 +44,18 @@ interface CuVSMatrixInternal extends CuVSMatrix {
    * DLTensor data type {@code code} for the element type of this matrix
    */
   default int code() {
-    return switch (dataType()) {
+    return code(dataType());
+  }
+
+  static int code(DataType dataType) {
+    return switch (dataType) {
       case FLOAT -> kDLFloat();
       case INT -> kDLInt();
       case UINT, BYTE -> kDLUInt();
     };
   }
+
+  long rowStride();
 
   /**
    * Creates a {@link DLManagedTensor} representing the matrix data and shape, to be

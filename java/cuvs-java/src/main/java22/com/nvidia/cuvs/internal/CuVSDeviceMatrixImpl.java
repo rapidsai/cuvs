@@ -63,6 +63,11 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
   }
 
   @Override
+  public long rowStride() {
+    return rowStride;
+  }
+
+  @Override
   public MemorySegment toTensor(Arena arena) {
     var strides = rowStride >= 0 ? new long[] {rowStride, columnStride} : null;
     return prepareTensor(
@@ -189,24 +194,8 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
   }
 
   @Override
-  public void toHost(CuVSHostMatrix hostMatrix) {
-    if (hostMatrix.columns() != columns || hostMatrix.size() != size) {
-      throw new IllegalArgumentException("[hostMatrix] must have the same dimensions");
-    }
-    if (hostMatrix.dataType() != dataType) {
-      throw new IllegalArgumentException("[hostMatrix] must have the same dataType");
-    }
-    try (var localArena = Arena.ofConfined()) {
-      var hostMatrixTensor = ((CuVSMatrixInternal) hostMatrix).toTensor(localArena);
-
-      try (var resourceAccess = resources.access()) {
-        var cuvsRes = resourceAccess.handle();
-        var deviceMatrixTensor = toTensor(localArena);
-        checkCuVSError(
-            cuvsMatrixCopy(cuvsRes, deviceMatrixTensor, hostMatrixTensor), "cuvsMatrixCopy");
-        checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync");
-      }
-    }
+  public void toHost(CuVSHostMatrix targetMatrix) {
+    copyMatrix(this, (CuVSMatrixInternal) targetMatrix, resources);
   }
 
   @Override
@@ -292,13 +281,8 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
     }
 
     @Override
-    public int bits() {
-      return deviceMatrix.bits();
-    }
-
-    @Override
-    public int code() {
-      return 0;
+    public long rowStride() {
+      return deviceMatrix.rowStride();
     }
 
     @Override
