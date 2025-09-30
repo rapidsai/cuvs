@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <cuvs/cluster/kmeans.h>
 #include <cuvs/core/c_api.h>
 #include <dlpack/dlpack.h>
 #include <stdint.h>
@@ -51,6 +52,10 @@ struct cuvsProductQuantizerParams {
    * When zero, an optimal value is selected using a heuristic.
    */
   double pq_kmeans_trainset_fraction = 0;
+  /**
+   * The type of kmeans algorithm to use for PQ training.
+   */
+  cuvsKMeansType pq_kmeans_type = cuvsKMeansType::KMeansBalanced;
 };
 
 typedef struct cuvsProductQuantizerParams* cuvsProductQuantizerParams_t;

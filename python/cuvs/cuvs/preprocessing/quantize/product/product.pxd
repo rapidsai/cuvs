@@ -17,6 +17,7 @@
 
 from libc.stdint cimport uint32_t, uintptr_t
 
+from cuvs.cluster.kmeans.kmeans cimport cuvsKMeansType
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
 
@@ -28,6 +29,7 @@ cdef extern from "cuvs/preprocessing/quantize/product.h" nogil:
         uint32_t pq_dim
         uint32_t kmeans_n_iters
         double pq_kmeans_trainset_fraction
+        cuvsKMeansType pq_kmeans_type
 
     ctypedef cuvsProductQuantizerParams* cuvsProductQuantizerParams_t
 

@@ -24,7 +24,8 @@ from cuvs.preprocessing.quantize import product
 @pytest.mark.parametrize("n_cols", [128, 256])
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("dtype", [np.float32, np.float64])
-def test_product_quantizer(n_rows, n_cols, inplace, dtype):
+@pytest.mark.parametrize("pq_kmeans_type", ["kmeans", "kmeans_balanced"])
+def test_product_quantizer(n_rows, n_cols, inplace, dtype, pq_kmeans_type):
     pq_dim = 32
     pq_bits = 8
     encoded_cols = int(np.ceil(pq_dim * pq_bits) / 8)
@@ -36,7 +37,9 @@ def test_product_quantizer(n_rows, n_cols, inplace, dtype):
     input1_device = device_ndarray(input1)
     output_device = device_ndarray(output) if inplace else None
 
-    params = product.QuantizerParams(pq_bits=pq_bits, pq_dim=pq_dim)
+    params = product.QuantizerParams(
+        pq_bits=pq_bits, pq_dim=pq_dim, pq_kmeans_type=pq_kmeans_type
+    )
     quantizer = product.train(params, input1_device)
     transformed = product.transform(
         quantizer, input1_device, output=output_device

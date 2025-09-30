@@ -26,6 +26,11 @@ from cuvs.common.exceptions import check_cuvs
 from cuvs.common.resources import auto_sync_resources
 from cuvs.neighbors.common import _check_input_array
 
+PQ_KMEANS_TYPES = {
+    "kmeans" : cuvsKMeansType.KMeans,
+    "kmeans_balanced" : cuvsKMeansType.KMeansBalanced}
+
+PQ_KMEANS_NAMES = {v: k for k, v in PQ_KMEANS_TYPES.items()}
 
 cdef class QuantizerParams:
     """
@@ -41,6 +46,9 @@ cdef class QuantizerParams:
         specifies the number of iterations searching for kmeans centers
     pq_kmeans_trainset_fraction: float
         specifies the fraction of data to use during iterative kmeans building
+    pq_kmeans_type: str
+        specifies the type of kmeans algorithm to use for PQ training
+        possible values: "kmeans", "kmeans_balanced"
     """
 
     cdef cuvsProductQuantizerParams * params
@@ -52,11 +60,14 @@ cdef class QuantizerParams:
         check_cuvs(cuvsProductQuantizerParamsDestroy(self.params))
 
     def __init__(self, *, pq_bits=8, pq_dim=0, kmeans_n_iters=25,
-                 pq_kmeans_trainset_fraction=0.0):
+                 pq_kmeans_trainset_fraction=0.0,
+                 pq_kmeans_type="kmeans_balanced"):
         self.params.pq_bits = pq_bits
         self.params.pq_dim = pq_dim
         self.params.kmeans_n_iters = kmeans_n_iters
         self.params.pq_kmeans_trainset_fraction = pq_kmeans_trainset_fraction
+        pq_kmeans_type_c = PQ_KMEANS_TYPES[pq_kmeans_type]
+        self.params.pq_kmeans_type = <cuvsKMeansType>pq_kmeans_type_c
 
     @property
     def pq_bits(self):
@@ -73,6 +84,10 @@ cdef class QuantizerParams:
     @property
     def pq_kmeans_trainset_fraction(self):
         return self.params.pq_kmeans_trainset_fraction
+
+    @property
+    def pq_kmeans_type(self):
+        return self.params.pq_kmeans_type
 
 
 cdef class Quantizer:
@@ -126,8 +141,8 @@ def train(QuantizerParams params, dataset, resources=None):
 
     >>> import cupy as cp
     >>> from cuvs.preprocessing.quantize import product
-    >>> n_samples = 50000
-    >>> n_features = 50
+    >>> n_samples = 5000
+    >>> n_features = 64
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
     >>> params = product.QuantizerParams(pq_bits=8, pq_dim=16)
@@ -175,8 +190,8 @@ def transform(Quantizer quantizer, dataset, output=None, resources=None):
     --------
     >>> import cupy as cp
     >>> from cuvs.preprocessing.quantize import product
-    >>> n_samples = 50000
-    >>> n_features = 50
+    >>> n_samples = 5000
+    >>> n_features = 64
     >>> dataset = cp.random.random_sample((n_samples, n_features),
     ...                                   dtype=cp.float32)
     >>> params = product.QuantizerParams(pq_bits=8, pq_dim=16)

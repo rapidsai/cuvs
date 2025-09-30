@@ -65,6 +65,8 @@ void* _train(cuvsResources_t res,
   quantizer_params.kmeans_n_iters              = params->kmeans_n_iters;
   quantizer_params.pq_kmeans_trainset_fraction = params->pq_kmeans_trainset_fraction;
   quantizer_params.vq_n_centers                = 1;
+  quantizer_params.pq_kmeans_type =
+    static_cast<cuvs::cluster::kmeans::kmeans_type>(params->pq_kmeans_type);
 
   cuvs::preprocessing::quantize::product::quantizer<T>* ret = nullptr;
 
