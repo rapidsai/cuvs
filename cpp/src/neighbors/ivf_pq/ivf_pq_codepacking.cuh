@@ -176,6 +176,36 @@ __device__ void write_vector(
   }
 }
 
+
+template <uint32_t SubWarpSize>
+__device__ void write_vector_chunks(
+  uint8_t* dest,
+  const uint8_t* source,
+  uint32_t size_bytes,
+  uint32_t dest_offset = 0,
+  uint32_t source_offset = 0)
+{
+  const uint32_t lane_id = threadIdx.x % SubWarpSize;
+  
+  // Each thread handles 128-bit (16-byte) chunks
+  constexpr uint32_t chunk_bytes = sizeof(pq_vec_t);
+  
+  // Calculate starting byte position for this thread
+  uint32_t byte_pos = lane_id * chunk_bytes;
+  
+  for (; byte_pos < size_bytes; byte_pos += SubWarpSize * chunk_bytes) {
+    if (byte_pos + chunk_bytes <= size_bytes) {
+      *reinterpret_cast<pq_vec_t*>(dest + dest_offset + group_ix * chunk_bytes + ingroup_ix * chunk_bytes + byte_pos) = 
+        *reinterpret_cast<const pq_vec_t*>(source + source_offset + byte_pos);
+    } else {
+      uint32_t remaining = size_bytes - byte_pos;
+      for (uint32_t i = 0; i < remaining; i++) {
+        dest[dest_offset + byte_pos + i] = source[source_offset + byte_pos + i];
+      }
+    }
+  }
+}
+
 /** Process the given indices or a block of a single list (cluster). */
 template <uint32_t PqBits, typename Action>
 __device__ void run_on_list(

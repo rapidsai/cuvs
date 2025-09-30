@@ -138,8 +138,15 @@ __launch_bounds__(BlockSize) static __global__ void pack_contiguous_list_data_ke
   uint32_t pq_dim,
   std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
-  write_list<PqBits, 1>(
-    list_data, offset_or_indices, n_rows, pq_dim, pack_contiguous<PqBits>(codes, pq_dim));
+    using subwarp_align = raft::Pow2<SubWarpSize>;
+    uint32_t stride     = subwarp_align::div(blockDim.x);
+    uint32_t ix         = subwarp_align::div(threadIdx.x + blockDim.x * blockIdx.x);
+    for (; ix < len; ix += stride) {
+      const uint32_t dst_ix = std::holds_alternative<uint32_t>(offset_or_indices)
+                                ? std::get<uint32_t>(offset_or_indices) + ix
+                                : std::get<const uint32_t*>(offset_or_indices)[ix];
+      write_vector<PqBits, SubWarpSize>(out_list_data, dst_ix, ix, pq_dim, action);
+    }
 }
 
 /**
