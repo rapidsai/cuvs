@@ -138,6 +138,19 @@ __launch_bounds__(BlockSize) static __global__ void pack_contiguous_list_data_ke
   uint32_t pq_dim,
   std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
+  write_list<PqBits, 1>(
+    list_data, offset_or_indices, n_rows, pq_dim, pack_contiguous<PqBits>(codes, pq_dim));
+}
+
+template <uint32_t BlockSize, uint32_t PqBits>
+__launch_bounds__(BlockSize) static __global__ void copy_list_chunks_kernel(
+  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+    list_data,
+  const uint8_t* codes,
+  uint32_t n_rows,
+  uint32_t pq_dim,
+  std::variant<uint32_t, const uint32_t*> offset_or_indices)
+{
     using subwarp_align = raft::Pow2<SubWarpSize>;
     uint32_t stride     = subwarp_align::div(blockDim.x);
     uint32_t ix         = subwarp_align::div(threadIdx.x + blockDim.x * blockIdx.x);
@@ -145,7 +158,7 @@ __launch_bounds__(BlockSize) static __global__ void pack_contiguous_list_data_ke
       const uint32_t dst_ix = std::holds_alternative<uint32_t>(offset_or_indices)
                                 ? std::get<uint32_t>(offset_or_indices) + ix
                                 : std::get<const uint32_t*>(offset_or_indices)[ix];
-      write_vector<PqBits, SubWarpSize>(out_list_data, dst_ix, ix, pq_dim, action);
+      copy_list_chunks<PqBits, SubWarpSize>(out_list_data, dst_ix, ix, pq_dim);
     }
 }
 
@@ -177,11 +190,11 @@ inline void pack_contiguous_list_data_impl(
   dim3 threads(kBlockSize, 1, 1);
   auto kernel = [pq_bits]() {
     switch (pq_bits) {
-      case 4: return pack_contiguous_list_data_kernel<kBlockSize, 4>;
+      case 4: return copy_list_chunks_kernel<kBlockSize, 4>;
       case 5: return pack_contiguous_list_data_kernel<kBlockSize, 5>;
       case 6: return pack_contiguous_list_data_kernel<kBlockSize, 6>;
       case 7: return pack_contiguous_list_data_kernel<kBlockSize, 7>;
-      case 8: return pack_contiguous_list_data_kernel<kBlockSize, 8>;
+      case 8: return copy_list_chunks_kernel<kBlockSize, 8>;
       default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
     }
   }();
