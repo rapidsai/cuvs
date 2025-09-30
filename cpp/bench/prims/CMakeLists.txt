@@ -135,4 +135,3 @@ if(CUVS_PRIMS_BENCH_USE_WMMA)
   )
 endif()
 message("CUDAToolkit_LIBRARY_DIR: ${CUDAToolkit_LIBRARY_DIR}")
-

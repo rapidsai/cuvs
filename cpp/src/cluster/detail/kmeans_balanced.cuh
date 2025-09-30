@@ -65,68 +65,72 @@ namespace cuvs::cluster::kmeans::detail {
 
 constexpr static inline float kAdjustCentersWeight = 7.0f;
 class ComparisonSummary {
-public:
+ public:
   double max_diff;          // Maximum difference found
-  uint64_t max_diff_index;   // where does the maximim difference occur
+  uint64_t max_diff_index;  // where does the maximum difference occur
   double max_a;
   double max_b;
-  double acc_diff;          // sum of all the diffs
-  uint64_t n;               // How many items are compared
+  double acc_diff;  // sum of all the diffs
+  uint64_t n;       // How many items are compared
   uint64_t n_misses;
-  int mutex;                // Simple mutex lock for thread synchronization
+  int mutex;  // Simple mutex lock for thread synchronization
 
-  __device__ __host__
-  void init() {
-    max_diff = 0.0;
+  __device__ __host__ void init()
+  {
+    max_diff       = 0.0;
     max_diff_index = 0;
-    max_a = 0.0;
-    max_b = 0.0;
-    acc_diff = 0.0;
-    n = 0;
-    n_misses = 0;
+    max_a          = 0.0;
+    max_b          = 0.0;
+    acc_diff       = 0.0;
+    n              = 0;
+    n_misses       = 0;
   }
 
-  __device__ __host__
-  void update(double diff, uint64_t index, double a_val, double b_val, bool missed) {
-    if ( max_diff < diff ) {
-      max_diff = diff;
+  __device__ __host__ void update(
+    double diff, uint64_t index, double a_val, double b_val, bool missed)
+  {
+    if (max_diff < diff) {
+      max_diff       = diff;
       max_diff_index = index;
-      max_a = a_val;
-      max_b = b_val;
+      max_a          = a_val;
+      max_b          = b_val;
     }
     acc_diff += diff;
     n++;
     n_misses = missed ? n_misses + 1 : n_misses;
   }
 
-  __device__ __host__
-  void update(ComparisonSummary& op2) {
-    if ( max_diff < op2.max_diff ) {
-      max_diff = op2.max_diff;
+  __device__ __host__ void update(ComparisonSummary& op2)
+  {
+    if (max_diff < op2.max_diff) {
+      max_diff       = op2.max_diff;
       max_diff_index = op2.max_diff_index;
-      max_a = op2.max_a;
-      max_b = op2.max_b;
+      max_a          = op2.max_a;
+      max_b          = op2.max_b;
     }
     acc_diff += op2.acc_diff;
     n += op2.n;
     n_misses += op2.n_misses;
   }
 
-  __device__ __host__
-  void print() {
-    //if (max_diff > 0.0) {
-      printf("Total compared %lu\n", n);
-      printf("Total missed %lu\n", n_misses);
-      printf("Average diff: %e\n", acc_diff / n);
-      printf("max_diff: %e (%e - %e)\n", max_diff, max_a, max_b);
-      printf("max_diff_index: %lu\n", max_diff_index);
+  __device__ __host__ void print()
+  {
+    // if (max_diff > 0.0) {
+    printf("Total compared %lu\n", n);
+    printf("Total missed %lu\n", n_misses);
+    printf("Average diff: %e\n", acc_diff / n);
+    printf("max_diff: %e (%e - %e)\n", max_diff, max_a, max_b);
+    printf("max_diff_index: %lu\n", max_diff_index);
     //}
   }
 };
 
 template <typename OutT, typename IdxT>
-__global__ void vector_compare_kernel(const OutT* a, const OutT* b, IdxT n,
-                                      ComparisonSummary* global_summary) {
+__global__ void vector_compare_kernel(const OutT* a,
+                                      const OutT* b,
+                                      IdxT n,
+                                      ComparisonSummary* global_summary)
+{
   ComparisonSummary block_summary;
 
   block_summary.init();
@@ -135,11 +139,11 @@ __global__ void vector_compare_kernel(const OutT* a, const OutT* b, IdxT n,
     double diff, a_val, b_val;
     bool missed = false;
     if constexpr (std::is_fundamental_v<OutT> || std::is_same_v<OutT, half>) {
-      diff = std::abs(double(a[i]) - double(b[i]));
+      diff  = std::abs(double(a[i]) - double(b[i]));
       a_val = double(a[i]);
       b_val = double(b[i]);
     } else {
-      diff = std::abs(double(a[i].value) - double(b[i].value));
+      diff  = std::abs(double(a[i].value) - double(b[i].value));
       a_val = double(a[i].value);
       b_val = double(b[i].value);
 
@@ -152,9 +156,14 @@ __global__ void vector_compare_kernel(const OutT* a, const OutT* b, IdxT n,
 }
 
 template <typename OutT, typename IdxT>
-void vector_compare(ComparisonSummary* global_summary, const OutT* a, const OutT* b, const IdxT n, cudaStream_t stream = nullptr) {
+void vector_compare(ComparisonSummary* global_summary,
+                    const OutT* a,
+                    const OutT* b,
+                    const IdxT n,
+                    cudaStream_t stream = nullptr)
+{
   constexpr int block_size = 256;
-  const int grid_size = (n + block_size - 1) / block_size;
+  const int grid_size      = (n + block_size - 1) / block_size;
 
   printf("comparing %lu\n", size_t(n));
 
@@ -165,45 +174,27 @@ void vector_compare(ComparisonSummary* global_summary, const OutT* a, const OutT
 }
 
 template <typename MathT, typename IdxT, typename LabelT>
-bool use_fused(IdxT m, IdxT n, IdxT k) {
-#if __CUDA_ARCH__ > 800
-  // Use fused if unfused workspace size is great than 100 MB
-  if (size_t(m) * n * sizeof(MathT) > 100 * 1024 * 1024) {
-    return true;
-  } else {
-    return false;
-  }
-#else
-  return true;
-#endif
-}
-
-template <typename MathT, typename IdxT, typename LabelT>
 bool use_fused(IdxT m, IdxT n, IdxT k)
 {
   // TODO: @tfeher Try using helpers from Try using the helpers from raft/util/arch.cuh
   // https://github.com/rapidsai/cuvs/blob/1155a3a427cd1d1bfaf8fe74a937ed6dfa797ec7/cpp/src/neighbors/detail/nn_descent.cuh#L1210-L1222
-/*#if __CUDA_ARCH__ > 800
-  // Use fused if unfused workspace size is great than 100 MB
-  if (size_t(m) * n * sizeof(MathT) > 100 * 1024 * 1024) {
+  /*#if __CUDA_ARCH__ > 800
+    // Use fused if unfused workspace size is great than 100 MB
+    if (size_t(m) * n * sizeof(MathT) > 100 * 1024 * 1024) {
+      return true;
+    } else {
+      return false;
+    }
+  #else
     return true;
-  } else {
-    return false;
-  }
-#else
-  return true;
-#endif*/
+  #endif*/
   static bool init_done = false;
-  static bool ret = true;
+  static bool ret       = true;
 
   if (init_done == false) {
     const char* NV_DEBUG = getenv("NV_DEBUG");
-    if (strcmp(NV_DEBUG, "unfused") == 0) {
-      ret = false;
-    }
-    if (strcmp(NV_DEBUG, "fused") == 0) {
-      ret = true;
-    }
+    if (strcmp(NV_DEBUG, "unfused") == 0) { ret = false; }
+    if (strcmp(NV_DEBUG, "fused") == 0) { ret = true; }
     init_done = true;
   }
   return ret;
@@ -318,12 +309,11 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
           stream);
       }
 
-      ComparisonSummary* global_summary;
+      /*ComparisonSummary* global_summary;
       cudaMallocManaged(&global_summary, sizeof(ComparisonSummary));
       global_summary->init();
-      vector_compare(global_summary, minClusterAndDistance.data_handle(), unf_minClusterAndDistance.data_handle(),
-          n_rows, stream);
-      global_summary->print();
+      vector_compare(global_summary, minClusterAndDistance.data_handle(),
+      unf_minClusterAndDistance.data_handle(), n_rows, stream); global_summary->print();*/
       // todo(lsugy): use KVP + iterator in caller.
       // Copy keys to output labels
       thrust::transform(raft::resource::get_thrust_policy(handle),

@@ -26,11 +26,11 @@ namespace cuvs {
 namespace distance {
 
 /**
- * \ingroup unfused_l2_nn
+ * \ingroup unfused_distance_nn
  * @{
  */
 /**
- * @brief Unfused L2 distance and 1-nearest-neighbor computation in a single call.
+ * @brief Unfused distance and 1-nearest-neighbor computation in a single call.
  *
  * Unlike the fused call, here we do explicit gemm call followed by a reduction call.
  * This code path exists because the fused path is sometime not the optimal due to
@@ -92,23 +92,24 @@ T min_val()
 
 template <typename AccT, typename IdxT>
 struct Reducer {
-    typedef raft::KeyValuePair<IdxT, AccT> KVType;
+  typedef raft::KeyValuePair<IdxT, AccT> KVType;
 
-    __device__ KVType operator()(const KVType& a, const KVType& b) {
-        if ((a.value < b.value) || (a.value == b.value && a.key < b.key)) {
-          return a;
-        } else {
-          return b;
-        }
+  __device__ KVType operator()(const KVType& a, const KVType& b)
+  {
+    if ((a.value < b.value) || (a.value == b.value && a.key < b.key)) {
+      return a;
+    } else {
+      return b;
     }
+  }
 
-    __device__ AccT operator()(const AccT& a, const AccT& b) {
-      return a < b ? a : b;
-    }
+  __device__ AccT operator()(const AccT& a, const AccT& b) { return a < b ? a : b; }
 };
 
 template <typename DataT, typename AccT, typename OutT, typename IdxT, int TPB>
-__global__ void reduce_min_kernel(OutT* out, const AccT* z, const AccT* x_norm, const AccT* y_norm, IdxT m, IdxT n, bool is_sqrt) {
+__global__ void reduce_min_kernel(
+  OutT* out, const AccT* z, const AccT* x_norm, const AccT* y_norm, IdxT m, IdxT n, bool is_sqrt)
+{
   IdxT tid = threadIdx.x + blockIdx.x * blockDim.x;
   IdxT row = blockIdx.x;
 
@@ -140,17 +141,36 @@ __global__ void reduce_min_kernel(OutT* out, const AccT* z, const AccT* x_norm, 
 }
 
 template <typename DataT, typename AccT, typename OutT, typename IdxT>
-void reduce_min(OutT* out, const AccT* z, const AccT* x_norm, const AccT* y_norm, IdxT m, IdxT n, cudaStream_t stream, bool is_sqrt) {
+void reduce_min(OutT* out,
+                const AccT* z,
+                const AccT* x_norm,
+                const AccT* y_norm,
+                IdxT m,
+                IdxT n,
+                cudaStream_t stream,
+                bool is_sqrt)
+{
   const int TPB = 128;
 
   int blocks = m;
-  reduce_min_kernel<DataT, AccT, OutT, IdxT, TPB><<<blocks, TPB, 0, stream>>>(out, z, x_norm, y_norm, m, n, is_sqrt);
+  reduce_min_kernel<DataT, AccT, OutT, IdxT, TPB>
+    <<<blocks, TPB, 0, stream>>>(out, z, x_norm, y_norm, m, n, is_sqrt);
 }
 
 template <typename DataT, typename AccT, typename OutT, typename IdxT>
-void cublas_l2nn(OutT* out, const DataT* x, const DataT* y, IdxT M, IdxT N, IdxT K,
-                 const AccT* x_norm, const AccT* y_norm, AccT* workspace, bool is_sqrt, cublasHandle_t& cublas_h, cudaStream_t stream) {
-
+void unfused_distance_nn(raft::resources const& handle,
+                         OutT* out,
+                         const DataT* x,
+                         const DataT* y,
+                         IdxT M,
+                         IdxT N,
+                         IdxT K,
+                         const AccT* x_norm,
+                         const AccT* y_norm,
+                         AccT* workspace,
+                         bool is_sqrt,
+                         cudaStream_t stream)
+{
   cudaDataType_t xyType, zType;
   cublasComputeType_t computeType;
 
@@ -161,36 +181,36 @@ void cublas_l2nn(OutT* out, const DataT* x, const DataT* y, IdxT M, IdxT N, IdxT
   const int8_t i8_alpha = 1, i8_beta = 0;
 
   const void* alpha = nullptr;
-  const void* beta = nullptr;
+  const void* beta  = nullptr;
   if constexpr (std::is_same_v<DataT, float>) {
-    xyType = CUDA_R_32F;
-    zType = CUDA_R_32F;
+    xyType      = CUDA_R_32F;
+    zType       = CUDA_R_32F;
     computeType = CUBLAS_COMPUTE_32F;
     // computeType = CUBLAS_COMPUTE_32F_FAST_TF32;
     // computeType = CUBLAS_COMPUTE_32F_FAST_16F;
     // computeType = CUBLAS_COMPUTE_32F_FAST_16BF;
     // computeType = CUBLAS_COMPUTE_32F_EMULATED_16BFX9;
     alpha = reinterpret_cast<const void*>(&f_alpha);
-    beta = reinterpret_cast<const void*>(&f_beta);
+    beta  = reinterpret_cast<const void*>(&f_beta);
   } else if constexpr (std::is_same_v<DataT, double>) {
-    xyType = CUDA_R_64F;
-    zType = CUDA_R_64F;
+    xyType      = CUDA_R_64F;
+    zType       = CUDA_R_64F;
     computeType = CUBLAS_COMPUTE_64F;
-    alpha = reinterpret_cast<const void*>(&d_alpha);
-    beta = reinterpret_cast<const void*>(&d_beta);
+    alpha       = reinterpret_cast<const void*>(&d_alpha);
+    beta        = reinterpret_cast<const void*>(&d_beta);
   } else if constexpr (std::is_same_v<DataT, half>) {
     xyType = CUDA_R_16F;
     if constexpr (std::is_same_v<AccT, half>) {
-      zType = CUDA_R_16F;
+      zType       = CUDA_R_16F;
       computeType = CUBLAS_COMPUTE_16F;
-      //computeType = CUBLAS_COMPUTE_32F;
+      // computeType = CUBLAS_COMPUTE_32F;
       alpha = reinterpret_cast<const void*>(&h_alpha);
-      beta = reinterpret_cast<const void*>(&h_beta);
+      beta  = reinterpret_cast<const void*>(&h_beta);
     } else if constexpr (std::is_same_v<AccT, float>) {
-      zType = CUDA_R_32F;
+      zType       = CUDA_R_32F;
       computeType = CUBLAS_COMPUTE_32F;
-      alpha = reinterpret_cast<const void*>(&f_alpha);
-      beta = reinterpret_cast<const void*>(&f_beta);
+      alpha       = reinterpret_cast<const void*>(&f_alpha);
+      beta        = reinterpret_cast<const void*>(&f_beta);
     }
   } else if constexpr (std::is_same_v<DataT, int8_t>) {
     xyType = CUDA_R_8I;
