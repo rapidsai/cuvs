@@ -7,7 +7,7 @@
       "patches" : [
         {
           "file" : "${current_json_dir}/faiss/fix-missing-includes-for-thrust-copy.patch",
-          "issue" : "Fix missing Thrust includes",
+          "issue" : "Fix missing Thrust includes. https://github.com/facebookresearch/faiss/pull/4597",
           "fixed_in" : ""
         }
       ]
