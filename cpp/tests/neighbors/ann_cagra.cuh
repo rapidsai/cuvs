@@ -1201,7 +1201,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Additional distances tested with a single search algo.
-  auto inputs2 =
+  inputs2 =
     raft::util::itertools::product<AnnCagraInputs>({1, 100},
                                                    {1000},
                                                    {8},
@@ -1299,23 +1299,28 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Vary team size only.
-  inputs2 =
-    raft::util::itertools::product<AnnCagraInputs>({100},
-                                                   {1000},
-                                                   {64},
-                                                   {16},
-                                                   {graph_build_algo::NN_DESCENT},
-                                                   {10},
-                                                   {8, 16, 32},  // team_size
-                                                   {64},
-                                                   {1},
-                                                   {cuvs::distance::DistanceType::L2Expanded,
-                                                    cuvs::distance::DistanceType::InnerProduct,
-                                                    cuvs::distance::DistanceType::BitwiseHamming,
-                                                    cuvs::distance::DistanceType::CosineExpanded},
-                                                   {false},
-                                                   {false},
-                                                   {0.995});
+  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
+    {100},
+    {1000},
+    {64},
+    {16},
+    {graph_build_algo::NN_DESCENT},
+    {search_algo::AUTO},
+    {10},
+    {8, 16, 32},  // team_size
+    {64},
+    {1},
+    {cuvs::distance::DistanceType::L2Expanded,
+     cuvs::distance::DistanceType::InnerProduct,
+     cuvs::distance::DistanceType::BitwiseHamming,
+     cuvs::distance::DistanceType::CosineExpanded},
+    {false},
+    {false},
+    {0.995},
+    {std::optional<float>{std::nullopt}},
+    {std::optional<vpq_params>{std::nullopt}},
+    {std::optional<bool>{std::nullopt}},
+    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Varying n_rows, host_dataset
