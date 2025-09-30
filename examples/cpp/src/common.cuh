@@ -47,6 +47,24 @@ void generate_dataset(raft::device_resources const& dev_resources,
                         1.0f);
 }
 
+// Generate a random device dataset and copy it to host. For this reason, the API does not accept
+// views, but rather generates its own intermediate device buffers.
+auto generate_host_dataset(raft::device_resources const& dev_resources,
+                           int64_t n_samples,
+                           int64_t n_features) -> raft::host_matrix<float, int64_t, raft::row_major>
+{
+  auto dataset = raft::make_device_matrix<float, int64_t>(dev_resources, n_samples, n_features);
+  auto labels  = raft::make_device_vector<int64_t, int64_t>(dev_resources, dataset.extent(0));
+  raft::random::make_blobs(dev_resources, dataset.view(), labels.view());
+
+  auto stream = raft::resource::get_cuda_stream(dev_resources);
+  auto h_X    = raft::make_host_matrix<float, int64_t>(n_samples, n_features);
+  raft::copy(h_X.data_handle(), dataset.data_handle(), n_samples * n_features, stream);
+  raft::resource::sync_stream(dev_resources, stream);
+
+  return h_X;
+}
+
 // Copy the results to host and print a few samples
 template <typename IdxT>
 void print_results(raft::device_resources const& dev_resources,
