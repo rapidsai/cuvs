@@ -267,7 +267,12 @@ extern "C" cuvsError_t cuvsMultiGpuCagraBuild(cuvsResources_t res,
                                               cuvsMultiGpuCagraIndex_t index)
 {
   return cuvs::core::translate_exceptions([=] {
-    auto dataset      = dataset_tensor->dl_tensor;
+    auto dataset = dataset_tensor->dl_tensor;
+
+    // Multi-GPU CAGRA requires dataset to be in host memory
+    RAFT_EXPECTS(cuvs::core::is_dlpack_host_compatible(dataset),
+                 "Multi-GPU CAGRA build requires dataset to have host compatible memory");
+
     index->dtype.code = dataset.dtype.code;
     index->dtype.bits = dataset.dtype.bits;
 
@@ -295,7 +300,29 @@ extern "C" cuvsError_t cuvsMultiGpuCagraSearch(cuvsResources_t res,
                                                DLManagedTensor* distances_tensor)
 {
   return cuvs::core::translate_exceptions([=] {
-    auto queries = queries_tensor->dl_tensor;
+    auto queries   = queries_tensor->dl_tensor;
+    auto neighbors = neighbors_tensor->dl_tensor;
+    auto distances = distances_tensor->dl_tensor;
+
+    // Multi-GPU CAGRA requires all tensors to be in host memory
+    RAFT_EXPECTS(cuvs::core::is_dlpack_host_compatible(queries),
+                 "Multi-GPU CAGRA search requires queries to have host compatible memory");
+    RAFT_EXPECTS(cuvs::core::is_dlpack_host_compatible(neighbors),
+                 "Multi-GPU CAGRA search requires neighbors to have host compatible memory");
+    RAFT_EXPECTS(cuvs::core::is_dlpack_host_compatible(distances),
+                 "Multi-GPU CAGRA search requires distances to have host compatible memory");
+
+    // Validate data types
+    RAFT_EXPECTS(neighbors.dtype.code == kDLInt && neighbors.dtype.bits == 64,
+                 "neighbors should be of type int64_t");
+    RAFT_EXPECTS(distances.dtype.code == kDLFloat && distances.dtype.bits == 32,
+                 "distances should be of type float32");
+
+    // Check type compatibility between index and queries
+    RAFT_EXPECTS(queries.dtype.code == index->dtype.code,
+                 "type mismatch between index and queries");
+    RAFT_EXPECTS(queries.dtype.bits == index->dtype.bits,
+                 "type mismatch between index and queries");
 
     if (queries.dtype.code == kDLFloat && queries.dtype.bits == 32) {
       _mg_search<float>(res, *params, *index, queries_tensor, neighbors_tensor, distances_tensor);
@@ -320,6 +347,25 @@ extern "C" cuvsError_t cuvsMultiGpuCagraExtend(cuvsResources_t res,
 {
   return cuvs::core::translate_exceptions([=] {
     auto vectors = new_vectors_tensor->dl_tensor;
+
+    // Multi-GPU CAGRA requires vectors to be in host memory
+    RAFT_EXPECTS(cuvs::core::is_dlpack_host_compatible(vectors),
+                 "Multi-GPU CAGRA extend requires new_vectors to have host compatible memory");
+
+    // Check type compatibility between index and vectors
+    RAFT_EXPECTS(vectors.dtype.code == index->dtype.code,
+                 "type mismatch between index and new_vectors");
+    RAFT_EXPECTS(vectors.dtype.bits == index->dtype.bits,
+                 "type mismatch between index and new_vectors");
+
+    // If indices are provided, they should also be in host memory
+    if (new_indices_tensor != nullptr) {
+      auto indices = new_indices_tensor->dl_tensor;
+      RAFT_EXPECTS(cuvs::core::is_dlpack_host_compatible(indices),
+                   "Multi-GPU CAGRA extend requires new_indices to have host compatible memory");
+      RAFT_EXPECTS(indices.dtype.code == kDLUInt && indices.dtype.bits == 32,
+                   "new_indices should be of type uint32_t");
+    }
 
     if (vectors.dtype.code == kDLFloat && vectors.dtype.bits == 32) {
       _mg_extend<float>(res, *index, new_vectors_tensor, new_indices_tensor);

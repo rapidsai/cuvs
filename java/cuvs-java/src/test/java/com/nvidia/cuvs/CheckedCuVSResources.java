@@ -42,10 +42,15 @@ public class CheckedCuVSResources implements CuVSResources {
   @Override
   public ScopedAccess access() {
     checkNotDestroyed();
-    var previousThreadId = currentThreadId.compareAndExchange(0, Thread.currentThread().threadId());
-    if (previousThreadId != 0) {
+    var currentThreadId = Thread.currentThread().threadId();
+    var previousThreadId = this.currentThreadId.compareAndExchange(0, currentThreadId);
+    if (previousThreadId != 0 && previousThreadId != currentThreadId) {
       throw new IllegalStateException(
-          "This resource is already accessed by thread [" + previousThreadId + "]");
+          "This resource is already accessed by thread ["
+              + previousThreadId
+              + "]. Current thread id: ["
+              + currentThreadId
+              + "]");
     }
     return new ScopedAccess() {
       @Override
@@ -56,7 +61,7 @@ public class CheckedCuVSResources implements CuVSResources {
 
       @Override
       public void close() {
-        currentThreadId.set(0);
+        CheckedCuVSResources.this.currentThreadId.set(0);
       }
     };
   }

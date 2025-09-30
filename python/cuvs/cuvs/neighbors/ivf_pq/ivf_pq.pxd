@@ -121,3 +121,11 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
                                 DLManagedTensor* new_vectors,
                                 DLManagedTensor* new_indices,
                                 cuvsIvfPqIndex_t index)
+
+
+cdef class IndexParams:
+    cdef cuvsIvfPqIndexParams* params
+    cdef object _metric
+
+cdef class SearchParams:
+    cdef cuvsIvfPqSearchParams* params

@@ -16,7 +16,7 @@ All-neighbors supports multiple underlying algorithms:
 
 The algorithm partitions the dataset into clusters and distributes the work across multiple GPUs when possible, making it suitable for large-scale graph construction tasks.
 
-[ :doc:`C API <../c_api/neighbors_all_neighbors_c>` |:doc:`C++ API <../cpp_api/neighbors_all_neighbors>` | :doc:`Python API <../python_api/neighbors_all_neighbors>` ]
+[ :doc:`C API <../c_api/neighbors_all_neighbors_c>` | :doc:`C++ API <../cpp_api/neighbors_all_neighbors>` | :doc:`Python API <../python_api/neighbors_all_neighbors>` ]
 
 Algorithm Overview
 ------------------

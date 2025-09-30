@@ -51,8 +51,8 @@ jobs:
       fail-fast: false
       matrix:
         cuda_version:
-          - '12.9.1'
-          - '13.0.0'
+          - &latest_cuda12 '12.9.1'
+          - &latest_cuda13 '13.0.1'
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
@@ -72,8 +72,8 @@ jobs:
       fail-fast: false
       matrix:
         cuda_version:
-          - '12.9.1'
-          - '13.0.0'
+          - *latest_cuda12
+          - *latest_cuda13
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
@@ -93,8 +93,8 @@ jobs:
       fail-fast: false
       matrix:
         cuda_version:
-          - '12.9.1'
-          - '13.0.0'
+          - *latest_cuda12
+          - *latest_cuda13
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}

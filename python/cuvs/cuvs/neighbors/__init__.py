@@ -20,7 +20,9 @@ from cuvs.neighbors import (
     filters,
     ivf_flat,
     ivf_pq,
+    mg,
     nn_descent,
+    vamana,
 )
 
 from .refine import refine
@@ -31,7 +33,9 @@ __all__ = [
     "filters",
     "ivf_flat",
     "ivf_pq",
+    "mg",
     "nn_descent",
     "all_neighbors",
     "refine",
+    "vamana",
 ]
