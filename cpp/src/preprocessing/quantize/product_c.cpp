@@ -192,3 +192,30 @@ extern "C" cuvsError_t cuvsProductQuantizerGetPqDim(cuvsProductQuantizer_t quant
     }
   });
 }
+
+extern "C" cuvsError_t cuvsProductQuantizerGetPqCodebook(cuvsProductQuantizer_t quantizer,
+                                                         DLManagedTensor* pq_codebook)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (quantizer != nullptr) {
+      auto quant_addr = quantizer->addr;
+      if (quantizer->dtype.code == kDLFloat && quantizer->dtype.bits == 32) {
+        auto pq_mdspan =
+          (reinterpret_cast<cuvs::preprocessing::quantize::product::quantizer<float>*>(quant_addr))
+            ->vpq_codebooks.pq_code_book.view();
+        cuvs::core::to_dlpack(pq_mdspan, pq_codebook);
+      } else if (quantizer->dtype.code == kDLFloat && quantizer->dtype.bits == 64) {
+        auto pq_mdspan =
+          (reinterpret_cast<cuvs::preprocessing::quantize::product::quantizer<double>*>(quant_addr))
+            ->vpq_codebooks.pq_code_book.view();
+        cuvs::core::to_dlpack(pq_mdspan, pq_codebook);
+      } else {
+        RAFT_FAIL("Unsupported quantizer dtype: %d and bits: %d",
+                  quantizer->dtype.code,
+                  quantizer->dtype.bits);
+      }
+    } else {
+      RAFT_FAIL("quantizer is not initialized");
+    }
+  });
+}

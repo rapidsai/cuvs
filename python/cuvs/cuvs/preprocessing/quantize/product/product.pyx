@@ -22,6 +22,7 @@ from cuvs.common cimport cydlpack
 from pylibraft.common import auto_convert_output, device_ndarray
 from pylibraft.common.cai_wrapper import wrap_array
 
+from cuvs.common.device_tensor_view import DeviceTensorView
 from cuvs.common.exceptions import check_cuvs
 from cuvs.common.resources import auto_sync_resources
 from cuvs.neighbors.common import _check_input_array
@@ -105,19 +106,31 @@ cdef class Quantizer:
     def __dealloc__(self):
         check_cuvs(cuvsProductQuantizerDestroy(self.quantizer))
 
+    @property
     def pq_bits(self):
         cdef uint32_t pq_bits
         check_cuvs(cuvsProductQuantizerGetPqBits(self.quantizer, &pq_bits))
         return pq_bits
 
+    @property
     def pq_dim(self):
         cdef uint32_t pq_dim
         check_cuvs(cuvsProductQuantizerGetPqDim(self.quantizer, &pq_dim))
         return pq_dim
 
+    @property
+    def pq_codebook(self):
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor* pq_codebook_dlpack = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsProductQuantizerGetPqCodebook(self.quantizer,
+                                                     pq_codebook_dlpack))
+        output.parent = self
+        return output
+
     def __repr__(self):
-        return f"product.Quantizer(pq_bits={self.pq_bits()}, " \
-               f"pq_dim={self.pq_dim()})"
+        return f"product.Quantizer(pq_bits={self.pq_bits}, " \
+               f"pq_dim={self.pq_dim})"
 
 
 @auto_sync_resources
@@ -209,7 +222,7 @@ def transform(Quantizer quantizer, dataset, output=None, resources=None):
         on_device = hasattr(dataset, "__cuda_array_interface__")
         ndarray = device_ndarray if on_device else np
         encoded_cols = int(np.ceil(
-            quantizer.pq_dim() * quantizer.pq_bits()) / 8)
+            quantizer.pq_dim * quantizer.pq_bits) / 8)
         output = ndarray.empty((dataset_ai.shape[0],
                                 encoded_cols), dtype="uint8")
 

@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 
+import cupy as cp
 import numpy as np
 import pytest
 from pylibraft.common import device_ndarray
@@ -50,3 +51,4 @@ def test_product_quantizer(n_rows, n_cols, inplace, dtype, pq_kmeans_type):
     # naive tests
     assert actual.any()  # Check that the output is not all zeros
     assert not np.isnan(actual).any()  # Check that the output has no NaNs
+    assert cp.array(quantizer.pq_codebook).any()

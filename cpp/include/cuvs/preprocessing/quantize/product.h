@@ -149,6 +149,15 @@ cuvsError_t cuvsProductQuantizerGetPqBits(cuvsProductQuantizer_t quantizer, uint
  */
 cuvsError_t cuvsProductQuantizerGetPqDim(cuvsProductQuantizer_t quantizer, uint32_t* pq_dim);
 
+/**
+ * @brief Get the PQ codebook.
+ *
+ * @param[in] quantizer product quantizer
+ * @param[out] pq_codebook PQ codebook
+ */
+cuvsError_t cuvsProductQuantizerGetPqCodebook(cuvsProductQuantizer_t quantizer,
+                                              DLManagedTensor* pq_codebook);
+
 #ifdef __cplusplus
 }
 #endif

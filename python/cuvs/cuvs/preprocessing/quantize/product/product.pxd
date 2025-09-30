@@ -64,3 +64,6 @@ cdef extern from "cuvs/preprocessing/quantize/product.h" nogil:
 
     cuvsError_t cuvsProductQuantizerGetPqDim(cuvsProductQuantizer_t quantizer,
                                              uint32_t* pq_dim)
+
+    cuvsError_t cuvsProductQuantizerGetPqCodebook(
+        cuvsProductQuantizer_t quantizer, DLManagedTensor* pq_codebook)
