@@ -54,31 +54,92 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
+// ACE: RAII wrapper for file descriptors
+class file_descriptor {
+ public:
+  explicit file_descriptor(int fd = -1) : fd_(fd) {}
+
+  file_descriptor(const std::string& path, int flags, mode_t mode = 0644)
+    : fd_(open(path.c_str(), flags, mode))
+  {
+    if (fd_ == -1) {
+      RAFT_FAIL("Failed to open file: %s (errno: %d, %s)", path.c_str(), errno, strerror(errno));
+    }
+  }
+
+  // No copy constructor/assignment
+  file_descriptor(const file_descriptor&)            = delete;
+  file_descriptor& operator=(const file_descriptor&) = delete;
+
+  // Move constructor/assignment
+  file_descriptor(file_descriptor&& other) noexcept : fd_(other.fd_) { other.fd_ = -1; }
+
+  file_descriptor& operator=(file_descriptor&& other) noexcept
+  {
+    if (this != &other) {
+      close();
+      fd_       = other.fd_;
+      other.fd_ = -1;
+    }
+    return *this;
+  }
+
+  ~file_descriptor() { close(); }
+
+  int get() const { return fd_; }
+  bool is_valid() const { return fd_ != -1; }
+
+  void close()
+  {
+    if (fd_ != -1) {
+      ::close(fd_);
+      fd_ = -1;
+    }
+  }
+
+  // Release ownership without closing
+  int release()
+  {
+    int fd = fd_;
+    fd_    = -1;
+    return fd;
+  }
+
+ private:
+  int fd_;
+};
+
 // ACE: Write large file in chunks
 template <typename DataT, typename IdxT>
-void ace_write_large_file(std::string file_path,
+void ace_write_large_file(const std::string& file_path,
                           const size_t total_bytes,
                           const void* data_ptr,
                           size_t offset = 0)
 {
+  RAFT_EXPECTS(total_bytes > 0, "Total bytes must be greater than 0");
+  RAFT_EXPECTS(data_ptr != nullptr, "Data pointer must not be nullptr");
+
   const size_t write_chunk_size = 1024 * 1024 * 1024;
   size_t bytes_remaining        = total_bytes;
-  int fd                        = open(file_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
-  RAFT_EXPECTS(fd != -1, "Failed to create file: %s", file_path.c_str());
+
+  file_descriptor fd(file_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
 
   while (bytes_remaining > 0) {
-    size_t chunk_size     = std::min(write_chunk_size, bytes_remaining);
-    ssize_t chunk_written = write(fd, reinterpret_cast<const char*>(data_ptr) + offset, chunk_size);
+    size_t chunk_size = std::min(write_chunk_size, bytes_remaining);
+    ssize_t chunk_written =
+      write(fd.get(), reinterpret_cast<const char*>(data_ptr) + offset, chunk_size);
 
+    RAFT_EXPECTS(
+      chunk_written != -1, "Failed to write to file %s: %s", file_path.c_str(), strerror(errno));
     RAFT_EXPECTS(chunk_written == static_cast<ssize_t>(chunk_size),
-                 "Failed to write file chunk. Expected %zu bytes, wrote %zd",
+                 "Incomplete write to file %s. Expected %zu bytes, wrote %zd",
+                 file_path.c_str(),
                  chunk_size,
                  chunk_written);
 
     bytes_remaining -= chunk_size;
     offset += chunk_size;
   }
-  close(fd);
 }
 
 // ACE: Get partition labels for partitioned approach
@@ -104,7 +165,7 @@ void ace_get_partition_labels(
   uint64_t n_samples = dataset_size * sampling_rate;
   if (n_samples < 100 * n_partitions) { n_samples = 100 * n_partitions; }
   if (n_samples > dataset_size) { n_samples = dataset_size; }
-  RAFT_LOG_INFO("ACE: n_samples: %lu", n_samples);
+  RAFT_LOG_DEBUG("ACE: n_samples: %lu", n_samples);
 
   auto sample_db = raft::make_host_matrix<float>(n_samples, dataset_dim);
 #pragma omp parallel for
@@ -133,7 +194,7 @@ void ace_get_partition_labels(
                              centroids_dev.view(),
                              raft::make_host_scalar_view(&inertia),
                              raft::make_host_scalar_view(&n_iter));
-  RAFT_LOG_INFO("ACE: K-means inertia: %f, iterations: %d", inertia, n_iter);
+  RAFT_LOG_DEBUG("ACE: K-means inertia: %f, iterations: %d", inertia, n_iter);
 
   auto partition_relations = raft::make_host_matrix<IdxT, int64_t>(n_partitions, n_partitions);
   for (uint64_t c0 = 0; c0 < n_partitions; c0++) {
@@ -542,19 +603,10 @@ void ace_reorder_and_store_dataset(
     RAFT_EXPECTS(false, "Failed to create ACE build directory: %s", build_dir.c_str());
   }
 
-  // Create output files
   std::string reordered_dataset_path = build_dir + "/reordered_dataset.bin";
   std::string augmented_dataset_path = build_dir + "/augmented_dataset.bin";
-
-  int reordered_fd = open(reordered_dataset_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
-  RAFT_EXPECTS(reordered_fd != -1,
-               "Failed to create reordered dataset file: %s",
-               reordered_dataset_path.c_str());
-
-  int augmented_fd = open(augmented_dataset_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
-  RAFT_EXPECTS(augmented_fd != -1,
-               "Failed to create augmented dataset file: %s",
-               augmented_dataset_path.c_str());
+  file_descriptor reordered_fd(reordered_dataset_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+  file_descriptor augmented_fd(augmented_dataset_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
 
   // Calculate total sizes for pre-allocation
   uint64_t total_primary_vectors   = 0;
@@ -572,10 +624,10 @@ void ace_reorder_and_store_dataset(
   uint64_t reordered_file_size = total_primary_vectors * vector_size;
   uint64_t augmented_file_size = total_augmented_vectors * vector_size;
 
-  if (posix_fallocate(reordered_fd, 0, reordered_file_size) != 0) {
+  if (posix_fallocate(reordered_fd.get(), 0, reordered_file_size) != 0) {
     RAFT_LOG_WARN("Failed to pre-allocate space for reordered dataset file");
   }
-  if (posix_fallocate(augmented_fd, 0, augmented_file_size) != 0) {
+  if (posix_fallocate(augmented_fd.get(), 0, augmented_file_size) != 0) {
     RAFT_LOG_WARN("Failed to pre-allocate space for augmented dataset file");
   }
 
@@ -630,7 +682,7 @@ void ace_reorder_and_store_dataset(
   // Generalized buffer flushing routine
   auto ace_flush_buffer = [&](uint64_t partition_id,
                               bool is_primary,
-                              int file_fd,
+                              const file_descriptor& file_fd,
                               std::vector<raft::host_matrix<T, int64_t>>& buffers,
                               raft::host_vector<uint64_t, int64_t>& buffer_counts,
                               raft::host_vector<uint64_t, int64_t>& partition_starts,
@@ -642,9 +694,15 @@ void ace_reorder_and_store_dataset(
         (partition_starts(partition_id) + partition_current(partition_id)) * vector_size;
 
       ssize_t bytes_written =
-        pwrite(file_fd, buffers[partition_id].data_handle(), bytes_to_write, file_offset);
+        pwrite(file_fd.get(), buffers[partition_id].data_handle(), bytes_to_write, file_offset);
+
+      RAFT_EXPECTS(bytes_written != -1,
+                   "Failed to write %s buffer for partition %lu: %s",
+                   buffer_type,
+                   partition_id,
+                   strerror(errno));
       RAFT_EXPECTS(bytes_written == static_cast<ssize_t>(bytes_to_write),
-                   "Failed to write %s buffer for partition %lu. Expected %lu bytes, wrote %ld",
+                   "Incomplete write of %s buffer for partition %lu. Expected %lu bytes, wrote %ld",
                    buffer_type,
                    partition_id,
                    bytes_to_write,
@@ -727,9 +785,7 @@ void ace_reorder_and_store_dataset(
     flush_augmented_buffer(p);
   }
 
-  // Close files
-  close(reordered_fd);
-  close(augmented_fd);
+  // Files will be automatically closed by RAII
 
   // Create mapping file to store the reordering information
   std::string mapping_file_path    = build_dir + "/dataset_mapping.bin";
@@ -738,20 +794,21 @@ void ace_reorder_and_store_dataset(
     mapping_file_path, mapping_file_size, backward_mapping_0.data_handle());
 
   std::string graph_file_path = build_dir + "/cagra_graph.bin";
-  int graph_fd                = open(graph_file_path.c_str(), O_WRONLY | O_CREAT, 0644);
-  RAFT_EXPECTS(graph_fd != -1, "Failed to open/create graph file: %s", graph_file_path.c_str());
+  {
+    file_descriptor graph_fd(graph_file_path, O_WRONLY | O_CREAT, 0644);
 
-  // Pre-allocate the graph file for the entire dataset
-  uint64_t total_file_size = dataset_size * params.graph_degree * sizeof(IdxT);
+    // Pre-allocate the graph file for the entire dataset
+    uint64_t total_file_size = dataset_size * params.graph_degree * sizeof(IdxT);
 
-  int result = posix_fallocate(graph_fd, 0, total_file_size);
-  if (result != 0) {
-    RAFT_LOG_WARN("ACE: Failed to pre-allocate graph file space: %s", strerror(result));
-  } else {
-    RAFT_LOG_DEBUG("ACE: Pre-allocated %.2f GB for graph file",
-                   total_file_size / (1024.0 * 1024.0 * 1024.0));
+    int result = posix_fallocate(graph_fd.get(), 0, total_file_size);
+    if (result != 0) {
+      RAFT_LOG_WARN("ACE: Failed to pre-allocate graph file space: %s", strerror(result));
+    } else {
+      RAFT_LOG_DEBUG("ACE: Pre-allocated %.2f GB for graph file",
+                     total_file_size / (1024.0 * 1024.0 * 1024.0));
+    }
+    // graph_fd will be automatically closed when it goes out of scope
   }
-  close(graph_fd);
 
   auto end        = std::chrono::high_resolution_clock::now();
   auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -817,19 +874,12 @@ void ace_load_partition_dataset_from_disk(
                  vectors_per_read,
                  vectors_per_read * vector_size);
 
-  // Open reordered dataset file
+  // Open dataset files with RAII wrappers
   std::string reordered_dataset_path = build_dir + "/reordered_dataset.bin";
-  int reordered_fd                   = open(reordered_dataset_path.c_str(), O_RDONLY);
-  RAFT_EXPECTS(reordered_fd != -1,
-               "Failed to open reordered dataset file: %s",
-               reordered_dataset_path.c_str());
-
-  // Open augmented dataset file
   std::string augmented_dataset_path = build_dir + "/augmented_dataset.bin";
-  int augmented_fd                   = open(augmented_dataset_path.c_str(), O_RDONLY);
-  RAFT_EXPECTS(augmented_fd != -1,
-               "Failed to open augmented dataset file: %s",
-               augmented_dataset_path.c_str());
+
+  file_descriptor reordered_fd(reordered_dataset_path, O_RDONLY);
+  file_descriptor augmented_fd(augmented_dataset_path, O_RDONLY);
 
   // Calculate file offsets for this partition
   uint64_t primary_file_offset   = 0;
@@ -860,11 +910,18 @@ void ace_load_partition_dataset_from_disk(
 
       // Read directly into the sub_dataset matrix
       T* dest_ptr        = sub_dataset.data_handle() + (vectors_read * dataset_dim);
-      ssize_t bytes_read = pread(reordered_fd, dest_ptr, bytes_to_read, file_pos);
+      ssize_t bytes_read = pread(reordered_fd.get(), dest_ptr, bytes_to_read, file_pos);
 
-      RAFT_EXPECTS(bytes_read == static_cast<ssize_t>(bytes_to_read),
-                   "Failed to read primary vectors from reordered dataset file at offset %lu",
-                   file_pos);
+      RAFT_EXPECTS(bytes_read != -1,
+                   "Failed to read from reordered dataset file at offset %lu: %s",
+                   file_pos,
+                   strerror(errno));
+      RAFT_EXPECTS(
+        bytes_read == static_cast<ssize_t>(bytes_to_read),
+        "Incomplete read from reordered dataset file. Expected %lu bytes, got %ld at offset %lu",
+        bytes_to_read,
+        bytes_read,
+        file_pos);
 
       vectors_read += vectors_to_read;
 
@@ -890,11 +947,18 @@ void ace_load_partition_dataset_from_disk(
 
       // Read into the sub_dataset matrix after primary vectors
       T* dest_ptr = sub_dataset.data_handle() + ((primary_size + vectors_read) * dataset_dim);
-      ssize_t bytes_read = pread(augmented_fd, dest_ptr, bytes_to_read, file_pos);
+      ssize_t bytes_read = pread(augmented_fd.get(), dest_ptr, bytes_to_read, file_pos);
 
-      RAFT_EXPECTS(bytes_read == static_cast<ssize_t>(bytes_to_read),
-                   "Failed to read augmented vectors from augmented dataset file at offset %lu",
-                   file_pos);
+      RAFT_EXPECTS(bytes_read != -1,
+                   "Failed to read from augmented dataset file at offset %lu: %s",
+                   file_pos,
+                   strerror(errno));
+      RAFT_EXPECTS(
+        bytes_read == static_cast<ssize_t>(bytes_to_read),
+        "Incomplete read from augmented dataset file. Expected %lu bytes, got %ld at offset %lu",
+        bytes_to_read,
+        bytes_read,
+        file_pos);
 
       vectors_read += vectors_to_read;
 
@@ -906,10 +970,6 @@ void ace_load_partition_dataset_from_disk(
       }
     }
   }
-
-  // Close files
-  close(reordered_fd);
-  close(augmented_fd);
 }
 
 // ACE: Build partitioned CAGRA index for very large graphs. Dataset must be on host.
@@ -940,17 +1000,36 @@ index<T, IdxT> build_ace(
     params.graph_degree,
     num_partitions);
 
+  // Input validation
+  uint64_t dataset_size = dataset.extent(0);
+  uint64_t dataset_dim  = dataset.extent(1);
+
+  RAFT_EXPECTS(dataset_size > 0, "ACE: Dataset must not be empty");
+  RAFT_EXPECTS(dataset_dim > 0, "ACE: Dataset dimension must be greater than 0");
+  RAFT_EXPECTS(params.intermediate_graph_degree > 0,
+               "ACE: Intermediate graph degree must be greater than 0");
+  RAFT_EXPECTS(params.graph_degree > 0, "ACE: Graph degree must be greater than 0");
+
   // Use num_partitions parameter if provided, otherwise use params.ace_npartitions
   uint64_t n_partitions = (num_partitions > 0) ? num_partitions : params.ace_npartitions;
-  RAFT_EXPECTS(n_partitions > 0, "num_partitions must be greater than 0");
+  RAFT_EXPECTS(n_partitions > 0, "ACE: num_partitions must be greater than 0");
+  RAFT_EXPECTS(n_partitions <= dataset_size, "ACE: num_partitions cannot exceed dataset size");
+
+  // Validate minimum partition size for stable graph construction
+  uint64_t min_vectors_per_partition = dataset_size / n_partitions;
+  uint64_t min_required_per_partition =
+    std::max<uint64_t>(params.intermediate_graph_degree * 2, 100);
+  RAFT_EXPECTS(
+    min_vectors_per_partition >= min_required_per_partition,
+    "ACE: Partition size too small. Each partition needs at least %lu vectors, but would have ~%lu",
+    min_required_per_partition,
+    min_vectors_per_partition);
 
   auto total_start = std::chrono::high_resolution_clock::now();
   RAFT_LOG_INFO("ACE: Starting partitioned CAGRA build with %zu partitions", n_partitions);
 
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
-  uint64_t dataset_size      = dataset.extent(0);
-  uint64_t dataset_dim       = dataset.extent(1);
 
   if (intermediate_degree >= dataset_size) {
     RAFT_LOG_WARN(
