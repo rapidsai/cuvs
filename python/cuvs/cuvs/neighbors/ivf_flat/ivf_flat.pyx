@@ -99,13 +99,12 @@ cdef class IndexParams:
         distribution of the newly added data.
     """
 
-    cdef cuvsIvfFlatIndexParams* params
-
     def __cinit__(self):
         cuvsIvfFlatIndexParamsCreate(&self.params)
 
     def __dealloc__(self):
-        check_cuvs(cuvsIvfFlatIndexParamsDestroy(self.params))
+        if self.params != NULL:
+            check_cuvs(cuvsIvfFlatIndexParamsDestroy(self.params))
 
     def __init__(self, *,
                  n_lists=1024,
@@ -188,12 +187,16 @@ cdef class Index:
     @property
     def n_lists(self):
         """ The number of inverted lists (clusters) """
-        return cuvsIvfFlatIndexGetNLists(self.index)
+        cdef int64_t n_lists = 0
+        cuvsIvfFlatIndexGetNLists(self.index, &n_lists)
+        return n_lists
 
     @property
     def dim(self):
         """ dimensionality of the cluster centers """
-        return cuvsIvfFlatIndexGetDim(self.index)
+        cdef int64_t dim = 0
+        cuvsIvfFlatIndexGetDim(self.index, &dim)
+        return dim
 
     @property
     def centers(self):
@@ -280,13 +283,12 @@ cdef class SearchParams:
         The number of clusters to search.
     """
 
-    cdef cuvsIvfFlatSearchParams* params
-
     def __cinit__(self):
         cuvsIvfFlatSearchParamsCreate(&self.params)
 
     def __dealloc__(self):
-        check_cuvs(cuvsIvfFlatSearchParamsDestroy(self.params))
+        if self.params != NULL:
+            check_cuvs(cuvsIvfFlatSearchParamsDestroy(self.params))
 
     def __init__(self, *, n_probes=20):
         self.params.n_probes = n_probes

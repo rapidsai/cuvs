@@ -15,7 +15,7 @@
 #
 # cython: language_level=3
 
-from libc.stdint cimport uint32_t, uintptr_t
+from libc.stdint cimport int64_t, uint32_t, uintptr_t
 from libcpp cimport bool
 
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
@@ -62,9 +62,10 @@ cdef extern from "cuvs/neighbors/ivf_flat.h" nogil:
 
     cuvsError_t cuvsIvfFlatIndexDestroy(cuvsIvfFlatIndex_t index)
 
-    uint32_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index)
+    cuvsError_t cuvsIvfFlatIndexGetNLists(cuvsIvfFlatIndex_t index,
+                                          int64_t * n_lists)
 
-    uint32_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index)
+    cuvsError_t cuvsIvfFlatIndexGetDim(cuvsIvfFlatIndex_t index, int64_t * dim)
 
     cuvsError_t cuvsIvfFlatIndexGetCenters(cuvsIvfFlatIndex_t index,
                                            DLManagedTensor * centers)
@@ -94,3 +95,10 @@ cdef extern from "cuvs/neighbors/ivf_flat.h" nogil:
                                   DLManagedTensor* new_vectors,
                                   DLManagedTensor* new_indices,
                                   cuvsIvfFlatIndex_t index)
+
+
+cdef class IndexParams:
+    cdef cuvsIvfFlatIndexParams* params
+
+cdef class SearchParams:
+    cdef cuvsIvfFlatSearchParams* params

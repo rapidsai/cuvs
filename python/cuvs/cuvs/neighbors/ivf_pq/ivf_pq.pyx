@@ -58,7 +58,8 @@ cdef class IndexParams:
         The number of clusters used in the coarse quantizer.
     metric : str, default="sqeuclidean"
         String denoting the metric type.
-        Valid values for metric: ["sqeuclidean", "inner_product", "euclidean"],
+        Valid values for metric: ["sqeuclidean", "inner_product",
+        "euclidean", "cosine"],
         where:
 
             - sqeuclidean is the euclidean distance without the square root
@@ -66,6 +67,8 @@ cdef class IndexParams:
             - euclidean is the euclidean distance
             - inner product distance is defined as
               distance(a, b) = \\sum_i a_i * b_i.
+            - cosine distance is defined as
+              distance(a, b) = 1 - \\sum_i a_i * b_i / ( ||a||_2 * ||b||_2).
 
     kmeans_n_iters : int, default = 20
         The number of iterations searching for kmeans centers during index
@@ -123,14 +126,12 @@ cdef class IndexParams:
         train each codebook.
     """
 
-    cdef cuvsIvfPqIndexParams* params
-    cdef object _metric
-
     def __cinit__(self):
         cuvsIvfPqIndexParamsCreate(&self.params)
 
     def __dealloc__(self):
-        check_cuvs(cuvsIvfPqIndexParamsDestroy(self.params))
+        if self.params != NULL:
+            check_cuvs(cuvsIvfPqIndexParamsDestroy(self.params))
 
     def __init__(self, *,
                  n_lists=1024,
@@ -249,12 +250,21 @@ cdef class Index:
     @property
     def n_lists(self):
         """ The number of inverted lists (clusters) """
-        return cuvsIvfPqIndexGetNLists(self.index)
+        cdef int64_t n_lists
+        check_cuvs(cuvsIvfPqIndexGetNLists(self.index, &n_lists))
+        return n_lists
 
     @property
     def dim(self):
         """ dimensionality of the cluster centers """
-        return cuvsIvfPqIndexGetDim(self.index)
+        cdef int64_t dim
+        check_cuvs(cuvsIvfPqIndexGetDim(self.index, &dim))
+        return dim
+
+    def __len__(self):
+        cdef int64_t size
+        check_cuvs(cuvsIvfPqIndexGetSize(self.index, &size))
+        return size
 
     @property
     def centers(self):
@@ -390,13 +400,12 @@ cdef class SearchParams:
         of larger memory footprint.
     """
 
-    cdef cuvsIvfPqSearchParams* params
-
     def __cinit__(self):
         cuvsIvfPqSearchParamsCreate(&self.params)
 
     def __dealloc__(self):
-        check_cuvs(cuvsIvfPqSearchParamsDestroy(self.params))
+        if self.params != NULL:
+            check_cuvs(cuvsIvfPqSearchParamsDestroy(self.params))
 
     def __init__(self, *, n_probes=20, lut_dtype=np.float32,
                  internal_distance_dtype=np.float32,

@@ -18,6 +18,7 @@ package com.nvidia.cuvs.internal;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_CHAR;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT;
+import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.CuVSMatrix;
@@ -29,7 +30,7 @@ import com.nvidia.cuvs.internal.panama.DLTensor;
 import java.lang.foreign.*;
 import java.util.Locale;
 
-public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
+abstract class CuVSMatrixBaseImpl implements CuVSMatrixInternal {
   protected final MemorySegment memorySegment;
   protected final DataType dataType;
   protected final ValueLayout valueLayout;
@@ -49,6 +50,29 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
     this.columns = columns;
   }
 
+  protected static void copyMatrix(
+      CuVSMatrixInternal sourceMatrix, CuVSMatrixInternal targetMatrix, CuVSResources resources) {
+    if (targetMatrix.columns() != sourceMatrix.columns()
+        || targetMatrix.size() != sourceMatrix.size()) {
+      throw new IllegalArgumentException(
+          "Source and target matrices must have the same dimensions");
+    }
+    if (targetMatrix.dataType() != sourceMatrix.dataType()) {
+      throw new IllegalArgumentException("Source and target matrices must have the same dataType");
+    }
+
+    try (var localArena = Arena.ofConfined()) {
+      var targetTensor = targetMatrix.toTensor(localArena);
+
+      try (var resourceAccess = resources.access()) {
+        var cuvsRes = resourceAccess.handle();
+        var sourceTensor = sourceMatrix.toTensor(localArena);
+        checkCuVSError(cuvsMatrixCopy(cuvsRes, sourceTensor, targetTensor), "cuvsMatrixCopy");
+        checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync");
+      }
+    }
+  }
+
   @Override
   public long size() {
     return size;
@@ -64,30 +88,14 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
     return dataType;
   }
 
+  @Override
   public MemorySegment memorySegment() {
     return memorySegment;
   }
 
+  @Override
   public ValueLayout valueLayout() {
     return valueLayout;
-  }
-
-  /**
-   * Size (in bits) for the element type of this matrix
-   */
-  protected int bits() {
-    return (int) (valueLayout.byteSize() * 8);
-  }
-
-  /**
-   * DLTensor data type {@code code} for the element type of this matrix
-   */
-  protected int code() {
-    return switch (dataType) {
-      case FLOAT -> kDLFloat();
-      case INT -> kDLInt();
-      case UINT, BYTE -> kDLUInt();
-    };
   }
 
   protected static ValueLayout valueLayoutFromType(DataType dataType) {
@@ -99,18 +107,11 @@ public abstract class CuVSMatrixBaseImpl implements CuVSMatrix {
   }
 
   protected static SequenceLayout sequenceLayoutFromType(
-      long size, long columns, DataType dataType) {
-    return MemoryLayout.sequenceLayout(size * columns, valueLayoutFromType(dataType))
+      long size, long columns, int rowStride, DataType dataType) {
+    var elements = rowStride > 0 ? rowStride * size : columns * size;
+    return MemoryLayout.sequenceLayout(elements, valueLayoutFromType(dataType))
         .withByteAlignment(32);
   }
-
-  /**
-   * Creates a {@link DLManagedTensor} representing the matrix data and shape, to be
-   * passed to the CuVS C API.
-   * @param arena The Arena to use to allocate DL data structures
-   * @return a {@link MemorySegment} for the newly allocated DLManagedTensor
-   */
-  public abstract MemorySegment toTensor(Arena arena);
 
   /**
    * Creates a {@link CuVSMatrix} from data and infos from a {@link DLManagedTensor}

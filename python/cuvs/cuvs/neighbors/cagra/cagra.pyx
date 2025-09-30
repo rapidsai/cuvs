@@ -172,13 +172,6 @@ cdef class IndexParams:
 
     """
 
-    cdef cuvsCagraIndexParams* params
-
-    # hold on to a reference to the compression, to keep from being GC'ed
-    cdef public object compression
-    cdef public object ivf_pq_build_params
-    cdef public object ivf_pq_search_params
-
     def __cinit__(self):
         check_cuvs(cuvsCagraIndexParamsCreate(&self.params))
         self.compression = None
@@ -186,7 +179,8 @@ cdef class IndexParams:
         self.ivf_pq_search_params = None
 
     def __dealloc__(self):
-        check_cuvs(cuvsCagraIndexParamsDestroy(self.params))
+        if self.params != NULL:
+            check_cuvs(cuvsCagraIndexParamsDestroy(self.params))
 
     def __init__(self, *,
                  metric="sqeuclidean",
@@ -275,18 +269,18 @@ cdef class Index:
 
     @property
     def dim(self):
-        cdef int32_t dim
+        cdef int64_t dim
         check_cuvs(cuvsCagraIndexGetDims(self.index, &dim))
         return dim
 
     @property
     def graph_degree(self):
-        cdef uint32_t degree
+        cdef int64_t degree
         check_cuvs(cuvsCagraIndexGetGraphDegree(self.index, &degree))
         return degree
 
     def __len__(self):
-        cdef uint32_t size
+        cdef int64_t size
         check_cuvs(cuvsCagraIndexGetSize(self.index, &size))
         return size
 
@@ -350,7 +344,7 @@ def build(IndexParams index_params, dataset, resources=None):
     ----------
     index_params : IndexParams object
     dataset : CUDA array interface compliant matrix shape (n_samples, dim)
-        Supported dtype [float, int8, uint8]
+        Supported dtype [float, half, int8, uint8]
     {resources_docstring}
 
     Returns
@@ -475,13 +469,12 @@ cdef class SearchParams:
 
     """
 
-    cdef cuvsCagraSearchParams * params
-
     def __cinit__(self):
         check_cuvs(cuvsCagraSearchParamsCreate(&self.params))
 
     def __dealloc__(self):
-        check_cuvs(cuvsCagraSearchParamsDestroy(self.params))
+        if self.params != NULL:
+            check_cuvs(cuvsCagraSearchParamsDestroy(self.params))
 
     def __init__(self, *,
                  max_queries=0,
@@ -841,3 +834,73 @@ def from_graph(graph, dataset, metric="sqeuclidean", resources=None):
         idx.index))
     idx.trained = True
     return idx
+
+
+cdef class ExtendParams:
+    """ Supplemental parameters to extend CAGRA Index
+
+    Parameters
+    ----------
+    max_chunk_size : int
+        The additional dataset is divided into chunks and added to the graph.
+        This is the knob to adjust the tradeoff between the recall and
+        operation throughput. Large chunk sizes can result in high throughput,
+        but use more working memory (O(max_chunk_size*degree^2)). This can also
+        degrade recall because no edges are added between the nodes in the same
+        chunk. Auto select when 0.
+    """
+
+    cdef cuvsCagraExtendParams* params
+
+    def __cinit__(self):
+        check_cuvs(cuvsCagraExtendParamsCreate(&self.params))
+
+    def __dealloc__(self):
+        check_cuvs(cuvsCagraExtendParamsDestroy(self.params))
+
+    def __init__(self, *,
+                 max_chunk_size=None):
+        if max_chunk_size is not None:
+            self.params.max_chunk_size = max_chunk_size
+
+    @property
+    def max_chunk_size(self):
+        return self.params.max_chunk_size
+
+
+@auto_sync_resources
+def extend(ExtendParams params, Index index, additional_dataset,
+           resources=None):
+    """
+    Extend a CAGRA index with additional vectors
+
+    Parameters
+    ----------
+    params : ExtendParams object
+    index: Index
+       Existing cagra index to extend
+    additional_dataset : CUDA array interface compliant matrix shape
+        Supported dtype [float, half, int8, uint8]
+    {resources_docstring}
+
+    """
+    dataset_ai = wrap_array(additional_dataset)
+    _check_input_array(dataset_ai, [np.dtype("float32"),
+                                    np.dtype("float16"),
+                                    np.dtype("byte"),
+                                    np.dtype("ubyte")])
+
+    cdef cydlpack.DLManagedTensor* dataset_dlpack = \
+        cydlpack.dlpack_c(dataset_ai)
+
+    cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
+
+    with cuda_interruptible():
+        check_cuvs(cuvsCagraExtend(
+            res,
+            params.params,
+            dataset_dlpack,
+            index.index
+        ))
+
+    return index

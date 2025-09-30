@@ -15,7 +15,7 @@
 #
 # cython: language_level=3
 
-from libc.stdint cimport uint32_t, uintptr_t
+from libc.stdint cimport int64_t, uint32_t, uintptr_t
 from libcpp cimport bool
 
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
@@ -84,9 +84,12 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
 
     cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index)
 
-    uint32_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index)
+    cuvsError_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index,
+                                        int64_t * n_lists)
 
-    uint32_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index)
+    cuvsError_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index, int64_t * dim)
+
+    cuvsError_t cuvsIvfPqIndexGetSize(cuvsIvfPqIndex_t index, int64_t * size)
 
     cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index,
                                          DLManagedTensor * centers)
@@ -118,3 +121,11 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
                                 DLManagedTensor* new_vectors,
                                 DLManagedTensor* new_indices,
                                 cuvsIvfPqIndex_t index)
+
+
+cdef class IndexParams:
+    cdef cuvsIvfPqIndexParams* params
+    cdef object _metric
+
+cdef class SearchParams:
+    cdef cuvsIvfPqSearchParams* params
