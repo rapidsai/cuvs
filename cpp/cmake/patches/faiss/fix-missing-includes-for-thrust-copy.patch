@@ -1,0 +1,40 @@
+From 87c5331dfa6ec30fd9839ecb89af519e65f010e7 Mon Sep 17 00:00:00 2001
+From: Bradley Dice <bdice@bradleydice.com>
+Date: Mon, 29 Sep 2025 15:39:17 -0500
+Subject: [PATCH] Fix missing includes for thrust::copy
+
+---
+ faiss/gpu/impl/BinaryCuvsCagra.cu | 3 +++
+ faiss/gpu/impl/CuvsCagra.cu       | 3 +++
+ 2 files changed, 6 insertions(+)
+
+diff --git a/faiss/gpu/impl/BinaryCuvsCagra.cu b/faiss/gpu/impl/BinaryCuvsCagra.cu
+index 0ca21dc5f..b331fdc8f 100644
+--- a/faiss/gpu/impl/BinaryCuvsCagra.cu
++++ b/faiss/gpu/impl/BinaryCuvsCagra.cu
+@@ -32,6 +32,9 @@
+ #include <raft/core/resource/thrust_policy.hpp>
+ #include <raft/linalg/map.cuh>
+
++#include <thrust/copy.h>
++#include <thrust/device_ptr.h>
++
+ namespace faiss {
+ namespace gpu {
+
+diff --git a/faiss/gpu/impl/CuvsCagra.cu b/faiss/gpu/impl/CuvsCagra.cu
+index 9ac4e1c5a..755817f43 100644
+--- a/faiss/gpu/impl/CuvsCagra.cu
++++ b/faiss/gpu/impl/CuvsCagra.cu
+@@ -31,6 +31,9 @@
+ #include <raft/core/device_resources.hpp>
+ #include <raft/core/resource/thrust_policy.hpp>
+
++#include <thrust/copy.h>
++#include <thrust/device_ptr.h>
++
+ namespace faiss {
+ namespace gpu {
+
+--
+2.49.0
