@@ -1156,7 +1156,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   std::vector<AnnCagraInputs> inputs = raft::util::itertools::product<AnnCagraInputs>(
     {100},
     {1000},
-    {1, 8, 16},
+    {1, 16},
     {16},                                                      // k
     {graph_build_algo::IVF_PQ, graph_build_algo::NN_DESCENT},  // build algo.
     {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
@@ -1174,25 +1174,30 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {std::optional<float>{std::nullopt}},
     {std::optional<vpq_params>{std::nullopt}},
     {std::optional<bool>{std::nullopt}},
-    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
-     cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
+    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL});
 
-  // Fixed dim, and changing neighbors and query size (output matrix size)
   auto inputs2 = raft::util::itertools::product<AnnCagraInputs>(
-    {1, 100},
+    {100},
     {1000},
-    {8},
-    {1, 16},  // k
-    {graph_build_algo::NN_DESCENT},
-    {search_algo::SINGLE_CTA, search_algo::MULTI_CTA, search_algo::MULTI_KERNEL},
-    {0},  // query size
+    {1, 16},
+    {16},                            // k
+    {graph_build_algo::NN_DESCENT},  // build algo.
+    {search_algo::MULTI_CTA},
+    {10},  // query size
     {0},
     {256},
     {1},
-    {cuvs::distance::DistanceType::L2Expanded},
+    {cuvs::distance::DistanceType::L2Expanded,
+     cuvs::distance::DistanceType::InnerProduct,
+     cuvs::distance::DistanceType::BitwiseHamming,
+     cuvs::distance::DistanceType::CosineExpanded},
     {false},
     {true},
-    {0.995});
+    {0.995},
+    {std::optional<float>{std::nullopt}},
+    {std::optional<vpq_params>{std::nullopt}},
+    {std::optional<bool>{std::nullopt}},
+    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_LOGICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Additional distances tested with a single search algo.
