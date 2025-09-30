@@ -571,7 +571,7 @@ if(NOT BUILD_CPU_ONLY)
       LIBRARY_NAMES nccl
     )
     find_package(NCCL REQUIRED)
-    target_link_libraries(cuvs_objs PUBLIC $<BUILD_LOCAL_INTERFACE:NCCL::NCCL>)
+    target_link_libraries(cuvs_objs PRIVATE $<BUILD_LOCAL_INTERFACE:NCCL::NCCL>)
 
     target_compile_definitions(cuvs_objs PUBLIC CUVS_BUILD_MG_ALGOS)
     target_compile_definitions(cuvs-cagra-search PUBLIC CUVS_BUILD_MG_ALGOS)
@@ -589,6 +589,13 @@ if(NOT BUILD_CPU_ONLY)
   if(NOT cuvs_compile_mode STREQUAL "static_only")
     add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs>)
     add_library(cuvs::cuvs ALIAS cuvs)
+
+    # Workaround for https://github.com/rapidsai/rapids-cmake/issues/176
+    rapids_export_package(BUILD NCCL cuvs-exports)
+    rapids_export_package(INSTALL NCCL cuvs-exports)
+    rapids_export_package(BUILD hnswlib cuvs-exports)
+    rapids_export_package(INSTALL hnswlib cuvs-exports)
+
     set_target_properties(
       cuvs
       PROPERTIES BUILD_RPATH "\$ORIGIN"
@@ -622,10 +629,10 @@ if(NOT BUILD_CPU_ONLY)
       PUBLIC rmm::rmm
              raft::raft
              ${CUVS_CTK_MATH_DEPENDENCIES}
-             $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
-             $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+             $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
+             $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
               cuvs-cagra-search
     )
 
@@ -683,10 +690,10 @@ SECTIONS
       PUBLIC rmm::rmm
              raft::raft
              ${CUVS_CTK_MATH_DEPENDENCIES}
-             $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
-             $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+             $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
+             $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
     )
   endif()
 
