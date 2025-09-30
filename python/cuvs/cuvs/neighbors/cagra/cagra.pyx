@@ -146,7 +146,7 @@ cdef class IndexParams:
             - inner_product distance is defined as
               distance(a, b) = \\sum_i a_i * b_i.
             - cosine distance is defined as
-              ``distance(a, b) = 1 - a.b / (|a| * |b|)``
+              distance(a, b) = 1 - \\sum_i a_i * b_i / ( ||a||_2 * ||b||_2).
 
     intermediate_graph_degree : int, default = 128
     graph_degree : int, default = 64
