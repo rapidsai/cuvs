@@ -28,33 +28,6 @@ namespace cuvs::neighbors::ivf_pq::detail {
 using cuvs::neighbors::ivf_pq::kIndexGroupSize;
 using cuvs::neighbors::ivf_pq::kIndexGroupVecLen;
 
-/**
- * A consumer for the `run_on_vector` that just flattens PQ codes
- * into a tightly packed matrix. That is, the codes are not expanded to one code-per-byte.
- */
-template <uint32_t PqBits>
-struct unpack_contiguous {
-  uint8_t* codes;
-  uint32_t code_size;
-
-  /**
-   * Create a callable to be passed to `run_on_vector`.
-   *
-   * @param[in] codes flat compressed PQ codes
-   */
-  __host__ __device__ inline unpack_contiguous(uint8_t* codes, uint32_t pq_dim)
-    : codes{codes}, code_size{raft::ceildiv<uint32_t>(pq_dim * PqBits, 8)}
-  {
-  }
-
-  /**  Write j-th component (code) of the i-th vector into the output array. */
-  __host__ __device__ inline void operator()(uint8_t code, uint32_t i, uint32_t j)
-  {
-    bitfield_view_t<PqBits> code_view{codes + i * code_size};
-    code_view[j] = code;
-  }
-};
-
 template <uint32_t BlockSize, uint32_t PqBits>
 __launch_bounds__(BlockSize) static __global__ void unpack_contiguous_list_data_kernel(
   uint8_t* out_codes,
