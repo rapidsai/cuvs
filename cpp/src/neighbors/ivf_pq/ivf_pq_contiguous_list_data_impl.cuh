@@ -107,34 +107,6 @@ inline void unpack_contiguous_list_data_impl(
 }
 
 /**
- * A producer for the `write_vector` reads tightly packed flat codes. That is,
- * the codes are not expanded to one code-per-byte.
- */
-template <uint32_t PqBits>
-struct pack_contiguous {
-  const uint8_t* codes;
-  uint32_t code_size;
-
-  /**
-   * Create a callable to be passed to `write_vector`.
-   *
-   * @param[in] codes flat compressed PQ codes
-   */
-  __host__ __device__ inline pack_contiguous(const uint8_t* codes, uint32_t pq_dim)
-    : codes{codes}, code_size{raft::ceildiv<uint32_t>(pq_dim * PqBits, 8)}
-  {
-  }
-
-  /** Read j-th component (code) of the i-th vector from the source. */
-  __host__ __device__ inline auto operator()(uint32_t i, uint32_t j) -> uint8_t
-  {
-    bitfield_view_t<PqBits> code_view{const_cast<uint8_t*>(codes + i * code_size)};
-    return uint8_t(code_view[j]);
-  }
-};
-
-/**
- * Pack a vector by copying chunks directly.
  */
 template <uint32_t PqBits>
 __device__ inline void pack_vector_chunks(
