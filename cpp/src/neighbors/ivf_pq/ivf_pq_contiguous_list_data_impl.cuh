@@ -54,10 +54,11 @@ __device__ inline void unpack_vector_chunks(
       uint32_t occupied_bytes = raft::ceildiv<uint32_t>((pq_dim % codes_per_chunk) * PqBits, 8);
       auto* chunk_bytes_ptr   = reinterpret_cast<uint8_t*>(&chunk);
       for (uint32_t j = 0; j < occupied_bytes; j++) {
-        chunk_bytes_ptr[j] =reinterpret_cast<uint8_t*>(in_list_data(group_ix, i, ingroup_ix, 0))[j];
+        chunk_bytes_ptr[j] =
+          reinterpret_cast<const uint8_t*>(&in_list_data(group_ix, i, ingroup_ix, 0))[j];
       }
     }
-    *reinterpret_cast<pq_vec_t*>(&codes[i * chunk_bytes + out_ix]) = chunk;
+    *reinterpret_cast<pq_vec_t*>(codes + i * chunk_bytes) = chunk;
   }
 }
 
@@ -78,15 +79,16 @@ __device__ inline void unpack_vector(
 
   pq_vec_t code_chunk = pq_vec_t{};
   bitfield_view_t<PqBits> dst_view{reinterpret_cast<uint8_t*>(&code_chunk)};
-  constexpr uint32_t kChunkSize = (sizeof(pq_vec_t) * 8u) / PqBits;
+  constexpr uint32_t kChunkSize  = (sizeof(pq_vec_t) * 8u) / PqBits;
   constexpr uint32_t chunk_bytes = sizeof(pq_vec_t);
 
   for (uint32_t j = 0, i = 0; j < pq_dim; i++) {
-    bitfield_view_t<PqBits> src_view{reinterpret_cast<const uint8_t*>(&in_list_data(group_ix, i, ingroup_ix, 0))};
+    bitfield_view_t<PqBits> src_view{const_cast<uint8_t*>(
+      reinterpret_cast<const uint8_t*>(&in_list_data(group_ix, i, ingroup_ix, 0)))};
     for (uint32_t k = 0; k < kChunkSize && j < pq_dim; k++, j++) {
       dst_view[k] = src_view[j];
     }
-    *reinterpret_cast<pq_vec_t*>(&codes[i * chunk_bytes + out_ix]) = code_chunk;
+    *reinterpret_cast<pq_vec_t*>(codes + i * chunk_bytes) = code_chunk;
     if (j < pq_dim) code_chunk = pq_vec_t{};
   }
 }
@@ -108,7 +110,7 @@ __launch_bounds__(BlockSize) static __global__ void unpack_list_chunks_kernel(
                             : std::get<const uint32_t*>(offset_or_indices)[ix];
 
   const uint32_t code_size = raft::ceildiv<uint32_t>(pq_dim * PqBits, 8);
-  const uint8_t* dst_codes = out_codes + ix * code_size;
+  uint8_t* dst_codes       = out_codes + ix * code_size;
 
   if constexpr (PqBits == 4 || PqBits == 8) {
     // aligned case: direct chunk copies
@@ -178,7 +180,7 @@ __device__ inline void pack_vector_chunks(
   for (uint32_t i = 0; i < n_chunks; i++) {
     pq_vec_t chunk;
     if (i < n_chunks - 1 || (pq_dim % codes_per_chunk) == 0) {
-      chunk = *reinterpret_cast<const pq_vec_t*>(codes + i * pq_dim);
+      chunk = *reinterpret_cast<const pq_vec_t*>(codes + i * chunk_bytes);
     } else {
       chunk                   = pq_vec_t{};
       uint32_t occupied_bytes = raft::ceildiv<uint32_t>((pq_dim % codes_per_chunk) * PqBits, 8);
