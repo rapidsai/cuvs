@@ -176,44 +176,6 @@ __device__ void write_vector(
   }
 }
 
-template <uint32_t PqBits, uint32_t SubWarpSize>
-__device__ void write_vector_chunks(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    out_list_data,
-  uint32_t out_ix,
-  const uint8_t* codes,
-  uint32_t pq_dim)
-{
-  const uint32_t lane_id         = raft::Pow2<SubWarpSize>::mod(threadIdx.x);
-  using group_align              = raft::Pow2<kIndexGroupSize>;
-  const uint32_t group_ix        = group_align::div(out_ix);
-  const uint32_t ingroup_ix      = group_align::mod(out_ix);
-  constexpr uint32_t chunk_bytes = sizeof(pq_vec_t);
-  constexpr uint32_t kChunkSize  = (sizeof(pq_vec_t) * 8u) / PqBits;
-  constexpr uint32_t chunk_bits  = chunk_bytes * 8u;
-  uint32_t n_chunks              = raft::ceildiv<uint32_t>(pq_dim * PqBits, chunk_bits);
-  const bool compute_last_chunk  = raft::Pow2<chunk_bits>::mod(pq_dim * PqBits) == 0;
-  uint32_t n_copies              = compute_last_chunk ? n_chunks - 1 : n_chunks;
-  for (uint32_t i = 0; i < n_copies; i++) {
-    uint32_t chunk_ix = i * kChunkSize;
-    *reinterpret_cast<pq_vec_t*>(&out_list_data(group_ix, chunk_ix, ingroup_ix, 0)) = 
-      *reinterpret_cast<const pq_vec_t*>(&codes[chunk_ix * chunk_bytes]);
-  }
-  if (compute_last_chunk) {
-    pq_vec_t code_chunk;
-    bitfield_view_t<PqBits> code_view{reinterpret_cast<uint8_t*>(&code_chunk)};
-    uint32_t chunk_ix = n_copies * kChunkSize;
-    for (uint32_t j = chunk_ix, i = 0; j < pq_dim; i++) {
-      code_chunk = *reinterpret_cast<const pq_vec_t*>(&codes[chunk_ix * chunk_bytes]);
-      for (uint32_t k = 0; k < kChunkSize && j < pq_dim; k++, j++) {
-        code_view[k] = codes[chunk_ix * chunk_bytes + k];
-      }
-    }
-    *reinterpret_cast<pq_vec_t*>(&out_list_data(group_ix, chunk_ix, ingroup_ix, 0)) =
-      *reinterpret_cast<const pq_vec_t*>(&codes[chunk_ix * chunk_bytes]);
-  }
-}
-
 /** Process the given indices or a block of a single list (cluster). */
 template <uint32_t PqBits, typename Action>
 __device__ void run_on_list(
