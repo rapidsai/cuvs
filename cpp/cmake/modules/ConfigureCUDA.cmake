@@ -19,6 +19,11 @@ if(DISABLE_DEPRECATION_WARNINGS)
   )
 endif()
 
+if(DISABLE_OPENMP)
+  list(APPEND CUVS_CXX_FLAGS -Wno-unknown-pragmas)
+  list(APPEND CUVS_CUDA_FLAGS -Xcompiler=-Wno-unknown-pragmas)
+endif()
+
 # Be very strict when compiling with GCC as host compiler (and thus more lenient when compiling with
 # clang)
 if(CMAKE_COMPILER_IS_GNUCXX)
