@@ -29,7 +29,7 @@ using cuvs::neighbors::ivf_pq::kIndexGroupSize;
 using cuvs::neighbors::ivf_pq::kIndexGroupVecLen;
 
 template <uint32_t BlockSize, uint32_t PqBits>
-__launch_bounds__(BlockSize) static __global__ void unpack_contiguous_list_data_kernel(
+__launch_bounds__(BlockSize) static __global__ void unpack_list_chunks_kernel(
   uint8_t* out_codes,
   raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
     in_list_data,
@@ -37,8 +37,23 @@ __launch_bounds__(BlockSize) static __global__ void unpack_contiguous_list_data_
   uint32_t pq_dim,
   std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
-  run_on_list<PqBits>(
-    in_list_data, offset_or_indices, n_rows, pq_dim, unpack_contiguous<PqBits>(out_codes, pq_dim));
+  uint32_t ix = threadIdx.x + blockDim.x * blockIdx.x;
+  if (ix >= n_rows) return;
+
+  const uint32_t dst_ix = std::holds_alternative<uint32_t>(offset_or_indices)
+                            ? std::get<uint32_t>(offset_or_indices) + ix
+                            : std::get<const uint32_t*>(offset_or_indices)[ix];
+
+  const uint32_t code_size = raft::ceildiv<uint32_t>(pq_dim * PqBits, 8);
+  const uint8_t* src_codes = out_codes + ix * code_size;
+
+  if constexpr (PqBits == 4 || PqBits == 8) {
+    // aligned case: direct chunk copies
+    unpack_vector_chunks<PqBits>(in_list_data, dst_ix, src_codes, pq_dim);
+  } else {
+    // unaligned case: extract each code
+    unpack_vector<PqBits>(in_list_data, dst_ix, src_codes, pq_dim);
+  }
 }
 
 /**
@@ -140,19 +155,6 @@ __device__ inline void pack_vector(
     *reinterpret_cast<pq_vec_t*>(&out_list_data(group_ix, i, ingroup_ix, 0)) = code_chunk;
     if (j < pq_dim) code_chunk = pq_vec_t{};
   }
-}
-
-template <uint32_t BlockSize, uint32_t PqBits>
-__launch_bounds__(BlockSize) static __global__ void pack_contiguous_list_data_kernel(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
-  const uint8_t* codes,
-  uint32_t n_rows,
-  uint32_t pq_dim,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices)
-{
-  write_list<PqBits, 1>(
-    list_data, offset_or_indices, n_rows, pq_dim, pack_contiguous<PqBits>(codes, pq_dim));
 }
 
 template <uint32_t BlockSize, uint32_t PqBits>
