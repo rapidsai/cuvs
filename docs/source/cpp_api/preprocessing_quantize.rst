@@ -29,7 +29,7 @@ namespace *cuvs::preprocessing::quantize::binary*
    :project: cuvs
 
 Product
-------
+-------
 
 ``#include <cuvs/preprocessing/quantize/product.hpp>``
 
