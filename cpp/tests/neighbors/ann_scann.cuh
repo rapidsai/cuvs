@@ -131,7 +131,7 @@ class scann_test : public ::testing::TestWithParam<scann_inputs> {
     ASSERT_EQ(index.pq_codebook().extent(0), num_pq_clusters);
     ASSERT_EQ(index.pq_codebook().extent(1), ps.dim);
 
-    IdxT expected_bf16_size = ps.index_params.reordering_bf16_enabled ? ps.dim * ps.num_db_vecs : 0;
+    IdxT expected_bf16_size = ps.index_params.reordering_bf16 ? ps.dim * ps.num_db_vecs : 0;
 
     ASSERT_EQ(index.bf16_dataset().size(), expected_bf16_size);
   }
@@ -227,7 +227,16 @@ inline auto big_dims_all_pq_bits() -> test_cases_t
 inline auto bf16() -> test_cases_t
 {
   scann_inputs ts;
-  ts.index_params.reordering_bf16_enabled = true;
+  ts.index_params.reordering_bf16 = true;
+
+  return {ts};
+}
+
+inline auto bf16_avq() -> test_cases_t
+{
+  scann_inputs ts;
+  ts.index_params.reordering_bf16                    = true;
+  ts.index_params.reordering_noise_shaping_threshold = 0.2;
 
   return {ts};
 }
