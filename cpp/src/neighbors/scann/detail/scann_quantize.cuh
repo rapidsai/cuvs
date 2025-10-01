@@ -314,6 +314,11 @@ __device__ inline float bfloat16_to_float(int16_t& bf16)
  * Based on the signs of the current residual and quantized value,
  * increment or decrement the quantized value to push residual closer to 0
  *
+ * Note that the bfloat16 value is encoded as an int16_t, and the
+ * increment/decrement is applied to encoded value. In terms of the float
+ * representation, it is the mantissa that is being incremented/decremented,
+ * which could carryover to the exponent
+ *
  * @param res the float residual
  * @param current the current quantized dimension
  * @return the other possible quantized value
@@ -328,9 +333,6 @@ __device__ inline int16_t bfloat16_next_delta(float& res, int16_t& current)
   return current + 1;
 }
 
-/**
- *
- */
 template <uint32_t BlockSize, typename IdxT>
 __launch_bounds__(BlockSize) RAFT_KERNEL
   quantize_bfloat16_noise_shaped_kernel(raft::device_matrix_view<const float, IdxT> dataset,
