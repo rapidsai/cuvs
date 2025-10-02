@@ -118,7 +118,7 @@ void ace_read_large_file(const file_descriptor& fd,
   RAFT_EXPECTS(dest_ptr != nullptr, "Destination pointer must not be nullptr");
   RAFT_EXPECTS(fd.is_valid(), "File descriptor must be valid");
 
-  const size_t read_chunk_size = 4 * 1024 * 1024;
+  const size_t read_chunk_size = 1024 * 1024 * 1024;
   size_t bytes_remaining       = total_bytes;
   size_t offset                = 0;
 
