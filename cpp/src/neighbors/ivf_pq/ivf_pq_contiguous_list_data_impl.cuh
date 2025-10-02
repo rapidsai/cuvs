@@ -77,19 +77,15 @@ __device__ inline void unpack_vector(
   const uint32_t group_ix   = group_align::div(out_ix);
   const uint32_t ingroup_ix = group_align::mod(out_ix);
 
-  pq_vec_t code_chunk = pq_vec_t{};
-  bitfield_view_t<PqBits> dst_view{reinterpret_cast<uint8_t*>(&code_chunk)};
   constexpr uint32_t kChunkSize  = (sizeof(pq_vec_t) * 8u) / PqBits;
-  constexpr uint32_t chunk_bytes = sizeof(pq_vec_t);
 
+  bitfield_view_t<PqBits> dst_view{codes};
   for (uint32_t j = 0, i = 0; j < pq_dim; i++) {
     bitfield_view_t<PqBits> src_view{const_cast<uint8_t*>(
       reinterpret_cast<const uint8_t*>(&in_list_data(group_ix, i, ingroup_ix, 0)))};
     for (uint32_t k = 0; k < kChunkSize && j < pq_dim; k++, j++) {
-      dst_view[k] = src_view[j];
+      dst_view[j] = src_view[k];
     }
-    *reinterpret_cast<pq_vec_t*>(codes + i * chunk_bytes) = code_chunk;
-    if (j < pq_dim) code_chunk = pq_vec_t{};
   }
 }
 
