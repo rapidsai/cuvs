@@ -1,9 +1,16 @@
 {
-    "packages" : {
-      "faiss" : {
-        "version": "1.12.0",
-        "git_url": "https://github.com/facebookresearch/faiss.git",
-        "git_tag": "v1.12.0"
-      }
+  "packages" : {
+    "faiss" : {
+      "version": "1.12.0",
+      "git_url": "https://github.com/facebookresearch/faiss.git",
+      "git_tag": "v1.12.0",
+      "patches" : [
+        {
+          "file" : "${current_json_dir}/faiss/fix-missing-includes-for-thrust-copy.patch",
+          "issue" : "Fix missing Thrust includes. https://github.com/facebookresearch/faiss/pull/4597",
+          "fixed_in" : ""
+        }
+      ]
     }
   }
+}
