@@ -18,6 +18,7 @@
 
 #include "../ivf_common.cuh"
 #include "../sample_filter.cuh"
+#include "jit_lto_kernels/interleaved_scan_planner.hpp"
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 
@@ -972,8 +973,8 @@ RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
 /**
  *  Configure the gridDim.x to maximize GPU occupancy, but reduce the output size
  */
-template <typename T>
-uint32_t configure_launch_x(uint32_t numQueries, uint32_t n_probes, int32_t sMemSize, T func)
+// template <typename T>
+uint32_t configure_launch_x(uint32_t numQueries, uint32_t n_probes, int32_t sMemSize, CUkernel func)
 {
   int dev_id;
   RAFT_CUDA_TRY(cudaGetDevice(&dev_id));
@@ -1017,16 +1018,20 @@ void launch_kernel(Lambda lambda,
 {
   RAFT_EXPECTS(Veclen == index.veclen(),
                "Configured Veclen does not match the index interleaving pattern.");
-  constexpr auto kKernel   = interleaved_scan_kernel<Capacity,
-                                                     Veclen,
-                                                     Ascending,
-                                                     ComputeNorm,
-                                                     T,
-                                                     AccT,
-                                                     IdxT,
-                                                     IvfSampleFilterT,
-                                                     Lambda,
-                                                     PostLambda>;
+  // constexpr auto kKernel   = interleaved_scan_kernel<Capacity,
+  //                                                    Veclen,
+  //                                                    Ascending,
+  //                                                    ComputeNorm,
+  //                                                    T,
+  //                                                    AccT,
+  //                                                    IdxT,
+  //                                                    IvfSampleFilterT,
+  //                                                    Lambda,
+  //                                                    PostLambda>;
+  auto kernel_planner = InterleavedScanPlanner<T, AccT, IdxT, IvfSampleFilterT, Lambda, PostLambda>(
+    Capacity, Veclen, Ascending, ComputeNorm);
+  auto kernel_launcher = kernel_planner.get_launcher();
+
   const int max_query_smem = 16384;
   int query_smem_elems     = std::min<int>(max_query_smem / sizeof(T),
                                        raft::Pow2<Veclen * raft::WarpSize>::roundUp(index.dim()));
@@ -1044,7 +1049,8 @@ void launch_kernel(Lambda lambda,
   constexpr uint32_t kMaxGridY = 32768;
 
   if (grid_dim_x == 0) {
-    grid_dim_x = configure_launch_x(std::min(kMaxGridY, num_queries), n_probes, smem_size, kKernel);
+    grid_dim_x = configure_launch_x(
+      std::min(kMaxGridY, num_queries), n_probes, smem_size, kernel_launcher.get_kernel());
     return;
   }
 
@@ -1060,22 +1066,42 @@ void launch_kernel(Lambda lambda,
       block_dim.x,
       n_probes,
       smem_size);
-    kKernel<<<grid_dim, block_dim, smem_size, stream>>>(lambda,
-                                                        post_process,
-                                                        query_smem_elems,
-                                                        queries,
-                                                        coarse_index,
-                                                        index.data_ptrs().data_handle(),
-                                                        index.list_sizes().data_handle(),
-                                                        queries_offset + query_offset,
-                                                        n_probes,
-                                                        k,
-                                                        max_samples,
-                                                        chunk_indices,
-                                                        index.dim(),
-                                                        sample_filter,
-                                                        neighbors,
-                                                        distances);
+    // kKernel<<<grid_dim, block_dim, smem_size, stream>>>(lambda,
+    //                                                     post_process,
+    //                                                     query_smem_elems,
+    //                                                     queries,
+    //                                                     coarse_index,
+    //                                                     index.data_ptrs().data_handle(),
+    //                                                     index.list_sizes().data_handle(),
+    //                                                     queries_offset + query_offset,
+    //                                                     n_probes,
+    //                                                     k,
+    //                                                     max_samples,
+    //                                                     chunk_indices,
+    //                                                     index.dim(),
+    //                                                     sample_filter,
+    //                                                     neighbors,
+    //                                                     distances);
+    kernel_launcher(stream,
+                    grid_dim,
+                    block_dim,
+                    smem_size,
+                    lambda,
+                    post_process,
+                    query_smem_elems,
+                    queries,
+                    coarse_index,
+                    index.data_ptrs().data_handle(),
+                    index.list_sizes().data_handle(),
+                    queries_offset + query_offset,
+                    n_probes,
+                    k,
+                    max_samples,
+                    chunk_indices,
+                    index.dim(),
+                    sample_filter,
+                    neighbors,
+                    distances);
     queries += grid_dim_y * index.dim();
     if constexpr (Capacity > 0) {
       neighbors += grid_dim_y * grid_dim_x * k;
