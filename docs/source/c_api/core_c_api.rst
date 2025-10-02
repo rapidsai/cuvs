@@ -30,4 +30,3 @@ Logging
     :project: cuvs
     :members:
     :content-only:
-
