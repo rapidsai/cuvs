@@ -150,7 +150,7 @@ __launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_vectors_kernel(
   constexpr uint32_t kSubWarpSize = std::min<uint32_t>(raft::WarpSize, 1u << PqBits);
   using subwarp_align             = raft::Pow2<kSubWarpSize>;
   const IdxT row_ix = subwarp_align::div(IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x});
-  if (row_ix >= codes.extent(0)) { return; }
+  if (row_ix >= dataset.extent(0)) { return; }
 
   auto* out_codes_ptr = &codes(row_ix, 0);
   bitfield_view_t<PqBits> code_view{out_codes_ptr};
