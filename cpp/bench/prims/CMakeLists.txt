@@ -122,16 +122,4 @@ if(CUVS_PRIMS_BENCH_USE_FUSED_L2_NN)
   )
 endif()
 
-#if(CUVS_PRIMS_BENCH_USE_CUBLAS_SAMPLE)
-#  ConfigurePrimsBench(
-#    NAME CUBLAS_GEMM PATH src/distance/cublas_sample.cu
-#    LINKS CUDA::cublas
-#  )
-#endif()
-
-#if(CUVS_PRIMS_BENCH_USE_WMMA)
-#  ConfigurePrimsBench(
-#    NAME WMMA PATH src/distance/wmma.cu
-#  )
-#endif()
 message("CUDAToolkit_LIBRARY_DIR: ${CUDAToolkit_LIBRARY_DIR}")
