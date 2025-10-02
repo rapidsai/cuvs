@@ -1,6 +1,6 @@
 #pragma once
 
-#define LIBCUDACXX_ENABLE_EXPERIMENTAL_MEMORY_RESOURCE
+//#define LIBCUDACXX_ENABLE_EXPERIMENTAL_MEMORY_RESOURCE
 #include <cmath>
 #include <cuda_runtime.h>
 #include <iostream>

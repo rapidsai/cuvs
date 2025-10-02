@@ -1,6 +1,4 @@
 #include "common.cuh"
-#include "cublas_sample.cu"
-#include "tensor_core.cu"
 #include <benchmark/benchmark.h>
 #include <iostream>
 
@@ -13,7 +11,7 @@
 #include <raft/linalg/norm_types.hpp>
 #include <raft/random/rng.cuh>
 
-//using namespace cuvs::distance;
+using namespace cuvs::distance;
 
 enum class AlgorithmType {gemm, unfused, fused};
 
@@ -49,21 +47,15 @@ void benchmark_fusedl2nn(benchmark::State& state)
   raft::random::uniform(handle, rng, x.data_handle(), m * k, DataT(-1.0), DataT(1.0));
   raft::random::uniform(handle, rng, y.data_handle(), n * k, DataT(-1.0), DataT(1.0));
 
-  // CHECK_CUDA(cudaDeviceSynchronize());
-  // rescale<DataT><<<(m*k)/128, 128, 0, stream>>>(x.data_handle(), 4, m*k);
-  // rescale<DataT><<<(n*k)/128, 128, 0, stream>>>(y.data_handle(), 4, n*k);
-
   // Pre-compute norms
-  raft::linalg::rowNorm(
-    x_norm.data_handle(), x.data_handle(), k, m, raft::linalg::L2Norm, true, stream);
-  raft::linalg::rowNorm(
-    y_norm.data_handle(), y.data_handle(), k, n, raft::linalg::L2Norm, true, stream);
+  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(x_norm.data_handle(), x.data_handle(), k, m, stream);
+  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(y_norm.data_handle(), y.data_handle(), k, n, stream);
 
   // Calculate the workspace size
-  // for fused it is m * sizeof(IdxT)
+  // for fused it is n * sizeof(IdxT)
   // for unfused, gemm and tensor it is m * n * sizeof(AccT);
-  size_t workspace_size =
-    m * n * sizeof(AccT) > n * sizeof(IdxT) ? m * n * sizeof(AccT) : n * sizeof(IdxT);
+
+  size_t workspace_size = (algo == AlgorithmType::fused) ? m * sizeof(IdxT) : m * n * sizeof(AccT);
 
   raft::device_vector<char, IdxT> workspace =
     raft::make_device_vector<char, IdxT>(handle, workspace_size);
@@ -80,18 +72,20 @@ void benchmark_fusedl2nn(benchmark::State& state)
     out_ref.data_handle(), x.data_handle(), y.data_handle(), m, n, k, stream);
 
   // Warm up
-  unfused_distance_nn<DataT, AccT, OutT, IdxT, false, false>(out.data_handle(),
-                                                     x.data_handle(),
-                                                     y.data_handle(),
-                                                     m,
-                                                     n,
-                                                     k,
-                                                     x_norm.data_handle(),
-                                                     y_norm.data_handle(),
-                                                     (AccT*)workspace.data_handle(),
-                                                     cublas_handle,
-                                                     stream);
-
+  if constexpr (algo != AlgorithmType::fused) {
+    unfused_distance_nn<DataT, AccT, OutT, IdxT>(handle,
+                                                out.data_handle(),
+                                                x.data_handle(),
+                                                y.data_handle(),
+                                                m,
+                                                n,
+                                                k,
+                                                x_norm.data_handle(),
+                                                y_norm.data_handle(),
+                                                (AccT*)workspace.data_handle(),
+                                                false,
+                                                stream);
+  }
   CHECK_CUDA(cudaMemsetAsync(workspace.data_handle(), 0, workspace_size, stream));
   CHECK_CUDA(cudaMemsetAsync(out.data_handle(), 0, m * sizeof(OutT)));
   CHECK_CUDA(cudaStreamSynchronize(stream));
@@ -119,31 +113,33 @@ void benchmark_fusedl2nn(benchmark::State& state)
     }
 
     if constexpr (algo == AlgorithmType::unfused) {
-      unfusedDistanceNNMinReduce<DataT, AccT, OutT, IdxT, false, false>(out.data_handle(),
-                                                         x.data_handle(),
-                                                         y.data_handle(),
-                                                         m,
-                                                         n,
-                                                         k,
-                                                         x_norm.data_handle(),
-                                                         y_norm.data_handle(),
-                                                         (AccT*)workspace.data_handle(),
-                                                         cublas_handle,
-                                                         stream);
+      unfused_distance_nn<DataT, AccT, OutT, IdxT>(handle,
+                                                   out.data_handle(),
+                                                   x.data_handle(),
+                                                   y.data_handle(),
+                                                   m,
+                                                   n,
+                                                   k,
+                                                   x_norm.data_handle(),
+                                                   y_norm.data_handle(),
+                                                   (AccT*)workspace.data_handle(),
+                                                   false,
+                                                   stream);
     }
 
     if constexpr (algo == AlgorithmType::gemm) {
-      unfusedDistanceNNMinReduce<DataT, AccT, OutT, IdxT, false, true>(out.data_handle(),
-                                                        x.data_handle(),
-                                                        y.data_handle(),
-                                                        m,
-                                                        n,
-                                                        k,
-                                                        x_norm.data_handle(),
-                                                        y_norm.data_handle(),
-                                                        (AccT*)workspace.data_handle(),
-                                                        cublas_handle,
-                                                        stream);
+      unfused_distance_nn<DataT, AccT, OutT, IdxT, false>(handle,
+                                                   out.data_handle(),
+                                                   x.data_handle(),
+                                                   y.data_handle(),
+                                                   m,
+                                                   n,
+                                                   k,
+                                                   x_norm.data_handle(),
+                                                   y_norm.data_handle(),
+                                                   (AccT*)workspace.data_handle(),
+                                                   false,
+                                                   stream);
     }
 
   }
@@ -156,7 +152,8 @@ void benchmark_fusedl2nn(benchmark::State& state)
                                         y_norm.data_handle(),
                                         m,
                                         n,
-                                        stream);
+                                        stream,
+                                        false);
   }
 
   ComparisonSummary* global_summary;
@@ -268,13 +265,6 @@ int main(int argc, char** argv)
   bench = benchmark::RegisterBenchmark(
     "gemm/float/int/<int, float>",
     benchmark_fusedl2nn<float, float, raft::KeyValuePair<int, float>, int, AlgorithmType::gemm>);
-  bench->Apply(CustomArguments<int>);
-
-  // hand coded tensor core MMA
-  // half -> half
-  bench = benchmark::RegisterBenchmark(
-    "tensor/half/int/<int, half>",
-    benchmark_fusedl2nn<half, half, raft::KeyValuePair<int, half>, int, AlgorithmType::tensor>);
   bench->Apply(CustomArguments<int>);
 
   // Initialize benchmark

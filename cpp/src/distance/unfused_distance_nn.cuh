@@ -157,7 +157,7 @@ void reduce_min(OutT* out,
     <<<blocks, TPB, 0, stream>>>(out, z, x_norm, y_norm, m, n, is_sqrt);
 }
 
-template <typename DataT, typename AccT, typename OutT, typename IdxT>
+template <typename DataT, typename AccT, typename OutT, typename IdxT, bool reduce=true>
 void unfused_distance_nn(raft::resources const& handle,
                          OutT* out,
                          const DataT* x,
