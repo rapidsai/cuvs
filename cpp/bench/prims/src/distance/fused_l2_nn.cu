@@ -52,7 +52,7 @@ void benchmark_fusedl2nn(benchmark::State& state)
   raft::linalg::rowNorm<raft::linalg::L2Norm, true>(y_norm.data_handle(), y.data_handle(), k, n, stream);
 
   // Calculate the workspace size
-  // for fused it is n * sizeof(IdxT)
+  // for fused it is m * sizeof(IdxT)
   // for unfused, gemm and tensor it is m * n * sizeof(AccT);
 
   size_t workspace_size = (algo == AlgorithmType::fused) ? m * sizeof(IdxT) : m * n * sizeof(AccT);
@@ -61,11 +61,6 @@ void benchmark_fusedl2nn(benchmark::State& state)
     raft::make_device_vector<char, IdxT>(handle, workspace_size);
 
   CudaEventTimer timer(stream);
-
-  // Create cuBLAS handle
-  cublasHandle_t cublas_handle;
-  CHECK_CUBLAS(cublasCreate(&cublas_handle));
-  CHECK_CUBLAS(cublasSetStream(cublas_handle, stream));
 
   // Reference calculation
   ref_l2nn_api<DataT, AccT, OutT, IdxT>(
