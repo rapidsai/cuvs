@@ -350,6 +350,15 @@ struct index : cuvs::neighbors::index {
     return graph_view_;
   }
 
+  /** Whether the index is stored on disk */
+  [[nodiscard]] constexpr inline auto on_disk() const noexcept -> bool { return on_disk_; }
+
+  /** Directory where index files are stored (empty if not on disk) */
+  [[nodiscard]] inline auto file_directory() const noexcept -> const std::string&
+  {
+    return file_directory_;
+  }
+
   // Don't allow copying the index for performance reasons (try avoiding copying data)
   /** \cond */
   index(const index&)                    = delete;
@@ -525,11 +534,22 @@ struct index : cuvs::neighbors::index {
     graph_view_ = graph_.view();
   }
 
+  /**
+   * Set whether the index is stored on disk and the directory where files are stored.
+   */
+  void set_disk_storage(bool on_disk, const std::string& file_directory = "")
+  {
+    on_disk_        = on_disk;
+    file_directory_ = file_directory;
+  }
+
  private:
   cuvs::distance::DistanceType metric_;
   raft::device_matrix<IdxT, int64_t, raft::row_major> graph_;
   raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
   std::unique_ptr<neighbors::dataset<dataset_index_type>> dataset_;
+  bool on_disk_               = false;
+  std::string file_directory_ = "";
 };
 /**
  * @}

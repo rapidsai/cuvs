@@ -1429,6 +1429,8 @@ index<T, IdxT> build_ace(
           "Insufficient GPU memory to attach dataset to ACE index. Only the graph will be stored.");
       }
     }
+  } else {
+    idx.set_disk_storage(true, params.ace_build_dir);
   }
 
   auto index_creation_end = std::chrono::high_resolution_clock::now();
