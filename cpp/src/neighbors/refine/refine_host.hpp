@@ -390,10 +390,12 @@ template <typename DC, typename IdxT, typename DataT, typename DistanceT, typena
     // taking this into account.
     auto n_elements    = std::max(size_t(512), dim);
     auto max_n_threads = raft::div_rounding_up_safe<size_t>(n_queries * orig_k * dim, n_elements);
-    auto suggested_n_threads_for_distance = std::min(size_t(suggested_n_threads), max_n_threads);
+    [[maybe_unused]] auto suggested_n_threads_for_distance =
+      std::min(size_t(suggested_n_threads), max_n_threads);
 
     // The max number of threads for topk computation is the number of queries.
-    auto suggested_n_threads_for_topk = std::min(size_t(suggested_n_threads), n_queries);
+    [[maybe_unused]] auto suggested_n_threads_for_topk =
+      std::min(size_t(suggested_n_threads), n_queries);
 
     // Compute the refined distance using original dataset vectors
 #pragma omp parallel for collapse(2) num_threads(suggested_n_threads_for_distance)
