@@ -849,12 +849,6 @@ inline void search(raft::resources const& handle,
   static_assert(std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, uint8_t> ||
                   std::is_same_v<T, int8_t>,
                 "Unsupported element type.");
-  if (index.metric() == distance::DistanceType::CosineExpanded) {
-    if constexpr (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>)
-      RAFT_FAIL(
-        "CosineExpanded distance metric is currently not supported for uint8_t and int8_t data "
-        "type");
-  }
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::search(n_queries = %u, n_probes = %u, k = %u, dim = %zu)",
     n_queries,
