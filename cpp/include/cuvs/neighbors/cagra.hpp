@@ -359,6 +359,14 @@ struct index : cuvs::neighbors::index {
     return file_directory_;
   }
 
+  /** Dataset norms for cosine distance [size] */
+  [[nodiscard]] inline auto dataset_norms() const noexcept
+    -> std::optional<raft::device_vector_view<const float, int64_t>>
+  {
+    if (dataset_norms_.has_value()) { return raft::make_const_mdspan(dataset_norms_->view()); }
+    return std::nullopt;
+  }
+
   // Don't allow copying the index for performance reasons (try avoiding copying data)
   /** \cond */
   index(const index&)                    = delete;
@@ -374,7 +382,8 @@ struct index : cuvs::neighbors::index {
     : cuvs::neighbors::index(),
       metric_(metric),
       graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0)),
-      dataset_(new cuvs::neighbors::empty_dataset<int64_t>(0))
+      dataset_(new cuvs::neighbors::empty_dataset<int64_t>(0)),
+      dataset_norms_(std::nullopt)
   {
   }
 
@@ -440,11 +449,20 @@ struct index : cuvs::neighbors::index {
     : cuvs::neighbors::index(),
       metric_(metric),
       graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0)),
-      dataset_(make_aligned_dataset(res, dataset, 16))
+      dataset_(make_aligned_dataset(res, dataset, 16)),
+      dataset_norms_(std::nullopt)
   {
     RAFT_EXPECTS(dataset.extent(0) == knn_graph.extent(0),
                  "Dataset and knn_graph must have equal number of rows");
     update_graph(res, knn_graph);
+
+    if (metric_ == cuvs::distance::DistanceType::CosineExpanded) {
+      auto p = dynamic_cast<strided_dataset<T, int64_t>*>(dataset_.get());
+      if (p) {
+        auto dataset_view = p->view();
+        if (dataset_view.extent(0) > 0) { compute_dataset_norms_(res); }
+      }
+    }
 
     raft::resource::sync_stream(res);
   }
@@ -455,11 +473,18 @@ struct index : cuvs::neighbors::index {
    * If the new dataset rows are aligned on 16 bytes, then only a reference is stored to the
    * dataset. It is the caller's responsibility to ensure that dataset stays alive as long as the
    * index. It is expected that the same set of vectors are used for update_dataset and index build.
+   *
+   * Note: This will clear any precomputed dataset norms.
    */
   void update_dataset(raft::resources const& res,
                       raft::device_matrix_view<const T, int64_t, raft::row_major> dataset)
   {
     dataset_ = make_aligned_dataset(res, dataset, 16);
+    dataset_norms_.reset();
+
+    if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      if (dataset.extent(0) > 0) { compute_dataset_norms_(res); }
+    }
   }
 
   /** Set the dataset reference explicitly to a device matrix view with padding. */
@@ -467,6 +492,11 @@ struct index : cuvs::neighbors::index {
                       raft::device_matrix_view<const T, int64_t, raft::layout_stride> dataset)
   {
     dataset_ = make_aligned_dataset(res, dataset, 16);
+    dataset_norms_.reset();
+
+    if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      if (dataset.extent(0) > 0) { compute_dataset_norms_(res); }
+    }
   }
 
   /**
@@ -474,22 +504,38 @@ struct index : cuvs::neighbors::index {
    *
    * We create a copy of the dataset on the device. The index manages the lifetime of this copy. It
    * is expected that the same set of vectors are used for update_dataset and index build.
+   *
+   * Note: This will clear any precomputed dataset norms.
    */
   void update_dataset(raft::resources const& res,
                       raft::host_matrix_view<const T, int64_t, raft::row_major> dataset)
   {
     dataset_ = make_aligned_dataset(res, dataset, 16);
+    dataset_norms_.reset();
+    if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      if (dataset.extent(0) > 0) { compute_dataset_norms_(res); }
+    }
   }
 
   /**
    * Replace the dataset with a new dataset. It is expected that the same set of vectors are used
    * for update_dataset and index build.
+   *
+   * Note: This will clear any precomputed dataset norms.
    */
   template <typename DatasetT>
   auto update_dataset(raft::resources const& res, DatasetT&& dataset)
     -> std::enable_if_t<std::is_base_of_v<cuvs::neighbors::dataset<dataset_index_type>, DatasetT>>
   {
     dataset_ = std::make_unique<DatasetT>(std::move(dataset));
+    dataset_norms_.reset();
+    if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      auto p = dynamic_cast<strided_dataset<T, int64_t>*>(dataset_.get());
+      if (p) {
+        auto dataset_view = p->view();
+        if (dataset_view.extent(0) > 0) { compute_dataset_norms_(res); }
+      }
+    }
   }
 
   template <typename DatasetT>
@@ -497,6 +543,11 @@ struct index : cuvs::neighbors::index {
     -> std::enable_if_t<std::is_base_of_v<neighbors::dataset<dataset_index_type>, DatasetT>>
   {
     dataset_ = std::move(dataset);
+    dataset_norms_.reset();
+    if (metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      auto dataset_view = this->dataset();
+      if (dataset_view.extent(0) > 0) { compute_dataset_norms_(res); }
+    }
   }
 
   /**
@@ -550,6 +601,10 @@ struct index : cuvs::neighbors::index {
   std::unique_ptr<neighbors::dataset<dataset_index_type>> dataset_;
   bool on_disk_               = false;
   std::string file_directory_ = "";
+  // only float distances supported at the moment
+  std::optional<raft::device_vector<float, int64_t>> dataset_norms_;
+
+  void compute_dataset_norms_(raft::resources const& res);
 };
 /**
  * @}
@@ -570,6 +625,7 @@ struct index : cuvs::neighbors::index {
  * The following distance metrics are supported:
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
+ * - CosineExpanded
  *
  * Usage example:
  * @code{.cpp}
@@ -607,6 +663,7 @@ auto build(raft::resources const& res,
  * The following distance metrics are supported:
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
+ * - CosineExpanded
  *
  * Usage example:
  * @code{.cpp}
@@ -644,6 +701,7 @@ auto build(raft::resources const& res,
  * The following distance metrics are supported:
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
+ * - CosineExpanded (dataset norms are computed as float regardless of input data type)
  *
  * Usage example:
  * @code{.cpp}
@@ -680,6 +738,7 @@ auto build(raft::resources const& res,
  *
  * The following distance metrics are supported:
  * - L2
+ * - CosineExpanded (dataset norms are computed as float regardless of input data type)
  *
  * Usage example:
  * @code{.cpp}
@@ -716,6 +775,7 @@ auto build(raft::resources const& res,
  *
  * The following distance metrics are supported:
  * - L2
+ * - CosineExpanded (dataset norms are computed as float regardless of input data type)
  *
  * Usage example:
  * @code{.cpp}
@@ -753,6 +813,7 @@ auto build(raft::resources const& res,
  * The following distance metrics are supported:
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
+ * - CosineExpanded (dataset norms are computed as float regardless of input data type)
  *
  * Usage example:
  * @code{.cpp}
@@ -790,6 +851,7 @@ auto build(raft::resources const& res,
  * The following distance metrics are supported:
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
+ * - CosineExpanded (dataset norms are computed as float regardless of input data type)
  *
  * Usage example:
  * @code{.cpp}
@@ -827,6 +889,7 @@ auto build(raft::resources const& res,
  * The following distance metrics are supported:
  * - L2
  * - InnerProduct (currently only supported with IVF-PQ as the build algorithm)
+ * - CosineExpanded (dataset norms are computed as float regardless of input data type)
  *
  * Usage example:
  * @code{.cpp}
