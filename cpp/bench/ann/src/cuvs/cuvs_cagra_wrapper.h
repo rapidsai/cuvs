@@ -92,14 +92,17 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
   cuvs_cagra(Metric metric, int dim, const build_param& param, int concurrent_searches = 1)
     : algo<T>(metric, dim),
       index_params_(param),
-
+      refine_ratio_(1.0f),
       dataset_(std::make_shared<raft::device_matrix<T, int64_t, raft::row_major>>(
         std::move(raft::make_device_matrix<T, int64_t>(handle_, 0, 0)))),
       graph_(std::make_shared<raft::device_matrix<IdxT, int64_t, raft::row_major>>(
         std::move(raft::make_device_matrix<IdxT, int64_t>(handle_, 0, 0)))),
       input_dataset_v_(
         std::make_shared<raft::device_matrix_view<const T, int64_t, raft::row_major>>(
-          nullptr, 0, 0))
+          nullptr, 0, 0)),
+      dynamic_batching_max_batch_size_(0),
+      dynamic_batching_n_queues_(0),
+      dynamic_batching_conservative_dispatch_(false)
 
   {
   }
@@ -265,7 +268,8 @@ template <typename T, typename IdxT>
 void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param,
                                            const void* filter_bitset)
 {
-  if (index_) { filter_ = make_cuvs_filter(filter_bitset, index_->size()); }
+  int64_t filter_size = index_ ? index_->size() : 0;
+  filter_ = make_cuvs_filter(filter_bitset, filter_size);
   auto sp = dynamic_cast<const search_param&>(param);
   bool needs_dynamic_batcher_update =
     (dynamic_batching_max_batch_size_ != sp.dynamic_batching_max_batch_size) ||
@@ -277,48 +281,53 @@ void cuvs_cagra<T, IdxT>::set_search_param(const search_param_base& param,
   search_params_                          = sp.p;
   refine_ratio_                           = sp.refine_ratio;
   if (sp.graph_mem != graph_mem_) {
-    // Move graph to correct memory space
-    graph_mem_ = sp.graph_mem;
-    RAFT_LOG_DEBUG("moving graph to new memory space: %s", allocator_to_string(graph_mem_).c_str());
-    // We create a new graph and copy to it from existing graph
-    auto mr = get_mr(graph_mem_);
+    if (index_) {
+      graph_mem_ = sp.graph_mem;
+      auto mr = get_mr(graph_mem_);
 
-    // Create a new graph, then copy, and __only then__ replace the shared pointer.
-    auto old_graph =
-      index_->graph();  // view of graph_ if it exists, of an internal index member otherwise
-    auto new_graph = raft::make_device_mdarray<IdxT, int64_t>(handle_, mr, old_graph.extents());
-    raft::copy(new_graph.data_handle(),
-               old_graph.data_handle(),
-               old_graph.size(),
-               raft::resource::get_cuda_stream(handle_));
-    raft::resource::sync_stream(handle_);
-    *graph_ = std::move(new_graph);
+      // Create a new graph, then copy, and __only then__ replace the shared pointer.
+      auto old_graph =
+        index_->graph();  // view of graph_ if it exists, of an internal index member otherwise
+      auto new_graph = raft::make_device_mdarray<IdxT, int64_t>(handle_, mr, old_graph.extents());
+      raft::copy(new_graph.data_handle(),
+                 old_graph.data_handle(),
+                 old_graph.size(),
+                 raft::resource::get_cuda_stream(handle_));
+      raft::resource::sync_stream(handle_);
+      *graph_ = std::move(new_graph);
 
-    // NB: update_graph() only stores a view in the index. We need to keep the graph object alive.
-    index_->update_graph(handle_, make_const_mdspan(graph_->view()));
-    needs_dynamic_batcher_update = true;
+      // NB: update_graph() only stores a view in the index. We need to keep the graph object alive.
+      index_->update_graph(handle_, make_const_mdspan(graph_->view()));
+      needs_dynamic_batcher_update = true;
+    } else {
+      graph_mem_ = sp.graph_mem;
+    }
   }
 
   if (sp.dataset_mem != dataset_mem_ || need_dataset_update_) {
-    dataset_mem_ = sp.dataset_mem;
+    if (index_ && input_dataset_v_->data_handle() != nullptr) {
+      dataset_mem_ = sp.dataset_mem;
 
-    // First free up existing memory
-    *dataset_ = raft::make_device_matrix<T, int64_t>(handle_, 0, 0);
-    index_->update_dataset(handle_, make_const_mdspan(dataset_->view()));
+      // First free up existing memory
+      *dataset_ = raft::make_device_matrix<T, int64_t>(handle_, 0, 0);
+      index_->update_dataset(handle_, make_const_mdspan(dataset_->view()));
 
-    // Allocate space using the correct memory resource.
-    RAFT_LOG_DEBUG("moving dataset to new memory space: %s",
-                   allocator_to_string(dataset_mem_).c_str());
+      // Allocate space using the correct memory resource.
+      RAFT_LOG_DEBUG("moving dataset to new memory space: %s",
+                     allocator_to_string(dataset_mem_).c_str());
 
-    auto mr = get_mr(dataset_mem_);
-    cuvs::neighbors::cagra::detail::copy_with_padding(handle_, *dataset_, *input_dataset_v_, mr);
+      auto mr = get_mr(dataset_mem_);
+      cuvs::neighbors::cagra::detail::copy_with_padding(handle_, *dataset_, *input_dataset_v_, mr);
 
-    auto dataset_view = raft::make_device_strided_matrix_view<const T, int64_t>(
-      dataset_->data_handle(), dataset_->extent(0), this->dim_, dataset_->extent(1));
-    index_->update_dataset(handle_, dataset_view);
+      auto dataset_view = raft::make_device_strided_matrix_view<const T, int64_t>(
+        dataset_->data_handle(), dataset_->extent(0), this->dim_, dataset_->extent(1));
+      index_->update_dataset(handle_, dataset_view);
 
-    need_dataset_update_         = false;
-    needs_dynamic_batcher_update = true;
+      need_dataset_update_         = false;
+      needs_dynamic_batcher_update = true;
+    } else {
+      dataset_mem_ = sp.dataset_mem;
+    }
   }
 
   // dynamic batching
