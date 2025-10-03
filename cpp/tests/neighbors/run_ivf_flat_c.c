@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <cuvs/c/neighbors/ivf_flat.h>
+#include <cuvs/neighbors/ivf_flat.h>
 
 void run_ivf_flat(int64_t n_rows,
                   int64_t n_queries,

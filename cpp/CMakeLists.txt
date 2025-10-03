@@ -197,10 +197,6 @@ if(NOT BUILD_CPU_ONLY)
   include(cmake/thirdparty/get_cutlass.cmake)
 endif()
 
-if(BUILD_C_LIBRARY)
-  include(cmake/thirdparty/get_dlpack.cmake)
-endif()
-
 if(BUILD_TESTS OR BUILD_C_TESTS)
   include(${rapids-cmake-dir}/cpm/gtest.cmake)
   rapids_cpm_gtest(BUILD_STATIC)
@@ -302,7 +298,9 @@ if(NOT BUILD_CPU_ONLY)
   )
   target_link_libraries(cuvs-cagra-search PRIVATE raft::raft)
   target_include_directories(
-    cuvs-cagra-search PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    cuvs-cagra-search PRIVATE
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
   )
   target_compile_options(
     cuvs-cagra-search PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
@@ -552,6 +550,7 @@ if(NOT BUILD_CPU_ONLY)
     cuvs_objs
     PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
     INTERFACE "$<INSTALL_INTERFACE:include>"
   )
 
@@ -614,6 +613,7 @@ if(NOT BUILD_CPU_ONLY)
 
     target_include_directories(
       cuvs PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+                  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
                   "$<INSTALL_INTERFACE:include>"
     )
 
@@ -720,24 +720,24 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
   if(BUILD_C_LIBRARY)
     add_library(
       cuvs_c SHARED
-      src/c/core/c_api.cpp
-      src/c/cluster/kmeans.cpp
-      src/c/neighbors/brute_force.cpp
-      src/c/neighbors/ivf_flat.cpp
-      src/c/neighbors/ivf_pq.cpp
-      src/c/neighbors/cagra.cpp
-      $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/c/neighbors/hnsw.cpp>
-      $<$<BOOL:${BUILD_MG_ALGOS}>:src/c/neighbors/mg_ivf_pq.cpp>
-      $<$<BOOL:${BUILD_MG_ALGOS}>:src/c/neighbors/mg_ivf_flat.cpp>
-      $<$<BOOL:${BUILD_MG_ALGOS}>:src/c/neighbors/mg_cagra.cpp>
-      src/c/neighbors/nn_descent.cpp
-      src/c/neighbors/vamana.cpp
-      src/c/neighbors/refine.cpp
-      src/c/neighbors/tiered_index.cpp
-      src/c/neighbors/all_neighbors.cpp
-      src/c/preprocessing/quantize/binary.cpp
-      src/c/preprocessing/quantize/scalar.cpp
-      src/c/distance/pairwise_distance.cpp
+      ../c/src/core/c_api.cpp
+      ../c/src/cluster/kmeans.cpp
+      ../c/src/neighbors/brute_force.cpp
+      ../c/src/neighbors/ivf_flat.cpp
+      ../c/src/neighbors/ivf_pq.cpp
+      ../c/src/neighbors/cagra.cpp
+      $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:../c/src/neighbors/hnsw.cpp>
+      $<$<BOOL:${BUILD_MG_ALGOS}>:../c/src/neighbors/mg_ivf_pq.cpp>
+      $<$<BOOL:${BUILD_MG_ALGOS}>:../c/src/neighbors/mg_ivf_flat.cpp>
+      $<$<BOOL:${BUILD_MG_ALGOS}>:../c/src/neighbors/mg_cagra.cpp>
+      ../c/src/neighbors/nn_descent.cpp
+      ../c/src/neighbors/vamana.cpp
+      ../c/src/neighbors/refine.cpp
+      ../c/src/neighbors/tiered_index.cpp
+      ../c/src/neighbors/all_neighbors.cpp
+      ../c/src/preprocessing/quantize/binary.cpp
+      ../c/src/preprocessing/quantize/scalar.cpp
+      ../c/src/distance/pairwise_distance.cpp
     )
     add_library(cuvs::c_api ALIAS cuvs_c)
     set_target_properties(
@@ -762,6 +762,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
       PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
              "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
              "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
+             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
       INTERFACE "$<INSTALL_INTERFACE:include>"
     )
 
@@ -795,6 +796,12 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
   )
 
   if(BUILD_C_LIBRARY)
+    install(
+      DIRECTORY ../c/include/cuvs
+      COMPONENT cuvs
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+
     install(
       TARGETS cuvs_c
       DESTINATION ${lib_dir}

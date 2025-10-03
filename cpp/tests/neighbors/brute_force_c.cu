@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * Copyright (c) 2024, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@
 #include <rmm/device_uvector.hpp>
 
 #include "ann_utils.cuh"
-#include <cuvs/c/neighbors/brute_force.h>
+#include <cuvs/neighbors/brute_force.h>
 
 #include <algorithm>
 #include <cmath>

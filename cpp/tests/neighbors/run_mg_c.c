@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-#include <cuvs/c/core/c_api.h>
-#include <cuvs/c/neighbors/brute_force.h>
-#include <cuvs/c/neighbors/common.h>
-#include <cuvs/c/neighbors/mg_cagra.h>
-#include <cuvs/c/neighbors/mg_ivf_flat.h>
-#include <cuvs/c/neighbors/mg_ivf_pq.h>
+#include <cuvs/core/c_api.h>
+#include <cuvs/neighbors/brute_force.h>
+#include <cuvs/neighbors/common.h>
+#include <cuvs/neighbors/mg_cagra.h>
+#include <cuvs/neighbors/mg_ivf_flat.h>
+#include <cuvs/neighbors/mg_ivf_pq.h>
 #include <stdio.h>
 
 typedef enum { MG_ALGO_IVF_FLAT, MG_ALGO_IVF_PQ, MG_ALGO_CAGRA } mg_algo_t;

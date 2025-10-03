@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <cuvs/c/neighbors/brute_force.h>
+#include <cuvs/neighbors/brute_force.h>
 #include <stdint.h>
 
 void run_brute_force(int64_t n_rows,

@@ -16,12 +16,12 @@
 
 #include "../test_utils.cuh"
 #include <cstddef>
-#include <cuvs/c/core/c_api.h>
+#include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.hpp>
 #include <dlpack/dlpack.h>
 
 #include <cstdint>
-#include <cuvs/c/neighbors/cagra.h>
+#include <cuvs/neighbors/cagra.h>
 
 #include <cuda_runtime.h>
 #include <gtest/gtest.h>

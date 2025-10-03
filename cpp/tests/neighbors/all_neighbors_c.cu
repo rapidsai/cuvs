@@ -22,7 +22,7 @@
 
 #include "ann_utils.cuh"
 #include "naive_knn.cuh"
-#include <cuvs/c/neighbors/all_neighbors.h>
+#include <cuvs/neighbors/all_neighbors.h>
 
 #include <algorithm>
 #include <cmath>

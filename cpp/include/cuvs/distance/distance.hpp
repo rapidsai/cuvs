@@ -18,7 +18,7 @@
 
 #include <cstdint>
 #include <cuda_fp16.h>
-#include <cuvs/c/distance/distance.h>
+#include <cuvs/distance/distance.h>
 #include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>

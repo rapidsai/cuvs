@@ -15,10 +15,10 @@
  */
 
 #include "../test_utils.cuh"
-#include <cuvs/c/core/c_api.h>
-#include <cuvs/c/distance/distance.h>
-#include <cuvs/c/neighbors/cagra.h>
-#include <cuvs/c/neighbors/hnsw.h>
+#include <cuvs/core/c_api.h>
+#include <cuvs/distance/distance.h>
+#include <cuvs/neighbors/cagra.h>
+#include <cuvs/neighbors/hnsw.h>
 #include <dlpack/dlpack.h>
 
 #include <cstdint>
