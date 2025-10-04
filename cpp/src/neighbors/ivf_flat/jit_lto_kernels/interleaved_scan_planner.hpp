@@ -21,7 +21,7 @@
 #include <iostream>
 #include <string>
 
-std::string bool_to_string(bool b) { return b ? "true" : "false"; }
+inline std::string bool_to_string(bool b) { return b ? "true" : "false"; }
 
 template <typename... Args>
 struct InterleavedScanPlanner : AlgorithmPlanner {

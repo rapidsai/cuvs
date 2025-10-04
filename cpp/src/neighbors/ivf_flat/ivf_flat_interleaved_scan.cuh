@@ -19,6 +19,7 @@
 #include "../ivf_common.cuh"
 #include "../sample_filter.cuh"
 #include "jit_lto_kernels/interleaved_scan_planner.hpp"
+#include "jit_lto_kernels/interleaved_scan_tags.hpp"
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 
@@ -40,6 +41,129 @@ namespace cuvs::neighbors::ivf_flat::detail {
 using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 constexpr int kThreadsPerBlock = 128;
+
+template <int Veclen, typename T, typename AccT>
+struct euclidean_dist {
+  __device__ __forceinline__ void operator()(AccT& acc, AccT x, AccT y)
+  {
+    const auto diff = x - y;
+    acc += diff * diff;
+  }
+};
+
+template <int Veclen>
+struct euclidean_dist<Veclen, uint8_t, uint32_t> {
+  __device__ __forceinline__ void operator()(uint32_t& acc, uint32_t x, uint32_t y)
+  {
+    if constexpr (Veclen > 1) {
+      const auto diff = __vabsdiffu4(x, y);
+      acc             = raft::dp4a(diff, diff, acc);
+    } else {
+      const auto diff = __usad(x, y, 0u);
+      acc += diff * diff;
+    }
+  }
+};
+
+template <int Veclen>
+struct euclidean_dist<Veclen, int8_t, int32_t> {
+  __device__ __forceinline__ void operator()(int32_t& acc, int32_t x, int32_t y)
+  {
+    if constexpr (Veclen > 1) {
+      // Note that we enforce here that the unsigned version of dp4a is used, because the difference
+      // between two int8 numbers can be greater than 127 and therefore represented as a negative
+      // number in int8. Casting from int8 to int32 would yield incorrect results, while casting
+      // from uint8 to uint32 is correct.
+      const auto diff = __vabsdiffs4(x, y);
+      acc             = raft::dp4a(diff, diff, static_cast<uint32_t>(acc));
+    } else {
+      const auto diff = x - y;
+      acc += diff * diff;
+    }
+  }
+};
+
+template <int Veclen, typename T, typename AccT>
+struct inner_prod_dist {
+  __device__ __forceinline__ void operator()(AccT& acc, AccT x, AccT y)
+  {
+    if constexpr (Veclen > 1 && (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>)) {
+      acc = raft::dp4a(x, y, acc);
+    } else {
+      acc += x * y;
+    }
+  }
+};
+
+// Constexpr mapping functions from actual types to tags
+template <typename T>
+constexpr auto get_data_type_tag()
+{
+  if constexpr (std::is_same_v<T, float>) { return tag_float{}; }
+  if constexpr (std::is_same_v<T, __half>) { return tag_half{}; }
+  if constexpr (std::is_same_v<T, int8_t>) { return tag_int8{}; }
+  if constexpr (std::is_same_v<T, uint8_t>) { return tag_uint8{}; }
+}
+
+template <typename AccT>
+constexpr auto get_acc_type_tag()
+{
+  if constexpr (std::is_same_v<AccT, float>) { return tag_acc_float{}; }
+  if constexpr (std::is_same_v<AccT, __half>) { return tag_acc_half{}; }
+  if constexpr (std::is_same_v<AccT, int32_t>) { return tag_acc_int32{}; }
+  if constexpr (std::is_same_v<AccT, uint32_t>) { return tag_acc_uint32{}; }
+}
+
+template <typename IdxT>
+constexpr auto get_idx_type_tag()
+{
+  if constexpr (std::is_same_v<IdxT, int64_t>) { return tag_idx_int64{}; }
+}
+
+template <typename FilterT>
+constexpr auto get_filter_type_tag()
+{
+  using namespace cuvs::neighbors::filtering;
+
+  // Determine the filter implementation tag
+  if constexpr (std::is_same_v<FilterT, ivf_to_sample_filter<int64_t, none_sample_filter>>) {
+    return tag_filter<tag_idx_int64, tag_filter_none_impl>{};
+  }
+  if constexpr (std::is_same_v<FilterT,
+                               ivf_to_sample_filter<int64_t, bitset_filter<uint32_t, int64_t>>>) {
+    return tag_filter<tag_idx_int64, tag_filter_bitset_impl>{};
+  }
+}
+
+template <typename Lambda, int Veclen, typename T, typename AccT>
+constexpr auto get_metric_tag()
+{
+  // Get tags for T and AccT
+  auto t_tag   = get_data_type_tag<T>();
+  auto acc_tag = get_acc_type_tag<AccT>();
+
+  // Check for euclidean_dist and return templated tag with tag types
+  if constexpr (std::is_same_v<Lambda, euclidean_dist<Veclen, T, AccT>>) {
+    return tag_metric_euclidean<Veclen, decltype(t_tag), decltype(acc_tag)>{};
+  }
+  // Check for inner_prod_dist and return templated tag with tag types
+  if constexpr (std::is_same_v<Lambda, inner_prod_dist<Veclen, T, AccT>>) {
+    return tag_metric_inner_product<Veclen, decltype(t_tag), decltype(acc_tag)>{};
+  }
+}
+
+template <typename PostLambda>
+constexpr auto get_post_lambda_tag()
+{
+  using namespace raft;
+
+  if constexpr (std::is_same_v<PostLambda, identity_op>) { return tag_post_identity{}; }
+  if constexpr (std::is_same_v<PostLambda, sqrt_op>) { return tag_post_sqrt{}; }
+  if constexpr (std::is_same_v<PostLambda,
+                               compose_op<raft::add_const_op<float>, raft::mul_const_op<float>>>) {
+    return tag_post_compose{};
+  }
+}
 
 /**
  * @brief Copy `n` elements per block from one place to another.
@@ -974,7 +1098,10 @@ RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
  *  Configure the gridDim.x to maximize GPU occupancy, but reduce the output size
  */
 // template <typename T>
-uint32_t configure_launch_x(uint32_t numQueries, uint32_t n_probes, int32_t sMemSize, CUkernel func)
+inline uint32_t configure_launch_x(uint32_t numQueries,
+                                   uint32_t n_probes,
+                                   int32_t sMemSize,
+                                   CUkernel func)
 {
   int dev_id;
   RAFT_CUDA_TRY(cudaGetDevice(&dev_id));
@@ -1028,7 +1155,14 @@ void launch_kernel(Lambda lambda,
   //                                                    IvfSampleFilterT,
   //                                                    Lambda,
   //                                                    PostLambda>;
-  auto kernel_planner = InterleavedScanPlanner<T, AccT, IdxT, IvfSampleFilterT, Lambda, PostLambda>(
+
+  // Use tag types for the planner to avoid template bloat
+  auto kernel_planner = InterleavedScanPlanner<decltype(get_data_type_tag<T>()),
+                                               decltype(get_acc_type_tag<AccT>()),
+                                               decltype(get_idx_type_tag<IdxT>()),
+                                               decltype(get_filter_type_tag<IvfSampleFilterT>()),
+                                               decltype(get_metric_tag<Lambda, Veclen, T, AccT>()),
+                                               decltype(get_post_lambda_tag<PostLambda>())>(
     Capacity, Veclen, Ascending, ComputeNorm);
   auto kernel_launcher = kernel_planner.get_launcher();
 
@@ -1113,59 +1247,6 @@ void launch_kernel(Lambda lambda,
     coarse_index += grid_dim_y * n_probes;
   }
 }
-
-template <int Veclen, typename T, typename AccT>
-struct euclidean_dist {
-  __device__ __forceinline__ void operator()(AccT& acc, AccT x, AccT y)
-  {
-    const auto diff = x - y;
-    acc += diff * diff;
-  }
-};
-
-template <int Veclen>
-struct euclidean_dist<Veclen, uint8_t, uint32_t> {
-  __device__ __forceinline__ void operator()(uint32_t& acc, uint32_t x, uint32_t y)
-  {
-    if constexpr (Veclen > 1) {
-      const auto diff = __vabsdiffu4(x, y);
-      acc             = raft::dp4a(diff, diff, acc);
-    } else {
-      const auto diff = __usad(x, y, 0u);
-      acc += diff * diff;
-    }
-  }
-};
-
-template <int Veclen>
-struct euclidean_dist<Veclen, int8_t, int32_t> {
-  __device__ __forceinline__ void operator()(int32_t& acc, int32_t x, int32_t y)
-  {
-    if constexpr (Veclen > 1) {
-      // Note that we enforce here that the unsigned version of dp4a is used, because the difference
-      // between two int8 numbers can be greater than 127 and therefore represented as a negative
-      // number in int8. Casting from int8 to int32 would yield incorrect results, while casting
-      // from uint8 to uint32 is correct.
-      const auto diff = __vabsdiffs4(x, y);
-      acc             = raft::dp4a(diff, diff, static_cast<uint32_t>(acc));
-    } else {
-      const auto diff = x - y;
-      acc += diff * diff;
-    }
-  }
-};
-
-template <int Veclen, typename T, typename AccT>
-struct inner_prod_dist {
-  __device__ __forceinline__ void operator()(AccT& acc, AccT x, AccT y)
-  {
-    if constexpr (Veclen > 1 && (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>)) {
-      acc = raft::dp4a(x, y, acc);
-    } else {
-      acc += x * y;
-    }
-  }
-};
 
 /** Select the distance computation function and forward the rest of the arguments. */
 template <int Capacity,

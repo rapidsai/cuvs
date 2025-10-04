@@ -217,7 +217,10 @@ endif()
 
 # this is needed to embed fatbins to JIT at runtime
 include(cmake/modules/embed_fatbins.cmake)
-include(cmake/jit_lto_kernels_list/interleaved_scan.cmake)
+
+# Generate interleaved scan kernel files at build time
+include(cmake/modules/generate_interleaved_scan_kernels.cmake)
+generate_interleaved_scan_kernels()
 
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
@@ -572,8 +575,13 @@ if(NOT BUILD_CPU_ONLY)
     ${INTERLEAVED_SCAN_KERNEL_FILES}
   )
 
+  # Make sure the kernels are generated before we try to build them
+  add_dependencies(jit_lto_fatbins ${INTERLEAVED_SCAN_KERNELS_TARGET})
+
   target_compile_definitions(jit_lto_fatbins PRIVATE BUILD_KERNEL)
-  target_include_directories(jit_lto_fatbins PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
+  target_include_directories(jit_lto_fatbins PRIVATE
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  )
   target_compile_options(jit_lto_fatbins PRIVATE -Xfatbin=--compress-all --compress-mode=size)
   target_compile_options(
     jit_lto_fatbins PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
@@ -594,12 +602,24 @@ if(NOT BUILD_CPU_ONLY)
   add_library(jit_lto_fatbins_as_cpp_sources STATIC
     src/detail/jit_lto/AlgorithmPlanner.cu
   )
-  target_include_directories(jit_lto_fatbins_as_cpp_sources PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
-  target_compile_options(
-    jit_lto_fatbins_as_cpp_sources PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
-                              "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+
+  # Set PIC for the static library since it will be linked into a shared library
+  set_target_properties(jit_lto_fatbins_as_cpp_sources PROPERTIES
+    CUDA_ARCHITECTURES "75-real"
+    POSITION_INDEPENDENT_CODE ON
   )
-  target_link_libraries(jit_lto_fatbins_as_cpp_sources PRIVATE CUDA::cuda_driver rmm::rmm raft::raft CCCL::CCCL)
+
+  # Make sure the kernels are generated before embedding fatbins
+  add_dependencies(jit_lto_fatbins_as_cpp_sources ${INTERLEAVED_SCAN_KERNELS_TARGET})
+
+  target_include_directories(jit_lto_fatbins_as_cpp_sources PRIVATE
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  )
+  # target_compile_options(
+  #   jit_lto_fatbins_as_cpp_sources PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+  #                             "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+  # )
+  target_link_libraries(jit_lto_fatbins_as_cpp_sources PRIVATE CUDA::cuda_driver)
 
   embed_fatbins(jit_lto_fatbins_as_cpp_sources jit_lto_fatbins)
 

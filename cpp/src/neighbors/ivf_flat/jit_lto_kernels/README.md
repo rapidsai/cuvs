@@ -1,45 +1,38 @@
 # Interleaved Scan Kernel Generation
 
-This directory contains the tools and generated files for creating CUDA kernel instantiations for the interleaved scan functionality.
+This directory contains the tools for creating CUDA kernel instantiations for the interleaved scan functionality. The kernel files are **generated at build time** and are not checked into version control.
 
 ## Files
 
 - `interleaved_scan_kernels.txt` - List of kernel function signatures (1280 entries)
 - `generate_kernels.py` - Python script to generate .cu files from the kernel list
-- `interleaved_scan_kernel_*.cu` - Generated CUDA kernel files (1280 files)
-- `generated_kernels.cmake` - CMake file with relative paths
-- `CMakeLists_kernels.cmake` - CMake file with absolute paths
+- `.gitignore` - Ignores generated `.cu` files
 
-## Usage
+## Build-Time Generation
 
-### Regenerating Kernel Files
+The kernel files are automatically generated during the CMake configuration phase. The process is handled by:
 
-To regenerate all kernel files:
+1. **CMake Module**: `cpp/cmake/modules/generate_interleaved_scan_kernels.cmake`
+2. **Generator Script**: `generate_kernels.py` (this directory)
+
+### How It Works
+
+During CMake configuration:
+1. Python script is executed to generate 1280 `.cu` files
+2. Files are placed in the build directory (not source directory)
+3. Generated CMake list file is included automatically
+4. Build targets depend on the generation step
+
+### Manual Regeneration (Optional)
+
+If you need to manually generate files (e.g., for inspection):
 
 ```bash
 cd /path/to/cuvs/cpp/src/neighbors/ivf_flat/jit_lto_kernels
 python3 generate_kernels.py
 ```
 
-This will:
-1. Parse `interleaved_scan_kernels.txt`
-2. Generate 1280 `.cu` files
-3. Create/update CMake files
-
-### Using in CMake
-
-Include the generated CMake file in your main CMakeLists.txt:
-
-```cmake
-# Option 1: Relative paths
-include(${CMAKE_CURRENT_SOURCE_DIR}/jit_lto_kernels/generated_kernels.cmake)
-
-# Option 2: Absolute paths
-include(${CMAKE_CURRENT_SOURCE_DIR}/jit_lto_kernels/CMakeLists_kernels.cmake)
-
-# Use the variable
-add_library(my_target ${INTERLEAVED_SCAN_KERNEL_FILES})
-```
+**Note**: Manual generation is not required for normal builds.
 
 ## Template Parameters
 

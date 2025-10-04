@@ -88,3 +88,7 @@ ivf_pq_index
 
 # java
 .classpath
+
+# jit lto kernels
+cpp/cmake/jit_lto_kernels_list/
+cpp/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_kernel_*.cu
