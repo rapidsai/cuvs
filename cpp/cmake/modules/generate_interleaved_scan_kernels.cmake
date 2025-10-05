@@ -43,12 +43,13 @@ function(generate_interleaved_scan_kernels)
     message(STATUS "Generating interleaved scan kernels for the first time...")
     execute_process(
       COMMAND ${Python3_EXECUTABLE} ${GENERATOR_SCRIPT}
-      WORKING_DIRECTORY ${OUTPUT_DIR}
       RESULT_VARIABLE GENERATION_RESULT
+      OUTPUT_VARIABLE GENERATION_OUTPUT
+      ERROR_VARIABLE GENERATION_ERROR
     )
 
     if(NOT GENERATION_RESULT EQUAL 0)
-      message(FATAL_ERROR "Failed to generate kernel files during configuration")
+      message(FATAL_ERROR "Failed to generate kernel files during configuration\nOutput: ${GENERATION_OUTPUT}\nError: ${GENERATION_ERROR}")
     endif()
   endif()
 

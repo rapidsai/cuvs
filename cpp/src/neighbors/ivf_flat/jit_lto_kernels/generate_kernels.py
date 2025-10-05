@@ -294,8 +294,9 @@ def main():
     with open(kernels_file, 'r') as f:
         lines = f.readlines()
 
-    # Output directory (same directory as the script)
-    output_dir = script_dir
+    # Output directory (interleaved_scan_kernels subdirectory)
+    output_dir = script_dir / 'interleaved_scan_kernels'
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     # Parse all kernels and generate files
     generated_files = []
