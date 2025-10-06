@@ -269,25 +269,14 @@ int initialize_point_in_hnsw(hnswlib::HierarchicalNSW<DistT>* appr_algo,
 // advice MADV_HUGEPAGE / MADV_SEQUENTIAL
 template <typename T, typename idx_t>
 raft::host_matrix_view<T, idx_t> mmap_matrix(const std::string& filename,
+                                             size_t n_rows,
+                                             size_t n_cols,
                                              int advice = MADV_HUGEPAGE)
 {
-  size_t n_rows      = 0;
-  size_t n_cols      = 0;
-  size_t header_size = 0;
-  {
-    std::ifstream is(filename, std::ios::in | std::ios::binary);
-    raft::detail::numpy_serializer::header_t header =
-      raft::detail::numpy_serializer::read_header(is);
-    n_rows = header.shape[0];
-    n_cols = header.shape[1];
-    std::stringstream ss;
-    raft::detail::numpy_serializer::write_header(ss, header);
-    header_size = ss.str().size();
-  }
   int fd = open(filename.c_str(), O_RDONLY);
   if (fd == -1) { THROW("Error opening file"); }
   size_t num_elements = n_rows * n_cols;
-  size_t file_size    = num_elements * sizeof(T) + header_size;
+  size_t file_size    = num_elements * sizeof(T);
   float file_size_gb  = file_size / 1e9;
   RAFT_LOG_INFO("mmap file %s, dimensions [%zu, %zu] size %.2f GB",
                 filename.c_str(),
@@ -304,31 +293,21 @@ raft::host_matrix_view<T, idx_t> mmap_matrix(const std::string& filename,
     THROW("madvise error");
   }
 
-  auto dataset = raft::make_host_matrix_view<T, idx_t>(
-    reinterpret_cast<T*>((char*)data + header_size), n_rows, n_cols);
+  auto dataset =
+    raft::make_host_matrix_view<T, idx_t>(reinterpret_cast<T*>((char*)data), n_rows, n_cols);
 
   return dataset;
 }
 
 template <typename T, typename idx_t>
-raft::host_matrix_view<T, idx_t> mmap_vector(const std::string& filename,
+raft::host_vector_view<T, idx_t> mmap_vector(const std::string& filename,
+                                             size_t n_rows,
                                              int advice = MADV_HUGEPAGE)
 {
-  size_t n_rows      = 0;
-  size_t header_size = 0;
-  {
-    std::ifstream is(filename, std::ios::in | std::ios::binary);
-    raft::detail::numpy_serializer::header_t header =
-      raft::detail::numpy_serializer::read_header(is);
-    n_rows = header.shape[0];
-    std::stringstream ss;
-    raft::detail::numpy_serializer::write_header(ss, header);
-    header_size = ss.str().size();
-  }
   int fd = open(filename.c_str(), O_RDONLY);
   if (fd == -1) { THROW("Error opening file"); }
   size_t num_elements = n_rows;
-  size_t file_size    = num_elements * sizeof(T) + header_size;
+  size_t file_size    = num_elements * sizeof(T);
   float file_size_gb  = file_size / 1e9;
   RAFT_LOG_INFO(
     "mmap file %s, dimension [%zu] size %.2f GB", filename.c_str(), n_rows, file_size_gb);
@@ -342,8 +321,7 @@ raft::host_matrix_view<T, idx_t> mmap_vector(const std::string& filename,
     THROW("madvise error");
   }
 
-  auto dataset =
-    raft::make_host_vector_view<T, idx_t>(reinterpret_cast<T*>((char*)data + header_size), n_rows);
+  auto dataset = raft::make_host_vector_view<T, idx_t>(reinterpret_cast<T*>((char*)data), n_rows);
 
   return dataset;
 }
@@ -384,35 +362,39 @@ void serialize_to_hnswlib_hierarchy(
 
   ASSERT(index_.on_disk(), "Function only implements serialization from disk.");
 
+  auto n_rows           = index_.size();
+  auto dim              = index_.dim();
+  auto graph_degree_int = static_cast<int>(index_.graph_degree());
+  RAFT_LOG_INFO("Saving CAGRA index to hnswlib format, size %zu, dim %zu, graph_degree %zu",
+                static_cast<size_t>(n_rows),
+                static_cast<size_t>(dim),
+                static_cast<size_t>(graph_degree_int));
+
   auto index_directory = index_.file_directory();
   ASSERT(std::filesystem::exists(index_directory) && std::filesystem::is_directory(index_directory),
          "Directory '%s' does not exist",
-         index_directory);
+         index_directory.c_str());
 
   std::string graph_filename =
     (std::filesystem::path(index_directory) / "cagra_graph.bin").string();
-  ASSERT(
-    std::filesystem::exists(graph_filename), "Graph file '%s' does not exist.", graph_filename);
-  auto host_graph_view  = mmap_matrix<uint32_t, int64_t>(graph_filename);
-  auto graph_degree_int = static_cast<int>(host_graph_view.extent(1));
+  ASSERT(std::filesystem::exists(graph_filename),
+         "Graph file '%s' does not exist.",
+         graph_filename.c_str());
+  auto host_graph_view = mmap_matrix<uint32_t, int64_t>(graph_filename, n_rows, graph_degree_int);
 
   std::string dataset_filename =
     (std::filesystem::path(index_directory) / "reordered_dataset.bin").string();
   ASSERT(std::filesystem::exists(dataset_filename),
          "Dataset file '%s' does not exist.",
-         dataset_filename);
-  auto host_dataset_view = mmap_matrix<T, int64_t>(dataset_filename);
-  auto n_rows            = host_dataset_view.extent(0);
-  auto dim               = host_dataset_view.extent(1);
+         dataset_filename.c_str());
+  auto host_dataset_view = mmap_matrix<T, int64_t>(dataset_filename, n_rows, dim);
 
   std::string label_filename =
     (std::filesystem::path(index_directory) / "dataset_mapping.bin").string();
-  ASSERT(
-    std::filesystem::exists(label_filename), "Label file '%s' does not exist.", label_filename);
-  auto host_label_view = mmap_vector<T, int64_t>(label_filename);
-
-  RAFT_LOG_INFO(
-    "Saving CAGRA index to hnswlib format, size %zu, dim %u", static_cast<size_t>(n_rows), dim);
+  ASSERT(std::filesystem::exists(label_filename),
+         "Label file '%s' does not exist.",
+         label_filename.c_str());
+  auto host_label_view = mmap_vector<uint32_t, int64_t>(label_filename, n_rows);
 
   // initialize dummy HNSW index to retrieve constants
   auto hnsw_index = std::make_unique<index_impl<T>>(dim, index_.metric(), HnswHierarchy::GPU);
@@ -510,7 +492,7 @@ void serialize_to_hnswlib_hierarchy(
     }
 
     // assign original label
-    const size_t label = host_label_view(i);
+    auto label = static_cast<size_t>(host_label_view[i]);
     os.write(reinterpret_cast<char*>(&label), sizeof(std::size_t));
 
     bytes_written += appr_algo->size_data_per_element_;
@@ -642,6 +624,29 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
       2M x uint32_t  +   1 x uint32_t        dim x T    1 x size_t
      [linked list + linked list sizes]        [data]     [label]
   */
+
+  if (cagra_index.on_disk()) {
+    auto index_directory = cagra_index.file_directory();
+    ASSERT(
+      std::filesystem::exists(index_directory) && std::filesystem::is_directory(index_directory),
+      "Directory '%s' does not exist",
+      index_directory.c_str());
+    std::string index_filename =
+      (std::filesystem::path(index_directory) / "hnsw_index.bin").string();
+    ASSERT(std::filesystem::exists(index_filename),
+           "Index file '%s' does not exist.",
+           index_filename.c_str());
+
+    std::ofstream of(index_filename, std::ios::out | std::ios::binary);
+    if (!of) { RAFT_FAIL("Cannot open file %s", index_filename.c_str()); }
+
+    serialize_to_hnswlib_hierarchy(res, of, params, cagra_index, dataset);
+
+    of.close();
+    if (!of) { RAFT_FAIL("Error writing output %s", index_filename.c_str()); }
+
+    return nullptr;
+  }
 
   const T* source_dataset = nullptr;
   int64_t n_rows, dim, source_stride;
