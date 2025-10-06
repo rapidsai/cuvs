@@ -633,9 +633,6 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
       index_directory.c_str());
     std::string index_filename =
       (std::filesystem::path(index_directory) / "hnsw_index.bin").string();
-    ASSERT(std::filesystem::exists(index_filename),
-           "Index file '%s' does not exist.",
-           index_filename.c_str());
 
     std::ofstream of(index_filename, std::ios::out | std::ios::binary);
     if (!of) { RAFT_FAIL("Cannot open file %s", index_filename.c_str()); }
