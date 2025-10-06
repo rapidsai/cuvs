@@ -153,7 +153,6 @@ outputs:
         - cmake ${{ cmake_version }}
         - ${{ stdlib("c") }}
       host:
-        - libnvjitlink-dev
         - librmm =${{ minor_version }}
         - libraft-headers =${{ minor_version }}
         - nccl ${{ nccl_version }}
@@ -169,7 +168,6 @@ outputs:
       run:
         - ${{ pin_subpackage("libcuvs", exact=True) }}
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
-        - libnvjitlink-dev
         - libraft-headers =${{ minor_version }}
         - nccl
         - cuda-cudart
@@ -188,7 +186,6 @@ outputs:
           - libcusolver
           - libcusparse
           - libcuda.so.1
-          - libnvjitlink-dev
           - librmm
           - mkl
           - nccl
@@ -247,7 +244,6 @@ outputs:
       host:
         - ${{ pin_subpackage("libcuvs", exact=True) }}
         - cuda-version =${{ cuda_version }}
-        - libnvjitlink-dev
         - libraft-headers =${{ minor_version }}
         - librmm =${{ minor_version }}
         - nccl ${{ nccl_version }}
@@ -317,7 +313,6 @@ outputs:
         - libcusolver-dev
         - libcusparse-dev
         - libgomp
-        - libnvjitlink-dev
         - libraft-headers =${{ minor_version }}
         - librmm =${{ minor_version }}
         - nccl ${{ nccl_version }}
@@ -335,7 +330,6 @@ outputs:
         - libcurand
         - libcusolver
         - libcusparse
-        - libnvjitlink-dev
         - libraft-headers =${{ minor_version }}
         - nccl
         - if: linux64
@@ -348,7 +342,6 @@ outputs:
           - libcurand
           - libcusolver
           - libcusparse
-          - libnvjitlink-dev
           - librmm
           - mkl
           - nccl
