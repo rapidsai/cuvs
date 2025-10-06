@@ -317,15 +317,19 @@ struct index : cuvs::neighbors::index {
   [[nodiscard]] constexpr inline auto size() const noexcept -> IdxT
   {
     auto data_rows = dataset_->n_rows();
+    if (on_disk_) { return n_rows_; }
     return data_rows > 0 ? data_rows : graph_view_.extent(0);
   }
 
   /** Dimensionality of the data. */
-  [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t { return dataset_->dim(); }
+  [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t
+  {
+    return on_disk_ ? dim_ : dataset_->dim();
+  }
   /** Graph degree */
   [[nodiscard]] constexpr inline auto graph_degree() const noexcept -> uint32_t
   {
-    return graph_view_.extent(1);
+    return on_disk_ ? graph_degree_ : graph_view_.extent(1);
   }
 
   [[nodiscard]] inline auto dataset() const noexcept
@@ -588,10 +592,17 @@ struct index : cuvs::neighbors::index {
   /**
    * Set whether the index is stored on disk and the directory where files are stored.
    */
-  void set_disk_storage(bool on_disk, const std::string& file_directory = "")
+  void set_disk_storage(bool on_disk,
+                        const std::string& file_directory = "",
+                        size_t n_rows                     = 0,
+                        size_t dim                        = 0,
+                        size_t graph_degree               = 0)
   {
     on_disk_        = on_disk;
     file_directory_ = file_directory;
+    n_rows_         = n_rows;
+    dim_            = dim;
+    graph_degree_   = graph_degree;
   }
 
  private:
@@ -605,6 +616,9 @@ struct index : cuvs::neighbors::index {
   void compute_dataset_norms_(raft::resources const& res);
   bool on_disk_               = false;
   std::string file_directory_ = "";
+  size_t n_rows_              = 0;
+  size_t dim_                 = 0;
+  size_t graph_degree_        = 0;
 };
 /**
  * @}

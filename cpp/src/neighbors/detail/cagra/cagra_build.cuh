@@ -1459,7 +1459,7 @@ index<T, IdxT> build_ace(
       }
     }
   } else {
-    idx.set_disk_storage(true, params.ace_build_dir);
+    idx.set_disk_storage(true, params.ace_build_dir, dataset_size, dataset_dim, graph_degree);
   }
 
   auto index_creation_end = std::chrono::high_resolution_clock::now();
