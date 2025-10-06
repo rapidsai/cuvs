@@ -350,6 +350,14 @@ struct index : cuvs::neighbors::index {
     return graph_view_;
   }
 
+  /** Dataset norms for cosine distance [size] */
+  [[nodiscard]] inline auto dataset_norms() const noexcept
+    -> std::optional<raft::device_vector_view<const float, int64_t>>
+  {
+    if (dataset_norms_.has_value()) { return raft::make_const_mdspan(dataset_norms_->view()); }
+    return std::nullopt;
+  }
+
   /** Whether the index is stored on disk */
   [[nodiscard]] constexpr inline auto on_disk() const noexcept -> bool { return on_disk_; }
 
@@ -599,6 +607,10 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix<IdxT, int64_t, raft::row_major> graph_;
   raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
   std::unique_ptr<neighbors::dataset<dataset_index_type>> dataset_;
+  // only float distances supported at the moment
+  std::optional<raft::device_vector<float, int64_t>> dataset_norms_;
+
+  void compute_dataset_norms_(raft::resources const& res);
   bool on_disk_               = false;
   std::string file_directory_ = "";
   // only float distances supported at the moment
