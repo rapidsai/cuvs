@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-#include "../test_utils.cuh"
+#include "test_utils.cuh"
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resources.hpp>
 
 #include <raft/core/host_mdarray.hpp>
 
-#include "../../../c/src/core/interop.hpp"
+#include "../../src/core/interop.hpp"
 
 #include <gtest/gtest.h>
 #include <sys/types.h>

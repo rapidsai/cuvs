@@ -20,8 +20,8 @@
 #include <raft/core/handle.hpp>
 #include <raft/random/rng.cuh>
 
-#include "ann_utils.cuh"
-#include "naive_knn.cuh"
+#include "neighbors/ann_utils.cuh"
+#include "neighbors/naive_knn.cuh"
 #include <cuvs/neighbors/brute_force.h>
 #include <cuvs/neighbors/mg_cagra.h>
 #include <cuvs/neighbors/mg_ivf_flat.h>

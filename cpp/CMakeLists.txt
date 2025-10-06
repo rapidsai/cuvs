@@ -21,7 +21,7 @@ option(BUILD_CPU_ONLY "Build CPU only components. Applies to CUVS benchmarks cur
 
 # workaround for rapids_cuda_init_architectures not working for arch detection with
 # enable_language(CUDA)
-set(lang_list "CXX")
+set(lang_list "CXX" "C")
 
 if(NOT BUILD_CPU_ONLY)
   include(rapids-cuda)
@@ -716,63 +716,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
   # ################################################################################################
   # * cuvs_c -------------------------------------------------------------------------------
   if(BUILD_C_LIBRARY)
-    include(cmake/thirdparty/get_dlpack.cmake)
-    add_library(
-      cuvs_c SHARED
-      ../c/src/core/c_api.cpp
-      ../c/src/cluster/kmeans.cpp
-      ../c/src/neighbors/brute_force.cpp
-      ../c/src/neighbors/ivf_flat.cpp
-      ../c/src/neighbors/ivf_pq.cpp
-      ../c/src/neighbors/cagra.cpp
-      $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:../c/src/neighbors/hnsw.cpp>
-      $<$<BOOL:${BUILD_MG_ALGOS}>:../c/src/neighbors/mg_ivf_pq.cpp>
-      $<$<BOOL:${BUILD_MG_ALGOS}>:../c/src/neighbors/mg_ivf_flat.cpp>
-      $<$<BOOL:${BUILD_MG_ALGOS}>:../c/src/neighbors/mg_cagra.cpp>
-      ../c/src/neighbors/nn_descent.cpp
-      ../c/src/neighbors/vamana.cpp
-      ../c/src/neighbors/refine.cpp
-      ../c/src/neighbors/tiered_index.cpp
-      ../c/src/neighbors/all_neighbors.cpp
-      ../c/src/preprocessing/quantize/binary.cpp
-      ../c/src/preprocessing/quantize/scalar.cpp
-      ../c/src/distance/pairwise_distance.cpp
-    )
-    add_library(cuvs::c_api ALIAS cuvs_c)
-    set_target_properties(
-      cuvs_c
-      PROPERTIES BUILD_RPATH "\$ORIGIN"
-                 INSTALL_RPATH "\$ORIGIN"
-                 CXX_STANDARD 17
-                 CXX_STANDARD_REQUIRED ON
-                 POSITION_INDEPENDENT_CODE ON
-                 INTERFACE_POSITION_INDEPENDENT_CODE ON
-                 EXPORT_NAME c_api
-    )
-
-    target_compile_definitions(
-      cuvs_c PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
-    )
-
-    target_compile_options(cuvs_c PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
-
-    target_include_directories(
-      cuvs_c
-      PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
-             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-             "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
-             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
-      INTERFACE "$<INSTALL_INTERFACE:include>"
-    )
-
-    target_link_libraries(
-      cuvs_c
-      PUBLIC cuvs::cuvs ${CUVS_CTK_MATH_DEPENDENCIES}
-      PRIVATE raft::raft $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
-    )
-
-    # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
-    target_link_options(cuvs_c PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
+    add_subdirectory(../c c)
   endif()
 
   # ################################################################################################

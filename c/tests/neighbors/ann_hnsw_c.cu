@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "../test_utils.cuh"
+#include "test_utils.cuh"
 #include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.h>
 #include <cuvs/neighbors/cagra.h>

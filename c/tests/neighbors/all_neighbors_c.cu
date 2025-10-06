@@ -20,8 +20,8 @@
 #include <raft/random/rng.cuh>
 #include <rmm/device_uvector.hpp>
 
-#include "ann_utils.cuh"
-#include "naive_knn.cuh"
+#include "neighbors/ann_utils.cuh"
+#include "neighbors/naive_knn.cuh"
 #include <cuvs/neighbors/all_neighbors.h>
 
 #include <algorithm>

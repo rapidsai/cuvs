@@ -20,9 +20,9 @@ include(rapids-export)
 include(rapids-find)
 
 project(
-  libcuvs-c
+  CUVS_C
   VERSION "${RAPIDS_VERSION}"
-  LANGUAGES CXX
+  LANGUAGES CXX C
 )
 
 
@@ -118,8 +118,7 @@ target_include_directories(
 
 target_link_libraries(
   cuvs_c
-  PUBLIC ${CUVS_CTK_MATH_DEPENDENCIES}
-         $<IF:$<BOOL:${CUVSC_STATIC_CUVS_LIBRARY}>,cuvs::cuvs_static,cuvs::cuvs>
+  PUBLIC $<IF:$<BOOL:${CUVSC_STATIC_CUVS_LIBRARY}>,cuvs::cuvs_static,cuvs::cuvs>
   PRIVATE raft::raft $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
 )
 
@@ -160,4 +159,14 @@ if(PROJECT_IS_TOP_LEVEL)
     COMPONENT cuvs_c
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   )
+endif()
+
+# ##################################################################################################
+# * build tests ----------------------------------------------------
+if(BUILD_TESTS OR BUILD_C_TESTS)
+  enable_language(CUDA)
+  find_package(CUDAToolkit REQUIRED)
+
+  enable_testing()
+  add_subdirectory(tests)
 endif()
