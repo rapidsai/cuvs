@@ -298,9 +298,8 @@ if(NOT BUILD_CPU_ONLY)
   )
   target_link_libraries(cuvs-cagra-search PRIVATE raft::raft)
   target_include_directories(
-    cuvs-cagra-search PRIVATE
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
+    cuvs-cagra-search PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+                              "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
   )
   target_compile_options(
     cuvs-cagra-search PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
@@ -548,8 +547,7 @@ if(NOT BUILD_CPU_ONLY)
 
   target_include_directories(
     cuvs_objs
-    PUBLIC
-           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
     INTERFACE "$<INSTALL_INTERFACE:include>"
   )
@@ -612,10 +610,11 @@ if(NOT BUILD_CPU_ONLY)
     )
 
     target_include_directories(
-      cuvs PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-                  "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
-                  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
-                  "$<INSTALL_INTERFACE:include>"
+      cuvs
+      PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+             "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
+             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
+             "$<INSTALL_INTERFACE:include>"
     )
 
     target_link_libraries(
@@ -666,18 +665,16 @@ SECTIONS
                          $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
     )
 
-    target_include_directories(
-      cuvs_static
-      INTERFACE "$<INSTALL_INTERFACE:include>"
-    )
+    target_include_directories(cuvs_static INTERFACE "$<INSTALL_INTERFACE:include>")
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
     target_link_options(cuvs_static PRIVATE $<HOST_LINK:${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld>)
 
     target_include_directories(
-      cuvs_static PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-                         "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
-                         "$<INSTALL_INTERFACE:include>"
+      cuvs_static
+      PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+             "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
+             "$<INSTALL_INTERFACE:include>"
     )
     target_link_libraries(
       cuvs_static
@@ -719,6 +716,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
   # ################################################################################################
   # * cuvs_c -------------------------------------------------------------------------------
   if(BUILD_C_LIBRARY)
+    include(cmake/thirdparty/get_dlpack.cmake)
     add_library(
       cuvs_c SHARED
       ../c/src/core/c_api.cpp
