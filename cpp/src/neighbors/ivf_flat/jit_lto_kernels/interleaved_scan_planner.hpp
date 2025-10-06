@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cuvs/detail/jit_lto/AlgorithmPlanner.h>
+#include <cuvs/detail/jit_lto/FragmentDatabase.h>
 #include <cuvs/detail/jit_lto/MakeFragmentKey.h>
 #include <iostream>
 #include <string>
@@ -32,5 +33,20 @@ struct InterleavedScanPlanner : AlgorithmPlanner {
                        make_fragment_key<Args...>())
   {
     std::cout << "In the planner" << std::endl;
+  }
+
+  template <typename... FuncTags>
+  void add_metric_device_function(std::string metric_name, int Veclen)
+  {
+    auto& db    = fragment_database();
+    auto key    = metric_name + "_" + std::to_string(Veclen);
+    auto params = make_fragment_key<FuncTags...>();
+    std::cout << "Looking for metric fragment: " << key + "_" + params << std::endl;
+    auto metric_fragment = db.cache.find(key + "_" + params);
+    if (metric_fragment == db.cache.end()) {
+      std::cout << "Metric fragment not found" << std::endl;
+      return;
+    }
+    fragments.push_back(metric_fragment->second.get());
   }
 };

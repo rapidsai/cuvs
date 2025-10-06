@@ -95,47 +95,47 @@ def get_final_op_abbreviation(op_str):
 
 
 def generate_filename(params):
-    """Generate filename from template parameters."""
-    # params[0]: kBlockSize (numeric)
-    # params[1]: VecLen (numeric)
-    # params[2]: kManageLocalTopK (bool)
-    # params[3]: kPrecompBaseDiff (bool)
+    """Generate filename from template parameters (WITHOUT metric)."""
+    # params[0]: Capacity (numeric)
+    # params[1]: Veclen (numeric)
+    # params[2]: Ascending (bool)
+    # params[3]: ComputeNorm (bool)
     # params[4]: T (type)
     # params[5]: AccT (type)
     # params[6]: IdxT (type)
     # params[7]: FilterT (filter type)
-    # params[8]: DistanceT (distance metric)
-    # params[9]: FinalLambda (final operator)
+    # params[8]: Lambda/MetricTag (metric type - EXCLUDED from filename)
+    # params[9]: PostLambda (final operator)
 
     parts = [
-        params[0],  # kBlockSize
-        params[1],  # VecLen
-        params[2],  # kManageLocalTopK
-        params[3],  # kPrecompBaseDiff
+        params[0],  # Capacity
+        params[1],  # Veclen
+        params[2],  # Ascending
+        params[3],  # ComputeNorm
         get_type_abbreviation(params[4]),  # T
         get_type_abbreviation(params[5]),  # AccT
         get_type_abbreviation(params[6]),  # IdxT
         get_filter_abbreviation(params[7]),  # FilterT
-        get_distance_abbreviation(params[8]),  # DistanceT
-        get_final_op_abbreviation(params[9])  # FinalLambda
+        # params[8] EXCLUDED - metric
+        get_final_op_abbreviation(params[9])  # PostLambda
     ]
 
     return f"interleaved_scan_kernel_{'_'.join(parts)}.cu"
 
 
 def generate_register_function_name(params):
-    """Generate the registration function name from template parameters."""
+    """Generate the registration function name from template parameters (WITHOUT metric)."""
     parts = [
-        params[0],  # kBlockSize
-        params[1],  # VecLen
-        params[2],  # kManageLocalTopK
-        params[3],  # kPrecompBaseDiff
+        params[0],  # Capacity
+        params[1],  # Veclen
+        params[2],  # Ascending
+        params[3],  # ComputeNorm
         get_type_abbreviation(params[4]),  # T
         get_type_abbreviation(params[5]),  # AccT
         get_type_abbreviation(params[6]),  # IdxT
         get_filter_abbreviation(params[7]),  # FilterT
-        get_distance_abbreviation(params[8]),  # DistanceT
-        get_final_op_abbreviation(params[9])  # FinalLambda
+        # params[8] EXCLUDED - metric
+        get_final_op_abbreviation(params[9])  # PostLambda
     ]
 
     return f"interleaved_scan_kernel_{'_'.join(parts)}"
@@ -228,11 +228,21 @@ def generate_cuda_file_content(params):
     filename = generate_register_function_name(params)
     embedded_var_name = f"embedded_{filename}"
 
-    # Format template parameters for the template instantiation (all 10 params)
-    template_params = ', '.join(params)
+    # The kernel now has 9 template parameters (removed MetricTag)
+    # params[0-3]: Capacity, Veclen, Ascending, ComputeNorm
+    # params[4]: T (data type)
+    # params[5]: AccT (accumulator type)
+    # params[6]: IdxT (index type)
+    # params[7]: IvfSampleFilterT (filter type)
+    # params[8]: Lambda (metric - NOT used in template anymore)
+    # params[9]: PostLambda (post-processing operator)
 
-    # Convert params 4-9 to tag types for registerAlgorithm
-    tag_params = [param_to_tag(i, params[i], params) for i in range(4, 10)]
+    # Template parameters without MetricTag (params 0-7, 9)
+    template_params_list = params[0:8] + [params[9]]
+    template_params = ', '.join(template_params_list)
+
+    # Convert params 4-7 and 9 to tag types for registerAlgorithm (NO metric tag)
+    tag_params = [param_to_tag(i, params[i], params) for i in [4, 5, 6, 7, 9]]
     register_template_params = ', '.join(tag_params)
 
     # Create the string parameter with first four params (Capacity, Veclen, Ascending, ComputeNorm)
@@ -258,7 +268,11 @@ def generate_cuda_file_content(params):
 
 #include "../../ivf_flat_interleaved_scan.cuh"
 
-template __global__ void cuvs::neighbors::ivf_flat::detail::interleaved_scan_kernel<{template_params}>({params[8]}, {params[9]}, unsigned int, {params[4]} const*, unsigned int const*, {params[4]} const* const*, unsigned int const*, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int const*, unsigned int, {params[7]}, unsigned int*, float*);
+namespace cuvs::neighbors::ivf_flat::detail {{
+
+template __global__ void interleaved_scan_kernel<{template_params}>({params[9]}, unsigned int, {params[4]} const*, unsigned int const*, {params[4]} const* const*, unsigned int const*, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int const*, unsigned int, {params[7]}, unsigned int*, float*);
+
+}}  // namespace cuvs::neighbors::ivf_flat::detail
 
 #else
 
@@ -281,6 +295,150 @@ registerAlgorithm<
     return content
 
 
+def generate_metric_device_function_content(metric_name, veclen, data_type, acc_type):
+    """Generate content for a metric device function file."""
+    # Map types to their tag equivalents
+    # Mapping for data types (T)
+    data_type_to_tag = {
+        'float': 'tag_float',
+        '__half': 'tag_half',
+        'int8_t': 'tag_int8',
+        'uint8_t': 'tag_uint8',
+    }
+
+    # Mapping for accumulator types (AccT)
+    acc_type_to_tag = {
+        'float': 'tag_acc_float',
+        '__half': 'tag_acc_half',
+        'int32_t': 'tag_acc_int32',
+        'uint32_t': 'tag_acc_uint32',
+    }
+
+    # Get abbreviated names for filename
+    type_abbrev = {
+        'float': 'f',
+        '__half': 'h',
+        'int8_t': 'i8',
+        'uint8_t': 'u8',
+        'int32_t': 'i32',
+        'uint32_t': 'u32',
+    }
+
+    data_tag = data_type_to_tag.get(data_type, data_type)
+    acc_tag = acc_type_to_tag.get(acc_type, acc_type)
+
+    # Determine which header to include and implementation struct based on metric
+    if metric_name == 'euclidean':
+        header_file = '../metric_euclidean_dist.cuh'
+        metric_impl = 'euclidean_dist'
+    elif metric_name == 'inner_prod':
+        header_file = '../metric_inner_product.cuh'
+        metric_impl = 'inner_prod_dist'
+    else:
+        raise ValueError(f"Unknown metric: {metric_name}")
+
+    content = f"""/*
+ * Copyright (c) 2025, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#ifdef BUILD_KERNEL
+
+#include "{header_file}"
+
+namespace cuvs::neighbors::ivf_flat::detail {{
+
+template __device__ void compute_dist<{veclen}, {data_type}, {acc_type}>({acc_type}&, {acc_type}, {acc_type});
+
+}}  // namespace cuvs::neighbors::ivf_flat::detail
+
+#else
+
+#include "{metric_name}_{veclen}_{type_abbrev[data_type]}_{type_abbrev[acc_type]}.h"
+#include <cuvs/detail/jit_lto/RegisterKernelFragment.h>
+#include "../interleaved_scan_tags.hpp"
+
+__attribute__((__constructor__)) static void register_{metric_name}_{veclen}_{type_abbrev[data_type]}_{type_abbrev[acc_type]}()
+{{
+using namespace cuvs::neighbors::ivf_flat::detail;
+registerAlgorithm<{data_tag}, {acc_tag}>("{metric_name}_{veclen}",
+            embedded_{metric_name}_{veclen}_{type_abbrev[data_type]}_{type_abbrev[acc_type]},
+            sizeof(embedded_{metric_name}_{veclen}_{type_abbrev[data_type]}_{type_abbrev[acc_type]}));
+}}
+
+#endif
+"""
+    return content
+
+
+def generate_metric_device_functions(script_dir):
+    """Generate all metric device function files."""
+    # Define all combinations we need
+    # Based on the kernel signatures, we have:
+    # - Veclen: 1, 2, 4, 8, 16
+    # - Data types: float, __half, int8_t, uint8_t
+    # - Acc types: float (for float), __half (for __half), int32_t (for int8_t), uint32_t (for uint8_t)
+    # - Metrics: euclidean, inner_prod
+
+    type_combinations = [
+        ('float', 'float'),
+        ('__half', '__half'),
+        ('int8_t', 'int32_t'),
+        ('uint8_t', 'uint32_t'),
+    ]
+
+    veclens = [1, 2, 4, 8, 16]
+    metrics = ['euclidean', 'inner_prod']
+
+    output_dir = script_dir / 'metric_device_functions'
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    generated_files = []
+
+    type_abbrev = {
+        'float': 'f',
+        '__half': 'h',
+        'int8_t': 'i8',
+        'uint8_t': 'u8',
+        'int32_t': 'i32',
+        'uint32_t': 'u32',
+    }
+
+    for metric in metrics:
+        for veclen in veclens:
+            for data_type, acc_type in type_combinations:
+                filename = f"{metric}_{veclen}_{type_abbrev[data_type]}_{type_abbrev[acc_type]}.cu"
+                file_content = generate_metric_device_function_content(metric, veclen, data_type, acc_type)
+
+                # Write file only if it doesn't exist or content has changed
+                output_file = output_dir / filename
+                should_write = True
+                if output_file.exists():
+                    with open(output_file, 'r') as f:
+                        existing_content = f.read()
+                    should_write = (existing_content != file_content)
+
+                if should_write:
+                    with open(output_file, 'w') as f:
+                        f.write(file_content)
+
+                generated_files.append(filename)
+
+    print(f"Generated {len(generated_files)} metric device function files")
+    return generated_files
+
+
 def main():
     # Get the script directory to find the kernels file
     script_dir = Path(__file__).parent.absolute()
@@ -299,7 +457,8 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Parse all kernels and generate files
-    generated_files = []
+    # Use a dict to deduplicate by filename (since we exclude metric from filename)
+    unique_kernels = {}
 
     for line_num, line in enumerate(lines, 1):
         line = line.strip()
@@ -331,9 +490,15 @@ def main():
 
         # Generate filename and content
         filename = generate_filename(params)
-        file_content = generate_cuda_file_content(params)
 
-        # Write file only if it doesn't exist or content has changed
+        # Only generate if we haven't seen this filename yet (deduplication)
+        if filename not in unique_kernels:
+            file_content = generate_cuda_file_content(params)
+            unique_kernels[filename] = file_content
+
+    # Write all unique kernel files
+    generated_files = []
+    for filename, file_content in unique_kernels.items():
         output_file = output_dir / filename
         should_write = True
         if output_file.exists():
@@ -347,10 +512,13 @@ def main():
 
         generated_files.append(filename)
 
-        if line_num % 100 == 0:
-            print(f"Generated {line_num} files...")
+        if len(generated_files) % 100 == 0:
+            print(f"Generated {len(generated_files)} files...")
 
     print(f"\nGenerated {len(generated_files)} CUDA kernel files")
+
+    # Generate metric device function files
+    metric_files = generate_metric_device_functions(script_dir)
 
     # Generate CMake file with all filenames
     # We're generating in the source tree at: cpp/src/neighbors/ivf_flat/jit_lto_kernels/
@@ -365,6 +533,12 @@ def main():
     cmake_content += "set(INTERLEAVED_SCAN_KERNEL_FILES\n"
     for filename in sorted(generated_files):
         cmake_content += f"  src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_kernels/{filename}\n"
+    cmake_content += ")\n\n"
+
+    # Add metric device function files
+    cmake_content += "set(METRIC_DEVICE_FUNCTION_FILES\n"
+    for filename in sorted(metric_files):
+        cmake_content += f"  src/neighbors/ivf_flat/jit_lto_kernels/metric_device_functions/{filename}\n"
     cmake_content += ")\n"
 
     # Only write if content has changed

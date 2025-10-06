@@ -56,14 +56,21 @@ function(generate_interleaved_scan_kernels)
   # Include the generated CMake file
   include(${CMAKE_LIST_FILE})
 
-  # Prepend the source directory path to all files
-  set(FULL_PATH_FILES)
+  # Prepend the source directory path to all kernel files
+  set(FULL_PATH_KERNEL_FILES)
   foreach(kernel_file ${INTERLEAVED_SCAN_KERNEL_FILES})
-    list(APPEND FULL_PATH_FILES ${CMAKE_CURRENT_SOURCE_DIR}/${kernel_file})
+    list(APPEND FULL_PATH_KERNEL_FILES ${CMAKE_CURRENT_SOURCE_DIR}/${kernel_file})
   endforeach()
 
-  # Return the list to parent scope
-  set(INTERLEAVED_SCAN_KERNEL_FILES ${FULL_PATH_FILES} PARENT_SCOPE)
+  # Prepend the source directory path to all metric device function files
+  set(FULL_PATH_METRIC_FILES)
+  foreach(metric_file ${METRIC_DEVICE_FUNCTION_FILES})
+    list(APPEND FULL_PATH_METRIC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/${metric_file})
+  endforeach()
+
+  # Return the lists to parent scope
+  set(INTERLEAVED_SCAN_KERNEL_FILES ${FULL_PATH_KERNEL_FILES} PARENT_SCOPE)
+  set(METRIC_DEVICE_FUNCTION_FILES ${FULL_PATH_METRIC_FILES} PARENT_SCOPE)
   set(INTERLEAVED_SCAN_KERNELS_STAMP ${STAMP_FILE} PARENT_SCOPE)
   set(INTERLEAVED_SCAN_KERNELS_TARGET generate_interleaved_scan_kernels_target PARENT_SCOPE)
 endfunction()
