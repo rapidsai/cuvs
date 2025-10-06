@@ -55,6 +55,23 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
+template <typename DataT, typename IdxT>
+size_t get_free_host_memory()
+{
+  size_t available_memory = 0;
+  std::ifstream meminfo("/proc/meminfo");
+  std::string line;
+  while (std::getline(meminfo, line)) {
+    if (line.find("MemAvailable:") != std::string::npos) {
+      available_memory = std::stoi(line.substr(line.find(":") + 1));
+    }
+  }
+  available_memory *= 1024;
+  meminfo.close();
+  RAFT_EXPECTS(available_memory > 0, "ACE: Failed to get available memory from /proc/meminfo");
+  return available_memory;
+}
+
 // RAII wrapper for file descriptors
 class file_descriptor {
  public:
@@ -704,10 +721,6 @@ void ace_reorder_and_store_dataset(
     dataset_dim,
     n_partitions);
 
-  const size_t disk_write_size    = 1024 * 1024;
-  const size_t vector_size        = dataset_dim * sizeof(T);
-  const size_t vectors_per_buffer = std::max<size_t>(1, disk_write_size / vector_size);
-
   if (mkdir(build_dir.c_str(), 0755) != 0 && errno != EEXIST) {
     RAFT_EXPECTS(false, "Failed to create ACE build directory: %s", build_dir.c_str());
   }
@@ -720,9 +733,13 @@ void ace_reorder_and_store_dataset(
   // Calculate total sizes for pre-allocation
   uint64_t total_primary_vectors   = 0;
   uint64_t total_augmented_vectors = 0;
+  uint64_t max_primary_vectors     = 0;
+  uint64_t max_augmented_vectors   = 0;
   for (uint64_t p = 0; p < n_partitions; p++) {
     total_primary_vectors += partition_histogram(p, 0);
     total_augmented_vectors += partition_histogram(p, 1);
+    max_primary_vectors   = std::max<uint64_t>(max_primary_vectors, partition_histogram(p, 0));
+    max_augmented_vectors = std::max<uint64_t>(max_augmented_vectors, partition_histogram(p, 1));
   }
   RAFT_EXPECTS(total_primary_vectors == dataset_size,
                "Total primary vectors must be equal to dataset size");
@@ -730,6 +747,7 @@ void ace_reorder_and_store_dataset(
                "Total augmented vectors must be equal to dataset size");
 
   // Pre-allocate file space for better performance
+  const size_t vector_size     = dataset_dim * sizeof(T);
   uint64_t reordered_file_size = total_primary_vectors * vector_size;
   uint64_t augmented_file_size = total_augmented_vectors * vector_size;
 
@@ -773,6 +791,26 @@ void ace_reorder_and_store_dataset(
 
   primary_buffers.reserve(n_partitions);
   augmented_buffers.reserve(n_partitions);
+
+  // Calculate the number of buffers that fit into main memory. ~80% limit, primary and augmented
+  // buffers.
+  size_t available_memory      = get_free_host_memory<T, IdxT>();
+  const size_t disk_write_size = available_memory * 0.4 / n_partitions;
+  size_t vectors_per_buffer    = std::max<size_t>(1, disk_write_size / vector_size);
+  const size_t max_vectors_per_buffer =
+    std::max<size_t>(max_primary_vectors, max_augmented_vectors);
+  vectors_per_buffer = std::min<size_t>(vectors_per_buffer, max_vectors_per_buffer);
+  if (disk_write_size < 1024 * 1024) {
+    RAFT_LOG_WARN(
+      "ACE: Reorder buffers are smaller than 1MB. Increase host memory for better disk "
+      "throughputs.");
+  }
+  RAFT_LOG_DEBUG("ACE: %.2f GB available memory, %.2f GB disk write size",
+                 available_memory / (1024.0 * 1024.0 * 1024.0),
+                 disk_write_size / (1024.0 * 1024.0 * 1024.0));
+  RAFT_LOG_DEBUG("ACE: Reorder buffers: %lu vectors per buffer (%.2f MB)",
+                 vectors_per_buffer,
+                 vectors_per_buffer * vector_size / (1024.0 * 1024.0));
 
   for (uint64_t p = 0; p < n_partitions; p++) {
     primary_buffers.emplace_back(
@@ -1072,16 +1110,7 @@ index<T, IdxT> build_ace(
     graph_degree = intermediate_degree;
   }
 
-  size_t available_memory = 0;
-  std::ifstream meminfo("/proc/meminfo");
-  std::string line;
-  while (std::getline(meminfo, line)) {
-    if (line.find("MemAvailable:") != std::string::npos) {
-      available_memory = std::stoi(line.substr(line.find(":") + 1));
-    }
-  }
-  meminfo.close();
-  RAFT_EXPECTS(available_memory > 0, "ACE: Failed to get available memory from /proc/meminfo");
+  size_t available_memory = get_free_host_memory<T, IdxT>();
 
   // Optimistic memory model: focus on largest arrays, assumes all partitions are of equal size
   // 5 main arrays: partition labels, forward, 2 backward mappings
@@ -1100,7 +1129,7 @@ index<T, IdxT> build_ace(
                   params.ace_build_dir.c_str());
     RAFT_LOG_INFO("ACE: Estimated memory required: %.2f GB, available: %.2f GB",
                   total_memory_size / (1024.0 * 1024.0 * 1024.0),
-                  available_memory / (1024.0 * 1024.0));
+                  available_memory / (1024.0 * 1024.0 * 1024.0));
   } else {
     RAFT_LOG_INFO("ACE: Graph fits in host memory");
   }
@@ -1370,8 +1399,8 @@ index<T, IdxT> build_ace(
     double write_throughput =
       sub_dataset_size_0 * dataset_dim * sizeof(T) / (1024.0 * 1024.0) / (write_elapsed / 1000.0);
     RAFT_LOG_INFO(
-      "ACE: Partition %4lu (%8lu + %8lu) completed in %6ld ms: read %6ld ms (%4.1f MB/s), optimize "
-      "%6ld ms, write %5ld ms (%4.1f MB/s)",
+      "ACE: Partition %4lu (%8lu + %8lu) completed in %6ld ms: read %6ld ms (%7.1f MB/s), optimize "
+      "%6ld ms, write %6ld ms (%7.1f MB/s)",
       partition_id,
       sub_dataset_size_0,
       sub_dataset_size_1,
