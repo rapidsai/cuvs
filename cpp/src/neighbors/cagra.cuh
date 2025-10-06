@@ -129,12 +129,7 @@ void build_knn_graph(
     raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, accessor>(
       dataset.data_handle(), dataset.extent(0), dataset.extent(1));
 
-  cagra::detail::build_knn_graph(res,
-                                 dataset_internal,
-                                 knn_graph_internal,
-                                 ivf_pq_params.refinement_rate,
-                                 ivf_pq_params.build_params,
-                                 ivf_pq_params.search_params);
+  cagra::detail::build_knn_graph(res, dataset_internal, knn_graph_internal, ivf_pq_params);
 }
 
 /**
