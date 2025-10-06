@@ -25,11 +25,11 @@
 #include <cuvs/neighbors/all_neighbors.h>
 #include <cuvs/neighbors/ivf_pq.h>
 #include <cuvs/neighbors/nn_descent.h>
-#include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/all_neighbors.hpp>
 #include <cuvs/neighbors/graph_build_types.hpp>
 
 #include "../core/exceptions.hpp"
+#include "../core/interop.hpp"
 
 #include "ivf_pq.hpp"
 

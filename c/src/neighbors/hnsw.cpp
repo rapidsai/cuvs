@@ -26,10 +26,10 @@
 #include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.h>
 #include <cuvs/neighbors/hnsw.h>
-#include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/hnsw.hpp>
 
 #include "../core/exceptions.hpp"
+#include "../core/interop.hpp"
 
 namespace {
 

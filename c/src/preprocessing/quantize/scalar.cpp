@@ -19,10 +19,10 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/preprocessing/quantize/scalar.h>
-#include <cuvs/core/interop.hpp>
 #include <cuvs/preprocessing/quantize/scalar.hpp>
 
 #include "../../core/exceptions.hpp"
+#include "../../core/interop.hpp"
 
 namespace {
 

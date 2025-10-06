@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,9 @@
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resources.hpp>
 
-#include <cuvs/core/interop.hpp>
 #include <raft/core/host_mdarray.hpp>
+
+#include "../../../c/src/core/interop.hpp"
 
 #include <gtest/gtest.h>
 #include <sys/types.h>

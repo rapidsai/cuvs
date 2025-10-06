@@ -548,7 +548,7 @@ if(NOT BUILD_CPU_ONLY)
 
   target_include_directories(
     cuvs_objs
-    PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
+    PUBLIC
            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
     INTERFACE "$<INSTALL_INTERFACE:include>"
@@ -613,6 +613,7 @@ if(NOT BUILD_CPU_ONLY)
 
     target_include_directories(
       cuvs PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+                  "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
                   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
                   "$<INSTALL_INTERFACE:include>"
     )
@@ -667,7 +668,6 @@ SECTIONS
 
     target_include_directories(
       cuvs_static
-      PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
       INTERFACE "$<INSTALL_INTERFACE:include>"
     )
 
@@ -676,6 +676,7 @@ SECTIONS
 
     target_include_directories(
       cuvs_static PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+                         "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
                          "$<INSTALL_INTERFACE:include>"
     )
     target_link_libraries(

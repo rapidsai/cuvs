@@ -24,13 +24,13 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/neighbors/tiered_index.h>
-#include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/tiered_index.hpp>
 
 
 #include <fstream>
 
 #include "../core/exceptions.hpp"
+#include "../core/interop.hpp"
 #include "cagra.hpp"
 #include "ivf_flat.hpp"
 #include "ivf_pq.hpp"

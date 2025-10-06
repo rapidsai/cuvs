@@ -27,10 +27,10 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/neighbors/nn_descent.h>
-#include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 
 #include "../core/exceptions.hpp"
+#include "../core/interop.hpp"
 
 #include <fstream>
 

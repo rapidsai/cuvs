@@ -27,10 +27,10 @@
 #include <cuvs/core/c_api.h>
 #include <cuvs/neighbors/brute_force.h>
 #include <cuvs/neighbors/common.h>
-#include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/brute_force.hpp>
 
 #include "../core/exceptions.hpp"
+#include "../core/interop.hpp"
 
 namespace {
 

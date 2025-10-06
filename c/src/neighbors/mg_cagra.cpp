@@ -17,7 +17,6 @@
 #include "cagra.hpp"
 #include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/mg_cagra.h>
-#include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <dlpack/dlpack.h>
@@ -25,6 +24,7 @@
 #include <raft/core/serialize.hpp>
 
 #include "../core/exceptions.hpp"
+#include "../core/interop.hpp"
 
 #include <fstream>
 

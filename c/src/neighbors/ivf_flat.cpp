@@ -26,10 +26,10 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/neighbors/ivf_flat.h>
-#include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 
 #include "../core/exceptions.hpp"
+#include "../core/interop.hpp"
 
 #include <fstream>
 

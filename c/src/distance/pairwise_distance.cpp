@@ -23,10 +23,10 @@
 #include <raft/core/resources.hpp>
 
 #include <cuvs/core/c_api.h>
-#include <cuvs/core/interop.hpp>
 #include <cuvs/distance/distance.hpp>
 
 #include "../core/exceptions.hpp"
+#include "../core/interop.hpp"
 
 namespace {
 

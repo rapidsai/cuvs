@@ -17,7 +17,6 @@
 #include "ivf_flat.hpp"
 #include <cuvs/neighbors/ivf_flat.h>
 #include <cuvs/neighbors/mg_ivf_flat.h>
-#include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 #include <dlpack/dlpack.h>
@@ -25,6 +24,7 @@
 #include <raft/core/serialize.hpp>
 
 #include "../core/exceptions.hpp"
+#include "../core/interop.hpp"
 
 #include <fstream>
 

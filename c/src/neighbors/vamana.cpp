@@ -22,12 +22,12 @@
 #include <raft/core/resources.hpp>
 
 #include <cuvs/core/c_api.h>
-#include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/common.h>
 #include <cuvs/neighbors/vamana.h>
 #include <cuvs/neighbors/vamana.hpp>
 
 #include "../core/exceptions.hpp"
+#include "../core/interop.hpp"
 
 namespace {
 

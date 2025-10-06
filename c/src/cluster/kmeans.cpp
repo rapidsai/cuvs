@@ -20,9 +20,9 @@
 #include <cuvs/cluster/kmeans.h>
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/core/c_api.h>
-#include <cuvs/core/interop.hpp>
 
 #include "../core/exceptions.hpp"
+#include "../core/interop.hpp"
 
 namespace {
 

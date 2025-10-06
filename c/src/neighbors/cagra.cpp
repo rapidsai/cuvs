@@ -25,10 +25,10 @@
 #include <cuvs/core/c_api.h>
 #include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/common.h>
-#include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 
 #include "../core/exceptions.hpp"
+#include "../core/interop.hpp"
 
 #include "cagra.hpp"
 #include <fstream>

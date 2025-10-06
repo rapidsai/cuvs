@@ -17,7 +17,6 @@
 #include "ivf_pq.hpp"
 #include <cuvs/neighbors/ivf_pq.h>
 #include <cuvs/neighbors/mg_ivf_pq.h>
-#include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <dlpack/dlpack.h>
@@ -25,6 +24,7 @@
 #include <raft/core/serialize.hpp>
 
 #include "../core/exceptions.hpp"
+#include "../core/interop.hpp"
 
 #include <fstream>
 

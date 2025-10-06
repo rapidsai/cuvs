@@ -23,10 +23,10 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/neighbors/refine.h>
-#include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/refine.hpp>
 
 #include "../core/exceptions.hpp"
+#include "../core/interop.hpp"
 
 namespace {
 

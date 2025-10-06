@@ -24,10 +24,10 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/neighbors/ivf_pq.h>
-#include <cuvs/core/interop.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 
 #include "../core/exceptions.hpp"
+#include "../core/interop.hpp"
 
 namespace cuvs::neighbors::ivf_pq {
 void convert_c_index_params(cuvsIvfPqIndexParams params, cuvs::neighbors::ivf_pq::index_params* out)
