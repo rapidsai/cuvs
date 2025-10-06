@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -161,11 +161,12 @@ def search(Index index,
                 - `n_prefilter_rows == 1` when using a bitset prefilter.
                 Each bit in `n_samples` determines whether `queries[i]`
                 should be considered for distance computation with the index.
-        (default None)
+                (default None)
     {resources_docstring}
 
     Examples
     --------
+
     >>> # Example without pre-filter
     >>> import cupy as cp
     >>> from cuvs.neighbors import brute_force
@@ -187,8 +188,6 @@ def search(Index index,
     >>> neighbors = cp.asarray(neighbors)
     >>> distances = cp.asarray(distances)
 
-    Examples
-    --------
     >>> # Example with pre-filter
     >>> import numpy as np
     >>> import cupy as cp
@@ -223,6 +222,7 @@ def search(Index index,
     ...                                           prefilter=bitmap_prefilter)
     >>> neighbors = cp.asarray(neighbors)
     >>> distances = cp.asarray(distances)
+
     """
     if not index.trained:
         raise ValueError("Index needs to be built before calling search.")

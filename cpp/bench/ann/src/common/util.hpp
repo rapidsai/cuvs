@@ -431,12 +431,30 @@ inline auto cuda_info()
   cudaRuntimeGetVersion(&runtime);
 
   cudaDeviceProp device_prop;
-  cudaGetDevice(&dev);
-  cudaGetDeviceProperties(&device_prop, dev);
+  auto err_code = cudaGetDevice(&dev);
+  if (err_code == cudaErrorNoDevice || err_code == cudaErrorInvalidDevice) {
+    throw std::runtime_error{"cuda_info: call to cudaGetDevice failed with code " +
+                             std::to_string(err_code) +
+                             ". If you are running on a CPU-only machine, please "
+                             "use the CPU package instead."};
+  } else if (err_code != cudaSuccess) {
+    throw std::runtime_error{"cuda_info: call to cudaGetDevice failed with code " +
+                             std::to_string(err_code)};
+  }
+  err_code = cudaGetDeviceProperties(&device_prop, dev);
+  if (err_code != cudaSuccess) {
+    throw std::runtime_error{"cuda_info: call to cudaGetDeviceProperties failed with code " +
+                             std::to_string(err_code)};
+  }
+  int clockRate       = 0;
+  int memoryClockRate = 0;
+  err_code            = cudaDeviceGetAttribute(&clockRate, cudaDevAttrClockRate, dev);
+  err_code            = cudaDeviceGetAttribute(&memoryClockRate, cudaDevAttrMemoryClockRate, dev);
+
   props.emplace_back("gpu_name", std::string(device_prop.name));
   props.emplace_back("gpu_sm_count", std::to_string(device_prop.multiProcessorCount));
-  props.emplace_back("gpu_sm_freq", std::to_string(device_prop.clockRate * 1e3));
-  props.emplace_back("gpu_mem_freq", std::to_string(device_prop.memoryClockRate * 1e3));
+  props.emplace_back("gpu_sm_freq", std::to_string(clockRate * 1e3));
+  props.emplace_back("gpu_mem_freq", std::to_string(memoryClockRate * 1e3));
   props.emplace_back("gpu_mem_bus_width", std::to_string(device_prop.memoryBusWidth));
   props.emplace_back("gpu_mem_global_size", std::to_string(device_prop.totalGlobalMem));
   props.emplace_back("gpu_mem_shared_size", std::to_string(device_prop.sharedMemPerMultiprocessor));
@@ -449,10 +467,8 @@ inline auto cuda_info()
   props.emplace_back("gpu_pageableMemoryAccess", std::to_string(device_prop.pageableMemoryAccess));
   props.emplace_back("gpu_pageableMemoryAccessUsesHostPageTables",
                      std::to_string(device_prop.pageableMemoryAccessUsesHostPageTables));
-#if defined(CUDART_VERSION) && CUDART_VERSION >= 12000
   props.emplace_back("gpu_gpuDirectRDMASupported",
                      std::to_string(device_prop.gpuDirectRDMASupported));
-#endif
 #endif
   return props;
 }

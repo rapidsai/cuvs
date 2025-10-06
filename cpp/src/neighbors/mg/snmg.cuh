@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,9 +72,13 @@ void deserialize(const raft::resources& clique,
   std::ifstream is(filename, std::ios::in | std::ios::binary);
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
+  char dtype_string[4];
+  is.read(dtype_string, 4);
+
   const auto& handle = raft::resource::set_current_device_to_root_rank(clique);
-  index.mode_        = (cuvs::neighbors::distribution_mode)deserialize_scalar<int>(handle, is);
-  index.num_ranks_   = deserialize_scalar<int>(handle, is);
+  index.mode_ =
+    static_cast<cuvs::neighbors::distribution_mode>(deserialize_scalar<int>(handle, is));
+  index.num_ranks_ = deserialize_scalar<int>(handle, is);
 
   if (index.num_ranks_ != raft::resource::get_num_ranks(clique)) {
     RAFT_FAIL("Serialized index has %d ranks whereas NCCL clique has %d ranks",
@@ -602,7 +606,7 @@ void search(const raft::resources& clique,
     int64_t n_batches = raft::ceildiv(n_rows, (int64_t)n_rows_per_batch);
     if (n_batches <= 1) n_rows_per_batch = n_rows;
 
-    if (merge_mode == MERGE_ON_ROOT_RANK) {
+    if (merge_mode == MERGE_ON_ROOT_RANK && index.num_ranks_ > 1) {
       RAFT_LOG_DEBUG("SHARDED SEARCH WITH MERGE_ON_ROOT_RANK MERGE MODE: %d*%drows",
                      n_batches,
                      n_rows_per_batch);
@@ -617,7 +621,7 @@ void search(const raft::resources& clique,
                                        n_cols,
                                        n_neighbors,
                                        n_batches);
-    } else if (merge_mode == TREE_MERGE) {
+    } else if (merge_mode == TREE_MERGE && index.num_ranks_ > 1) {
       RAFT_LOG_DEBUG(
         "SHARDED SEARCH WITH TREE_MERGE MERGE MODE %d*%drows", n_batches, n_rows_per_batch);
       sharded_search_with_tree_merge(clique,
@@ -631,6 +635,28 @@ void search(const raft::resources& clique,
                                      n_cols,
                                      n_neighbors,
                                      n_batches);
+    } else {
+      const int rank = 0;
+#pragma omp parallel for
+      for (int64_t batch_idx = 0; batch_idx < n_batches; batch_idx++) {
+        int64_t offset                  = batch_idx * n_rows_per_batch;
+        int64_t query_offset            = offset * n_cols;
+        int64_t output_offset           = offset * n_neighbors;
+        int64_t n_rows_of_current_batch = std::min(n_rows_per_batch, n_rows - offset);
+
+        run_search_batch(clique,
+                         index,
+                         rank,
+                         search_params,
+                         queries,
+                         neighbors,
+                         distances,
+                         query_offset,
+                         output_offset,
+                         n_rows_of_current_batch,
+                         n_cols,
+                         n_neighbors);
+      }
     }
   }
 }
@@ -643,9 +669,14 @@ void serialize(const raft::resources& clique,
   std::ofstream of(filename, std::ios::out | std::ios::binary);
   if (!of) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
+  std::string dtype_string = raft::detail::numpy_serializer::get_numpy_dtype<T>().to_string();
+  dtype_string.resize(4);
+  of << dtype_string;
+
   const auto& handle = raft::resource::set_current_device_to_root_rank(clique);
+
   serialize_scalar(handle, of, (int)index.mode_);
-  serialize_scalar(handle, of, index.num_ranks_);
+  serialize_scalar(handle, of, (int)index.num_ranks_);
 
   for (int rank = 0; rank < index.num_ranks_; rank++) {
     const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);

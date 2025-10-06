@@ -18,6 +18,7 @@
 
 #include "ann_utils.cuh"
 #include "cagra/device_common.hpp"
+#include "cuvs/distance/distance.h"
 #include "nn_descent_gnnd.hpp"
 
 #include <cuvs/distance/distance.hpp>
@@ -52,6 +53,7 @@
 #include <optional>
 #include <queue>
 #include <random>
+#include <type_traits>
 
 namespace cuvs::neighbors::nn_descent::detail {
 
@@ -285,6 +287,10 @@ RAFT_KERNEL preprocess_data_kernel(
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         output_data[list_id * dim + idx] =
           (float)input_data[(size_t)blockIdx.x * dim + idx] / sqrt(l2_norm);
+      } else if (metric == cuvs::distance::DistanceType::BitwiseHamming) {
+        int idx_for_byte           = list_id * dim + idx;  // uint8 or int8 data
+        uint8_t* output_bytes      = reinterpret_cast<uint8_t*>(output_data);
+        output_bytes[idx_for_byte] = input_data[(size_t)blockIdx.x * dim + idx];
       } else {  // L2Expanded or L2SqrtExpanded
         output_data[list_id * dim + idx] = input_data[(size_t)blockIdx.x * dim + idx];
         if (idx == 0) { l2_norms[list_id] = l2_norm; }
@@ -488,7 +494,7 @@ __device__ __forceinline__ void remove_duplicates(
 // MAX_RESIDENT_THREAD_PER_SM = BLOCK_SIZE * BLOCKS_PER_SM = 2048
 // For architectures 750 and 860 (890), the values for MAX_RESIDENT_THREAD_PER_SM
 // is 1024 and 1536 respectively, which means the bounds don't work anymore
-template <typename Index_t, typename ID_t = InternalID_t<Index_t>>
+template <typename Index_t, typename ID_t = InternalID_t<Index_t>, typename DistEpilogue_t>
 RAFT_KERNEL
 #ifdef __CUDA_ARCH__
 // Use minBlocksPerMultiprocessor = 4 on specific arches
@@ -513,7 +519,8 @@ __launch_bounds__(BLOCK_SIZE)
                     int graph_width,
                     int* locks,
                     DistData_t* l2_norms,
-                    cuvs::distance::DistanceType metric)
+                    cuvs::distance::DistanceType metric,
+                    DistEpilogue_t dist_epilogue)
 {
 #if (__CUDA_ARCH__ >= 700)
   using namespace nvcuda;
@@ -560,6 +567,10 @@ __launch_bounds__(BLOCK_SIZE)
 
   __syncthreads();
 
+  // if we have a distance epilogue, distances need to be fully calculated instead of postprocessing
+  // them.
+  bool can_postprocess_dist = std::is_same_v<DistEpilogue_t, raft::identity_op>;
+
   remove_duplicates(new_neighbors,
                     list_new_size2.x,
                     new_neighbors + list_new_size2.x,
@@ -587,56 +598,76 @@ __launch_bounds__(BLOCK_SIZE)
   wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, wmma::row_major> a_frag;
   wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, half, wmma::col_major> b_frag;
   wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> c_frag;
-  wmma::fill_fragment(c_frag, 0.0);
-  for (int step = 0; step < raft::ceildiv(data_dim, TILE_COL_WIDTH); step++) {
-    int num_load_elems = (step == raft::ceildiv(data_dim, TILE_COL_WIDTH) - 1)
-                           ? data_dim - step * TILE_COL_WIDTH
-                           : TILE_COL_WIDTH;
+  if (metric != cuvs::distance::DistanceType::BitwiseHamming) {
+    wmma::fill_fragment(c_frag, 0.0);
+
+    for (int step = 0; step < raft::ceildiv(data_dim, TILE_COL_WIDTH); step++) {
+      int num_load_elems = (step == raft::ceildiv(data_dim, TILE_COL_WIDTH) - 1)
+                             ? data_dim - step * TILE_COL_WIDTH
+                             : TILE_COL_WIDTH;
 #pragma unroll
-    for (int i = 0; i < MAX_NUM_BI_SAMPLES / num_warps; i++) {
-      int idx = i * num_warps + warp_id;
-      if (idx < list_new_size) {
-        size_t neighbor_id = new_neighbors[idx];
-        size_t idx_in_data = neighbor_id * data_dim;
-        load_vec(s_nv[idx],
-                 data + idx_in_data + step * TILE_COL_WIDTH,
-                 num_load_elems,
-                 TILE_COL_WIDTH,
-                 lane_id);
+      for (int i = 0; i < MAX_NUM_BI_SAMPLES / num_warps; i++) {
+        int idx = i * num_warps + warp_id;
+        if (idx < list_new_size) {
+          size_t neighbor_id = new_neighbors[idx];
+          size_t idx_in_data = neighbor_id * data_dim;
+          load_vec(s_nv[idx],
+                   data + idx_in_data + step * TILE_COL_WIDTH,
+                   num_load_elems,
+                   TILE_COL_WIDTH,
+                   lane_id);
+        }
+      }
+      __syncthreads();
+
+      for (int i = 0; i < TILE_COL_WIDTH / WMMA_K; i++) {
+        wmma::load_matrix_sync(
+          a_frag, s_nv[warp_id_y * WMMA_M] + i * WMMA_K, TILE_COL_WIDTH + APAD);
+        wmma::load_matrix_sync(
+          b_frag, s_nv[warp_id_x * WMMA_N] + i * WMMA_K, TILE_COL_WIDTH + BPAD);
+        wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
+        __syncthreads();
       }
     }
-    __syncthreads();
 
-    for (int i = 0; i < TILE_COL_WIDTH / WMMA_K; i++) {
-      wmma::load_matrix_sync(a_frag, s_nv[warp_id_y * WMMA_M] + i * WMMA_K, TILE_COL_WIDTH + APAD);
-      wmma::load_matrix_sync(b_frag, s_nv[warp_id_x * WMMA_N] + i * WMMA_K, TILE_COL_WIDTH + BPAD);
-      wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
-      __syncthreads();
-    }
+    wmma::store_matrix_sync(
+      s_distances + warp_id_y * WMMA_M * SKEWED_MAX_NUM_BI_SAMPLES + warp_id_x * WMMA_N,
+      c_frag,
+      SKEWED_MAX_NUM_BI_SAMPLES,
+      wmma::mem_row_major);
   }
-
-  wmma::store_matrix_sync(
-    s_distances + warp_id_y * WMMA_M * SKEWED_MAX_NUM_BI_SAMPLES + warp_id_x * WMMA_N,
-    c_frag,
-    SKEWED_MAX_NUM_BI_SAMPLES,
-    wmma::mem_row_major);
   __syncthreads();
 
   for (int i = threadIdx.x; i < MAX_NUM_BI_SAMPLES * SKEWED_MAX_NUM_BI_SAMPLES; i += blockDim.x) {
-    if (i % SKEWED_MAX_NUM_BI_SAMPLES < list_new_size &&
-        i / SKEWED_MAX_NUM_BI_SAMPLES < list_new_size) {
-      if (metric == cuvs::distance::DistanceType::InnerProduct) {
+    int row_id = i % SKEWED_MAX_NUM_BI_SAMPLES;
+    int col_id = i / SKEWED_MAX_NUM_BI_SAMPLES;
+
+    if (row_id < list_new_size && col_id < list_new_size) {
+      if (metric == cuvs::distance::DistanceType::InnerProduct && can_postprocess_dist) {
         s_distances[i] = -s_distances[i];
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         s_distances[i] = 1.0 - s_distances[i];
+      } else if (metric == cuvs::distance::DistanceType::BitwiseHamming) {
+        s_distances[i] = 0.0;
+        int n1         = new_neighbors[row_id];
+        int n2         = new_neighbors[col_id];
+        // TODO: https://github.com/rapidsai/cuvs/issues/1127
+        const uint8_t* data_n1 = reinterpret_cast<const uint8_t*>(data) + n1 * data_dim;
+        const uint8_t* data_n2 = reinterpret_cast<const uint8_t*>(data) + n2 * data_dim;
+        for (int d = 0; d < data_dim; d++) {
+          s_distances[i] += __popc(static_cast<uint32_t>(data_n1[d] ^ data_n2[d]) & 0xff);
+        }
       } else {  // L2Expanded or L2SqrtExpanded
-        s_distances[i] = l2_norms[new_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
-                         l2_norms[new_neighbors[i / SKEWED_MAX_NUM_BI_SAMPLES]] -
-                         2.0 * s_distances[i];
+        s_distances[i] =
+          l2_norms[new_neighbors[row_id]] + l2_norms[new_neighbors[col_id]] - 2.0 * s_distances[i];
         // for fp32 vs fp16 precision differences resulting in negative distances when distance
         // should be 0 related issue: https://github.com/rapidsai/cuvs/issues/991
         s_distances[i] = s_distances[i] < 0.0f ? 0.0f : s_distances[i];
+        if (!can_postprocess_dist && metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+          s_distances[i] = sqrtf(s_distances[i]);
+        }
       }
+      s_distances[i] = dist_epilogue(s_distances[i], new_neighbors[row_id], new_neighbors[col_id]);
     } else {
       s_distances[i] = std::numeric_limits<float>::max();
     }
@@ -656,71 +687,89 @@ __launch_bounds__(BLOCK_SIZE)
 
   __syncthreads();
 
-  wmma::fill_fragment(c_frag, 0.0);
-  for (int step = 0; step < raft::ceildiv(data_dim, TILE_COL_WIDTH); step++) {
-    int num_load_elems = (step == raft::ceildiv(data_dim, TILE_COL_WIDTH) - 1)
-                           ? data_dim - step * TILE_COL_WIDTH
-                           : TILE_COL_WIDTH;
-    if (TILE_COL_WIDTH < data_dim) {
+  if (metric != cuvs::distance::DistanceType::BitwiseHamming) {
+    wmma::fill_fragment(c_frag, 0.0);
+    for (int step = 0; step < raft::ceildiv(data_dim, TILE_COL_WIDTH); step++) {
+      int num_load_elems = (step == raft::ceildiv(data_dim, TILE_COL_WIDTH) - 1)
+                             ? data_dim - step * TILE_COL_WIDTH
+                             : TILE_COL_WIDTH;
+      if (TILE_COL_WIDTH < data_dim) {
+#pragma unroll
+        for (int i = 0; i < MAX_NUM_BI_SAMPLES / num_warps; i++) {
+          int idx = i * num_warps + warp_id;
+          if (idx < list_new_size) {
+            size_t neighbor_id = new_neighbors[idx];
+            size_t idx_in_data = neighbor_id * data_dim;
+            load_vec(s_nv[idx],
+                     data + idx_in_data + step * TILE_COL_WIDTH,
+                     num_load_elems,
+                     TILE_COL_WIDTH,
+                     lane_id);
+          }
+        }
+      }
 #pragma unroll
       for (int i = 0; i < MAX_NUM_BI_SAMPLES / num_warps; i++) {
         int idx = i * num_warps + warp_id;
-        if (idx < list_new_size) {
-          size_t neighbor_id = new_neighbors[idx];
+        if (idx < list_old_size) {
+          size_t neighbor_id = old_neighbors[idx];
           size_t idx_in_data = neighbor_id * data_dim;
-          load_vec(s_nv[idx],
+          load_vec(s_ov[idx],
                    data + idx_in_data + step * TILE_COL_WIDTH,
                    num_load_elems,
                    TILE_COL_WIDTH,
                    lane_id);
         }
       }
-    }
-#pragma unroll
-    for (int i = 0; i < MAX_NUM_BI_SAMPLES / num_warps; i++) {
-      int idx = i * num_warps + warp_id;
-      if (idx < list_old_size) {
-        size_t neighbor_id = old_neighbors[idx];
-        size_t idx_in_data = neighbor_id * data_dim;
-        load_vec(s_ov[idx],
-                 data + idx_in_data + step * TILE_COL_WIDTH,
-                 num_load_elems,
-                 TILE_COL_WIDTH,
-                 lane_id);
+      __syncthreads();
+
+      for (int i = 0; i < TILE_COL_WIDTH / WMMA_K; i++) {
+        wmma::load_matrix_sync(
+          a_frag, s_nv[warp_id_y * WMMA_M] + i * WMMA_K, TILE_COL_WIDTH + APAD);
+        wmma::load_matrix_sync(
+          b_frag, s_ov[warp_id_x * WMMA_N] + i * WMMA_K, TILE_COL_WIDTH + BPAD);
+        wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
+        __syncthreads();
       }
     }
-    __syncthreads();
 
-    for (int i = 0; i < TILE_COL_WIDTH / WMMA_K; i++) {
-      wmma::load_matrix_sync(a_frag, s_nv[warp_id_y * WMMA_M] + i * WMMA_K, TILE_COL_WIDTH + APAD);
-      wmma::load_matrix_sync(b_frag, s_ov[warp_id_x * WMMA_N] + i * WMMA_K, TILE_COL_WIDTH + BPAD);
-      wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
-      __syncthreads();
-    }
+    wmma::store_matrix_sync(
+      s_distances + warp_id_y * WMMA_M * SKEWED_MAX_NUM_BI_SAMPLES + warp_id_x * WMMA_N,
+      c_frag,
+      SKEWED_MAX_NUM_BI_SAMPLES,
+      wmma::mem_row_major);
+    __syncthreads();
   }
 
-  wmma::store_matrix_sync(
-    s_distances + warp_id_y * WMMA_M * SKEWED_MAX_NUM_BI_SAMPLES + warp_id_x * WMMA_N,
-    c_frag,
-    SKEWED_MAX_NUM_BI_SAMPLES,
-    wmma::mem_row_major);
-  __syncthreads();
-
   for (int i = threadIdx.x; i < MAX_NUM_BI_SAMPLES * SKEWED_MAX_NUM_BI_SAMPLES; i += blockDim.x) {
-    if (i % SKEWED_MAX_NUM_BI_SAMPLES < list_old_size &&
-        i / SKEWED_MAX_NUM_BI_SAMPLES < list_new_size) {
-      if (metric == cuvs::distance::DistanceType::InnerProduct) {
+    int row_id = i % SKEWED_MAX_NUM_BI_SAMPLES;
+    int col_id = i / SKEWED_MAX_NUM_BI_SAMPLES;
+    if (row_id < list_old_size && col_id < list_new_size) {
+      if (metric == cuvs::distance::DistanceType::InnerProduct && can_postprocess_dist) {
         s_distances[i] = -s_distances[i];
       } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
         s_distances[i] = 1.0 - s_distances[i];
+      } else if (metric == cuvs::distance::DistanceType::BitwiseHamming) {
+        s_distances[i] = 0.0;
+        int n1         = old_neighbors[row_id];
+        int n2         = new_neighbors[col_id];
+        // TODO: https://github.com/rapidsai/cuvs/issues/1127
+        const uint8_t* data_n1 = reinterpret_cast<const uint8_t*>(data) + n1 * data_dim;
+        const uint8_t* data_n2 = reinterpret_cast<const uint8_t*>(data) + n2 * data_dim;
+        for (int d = 0; d < data_dim; d++) {
+          s_distances[i] += __popc(static_cast<uint32_t>(data_n1[d] ^ data_n2[d]) & 0xff);
+        }
       } else {  // L2Expanded or L2SqrtExpanded
-        s_distances[i] = l2_norms[old_neighbors[i % SKEWED_MAX_NUM_BI_SAMPLES]] +
-                         l2_norms[new_neighbors[i / SKEWED_MAX_NUM_BI_SAMPLES]] -
-                         2.0 * s_distances[i];
+        s_distances[i] =
+          l2_norms[old_neighbors[row_id]] + l2_norms[new_neighbors[col_id]] - 2.0 * s_distances[i];
         // for fp32 vs fp16 precision differences resulting in negative distances when distance
         // should be 0 related issue: https://github.com/rapidsai/cuvs/issues/991
         s_distances[i] = s_distances[i] < 0.0f ? 0.0f : s_distances[i];
+        if (!can_postprocess_dist && metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+          s_distances[i] = sqrtf(s_distances[i]);
+        }
       }
+      s_distances[i] = dist_epilogue(s_distances[i], old_neighbors[row_id], new_neighbors[col_id]);
     } else {
       s_distances[i] = std::numeric_limits<float>::max();
     }
@@ -976,7 +1025,11 @@ GNND<Data_t, Index_t>::GNND(raft::resources const& res, const BuildConfig& build
     nrow_(build_config.max_dataset_size),
     ndim_(build_config.dataset_dim),
     d_data_{raft::make_device_matrix<__half, size_t, raft::row_major>(
-      res, nrow_, build_config.dataset_dim)},
+      res,
+      nrow_,
+      build_config.metric == cuvs::distance::DistanceType::BitwiseHamming
+        ? (build_config.dataset_dim + 1) / 2
+        : build_config.dataset_dim)},
     l2_norms_{raft::make_device_vector<DistData_t, size_t>(res, 0)},
     graph_buffer_{
       raft::make_device_matrix<ID_t, size_t, raft::row_major>(res, nrow_, DEGREE_ON_DEVICE)},
@@ -1034,7 +1087,8 @@ void GNND<Data_t, Index_t>::add_reverse_edges(Index_t* graph_ptr,
 }
 
 template <typename Data_t, typename Index_t>
-void GNND<Data_t, Index_t>::local_join(cudaStream_t stream)
+template <typename DistEpilogue_t>
+void GNND<Data_t, Index_t>::local_join(cudaStream_t stream, DistEpilogue_t dist_epilogue)
 {
   raft::matrix::fill(res, dists_buffer_.view(), std::numeric_limits<float>::max());
   local_join_kernel<<<nrow_, BLOCK_SIZE, 0, stream>>>(graph_.h_graph_new.data_handle(),
@@ -1051,17 +1105,26 @@ void GNND<Data_t, Index_t>::local_join(cudaStream_t stream)
                                                       DEGREE_ON_DEVICE,
                                                       d_locks_.data_handle(),
                                                       l2_norms_.data_handle(),
-                                                      build_config_.metric);
+                                                      build_config_.metric,
+                                                      dist_epilogue);
 }
 
 template <typename Data_t, typename Index_t>
+template <typename DistEpilogue_t>
 void GNND<Data_t, Index_t>::build(Data_t* data,
                                   const Index_t nrow,
                                   Index_t* output_graph,
                                   bool return_distances,
-                                  DistData_t* output_distances)
+                                  DistData_t* output_distances,
+                                  DistEpilogue_t dist_epilogue)
 {
   using input_t = typename std::remove_const<Data_t>::type;
+
+  if (build_config_.metric == cuvsDistanceType::BitwiseHamming &&
+      !(std::is_same_v<input_t, uint8_t> || std::is_same_v<input_t, int8_t>)) {
+    RAFT_FAIL(
+      "Data type needs to be int8 or uint8 for NN Descent to run with BitwiseHamming distance.");
+  }
 
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
   nrow_               = nrow;
@@ -1069,6 +1132,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
   graph_.bloom_filter.set_nrow(nrow);
   update_counter_ = 0;
   graph_.h_graph  = (InternalID_t<Index_t>*)output_graph;
+  raft::matrix::fill(res, d_data_.view(), static_cast<__half>(0));
 
   cudaPointerAttributes data_ptr_attr;
   RAFT_CUDA_TRY(cudaPointerGetAttributes(&data_ptr_attr, data));
@@ -1154,7 +1218,7 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
       raft::util::arch::SM_range(raft::util::arch::SM_70(), raft::util::arch::SM_future());
 
     if (wmma_range.contains(runtime_arch)) {
-      local_join(stream);
+      local_join(stream, dist_epilogue);
     } else {
       THROW("NN_DESCENT cannot be run for __CUDA_ARCH__ < 700");
     }
@@ -1186,28 +1250,30 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
   static_assert(sizeof(decltype(*(graph_.h_dists.data_handle()))) >= sizeof(Index_t));
 
   if (return_distances) {
-    auto graph_d_dists = raft::make_device_matrix<DistData_t, int64_t, raft::row_major>(
-      res, nrow_, build_config_.node_degree);
-    raft::copy(graph_d_dists.data_handle(),
-               graph_.h_dists.data_handle(),
-               nrow_ * build_config_.node_degree,
+    auto graph_h_dists = raft::make_host_matrix<DistData_t, int64_t, raft::row_major>(
+      nrow_, build_config_.output_graph_degree);
+
+// slice on host
+#pragma omp parallel for
+    for (size_t i = 0; i < (size_t)nrow_; i++) {
+      for (size_t j = 0; j < build_config_.output_graph_degree; j++) {
+        graph_h_dists(i, j) = graph_.h_dists(i, j);
+      }
+    }
+    raft::copy(output_distances,
+               graph_h_dists.data_handle(),
+               nrow_ * build_config_.output_graph_degree,
                raft::resource::get_cuda_stream(res));
 
     auto output_dist_view = raft::make_device_matrix_view<DistData_t, int64_t, raft::row_major>(
       output_distances, nrow_, build_config_.output_graph_degree);
-
-    raft::matrix::slice_coordinates coords{static_cast<int64_t>(0),
-                                           static_cast<int64_t>(0),
-                                           static_cast<int64_t>(nrow_),
-                                           static_cast<int64_t>(build_config_.output_graph_degree)};
-    raft::matrix::slice<DistData_t, int64_t, raft::row_major>(
-      res, raft::make_const_mdspan(graph_d_dists.view()), output_dist_view, coords);
-
     // distance post-processing
-    if (build_config_.metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+    bool can_postprocess_dist = std::is_same_v<DistEpilogue_t, raft::identity_op>;
+    if (build_config_.metric == cuvs::distance::DistanceType::L2SqrtExpanded &&
+        can_postprocess_dist) {
       raft::linalg::map(
         res, output_dist_view, raft::sqrt_op{}, raft::make_const_mdspan(output_dist_view));
-    } else if (!cuvs::distance::is_min_close(build_config_.metric)) {
+    } else if (!cuvs::distance::is_min_close(build_config_.metric) && can_postprocess_dist) {
       // revert negated innerproduct
       raft::linalg::map(res,
                         output_dist_view,

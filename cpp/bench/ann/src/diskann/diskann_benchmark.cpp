@@ -35,8 +35,8 @@ template <typename T>
 void parse_build_param(const nlohmann::json& conf,
                        typename cuvs::bench::diskann_memory<T>::build_param& param)
 {
-  param.R = conf.at("R");
-  if (conf.contains("L_build")) { param.L_build = conf.at("L_build"); }
+  param.R       = conf.at("R");
+  param.L_build = conf.at("L_build");
   if (conf.contains("alpha")) { param.num_threads = conf.at("alpha"); }
   if (conf.contains("num_threads")) { param.num_threads = conf.at("num_threads"); }
 }
@@ -45,8 +45,8 @@ template <typename T>
 void parse_build_param(const nlohmann::json& conf,
                        typename cuvs::bench::diskann_ssd<T>::build_param& param)
 {
-  param.R = conf.at("R");
-  if (conf.contains("L_build")) { param.L_build = conf.at("L_build"); }
+  param.R       = conf.at("R");
+  param.L_build = conf.at("L_build");
   if (conf.contains("alpha")) { param.num_threads = conf.at("alpha"); }
   if (conf.contains("num_threads")) { param.num_threads = conf.at("num_threads"); }
   if (conf.contains("QD")) { param.QD = conf.at("QD"); }
@@ -65,16 +65,14 @@ template <typename T>
 void parse_search_param(const nlohmann::json& conf,
                         typename cuvs::bench::diskann_memory<T>::search_param& param)
 {
-  param.L_search    = conf.at("L_search");
-  param.num_threads = conf.at("num_threads");
+  param.L_search = conf.at("L_search");
 }
 
 template <typename T>
 void parse_search_param(const nlohmann::json& conf,
                         typename cuvs::bench::diskann_ssd<T>::search_param& param)
 {
-  param.L_search    = conf.at("L_search");
-  param.num_threads = conf.at("num_threads");
+  param.L_search = conf.at("L_search");
   if (conf.contains("num_nodes_to_cache")) {
     param.num_nodes_to_cache = conf.at("num_nodes_to_cache");
   }
@@ -132,6 +130,8 @@ std::unique_ptr<typename cuvs::bench::algo<T>::search_param> create_search_param
 };  // namespace cuvs::bench
 
 REGISTER_ALGO_INSTANCE(float);
+REGISTER_ALGO_INSTANCE(std::int8_t);
+REGISTER_ALGO_INSTANCE(std::uint8_t);
 
 #ifdef ANN_BENCH_BUILD_MAIN
 #include "../common/benchmark.hpp"

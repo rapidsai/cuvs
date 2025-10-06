@@ -19,6 +19,11 @@ if(DISABLE_DEPRECATION_WARNINGS)
   )
 endif()
 
+if(DISABLE_OPENMP)
+  list(APPEND CUVS_CXX_FLAGS -Wno-unknown-pragmas)
+  list(APPEND CUVS_CUDA_FLAGS -Xcompiler=-Wno-unknown-pragmas)
+endif()
+
 # Be very strict when compiling with GCC as host compiler (and thus more lenient when compiling with
 # clang)
 if(CMAKE_COMPILER_IS_GNUCXX)
@@ -48,13 +53,8 @@ list(APPEND CUVS_CUDA_FLAGS --expt-extended-lambda --expt-relaxed-constexpr)
 list(APPEND CUVS_CXX_FLAGS "-DCUDA_API_PER_THREAD_DEFAULT_STREAM")
 list(APPEND CUVS_CUDA_FLAGS "-DCUDA_API_PER_THREAD_DEFAULT_STREAM")
 # make sure we produce smallest binary size
-list(APPEND CUVS_CUDA_FLAGS -Xfatbin=-compress-all)
-if(CMAKE_CUDA_COMPILER_ID STREQUAL "NVIDIA"
-   AND (CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 12.9 AND CMAKE_CUDA_COMPILER_VERSION
-                                                                   VERSION_LESS 13.0)
-)
-  list(APPEND CUVS_CUDA_FLAGS -Xfatbin=--compress-level=3)
-endif()
+include(${rapids-cmake-dir}/cuda/enable_fatbin_compression.cmake)
+rapids_cuda_enable_fatbin_compression(VARIABLE CUVS_CUDA_FLAGS TUNE_FOR rapids)
 
 # Option to enable line info in CUDA device compilation to allow introspection when profiling /
 # memchecking
@@ -69,6 +69,6 @@ endif()
 # Debug options
 if(CMAKE_BUILD_TYPE MATCHES Debug)
   message(VERBOSE "cuVS: Building with debugging flags")
-  list(APPEND CUVS_CUDA_FLAGS -G -Xcompiler=-rdynamic)
+  list(APPEND CUVS_CUDA_FLAGS -G -Xcompiler=-rdynamic --maxrregcount=64)
   list(APPEND CUVS_CUDA_FLAGS -Xptxas --suppress-stack-size-warning)
 endif()

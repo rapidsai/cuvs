@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 
+import cupy as cp
 import numpy as np
 import pytest
 from pylibraft.common import device_ndarray
@@ -40,12 +41,12 @@ def run_cagra_build_search_test(
     array_type="device",
     compare=True,
     inplace=True,
-    add_data_on_build=True,
+    test_extend=False,
     search_params={},
     compression=None,
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
-    if metric == "inner_product":
+    if metric == "inner_product" or metric == "cosine":
         if dtype in [np.int8, np.uint8]:
             pytest.skip("skip normalization for int8/uint8 data")
         dataset = normalize(dataset, norm="l2", axis=1)
@@ -59,26 +60,24 @@ def run_cagra_build_search_test(
         compression=compression,
     )
 
-    if array_type == "device":
-        index = cagra.build(build_params, dataset_device)
-    else:
-        index = cagra.build(build_params, dataset)
-
-    if not add_data_on_build:
+    if test_extend:
         dataset_1 = dataset[: n_rows // 2, :]
         dataset_2 = dataset[n_rows // 2 :, :]
-        indices_1 = np.arange(n_rows // 2, dtype=np.uint32)
-        indices_2 = np.arange(n_rows // 2, n_rows, dtype=np.uint32)
+        extend_params = cagra.ExtendParams()
         if array_type == "device":
             dataset_1_device = device_ndarray(dataset_1)
             dataset_2_device = device_ndarray(dataset_2)
-            indices_1_device = device_ndarray(indices_1)
-            indices_2_device = device_ndarray(indices_2)
-            index = cagra.extend(index, dataset_1_device, indices_1_device)
-            index = cagra.extend(index, dataset_2_device, indices_2_device)
+
+            index = cagra.build(build_params, dataset_1_device)
+            index = cagra.extend(extend_params, index, dataset_2_device)
         else:
-            index = cagra.extend(index, dataset_1, indices_1)
-            index = cagra.extend(index, dataset_2, indices_2)
+            index = cagra.build(build_params, dataset_1)
+            index = cagra.extend(index, dataset_2)
+    else:
+        if array_type == "device":
+            index = cagra.build(build_params, dataset_device)
+        else:
+            index = cagra.build(build_params, dataset)
 
     queries = generate_data((n_queries, n_cols), dtype)
     out_idx = np.zeros((n_queries, k), dtype=np.uint32)
@@ -113,6 +112,7 @@ def run_cagra_build_search_test(
         "sqeuclidean": "sqeuclidean",
         "inner_product": "cosine",
         "euclidean": "euclidean",
+        "cosine": "cosine",
     }[metric]
     nn_skl = NearestNeighbors(
         n_neighbors=k, algorithm="brute", metric=skl_metric
@@ -123,15 +123,46 @@ def run_cagra_build_search_test(
     recall = calc_recall(out_idx, skl_idx)
     assert recall > 0.7
 
+    # test that we can get the cagra graph from the index
+    graph = index.graph
+    assert graph.shape == (n_rows, graph_degree)
+
+    # make sure we can convert the graph to cupy, and access it
+    cp_graph = cp.array(graph)
+    assert cp_graph.shape == (n_rows, graph_degree)
+
+    if compression is None:
+        # make sure we can get the dataset from the cagra index
+        dataset_from_index = index.dataset
+
+        dataset_from_index_host = dataset_from_index.copy_to_host()
+        assert np.allclose(dataset, dataset_from_index_host)
+
+        # make sure we can reconstruct the index from the graph
+        # Note that we can't actually use the dataset from the index itself
+        # - since that is a strided matrix (and we expect non-strided inputs
+        # in the C++ cagra::build api), so we are using the host version
+        # which will have been copied into a non-strided layout
+        reloaded_index = cagra.from_graph(
+            graph, dataset_from_index_host, metric=metric
+        )
+
+        dist_device, idx_device = cagra.search(
+            search_params, reloaded_index, queries_device, k
+        )
+        recall = calc_recall(idx_device.copy_to_host(), skl_idx)
+        assert recall > 0.9
+
 
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
-@pytest.mark.parametrize("array_type", ["device", "host"])
+@pytest.mark.parametrize("array_type", ["device"])
 @pytest.mark.parametrize("build_algo", ["ivf_pq", "nn_descent"])
-@pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product"])
+@pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product", "cosine"])
 def test_cagra_dataset_dtype_host_device(
     dtype, array_type, inplace, build_algo, metric
 ):
+
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.
     run_cagra_build_search_test(
@@ -154,7 +185,7 @@ def test_filtered_cagra(sparsity):
         {
             "intermediate_graph_degree": 64,
             "graph_degree": 32,
-            "add_data_on_build": True,
+            "test_extend": False,
             "k": 1,
             "metric": "sqeuclidean",
             "build_algo": "ivf_pq",
@@ -162,7 +193,7 @@ def test_filtered_cagra(sparsity):
         {
             "intermediate_graph_degree": 32,
             "graph_degree": 16,
-            "add_data_on_build": False,
+            "test_extend": True,
             "k": 5,
             "metric": "sqeuclidean",
             "build_algo": "ivf_pq",
@@ -170,10 +201,18 @@ def test_filtered_cagra(sparsity):
         {
             "intermediate_graph_degree": 128,
             "graph_degree": 32,
-            "add_data_on_build": True,
+            "test_extend": False,
             "k": 10,
             "metric": "inner_product",
             "build_algo": "nn_descent",
+        },
+        {
+            "intermediate_graph_degree": 64,
+            "graph_degree": 32,
+            "test_extend": True,
+            "k": 10,
+            "metric": "cosine",
+            "build_algo": "ivf_pq",
         },
     ],
 )
@@ -181,6 +220,7 @@ def test_cagra_index_params(params):
     # Note that inner_product tests use normalized input which we cannot
     # represent in int8, therefore we test only sqeuclidean metric here.
     run_cagra_build_search_test(
+        test_extend=params["test_extend"],
         k=params["k"],
         metric=params["metric"],
         graph_degree=params["graph_degree"],

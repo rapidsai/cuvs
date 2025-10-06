@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,11 +39,6 @@ namespace cuvs::neighbors::ivf_flat::detail {
 using namespace cuvs::spatial::knn::detail;  // NOLINT
 
 constexpr int kThreadsPerBlock = 128;
-
-auto RAFT_WEAK_FUNCTION is_local_topk_feasible(uint32_t k) -> bool
-{
-  return k <= raft::matrix::detail::select::warpsort::kMaxCapacity;
-}
 
 /**
  * @brief Copy `n` elements per block from one place to another.

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,14 @@
 
 #include "common.cuh"
 
+#include <cuvs/neighbors/ivf_flat.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
-#include <raft/core/resource/thrust_policy.hpp>
-#include <cuvs/neighbors/ivf_flat.hpp>
+#include <raft/linalg/map.cuh>
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/mr/device/device_memory_resource.hpp>
 #include <rmm/mr/device/pool_memory_resource.hpp>
-
-#include <thrust/copy.h>
-#include <thrust/device_ptr.h>
-#include <thrust/iterator/counting_iterator.h>
 
 #include <cstdint>
 #include <optional>
@@ -64,7 +60,7 @@ void ivf_flat_build_search_simple(raft::device_resources const& dev_resources,
     dev_resources, search_params, index, queries, neighbors.view(), distances.view());
 
   // The call to ivf_flat::search is asynchronous. Before accessing the data, sync by calling
-   raft::resource::sync_stream(dev_resources);
+  raft::resource::sync_stream(dev_resources);
 
   print_results(dev_resources, neighbors.view(), distances.view());
 }
@@ -77,10 +73,7 @@ void ivf_flat_build_extend_search(raft::device_resources const& dev_resources,
 
   // Define dataset indices.
   auto data_indices = raft::make_device_vector<int64_t, int64_t>(dev_resources, dataset.extent(0));
-  thrust::counting_iterator<int64_t> first(0);
-  thrust::device_ptr<int64_t> ptr(data_indices.data_handle());
-  thrust::copy(
-    raft::resource::get_thrust_policy(dev_resources), first, first + dataset.extent(0), ptr);
+  raft::linalg::map_offset(dev_resources, data_indices.view(), raft::identity_op{});
 
   // Sub-sample the dataset to create a training set.
   auto trainset =
@@ -121,7 +114,7 @@ void ivf_flat_build_extend_search(raft::device_resources const& dev_resources,
     dev_resources, search_params, index, queries, neighbors.view(), distances.view());
 
   // The call to ivf_flat::search is asynchronous. Before accessing the data, sync using:
-   raft::resource::sync_stream(dev_resources);
+  raft::resource::sync_stream(dev_resources);
 
   print_results(dev_resources, neighbors.view(), distances.view());
 }

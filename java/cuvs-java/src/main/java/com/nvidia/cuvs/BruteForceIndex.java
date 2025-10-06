@@ -13,15 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.nvidia.cuvs;
 
+import com.nvidia.cuvs.spi.CuVSProvider;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.Objects;
-
-import com.nvidia.cuvs.spi.CuVSProvider;
 
 /**
  *
@@ -30,13 +28,14 @@ import com.nvidia.cuvs.spi.CuVSProvider;
  *
  * @since 25.02
  */
-public interface BruteForceIndex {
+public interface BruteForceIndex extends AutoCloseable {
 
   /**
    * Invokes the native destroy_brute_force_index function to de-allocate
    * BRUTEFORCE index
    */
-  void destroyIndex() throws Throwable;
+  @Override
+  void close() throws Exception;
 
   /**
    * Invokes the native search_brute_force_index via the Panama API for searching
@@ -56,6 +55,7 @@ public interface BruteForceIndex {
    *                     bytes into
    */
   void serialize(OutputStream outputStream) throws Throwable;
+
   /**
    * A method to persist a BRUTEFORCE index using an instance of
    * {@link OutputStream} and path to the intermediate temporary file.
@@ -112,10 +112,10 @@ public interface BruteForceIndex {
     /**
      * Sets the dataset for building the {@link BruteForceIndex}.
      *
-     * @param dataset a {@link Dataset} object containing the vectors
+     * @param dataset a {@link CuVSMatrix} object containing the vectors
      * @return an instance of this Builder
      */
-    Builder withDataset(Dataset dataset);
+    Builder withDataset(CuVSMatrix dataset);
 
     /**
      * Builds and returns an instance of {@link BruteForceIndex}.

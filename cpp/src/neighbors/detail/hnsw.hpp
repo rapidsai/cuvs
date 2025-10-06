@@ -193,7 +193,8 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
     cagra_index.graph().extent(1) / 2,
     params.ef_construction);
   appr_algo->base_layer_init = false;  // tell hnswlib to build upper layers only
-  auto num_threads           = params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
+  [[maybe_unused]] auto num_threads =
+    params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
 #pragma omp parallel for num_threads(num_threads)
   for (int64_t i = 0; i < host_dataset_view.extent(0); i++) {
     appr_algo->addPoint((void*)(host_dataset_view.data_handle() + i * host_dataset_view.extent(1)),
@@ -472,35 +473,46 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
     }
   }
 
-  // move cagra graph to host or access it from host if available
-  auto host_graph_view = cagra_index.graph();
-  auto host_graph      = raft::make_host_matrix<uint32_t, int64_t>(0, 0);
-  if (!raft::is_host_accessible(raft::memory_type_from_pointer(host_graph_view.data_handle()))) {
-    // copy cagra graph to host
-    host_graph = raft::make_host_matrix<uint32_t, int64_t>(host_graph_view.extent(0),
-                                                           host_graph_view.extent(1));
-    raft::copy(host_graph.data_handle(),
-               host_graph_view.data_handle(),
-               host_graph_view.size(),
-               raft::resource::get_cuda_stream(res));
-    raft::resource::sync_stream(res);
-    host_graph_view = host_graph.view();
+  auto graph_ptr = cagra_index.graph().data_handle();
+  cudaPointerAttributes attr;
+  RAFT_CUDA_TRY(cudaPointerGetAttributes(&attr, graph_ptr));
+  bool is_host_accessible = false;
+  int64_t degree          = cagra_index.graph().extent(1);
+  if (attr.type == cudaMemoryTypeUnregistered) {
+    is_host_accessible = true;
+  } else if (attr.hostPointer != nullptr) {
+    graph_ptr          = static_cast<uint32_t*>(attr.hostPointer);
+    is_host_accessible = true;
   }
 
-  {
-    common::nvtx::range<common::nvtx::domain::cuvs> copy_scope("get_linklist0");
-// copy cagra graph to hnswlib base layer
+  // copy cagra graph to hnswlib base layer
+  if (is_host_accessible) {
+    common::nvtx::range<common::nvtx::domain::cuvs> copy_scope("get_linklist0<host>");
 #pragma omp parallel for num_threads(num_threads)
-    for (size_t i = 0; i < static_cast<size_t>(host_graph_view.extent(0)); ++i) {
+    for (int64_t i = 0; i < n_rows; i++) {
       auto ll_i = appr_algo->get_linklist0(i);
-      appr_algo->setListCount(ll_i, host_graph_view.extent(1));
+      appr_algo->setListCount(ll_i, degree);
       auto* data = (uint32_t*)(ll_i + 1);
-      for (size_t j = 0; j < static_cast<size_t>(host_graph_view.extent(1)); ++j) {
-        data[j] = host_graph_view(i, j);
+      for (int64_t j = 0; j < degree; j++) {
+        data[j] = graph_ptr[i * degree + j];
       }
     }
+  } else {
+    common::nvtx::range<common::nvtx::domain::cuvs> copy_scope("get_linklist0<device>");
+    RAFT_CUDA_TRY(cudaMemcpy2DAsync(appr_algo->get_linklist0(0) + 1,
+                                    appr_algo->size_data_per_element_,
+                                    graph_ptr,
+                                    degree * sizeof(uint32_t),
+                                    degree * sizeof(uint32_t),
+                                    n_rows,
+                                    cudaMemcpyDefault,
+                                    raft::resource::get_cuda_stream(res)));
+#pragma omp parallel for num_threads(num_threads)
+    for (int64_t i = 0; i < n_rows; i++) {
+      appr_algo->setListCount(appr_algo->get_linklist0(i), degree);
+    }
+    raft::resource::sync_stream(res);
   }
-
   hnsw_index->set_index(std::move(appr_algo));
   return hnsw_index;
 }
@@ -533,7 +545,8 @@ void extend(raft::resources const& res,
     const_cast<void*>(idx.get_index()));
   auto current_element_count = hnswlib_index->getCurrentElementCount();
   auto new_element_count     = additional_dataset.extent(0);
-  auto num_threads           = params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
+  [[maybe_unused]] auto num_threads =
+    params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
 
   hnswlib_index->resizeIndex(current_element_count + new_element_count);
 #pragma omp parallel for num_threads(num_threads)
