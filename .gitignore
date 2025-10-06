@@ -92,3 +92,4 @@ ivf_pq_index
 # jit lto kernels
 cpp/cmake/jit_lto_kernels_list/
 cpp/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_kernels/interleaved_scan_kernel_*.cu
+cpp/src/neighbors/ivf_flat/jit_lto_kernels/metric_device_functions/*.cu
