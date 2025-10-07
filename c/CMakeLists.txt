@@ -114,7 +114,6 @@ target_include_directories(
   cuvs_c
   PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
          "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-         "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
   INTERFACE "$<INSTALL_INTERFACE:include>"
 )
 
