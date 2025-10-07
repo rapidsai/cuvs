@@ -134,6 +134,12 @@ struct balanced_params : base_params {
    * Number of training iterations
    */
   uint32_t n_iters = 20;
+
+  /**
+   * Balancing threshold when any cluster is smaller than `avg_size * balancing_threshold`
+   * on a given iteration (default should be `~ 0.25`).
+   */
+  float balancing_threshold = 0.25;
 };
 
 /**

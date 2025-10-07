@@ -218,63 +218,58 @@ void ace_get_partition_labels(
   if (n_samples > dataset_size) { n_samples = dataset_size; }
   RAFT_LOG_DEBUG("ACE: n_samples: %lu", n_samples);
 
-  auto sample_db = raft::make_host_matrix<float>(n_samples, dataset_dim);
-#pragma omp parallel for
-  for (uint64_t i = 0; i < n_samples; i++) {
-    uint64_t j = i * dataset_size / n_samples;
-    for (uint64_t k = 0; k < dataset_dim; k++) {
-      sample_db(i, k) = static_cast<float>(dataset(j, k));
-    }
+  raft::random::RngState random_state{137};
+  auto device_memory = raft::resource::get_workspace_resource(res);
+  auto sample_db_dev =
+    raft::make_device_mdarray<float>(res, device_memory, raft::make_extents<int64_t>(0, 0));
+  try {
+    sample_db_dev = raft::make_device_mdarray<float>(
+      res, device_memory, raft::make_extents<int64_t>(n_samples, dataset_dim));
+  } catch (raft::logic_error& e) {
+    RAFT_LOG_ERROR(
+      "Insufficient memory for kmeans training set allocation. Please decrease "
+      "sampling_rate, or use managed memory.");
+    throw;
   }
-  auto sample_db_dev = raft::make_device_matrix<float, int64_t>(res, n_samples, dataset_dim);
-  raft::update_device(
-    sample_db_dev.data_handle(), sample_db.data_handle(), sample_db.size(), stream);
+  if constexpr (std::is_same_v<DataT, float>) {
+    raft::matrix::sample_rows<DataT, int64_t>(res, random_state, dataset, sample_db_dev.view());
+  } else {
+    auto sample_db_tmp = raft::make_device_mdarray<DataT>(
+      res, device_memory, raft::make_extents<int64_t>(n_samples, dataset_dim));
+
+    raft::matrix::sample_rows<DataT, int64_t>(res, random_state, dataset, sample_db_tmp.view());
+
+    raft::linalg::unaryOp(sample_db_dev.data_handle(),
+                          sample_db_tmp.data_handle(),
+                          sample_db_dev.size(),
+                          cuvs::spatial::knn::detail::utils::mapping<float>{},
+                          stream);
+  }
+
   auto centroids_dev     = raft::make_device_matrix<float, int64_t>(res, n_partitions, dataset_dim);
   auto sample_labels_dev = raft::make_device_vector<uint32_t, int64_t>(res, n_samples);
   auto sample_sizes_dev  = raft::make_device_vector<uint32_t, int64_t>(res, n_partitions);
 
-  // K-means: partitioning dataset vectors and compute centroid for each partition
-  // Use balanced k-means with small balancing threshold for more even partition sizes
-  // This shadows build_clusters pattern which doesn't expose balancing threshold.
+  raft::resource::sync_stream(res);
+
+  // K-means: partitioning dataset vectors and compute centroid for each partition.
+  // Use balanced k-means with small balancing threshold for more even partition sizes.
+  // This might require more iterations for convergence. (100 instead of typically 20)
   cuvs::cluster::kmeans::balanced_params kmeans_params;
-  kmeans_params.n_iters = 100;
-  kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
-  auto device_memory    = raft::resource::get_workspace_resource(res);
+  kmeans_params.n_iters             = 100;
+  kmeans_params.metric              = cuvs::distance::DistanceType::L2Expanded;
+  kmeans_params.balancing_threshold = 0.1;
 
-  raft::linalg::map_offset(
-    res,
-    sample_labels_dev.view(),
-    raft::compose_op(raft::cast_op<uint32_t>(), raft::mod_const_op<int64_t>(n_partitions)));
-
-  cuvs::cluster::kmeans::detail::calc_centers_and_sizes<float, float, int64_t, uint32_t, uint32_t>(
-    res,
-    centroids_dev.data_handle(),
-    sample_sizes_dev.data_handle(),
-    n_partitions,
-    dataset_dim,
-    sample_db_dev.data_handle(),
-    n_samples,
-    sample_labels_dev.data_handle(),
-    true,  // reset_counters
-    raft::identity_op{},
-    device_memory);
-
-  cuvs::cluster::kmeans::detail::balancing_em_iters<float, float, int64_t, uint32_t, uint32_t>(
+  auto sample_db_const_view = raft::make_device_matrix_view<const float, int64_t>(
+    sample_db_dev.data_handle(), n_samples, dataset_dim);
+  cuvs::cluster::kmeans_balanced::helpers::build_clusters(
     res,
     kmeans_params,
-    kmeans_params.n_iters,
-    dataset_dim,
-    sample_db_dev.data_handle(),
-    nullptr,  // dataset_norm
-    n_samples,
-    n_partitions,
-    centroids_dev.data_handle(),
-    sample_labels_dev.data_handle(),
-    sample_sizes_dev.data_handle(),
-    2,           // balancing_pullback
-    float{0.1},  // balancing_threshold
-    raft::identity_op{},
-    device_memory);
+    sample_db_const_view,
+    centroids_dev.view(),
+    sample_labels_dev.view(),
+    sample_sizes_dev.view(),
+    cuvs::spatial::knn::detail::utils::mapping<float>{});
 
   // Compute distances between dataset and centroid vectors
   const uint64_t chunk_size = 32 * 1024;
