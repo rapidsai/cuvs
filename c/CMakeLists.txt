@@ -25,7 +25,6 @@ project(
   LANGUAGES CXX C
 )
 
-
 # ##################################################################################################
 # * User Options  ------------------------------------------------------------
 
@@ -102,9 +101,7 @@ set_target_properties(
              EXPORT_NAME c_api
 )
 
-target_compile_definitions(
-  cuvs_c PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
-)
+target_compile_definitions(cuvs_c PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>)
 
 target_compile_options(cuvs_c PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
 
@@ -122,7 +119,7 @@ target_link_libraries(
   PRIVATE raft::raft $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
 )
 
-# ################################################################################################
+# ##################################################################################################
 # * install targets-----------------------------------------------------------
 if(PROJECT_IS_TOP_LEVEL)
   rapids_cmake_install_lib_dir(lib_dir)

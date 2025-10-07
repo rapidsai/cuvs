@@ -16,7 +16,6 @@
 # enable testing ################################################################################
 # ##################################################################################################
 
-
 include(rapids-test)
 rapids_test_init()
 
@@ -25,8 +24,8 @@ rapids_cpm_gtest(BUILD_STATIC)
 
 function(ConfigureTest)
 
-  set(options )
-  set(oneValueArgs NAME GPUS PERCENT ADDITIONAL_DEP)
+  set(options)
+  set(oneValueArgs NAME GPUS PERCENT)
   set(multiValueArgs PATH)
 
   cmake_parse_arguments(_CUVS_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
@@ -46,11 +45,8 @@ function(ConfigureTest)
   add_executable(${TEST_NAME} ${_CUVS_TEST_PATH})
   target_link_libraries(
     ${TEST_NAME}
-    PRIVATE cuvs::c_api
-            GTest::gtest
-            GTest::gtest_main
+    PRIVATE cuvs::c_api GTest::gtest GTest::gtest_main
             $<TARGET_NAME_IF_EXISTS:conda_env>
-            ${_CUVS_TEST_ADDITIONAL_DEP}
   )
   set_target_properties(
     ${TEST_NAME}
