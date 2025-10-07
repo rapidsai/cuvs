@@ -17,7 +17,10 @@
 # ##################################################################################################
 
 include(rapids-test)
-rapids_test_init()
+
+if(PROJECT_IS_TOP_LEVEL)
+  rapids_test_init()
+endif()
 
 include(${rapids-cmake-dir}/cpm/gtest.cmake)
 rapids_cpm_gtest(BUILD_STATIC)
@@ -116,4 +119,6 @@ rapids_test_add(
 # ##################################################################################################
 # Install tests ####################################################################################
 # ##################################################################################################
-rapids_test_install_relocatable(INSTALL_COMPONENT_SET testing DESTINATION bin/gtests/libcuvs)
+if(PROJECT_IS_TOP_LEVEL)
+  rapids_test_install_relocatable(INSTALL_COMPONENT_SET testing DESTINATION bin/gtests/libcuvs)
+endif()

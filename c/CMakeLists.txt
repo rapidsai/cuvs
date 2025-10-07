@@ -164,7 +164,7 @@ endif()
 
 # ##################################################################################################
 # * build tests ----------------------------------------------------
-if(BUILD_TESTS OR BUILD_C_TESTS)
+if(BUILD_TESTS)
   enable_language(CUDA)
   find_package(CUDAToolkit REQUIRED)
 
