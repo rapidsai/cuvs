@@ -135,7 +135,7 @@ void ace_read_large_file(const file_descriptor& fd,
   RAFT_EXPECTS(dest_ptr != nullptr, "Destination pointer must not be nullptr");
   RAFT_EXPECTS(fd.is_valid(), "File descriptor must be valid");
 
-  const size_t read_chunk_size = 1024 * 1024 * 1024;
+  const size_t read_chunk_size = std::min<size_t>(1024 * 1024 * 1024, SSIZE_MAX);
   size_t bytes_remaining       = total_bytes;
   size_t offset                = 0;
 
@@ -1076,15 +1076,14 @@ index<T, IdxT> build_ace(
 
   uint64_t n_partitions = params.ace_npartitions;
   RAFT_EXPECTS(n_partitions > 0, "ACE: ace_npartitions must be greater than 0");
-  RAFT_EXPECTS(n_partitions <= dataset_size, "ACE: ace_npartitions cannot exceed dataset size");
 
-  uint64_t min_vectors_per_partition  = dataset_size / n_partitions;
+  uint64_t avg_vectors_per_partition  = dataset_size / n_partitions;
   uint64_t min_required_per_partition = 1000;
   RAFT_EXPECTS(
-    min_vectors_per_partition >= min_required_per_partition,
+    avg_vectors_per_partition >= min_required_per_partition,
     "ACE: Partition size too small. Each partition needs at least %lu vectors, but would have ~%lu",
     min_required_per_partition,
-    min_vectors_per_partition);
+    avg_vectors_per_partition);
 
   auto total_start = std::chrono::high_resolution_clock::now();
   RAFT_LOG_INFO("ACE: Starting partitioned CAGRA build with %zu partitions", n_partitions);
