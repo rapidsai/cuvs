@@ -41,6 +41,9 @@ set +e
 
 rapids-logger "Run Java build"
 
+RAPIDS_CUDA_MAJOR="${RAPIDS_CUDA_VERSION%%.*}"
+export RAPIDS_CUDA_MAJOR
+
 bash ./build.sh java "${EXTRA_BUILD_ARGS[@]}"
 
 rapids-logger "Test script exiting with value: $EXITCODE"

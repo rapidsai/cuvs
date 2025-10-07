@@ -18,7 +18,10 @@
 #include <cuvs/core/exceptions.hpp>
 #include <cuvs/version_config.h>
 
+#include <raft/core/device_resources_snmg.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/core/resource/device_id.hpp>
+#include <raft/core/resource/resource_types.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
@@ -49,6 +52,50 @@ extern "C" cuvsError_t cuvsResourcesDestroy(cuvsResources_t res)
   });
 }
 
+extern "C" cuvsError_t cuvsMultiGpuResourcesCreate(cuvsResources_t* res)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = new raft::device_resources_snmg{};
+    *res         = reinterpret_cast<uintptr_t>(res_ptr);
+  });
+}
+
+extern "C" cuvsError_t cuvsMultiGpuResourcesCreateWithDeviceIds(cuvsResources_t* res,
+                                                                DLManagedTensor* device_ids)
+{
+  return cuvs::core::translate_exceptions([=] {
+    // Basic validation
+    if (device_ids == nullptr || device_ids->dl_tensor.data == nullptr) {
+      throw std::invalid_argument("device_ids cannot be null");
+    }
+
+    // Check data type is int32
+    if (device_ids->dl_tensor.dtype.code != kDLInt || device_ids->dl_tensor.dtype.bits != 32) {
+      throw std::invalid_argument("device_ids must be int32");
+    }
+
+    // Check data is on host
+    if (device_ids->dl_tensor.device.device_type != kDLCPU) {
+      throw std::invalid_argument("device_ids must be on host memory");
+    }
+
+    // Cast void* to int* to perform pointer arithmetic
+    int* data_ptr = static_cast<int*>(device_ids->dl_tensor.data);
+    std::vector<int> ids(data_ptr, data_ptr + device_ids->dl_tensor.shape[0]);
+
+    auto res_ptr = new raft::device_resources_snmg{ids};
+    *res         = reinterpret_cast<uintptr_t>(res_ptr);
+  });
+}
+
+extern "C" cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = reinterpret_cast<raft::device_resources_snmg*>(res);
+    delete res_ptr;
+  });
+}
+
 extern "C" cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream)
 {
   return cuvs::core::translate_exceptions([=] {
@@ -70,6 +117,14 @@ extern "C" cuvsError_t cuvsStreamSync(cuvsResources_t res)
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
     raft::resource::sync_stream(*res_ptr);
+  });
+}
+
+extern "C" cuvsError_t cuvsDeviceIdGet(cuvsResources_t res, int* device_id)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = reinterpret_cast<raft::resources*>(res);
+    *device_id   = raft::resource::get_device_id(*res_ptr);
   });
 }
 

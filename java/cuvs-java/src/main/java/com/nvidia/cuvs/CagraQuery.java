@@ -15,13 +15,17 @@
  */
 package com.nvidia.cuvs;
 
-import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Objects;
 import java.util.function.LongToIntFunction;
 
 /**
  * CagraQuery holds the CagraSearchParams and the query vectors to be used while
  * invoking search.
+ *
+ * <p><strong>Thread Safety:</strong> Each CagraQuery instance should use its own
+ * CuVSResources object that is not shared with other threads. Sharing CuVSResources
+ * between threads can lead to memory allocation errors or JVM crashes.
  *
  * @since 25.02
  */
@@ -29,10 +33,11 @@ public class CagraQuery {
 
   private final CagraSearchParams cagraSearchParameters;
   private final LongToIntFunction mapping;
-  private final float[][] queryVectors;
+  private final CuVSMatrix queryVectors;
   private final int topK;
   private final BitSet prefilter;
   private final int numDocs;
+  private final CuVSResources resources;
 
   /**
    * Constructs an instance of {@link CagraQuery} using cagraSearchParameters,
@@ -45,14 +50,16 @@ public class CagraQuery {
    * @param topK                  the top k results to return
    * @param prefilter             A single BitSet to use as filter while searching the CAGRA index
    * @param numDocs               Total number of dataset vectors; used to align the prefilter correctly
+   * @param resources             CuVSResources instance to use for this query
    */
-  public CagraQuery(
+  private CagraQuery(
       CagraSearchParams cagraSearchParameters,
-      float[][] queryVectors,
+      CuVSMatrix queryVectors,
       LongToIntFunction mapping,
       int topK,
       BitSet prefilter,
-      int numDocs) {
+      int numDocs,
+      CuVSResources resources) {
     super();
     this.cagraSearchParameters = cagraSearchParameters;
     this.queryVectors = queryVectors;
@@ -60,6 +67,7 @@ public class CagraQuery {
     this.topK = topK;
     this.prefilter = prefilter;
     this.numDocs = numDocs;
+    this.resources = resources;
   }
 
   /**
@@ -72,11 +80,9 @@ public class CagraQuery {
   }
 
   /**
-   * Gets the query vector 2D float array.
-   *
-   * @return 2D float array
+   * Gets the query vector matrix.
    */
-  public float[][] getQueryVectors() {
+  public CuVSMatrix getQueryVectors() {
     return queryVectors;
   }
 
@@ -114,12 +120,21 @@ public class CagraQuery {
     return numDocs;
   }
 
+  /**
+   * Gets the CuVSResources instance for this query.
+   *
+   * @return the CuVSResources instance
+   */
+  public CuVSResources getResources() {
+    return resources;
+  }
+
   @Override
   public String toString() {
     return "CuVSQuery [cagraSearchParameters="
         + cagraSearchParameters
         + ", queryVectors="
-        + Arrays.toString(queryVectors)
+        + queryVectors.toString()
         + ", mapping="
         + mapping
         + ", topK="
@@ -133,16 +148,25 @@ public class CagraQuery {
   public static class Builder {
 
     private CagraSearchParams cagraSearchParams;
-    private float[][] queryVectors;
+    private CuVSMatrix queryVectors;
     private LongToIntFunction mapping = SearchResults.IDENTITY_MAPPING;
     private int topK = 2;
     private BitSet prefilter;
     private int numDocs;
+    private final CuVSResources resources;
 
     /**
-     * Default constructor.
+     * Constructor that requires CuVSResources.
+     *
+     * <p><strong>Important:</strong> The provided CuVSResources instance should not be
+     * shared with other threads. Each thread performing searches should create its own
+     * CuVSResources instance to avoid memory allocation conflicts and potential JVM crashes.
+     *
+     * @param resources the CuVSResources instance to use for this query (must not be shared between threads)
      */
-    public Builder() {}
+    public Builder(CuVSResources resources) {
+      this.resources = Objects.requireNonNull(resources, "resources cannot be null");
+    }
 
     /**
      * Sets the instance of configured CagraSearchParams to be passed for search.
@@ -159,10 +183,10 @@ public class CagraQuery {
     /**
      * Registers the query vectors to be passed in the search call.
      *
-     * @param queryVectors 2D float query vector array
+     * @param queryVectors 2D query vector array
      * @return an instance of this Builder
      */
-    public Builder withQueryVectors(float[][] queryVectors) {
+    public Builder withQueryVectors(CuVSMatrix queryVectors) {
       this.queryVectors = queryVectors;
       return this;
     }
@@ -211,7 +235,8 @@ public class CagraQuery {
      * @return an instance of CuVSQuery
      */
     public CagraQuery build() {
-      return new CagraQuery(cagraSearchParams, queryVectors, mapping, topK, prefilter, numDocs);
+      return new CagraQuery(
+          cagraSearchParams, queryVectors, mapping, topK, prefilter, numDocs, resources);
     }
   }
 }

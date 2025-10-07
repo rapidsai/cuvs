@@ -15,6 +15,7 @@
  */
 package com.nvidia.cuvs.internal;
 
+import static com.nvidia.cuvs.internal.common.CloseableRMMAllocation.allocateRMMSegment;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_FLOAT_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_INT_BYTE_SIZE;
@@ -22,22 +23,12 @@ import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG;
 import static com.nvidia.cuvs.internal.common.LinkerHelper.C_LONG_BYTE_SIZE;
 import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.HOST_TO_DEVICE;
 import static com.nvidia.cuvs.internal.common.Util.CudaMemcpyKind.INFER_DIRECTION;
-import static com.nvidia.cuvs.internal.common.Util.allocateRMMSegment;
 import static com.nvidia.cuvs.internal.common.Util.buildMemorySegment;
 import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.concatenate;
 import static com.nvidia.cuvs.internal.common.Util.cudaMemcpy;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceBuild;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceDeserialize;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceIndexCreate;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceIndexDestroy;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceIndex_t;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceSearch;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsBruteForceSerialize;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsRMMFree;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsStreamSync;
-import static com.nvidia.cuvs.internal.panama.headers_h.omp_set_num_threads;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.BruteForceIndexParams;
@@ -45,6 +36,7 @@ import com.nvidia.cuvs.BruteForceQuery;
 import com.nvidia.cuvs.CuVSMatrix;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.SearchResults;
+import com.nvidia.cuvs.internal.common.CloseableRMMAllocation;
 import com.nvidia.cuvs.internal.panama.cuvsFilter;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -86,8 +78,8 @@ public class BruteForceIndexImpl implements BruteForceIndex {
     Objects.requireNonNull(dataset);
     try (dataset) {
       this.resources = resources;
-      assert dataset instanceof CuVSMatrixBaseImpl;
-      this.bruteForceIndexReference = build((CuVSMatrixBaseImpl) dataset, bruteForceIndexParams);
+      assert dataset instanceof CuVSMatrixInternal;
+      this.bruteForceIndexReference = build((CuVSMatrixInternal) dataset, bruteForceIndexParams);
     }
   }
 
@@ -113,25 +105,12 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    * BRUTEFORCE index
    */
   @Override
-  public void destroyIndex() {
+  public void close() {
     checkNotDestroyed();
     try {
       int returnValue = cuvsBruteForceIndexDestroy(bruteForceIndexReference.indexPtr);
       checkCuVSError(returnValue, "cuvsBruteForceIndexDestroy");
-
-      if (bruteForceIndexReference.datasetBytes > 0) {
-        try (var resourcesAccessor = resources.access()) {
-          checkCuVSError(
-              cuvsRMMFree(
-                  resourcesAccessor.handle(),
-                  bruteForceIndexReference.datasetPtr,
-                  bruteForceIndexReference.datasetBytes),
-              "cuvsRMMFree");
-        }
-      }
-      if (bruteForceIndexReference.tensorDataArena != null) {
-        bruteForceIndexReference.tensorDataArena.close();
-      }
+      bruteForceIndexReference.close(resources);
     } finally {
       destroyed = true;
     }
@@ -145,7 +124,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    * index
    */
   private IndexReference build(
-      CuVSMatrixBaseImpl dataset, BruteForceIndexParams bruteForceIndexParams) {
+      CuVSMatrixInternal dataset, BruteForceIndexParams bruteForceIndexParams) {
     long rows = dataset.size();
     long cols = dataset.columns();
 
@@ -158,25 +137,32 @@ public class BruteForceIndexImpl implements BruteForceIndex {
 
     try (var resourcesAccessor = resources.access()) {
       long cuvsResources = resourcesAccessor.handle();
-      MemorySegment datasetMemorySegmentP = allocateRMMSegment(cuvsResources, datasetBytes);
+      try (var closeableDataMemorySegmentP = allocateRMMSegment(cuvsResources, datasetBytes)) {
+        MemorySegment datasetMemorySegmentP = closeableDataMemorySegmentP.handle();
 
-      cudaMemcpy(datasetMemorySegmentP, datasetMemSegment, datasetBytes, INFER_DIRECTION);
+        cudaMemcpy(datasetMemorySegmentP, datasetMemSegment, datasetBytes, INFER_DIRECTION);
 
-      long[] datasetShape = {rows, cols};
-      var tensorDataArena = Arena.ofShared();
-      MemorySegment datasetTensor =
-          prepareTensor(tensorDataArena, datasetMemorySegmentP, datasetShape, 2, 32, 2, 1);
+        long[] datasetShape = {rows, cols};
+        var tensorDataArena = Arena.ofShared();
+        MemorySegment datasetTensor =
+            prepareTensor(
+                tensorDataArena, datasetMemorySegmentP, datasetShape, kDLFloat(), 32, kDLCUDA());
 
-      var returnValue = cuvsStreamSync(cuvsResources);
-      checkCuVSError(returnValue, "cuvsStreamSync");
+        var returnValue = cuvsStreamSync(cuvsResources);
+        checkCuVSError(returnValue, "cuvsStreamSync");
 
-      returnValue = cuvsBruteForceBuild(cuvsResources, datasetTensor, 0, 0.0f, index);
-      checkCuVSError(returnValue, "cuvsBruteForceBuild");
+        returnValue = cuvsBruteForceBuild(cuvsResources, datasetTensor, 0, 0.0f, index);
+        checkCuVSError(returnValue, "cuvsBruteForceBuild");
 
-      returnValue = cuvsStreamSync(cuvsResources);
-      checkCuVSError(returnValue, "cuvsStreamSync");
+        returnValue = cuvsStreamSync(cuvsResources);
+        checkCuVSError(returnValue, "cuvsStreamSync");
 
-      return new IndexReference(datasetMemorySegmentP, datasetBytes, tensorDataArena, index);
+        return new IndexReference(
+            new CloseableRMMAllocation(closeableDataMemorySegmentP),
+            datasetBytes,
+            tensorDataArena,
+            index);
+      }
     } finally {
       omp_set_num_threads(1);
     }
@@ -205,6 +191,7 @@ public class BruteForceIndexImpl implements BruteForceIndex {
 
       // prepare the prefiltering data
       final long prefilterDataLength;
+      final long prefilterBytes;
       final MemorySegment prefilterDataMemorySegment;
       BitSet[] prefilters = cuvsQuery.getPrefilters();
       if (prefilters != null && prefilters.length > 0) {
@@ -212,88 +199,85 @@ public class BruteForceIndexImpl implements BruteForceIndex {
         long[] filters = concatenatedFilters.toLongArray();
         prefilterDataMemorySegment = buildMemorySegment(localArena, filters);
         prefilterDataLength = (long) cuvsQuery.getNumDocs() * prefilters.length;
+        long[] prefilterShape = {(prefilterDataLength + 31) / 32};
+        prefilterBytes = C_INT_BYTE_SIZE * prefilterShape[0];
       } else {
         prefilterDataLength = 0;
+        prefilterBytes = 0;
         prefilterDataMemorySegment = MemorySegment.NULL;
       }
 
       MemorySegment querySeg = buildMemorySegment(localArena, cuvsQuery.getQueryVectors());
 
       int topk = cuvsQuery.getTopK();
-      try (var resourcesAccessor = resources.access()) {
+      try (var resourcesAccessor = cuvsQuery.getResources().access()) {
         long cuvsResources = resourcesAccessor.handle();
 
-        long queriesBytes = C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
-        long neighborsBytes = C_LONG_BYTE_SIZE * numQueries * topk;
-        long distanceBytes = C_FLOAT_BYTE_SIZE * numQueries * topk;
-        long prefilterBytes = 0; // size assigned later
+        final long queriesBytes = C_FLOAT_BYTE_SIZE * numQueries * vectorDimension;
+        final long neighborsBytes = C_LONG_BYTE_SIZE * numQueries * topk;
+        final long distanceBytes = C_FLOAT_BYTE_SIZE * numQueries * topk;
 
-        MemorySegment queriesDP = allocateRMMSegment(cuvsResources, queriesBytes);
-        MemorySegment neighborsDP = allocateRMMSegment(cuvsResources, neighborsBytes);
-        MemorySegment distancesDP = allocateRMMSegment(cuvsResources, distanceBytes);
-        MemorySegment prefilterDP = MemorySegment.NULL;
+        try (var queriesDP = allocateRMMSegment(cuvsResources, queriesBytes);
+            var neighborsDP = allocateRMMSegment(cuvsResources, neighborsBytes);
+            var distancesDP = allocateRMMSegment(cuvsResources, distanceBytes);
+            var prefilterDP =
+                prefilterBytes > 0
+                    ? allocateRMMSegment(cuvsResources, prefilterBytes)
+                    : CloseableRMMAllocation.EMPTY) {
 
-        cudaMemcpy(queriesDP, querySeg, queriesBytes, INFER_DIRECTION);
+          cudaMemcpy(queriesDP.handle(), querySeg, queriesBytes, INFER_DIRECTION);
 
-        long[] queriesShape = {numQueries, vectorDimension};
-        MemorySegment queriesTensor =
-            prepareTensor(localArena, queriesDP, queriesShape, 2, 32, 2, 1);
-        long[] neighborsShape = {numQueries, topk};
-        MemorySegment neighborsTensor =
-            prepareTensor(localArena, neighborsDP, neighborsShape, 0, 64, 2, 1);
-        long[] distancesShape = {numQueries, topk};
-        MemorySegment distancesTensor =
-            prepareTensor(localArena, distancesDP, distancesShape, 2, 32, 2, 1);
+          long[] queriesShape = {numQueries, vectorDimension};
+          MemorySegment queriesTensor =
+              prepareTensor(
+                  localArena, queriesDP.handle(), queriesShape, kDLFloat(), 32, kDLCUDA());
+          long[] neighborsShape = {numQueries, topk};
+          MemorySegment neighborsTensor =
+              prepareTensor(
+                  localArena, neighborsDP.handle(), neighborsShape, kDLInt(), 64, kDLCUDA());
+          long[] distancesShape = {numQueries, topk};
+          MemorySegment distancesTensor =
+              prepareTensor(
+                  localArena, distancesDP.handle(), distancesShape, kDLFloat(), 32, kDLCUDA());
 
-        MemorySegment prefilter = cuvsFilter.allocate(localArena);
-        MemorySegment prefilterTensor;
+          MemorySegment prefilter = cuvsFilter.allocate(localArena);
+          MemorySegment prefilterTensor;
 
-        if (prefilterDataMemorySegment == MemorySegment.NULL) {
-          cuvsFilter.type(prefilter, 0); // NO_FILTER
-          cuvsFilter.addr(prefilter, 0);
-        } else {
-          long[] prefilterShape = {(prefilterDataLength + 31) / 32};
-          long prefilterLen = prefilterShape[0];
-          prefilterBytes = C_INT_BYTE_SIZE * prefilterLen;
+          if (prefilterDataMemorySegment == MemorySegment.NULL) {
+            cuvsFilter.type(prefilter, 0); // NO_FILTER
+            cuvsFilter.addr(prefilter, 0);
+          } else {
+            long[] prefilterShape = {(prefilterDataLength + 31) / 32};
+            cudaMemcpy(
+                prefilterDP.handle(), prefilterDataMemorySegment, prefilterBytes, HOST_TO_DEVICE);
 
-          prefilterDP = allocateRMMSegment(cuvsResources, prefilterBytes);
+            // TODO: check if this is correct: filters is a long[] (64 bits)
+            prefilterTensor =
+                prepareTensor(
+                    localArena, prefilterDP.handle(), prefilterShape, kDLUInt(), 32, kDLCUDA());
 
-          cudaMemcpy(prefilterDP, prefilterDataMemorySegment, prefilterBytes, HOST_TO_DEVICE);
+            cuvsFilter.type(prefilter, 2);
+            cuvsFilter.addr(prefilter, prefilterTensor.address());
+          }
 
-          prefilterTensor = prepareTensor(localArena, prefilterDP, prefilterShape, 1, 32, 2, 1);
+          var returnValue = cuvsStreamSync(cuvsResources);
+          checkCuVSError(returnValue, "cuvsStreamSync");
 
-          cuvsFilter.type(prefilter, 2);
-          cuvsFilter.addr(prefilter, prefilterTensor.address());
-        }
+          returnValue =
+              cuvsBruteForceSearch(
+                  cuvsResources,
+                  bruteForceIndexReference.indexPtr,
+                  queriesTensor,
+                  neighborsTensor,
+                  distancesTensor,
+                  prefilter);
+          checkCuVSError(returnValue, "cuvsBruteForceSearch");
 
-        var returnValue = cuvsStreamSync(cuvsResources);
-        checkCuVSError(returnValue, "cuvsStreamSync");
+          returnValue = cuvsStreamSync(cuvsResources);
+          checkCuVSError(returnValue, "cuvsStreamSync");
 
-        returnValue =
-            cuvsBruteForceSearch(
-                cuvsResources,
-                bruteForceIndexReference.indexPtr,
-                queriesTensor,
-                neighborsTensor,
-                distancesTensor,
-                prefilter);
-        checkCuVSError(returnValue, "cuvsBruteForceSearch");
-
-        returnValue = cuvsStreamSync(cuvsResources);
-        checkCuVSError(returnValue, "cuvsStreamSync");
-
-        cudaMemcpy(neighborsMemorySegment, neighborsDP, neighborsBytes, INFER_DIRECTION);
-        cudaMemcpy(distancesMemorySegment, distancesDP, distanceBytes, INFER_DIRECTION);
-
-        returnValue = cuvsRMMFree(cuvsResources, neighborsDP, neighborsBytes);
-        checkCuVSError(returnValue, "cuvsRMMFree");
-        returnValue = cuvsRMMFree(cuvsResources, distancesDP, distanceBytes);
-        checkCuVSError(returnValue, "cuvsRMMFree");
-        returnValue = cuvsRMMFree(cuvsResources, queriesDP, queriesBytes);
-        checkCuVSError(returnValue, "cuvsRMMFree");
-        if (prefilterBytes > 0) {
-          returnValue = cuvsRMMFree(cuvsResources, prefilterDP, prefilterBytes);
-          checkCuVSError(returnValue, "cuvsRMMFree");
+          cudaMemcpy(neighborsMemorySegment, neighborsDP.handle(), neighborsBytes, INFER_DIRECTION);
+          cudaMemcpy(distancesMemorySegment, distancesDP.handle(), distanceBytes, INFER_DIRECTION);
         }
       }
       return BruteForceSearchResults.create(
@@ -479,27 +463,39 @@ public class BruteForceIndexImpl implements BruteForceIndex {
    */
   private static class IndexReference {
 
-    private final MemorySegment datasetPtr;
+    private final CloseableRMMAllocation datasetAllocationHandle;
     private final long datasetBytes;
     private final Arena tensorDataArena;
     private final MemorySegment indexPtr;
 
     private IndexReference(
-        MemorySegment datasetPtr,
+        CloseableRMMAllocation datasetAllocationHandle,
         long datasetBytes,
         Arena tensorDataArena,
         MemorySegment indexPtr) {
-      this.datasetPtr = datasetPtr;
+      this.datasetAllocationHandle = datasetAllocationHandle;
       this.datasetBytes = datasetBytes;
       this.tensorDataArena = tensorDataArena;
       this.indexPtr = indexPtr;
     }
 
     private IndexReference(MemorySegment indexPtr) {
-      this.datasetPtr = MemorySegment.NULL;
+      this.datasetAllocationHandle = CloseableRMMAllocation.EMPTY;
       this.datasetBytes = 0;
       this.tensorDataArena = null;
       this.indexPtr = indexPtr;
+    }
+
+    /**
+     * Free up the memory used for dataset, tensor-data.
+     */
+    private void close(CuVSResources resources) {
+      try (var resourcesAccessor = resources.access()) {
+        datasetAllocationHandle.close();
+      }
+      if (tensorDataArena != null) {
+        tensorDataArena.close();
+      }
     }
   }
 }

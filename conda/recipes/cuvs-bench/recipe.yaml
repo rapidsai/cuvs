@@ -32,7 +32,7 @@ requirements:
     - libcuvs-bench-ann =${{ version }}
     - python =${{ py_version }}
     - pip
-    - rapids-build-backend >=0.3.0,<0.4.0.dev0
+    - rapids-build-backend >=0.4.0,<0.5.0.dev0
     - rmm =${{ minor_version }}
     - setuptools >=64.0.0
   run:
@@ -40,7 +40,7 @@ requirements:
     - benchmark
     - click
     - cuda-cudart
-    - cupy >=12.0.0
+    - cupy >=13.6.0
     - cuvs =${{ version }}
     - glog ${{ glog_version }}
     - h5py ${{ h5py_version }}

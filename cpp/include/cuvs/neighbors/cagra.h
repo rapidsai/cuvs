@@ -356,7 +356,7 @@ cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index);
  * @param[out] dim return dimension of the index
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int* dim);
+cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int64_t* dim);
 
 /**
  * @brief Get size of the CAGRA index
@@ -365,7 +365,7 @@ cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int* dim);
  * @param[out] size return number of vectors in the index
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, uint32_t* size);
+cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* size);
 
 /**
  * @brief Get graph degree of the CAGRA index
@@ -374,7 +374,7 @@ cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, uint32_t* size);
  * @param[out] graph_degree return graph degree
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, uint32_t* graph_degree);
+cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int64_t* graph_degree);
 
 /**
  * @brief Returns a view of the CAGRA dataset
@@ -525,14 +525,12 @@ cuvsError_t cuvsCagraBuild(cuvsResources_t res,
  * @param[in] params cuvsCagraExtendParams_t used to extend CAGRA index
  * @param[in] additional_dataset DLManagedTensor* additional dataset
  * @param[in,out] index cuvsCagraIndex_t CAGRA index
- * @param[out] return_dataset DLManagedTensor* extended dataset
  * @return cuvsError_t
  */
 cuvsError_t cuvsCagraExtend(cuvsResources_t res,
                             cuvsCagraExtendParams_t params,
                             DLManagedTensor* additional_dataset,
-                            cuvsCagraIndex_t index,
-                            DLManagedTensor* return_dataset);
+                            cuvsCagraIndex_t index);
 
 /**
  * @}
@@ -605,7 +603,7 @@ cuvsError_t cuvsCagraSearch(cuvsResources_t res,
  */
 
 /**
- * @defgroup cagra_c_serialize CAGRA C-API serialize functions
+ * @defgroup cagra_c_index_serialize CAGRA C-API serialize functions
  * @{
  */
 /**

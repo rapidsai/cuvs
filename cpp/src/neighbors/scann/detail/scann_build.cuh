@@ -173,11 +173,18 @@ index<T, IdxT> build(
       res, kmeans_params, batch_view, raft::make_const_mdspan(centroids_view), batch_labels_view);
 
     dataset_vec_batches.prefetch_next_batch();
+
+    // Make sure work on device is finished before swapping buffers
+    raft::resource::sync_stream(res);
   }
 
   // AVQ update of KMeans centroids
-  apply_avq(
-    res, dataset, centroids_view, raft::make_const_mdspan(labels_view), params.partitioning_eta);
+  apply_avq(res,
+            dataset,
+            centroids_view,
+            raft::make_const_mdspan(labels_view),
+            params.partitioning_eta,
+            copy_stream);
 
   raft::device_vector_view<uint32_t, int64_t> soar_labels_view = idx.soar_labels();
 
@@ -304,18 +311,9 @@ index<T, IdxT> build(
     // quantize dataset to bfloat16, if enabled. Similar to SOAR, quantization
     // is performed in this loop to improve locality
     // TODO (rmaschal): Might be more efficient to do on CPU, to avoid DtoH copy
-
     auto bf16_dataset = raft::make_device_matrix<int16_t, int64_t>(res, batch_view.extent(0), dim);
 
     if (params.bf16_enabled) {
-      // raft::linalg::map_offset(res, bf16_dataset.view(), [batch_view, dim] __device__(size_t i) {
-      //   int64_t row_idx = i / dim;
-      //   int64_t col_idx = i % dim;
-
-      //  nv_bfloat16 val = __float2bfloat16(batch_view(row_idx, col_idx));
-
-      //  return reinterpret_cast<int16_t&>(val);
-      //});
       raft::linalg::unaryOp(
         bf16_dataset.data_handle(),
         batch_view.data_handle(),
@@ -348,6 +346,9 @@ index<T, IdxT> build(
                  bf16_dataset.size(),
                  stream);
     }
+
+    // Make sure work on device is finished before swapping buffers
+    raft::resource::sync_stream(res);
   }
 
   // Codebooks from VPQ have the shape [subspace idx, subspace dim, code]

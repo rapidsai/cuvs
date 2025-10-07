@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-use crate::error::{check_cuvs, Result};
 use crate::distance_type::DistanceType;
+use crate::error::{check_cuvs, Result};
 use std::fmt;
 use std::io::{stderr, Write};
 
