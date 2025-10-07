@@ -34,6 +34,7 @@
 #include <memory>
 #include <omp.h>
 #include <random>
+#include <sys/mman.h>
 #include <thread>
 
 namespace cuvs::neighbors::hnsw::detail {
