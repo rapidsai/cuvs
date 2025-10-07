@@ -95,7 +95,7 @@ def get_final_op_abbreviation(op_str):
 
 
 def generate_filename(params):
-    """Generate filename from template parameters (WITHOUT metric and filter)."""
+    """Generate filename from template parameters (WITHOUT metric, filter, and post lambda)."""
     # params[0]: Capacity (numeric)
     # params[1]: Veclen (numeric)
     # params[2]: Ascending (bool)
@@ -105,7 +105,7 @@ def generate_filename(params):
     # params[6]: IdxT (type)
     # params[7]: FilterT (filter type - EXCLUDED from filename)
     # params[8]: Lambda/MetricTag (metric type - EXCLUDED from filename)
-    # params[9]: PostLambda (final operator)
+    # params[9]: PostLambda (final operator - EXCLUDED from filename)
 
     parts = [
         params[0],  # Capacity
@@ -117,14 +117,14 @@ def generate_filename(params):
         get_type_abbreviation(params[6]),  # IdxT
         # params[7] EXCLUDED - filter
         # params[8] EXCLUDED - metric
-        get_final_op_abbreviation(params[9])  # PostLambda
+        # params[9] EXCLUDED - post lambda
     ]
 
     return f"interleaved_scan_kernel_{'_'.join(parts)}.cu"
 
 
 def generate_register_function_name(params):
-    """Generate the registration function name from template parameters (WITHOUT metric and filter)."""
+    """Generate the registration function name from template parameters (WITHOUT metric, filter, and post lambda)."""
     parts = [
         params[0],  # Capacity
         params[1],  # Veclen
@@ -135,7 +135,7 @@ def generate_register_function_name(params):
         get_type_abbreviation(params[6]),  # IdxT
         # params[7] EXCLUDED - filter
         # params[8] EXCLUDED - metric
-        get_final_op_abbreviation(params[9])  # PostLambda
+        # params[9] EXCLUDED - post lambda
     ]
 
     return f"interleaved_scan_kernel_{'_'.join(parts)}"
@@ -237,18 +237,18 @@ def generate_cuda_file_content(params):
     # params[8]: Lambda (metric - NOT used in template anymore)
     # params[9]: PostLambda (post-processing operator)
 
-    # Template parameters without MetricTag and FilterT (params 0-6, 9)
-    template_params_list = params[0:7] + [params[9]]
+    # Template parameters without MetricTag, FilterT, and PostLambda (params 0-6)
+    template_params_list = params[0:7]
     template_params = ', '.join(template_params_list)
 
-    # Convert params 4-6 and 9 to tag types for registerAlgorithm (NO metric/filter tags)
-    tag_params = [param_to_tag(i, params[i], params) for i in [4, 5, 6, 9]]
+    # Convert params 4-6 to tag types for registerAlgorithm (NO metric/filter/postlambda tags)
+    tag_params = [param_to_tag(i, params[i], params) for i in [4, 5, 6]]
     register_template_params = ', '.join(tag_params)
 
     # Create the string parameter with first four params (Capacity, Veclen, Ascending, ComputeNorm)
     string_param = f"interleaved_scan_kernel_{params[0]}_{params[1]}_{params[2]}_{params[3]}"
 
-    # Function parameters for the kernel instantiation (updated signature)
+    # Function parameters for the kernel instantiation (updated signature - PostLambda removed)
     content = f"""/*
  * Copyright (c) 2025, NVIDIA CORPORATION.
  *
@@ -267,11 +267,11 @@ def generate_cuda_file_content(params):
 
 #ifdef BUILD_KERNEL
 
-#include "../../ivf_flat_interleaved_scan_kernel.cuh"
+#include <neighbors/ivf_flat/ivf_flat_interleaved_scan_kernel.cuh>
 
 namespace cuvs::neighbors::ivf_flat::detail {{
 
-template __global__ void interleaved_scan_kernel<{template_params}>({params[9]}, unsigned int, {params[4]} const*, unsigned int const*, {params[4]} const* const*, unsigned int const*, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int const*, unsigned int, {params[6]}* const* const, unsigned int*, {params[6]}, {params[6]}, unsigned int*, float*);
+template __global__ void interleaved_scan_kernel<{template_params}>(unsigned int, {params[4]} const*, unsigned int const*, {params[4]} const* const*, unsigned int const*, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int const*, unsigned int, {params[6]}* const* const, unsigned int*, {params[6]}, {params[6]}, unsigned int*, float*);
 
 }}  // namespace cuvs::neighbors::ivf_flat::detail
 
@@ -279,7 +279,7 @@ template __global__ void interleaved_scan_kernel<{template_params}>({params[9]},
 
 #include "{filename}.h"
 #include <cuvs/detail/jit_lto/RegisterKernelFragment.h>
-#include "../interleaved_scan_tags.hpp"
+#include <neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_tags.hpp>
 
 __attribute__((__constructor__)) static void register_{filename}()
 {{
@@ -330,10 +330,10 @@ def generate_metric_device_function_content(metric_name, veclen, data_type, acc_
 
     # Determine which header to include and implementation struct based on metric
     if metric_name == 'euclidean':
-        header_file = '../metric_euclidean_dist.cuh'
+        header_file = 'neighbors/ivf_flat/jit_lto_kernels/metric_euclidean_dist.cuh'
         metric_impl = 'euclidean_dist'
     elif metric_name == 'inner_prod':
-        header_file = '../metric_inner_product.cuh'
+        header_file = 'neighbors/ivf_flat/jit_lto_kernels/metric_inner_product.cuh'
         metric_impl = 'inner_prod_dist'
     else:
         raise ValueError(f"Unknown metric: {metric_name}")
@@ -368,7 +368,7 @@ template __device__ void compute_dist<{veclen}, {data_type}, {acc_type}>({acc_ty
 
 #include "{metric_name}_{veclen}_{type_abbrev[data_type]}_{type_abbrev[acc_type]}.h"
 #include <cuvs/detail/jit_lto/RegisterKernelFragment.h>
-#include "../interleaved_scan_tags.hpp"
+#include <neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_tags.hpp>
 
 __attribute__((__constructor__)) static void register_{metric_name}_{veclen}_{type_abbrev[data_type]}_{type_abbrev[acc_type]}()
 {{
@@ -387,9 +387,9 @@ def generate_filter_device_function_content(filter_name):
     """Generate content for a filter device function file."""
     # Determine which header to include based on filter name
     if filter_name == 'filter_none':
-        header_file = '../filter_none.cuh'
+        header_file = 'neighbors/ivf_flat/jit_lto_kernels/filter_none.cuh'
     elif filter_name == 'filter_bitset':
-        header_file = '../filter_bitset.cuh'
+        header_file = 'neighbors/ivf_flat/jit_lto_kernels/filter_bitset.cuh'
     else:
         raise ValueError(f"Unknown filter: {filter_name}")
 
@@ -423,7 +423,7 @@ template __device__ bool sample_filter(int64_t* const* const inds_ptrs, const ui
 
 #include "{filter_name}.h"
 #include <cuvs/detail/jit_lto/RegisterKernelFragment.h>
-#include "../interleaved_scan_tags.hpp"
+#include <neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_tags.hpp>
 
 __attribute__((__constructor__)) static void register_{filter_name}()
 {{
@@ -438,7 +438,7 @@ registerAlgorithm("{filter_name}",
     return content
 
 
-def generate_metric_device_functions(script_dir):
+def generate_metric_device_functions(script_dir, output_base_dir):
     """Generate all metric device function files."""
     # Define all combinations we need
     # Based on the kernel signatures, we have:
@@ -457,7 +457,7 @@ def generate_metric_device_functions(script_dir):
     veclens = [1, 2, 4, 8, 16]
     metrics = ['euclidean', 'inner_prod']
 
-    output_dir = script_dir / 'metric_device_functions'
+    output_dir = output_base_dir / 'metric_device_functions'
     output_dir.mkdir(parents=True, exist_ok=True)
 
     generated_files = []
@@ -495,11 +495,11 @@ def generate_metric_device_functions(script_dir):
     return generated_files
 
 
-def generate_filter_device_functions(script_dir):
+def generate_filter_device_functions(script_dir, output_base_dir):
     """Generate all filter device function files."""
     filters = ['filter_none', 'filter_bitset']
 
-    output_dir = script_dir / 'filter_device_functions'
+    output_dir = output_base_dir / 'filter_device_functions'
     output_dir.mkdir(parents=True, exist_ok=True)
 
     generated_files = []
@@ -526,7 +526,97 @@ def generate_filter_device_functions(script_dir):
     return generated_files
 
 
+def generate_post_lambda_device_function_content(post_lambda_name):
+    """Generate content for a post lambda device function file."""
+    # Determine which header to include based on post lambda name
+    if post_lambda_name == 'post_identity':
+        header_file = 'neighbors/ivf_flat/jit_lto_kernels/post_identity.cuh'
+    elif post_lambda_name == 'post_sqrt':
+        header_file = 'neighbors/ivf_flat/jit_lto_kernels/post_sqrt.cuh'
+    elif post_lambda_name == 'post_compose':
+        header_file = 'neighbors/ivf_flat/jit_lto_kernels/post_compose.cuh'
+    else:
+        raise ValueError(f"Unknown post lambda: {post_lambda_name}")
+
+    content = f"""/*
+ * Copyright (c) 2025, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#ifdef BUILD_KERNEL
+
+#include "{header_file}"
+
+namespace cuvs::neighbors::ivf_flat::detail {{
+
+template __device__ float post_process(float val);
+
+}}  // namespace cuvs::neighbors::ivf_flat::detail
+
+#else
+
+#include "{post_lambda_name}.h"
+#include <cuvs/detail/jit_lto/RegisterKernelFragment.h>
+#include <neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_tags.hpp>
+
+__attribute__((__constructor__)) static void register_{post_lambda_name}()
+{{
+using namespace cuvs::neighbors::ivf_flat::detail;
+registerAlgorithm("{post_lambda_name}",
+            embedded_{post_lambda_name},
+            sizeof(embedded_{post_lambda_name}));
+}}
+
+#endif
+"""
+    return content
+
+
+def generate_post_lambda_device_functions(script_dir, output_base_dir):
+    """Generate all post lambda device function files."""
+    post_lambdas = ['post_identity', 'post_sqrt', 'post_compose']
+
+    output_dir = output_base_dir / 'post_lambda_device_functions'
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    generated_files = []
+
+    for post_lambda_name in post_lambdas:
+        filename = f"{post_lambda_name}.cu"
+        file_content = generate_post_lambda_device_function_content(post_lambda_name)
+
+        # Write file only if it doesn't exist or content has changed
+        output_file = output_dir / filename
+        should_write = True
+        if output_file.exists():
+            with open(output_file, 'r') as f:
+                existing_content = f.read()
+            should_write = (existing_content != file_content)
+
+        if should_write:
+            with open(output_file, 'w') as f:
+                f.write(file_content)
+
+        generated_files.append(filename)
+
+    print(f"Generated {len(generated_files)} post lambda device function files")
+    return generated_files
+
+
 def main():
+    import sys
+
     # Get the script directory to find the kernels file
     script_dir = Path(__file__).parent.absolute()
 
@@ -539,8 +629,13 @@ def main():
     with open(kernels_file, 'r') as f:
         lines = f.readlines()
 
-    # Output directory (interleaved_scan_kernels subdirectory)
-    output_dir = script_dir / 'interleaved_scan_kernels'
+    # Output directory - use command line argument if provided, otherwise use source dir
+    if len(sys.argv) > 1:
+        output_base_dir = Path(sys.argv[1]).absolute()
+    else:
+        output_base_dir = script_dir
+
+    output_dir = output_base_dir / 'interleaved_scan_kernels'
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Parse all kernels and generate files
@@ -605,36 +700,45 @@ def main():
     print(f"\nGenerated {len(generated_files)} CUDA kernel files")
 
     # Generate metric device function files
-    metric_files = generate_metric_device_functions(script_dir)
+    metric_files = generate_metric_device_functions(script_dir, output_base_dir)
 
     # Generate filter device function files
-    filter_files = generate_filter_device_functions(script_dir)
+    filter_files = generate_filter_device_functions(script_dir, output_base_dir)
+
+    # Generate post lambda device function files
+    post_lambda_files = generate_post_lambda_device_functions(script_dir, output_base_dir)
 
     # Generate CMake file with all filenames
-    # We're generating in the source tree at: cpp/src/neighbors/ivf_flat/jit_lto_kernels/
-    # CMake file goes to: cpp/cmake/jit_lto_kernels_list/
-    cmake_dir = script_dir.parent.parent.parent.parent / 'cmake' / 'jit_lto_kernels_list'
+    # CMake file goes to the binary directory
+    cmake_dir = output_base_dir
     cmake_dir.mkdir(parents=True, exist_ok=True)
     cmake_file = cmake_dir / 'interleaved_scan.cmake'
 
     # Generate CMake content
+    # Paths are now relative to CMAKE_CURRENT_BINARY_DIR
     cmake_content = "# Auto-generated list of interleaved scan kernel files\n"
     cmake_content += "# Generated by generate_kernels.py\n\n"
     cmake_content += "set(INTERLEAVED_SCAN_KERNEL_FILES\n"
     for filename in sorted(generated_files):
-        cmake_content += f"  src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_kernels/{filename}\n"
+        cmake_content += f"  generated_kernels/interleaved_scan_kernels/{filename}\n"
     cmake_content += ")\n\n"
 
     # Add metric device function files
     cmake_content += "set(METRIC_DEVICE_FUNCTION_FILES\n"
     for filename in sorted(metric_files):
-        cmake_content += f"  src/neighbors/ivf_flat/jit_lto_kernels/metric_device_functions/{filename}\n"
+        cmake_content += f"  generated_kernels/metric_device_functions/{filename}\n"
     cmake_content += ")\n\n"
 
     # Add filter device function files
     cmake_content += "set(FILTER_DEVICE_FUNCTION_FILES\n"
     for filename in sorted(filter_files):
-        cmake_content += f"  src/neighbors/ivf_flat/jit_lto_kernels/filter_device_functions/{filename}\n"
+        cmake_content += f"  generated_kernels/filter_device_functions/{filename}\n"
+    cmake_content += ")\n\n"
+
+    # Add post lambda device function files
+    cmake_content += "set(POST_LAMBDA_DEVICE_FUNCTION_FILES\n"
+    for filename in sorted(post_lambda_files):
+        cmake_content += f"  generated_kernels/post_lambda_device_functions/{filename}\n"
     cmake_content += ")\n"
 
     # Only write if content has changed

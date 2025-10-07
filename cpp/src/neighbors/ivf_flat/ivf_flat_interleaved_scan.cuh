@@ -118,17 +118,12 @@ constexpr auto get_filter_name()
   }
 }
 
-template <typename PostLambda>
-constexpr auto get_post_lambda_tag()
+template <typename PostLambdaTag>
+constexpr auto get_post_lambda_name()
 {
-  using namespace raft;
-
-  if constexpr (std::is_same_v<PostLambda, identity_op>) { return tag_post_identity{}; }
-  if constexpr (std::is_same_v<PostLambda, sqrt_op>) { return tag_post_sqrt{}; }
-  if constexpr (std::is_same_v<PostLambda,
-                               compose_op<raft::add_const_op<float>, raft::mul_const_op<float>>>) {
-    return tag_post_compose{};
-  }
+  if constexpr (std::is_same_v<PostLambdaTag, tag_post_identity>) { return "post_identity"; }
+  if constexpr (std::is_same_v<PostLambdaTag, tag_post_sqrt>) { return "post_sqrt"; }
+  if constexpr (std::is_same_v<PostLambdaTag, tag_post_compose>) { return "post_compose"; }
 }
 
 /**
@@ -162,9 +157,8 @@ template <int Capacity,
           typename IdxT,
           typename IvfSampleFilterTag,
           typename MetricTag,
-          typename PostLambda>
-void launch_kernel(PostLambda post_process,
-                   const index<T, IdxT>& index,
+          typename PostLambdaTag>
+void launch_kernel(const index<T, IdxT>& index,
                    const T* queries,
                    const uint32_t* coarse_index,
                    const uint32_t num_queries,
@@ -196,16 +190,21 @@ void launch_kernel(PostLambda post_process,
   //                                                    PostLambda>;
 
   // Use tag types for the planner to avoid template bloat
+  auto start_time     = std::chrono::high_resolution_clock::now();
   auto kernel_planner = InterleavedScanPlanner<decltype(get_data_type_tag<T>()),
                                                decltype(get_acc_type_tag<AccT>()),
-                                               decltype(get_idx_type_tag<IdxT>()),
-                                               decltype(get_post_lambda_tag<PostLambda>())>(
+                                               decltype(get_idx_type_tag<IdxT>())>(
     Capacity, Veclen, Ascending, ComputeNorm);
   kernel_planner.template add_metric_device_function<decltype(get_data_type_tag<T>()),
                                                      decltype(get_acc_type_tag<AccT>())>(
     get_metric_name<MetricTag, Veclen, T, AccT>(), Veclen);
   kernel_planner.add_filter_device_function(get_filter_name<IvfSampleFilterTag>());
+  kernel_planner.add_post_lambda_device_function(get_post_lambda_name<PostLambdaTag>());
   auto kernel_launcher = kernel_planner.get_launcher();
+  auto end_time        = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+  std::cout << "Time taken to get kernel launcher: " << duration.count() << " microseconds"
+            << std::endl;
 
   const int max_query_smem = 16384;
   int query_smem_elems     = std::min<int>(max_query_smem / sizeof(T),
@@ -261,7 +260,6 @@ void launch_kernel(PostLambda post_process,
                     grid_dim,
                     block_dim,
                     smem_size,
-                    post_process,
                     query_smem_elems,
                     queries,
                     coarse_index,
@@ -315,7 +313,7 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
                            IdxT,
                            IvfSampleFilterTag,
                            tag_metric_euclidean<Veclen, T, AccT>,
-                           raft::identity_op>({}, std::forward<Args>(args)...);
+                           tag_post_identity>(std::forward<Args>(args)...);
     case cuvs::distance::DistanceType::L2SqrtExpanded:
     case cuvs::distance::DistanceType::L2SqrtUnexpanded:
       return launch_kernel<Capacity,
@@ -327,7 +325,7 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
                            IdxT,
                            IvfSampleFilterTag,
                            tag_metric_euclidean<Veclen, T, AccT>,
-                           raft::sqrt_op>({}, std::forward<Args>(args)...);
+                           tag_post_sqrt>(std::forward<Args>(args)...);
     case cuvs::distance::DistanceType::InnerProduct:
       return launch_kernel<Capacity,
                            Veclen,
@@ -338,7 +336,7 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
                            IdxT,
                            IvfSampleFilterTag,
                            tag_metric_inner_product<Veclen, T, AccT>,
-                           raft::identity_op>({}, std::forward<Args>(args)...);
+                           tag_post_identity>(std::forward<Args>(args)...);
     case cuvs::distance::DistanceType::CosineExpanded:
       // NB: "Ascending" is reversed because the post-processing step is done after that sort
       return launch_kernel<Capacity,
@@ -349,8 +347,8 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
                            AccT,
                            IdxT,
                            IvfSampleFilterTag,
-                           tag_metric_inner_product<Veclen, T, AccT>>(
-        raft::compose_op(raft::add_const_op<float>{1.0f}, raft::mul_const_op<float>{-1.0f}),
+                           tag_metric_inner_product<Veclen, T, AccT>,
+                           tag_post_compose>(
         std::forward<Args>(args)...);  // NB: update the description of `knn::ivf_flat::build` when
                                        // adding here a new metric.
     default: RAFT_FAIL("The chosen distance metric is not supported (%d)", int(metric));

@@ -32,24 +32,25 @@ struct InterleavedScanPlanner : AlgorithmPlanner {
                          bool_to_string(ComputeNorm),
                        make_fragment_key<Args...>())
   {
-    std::cout << "In the planner" << std::endl;
   }
 
   template <typename... FuncTags>
   void add_metric_device_function(std::string metric_name, int Veclen)
   {
-    auto& db    = fragment_database();
     auto key    = metric_name + "_" + std::to_string(Veclen);
     auto params = make_fragment_key<FuncTags...>();
-    std::cout << "Looking for metric fragment: " << key + "_" + params << std::endl;
     this->device_functions.push_back(key + "_" + params);
   }
 
   void add_filter_device_function(std::string filter_name)
   {
-    auto& db = fragment_database();
     auto key = filter_name + "_";
-    std::cout << "Looking for filter fragment: " << key << std::endl;
+    this->device_functions.push_back(key);
+  }
+
+  void add_post_lambda_device_function(std::string post_lambda_name)
+  {
+    auto key = post_lambda_name + "_";
     this->device_functions.push_back(key);
   }
 };

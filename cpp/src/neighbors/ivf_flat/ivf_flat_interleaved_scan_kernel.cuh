@@ -45,6 +45,9 @@ extern __device__ bool sample_filter(index_t* const* const inds_ptrs,
                                      index_t bitset_len,
                                      index_t original_nbits);
 
+template <typename T>
+extern __device__ T post_process(T val);
+
 /**
  * @brief Copy `n` elements per block from one place to another.
  *
@@ -817,11 +820,9 @@ template <int Capacity,
           bool ComputeNorm,
           typename T,
           typename AccT,
-          typename IdxT,
-          typename PostLambda>
+          typename IdxT>
 RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
-  interleaved_scan_kernel(PostLambda post_process,
-                          const uint32_t query_smem_elems,
+  interleaved_scan_kernel(const uint32_t query_smem_elems,
                           const T* query,
                           const uint32_t* coarse_index,
                           const T* const* list_data_ptrs,
@@ -973,7 +974,7 @@ RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
   if constexpr (kManageLocalTopK) {
     __syncthreads();
     queue.done(interleaved_scan_kernel_smem);
-    queue.store(distances, neighbors, post_process);
+    queue.store(distances, neighbors, [](auto val) { return post_process(val); });
   }
 }
 

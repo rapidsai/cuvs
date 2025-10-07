@@ -20,13 +20,6 @@
 #include <cuvs/detail/jit_lto/FragmentEntry.h>
 
 namespace {
-// std::string make_compute_key(std::vector<std::string> const& params) {
-//   std::string k{};
-//   for (auto& p : params) {
-//     k += p + "_";
-//   }
-//   return k;
-// }
 
 // We can make a better RAII wrapper around nvjitlinkhandle
 void check_nvjitlink_result(nvJitLinkHandle handle, nvJitLinkResult result)
@@ -49,21 +42,6 @@ void check_nvjitlink_result(nvJitLinkHandle handle, nvJitLinkResult result)
 
 FragmentEntry::FragmentEntry(std::string const& params) : compute_key(params) {}
 
-// std::size_t FragmentEntryHash::operator()(
-//     std::vector<std::string> const& params) const noexcept {
-//   return std::hash<std::string>{}(make_compute_key(params));
-// }
-
-// bool FragmentEntryEqual::operator()(
-//     std::vector<std::string> const& params,
-//     std::unique_ptr<FragmentEntry> const& entry) const noexcept {
-//   if (params.size() == entry->compute_arg_count) {
-//     auto key = make_compute_key(params);
-//     return entry->compute_key == key;
-//   }
-//   return false;
-// }
-
 FatbinFragmentEntry::FatbinFragmentEntry(std::string const& params,
                                          unsigned char const* view,
                                          std::size_t size)
@@ -76,12 +54,6 @@ bool FatbinFragmentEntry::add_to(nvJitLinkHandle& handle) const
   auto result = nvJitLinkAddData(
     handle, NVJITLINK_INPUT_ANY, this->data_view, this->data_size, this->compute_key.c_str());
 
-  // Loading from file works
-  // So the issue is in our data_view / data_size
-  // auto result = nvJitLinkAddFile(
-  //     handle, NVJITLINK_INPUT_ANY,
-  //     "/home/rmaynard/Work/runtime_lto_examples/build/algorithms/CMakeFiles/"
-  //     "algo_kernels.dir/kernels/sum_int32.fatbin");
   check_nvjitlink_result(handle, result);
   return true;
 }

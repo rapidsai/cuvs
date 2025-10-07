@@ -338,7 +338,6 @@ if(NOT BUILD_CPU_ONLY)
     src/detail/jit_lto/AlgorithmLauncher.cu
     src/detail/jit_lto/FragmentDatabase.cu
     src/detail/jit_lto/FragmentEntry.cu
-    src/detail/jit_lto/MakeFragmentKey.cu
   )
 
   add_library(
@@ -575,6 +574,7 @@ if(NOT BUILD_CPU_ONLY)
     ${INTERLEAVED_SCAN_KERNEL_FILES}
     ${METRIC_DEVICE_FUNCTION_FILES}
     ${FILTER_DEVICE_FUNCTION_FILES}
+    ${POST_LAMBDA_DEVICE_FUNCTION_FILES}
   )
 
   # Make sure the kernels are generated before we try to build them
@@ -583,6 +583,7 @@ if(NOT BUILD_CPU_ONLY)
   target_compile_definitions(jit_lto_fatbins PRIVATE BUILD_KERNEL)
   target_include_directories(jit_lto_fatbins PRIVATE
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
   )
   target_compile_options(jit_lto_fatbins PRIVATE -Xfatbin=--compress-all --compress-mode=size)
   target_compile_options(
@@ -616,6 +617,7 @@ if(NOT BUILD_CPU_ONLY)
 
   target_include_directories(jit_lto_fatbins_as_cpp_sources PRIVATE
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
   )
   # target_compile_options(
   #   jit_lto_fatbins_as_cpp_sources PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"

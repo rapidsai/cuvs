@@ -552,13 +552,13 @@ dependencies:
               cuda: "12.*"
               cuda_suffixed: "true"
             packages:
-              - nvidia-nvjitlink-cu12==25.10.*,>=0.0.0a0
+              - nvidia-nvjitlink-cu12
           - matrix:
               cuda: "13.*"
-              cuda_suffixed: "true"
+              cuda_suffixed: "false"
             packages:
-              - nvidia-nvjitlink-cu13==25.10.*,>=0.0.0a0
-          - {matrix: null, packages: [libnvjitlink-dev]}
+              - nvidia-nvjitlink=13.*
+          - {matrix: null, packages: [nvidia-nvjitlink]}
   depends_on_libraft:
     common:
       - output_types: conda

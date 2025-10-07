@@ -59,4 +59,4 @@ endforeach()
 # Create a stamp file to indicate completion
 file(WRITE "${STAMP_FILE}" "Headers generated: ${generated_headers}")
 list(LENGTH generated_headers num_headers)
-message(STATUS "Generated ${num_headers} individual FATBIN headers")
+message(VERBOSE "Generated ${num_headers} individual FATBIN headers")

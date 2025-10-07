@@ -34,36 +34,6 @@ struct FragmentEntry {
   std::string compute_key{};
 };
 
-// struct FragmentEntryHash {
-//   using is_transparent = void;
-
-//   std::size_t operator()(std::unique_ptr<FragmentEntry> const& entry) const noexcept {
-//     return std::hash<std::string>{}(entry->compute_key);
-//   }
-//     std::size_t operator()(FragmentEntry const* entry) const noexcept {
-//     return std::hash<std::string>{}(entry->compute_key);
-//   }
-//   std::size_t operator()(std::vector<std::string> const& params) const noexcept;
-// };
-
-// struct FragmentEntryEqual {
-//   using is_transparent = void;
-
-//   template <typename T, typename U>
-//   bool operator()(T const& t, U const& u) const {
-//     return std::to_address(t) == std::to_address(u);
-//   }
-
-//   bool operator()(std::unique_ptr<FragmentEntry> const& entry,
-//                   std::string const& params) const noexcept
-//   {
-//     return this->operator()(params, entry);
-//   }
-
-//   bool operator()(std::string const& params,
-//                   std::unique_ptr<FragmentEntry> const& entry) const noexcept;
-// };
-
 struct FatbinFragmentEntry final : FragmentEntry {
   FatbinFragmentEntry(std::string const& params, unsigned char const* view, std::size_t size);
 

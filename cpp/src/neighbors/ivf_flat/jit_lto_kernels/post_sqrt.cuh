@@ -14,15 +14,16 @@
  * limitations under the License.
  */
 
-#define NVRTC_GET_TYPE_NAME 1
-// #include <nvrtc.h>
+#pragma once
 
-#include <cuvs/detail/jit_lto/MakeFragmentKey.h>
+#include <raft/core/operators.hpp>
 
-namespace detail {
-// std::string nvrtc_name(std::type_info const& info) {
-//   std::string type_name;
-//   nvrtcGetTypeName(info, &type_name);
-//   return type_name;
-// }
-}  // namespace detail
+namespace cuvs::neighbors::ivf_flat::detail {
+
+template <typename T>
+__device__ T post_process(T val)
+{
+  return raft::sqrt_op{}(val);
+}
+
+}  // namespace cuvs::neighbors::ivf_flat::detail

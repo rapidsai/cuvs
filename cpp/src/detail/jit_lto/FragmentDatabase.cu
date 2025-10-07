@@ -39,17 +39,10 @@ FragmentDatabase& fragment_database()
 
 FragmentEntry* FragmentDatabase::get_fragment(std::string const& key)
 {
-  std::cout << "Saving compute" << std::endl;
   auto& db = fragment_database();
-  std::cout << "DB size: " << db.cache.size() << std::endl;
-  std::cout << "Available keys in cache:" << std::endl;
-  for (const auto& pair : db.cache) {
-    std::cout << "  " << pair.first << std::endl;
-  }
-  std::cout << "Finding key: " << key << std::endl;
   auto val = db.cache.find(key);
   if (val == db.cache.end()) {
-    std::cout << "Key not found" << std::endl;
+    std::cout << "FragmentDatabase: Key not found" << std::endl;
     return nullptr;
   }
   return val->second.get();
@@ -63,6 +56,5 @@ void registerFatbinFragment(std::string const& algo,
   auto& planner     = fragment_database();
   auto entry_exists = planner.make_cache_entry(algo, params);
   if (entry_exists) { return; }
-  std::cout << "Caching fatbin fragment: " << algo + "_" + params << std::endl;
   planner.cache[algo + "_" + params] = std::make_unique<FatbinFragmentEntry>(params, blob, size);
 }

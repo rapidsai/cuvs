@@ -51,8 +51,6 @@ void AlgorithmPlanner::add_entrypoint()
 {
   auto entrypoint_fragment = fragment_database().get_fragment(this->entrypoint);
   this->fragments.push_back(entrypoint_fragment);
-  std::cout << "Fragment added with key: " << fragments.back()->compute_key << std::endl;
-  std::cout << "Fragments size: " << this->fragments.size() << std::endl;
 }
 
 void AlgorithmPlanner::add_device_functions()
@@ -60,8 +58,6 @@ void AlgorithmPlanner::add_device_functions()
   for (const auto& device_function_key : this->device_functions) {
     auto device_function_fragment = fragment_database().get_fragment(device_function_key);
     this->fragments.push_back(device_function_fragment);
-    std::cout << "Fragment added with key: " << fragments.back()->compute_key << std::endl;
-    std::cout << "Fragments size: " << this->fragments.size() << std::endl;
   }
 }
 
@@ -84,7 +80,6 @@ AlgorithmLauncher AlgorithmPlanner::get_launcher()
     add_device_functions();
     launchers[launch_key] = this->build();
   }
-  std::cout << "launcher key: " << launch_key << std::endl;
   return launchers[launch_key];
 }
 
@@ -111,10 +106,8 @@ AlgorithmLauncher AlgorithmPlanner::build()
 
   // Call to nvJitLinkComplete causes linker to link together all the LTO-IR
   // modules perform any optimizations and generate cubin from it.
-  std::cout << "\tStarted LTO runtime linking \n";
   result = nvJitLinkComplete(handle);
   check_nvjitlink_result(handle, result);
-  std::cout << "\tCompleted LTO runtime linking \n";
 
   // get cubin from nvJitLink
   size_t cubin_size;

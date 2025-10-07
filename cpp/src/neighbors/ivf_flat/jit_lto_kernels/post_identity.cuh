@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) 2025, NVIDIA CORPORATION.
  *
@@ -17,26 +16,14 @@
 
 #pragma once
 
-#include <string>
-#include <typeinfo>
+#include <raft/core/operators.hpp>
 
-namespace detail {
+namespace cuvs::neighbors::ivf_flat::detail {
 
 template <typename T>
-std::string type_as_string()
+__device__ T post_process(T val)
 {
-  if constexpr (std::is_reference_v<T>) {
-    return std::string(typeid(T).name()) + "&";
-  } else {
-    return std::string(typeid(T).name());
-  }
+  return raft::identity_op{}(val);
 }
-}  // namespace detail
 
-template <typename... Ts>
-std::string make_fragment_key()
-{
-  std::string result;
-  ((result += detail::type_as_string<Ts>() + "_"), ...);
-  return result;
-}
+}  // namespace cuvs::neighbors::ivf_flat::detail
