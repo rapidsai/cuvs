@@ -1056,8 +1056,7 @@ template <typename T, typename IdxT, typename Accessor>
 index<T, IdxT> build_ace(
   raft::resources const& res,
   const index_params& params,
-  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
-  size_t num_partitions = 0)
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
 {
   common::nvtx::range<common::nvtx::domain::cuvs> function_scope(
     "cagra::build_ace<%s>(%zu, %zu, %zu)",
@@ -1066,7 +1065,7 @@ index<T, IdxT> build_ace(
                                      : "device",
     params.intermediate_graph_degree,
     params.graph_degree,
-    num_partitions);
+    params.ace_npartitions);
 
   uint64_t dataset_size = dataset.extent(0);
   uint64_t dataset_dim  = dataset.extent(1);
@@ -1077,9 +1076,9 @@ index<T, IdxT> build_ace(
                "ACE: Intermediate graph degree must be greater than 0");
   RAFT_EXPECTS(params.graph_degree > 0, "ACE: Graph degree must be greater than 0");
 
-  uint64_t n_partitions = (num_partitions > 0) ? num_partitions : params.ace_npartitions;
-  RAFT_EXPECTS(n_partitions > 0, "ACE: num_partitions must be greater than 0");
-  RAFT_EXPECTS(n_partitions <= dataset_size, "ACE: num_partitions cannot exceed dataset size");
+  uint64_t n_partitions = params.ace_npartitions;
+  RAFT_EXPECTS(n_partitions > 0, "ACE: ace_npartitions must be greater than 0");
+  RAFT_EXPECTS(n_partitions <= dataset_size, "ACE: ace_npartitions cannot exceed dataset size");
 
   uint64_t min_vectors_per_partition  = dataset_size / n_partitions;
   uint64_t min_required_per_partition = 1000;
@@ -1108,6 +1107,18 @@ index<T, IdxT> build_ace(
       graph_degree,
       intermediate_degree);
     graph_degree = intermediate_degree;
+  }
+
+  // ACE expects the dataset to be on host due to the large dataset size
+  if (raft::get_device_for_address(dataset.data_handle()) != -1) {
+    RAFT_LOG_WARN("ACE: Dataset is on device, moving to host");
+    auto dataset_host = raft::make_host_matrix<T, int64_t>(dataset_size, dataset_dim);
+    raft::copy(dataset_host.data_handle(),
+               dataset.data_handle(),
+               dataset_size * dataset_dim,
+               raft::resource::get_cuda_stream(res));
+    raft::resource::sync_stream(res);
+    dataset = dataset_host.view();
   }
 
   size_t available_memory = get_free_host_memory<T, IdxT>();

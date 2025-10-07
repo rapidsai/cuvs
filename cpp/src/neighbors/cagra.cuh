@@ -289,6 +289,9 @@ index<T, IdxT> build(
   const index_params& params,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
 {
+  if (params.ace_npartitions > 1) {
+    return cuvs::neighbors::cagra::detail::build_ace<T, IdxT, Accessor>(res, params, dataset);
+  }
   return cuvs::neighbors::cagra::detail::build<T, IdxT, Accessor>(res, params, dataset);
 }
 
