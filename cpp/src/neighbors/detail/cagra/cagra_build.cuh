@@ -1091,21 +1091,6 @@ index<T, IdxT> build_ace(
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
 
-  if (intermediate_degree >= dataset_size) {
-    RAFT_LOG_WARN(
-      "Intermediate graph degree cannot be larger than dataset size, reducing it to %lu",
-      dataset_size);
-    intermediate_degree = dataset_size - 1;
-  }
-  if (intermediate_degree < graph_degree) {
-    RAFT_LOG_WARN(
-      "Graph degree (%lu) cannot be larger than intermediate graph degree (%lu), reducing "
-      "graph_degree.",
-      graph_degree,
-      intermediate_degree);
-    graph_degree = intermediate_degree;
-  }
-
   // ACE expects the dataset to be on host due to the large dataset size
   if (raft::get_device_for_address(dataset.data_handle()) != -1) {
     RAFT_LOG_WARN("ACE: Dataset is on device, moving to host");
