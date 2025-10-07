@@ -46,7 +46,7 @@ function(ConfigureTest)
   target_link_libraries(
     ${TEST_NAME} PRIVATE cuvs::c_api GTest::gtest GTest::gtest_main
                          $<TARGET_NAME_IF_EXISTS:conda_env>
-   )
+  )
   set_target_properties(
     ${TEST_NAME}
     PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<BUILD_INTERFACE:${CUVS_C_BINARY_DIR}/gtests>"
@@ -55,7 +55,8 @@ function(ConfigureTest)
 
   target_include_directories(
     ${TEST_NAME} PRIVATE "$<BUILD_INTERFACE:${CUVS_C_SOURCE_DIR}/tests>"
-                         "$<BUILD_INTERFACE:${CUVS_C_SOURCE_DIR}/../cpp/tests>")
+                         "$<BUILD_INTERFACE:${CUVS_C_SOURCE_DIR}/../cpp/tests>"
+  )
 
   rapids_test_add(
     NAME ${TEST_NAME}
@@ -66,11 +67,10 @@ function(ConfigureTest)
   )
 endfunction()
 
-
 ConfigureTest(NAME INTEROP_TEST PATH core/interop.cu)
 ConfigureTest(
-    NAME DISTANCE_C_TEST PATH distance/run_pairwise_distance_c.c distance/pairwise_distance_c.cu
-  )
+  NAME DISTANCE_C_TEST PATH distance/run_pairwise_distance_c.c distance/pairwise_distance_c.cu
+)
 ConfigureTest(NAME BRUTEFORCE_C_TEST PATH neighbors/run_brute_force_c.c neighbors/brute_force_c.cu)
 ConfigureTest(NAME IVF_FLAT_C_TEST PATH neighbors/run_ivf_flat_c.c neighbors/ann_ivf_flat_c.cu)
 ConfigureTest(NAME IVF_PQ_C_TEST PATH neighbors/run_ivf_pq_c.c neighbors/ann_ivf_pq_c.cu)
