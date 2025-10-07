@@ -436,7 +436,21 @@ __launch_bounds__(BlockSize) RAFT_KERNEL
 
 /**
  * @brief Quantized a float dataset as bfloat16, with noise shaping (AVQ)
- *
+* During quantization we replace each input vector coordinate `f` of type float32 with a bfloat16
+* coordinate `b`. One way to do this would be to simply assign the nearest bfloat16 value to
+* each coordinate. This would be the best way to quantize if we want to minimize the L2
+* distance between the quantized and the original vector.
+*
+* In the AVQ method, we use a different cost function. To minimize that, we consider nearest 
+* representable bfloat16 values (`b1`, `b2`) around `f`, and select the one that minimizes the AVQ
+* cost function. In two dimensions we need to consider the four neighboring quantized vectors:
+* b1       b2
+*        f
+* b3      b4
+* 
+* In N dimension we will select one the vertices of an N dimensional hypercube as the quantized
+* vector. To find the minimum without enumerating all the combinations, a coordinate descent
+* method is used.
  * @tparam IdxT
  * @param res raft resources
  * @param dataset the dataset (device only) size [n_rows, dim]
