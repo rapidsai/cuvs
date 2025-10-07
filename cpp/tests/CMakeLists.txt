@@ -21,7 +21,7 @@ rapids_test_init()
 
 function(ConfigureTest)
 
-  set(options NOCUDA C_LIB FETCH_CODEBOOKS)
+  set(options NOCUDA FETCH_CODEBOOKS)
   set(oneValueArgs NAME GPUS PERCENT ADDITIONAL_DEP)
   set(multiValueArgs PATH)
 
@@ -55,7 +55,6 @@ function(ConfigureTest)
             ${CUVS_CTK_MATH_DEPENDENCIES}
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
             $<TARGET_NAME_IF_EXISTS:conda_env>
-            $<$<BOOL:${_CUVS_TEST_C_LIB}>:cuvs::c_api>
             ${_CUVS_TEST_ADDITIONAL_DEP}
   )
   set_target_properties(
@@ -109,8 +108,8 @@ endfunction()
 
 ConfigureTest(
   NAME NEIGHBORS_TEST
-  PATH neighbors/brute_force.cu neighbors/brute_force_prefiltered.cu
-       neighbors/sparse_brute_force.cu neighbors/refine.cu
+  PATH neighbors/brute_force.cu neighbors/brute_force_prefiltered.cu neighbors/sparse_brute_force.cu
+       neighbors/refine.cu
   GPUS 1
   PERCENT 100
 )
@@ -132,10 +131,8 @@ ConfigureTest(
 
 ConfigureTest(
   NAME NEIGHBORS_ANN_IVF_FLAT_TEST
-  PATH neighbors/ann_ivf_flat/test_float_int64_t.cu
-       neighbors/ann_ivf_flat/test_half_int64_t.cu
-       neighbors/ann_ivf_flat/test_int8_t_int64_t.cu
-       neighbors/ann_ivf_flat/test_uint8_t_int64_t.cu
+  PATH neighbors/ann_ivf_flat/test_float_int64_t.cu neighbors/ann_ivf_flat/test_half_int64_t.cu
+       neighbors/ann_ivf_flat/test_int8_t_int64_t.cu neighbors/ann_ivf_flat/test_uint8_t_int64_t.cu
   GPUS 1
   PERCENT 100
 )
@@ -298,8 +295,7 @@ ConfigureTest(
 
 ConfigureTest(
   NAME SPARSE_TEST
-  PATH sparse/cluster/cluster_solvers.cu sparse/cluster/eigen_solvers.cu
-       sparse/cluster/spectral.cu
+  PATH sparse/cluster/cluster_solvers.cu sparse/cluster/eigen_solvers.cu sparse/cluster/spectral.cu
   GPUS 1
   PERCENT 100
 )

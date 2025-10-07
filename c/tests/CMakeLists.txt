@@ -44,19 +44,18 @@ function(ConfigureTest)
 
   add_executable(${TEST_NAME} ${_CUVS_TEST_PATH})
   target_link_libraries(
-    ${TEST_NAME}
-    PRIVATE cuvs::c_api GTest::gtest GTest::gtest_main
-            $<TARGET_NAME_IF_EXISTS:conda_env>
-  )
+    ${TEST_NAME} PRIVATE cuvs::c_api GTest::gtest GTest::gtest_main
+                         $<TARGET_NAME_IF_EXISTS:conda_env>
+   )
   set_target_properties(
     ${TEST_NAME}
     PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<BUILD_INTERFACE:${CUVS_C_BINARY_DIR}/gtests>"
                INSTALL_RPATH "\$ORIGIN/../../../lib"
   )
 
-  target_include_directories(${TEST_NAME}
-    PRIVATE "$<BUILD_INTERFACE:${CUVS_C_SOURCE_DIR}/tests>"
-            "$<BUILD_INTERFACE:${CUVS_C_SOURCE_DIR}/../cpp/tests>")
+  target_include_directories(
+    ${TEST_NAME} PRIVATE "$<BUILD_INTERFACE:${CUVS_C_SOURCE_DIR}/tests>"
+                         "$<BUILD_INTERFACE:${CUVS_C_SOURCE_DIR}/../cpp/tests>")
 
   rapids_test_add(
     NAME ${TEST_NAME}
@@ -67,77 +66,52 @@ function(ConfigureTest)
   )
 endfunction()
 
-enable_language(CUDA)
 
+ConfigureTest(NAME INTEROP_TEST PATH core/interop.cu)
 ConfigureTest(
-  NAME INTEROP_TEST
-  PATH core/interop.cu
+    NAME DISTANCE_C_TEST PATH distance/run_pairwise_distance_c.c distance/pairwise_distance_c.cu
+  )
+ConfigureTest(NAME BRUTEFORCE_C_TEST PATH neighbors/run_brute_force_c.c neighbors/brute_force_c.cu)
+ConfigureTest(NAME IVF_FLAT_C_TEST PATH neighbors/run_ivf_flat_c.c neighbors/ann_ivf_flat_c.cu)
+ConfigureTest(NAME IVF_PQ_C_TEST PATH neighbors/run_ivf_pq_c.c neighbors/ann_ivf_pq_c.cu)
+ConfigureTest(NAME CAGRA_C_TEST PATH neighbors/ann_cagra_c.cu)
+ConfigureTest(NAME MG_C_TEST PATH neighbors/run_mg_c.c neighbors/ann_mg_c.cu)
+ConfigureTest(
+  NAME ALL_NEIGHBORS_C_TEST PATH neighbors/run_all_neighbors_c.c neighbors/all_neighbors_c.cu
 )
-ConfigureTest(
-    NAME DISTANCE_C_TEST
-    PATH distance/run_pairwise_distance_c.c distance/pairwise_distance_c.cu
-  )
-ConfigureTest(
-    NAME BRUTEFORCE_C_TEST
-    PATH neighbors/run_brute_force_c.c neighbors/brute_force_c.cu
-  )
-ConfigureTest(
-    NAME IVF_FLAT_C_TEST
-    PATH neighbors/run_ivf_flat_c.c neighbors/ann_ivf_flat_c.cu
-  )
-ConfigureTest(
-    NAME IVF_PQ_C_TEST
-    PATH neighbors/run_ivf_pq_c.c neighbors/ann_ivf_pq_c.cu
-  )
-ConfigureTest(
-    NAME CAGRA_C_TEST
-    PATH neighbors/ann_cagra_c.cu
-  )
-ConfigureTest(
-    NAME MG_C_TEST
-    PATH neighbors/run_mg_c.c neighbors/ann_mg_c.cu
-  )
-ConfigureTest(
-    NAME ALL_NEIGHBORS_C_TEST
-    PATH neighbors/run_all_neighbors_c.c neighbors/all_neighbors_c.cu
-  )
 
-  if(BUILD_CAGRA_HNSWLIB)
-    ConfigureTest(
-      NAME HNSW_C_TEST
-      PATH neighbors/ann_hnsw_c.cu
+if(BUILD_CAGRA_HNSWLIB)
+  ConfigureTest(NAME HNSW_C_TEST PATH neighbors/ann_hnsw_c.cu)
+  target_link_libraries(HNSW_C_TEST PRIVATE hnswlib::hnswlib)
+  target_compile_definitions(HNSW_C_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
+endif()
 
-    )
-    target_link_libraries(HNSW_C_TEST PRIVATE hnswlib::hnswlib)
-    target_compile_definitions(HNSW_C_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
-  endif()
+add_executable(cuvs_c_test core/c_api.c)
+target_link_libraries(cuvs_c_test PUBLIC cuvs::c_api)
 
-  add_executable(cuvs_c_test core/c_api.c)
-  target_link_libraries(cuvs_c_test PUBLIC cuvs::c_api)
+add_executable(cuvs_c_neighbors_test neighbors/c_api.c)
+target_link_libraries(cuvs_c_neighbors_test PUBLIC cuvs::c_api)
 
-  add_executable(cuvs_c_neighbors_test neighbors/c_api.c)
-  target_link_libraries(cuvs_c_neighbors_test PUBLIC cuvs::c_api)
+set_target_properties(
+  cuvs_c_test cuvs_c_neighbors_test
+  PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<BUILD_INTERFACE:${CUVS_C_BINARY_DIR}/gtests>"
+             INSTALL_RPATH "\$ORIGIN/../../../lib"
+)
 
-  set_target_properties(
-    cuvs_c_test cuvs_c_neighbors_test
-    PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<BUILD_INTERFACE:${CUVS_C_BINARY_DIR}/gtests>"
-               INSTALL_RPATH "\$ORIGIN/../../../lib"
-  )
-
-  rapids_test_add(
-    NAME cuvs_c_test
-    COMMAND cuvs_c_test
-    GPUS 1
-    PERCENT 100
-    INSTALL_COMPONENT_SET testing
-  )
-  rapids_test_add(
-    NAME cuvs_c_neighbors_test
-    COMMAND cuvs_c_neighbors_test
-    GPUS 1
-    PERCENT 100
-    INSTALL_COMPONENT_SET testing
-  )
+rapids_test_add(
+  NAME cuvs_c_test
+  COMMAND cuvs_c_test
+  GPUS 1
+  PERCENT 100
+  INSTALL_COMPONENT_SET testing
+)
+rapids_test_add(
+  NAME cuvs_c_neighbors_test
+  COMMAND cuvs_c_neighbors_test
+  GPUS 1
+  PERCENT 100
+  INSTALL_COMPONENT_SET testing
+)
 
 # ##################################################################################################
 # Install tests ####################################################################################
