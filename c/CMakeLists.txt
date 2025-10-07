@@ -24,6 +24,7 @@ project(
   VERSION "${RAPIDS_VERSION}"
   LANGUAGES CXX C
 )
+set(CMAKE_INSTALL_MESSAGE LAZY)
 
 # ##################################################################################################
 # * User Options  ------------------------------------------------------------
@@ -52,6 +53,10 @@ rapids_cmake_build_type(Release)
 
 # this is needed for clang-tidy runs
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+if(NOT DEFINED CUVS_CXX_FLAGS)
+  include(../cpp/cmake/modules/ConfigureCUDA.cmake)
+endif()
 
 # ##################################################################################################
 # * Requirements -------------------------------------------------------------
