@@ -574,6 +574,7 @@ if(NOT BUILD_CPU_ONLY)
     jit_lto_fatbins OBJECT
     ${INTERLEAVED_SCAN_KERNEL_FILES}
     ${METRIC_DEVICE_FUNCTION_FILES}
+    ${FILTER_DEVICE_FUNCTION_FILES}
   )
 
   # Make sure the kernels are generated before we try to build them

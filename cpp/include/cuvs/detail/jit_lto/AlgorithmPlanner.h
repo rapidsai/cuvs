@@ -24,15 +24,17 @@
 struct FragmentEntry;
 
 struct AlgorithmPlanner {
-  AlgorithmPlanner(std::string const& n, std::string const& p) : name(n), params(p) {}
+  AlgorithmPlanner(std::string const& n, std::string const& p) : entrypoint(n + "_" + p) {}
 
   AlgorithmLauncher get_launcher();
 
-  std::string name;
-  std::string params;
+  std::string entrypoint;
+  std::vector<std::string> device_functions;
   std::vector<FragmentEntry*> fragments;
 
  private:
-  void save_compute();
+  void add_entrypoint();
+  void add_device_functions();
+  std::string get_device_functions_key();
   AlgorithmLauncher build();
 };

@@ -95,7 +95,7 @@ def get_final_op_abbreviation(op_str):
 
 
 def generate_filename(params):
-    """Generate filename from template parameters (WITHOUT metric)."""
+    """Generate filename from template parameters (WITHOUT metric and filter)."""
     # params[0]: Capacity (numeric)
     # params[1]: Veclen (numeric)
     # params[2]: Ascending (bool)
@@ -103,7 +103,7 @@ def generate_filename(params):
     # params[4]: T (type)
     # params[5]: AccT (type)
     # params[6]: IdxT (type)
-    # params[7]: FilterT (filter type)
+    # params[7]: FilterT (filter type - EXCLUDED from filename)
     # params[8]: Lambda/MetricTag (metric type - EXCLUDED from filename)
     # params[9]: PostLambda (final operator)
 
@@ -115,7 +115,7 @@ def generate_filename(params):
         get_type_abbreviation(params[4]),  # T
         get_type_abbreviation(params[5]),  # AccT
         get_type_abbreviation(params[6]),  # IdxT
-        get_filter_abbreviation(params[7]),  # FilterT
+        # params[7] EXCLUDED - filter
         # params[8] EXCLUDED - metric
         get_final_op_abbreviation(params[9])  # PostLambda
     ]
@@ -124,7 +124,7 @@ def generate_filename(params):
 
 
 def generate_register_function_name(params):
-    """Generate the registration function name from template parameters (WITHOUT metric)."""
+    """Generate the registration function name from template parameters (WITHOUT metric and filter)."""
     parts = [
         params[0],  # Capacity
         params[1],  # Veclen
@@ -133,7 +133,7 @@ def generate_register_function_name(params):
         get_type_abbreviation(params[4]),  # T
         get_type_abbreviation(params[5]),  # AccT
         get_type_abbreviation(params[6]),  # IdxT
-        get_filter_abbreviation(params[7]),  # FilterT
+        # params[7] EXCLUDED - filter
         # params[8] EXCLUDED - metric
         get_final_op_abbreviation(params[9])  # PostLambda
     ]
@@ -228,26 +228,27 @@ def generate_cuda_file_content(params):
     filename = generate_register_function_name(params)
     embedded_var_name = f"embedded_{filename}"
 
-    # The kernel now has 9 template parameters (removed MetricTag)
+    # The kernel now has 8 template parameters (removed MetricTag and FilterT)
     # params[0-3]: Capacity, Veclen, Ascending, ComputeNorm
     # params[4]: T (data type)
     # params[5]: AccT (accumulator type)
     # params[6]: IdxT (index type)
-    # params[7]: IvfSampleFilterT (filter type)
+    # params[7]: IvfSampleFilterT (filter type - NOT used in template anymore)
     # params[8]: Lambda (metric - NOT used in template anymore)
     # params[9]: PostLambda (post-processing operator)
 
-    # Template parameters without MetricTag (params 0-7, 9)
-    template_params_list = params[0:8] + [params[9]]
+    # Template parameters without MetricTag and FilterT (params 0-6, 9)
+    template_params_list = params[0:7] + [params[9]]
     template_params = ', '.join(template_params_list)
 
-    # Convert params 4-7 and 9 to tag types for registerAlgorithm (NO metric tag)
-    tag_params = [param_to_tag(i, params[i], params) for i in [4, 5, 6, 7, 9]]
+    # Convert params 4-6 and 9 to tag types for registerAlgorithm (NO metric/filter tags)
+    tag_params = [param_to_tag(i, params[i], params) for i in [4, 5, 6, 9]]
     register_template_params = ', '.join(tag_params)
 
     # Create the string parameter with first four params (Capacity, Veclen, Ascending, ComputeNorm)
     string_param = f"interleaved_scan_kernel_{params[0]}_{params[1]}_{params[2]}_{params[3]}"
 
+    # Function parameters for the kernel instantiation (updated signature)
     content = f"""/*
  * Copyright (c) 2025, NVIDIA CORPORATION.
  *
@@ -266,11 +267,11 @@ def generate_cuda_file_content(params):
 
 #ifdef BUILD_KERNEL
 
-#include "../../ivf_flat_interleaved_scan.cuh"
+#include "../../ivf_flat_interleaved_scan_kernel.cuh"
 
 namespace cuvs::neighbors::ivf_flat::detail {{
 
-template __global__ void interleaved_scan_kernel<{template_params}>({params[9]}, unsigned int, {params[4]} const*, unsigned int const*, {params[4]} const* const*, unsigned int const*, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int const*, unsigned int, {params[7]}, unsigned int*, float*);
+template __global__ void interleaved_scan_kernel<{template_params}>({params[9]}, unsigned int, {params[4]} const*, unsigned int const*, {params[4]} const* const*, unsigned int const*, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int const*, unsigned int, {params[6]}* const* const, unsigned int*, {params[6]}, {params[6]}, unsigned int*, float*);
 
 }}  // namespace cuvs::neighbors::ivf_flat::detail
 
@@ -382,6 +383,61 @@ registerAlgorithm<{data_tag}, {acc_tag}>("{metric_name}_{veclen}",
     return content
 
 
+def generate_filter_device_function_content(filter_name):
+    """Generate content for a filter device function file."""
+    # Determine which header to include based on filter name
+    if filter_name == 'filter_none':
+        header_file = '../filter_none.cuh'
+    elif filter_name == 'filter_bitset':
+        header_file = '../filter_bitset.cuh'
+    else:
+        raise ValueError(f"Unknown filter: {filter_name}")
+
+    content = f"""/*
+ * Copyright (c) 2025, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#ifdef BUILD_KERNEL
+
+#include "{header_file}"
+
+namespace cuvs::neighbors::ivf_flat::detail {{
+
+template __device__ bool sample_filter(int64_t* const* const inds_ptrs, const uint32_t query_ix, const uint32_t cluster_ix, const uint32_t sample_ix, uint32_t* bitset_ptr, int64_t bitset_len, int64_t original_nbits);
+
+}}  // namespace cuvs::neighbors::ivf_flat::detail
+
+#else
+
+#include "{filter_name}.h"
+#include <cuvs/detail/jit_lto/RegisterKernelFragment.h>
+#include "../interleaved_scan_tags.hpp"
+
+__attribute__((__constructor__)) static void register_{filter_name}()
+{{
+using namespace cuvs::neighbors::ivf_flat::detail;
+registerAlgorithm("{filter_name}",
+            embedded_{filter_name},
+            sizeof(embedded_{filter_name}));
+}}
+
+#endif
+"""
+    return content
+
+
 def generate_metric_device_functions(script_dir):
     """Generate all metric device function files."""
     # Define all combinations we need
@@ -436,6 +492,37 @@ def generate_metric_device_functions(script_dir):
                 generated_files.append(filename)
 
     print(f"Generated {len(generated_files)} metric device function files")
+    return generated_files
+
+
+def generate_filter_device_functions(script_dir):
+    """Generate all filter device function files."""
+    filters = ['filter_none', 'filter_bitset']
+
+    output_dir = script_dir / 'filter_device_functions'
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    generated_files = []
+
+    for filter_name in filters:
+        filename = f"{filter_name}.cu"
+        file_content = generate_filter_device_function_content(filter_name)
+
+        # Write file only if it doesn't exist or content has changed
+        output_file = output_dir / filename
+        should_write = True
+        if output_file.exists():
+            with open(output_file, 'r') as f:
+                existing_content = f.read()
+            should_write = (existing_content != file_content)
+
+        if should_write:
+            with open(output_file, 'w') as f:
+                f.write(file_content)
+
+        generated_files.append(filename)
+
+    print(f"Generated {len(generated_files)} filter device function files")
     return generated_files
 
 
@@ -520,6 +607,9 @@ def main():
     # Generate metric device function files
     metric_files = generate_metric_device_functions(script_dir)
 
+    # Generate filter device function files
+    filter_files = generate_filter_device_functions(script_dir)
+
     # Generate CMake file with all filenames
     # We're generating in the source tree at: cpp/src/neighbors/ivf_flat/jit_lto_kernels/
     # CMake file goes to: cpp/cmake/jit_lto_kernels_list/
@@ -539,6 +629,12 @@ def main():
     cmake_content += "set(METRIC_DEVICE_FUNCTION_FILES\n"
     for filename in sorted(metric_files):
         cmake_content += f"  src/neighbors/ivf_flat/jit_lto_kernels/metric_device_functions/{filename}\n"
+    cmake_content += ")\n\n"
+
+    # Add filter device function files
+    cmake_content += "set(FILTER_DEVICE_FUNCTION_FILES\n"
+    for filename in sorted(filter_files):
+        cmake_content += f"  src/neighbors/ivf_flat/jit_lto_kernels/filter_device_functions/{filename}\n"
     cmake_content += ")\n"
 
     # Only write if content has changed

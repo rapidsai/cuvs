@@ -68,9 +68,16 @@ function(generate_interleaved_scan_kernels)
     list(APPEND FULL_PATH_METRIC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/${metric_file})
   endforeach()
 
+  # Prepend the source directory path to all filter device function files
+  set(FULL_PATH_FILTER_FILES)
+  foreach(filter_file ${FILTER_DEVICE_FUNCTION_FILES})
+    list(APPEND FULL_PATH_FILTER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/${filter_file})
+  endforeach()
+
   # Return the lists to parent scope
   set(INTERLEAVED_SCAN_KERNEL_FILES ${FULL_PATH_KERNEL_FILES} PARENT_SCOPE)
   set(METRIC_DEVICE_FUNCTION_FILES ${FULL_PATH_METRIC_FILES} PARENT_SCOPE)
+  set(FILTER_DEVICE_FUNCTION_FILES ${FULL_PATH_FILTER_FILES} PARENT_SCOPE)
   set(INTERLEAVED_SCAN_KERNELS_STAMP ${STAMP_FILE} PARENT_SCOPE)
   set(INTERLEAVED_SCAN_KERNELS_TARGET generate_interleaved_scan_kernels_target PARENT_SCOPE)
 endfunction()

@@ -39,7 +39,7 @@ class FragmentDatabase {
   FragmentDatabase& operator=(FragmentDatabase&&)      = delete;
   FragmentDatabase& operator=(FragmentDatabase const&) = delete;
 
-  std::unordered_map<std::string, std::unique_ptr<FragmentEntry>> cache;
+  FragmentEntry* get_fragment(std::string const& key);
 
  private:
   FragmentDatabase();
@@ -52,6 +52,8 @@ class FragmentDatabase {
                                      std::string const& params,
                                      unsigned char const* blob,
                                      std::size_t size);
+
+  std::unordered_map<std::string, std::unique_ptr<FragmentEntry>> cache;
 };
 
 FragmentDatabase& fragment_database();

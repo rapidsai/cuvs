@@ -47,39 +47,45 @@ void check_nvjitlink_result(nvJitLinkHandle handle, nvJitLinkResult result)
 }
 }  // namespace
 
-void AlgorithmPlanner::save_compute()
+void AlgorithmPlanner::add_entrypoint()
 {
-  std::cout << "Saving compute" << std::endl;
-  auto& db = fragment_database();
-  std::cout << "DB size: " << db.cache.size() << std::endl;
-  std::cout << "Available keys in cache:" << std::endl;
-  for (const auto& pair : db.cache) {
-    std::cout << "  " << pair.first << std::endl;
-  }
-  std::cout << "Finding key: " << this->name + "_" + this->params << std::endl;
-  auto val = db.cache.find(this->name + "_" + this->params);
-  if (val == db.cache.end()) {
-    std::cout << "Key not found" << std::endl;
-    return;
-  }
-  this->fragments.push_back(val->second.get());
+  auto entrypoint_fragment = fragment_database().get_fragment(this->entrypoint);
+  this->fragments.push_back(entrypoint_fragment);
   std::cout << "Fragment added with key: " << fragments.back()->compute_key << std::endl;
   std::cout << "Fragments size: " << this->fragments.size() << std::endl;
+}
+
+void AlgorithmPlanner::add_device_functions()
+{
+  for (const auto& device_function_key : this->device_functions) {
+    auto device_function_fragment = fragment_database().get_fragment(device_function_key);
+    this->fragments.push_back(device_function_fragment);
+    std::cout << "Fragment added with key: " << fragments.back()->compute_key << std::endl;
+    std::cout << "Fragments size: " << this->fragments.size() << std::endl;
+  }
+}
+
+std::string AlgorithmPlanner::get_device_functions_key()
+{
+  std::string key = "";
+  for (const auto& device_function : this->device_functions) {
+    key += "_" + device_function;
+  }
+  return key;
 }
 
 AlgorithmLauncher AlgorithmPlanner::get_launcher()
 {
   std::cout << "Getting launcher" << std::endl;
   auto& launchers = get_cached_launchers();
-  auto key        = this->name + "_" + this->params;
-  if (launchers.count(key) == 0) {
-    this->save_compute();
-    launchers[key] = this->build();
+  auto launch_key = this->entrypoint + this->get_device_functions_key();
+  if (launchers.count(launch_key) == 0) {
+    add_entrypoint();
+    add_device_functions();
+    launchers[launch_key] = this->build();
   }
-  std::cout << "launcher key: " << key << std::endl;
-  return launchers[key];
-  // this->save_compute();
-  // return this->build();
+  std::cout << "launcher key: " << launch_key << std::endl;
+  return launchers[launch_key];
 }
 
 AlgorithmLauncher AlgorithmPlanner::build()

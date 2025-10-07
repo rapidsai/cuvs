@@ -42,11 +42,14 @@ struct InterleavedScanPlanner : AlgorithmPlanner {
     auto key    = metric_name + "_" + std::to_string(Veclen);
     auto params = make_fragment_key<FuncTags...>();
     std::cout << "Looking for metric fragment: " << key + "_" + params << std::endl;
-    auto metric_fragment = db.cache.find(key + "_" + params);
-    if (metric_fragment == db.cache.end()) {
-      std::cout << "Metric fragment not found" << std::endl;
-      return;
-    }
-    fragments.push_back(metric_fragment->second.get());
+    this->device_functions.push_back(key + "_" + params);
+  }
+
+  void add_filter_device_function(std::string filter_name)
+  {
+    auto& db = fragment_database();
+    auto key = filter_name + "_";
+    std::cout << "Looking for filter fragment: " << key << std::endl;
+    this->device_functions.push_back(key);
   }
 };
