@@ -51,17 +51,17 @@ struct index_params : cuvs::neighbors::index_params {
   size_t graph_degree = 64;
   /**
    * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
-   * 
-   * The search graph for very large datasets can be larger than the device or host memory of 
+   *
+   * The search graph for very large datasets can be larger than the device or host memory of
    * the systems. Although such graphs cannot be searched by CAGRA, we can still
    * create such large graphs to be searched by other search methods.
-   * 
-   * To build such large graph, we need to divide the graph into smaller partitions. 
+   *
+   * To build such large graph, we need to divide the graph into smaller partitions.
    * The parameter ace_npartitions defines the number of such partitions.
    * When set to a value > 1, enables the ACE partitioned approach for very large graphs.
    * Set to 0 or 1 to disable ACE and use standard build.
    */
-  size_t ace_npartitions = 0;
+  size_t ace_npartitions = 1;
   /**
    * Specify compression parameters if compression is desired. If set, overrides the
    * attach_dataset_on_build (and the compressed dataset is always added to the index).
