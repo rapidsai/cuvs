@@ -106,7 +106,10 @@ set_target_properties(
              EXPORT_NAME c_api
 )
 
-target_compile_definitions(cuvs_c PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>)
+target_compile_definitions(
+  cuvs_c PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB> # Needed for bindings
+                $<$<BOOL:${BUILD_MG_ALGOS}>:CUVS_BUILD_MG_ALGOS> # Needed for bindings
+)
 
 target_compile_options(cuvs_c PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
 
