@@ -42,25 +42,25 @@ using namespace cuvs::spatial::knn::detail;  // NOLINT
 template <typename T>
 constexpr auto get_data_type_tag()
 {
-  if constexpr (std::is_same_v<T, float>) { return tag_float{}; }
-  if constexpr (std::is_same_v<T, __half>) { return tag_half{}; }
-  if constexpr (std::is_same_v<T, int8_t>) { return tag_int8{}; }
-  if constexpr (std::is_same_v<T, uint8_t>) { return tag_uint8{}; }
+  if constexpr (std::is_same_v<T, float>) { return tag_f{}; }
+  if constexpr (std::is_same_v<T, __half>) { return tag_h{}; }
+  if constexpr (std::is_same_v<T, int8_t>) { return tag_sc{}; }
+  if constexpr (std::is_same_v<T, uint8_t>) { return tag_uc{}; }
 }
 
 template <typename AccT>
 constexpr auto get_acc_type_tag()
 {
-  if constexpr (std::is_same_v<AccT, float>) { return tag_acc_float{}; }
-  if constexpr (std::is_same_v<AccT, __half>) { return tag_acc_half{}; }
-  if constexpr (std::is_same_v<AccT, int32_t>) { return tag_acc_int32{}; }
-  if constexpr (std::is_same_v<AccT, uint32_t>) { return tag_acc_uint32{}; }
+  if constexpr (std::is_same_v<AccT, float>) { return tag_acc_f{}; }
+  if constexpr (std::is_same_v<AccT, __half>) { return tag_acc_h{}; }
+  if constexpr (std::is_same_v<AccT, int32_t>) { return tag_acc_i{}; }
+  if constexpr (std::is_same_v<AccT, uint32_t>) { return tag_acc_ui{}; }
 }
 
 template <typename IdxT>
 constexpr auto get_idx_type_tag()
 {
-  if constexpr (std::is_same_v<IdxT, int64_t>) { return tag_idx_int64{}; }
+  if constexpr (std::is_same_v<IdxT, int64_t>) { return tag_idx_l{}; }
 }
 
 template <typename FilterT>
@@ -70,10 +70,10 @@ constexpr auto get_filter_type_tag()
 
   // Determine the filter implementation tag
   if constexpr (std::is_same_v<FilterT, none_sample_filter>) {
-    return tag_filter<tag_idx_int64, tag_filter_none_impl>{};
+    return tag_filter<tag_idx_l, tag_filter_none_impl>{};
   }
   if constexpr (std::is_same_v<FilterT, bitset_filter<uint32_t, int64_t>>) {
-    return tag_filter<tag_idx_int64, tag_filter_bitset_impl>{};
+    return tag_filter<tag_idx_l, tag_filter_bitset_impl>{};
   }
 }
 
@@ -108,12 +108,10 @@ constexpr auto get_metric_name()
 template <typename IvfSampleFilterTag>
 constexpr auto get_filter_name()
 {
-  if constexpr (std::is_same_v<IvfSampleFilterTag,
-                               tag_filter<tag_idx_int64, tag_filter_none_impl>>) {
+  if constexpr (std::is_same_v<IvfSampleFilterTag, tag_filter<tag_idx_l, tag_filter_none_impl>>) {
     return "filter_none";
   }
-  if constexpr (std::is_same_v<IvfSampleFilterTag,
-                               tag_filter<tag_idx_int64, tag_filter_bitset_impl>>) {
+  if constexpr (std::is_same_v<IvfSampleFilterTag, tag_filter<tag_idx_l, tag_filter_bitset_impl>>) {
     return "filter_bitset";
   }
 }
@@ -178,19 +176,8 @@ void launch_kernel(const index<T, IdxT>& index,
 {
   RAFT_EXPECTS(Veclen == index.veclen(),
                "Configured Veclen does not match the index interleaving pattern.");
-  // constexpr auto kKernel   = interleaved_scan_kernel<Capacity,
-  //                                                    Veclen,
-  //                                                    Ascending,
-  //                                                    ComputeNorm,
-  //                                                    T,
-  //                                                    AccT,
-  //                                                    IdxT,
-  //                                                    IvfSampleFilterT,
-  //                                                    Lambda,
-  //                                                    PostLambda>;
 
   // Use tag types for the planner to avoid template bloat
-  auto start_time     = std::chrono::high_resolution_clock::now();
   auto kernel_planner = InterleavedScanPlanner<decltype(get_data_type_tag<T>()),
                                                decltype(get_acc_type_tag<AccT>()),
                                                decltype(get_idx_type_tag<IdxT>())>(
@@ -201,10 +188,6 @@ void launch_kernel(const index<T, IdxT>& index,
   kernel_planner.add_filter_device_function(get_filter_name<IvfSampleFilterTag>());
   kernel_planner.add_post_lambda_device_function(get_post_lambda_name<PostLambdaTag>());
   auto kernel_launcher = kernel_planner.get_launcher();
-  auto end_time        = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
-  std::cout << "Time taken to get kernel launcher: " << duration.count() << " microseconds"
-            << std::endl;
 
   const int max_query_smem = 16384;
   int query_smem_elems     = std::min<int>(max_query_smem / sizeof(T),
@@ -470,8 +453,6 @@ void ivfflat_interleaved_scan(const index<T, IdxT>& index,
 {
   const int capacity = raft::bound_by_power_of_two(k);
 
-  // auto filter_adapter = cuvs::neighbors::filtering::ivf_to_sample_filter(
-  //   index.inds_ptrs().data_handle(), sample_filter);
   cuda::std::optional<uint32_t*> bitset_ptr;
   cuda::std::optional<IdxT> bitset_len;
   cuda::std::optional<IdxT> original_nbits;
@@ -496,7 +477,6 @@ void ivfflat_interleaved_scan(const index<T, IdxT>& index,
         k,
         max_samples,
         chunk_indices,
-        //  filter_adapter,
         index.inds_ptrs().data_handle(),
         bitset_ptr,
         bitset_len,

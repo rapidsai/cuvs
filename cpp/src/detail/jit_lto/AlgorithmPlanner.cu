@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <chrono>
 #include <iostream>
 #include <iterator>
 #include <memory>
@@ -72,10 +73,10 @@ std::string AlgorithmPlanner::get_device_functions_key()
 
 AlgorithmLauncher AlgorithmPlanner::get_launcher()
 {
-  std::cout << "Getting launcher" << std::endl;
   auto& launchers = get_cached_launchers();
   auto launch_key = this->entrypoint + this->get_device_functions_key();
   if (launchers.count(launch_key) == 0) {
+    auto start = std::chrono::high_resolution_clock::now();
     add_entrypoint();
     add_device_functions();
     launchers[launch_key] = this->build();

@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include "interleaved_scan_tags.hpp"
 #include <raft/util/cuda_utils.cuh>
 
 namespace cuvs::neighbors::ivf_flat::detail {

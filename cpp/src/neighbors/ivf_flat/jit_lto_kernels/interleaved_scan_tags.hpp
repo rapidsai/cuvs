@@ -19,19 +19,19 @@
 namespace cuvs::neighbors::ivf_flat::detail {
 
 // Tag types for data types
-struct tag_float {};
-struct tag_half {};
-struct tag_int8 {};
-struct tag_uint8 {};
+struct tag_f {};
+struct tag_h {};
+struct tag_sc {};
+struct tag_uc {};
 
 // Tag types for accumulator types
-struct tag_acc_float {};
-struct tag_acc_half {};
-struct tag_acc_int32 {};
-struct tag_acc_uint32 {};
+struct tag_acc_f {};
+struct tag_acc_h {};
+struct tag_acc_i {};
+struct tag_acc_ui {};
 
 // Tag types for index types
-struct tag_idx_int64 {};
+struct tag_idx_l {};
 
 // Tag types for filter subtypes
 struct tag_filter_bitset_impl {};
