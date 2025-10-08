@@ -16,9 +16,6 @@
 function(generate_interleaved_scan_kernels)
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
-  set(KERNEL_LIST_FILE
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_kernels.txt
-  )
   set(GENERATOR_SCRIPT
       ${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/generate_kernels.py
   )
@@ -31,7 +28,7 @@ function(generate_interleaved_scan_kernels)
     OUTPUT ${STAMP_FILE}
     COMMAND ${Python3_EXECUTABLE} ${GENERATOR_SCRIPT} ${OUTPUT_BASE_DIR}
     COMMAND ${CMAKE_COMMAND} -E touch ${STAMP_FILE}
-    DEPENDS ${KERNEL_LIST_FILE} ${GENERATOR_SCRIPT}
+    DEPENDS ${GENERATOR_SCRIPT}
     COMMENT "Generating interleaved scan kernel files..."
     VERBATIM
   )
