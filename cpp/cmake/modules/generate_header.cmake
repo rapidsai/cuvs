@@ -39,12 +39,13 @@ foreach(obj ${objects_list})
       set(header_file "${OUTPUT_DIR}/${obj_name}.h")
 
       set(args -c -p 0x0 --name embedded_${obj_name} ${obj})
-      execute_process(COMMAND "${BIN_TO_C_COMMAND}" ${args}
-                      WORKING_DIRECTORY ${obj_dir}
-                      RESULT_VARIABLE result
-                      OUTPUT_VARIABLE output
-                      ERROR_VARIABLE error_var
-                      )
+      execute_process(
+        COMMAND "${BIN_TO_C_COMMAND}" ${args}
+        WORKING_DIRECTORY ${obj_dir}
+        RESULT_VARIABLE result
+        OUTPUT_VARIABLE output
+        ERROR_VARIABLE error_var
+      )
       if(NOT result EQUAL 0)
         message(FATAL_ERROR "Failed to process ${obj}: ${error_var}")
       endif()

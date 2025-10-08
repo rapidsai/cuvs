@@ -16,8 +16,12 @@
 function(generate_interleaved_scan_kernels)
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
-  set(KERNEL_LIST_FILE ${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_kernels.txt)
-  set(GENERATOR_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/generate_kernels.py)
+  set(KERNEL_LIST_FILE
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_kernels.txt
+  )
+  set(GENERATOR_SCRIPT
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/generate_kernels.py
+  )
   set(OUTPUT_BASE_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated_kernels)
   set(CMAKE_LIST_FILE ${OUTPUT_BASE_DIR}/interleaved_scan.cmake)
   set(STAMP_FILE ${CMAKE_CURRENT_BINARY_DIR}/kernels_generated.stamp)
@@ -33,12 +37,9 @@ function(generate_interleaved_scan_kernels)
   )
 
   # Create a custom target that depends on the stamp file
-  add_custom_target(generate_interleaved_scan_kernels_target
-    DEPENDS ${STAMP_FILE}
-  )
+  add_custom_target(generate_interleaved_scan_kernels_target DEPENDS ${STAMP_FILE})
 
-  # Include the generated CMake list file
-  # Only generate if the CMake list file doesn't exist
+  # Include the generated CMake list file Only generate if the CMake list file doesn't exist
   if(NOT EXISTS ${CMAKE_LIST_FILE})
     message(VERBOSE "Generating interleaved scan kernels for the first time...")
     execute_process(
@@ -49,7 +50,10 @@ function(generate_interleaved_scan_kernels)
     )
 
     if(NOT GENERATION_RESULT EQUAL 0)
-      message(FATAL_ERROR "Failed to generate kernel files during configuration\nOutput: ${GENERATION_OUTPUT}\nError: ${GENERATION_ERROR}")
+      message(
+        FATAL_ERROR
+          "Failed to generate kernel files during configuration\nOutput: ${GENERATION_OUTPUT}\nError: ${GENERATION_ERROR}"
+      )
     endif()
   endif()
 
@@ -81,10 +85,28 @@ function(generate_interleaved_scan_kernels)
   endforeach()
 
   # Return the lists to parent scope
-  set(INTERLEAVED_SCAN_KERNEL_FILES ${FULL_PATH_KERNEL_FILES} PARENT_SCOPE)
-  set(METRIC_DEVICE_FUNCTION_FILES ${FULL_PATH_METRIC_FILES} PARENT_SCOPE)
-  set(FILTER_DEVICE_FUNCTION_FILES ${FULL_PATH_FILTER_FILES} PARENT_SCOPE)
-  set(POST_LAMBDA_DEVICE_FUNCTION_FILES ${FULL_PATH_POST_LAMBDA_FILES} PARENT_SCOPE)
-  set(INTERLEAVED_SCAN_KERNELS_STAMP ${STAMP_FILE} PARENT_SCOPE)
-  set(INTERLEAVED_SCAN_KERNELS_TARGET generate_interleaved_scan_kernels_target PARENT_SCOPE)
+  set(INTERLEAVED_SCAN_KERNEL_FILES
+      ${FULL_PATH_KERNEL_FILES}
+      PARENT_SCOPE
+  )
+  set(METRIC_DEVICE_FUNCTION_FILES
+      ${FULL_PATH_METRIC_FILES}
+      PARENT_SCOPE
+  )
+  set(FILTER_DEVICE_FUNCTION_FILES
+      ${FULL_PATH_FILTER_FILES}
+      PARENT_SCOPE
+  )
+  set(POST_LAMBDA_DEVICE_FUNCTION_FILES
+      ${FULL_PATH_POST_LAMBDA_FILES}
+      PARENT_SCOPE
+  )
+  set(INTERLEAVED_SCAN_KERNELS_STAMP
+      ${STAMP_FILE}
+      PARENT_SCOPE
+  )
+  set(INTERLEAVED_SCAN_KERNELS_TARGET
+      generate_interleaved_scan_kernels_target
+      PARENT_SCOPE
+  )
 endfunction()
