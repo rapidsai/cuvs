@@ -205,11 +205,10 @@ void fusedDistanceNN(OutT* min,
     }
   } else {
     if (is_skinny) {
-      constexpr int max_veclen = std::min<int>(4, 16 / sizeof(DataT));
       detail::fusedDistanceNNImpl<DataT,
                                   OutT,
                                   IdxT,
-                                  typename raft::linalg::Policy4x4Skinny<DataT, max_veclen>::Policy,
+                                  typename raft::linalg::Policy4x4Skinny<DataT, 1>::Policy,
                                   ReduceOpT>(min,
                                              x,
                                              y,
@@ -228,11 +227,10 @@ void fusedDistanceNN(OutT* min,
                                              metric_arg,
                                              stream);
     } else {
-      constexpr int max_veclen = std::min<int>(4, 16 / sizeof(DataT));
       detail::fusedDistanceNNImpl<DataT,
                                   OutT,
                                   IdxT,
-                                  typename raft::linalg::Policy4x4<DataT, max_veclen>::Policy,
+                                  typename raft::linalg::Policy4x4<DataT, 1>::Policy,
                                   ReduceOpT>(min,
                                              x,
                                              y,
