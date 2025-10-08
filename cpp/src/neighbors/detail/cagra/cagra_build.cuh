@@ -49,11 +49,8 @@
 #include <unordered_set>
 #include <vector>
 
-#include <errno.h>
-#include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 namespace cuvs::neighbors::cagra::detail {
 
@@ -685,61 +682,36 @@ void ace_reorder_and_store_dataset(
     primary_buffer_counts(p)   = 0;
     augmented_buffer_counts(p) = 0;
   }
-  auto ace_flush_buffer = [&, vector_size](
-                            const uint64_t partition_id,
-                            const bool is_primary,
-                            const cuvs::util::file_descriptor& file_fd,
-                            std::vector<raft::host_matrix<T, int64_t>>& buffers,
-                            raft::host_vector<uint64_t, int64_t>& buffer_counts,
-                            const raft::host_vector<uint64_t, int64_t>& partition_starts,
-                            raft::host_vector<uint64_t, int64_t>& partition_current,
-                            const char* buffer_type) {
-    const uint64_t count = buffer_counts(partition_id);
+  auto flush_primary_buffer = [&](uint64_t partition_id) {
+    const uint64_t count = primary_buffer_counts(partition_id);
     if (count > 0) {
       const size_t bytes_to_write = count * vector_size;
       const uint64_t file_offset =
-        (partition_starts(partition_id) + partition_current(partition_id)) * vector_size;
+        (primary_partition_starts(partition_id) + primary_partition_current(partition_id)) *
+        vector_size;
 
-      const ssize_t bytes_written =
-        pwrite(file_fd.get(), buffers[partition_id].data_handle(), bytes_to_write, file_offset);
+      cuvs::util::write_large_file(
+        reordered_fd, primary_buffers[partition_id].data_handle(), bytes_to_write, file_offset);
 
-      RAFT_EXPECTS(bytes_written != -1,
-                   "Failed to write %s buffer for partition %lu: %s",
-                   buffer_type,
-                   partition_id,
-                   strerror(errno));
-      RAFT_EXPECTS(bytes_written == static_cast<ssize_t>(bytes_to_write),
-                   "Incomplete write of %s buffer for partition %lu. Expected %zu bytes, wrote %zd",
-                   buffer_type,
-                   partition_id,
-                   bytes_to_write,
-                   bytes_written);
-
-      partition_current(partition_id) += count;
-      buffer_counts(partition_id) = 0;
+      primary_partition_current(partition_id) += count;
+      primary_buffer_counts(partition_id) = 0;
     }
   };
 
-  auto flush_primary_buffer = [&](uint64_t partition_id) {
-    ace_flush_buffer(partition_id,
-                     true,
-                     reordered_fd,
-                     primary_buffers,
-                     primary_buffer_counts,
-                     primary_partition_starts,
-                     primary_partition_current,
-                     "primary");
-  };
-
   auto flush_augmented_buffer = [&](uint64_t partition_id) {
-    ace_flush_buffer(partition_id,
-                     false,
-                     augmented_fd,
-                     augmented_buffers,
-                     augmented_buffer_counts,
-                     augmented_partition_starts,
-                     augmented_partition_current,
-                     "augmented");
+    const uint64_t count = augmented_buffer_counts(partition_id);
+    if (count > 0) {
+      const size_t bytes_to_write = count * vector_size;
+      const uint64_t file_offset =
+        (augmented_partition_starts(partition_id) + augmented_partition_current(partition_id)) *
+        vector_size;
+
+      cuvs::util::write_large_file(
+        augmented_fd, augmented_buffers[partition_id].data_handle(), bytes_to_write, file_offset);
+
+      augmented_partition_current(partition_id) += count;
+      augmented_buffer_counts(partition_id) = 0;
+    }
   };
 
   uint64_t vectors_processed  = 0;
