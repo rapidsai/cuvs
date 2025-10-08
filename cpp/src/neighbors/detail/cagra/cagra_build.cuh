@@ -16,6 +16,8 @@
 #pragma once
 
 #include "../../../core/nvtx.hpp"
+#include "../../../util/file_io.hpp"
+#include "../../../util/host_memory.hpp"
 #include "../../vpq_dataset.cuh"
 #include "graph_core.cuh"
 
@@ -54,143 +56,6 @@
 #include <unistd.h>
 
 namespace cuvs::neighbors::cagra::detail {
-
-template <typename DataT, typename IdxT>
-size_t get_free_host_memory()
-{
-  size_t available_memory = 0;
-  std::ifstream meminfo("/proc/meminfo");
-  std::string line;
-  while (std::getline(meminfo, line)) {
-    if (line.find("MemAvailable:") != std::string::npos) {
-      available_memory = std::stoi(line.substr(line.find(":") + 1));
-    }
-  }
-  available_memory *= 1024;
-  meminfo.close();
-  RAFT_EXPECTS(available_memory > 0, "ACE: Failed to get available memory from /proc/meminfo");
-  return available_memory;
-}
-
-// RAII wrapper for file descriptors
-class file_descriptor {
- public:
-  explicit file_descriptor(int fd = -1) : fd_(fd) {}
-
-  file_descriptor(const std::string& path, int flags, mode_t mode = 0644)
-    : fd_(open(path.c_str(), flags, mode))
-  {
-    if (fd_ == -1) {
-      RAFT_FAIL("Failed to open file: %s (errno: %d, %s)", path.c_str(), errno, strerror(errno));
-    }
-  }
-
-  file_descriptor(const file_descriptor&)            = delete;
-  file_descriptor& operator=(const file_descriptor&) = delete;
-
-  file_descriptor(file_descriptor&& other) noexcept : fd_(other.fd_) { other.fd_ = -1; }
-
-  file_descriptor& operator=(file_descriptor&& other) noexcept
-  {
-    if (this != &other) {
-      close();
-      fd_       = other.fd_;
-      other.fd_ = -1;
-    }
-    return *this;
-  }
-
-  ~file_descriptor() noexcept { close(); }
-
-  [[nodiscard]] int get() const noexcept { return fd_; }
-  [[nodiscard]] bool is_valid() const noexcept { return fd_ != -1; }
-
-  void close() noexcept
-  {
-    if (fd_ != -1) {
-      ::close(fd_);
-      fd_ = -1;
-    }
-  }
-
-  [[nodiscard]] int release() noexcept
-  {
-    const int fd = fd_;
-    fd_          = -1;
-    return fd;
-  }
-
- private:
-  int fd_;
-};
-
-// ACE: Read large file in chunks
-template <typename DataT, typename IdxT>
-void ace_read_large_file(const file_descriptor& fd,
-                         void* dest_ptr,
-                         const size_t total_bytes,
-                         const uint64_t file_offset)
-{
-  RAFT_EXPECTS(total_bytes > 0, "Total bytes must be greater than 0");
-  RAFT_EXPECTS(dest_ptr != nullptr, "Destination pointer must not be nullptr");
-  RAFT_EXPECTS(fd.is_valid(), "File descriptor must be valid");
-
-  const size_t read_chunk_size = std::min<size_t>(1024 * 1024 * 1024, SSIZE_MAX);
-  size_t bytes_remaining       = total_bytes;
-  size_t offset                = 0;
-
-  while (bytes_remaining > 0) {
-    const size_t chunk_size = std::min(read_chunk_size, bytes_remaining);
-    const uint64_t file_pos = file_offset + offset;
-    const ssize_t bytes_read =
-      pread(fd.get(), reinterpret_cast<char*>(dest_ptr) + offset, chunk_size, file_pos);
-
-    RAFT_EXPECTS(
-      bytes_read != -1, "Failed to read from file at offset %lu: %s", file_pos, strerror(errno));
-    RAFT_EXPECTS(bytes_read == static_cast<ssize_t>(chunk_size),
-                 "Incomplete read from file. Expected %zu bytes, got %zd at offset %lu",
-                 chunk_size,
-                 bytes_read,
-                 file_pos);
-
-    bytes_remaining -= chunk_size;
-    offset += chunk_size;
-  }
-}
-
-// ACE: Write large file in chunks
-template <typename DataT, typename IdxT>
-void ace_write_large_file(const file_descriptor& fd,
-                          const void* data_ptr,
-                          const size_t total_bytes,
-                          const uint64_t file_offset)
-{
-  RAFT_EXPECTS(total_bytes > 0, "Total bytes must be greater than 0");
-  RAFT_EXPECTS(data_ptr != nullptr, "Data pointer must not be nullptr");
-  RAFT_EXPECTS(fd.is_valid(), "File descriptor must be valid");
-
-  const size_t write_chunk_size = 1024 * 1024 * 1024;
-  size_t bytes_remaining        = total_bytes;
-  size_t offset                 = 0;
-
-  while (bytes_remaining > 0) {
-    const size_t chunk_size = std::min(write_chunk_size, bytes_remaining);
-    const uint64_t file_pos = file_offset + offset;
-    const ssize_t chunk_written =
-      pwrite(fd.get(), reinterpret_cast<const char*>(data_ptr) + offset, chunk_size, file_pos);
-
-    RAFT_EXPECTS(
-      chunk_written != -1, "Failed to write to file at offset %lu: %s", file_pos, strerror(errno));
-    RAFT_EXPECTS(chunk_written == static_cast<ssize_t>(chunk_size),
-                 "Incomplete write to file. Expected %zu bytes, wrote %zd at offset %lu",
-                 chunk_size,
-                 chunk_written,
-                 file_pos);
-
-    bytes_remaining -= chunk_size;
-    offset += chunk_size;
-  }
-}
 
 // ACE: Get partition labels for partitioned approach
 template <typename DataT, typename IdxT, typename Accessor>
@@ -725,8 +590,10 @@ void ace_reorder_and_store_dataset(
 
   const std::string reordered_dataset_path = build_dir + "/reordered_dataset.bin";
   const std::string augmented_dataset_path = build_dir + "/augmented_dataset.bin";
-  file_descriptor reordered_fd(reordered_dataset_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
-  file_descriptor augmented_fd(augmented_dataset_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+  cuvs::util::file_descriptor reordered_fd(
+    reordered_dataset_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+  cuvs::util::file_descriptor augmented_fd(
+    augmented_dataset_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
 
   // Calculate total sizes for pre-allocation
   uint64_t total_primary_vectors   = 0;
@@ -792,7 +659,7 @@ void ace_reorder_and_store_dataset(
 
   // Calculate the number of buffers that fit into main memory. ~80% limit, primary and augmented
   // buffers.
-  size_t available_memory      = get_free_host_memory<T, IdxT>();
+  size_t available_memory      = cuvs::util::get_free_host_memory();
   const size_t disk_write_size = available_memory * 0.4 / n_partitions;
   size_t vectors_per_buffer    = std::max<size_t>(1, disk_write_size / vector_size);
   const size_t max_vectors_per_buffer =
@@ -821,7 +688,7 @@ void ace_reorder_and_store_dataset(
   auto ace_flush_buffer = [&, vector_size](
                             const uint64_t partition_id,
                             const bool is_primary,
-                            const file_descriptor& file_fd,
+                            const cuvs::util::file_descriptor& file_fd,
                             std::vector<raft::host_matrix<T, int64_t>>& buffers,
                             raft::host_vector<uint64_t, int64_t>& buffer_counts,
                             const raft::host_vector<uint64_t, int64_t>& partition_starts,
@@ -924,14 +791,14 @@ void ace_reorder_and_store_dataset(
   const std::string mapping_file_path = build_dir + "/dataset_mapping.bin";
   const uint64_t mapping_file_size    = dataset_size * sizeof(IdxT);
   {
-    file_descriptor mapping_fd(mapping_file_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
-    ace_write_large_file<T, IdxT>(
+    cuvs::util::file_descriptor mapping_fd(mapping_file_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    cuvs::util::write_large_file(
       mapping_fd, backward_mapping_0.data_handle(), mapping_file_size, 0);
   }
 
   const std::string graph_file_path = build_dir + "/cagra_graph.bin";
   {
-    file_descriptor graph_fd(graph_file_path, O_WRONLY | O_CREAT, 0644);
+    cuvs::util::file_descriptor graph_fd(graph_file_path, O_WRONLY | O_CREAT, 0644);
 
     // Pre-allocate the graph file for the entire dataset
     const uint64_t total_file_size = dataset_size * params.graph_degree * sizeof(IdxT);
@@ -963,7 +830,7 @@ void ace_reorder_and_store_dataset(
 }
 
 // ACE: Load partition dataset and augmented dataset from disk
-template <typename T, typename IdxT, typename Accessor>
+template <typename T, typename IdxT>
 void ace_load_partition_dataset_from_disk(
   raft::resources const& res,
   const index_params& params,
@@ -1003,8 +870,8 @@ void ace_load_partition_dataset_from_disk(
   const std::string reordered_dataset_path = build_dir + "/reordered_dataset.bin";
   const std::string augmented_dataset_path = build_dir + "/augmented_dataset.bin";
 
-  file_descriptor reordered_fd(reordered_dataset_path, O_RDONLY);
-  file_descriptor augmented_fd(augmented_dataset_path, O_RDONLY);
+  cuvs::util::file_descriptor reordered_fd(reordered_dataset_path, O_RDONLY);
+  cuvs::util::file_descriptor augmented_fd(augmented_dataset_path, O_RDONLY);
 
   uint64_t primary_file_offset   = 0;
   uint64_t augmented_file_offset = 0;
@@ -1026,7 +893,7 @@ void ace_load_partition_dataset_from_disk(
       "ACE: Reading %lu primary vectors from offset %lu", primary_size, primary_file_offset);
 
     const size_t primary_bytes = primary_size * vector_size;
-    ace_read_large_file<T, IdxT>(
+    cuvs::util::read_large_file(
       reordered_fd, sub_dataset.data_handle(), primary_bytes, primary_file_offset);
   }
 
@@ -1036,7 +903,7 @@ void ace_load_partition_dataset_from_disk(
 
     const size_t augmented_bytes = augmented_size * vector_size;
     T* augmented_dest            = sub_dataset.data_handle() + (primary_size * dataset_dim);
-    ace_read_large_file<T, IdxT>(
+    cuvs::util::read_large_file(
       augmented_fd, augmented_dest, augmented_bytes, augmented_file_offset);
   }
 }
@@ -1103,7 +970,7 @@ index<T, IdxT> build_ace(
     dataset = dataset_host.view();
   }
 
-  size_t available_memory = get_free_host_memory<T, IdxT>();
+  size_t available_memory = cuvs::util::get_free_host_memory();
 
   // Optimistic memory model: focus on largest arrays, assumes all partitions are of equal size
   // 5 main arrays: partition labels, forward, 2 backward mappings
@@ -1272,10 +1139,10 @@ index<T, IdxT> build_ace(
                           ? raft::make_host_matrix<IdxT, int64_t>(0, 0)
                           : raft::make_host_matrix<IdxT, int64_t>(dataset_size, graph_degree);
 
-  file_descriptor graph_fd;
+  cuvs::util::file_descriptor graph_fd;
   if (use_disk) {
     const std::string graph_file_path = params.ace_build_dir + "/cagra_graph.bin";
-    graph_fd                          = file_descriptor(graph_file_path, O_WRONLY, 0644);
+    graph_fd = cuvs::util::file_descriptor(graph_file_path, O_WRONLY, 0644);
   }
 
   // Process each partition
@@ -1312,14 +1179,14 @@ index<T, IdxT> build_ace(
 
     if (use_disk) {
       // Load partition dataset from disk files
-      ace_load_partition_dataset_from_disk<T, IdxT, Accessor>(res,
-                                                              params,
-                                                              partition_id,
-                                                              dataset_dim,
-                                                              partition_histogram.view(),
-                                                              primary_partition_offsets.view(),
-                                                              augmented_partition_offsets.view(),
-                                                              sub_dataset.view());
+      ace_load_partition_dataset_from_disk<T, IdxT>(res,
+                                                    params,
+                                                    partition_id,
+                                                    dataset_dim,
+                                                    partition_histogram.view(),
+                                                    primary_partition_offsets.view(),
+                                                    augmented_partition_offsets.view(),
+                                                    sub_dataset.view());
     } else {
       // Gather partition dataset from memory
       ace_gather_partition_dataset<T, IdxT, Accessor>(sub_dataset_size_0,
@@ -1367,7 +1234,7 @@ index<T, IdxT> build_ace(
       const uint64_t graph_offset =
         primary_partition_offsets(partition_id) * graph_degree * sizeof(IdxT);
       const uint64_t graph_bytes = sub_dataset_size_0 * graph_degree * sizeof(IdxT);
-      ace_write_large_file<T, IdxT>(
+      cuvs::util::write_large_file(
         graph_fd, sub_search_graph.data_handle(), graph_bytes, graph_offset);
     } else {
       // Adjust IDs in sub_search_graph and save to search_graph_0
