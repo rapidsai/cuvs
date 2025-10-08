@@ -35,7 +35,7 @@ void ivf_flat_build_search_simple(raft::device_resources const& dev_resources,
   using namespace cuvs::neighbors;
 
   ivf_flat::index_params index_params;
-  index_params.n_lists                  = 1024;
+  index_params.n_lists                  = 100;
   index_params.kmeans_trainset_fraction = 0.1;
   index_params.metric                   = cuvs::distance::DistanceType::L2Expanded;
 
@@ -62,7 +62,32 @@ void ivf_flat_build_search_simple(raft::device_resources const& dev_resources,
   // The call to ivf_flat::search is asynchronous. Before accessing the data, sync by calling
   raft::resource::sync_stream(dev_resources);
 
-  print_results(dev_resources, neighbors.view(), distances.view());
+  int label         = 0;
+  auto list_indices = make_device_vector_view<const int64_t, int64_t>(
+    index.lists()[label]->indices.data_handle(), index.lists()[label]->size);
+  std::cout << "Indices of vectors in cluster " << label << std::endl;
+  raft::print_vector("Idx:", list_indices.data_handle(), list_indices.size(), std::cout);
+
+  auto list_data = index.lists()[label]->data.view();
+  // allocate the buffer for the output
+  uint32_t n_take = 1;
+  auto vectors    = raft::make_device_matrix<float>(dev_resources, n_take, index.dim());
+  uint32_t offset = 10;
+  // unpack n_take elements from the list
+  ivf_flat::helpers::codepacker::unpack(
+    dev_resources, list_data, index.veclen(), offset, vectors.view());
+
+  int64_t vector_id;
+  raft::copy(&vector_id, &list_indices(offset), 1, raft::resource::get_cuda_stream(dev_resources));
+  raft::resource::sync_stream(dev_resources);
+
+  std::cout << "Vector at position " << offset << " in the list (vector id=" << vector_id
+            << "):" << std::endl;
+  raft::print_vector("vector from list    ", vectors.data_handle(), vectors.size(), std::cout);
+
+  raft::print_vector("vector from dataset ", &dataset(vector_id, 0), vectors.size(), std::cout);
+
+  // print_results(dev_resources, neighbors.view(), distances.view());
 }
 
 void ivf_flat_build_extend_search(raft::device_resources const& dev_resources,
@@ -141,8 +166,8 @@ int main()
                                raft::make_const_mdspan(dataset.view()),
                                raft::make_const_mdspan(queries.view()));
 
-  // Build and extend example.
-  ivf_flat_build_extend_search(dev_resources,
-                               raft::make_const_mdspan(dataset.view()),
-                               raft::make_const_mdspan(queries.view()));
+  // // Build and extend example.
+  // ivf_flat_build_extend_search(dev_resources,
+  //                              raft::make_const_mdspan(dataset.view()),
+  //                              raft::make_const_mdspan(queries.view()));
 }
