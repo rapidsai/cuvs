@@ -127,8 +127,9 @@ void build_knn_graph(
   cuvs::neighbors::cagra::graph_build_params::ivf_pq_params pq)
 {
   RAFT_EXPECTS(pq.build_params.metric == cuvs::distance::DistanceType::L2Expanded ||
-                 pq.build_params.metric == cuvs::distance::DistanceType::InnerProduct,
-               "Currently only L2Expanded or InnerProduct metric are supported");
+                 pq.build_params.metric == cuvs::distance::DistanceType::InnerProduct ||
+                 pq.build_params.metric == cuvs::distance::DistanceType::CosineExpanded,
+               "Currently only L2Expanded, InnerProduct and CosineExpanded metrics are supported");
 
   uint32_t node_degree = knn_graph.extent(1);
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
@@ -710,6 +711,11 @@ index<T, IdxT> build(
       std::holds_alternative<cagra::graph_build_params::nn_descent_params>(knn_build_params),
     "IVF_PQ for CAGRA graph build does not support BitwiseHamming as a metric. Please "
     "use nn-descent or the iterative CAGRA search build.");
+  RAFT_EXPECTS(
+    params.metric != cuvs::distance::DistanceType::CosineExpanded ||
+      std::holds_alternative<cagra::graph_build_params::ivf_pq_params>(knn_build_params) ||
+      std::holds_alternative<cagra::graph_build_params::nn_descent_params>(knn_build_params),
+    "CosineExpanded distance is not supported for iterative CAGRA graph build.");
 
   // Validate data type for BitwiseHamming metric
   RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::BitwiseHamming ||

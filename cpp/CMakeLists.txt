@@ -231,6 +231,9 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_float_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_float_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_float_uint32_dim512_t32.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_half_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_half_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_half_uint32_dim512_t32.cu
@@ -246,6 +249,15 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_half_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_half_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_half_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_half_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_half_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_half_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_int8_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_int8_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_int8_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_uint8_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_uint8_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_uint8_uint32_dim512_t32.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_int8_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_int8_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_int8_uint32_dim512_t32.cu
@@ -736,8 +748,10 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
       src/neighbors/cagra_c.cpp
       $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw_c.cpp>
       src/neighbors/nn_descent_c.cpp
+      src/neighbors/vamana_c.cpp
       src/neighbors/refine/refine_c.cpp
       src/neighbors/tiered_index_c.cpp
+      src/neighbors/all_neighbors_c.cpp
       src/preprocessing/quantize/binary_c.cpp
       src/preprocessing/quantize/scalar_c.cpp
       src/distance/pairwise_distance_c.cpp

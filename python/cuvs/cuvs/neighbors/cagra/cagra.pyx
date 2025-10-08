@@ -139,12 +139,14 @@ cdef class IndexParams:
 
     metric : str, default = "sqeuclidean"
         String denoting the metric type, valid values for metric are
-        ["sqeuclidean", "inner_product"], where:
+        ["sqeuclidean", "inner_product", "cosine"], where:
 
             - sqeuclidean is the euclidean distance without the square root
               operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2
             - inner_product distance is defined as
               distance(a, b) = \\sum_i a_i * b_i.
+            - cosine distance is defined as
+              distance(a, b) = 1 - \\sum_i a_i * b_i / ( ||a||_2 * ||b||_2).
 
     intermediate_graph_degree : int, default = 128
     graph_degree : int, default = 64
@@ -172,13 +174,6 @@ cdef class IndexParams:
 
     """
 
-    cdef cuvsCagraIndexParams* params
-
-    # hold on to a reference to the compression, to keep from being GC'ed
-    cdef public object compression
-    cdef public object ivf_pq_build_params
-    cdef public object ivf_pq_search_params
-
     def __cinit__(self):
         check_cuvs(cuvsCagraIndexParamsCreate(&self.params))
         self.compression = None
@@ -186,7 +181,8 @@ cdef class IndexParams:
         self.ivf_pq_search_params = None
 
     def __dealloc__(self):
-        check_cuvs(cuvsCagraIndexParamsDestroy(self.params))
+        if self.params != NULL:
+            check_cuvs(cuvsCagraIndexParamsDestroy(self.params))
 
     def __init__(self, *,
                  metric="sqeuclidean",
@@ -345,6 +341,7 @@ def build(IndexParams index_params, dataset, resources=None):
     The following distance metrics are supported:
         - L2
         - InnerProduct
+        - Cosine
 
     Parameters
     ----------
@@ -475,13 +472,12 @@ cdef class SearchParams:
 
     """
 
-    cdef cuvsCagraSearchParams * params
-
     def __cinit__(self):
         check_cuvs(cuvsCagraSearchParamsCreate(&self.params))
 
     def __dealloc__(self):
-        check_cuvs(cuvsCagraSearchParamsDestroy(self.params))
+        if self.params != NULL:
+            check_cuvs(cuvsCagraSearchParamsDestroy(self.params))
 
     def __init__(self, *,
                  max_queries=0,
