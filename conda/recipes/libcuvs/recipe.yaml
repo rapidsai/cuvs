@@ -97,20 +97,20 @@ outputs:
         - cmake ${{ cmake_version }}
         - ${{ stdlib("c") }}
       host:
-        - libnvjitlink-dev
         - librmm =${{ minor_version }}
         - libraft-headers =${{ minor_version }}
         - nccl ${{ nccl_version }}
         - cuda-version =${{ cuda_version }}
         - cuda-cudart-dev
+        - cuda-driver-dev
         - cuda-profiler-api
         - libcublas-dev
         - libcurand-dev
         - libcusolver-dev
         - libcusparse-dev
+        - libnvjitlink-dev
       run:
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
-        - libnvjitlink-dev
         - libraft-headers =${{ minor_version }}
         - nccl
         - cuda-cudart
@@ -118,9 +118,11 @@ outputs:
         - libcurand
         - libcusolver
         - libcusparse
+        - libnvjitlink
       ignore_run_exports:
         by_name:
           - cuda-cudart
+          - cuda-driver-dev
           - cuda-version
           - libaio
           - libboost
@@ -128,8 +130,7 @@ outputs:
           - libcurand
           - libcusolver
           - libcusparse
-          - libcuda.so.1
-          - libnvjitlink-dev
+          - libnvjitlink
           - librmm
           - mkl
           - nccl

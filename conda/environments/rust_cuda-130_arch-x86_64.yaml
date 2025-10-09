@@ -10,6 +10,7 @@ dependencies:
 - clang==20.1.4
 - cmake>=3.30.4
 - cuda-cudart-dev
+- cuda-driver-dev
 - cuda-nvcc
 - cuda-nvtx-dev
 - cuda-profiler-api
@@ -22,6 +23,7 @@ dependencies:
 - libcusolver-dev
 - libcusparse-dev
 - libcuvs==25.12.*,>=0.0.0a0
+- libnvjitlink-dev
 - libraft==25.12.*,>=0.0.0a0
 - make
 - nccl>=2.19

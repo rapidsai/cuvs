@@ -144,6 +144,7 @@ if(DETECT_CONDA_ENV)
     )
     set(CMAKE_INSTALL_PREFIX "$ENV{CONDA_PREFIX}")
   endif()
+  set(CONDA_STUB_PATH "$ENV{CONDA_PREFIX}/lib/stubs")
 endif()
 
 # ##################################################################################################
@@ -585,9 +586,17 @@ if(NOT BUILD_CPU_ONLY)
     jit_lto_fatbins PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
                             "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
   )
+
+  set(JIT_LTO_TARGET_ARCHITECTURE "")
+  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 12.0)
+    set(JIT_LTO_TARGET_ARCHITECTURE "70-real")
+  elseif(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
+    set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
+  endif()
+
   set_target_properties(
     jit_lto_fatbins
-    PROPERTIES CUDA_ARCHITECTURES "75-real"
+    PROPERTIES CUDA_ARCHITECTURES ${JIT_LTO_TARGET_ARCHITECTURE}
                CXX_STANDARD 17
                CXX_STANDARD_REQUIRED ON
                CUDA_STANDARD 17
@@ -603,8 +612,8 @@ if(NOT BUILD_CPU_ONLY)
 
   # Set PIC for the static library since it will be linked into a shared library
   set_target_properties(
-    jit_lto_fatbins_as_cpp_sources PROPERTIES CUDA_ARCHITECTURES "75-real" POSITION_INDEPENDENT_CODE
-                                                                           ON
+    jit_lto_fatbins_as_cpp_sources PROPERTIES CUDA_ARCHITECTURES ${JIT_LTO_TARGET_ARCHITECTURE}
+                                              POSITION_INDEPENDENT_CODE ON
   )
 
   # Make sure the kernels are generated before embedding fatbins
@@ -614,10 +623,10 @@ if(NOT BUILD_CPU_ONLY)
     jit_lto_fatbins_as_cpp_sources PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
                                            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
   )
-  # target_compile_options( jit_lto_fatbins_as_cpp_sources PRIVATE
-  # "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
-  # "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
-  # )
+
+  target_link_directories(
+    jit_lto_fatbins_as_cpp_sources PRIVATE $<$<BOOL:${CONDA_STUB_PATH}>:${CONDA_STUB_PATH}>
+  )
   target_link_libraries(jit_lto_fatbins_as_cpp_sources PRIVATE CUDA::cuda_driver)
 
   embed_fatbins(jit_lto_fatbins_as_cpp_sources jit_lto_fatbins)
@@ -757,6 +766,7 @@ SECTIONS
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+              $<LINK_LIBRARY:WHOLE_ARCHIVE,jit_lto_fatbins_as_cpp_sources> CUDA::nvJitLink
     )
   endif()
 

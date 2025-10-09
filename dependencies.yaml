@@ -16,7 +16,6 @@ files:
       - cuda_version
       - depends_on_cuda_python
       - depends_on_cupy
-      - depends_on_libnvjitlink_dev
       - depends_on_librmm
       - depends_on_pylibraft
       - depends_on_nccl
@@ -138,7 +137,6 @@ files:
       table: tool.rapids-build-backend
       key: requires
     includes:
-      - depends_on_libnvjitlink_dev
       - depends_on_libraft
       - depends_on_librmm
       - depends_on_nccl
@@ -150,7 +148,6 @@ files:
       table: project
     includes:
       - cuda_wheels
-      - depends_on_libnvjitlink_dev
       - depends_on_libraft
       - depends_on_librmm
       - depends_on_nccl
@@ -319,11 +316,13 @@ dependencies:
         packages:
           - cuda-nvtx-dev
           - cuda-cudart-dev
+          - cuda-driver-dev
           - cuda-profiler-api
           - libcublas-dev
           - libcurand-dev
           - libcusolver-dev
           - libcusparse-dev
+          - libnvjitlink-dev
   cuda_wheels:
     specific:
       - output_types: [requirements, pyproject]
@@ -333,11 +332,13 @@ dependencies:
               use_cuda_wheels: "true"
             packages:
               - cuda-toolkit[cublas,curand,cusolver,cusparse]==12.*
+              - nvidia-nvjitlink-cu12
           - matrix:
               cuda: "13.*"
               use_cuda_wheels: "true"
             packages:
               - cuda-toolkit[cublas,curand,cusolver,cusparse]==13.*
+              - nvidia-nvjitlink==13.*
           - matrix:
               use_cuda_wheels: "false"
             packages:
@@ -346,6 +347,7 @@ dependencies:
           - matrix:
             packages:
               - cuda-toolkit[cublas,curand,cusolver,cusparse]>=12,<14
+              - nvidia-nvjitlink>=13,<14
   depends_on_cupy:
     common:
       - output_types: conda
@@ -540,25 +542,6 @@ dependencies:
       - output_types: conda
         packages:
           - libcuvs-tests==25.12.*,>=0.0.0a0
-  depends_on_libnvjitlink_dev:
-    common:
-      - output_types: conda
-        packages:
-          - libnvjitlink-dev
-    specific:
-      - output_types: [requirements, pyproject]
-        matrices:
-          - matrix:
-              cuda: "12.*"
-              cuda_suffixed: "true"
-            packages:
-              - nvidia-nvjitlink-cu12
-          - matrix:
-              cuda: "13.*"
-              cuda_suffixed: "false"
-            packages:
-              - nvidia-nvjitlink=13.*
-          - {matrix: null, packages: [nvidia-nvjitlink]}
   depends_on_libraft:
     common:
       - output_types: conda
