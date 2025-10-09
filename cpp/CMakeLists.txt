@@ -623,8 +623,12 @@ if(NOT BUILD_CPU_ONLY)
 
   # Set PIC for the static library since it will be linked into a shared library
   set_target_properties(
-    jit_lto_fatbins_as_cpp_sources PROPERTIES CUDA_ARCHITECTURES ${JIT_LTO_TARGET_ARCHITECTURE}
-                                              POSITION_INDEPENDENT_CODE ON
+    jit_lto_fatbins_as_cpp_sources PROPERTIES 
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CUDA_STANDARD 17
+    CUDA_STANDARD_REQUIRED ON 
+    POSITION_INDEPENDENT_CODE ON
   )
 
   # Make sure the kernels are generated before embedding fatbins
@@ -634,7 +638,6 @@ if(NOT BUILD_CPU_ONLY)
     jit_lto_fatbins_as_cpp_sources PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
                                            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
   )
-  target_link_libraries(jit_lto_fatbins_as_cpp_sources PRIVATE CUDA::cudart)
 
   embed_fatbins(jit_lto_fatbins_as_cpp_sources jit_lto_fatbins)
 
@@ -713,7 +716,6 @@ if(NOT BUILD_CPU_ONLY)
               cuvs-cagra-search
               $<LINK_LIBRARY:WHOLE_ARCHIVE,jit_lto_fatbins_as_cpp_sources>
               CUDA::nvJitLink
-              CUDA::cudart
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -777,7 +779,6 @@ SECTIONS
               $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
               $<LINK_LIBRARY:WHOLE_ARCHIVE,jit_lto_fatbins_as_cpp_sources>
               CUDA::nvJitLink
-              CUDA::cudart
     )
   endif()
 
