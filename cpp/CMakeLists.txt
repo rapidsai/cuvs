@@ -623,12 +623,12 @@ if(NOT BUILD_CPU_ONLY)
 
   # Set PIC for the static library since it will be linked into a shared library
   set_target_properties(
-    jit_lto_fatbins_as_cpp_sources PROPERTIES 
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED ON
-    CUDA_STANDARD 17
-    CUDA_STANDARD_REQUIRED ON 
-    POSITION_INDEPENDENT_CODE ON
+    jit_lto_fatbins_as_cpp_sources
+    PROPERTIES CXX_STANDARD 17
+               CXX_STANDARD_REQUIRED ON
+               CUDA_STANDARD 17
+               CUDA_STANDARD_REQUIRED ON
+               POSITION_INDEPENDENT_CODE ON
   )
 
   # Make sure the kernels are generated before embedding fatbins
@@ -775,10 +775,8 @@ SECTIONS
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
-      PRIVATE nvidia::cutlass::cutlass
-              $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              $<LINK_LIBRARY:WHOLE_ARCHIVE,jit_lto_fatbins_as_cpp_sources>
-              CUDA::nvJitLink
+      PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+              $<LINK_LIBRARY:WHOLE_ARCHIVE,jit_lto_fatbins_as_cpp_sources> CUDA::nvJitLink
     )
   endif()
 
