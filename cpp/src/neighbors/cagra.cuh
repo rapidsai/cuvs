@@ -290,7 +290,10 @@ index<T, IdxT> build(
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
 {
   if (params.ace_npartitions > 1) {
-    return cuvs::neighbors::cagra::detail::build_ace<T, IdxT, Accessor>(res, params, dataset);
+    // ACE expects the dataset to be on host due to the large dataset size
+    auto dataset_view = raft::make_host_matrix_view<const T, int64_t, row_major>(
+      dataset.data_handle(), dataset.extent(0), dataset.extent(1));
+    return cuvs::neighbors::cagra::detail::build_ace<T, IdxT>(res, params, dataset_view);
   }
   return cuvs::neighbors::cagra::detail::build<T, IdxT, Accessor>(res, params, dataset);
 }

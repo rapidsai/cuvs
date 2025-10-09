@@ -55,10 +55,10 @@
 namespace cuvs::neighbors::cagra::detail {
 
 // ACE: Get partition labels for partitioned approach
-template <typename DataT, typename IdxT, typename Accessor>
+template <typename T, typename IdxT>
 void ace_get_partition_labels(
   raft::resources const& res,
-  raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
+  raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_labels,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_histogram,
   uint64_t min_partition_size,
@@ -96,13 +96,20 @@ void ace_get_partition_labels(
       "sampling_rate, or use managed memory.");
     throw;
   }
-  if constexpr (std::is_same_v<DataT, float>) {
-    raft::matrix::sample_rows<DataT, int64_t>(res, random_state, dataset, sample_db_dev.view());
+  if constexpr (std::is_same_v<T, float>) {
+    raft::matrix::sample_rows<T, int64_t>(res, random_state, dataset, sample_db_dev.view());
   } else {
-    auto sample_db_tmp = raft::make_device_mdarray<DataT>(
+    raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
+      "   cagra::build_ace(%zu, %zu)/sample rows with tmp trainset (%zu rows).",
+      size_t(dataset_size),
+      size_t(dataset_dim),
+      size_t(n_samples));
+
+    // TODO(tfeher): Enable codebook generation with any type T, and then remove trainset tmp.
+    auto sample_db_tmp = raft::make_device_mdarray<T>(
       res, device_memory, raft::make_extents<int64_t>(n_samples, dataset_dim));
 
-    raft::matrix::sample_rows<DataT, int64_t>(res, random_state, dataset, sample_db_tmp.view());
+    raft::matrix::sample_rows<T, int64_t>(res, random_state, dataset, sample_db_tmp.view());
 
     raft::linalg::unaryOp(sample_db_dev.data_handle(),
                           sample_db_tmp.data_handle(),
@@ -112,8 +119,8 @@ void ace_get_partition_labels(
   }
 
   auto centroids_dev     = raft::make_device_matrix<float, int64_t>(res, n_partitions, dataset_dim);
-  auto sample_labels_dev = raft::make_device_vector<uint32_t, int64_t>(res, n_samples);
-  auto sample_sizes_dev  = raft::make_device_vector<uint32_t, int64_t>(res, n_partitions);
+  auto sample_labels_dev = raft::make_device_vector<IdxT, int64_t>(res, n_samples);
+  auto sample_sizes_dev  = raft::make_device_vector<IdxT, int64_t>(res, n_partitions);
 
   raft::resource::sync_stream(res);
 
@@ -470,13 +477,13 @@ void ace_set_index_params(raft::resources const& res,
 }
 
 // ACE: Gather partition dataset
-template <typename T, typename IdxT, typename Accessor>
+template <typename T, typename IdxT>
 void ace_gather_partition_dataset(
   uint64_t sub_dataset_size_0,
   uint64_t sub_dataset_size_1,
   uint64_t dataset_dim,
   uint64_t partition_id,
-  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
+  raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,
   raft::host_vector_view<IdxT, int64_t, raft::row_major> backward_mapping_0,
   raft::host_vector_view<IdxT, int64_t, raft::row_major> backward_mapping_1,
   raft::host_vector_view<IdxT, int64_t, raft::row_major> primary_partition_offsets,
@@ -556,11 +563,11 @@ void ace_adjust_final_graph_ids(
 // ACE: Reorder dataset based on partition assignments and store to disk
 // Writes two files: reordered_dataset.bin (primary partitions) and augmented_dataset.bin (secondary
 // partitions). Uses buffered writes optimized for NVMe storage.
-template <typename T, typename IdxT, typename Accessor>
+template <typename T, typename IdxT>
 void ace_reorder_and_store_dataset(
   raft::resources const& res,
   const index_params& params,
-  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,
+  raft::host_matrix_view<const T, int64_t, row_major> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_labels,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_histogram,
   raft::host_vector_view<IdxT, int64_t, raft::row_major> backward_mapping_0,
@@ -889,17 +896,13 @@ void ace_load_partition_dataset_from_disk(
 // Supports both in-memory and disk-based modes depending on available host memory.
 // In disk mode, the graph is stored in ace_build_dir and dataset is reordered on disk.
 // The returned index is not usable for search. Use the created files for search instead.
-template <typename T, typename IdxT, typename Accessor>
-index<T, IdxT> build_ace(
-  raft::resources const& res,
-  const index_params& params,
-  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
+template <typename T, typename IdxT>
+index<T, IdxT> build_ace(raft::resources const& res,
+                         const index_params& params,
+                         raft::host_matrix_view<const T, int64_t, row_major> dataset)
 {
   common::nvtx::range<common::nvtx::domain::cuvs> function_scope(
-    "cagra::build_ace<%s>(%zu, %zu, %zu)",
-    Accessor::is_managed_type::value ? "managed"
-    : Accessor::is_host_type::value  ? "host"
-                                     : "device",
+    "cagra::build_ace<host>(%zu, %zu, %zu)",
     params.intermediate_graph_degree,
     params.graph_degree,
     params.ace_npartitions);
@@ -929,18 +932,6 @@ index<T, IdxT> build_ace(
 
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
-
-  // ACE expects the dataset to be on host due to the large dataset size
-  if (raft::get_device_for_address(dataset.data_handle()) != -1) {
-    RAFT_LOG_WARN("ACE: Dataset is on device, moving to host");
-    auto dataset_host = raft::make_host_matrix<T, int64_t>(dataset_size, dataset_dim);
-    raft::copy(dataset_host.data_handle(),
-               dataset.data_handle(),
-               dataset_size * dataset_dim,
-               raft::resource::get_cuda_stream(res));
-    raft::resource::sync_stream(res);
-    dataset = dataset_host.view();
-  }
 
   size_t available_memory = cuvs::util::get_free_host_memory();
 
@@ -977,7 +968,7 @@ index<T, IdxT> build_ace(
   // Determine minimum partition size for stable KNN graph construction
   uint64_t min_partition_size = std::max<uint64_t>(1000ULL, dataset_size / n_partitions * 0.1);
 
-  ace_get_partition_labels<T, IdxT, Accessor>(
+  ace_get_partition_labels<T, IdxT>(
     res, dataset, partition_labels.view(), partition_histogram.view(), min_partition_size);
 
   auto partition_end = std::chrono::high_resolution_clock::now();
@@ -1096,14 +1087,14 @@ index<T, IdxT> build_ace(
   // Reorder the dataset based on partitions and store to disk. Uses write buffers to improve
   // performance.
   if (use_disk) {
-    ace_reorder_and_store_dataset<T, IdxT, Accessor>(res,
-                                                     params,
-                                                     dataset,
-                                                     partition_labels.view(),
-                                                     partition_histogram.view(),
-                                                     backward_mapping_0.view(),
-                                                     primary_partition_offsets.view(),
-                                                     augmented_partition_offsets.view());
+    ace_reorder_and_store_dataset<T, IdxT>(res,
+                                           params,
+                                           dataset,
+                                           partition_labels.view(),
+                                           partition_histogram.view(),
+                                           backward_mapping_0.view(),
+                                           primary_partition_offsets.view(),
+                                           augmented_partition_offsets.view());
   }
 
   // Placeholder search graph for in-memory version
@@ -1161,16 +1152,16 @@ index<T, IdxT> build_ace(
                                                     sub_dataset.view());
     } else {
       // Gather partition dataset from memory
-      ace_gather_partition_dataset<T, IdxT, Accessor>(sub_dataset_size_0,
-                                                      sub_dataset_size_1,
-                                                      dataset_dim,
-                                                      partition_id,
-                                                      dataset,
-                                                      backward_mapping_0.view(),
-                                                      backward_mapping_1.view(),
-                                                      primary_partition_offsets.view(),
-                                                      augmented_partition_offsets.view(),
-                                                      sub_dataset.view());
+      ace_gather_partition_dataset<T, IdxT>(sub_dataset_size_0,
+                                            sub_dataset_size_1,
+                                            dataset_dim,
+                                            partition_id,
+                                            dataset,
+                                            backward_mapping_0.view(),
+                                            backward_mapping_1.view(),
+                                            primary_partition_offsets.view(),
+                                            augmented_partition_offsets.view(),
+                                            sub_dataset.view());
     }
     auto read_end = std::chrono::high_resolution_clock::now();
     auto read_elapsed =
