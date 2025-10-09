@@ -346,6 +346,10 @@ if(NOT BUILD_CPU_ONLY)
     )
   endif()
 
+  set(JIT_LTO_FILES src/detail/jit_lto/AlgorithmLauncher.cu src/detail/jit_lto/FragmentDatabase.cu
+                    src/detail/jit_lto/FragmentEntry.cu
+  )
+
   add_library(
     cuvs_objs OBJECT
     src/cluster/kmeans_balanced_fit_float.cu
@@ -541,6 +545,7 @@ if(NOT BUILD_CPU_ONLY)
     src/stats/silhouette_score.cu
     src/stats/trustworthiness_score.cu
     ${CUVS_MG_ALGOS}
+    ${JIT_LTO_FILES}
   )
 
   set_target_properties(
@@ -614,11 +619,7 @@ if(NOT BUILD_CPU_ONLY)
   )
   target_link_libraries(jit_lto_fatbins PRIVATE rmm::rmm raft::raft CCCL::CCCL)
 
-  add_library(
-    jit_lto_fatbins_as_cpp_sources STATIC
-    src/detail/jit_lto/AlgorithmPlanner.cu src/detail/jit_lto/AlgorithmLauncher.cu
-    src/detail/jit_lto/FragmentDatabase.cu src/detail/jit_lto/FragmentEntry.cu
-  )
+  add_library(jit_lto_fatbins_as_cpp_sources STATIC src/detail/jit_lto/AlgorithmPlanner.cu)
 
   # Set PIC for the static library since it will be linked into a shared library
   set_target_properties(
@@ -633,6 +634,7 @@ if(NOT BUILD_CPU_ONLY)
     jit_lto_fatbins_as_cpp_sources PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
                                            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
   )
+  target_link_libraries(jit_lto_fatbins_as_cpp_sources PRIVATE CUDA::cudart)
 
   embed_fatbins(jit_lto_fatbins_as_cpp_sources jit_lto_fatbins)
 
@@ -711,6 +713,7 @@ if(NOT BUILD_CPU_ONLY)
               cuvs-cagra-search
               $<LINK_LIBRARY:WHOLE_ARCHIVE,jit_lto_fatbins_as_cpp_sources>
               CUDA::nvJitLink
+              CUDA::cudart
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -770,8 +773,11 @@ SECTIONS
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
-      PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              $<LINK_LIBRARY:WHOLE_ARCHIVE,jit_lto_fatbins_as_cpp_sources> CUDA::nvJitLink
+      PRIVATE nvidia::cutlass::cutlass
+              $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+              $<LINK_LIBRARY:WHOLE_ARCHIVE,jit_lto_fatbins_as_cpp_sources>
+              CUDA::nvJitLink
+              CUDA::cudart
     )
   endif()
 
