@@ -936,25 +936,48 @@ index<T, IdxT> build_ace(raft::resources const& res,
   size_t available_memory = cuvs::util::get_free_host_memory();
 
   // Optimistic memory model: focus on largest arrays, assumes all partitions are of equal size
-  // 5 main arrays: partition labels, forward, 2 backward mappings
-  size_t ace_memory_size       = 5ULL * dataset_size * sizeof(IdxT);
-  size_t ace_graph_memory_size = dataset_size * sizeof(IdxT) *
-                                 (params.graph_degree + params.intermediate_graph_degree) /
-                                 params.ace_npartitions;
-  size_t total_memory_size = ace_memory_size + ace_graph_memory_size;
+  // For memory path:
+  //   - Partition labes (primary + augmented): 2 * dataset_size * sizeof(IdxT)
+  //   - Forward ID mapping array (primary only): dataset_size * sizeof(IdxT)
+  //   - Backward ID mapping arrays (primary + augmented): 2 * dataset_size * sizeof(IdxT)
+  //   - Per-partition dataset (2x for imbalanced partitions): 4 * (dataset_size / n_partitions) *
+  //   dataset_dim * sizeof(T)
+  //   - Per-partition graph during build: (dataset_size / n_partitions) * (intermediate + final) *
+  //   sizeof(IdxT)
+  //   - Final assembled graph: dataset_size * graph_degree * sizeof(IdxT)
+  size_t ace_partition_labels_size = 2 * dataset_size * sizeof(IdxT);
+  size_t ace_id_mapping_size       = 3 * dataset_size * sizeof(IdxT);
+  size_t ace_sub_dataset_size      = 4 * (dataset_size / n_partitions) * dataset_dim * sizeof(T);
+  size_t ace_sub_graph_size =
+    (dataset_size / n_partitions) * (intermediate_degree + graph_degree) * sizeof(IdxT);
+  size_t ace_graph_size   = dataset_size * graph_degree * sizeof(IdxT);
+  size_t cagra_graph_size = dataset_size * sizeof(IdxT) * params.graph_degree;
+  size_t total_size       = ace_partition_labels_size + ace_id_mapping_size + ace_sub_dataset_size +
+                      ace_sub_graph_size + ace_graph_size + cagra_graph_size;
+  RAFT_LOG_INFO("ACE: Estimated host memory required: %.2f GB, available: %.2f GB",
+                total_size / (1024.0 * 1024.0 * 1024.0),
+                available_memory / (1024.0 * 1024.0 * 1024.0));
   // TODO: Adjust overhead factor if needed
-  bool use_disk = static_cast<size_t>(0.8 * available_memory) < total_memory_size;
+  bool use_disk = static_cast<size_t>(0.8 * available_memory) < total_size;
+
+  if (!use_disk) {
+    // GPU is mostly limited by the index size (update_graph() in the end of this routine).
+    // Check if GPU has enough memory for the final graph or use disk mode instead.
+    // TODO: Extend model or use managed memory if running out of GPU memory.
+    auto available_gpu_memory = rmm::available_device_memory().second;
+    use_disk                  = static_cast<size_t>(0.8 * available_gpu_memory) < cagra_graph_size;
+    RAFT_LOG_INFO("ACE: Estimated GPU memory required: %.2f GB, available: %.2f GB",
+                  cagra_graph_size / (1024.0 * 1024.0 * 1024.0),
+                  available_gpu_memory / (1024.0 * 1024.0 * 1024.0));
+  }
 
   if (use_disk) {
     RAFT_EXPECTS(!params.ace_build_dir.empty(),
                  "ACE: ace_build_dir must be specified when using disk storage");
-    RAFT_LOG_INFO("ACE: Graph does not fit in host memory, using disk at %s",
+    RAFT_LOG_INFO("ACE: Graph does not fit in memory, using disk at %s",
                   params.ace_build_dir.c_str());
-    RAFT_LOG_INFO("ACE: Estimated memory required: %.2f GB, available: %.2f GB",
-                  total_memory_size / (1024.0 * 1024.0 * 1024.0),
-                  available_memory / (1024.0 * 1024.0 * 1024.0));
   } else {
-    RAFT_LOG_INFO("ACE: Graph fits in host memory");
+    RAFT_LOG_INFO("ACE: Graph fits in memory");
   }
 
   auto partition_start     = std::chrono::high_resolution_clock::now();
