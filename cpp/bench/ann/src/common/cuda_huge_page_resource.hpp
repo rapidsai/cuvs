@@ -16,6 +16,7 @@
 #pragma once
 
 #include <raft/core/error.hpp>
+#include <raft/core/logger_macros.hpp>
 
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/mr/device/device_memory_resource.hpp>
@@ -81,7 +82,7 @@ class cuda_huge_page_resource final : public rmm::mr::device_memory_resource {
    */
   void do_deallocate(void* ptr, std::size_t size, rmm::cuda_stream_view) noexcept override
   {
-    if (munmap(ptr, size) == -1) { RAFT_FAIL("huge_page_resource::munmap"); }
+    if (munmap(ptr, size) == -1) { RAFT_LOG_ERROR("huge_page_resource::munmap failed"); }
   }
 
   /**
