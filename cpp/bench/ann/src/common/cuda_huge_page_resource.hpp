@@ -15,8 +15,6 @@
  */
 #pragma once
 
-#include "util.hpp"
-
 #include <raft/core/error.hpp>
 #include <raft/core/logger_macros.hpp>
 
