@@ -441,9 +441,10 @@ void serialize_to_hnswlib_hierarchy(
   // offset_level_0
   os.write(reinterpret_cast<char*>(&appr_algo->offsetLevel0_), sizeof(std::size_t));
   // 8 max_element - override with n_rows
-  os.write(reinterpret_cast<char*>(&n_rows), sizeof(std::size_t));
+  size_t num_elements = (size_t)n_rows;
+  os.write(reinterpret_cast<char*>(&num_elements), sizeof(std::size_t));
   // 16 curr_element_count - override with n_rows
-  os.write(reinterpret_cast<char*>(&n_rows), sizeof(std::size_t));
+  os.write(reinterpret_cast<char*>(&num_elements), sizeof(std::size_t));
   // 24 size_data_per_element
   os.write(reinterpret_cast<char*>(&appr_algo->size_data_per_element_), sizeof(std::size_t));
   // 32 label_offset
