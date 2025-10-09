@@ -17,18 +17,18 @@
 #pragma once
 
 #include <cstdint>
+#include <driver_types.h>
 #include <string>
 #include <unordered_map>
 #include <vector_types.h>
 
-#include <cuda.h>
 #include <cuda_runtime.h>
 #include <nvJitLink.h>
 
 struct AlgorithmLauncher {
   AlgorithmLauncher() = default;
 
-  AlgorithmLauncher(CUlibrary l, CUkernel k);
+  AlgorithmLauncher(cudaLibrary_t l, cudaKernel_t k);
 
   template <typename... Args>
   void operator()(
@@ -38,12 +38,12 @@ struct AlgorithmLauncher {
     this->call(stream, grid, block, shared_mem, kernel_args);
   }
 
-  CUkernel get_kernel() { return this->kernel; }
+  cudaKernel_t get_kernel() { return this->kernel; }
 
  private:
   void call(cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, void** args);
-  CUlibrary library;
-  CUkernel kernel;
+  cudaLibrary_t library;
+  cudaKernel_t kernel;
 };
 
 std::unordered_map<std::string, AlgorithmLauncher>& get_cached_launchers();

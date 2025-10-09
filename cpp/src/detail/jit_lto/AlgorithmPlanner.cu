@@ -25,7 +25,7 @@
 #include <cuvs/detail/jit_lto/AlgorithmPlanner.h>
 #include <cuvs/detail/jit_lto/FragmentDatabase.h>
 
-#include "cuda.h"
+#include "cuda_runtime.h"
 #include "nvJitLink.h"
 
 namespace {
@@ -90,8 +90,8 @@ AlgorithmLauncher AlgorithmPlanner::build()
   int major  = 0;
   int minor  = 0;
   cudaGetDevice(&device);
-  cuDeviceGetAttribute(&major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, device);
-  cuDeviceGetAttribute(&minor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, device);
+  cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device);
+  cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
 
   std::string archs = "-arch=sm_" + std::to_string((major * 10 + minor));
 
@@ -123,13 +123,13 @@ AlgorithmLauncher AlgorithmPlanner::build()
   check_nvjitlink_result(handle, result);
 
   // cubin is linked, so now load it
-  CUlibrary library;
-  cuLibraryLoadData(&library, cubin.get(), nullptr, nullptr, 0, nullptr, nullptr, 0);
+  cudaLibrary_t library;
+  cudaLibraryLoadData(&library, cubin.get(), nullptr, nullptr, 0, nullptr, nullptr, 0);
 
   unsigned int count = 1;
   // Still need to cache/compute the mangled name
-  std::unique_ptr<CUkernel[]> kernels_{new CUkernel[count]};
-  cuLibraryEnumerateKernels(kernels_.get(), count, library);
+  std::unique_ptr<cudaKernel_t[]> kernels_{new cudaKernel_t[count]};
+  cudaLibraryEnumerateKernels(kernels_.get(), count, library);
 
   return AlgorithmLauncher{library, kernels_[0]};
 }

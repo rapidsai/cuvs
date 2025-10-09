@@ -316,7 +316,6 @@ dependencies:
         packages:
           - cuda-nvtx-dev
           - cuda-cudart-dev
-          - cuda-driver-dev
           - cuda-profiler-api
           - libcublas-dev
           - libcurand-dev

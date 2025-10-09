@@ -17,7 +17,6 @@ cd "${package_dir}"
 EXCLUDE_ARGS=(
   --exclude "libcublas.so.*"
   --exclude "libcublasLt.so.*"
-  --exclude "libcuda.so.*"
   --exclude "libcurand.so.*"
   --exclude "libcusolver.so.*"
   --exclude "libcusparse.so.*"

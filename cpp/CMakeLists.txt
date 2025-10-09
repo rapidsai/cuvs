@@ -144,7 +144,6 @@ if(DETECT_CONDA_ENV)
     )
     set(CMAKE_INSTALL_PREFIX "$ENV{CONDA_PREFIX}")
   endif()
-  set(CONDA_STUB_PATH "$ENV{CONDA_PREFIX}/lib/stubs")
 endif()
 
 # ##################################################################################################
@@ -334,10 +333,6 @@ if(NOT BUILD_CPU_ONLY)
         src/neighbors/mg/omp_checks.cpp
     )
   endif()
-
-  set(JIT_LTO_FILES src/detail/jit_lto/AlgorithmLauncher.cu src/detail/jit_lto/FragmentDatabase.cu
-                    src/detail/jit_lto/FragmentEntry.cu
-  )
 
   add_library(
     cuvs_objs OBJECT
@@ -534,7 +529,6 @@ if(NOT BUILD_CPU_ONLY)
     src/stats/silhouette_score.cu
     src/stats/trustworthiness_score.cu
     ${CUVS_MG_ALGOS}
-    ${JIT_LTO_FILES}
   )
 
   set_target_properties(
@@ -608,7 +602,11 @@ if(NOT BUILD_CPU_ONLY)
   )
   target_link_libraries(jit_lto_fatbins PRIVATE rmm::rmm raft::raft CCCL::CCCL)
 
-  add_library(jit_lto_fatbins_as_cpp_sources STATIC src/detail/jit_lto/AlgorithmPlanner.cu)
+  add_library(
+    jit_lto_fatbins_as_cpp_sources STATIC
+    src/detail/jit_lto/AlgorithmPlanner.cu src/detail/jit_lto/AlgorithmLauncher.cu
+    src/detail/jit_lto/FragmentDatabase.cu src/detail/jit_lto/FragmentEntry.cu
+  )
 
   # Set PIC for the static library since it will be linked into a shared library
   set_target_properties(
@@ -623,11 +621,6 @@ if(NOT BUILD_CPU_ONLY)
     jit_lto_fatbins_as_cpp_sources PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
                                            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
   )
-
-  target_link_directories(
-    jit_lto_fatbins_as_cpp_sources PRIVATE $<$<BOOL:${CONDA_STUB_PATH}>:${CONDA_STUB_PATH}>
-  )
-  target_link_libraries(jit_lto_fatbins_as_cpp_sources PRIVATE CUDA::cuda_driver)
 
   embed_fatbins(jit_lto_fatbins_as_cpp_sources jit_lto_fatbins)
 

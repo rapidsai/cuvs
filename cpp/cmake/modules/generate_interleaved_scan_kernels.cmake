@@ -21,20 +21,18 @@ function(generate_interleaved_scan_kernels)
   )
   set(OUTPUT_BASE_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated_kernels)
   set(CMAKE_LIST_FILE ${OUTPUT_BASE_DIR}/interleaved_scan.cmake)
-  set(STAMP_FILE ${CMAKE_CURRENT_BINARY_DIR}/kernels_generated.stamp)
 
   # Generate the kernels at build time
   add_custom_command(
-    OUTPUT ${STAMP_FILE}
+    OUTPUT ${CMAKE_LIST_FILE}
     COMMAND ${Python3_EXECUTABLE} ${GENERATOR_SCRIPT} ${OUTPUT_BASE_DIR}
-    COMMAND ${CMAKE_COMMAND} -E touch ${STAMP_FILE}
     DEPENDS ${GENERATOR_SCRIPT}
     COMMENT "Generating interleaved scan kernel files..."
     VERBATIM
   )
 
-  # Create a custom target that depends on the stamp file
-  add_custom_target(generate_interleaved_scan_kernels_target DEPENDS ${STAMP_FILE})
+  # Create a custom target that depends on the generated CMake file
+  add_custom_target(generate_interleaved_scan_kernels_target DEPENDS ${CMAKE_LIST_FILE})
 
   # Include the generated CMake list file Only generate if the CMake list file doesn't exist
   if(NOT EXISTS ${CMAKE_LIST_FILE})
@@ -96,10 +94,6 @@ function(generate_interleaved_scan_kernels)
   )
   set(POST_LAMBDA_DEVICE_FUNCTION_FILES
       ${FULL_PATH_POST_LAMBDA_FILES}
-      PARENT_SCOPE
-  )
-  set(INTERLEAVED_SCAN_KERNELS_STAMP
-      ${STAMP_FILE}
       PARENT_SCOPE
   )
   set(INTERLEAVED_SCAN_KERNELS_TARGET

@@ -18,28 +18,23 @@
 
 #include <iostream>
 
-AlgorithmLauncher::AlgorithmLauncher(CUlibrary l, CUkernel k) : library{l}, kernel{k} {}
+AlgorithmLauncher::AlgorithmLauncher(cudaLibrary_t l, cudaKernel_t k) : library{l}, kernel{k} {}
 
 void AlgorithmLauncher::call(
   cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, void** kernel_args)
 {
-  CUlaunchAttribute attribute[1];
-  attribute[0].id = CU_LAUNCH_ATTRIBUTE_PROGRAMMATIC_STREAM_SERIALIZATION;
-  attribute[0].value.programmaticStreamSerializationAllowed = 1;
+  cudaLaunchAttribute attribute[1];
+  attribute[0].id = cudaLaunchAttributeProgrammaticStreamSerialization;
+  attribute[0].val.programmaticStreamSerializationAllowed = 1;
 
-  CUlaunchConfig config{};
-  config.gridDimX       = grid.x;
-  config.gridDimY       = grid.y;
-  config.gridDimZ       = grid.z;
-  config.blockDimX      = block.x;
-  config.blockDimY      = block.y;
-  config.blockDimZ      = block.z;
-  config.sharedMemBytes = shared_mem;
-  config.hStream        = stream;
-  config.attrs          = attribute;
-  config.numAttrs       = 1;
+  cudaLaunchConfig_t config;
+  config.gridDim  = grid;
+  config.blockDim = block;
+  config.stream   = stream;
+  config.attrs    = attribute;
+  config.numAttrs = 1;
 
-  cuLaunchKernelEx(&config, (CUfunction)kernel, kernel_args, 0);
+  cudaLaunchKernelExC(&config, kernel, kernel_args);
 }
 
 std::unordered_map<std::string, AlgorithmLauncher>& get_cached_launchers()
