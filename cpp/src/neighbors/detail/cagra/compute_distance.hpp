@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -316,7 +316,7 @@ struct dataset_descriptor_host {
  */
 template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
 using init_desc_type = dataset_descriptor_host<DataT, IndexT, DistanceT> (*)(
-  const cagra::search_params&, const DatasetT&, cuvs::distance::DistanceType);
+  const cagra::search_params&, const DatasetT&, cuvs::distance::DistanceType, const float*);
 
 /**
  * @brief Descriptor instance specification.
@@ -401,7 +401,10 @@ constexpr auto spec_match(const cagra::search_params& params,
 template <typename... Specs>
 struct instance_selector {
   template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
-  static auto select(const cagra::search_params&, const DatasetT&, cuvs::distance::DistanceType)
+  static auto select(const cagra::search_params&,
+                     const DatasetT&,
+                     cuvs::distance::DistanceType,
+                     const float*)
     -> std::tuple<init_desc_type<DataT, IndexT, DistanceT, DatasetT>, double>
   {
     return std::make_tuple(nullptr, -1.0);
@@ -413,25 +416,27 @@ struct instance_selector<Spec, Specs...> {
   template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
   static auto select(const cagra::search_params& params,
                      const DatasetT& dataset,
-                     cuvs::distance::DistanceType metric)
+                     cuvs::distance::DistanceType metric,
+                     const DistanceT* dataset_norms)
     -> std::enable_if_t<spec_sound<Spec, DataT, IndexT, DistanceT, DatasetT>,
                         std::tuple<init_desc_type<DataT, IndexT, DistanceT, DatasetT>, double>>
   {
     auto s0 = spec_match<Spec, DataT, IndexT, DistanceT, DatasetT>(params, dataset, metric);
     auto ss = instance_selector<Specs...>::template select<DataT, IndexT, DistanceT, DatasetT>(
-      params, dataset, metric);
+      params, dataset, metric, dataset_norms);
     return std::get<1>(s0) >= std::get<1>(ss) ? s0 : ss;
   }
 
   template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
   static auto select(const cagra::search_params& params,
                      const DatasetT& dataset,
-                     cuvs::distance::DistanceType metric)
+                     cuvs::distance::DistanceType metric,
+                     const DistanceT* dataset_norms)
     -> std::enable_if_t<!spec_sound<Spec, DataT, IndexT, DistanceT, DatasetT>,
                         std::tuple<init_desc_type<DataT, IndexT, DistanceT, DatasetT>, double>>
   {
     return instance_selector<Specs...>::template select<DataT, IndexT, DistanceT, DatasetT>(
-      params, dataset, metric);
+      params, dataset, metric, dataset_norms);
   }
 };
 
