@@ -46,7 +46,7 @@ public class CagraIndexParams {
     /**
      * Experimental, use NN-Descent to build all-neighbors knn graph
      */
-    NN_DESCENT(2);
+    NN_DESCENT(200);
 
     /**
      * The value for the enum choice.
