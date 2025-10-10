@@ -193,7 +193,8 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
     cagra_index.graph().extent(1) / 2,
     params.ef_construction);
   appr_algo->base_layer_init = false;  // tell hnswlib to build upper layers only
-  auto num_threads           = params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
+  [[maybe_unused]] auto num_threads =
+    params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
 #pragma omp parallel for num_threads(num_threads)
   for (int64_t i = 0; i < host_dataset_view.extent(0); i++) {
     appr_algo->addPoint((void*)(host_dataset_view.data_handle() + i * host_dataset_view.extent(1)),
@@ -544,7 +545,8 @@ void extend(raft::resources const& res,
     const_cast<void*>(idx.get_index()));
   auto current_element_count = hnswlib_index->getCurrentElementCount();
   auto new_element_count     = additional_dataset.extent(0);
-  auto num_threads           = params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
+  [[maybe_unused]] auto num_threads =
+    params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
 
   hnswlib_index->resizeIndex(current_element_count + new_element_count);
 #pragma omp parallel for num_threads(num_threads)
