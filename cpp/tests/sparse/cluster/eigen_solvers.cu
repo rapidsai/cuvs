@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2023, NVIDIA CORPORATION.
+ * Copyright (c) 2020-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#include "../../../src/sparse/cluster/eigen_solvers.cuh"
 #include "../../../src/sparse/cluster/partition.cuh"
+#include <cuvs/sparse/cluster/eigen_solvers.hpp>
 #include <raft/core/nvtx.hpp>
 #include <raft/core/resource/device_id.hpp>
 #include <raft/core/resources.hpp>
