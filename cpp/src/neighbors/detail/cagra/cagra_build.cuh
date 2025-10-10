@@ -661,11 +661,12 @@ void ace_reorder_and_store_dataset(
   primary_buffers.reserve(n_partitions);
   augmented_buffers.reserve(n_partitions);
 
-  // Calculate the number of buffers that fit into main memory. ~80% limit, primary and augmented
-  // buffers.
-  size_t available_memory      = cuvs::util::get_free_host_memory();
-  const size_t disk_write_size = available_memory * 0.4 / n_partitions;
+  // Calculate the number of buffers (primary and augmented) that fit into main memory.
+  size_t available_memory = cuvs::util::get_free_host_memory();
+  // TODO: Adjust overhead factor if needed
+  const size_t disk_write_size = available_memory * 0.5 / (n_partitions * 2);
   size_t vectors_per_buffer    = std::max<size_t>(1, disk_write_size / vector_size);
+  // Limit the number of vectors per buffer to the maximum number of vectors in a partition.
   const size_t max_vectors_per_buffer =
     std::max<size_t>(max_primary_vectors, max_augmented_vectors);
   vectors_per_buffer = std::min<size_t>(vectors_per_buffer, max_vectors_per_buffer);
