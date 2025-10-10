@@ -16,8 +16,6 @@
 
 #include <cuvs/detail/jit_lto/AlgorithmLauncher.h>
 
-#include <iostream>
-
 AlgorithmLauncher::AlgorithmLauncher(cudaLibrary_t l, cudaKernel_t k) : library{l}, kernel{k} {}
 
 void AlgorithmLauncher::call(
@@ -28,11 +26,12 @@ void AlgorithmLauncher::call(
   attribute[0].val.programmaticStreamSerializationAllowed = 1;
 
   cudaLaunchConfig_t config;
-  config.gridDim  = grid;
-  config.blockDim = block;
-  config.stream   = stream;
-  config.attrs    = attribute;
-  config.numAttrs = 1;
+  config.gridDim          = grid;
+  config.blockDim         = block;
+  config.stream           = stream;
+  config.attrs            = attribute;
+  config.numAttrs         = 1;
+  config.dynamicSmemBytes = shared_mem;
 
   cudaLaunchKernelExC(&config, kernel, kernel_args);
 }
