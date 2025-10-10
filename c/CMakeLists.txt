@@ -156,7 +156,7 @@ if(PROJECT_IS_TOP_LEVEL)
     NAMESPACE cuvs::
   )
   install(
-    DIRECTORY include/cuvs/
+    DIRECTORY include/cuvs
     COMPONENT cuvs_c
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   )
