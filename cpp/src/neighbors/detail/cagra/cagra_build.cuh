@@ -440,8 +440,6 @@ void ace_create_forward_and_backward_lists(
     primary_partition_offsets(c)   = primary_partition_offsets(c - 1);
     augmented_partition_offsets(c) = augmented_partition_offsets(c - 1);
   }
-  primary_partition_offsets(0)   = 0;
-  augmented_partition_offsets(0) = 0;
 }
 
 // ACE: Set index parameters for each partition
