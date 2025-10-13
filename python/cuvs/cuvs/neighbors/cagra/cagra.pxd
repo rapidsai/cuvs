@@ -83,12 +83,12 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
         SINGLE_CTA,
         MULTI_CTA,
         MULTI_KERNEL,
-        AUTO
+        AUTO=100
 
     ctypedef enum cuvsCagraHashMode:
         HASH,
         SMALL,
-        AUTO_HASH
+        AUTO_HASH=100
 
     ctypedef struct cuvsCagraSearchParams:
         size_t max_queries

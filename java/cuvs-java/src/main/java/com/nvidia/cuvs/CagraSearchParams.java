@@ -56,7 +56,7 @@ public class CagraSearchParams {
     /**
      * AUTO
      */
-    AUTO(100);
+    AUTO(3);
 
     /**
      * The value for the enum choice.

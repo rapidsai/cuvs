@@ -133,10 +133,10 @@ enum class search_algo {
   /** For small batch sizes. */
   MULTI_CTA    = 1,
   MULTI_KERNEL = 2,
-  AUTO         = 100
+  AUTO         = 3
 };
 
-enum class hash_mode { HASH, SMALL, AUTO };
+enum class hash_mode { HASH = 0, SMALL = 1, AUTO = 2 };
 
 struct search_params : cuvs::neighbors::search_params {
   /** Maximum number of queries to search at the same time (batch size). Auto select when 0.*/

@@ -214,14 +214,14 @@ enum cuvsCagraSearchAlgo {
   /** For small batch sizes. */
   MULTI_CTA    = 1,
   MULTI_KERNEL = 2,
-  AUTO         = 100
+  AUTO         = 3
 };
 
 /**
  * @brief Enum to denote Hash Mode used while searching CAGRA index
  *
  */
-enum cuvsCagraHashMode { HASH = 0, SMALL = 0, AUTO_HASH = 100 };
+enum cuvsCagraHashMode { HASH = 0, SMALL = 1, AUTO_HASH = 2 };
 
 /**
  * @brief Supplemental parameters to search CAGRA index
