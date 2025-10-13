@@ -80,7 +80,6 @@ void ace_get_partition_labels(
   raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_labels,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_histogram,
-  IdxT min_partition_size,
   float sampling_rate = 0.01)
 {
   IdxT dataset_size = dataset.extent(0);
@@ -236,136 +235,92 @@ void ace_get_partition_labels(
       partition_histogram(label_1, 1) += 1;
     }
   }
+}
 
-  std::vector<IdxT> small_partitions;
+// ACE: Check partition sizes for stable KNN graph construction
+template <typename IdxT>
+void ace_check_partition_sizes(
+  IdxT dataset_size,
+  IdxT n_partitions,
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_labels,
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_histogram,
+  IdxT min_partition_size)
+{
+  // Collect partition histogram statistics
+  IdxT total_primary_vectors   = 0;
+  IdxT total_augmented_vectors = 0;
+  IdxT min_primary_vectors     = dataset_size;
+  IdxT max_primary_vectors     = 0;
+  IdxT min_augmented_vectors   = dataset_size;
+  IdxT max_augmented_vectors   = 0;
+  IdxT min_total_vectors       = dataset_size;
+  IdxT max_total_vectors       = 0;
+  IdxT non_empty_partitions    = 0;
+
   for (IdxT c = 0; c < n_partitions; c++) {
-    IdxT partition_size = partition_histogram(c, 0) + partition_histogram(c, 1);
-    if (partition_size < min_partition_size) {
-      small_partitions.push_back(c);
-      RAFT_LOG_DEBUG(
-        "ACE: Partition %lu is too small (%lu vectors), will be merged", c, partition_size);
+    IdxT primary_count   = partition_histogram(c, 0);
+    IdxT augmented_count = partition_histogram(c, 1);
+    IdxT total_count     = primary_count + augmented_count;
+
+    if (total_count > 0) {
+      non_empty_partitions++;
+      total_primary_vectors += primary_count;
+      total_augmented_vectors += augmented_count;
+
+      min_primary_vectors   = std::min(min_primary_vectors, primary_count);
+      max_primary_vectors   = std::max(max_primary_vectors, primary_count);
+      min_augmented_vectors = std::min(min_augmented_vectors, augmented_count);
+      max_augmented_vectors = std::max(max_augmented_vectors, augmented_count);
+      min_total_vectors     = std::min(min_total_vectors, total_count);
+      max_total_vectors     = std::max(max_total_vectors, total_count);
     }
   }
 
-  if (!small_partitions.empty()) {
-    RAFT_LOG_DEBUG("ACE: Found %zu small partitions, reassigning to next closest",
-                   small_partitions.size());
+  double avg_primary_vectors = static_cast<double>(total_primary_vectors) / non_empty_partitions;
+  double avg_augmented_vectors =
+    static_cast<double>(total_augmented_vectors) / non_empty_partitions;
+  double avg_total_vectors    = 2.0 * static_cast<double>(dataset_size) / non_empty_partitions;
+  double expected_avg_vectors = 2.0 * static_cast<double>(dataset_size) / n_partitions;
 
-    std::unordered_set<IdxT> small_partition_set(small_partitions.begin(), small_partitions.end());
+  RAFT_LOG_INFO("ACE: Active partitions: %lu / %lu", non_empty_partitions, n_partitions);
+  RAFT_LOG_INFO("ACE: Primary vectors     - Total: %lu, Avg: %.1f, Min: %lu, Max: %lu",
+                total_primary_vectors,
+                avg_primary_vectors,
+                min_primary_vectors,
+                max_primary_vectors);
+  RAFT_LOG_INFO("ACE: Augmented vectors   - Total: %lu, Avg: %.1f, Min: %lu, Max: %lu",
+                total_augmented_vectors,
+                avg_augmented_vectors,
+                min_augmented_vectors,
+                max_augmented_vectors);
+  RAFT_LOG_INFO("ACE: Total per partition - Total: %lu, Avg: %.1f, Min: %lu, Max: %lu",
+                total_primary_vectors + total_augmented_vectors,
+                avg_total_vectors,
+                min_total_vectors,
+                max_total_vectors);
 
-    std::vector<IdxT> vectors_to_reassign;
-    for (IdxT i = 0; i < dataset_size; i++) {
-      bool label_0_is_small = small_partition_set.count(partition_labels(i, 0)) > 0;
-      bool label_1_is_small = small_partition_set.count(partition_labels(i, 1)) > 0;
-      if (label_0_is_small || label_1_is_small) { vectors_to_reassign.push_back(i); }
-    }
+  // Check for partition imbalance and issue warnings
+  IdxT very_small_threshold = min_partition_size;
+  IdxT very_large_threshold = static_cast<IdxT>(5.0 * expected_avg_vectors);
 
-    RAFT_LOG_DEBUG("ACE: Reassigning %zu vectors from small partitions",
-                   vectors_to_reassign.size());
+  for (IdxT c = 0; c < n_partitions; c++) {
+    IdxT total_count = partition_histogram(c, 0) + partition_histogram(c, 1);
 
-    for (IdxT small_partition : small_partitions) {
-      partition_histogram(small_partition, 0) = 0;
-      partition_histogram(small_partition, 1) = 0;
-    }
-
-    const IdxT reassign_chunk_size = std::min(chunk_size, (IdxT)vectors_to_reassign.size());
-    auto reassign_sub_dataset =
-      raft::make_host_matrix<float, int64_t>(reassign_chunk_size, dataset_dim);
-    auto reassign_sub_dataset_dev =
-      raft::make_device_matrix<float, int64_t>(res, reassign_chunk_size, dataset_dim);
-    auto reassign_distances =
-      raft::make_host_matrix<float, int64_t>(reassign_chunk_size, n_partitions);
-    auto reassign_distances_dev =
-      raft::make_device_matrix<float, int64_t>(res, reassign_chunk_size, n_partitions);
-
-    for (IdxT chunk_start = 0; chunk_start < vectors_to_reassign.size();
-         chunk_start += reassign_chunk_size) {
-      IdxT current_chunk_size =
-        std::min(reassign_chunk_size, (IdxT)vectors_to_reassign.size() - chunk_start);
-
-#pragma omp parallel for
-      for (IdxT j = 0; j < current_chunk_size; j++) {
-        IdxT i = vectors_to_reassign[chunk_start + j];
-        for (IdxT k = 0; k < dataset_dim; k++) {
-          reassign_sub_dataset(j, k) = static_cast<float>(dataset(i, k));
-        }
-      }
-
-      auto reassign_sub_dataset_view = raft::make_device_matrix_view<const float, int64_t>(
-        reassign_sub_dataset_dev.data_handle(), current_chunk_size, dataset_dim);
-      raft::update_device(reassign_sub_dataset_dev.data_handle(),
-                          reassign_sub_dataset.data_handle(),
-                          current_chunk_size * dataset_dim,
-                          stream);
-
-      auto reassign_distances_view = raft::make_device_matrix_view<float, int64_t>(
-        reassign_distances_dev.data_handle(), current_chunk_size, n_partitions);
-
-      cuvs::distance::pairwise_distance(res,
-                                        reassign_sub_dataset_view,
-                                        centroids_dev.view(),
-                                        reassign_distances_view,
-                                        cuvs::distance::DistanceType::L2Expanded);
-
-      raft::update_host(reassign_distances.data_handle(),
-                        reassign_distances_dev.data_handle(),
-                        current_chunk_size * n_partitions,
-                        stream);
-      raft::resource::sync_stream(res, stream);
-
-      // Reassign labels based on computed distances
-#pragma omp parallel for
-      for (IdxT j = 0; j < current_chunk_size; j++) {
-        const IdxT i                = vectors_to_reassign[chunk_start + j];
-        const bool label_0_is_small = small_partition_set.count(partition_labels(i, 0)) > 0;
-        const bool label_1_is_small = small_partition_set.count(partition_labels(i, 1)) > 0;
-
-        IdxT new_label_0 = partition_labels(i, 0);
-        IdxT new_label_1 = partition_labels(i, 1);
-
-        std::vector<std::pair<float, IdxT>> sorted_partitions;
-        sorted_partitions.reserve(n_partitions);
-        for (IdxT c = 0; c < n_partitions; c++) {
-          sorted_partitions.emplace_back(reassign_distances(j, c), static_cast<IdxT>(c));
-        }
-        const IdxT elements_to_sort = std::min(IdxT(4), sorted_partitions.size());
-        std::partial_sort(sorted_partitions.begin(),
-                          sorted_partitions.begin() + elements_to_sort,
-                          sorted_partitions.end());
-
-        IdxT found = 0;
-        for (const auto& [dist, label] : sorted_partitions) {
-          if (small_partition_set.count(label) == 0) {
-            if (found == 0) {
-              new_label_0 = label;
-              found++;
-            } else if (found == 1) {
-              new_label_1 = label;
-              found++;
-              break;
-            }
-          }
-        }
-
-        if (new_label_0 != partition_labels(i, 0) || new_label_1 != partition_labels(i, 1)) {
-          if (!label_0_is_small) {
-#pragma omp atomic update
-            partition_histogram(partition_labels(i, 0), 0) -= 1;
-          }
-          if (!label_1_is_small) {
-#pragma omp atomic update
-            partition_histogram(partition_labels(i, 1), 1) -= 1;
-          }
-
-          partition_labels(i, 0) = new_label_0;
-          partition_labels(i, 1) = new_label_1;
-
-#pragma omp atomic update
-          partition_histogram(new_label_0, 0) += 1;
-#pragma omp atomic update
-          partition_histogram(new_label_1, 1) += 1;
-        }
-      }
+    if (total_count > 0 && total_count < very_small_threshold) {
+      RAFT_LOG_WARN(
+        "ACE: Partition %lu is very small (%lu vectors, expected ~%.1f). This may affect graph "
+        "quality.",
+        c,
+        total_count,
+        expected_avg_vectors);
+    } else if (total_count > very_large_threshold) {
+      RAFT_LOG_WARN(
+        "ACE: Partition %lu is very large (%lu vectors, expected ~%.1f, threshold: %lu). This may "
+        "indicate imbalance and can lead to memory issues in restricted environments.",
+        c,
+        total_count,
+        expected_avg_vectors,
+        very_large_threshold);
     }
   }
 }
@@ -1011,95 +966,24 @@ index<T, IdxT> build_ace(raft::resources const& res,
     partition_histogram(partition_labels(i, 1), 1)++;
   }
 
-  // Determine minimum partition size for stable KNN graph construction
-  IdxT min_partition_size = std::max<IdxT>(1000ULL, dataset_size / n_partitions * 0.1);
+  ace_get_partition_labels<T, IdxT>(
+    res, dataset, partition_labels.view(), partition_histogram.view());
+
+  // Check partition sizes for stable KNN graph construction
+  IdxT min_partition_size = std::max<IdxT>(1000, dataset_size / n_partitions * 0.1);
+  ace_check_partition_sizes<IdxT>(dataset_size,
+                                  n_partitions,
+                                  partition_labels.view(),
+                                  partition_histogram.view(),
+                                  min_partition_size);
 
   auto partition_end = std::chrono::high_resolution_clock::now();
   auto partition_elapsed =
     std::chrono::duration_cast<std::chrono::milliseconds>(partition_end - partition_start).count();
   RAFT_LOG_INFO(
-    "ACE: Partition labeling and small partition handling completed in %ld ms (min_partition_size: "
+    "ACE: Partition labeling completed in %ld ms (min_partition_size: "
     "%lu)",
-    partition_elapsed,
-    min_partition_size);
-
-  // Collect partition histogram statistics
-  IdxT total_primary_vectors   = 0;
-  IdxT total_augmented_vectors = 0;
-  IdxT min_primary_vectors     = dataset_size;
-  IdxT max_primary_vectors     = 0;
-  IdxT min_augmented_vectors   = dataset_size;
-  IdxT max_augmented_vectors   = 0;
-  IdxT min_total_vectors       = dataset_size;
-  IdxT max_total_vectors       = 0;
-  IdxT non_empty_partitions    = 0;
-
-  for (IdxT c = 0; c < n_partitions; c++) {
-    IdxT primary_count   = partition_histogram(c, 0);
-    IdxT augmented_count = partition_histogram(c, 1);
-    IdxT total_count     = primary_count + augmented_count;
-
-    if (total_count > 0) {
-      non_empty_partitions++;
-      total_primary_vectors += primary_count;
-      total_augmented_vectors += augmented_count;
-
-      min_primary_vectors   = std::min(min_primary_vectors, primary_count);
-      max_primary_vectors   = std::max(max_primary_vectors, primary_count);
-      min_augmented_vectors = std::min(min_augmented_vectors, augmented_count);
-      max_augmented_vectors = std::max(max_augmented_vectors, augmented_count);
-      min_total_vectors     = std::min(min_total_vectors, total_count);
-      max_total_vectors     = std::max(max_total_vectors, total_count);
-    }
-  }
-
-  double avg_primary_vectors = static_cast<double>(total_primary_vectors) / non_empty_partitions;
-  double avg_augmented_vectors =
-    static_cast<double>(total_augmented_vectors) / non_empty_partitions;
-  double avg_total_vectors    = 2.0 * static_cast<double>(dataset_size) / non_empty_partitions;
-  double expected_avg_vectors = 2.0 * static_cast<double>(dataset_size) / n_partitions;
-
-  RAFT_LOG_INFO("ACE: Active partitions: %lu / %lu", non_empty_partitions, n_partitions);
-  RAFT_LOG_INFO("ACE: Primary vectors     - Total: %lu, Avg: %.1f, Min: %lu, Max: %lu",
-                total_primary_vectors,
-                avg_primary_vectors,
-                min_primary_vectors,
-                max_primary_vectors);
-  RAFT_LOG_INFO("ACE: Augmented vectors   - Total: %lu, Avg: %.1f, Min: %lu, Max: %lu",
-                total_augmented_vectors,
-                avg_augmented_vectors,
-                min_augmented_vectors,
-                max_augmented_vectors);
-  RAFT_LOG_INFO("ACE: Total per partition - Total: %lu, Avg: %.1f, Min: %lu, Max: %lu",
-                total_primary_vectors + total_augmented_vectors,
-                avg_total_vectors,
-                min_total_vectors,
-                max_total_vectors);
-
-  // Check for partition imbalance and issue warnings
-  IdxT very_small_threshold = min_partition_size;
-  IdxT very_large_threshold = static_cast<IdxT>(5.0 * expected_avg_vectors);
-
-  for (IdxT c = 0; c < n_partitions; c++) {
-    IdxT total_count = partition_histogram(c, 0) + partition_histogram(c, 1);
-
-    if (total_count > 0 && total_count < very_small_threshold) {
-      RAFT_LOG_WARN(
-        "ACE: Partition %lu is very small (%lu vectors, expected ~%.1f). This may affect graph "
-        "quality.",
-        c,
-        total_count,
-        expected_avg_vectors);
-    } else if (total_count > very_large_threshold) {
-      RAFT_LOG_WARN(
-        "ACE: Partition %lu is very large (%lu vectors, expected ~%.1f, threshold: %lu). This may "
-        "indicate imbalance and can lead to memory issues in restricted environments.",
-        c,
-        total_count,
-        expected_avg_vectors,
-        very_large_threshold);
-    }
-  }
+    partition_elapsed);
 
   // Create vector lists for each partition
   auto vectorlist_start            = std::chrono::high_resolution_clock::now();
