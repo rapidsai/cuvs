@@ -54,6 +54,25 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
+template <typename T, typename IdxT>
+void check_graph_degree(size_t& intermediate_degree, size_t& graph_degree, size_t dataset_size)
+{
+  if (intermediate_degree >= static_cast<size_t>(dataset_size)) {
+    RAFT_LOG_WARN(
+      "Intermediate graph degree cannot be larger than dataset size, reducing it to %lu",
+      dataset_size);
+    intermediate_degree = dataset_size - 1;
+  }
+  if (intermediate_degree < graph_degree) {
+    RAFT_LOG_WARN(
+      "Graph degree (%lu) cannot be larger than intermediate graph degree (%lu), reducing "
+      "graph_degree.",
+      graph_degree,
+      intermediate_degree);
+    graph_degree = intermediate_degree;
+  }
+}
+
 // ACE: Get partition labels for partitioned approach
 template <typename T, typename IdxT>
 void ace_get_partition_labels(
@@ -933,6 +952,8 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
   size_t intermediate_degree = params.intermediate_graph_degree;
   size_t graph_degree        = params.graph_degree;
+
+  check_graph_degree<T, IdxT>(intermediate_degree, graph_degree, dataset_size);
 
   size_t available_memory = cuvs::util::get_free_host_memory();
 
@@ -1964,20 +1985,7 @@ index<T, IdxT> build(
                                      : "device",
     intermediate_degree,
     graph_degree);
-  if (intermediate_degree >= static_cast<size_t>(dataset.extent(0))) {
-    RAFT_LOG_WARN(
-      "Intermediate graph degree cannot be larger than dataset size, reducing it to %lu",
-      dataset.extent(0));
-    intermediate_degree = dataset.extent(0) - 1;
-  }
-  if (intermediate_degree < graph_degree) {
-    RAFT_LOG_WARN(
-      "Graph degree (%lu) cannot be larger than intermediate graph degree (%lu), reducing "
-      "graph_degree.",
-      graph_degree,
-      intermediate_degree);
-    graph_degree = intermediate_degree;
-  }
+  check_graph_degree<T, IdxT>(intermediate_degree, graph_degree, dataset.extent(0));
 
   // Set default value in case knn_build_params is not defined.
   auto knn_build_params = params.graph_build_params;
