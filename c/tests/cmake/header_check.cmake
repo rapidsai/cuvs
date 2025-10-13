@@ -13,7 +13,8 @@
 # =============================================================================
 
 # Build a list of all headers in `c/include/cuvs`
-
+#
+# cmake-lint: disable=E1126
 function(cuvs_c_add_header_check project_root binding_header COMPONENT_PLACEHOLDER install_set)
   file(
     GLOB_RECURSE all_headers_to_match
