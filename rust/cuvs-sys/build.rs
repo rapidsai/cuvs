@@ -73,7 +73,7 @@ fn main() {
     // run bindgen to automatically create rust bindings for the cuvs c-api
     bindgen::Builder::default()
         .header("cuvs_c_wrapper.h")
-        .clang_arg("-I../../cpp/include")
+        .clang_arg("-I../../c/include")
         // needed to find cudaruntime.h
         .clang_args(cmake_cxx_flags.split(' '))
         // include dlpack from the cmake build dependencies
