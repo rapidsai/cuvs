@@ -83,7 +83,7 @@ public class CagraSearchParams {
     /**
      * AUTO_HASH
      */
-    AUTO_HASH(100);
+    AUTO_HASH(2);
 
     /**
      * The value for the enum choice.
