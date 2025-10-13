@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 #pragma once
 
 #include <raft/core/error.hpp>
+#include <raft/core/logger_macros.hpp>
 
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/mr/device/device_memory_resource.hpp>
@@ -79,9 +80,9 @@ class cuda_huge_page_resource final : public rmm::mr::device_memory_resource {
    *
    * @param p Pointer to be deallocated
    */
-  void do_deallocate(void* ptr, std::size_t size, rmm::cuda_stream_view) override
+  void do_deallocate(void* ptr, std::size_t size, rmm::cuda_stream_view) noexcept override
   {
-    if (munmap(ptr, size) == -1) { RAFT_FAIL("huge_page_resource::munmap"); }
+    if (munmap(ptr, size) == -1) { RAFT_LOG_ERROR("huge_page_resource::munmap failed"); }
   }
 
   /**
