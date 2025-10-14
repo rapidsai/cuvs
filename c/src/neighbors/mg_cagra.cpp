@@ -419,7 +419,7 @@ extern "C" cuvsError_t cuvsMultiGpuCagraDeserialize(cuvsResources_t res,
     if (dtype.kind == 'f' && dtype.itemsize == 4) {
       index->dtype.code = kDLFloat;
       index->addr       = reinterpret_cast<uintptr_t>(_mg_deserialize<float>(res, filename));
-    } else if (dtype.kind == 'f' && dtype.itemsize == 2) {
+    } else if (dtype.kind == 'e' && dtype.itemsize == 2) {
       index->dtype.code = kDLFloat;
       index->addr       = reinterpret_cast<uintptr_t>(_mg_deserialize<half>(res, filename));
     } else if (dtype.kind == 'i' && dtype.itemsize == 1) {
@@ -450,7 +450,7 @@ extern "C" cuvsError_t cuvsMultiGpuCagraDistribute(cuvsResources_t res,
     if (dtype.kind == 'f' && dtype.itemsize == 4) {
       index->dtype.code = kDLFloat;
       index->addr       = reinterpret_cast<uintptr_t>(_mg_distribute<float>(res, filename));
-    } else if (dtype.kind == 'f' && dtype.itemsize == 2) {
+    } else if (dtype.kind == 'e' && dtype.itemsize == 2) {
       index->dtype.code = kDLFloat;
       index->addr       = reinterpret_cast<uintptr_t>(_mg_distribute<half>(res, filename));
     } else if (dtype.kind == 'i' && dtype.itemsize == 1) {
