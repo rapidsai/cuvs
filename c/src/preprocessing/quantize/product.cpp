@@ -18,10 +18,10 @@
 #include <dlpack/dlpack.h>
 
 #include <cuvs/core/c_api.h>
-#include <cuvs/core/exceptions.hpp>
-#include <cuvs/core/interop.hpp>
 #include <cuvs/preprocessing/quantize/product.h>
 #include <cuvs/preprocessing/quantize/product.hpp>
+#include "../../core/exceptions.hpp"
+#include "../../core/interop.hpp"
 
 namespace {
 
