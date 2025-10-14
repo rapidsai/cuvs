@@ -109,8 +109,11 @@ set_target_properties(
 # Encode what optional components we are building
 set(CUVS_BUILD_CAGRA_HNSWLIB ${BUILD_CAGRA_HNSWLIB})
 set(CUVS_BUILD_MG_ALGOS ${BUILD_MG_ALGOS})
-file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/core/c_config.h"
-     CONTENT [=[
+file(
+  CONFIGURE
+  OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/core/c_config.h"
+  CONTENT
+  [=[
   #pragma once
   #ifndef CUVS_BUILD_CAGRA_HNSWLIB
     #cmakedefine CUVS_BUILD_CAGRA_HNSWLIB
@@ -118,7 +121,8 @@ file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/core/c_config.h"
   #ifndef CUVS_BUILD_MG_ALGOS
     #cmakedefine CUVS_BUILD_MG_ALGOS
   #endif
-]=] @ONLY)
+]=]
+)
 target_compile_definitions(
   cuvs_c PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
                 $<$<BOOL:${BUILD_MG_ALGOS}>:CUVS_BUILD_MG_ALGOS>
@@ -181,7 +185,7 @@ if(PROJECT_IS_TOP_LEVEL)
     FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/core/c_config.h
     COMPONENT cuvs_c
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs/core/
-    )
+  )
 endif()
 
 # ##################################################################################################
