@@ -12,20 +12,20 @@
 #include <raft/random/rng.cuh>
 
 using cuvs::distance::DistanceType;
+using cuvs::distance::fusedDistanceNNMinReduce;
+using cuvs::distance::reduce_min;
 using cuvs::distance::unfused_distance_nn;
 using cuvs::distance::unfusedDistanceNNMinReduce;
-using cuvs::distance::reduce_min;
-using cuvs::distance::fusedDistanceNNMinReduce;
 
-enum class AlgorithmType {gemm, unfused, fused};
+enum class AlgorithmType { gemm, unfused, fused };
 
 template <typename DataT, typename AccT, typename OutT, typename IdxT, AlgorithmType algo>
 void benchmark_fusedl2nn(benchmark::State& state)
 {
-  const int m = state.range(0);
-  const int n = state.range(1);
-  const int k = state.range(2);
-  const bool sqrt = state.range(3);
+  const int m               = state.range(0);
+  const int n               = state.range(1);
+  const int k               = state.range(2);
+  const bool sqrt           = state.range(3);
   const DistanceType metric = DistanceType(state.range(4));
 
   raft::device_resources handle;
@@ -45,8 +45,10 @@ void benchmark_fusedl2nn(benchmark::State& state)
   raft::random::uniform(handle, rng, y.data_handle(), n * k, DataT(-1.0), DataT(1.0));
 
   // Pre-compute norms
-  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(x_norm.data_handle(), x.data_handle(), k, m, stream);
-  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(y_norm.data_handle(), y.data_handle(), k, n, stream);
+  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+    x_norm.data_handle(), x.data_handle(), k, m, stream);
+  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+    y_norm.data_handle(), y.data_handle(), k, n, stream);
 
   // Calculate the workspace size
   // for fused it is m * sizeof(IdxT)
@@ -65,22 +67,22 @@ void benchmark_fusedl2nn(benchmark::State& state)
 
   // Warm up
   if constexpr (algo != AlgorithmType::fused) {
-     unfusedDistanceNNMinReduce<DataT, AccT, OutT, IdxT>(handle,
-                                out.data_handle(),
-                                x.data_handle(),
-                                y.data_handle(),
-                                x_norm.data_handle(),
-                                y_norm.data_handle(),
-                                static_cast<IdxT>(m),
-                                static_cast<IdxT>(n),
-                                static_cast<IdxT>(k),
-                                (AccT*) workspace.data_handle(),
-                                sqrt,
-                                true,
-                                true,
-                                metric,
-                                0.0,
-                                stream);
+    unfusedDistanceNNMinReduce<DataT, AccT, OutT, IdxT>(handle,
+                                                        out.data_handle(),
+                                                        x.data_handle(),
+                                                        y.data_handle(),
+                                                        x_norm.data_handle(),
+                                                        y_norm.data_handle(),
+                                                        static_cast<IdxT>(m),
+                                                        static_cast<IdxT>(n),
+                                                        static_cast<IdxT>(k),
+                                                        (AccT*)workspace.data_handle(),
+                                                        sqrt,
+                                                        true,
+                                                        true,
+                                                        metric,
+                                                        0.0,
+                                                        stream);
   }
 
   RAFT_CUDA_TRY(cudaMemsetAsync(workspace.data_handle(), 0, workspace_size, stream));
@@ -91,96 +93,96 @@ void benchmark_fusedl2nn(benchmark::State& state)
   timer.start();
   for (auto _ : state) {
     if constexpr (algo == AlgorithmType::fused) {
-      fusedDistanceNNMinReduce<DataT, OutT, IdxT>(
-        out.data_handle(),
-        x.data_handle(),
-        y.data_handle(),
-        x_norm.data_handle(),
-        y_norm.data_handle(),
-        static_cast<IdxT>(m),
-        static_cast<IdxT>(n),
-        static_cast<IdxT>(k),
-        (void*)workspace.data_handle(),
-        sqrt,
-        true,
-        true,
-        metric,
-        0.0,
-        stream);
+      fusedDistanceNNMinReduce<DataT, OutT, IdxT>(out.data_handle(),
+                                                  x.data_handle(),
+                                                  y.data_handle(),
+                                                  x_norm.data_handle(),
+                                                  y_norm.data_handle(),
+                                                  static_cast<IdxT>(m),
+                                                  static_cast<IdxT>(n),
+                                                  static_cast<IdxT>(k),
+                                                  (void*)workspace.data_handle(),
+                                                  sqrt,
+                                                  true,
+                                                  true,
+                                                  metric,
+                                                  0.0,
+                                                  stream);
     }
 
     if constexpr (algo == AlgorithmType::unfused) {
-     unfusedDistanceNNMinReduce<DataT, AccT, OutT, IdxT>(handle,
-                                out.data_handle(),
-                                x.data_handle(),
-                                y.data_handle(),
-                                x_norm.data_handle(),
-                                y_norm.data_handle(),
-                                static_cast<IdxT>(m),
-                                static_cast<IdxT>(n),
-                                static_cast<IdxT>(k),
-                                (AccT*) workspace.data_handle(),
-                                sqrt,
-                                true,
-                                true,
-                                metric,
-                                0.0,
-                                stream);
+      unfusedDistanceNNMinReduce<DataT, AccT, OutT, IdxT>(handle,
+                                                          out.data_handle(),
+                                                          x.data_handle(),
+                                                          y.data_handle(),
+                                                          x_norm.data_handle(),
+                                                          y_norm.data_handle(),
+                                                          static_cast<IdxT>(m),
+                                                          static_cast<IdxT>(n),
+                                                          static_cast<IdxT>(k),
+                                                          (AccT*)workspace.data_handle(),
+                                                          sqrt,
+                                                          true,
+                                                          true,
+                                                          metric,
+                                                          0.0,
+                                                          stream);
     }
 
     if constexpr (algo == AlgorithmType::gemm) {
-     unfusedDistanceNNMinReduce<DataT, AccT, OutT, IdxT, false>(handle,
-                                out.data_handle(),
-                                x.data_handle(),
-                                y.data_handle(),
-                                x_norm.data_handle(),
-                                y_norm.data_handle(),
-                                static_cast<IdxT>(m),
-                                static_cast<IdxT>(n),
-                                static_cast<IdxT>(k),
-                                (AccT*) workspace.data_handle(),
-                                sqrt,
-                                true,
-                                true,
-                                metric,
-                                0.0,
-                                stream);
+      unfusedDistanceNNMinReduce<DataT, AccT, OutT, IdxT, false>(handle,
+                                                                 out.data_handle(),
+                                                                 x.data_handle(),
+                                                                 y.data_handle(),
+                                                                 x_norm.data_handle(),
+                                                                 y_norm.data_handle(),
+                                                                 static_cast<IdxT>(m),
+                                                                 static_cast<IdxT>(n),
+                                                                 static_cast<IdxT>(k),
+                                                                 (AccT*)workspace.data_handle(),
+                                                                 sqrt,
+                                                                 true,
+                                                                 true,
+                                                                 metric,
+                                                                 0.0,
+                                                                 stream);
     }
-
   }
   timer.stop();
   RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
-  if constexpr (algo == AlgorithmType::gemm ) {
+  if constexpr (algo == AlgorithmType::gemm) {
     if (metric == DistanceType::L2Expanded) {
       reduce_min<DataT, AccT, OutT, IdxT, DistanceType::L2Expanded>(out.data_handle(),
                                                                     (AccT*)workspace.data_handle(),
-                                                                    x_norm.data_handle(), 
+                                                                    x_norm.data_handle(),
                                                                     y_norm.data_handle(),
                                                                     m,
-                                                                    n, 
+                                                                    n,
                                                                     stream,
                                                                     sqrt,
                                                                     true);
     } else if (metric == DistanceType::L2SqrtExpanded) {
-      reduce_min<DataT, AccT, OutT, IdxT, DistanceType::L2SqrtExpanded>(out.data_handle(),
-                                                                    (AccT*)workspace.data_handle(),
-                                                                    x_norm.data_handle(), 
-                                                                    y_norm.data_handle(),
-                                                                    m,
-                                                                    n, 
-                                                                    stream,
-                                                                    sqrt,
-                                                                    true);
+      reduce_min<DataT, AccT, OutT, IdxT, DistanceType::L2SqrtExpanded>(
+        out.data_handle(),
+        (AccT*)workspace.data_handle(),
+        x_norm.data_handle(),
+        y_norm.data_handle(),
+        m,
+        n,
+        stream,
+        sqrt,
+        true);
     } else if (metric == DistanceType::CosineExpanded) {
-      reduce_min<DataT, AccT, OutT, IdxT, DistanceType::CosineExpanded>(out.data_handle(),
-                                                                    (AccT*)workspace.data_handle(),
-                                                                    x_norm.data_handle(), 
-                                                                    y_norm.data_handle(),
-                                                                    m,
-                                                                    n, 
-                                                                    stream,
-                                                                    sqrt,
-                                                                    true);
+      reduce_min<DataT, AccT, OutT, IdxT, DistanceType::CosineExpanded>(
+        out.data_handle(),
+        (AccT*)workspace.data_handle(),
+        x_norm.data_handle(),
+        y_norm.data_handle(),
+        m,
+        n,
+        stream,
+        sqrt,
+        true);
     }
   }
 
@@ -238,9 +240,8 @@ static void CustomArguments(benchmark::internal::Benchmark* b)
   }*/
   b->Args({65536, 256, 128, true, DistanceType::L2Expanded});
   b->Args({65536, 256, 128, false, DistanceType::CosineExpanded});
-  //b->Args({65536, 10000, 768, false});
+  // b->Args({65536, 10000, 768, false});
 }
-
 
 int main(int argc, char** argv)
 {
@@ -275,12 +276,15 @@ int main(int argc, char** argv)
   // fused path
   /*bench = benchmark::RegisterBenchmark(
     "fusedl2nn/float/float/<int64_t, float>",
-    benchmark_fusedl2nn<float, float, raft::KeyValuePair<int64_t, float>, int64_t, AlgorithmType::fused>);
-  bench->Apply(CustomArguments<int64_t>);*/
+    benchmark_fusedl2nn<float, float, raft::KeyValuePair<int64_t, float>, int64_t,
+  AlgorithmType::fused>); bench->Apply(CustomArguments<int64_t>);*/
 
-  bench = benchmark::RegisterBenchmark(
-    "unfused/float/int/<int, float>",
-    benchmark_fusedl2nn<float, float, raft::KeyValuePair<int64_t, float>, int64_t, AlgorithmType::gemm>);
+  bench = benchmark::RegisterBenchmark("unfused/float/int/<int, float>",
+                                       benchmark_fusedl2nn<float,
+                                                           float,
+                                                           raft::KeyValuePair<int64_t, float>,
+                                                           int64_t,
+                                                           AlgorithmType::gemm>);
   bench->Apply(CustomArguments<int64_t>);
   // unfused path
   // half -> half
@@ -315,18 +319,18 @@ int main(int argc, char** argv)
   // half -> half
   bench = benchmark::RegisterBenchmark(
     "gemm/half/int/<int, half>",
-    benchmark_fusedl2nn<half, half, raft::KeyValuePair<int64_t, half>, int64_t, AlgorithmType::gemm>);
-  bench->Apply(CustomArguments<int64_t>);
+    benchmark_fusedl2nn<half, half, raft::KeyValuePair<int64_t, half>, int64_t,
+  AlgorithmType::gemm>); bench->Apply(CustomArguments<int64_t>);
   // half -> float
   bench = benchmark::RegisterBenchmark(
     "gemm/half/int/<int, float>",
-    benchmark_fusedl2nn<half, float, raft::KeyValuePair<int64_t, float>, int64_t, AlgorithmType::gemm>);
-  bench->Apply(CustomArguments<int64_t>);
+    benchmark_fusedl2nn<half, float, raft::KeyValuePair<int64_t, float>, int64_t,
+  AlgorithmType::gemm>); bench->Apply(CustomArguments<int64_t>);
   // float -> float
   bench = benchmark::RegisterBenchmark(
     "gemm/float/int/<int, float>",
-    benchmark_fusedl2nn<float, float, raft::KeyValuePair<int64_t, float>, int64_t, AlgorithmType::gemm>);
-  bench->Apply(CustomArguments<int64_t>);*/
+    benchmark_fusedl2nn<float, float, raft::KeyValuePair<int64_t, float>, int64_t,
+  AlgorithmType::gemm>); bench->Apply(CustomArguments<int64_t>);*/
 
   // Initialize benchmark
   ::benchmark::Initialize(&argc, argv);

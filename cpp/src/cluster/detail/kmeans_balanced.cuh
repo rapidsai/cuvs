@@ -113,37 +113,36 @@ bool use_fused(IdxT m, IdxT n, IdxT k)
  * @param[out] labels Output predictions [n_rows]
  * @param[inout] mr (optional) Memory resource to use for temporary allocations
  */
-#include <vector>
-#include <tuple>
 #include <algorithm>
 #include <iostream>
+#include <tuple>
+#include <vector>
 
-static void add(int64_t i, int64_t j, int64_t k) {
-    // Static vector of pairs: (tuple, counter)
-    static std::vector<std::pair<std::tuple<int64_t, int64_t, int64_t>, int>> tupleList;
+static void add(int64_t i, int64_t j, int64_t k)
+{
+  // Static vector of pairs: (tuple, counter)
+  static std::vector<std::pair<std::tuple<int64_t, int64_t, int64_t>, int>> tupleList;
 
-    std::tuple<int64_t, int64_t, int64_t> tuple = std::make_tuple(i, j, k);
+  std::tuple<int64_t, int64_t, int64_t> tuple = std::make_tuple(i, j, k);
 
-    auto it = std::find_if(
-        tupleList.begin(), tupleList.end(),
-        [&](const auto& p) { return p.first == tuple; }
-    );
-    if (it != tupleList.end()) {
-        // Tuple exists, increment counter
-        it->second += 1;
-    } else {
-        // New tuple, add with counter 1
-        tupleList.emplace_back(tuple, 1);
-    }
-    /*FILE* outFile;
+  auto it = std::find_if(
+    tupleList.begin(), tupleList.end(), [&](const auto& p) { return p.first == tuple; });
+  if (it != tupleList.end()) {
+    // Tuple exists, increment counter
+    it->second += 1;
+  } else {
+    // New tuple, add with counter 1
+    tupleList.emplace_back(tuple, 1);
+  }
+  /*FILE* outFile;
 
-    outFile = fopen("tuples.txt", "w");
-    for (const auto& entry : tupleList) {
-        int64_t _i, _j, _k;
-        std::tie(_i, _j, _k) = entry.first;
-        fprintf(outFile, "%d,%lu,%lu,%lu\n", entry.second, _i, _j, _k);
-    }
-    fclose(outFile); */
+  outFile = fopen("tuples.txt", "w");
+  for (const auto& entry : tupleList) {
+      int64_t _i, _j, _k;
+      std::tie(_i, _j, _k) = entry.first;
+      fprintf(outFile, "%d,%lu,%lu,%lu\n", entry.second, _i, _j, _k);
+  }
+  fclose(outFile); */
 }
 
 template <typename MathT, typename IdxT, typename LabelT>
@@ -159,7 +158,8 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
   LabelT* labels,
   rmm::device_async_resource_ref mr)
 {
-  std::string result = "predict_core_" + std::to_string(n_rows) + "_" + std::to_string(n_clusters) + "_" + std::to_string(dim) + "_" + std::to_string(sizeof(MathT));
+  std::string result = "predict_core_" + std::to_string(n_rows) + "_" + std::to_string(n_clusters) +
+                       "_" + std::to_string(dim) + "_" + std::to_string(sizeof(MathT));
   nvtxRangePushA(result.c_str());
   auto stream           = raft::resource::get_cuda_stream(handle);
   bool should_use_fused = use_fused<MathT, IdxT, LabelT>(n_rows, n_clusters, dim);
