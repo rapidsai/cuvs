@@ -17,6 +17,9 @@
 // This is a list of required header files that cuvs_c rust/go/java
 // will bind to.
 
+#pragma once
+
+#include <cuvs/core/c_config.h>
 #include <cuvs/core/c_api.h>
 
 #include <cuvs/cluster/kmeans.h>
