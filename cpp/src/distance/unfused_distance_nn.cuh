@@ -106,41 +106,60 @@ struct Reducer {
   __device__ AccT operator()(const AccT& a, const AccT& b) { return a < b ? a : b; }
 };
 
-template <typename DataT, typename AccT, typename OutT, typename IdxT, int TPB>
+template <typename DataT, typename AccT, typename OutT, typename IdxT, int TPB, DistanceType metric>
 __global__ void reduce_min_kernel(
-  OutT* out, const AccT* z, const AccT* x_norm, const AccT* y_norm, IdxT m, IdxT n, bool is_sqrt)
+  OutT* out, const AccT* z, const AccT* x_norm, const AccT* y_norm, IdxT m, IdxT n, bool is_sqrt, bool initOutBuffer)
 {
   IdxT tid = threadIdx.x + blockIdx.x * blockDim.x;
   IdxT row = blockIdx.x;
 
   AccT x_norm_row = x_norm[row];
 
-  raft::KeyValuePair<IdxT, AccT> thread_min;
+  typedef raft::KeyValuePair<IdxT, AccT> KVType;
+  KVType thread_min;
 
   thread_min.value = max_val<AccT>();
   thread_min.key   = max_val<IdxT>();
 
   for (IdxT col = threadIdx.x; col < n; col += TPB) {
-    auto dist = x_norm_row + y_norm[col] - AccT(2) * z[row * n + col];
+    AccT dist = 0.0;
+
+    if constexpr (metric == DistanceType::L2SqrtExpanded || metric == DistanceType::L2Expanded) {
+      dist = x_norm_row + y_norm[col] - AccT(2) * z[row * n + col];
+    } else if constexpr (metric == DistanceType::CosineExpanded) {
+      dist = 1 - (z[row * n + col] / (x_norm_row * y_norm[col]));
+    }
     if (dist < thread_min.value) {
       thread_min.value = dist;
       thread_min.key   = col;
     }
   }
-  typedef cub::BlockReduce<OutT, TPB> BlockReduceT;
+
+  typedef cub::BlockReduce<KVType, TPB> BlockReduceT;
   __shared__ typename BlockReduceT::TempStorage temp_storage;
   auto block_result = BlockReduceT(temp_storage).Reduce(thread_min, Reducer<AccT, IdxT>{});
 
   if (threadIdx.x == 0) {
     if (is_sqrt) {
-      out[row] = block_result;
+      block_result.value = raft::sqrt(block_result.value);
+    }
+    if constexpr (std::is_same_v<OutT, KVType>) {
+      if (initOutBuffer == true) {
+        out[row] = block_result;
+      } else {
+        out[row] = block_result.value < out[row].value ? block_result : out[row];
+      }
     } else {
-      out[row] = block_result;
+      if (initOutBuffer == true) {
+        out[row] = block_result.value;
+      } else {
+        out[row] = block_result.value < out[row] ? block_result.value : out[row];
+      }
     }
   }
 }
 
-template <typename DataT, typename AccT, typename OutT, typename IdxT>
+template <typename DataT, typename AccT, typename OutT, typename IdxT, DistanceType metric>
 void reduce_min(OutT* out,
                 const AccT* z,
                 const AccT* x_norm,
@@ -148,16 +167,17 @@ void reduce_min(OutT* out,
                 IdxT m,
                 IdxT n,
                 cudaStream_t stream,
-                bool is_sqrt)
+                bool is_sqrt,
+                bool initOutBuffer)
 {
   const int TPB = 128;
 
   int blocks = m;
-  reduce_min_kernel<DataT, AccT, OutT, IdxT, TPB>
-    <<<blocks, TPB, 0, stream>>>(out, z, x_norm, y_norm, m, n, is_sqrt);
+  reduce_min_kernel<DataT, AccT, OutT, IdxT, TPB, metric>
+    <<<blocks, TPB, 0, stream>>>(out, z, x_norm, y_norm, m, n, is_sqrt, initOutBuffer);
 }
 
-template <typename DataT, typename AccT, typename OutT, typename IdxT, bool reduce=true>
+template <typename DataT, typename AccT, typename OutT, typename IdxT, bool reduce>
 void unfused_distance_nn(raft::resources const& handle,
                          OutT* out,
                          const DataT* x,
@@ -169,8 +189,15 @@ void unfused_distance_nn(raft::resources const& handle,
                          const AccT* y_norm,
                          AccT* workspace,
                          bool is_sqrt,
+                         bool initOutBuffer,
+                         DistanceType metric,
                          cudaStream_t stream)
 {
+
+  assert( (metric == DistanceType::CosineExpanded) || \
+          (metric == DistanceType::L2Expanded) || \
+          (metric == DistanceType::L2SqrtExpanded));
+          
   cudaDataType_t xyType, zType;
   cublasComputeType_t computeType;
 
@@ -240,7 +267,16 @@ void unfused_distance_nn(raft::resources const& handle,
       CUBLAS_GEMM_DEFAULT        // Algorithm selection
     ));
 
-    reduce_min<DataT, AccT, OutT, IdxT>(out, workspace, x_norm, y_norm, M, N, stream, is_sqrt);
+  if (reduce == true) {
+    if (metric == DistanceType::L2Expanded) {
+      reduce_min<DataT, AccT, OutT, IdxT, DistanceType::L2Expanded>(out, workspace, x_norm, y_norm, M, N, stream, is_sqrt, initOutBuffer);
+    } else if (metric == DistanceType::L2SqrtExpanded) {
+      reduce_min<DataT, AccT, OutT, IdxT, DistanceType::L2SqrtExpanded>(out, workspace, x_norm, y_norm, M, N, stream, is_sqrt, initOutBuffer);
+    } else if (metric == DistanceType::CosineExpanded) {
+      reduce_min<DataT, AccT, OutT, IdxT, DistanceType::CosineExpanded>(out, workspace, x_norm, y_norm, M, N, stream, is_sqrt, initOutBuffer);
+    }
+  }
+
 }
 //
 
@@ -275,25 +311,27 @@ void unfused_distance_nn(raft::resources const& handle,
  * @param[in]  metric_arg    power argument for distances like Minkowski (not supported for now)
  * @param[in]  stream        cuda stream
  */
-template <typename DataT, typename OutT, typename IdxT>
-void unfusedDistanceNNMinReduce(OutT* min,
-                              const DataT* x,
-                              const DataT* y,
-                              const DataT* xn,
-                              const DataT* yn,
-                              IdxT m,
-                              IdxT n,
-                              IdxT k,
-                              void* workspace,
-                              bool is_sqrt,
-                              bool initOutBuffer,
-                              bool isRowMajor,
-                              cuvs::distance::DistanceType metric,
-                              float metric_arg,
-                              cudaStream_t stream,
-                              cublasHandle_t& cublas_h)
+template <typename DataT, typename AccT, typename OutT, typename IdxT, bool reduce=true>
+void unfusedDistanceNNMinReduce(raft::resources const& handle,
+                                OutT* min,
+                                const DataT* x,
+                                const DataT* y,
+                                const DataT* xn,
+                                const DataT* yn,
+                                IdxT m,
+                                IdxT n,
+                                IdxT k,
+                                void* workspace,
+                                bool is_sqrt,
+                                bool initOutBuffer,
+                                bool isRowMajor,
+                                DistanceType metric,
+                                float metric_arg,
+                                cudaStream_t stream)
 {
-  cublas_l2nn<DataT, DataT, OutT, IdxT>(min, x, y, m, n, k, xn, yn, (DataT*)workspace, is_sqrt, cublas_h, stream);
+  ASSERT(isRowMajor, "unfusedDistanceNN only supports row major inputs");
+  unfused_distance_nn<DataT, AccT, OutT, IdxT, reduce>(
+    handle, min, x, y, m, n, k, xn, yn, (DataT*)workspace, is_sqrt, initOutBuffer, metric, stream);
 }
 
 /** @} */
