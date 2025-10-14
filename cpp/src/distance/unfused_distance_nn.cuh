@@ -133,7 +133,7 @@ __global__ void reduce_min_kernel(OutT* out,
     if constexpr (metric == DistanceType::L2SqrtExpanded || metric == DistanceType::L2Expanded) {
       dist = x_norm_row + y_norm[col] - AccT(2) * z[row * n + col];
     } else if constexpr (metric == DistanceType::CosineExpanded) {
-      dist = 1 - (z[row * n + col] / (x_norm_row * y_norm[col]));
+      dist = AccT(1.0) - (z[row * n + col] / (x_norm_row * y_norm[col]));
     }
     if (dist < thread_min.value) {
       thread_min.value = dist;

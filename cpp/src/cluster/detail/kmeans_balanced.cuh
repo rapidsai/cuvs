@@ -220,7 +220,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
         nvtxRangePop();
       } else {
         if (print_guard < 5) printf("unfused called\n");
-        cuvs::distance::unfusedDistanceNNMinReduce<MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
+        cuvs::distance::unfusedDistanceNNMinReduce<MathT, MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
           handle,
           minClusterAndDistance.data_handle(),
           dataset,
