@@ -415,6 +415,7 @@ void ace_set_index_params(raft::resources const& res,
   sub_index_params.guarantee_connectivity    = params.guarantee_connectivity;
   sub_index_params.metric                    = params.metric;
   sub_index_params.graph_build_params        = params.graph_build_params;
+  sub_index_params.attach_dataset_on_build   = false;
 
   if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
         sub_index_params.graph_build_params)) {
@@ -566,7 +567,10 @@ void ace_reorder_and_store_dataset(
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_histogram,
   raft::host_vector_view<IdxT, int64_t, raft::row_major> primary_backward_mapping,
   raft::host_vector_view<IdxT, int64_t, raft::row_major> primary_partition_offsets,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_partition_offsets)
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_partition_offsets,
+  cuvs::util::file_descriptor& reordered_fd,
+  cuvs::util::file_descriptor& augmented_fd,
+  cuvs::util::file_descriptor& mapping_fd)
 {
   auto start = std::chrono::high_resolution_clock::now();
 
@@ -585,13 +589,6 @@ void ace_reorder_and_store_dataset(
   if (mkdir(build_dir.c_str(), 0755) != 0 && errno != EEXIST) {
     RAFT_EXPECTS(false, "Failed to create ACE build directory: %s", build_dir.c_str());
   }
-
-  const std::string reordered_dataset_path = build_dir + "/reordered_dataset.bin";
-  const std::string augmented_dataset_path = build_dir + "/augmented_dataset.bin";
-  cuvs::util::file_descriptor reordered_fd(
-    reordered_dataset_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
-  cuvs::util::file_descriptor augmented_fd(
-    augmented_dataset_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
 
   // Calculate total sizes for pre-allocation
   size_t total_primary_vectors   = 0;
@@ -614,17 +611,10 @@ void ace_reorder_and_store_dataset(
   size_t reordered_file_size = total_primary_vectors * vector_size;
   size_t augmented_file_size = total_augmented_vectors * vector_size;
 
-  if (posix_fallocate(reordered_fd.get(), 0, reordered_file_size) != 0) {
-    RAFT_LOG_WARN("Failed to pre-allocate space for reordered dataset file");
-  }
-  if (posix_fallocate(augmented_fd.get(), 0, augmented_file_size) != 0) {
-    RAFT_LOG_WARN("Failed to pre-allocate space for augmented dataset file");
-  }
-
-  RAFT_LOG_DEBUG("ACE: Reordered dataset: %lu primary vectors (%.2f GB)",
+  RAFT_LOG_DEBUG("ACE: Reordered dataset: %lu primary vectors (%.2f GiB)",
                  total_primary_vectors,
                  reordered_file_size / (1024.0 * 1024.0 * 1024.0));
-  RAFT_LOG_DEBUG("ACE: Augmented dataset: %lu secondary vectors (%.2f GB)",
+  RAFT_LOG_DEBUG("ACE: Augmented dataset: %lu secondary vectors (%.2f GiB)",
                  total_augmented_vectors,
                  augmented_file_size / (1024.0 * 1024.0 * 1024.0));
 
@@ -669,7 +659,7 @@ void ace_reorder_and_store_dataset(
       "ACE: Reorder buffers are smaller than 1MB. Increase host memory for better disk "
       "throughputs.");
   }
-  RAFT_LOG_DEBUG("ACE: %.2f GB available memory, %.2f GB disk write size",
+  RAFT_LOG_DEBUG("ACE: %.2f GiB available memory, %.2f GiB disk write size",
                  available_memory / (1024.0 * 1024.0 * 1024.0),
                  disk_write_size / (1024.0 * 1024.0 * 1024.0));
   RAFT_LOG_DEBUG("ACE: Reorder buffers: %lu vectors per buffer (%.2f MB)",
@@ -762,29 +752,9 @@ void ace_reorder_and_store_dataset(
     flush_augmented_buffer(p);
   }
 
-  const std::string mapping_file_path = build_dir + "/dataset_mapping.bin";
-  const size_t mapping_file_size      = dataset_size * sizeof(IdxT);
-  {
-    cuvs::util::file_descriptor mapping_fd(mapping_file_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
-    cuvs::util::write_large_file(
-      mapping_fd, primary_backward_mapping.data_handle(), mapping_file_size, 0);
-  }
-
-  const std::string graph_file_path = build_dir + "/cagra_graph.bin";
-  {
-    cuvs::util::file_descriptor graph_fd(graph_file_path, O_WRONLY | O_CREAT, 0644);
-
-    // Pre-allocate the graph file for the entire dataset
-    const size_t total_file_size = dataset_size * params.graph_degree * sizeof(IdxT);
-
-    const int result = posix_fallocate(graph_fd.get(), 0, total_file_size);
-    if (result != 0) {
-      RAFT_LOG_WARN("ACE: Failed to pre-allocate graph file space: %s", strerror(result));
-    } else {
-      RAFT_LOG_DEBUG("ACE: Pre-allocated %.2f GB for graph file",
-                     total_file_size / (1024.0 * 1024.0 * 1024.0));
-    }
-  }
+  const size_t mapping_file_size = dataset_size * sizeof(IdxT);
+  cuvs::util::write_large_file(
+    mapping_fd, primary_backward_mapping.data_handle(), mapping_file_size, 0);
 
   auto end        = std::chrono::high_resolution_clock::now();
   auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -794,8 +764,8 @@ void ace_reorder_and_store_dataset(
   double throughput_mb_s     = (total_bytes_written / (1024.0 * 1024.0)) / (elapsed_ms / 1000.0);
 
   RAFT_LOG_INFO(
-    "ACE: Dataset (%.2f GB reordered, %.2f GB augmented, %.2f GB mapping) reordering completed in "
-    "%ld ms (%.1f MB/s)",
+    "ACE: Dataset (%.2f GiB reordered, %.2f GiB augmented, %.2f GiB mapping) reordering completed "
+    "in %ld ms (%.1f MB/s)",
     reordered_file_size / (1024.0 * 1024.0 * 1024.0),
     augmented_file_size / (1024.0 * 1024.0 * 1024.0),
     mapping_file_size / (1024.0 * 1024.0 * 1024.0),
@@ -914,13 +884,12 @@ index<T, IdxT> build_ace(raft::resources const& res,
   size_t n_partitions = params.ace_npartitions;
   RAFT_EXPECTS(n_partitions > 0, "ACE: ace_npartitions must be greater than 0");
 
-  size_t avg_vectors_per_partition  = dataset_size / n_partitions;
   size_t min_required_per_partition = 1000;
-  RAFT_EXPECTS(
-    avg_vectors_per_partition >= min_required_per_partition,
-    "ACE: Partition size too small. Each partition needs at least %lu vectors, but would have ~%lu",
-    min_required_per_partition,
-    avg_vectors_per_partition);
+  if (n_partitions > dataset_size / min_required_per_partition) {
+    n_partitions = dataset_size / min_required_per_partition;
+    RAFT_LOG_WARN("ACE: Reduced number of partitions to %zu to avoid tiny partitions",
+                  n_partitions);
+  }
 
   auto total_start = std::chrono::high_resolution_clock::now();
   RAFT_LOG_INFO("ACE: Starting partitioned CAGRA build with %zu partitions", n_partitions);
@@ -949,7 +918,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
   size_t cagra_graph_size = dataset_size * graph_degree * sizeof(IdxT);
   size_t total_size       = ace_partition_labels_size + ace_id_mapping_size + ace_sub_dataset_size +
                       ace_sub_graph_size + cagra_graph_size;
-  RAFT_LOG_INFO("ACE: Estimated host memory required: %.2f GB, available: %.2f GB",
+  RAFT_LOG_INFO("ACE: Estimated host memory required: %.2f GiB, available: %.2f GiB",
                 total_size / (1024.0 * 1024.0 * 1024.0),
                 available_memory / (1024.0 * 1024.0 * 1024.0));
   // TODO: Adjust overhead factor if needed
@@ -961,7 +930,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
     // TODO: Extend model or use managed memory if running out of GPU memory.
     auto available_gpu_memory = rmm::available_device_memory().second;
     use_disk                  = static_cast<size_t>(0.8 * available_gpu_memory) < cagra_graph_size;
-    RAFT_LOG_INFO("ACE: Estimated GPU memory required: %.2f GB, available: %.2f GB",
+    RAFT_LOG_INFO("ACE: Estimated GPU memory required: %.2f GiB, available: %.2f GiB",
                   cagra_graph_size / (1024.0 * 1024.0 * 1024.0),
                   available_gpu_memory / (1024.0 * 1024.0 * 1024.0));
   }
@@ -973,6 +942,34 @@ index<T, IdxT> build_ace(raft::resources const& res,
                   params.ace_build_dir.c_str());
   } else {
     RAFT_LOG_INFO("ACE: Graph fits in memory");
+  }
+
+  // Preallocate space for files for better performance and fail early if not enough space.
+  cuvs::util::file_descriptor reordered_fd;
+  cuvs::util::file_descriptor augmented_fd;
+  cuvs::util::file_descriptor mapping_fd;
+  cuvs::util::file_descriptor graph_fd;
+  if (use_disk) {
+    reordered_fd = cuvs::util::file_descriptor(
+      params.ace_build_dir + "/reordered_dataset.bin", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    augmented_fd = cuvs::util::file_descriptor(
+      params.ace_build_dir + "/augmented_dataset.bin", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    mapping_fd = cuvs::util::file_descriptor(
+      params.ace_build_dir + "/dataset_mapping.bin", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    graph_fd = cuvs::util::file_descriptor(
+      params.ace_build_dir + "/cagra_graph.bin", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (posix_fallocate(reordered_fd.get(), 0, dataset_size * dataset_dim * sizeof(T)) != 0) {
+      RAFT_FAIL("Failed to pre-allocate space for reordered dataset file");
+    }
+    if (posix_fallocate(augmented_fd.get(), 0, dataset_size * dataset_dim * sizeof(T)) != 0) {
+      RAFT_FAIL("Failed to pre-allocate space for augmented dataset file");
+    }
+    if (posix_fallocate(mapping_fd.get(), 0, dataset_size * sizeof(IdxT)) != 0) {
+      RAFT_FAIL("Failed to pre-allocate space for dataset mapping file");
+    }
+    if (posix_fallocate(graph_fd.get(), 0, cagra_graph_size) != 0) {
+      RAFT_FAIL("Failed to pre-allocate space for graph file");
+    }
   }
 
   auto partition_start     = std::chrono::high_resolution_clock::now();
@@ -988,6 +985,12 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
   ace_get_partition_labels<T, IdxT>(
     res, dataset, partition_labels.view(), partition_histogram.view(), min_partition_size);
+
+  ace_check_partition_sizes<IdxT>(dataset_size,
+                                  n_partitions,
+                                  partition_labels.view(),
+                                  partition_histogram.view(),
+                                  min_partition_size);
 
   auto partition_end = std::chrono::high_resolution_clock::now();
   auto partition_elapsed =
@@ -1033,7 +1036,10 @@ index<T, IdxT> build_ace(raft::resources const& res,
                                            partition_histogram.view(),
                                            primary_backward_mapping.view(),
                                            primary_partition_offsets.view(),
-                                           augmented_partition_offsets.view());
+                                           augmented_partition_offsets.view(),
+                                           reordered_fd,
+                                           augmented_fd,
+                                           mapping_fd);
     // primary_backward_mapping is not needed anymore.
     primary_backward_mapping = raft::make_host_vector<IdxT, int64_t>(0);
   }
@@ -1041,12 +1047,6 @@ index<T, IdxT> build_ace(raft::resources const& res,
   // Placeholder search graph for in-memory version
   auto search_graph = use_disk ? raft::make_host_matrix<IdxT, int64_t>(0, 0)
                                : raft::make_host_matrix<IdxT, int64_t>(dataset_size, graph_degree);
-
-  cuvs::util::file_descriptor graph_fd;
-  if (use_disk) {
-    const std::string graph_file_path = params.ace_build_dir + "/cagra_graph.bin";
-    graph_fd = cuvs::util::file_descriptor(graph_file_path, O_WRONLY, 0644);
-  }
 
   // Process each partition
   auto partition_processing_start = std::chrono::high_resolution_clock::now();
