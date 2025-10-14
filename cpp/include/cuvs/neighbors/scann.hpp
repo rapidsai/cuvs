@@ -272,9 +272,21 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix<float, uint32_t, raft::row_major> pq_codebook_;
   raft::host_matrix<uint8_t, IdxT, raft::row_major> quantized_residuals_;
   raft::host_matrix<uint8_t, IdxT, raft::row_major> quantized_soar_residuals_;
+
+  /* Internally, __nv_bfloat16 is used for float <-> __nv_bfloat16 conversion.
+   * The bits of __nv_bfloat16 are stored here reinterpreted as int16_t
+   *
+   * int16_t is used for two reaosns:
+   * * OSS ScaNN expects int16_t, so the serialzed bf16_dataset_ can be consumed
+   *   without any additional post-processing
+   * * For AVQ, we need to find the next bfloat16 number that is larger/smaller than a
+   *   given float. This is equivalent to incrementing/decrementing the mantissa
+   *   in IEEE representation of the bfloat16 number, which in turn is equivalent
+   *   to incrementing/decrementing the int16_t representation
+   */
   raft::host_matrix<int16_t, IdxT, raft::row_major> bf16_dataset_;
-  // TODO - add any data, pointers or structures needed
 };
+
 /**
  * @}
  */
