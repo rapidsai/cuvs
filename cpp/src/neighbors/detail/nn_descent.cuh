@@ -50,6 +50,7 @@
 #include <omp.h>
 
 #include <limits>
+#include <numeric>
 #include <optional>
 #include <queue>
 #include <random>
@@ -885,36 +886,29 @@ void GnndGraph<Index_t>::sample_graph_new(InternalID_t<Index_t>* new_neighbors, 
 template <typename Index_t>
 void GnndGraph<Index_t>::init_random_graph()
 {
-  for (size_t seg_idx = 0; seg_idx < static_cast<size_t>(num_segments); seg_idx++) {
-    // random sequence (range: 0~nrow)
-    // segment_x stores neighbors which id % num_segments == x
-    std::vector<Index_t> rand_seq((nrow + num_segments - 1) / num_segments);
-    std::iota(rand_seq.begin(), rand_seq.end(), 0);
-    auto gen = std::default_random_engine{seg_idx};
-    std::shuffle(rand_seq.begin(), rand_seq.end(), gen);
+  const auto segment_block_size = node_degree / num_segments;
+
+  uint64_t stride = nrow / node_degree;
+  while (std::gcd(nrow, stride) != 1 || std::gcd(num_segments, stride) != 1) {
+    stride++;
+  }
 
 #pragma omp parallel for
-    for (size_t i = 0; i < nrow; i++) {
-      size_t base_idx         = i * node_degree + seg_idx * segment_size;
-      auto h_neighbor_list    = h_graph + base_idx;
-      auto h_dist_list        = h_dists.data_handle() + base_idx;
-      size_t idx              = base_idx;
-      size_t self_in_this_seg = 0;
-      for (size_t j = 0; j < static_cast<size_t>(segment_size); j++) {
-        Index_t id = rand_seq[idx % rand_seq.size()] * num_segments + seg_idx;
-        if ((size_t)id == i) {
-          idx++;
-          id               = rand_seq[idx % rand_seq.size()] * num_segments + seg_idx;
-          self_in_this_seg = 1;
-        }
+  for (size_t i = 0; i < nrow; i++) {
+    std::size_t start_neighbor_id = i + 1;
 
-        h_neighbor_list[j].id_with_flag() =
-          j < (rand_seq.size() - self_in_this_seg) && size_t(id) < nrow
-            ? id
-            : std::numeric_limits<Index_t>::max();
-        h_dist_list[j] = std::numeric_limits<DistData_t>::max();
-        idx++;
-      }
+    auto h_neighbor_list = h_graph + i * node_degree;
+    auto h_dist_list     = h_dists.data_handle() + i * node_degree;
+    for (uint32_t j = 0; j < (uint32_t)node_degree; j++) {
+      std::size_t id = (start_neighbor_id + j * stride) % nrow;
+
+      const auto store_segment_lane_id  = j / num_segments;
+      const auto store_segment_block_id = (start_neighbor_id + j * stride) % num_segments;
+      const auto store_index = store_segment_lane_id + store_segment_block_id * segment_block_size;
+
+      id = (id / num_segments) * num_segments + store_segment_block_id % num_segments;
+      h_neighbor_list[store_index].id_with_flag() = id;
+      h_dist_list[store_index]                    = std::numeric_limits<DistData_t>::max();
     }
   }
 }
@@ -1285,17 +1279,55 @@ void GNND<Data_t, Index_t>::build(Data_t* data,
 
   Index_t* graph_shrink_buffer = (Index_t*)graph_.h_dists.data_handle();
 
+  const size_t max_graph_degree =
+    std::min(static_cast<size_t>(nrow_ - 1), static_cast<size_t>(build_config_.node_degree));
+  // Copy the output graph while removing duplicates.
 #pragma omp parallel for
   for (size_t i = 0; i < (size_t)nrow_; i++) {
-    for (size_t j = 0; j < build_config_.node_degree; j++) {
-      size_t idx = i * graph_.node_degree + j;
-      int id     = graph_.h_graph[idx].id();
-      if (id < static_cast<int>(nrow_)) {
-        graph_shrink_buffer[i * build_config_.node_degree + j] = id;
-      } else {
-        graph_shrink_buffer[i * build_config_.node_degree + j] =
-          cuvs::neighbors::cagra::detail::device::xorshift64(idx) % nrow_;
+    auto output_neighbor_list_ptr = graph_shrink_buffer + i * build_config_.node_degree;
+
+    size_t out_j = 0;
+
+    // Copy neighbor list while removing duplicates.
+    for (size_t in_j = 0; out_j < max_graph_degree && in_j < build_config_.node_degree; in_j++) {
+      size_t idx = graph_.h_graph[i * graph_.node_degree + in_j].id();
+
+      bool dup = false;
+      for (size_t exi_j = 0; exi_j < out_j; exi_j++) {
+        if (static_cast<decltype(idx)>(output_neighbor_list_ptr[exi_j]) == idx || i == idx) {
+          dup = true;
+          break;
+        }
       }
+      if (!dup) {
+        output_neighbor_list_ptr[out_j] = idx;
+        out_j++;
+      }
+    }
+
+    // Fill with random nodes if the length of the filled neighbor list is less than the degree.
+    for (size_t j = out_j; j < max_graph_degree; j++) {
+      uint64_t rnd = static_cast<uint64_t>(i * build_config_.node_degree + j + 1);
+      uint64_t idx;
+      bool dup = false;
+      do {
+        rnd = cuvs::neighbors::cagra::detail::device::xorshift64(rnd);
+        idx = rnd % nrow_;
+        dup = false;
+        for (size_t exi_j = 0; exi_j < j; exi_j++) {
+          if (static_cast<decltype(idx)>(output_neighbor_list_ptr[exi_j]) == idx || i == idx) {
+            dup = true;
+            break;
+          }
+        }
+      } while (dup);
+      output_neighbor_list_ptr[j] = static_cast<int>(idx);
+    }
+
+    // If the dataset size - 1 is smaller than the degree, fill the neighbor list with the parent
+    // node id
+    for (size_t j = out_j; j < max_graph_degree; j++) {
+      output_neighbor_list_ptr[j] = static_cast<int>(i);
     }
   }
   graph_.h_graph = nullptr;
