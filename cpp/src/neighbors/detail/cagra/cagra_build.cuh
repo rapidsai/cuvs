@@ -74,6 +74,7 @@ void check_graph_degree(size_t& intermediate_degree, size_t& graph_degree, size_
 }
 
 // ACE: Get partition labels for partitioned approach
+// TODO(julianmi): Use all neighbors APIs.
 template <typename T, typename IdxT>
 void ace_get_partition_labels(
   raft::resources const& res,
@@ -212,28 +213,28 @@ void ace_get_partition_labels(
     // Find two closest partitions to each dataset vector
 #pragma omp parallel for
     for (size_t i_sub = 0; i_sub < sub_dataset_size; i_sub++) {
-      IdxT label_0 = 0;
-      IdxT label_1 = 1;
+      size_t primary_label   = 0;
+      size_t augmented_label = 1;
       if (sub_distances(i_sub, 0) > sub_distances(i_sub, 1)) {
-        label_0 = 1;
-        label_1 = 0;
+        primary_label   = 1;
+        augmented_label = 0;
       }
       for (size_t c = 2; c < n_partitions; c++) {
-        if (sub_distances(i_sub, c) < sub_distances(i_sub, label_0)) {
-          label_1 = label_0;
-          label_0 = c;
-        } else if (sub_distances(i_sub, c) < sub_distances(i_sub, label_1)) {
-          label_1 = c;
+        if (sub_distances(i_sub, c) < sub_distances(i_sub, primary_label)) {
+          augmented_label = primary_label;
+          primary_label   = c;
+        } else if (sub_distances(i_sub, c) < sub_distances(i_sub, augmented_label)) {
+          augmented_label = c;
         }
       }
       size_t i               = i_base + i_sub;
-      partition_labels(i, 0) = label_0;
-      partition_labels(i, 1) = label_1;
+      partition_labels(i, 0) = primary_label;
+      partition_labels(i, 1) = augmented_label;
 
 #pragma omp atomic update
-      partition_histogram(label_0, 0) += 1;
+      partition_histogram(primary_label, 0) += 1;
 #pragma omp atomic update
-      partition_histogram(label_1, 1) += 1;
+      partition_histogram(augmented_label, 1) += 1;
     }
   }
 }
@@ -256,7 +257,6 @@ void ace_check_partition_sizes(
   size_t max_augmented_vectors   = 0;
   size_t min_total_vectors       = dataset_size;
   size_t max_total_vectors       = 0;
-  size_t non_empty_partitions    = 0;
 
   for (size_t c = 0; c < n_partitions; c++) {
     size_t primary_count   = partition_histogram(c, 0);
@@ -264,7 +264,6 @@ void ace_check_partition_sizes(
     size_t total_count     = primary_count + augmented_count;
 
     if (total_count > 0) {
-      non_empty_partitions++;
       total_primary_vectors += primary_count;
       total_augmented_vectors += augmented_count;
 
@@ -277,13 +276,11 @@ void ace_check_partition_sizes(
     }
   }
 
-  double avg_primary_vectors = static_cast<double>(total_primary_vectors) / non_empty_partitions;
-  double avg_augmented_vectors =
-    static_cast<double>(total_augmented_vectors) / non_empty_partitions;
-  double avg_total_vectors    = 2.0 * static_cast<double>(dataset_size) / non_empty_partitions;
-  double expected_avg_vectors = 2.0 * static_cast<double>(dataset_size) / n_partitions;
+  double avg_primary_vectors   = static_cast<double>(total_primary_vectors) / n_partitions;
+  double avg_augmented_vectors = static_cast<double>(total_augmented_vectors) / n_partitions;
+  double avg_total_vectors     = 2.0 * static_cast<double>(dataset_size) / n_partitions;
+  double expected_avg_vectors  = 2.0 * static_cast<double>(dataset_size) / n_partitions;
 
-  RAFT_LOG_INFO("ACE: Active partitions: %lu / %lu", non_empty_partitions, n_partitions);
   RAFT_LOG_INFO("ACE: Primary vectors     - Total: %lu, Avg: %.1f, Min: %lu, Max: %lu",
                 total_primary_vectors,
                 avg_primary_vectors,
@@ -327,20 +324,19 @@ void ace_check_partition_sizes(
 }
 
 // ACE: Create forward/backward mappings between original and reordered vector IDs
+// The in-memory path can be parallelized but the disk path requires ordering.
 template <typename IdxT>
 void ace_create_forward_and_backward_lists(
   size_t dataset_size,
   size_t n_partitions,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_labels,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_histogram,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> forward_mapping_0,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> backward_mapping_0,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> backward_mapping_1,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> primary_forward_mapping,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> primary_backward_mapping,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_backward_mapping,
   raft::host_vector_view<IdxT, int64_t, raft::row_major> primary_partition_offsets,
   raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_partition_offsets)
 {
-  RAFT_EXPECTS(static_cast<size_t>(backward_mapping_0.extent(0)) == dataset_size,
-               "backward_mapping_0 must be of size dataset_size");
   primary_partition_offsets(0)   = 0;
   augmented_partition_offsets(0) = 0;
   for (size_t c = 1; c < n_partitions; c++) {
@@ -349,44 +345,49 @@ void ace_create_forward_and_backward_lists(
       augmented_partition_offsets(c - 1) + partition_histogram(c - 1, 1);
   }
 
-  // The disk version doesn't map vectors to their original ids. Skip backward mappings.
-  if (forward_mapping_0.extent(0) > 0 && backward_mapping_1.extent(0) > 0) {
-    RAFT_EXPECTS(static_cast<size_t>(forward_mapping_0.extent(0)) == dataset_size,
-                 "forward_mapping_0 must be of size dataset_size");
-    RAFT_EXPECTS(static_cast<size_t>(backward_mapping_1.extent(0)) == dataset_size,
-                 "backward_mapping_1 must be of size dataset_size");
+  if (static_cast<size_t>(primary_forward_mapping.extent(0)) == 0) {
+    // Memory path: both backward mappings
+    RAFT_EXPECTS(static_cast<size_t>(primary_backward_mapping.extent(0)) == dataset_size,
+                 "primary_backward_mapping must be of size dataset_size");
+    RAFT_EXPECTS(static_cast<size_t>(augmented_backward_mapping.extent(0)) == dataset_size,
+                 "augmented_backward_mapping must be of size dataset_size");
 #pragma omp parallel for
     for (size_t i = 0; i < dataset_size; i++) {
-      size_t c_0 = partition_labels(i, 0);
-      size_t j_0;
+      size_t primary_partition_id = partition_labels(i, 0);
+      size_t primary_id;
 #pragma omp atomic capture
-      j_0 = primary_partition_offsets(c_0)++;
-      RAFT_EXPECTS(j_0 < dataset_size, "Vector ID must be smaller than dataset_size");
-      forward_mapping_0(i)    = j_0;
-      backward_mapping_0(j_0) = i;
+      primary_id = primary_partition_offsets(primary_partition_id)++;
+      RAFT_EXPECTS(primary_id < dataset_size, "Vector ID must be smaller than dataset_size");
+      primary_backward_mapping(primary_id) = i;
 
-      size_t c_1 = partition_labels(i, 1);
-      size_t j_1;
+      size_t augmented_partition_id = partition_labels(i, 1);
+      size_t augmented_id;
 #pragma omp atomic capture
-      j_1 = augmented_partition_offsets(c_1)++;
-      RAFT_EXPECTS(j_1 < dataset_size, "Vector ID must be smaller than dataset_size");
-      backward_mapping_1(j_1) = i;
+      augmented_id = augmented_partition_offsets(augmented_partition_id)++;
+      RAFT_EXPECTS(augmented_id < dataset_size, "Vector ID must be smaller than dataset_size");
+      augmented_backward_mapping(augmented_id) = i;
     }
   } else {
-#pragma omp parallel for
+    // Disk path: all three mappings
+    RAFT_EXPECTS(static_cast<size_t>(primary_forward_mapping.extent(0)) == dataset_size,
+                 "primary_forward_mapping must be of size dataset_size");
+    RAFT_EXPECTS(static_cast<size_t>(primary_backward_mapping.extent(0)) == dataset_size,
+                 "primary_backward_mapping must be of size dataset_size");
+    RAFT_EXPECTS(static_cast<size_t>(augmented_backward_mapping.extent(0)) == dataset_size,
+                 "augmented_backward_mapping must be of size dataset_size");
     for (size_t i = 0; i < dataset_size; i++) {
-      size_t c_0 = partition_labels(i, 0);
-      size_t j_0;
-#pragma omp atomic capture
-      j_0 = primary_partition_offsets(c_0)++;
-      RAFT_EXPECTS(j_0 < dataset_size, "Vector ID must be smaller than dataset_size");
-      backward_mapping_0(j_0) = i;
+      size_t primary_partition_id = partition_labels(i, 0);
+      size_t primary_id;
+      primary_id = primary_partition_offsets(primary_partition_id)++;
+      RAFT_EXPECTS(primary_id < dataset_size, "Vector ID must be smaller than dataset_size");
+      primary_backward_mapping(primary_id) = i;
+      primary_forward_mapping(i)           = primary_id;
 
-      size_t c_1 = partition_labels(i, 1);
-      size_t j_1;
-#pragma omp atomic capture
-      j_1 = augmented_partition_offsets(c_1)++;
-      RAFT_EXPECTS(j_1 < dataset_size, "Vector ID must be smaller than dataset_size");
+      size_t augmented_partition_id = partition_labels(i, 1);
+      size_t augmented_id;
+      augmented_id = augmented_partition_offsets(augmented_partition_id)++;
+      RAFT_EXPECTS(augmented_id < dataset_size, "Vector ID must be smaller than dataset_size");
+      augmented_backward_mapping(augmented_id) = i;
     }
   }
 
@@ -395,6 +396,8 @@ void ace_create_forward_and_backward_lists(
     primary_partition_offsets(c)   = primary_partition_offsets(c - 1);
     augmented_partition_offsets(c) = augmented_partition_offsets(c - 1);
   }
+  primary_partition_offsets(0)   = 0;
+  augmented_partition_offsets(0) = 0;
 }
 
 // ACE: Set index parameters for each partition
@@ -451,21 +454,21 @@ void ace_set_index_params(raft::resources const& res,
 // ACE: Gather partition dataset
 template <typename T, typename IdxT>
 void ace_gather_partition_dataset(
-  size_t sub_dataset_size_0,
-  size_t sub_dataset_size_1,
+  size_t primary_sub_dataset_size,
+  size_t augmented_sub_dataset_size,
   size_t dataset_dim,
   size_t partition_id,
-  raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> backward_mapping_0,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> backward_mapping_1,
+  raft::host_matrix_view<const T, int64_t, row_major> dataset,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> primary_backward_mapping,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_backward_mapping,
   raft::host_vector_view<IdxT, int64_t, raft::row_major> primary_partition_offsets,
   raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_partition_offsets,
   raft::host_matrix_view<T, int64_t, raft::row_major> sub_dataset)
 {
   // Copy vectors belonging to this as closest partition
 #pragma omp parallel for
-  for (size_t j = 0; j < sub_dataset_size_0; j++) {
-    size_t i = backward_mapping_0(j + primary_partition_offsets(partition_id));
+  for (size_t j = 0; j < primary_sub_dataset_size; j++) {
+    size_t i = primary_backward_mapping(j + primary_partition_offsets(partition_id));
     for (size_t k = 0; k < dataset_dim; k++) {
       sub_dataset(j, k) = dataset(i, k);
     }
@@ -473,61 +476,80 @@ void ace_gather_partition_dataset(
 
 // Copy vectors belonging to this as 2nd closest partition
 #pragma omp parallel for
-  for (size_t j = 0; j < sub_dataset_size_1; j++) {
-    size_t i = backward_mapping_1(j + augmented_partition_offsets(partition_id));
+  for (size_t j = 0; j < augmented_sub_dataset_size; j++) {
+    size_t i = augmented_backward_mapping(j + augmented_partition_offsets(partition_id));
     for (size_t k = 0; k < dataset_dim; k++) {
-      sub_dataset(j + sub_dataset_size_0, k) = dataset(i, k);
+      sub_dataset(j + primary_sub_dataset_size, k) = dataset(i, k);
     }
   }
 }
 
-// ACE: Adjust ids in sub search graph
+// ACE: Adjust IDs from primary and augmented partitions to global reordered IDs
 template <typename IdxT>
 void ace_adjust_sub_graph_ids(
-  size_t sub_dataset_size_0,
-  size_t sub_dataset_size_1,
+  size_t primary_sub_dataset_size,
+  size_t augmented_sub_dataset_size,
   size_t graph_degree,
   size_t partition_id,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> sub_search_graph,
-  raft::host_matrix_view<IdxT, int64_t, raft::row_major> search_graph_0,
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> search_graph,
   raft::host_vector_view<IdxT, int64_t, raft::row_major> primary_partition_offsets,
   raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_partition_offsets,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> backward_mapping_1,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> forward_mapping_0)
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> primary_backward_mapping,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_backward_mapping)
 {
 #pragma omp parallel for
-  for (size_t i_0 = 0; i_0 < sub_dataset_size_0; i_0++) {
+  for (size_t i = 0; i < primary_sub_dataset_size; i++) {
+    // Map row index from local → reordered → original
+    size_t i_reordered = i + primary_partition_offsets(partition_id);
+    size_t i_original  = primary_backward_mapping(i_reordered);
+
     for (size_t k = 0; k < graph_degree; k++) {
-      size_t j_0 = sub_search_graph(i_0, k);
-      if (j_0 < sub_dataset_size_0) {
-        search_graph_0(i_0 + primary_partition_offsets(partition_id), k) =
-          j_0 + primary_partition_offsets(partition_id);
+      size_t j = sub_search_graph(i, k);
+      size_t j_original;
+
+      if (j < primary_sub_dataset_size) {
+        // Primary partition neighbor: local → primary reordered → original
+        size_t j_reordered = j + primary_partition_offsets(partition_id);
+        j_original         = primary_backward_mapping(j_reordered);
       } else {
-        size_t j_1 = j_0 - sub_dataset_size_0;
-        size_t j   = backward_mapping_1(j_1 + augmented_partition_offsets(partition_id));
-        search_graph_0(i_0 + primary_partition_offsets(partition_id), k) = forward_mapping_0(j);
+        // Augmented partition neighbor: local → augmented reordered → original
+        size_t j_augmented = j - primary_sub_dataset_size;
+        j_original =
+          augmented_backward_mapping(j_augmented + augmented_partition_offsets(partition_id));
       }
+      search_graph(i_original, k) = j_original;
     }
   }
 }
 
-// ACE: Map graph neighbor IDs from reordered space back to original vector IDs
+// ACE: Adjust ids in sub search graph in place for disk version
 template <typename IdxT>
-void ace_adjust_final_graph_ids(
-  size_t dataset_size,
+void ace_adjust_sub_graph_ids_disk(
+  size_t primary_sub_dataset_size,
+  size_t augmented_sub_dataset_size,
   size_t graph_degree,
-  raft::host_matrix_view<IdxT, int64_t, raft::row_major> search_graph_0,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> forward_mapping_0,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> backward_mapping_0,
-  raft::host_matrix_view<IdxT, int64_t, raft::row_major> search_graph)
+  size_t partition_id,
+  raft::host_matrix_view<IdxT, int64_t, raft::row_major> sub_search_graph,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> primary_partition_offsets,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_partition_offsets,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_backward_mapping,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> primary_forward_mapping)
 {
 #pragma omp parallel for
-  for (size_t i = 0; i < dataset_size; i++) {
-    size_t i_0 = forward_mapping_0(i);
+  for (size_t i = 0; i < primary_sub_dataset_size; i++) {
     for (size_t k = 0; k < graph_degree; k++) {
-      size_t j_0         = search_graph_0(i_0, k);
-      size_t j           = backward_mapping_0(j_0);
-      search_graph(i, k) = j;
+      size_t j = sub_search_graph(i, k);
+      if (j < primary_sub_dataset_size) {
+        // Primary partition neighbor: local → primary reordered
+        sub_search_graph(i, k) = j + primary_partition_offsets(partition_id);
+      } else {
+        // Augmented partition neighbor: local → augmented reordered→ original → primary reordered
+        size_t j_augmented = j - primary_sub_dataset_size;
+        size_t j_original =
+          augmented_backward_mapping(j_augmented + augmented_partition_offsets(partition_id));
+        sub_search_graph(i, k) = primary_forward_mapping(j_original);
+      }
     }
   }
 }
@@ -542,7 +564,7 @@ void ace_reorder_and_store_dataset(
   raft::host_matrix_view<const T, int64_t, row_major> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_labels,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_histogram,
-  raft::host_vector_view<IdxT, int64_t, raft::row_major> backward_mapping_0,
+  raft::host_vector_view<IdxT, int64_t, raft::row_major> primary_backward_mapping,
   raft::host_vector_view<IdxT, int64_t, raft::row_major> primary_partition_offsets,
   raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_partition_offsets)
 {
@@ -745,7 +767,7 @@ void ace_reorder_and_store_dataset(
   {
     cuvs::util::file_descriptor mapping_fd(mapping_file_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
     cuvs::util::write_large_file(
-      mapping_fd, backward_mapping_0.data_handle(), mapping_file_size, 0);
+      mapping_fd, primary_backward_mapping.data_handle(), mapping_file_size, 0);
   }
 
   const std::string graph_file_path = build_dir + "/cagra_graph.bin";
@@ -913,7 +935,6 @@ index<T, IdxT> build_ace(raft::resources const& res,
   // Optimistic memory model: focus on largest arrays, assumes all partitions are of equal size
   // For memory path:
   //   - Partition labes (primary + augmented): 2 * dataset_size * sizeof(IdxT)
-  //   - Forward ID mapping array (primary only): dataset_size * sizeof(IdxT)
   //   - Backward ID mapping arrays (primary + augmented): 2 * dataset_size * sizeof(IdxT)
   //   - Per-partition dataset (2x for imbalanced partitions): 4 * (dataset_size / n_partitions) *
   //   dataset_dim * sizeof(T)
@@ -921,14 +942,13 @@ index<T, IdxT> build_ace(raft::resources const& res,
   //   sizeof(IdxT)
   //   - Final assembled graph: dataset_size * graph_degree * sizeof(IdxT)
   size_t ace_partition_labels_size = 2 * dataset_size * sizeof(IdxT);
-  size_t ace_id_mapping_size       = 3 * dataset_size * sizeof(IdxT);
+  size_t ace_id_mapping_size       = 2 * dataset_size * sizeof(IdxT);
   size_t ace_sub_dataset_size      = 4 * (dataset_size / n_partitions) * dataset_dim * sizeof(T);
   size_t ace_sub_graph_size =
     (dataset_size / n_partitions) * (intermediate_degree + graph_degree) * sizeof(IdxT);
-  size_t ace_graph_size   = dataset_size * graph_degree * sizeof(IdxT);
-  size_t cagra_graph_size = dataset_size * sizeof(IdxT) * params.graph_degree;
+  size_t cagra_graph_size = dataset_size * graph_degree * sizeof(IdxT);
   size_t total_size       = ace_partition_labels_size + ace_id_mapping_size + ace_sub_dataset_size +
-                      ace_sub_graph_size + ace_graph_size + cagra_graph_size;
+                      ace_sub_graph_size + cagra_graph_size;
   RAFT_LOG_INFO("ACE: Estimated host memory required: %.2f GB, available: %.2f GB",
                 total_size / (1024.0 * 1024.0 * 1024.0),
                 available_memory / (1024.0 * 1024.0 * 1024.0));
@@ -980,11 +1000,10 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
   // Create vector lists for each partition
   auto vectorlist_start            = std::chrono::high_resolution_clock::now();
-  auto forward_mapping_0           = use_disk ? raft::make_host_vector<IdxT, int64_t>(0)
-                                              : raft::make_host_vector<IdxT, int64_t>(dataset_size);
-  auto backward_mapping_0          = raft::make_host_vector<IdxT, int64_t>(dataset_size);
-  auto backward_mapping_1          = use_disk ? raft::make_host_vector<IdxT, int64_t>(0)
-                                              : raft::make_host_vector<IdxT, int64_t>(dataset_size);
+  auto primary_forward_mapping     = use_disk ? raft::make_host_vector<IdxT, int64_t>(dataset_size)
+                                              : raft::make_host_vector<IdxT, int64_t>(0);
+  auto primary_backward_mapping    = raft::make_host_vector<IdxT, int64_t>(dataset_size);
+  auto augmented_backward_mapping  = raft::make_host_vector<IdxT, int64_t>(dataset_size);
   auto primary_partition_offsets   = raft::make_host_vector<IdxT, int64_t>(n_partitions + 1);
   auto augmented_partition_offsets = raft::make_host_vector<IdxT, int64_t>(n_partitions + 1);
 
@@ -992,9 +1011,9 @@ index<T, IdxT> build_ace(raft::resources const& res,
                                               n_partitions,
                                               partition_labels.view(),
                                               partition_histogram.view(),
-                                              forward_mapping_0.view(),
-                                              backward_mapping_0.view(),
-                                              backward_mapping_1.view(),
+                                              primary_forward_mapping.view(),
+                                              primary_backward_mapping.view(),
+                                              augmented_backward_mapping.view(),
                                               primary_partition_offsets.view(),
                                               augmented_partition_offsets.view());
 
@@ -1012,15 +1031,16 @@ index<T, IdxT> build_ace(raft::resources const& res,
                                            dataset,
                                            partition_labels.view(),
                                            partition_histogram.view(),
-                                           backward_mapping_0.view(),
+                                           primary_backward_mapping.view(),
                                            primary_partition_offsets.view(),
                                            augmented_partition_offsets.view());
+    // primary_backward_mapping is not needed anymore.
+    primary_backward_mapping = raft::make_host_vector<IdxT, int64_t>(0);
   }
 
   // Placeholder search graph for in-memory version
-  auto search_graph_0 = use_disk
-                          ? raft::make_host_matrix<IdxT, int64_t>(0, 0)
-                          : raft::make_host_matrix<IdxT, int64_t>(dataset_size, graph_degree);
+  auto search_graph = use_disk ? raft::make_host_matrix<IdxT, int64_t>(0, 0)
+                               : raft::make_host_matrix<IdxT, int64_t>(dataset_size, graph_degree);
 
   cuvs::util::file_descriptor graph_fd;
   if (use_disk) {
@@ -1030,33 +1050,19 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
   // Process each partition
   auto partition_processing_start = std::chrono::high_resolution_clock::now();
-  size_t processed_partitions     = 0;
   for (size_t partition_id = 0; partition_id < n_partitions; partition_id++) {
-    // Skip partitions that have been merged (empty partitions)
-    size_t partition_size =
-      partition_histogram(partition_id, 0) + partition_histogram(partition_id, 1);
-    if (partition_size == 0) {
-      RAFT_LOG_DEBUG("ACE: Skipping empty partition %lu (merged into another partition)",
-                     partition_id);
-      continue;
-    }
-
-    processed_partitions++;
-    RAFT_LOG_DEBUG("ACE: Processing partition %lu/%lu (active partition %lu)",
-                   partition_id + 1,
-                   n_partitions,
-                   processed_partitions);
+    RAFT_LOG_DEBUG("ACE: Processing partition %lu/%lu", partition_id + 1, n_partitions);
     auto start = std::chrono::high_resolution_clock::now();
 
     // Extract vectors for this partition
-    size_t sub_dataset_size_0 = partition_histogram(partition_id, 0);
-    size_t sub_dataset_size_1 = partition_histogram(partition_id, 1);
-    size_t sub_dataset_size   = sub_dataset_size_0 + sub_dataset_size_1;
+    IdxT primary_sub_dataset_size   = partition_histogram(partition_id, 0);
+    IdxT augmented_sub_dataset_size = partition_histogram(partition_id, 1);
+    IdxT sub_dataset_size           = primary_sub_dataset_size + augmented_sub_dataset_size;
 
     RAFT_LOG_DEBUG("ACE: Sub-dataset size: %lu (%lu + %lu)",
                    sub_dataset_size,
-                   sub_dataset_size_0,
-                   sub_dataset_size_1);
+                   primary_sub_dataset_size,
+                   augmented_sub_dataset_size);
 
     auto sub_dataset = raft::make_host_matrix<T, int64_t>(sub_dataset_size, dataset_dim);
 
@@ -1072,13 +1078,13 @@ index<T, IdxT> build_ace(raft::resources const& res,
                                                     sub_dataset.view());
     } else {
       // Gather partition dataset from memory
-      ace_gather_partition_dataset<T, IdxT>(sub_dataset_size_0,
-                                            sub_dataset_size_1,
+      ace_gather_partition_dataset<T, IdxT>(primary_sub_dataset_size,
+                                            augmented_sub_dataset_size,
                                             dataset_dim,
                                             partition_id,
                                             dataset,
-                                            backward_mapping_0.view(),
-                                            backward_mapping_1.view(),
+                                            primary_backward_mapping.view(),
+                                            augmented_backward_mapping.view(),
                                             primary_partition_offsets.view(),
                                             augmented_partition_offsets.view(),
                                             sub_dataset.view());
@@ -1105,8 +1111,9 @@ index<T, IdxT> build_ace(raft::resources const& res,
       std::chrono::duration_cast<std::chrono::milliseconds>(optimize_end - read_end).count();
 
     // Copy graph edges for core members of this partition
-    auto sub_search_graph = raft::make_host_matrix<IdxT, int64_t>(sub_dataset_size_0, graph_degree);
-    cudaStream_t stream   = raft::resource::get_cuda_stream(res);
+    auto sub_search_graph =
+      raft::make_host_matrix<IdxT, int64_t>(primary_sub_dataset_size, graph_degree);
+    cudaStream_t stream = raft::resource::get_cuda_stream(res);
     raft::update_host(sub_search_graph.data_handle(),
                       sub_index.graph().data_handle(),
                       sub_search_graph.size(),
@@ -1114,23 +1121,34 @@ index<T, IdxT> build_ace(raft::resources const& res,
     raft::resource::sync_stream(res, stream);
 
     if (use_disk) {
-      const size_t graph_offset =
+      // Adjust IDs in sub_search_graph in place for disk storage
+      ace_adjust_sub_graph_ids_disk<IdxT>(primary_sub_dataset_size,
+                                          augmented_sub_dataset_size,
+                                          graph_degree,
+                                          partition_id,
+                                          sub_search_graph.view(),
+                                          primary_partition_offsets.view(),
+                                          augmented_partition_offsets.view(),
+                                          augmented_backward_mapping.view(),
+                                          primary_forward_mapping.view());
+
+      const IdxT graph_offset =
         primary_partition_offsets(partition_id) * graph_degree * sizeof(IdxT);
-      const size_t graph_bytes = sub_dataset_size_0 * graph_degree * sizeof(IdxT);
+      const IdxT graph_bytes = primary_sub_dataset_size * graph_degree * sizeof(IdxT);
       cuvs::util::write_large_file(
         graph_fd, sub_search_graph.data_handle(), graph_bytes, graph_offset);
     } else {
-      // Adjust IDs in sub_search_graph and save to search_graph_0
-      ace_adjust_sub_graph_ids<IdxT>(sub_dataset_size_0,
-                                     sub_dataset_size_1,
+      // Adjust IDs in sub_search_graph and save to search_graph
+      ace_adjust_sub_graph_ids<IdxT>(primary_sub_dataset_size,
+                                     augmented_sub_dataset_size,
                                      graph_degree,
                                      partition_id,
                                      sub_search_graph.view(),
-                                     search_graph_0.view(),
+                                     search_graph.view(),
                                      primary_partition_offsets.view(),
                                      augmented_partition_offsets.view(),
-                                     backward_mapping_1.view(),
-                                     forward_mapping_0.view());
+                                     primary_backward_mapping.view(),
+                                     augmented_backward_mapping.view());
     }
 
     auto end = std::chrono::high_resolution_clock::now();
@@ -1139,14 +1157,14 @@ index<T, IdxT> build_ace(raft::resources const& res,
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     double read_throughput =
       sub_dataset_size * dataset_dim * sizeof(T) / (1024.0 * 1024.0) / (read_elapsed / 1000.0);
-    double write_throughput =
-      sub_dataset_size_0 * dataset_dim * sizeof(T) / (1024.0 * 1024.0) / (write_elapsed / 1000.0);
+    double write_throughput = primary_sub_dataset_size * dataset_dim * sizeof(T) /
+                              (1024.0 * 1024.0) / (write_elapsed / 1000.0);
     RAFT_LOG_INFO(
       "ACE: Partition %4lu (%8lu + %8lu) completed in %6ld ms: read %6ld ms (%7.1f MB/s), optimize "
       "%6ld ms, write %6ld ms (%7.1f MB/s)",
       partition_id,
-      sub_dataset_size_0,
-      sub_dataset_size_1,
+      primary_sub_dataset_size,
+      augmented_sub_dataset_size,
       elapsed_ms,
       read_elapsed,
       read_throughput,
@@ -1159,29 +1177,9 @@ index<T, IdxT> build_ace(raft::resources const& res,
   auto partition_processing_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                                         partition_processing_end - partition_processing_start)
                                         .count();
-  RAFT_LOG_INFO("ACE: All partition processing completed in %ld ms (%lu active partitions)",
+  RAFT_LOG_INFO("ACE: All partition processing completed in %ld ms (%zu partitions)",
                 partition_processing_elapsed,
-                processed_partitions);
-
-  // Placeholder search graph for in-memory version
-  auto search_graph = use_disk ? raft::make_host_matrix<IdxT, int64_t>(0, 0)
-                               : raft::make_host_matrix<IdxT, int64_t>(dataset_size, graph_degree);
-  if (!use_disk) {
-    // Convert IDs in search_graph_0 to create final search_graph
-    auto conversion_start = std::chrono::high_resolution_clock::now();
-    ace_adjust_final_graph_ids<IdxT>(dataset_size,
-                                     graph_degree,
-                                     search_graph_0.view(),
-                                     forward_mapping_0.view(),
-                                     backward_mapping_0.view(),
-                                     search_graph.view());
-
-    auto conversion_end = std::chrono::high_resolution_clock::now();
-    auto conversion_elapsed =
-      std::chrono::duration_cast<std::chrono::milliseconds>(conversion_end - conversion_start)
-        .count();
-    RAFT_LOG_INFO("ACE: Graph ID conversion completed in %ld ms", conversion_elapsed);
-  }
+                n_partitions);
 
   auto index_creation_start = std::chrono::high_resolution_clock::now();
   index<T, IdxT> idx(res, params.metric);
