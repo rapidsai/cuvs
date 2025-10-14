@@ -8,86 +8,9 @@
 #include <raft/core/device_resources.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/kvp.hpp>
-// Error checking macro
-#define CHECK_CUDA(call)                                                                   \
-  do {                                                                                     \
-    cudaError_t status = call;                                                             \
-    if (status != cudaSuccess) {                                                           \
-      std::cerr << "CUDA Error at line " << __LINE__ << ": " << cudaGetErrorString(status) \
-                << std::endl;                                                              \
-      exit(EXIT_FAILURE);                                                                  \
-    }                                                                                      \
-  } while (0)
 
-#define CHECK_CUBLAS(call)                                                             \
-  do {                                                                                 \
-    cublasStatus_t status = call;                                                      \
-    if (status != CUBLAS_STATUS_SUCCESS) {                                             \
-      std::cerr << "cuBLAS Error at line " << __LINE__ << ": " << status << std::endl; \
-      exit(EXIT_FAILURE);                                                              \
-    }                                                                                  \
-  } while (0)
-
-template <typename T>
-constexpr bool is_scalar()
-{
-  return std::is_same<T, double>() || std::is_same<T, float>() || std::is_same<T, half>() ||
-         std::is_same<T, int8_t>();
-}
-
-template <typename T, typename IdxT, typename AccT>
-constexpr static bool is_pair()
-{
-  return std::is_same<T, raft::KeyValuePair<IdxT, AccT>>();
-}
-
-template <typename DataT, typename AccT, typename OutT, typename IdxT>
-class OutAccessor {
-  __host__ __device__ constexpr static bool is_out_scalar()
-  {
-    return std::is_same<OutT, double>() || std::is_same<OutT, float>() ||
-           std::is_same<OutT, half>() || std::is_same<OutT, int8_t>();
-  }
-
-  constexpr static bool is_out_pair()
-  {
-    return std::is_same<OutT, raft::KeyValuePair<IdxT, AccT>>();
-  }
-
- public:
-  // Check that the OutT type is either scalar (float, int etc.) or of type raft::KeyValuePair
-  static_assert(is_out_scalar() || is_out_pair(), "Type of out variable is unsupported");
-
-  __host__ __device__ inline static IdxT get_key(OutT out)
-  {
-    if constexpr (is_out_scalar()) { return IdxT(0); }
-
-    if constexpr (is_out_pair()) { return out.key; }
-  }
-
-  __host__ __device__ inline static void set_key(OutT& out, IdxT key)
-  {
-    if constexpr (is_out_scalar()) {
-      // we are not storing key information
-    }
-
-    if constexpr (is_out_pair()) { out.key = key; }
-  }
-
-  __host__ __device__ inline static AccT get_value(OutT out)
-  {
-    if constexpr (is_out_scalar()) { return out; }
-
-    if constexpr (is_out_pair()) { return out.value; }
-  }
-
-  __host__ __device__ inline static void set_value(OutT& out, AccT value)
-  {
-    if constexpr (is_out_scalar()) { out = value; }
-
-    if constexpr (is_out_pair()) { out.value = value; }
-  }
-};
+#include <cuvs/distance/distance.hpp>
+using cuvs::distance::DistanceType;
 
 template <typename T>
 __host__ __device__ T max_val()
@@ -109,42 +32,6 @@ T min_val()
   }
 }
 
-template <typename T>
-__global__ void print_kernel(const T* f, size_t n_rows, size_t n_cols, bool is_row_major = true)
-{
-  for (size_t r = 0; r < n_rows; r++) {
-    printf("%ld [", sizeof(T));
-    for (size_t c = 0; c < n_cols; c++) {
-      size_t index = 0;
-      if (is_row_major) {
-        index = r * n_cols + c;
-      } else {
-        index = r + c * n_rows;
-      }
-      /*if constexpr (std::is_fundamental<T>::value) {
-        double val;
-        if constexpr (std::is_same<T, const half>::value) {
-          val = double(float(f[index]));
-        } else {
-          val = double(f[index]);
-        }
-        printf("..\n");
-      } else {*/
-
-      printf("%f, ", float(f[index]));
-      /*double val;
-      if (std::is_same<decltype(f[index].value), half>::value) {
-        val = double(float(f[index].value));
-      } else {
-        val = double(f[index].value);
-      }
-      printf("<%ld, %e>, ", int64_t(f[index].key), val);*/
-      //}
-    }
-    printf("]\n");
-  }
-}
-
 class CudaEventTimer {
  private:
   cudaEvent_t start_;
@@ -157,19 +44,19 @@ class CudaEventTimer {
   CudaEventTimer(cudaStream_t stream = nullptr)
     : stream_(stream), elapsed_ms_(0.0f), timing_started_(false)
   {
-    CHECK_CUDA(cudaEventCreate(&start_));
-    CHECK_CUDA(cudaEventCreate(&stop_));
+    RAFT_CUDA_TRY(cudaEventCreate(&start_));
+    RAFT_CUDA_TRY(cudaEventCreate(&stop_));
   }
 
   ~CudaEventTimer()
   {
-    CHECK_CUDA(cudaEventDestroy(start_));
-    CHECK_CUDA(cudaEventDestroy(stop_));
+    RAFT_CUDA_TRY(cudaEventDestroy(start_));
+    RAFT_CUDA_TRY(cudaEventDestroy(stop_));
   }
 
   void start()
   {
-    CHECK_CUDA(cudaEventRecord(start_, stream_));
+    RAFT_CUDA_TRY(cudaEventRecord(start_, stream_));
     timing_started_ = true;
   }
 
@@ -179,9 +66,9 @@ class CudaEventTimer {
       std::cerr << "Warning: Timer stopped without being started" << std::endl;
       return;
     }
-    CHECK_CUDA(cudaEventRecord(stop_, stream_));
-    CHECK_CUDA(cudaEventSynchronize(stop_));
-    CHECK_CUDA(cudaEventElapsedTime(&elapsed_ms_, start_, stop_));
+    RAFT_CUDA_TRY(cudaEventRecord(stop_, stream_));
+    RAFT_CUDA_TRY(cudaEventSynchronize(stop_));
+    RAFT_CUDA_TRY(cudaEventElapsedTime(&elapsed_ms_, start_, stop_));
     timing_started_ = false;
   }
 
@@ -191,7 +78,7 @@ class CudaEventTimer {
 };
 
 template <typename DataT, typename AccT, typename OutT, typename IdxT>
-void ref_l2nn(OutT* out, const DataT* A, const DataT* B, IdxT M, IdxT N, IdxT K)
+void ref_l2nn(OutT* out, const DataT* A, const DataT* B, IdxT M, IdxT N, IdxT K, bool sqrt)
 {
   for (IdxT m = 0; m < M; m++) {
     IdxT min_index  = N + 1;
@@ -216,50 +103,67 @@ void ref_l2nn(OutT* out, const DataT* A, const DataT* B, IdxT M, IdxT N, IdxT K)
   }
 }
 
+template <typename DataT, typename AccT, typename OutT, typename IdxT>
+__device__ AccT l2_distance(const DataT* v1, const DataT* v2, IdxT K)
+{
+  AccT th_dist = AccT(0.0);
+  for (IdxT k = 0; k < K; k++) {
+    AccT diff = AccT(v1[k]) - AccT(v2[k]);
+    th_dist += (diff * diff);
+  }
+  return th_dist;
+}
+
+template <typename DataT, typename AccT, typename OutT, typename IdxT>
+__device__ AccT cosine_distance(const DataT* v1, const DataT* v2, IdxT K)
+{
+  AccT v1_norm = AccT(0.0);
+  AccT v2_norm = AccT(0.0);
+  AccT v1v2    = AccT(0.0);
+
+  for (IdxT k = 0; k < K; k++) {
+    v1_norm += (v1[k] * v1[k]);
+    v2_norm += (v2[k] * v2[k]);
+    v1v2 += (v1[k] * v2[k]);
+  }
+
+  return AccT(1.0) - (v1v2 / (v1_norm * v2_norm));
+}
 // This is a naive implementation of l2-distance finding nearest neighbour
 template <typename DataT, typename AccT, typename OutT, typename IdxT>
-__global__ void ref_l2nn_dev(OutT* out, const DataT* A, const DataT* B, IdxT M, IdxT N, IdxT K)
+__global__ void ref_l2nn_dev(
+  OutT* out, const DataT* A, const DataT* B, IdxT M, IdxT N, IdxT K, bool sqrt, DistanceType metric)
 {
-  IdxT tid     = threadIdx.x + blockIdx.x * size_t(blockDim.x);
-  IdxT n_warps = (size_t(blockDim.x) * gridDim.x) / 32;
+  IdxT tid = threadIdx.x + blockIdx.x * size_t(blockDim.x);
 
-  IdxT warp_id        = tid / 32;
-  IdxT warp_lane      = threadIdx.x % 32;
-  const int warp_size = 32;
-
-  for (IdxT m = warp_id; m < M; m += n_warps) {
-    __shared__ AccT dist[4];
-
+  for (IdxT m = tid; m < M; m += (blockDim.x * gridDim.x)) {
     IdxT min_index = N + 1;
     AccT min_dist  = max_val<AccT>();
 
     for (IdxT n = 0; n < N; n++) {
-      if (warp_lane == 0) { dist[warp_id % 4] = AccT(0.0); }
-      AccT th_dist = AccT(0.0);
-      for (IdxT k = warp_lane; k < K; k += warp_size) {
-        AccT diff = AccT(A[m * K + k]) - AccT(B[n * K + k]);
-        th_dist += (diff * diff);
+      AccT dist;
+      if (metric == DistanceType::L2SqrtExpanded || metric == DistanceType::L2Expanded) {
+        dist = l2_distance<DataT, AccT, OutT, IdxT>(&A[m * K], &B[n * K], K);
+      } else if (metric == DistanceType::CosineExpanded) {
+        dist = cosine_distance<DataT, AccT, OutT, IdxT>(&A[m * K], &B[n * K], K);
       }
-      __syncwarp();
-      atomicAdd(&dist[warp_id % 4], th_dist);
-      __syncwarp();
-
-      if (warp_lane == 0 && dist[warp_id % 4] < min_dist) {
-        min_dist  = dist[warp_id % 4];
+      if (dist < min_dist) {
+        min_dist  = dist;
         min_index = n;
       }
     }
+
     if constexpr (std::is_fundamental<OutT>::value) {
-      if (warp_lane == 0) {
-        static_assert(std::is_same<OutT, AccT>::value, "OutT and AccT are not same type");
-        out[m] = AccT(min_dist);
-      }
+      static_assert(std::is_same<OutT, AccT>::value, "OutT and AccT are not same type");
+      out[m] = AccT(min_dist);
     } else {
       // output is a raft::KeyValuePair
-      if (warp_lane == 0) {
-        static_assert(std::is_same<OutT, raft::KeyValuePair<IdxT, AccT>>::value,
-                      "OutT is not raft::KeyValuePair<> type");
-        out[m].key   = IdxT(min_index);
+      static_assert(std::is_same<OutT, raft::KeyValuePair<IdxT, AccT>>::value,
+                    "OutT is not raft::KeyValuePair<> type");
+      out[m].key = IdxT(min_index);
+      if (sqrt) {
+        out[m].value = raft::sqrt(AccT(min_dist));
+      } else {
         out[m].value = AccT(min_dist);
       }
     }
@@ -267,14 +171,22 @@ __global__ void ref_l2nn_dev(OutT* out, const DataT* A, const DataT* B, IdxT M, 
 }
 
 template <typename DataT, typename AccT, typename OutT, typename IdxT>
-void ref_l2nn_api(
-  OutT* out, const DataT* A, const DataT* B, IdxT m, IdxT n, IdxT k, cudaStream_t stream)
+void ref_l2nn_api(OutT* out,
+                  const DataT* A,
+                  const DataT* B,
+                  IdxT m,
+                  IdxT n,
+                  IdxT k,
+                  bool sqrt,
+                  DistanceType metric,
+                  cudaStream_t stream)
 {
   // constexpr int block_dim = 128;
   // static_assert(block_dim % 32 == 0, "blockdim must be divisible by 32");
   // constexpr int warps_per_block = block_dim / 32;
   // int num_blocks = m ;
-  ref_l2nn_dev<DataT, AccT, OutT, IdxT><<<m / 4, 128, 0, stream>>>(out, A, B, m, n, k);
+  ref_l2nn_dev<DataT, AccT, OutT, IdxT>
+    <<<(m + 127) / 128, 128, 0, stream>>>(out, A, B, m, n, k, sqrt, metric);
   return;
 }
 
@@ -418,9 +330,9 @@ void vector_compare(ComparisonSummary* global_summary,
   //  Not thread safe right now, so launch only single thread
   vector_compare_kernel<OutT, IdxT><<<1, 1, 0, stream>>>(a, b, n, global_summary);
 
-  CHECK_CUDA(cudaStreamSynchronize(stream));
+  RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
 
   // global_summary->print();
 
-  // CHECK_CUDA(cudaFree(global_summary));
+  // RAFT_CUDA_TRY(cudaFree(global_summary));
 }
