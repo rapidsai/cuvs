@@ -109,6 +109,7 @@ set_target_properties(
 # Encode what optional components we are building
 set(CUVS_BUILD_CAGRA_HNSWLIB ${BUILD_CAGRA_HNSWLIB})
 set(CUVS_BUILD_MG_ALGOS ${BUILD_MG_ALGOS})
+# cmake-lint: disable=E1126
 file(
   CONFIGURE
   OUTPUT
