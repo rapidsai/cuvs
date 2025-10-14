@@ -111,7 +111,8 @@ set(CUVS_BUILD_CAGRA_HNSWLIB ${BUILD_CAGRA_HNSWLIB})
 set(CUVS_BUILD_MG_ALGOS ${BUILD_MG_ALGOS})
 file(
   CONFIGURE
-  OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/core/c_config.h"
+  OUTPUT
+  "${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/core/c_config.h"
   CONTENT
   [=[
   #pragma once
