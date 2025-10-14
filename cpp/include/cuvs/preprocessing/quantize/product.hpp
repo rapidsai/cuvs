@@ -29,12 +29,13 @@ namespace cuvs::preprocessing::quantize::product {
  */
 
 /**
- * @brief Product Quantizer parameters.
+ * @brief Product Quantizer parameters. If vector quantization is not needed, set vq_n_centers to 1.
+ * @see cuvs::neighbors::vpq_params
  */
 using params = cuvs::neighbors::vpq_params;
 
 /**
- * @brief Defines and stores PQ index upon training
+ * @brief Defines and stores VPQ codebooks upon training
  *
  * @tparam T data element type
  *
@@ -78,30 +79,43 @@ quantizer<double> train(raft::resources const& res,
  * raft::handle_t handle;
  * cuvs::preprocessing::quantize::product::params params;
  * auto quantizer = cuvs::preprocessing::quantize::product::train(handle, params, dataset);
+ * auto quantized_dim = get_quantized_dim(quantizer.params_quantizer);
  * auto quantized_dataset =
- *   raft::make_device_matrix<uint8_t, int64_t>(handle, samples, pq_dim);
+ *   raft::make_device_matrix<uint8_t, int64_t>(handle, samples, quantized_dim);
  * cuvs::preprocessing::quantize::product::transform(handle, quantizer, dataset,
  *   quantized_dataset.view());
  *
  * @endcode
  *
  * @param[in] res raft resource
- * @param[in] quantizer a product quantizer
+ * @param[in] quant a product quantizer
  * @param[in] dataset a row-major matrix view on device
  * @param[out] out a row-major matrix view on device
  *
  */
 void transform(raft::resources const& res,
-               const quantizer<float>& quantizer,
+               const quantizer<float>& quant,
                raft::device_matrix_view<const float, int64_t> dataset,
                raft::device_matrix_view<uint8_t, int64_t> out);
 
 /** @copydoc transform */
 void transform(raft::resources const& res,
-               const quantizer<double>& quantizer,
+               const quantizer<double>& quant,
                raft::device_matrix_view<const double, int64_t> dataset,
                raft::device_matrix_view<uint8_t, int64_t> out);
 
+/**
+ * @brief Get the dimension of the quantized dataset
+ *
+ * @param[in] config product quantizer parameters
+ * @return the dimension of the quantized dataset
+ */
+template <typename LabelT = uint32_t>
+inline int64_t get_quantized_dim(const params& config)
+{
+  return sizeof(LabelT) * (1 + raft::div_rounding_up_safe<int64_t>(config.pq_dim * config.pq_bits,
+                                                                   8 * sizeof(LabelT)));
+}
 /** @} */  // end of group product
 
 }  // namespace cuvs::preprocessing::quantize::product
