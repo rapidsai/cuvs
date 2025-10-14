@@ -177,6 +177,29 @@ void _get_pq_centers(cuvsIvfPqIndex index, DLManagedTensor* centers)
   auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
   cuvs::core::to_dlpack(index_ptr->pq_centers(), centers);
 }
+
+template <typename IdxT>
+void _get_list_sizes(cuvsIvfPqIndex index, DLManagedTensor* list_sizes)
+{
+  auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  cuvs::core::to_dlpack(index_ptr->list_sizes(), list_sizes);
+}
+
+template <typename IdxT>
+void _unpack_contiguous_list_data(cuvsResources_t res,
+                                  cuvsIvfPqIndex index,
+                                  DLManagedTensor* out_codes,
+                                  uint32_t label,
+                                  uint32_t offset)
+{
+  auto index_ptr    = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  using mdspan_type = raft::device_matrix_view<uint8_t, uint32_t, raft::row_major>;
+  auto mds          = cuvs::core::from_dlpack<mdspan_type>(out_codes);
+  auto res_ptr      = reinterpret_cast<raft::resources*>(res);
+
+  cuvs::neighbors::ivf_pq::helpers::codepacker::unpack_contiguous_list_data(
+    *res_ptr, *index_ptr, mds.data_handle(), mds.extent(0), label, offset);
+}
 }  // namespace
 
 extern "C" cuvsError_t cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index)
@@ -371,6 +394,30 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetSize(cuvsIvfPqIndex_t index, int64_t* si
   });
 }
 
+extern "C" cuvsError_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index, int64_t* pq_dim)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+    *pq_dim        = index_ptr->pq_dim();
+  });
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexGetPqBits(cuvsIvfPqIndex_t index, int64_t* pq_bits)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+    *pq_bits       = index_ptr->pq_bits();
+  });
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index, int64_t* pq_len)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::ivf_pq::index<int64_t>*>(index->addr);
+    *pq_len        = index_ptr->pq_len();
+  });
+}
+
 extern "C" cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* centers)
 {
   return cuvs::core::translate_exceptions([=] { _get_centers<int64_t>(*index, centers); });
@@ -380,4 +427,20 @@ extern "C" cuvsError_t cuvsIvfPqIndexGetPqCenters(cuvsIvfPqIndex_t index,
                                                   DLManagedTensor* pq_centers)
 {
   return cuvs::core::translate_exceptions([=] { _get_pq_centers<int64_t>(*index, pq_centers); });
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexGetListSizes(cuvsIvfPqIndex_t index,
+                                                  DLManagedTensor* list_sizes)
+{
+  return cuvs::core::translate_exceptions([=] { _get_list_sizes<int64_t>(*index, list_sizes); });
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexUnpackContiguousListData(cuvsResources_t res,
+                                                              cuvsIvfPqIndex_t index,
+                                                              DLManagedTensor* out_codes,
+                                                              uint32_t label,
+                                                              uint32_t offset)
+{
+  return cuvs::core::translate_exceptions(
+    [=] { _unpack_contiguous_list_data<int64_t>(res, *index, out_codes, label, offset); });
 }

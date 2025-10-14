@@ -270,6 +270,16 @@ cuvsError_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index, int64_t* dim);
 /** Get the size of the index */
 cuvsError_t cuvsIvfPqIndexGetSize(cuvsIvfPqIndex_t index, int64_t* size);
 
+/** Get the dimensionality of an encoded vector after compression by PQ. */
+cuvsError_t cuvsIvfPqIndexGetPqDim(cuvsIvfPqIndex_t index, int64_t* pq_dim);
+
+/** Get the bit length of an encoded vector element after compression by PQ.*/
+cuvsError_t cuvsIvfPqIndexGetPqBits(cuvsIvfPqIndex_t index, int64_t* pq_bits);
+
+/** Get the Dimensionality of a subspace, i.e. the number of vector
+ * components mapped to a subspace */
+cuvsError_t cuvsIvfPqIndexGetPqLen(cuvsIvfPqIndex_t index, int64_t* pq_len);
+
 /**
  * @brief Get the cluster centers corresponding to the lists in the original space
  *
@@ -290,6 +300,38 @@ cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index, DLManagedTensor* ce
  * @return cuvsError_t
  */
 cuvsError_t cuvsIvfPqIndexGetPqCenters(cuvsIvfPqIndex_t index, DLManagedTensor* pq_centers);
+
+/**
+ * @brief Get the sizes of each list
+ *
+ * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
+ * @param[out] list_sizes Output tensor that will be populated with a non-owning view of the data
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqIndexGetListSizes(cuvsIvfPqIndex_t index, DLManagedTensor* list_sizes);
+
+/**
+ * @brief Unpack `n_rows` consecutive PQ encoded vectors of a single list (cluster) in the
+ * compressed index starting at given `offset`, not expanded to one code per byte. Each code in the
+ * output buffer occupies ceildiv(index.pq_dim() * index.pq_bits(), 8) bytes.
+ *
+ * @param[in] res raft resource
+ * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
+ * @param[out] out_codes
+ *   the destination buffer [n_rows, ceildiv(index.pq_dim() * index.pq_bits(), 8)].
+ *   The length `n_rows` defines how many records to unpack,
+ *   offset + n_rows must be smaller than or equal to the list size.
+ *   This DLManagedTensor must already point to allocated device memory
+ * @param[in] label
+ *   The id of the list (cluster) to decode.
+ * @param[in] offset
+ *   How many records in the list to skip.
+ */
+cuvsError_t cuvsIvfPqIndexUnpackContiguousListData(cuvsResources_t res,
+                                                   cuvsIvfPqIndex_t index,
+                                                   DLManagedTensor* out_codes,
+                                                   uint32_t label,
+                                                   uint32_t offset);
 /**
  * @}
  */
