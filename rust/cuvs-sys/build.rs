@@ -76,6 +76,8 @@ fn main() {
         .clang_arg("-I../../c/include")
         // needed to find cudaruntime.h
         .clang_args(cmake_cxx_flags.split(' '))
+        // include c config header from the build directory
+        .clang_arg(format!("-I{}/build/c/include/cuvs/", out_path.display()))
         // include dlpack from the cmake build dependencies
         .clang_arg(format!(
             "-I{}/build/_deps/dlpack-src/include/",

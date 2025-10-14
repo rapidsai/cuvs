@@ -34,6 +34,7 @@ fi
 # Use Jextract utility to generate panama bindings
 jextract \
  --include-dir "${REPODIR}"/java/internal/build/_deps/dlpack-src/include/ \
+ --include-dir "${REPODIR}"/java/internal/build/c/include/cuvs \
  --include-dir "${CUDA_INCLUDE_DIR}" \
  --include-dir "${REPODIR}"/c/include \
  --output "${REPODIR}/java/cuvs-java/src/main/java22/" \
