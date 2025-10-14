@@ -95,12 +95,12 @@ void ace_get_partition_labels(
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
 
   // Sampling vectors from dataset
-  size_t n_samples                       = dataset_size * sampling_rate;
-  const size_t min_samples_per_partition = 100;
-  if (n_samples < min_samples_per_partition * n_partitions) {
-    n_samples = min_samples_per_partition * n_partitions;
-  }
-  if (n_samples > dataset_size) { n_samples = dataset_size; }
+  size_t n_samples         = dataset_size * sampling_rate;
+  const size_t min_samples = 100 * n_partitions;
+  n_samples                = std::max(n_samples, min_samples);
+  const size_t max_samples = 1000000;  // Limit due to memory constraints
+  n_samples                = std::min(n_samples, max_samples);
+  n_samples                = std::min(n_samples, dataset_size);
   RAFT_LOG_DEBUG("ACE: n_samples: %lu", n_samples);
 
   raft::random::RngState random_state{137};
