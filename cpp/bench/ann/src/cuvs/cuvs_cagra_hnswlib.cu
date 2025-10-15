@@ -59,7 +59,7 @@ auto parse_build_param(const nlohmann::json& conf) ->
     // to override them.
     cagra_params.cagra_params = [conf, hnsw_params](raft::matrix_extent<int64_t> extents,
                                                     cuvs::distance::DistanceType dist_type) {
-      auto ps = cuvs::neighbors::hnsw::to_cagra_params(
+      auto ps = cuvs::neighbors::cagra::to_cagra_params<T, IdxT>(
         extents, conf.at("M"), hnsw_params.ef_construction, dist_type);
       ps.metric = dist_type;
       if (conf.contains("ace_npartitions")) { ps.ace_npartitions = conf.at("ace_npartitions"); }

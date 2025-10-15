@@ -344,6 +344,9 @@ void parse_build_param(const nlohmann::json& conf,
       cagra_params.ace_npartitions = conf.at("ace_npartitions");
     }
     if (conf.contains("ace_build_dir")) { cagra_params.ace_build_dir = conf.at("ace_build_dir"); }
+    if (conf.contains("ace_ef_construction")) {
+      cagra_params.ace_ef_construction = conf.at("ace_ef_construction");
+    }
     ::parse_build_param<T, IdxT>(conf, cagra_params);
     return cagra_params;
   };

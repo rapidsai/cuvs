@@ -105,6 +105,14 @@ struct index_params : cuvs::neighbors::index_params {
   bool guarantee_connectivity = false;
 
   /**
+   * The index quality for the ACE build.
+   *
+   * Bigger values increase the index quality. At some point, increasing this will no longer improve
+   * the quality.
+   */
+  size_t ace_ef_construction = 120;
+
+  /**
    * Whether to add the dataset content to the index, i.e.:
    *
    *  - `true` means the index is filled with the dataset vectors and ready to search after calling
@@ -135,6 +143,51 @@ struct index_params : cuvs::neighbors::index_params {
    */
   bool attach_dataset_on_build = true;
 };
+
+/**
+ * @brief Create a CAGRA index parameters compatible with HNSW index
+ *
+ * @param dataset The shape of the input dataset.
+ * @param M HNSW index parameter M.
+ * @param ef_construction HNSW index parameter ef_construction.
+ * @param metric The distance metric to search.
+ *
+ *
+ * * IMPORTANT NOTE *
+ *
+ * The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce
+ * the same recalls and QPS for the same parameter `ef`. The graphs are different internally. For
+ * the same `ef`, the from-CAGRA index likely has a slightly higher recall and slightly lower QPS.
+ * However, the Recall-QPS curves should be similar (i.e. the points are just shifted along the
+ * curve).
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   raft::resources res;
+ *   auto dataset = raft::make_device_matrix<float, int64_t>(res, N, D);
+ *   auto cagra_params = to_cagra_params(dataset.extents(), M, efc);
+ *   auto cagra_index = cagra::build(res, cagra_params, dataset);
+ *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, cagra_index);
+ * @endcode
+ */
+template <typename T, typename IdxT>
+auto to_cagra_params(raft::matrix_extent<int64_t> dataset,
+                     int M,
+                     int ef_construction,
+                     cuvs::distance::DistanceType metric) -> cuvs::neighbors::cagra::index_params
+{
+  auto ivf_pq_params = cuvs::neighbors::graph_build_params::ivf_pq_params(dataset, metric);
+  ivf_pq_params.search_params.n_probes =
+    std::round(std::sqrt(ivf_pq_params.build_params.n_lists) / 20 + ef_construction / 16);
+
+  cagra::index_params params;
+  params.graph_build_params        = ivf_pq_params;
+  params.graph_degree              = M * 2;
+  params.intermediate_graph_degree = M * 3;
+
+  return params;
+}
 
 /**
  * @}

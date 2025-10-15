@@ -401,7 +401,7 @@ void ace_create_forward_and_backward_lists(
 }
 
 // ACE: Set index parameters for each partition
-template <typename IdxT>
+template <typename T, typename IdxT>
 void ace_set_index_params(raft::resources const& res,
                           const index_params& params,
                           size_t sub_dataset_size,
@@ -410,23 +410,14 @@ void ace_set_index_params(raft::resources const& res,
                           size_t intermediate_degree,
                           cuvs::neighbors::cagra::index_params& sub_index_params)
 {
-  sub_index_params.graph_degree              = graph_degree;
-  sub_index_params.intermediate_graph_degree = intermediate_degree;
-  sub_index_params.guarantee_connectivity    = params.guarantee_connectivity;
-  sub_index_params.metric                    = params.metric;
-  sub_index_params.graph_build_params        = params.graph_build_params;
-  sub_index_params.attach_dataset_on_build   = false;
-
-  if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
-        sub_index_params.graph_build_params)) {
-    // If IVF-PQ is used, set nprobes and nlists based on the number of vectors in the partition
-    // to ensure correct KNN graph construction. Here, we use the same parameters as in hnsw.cpp
-    auto ivf_pq_params = cuvs::neighbors::graph_build_params::ivf_pq_params(
-      raft::make_extents<int64_t>(sub_dataset_size, dataset_dim), params.metric);
-    int ef_construction = 120;  // TODO: Might be a user-specified parameter
-    ivf_pq_params.search_params.n_probes =
-      std::round(std::sqrt(ivf_pq_params.build_params.n_lists) / 20 + ef_construction / 16);
-    sub_index_params.graph_build_params = ivf_pq_params;
+  // ACE drops the default graph build params and sets the default params based on the partition
+  // size
+  if (sub_dataset_size > 100000) {
+    sub_index_params = cuvs::neighbors::cagra::to_cagra_params<T, IdxT>(
+      raft::make_extents<int64_t>(sub_dataset_size, dataset_dim),
+      graph_degree / 2,
+      params.ace_ef_construction,
+      params.metric);
     RAFT_LOG_DEBUG(
       "ACE: IVF-PQ nlists: %u, pq_bits: %u, pq_dim: %u, nprobes: %u, refinement_rate: %.2f",
       ivf_pq_params.build_params.n_lists,
@@ -434,22 +425,22 @@ void ace_set_index_params(raft::resources const& res,
       ivf_pq_params.build_params.pq_dim,
       ivf_pq_params.search_params.n_probes,
       ivf_pq_params.refinement_rate);
-  } else if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::nn_descent_params>(
-               sub_index_params.graph_build_params)) {
+  } else {
     sub_index_params.graph_build_params =
-      cuvs::neighbors::cagra::graph_build_params::nn_descent_params(
-        sub_index_params.intermediate_graph_degree, sub_index_params.metric);
-  } else if (std::holds_alternative<std::monostate>(sub_index_params.graph_build_params)) {
-    // Set default build params if not specified
-    if (cuvs::neighbors::nn_descent::has_enough_device_memory(
-          res, raft::make_extents<int64_t>(sub_dataset_size, dataset_dim), sizeof(IdxT))) {
-      sub_index_params.graph_build_params =
-        cagra::graph_build_params::nn_descent_params(intermediate_degree, params.metric);
-    } else {
-      sub_index_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
-        raft::make_extents<int64_t>(sub_dataset_size, dataset_dim), params.metric);
-    }
+      cuvs::neighbors::cagra::graph_build_params::nn_descent_params(intermediate_degree,
+                                                                    params.metric);
+    sub_index_params.graph_degree              = graph_degree;
+    sub_index_params.intermediate_graph_degree = intermediate_degree;
+    RAFT_LOG_DEBUG(
+      "ACE: NN descent graph_degree: %u, intermediate_graph_degree: %u, max_iterations: %u, "
+      "termination_threshold: %f",
+      sub_index_params.graph_degree,
+      sub_index_params.intermediate_graph_degree,
+      sub_index_params.max_iterations,
+      sub_index_params.termination_threshold);
   }
+  sub_index_params.attach_dataset_on_build = false;
+  sub_index_params.guarantee_connectivity  = params.guarantee_connectivity;
 }
 
 // ACE: Gather partition dataset
@@ -1094,13 +1085,13 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
     // Create index for this partition
     cuvs::neighbors::cagra::index_params sub_index_params;
-    ace_set_index_params<IdxT>(res,
-                               params,
-                               sub_dataset_size,
-                               dataset_dim,
-                               graph_degree,
-                               intermediate_degree,
-                               sub_index_params);
+    ace_set_index_params<T, IdxT>(res,
+                                  params,
+                                  sub_dataset_size,
+                                  dataset_dim,
+                                  graph_degree,
+                                  intermediate_degree,
+                                  sub_index_params);
 
     auto sub_index = cuvs::neighbors::cagra::build(
       res, sub_index_params, raft::make_const_mdspan(sub_dataset.view()));
