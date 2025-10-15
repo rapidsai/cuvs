@@ -44,14 +44,4 @@ cuvs::neighbors::cagra::index<half, uint32_t> build(
   return cuvs::neighbors::cagra::build<half, uint32_t>(handle, params, dataset);
 }
 
-cuvs::neighbors::cagra::index<half, uint32_t> build_ace(
-  raft::resources const& handle,
-  const cuvs::neighbors::cagra::index_params& params,
-  raft::host_matrix_view<const half, int64_t, raft::row_major> dataset,
-  size_t num_clusters)
-{
-  return cuvs::neighbors::cagra::detail::build_ace<half, uint32_t>(
-    handle, params, dataset, num_clusters);
-}
-
 }  // namespace cuvs::neighbors::cagra

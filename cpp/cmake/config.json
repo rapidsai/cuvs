@@ -2,7 +2,7 @@
   "parse": {
     "additional_commands": {
       "ConfigureTest": {
-        "flags": ["NOCUDA", "C_LIB", "FETCH_CODEBOOKS"],
+        "flags": ["NOCUDA", "FETCH_CODEBOOKS"],
         "kwargs": {
           "NAME": 1,
           "GPUS": "?",
