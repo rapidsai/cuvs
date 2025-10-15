@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,19 +15,73 @@
  */
 
 #include <omp.h>
+
 #include <raft/core/logger.hpp>
 
-namespace cuvs::neighbors::snmg {
+#include "omp_wrapper.hpp"
 
-void check_omp_threads(const int requirements)
+namespace cuvs::core::omp {
+
+bool is_omp_enabled()
 {
-  const int max_threads = omp_get_max_threads();
-  if (max_threads < requirements)
+#if defined(_OPENMP)
+  return true;
+#else
+  return false;
+#endif
+}
+
+int get_max_threads()
+{
+#if defined(_OPENMP)
+  return omp_get_max_threads();
+#else
+  return 1;
+#endif
+}
+int get_num_procs()
+{
+#if defined(_OPENMP)
+  return omp_get_num_procs();
+#else
+  return 1;
+#endif
+}
+int get_num_threads()
+{
+#if defined(_OPENMP)
+  return omp_get_num_threads();
+#else
+  return 1;
+#endif
+}
+int get_thread_num()
+{
+#if defined(_OPENMP)
+  return omp_get_thread_num();
+#else
+  return 0;
+#endif
+}
+
+void set_nested(int v)
+{
+  (void)v;
+#if defined(_OPENMP)
+  omp_set_nested(v);
+#endif
+}
+
+void check_threads(const int requirements)
+{
+  const int max_threads = get_max_threads();
+  if (max_threads < requirements) {
     RAFT_LOG_WARN(
       "OpenMP is only allowed %d threads to run %d GPUs. Please increase the number of OpenMP "
       "threads to avoid NCCL hangs by modifying the environment variable OMP_NUM_THREADS.",
       max_threads,
       requirements);
+  }
 }
 
-}  // namespace cuvs::neighbors::snmg
+}  // namespace cuvs::core::omp
