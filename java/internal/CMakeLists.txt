@@ -55,16 +55,18 @@ endif()
 
 file(
   INSTALL "${DLPACK_INCLUDE_DIR}"
-  DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/bindings/include"
+  DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/bindings/"
   FILES_MATCHING
   PATTERN "*.h"
 )
 
 foreach(cuvs_c_dir IN LISTS cuvs_c_headers)
-  file(
-    INSTALL "${cuvs_c_dir}"
-    DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/bindings/include"
-    FILES_MATCHING
-    PATTERN "*.h"
-  )
+  if(EXISTS "${cuvs_c_dir}/cuvs/")
+    file(
+      INSTALL "${cuvs_c_dir}/cuvs"
+      DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/bindings/include/"
+      FILES_MATCHING
+      PATTERN "*.h"
+    )
+  endif()
 endforeach()
