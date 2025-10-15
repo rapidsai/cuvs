@@ -586,10 +586,6 @@ void ace_reorder_and_store_dataset(
     dataset_dim,
     n_partitions);
 
-  if (mkdir(build_dir.c_str(), 0755) != 0 && errno != EEXIST) {
-    RAFT_EXPECTS(false, "Failed to create ACE build directory: %s", build_dir.c_str());
-  }
-
   // Calculate total sizes for pre-allocation
   size_t total_primary_vectors   = 0;
   size_t total_augmented_vectors = 0;
@@ -950,6 +946,9 @@ index<T, IdxT> build_ace(raft::resources const& res,
   cuvs::util::file_descriptor mapping_fd;
   cuvs::util::file_descriptor graph_fd;
   if (use_disk) {
+    if (mkdir(params.ace_build_dir.c_str(), 0755) != 0 && errno != EEXIST) {
+      RAFT_EXPECTS(false, "Failed to create ACE build directory: %s", params.ace_build_dir.c_str());
+    }
     reordered_fd = cuvs::util::file_descriptor(
       params.ace_build_dir + "/reordered_dataset.bin", O_CREAT | O_WRONLY | O_TRUNC, 0644);
     augmented_fd = cuvs::util::file_descriptor(
