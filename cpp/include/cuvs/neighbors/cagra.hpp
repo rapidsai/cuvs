@@ -50,19 +50,6 @@ struct index_params : cuvs::neighbors::index_params {
   /** Degree of output graph. */
   size_t graph_degree = 64;
   /**
-   * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
-   *
-   * The search graph for very large datasets can be larger than the device or host memory of
-   * the systems. Although such graphs cannot be searched by CAGRA, we can still
-   * create such large graphs to be searched by other search methods.
-   *
-   * To build such large graph, we need to divide the graph into smaller partitions.
-   * The parameter ace_npartitions defines the number of such partitions.
-   * When set to a value > 1, enables the ACE partitioned approach for very large graphs.
-   * Set to 0 or 1 to disable ACE and use standard build.
-   */
-  size_t ace_npartitions = 1;
-  /**
    * Specify compression parameters if compression is desired. If set, overrides the
    * attach_dataset_on_build (and the compressed dataset is always added to the index).
    */
@@ -70,9 +57,9 @@ struct index_params : cuvs::neighbors::index_params {
 
   /** Parameters for graph building.
    *
-   * Set ivf_pq_params, nn_descent_params, or iterative_search_params to select the graph build
-   * algorithm and control their parameters. The default (std::monostate) is to use a heuristic
-   *  to decide the algorithm and its parameters.
+   * Set ivf_pq_params, nn_descent_params, ace_params, or iterative_search_params to select the
+   * graph build algorithm and control their parameters. The default (std::monostate) is to use a
+   * heuristic to decide the algorithm and its parameters.
    *
    * @code{.cpp}
    * cagra::index_params params;
@@ -84,7 +71,10 @@ struct index_params : cuvs::neighbors::index_params {
    * params.graph_build_params =
    * cagra::graph_build_params::nn_descent_params(params.intermediate_graph_degree);
    *
-   * // 3. Choose iterative graph building using CAGRA's search() and optimize()  [Experimental]
+   * // 3. Choose ACE algorithm for graph construction
+   * params.graph_build_params = cagra::graph_build_params::ace_params();
+   *
+   * // 4. Choose iterative graph building using CAGRA's search() and optimize()  [Experimental]
    * params.graph_build_params =
    * cagra::graph_build_params::iterative_search_params();
    * @endcode
@@ -92,25 +82,13 @@ struct index_params : cuvs::neighbors::index_params {
   std::variant<std::monostate,
                graph_build_params::ivf_pq_params,
                graph_build_params::nn_descent_params,
+               graph_build_params::ace_params,
                graph_build_params::iterative_search_params>
     graph_build_params;
-  /**
-   * Directory to store ACE build artifacts (e.g., KNN graph,
-   * optimized graph). Used when `ace_npartitions` > 1.
-   */
-  std::string ace_build_dir = "";
   /**
    * Whether to use MST optimization to guarantee graph connectivity.
    */
   bool guarantee_connectivity = false;
-
-  /**
-   * The index quality for the ACE build.
-   *
-   * Bigger values increase the index quality. At some point, increasing this will no longer improve
-   * the quality.
-   */
-  size_t ace_ef_construction = 120;
 
   /**
    * Whether to add the dataset content to the index, i.e.:

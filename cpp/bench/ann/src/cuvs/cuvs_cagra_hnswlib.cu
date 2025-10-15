@@ -62,8 +62,20 @@ auto parse_build_param(const nlohmann::json& conf) ->
       auto ps = cuvs::neighbors::cagra::to_cagra_params<T, IdxT>(
         extents, conf.at("M"), hnsw_params.ef_construction, dist_type);
       ps.metric = dist_type;
-      if (conf.contains("ace_npartitions")) { ps.ace_npartitions = conf.at("ace_npartitions"); }
-      if (conf.contains("ace_build_dir")) { ps.ace_build_dir = conf.at("ace_build_dir"); }
+      // Parse ACE parameters if provided
+      if (conf.contains("ace_npartitions") || conf.contains("ace_build_dir") ||
+          conf.contains("ace_ef_construction") || conf.contains("ace_use_disk")) {
+        auto ace_params = cuvs::neighbors::cagra::graph_build_params::ace_params();
+        if (conf.contains("ace_npartitions")) {
+          ace_params.ace_npartitions = conf.at("ace_npartitions");
+        }
+        if (conf.contains("ace_build_dir")) { ace_params.ace_build_dir = conf.at("ace_build_dir"); }
+        if (conf.contains("ace_ef_construction")) {
+          ace_params.ace_ef_construction = conf.at("ace_ef_construction");
+        }
+        if (conf.contains("ace_use_disk")) { ace_params.ace_use_disk = conf.at("ace_use_disk"); }
+        ps.graph_build_params = ace_params;
+      }
       // NB: above, we only provide the defaults. Below we parse the explicit parameters as usual.
       ::parse_build_param<T, uint32_t>(conf, ps);
       return ps;
