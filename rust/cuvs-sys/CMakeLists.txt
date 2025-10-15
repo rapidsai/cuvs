@@ -48,27 +48,30 @@ if(NOT cuvs_FOUND)
   add_subdirectory(../../cpp cuvs-cpp EXCLUDE_FROM_ALL)
 endif()
 
-
 include(get_dlpack.cmake)
 
-# We are going to copy all the cuvs_c and dlpack
-# headers into a staging location
+# We are going to copy all the cuvs_c and dlpack headers into a staging location
 if(TARGET cuvs_c)
   get_target_property(cuvs_c_headers cuvs_c INCLUDE_DIRECTORIES)
 else()
   get_target_property(cuvs_c_headers cuvs::c_api INTERFACE_INCLUDE_DIRECTORIES)
 endif()
 
-file(INSTALL "${DLPACK_INCLUDE_DIR}"
+file(
+  INSTALL "${DLPACK_INCLUDE_DIR}"
   DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/bindings/include"
-  FILES_MATCHING PATTERN "*.h")
+  FILES_MATCHING
+  PATTERN "*.h"
+)
 
 foreach(cuvs_c_dir IN LISTS cuvs_c_headers)
-  file(INSTALL "${cuvs_c_dir}"
+  file(
+    INSTALL "${cuvs_c_dir}"
     DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/bindings/include"
-    FILES_MATCHING PATTERN "*.h")
+    FILES_MATCHING
+    PATTERN "*.h"
+  )
 endforeach()
-
 
 # add a dummy target here,
 add_library(cuvs-rust INTERFACE)
