@@ -139,7 +139,7 @@ def run_mg_cagra_build_search_test(
 
 
 @requires_multiple_gpus
-@pytest.mark.parametrize("dtype", [np.float32])
+@pytest.mark.parametrize("dtype", [np.float32, np.float16])
 @pytest.mark.parametrize(
     "metric", ["sqeuclidean"]
 )  # Start with just sqeuclidean
