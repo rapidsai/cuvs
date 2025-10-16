@@ -39,6 +39,7 @@ static void _set_graph_build_params(
   std::variant<std::monostate,
                cuvs::neighbors::cagra::graph_build_params::ivf_pq_params,
                cuvs::neighbors::cagra::graph_build_params::nn_descent_params,
+               cuvs::neighbors::cagra::graph_build_params::ace_params,
                cuvs::neighbors::cagra::graph_build_params::iterative_search_params>& out_params,
   cuvsCagraIndexParams& params,
   cuvsCagraGraphBuildAlgo algo,
@@ -88,6 +89,18 @@ static void _set_graph_build_params(
         cuvs::neighbors::nn_descent::index_params(params.intermediate_graph_degree, metric);
       nn_params.max_iterations = params.nn_descent_niter;
       out_params               = nn_params;
+      break;
+    }
+    case cuvsCagraGraphBuildAlgo::ACE: {
+      cuvs::neighbors::cagra::graph_build_params::ace_params ace_p;
+      if (params.graph_build_params) {
+        auto ace_params_c             = static_cast<cuvsAceParams*>(params.graph_build_params);
+        ace_p.ace_npartitions         = ace_params_c->ace_npartitions;
+        ace_p.ace_ef_construction     = ace_params_c->ace_ef_construction;
+        ace_p.ace_build_dir           = std::string(ace_params_c->ace_build_dir);
+        ace_p.ace_use_disk            = ace_params_c->ace_use_disk;
+      }
+      out_params = ace_p;
       break;
     }
     case cuvsCagraGraphBuildAlgo::ITERATIVE_CAGRA_SEARCH: {
