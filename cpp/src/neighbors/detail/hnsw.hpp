@@ -329,6 +329,44 @@ struct mmap_reader {
   size_t size_;
 };
 
+struct buffered_ofstream {
+  buffered_ofstream(std::ostream* os, size_t buffer_size) : os_(os), buffer_(buffer_size), pos_(0)
+  {
+  }
+
+  ~buffered_ofstream() noexcept
+  {
+    // flush it
+    flush();
+  }
+
+  buffered_ofstream(const buffered_ofstream& res)                      = delete;
+  auto operator=(const buffered_ofstream& other) -> buffered_ofstream& = delete;
+  buffered_ofstream(buffered_ofstream&& other)                         = delete;
+  auto operator=(buffered_ofstream&& other) -> buffered_ofstream&      = delete;
+
+  void flush()
+  {
+    if (pos_ > 0) {
+      os_->write(reinterpret_cast<char*>(&buffer_.front()), pos_);
+      if (!os_->good()) { RAFT_FAIL("Error writing HNSW file!"); }
+      pos_ = 0;
+    }
+  }
+
+  void write(const char* input, size_t size)
+  {
+    if (pos_ + size > buffer_.size()) { flush(); }
+    std::copy(input, input + size, &buffer_[pos_]);
+    pos_ += size;
+  }
+
+ private:
+  std::vector<char> buffer_;
+  std::ostream* os_;
+  size_t pos_;
+};
+
 template <typename T>
 void all_neighbors_graph(raft::resources const& res,
                          raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,
@@ -338,7 +376,6 @@ void all_neighbors_graph(raft::resources const& res,
   // FIXME: choose better heuristic
   bool use_nn_decent = neighbors.size() < 1e7;
   if (use_nn_decent) {
-    std::cerr << "Using nn-descent for neighbor graph" << std::endl;
     nn_descent::index_params nn_params;
     nn_params.graph_degree              = neighbors.extent(1);
     nn_params.intermediate_graph_degree = neighbors.extent(1) * 2;
@@ -346,7 +383,6 @@ void all_neighbors_graph(raft::resources const& res,
     nn_params.return_distances          = false;
     auto nn_index                       = nn_descent::build(res, nn_params, dataset, neighbors);
   } else {
-    std::cerr << "Using ivf-pq for neighbor graph" << std::endl;
     // TODO: choose parameters to minimize memory consumption
     cagra::graph_build_params::ivf_pq_params ivfpq_params(dataset.extents(), metric);
     cagra::build_knn_graph(res, dataset, neighbors, ivfpq_params);
@@ -355,11 +391,13 @@ void all_neighbors_graph(raft::resources const& res,
 
 template <typename T, typename IdxT>
 void serialize_to_hnswlib_from_disk(raft::resources const& res,
-                                    std::ostream& os,
+                                    std::ostream& os_raw,
                                     const cuvs::neighbors::hnsw::index_params& params,
                                     const cuvs::neighbors::cagra::index<T, IdxT>& index_)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::serialize");
+
+  buffered_ofstream os(&os_raw, 1 << 20 /*1MB*/);
 
   ASSERT(index_.on_disk(), "Function only implements serialization from disk.");
   ASSERT(params.hierarchy != HnswHierarchy::CPU,
@@ -515,7 +553,7 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
            dim * sizeof(T) + graph_degree_int * sizeof(IdxT) + sizeof(int) + sizeof(size_t));
 
     const auto end_clock = std::chrono::system_clock::now();
-    if (!os.good()) { RAFT_FAIL("Error writing HNSW file, row %zu", i); }
+    // if (!os.good()) { RAFT_FAIL("Error writing HNSW file, row %zu", i); }
     if (i > next_report_offset) {
       next_report_offset += d_report_offset;
       const auto time =
@@ -594,7 +632,7 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
     }
 
     const auto end_clock = std::chrono::system_clock::now();
-    if (!os.good()) { RAFT_FAIL("Error writing HNSW file, row %zu", i); }
+    // if (!os.good()) { RAFT_FAIL("Error writing HNSW file, row %zu", i); }
     if (i > next_report_offset) {
       next_report_offset += d_report_offset;
       const auto time =
@@ -875,6 +913,7 @@ std::unique_ptr<index<T>> from_cagra(
       (std::filesystem::path(index_directory) / "hnsw_index.bin").string();
 
     std::ofstream of(index_filename, std::ios::out | std::ios::binary);
+
     if (!of) { RAFT_FAIL("Cannot open file %s", index_filename.c_str()); }
 
     serialize_to_hnswlib_from_disk(res, of, params, cagra_index);
