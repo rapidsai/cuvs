@@ -312,43 +312,6 @@ dim3 launchConfigGenerator(IdxT m, IdxT n, std::size_t sMemSize, T func)
   int numBlocksPerSm = 0;
   dim3 grid;
 
-  // Validate function pointer
-  // if (func == nullptr) {
-  //   RAFT_LOG_ERROR("Kernel function pointer is null!");
-  //   throw std::runtime_error("Null kernel function pointer");
-  // }
-  
-  // // Check kernel attributes to validate function pointer
-  // cudaFuncAttributes attr;
-  // cudaError_t attr_err = cudaFuncGetAttributes(&attr, func);
-  // if (attr_err != cudaSuccess) {
-  //   RAFT_LOG_ERROR("Failed to get kernel attributes: %s (%s)", 
-  //                  cudaGetErrorString(attr_err), cudaGetErrorName(attr_err));
-  //   RAFT_CUDA_TRY(attr_err);
-  // }
-  
-  // RAFT_LOG_INFO("Kernel info: binaryVersion=%d, constSizeBytes=%zu, localSizeBytes=%zu, "
-  //               "maxThreadsPerBlock=%d, numRegs=%d, sharedSizeBytes=%zu, maxDynamicSharedSizeBytes=%zu",
-  //               attr.binaryVersion, attr.constSizeBytes, attr.localSizeBytes,
-  //               attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes,
-  //               attr.maxDynamicSharedSizeBytes);
-
-  // RAFT_LOG_INFO("Launch params: m=%d, n=%d, sMemSize=%zu, numSMs=%d, Nthreads=%d", 
-  //               static_cast<int>(m), static_cast<int>(n), sMemSize, numSMs, P::Nthreads);
-
-  // // Validate shared memory size
-  // if (sMemSize > attr.maxDynamicSharedSizeBytes) {
-  //   RAFT_LOG_ERROR("Requested shared memory (%zu) exceeds maximum (%zu)", 
-  //                  sMemSize, attr.maxDynamicSharedSizeBytes);
-  // }
-
-  // RAFT_CUDA_TRY(cudaFuncSetAttribute(func,
-  //   cudaFuncAttributeMaxDynamicSharedMemorySize,
-  //   98304));  // allow up to 96 KB
-  
-  // Synchronize before the problematic call to ensure all prior operations are complete
-  RAFT_CUDA_TRY(cudaDeviceSynchronize());
-  
   RAFT_CUDA_TRY(
     cudaOccupancyMaxActiveBlocksPerMultiprocessor(&numBlocksPerSm, func, P::Nthreads, sMemSize));
   std::size_t minGridSize = numSMs * numBlocksPerSm;

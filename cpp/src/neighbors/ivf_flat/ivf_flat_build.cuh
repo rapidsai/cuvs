@@ -256,7 +256,7 @@ void extend(raft::resources const& handle,
                                                 batch_data_view,
                                                 orig_centroids_view,
                                                 batch_labels_view,
-                                                raft::cast_op<float>{});
+                                                utils::mapping<float>{});
       }
       vec_batches.prefetch_next_batch();
       // User needs to make sure kernel finishes its work before we overwrite batch in the next
@@ -264,7 +264,6 @@ void extend(raft::resources const& handle,
       raft::resource::sync_stream(handle);
     }
   } else {
-    // For non-uint8_t types, always use standard prediction
     auto orig_centroids_view = raft::make_device_matrix_view<const float, IdxT>(
       index->centers().data_handle(), n_lists, dim);
     for (const auto& batch : vec_batches) {
@@ -278,7 +277,7 @@ void extend(raft::resources const& handle,
                                               batch_data_view,
                                               orig_centroids_view,
                                               batch_labels_view,
-                                              raft::cast_op<float>{});
+                                              utils::mapping<float>{});
       vec_batches.prefetch_next_batch();
       // User needs to make sure kernel finishes its work before we overwrite batch in the next
       // iteration if different streams are used for kernel and copy.
@@ -305,7 +304,6 @@ void extend(raft::resources const& handle,
         auto expanded_centers_view = raft::make_device_matrix_view<float, IdxT>(
           temp_expanded_centers.data(), n_lists, dim * 8);
 
-        // Initialize with decoded version of current centers
         raft::linalg::map_offset(
           handle,
           expanded_centers_view,
@@ -356,7 +354,7 @@ void extend(raft::resources const& handle,
                                                                         centroids_view,
                                                                         list_sizes_view,
                                                                         false,
-                                                                        raft::cast_op<float>{});
+                                                                        utils::mapping<float>{});
       }
     }
   } else {
@@ -580,14 +578,14 @@ inline auto build(raft::resources const& handle,
         auto centers_view = raft::make_device_matrix_view<float, IdxT>(
           index.centers().data_handle(), index.n_lists(), index.dim());
         cuvs::cluster::kmeans_balanced::fit(
-          handle, kmeans_params, trainset_const_view, centers_view, raft::cast_op<float>{});
+          handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
       }
     } else {
       // For non-uint8_t types, always use standard clustering (BitwiseHamming already caught above)
       auto centers_view = raft::make_device_matrix_view<float, IdxT>(
         index.centers().data_handle(), index.n_lists(), index.dim());
       cuvs::cluster::kmeans_balanced::fit(
-        handle, kmeans_params, trainset_const_view, centers_view, raft::cast_op<float>{});
+        handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
     }
   }
 

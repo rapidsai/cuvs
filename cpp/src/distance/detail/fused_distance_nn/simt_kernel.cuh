@@ -16,10 +16,11 @@
 
 #pragma once
 
-#include "../distance_ops/l2_exp.cuh"     // ops::l2_exp_distance_op
-#include "../pairwise_distance_base.cuh"  // PairwiseDistances
-#include <raft/core/kvp.hpp>              // raft::KeyValuePair
-#include <raft/linalg/contractions.cuh>   // Policy
+#include "../distance_ops/l2_exp.cuh"             // ops::l2_exp_distance_op
+#include "../distance_ops/bitwise_hamming.cuh"    // ops::bitwise_hamming_distance_op
+#include "../pairwise_distance_base.cuh"          // PairwiseDistances
+#include <raft/core/kvp.hpp>                      // raft::KeyValuePair
+#include <raft/linalg/contractions.cuh>           // Policy
 
 #include <cstddef>  // size_t
 #include <limits>   // std::numeric_limits
@@ -82,23 +83,17 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
                                                                     OpT distance_op,
                                                                     FinalLambda fin_op)
 {
-  // compile only if below non-ampere arch.
-  // #if __CUDA_ARCH__ < 800
+  // For hamming-like distances, we need this kernel on all architectures
+  // For other distances, only use for pre-ampere architectures
+  
+  constexpr bool is_hamming = std::is_same_v<OpT, ops::bitwise_hamming_distance_op<uint8_t, uint32_t, IdxT>>;
+  
+  if constexpr (!is_hamming) {
+#if __CUDA_ARCH__ >= 800
+    return;
+#endif
+  }  
   extern __shared__ char smem[];
-
-  // Debug: Check input parameters
-  // if (blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0) {
-  //   if (m <= 0 || n <= 0 || k <= 0) {
-  //     printf("ERROR: Invalid dimensions in fusedDistanceNNkernel: m=%d, n=%d, k=%d\n",
-  //            static_cast<int>(m), static_cast<int>(n), static_cast<int>(k));
-  //   }
-  //   if (x == nullptr || y == nullptr) {
-  //     printf("ERROR: Null pointer in fusedDistanceNNkernel: x=%p, y=%p\n", x, y);
-  //   }
-  //   if (min == nullptr) {
-  //     printf("ERROR: Output pointer is null in fusedDistanceNNkernel\n");
-  //   }
-  // }
 
   using AccT = std::conditional_t<std::is_same_v<DataT, uint8_t>, uint32_t, DataT>;
   typedef raft::KeyValuePair<IdxT, AccT> KVPair;
@@ -195,7 +190,6 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
         fin_op,
         rowEpilog_lambda);
   obj.run();
-  // #endif
 }
 
 }  // namespace detail

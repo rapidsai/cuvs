@@ -53,8 +53,6 @@ void fusedBitwiseHammingNN(OutT* min,
 {
   typedef Policy P;
 
-  RAFT_LOG_INFO("inside fusedBitwiseHammingNN, Nthreads=%d", P::Nthreads);
-
   dim3 blk(P::Nthreads);
   constexpr auto maxVal = std::numeric_limits<DataT>::max();
   typedef ::raft::KeyValuePair<IdxT, OutT> KVPair;
@@ -88,7 +86,6 @@ void fusedBitwiseHammingNN(OutT* min,
   kernel<<<grid, blk, shmemSize, stream>>>(
     min, x, y, nullptr, nullptr, m, n, k, maxVal, workspace, redOp, pairRedOp, distance_op, fin_op);
   
-  // Properly check for launch errors
   RAFT_CUDA_TRY(cudaGetLastError());
 }
 
