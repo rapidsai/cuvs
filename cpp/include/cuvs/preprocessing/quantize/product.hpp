@@ -116,6 +116,26 @@ inline int64_t get_quantized_dim(const params& config)
   return sizeof(LabelT) * (1 + raft::div_rounding_up_safe<int64_t>(config.pq_dim * config.pq_bits,
                                                                    8 * sizeof(LabelT)));
 }
+
+/**
+ * @brief Applies inverse quantization transform to given dataset
+ *
+ * @param[in] res raft resource
+ * @param[in] quant a product quantizer
+ * @param[in] codes a row-major matrix view on device
+ * @param[out] out a row-major matrix view on device
+ *
+ */
+void inverse_transform(raft::resources const& res,
+                       const quantizer<float>& quant,
+                       raft::device_matrix_view<const uint8_t, int64_t> codes,
+                       raft::device_matrix_view<float, int64_t> out);
+
+/** @copydoc inverse_transform */
+void inverse_transform(raft::resources const& res,
+                       const quantizer<double>& quant,
+                       raft::device_matrix_view<const uint8_t, int64_t> codes,
+                       raft::device_matrix_view<double, int64_t> out);
 /** @} */  // end of group product
 
 }  // namespace cuvs::preprocessing::quantize::product

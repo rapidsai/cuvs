@@ -12,11 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .product import Quantizer, QuantizerParams, train, transform
+from .product import (
+    Quantizer,
+    QuantizerParams,
+    inverse_transform,
+    train,
+    transform,
+)
 
 __all__ = [
     "QuantizerParams",
     "Quantizer",
+    "inverse_transform",
     "train",
     "transform",
 ]

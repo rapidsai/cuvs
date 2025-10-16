@@ -63,6 +63,7 @@ struct vpq_params {
   /**
    * Vector Quantization (VQ) codebook size - number of "coarse cluster centers".
    * When zero, an optimal value is selected using a heuristic.
+   * When one, only product quantization is used.
    */
   uint32_t vq_n_centers = 0;
   /** The number of iterations searching for kmeans centers (both VQ & PQ phases). */

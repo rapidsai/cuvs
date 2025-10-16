@@ -27,7 +27,9 @@ cdef extern from "cuvs/preprocessing/quantize/product.h" nogil:
     ctypedef struct cuvsProductQuantizerParams:
         uint32_t pq_bits
         uint32_t pq_dim
+        uint32_t vq_n_centers
         uint32_t kmeans_n_iters
+        double vq_kmeans_trainset_fraction
         double pq_kmeans_trainset_fraction
         cuvsKMeansType pq_kmeans_type
 
@@ -53,6 +55,9 @@ cdef extern from "cuvs/preprocessing/quantize/product.h" nogil:
                                               cuvsProductQuantizer_t quantizer,
                                               DLManagedTensor* dataset,
                                               DLManagedTensor* out)
+    cuvsError_t cuvsProductQuantizerInverseTransform(
+        cuvsResources_t res, cuvsProductQuantizer_t quantizer,
+        DLManagedTensor* codes, DLManagedTensor* out)
 
     cuvsError_t cuvsProductQuantizerTrain(cuvsResources_t res,
                                           cuvsProductQuantizerParams_t params,
@@ -67,3 +72,9 @@ cdef extern from "cuvs/preprocessing/quantize/product.h" nogil:
 
     cuvsError_t cuvsProductQuantizerGetPqCodebook(
         cuvsProductQuantizer_t quantizer, DLManagedTensor* pq_codebook)
+
+    cuvsError_t cuvsProductQuantizerGetVqCodebook(
+        cuvsProductQuantizer_t quantizer, DLManagedTensor* vq_codebook)
+
+    cuvsError_t cuvsProductQuantizerGetEncodedDim(
+        cuvsProductQuantizer_t quantizer, uint32_t* encoded_dim)

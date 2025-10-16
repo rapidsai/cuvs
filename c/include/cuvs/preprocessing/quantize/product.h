@@ -45,8 +45,19 @@ struct cuvsProductQuantizerParams {
    * TODO: at the moment `dim` must be a multiple `pq_dim`.
    */
   uint32_t pq_dim = 0;
+  /**
+   * Vector Quantization (VQ) codebook size - number of "coarse cluster centers".
+   * When zero, an optimal value is selected using a heuristic.
+   * When one, only product quantization is used.
+   */
+  uint32_t vq_n_centers = 0;
   /** The number of iterations searching for kmeans centers (both VQ & PQ phases). */
   uint32_t kmeans_n_iters = 25;
+  /**
+   * The fraction of data to use during iterative kmeans building (VQ phase).
+   * When zero, an optimal value is selected using a heuristic.
+   */
+  double vq_kmeans_trainset_fraction = 0;
   /**
    * The fraction of data to use during iterative kmeans building (PQ phase).
    * When zero, an optimal value is selected using a heuristic.
@@ -134,6 +145,21 @@ cuvsError_t cuvsProductQuantizerTransform(cuvsResources_t res,
                                           DLManagedTensor* out);
 
 /**
+ * @brief Applies product quantization inverse transform to the given quantized codes
+ *
+ * This applies product quantization inverse transform to the given quantized codes.
+ *
+ * @param[in] res raft resource
+ * @param[in] quantizer product quantizer
+ * @param[in] codes a row-major host or device matrix of quantized codes
+ * @param[out] out a row-major host or device matrix to store the original data
+ */
+ cuvsError_t cuvsProductQuantizerInverseTransform(cuvsResources_t res,
+  cuvsProductQuantizer_t quantizer,
+  DLManagedTensor* codes,
+  DLManagedTensor* out);
+
+/**
  * @brief Get the bit length of the vector element after compression by PQ.
  *
  * @param[in] quantizer product quantizer
@@ -158,6 +184,22 @@ cuvsError_t cuvsProductQuantizerGetPqDim(cuvsProductQuantizer_t quantizer, uint3
 cuvsError_t cuvsProductQuantizerGetPqCodebook(cuvsProductQuantizer_t quantizer,
                                               DLManagedTensor* pq_codebook);
 
+/**
+ * @brief Get the VQ codebook.
+ *
+ * @param[in] quantizer product quantizer
+ * @param[out] vq_codebook VQ codebook
+ */
+cuvsError_t cuvsProductQuantizerGetVqCodebook(cuvsProductQuantizer_t quantizer,
+                                              DLManagedTensor* vq_codebook);
+/**
+ * @brief Get the encoded dimension of the quantized dataset.
+ *
+ * @param[in] quantizer product quantizer
+ * @param[out] encoded_dim encoded dimension of the quantized dataset
+ */
+cuvsError_t cuvsProductQuantizerGetEncodedDim(cuvsProductQuantizer_t quantizer,
+                                              uint32_t* encoded_dim);
 #ifdef __cplusplus
 }
 #endif

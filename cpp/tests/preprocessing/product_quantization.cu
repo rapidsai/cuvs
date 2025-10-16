@@ -94,128 +94,6 @@ void compare_vectors_l2(const raft::resources& res,
   }
 }
 
-/**
- * Copy from cuvs::neighbors::ivf_pq::detail::bitfield_ref_t to be used in this test.
- */
-template <uint32_t Bits, typename PtrT = uint8_t>
-struct bitfield_ref_t {
-  static_assert(Bits <= 8 && Bits > 0, "Bit code must fit one byte");
-  constexpr static uint8_t kMask = static_cast<uint8_t>((1u << Bits) - 1u);
-  PtrT* ptr;
-  uint32_t offset;
-
-  constexpr operator uint8_t()  // NOLINT
-  {
-    auto pair = static_cast<uint16_t>(ptr[0]);
-    if (offset + Bits > 8) { pair |= static_cast<uint16_t>(ptr[1]) << 8; }
-    return static_cast<uint8_t>((pair >> offset) & kMask);
-  }
-
-  constexpr auto operator=(uint8_t code) -> bitfield_ref_t&
-  {
-    if (offset + Bits > 8) {
-      auto pair = static_cast<uint16_t>(ptr[0]);
-      pair |= static_cast<uint16_t>(ptr[1]) << 8;
-      pair &= ~(static_cast<uint16_t>(kMask) << offset);
-      pair |= static_cast<uint16_t>(code) << offset;
-      ptr[0] = static_cast<uint8_t>(raft::Pow2<256>::mod(pair));
-      ptr[1] = static_cast<uint8_t>(raft::Pow2<256>::div(pair));
-    } else {
-      ptr[0] = (ptr[0] & ~(kMask << offset)) | (code << offset);
-    }
-    return *this;
-  }
-};
-
-/**
- * Copy from cuvs::neighbors::ivf_pq::detail::bitfield_view_t to be used in this test.
- */
-template <uint32_t Bits, typename PtrT = uint8_t>
-struct bitfield_view_t {
-  static_assert(Bits <= 8 && Bits > 0, "Bit code must fit one byte");
-  PtrT* raw;
-
-  constexpr auto operator[](uint32_t i) -> bitfield_ref_t<Bits, PtrT>
-  {
-    uint32_t bit_offset = i * Bits;
-    return bitfield_ref_t<Bits, PtrT>{raw + raft::Pow2<8>::div(bit_offset),
-                                      raft::Pow2<8>::mod(bit_offset)};
-  }
-};
-
-template <uint32_t BlockSize,
-          uint32_t PqBits,
-          typename DataT,
-          typename MathT,
-          typename IdxT,
-          typename LabelT>
-__launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_vectors_kernel(
-  raft::device_matrix_view<uint8_t, IdxT, raft::row_major> codes,
-  raft::device_matrix_view<DataT, IdxT, raft::row_major> dataset,
-  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
-  const uint32_t pq_dim,
-  std::optional<raft::device_matrix_view<const DataT, IdxT, raft::row_major>> vq_centers)
-{
-  const IdxT row_ix = IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x};
-  if (row_ix >= dataset.extent(0)) { return; }
-
-  uint8_t* out_codes_ptr = &codes(row_ix, 0);
-  LabelT vq_label        = *reinterpret_cast<LabelT*>(out_codes_ptr);
-  out_codes_ptr          = (&codes(row_ix, 0)) + sizeof(LabelT);
-  bitfield_view_t<PqBits> code_view{out_codes_ptr};
-  for (uint32_t j = 0; j < pq_dim; j++) {
-    uint8_t code = code_view[j];
-    for (uint32_t k = 0; k < pq_centers.extent(1); k++) {
-      const auto col = j * pq_centers.extent(1) + k;
-      if (vq_centers) {
-        dataset(row_ix, col) = pq_centers(code, k) + vq_centers.value()(vq_label, col);
-      } else {
-        dataset(row_ix, col) = pq_centers(code, k);
-      }
-    }
-  }
-}
-
-template <typename DataT, typename MathT, typename IdxT, typename LabelT>
-auto reconstruct_vectors(
-  const raft::resources& res,
-  const params& params,
-  raft::device_matrix_view<uint8_t, IdxT, raft::row_major> codes,
-  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
-  std::optional<raft::device_matrix_view<const DataT, uint32_t, raft::row_major>> vq_centers,
-  raft::device_matrix_view<DataT, IdxT, raft::row_major> out_vectors)
-{
-  using data_t = DataT;
-  using ix_t   = IdxT;
-
-  const ix_t n_rows       = out_vectors.extent(0);
-  const ix_t dim          = out_vectors.extent(1);
-  const ix_t pq_dim       = params.pq_dim;
-  const ix_t pq_bits      = params.pq_bits;
-  const ix_t pq_n_centers = ix_t{1} << pq_bits;
-
-  auto stream = raft::resource::get_cuda_stream(res);
-
-  constexpr ix_t kBlockSize  = 256;
-  const ix_t threads_per_vec = 1;
-  dim3 threads(kBlockSize, 1, 1);
-  auto kernel = [](uint32_t pq_bits) {
-    switch (pq_bits) {
-      case 4: return reconstruct_vectors_kernel<kBlockSize, 4, data_t, MathT, IdxT, LabelT>;
-      case 5: return reconstruct_vectors_kernel<kBlockSize, 5, data_t, MathT, IdxT, LabelT>;
-      case 6: return reconstruct_vectors_kernel<kBlockSize, 6, data_t, MathT, IdxT, LabelT>;
-      case 7: return reconstruct_vectors_kernel<kBlockSize, 7, data_t, MathT, IdxT, LabelT>;
-      case 8: return reconstruct_vectors_kernel<kBlockSize, 8, data_t, MathT, IdxT, LabelT>;
-      default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
-    }
-  }(pq_bits);
-  dim3 blocks(raft::div_rounding_up_safe<ix_t>(n_rows, kBlockSize / threads_per_vec), 1, 1);
-  kernel<<<blocks, threads, 0, stream>>>(codes, out_vectors, pq_centers, pq_dim, vq_centers);
-  RAFT_CUDA_TRY(cudaPeekAtLastError());
-
-  return codes;
-}
-
 template <typename T>
 class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizationInputs<T>> {
  public:
@@ -280,13 +158,11 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
       vq_centers_opt = raft::make_const_mdspan(quantizer.vpq_codebooks.vq_code_book.view());
     }
 
-    reconstruct_vectors<T, T, uint32_t, uint32_t>(
-      handle,
-      quantizer.params_quantizer,
-      codes,
-      raft::make_const_mdspan(quantizer.vpq_codebooks.pq_code_book.view()),
-      vq_centers_opt,
-      rec_data.view());
+    inverse_transform(handle,
+                      quantizer,
+                      raft::device_matrix_view<const uint8_t, int64_t>(
+                        codes.data_handle(), n_take, codes.extent(1)),
+                      rec_data.view());
 
     compare_vectors_l2(handle, orig_data, rec_data.view(), compression_ratio, 0.04, false);
   }
