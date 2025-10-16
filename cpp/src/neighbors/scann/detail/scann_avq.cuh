@@ -593,10 +593,10 @@ class cluster_loader {
  * @param eta the weight for the parallel component of the residual in the avq update
  */
 template <typename T,
-          typename IdxT     = int64_t,
-          typename LabelT   = uint32_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT   = int64_t,
+          typename LabelT = uint32_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 void apply_avq(raft::resources const& res,
                raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, Accessor> dataset,
                raft::device_matrix_view<T, IdxT> centroids_view,

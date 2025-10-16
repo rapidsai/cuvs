@@ -54,7 +54,7 @@ namespace cuvs::cluster::agglomerative::detail {
 template <typename value_t   = float,
           typename value_idx = int,
           typename nnz_t     = size_t,
-          typename Accessor  = raft::device_accessor<std::experimental::default_accessor<value_t>>>
+          typename Accessor  = raft::device_accessor<cuda::std::default_accessor<value_t>>>
 void build_mr_linkage(
   raft::resources const& handle,
   raft::mdspan<const value_t, raft::matrix_extent<value_idx>, raft::row_major, Accessor> X,

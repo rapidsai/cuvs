@@ -283,8 +283,8 @@ void unpack_codes(raft::resources const& res,
  */
 template <typename T,
           typename LabelT,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 auto sample_training_residuals(
   raft::resources const& res,
   random::RngState random_state,

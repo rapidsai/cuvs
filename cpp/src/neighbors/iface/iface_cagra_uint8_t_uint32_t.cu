@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,14 +28,14 @@
 namespace cuvs::neighbors {
 
 #define CUVS_INST_MG_CAGRA(T, IdxT)                                                                \
-  using T_ha    = raft::host_device_accessor<std::experimental::default_accessor<const T>,         \
+  using T_ha =                                                                                     \
+    raft::host_device_accessor<cuda::std::default_accessor<const T>, raft::memory_type::device>;   \
+  using T_da =                                                                                     \
+    raft::host_device_accessor<cuda::std::default_accessor<const T>, raft::memory_type::host>;     \
+  using IdxT_ha = raft::host_device_accessor<cuda::std::default_accessor<const IdxT>,              \
                                              raft::memory_type::device>;                           \
-  using T_da    = raft::host_device_accessor<std::experimental::default_accessor<const T>,         \
-                                             raft::memory_type::host>;                             \
-  using IdxT_ha = raft::host_device_accessor<std::experimental::default_accessor<const IdxT>,      \
-                                             raft::memory_type::device>;                           \
-  using IdxT_da = raft::host_device_accessor<std::experimental::default_accessor<const IdxT>,      \
-                                             raft::memory_type::host>;                             \
+  using IdxT_da =                                                                                  \
+    raft::host_device_accessor<cuda::std::default_accessor<const IdxT>, raft::memory_type::host>;  \
                                                                                                    \
   template void build(                                                                             \
     const raft::resources& handle,                                                                 \
