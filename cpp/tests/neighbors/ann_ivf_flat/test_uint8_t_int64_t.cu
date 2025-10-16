@@ -26,6 +26,7 @@ TEST_P(AnnIVFFlatTestF_uint8, AnnIVFFlat)
   this->testIVFFlat();
   this->testPacker();
   this->testFilter();
+  this->testBitwiseHammingEquivalence();
 }
 
 INSTANTIATE_TEST_CASE_P(AnnIVFFlatTest, AnnIVFFlatTestF_uint8, ::testing::ValuesIn(inputs));

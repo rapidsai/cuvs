@@ -256,7 +256,7 @@ void extend(raft::resources const& handle,
                                                 batch_data_view,
                                                 orig_centroids_view,
                                                 batch_labels_view,
-                                                utils::mapping<float>{});
+                                                raft::cast_op<float>{});
       }
       vec_batches.prefetch_next_batch();
       // User needs to make sure kernel finishes its work before we overwrite batch in the next
@@ -278,7 +278,7 @@ void extend(raft::resources const& handle,
                                               batch_data_view,
                                               orig_centroids_view,
                                               batch_labels_view,
-                                              utils::mapping<float>{});
+                                              raft::cast_op<float>{});
       vec_batches.prefetch_next_batch();
       // User needs to make sure kernel finishes its work before we overwrite batch in the next
       // iteration if different streams are used for kernel and copy.
@@ -356,7 +356,7 @@ void extend(raft::resources const& handle,
                                                                         centroids_view,
                                                                         list_sizes_view,
                                                                         false,
-                                                                        utils::mapping<float>{});
+                                                                        raft::cast_op<float>{});
       }
     }
   } else {
@@ -580,14 +580,14 @@ inline auto build(raft::resources const& handle,
         auto centers_view = raft::make_device_matrix_view<float, IdxT>(
           index.centers().data_handle(), index.n_lists(), index.dim());
         cuvs::cluster::kmeans_balanced::fit(
-          handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
+          handle, kmeans_params, trainset_const_view, centers_view, raft::cast_op<float>{});
       }
     } else {
       // For non-uint8_t types, always use standard clustering (BitwiseHamming already caught above)
       auto centers_view = raft::make_device_matrix_view<float, IdxT>(
         index.centers().data_handle(), index.n_lists(), index.dim());
       cuvs::cluster::kmeans_balanced::fit(
-        handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
+        handle, kmeans_params, trainset_const_view, centers_view, raft::cast_op<float>{});
     }
   }
 

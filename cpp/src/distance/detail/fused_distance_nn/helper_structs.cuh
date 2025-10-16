@@ -38,8 +38,13 @@ namespace detail {
 template <typename LabelT, typename DataT>
 struct KVPMinReduceImpl {
   typedef raft::KeyValuePair<LabelT, DataT> KVP;
-  DI KVP operator()(LabelT rit, const KVP& a, const KVP& b) { return b.value < a.value ? b : a; }
-  DI KVP operator()(const KVP& a, const KVP& b) { return b.value < a.value ? b : a; }
+  // Use index as tiebreaker for consistent behavior when distances are equal
+  DI KVP operator()(LabelT rit, const KVP& a, const KVP& b) { 
+    return (b.value < a.value || (b.value == a.value && b.key < a.key)) ? b : a; 
+  }
+  DI KVP operator()(const KVP& a, const KVP& b) { 
+    return (b.value < a.value || (b.value == a.value && b.key < a.key)) ? b : a; 
+  }
 
 };  // KVPMinReduce
 
@@ -49,14 +54,16 @@ struct MinAndDistanceReduceOpImpl {
 
   DI void operator()(LabelT rid, KVP* out, const KVP& other) const
   {
-    if (other.value < out->value) {
+    // Use index as tiebreaker for consistent behavior when distances are equal
+    if (other.value < out->value || (other.value == out->value && other.key < out->key)) {
       out->key   = other.key;
       out->value = other.value;
     }
   }
   DI void operator()(LabelT rid, volatile KVP* out, const KVP& other) const
   {
-    if (other.value < out->value) {
+    // Use index as tiebreaker for consistent behavior when distances are equal
+    if (other.value < out->value || (other.value == out->value && other.key < out->key)) {
       out->key   = other.key;
       out->value = other.value;
     }
@@ -134,7 +141,10 @@ struct kvp_cg_min_reduce_op {
   using AccTypeT = AccType;
   using IndexT   = Index;
   // functor signature.
-  __host__ __device__ KVP operator()(KVP a, KVP b) const { return a.value < b.value ? a : b; }
+  // Use index as tiebreaker for consistent behavior when distances are equal
+  __host__ __device__ KVP operator()(KVP a, KVP b) const { 
+    return (a.value < b.value || (a.value == b.value && a.key < b.key)) ? a : b; 
+  }
 
   __host__ __device__ AccType operator()(AccType a, AccType b) const { return min(a, b); }
 

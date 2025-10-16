@@ -85,9 +85,6 @@ void fusedBitwiseHammingNN(OutT* min,
 
   dim3 grid = launchConfigGenerator<P>(m, n, shmemSize, kernel);
   
-  RAFT_LOG_INFO("Launching fusedDistanceNNkernel: grid=(%d,%d,%d), block=(%d,%d,%d), shmem=%zu, m=%d, n=%d, k=%d",
-                grid.x, grid.y, grid.z, blk.x, blk.y, blk.z, shmemSize, static_cast<int>(m), static_cast<int>(n), static_cast<int>(k));
-  
   kernel<<<grid, blk, shmemSize, stream>>>(
     min, x, y, nullptr, nullptr, m, n, k, maxVal, workspace, redOp, pairRedOp, distance_op, fin_op);
   
