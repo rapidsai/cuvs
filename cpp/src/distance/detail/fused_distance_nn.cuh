@@ -104,8 +104,7 @@ void fusedDistanceNNImpl(OutT* min,
         assert(false && "BitwiseHamming distance only supports uint8_t data type");
       }
       break;
-    default:
-      assert("only cosine/l2/bitwise hamming metric is supported with fusedDistanceNN\n");
+    default: assert("only cosine/l2/bitwise hamming metric is supported with fusedDistanceNN\n");
   }
 }
 

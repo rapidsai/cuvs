@@ -1151,7 +1151,6 @@ struct hamming_dist {
   {
     if constexpr (Veclen > 1) {
       // x and y are uint32_t, so no static_cast is needed.
-
       acc += __popc(x ^ y);
     } else {
       acc += __popc(static_cast<uint32_t>(x ^ y) & 0xffu);

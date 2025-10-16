@@ -255,11 +255,11 @@ void index<T, IdxT>::check_consistency()
     RAFT_EXPECTS(binary_centers_.extent(0) == list_sizes_.extent(0),
                  "inconsistent number of lists (clusters)");
   } else {
-  RAFT_EXPECTS(                                       //
-    (centers_.extent(0) == list_sizes_.extent(0)) &&  //
-      (!center_norms_.has_value() || centers_.extent(0) == center_norms_->extent(0)),
-    "inconsistent number of lists (clusters)");
-}
+    RAFT_EXPECTS(                                       //
+      (centers_.extent(0) == list_sizes_.extent(0)) &&  //
+        (!center_norms_.has_value() || centers_.extent(0) == center_norms_->extent(0)),
+      "inconsistent number of lists (clusters)");
+  }
 }
 
 template <typename T, typename IdxT>

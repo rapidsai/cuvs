@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2021-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,11 +39,13 @@ template <typename LabelT, typename DataT>
 struct KVPMinReduceImpl {
   typedef raft::KeyValuePair<LabelT, DataT> KVP;
   // Use index as tiebreaker for consistent behavior when distances are equal
-  DI KVP operator()(LabelT rit, const KVP& a, const KVP& b) { 
-    return (b.value < a.value || (b.value == a.value && b.key < a.key)) ? b : a; 
+  DI KVP operator()(LabelT rit, const KVP& a, const KVP& b)
+  {
+    return (b.value < a.value || (b.value == a.value && b.key < a.key)) ? b : a;
   }
-  DI KVP operator()(const KVP& a, const KVP& b) { 
-    return (b.value < a.value || (b.value == a.value && b.key < a.key)) ? b : a; 
+  DI KVP operator()(const KVP& a, const KVP& b)
+  {
+    return (b.value < a.value || (b.value == a.value && b.key < a.key)) ? b : a;
   }
 
 };  // KVPMinReduce
@@ -142,8 +144,9 @@ struct kvp_cg_min_reduce_op {
   using IndexT   = Index;
   // functor signature.
   // Use index as tiebreaker for consistent behavior when distances are equal
-  __host__ __device__ KVP operator()(KVP a, KVP b) const { 
-    return (a.value < b.value || (a.value == b.value && a.key < b.key)) ? a : b; 
+  __host__ __device__ KVP operator()(KVP a, KVP b) const
+  {
+    return (a.value < b.value || (a.value == b.value && a.key < b.key)) ? a : b;
   }
 
   __host__ __device__ AccType operator()(AccType a, AccType b) const { return min(a, b); }

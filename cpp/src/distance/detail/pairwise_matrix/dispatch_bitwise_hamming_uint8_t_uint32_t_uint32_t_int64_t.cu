@@ -23,11 +23,11 @@
  *
  */
 
-#include <raft/core/operators.hpp> // raft::identity_op
-#include "../distance_ops/all_ops.cuh"  // ops::*
-#include "dispatch-inl.cuh" // dispatch
-#include "../distance_ops/bitwise_hamming.cuh" // bitwise_hamming_distance_op
+#include "../distance_ops/all_ops.cuh"          // ops::*
+#include "../distance_ops/bitwise_hamming.cuh"  // bitwise_hamming_distance_op
+#include "dispatch-inl.cuh"                     // dispatch
 #include "dispatch_sm60.cuh"
+#include <raft/core/operators.hpp>  // raft::identity_op
 #define instantiate_raft_distance_detail_pairwise_matrix_dispatch(                     \
   OpT, DataT, AccT, OutT, FinOpT, IdxT)                                                \
   template void cuvs::distance::detail::                                               \
@@ -45,6 +45,12 @@
       cudaStream_t stream,                                                             \
       bool is_row_major)
 
-instantiate_raft_distance_detail_pairwise_matrix_dispatch(cuvs::distance::detail::ops::bitwise_hamming_distance_op, uint8_t, uint32_t, uint32_t, raft::identity_op, int64_t);
+instantiate_raft_distance_detail_pairwise_matrix_dispatch(
+  cuvs::distance::detail::ops::bitwise_hamming_distance_op,
+  uint8_t,
+  uint32_t,
+  uint32_t,
+  raft::identity_op,
+  int64_t);
 
 #undef instantiate_raft_distance_detail_pairwise_matrix_dispatch

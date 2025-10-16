@@ -16,11 +16,11 @@
 
 #pragma once
 
-#include "../distance_ops/l2_exp.cuh"             // ops::l2_exp_distance_op
-#include "../distance_ops/bitwise_hamming.cuh"    // ops::bitwise_hamming_distance_op
-#include "../pairwise_distance_base.cuh"          // PairwiseDistances
-#include <raft/core/kvp.hpp>                      // raft::KeyValuePair
-#include <raft/linalg/contractions.cuh>           // Policy
+#include "../distance_ops/bitwise_hamming.cuh"  // ops::bitwise_hamming_distance_op
+#include "../distance_ops/l2_exp.cuh"           // ops::l2_exp_distance_op
+#include "../pairwise_distance_base.cuh"        // PairwiseDistances
+#include <raft/core/kvp.hpp>                    // raft::KeyValuePair
+#include <raft/linalg/contractions.cuh>         // Policy
 
 #include <cstddef>  // size_t
 #include <limits>   // std::numeric_limits
@@ -85,14 +85,15 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
 {
   // For hamming-like distances, we need this kernel on all architectures
   // For other distances, only use for pre-ampere architectures
-  
-  constexpr bool is_hamming = std::is_same_v<OpT, ops::bitwise_hamming_distance_op<uint8_t, uint32_t, IdxT>>;
-  
+
+  constexpr bool is_hamming =
+    std::is_same_v<OpT, ops::bitwise_hamming_distance_op<uint8_t, uint32_t, IdxT>>;
+
   if constexpr (!is_hamming) {
 #if __CUDA_ARCH__ >= 800
     return;
 #endif
-  }  
+  }
   extern __shared__ char smem[];
 
   using AccT = std::conditional_t<std::is_same_v<DataT, uint8_t>, uint32_t, DataT>;

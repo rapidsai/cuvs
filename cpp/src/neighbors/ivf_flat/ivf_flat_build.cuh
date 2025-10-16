@@ -307,7 +307,7 @@ void extend(raft::resources const& handle,
           expanded_centers_view,
           utils::bitwise_decode_op<float, IdxT>(index->binary_centers().data_handle(), dim));
 
-        vec_batches.reset();  // Reset for second pass through the data
+        vec_batches.reset();
         for (const auto& batch : vec_batches) {
           rmm::device_uvector<int8_t> decoded_batch(
             batch.size() * dim * 8, stream, raft::resource::get_workspace_resource(handle));
@@ -330,8 +330,9 @@ void extend(raft::resources const& handle,
 
         // Convert updated centroids back to binary format
         cuvs::preprocessing::quantize::binary::quantizer<float> temp_quantizer(handle);
-        cuvs::preprocessing::quantize::binary::transform(handle, temp_quantizer, expanded_centers_view, index->binary_centers());
-  
+        cuvs::preprocessing::quantize::binary::transform(
+          handle, temp_quantizer, expanded_centers_view, index->binary_centers());
+
       } else {
         // Error: BitwiseHamming with non-uint8_t type
         RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t data type, got %s",
@@ -340,7 +341,7 @@ void extend(raft::resources const& handle,
     } else {
       auto centroids_view = raft::make_device_matrix_view<float, IdxT>(
         index->centers().data_handle(), index->centers().extent(0), index->centers().extent(1));
-      vec_batches.reset();  // Reset for second pass through the data
+      vec_batches.reset();
       for (const auto& batch : vec_batches) {
         auto batch_data_view =
           raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
@@ -488,7 +489,7 @@ inline auto build(raft::resources const& handle,
   auto stream = raft::resource::get_cuda_stream(handle);
   cuvs::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_flat::build(%zu, %u)", size_t(n_rows), dim);
-  
+
   if (params.metric == cuvs::distance::DistanceType::BitwiseHamming &&
       !std::is_same_v<T, uint8_t>) {
     RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t input type, got %s",
@@ -503,7 +504,7 @@ inline auto build(raft::resources const& handle,
   RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::CosineExpanded || dim > 1,
                "Cosine metric requires more than one dim");
   index<T, IdxT> index(handle, params, dim);
-  
+
   utils::memzero(
     index.accum_sorted_sizes().data_handle(), index.accum_sorted_sizes().size(), stream);
   utils::memzero(index.list_sizes().data_handle(), index.list_sizes().size(), stream);
@@ -515,7 +516,7 @@ inline auto build(raft::resources const& handle,
     auto trainset_ratio = std::max<size_t>(
       1, n_rows / std::max<size_t>(params.kmeans_trainset_fraction * n_rows, index.n_lists()));
     auto n_rows_train = n_rows / trainset_ratio;
-    
+
     rmm::device_uvector<T> trainset(
       n_rows_train * index.dim(), stream, raft::resource::get_large_workspace_resource(handle));
     // TODO: a proper sampling
@@ -544,14 +545,13 @@ inline auto build(raft::resources const& handle,
           raft::resource::get_large_workspace_resource(handle));
         auto decoded_trainset_view = raft::make_device_matrix_view<int8_t, IdxT>(
           decoded_trainset.data(), n_rows_train, index.dim() * 8);
-        
 
         // Decode binary trainset to expanded representation
         raft::linalg::map_offset(
           handle,
           decoded_trainset_view,
           utils::bitwise_decode_op<int8_t, IdxT>(trainset.data(), index.dim()));
-        
+
         trainset.release();
 
         rmm::device_uvector<float> decoded_centers(index.n_lists() * index.dim() * 8,
@@ -565,7 +565,7 @@ inline auto build(raft::resources const& handle,
                                             raft::make_const_mdspan(decoded_trainset_view),
                                             decoded_centers_view,
                                             raft::cast_op<float>());
-        
+
         // Convert decoded centers back to binary format
         cuvs::preprocessing::quantize::binary::quantizer<float> temp_quantizer(handle);
         cuvs::preprocessing::quantize::binary::transform(

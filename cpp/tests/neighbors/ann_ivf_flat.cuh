@@ -83,9 +83,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
   void testIVFFlat()
   {
     // Skip tests when dataset dimension is 1
-    if (ps.dim == 1) {
-      GTEST_SKIP();
-    }
+    if (ps.dim == 1) { GTEST_SKIP(); }
 
     size_t queries_size = ps.num_queries * ps.k;
     std::vector<IdxT> indices_ivfflat(queries_size);
@@ -295,9 +293,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
   void testPacker()
   {
     // Skip tests when dataset dimension is 1
-    if (ps.dim == 1) {
-      GTEST_SKIP();
-    }
+    if (ps.dim == 1) { GTEST_SKIP(); }
 
     ivf_flat::index_params index_params;
     ivf_flat::search_params search_params;
@@ -432,9 +428,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
   void testFilter()
   {
     // Skip tests when dataset dimension is 1
-    if (ps.dim == 1) {
-      GTEST_SKIP();
-    }
+    if (ps.dim == 1) { GTEST_SKIP(); }
 
     size_t queries_size = ps.num_queries * ps.k;
     std::vector<IdxT> indices_ivfflat(queries_size);
@@ -470,7 +464,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
       // unless something is really wrong with clustering, this could serve as a lower bound on
       // recall
       double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
-      
+
       // For BitwiseHamming with dimensions not divisible by 16, we need to be more lenient
       // because veclen falls back to 1, which can affect recall slightly
       if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming) {
@@ -552,7 +546,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         handle_, r, database.data(), ps.num_db_vecs * ps.dim, DataT(0.1), DataT(2.0));
       raft::random::uniform(
         handle_, r, search_queries.data(), ps.num_queries * ps.dim, DataT(0.1), DataT(2.0));
-    } else if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming && 
+    } else if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
                std::is_same_v<DataT, uint8_t>) {
       // For BitwiseHamming, use the full range of uint8_t values to get proper bit distribution
       // uniformInt's upper bound is exclusive, so we need 256 to include 255
@@ -590,45 +584,43 @@ const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
   {1000, 10000, 1, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
   {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
   {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=1 test
+  {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=1
+                                                                                        // test
   {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
   {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=1 test
+  {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=1
+                                                                                        // test
   {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
   {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=1 test
+  {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=1
+                                                                                        // test
   {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
   {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=1 test
+  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=1
+                                                                                        // test
   {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
   {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=1 test
-  {1000, 10000, 16, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=16 test
-  {1000, 10000, 32, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=16 test
-  {1000, 10000, 64, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=16 test
-  {1000, 10000, 128, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=16 test
+  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},   // veclen=1
+                                                                                         // test
+  {1000, 10000, 16, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=16
+                                                                                         // test
+  {1000, 10000, 32, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=16
+                                                                                         // test
+  {1000, 10000, 64, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=16
+                                                                                         // test
+  {1000, 10000, 128, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=16
+                                                                                          // test
 };
 
 }  // namespace cuvs::neighbors::ivf_flat
 
 // Instantiate tests for different data type combinations
-#define INSTANTIATE_TEST(T, DataT, IdxT)                                      \
-  typedef AnnIvfFlatTest<T, DataT, IdxT> IvfFlatTest##T##DataT##IdxT;        \
-  TEST_P(IvfFlatTest##T##DataT##IdxT, testIVFFlat)                           \
-  {                                                                            \
-    this->testIVFFlat();                                                       \
-  }                                                                            \
-  TEST_P(IvfFlatTest##T##DataT##IdxT, testPacker)                            \
-  {                                                                            \
-    this->testPacker();                                                        \
-  }                                                                            \
-  TEST_P(IvfFlatTest##T##DataT##IdxT, testFilter)                            \
-  {                                                                            \
-    this->testFilter();                                                        \
-  }                                                                            \
-  INSTANTIATE_TEST_CASE_P(IvfFlatTest,                                        \
-                          IvfFlatTest##T##DataT##IdxT,                        \
-                          ::testing::ValuesIn(inputs));
+#define INSTANTIATE_TEST(T, DataT, IdxT)                                    \
+  typedef AnnIvfFlatTest<T, DataT, IdxT> IvfFlatTest##T##DataT##IdxT;       \
+  TEST_P(IvfFlatTest##T##DataT##IdxT, testIVFFlat) { this->testIVFFlat(); } \
+  TEST_P(IvfFlatTest##T##DataT##IdxT, testPacker) { this->testPacker(); }   \
+  TEST_P(IvfFlatTest##T##DataT##IdxT, testFilter) { this->testFilter(); }   \
+  INSTANTIATE_TEST_CASE_P(IvfFlatTest, IvfFlatTest##T##DataT##IdxT, ::testing::ValuesIn(inputs));
 
 // Instantiate tests
 INSTANTIATE_TEST(float, float, int64_t);
