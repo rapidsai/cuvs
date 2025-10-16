@@ -37,36 +37,36 @@ struct cuvsProductQuantizerParams {
    * Hint: the smaller the 'pq_bits', the smaller the index size and the better the search
    * performance, but the lower the recall.
    */
-  uint32_t pq_bits = 8;
+  uint32_t pq_bits;
   /**
    * The dimensionality of the vector after compression by PQ.
    * When zero, an optimal value is selected using a heuristic.
    *
    * TODO: at the moment `dim` must be a multiple `pq_dim`.
    */
-  uint32_t pq_dim = 0;
+  uint32_t pq_dim;
   /**
    * Vector Quantization (VQ) codebook size - number of "coarse cluster centers".
    * When zero, an optimal value is selected using a heuristic.
    * When one, only product quantization is used.
    */
-  uint32_t vq_n_centers = 0;
+  uint32_t vq_n_centers;
   /** The number of iterations searching for kmeans centers (both VQ & PQ phases). */
-  uint32_t kmeans_n_iters = 25;
+  uint32_t kmeans_n_iters;
   /**
    * The fraction of data to use during iterative kmeans building (VQ phase).
    * When zero, an optimal value is selected using a heuristic.
    */
-  double vq_kmeans_trainset_fraction = 0;
+  double vq_kmeans_trainset_fraction;
   /**
    * The fraction of data to use during iterative kmeans building (PQ phase).
    * When zero, an optimal value is selected using a heuristic.
    */
-  double pq_kmeans_trainset_fraction = 0;
+  double pq_kmeans_trainset_fraction;
   /**
    * The type of kmeans algorithm to use for PQ training.
    */
-  cuvsKMeansType pq_kmeans_type = cuvsKMeansType::KMeansBalanced;
+  cuvsKMeansType pq_kmeans_type;
 };
 
 typedef struct cuvsProductQuantizerParams* cuvsProductQuantizerParams_t;

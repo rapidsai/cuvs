@@ -111,7 +111,11 @@ void _inverse_transform(cuvsResources_t res,
 
 extern "C" cuvsError_t cuvsProductQuantizerParamsCreate(cuvsProductQuantizerParams_t* params)
 {
-  return cuvs::core::translate_exceptions([=] { *params = new cuvsProductQuantizerParams; });
+  return cuvs::core::translate_exceptions([=] {
+    *params = new cuvsProductQuantizerParams{
+      .pq_bits = 8, .pq_dim = 0, .vq_n_centers = 0, .kmeans_n_iters = 25,
+      .pq_kmeans_trainset_fraction = 0, .vq_kmeans_trainset_fraction = 0,
+      .pq_kmeans_type = cuvsKMeansType::KMeansBalanced}; });
 }
 
 extern "C" cuvsError_t cuvsProductQuantizerParamsDestroy(cuvsProductQuantizerParams_t params)
