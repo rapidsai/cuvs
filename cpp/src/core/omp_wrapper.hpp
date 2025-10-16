@@ -18,7 +18,7 @@
 
 namespace cuvs::core::omp {
 
-bool is_omp_enabled();
+constexpr bool is_omp_enabled();
 
 int get_max_threads();
 int get_num_procs();

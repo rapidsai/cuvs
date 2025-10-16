@@ -22,7 +22,7 @@
 
 namespace cuvs::core::omp {
 
-bool is_omp_enabled()
+constexpr bool is_omp_enabled()
 {
 #if defined(_OPENMP)
   return true;
@@ -31,45 +31,15 @@ bool is_omp_enabled()
 #endif
 }
 
-int get_max_threads()
-{
-#if defined(_OPENMP)
-  return omp_get_max_threads();
-#else
-  return 1;
-#endif
-}
-int get_num_procs()
-{
-#if defined(_OPENMP)
-  return omp_get_num_procs();
-#else
-  return 1;
-#endif
-}
-int get_num_threads()
-{
-#if defined(_OPENMP)
-  return omp_get_num_threads();
-#else
-  return 1;
-#endif
-}
-int get_thread_num()
-{
-#if defined(_OPENMP)
-  return omp_get_thread_num();
-#else
-  return 0;
-#endif
-}
+int get_max_threads() { return is_omp_enabled() ? omp_get_max_threads() : 1; }
+int get_num_procs() { return is_omp_enabled() ? omp_get_num_procs() : 1; }
+int get_num_threads() { return is_omp_enabled() ? omp_get_num_threads() : 1; }
+int get_thread_num() { return is_omp_enabled() ? omp_get_thread_num() : 0; }
 
 void set_nested(int v)
 {
   (void)v;
-#if defined(_OPENMP)
-  omp_set_nested(v);
-#endif
+  if constexpr (is_omp_enabled()) { omp_set_nested(v); }
 }
 
 void check_threads(const int requirements)
