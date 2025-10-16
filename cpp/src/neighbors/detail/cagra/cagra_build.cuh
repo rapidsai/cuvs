@@ -674,6 +674,27 @@ index<T, IdxT> build(
                                      : "device",
     intermediate_degree,
     graph_degree);
+
+  // Handle edge case with single vector in dataset
+  if (dataset.extent(0) == 1) {
+    // Return an index with just the single vector
+    index<T, IdxT> idx(res, params.metric);
+    if (params.attach_dataset_on_build) {
+      try {
+        // Create a dummy graph with a single node pointing to itself
+        auto dummy_graph = raft::make_host_matrix<IdxT, int64_t>(1, 1);
+        dummy_graph(0, 0) = 0;
+        idx.update_graph(res, raft::make_const_mdspan(dummy_graph.view()));
+        // Attach the single vector dataset
+        auto strided_dataset = cuvs::neighbors::make_aligned_dataset(res, dataset);
+        idx.update_dataset(res, strided_dataset->view());
+      } catch (std::bad_alloc& e) {
+        RAFT_LOG_WARN("Insufficient GPU memory to attach dataset to index");
+      }
+    }
+    return idx;
+  }
+
   if (intermediate_degree >= static_cast<size_t>(dataset.extent(0))) {
     RAFT_LOG_WARN(
       "Intermediate graph degree cannot be larger than dataset size, reducing it to %lu",
