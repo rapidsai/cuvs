@@ -1053,9 +1053,9 @@ index<T, IdxT> build_ace(raft::resources const& res,
     auto start = std::chrono::high_resolution_clock::now();
 
     // Extract vectors for this partition
-    IdxT primary_sub_dataset_size   = partition_histogram(partition_id, 0);
-    IdxT augmented_sub_dataset_size = partition_histogram(partition_id, 1);
-    IdxT sub_dataset_size           = primary_sub_dataset_size + augmented_sub_dataset_size;
+    size_t primary_sub_dataset_size   = partition_histogram(partition_id, 0);
+    size_t augmented_sub_dataset_size = partition_histogram(partition_id, 1);
+    size_t sub_dataset_size           = primary_sub_dataset_size + augmented_sub_dataset_size;
 
     RAFT_LOG_DEBUG("ACE: Sub-dataset size: %lu (%lu + %lu)",
                    sub_dataset_size,
@@ -1132,9 +1132,9 @@ index<T, IdxT> build_ace(raft::resources const& res,
                                           augmented_backward_mapping.view(),
                                           primary_forward_mapping.view());
 
-      const IdxT graph_offset =
-        primary_partition_offsets(partition_id) * graph_degree * sizeof(IdxT);
-      const IdxT graph_bytes = primary_sub_dataset_size * graph_degree * sizeof(IdxT);
+      const size_t graph_offset =
+        static_cast<size_t>(primary_partition_offsets(partition_id)) * graph_degree * sizeof(IdxT);
+      const size_t graph_bytes = primary_sub_dataset_size * graph_degree * sizeof(IdxT);
       cuvs::util::write_large_file(
         graph_fd, sub_search_graph.data_handle(), graph_bytes, graph_offset);
     } else {
