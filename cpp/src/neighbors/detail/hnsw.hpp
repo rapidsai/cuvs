@@ -352,16 +352,16 @@ void all_neighbors_graph(raft::resources const& res,
 }
 
 template <typename T, typename IdxT>
-void serialize_to_hnswlib_hierarchy(
-  raft::resources const& res,
-  std::ostream& os,
-  const cuvs::neighbors::hnsw::index_params& params,
-  const cuvs::neighbors::cagra::index<T, IdxT>& index_,
-  std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
+void serialize_to_hnswlib_from_disk(raft::resources const& res,
+                                    std::ostream& os,
+                                    const cuvs::neighbors::hnsw::index_params& params,
+                                    const cuvs::neighbors::cagra::index<T, IdxT>& index_)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::serialize");
 
   ASSERT(index_.on_disk(), "Function only implements serialization from disk.");
+  ASSERT(params.hierarchy != HnswHierarchy::CPU,
+         "Disk2disk serialization not supported for CPU hierarchy.");
 
   auto n_rows           = index_.size();
   auto dim              = index_.dim();
@@ -398,11 +398,11 @@ void serialize_to_hnswlib_hierarchy(
   auto host_label_view = mmap_vector<uint32_t, int64_t>(label_filename, n_rows);
 
   // initialize dummy HNSW index to retrieve constants
-  auto hnsw_index = std::make_unique<index_impl<T>>(dim, index_.metric(), HnswHierarchy::GPU);
+  auto hnsw_index = std::make_unique<index_impl<T>>(dim, index_.metric(), params.hierarchy);
   auto appr_algo  = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
     hnsw_index->get_space(), 1, graph_degree_int / 2, params.ef_construction);
 
-  RAFT_LOG_INFO("Sort points by levels");
+  bool create_hierarchy = params.hierarchy != HnswHierarchy::NONE;
 
   // create hierarchy order
   // sort the points by levels
@@ -411,31 +411,36 @@ void serialize_to_hnswlib_hierarchy(
   std::vector<size_t> order(n_rows);
   std::vector<size_t> order_bw(n_rows);
   std::vector<int> levels(n_rows);
-  for (int64_t i = 0; i < n_rows; i++) {
-    auto pt_level = appr_algo->getRandomLevel(appr_algo->mult_);
-    while (pt_level >= static_cast<int32_t>(hist.size()))
-      hist.push_back(0);
-    hist[pt_level]++;
-    levels[i] = pt_level;
-  }
+  std::vector<size_t> offsets;
 
-  // accumulate
-  std::vector<size_t> offsets(hist.size() + 1, 0);
-  for (size_t i = 0; i < hist.size() - 1; i++) {
-    offsets[i + 1] = offsets[i] + hist[i];
-    RAFT_LOG_INFO("Level %zu : %zu", i + 1, size_t(n_rows) - offsets[i + 1]);
-  }
+  if (create_hierarchy) {
+    RAFT_LOG_INFO("Sort points by levels");
+    for (int64_t i = 0; i < n_rows; i++) {
+      auto pt_level = appr_algo->getRandomLevel(appr_algo->mult_);
+      while (pt_level >= static_cast<int32_t>(hist.size()))
+        hist.push_back(0);
+      hist[pt_level]++;
+      levels[i] = pt_level;
+    }
 
-  // fw/bw indices
-  for (int64_t i = 0; i < n_rows; i++) {
-    auto pt_level              = levels[i];
-    order_bw[i]                = offsets[pt_level];
-    order[offsets[pt_level]++] = i;
+    // accumulate
+    offsets.resize(hist.size() + 1, 0);
+    for (size_t i = 0; i < hist.size() - 1; i++) {
+      offsets[i + 1] = offsets[i] + hist[i];
+      RAFT_LOG_INFO("Level %zu : %zu", i + 1, size_t(n_rows) - offsets[i + 1]);
+    }
+
+    // fw/bw indices
+    for (int64_t i = 0; i < n_rows; i++) {
+      auto pt_level              = levels[i];
+      order_bw[i]                = offsets[pt_level];
+      order[offsets[pt_level]++] = i;
+    }
   }
 
   // set last point of the highest level as the entry point
-  appr_algo->enterpoint_node_ = order.back();
-  appr_algo->maxlevel_        = hist.size() - 1;
+  appr_algo->enterpoint_node_ = create_hierarchy ? order.back() : n_rows / 2;
+  appr_algo->maxlevel_        = create_hierarchy ? hist.size() - 1 : 1;
 
   // write header information
   // offset_level_0
@@ -467,7 +472,8 @@ void serialize_to_hnswlib_hierarchy(
   os.write(reinterpret_cast<char*>(&appr_algo->ef_construction_), sizeof(std::size_t));
 
   // host queries
-  auto host_query_set = raft::make_host_matrix<T, int64_t>(n_rows - hist[0], dim);
+  auto host_query_set =
+    raft::make_host_matrix<T, int64_t>(create_hierarchy ? n_rows - hist[0] : 0, dim);
 
   int64_t d_report_offset    = n_rows / 20;  // Report progress in 5% steps.
   int64_t next_report_offset = d_report_offset;
@@ -486,7 +492,7 @@ void serialize_to_hnswlib_hierarchy(
     os.write(reinterpret_cast<const char*>(data_row), sizeof(T) * dim);
 
     // copy out host data to query storage
-    if (levels[i] > 0) {
+    if (create_hierarchy && levels[i] > 0) {
       // position in query: order_bw[i]-hist[0]
       std::copy(data_row,
                 data_row + dim,
@@ -523,36 +529,39 @@ void serialize_to_hnswlib_hierarchy(
     }
   }
 
-  // TODO close input streams if applicable
-
   // trigger knn builds for all levels
   std::vector<raft::host_matrix<IdxT, int64_t>> host_neighbors;
-  for (size_t pt_level = 1; pt_level < hist.size(); pt_level++) {
-    auto num_pts       = n_rows - offsets[pt_level - 1];
-    auto neighbor_size = num_pts > appr_algo->M_ ? appr_algo->M_ : num_pts - 1;
-    host_neighbors.emplace_back(raft::make_host_matrix<IdxT, int64_t>(num_pts, neighbor_size));
-  }
-  for (size_t pt_level = 1; pt_level < hist.size(); pt_level++) {
-    RAFT_LOG_INFO("Compute hierarchy neighbors level %zu", pt_level);
-    auto removed_rows = offsets[pt_level - 1] - offsets[0];
-    raft::host_matrix_view<T, int64_t, raft::row_major> sub_query_view(
-      host_query_set.data_handle() + removed_rows * dim,
-      host_query_set.extent(0) - removed_rows,
-      dim);
-    auto neighbor_view = host_neighbors[pt_level - 1].view();
-    all_neighbors_graph(
-      res, raft::make_const_mdspan(sub_query_view), neighbor_view, index_.metric());
+  if (create_hierarchy) {
+    for (size_t pt_level = 1; pt_level < hist.size(); pt_level++) {
+      auto num_pts       = n_rows - offsets[pt_level - 1];
+      auto neighbor_size = num_pts > appr_algo->M_ ? appr_algo->M_ : num_pts - 1;
+      host_neighbors.emplace_back(raft::make_host_matrix<IdxT, int64_t>(num_pts, neighbor_size));
+    }
+    for (size_t pt_level = 1; pt_level < hist.size(); pt_level++) {
+      RAFT_LOG_INFO("Compute hierarchy neighbors level %zu", pt_level);
+      auto removed_rows = offsets[pt_level - 1] - offsets[0];
+      raft::host_matrix_view<T, int64_t, raft::row_major> sub_query_view(
+        host_query_set.data_handle() + removed_rows * dim,
+        host_query_set.extent(0) - removed_rows,
+        dim);
+      auto neighbor_view = host_neighbors[pt_level - 1].view();
+      all_neighbors_graph(
+        res, raft::make_const_mdspan(sub_query_view), neighbor_view, index_.metric());
+    }
   }
 
-  RAFT_LOG_INFO("Assemble hierarchy linklists");
-  bytes_written      = 0;
-  next_report_offset = d_report_offset;
-  start_clock        = std::chrono::system_clock::now();
-  IdxT zero          = 0;
-  size_t count       = 0;
+  if (create_hierarchy) {
+    RAFT_LOG_INFO("Assemble hierarchy linklists");
+    next_report_offset = d_report_offset;
+  }
+  bytes_written = 0;
+  start_clock   = std::chrono::system_clock::now();
+  IdxT zero     = 0;
+
   for (int64_t i = 0; i < n_rows; i++) {
-    size_t cur_level          = levels[i];
-    unsigned int linkListSize = cur_level > 0 ? appr_algo->size_links_per_element_ * cur_level : 0;
+    size_t cur_level = create_hierarchy ? levels[i] : 0;
+    unsigned int linkListSize =
+      create_hierarchy && cur_level > 0 ? appr_algo->size_links_per_element_ * cur_level : 0;
     os.write(reinterpret_cast<char*>(&linkListSize), sizeof(int));
     bytes_written += sizeof(int);
     if (linkListSize) {
@@ -576,7 +585,7 @@ void serialize_to_hnswlib_hierarchy(
                (neighbor_view.extent(1) + remainder) * sizeof(IdxT) + sizeof(int));
       }
     }
-    count += linkListSize;
+
     const auto end_clock = std::chrono::system_clock::now();
     if (!os.good()) { RAFT_FAIL("Error writing HNSW file, row %zu", i); }
     if (i > next_report_offset) {
@@ -626,26 +635,6 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
       2M x uint32_t  +   1 x uint32_t        dim x T    1 x size_t
      [linked list + linked list sizes]        [data]     [label]
   */
-
-  if (cagra_index.on_disk()) {
-    auto index_directory = cagra_index.file_directory();
-    ASSERT(
-      std::filesystem::exists(index_directory) && std::filesystem::is_directory(index_directory),
-      "Directory '%s' does not exist",
-      index_directory.c_str());
-    std::string index_filename =
-      (std::filesystem::path(index_directory) / "hnsw_index.bin").string();
-
-    std::ofstream of(index_filename, std::ios::out | std::ios::binary);
-    if (!of) { RAFT_FAIL("Cannot open file %s", index_filename.c_str()); }
-
-    serialize_to_hnswlib_hierarchy(res, of, params, cagra_index, dataset);
-
-    of.close();
-    if (!of) { RAFT_FAIL("Error writing output %s", index_filename.c_str()); }
-
-    return nullptr;
-  }
 
   const T* source_dataset = nullptr;
   int64_t n_rows, dim, source_stride;
@@ -868,6 +857,27 @@ std::unique_ptr<index<T>> from_cagra(
   const cuvs::neighbors::cagra::index<T, uint32_t>& cagra_index,
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
+  // special treatment for index on disk
+  if (cagra_index.on_disk()) {
+    auto index_directory = cagra_index.file_directory();
+    ASSERT(
+      std::filesystem::exists(index_directory) && std::filesystem::is_directory(index_directory),
+      "Directory '%s' does not exist",
+      index_directory.c_str());
+    std::string index_filename =
+      (std::filesystem::path(index_directory) / "hnsw_index.bin").string();
+
+    std::ofstream of(index_filename, std::ios::out | std::ios::binary);
+    if (!of) { RAFT_FAIL("Cannot open file %s", index_filename.c_str()); }
+
+    serialize_to_hnswlib_from_disk(res, of, params, cagra_index);
+
+    of.close();
+    if (!of) { RAFT_FAIL("Error writing output %s", index_filename.c_str()); }
+
+    return nullptr;
+  }
+
   if (params.hierarchy == HnswHierarchy::NONE) {
     return from_cagra<T, HnswHierarchy::NONE>(res, params, cagra_index, dataset);
   } else if (params.hierarchy == HnswHierarchy::CPU) {
