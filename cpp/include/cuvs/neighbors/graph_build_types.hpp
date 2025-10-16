@@ -112,8 +112,6 @@ struct ace_params {
    *
    * The search graph for very large datasets can be larger than the device or host memory.
    * To build such large graphs, we divide the graph into smaller partitions.
-   * When set to a value > 1, enables the ACE partitioned approach for very large graphs.
-   * Set to 0 or 1 to disable ACE partitioning and use standard build.
    */
   size_t ace_npartitions = 1;
   /**

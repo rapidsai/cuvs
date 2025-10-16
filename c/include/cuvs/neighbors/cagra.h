@@ -101,8 +101,10 @@ typedef struct cuvsIvfPqParams* cuvsIvfPqParams_t;
 struct cuvsAceParams {
   /**
    * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
-   * When set to a value > 1, enables the ACE partitioned approach for very large graphs.
-   * Set to 0 or 1 to disable ACE partitioning and use standard build.
+   * Small values might improve recall but potentially degrade performance and
+   * increase memory usage. Partitions should not be too small to prevent issues
+   * in KNN graph construction. 100k - 5M vectors per partition is recommended
+   * depending on the available host and GPU memory.
    */
   size_t ace_npartitions;
   /**
