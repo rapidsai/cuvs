@@ -44,6 +44,7 @@
 
 #include <chrono>
 #include <cstdio>
+#include <filesystem>
 #include <omp.h>
 #include <type_traits>
 #include <unordered_set>
@@ -1181,6 +1182,16 @@ index<T, IdxT> build_ace(raft::resources const& res,
                 partition_processing_elapsed,
                 n_partitions);
 
+  // Clean up augmented dataset file to save disk space (no longer needed after partitions
+  // processed)
+  if (use_disk) {
+    const std::string augmented_dataset_path = ace_build_dir + "/augmented_dataset.bin";
+    if (std::filesystem::exists(augmented_dataset_path)) {
+      std::filesystem::remove(augmented_dataset_path);
+      RAFT_LOG_INFO("ACE: Removed augmented dataset file to save disk space");
+    }
+  }
+
   auto index_creation_start = std::chrono::high_resolution_clock::now();
   index<T, IdxT> idx(res, params.metric);
   // Only add graph and dataset if not using disk storage. The returned index is empty if using disk
@@ -1201,6 +1212,13 @@ index<T, IdxT> build_ace(raft::resources const& res,
     }
   } else {
     idx.set_disk_storage(true, ace_build_dir, dataset_size, dataset_dim, graph_degree);
+    RAFT_LOG_INFO(
+      "ACE: Set disk storage at %s with dataset size %zu and dataset dimension %zu and graph "
+      "degree %zu",
+      ace_build_dir.c_str(),
+      dataset_size,
+      dataset_dim,
+      graph_degree);
   }
 
   auto index_creation_end = std::chrono::high_resolution_clock::now();
