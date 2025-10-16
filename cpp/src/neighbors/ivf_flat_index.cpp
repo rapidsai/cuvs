@@ -64,7 +64,6 @@ index<T, IdxT>::index(raft::resources const& res,
     inds_ptrs_{raft::make_device_vector<IdxT*, uint32_t>(res, n_lists)},
     accum_sorted_sizes_{raft::make_host_vector<IdxT, uint32_t>(n_lists + 1)}
 {
-  // Validate that BitwiseHamming distance is only used with uint8_t data type
   if (metric == cuvs::distance::DistanceType::BitwiseHamming && !std::is_same_v<T, uint8_t>) {
     RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t data type, got %s",
               typeid(T).name());

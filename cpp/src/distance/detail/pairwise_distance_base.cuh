@@ -17,7 +17,6 @@
 #include <raft/linalg/contractions.cuh>       // raft::linalg::Contractions_NT
 #include <raft/util/cuda_dev_essentials.cuh>  // ceildiv
 #include <raft/util/cuda_rt_essentials.hpp>   // RAFT_CUDA_TRY
-#include <raft/core/logger.hpp>              // RAFT_LOG_INFO
 
 #include <cstddef>  // size_t
 
@@ -296,14 +295,6 @@ struct PairwiseDistances : public BaseClass {
 template <typename P, typename IdxT, typename T>
 dim3 launchConfigGenerator(IdxT m, IdxT n, std::size_t sMemSize, T func)
 {
-  // Check for any prior CUDA errors
-  cudaError_t prior_error = cudaGetLastError();
-  if (prior_error != cudaSuccess) {
-    RAFT_LOG_ERROR("Prior CUDA error detected before launchConfigGenerator: %s (%s)", 
-                   cudaGetErrorString(prior_error), cudaGetErrorName(prior_error));
-    RAFT_CUDA_TRY(prior_error);
-  }
-  
   int devId;
   RAFT_CUDA_TRY(cudaGetDevice(&devId));
   int numSMs;

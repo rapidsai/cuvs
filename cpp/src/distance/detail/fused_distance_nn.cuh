@@ -106,7 +106,6 @@ void fusedDistanceNNImpl(OutT* min,
       break;
     default:
       assert("only cosine/l2/bitwise hamming metric is supported with fusedDistanceNN\n");
-      break;
   }
 }
 

@@ -513,7 +513,7 @@ void minClusterDistanceCompute(raft::resources const& handle,
                   metric == cuvs::distance::DistanceType::L2SqrtExpanded;
   auto dataBatchSize = is_fused ? (IndexT)n_samples : getDataBatchSize(batch_samples, n_samples);
   auto centroidsBatchSize = getCentroidsBatchSize(batch_centroids, n_clusters);
-  
+
   if (is_fused) {
     L2NormBuf_OR_DistBuf.resize(n_clusters, stream);
     raft::linalg::rowNorm<raft::linalg::L2Norm, true>(L2NormBuf_OR_DistBuf.data(),

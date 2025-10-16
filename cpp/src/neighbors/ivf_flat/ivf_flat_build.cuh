@@ -201,7 +201,6 @@ void extend(raft::resources const& handle,
   cuvs::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_flat::extend(%zu, %u)", size_t(n_rows), dim);
 
-
   RAFT_EXPECTS(new_indices != nullptr || index->size() == 0,
                "You must pass data indices when the index is non-empty.");
 
@@ -209,7 +208,6 @@ void extend(raft::resources const& handle,
     handle, raft::resource::get_large_workspace_resource(handle), raft::make_extents<IdxT>(n_rows));
   cuvs::cluster::kmeans::balanced_params kmeans_params;
   kmeans_params.metric = index->metric();
-
   // Calculate the batch size for the input data if it's not accessible directly from the device
   constexpr size_t kReasonableMaxBatchSize = 65536;
   size_t max_batch_size                    = std::min<size_t>(n_rows, kReasonableMaxBatchSize);
@@ -401,7 +399,6 @@ void extend(raft::resources const& handle,
   for (const auto& batch : vec_batches) {
     auto batch_data_view =
       raft::make_device_matrix_view<const T, IdxT>(batch.data(), batch.size(), index->dim());
-    
     // Kernel to insert the new vectors
     const dim3 block_dim(256);
     const dim3 grid_dim(raft::ceildiv<IdxT>(batch.size(), block_dim.x));
@@ -424,7 +421,7 @@ void extend(raft::resources const& handle,
 
     if (batch.offset() > next_report_offset) {
       float progress = batch.offset() * 100.0f / n_rows;
-      RAFT_LOG_INFO("ivf_flat::extend added vectors %zu, %6.1f%% complete",
+      RAFT_LOG_DEBUG("ivf_flat::extend added vectors %zu, %6.1f%% complete",
                      static_cast<size_t>(batch.offset()),
                      progress);
       next_report_offset += d_report_offset;
@@ -574,21 +571,18 @@ inline auto build(raft::resources const& handle,
         cuvs::preprocessing::quantize::binary::transform(
           handle, temp_quantizer, decoded_centers_view, index.binary_centers());
       } else {
-        // For non-binary data, use standard clustering
         auto centers_view = raft::make_device_matrix_view<float, IdxT>(
           index.centers().data_handle(), index.n_lists(), index.dim());
         cuvs::cluster::kmeans_balanced::fit(
           handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
       }
     } else {
-      // For non-uint8_t types, always use standard clustering (BitwiseHamming already caught above)
       auto centers_view = raft::make_device_matrix_view<float, IdxT>(
         index.centers().data_handle(), index.n_lists(), index.dim());
       cuvs::cluster::kmeans_balanced::fit(
         handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
     }
   }
-
 
   // add the data if necessary
   if (params.add_data_on_build) {
