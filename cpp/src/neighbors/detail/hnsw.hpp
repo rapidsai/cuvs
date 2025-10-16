@@ -266,66 +266,68 @@ int initialize_point_in_hnsw(hnswlib::HierarchicalNSW<DistT>* appr_algo,
   return cur_c;
 }
 
-// FIXME: this is only a first draft
-// advice MADV_HUGEPAGE / MADV_SEQUENTIAL
+// RAII mmap reader wrapper
 template <typename T, typename idx_t>
-raft::host_matrix_view<T, idx_t> mmap_matrix(const std::string& filename,
-                                             size_t n_rows,
-                                             size_t n_cols,
-                                             int advice = MADV_HUGEPAGE)
-{
-  int fd = open(filename.c_str(), O_RDONLY);
-  if (fd == -1) { THROW("Error opening file"); }
-  size_t num_elements = n_rows * n_cols;
-  size_t file_size    = num_elements * sizeof(T);
-  float file_size_gb  = file_size / 1e9;
-  RAFT_LOG_INFO("mmap file %s, dimensions [%zu, %zu] size %.2f GB",
-                filename.c_str(),
-                n_rows,
-                n_cols,
-                file_size_gb);
+struct mmap_reader {
+  mmap_reader(const std::string& filename, size_t num_elements) : size_{num_elements * sizeof(T)}
+  {
+    fd_ = open(filename.c_str(), O_RDONLY);
+    if (fd_ == -1) { throw std::runtime_error("cuvs::mmap_reader error opening file"); }
 
-  void* data = mmap(nullptr, file_size, PROT_READ, MAP_SHARED, fd, 0);
-  close(fd);
-  if (data == MAP_FAILED) { THROW("mmap error"); }
-  if (madvise(data, file_size, advice) != 0) {
-    munmap(data, file_size);
-    data = nullptr;
-    THROW("madvise error");
+    float file_size_gb = size_ / 1e9;
+    RAFT_LOG_INFO("mmap opening file %s, num_elements [%zu] size %.2f GB",
+                  filename.c_str(),
+                  num_elements,
+                  file_size_gb);
+
+    data_ = mmap(nullptr, size_, PROT_READ, MAP_PRIVATE, fd_, 0);
+    // close(fd_);
+    if (data_ == MAP_FAILED) { throw std::runtime_error("cuvs::mmap_reader error"); }
+    if (madvise(data_, size_, MADV_HUGEPAGE) != 0) {
+      munmap(data_, size_);
+      data_ = nullptr;
+      throw std::runtime_error("cuvs::mmap_reader madvise error");
+    }
   }
 
-  auto dataset =
-    raft::make_host_matrix_view<T, idx_t>(reinterpret_cast<T*>((char*)data), n_rows, n_cols);
-
-  return dataset;
-}
-
-template <typename T, typename idx_t>
-raft::host_vector_view<T, idx_t> mmap_vector(const std::string& filename,
-                                             size_t n_rows,
-                                             int advice = MADV_HUGEPAGE)
-{
-  int fd = open(filename.c_str(), O_RDONLY);
-  if (fd == -1) { THROW("Error opening file"); }
-  size_t num_elements = n_rows;
-  size_t file_size    = num_elements * sizeof(T);
-  float file_size_gb  = file_size / 1e9;
-  RAFT_LOG_INFO(
-    "mmap file %s, dimension [%zu] size %.2f GB", filename.c_str(), n_rows, file_size_gb);
-
-  void* data = mmap(nullptr, file_size, PROT_READ, MAP_SHARED, fd, 0);
-  close(fd);
-  if (data == MAP_FAILED) { THROW("mmap error"); }
-  if (madvise(data, file_size, advice) != 0) {
-    munmap(data, file_size);
-    data = nullptr;
-    THROW("madvise error");
+  ~mmap_reader() noexcept
+  {
+    if (data_ != nullptr) { munmap(data_, size_); }
+    close(fd_);
   }
 
-  auto dataset = raft::make_host_vector_view<T, idx_t>(reinterpret_cast<T*>((char*)data), n_rows);
+  mmap_reader(const mmap_reader& res)                      = delete;
+  auto operator=(const mmap_reader& other) -> mmap_reader& = delete;
+  // Moving is fine
+  mmap_reader(mmap_reader&& other)
+    : fd_{std::exchange(other.fd_, -1)},
+      data_{std::exchange(other.data_, nullptr)},
+      size_{std::exchange(other.size_, 0)}
+  {
+  }
+  auto operator=(mmap_reader&& other) -> mmap_reader&
+  {
+    std::swap(this->fd_, other.fd_);
+    std::swap(this->data_, other.data_);
+    std::swap(this->size_, other.size_);
+    return *this;
+  }
 
-  return dataset;
-}
+  [[nodiscard]] auto view(idx_t n_rows, idx_t n_cols) const -> raft::host_matrix_view<T, idx_t>
+  {
+    return raft::make_host_matrix_view<T, idx_t>(
+      reinterpret_cast<T*>((char*)data_), n_rows, n_cols);
+  }
+  [[nodiscard]] auto view(idx_t n_rows) const -> raft::host_vector_view<T, idx_t>
+  {
+    return raft::make_host_vector_view<T, idx_t>(reinterpret_cast<T*>((char*)data_), n_rows);
+  }
+
+ private:
+  int fd_ = -1;
+  void* data_;
+  size_t size_;
+};
 
 template <typename T>
 void all_neighbors_graph(raft::resources const& res,
@@ -381,21 +383,26 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
   ASSERT(std::filesystem::exists(graph_filename),
          "Graph file '%s' does not exist.",
          graph_filename.c_str());
-  auto host_graph_view = mmap_matrix<uint32_t, int64_t>(graph_filename, n_rows, graph_degree_int);
+
+  mmap_reader<uint32_t, int64_t> graph_handle(graph_filename,
+                                              static_cast<size_t>(n_rows) * graph_degree_int);
+  auto host_graph_view = graph_handle.view(n_rows, graph_degree_int);
 
   std::string dataset_filename =
     (std::filesystem::path(index_directory) / "reordered_dataset.bin").string();
   ASSERT(std::filesystem::exists(dataset_filename),
          "Dataset file '%s' does not exist.",
          dataset_filename.c_str());
-  auto host_dataset_view = mmap_matrix<T, int64_t>(dataset_filename, n_rows, dim);
+  mmap_reader<T, int64_t> dataset_handle(dataset_filename, static_cast<size_t>(n_rows) * dim);
+  auto host_dataset_view = dataset_handle.view(n_rows, dim);
 
   std::string label_filename =
     (std::filesystem::path(index_directory) / "dataset_mapping.bin").string();
   ASSERT(std::filesystem::exists(label_filename),
          "Label file '%s' does not exist.",
          label_filename.c_str());
-  auto host_label_view = mmap_vector<uint32_t, int64_t>(label_filename, n_rows);
+  mmap_reader<uint32_t, int64_t> label_handle(label_filename, n_rows);
+  auto host_label_view = label_handle.view(n_rows);
 
   // initialize dummy HNSW index to retrieve constants
   auto hnsw_index = std::make_unique<index_impl<T>>(dim, index_.metric(), params.hierarchy);
