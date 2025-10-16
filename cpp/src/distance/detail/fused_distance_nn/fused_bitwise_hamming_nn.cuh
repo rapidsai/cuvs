@@ -57,10 +57,8 @@ void fusedBitwiseHammingNN(OutT* min,
   constexpr auto maxVal = std::numeric_limits<DataT>::max();
   typedef ::raft::KeyValuePair<IdxT, OutT> KVPair;
 
-  // Create the distance operation
   ops::bitwise_hamming_distance_op<DataT, uint32_t, IdxT> distance_op{k};
 
-  // No special finalization operation needed
   ::raft::identity_op fin_op{};
 
   auto kernel = fusedDistanceNNkernel<DataT,
@@ -74,7 +72,6 @@ void fusedBitwiseHammingNN(OutT* min,
 
   constexpr size_t shmemSize = P::SmemSize;
 
-  // Check for any prior CUDA errors before kernel configuration
   cudaError_t prior_error = cudaGetLastError();
   if (prior_error != cudaSuccess) {
     RAFT_LOG_INFO("Prior CUDA error before fusedDistanceNN: %s", cudaGetErrorString(prior_error));
