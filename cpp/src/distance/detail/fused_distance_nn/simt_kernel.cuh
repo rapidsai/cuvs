@@ -86,111 +86,112 @@ __launch_bounds__(P::Nthreads, 2) RAFT_KERNEL fusedDistanceNNkernel(OutT* min,
   // For hamming-like distances, we need this kernel on all architectures
   // For other distances, only use for pre-ampere architectures
 
-  constexpr bool is_hamming =
-    std::is_same_v<OpT, ops::bitwise_hamming_distance_op<uint8_t, uint32_t, IdxT>>;
-
-  if constexpr (!is_hamming) {
 #if __CUDA_ARCH__ >= 800
-    return;
+  static constexpr bool compile =
+    std::is_same_v<OpT, ops::bitwise_hamming_distance_op<uint8_t, uint32_t, IdxT>>;
+#else
+  static constexpr bool compile = true;
 #endif
-  }
-  extern __shared__ char smem[];
 
-  using AccT = std::conditional_t<std::is_same_v<DataT, uint8_t>, uint32_t, DataT>;
-  typedef raft::KeyValuePair<IdxT, AccT> KVPair;
-  KVPair val[P::AccRowsPerTh];
-#pragma unroll
-  for (int i = 0; i < P::AccRowsPerTh; ++i) {
-    val[i] = {0, maxVal};
-  }
+  if constexpr (compile) {
+    extern __shared__ char smem[];
 
-  // epilogue operation lambda for final value calculation
-  auto epilog_lambda = [n, pairRedOp, &val, maxVal] __device__(
-                         AccT acc[P::AccRowsPerTh][P::AccColsPerTh],
-                         AccT * regxn,
-                         AccT * regyn,
-                         IdxT gridStrideX,
-                         IdxT gridStrideY) {
-    KVPReduceOpT pairRed_op(pairRedOp);
-
-    // intra thread reduce
-    const auto acccolid = threadIdx.x % P::AccThCols;
-    const auto accrowid = threadIdx.x / P::AccThCols;
+    using AccT = std::conditional_t<std::is_same_v<DataT, uint8_t>, uint32_t, DataT>;
+    typedef raft::KeyValuePair<IdxT, AccT> KVPair;
+    KVPair val[P::AccRowsPerTh];
 #pragma unroll
     for (int i = 0; i < P::AccRowsPerTh; ++i) {
-#pragma unroll
-      for (int j = 0; j < P::AccColsPerTh; ++j) {
-        auto tmpkey = acccolid + j * P::AccThCols + gridStrideX;
-        KVPair tmp  = {tmpkey, acc[i][j]};
-        if (tmpkey < n) {
-          val[i] = pairRed_op(accrowid + i * P::AccThRows + gridStrideY, tmp, val[i]);
-        }
-      }
+      val[i] = {0, maxVal};
     }
-  };
 
-  auto rowEpilog_lambda =
-    [m, mutex, min, pairRedOp, redOp, &val, maxVal] __device__(IdxT gridStrideY) {
+    // epilogue operation lambda for final value calculation
+    auto epilog_lambda = [n, pairRedOp, &val, maxVal] __device__(
+                           AccT acc[P::AccRowsPerTh][P::AccColsPerTh],
+                           AccT * regxn,
+                           AccT * regyn,
+                           IdxT gridStrideX,
+                           IdxT gridStrideY) {
       KVPReduceOpT pairRed_op(pairRedOp);
-      ReduceOpT red_op(redOp);
 
+      // intra thread reduce
+      const auto acccolid = threadIdx.x % P::AccThCols;
       const auto accrowid = threadIdx.x / P::AccThCols;
-      const auto lid      = raft::laneId();
-
-    // reduce
 #pragma unroll
       for (int i = 0; i < P::AccRowsPerTh; ++i) {
 #pragma unroll
-        for (int j = P::AccThCols / 2; j > 0; j >>= 1) {
-          // Actually, the srcLane (lid +j) should be (lid +j) % P:AccThCols,
-          // but the shfl op applies the modulo internally.
-          auto tmpkey   = raft::shfl(val[i].key, lid + j, P::AccThCols);
-          auto tmpvalue = raft::shfl(val[i].value, lid + j, P::AccThCols);
-          KVPair tmp    = {tmpkey, tmpvalue};
-          val[i]        = pairRed_op(accrowid + i * P::AccThRows + gridStrideY, tmp, val[i]);
+        for (int j = 0; j < P::AccColsPerTh; ++j) {
+          auto tmpkey = acccolid + j * P::AccThCols + gridStrideX;
+          KVPair tmp  = {tmpkey, acc[i][j]};
+          if (tmpkey < n) {
+            val[i] = pairRed_op(accrowid + i * P::AccThRows + gridStrideY, tmp, val[i]);
+          }
         }
-      }
-
-      updateReducedVal<P, OutT, IdxT, KVPair, ReduceOpT>(mutex, min, val, red_op, m, gridStrideY);
-
-    // reset the val array.
-#pragma unroll
-      for (int i = 0; i < P::AccRowsPerTh; ++i) {
-        val[i] = {0, maxVal};
       }
     };
 
-  IdxT lda = k, ldb = k, ldd = n;
-  constexpr bool row_major = true;
-  constexpr bool write_out = false;
-  using AccT               = std::conditional_t<std::is_same_v<DataT, uint8_t>, uint32_t, DataT>;
-  PairwiseDistances<DataT,
-                    AccT,  // OutT (unused in PairwiseDistances)
-                    IdxT,
-                    P,
-                    decltype(distance_op),
-                    decltype(epilog_lambda),
-                    FinalLambda,
-                    decltype(rowEpilog_lambda),
-                    row_major,
-                    write_out>
-    obj(x,
-        y,
-        m,
-        n,
-        k,
-        lda,
-        ldb,
-        ldd,
-        reinterpret_cast<const AccT*>(xn),
-        reinterpret_cast<const AccT*>(yn),
-        nullptr,  // Output pointer
-        smem,
-        distance_op,
-        epilog_lambda,
-        fin_op,
-        rowEpilog_lambda);
-  obj.run();
+    auto rowEpilog_lambda =
+      [m, mutex, min, pairRedOp, redOp, &val, maxVal] __device__(IdxT gridStrideY) {
+        KVPReduceOpT pairRed_op(pairRedOp);
+        ReduceOpT red_op(redOp);
+
+        const auto accrowid = threadIdx.x / P::AccThCols;
+        const auto lid      = raft::laneId();
+
+      // reduce
+#pragma unroll
+        for (int i = 0; i < P::AccRowsPerTh; ++i) {
+#pragma unroll
+          for (int j = P::AccThCols / 2; j > 0; j >>= 1) {
+            // Actually, the srcLane (lid +j) should be (lid +j) % P:AccThCols,
+            // but the shfl op applies the modulo internally.
+            auto tmpkey   = raft::shfl(val[i].key, lid + j, P::AccThCols);
+            auto tmpvalue = raft::shfl(val[i].value, lid + j, P::AccThCols);
+            KVPair tmp    = {tmpkey, tmpvalue};
+            val[i]        = pairRed_op(accrowid + i * P::AccThRows + gridStrideY, tmp, val[i]);
+          }
+        }
+
+        updateReducedVal<P, OutT, IdxT, KVPair, ReduceOpT>(mutex, min, val, red_op, m, gridStrideY);
+
+      // reset the val array.
+#pragma unroll
+        for (int i = 0; i < P::AccRowsPerTh; ++i) {
+          val[i] = {0, maxVal};
+        }
+      };
+
+    IdxT lda = k, ldb = k, ldd = n;
+    constexpr bool row_major = true;
+    constexpr bool write_out = false;
+    using AccT               = std::conditional_t<std::is_same_v<DataT, uint8_t>, uint32_t, DataT>;
+    PairwiseDistances<DataT,
+                      AccT,  // OutT (unused in PairwiseDistances)
+                      IdxT,
+                      P,
+                      decltype(distance_op),
+                      decltype(epilog_lambda),
+                      FinalLambda,
+                      decltype(rowEpilog_lambda),
+                      row_major,
+                      write_out>
+      obj(x,
+          y,
+          m,
+          n,
+          k,
+          lda,
+          ldb,
+          ldd,
+          reinterpret_cast<const AccT*>(xn),
+          reinterpret_cast<const AccT*>(yn),
+          nullptr,  // Output pointer
+          smem,
+          distance_op,
+          epilog_lambda,
+          fin_op,
+          rowEpilog_lambda);
+    obj.run();
+  }
 }
 
 }  // namespace detail
