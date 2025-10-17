@@ -63,6 +63,8 @@ void search_main_core(
   raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
   CagraSampleFilterT sample_filter = CagraSampleFilterT())
 {
+  static_assert(std::is_same_v<IndexT, uint32_t>,
+                "Only uint32_t is supported as the graph element type (internal index type)");
   RAFT_LOG_DEBUG("# dataset size = %lu, dim = %lu\n",
                  static_cast<size_t>(graph.extent(0)),
                  static_cast<size_t>(queries.extent(1)));
