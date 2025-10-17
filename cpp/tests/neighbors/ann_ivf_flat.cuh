@@ -223,6 +223,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         if (index_2.adaptive_centers()) {
           // Skip centroid verification for BitwiseHamming metric
           if (ps.metric != cuvs::distance::DistanceType::BitwiseHamming) {
+            // The centers must be up-to-date with the corresponding data
             std::vector<uint32_t> list_sizes(index_2.n_lists());
             std::vector<IdxT*> list_indices(index_2.n_lists());
             rmm::device_uvector<float> centroid(ps.dim, stream_);
@@ -455,7 +456,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
       // unless something is really wrong with clustering, this could serve as a lower bound on
       // recall
       double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
-      
+
       // For BitwiseHamming with dimensions not divisible by 16, we need to be more lenient
       // because veclen falls back to 1, which can affect recall slightly
       if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming) {
@@ -537,7 +538,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         handle_, r, database.data(), ps.num_db_vecs * ps.dim, DataT(0.1), DataT(2.0));
       raft::random::uniform(
         handle_, r, search_queries.data(), ps.num_queries * ps.dim, DataT(0.1), DataT(2.0));
-    } else if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming && 
+    } else if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
                std::is_same_v<DataT, uint8_t>) {
       raft::random::uniformInt(
         handle_, r, database.data(), ps.num_db_vecs * ps.dim, DataT(0), DataT(255));
@@ -588,30 +589,172 @@ const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
                                                                                         // test
   {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
   {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},   // veclen=1
-                                                                                         // test
-  {1000, 10000, 16, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=16
-                                                                                         // test
-  {1000, 10000, 32, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=16
-                                                                                         // test
-  {1000, 10000, 64, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=16
-                                                                                         // test
-  {1000, 10000, 128, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=16
-                                                                                          // test
+  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, false},
+  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, true},
+  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+
+  // test dims that do not fit into kernel shared memory limits
+  {1000, 10000, 2048, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 2048, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 2049, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 2049, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 2050, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 2050, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  // TODO: Re-enable test after adjusting parameters for higher recall. See
+  // https://github.com/rapidsai/cuvs/issues/1091
+  // {1000, 10000, 2051, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {1000, 10000, 2051, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+  {1000, 10000, 2052, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 2052, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 2053, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 10000, 2053, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+  {1000, 10000, 2056, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 10000, 2056, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+
+  // various random combinations
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::L2Expanded, false},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::CosineExpanded, false},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, true},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false},
+  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+
+  // host input data
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::L2Expanded, false, true},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::CosineExpanded, false, true},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true},
+  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true},
+  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true},
+
+  // // host input data with prefetching for kernel copy overlapping
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true, true},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true, true},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true, true},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::CosineExpanded, false, true, true},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true, true},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true, true},
+  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, false, true, true},
+  {10000, 131072, 8, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, false, true, true},
+
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {1000, 10000, 16, 10, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {1000, 10000, 16, 10, 50, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 16, 10, 70, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::InnerProduct, true},
+  {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::CosineExpanded, true},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+  {10000, 131072, 8, 10, 50, 1024, cuvs::distance::DistanceType::InnerProduct, true},
+  {10000, 131072, 8, 10, 50, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
+
+  {1000, 10000, 4096, 20, 50, 1024, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000, 10000, 4096, 20, 50, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
+
+  // test splitting the big query batches  (> max gridDim.y) into smaller batches
+  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::InnerProduct, false},
+  {100000, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::CosineExpanded, false},
+  {1000000, 1024, 32, 10, 256, 256, cuvs::distance::DistanceType::InnerProduct, false},
+  {1000000, 1024, 32, 10, 256, 256, cuvs::distance::DistanceType::CosineExpanded, false},
+  {98306, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::InnerProduct, true},
+  {98306, 1024, 32, 10, 64, 64, cuvs::distance::DistanceType::CosineExpanded, true},
+
+  // test radix_sort for getting the cluster selection
+  {1000,
+   10000,
+   16,
+   10,
+   raft::matrix::detail::select::warpsort::kMaxCapacity * 2,
+   raft::matrix::detail::select::warpsort::kMaxCapacity * 4,
+   cuvs::distance::DistanceType::L2Expanded,
+   false},
+  {1000,
+   10000,
+   16,
+   10,
+   raft::matrix::detail::select::warpsort::kMaxCapacity * 4,
+   raft::matrix::detail::select::warpsort::kMaxCapacity * 4,
+   cuvs::distance::DistanceType::InnerProduct,
+   false},
+  {1000,
+   10000,
+   16,
+   10,
+   raft::matrix::detail::select::warpsort::kMaxCapacity * 4,
+   raft::matrix::detail::select::warpsort::kMaxCapacity * 4,
+   cuvs::distance::DistanceType::CosineExpanded,
+   false},
+
+  // The following two test cases should show very similar recall.
+  // num_queries, num_db_vecs, dim, k, nprobe, nlist, metric, adaptive_centers
+  {20000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded, false},
+  {100000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded, false}};
+{1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=1
+                                                                                      // test
+  {1000,
+   10000,
+   16,
+   16,
+   40,
+   1024,
+   cuvs::distance::DistanceType::BitwiseHamming,
+   false},  // veclen=16
+            // test
+  {1000,
+   10000,
+   32,
+   16,
+   40,
+   1024,
+   cuvs::distance::DistanceType::BitwiseHamming,
+   false},  // veclen=16
+            // test
+  {1000,
+   10000,
+   64,
+   16,
+   40,
+   1024,
+   cuvs::distance::DistanceType::BitwiseHamming,
+   false},  // veclen=16
+            // test
+  {1000,
+   10000,
+   128,
+   16,
+   40,
+   1024,
+   cuvs::distance::DistanceType::BitwiseHamming,
+   false},  // veclen=16
+            // test
 };
 
 }  // namespace cuvs::neighbors::ivf_flat
 
-// Instantiate tests for different data type combinations
-#define INSTANTIATE_TEST(T, DataT, IdxT)                                    \
-  typedef AnnIvfFlatTest<T, DataT, IdxT> IvfFlatTest##T##DataT##IdxT;       \
-  TEST_P(IvfFlatTest##T##DataT##IdxT, testIVFFlat) { this->testIVFFlat(); } \
-  TEST_P(IvfFlatTest##T##DataT##IdxT, testPacker) { this->testPacker(); }   \
-  TEST_P(IvfFlatTest##T##DataT##IdxT, testFilter) { this->testFilter(); }   \
-  INSTANTIATE_TEST_CASE_P(IvfFlatTest, IvfFlatTest##T##DataT##IdxT, ::testing::ValuesIn(inputs));
-
-// Instantiate tests
-INSTANTIATE_TEST(float, float, int64_t);
-INSTANTIATE_TEST(half, half, int64_t);
-INSTANTIATE_TEST(float, int8_t, int64_t);
-INSTANTIATE_TEST(float, uint8_t, int64_t);
