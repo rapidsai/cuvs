@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,19 +15,18 @@
  */
 
 #include <omp.h>
-#include <raft/core/logger.hpp>
 
-namespace cuvs::neighbors::snmg {
+namespace cuvs::core::omp {
 
-void check_omp_threads(const int requirements)
-{
-  const int max_threads = omp_get_max_threads();
-  if (max_threads < requirements)
-    RAFT_LOG_WARN(
-      "OpenMP is only allowed %d threads to run %d GPUs. Please increase the number of OpenMP "
-      "threads to avoid NCCL hangs by modifying the environment variable OMP_NUM_THREADS.",
-      max_threads,
-      requirements);
-}
+constexpr bool is_omp_enabled();
 
-}  // namespace cuvs::neighbors::snmg
+int get_max_threads();
+int get_num_procs();
+int get_num_threads();
+int get_thread_num();
+
+void set_nested(int v);
+
+void check_threads(const int requirements);
+
+}  // namespace cuvs::core::omp
