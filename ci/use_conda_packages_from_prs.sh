@@ -3,6 +3,7 @@
 
 # download CI artifacts from RAFT PR #2770
 LIBRAFT_CHANNEL=$(rapids-get-pr-artifact raft 2770 cpp conda)
+RAFT_CHANNEL=$(rapids-get-pr-artifact raft 2770 python conda)
 
 # For `rattler` builds:
 #
@@ -12,6 +13,7 @@ LIBRAFT_CHANNEL=$(rapids-get-pr-artifact raft 2770 cpp conda)
 #
 RAPIDS_PREPENDED_CONDA_CHANNELS=(
     "${LIBRAFT_CHANNEL}"
+    "${RAFT_CHANNEL}"
 )
 export RAPIDS_PREPENDED_CONDA_CHANNELS
 
