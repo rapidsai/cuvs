@@ -11,6 +11,9 @@ export CMAKE_GENERATOR=Ninja
 
 rapids-print-env
 
+# Use RAFT CI artifacts from PR
+source ./ci/use_conda_packages_from_prs.sh
+
 rapids-logger "Begin cpp build"
 
 sccache --zero-stats

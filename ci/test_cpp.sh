@@ -5,6 +5,9 @@ set -euo pipefail
 
 . /opt/conda/etc/profile.d/conda.sh
 
+# Use RAFT CI artifacts from PR
+source ./ci/use_conda_packages_from_prs.sh
+
 CPP_CHANNEL=$(rapids-download-conda-from-github cpp)
 
 rapids-logger "Generate C++ testing dependencies"
