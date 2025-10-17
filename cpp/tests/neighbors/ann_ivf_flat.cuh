@@ -715,46 +715,12 @@ const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
   // The following two test cases should show very similar recall.
   // num_queries, num_db_vecs, dim, k, nprobe, nlist, metric, adaptive_centers
   {20000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded, false},
-  {100000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded, false}};
-{1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=1
-                                                                                      // test
-  {1000,
-   10000,
-   16,
-   16,
-   40,
-   1024,
-   cuvs::distance::DistanceType::BitwiseHamming,
-   false},  // veclen=16
-            // test
-  {1000,
-   10000,
-   32,
-   16,
-   40,
-   1024,
-   cuvs::distance::DistanceType::BitwiseHamming,
-   false},  // veclen=16
-            // test
-  {1000,
-   10000,
-   64,
-   16,
-   40,
-   1024,
-   cuvs::distance::DistanceType::BitwiseHamming,
-   false},  // veclen=16
-            // test
-  {1000,
-   10000,
-   128,
-   16,
-   40,
-   1024,
-   cuvs::distance::DistanceType::BitwiseHamming,
-   false},  // veclen=16
-            // test
+  {100000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded, false},
+  {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},
+  {1000, 10000, 16, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},
+  {1000, 10000, 32, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},
+  {1000, 10000, 64, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},
+  {1000, 10000, 128, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},
 };
 
 }  // namespace cuvs::neighbors::ivf_flat
-
