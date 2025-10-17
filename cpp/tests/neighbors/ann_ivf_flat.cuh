@@ -26,9 +26,6 @@
 #include <raft/stats/mean.cuh>
 #include <thrust/reduce.h>
 
-#include "../../src/cluster/detail/kmeans_balanced.cuh"
-#include "../../src/cluster/kmeans_balanced.cuh"
-#include "../../src/neighbors/detail/ann_utils.cuh"
 #include <raft/core/resource/cuda_stream_pool.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/map.cuh>
@@ -215,11 +212,9 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
                                           search_queries_view,
                                           indices_out_view,
                                           dists_out_view);
-        cudaDeviceSynchronize();
 
         raft::update_host(
           distances_ivfflat.data(), distances_ivfflat_dev.data(), queries_size, stream_);
-        raft::resource::sync_stream(handle_);
         raft::update_host(
           indices_ivfflat.data(), indices_ivfflat_dev.data(), queries_size, stream_);
         raft::resource::sync_stream(handle_);
@@ -227,11 +222,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         // Test the centroid invariants
         if (index_2.adaptive_centers()) {
           // Skip centroid verification for BitwiseHamming metric
-          // TODO: Implement proper verification for binary centers
-          if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming) {
-            // Skip verification for binary centers
-          } else {
-            // The centers must be up-to-date with the corresponding data
+          if (ps.metric != cuvs::distance::DistanceType::BitwiseHamming) {
             std::vector<uint32_t> list_sizes(index_2.n_lists());
             std::vector<IdxT*> list_indices(index_2.n_lists());
             rmm::device_uvector<float> centroid(ps.dim, stream_);
@@ -464,7 +455,7 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
       // unless something is really wrong with clustering, this could serve as a lower bound on
       // recall
       double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
-
+      
       // For BitwiseHamming with dimensions not divisible by 16, we need to be more lenient
       // because veclen falls back to 1, which can affect recall slightly
       if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming) {
@@ -546,11 +537,8 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
         handle_, r, database.data(), ps.num_db_vecs * ps.dim, DataT(0.1), DataT(2.0));
       raft::random::uniform(
         handle_, r, search_queries.data(), ps.num_queries * ps.dim, DataT(0.1), DataT(2.0));
-    } else if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
+    } else if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming && 
                std::is_same_v<DataT, uint8_t>) {
-      // For BitwiseHamming, use the full range of uint8_t values to get proper bit distribution
-      // uniformInt's upper bound is exclusive, so we need 256 to include 255
-      // Use int type to avoid uint8_t overflow, then the values will be implicitly cast
       raft::random::uniformInt(
         handle_, r, database.data(), ps.num_db_vecs * ps.dim, DataT(0), DataT(255));
       raft::random::uniformInt(

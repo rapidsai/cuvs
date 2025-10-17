@@ -1353,7 +1353,6 @@ void ivfflat_interleaved_scan(const index<T, IdxT>& index,
                               uint32_t& grid_dim_x,
                               rmm::cuda_stream_view stream)
 {
-  // Runtime check for BitwiseHamming distance with non-uint8_t types
   if (metric == cuvs::distance::DistanceType::BitwiseHamming && !std::is_same_v<T, uint8_t>) {
     RAFT_FAIL("BitwiseHamming distance is only supported with uint8_t data type, got %s",
               typeid(T).name());
