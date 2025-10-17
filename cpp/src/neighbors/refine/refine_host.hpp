@@ -17,8 +17,9 @@
 #pragma once
 
 #include "../../core/nvtx.hpp"
+#include "../../core/omp_wrapper.hpp"
 #include "refine_common.hpp"
-#include <omp.h>
+
 #include <raft/core/host_mdspan.hpp>
 #include <raft/util/integer_utils.hpp>
 
@@ -376,7 +377,8 @@ template <typename DC, typename IdxT, typename DataT, typename DistanceT, typena
   cuvs::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "neighbors::refine_host(%zu, %zu -> %zu)", n_queries, orig_k, refined_k);
 
-  auto suggested_n_threads = std::max(1, std::min(omp_get_num_procs(), omp_get_max_threads()));
+  auto suggested_n_threads =
+    std::max(1, std::min(cuvs::core::omp::get_num_procs(), cuvs::core::omp::get_max_threads()));
 
   // If the number of queries is small, separate the distance calculation and
   // the top-k calculation into separate loops, and apply finer-grained thread
@@ -438,8 +440,8 @@ template <typename DC, typename IdxT, typename DataT, typename DistanceT, typena
       suggested_n_threads, std::vector<std::tuple<DistanceT, IdxT>>(orig_k));
 #pragma omp parallel num_threads(suggested_n_threads)
     {
-      auto tid = omp_get_thread_num();
-      for (size_t i = tid; i < n_queries; i += omp_get_num_threads()) {
+      auto tid = cuvs::core::omp::get_thread_num();
+      for (size_t i = tid; i < n_queries; i += cuvs::core::omp::get_num_threads()) {
         // Compute the refined distance using original dataset vectors
         const DataT* query = queries.data_handle() + dim * i;
         for (size_t j = 0; j < orig_k; j++) {

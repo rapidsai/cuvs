@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "../../../core/omp_wrapper.hpp"
 #include "../ann_utils.cuh"
 #include <cuvs/neighbors/cagra.hpp>
 #include <raft/core/device_resources.hpp>
@@ -23,8 +24,6 @@
 #include <raft/stats/histogram.cuh>
 
 #include <rmm/device_buffer.hpp>
-
-#include <omp.h>
 
 #include <cstdint>
 
@@ -165,8 +164,8 @@ void add_node_core(
 #pragma omp parallel
     {
       std::vector<std::pair<IdxT, std::size_t>> detourable_node_count_list(base_degree);
-      for (std::size_t vec_i = omp_get_thread_num(); vec_i < batch.size();
-           vec_i += omp_get_num_threads()) {
+      for (std::size_t vec_i = cuvs::core::omp::get_thread_num(); vec_i < batch.size();
+           vec_i += cuvs::core::omp::get_num_threads()) {
         // Count detourable edges
         for (std::uint32_t i = 0; i < base_degree; i++) {
           std::uint32_t detourable_node_count = 0;
