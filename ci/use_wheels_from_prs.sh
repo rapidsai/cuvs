@@ -16,6 +16,6 @@ RAFT_DASK_WHEELHOUSE=$(
 
 # write a pip constraints file saying e.g. "whenever you encounter a requirement for 'libraft-cu12', use this wheel"
 cat > "${PIP_CONSTRAINT}" <<EOF
-libraft-${RAPIDS_PY_CUDA_SUFFIX} @ file://$(echo ${LIBRAFT_WHEELHOUSE}/libraft_*.whl)
-raft-dask-${RAPIDS_PY_CUDA_SUFFIX} @ file://$(echo ${RAFT_DASK_WHEELHOUSE}/raft_dask_*.whl)
+libraft-${RAPIDS_PY_CUDA_SUFFIX} @ file://$(echo "${LIBRAFT_WHEELHOUSE}"/libraft_*.whl)
+raft-dask-${RAPIDS_PY_CUDA_SUFFIX} @ file://$(echo "${RAFT_DASK_WHEELHOUSE}"/raft_dask_*.whl)
 EOF
