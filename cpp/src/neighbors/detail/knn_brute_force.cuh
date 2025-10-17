@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -530,7 +530,7 @@ void brute_force_knn_impl(
       raft::make_device_matrix_view<const IdxType, int64_t>(out_I, n, input.size() * k),
       raft::make_device_matrix_view<DistType, int64_t>(res_D, n, k),
       raft::make_device_matrix_view<IdxType, int64_t>(res_I, n, k),
-      raft::make_device_vector_view<IdxType>(trans.data(), input.size()));
+      raft::make_device_vector_view<IdxType, int64_t>(trans.data(), input.size()));
   }
 };
 

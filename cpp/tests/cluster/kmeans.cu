@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -164,8 +164,8 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
   //                                    X_view,
   //                                    weight_view,
   //                                    centroids_view,
-  //                                    raft::make_host_scalar_view(&inertia),
-  //                                    raft::make_host_scalar_view(&n_iter),
+  //                                    raft::make_host_scalar_view<T, int>(&inertia),
+  //                                    raft::make_host_scalar_view<int, int>(&n_iter),
   //                                    workspace);
   //
   //    // Check that the cluster cost decreased
@@ -293,8 +293,8 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
       d_sw,
       d_centroids_view,
       raft::make_device_vector_view<int, int>(d_labels.data(), n_samples),
-      raft::make_host_scalar_view<T>(&inertia),
-      raft::make_host_scalar_view<int>(&n_iter));
+      raft::make_host_scalar_view<T, int>(&inertia),
+      raft::make_host_scalar_view<int, int>(&n_iter));
 
     raft::resource::sync_stream(handle, stream);
 

@@ -932,8 +932,8 @@ void kmeans_fit(raft::resources const& handle,
       X,
       weight.view(),
       centroidsRawData.view(),
-      raft::make_host_scalar_view<DataT>(&iter_inertia),
-      raft::make_host_scalar_view<IndexT>(&n_current_iter),
+      raft::make_host_scalar_view<DataT, IndexT>(&iter_inertia),
+      raft::make_host_scalar_view<IndexT, IndexT>(&n_current_iter),
       workspace);
     if (iter_inertia < inertia[0]) {
       inertia[0] = iter_inertia;
@@ -968,8 +968,8 @@ void kmeans_fit(raft::resources const& handle,
   if (sample_weight)
     sample_weightView =
       raft::make_device_vector_view<const DataT, IndexT>(sample_weight, n_samples);
-  auto inertiaView = raft::make_host_scalar_view(&inertia);
-  auto n_iterView  = raft::make_host_scalar_view(&n_iter);
+  auto inertiaView = raft::make_host_scalar_view<DataT, IndexT>(&inertia);
+  auto n_iterView  = raft::make_host_scalar_view<IndexT, IndexT>(&n_iter);
 
   cuvs::cluster::kmeans::detail::kmeans_fit<DataT, IndexT>(
     handle, pams, XView, sample_weightView, centroidsView, inertiaView, n_iterView);
@@ -1102,7 +1102,7 @@ void kmeans_predict(raft::resources const& handle,
     sample_weightView.emplace(
       raft::make_device_vector_view<const DataT, IndexT>(sample_weight, n_samples));
   auto labelsView  = raft::make_device_vector_view<IndexT, IndexT>(labels, n_samples);
-  auto inertiaView = raft::make_host_scalar_view(&inertia);
+  auto inertiaView = raft::make_host_scalar_view<DataT, IndexT>(&inertia);
 
   cuvs::cluster::kmeans::detail::kmeans_predict<DataT, IndexT>(handle,
                                                                pams,
@@ -1163,8 +1163,8 @@ void kmeans_fit_predict(raft::resources const& handle,
     centroidsView.emplace(
       raft::make_device_matrix_view<DataT, IndexT>(centroids, pams.n_clusters, n_features));
   auto labelsView  = raft::make_device_vector_view<IndexT, IndexT>(labels, n_samples);
-  auto inertiaView = raft::make_host_scalar_view(&inertia);
-  auto n_iterView  = raft::make_host_scalar_view(&n_iter);
+  auto inertiaView = raft::make_host_scalar_view<DataT, IndexT>(&inertia);
+  auto n_iterView  = raft::make_host_scalar_view<IndexT, IndexT>(&n_iter);
 
   cuvs::cluster::kmeans::detail::kmeans_fit_predict<DataT, IndexT>(
     handle, pams, XView, sample_weightView, centroidsView, labelsView, inertiaView, n_iterView);

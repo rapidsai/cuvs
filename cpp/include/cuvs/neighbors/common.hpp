@@ -259,7 +259,7 @@ auto make_strided_dataset(const raft::resources& res, const SrcT& src, uint32_t 
   }
   // Something is wrong: have to make a copy and produce an owning dataset
   auto out_layout =
-    raft::make_strided_layout(src.extents(), std::array<index_type, 2>{required_stride, 1});
+    raft::make_strided_layout(src.extents(), cuda::std::array<index_type, 2>{required_stride, 1});
   auto out_array =
     raft::make_device_matrix<value_type, index_type>(res, src.extent(0), required_stride);
 
@@ -321,7 +321,7 @@ auto make_strided_dataset(
   const bool stride_matches = required_stride == src_stride;
 
   auto out_layout =
-    raft::make_strided_layout(src.extents(), std::array<index_type, 2>{required_stride, 1});
+    raft::make_strided_layout(src.extents(), cuda::std::array<index_type, 2>{required_stride, 1});
 
   using out_mdarray_type          = raft::device_matrix<value_type, index_type>;
   using out_layout_type           = typename out_mdarray_type::layout_type;

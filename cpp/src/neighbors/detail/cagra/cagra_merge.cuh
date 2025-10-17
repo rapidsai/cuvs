@@ -111,7 +111,7 @@ index<T, IdxT> merge(raft::resources const& handle,
       using container_policy_t = typename matrix_t::container_policy_type;
       using owning_t           = owning_dataset<T, int64_t, layout_t, container_policy_t>;
       auto out_layout          = raft::make_strided_layout(updated_dataset.view().extents(),
-                                                  std::array<int64_t, 2>{stride, 1});
+                                                  cuda::std::array<int64_t, 2>{stride, 1});
       merged_index.update_dataset(handle, owning_t{std::move(updated_dataset), out_layout});
     }
     RAFT_LOG_DEBUG("cagra merge: using device memory for merged dataset");
@@ -133,7 +133,7 @@ index<T, IdxT> merge(raft::resources const& handle,
       using container_policy_t = typename matrix_t::container_policy_type;
       using owning_t           = owning_dataset<T, int64_t, layout_t, container_policy_t>;
       auto out_layout          = raft::make_strided_layout(updated_dataset.view().extents(),
-                                                  std::array<int64_t, 2>{stride, 1});
+                                                  cuda::std::array<int64_t, 2>{stride, 1});
       merged_index.update_dataset(handle, owning_t{std::move(updated_dataset), out_layout});
     }
     return merged_index;

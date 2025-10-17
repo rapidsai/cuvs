@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2019-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,14 +77,15 @@ struct kmeans_solver_t {
                  1);
 
     auto sw = std::make_optional((raft::device_vector_view<const value_type_t>)weight.view());
-    cuvs::cluster::kmeans::fit_predict(handle,
-                                       km_params,
-                                       X,
-                                       sw,
-                                       centroids.view(),
-                                       labels,
-                                       raft::make_host_scalar_view(&residual),
-                                       raft::make_host_scalar_view(&iters));
+    cuvs::cluster::kmeans::fit_predict(
+      handle,
+      km_params,
+      X,
+      sw,
+      centroids.view(),
+      labels,
+      raft::make_host_scalar_view<value_type_t, index_type_t>(&residual),
+      raft::make_host_scalar_view<index_type_t, index_type_t>(&iters));
     return std::make_pair(residual, iters);
   }
 

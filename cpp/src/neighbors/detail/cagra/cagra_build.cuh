@@ -323,7 +323,7 @@ void build_knn_graph(
                                     gpu_top_k);
       }
     } else {
-      auto neighbor_candidates_view = raft::make_device_matrix_view<const int64_t, uint64_t>(
+      auto neighbor_candidates_view = raft::make_device_matrix_view<const int64_t, int64_t>(
         neighbors.data_handle(), batch.size(), gpu_top_k);
       auto refined_neighbors_view = raft::make_device_matrix_view<int64_t, int64_t>(
         refined_neighbors.data_handle(), batch.size(), top_k);
