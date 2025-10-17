@@ -26,7 +26,6 @@
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/device_scalar.hpp>
 #include <rmm/device_uvector.hpp>
-#include <rmm/mr/host/pinned_memory_resource.hpp>
 #include <rmm/resource_ref.hpp>
 
 #include <cuda_fp16.hpp>
