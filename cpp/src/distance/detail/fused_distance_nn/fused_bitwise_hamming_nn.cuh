@@ -72,12 +72,6 @@ void fusedBitwiseHammingNN(OutT* min,
 
   constexpr size_t shmemSize = P::SmemSize;
 
-  cudaError_t prior_error = cudaGetLastError();
-  if (prior_error != cudaSuccess) {
-    RAFT_LOG_INFO("Prior CUDA error before fusedDistanceNN: %s", cudaGetErrorString(prior_error));
-    RAFT_CUDA_TRY(prior_error);
-  }
-
   dim3 grid = launchConfigGenerator<P>(m, n, shmemSize, kernel);
 
   kernel<<<grid, blk, shmemSize, stream>>>(
