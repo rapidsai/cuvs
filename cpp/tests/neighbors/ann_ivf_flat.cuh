@@ -573,20 +573,16 @@ const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
   {1000, 10000, 1, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
   {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
   {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=1
-                                                                                        // test
+  {1000, 10000, 2, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},
   {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, true},
   {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=1
-                                                                                        // test
+  {1000, 10000, 3, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},
   {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::L2Expanded, false},
   {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=1
-                                                                                        // test
+  {1000, 10000, 4, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},
   {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, false},
   {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, false},
-  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},  // veclen=1
-                                                                                        // test
+  {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},
   {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::InnerProduct, true},
   {1000, 10000, 8, 16, 40, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
   {1000, 10000, 5, 16, 40, 1024, cuvs::distance::DistanceType::L2SqrtExpanded, false},
