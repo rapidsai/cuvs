@@ -1184,9 +1184,9 @@ void kmeans_fit_predict(raft::resources const& handle,
 template <typename DataT, typename IndexT = int>
 void kmeans_transform(raft::resources const& handle,
                       const cuvs::cluster::kmeans::params& pams,
-                      raft::device_matrix_view<const DataT> X,
-                      raft::device_matrix_view<const DataT> centroids,
-                      raft::device_matrix_view<DataT> X_new)
+                      raft::device_matrix_view<const DataT, IndexT> X,
+                      raft::device_matrix_view<const DataT, IndexT> centroids,
+                      raft::device_matrix_view<DataT, IndexT> X_new)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("kmeans_transform");
   raft::default_logger().set_level(pams.verbosity);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2020-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -93,8 +93,8 @@ void fit(raft::resources const& handle,
          raft::device_matrix_view<const DataT, IndexT> X,
          std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
          raft::device_matrix_view<DataT, IndexT> centroids,
-         raft::host_scalar_view<DataT> inertia,
-         raft::host_scalar_view<IndexT> n_iter)
+         raft::host_scalar_view<DataT, IndexT> inertia,
+         raft::host_scalar_view<IndexT, IndexT> n_iter)
 {
   // use the mnmg kmeans fit if we have comms initialize, single gpu otherwise
   if (raft::resource::comms_initialized(handle)) {
