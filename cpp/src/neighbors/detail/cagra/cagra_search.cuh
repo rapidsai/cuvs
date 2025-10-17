@@ -40,7 +40,9 @@
 // TODO: This shouldn't be calling spatial/knn apis
 #include "../ann_utils.cuh"
 
-#include <rmm/cuda_stream_view.hpp>
+#include <raft/linalg/matrix_vector_op.cuh>
+#include <raft/linalg/norm.cuh>
+#include <raft/linalg/unary_op.cuh>
 
 namespace cuvs::neighbors::cagra::detail {
 
@@ -156,8 +158,16 @@ void search_main(raft::resources const& res,
   if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index.data());
       strided_dset != nullptr) {
     // Search using a plain (strided) row-major dataset
+    RAFT_EXPECTS(index.metric() != cuvs::distance::DistanceType::CosineExpanded ||
+                   index.dataset_norms().has_value(),
+                 "Dataset norms must be provided for CosineExpanded metric");
+
+    const float* dataset_norms_ptr = nullptr;
+    if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
+      dataset_norms_ptr = index.dataset_norms().value().data_handle();
+    }
     auto desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
-      res, params, *strided_dset, index.metric());
+      res, params, *strided_dset, index.metric(), dataset_norms_ptr);
     search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
       res,
       params,
@@ -175,7 +185,7 @@ void search_main(raft::resources const& res,
   } else if (auto* vpq_dset = dynamic_cast<const vpq_dataset<half, ds_idx_type>*>(&index.data());
              vpq_dset != nullptr) {
     auto desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
-      res, params, *vpq_dset, index.metric());
+      res, params, *vpq_dset, index.metric(), nullptr);
     search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
       res,
       params,
@@ -204,14 +214,45 @@ void search_main(raft::resources const& res,
   // and divide the values by kDivisor. Here we restore the original scale.
   constexpr float kScale = cuvs::spatial::knn::detail::utils::config<T>::kDivisor /
                            cuvs::spatial::knn::detail::utils::config<DistanceT>::kDivisor;
-  cuvs::neighbors::ivf::detail::postprocess_distances(dist_out,
-                                                      dist_in,
-                                                      index.metric(),
-                                                      distances.extent(0),
-                                                      distances.extent(1),
-                                                      kScale,
-                                                      true,
-                                                      raft::resource::get_cuda_stream(res));
+
+  if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
+    auto stream      = raft::resource::get_cuda_stream(res);
+    auto query_norms = raft::make_device_vector<DistanceT, int64_t>(res, queries.extent(0));
+
+    // first scale the queries and then compute norms
+    auto scaled_sq_op = raft::compose_op(
+      raft::sq_op{}, raft::div_const_op<DistanceT>{DistanceT(kScale)}, raft::cast_op<DistanceT>());
+    raft::linalg::reduce<true, true, T, DistanceT, int64_t>(query_norms.data_handle(),
+                                                            queries.data_handle(),
+                                                            queries.extent(1),
+                                                            queries.extent(0),
+                                                            (DistanceT)0,
+                                                            stream,
+                                                            false,
+                                                            scaled_sq_op,
+                                                            raft::add_op(),
+                                                            raft::sqrt_op{});
+
+    const auto n_queries = distances.extent(0);
+    const auto k         = distances.extent(1);
+    auto query_norms_ptr = query_norms.data_handle();
+
+    raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
+      res,
+      raft::make_const_mdspan(distances),
+      raft::make_const_mdspan(query_norms.view()),
+      distances,
+      raft::compose_op(raft::add_const_op<DistanceT>{DistanceT(1)}, raft::div_checkzero_op{}));
+  } else {
+    cuvs::neighbors::ivf::detail::postprocess_distances(dist_out,
+                                                        dist_in,
+                                                        index.metric(),
+                                                        distances.extent(0),
+                                                        distances.extent(1),
+                                                        kScale,
+                                                        true,
+                                                        raft::resource::get_cuda_stream(res));
+  }
 }
 /** @} */  // end group cagra
 

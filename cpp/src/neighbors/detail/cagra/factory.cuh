@@ -164,7 +164,8 @@ template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT
 auto dataset_descriptor_init_with_cache(const raft::resources& res,
                                         const cagra::search_params& params,
                                         const DatasetT& dataset,
-                                        cuvs::distance::DistanceType metric)
+                                        cuvs::distance::DistanceType metric,
+                                        const DistanceT* dataset_norms = nullptr)
   -> dataset_descriptor_host<DataT, IndexT, DistanceT>
 {
   auto key = descriptor_cache::make_key(params, dataset, metric);
@@ -173,7 +174,8 @@ auto dataset_descriptor_init_with_cache(const raft::resources& res,
       ->value;
   dataset_descriptor_host<DataT, IndexT, DistanceT> desc;
   if (!cache.get(key, &desc)) {
-    desc = dataset_descriptor_init<DataT, IndexT, DistanceT>(params, dataset, metric);
+    desc =
+      dataset_descriptor_init<DataT, IndexT, DistanceT>(params, dataset, metric, dataset_norms);
     cache.set(key, desc);
   }
   return desc;
