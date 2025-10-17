@@ -969,6 +969,9 @@ auto build(raft::resources const& res,
            const cuvs::neighbors::cagra::index_params& params,
            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset)
   -> cuvs::neighbors::cagra::index<uint8_t, uint32_t>;
+/**
+ * @}
+ */
 
 /**
  * @defgroup cagra_cpp_index_extend CAGRA extend functions

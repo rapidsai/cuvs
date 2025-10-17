@@ -149,9 +149,12 @@ struct cuvsCagraIndexParams {
    */
   cuvsCagraCompressionParams_t compression;
   /**
-   * Optional: specify ivf pq params when `build_algo = IVF_PQ`
+   * Optional: specify graph build params based on build_algo
+   * - IVF_PQ: cuvsIvfPqParams_t
+   * - ACE: cuvsAceParams_t
+   * - Others: nullptr
    */
-  cuvsIvfPqParams_t graph_build_params;
+  void* graph_build_params;
 };
 
 typedef struct cuvsCagraIndexParams* cuvsCagraIndexParams_t;

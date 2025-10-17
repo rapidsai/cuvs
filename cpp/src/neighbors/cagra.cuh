@@ -292,6 +292,8 @@ index<T, IdxT> build(
   // Check if ACE dispatch is requested via graph_build_params
   if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
     // ACE expects the dataset to be on host due to the large dataset size
+    RAFT_EXPECTS(raft::get_device_for_address(dataset.data_handle()) == -1,
+                 "ACE: Dataset must be on host for ACE build");
     auto dataset_view = raft::make_host_matrix_view<const T, int64_t, row_major>(
       dataset.data_handle(), dataset.extent(0), dataset.extent(1));
     return cuvs::neighbors::cagra::detail::build_ace<T, IdxT>(res, params, dataset_view);

@@ -125,7 +125,7 @@ struct ace_params {
    * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).
    * Used when `ace_npartitions` > 1 or `ace_use_disk` is true.
    */
-  std::string ace_build_dir = "";
+  std::string ace_build_dir = "/tmp/ace_build";
   /**
    * Whether to use disk-based storage for ACE build.
    * When true, enables disk-based operations for memory-efficient graph construction.

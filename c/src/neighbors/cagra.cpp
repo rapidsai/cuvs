@@ -665,7 +665,22 @@ extern "C" cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params
 extern "C" cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params)
 {
   return cuvs::core::translate_exceptions([=] {
-    delete params->graph_build_params;
+    // Delete graph_build_params based on the build algorithm type
+    if (params->graph_build_params != nullptr) {
+      switch (params->build_algo) {
+      case cuvsCagraGraphBuildAlgo::IVF_PQ:
+        delete static_cast<cuvsIvfPqParams *>(params->graph_build_params);
+        break;
+      case cuvsCagraGraphBuildAlgo::ACE:
+        delete static_cast<cuvsAceParams *>(params->graph_build_params);
+        break;
+      case cuvsCagraGraphBuildAlgo::AUTO_SELECT:
+      case cuvsCagraGraphBuildAlgo::NN_DESCENT:
+      case cuvsCagraGraphBuildAlgo::ITERATIVE_CAGRA_SEARCH:
+        // These algorithms don't have separate parameter structs
+        break;
+      }
+    }
     delete params;
   });
 }
