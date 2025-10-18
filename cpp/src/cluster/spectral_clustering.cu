@@ -46,6 +46,7 @@ void fit_predict(raft::resources const& handle,
   kmeans_config.n_clusters = config.n_clusters;
   kmeans_config.rng_state  = raft::random::RngState(config.seed);
   kmeans_config.n_init     = config.n_init;
+  kmeans_config.oversampling_factor = 0.0;
 
   cuvs::preprocessing::spectral_embedding::transform(
     handle, spectral_embedding_config, connectivity_graph, embedding_col_major.view());
