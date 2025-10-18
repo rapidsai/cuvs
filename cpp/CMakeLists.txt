@@ -332,7 +332,6 @@ if(NOT BUILD_CPU_ONLY)
         src/neighbors/mg/mg_cagra_half_uint32_t.cu
         src/neighbors/mg/mg_cagra_int8_t_uint32_t.cu
         src/neighbors/mg/mg_cagra_uint8_t_uint32_t.cu
-        src/neighbors/mg/omp_checks.cpp
     )
   endif()
 
@@ -360,6 +359,7 @@ if(NOT BUILD_CPU_ONLY)
     src/cluster/single_linkage_float.cu
     src/cluster/spectral_clustering.cu
     src/core/bitset.cu
+    src/core/omp_wrapper.cpp
     src/distance/detail/kernels/gram_matrix.cu
     src/distance/detail/kernels/kernel_factory.cu
     src/distance/detail/kernels/kernel_matrices.cu
@@ -687,6 +687,7 @@ SECTIONS
       cuvs_static
       PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
              "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
+             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
              "$<INSTALL_INTERFACE:include>"
     )
     target_link_libraries(
