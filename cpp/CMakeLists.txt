@@ -462,12 +462,10 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_flat/ivf_flat_search_uint8_t_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_interleaved_scan_float_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_interleaved_scan_half_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_int8_t_int64_t.cu
-    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_uint8_t_int64_t.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_int8_uint8_t_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_interleaved_scan_float_int64_t_bitset.cu
     src/neighbors/ivf_flat/ivf_flat_interleaved_scan_half_int64_t_bitset.cu
-    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_int8_t_int64_t_bitset.cu
-    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_uint8_t_int64_t_bitset.cu
+    src/neighbors/ivf_flat/ivf_flat_interleaved_scan_int8_uint8_t_int64_t_bitset.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_float_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_half_int64_t.cu
     src/neighbors/ivf_flat/ivf_flat_serialize_int8_t_int64_t.cu
