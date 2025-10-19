@@ -262,15 +262,13 @@ struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, int32_t, Compu
 #pragma unroll
     for (int j = 0; j < kUnroll; ++j) {
       uint32_t encV[veclen_int];
-      // Load from byte_array with explicit cast to uint8_t for normalization
       const int byte_offset = (loadIndex + j * kIndexGroupSize * veclen_int) * 4;
 #pragma unroll
       for (int i = 0; i < veclen_int; i++) {
-        uint8_t b0 = static_cast<uint8_t>(data[byte_offset + i * 4 + 0]);
-        uint8_t b1 = static_cast<uint8_t>(data[byte_offset + i * 4 + 1]);
-        uint8_t b2 = static_cast<uint8_t>(data[byte_offset + i * 4 + 2]);
-        uint8_t b3 = static_cast<uint8_t>(data[byte_offset + i * 4 + 3]);
-        encV[i]    = pack_bytes_uint32(b0, b1, b2, b3);
+        encV[i] = pack_bytes_uint32(data[byte_offset + i * 4 + 0],
+                                    data[byte_offset + i * 4 + 1],
+                                    data[byte_offset + i * 4 + 2],
+                                    data[byte_offset + i * 4 + 3]);
       }
       uint32_t queryRegs[veclen_int];
       raft::lds(queryRegs,
@@ -311,11 +309,10 @@ struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, int32_t, Compu
     uint32_t queryReg            = 0;
     if (lane_id < 8) {
       const int byte_offset = baseLoadIndex + lane_id * 4;
-      uint8_t b0            = static_cast<uint8_t>(query[byte_offset + 0]);
-      uint8_t b1            = static_cast<uint8_t>(query[byte_offset + 1]);
-      uint8_t b2            = static_cast<uint8_t>(query[byte_offset + 2]);
-      uint8_t b3            = static_cast<uint8_t>(query[byte_offset + 3]);
-      queryReg              = pack_bytes_uint32(b0, b1, b2, b3);
+      queryReg              = pack_bytes_uint32(query[byte_offset + 0],
+                                   query[byte_offset + 1],
+                                   query[byte_offset + 2],
+                                   query[byte_offset + 3]);
     }
     constexpr int stride = kUnroll * uint8_veclen;
 
@@ -327,11 +324,10 @@ struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, int32_t, Compu
         const int byte_offset = (lane_id + j * kIndexGroupSize) * veclen_int * 4;
 #pragma unroll
         for (int v = 0; v < veclen_int; v++) {
-          uint8_t b0 = static_cast<uint8_t>(data[byte_offset + v * 4 + 0]);
-          uint8_t b1 = static_cast<uint8_t>(data[byte_offset + v * 4 + 1]);
-          uint8_t b2 = static_cast<uint8_t>(data[byte_offset + v * 4 + 2]);
-          uint8_t b3 = static_cast<uint8_t>(data[byte_offset + v * 4 + 3]);
-          encV[v]    = pack_bytes_uint32(b0, b1, b2, b3);
+          encV[v] = pack_bytes_uint32(data[byte_offset + v * 4 + 0],
+                                      data[byte_offset + v * 4 + 1],
+                                      data[byte_offset + v * 4 + 2],
+                                      data[byte_offset + v * 4 + 3]);
         }
         const int d = (i * kUnroll + j) * veclen_int;
 #pragma unroll
@@ -374,11 +370,8 @@ struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, int32_t, Compu
     const int loadDim            = dimBlocks + lane_id * 4;  // Here 4 is for 1 - int
     uint32_t queryReg            = 0;
     if (loadDim < dim) {
-      uint8_t b0 = static_cast<uint8_t>(query[loadDim + 0]);
-      uint8_t b1 = static_cast<uint8_t>(query[loadDim + 1]);
-      uint8_t b2 = static_cast<uint8_t>(query[loadDim + 2]);
-      uint8_t b3 = static_cast<uint8_t>(query[loadDim + 3]);
-      queryReg   = pack_bytes_uint32(b0, b1, b2, b3);
+      queryReg = pack_bytes_uint32(
+        query[loadDim + 0], query[loadDim + 1], query[loadDim + 2], query[loadDim + 3]);
     }
     for (int d = 0; d < dim - dimBlocks;
          d += uint8_veclen, data = data + kIndexGroupSize * uint8_veclen) {
@@ -386,11 +379,10 @@ struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, int32_t, Compu
       const int byte_offset = lane_id * veclen_int * 4;
 #pragma unroll
       for (int v = 0; v < veclen_int; v++) {
-        uint8_t b0 = static_cast<uint8_t>(data[byte_offset + v * 4 + 0]);
-        uint8_t b1 = static_cast<uint8_t>(data[byte_offset + v * 4 + 1]);
-        uint8_t b2 = static_cast<uint8_t>(data[byte_offset + v * 4 + 2]);
-        uint8_t b3 = static_cast<uint8_t>(data[byte_offset + v * 4 + 3]);
-        enc[v]     = pack_bytes_uint32(b0, b1, b2, b3);
+        enc[v] = pack_bytes_uint32(data[byte_offset + v * 4 + 0],
+                                   data[byte_offset + v * 4 + 1],
+                                   data[byte_offset + v * 4 + 2],
+                                   data[byte_offset + v * 4 + 3]);
       }
 #pragma unroll
       for (int k = 0; k < veclen_int; k++) {
@@ -446,12 +438,9 @@ struct loadAndComputeDist<kUnroll, Lambda, 4, uint8_t, int32_t, ComputeNorm> {
     for (int j = 0; j < kUnroll; ++j) {
       uint32_t encV;
       const int byte_offset = (loadIndex + j * kIndexGroupSize) * 4;
-      uint8_t b0            = static_cast<uint8_t>(data[byte_offset + 0]);
-      uint8_t b1            = static_cast<uint8_t>(data[byte_offset + 1]);
-      uint8_t b2            = static_cast<uint8_t>(data[byte_offset + 2]);
-      uint8_t b3            = static_cast<uint8_t>(data[byte_offset + 3]);
-      encV                  = pack_bytes_uint32(b0, b1, b2, b3);
-      uint32_t queryRegs    = reinterpret_cast<unsigned const*>(query_shared + shmemIndex)[j];
+      encV                  = pack_bytes_uint32(
+        data[byte_offset + 0], data[byte_offset + 1], data[byte_offset + 2], data[byte_offset + 3]);
+      uint32_t queryRegs = reinterpret_cast<unsigned const*>(query_shared + shmemIndex)[j];
       if constexpr (is_inner_prod_dist<Lambda>::value) {
         int32_t q = is_signed ? (static_cast<int32_t>(queryRegs) - offset_reg)
                               : static_cast<int32_t>(queryRegs);
@@ -484,11 +473,10 @@ struct loadAndComputeDist<kUnroll, Lambda, 4, uint8_t, int32_t, ComputeNorm> {
     uint32_t queryReg            = 0;
     if (lane_id < 8) {
       const int byte_offset = baseLoadIndex + lane_id * 4;
-      uint8_t b0            = static_cast<uint8_t>(query[byte_offset + 0]);
-      uint8_t b1            = static_cast<uint8_t>(query[byte_offset + 1]);
-      uint8_t b2            = static_cast<uint8_t>(query[byte_offset + 2]);
-      uint8_t b3            = static_cast<uint8_t>(query[byte_offset + 3]);
-      queryReg              = pack_bytes_uint32(b0, b1, b2, b3);
+      queryReg              = pack_bytes_uint32(query[byte_offset + 0],
+                                   query[byte_offset + 1],
+                                   query[byte_offset + 2],
+                                   query[byte_offset + 3]);
     }
     constexpr int veclen = 4;
     constexpr int stride = kUnroll * veclen;
@@ -499,11 +487,10 @@ struct loadAndComputeDist<kUnroll, Lambda, 4, uint8_t, int32_t, ComputeNorm> {
       for (int j = 0; j < kUnroll; ++j) {
         uint32_t encV;
         const int byte_offset = (lane_id + j * kIndexGroupSize) * 4;
-        uint8_t b0            = static_cast<uint8_t>(data[byte_offset + 0]);
-        uint8_t b1            = static_cast<uint8_t>(data[byte_offset + 1]);
-        uint8_t b2            = static_cast<uint8_t>(data[byte_offset + 2]);
-        uint8_t b3            = static_cast<uint8_t>(data[byte_offset + 3]);
-        encV                  = pack_bytes_uint32(b0, b1, b2, b3);
+        encV                  = pack_bytes_uint32(data[byte_offset + 0],
+                                 data[byte_offset + 1],
+                                 data[byte_offset + 2],
+                                 data[byte_offset + 3]);
         uint32_t q_raw        = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
         if constexpr (is_inner_prod_dist<Lambda>::value) {
           int32_t q =
@@ -541,21 +528,15 @@ struct loadAndComputeDist<kUnroll, Lambda, 4, uint8_t, int32_t, ComputeNorm> {
     const int loadDim            = dimBlocks + lane_id * 4;
     uint32_t queryReg            = 0;
     if (loadDim < dim) {
-      uint8_t b0 = static_cast<uint8_t>(query[loadDim + 0]);
-      uint8_t b1 = static_cast<uint8_t>(query[loadDim + 1]);
-      uint8_t b2 = static_cast<uint8_t>(query[loadDim + 2]);
-      uint8_t b3 = static_cast<uint8_t>(query[loadDim + 3]);
-      queryReg   = pack_bytes_uint32(b0, b1, b2, b3);
+      queryReg = pack_bytes_uint32(
+        query[loadDim + 0], query[loadDim + 1], query[loadDim + 2], query[loadDim + 3]);
     }
     for (int d = 0; d < dim - dimBlocks; d += veclen, data = data + kIndexGroupSize * veclen) {
       uint32_t enc;
       const int byte_offset = lane_id * 4;
-      uint8_t b0            = static_cast<uint8_t>(data[byte_offset + 0]);
-      uint8_t b1            = static_cast<uint8_t>(data[byte_offset + 1]);
-      uint8_t b2            = static_cast<uint8_t>(data[byte_offset + 2]);
-      uint8_t b3            = static_cast<uint8_t>(data[byte_offset + 3]);
-      enc                   = pack_bytes_uint32(b0, b1, b2, b3);
-      uint32_t q_raw        = raft::shfl(queryReg, d / veclen, raft::WarpSize);
+      enc                   = pack_bytes_uint32(
+        data[byte_offset + 0], data[byte_offset + 1], data[byte_offset + 2], data[byte_offset + 3]);
+      uint32_t q_raw = raft::shfl(queryReg, d / veclen, raft::WarpSize);
       if constexpr (is_inner_prod_dist<Lambda>::value) {
         int32_t q =
           is_signed ? (static_cast<int32_t>(q_raw) - offset_reg) : static_cast<int32_t>(q_raw);
