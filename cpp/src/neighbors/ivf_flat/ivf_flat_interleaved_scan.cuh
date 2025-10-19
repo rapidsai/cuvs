@@ -1078,6 +1078,22 @@ uint32_t configure_launch_x(uint32_t numQueries, uint32_t n_probes, int32_t sMem
   return min_grid_x > n_probes ? n_probes : static_cast<uint32_t>(min_grid_x);
 }
 
+/**
+ * Functor to convert uint8_t pointers to byte_arrays.
+ * Using a functor instead of a lambda ensures the same type is used across
+ * all template instantiations, avoiding ~40MB of duplicate host code.
+ */
+struct byte_array_converter {
+  bool is_signed;
+
+  __host__ __device__ explicit byte_array_converter(bool is_signed_) : is_signed(is_signed_) {}
+
+  __device__ cuvs::detail::byte_array operator()(const uint8_t* ptr) const
+  {
+    return cuvs::detail::byte_array(const_cast<uint8_t*>(ptr), is_signed);
+  }
+};
+
 template <int Capacity,
           int Veclen,
           bool Ascending,
@@ -1140,6 +1156,21 @@ void launch_kernel(Lambda lambda,
     return;
   }
 
+  // For int8_t/uint8_t, pre-convert data pointers to byte_arrays (only needs to be done once)
+  std::optional<rmm::device_uvector<cuvs::detail::byte_array>> byte_array_list_data_ptrs;
+  if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) {
+    constexpr bool is_signed = std::is_same_v<T, int8_t>;
+    byte_array_list_data_ptrs.emplace(index.data_ptrs().size(), stream);
+    // Cast to uint8_t* and use functor to ensure identical thrust::transform instantiation
+    const uint8_t* const* data_ptrs_uint8 =
+      reinterpret_cast<const uint8_t* const*>(index.data_ptrs().data_handle());
+    thrust::transform(rmm::exec_policy(stream),
+                      data_ptrs_uint8,
+                      data_ptrs_uint8 + index.data_ptrs().size(),
+                      byte_array_list_data_ptrs->begin(),
+                      byte_array_converter(is_signed));
+  }
+
   for (uint32_t query_offset = 0; query_offset < num_queries; query_offset += kMaxGridY) {
     uint32_t grid_dim_y = std::min<uint32_t>(kMaxGridY, num_queries - query_offset);
     dim3 grid_dim(grid_dim_x, grid_dim_y, 1);
@@ -1153,24 +1184,16 @@ void launch_kernel(Lambda lambda,
       n_probes,
       smem_size);
     if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) {
-      // For both int8_t and uint8_t, wrap in byte_array (is_signed determines normalization)
+      // For both int8_t and uint8_t, wrap query batch in byte_array (is_signed determines
+      // normalization)
       constexpr bool is_signed = std::is_same_v<T, int8_t>;
       auto byte_array_queries  = cuvs::detail::byte_array(const_cast<T*>(queries), is_signed);
-      auto byte_array_list_data_ptrs =
-        rmm::device_uvector<cuvs::detail::byte_array>(index.data_ptrs().size(), stream);
-      thrust::transform(rmm::exec_policy(stream),
-                        index.data_ptrs().data_handle(),
-                        index.data_ptrs().data_handle() + index.data_ptrs().size(),
-                        byte_array_list_data_ptrs.begin(),
-                        [is_signed] __device__(const T* ptr) {
-                          return cuvs::detail::byte_array(const_cast<T*>(ptr), is_signed);
-                        });
       kKernel<<<grid_dim, block_dim, smem_size, stream>>>(lambda,
                                                           post_process,
                                                           query_smem_elems,
                                                           byte_array_queries,
                                                           coarse_index,
-                                                          byte_array_list_data_ptrs.data(),
+                                                          byte_array_list_data_ptrs->data(),
                                                           index.list_sizes().data_handle(),
                                                           queries_offset + query_offset,
                                                           n_probes,
