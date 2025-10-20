@@ -320,8 +320,8 @@ void unfusedDistanceNNMinReduce(raft::resources const& handle,
                                 OutT* min,
                                 const DataT* x,
                                 const DataT* y,
-                                const DataT* xn,
-                                const DataT* yn,
+                                const AccT* xn,
+                                const AccT* yn,
                                 IdxT m,
                                 IdxT n,
                                 IdxT k,
@@ -335,7 +335,7 @@ void unfusedDistanceNNMinReduce(raft::resources const& handle,
 {
   ASSERT(isRowMajor, "unfusedDistanceNN only supports row major inputs");
   unfused_distance_nn<DataT, AccT, OutT, IdxT, reduce>(
-    handle, min, x, y, m, n, k, xn, yn, (DataT*)workspace, is_sqrt, initOutBuffer, metric, stream);
+    handle, min, x, y, m, n, k, xn, yn, (AccT*)workspace, is_sqrt, initOutBuffer, metric, stream);
 }
 
 /** @} */
