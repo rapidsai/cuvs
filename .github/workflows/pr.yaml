@@ -17,6 +17,7 @@ jobs:
       - conda-cpp-checks
       - conda-python-build
       - conda-python-tests
+      - rocky8-clib-standalone-build
       - conda-java-tests
       - docs-build
       - rust-build
@@ -148,6 +149,26 @@ jobs:
     with:
       build_type: pull-request
       script: ci/test_python.sh
+  rocky8-clib-standalone-build:
+    needs: [checks]
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.12
+    strategy:
+      fail-fast: false
+      matrix:
+        cuda_version:
+          - &latest_cuda12 '12.9.1'
+          - &latest_cuda13 '13.0.1'
+    with:
+      build_type: ${{ inputs.build_type || 'branch' }}
+      branch: ${{ inputs.branch }}
+      arch: "amd64"
+      date: ${{ inputs.date }}_c
+      container_image: "nvidia/cuda:${{ matrix.cuda_version }}-devel-rockylinux8"
+      script: "ci/build_standalone_c.sh"
+      artifact-name: "libcuvs_c_${{ matrix.cuda_version }}.tar.gz"
+      file_to_upload: "libcuvs_c.tar.gz"
+      sha: ${{ inputs.sha }}
   conda-java-tests:
     needs: [conda-cpp-build, changed-files]
     secrets: inherit
