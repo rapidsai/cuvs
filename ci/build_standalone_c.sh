@@ -13,7 +13,7 @@ dnf install -y \
       tar \
       wget
 
-source scl_source enable gcc-toolset-${TOOLSET_VERSION}
+scl_source enable gcc-toolset-${TOOLSET_VERSION}
 
 # Fetch and install CMake.
 pushd /usr/local
