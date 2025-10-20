@@ -41,6 +41,7 @@ cdef class QuantizerParams:
     ----------
     pq_bits: int
         specifies the bit length of the vector element after compression by PQ
+        possible values: [4, 5, 6, 7, 8]
     pq_dim: int
         specifies the dimensionality of the vector after compression by PQ
     vq_n_centers: int
@@ -74,6 +75,8 @@ cdef class QuantizerParams:
                  kmeans_n_iters=25, vq_kmeans_trainset_fraction=0.0,
                  pq_kmeans_trainset_fraction=0.0,
                  pq_kmeans_type="kmeans_balanced"):
+        if pq_bits not in [4, 5, 6, 7, 8]:
+            raise ValueError("pq_bits must be one of [4, 5, 6, 7, 8]")
         self.params.pq_bits = pq_bits
         self.params.pq_dim = pq_dim
         self.params.vq_n_centers = vq_n_centers

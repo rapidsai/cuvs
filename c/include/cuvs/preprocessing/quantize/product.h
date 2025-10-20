@@ -26,6 +26,10 @@ extern "C" {
 #endif
 
 /**
+ * @defgroup preprocessing_c_pq C API for Product Quantizer
+ * @{
+ */
+/**
  * @brief Binary quantizer parameters.
  */
 struct cuvsProductQuantizerParams {
@@ -200,6 +204,10 @@ cuvsError_t cuvsProductQuantizerGetVqCodebook(cuvsProductQuantizer_t quantizer,
  */
 cuvsError_t cuvsProductQuantizerGetEncodedDim(cuvsProductQuantizer_t quantizer,
                                               uint32_t* encoded_dim);
+
+/**
+ * @}
+ */
 #ifdef __cplusplus
 }
 #endif
