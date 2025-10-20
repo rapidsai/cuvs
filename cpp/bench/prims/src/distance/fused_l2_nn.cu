@@ -97,7 +97,7 @@ void benchmark_fusedl2nn(benchmark::State& state)
                                                         true,
                                                         true,
                                                         metric,
-                                                        0.0,
+                                                        float(0.0),
                                                         stream);
   }
 
@@ -141,7 +141,7 @@ void benchmark_fusedl2nn(benchmark::State& state)
                                                           true,
                                                           true,
                                                           metric,
-                                                          0.0,
+                                                          float(0.0),
                                                           stream);
     }
 
@@ -160,7 +160,7 @@ void benchmark_fusedl2nn(benchmark::State& state)
                                                                  true,
                                                                  true,
                                                                  metric,
-                                                                 0.0,
+                                                                 float(0.0),
                                                                  stream);
     }
   }
@@ -207,7 +207,7 @@ void benchmark_fusedl2nn(benchmark::State& state)
   global_summary->init();
 
   vector_compare(global_summary, out_ref.data_handle(), out.data_handle(), m, stream);
-  global_summary->print();
+  //global_summary->print();
 
   state.counters["M"]         = m;
   state.counters["N"]         = n;
