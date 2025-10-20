@@ -89,36 +89,22 @@ if(BUILD_CAGRA_HNSWLIB)
   target_compile_definitions(HNSW_C_TEST PUBLIC CUVS_BUILD_CAGRA_HNSWLIB)
 endif()
 
-add_executable(cuvs_c_test core/c_api.c)
-target_link_libraries(cuvs_c_test PUBLIC cuvs::c_api)
+# ##################################################################################################
+# * Validate C API ---------------------------------------------------------------
 
-add_executable(cuvs_c_neighbors_test neighbors/c_api.c)
-target_link_libraries(cuvs_c_neighbors_test PUBLIC cuvs::c_api)
-
-set_target_properties(
-  cuvs_c_test cuvs_c_neighbors_test
-  PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<BUILD_INTERFACE:${CUVS_C_BINARY_DIR}/gtests>"
-             INSTALL_RPATH "\$ORIGIN/../../../lib"
-)
-
-rapids_test_add(
-  NAME cuvs_c_test
-  COMMAND cuvs_c_test
-  GPUS 1
-  PERCENT 100
-  INSTALL_COMPONENT_SET testing
-)
-rapids_test_add(
-  NAME cuvs_c_neighbors_test
-  COMMAND cuvs_c_neighbors_test
-  GPUS 1
-  PERCENT 100
-  INSTALL_COMPONENT_SET testing
-)
+ConfigureTest(NAME cuvs_c_headers PATH core/headers.c)
+ConfigureTest(NAME cuvs_c_test PATH core/c_api.c)
+ConfigureTest(NAME cuvs_c_neighbors_test PATH neighbors/c_api.c)
 
 # ##################################################################################################
-# Install tests ####################################################################################
+# * Validate installed headers are listed in `all.h`
+
+include(cmake/header_check.cmake)
+cuvs_c_add_header_check("${CUVS_C_SOURCE_DIR}" "cuvs/core/all.h" INSTALL_COMPONENT_SET testing)
+
 # ##################################################################################################
+# * Install Tests ---------------------------------------------------------------
+
 if(PROJECT_IS_TOP_LEVEL)
   rapids_test_install_relocatable(INSTALL_COMPONENT_SET testing DESTINATION bin/gtests/libcuvs)
 endif()

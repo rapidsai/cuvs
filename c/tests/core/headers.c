@@ -14,17 +14,12 @@
  * limitations under the License.
  */
 
+// Basic smoke test to verify non of the C API headers
+// ever use a C++ only construct
 #include <cuvs/core/all.h>
+#include <cuvs/core/all.h> //smoke out missing include guards
 
-// Please add any extra required header files below for which panama FFM API bindings are needed
-#include <cuda_runtime.h>
-
-/**
- * @brief function signature for setting omp threads
- */
-void omp_set_num_threads(int n_writer_threads);
-
-/**
- * @brief function signature for getting omp threads
- */
-int omp_get_num_threads(void);
+int main()
+{
+  return 0;
+}

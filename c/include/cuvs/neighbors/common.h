@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include <cuvs/distance/distance.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
