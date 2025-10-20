@@ -20,20 +20,23 @@
 
 namespace cuvs::detail {
 
-struct byte_array {
+struct byte_arithmetic_ptr {
   void* data     = nullptr;
   bool is_signed = false;
 
-  __host__ __device__ byte_array(void* ptr, bool signed_flag) : data(ptr), is_signed(signed_flag) {}
+  __host__ __device__ byte_arithmetic_ptr(void* ptr, bool signed_flag)
+    : data(ptr), is_signed(signed_flag)
+  {
+  }
 
   // Proxy that references an element in the array
   struct byte {
-    byte_array* parent = nullptr;
-    int64_t idx        = -1;
-    uint8_t value      = 0;  // used for detached proxies
+    byte_arithmetic_ptr* parent = nullptr;
+    int64_t idx                 = -1;
+    uint8_t value               = 0;  // used for detached proxies
 
     // Constructor for live proxy
-    __host__ __device__ byte(byte_array& p, int64_t i) : parent(&p), idx(i) {}
+    __host__ __device__ byte(byte_arithmetic_ptr& p, int64_t i) : parent(&p), idx(i) {}
 
     // Copy constructor: detached copy stores the current value
     __host__ __device__ byte(const byte& other)
@@ -105,16 +108,22 @@ struct byte_array {
   __host__ __device__ byte operator*() { return byte(*this, 0); }
 
   // Pointer arithmetic
-  __host__ __device__ byte_array operator+(int64_t offset) const
+  __host__ __device__ byte_arithmetic_ptr operator+(int64_t offset) const
   {
     if (is_signed)
-      return byte_array(static_cast<int8_t*>(data) + offset, true);
+      return byte_arithmetic_ptr(static_cast<int8_t*>(data) + offset, true);
     else
-      return byte_array(static_cast<uint8_t*>(data) + offset, false);
+      return byte_arithmetic_ptr(static_cast<uint8_t*>(data) + offset, false);
   }
 
-  __host__ __device__ bool operator==(const byte_array& other) const { return data == other.data; }
-  __host__ __device__ bool operator!=(const byte_array& other) const { return !(*this == other); }
+  __host__ __device__ bool operator==(const byte_arithmetic_ptr& other) const
+  {
+    return data == other.data;
+  }
+  __host__ __device__ bool operator!=(const byte_arithmetic_ptr& other) const
+  {
+    return !(*this == other);
+  }
 };
 
 }  // namespace cuvs::detail

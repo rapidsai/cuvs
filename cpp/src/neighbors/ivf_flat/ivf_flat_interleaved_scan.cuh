@@ -23,7 +23,7 @@
 #include <cuvs/neighbors/ivf_flat.hpp>
 
 #include "../detail/ann_utils.cuh"
-#include <cuvs/core/byte_array.hpp>
+#include <cuvs/core/byte_arithmetic_ptr.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
@@ -90,10 +90,12 @@ __device__ inline void copy_vectorized(T* out, const T* in, uint32_t n)
   }
 }
 
-// Specialization for byte_array -> uint8_t* (for int8_t normalization)
-__device__ inline void copy_vectorized(uint8_t* out, const cuvs::detail::byte_array in, uint32_t n)
+// Specialization for byte_arithmetic_ptr -> uint8_t* (for int8_t normalization)
+__device__ inline void copy_vectorized(uint8_t* out,
+                                       const cuvs::detail::byte_arithmetic_ptr& in,
+                                       uint32_t n)
 {
-  // For byte_array, copy element by element with normalization to uint8_t
+  // For byte_arithmetic_ptr, copy element by element with normalization to uint8_t
   for (int i = threadIdx.x; i < n; i += blockDim.x) {
     out[i] = static_cast<uint8_t>(in[i]);
   }
@@ -236,7 +238,8 @@ struct is_inner_prod_dist : std::false_type {};
 template <int Veclen, typename DataT, typename AccT>
 struct is_inner_prod_dist<inner_prod_dist<Veclen, DataT, AccT>> : std::true_type {};
 
-// This handles uint8_t 8, 16 Veclens (also handles int8_t via byte_array with int32 accumulator)
+// This handles uint8_t 8, 16 Veclens (also handles int8_t via byte_arithmetic_ptr with int32
+// accumulator)
 template <int kUnroll, typename Lambda, int uint8_veclen, bool ComputeNorm>
 struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, int32_t, ComputeNorm> {
   Lambda compute_dist;
@@ -250,7 +253,7 @@ struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, int32_t, Compu
   {
   }
 
-  __device__ __forceinline__ void runLoadShmemCompute(const cuvs::detail::byte_array& data,
+  __device__ __forceinline__ void runLoadShmemCompute(const cuvs::detail::byte_arithmetic_ptr& data,
                                                       const uint8_t* query_shared,
                                                       int loadIndex,
                                                       int shmemIndex)
@@ -298,10 +301,11 @@ struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, int32_t, Compu
     }
   }
 
-  __device__ __forceinline__ void runLoadShflAndCompute(cuvs::detail::byte_array data,
-                                                        const cuvs::detail::byte_array& query,
-                                                        int baseLoadIndex,
-                                                        const int lane_id)
+  __device__ __forceinline__ void runLoadShflAndCompute(
+    cuvs::detail::byte_arithmetic_ptr data,
+    const cuvs::detail::byte_arithmetic_ptr& query,
+    int baseLoadIndex,
+    const int lane_id)
   {
     constexpr int veclen_int     = uint8_veclen / 4;  // converting uint8_t veclens to int
     const bool is_signed         = data.is_signed;
@@ -358,8 +362,8 @@ struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, int32_t, Compu
   }
 
   __device__ __forceinline__ void runLoadShflAndComputeRemainder(
-    cuvs::detail::byte_array data,
-    const cuvs::detail::byte_array& query,
+    cuvs::detail::byte_arithmetic_ptr data,
+    const cuvs::detail::byte_arithmetic_ptr& query,
     const int lane_id,
     const int dim,
     const int dimBlocks)
@@ -412,7 +416,7 @@ struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, int32_t, Compu
 };
 
 // Keep this specialized uint8 Veclen = 4, because compiler is generating suboptimal code while
-// using above common template of int2/int4 (also handles int8_t via byte_array with int32
+// using above common template of int2/int4 (also handles int8_t via byte_arithmetic_ptr with int32
 // accumulator)
 template <int kUnroll, typename Lambda, bool ComputeNorm>
 struct loadAndComputeDist<kUnroll, Lambda, 4, uint8_t, int32_t, ComputeNorm> {
@@ -427,7 +431,7 @@ struct loadAndComputeDist<kUnroll, Lambda, 4, uint8_t, int32_t, ComputeNorm> {
   {
   }
 
-  __device__ __forceinline__ void runLoadShmemCompute(const cuvs::detail::byte_array& data,
+  __device__ __forceinline__ void runLoadShmemCompute(const cuvs::detail::byte_arithmetic_ptr& data,
                                                       const uint8_t* query_shared,
                                                       int loadIndex,
                                                       int shmemIndex)
@@ -463,10 +467,11 @@ struct loadAndComputeDist<kUnroll, Lambda, 4, uint8_t, int32_t, ComputeNorm> {
     }
   }
 
-  __device__ __forceinline__ void runLoadShflAndCompute(cuvs::detail::byte_array data,
-                                                        const cuvs::detail::byte_array& query,
-                                                        int baseLoadIndex,
-                                                        const int lane_id)
+  __device__ __forceinline__ void runLoadShflAndCompute(
+    cuvs::detail::byte_arithmetic_ptr data,
+    const cuvs::detail::byte_arithmetic_ptr& query,
+    int baseLoadIndex,
+    const int lane_id)
   {
     const bool is_signed         = data.is_signed;
     constexpr int32_t offset_reg = 0x80808080;  // 128 in each byte position
@@ -516,8 +521,8 @@ struct loadAndComputeDist<kUnroll, Lambda, 4, uint8_t, int32_t, ComputeNorm> {
   }
 
   __device__ __forceinline__ void runLoadShflAndComputeRemainder(
-    cuvs::detail::byte_array data,
-    const cuvs::detail::byte_array& query,
+    cuvs::detail::byte_arithmetic_ptr data,
+    const cuvs::detail::byte_arithmetic_ptr& query,
     const int lane_id,
     const int dim,
     const int dimBlocks)
@@ -573,7 +578,7 @@ struct loadAndComputeDist<kUnroll, Lambda, 2, uint8_t, int32_t, ComputeNorm> {
   {
   }
 
-  __device__ __forceinline__ void runLoadShmemCompute(const cuvs::detail::byte_array& data,
+  __device__ __forceinline__ void runLoadShmemCompute(const cuvs::detail::byte_arithmetic_ptr& data,
                                                       const uint8_t* query_shared,
                                                       int loadIndex,
                                                       int shmemIndex)
@@ -609,10 +614,11 @@ struct loadAndComputeDist<kUnroll, Lambda, 2, uint8_t, int32_t, ComputeNorm> {
     }
   }
 
-  __device__ __forceinline__ void runLoadShflAndCompute(cuvs::detail::byte_array data,
-                                                        const cuvs::detail::byte_array& query,
-                                                        int baseLoadIndex,
-                                                        const int lane_id)
+  __device__ __forceinline__ void runLoadShflAndCompute(
+    cuvs::detail::byte_arithmetic_ptr data,
+    const cuvs::detail::byte_arithmetic_ptr& query,
+    int baseLoadIndex,
+    const int lane_id)
   {
     const bool is_signed         = data.is_signed;
     constexpr int32_t offset_reg = 0x8080;  // 128 in each of 2 byte positions
@@ -658,8 +664,8 @@ struct loadAndComputeDist<kUnroll, Lambda, 2, uint8_t, int32_t, ComputeNorm> {
   }
 
   __device__ __forceinline__ void runLoadShflAndComputeRemainder(
-    cuvs::detail::byte_array data,
-    const cuvs::detail::byte_array& query,
+    cuvs::detail::byte_arithmetic_ptr data,
+    const cuvs::detail::byte_arithmetic_ptr& query,
     const int lane_id,
     const int dim,
     const int dimBlocks)
@@ -715,7 +721,7 @@ struct loadAndComputeDist<kUnroll, Lambda, 1, uint8_t, int32_t, ComputeNorm> {
   {
   }
 
-  __device__ __forceinline__ void runLoadShmemCompute(const cuvs::detail::byte_array& data,
+  __device__ __forceinline__ void runLoadShmemCompute(const cuvs::detail::byte_arithmetic_ptr& data,
                                                       const uint8_t* query_shared,
                                                       int loadIndex,
                                                       int shmemIndex)
@@ -748,10 +754,11 @@ struct loadAndComputeDist<kUnroll, Lambda, 1, uint8_t, int32_t, ComputeNorm> {
     }
   }
 
-  __device__ __forceinline__ void runLoadShflAndCompute(cuvs::detail::byte_array data,
-                                                        const cuvs::detail::byte_array& query,
-                                                        int baseLoadIndex,
-                                                        const int lane_id)
+  __device__ __forceinline__ void runLoadShflAndCompute(
+    cuvs::detail::byte_arithmetic_ptr data,
+    const cuvs::detail::byte_arithmetic_ptr& query,
+    int baseLoadIndex,
+    const int lane_id)
   {
     const bool is_signed          = data.is_signed;
     constexpr int32_t offset_byte = 128;
@@ -789,8 +796,8 @@ struct loadAndComputeDist<kUnroll, Lambda, 1, uint8_t, int32_t, ComputeNorm> {
   }
 
   __device__ __forceinline__ void runLoadShflAndComputeRemainder(
-    cuvs::detail::byte_array data,
-    const cuvs::detail::byte_array& query,
+    cuvs::detail::byte_arithmetic_ptr data,
+    const cuvs::detail::byte_arithmetic_ptr& query,
     const int lane_id,
     const int dim,
     const int dimBlocks)
@@ -883,10 +890,10 @@ template <
   typename Lambda,
   typename PostLambda,
   typename DataT     = std::conditional_t<std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>,
-                                          cuvs::detail::byte_array,
+                                          cuvs::detail::byte_arithmetic_ptr,
                                           const T*>,
   typename ListDataT = std::conditional_t<std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>,
-                                          cuvs::detail::byte_array*,
+                                          cuvs::detail::byte_arithmetic_ptr*,
                                           const T* const*>>
 RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
   interleaved_scan_kernel(Lambda compute_dist,
@@ -1060,18 +1067,21 @@ uint32_t configure_launch_x(uint32_t numQueries, uint32_t n_probes, int32_t sMem
 }
 
 /**
- * Functor to convert uint8_t pointers to byte_arrays.
+ * Functor to convert uint8_t pointers to byte_arithmetic_ptrs.
  * Using a functor instead of a lambda ensures the same type is used across
  * all template instantiations, avoiding ~40MB of duplicate host code.
  */
-struct byte_array_converter {
+struct byte_arithmetic_ptr_converter {
   bool is_signed;
 
-  __host__ __device__ explicit byte_array_converter(bool is_signed_) : is_signed(is_signed_) {}
-
-  __device__ cuvs::detail::byte_array operator()(const uint8_t* ptr) const
+  __host__ __device__ explicit byte_arithmetic_ptr_converter(bool is_signed_)
+    : is_signed(is_signed_)
   {
-    return cuvs::detail::byte_array(const_cast<uint8_t*>(ptr), is_signed);
+  }
+
+  __device__ cuvs::detail::byte_arithmetic_ptr operator()(const uint8_t* ptr) const
+  {
+    return cuvs::detail::byte_arithmetic_ptr(const_cast<uint8_t*>(ptr), is_signed);
   }
 };
 
@@ -1137,19 +1147,21 @@ void launch_kernel(Lambda lambda,
     return;
   }
 
-  // For int8_t/uint8_t, pre-convert data pointers to byte_arrays (only needs to be done once)
-  std::optional<rmm::device_uvector<cuvs::detail::byte_array>> byte_array_list_data_ptrs;
+  // For int8_t/uint8_t, pre-convert data pointers to byte_arithmetic_ptrs (only needs to be done
+  // once)
+  std::optional<rmm::device_uvector<cuvs::detail::byte_arithmetic_ptr>>
+    byte_arithmetic_ptr_list_data_ptrs;
   if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) {
     constexpr bool is_signed = std::is_same_v<T, int8_t>;
-    byte_array_list_data_ptrs.emplace(index.data_ptrs().size(), stream);
+    byte_arithmetic_ptr_list_data_ptrs.emplace(index.data_ptrs().size(), stream);
     // Cast to uint8_t* and use functor to ensure identical thrust::transform instantiation
     const uint8_t* const* data_ptrs_uint8 =
       reinterpret_cast<const uint8_t* const*>(index.data_ptrs().data_handle());
     thrust::transform(rmm::exec_policy(stream),
                       data_ptrs_uint8,
                       data_ptrs_uint8 + index.data_ptrs().size(),
-                      byte_array_list_data_ptrs->begin(),
-                      byte_array_converter(is_signed));
+                      byte_arithmetic_ptr_list_data_ptrs->begin(),
+                      byte_arithmetic_ptr_converter(is_signed));
   }
 
   for (uint32_t query_offset = 0; query_offset < num_queries; query_offset += kMaxGridY) {
@@ -1165,26 +1177,28 @@ void launch_kernel(Lambda lambda,
       n_probes,
       smem_size);
     if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) {
-      // For both int8_t and uint8_t, wrap query batch in byte_array (is_signed determines
+      // For both int8_t and uint8_t, wrap query batch in byte_arithmetic_ptr (is_signed determines
       // normalization)
       constexpr bool is_signed = std::is_same_v<T, int8_t>;
-      auto byte_array_queries  = cuvs::detail::byte_array(const_cast<T*>(queries), is_signed);
-      kKernel<<<grid_dim, block_dim, smem_size, stream>>>(lambda,
-                                                          post_process,
-                                                          query_smem_elems,
-                                                          byte_array_queries,
-                                                          coarse_index,
-                                                          byte_array_list_data_ptrs->data(),
-                                                          index.list_sizes().data_handle(),
-                                                          queries_offset + query_offset,
-                                                          n_probes,
-                                                          k,
-                                                          max_samples,
-                                                          chunk_indices,
-                                                          index.dim(),
-                                                          sample_filter,
-                                                          neighbors,
-                                                          distances);
+      auto byte_arithmetic_ptr_queries =
+        cuvs::detail::byte_arithmetic_ptr(const_cast<T*>(queries), is_signed);
+      kKernel<<<grid_dim, block_dim, smem_size, stream>>>(
+        lambda,
+        post_process,
+        query_smem_elems,
+        byte_arithmetic_ptr_queries,
+        coarse_index,
+        byte_arithmetic_ptr_list_data_ptrs->data(),
+        index.list_sizes().data_handle(),
+        queries_offset + query_offset,
+        n_probes,
+        k,
+        max_samples,
+        chunk_indices,
+        index.dim(),
+        sample_filter,
+        neighbors,
+        distances);
     } else {
       // For other types (float, etc.), use raw pointers directly
       kKernel<<<grid_dim, block_dim, smem_size, stream>>>(lambda,
