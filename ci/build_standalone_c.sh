@@ -11,6 +11,7 @@ dnf install -y \
       gcc-toolset-${TOOLSET_VERSION} \
       patch \
       tar \
+      make \
       wget
 
 scl_source enable gcc-toolset-${TOOLSET_VERSION}
@@ -26,8 +27,6 @@ popd
 source rapids-configure-sccache
 
 source rapids-date-string
-
-export CMAKE_GENERATOR=Ninja
 
 rapids-print-env
 
