@@ -30,7 +30,11 @@ extern "C" {
  * and sampling_median thresholds are calculated separately for each dimension.
  *
  */
-enum cuvsBinaryQuantizerThreshold { ZERO, MEAN, SAMPLING_MEDIAN };
+enum cuvsBinaryQuantizerThreshold {
+  ZERO=0,
+  MEAN=1,
+  SAMPLING_MEDIAN=2
+};
 
 /**
  * @brief Binary quantizer parameters.
@@ -39,12 +43,12 @@ struct cuvsBinaryQuantizerParams {
   /*
    * specifies the threshold to set a bit in cuvsBinaryQuantizerTransform
    */
-  cuvsBinaryQuantizerThreshold threshold = MEAN;
+  enum cuvsBinaryQuantizerThreshold threshold;
 
   /*
    * specifies the sampling ratio
    */
-  float sampling_ratio = 0.1;
+  float sampling_ratio;
 };
 
 typedef struct cuvsBinaryQuantizerParams* cuvsBinaryQuantizerParams_t;
