@@ -9,10 +9,7 @@ CMAKE_ARCH=x86_64
 
 dnf install -y \
       gcc-toolset-${TOOLSET_VERSION} \
-      git \
-      make \
       patch \
-      python39 \
       tar \
       wget
 

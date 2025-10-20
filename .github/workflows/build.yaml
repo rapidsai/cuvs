@@ -56,14 +56,12 @@ jobs:
       branch: ${{ inputs.branch }}
       arch: "amd64"
       date: ${{ inputs.date }}
-      container_image: "nvidia/cuda:${{ matrix.cuda_version }}-devel-rockylinux8"
+      container_image: "rapidsai/ci-wheel:25.12-cuda${{ matrix.cuda_version }}-rockylinux8-py3.10"
       name:  "${{ matrix.cuda_version }}, amd64, rockylinux8"
       script: ci/build_standalone_c.sh
       artifact-name: "libcuvs_c_${{ matrix.cuda_version }}.tar.gz"
       file_to_upload: "libcuvs_c.tar.gz"
       sha: ${{ inputs.sha }}
-
-
   rust-build:
     needs: cpp-build
     secrets: inherit
