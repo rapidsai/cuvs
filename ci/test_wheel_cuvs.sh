@@ -17,4 +17,4 @@ rapids-pip-retry install \
     "${LIBCUVS_WHEELHOUSE}"/libcuvs*.whl \
     "$(echo "${CUVS_WHEELHOUSE}"/cuvs*.whl)[test]"
 
-python -m pytest ./python/cuvs/cuvs/tests
+python -m pytest ./python/cuvs/cuvs/tests -s -v

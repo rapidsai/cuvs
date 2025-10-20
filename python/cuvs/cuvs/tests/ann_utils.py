@@ -122,4 +122,5 @@ def run_filtered_search_test(
 
     recall = calc_recall(mapped_actual_indices, skl_idx)
 
+    print(f"Recall: {recall}")
     assert recall > 0.7
