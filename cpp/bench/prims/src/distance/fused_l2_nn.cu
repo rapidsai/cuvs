@@ -52,8 +52,13 @@ void benchmark_fusedl2nn(benchmark::State& state)
   auto out_ref = raft::make_device_vector<OutT, IdxT>(handle, m);
 
   raft::random::RngState rng{1234};
-  raft::random::uniform(handle, rng, x.data_handle(), m * k, DataT(-1.0), DataT(1.0));
-  raft::random::uniform(handle, rng, y.data_handle(), n * k, DataT(-1.0), DataT(1.0));
+  if constexpr (std::is_same_v<DataT, int8_t>) {
+    fill_int8<<<1000, 256, 0, stream>>>(x.data_handle(), m*k);
+    fill_int8<<<1000, 256, 0, stream>>>(y.data_handle(), n*k);
+  } else {
+    raft::random::uniform(handle, rng, x.data_handle(), m * k, DataT(-1.0), DataT(1.0));
+    raft::random::uniform(handle, rng, y.data_handle(), n * k, DataT(-1.0), DataT(1.0));
+  }
 
   // Pre-compute norms
   raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
