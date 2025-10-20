@@ -122,9 +122,9 @@ __device__ AccT cosine_distance(const DataT* v1, const DataT* v2, IdxT K)
   AccT v1v2    = AccT(0.0);
 
   for (IdxT k = 0; k < K; k++) {
-    v1_norm += (v1[k] * v1[k]);
-    v2_norm += (v2[k] * v2[k]);
-    v1v2 += (v1[k] * v2[k]);
+    v1_norm += (AccT(v1[k]) * AccT(v1[k]));
+    v2_norm += (AccT(v2[k]) * AccT(v2[k]));
+    v1v2 += (AccT(v1[k]) * AccT(v2[k]));
   }
 
   return AccT(1.0) - (v1v2 / (v1_norm * v2_norm));
