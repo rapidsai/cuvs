@@ -79,8 +79,10 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
 
   void testIVFFlat()
   {
-    // Skip tests when dataset dimension is 1
-    if (ps.dim == 1) { GTEST_SKIP(); }
+    if ((ps.metric == cuvs::distance::DistanceType::BitwiseHamming) &&
+        !(std::is_same_v<DataT, uint8_t>)) {
+      GTEST_SKIP();
+    }
 
     size_t queries_size = ps.num_queries * ps.k;
     std::vector<IdxT> indices_ivfflat(queries_size);
@@ -284,8 +286,10 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
 
   void testPacker()
   {
-    // Skip tests when dataset dimension is 1
-    if (ps.dim == 1) { GTEST_SKIP(); }
+    if ((ps.metric == cuvs::distance::DistanceType::BitwiseHamming) &&
+        !(std::is_same_v<DataT, uint8_t>)) {
+      GTEST_SKIP();
+    }
 
     ivf_flat::index_params index_params;
     ivf_flat::search_params search_params;
@@ -419,8 +423,10 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
 
   void testFilter()
   {
-    // Skip tests when dataset dimension is 1
-    if (ps.dim == 1) { GTEST_SKIP(); }
+    if ((ps.metric == cuvs::distance::DistanceType::BitwiseHamming) &&
+        !(std::is_same_v<DataT, uint8_t>)) {
+      GTEST_SKIP();
+    }
 
     size_t queries_size = ps.num_queries * ps.k;
     std::vector<IdxT> indices_ivfflat(queries_size);
