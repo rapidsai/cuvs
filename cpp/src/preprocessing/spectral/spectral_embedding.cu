@@ -41,7 +41,6 @@ namespace cuvs::preprocessing::spectral_embedding {
 void create_connectivity_graph(raft::resources const& handle,
                                params spectral_embedding_config,
                                raft::device_matrix_view<float, int, raft::row_major> dataset,
-                               raft::device_matrix_view<float, int, raft::col_major> embedding,
                                raft::device_coo_matrix<float, int, int, int>& connectivity_graph)
 {
   const int n_samples  = dataset.extent(0);
@@ -91,6 +90,8 @@ void create_connectivity_graph(raft::resources const& handle,
     handle, coo_matrix_view, sym_coo1_matrix, [] __device__(int row, int col, float a, float b) {
       return 0.5f * (a + b);
     });
+
+  raft::sparse::matrix::set_diagonal(handle, sym_coo1_matrix.view(), static_cast<float>(0.0f));
 
   raft::sparse::op::coo_sort<float>(n_samples,
                                     n_samples,
@@ -174,9 +175,9 @@ void compute_eigenpairs(raft::resources const& handle,
 {
   auto config           = raft::sparse::solver::lanczos_solver_config<float>();
   config.n_components   = spectral_embedding_config.n_components;
-  config.max_iterations = 1000;
+  config.max_iterations = 10 * n_samples;
   config.ncv            = std::min(n_samples, std::max(2 * config.n_components + 1, 20));
-  config.tolerance      = 1e-5;
+  config.tolerance      = 1e-8;
   config.which          = raft::sparse::solver::LANCZOS_WHICH::LA;
   config.seed           = spectral_embedding_config.seed;
 
@@ -248,7 +249,7 @@ void transform(raft::resources const& handle,
   auto sym_coo_row_ind = raft::make_device_vector<int>(handle, n_samples + 1);
   auto diagonal        = raft::make_device_vector<float, int>(handle, n_samples);
 
-  create_connectivity_graph(handle, spectral_embedding_config, dataset, embedding, sym_coo_matrix);
+  create_connectivity_graph(handle, spectral_embedding_config, dataset, sym_coo_matrix);
   auto csr_matrix_view =
     coo_to_csr_matrix(handle, n_samples, sym_coo_row_ind.view(), sym_coo_matrix.view());
   auto laplacian =
