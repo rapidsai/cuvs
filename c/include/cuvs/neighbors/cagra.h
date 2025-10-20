@@ -149,9 +149,12 @@ struct cuvsCagraIndexParams {
    */
   cuvsCagraCompressionParams_t compression;
   /**
-   * Optional: specify ivf pq params when `build_algo = IVF_PQ`
+   * Optional: specify graph build params based on build_algo
+   * - IVF_PQ: cuvsIvfPqParams_t
+   * - ACE: cuvsAceParams_t
+   * - Others: nullptr
    */
-  cuvsIvfPqParams_t graph_build_params;
+  void* graph_build_params;
 };
 
 typedef struct cuvsCagraIndexParams* cuvsCagraIndexParams_t;
@@ -262,14 +265,14 @@ enum cuvsCagraSearchAlgo {
   /** For small batch sizes. */
   MULTI_CTA    = 1,
   MULTI_KERNEL = 2,
-  AUTO         = 3
+  AUTO         = 100
 };
 
 /**
  * @brief Enum to denote Hash Mode used while searching CAGRA index
  *
  */
-enum cuvsCagraHashMode { HASH = 0, SMALL = 1, AUTO_HASH = 2 };
+enum cuvsCagraHashMode { HASH = 0, SMALL = 1, AUTO_HASH = 100 };
 
 /**
  * @brief Supplemental parameters to search CAGRA index

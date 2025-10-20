@@ -139,30 +139,12 @@ void ace_get_partition_labels(
                           stream);
   }
 
-  auto centroids_dev     = raft::make_device_matrix<float, int64_t>(res, n_partitions, dataset_dim);
-  auto sample_labels_dev = raft::make_device_vector<IdxT, int64_t>(res, n_samples);
-  auto sample_sizes_dev  = raft::make_device_vector<IdxT, int64_t>(res, n_partitions);
-
-  raft::resource::sync_stream(res);
-
-  // K-means: partitioning dataset vectors and compute centroid for each partition.
-  // Use balanced k-means with small balancing threshold for more even partition sizes.
-  // This might require more iterations for convergence. (100 instead of typically 20)
+  auto centroids_dev = raft::make_device_matrix<float, int64_t>(res, n_partitions, dataset_dim);
   cuvs::cluster::kmeans::balanced_params kmeans_params;
-  kmeans_params.n_iters             = 100;
-  kmeans_params.metric              = cuvs::distance::DistanceType::L2Expanded;
-  kmeans_params.balancing_threshold = 0.1;
-
   auto sample_db_const_view = raft::make_device_matrix_view<const float, int64_t>(
     sample_db_dev.data_handle(), n_samples, dataset_dim);
-  cuvs::cluster::kmeans_balanced::helpers::build_clusters(
-    res,
-    kmeans_params,
-    sample_db_const_view,
-    centroids_dev.view(),
-    sample_labels_dev.view(),
-    sample_sizes_dev.view(),
-    cuvs::spatial::knn::detail::utils::mapping<float>{});
+  cuvs::cluster::kmeans::fit(
+    res, kmeans_params, raft::make_const_mdspan(sample_db_const_view), centroids_dev.view());
 
   // Compute distances between dataset and centroid vectors
   const size_t chunk_size = 32 * 1024;
@@ -752,7 +734,7 @@ void ace_reorder_and_store_dataset(
 
   RAFT_LOG_INFO(
     "ACE: Dataset (%.2f GiB reordered, %.2f GiB augmented, %.2f GiB mapping) reordering completed "
-    "in %ld ms (%.1f MB/s)",
+    "in %ld ms (%.1f MiB/s)",
     reordered_file_size / (1024.0 * 1024.0 * 1024.0),
     augmented_file_size / (1024.0 * 1024.0 * 1024.0),
     mapping_file_size / (1024.0 * 1024.0 * 1024.0),
@@ -933,9 +915,20 @@ index<T, IdxT> build_ace(raft::resources const& res,
   }
 
   if (use_disk) {
-    RAFT_EXPECTS(!ace_build_dir.empty(),
-                 "ACE: ace_build_dir must be specified when using disk storage");
+    bool valid_build_dir = !ace_build_dir.empty();
+    valid_build_dir &= ace_build_dir.length() <= 255;
+    const std::string invalid_chars = "\\/:*?\"<>|";
+    for (char c : invalid_chars) {
+      valid_build_dir &= ace_build_dir.find(c) == std::string::npos;
+    }
+    if (!valid_build_dir) {
+      RAFT_LOG_WARN("ACE: Invalid ace_build_dir path, resetting to default: /tmp/ace_build");
+      ace_build_dir = "/tmp/ace_build";
+    }
     RAFT_LOG_INFO("ACE: Graph does not fit in memory, using disk at %s", ace_build_dir.c_str());
+    if (mkdir(ace_build_dir.c_str(), 0755) != 0 && errno != EEXIST) {
+      RAFT_EXPECTS(false, "Failed to create ACE build directory: %s", ace_build_dir.c_str());
+    }
   } else {
     RAFT_LOG_INFO("ACE: Graph fits in memory");
   }
@@ -1161,8 +1154,9 @@ index<T, IdxT> build_ace(raft::resources const& res,
     double write_throughput = primary_sub_dataset_size * dataset_dim * sizeof(T) /
                               (1024.0 * 1024.0) / (write_elapsed / 1000.0);
     RAFT_LOG_INFO(
-      "ACE: Partition %4lu (%8lu + %8lu) completed in %6ld ms: read %6ld ms (%7.1f MB/s), optimize "
-      "%6ld ms, write %6ld ms (%7.1f MB/s)",
+      "ACE: Partition %4lu (%8lu + %8lu) completed in %6ld ms: read %6ld ms (%7.1f MiB/s), "
+      "optimize "
+      "%6ld ms, write %6ld ms (%7.1f MiB/s)",
       partition_id,
       primary_sub_dataset_size,
       augmented_sub_dataset_size,

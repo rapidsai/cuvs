@@ -1,5 +1,5 @@
 # =============================================================================
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
 # in compliance with the License. You may obtain a copy of the License at
@@ -39,16 +39,7 @@ option(FIND_CUVS_CPP "Search for existing CUVS C++ installations before defaulti
 
 # If the user requested it we attempt to find CUVS.
 if(FIND_CUVS_CPP)
-  find_package(cuvs "${RAPIDS_VERSION}" REQUIRED COMPONENTS compiled)
-  if(NOT TARGET cuvs::cuvs)
-    message(
-      FATAL_ERROR
-        "Building against a preexisting libcuvs library requires the compiled libcuvs to have been built!"
-    )
-
-  endif()
-else()
-  set(cuvs_FOUND OFF)
+  find_package(cuvs "${RAPIDS_VERSION}" REQUIRED COMPONENTS c_api)
 endif()
 
 if(NOT cuvs_FOUND)
@@ -58,6 +49,31 @@ if(NOT cuvs_FOUND)
 endif()
 
 include(get_dlpack.cmake)
+
+# We are going to copy all the cuvs_c and dlpack headers into a staging location
+if(TARGET cuvs_c)
+  get_target_property(cuvs_c_headers cuvs_c INCLUDE_DIRECTORIES)
+else()
+  get_target_property(cuvs_c_headers cuvs::c_api INTERFACE_INCLUDE_DIRECTORIES)
+endif()
+
+file(
+  INSTALL "${DLPACK_INCLUDE_DIR}"
+  DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/bindings/"
+  FILES_MATCHING
+  PATTERN "*.h"
+)
+
+foreach(cuvs_c_dir IN LISTS cuvs_c_headers)
+  if(EXISTS "${cuvs_c_dir}/cuvs/")
+    file(
+      INSTALL "${cuvs_c_dir}/cuvs"
+      DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/bindings/include/"
+      FILES_MATCHING
+      PATTERN "*.h"
+    )
+  endif()
+endforeach()
 
 # add a dummy target here,
 add_library(cuvs-rust INTERFACE)

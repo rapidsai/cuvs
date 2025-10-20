@@ -83,7 +83,7 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
         cuvsCagraGraphBuildAlgo build_algo
         size_t nn_descent_niter
         cuvsCagraCompressionParams_t compression
-        cuvsIvfPqParams_t graph_build_params
+        void* graph_build_params
 
     ctypedef cuvsCagraIndexParams* cuvsCagraIndexParams_t
 
