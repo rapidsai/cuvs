@@ -44,6 +44,7 @@
 
 #include <chrono>
 #include <cstdio>
+#include <filesystem>
 #include <omp.h>
 #include <type_traits>
 #include <unordered_set>
@@ -401,32 +402,25 @@ void ace_create_forward_and_backward_lists(
 }
 
 // ACE: Set index parameters for each partition
-template <typename IdxT>
+template <typename T, typename IdxT>
 void ace_set_index_params(raft::resources const& res,
-                          const index_params& params,
+                          cuvs::distance::DistanceType metric,
                           size_t sub_dataset_size,
                           size_t dataset_dim,
                           size_t graph_degree,
                           size_t intermediate_degree,
+                          bool guarantee_connectivity,
+                          size_t ace_ef_construction,
                           cuvs::neighbors::cagra::index_params& sub_index_params)
 {
-  sub_index_params.graph_degree              = graph_degree;
-  sub_index_params.intermediate_graph_degree = intermediate_degree;
-  sub_index_params.guarantee_connectivity    = params.guarantee_connectivity;
-  sub_index_params.metric                    = params.metric;
-  sub_index_params.graph_build_params        = params.graph_build_params;
-  sub_index_params.attach_dataset_on_build   = false;
-
-  if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
-        sub_index_params.graph_build_params)) {
-    // If IVF-PQ is used, set nprobes and nlists based on the number of vectors in the partition
-    // to ensure correct KNN graph construction. Here, we use the same parameters as in hnsw.cpp
-    auto ivf_pq_params = cuvs::neighbors::graph_build_params::ivf_pq_params(
-      raft::make_extents<int64_t>(sub_dataset_size, dataset_dim), params.metric);
-    int ef_construction = 120;  // TODO: Might be a user-specified parameter
-    ivf_pq_params.search_params.n_probes =
-      std::round(std::sqrt(ivf_pq_params.build_params.n_lists) / 20 + ef_construction / 16);
-    sub_index_params.graph_build_params = ivf_pq_params;
+  // ACE drops the default graph build params and sets the default params based on the partition
+  // size
+  if (sub_dataset_size > 100000) {
+    sub_index_params = cuvs::neighbors::cagra::hnsw_to_cagra_params<T, IdxT>(
+      raft::make_extents<int64_t>(sub_dataset_size, dataset_dim),
+      graph_degree / 2,
+      ace_ef_construction,
+      metric);
     RAFT_LOG_DEBUG(
       "ACE: IVF-PQ nlists: %u, pq_bits: %u, pq_dim: %u, nprobes: %u, refinement_rate: %.2f",
       ivf_pq_params.build_params.n_lists,
@@ -434,22 +428,21 @@ void ace_set_index_params(raft::resources const& res,
       ivf_pq_params.build_params.pq_dim,
       ivf_pq_params.search_params.n_probes,
       ivf_pq_params.refinement_rate);
-  } else if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::nn_descent_params>(
-               sub_index_params.graph_build_params)) {
+  } else {
     sub_index_params.graph_build_params =
-      cuvs::neighbors::cagra::graph_build_params::nn_descent_params(
-        sub_index_params.intermediate_graph_degree, sub_index_params.metric);
-  } else if (std::holds_alternative<std::monostate>(sub_index_params.graph_build_params)) {
-    // Set default build params if not specified
-    if (cuvs::neighbors::nn_descent::has_enough_device_memory(
-          res, raft::make_extents<int64_t>(sub_dataset_size, dataset_dim), sizeof(IdxT))) {
-      sub_index_params.graph_build_params =
-        cagra::graph_build_params::nn_descent_params(intermediate_degree, params.metric);
-    } else {
-      sub_index_params.graph_build_params = cagra::graph_build_params::ivf_pq_params(
-        raft::make_extents<int64_t>(sub_dataset_size, dataset_dim), params.metric);
-    }
+      cuvs::neighbors::cagra::graph_build_params::nn_descent_params(intermediate_degree, metric);
+    sub_index_params.graph_degree              = graph_degree;
+    sub_index_params.intermediate_graph_degree = intermediate_degree;
+    RAFT_LOG_DEBUG(
+      "ACE: NN descent graph_degree: %u, intermediate_graph_degree: %u, max_iterations: %u, "
+      "termination_threshold: %f",
+      sub_index_params.graph_degree,
+      sub_index_params.intermediate_graph_degree,
+      sub_index_params.max_iterations,
+      sub_index_params.termination_threshold);
   }
+  sub_index_params.attach_dataset_on_build = false;
+  sub_index_params.guarantee_connectivity  = guarantee_connectivity;
 }
 
 // ACE: Gather partition dataset
@@ -561,7 +554,7 @@ void ace_adjust_sub_graph_ids_disk(
 template <typename T, typename IdxT>
 void ace_reorder_and_store_dataset(
   raft::resources const& res,
-  const index_params& params,
+  const std::string& ace_build_dir,
   raft::host_matrix_view<const T, int64_t, row_major> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_labels,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_histogram,
@@ -577,8 +570,6 @@ void ace_reorder_and_store_dataset(
   size_t dataset_size = dataset.extent(0);
   size_t dataset_dim  = dataset.extent(1);
   size_t n_partitions = partition_histogram.extent(0);
-
-  std::string build_dir = params.ace_build_dir;
 
   RAFT_LOG_DEBUG(
     "ACE: Reordering and storing dataset to disk (%lu vectors, %lu dimensions, %lu partitions)",
@@ -773,7 +764,7 @@ void ace_reorder_and_store_dataset(
 template <typename T, typename IdxT>
 void ace_load_partition_dataset_from_disk(
   raft::resources const& res,
-  const index_params& params,
+  const std::string& ace_build_dir,
   size_t partition_id,
   size_t dataset_dim,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_histogram,
@@ -781,8 +772,7 @@ void ace_load_partition_dataset_from_disk(
   raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_partition_offsets,
   raft::host_matrix_view<T, int64_t, raft::row_major> sub_dataset)
 {
-  std::string build_dir = params.ace_build_dir;
-  size_t n_partitions   = partition_histogram.extent(0);
+  size_t n_partitions = partition_histogram.extent(0);
 
   RAFT_LOG_DEBUG("ACE: Loading partition %lu dataset from disk", partition_id);
 
@@ -807,8 +797,8 @@ void ace_load_partition_dataset_from_disk(
 
   const size_t vector_size = dataset_dim * sizeof(T);
 
-  const std::string reordered_dataset_path = build_dir + "/reordered_dataset.bin";
-  const std::string augmented_dataset_path = build_dir + "/augmented_dataset.bin";
+  const std::string reordered_dataset_path = ace_build_dir + "/reordered_dataset.bin";
+  const std::string augmented_dataset_path = ace_build_dir + "/augmented_dataset.bin";
 
   cuvs::util::file_descriptor reordered_fd(reordered_dataset_path, O_RDONLY);
   cuvs::util::file_descriptor augmented_fd(augmented_dataset_path, O_RDONLY);
@@ -862,11 +852,22 @@ index<T, IdxT> build_ace(raft::resources const& res,
                          const index_params& params,
                          raft::host_matrix_view<const T, int64_t, row_major> dataset)
 {
+  // Extract ACE parameters from graph_build_params
+  RAFT_EXPECTS(
+    std::holds_alternative<cagra::graph_build_params::ace_params>(params.graph_build_params),
+    "ACE build requires graph_build_params to be set to ace_params");
+
+  auto ace_params = std::get<cagra::graph_build_params::ace_params>(params.graph_build_params);
+  size_t ace_npartitions     = ace_params.ace_npartitions;
+  size_t ace_ef_construction = ace_params.ace_ef_construction;
+  std::string ace_build_dir  = ace_params.ace_build_dir;
+  bool ace_use_disk          = ace_params.ace_use_disk;
+
   common::nvtx::range<common::nvtx::domain::cuvs> function_scope(
     "cagra::build_ace<host>(%zu, %zu, %zu)",
     params.intermediate_graph_degree,
     params.graph_degree,
-    params.ace_npartitions);
+    ace_npartitions);
 
   size_t dataset_size = dataset.extent(0);
   size_t dataset_dim  = dataset.extent(1);
@@ -877,7 +878,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
                "ACE: Intermediate graph degree must be greater than 0");
   RAFT_EXPECTS(params.graph_degree > 0, "ACE: Graph degree must be greater than 0");
 
-  size_t n_partitions = params.ace_npartitions;
+  size_t n_partitions = ace_npartitions;
   RAFT_EXPECTS(n_partitions > 0, "ACE: ace_npartitions must be greater than 0");
 
   size_t min_required_per_partition = 1000;
@@ -918,7 +919,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
                 total_size / (1024.0 * 1024.0 * 1024.0),
                 available_memory / (1024.0 * 1024.0 * 1024.0));
   // TODO: Adjust overhead factor if needed
-  bool use_disk = static_cast<size_t>(0.8 * available_memory) < total_size;
+  bool use_disk = ace_use_disk || static_cast<size_t>(0.8 * available_memory) < total_size;
 
   if (!use_disk) {
     // GPU is mostly limited by the index size (update_graph() in the end of this routine).
@@ -932,10 +933,9 @@ index<T, IdxT> build_ace(raft::resources const& res,
   }
 
   if (use_disk) {
-    RAFT_EXPECTS(!params.ace_build_dir.empty(),
+    RAFT_EXPECTS(!ace_build_dir.empty(),
                  "ACE: ace_build_dir must be specified when using disk storage");
-    RAFT_LOG_INFO("ACE: Graph does not fit in memory, using disk at %s",
-                  params.ace_build_dir.c_str());
+    RAFT_LOG_INFO("ACE: Graph does not fit in memory, using disk at %s", ace_build_dir.c_str());
   } else {
     RAFT_LOG_INFO("ACE: Graph fits in memory");
   }
@@ -946,17 +946,17 @@ index<T, IdxT> build_ace(raft::resources const& res,
   cuvs::util::file_descriptor mapping_fd;
   cuvs::util::file_descriptor graph_fd;
   if (use_disk) {
-    if (mkdir(params.ace_build_dir.c_str(), 0755) != 0 && errno != EEXIST) {
-      RAFT_EXPECTS(false, "Failed to create ACE build directory: %s", params.ace_build_dir.c_str());
+    if (mkdir(ace_build_dir.c_str(), 0755) != 0 && errno != EEXIST) {
+      RAFT_EXPECTS(false, "Failed to create ACE build directory: %s", ace_build_dir.c_str());
     }
     reordered_fd = cuvs::util::file_descriptor(
-      params.ace_build_dir + "/reordered_dataset.bin", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+      ace_build_dir + "/reordered_dataset.bin", O_CREAT | O_WRONLY | O_TRUNC, 0644);
     augmented_fd = cuvs::util::file_descriptor(
-      params.ace_build_dir + "/augmented_dataset.bin", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+      ace_build_dir + "/augmented_dataset.bin", O_CREAT | O_WRONLY | O_TRUNC, 0644);
     mapping_fd = cuvs::util::file_descriptor(
-      params.ace_build_dir + "/dataset_mapping.bin", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+      ace_build_dir + "/dataset_mapping.bin", O_CREAT | O_WRONLY | O_TRUNC, 0644);
     graph_fd = cuvs::util::file_descriptor(
-      params.ace_build_dir + "/cagra_graph.bin", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+      ace_build_dir + "/cagra_graph.bin", O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (posix_fallocate(reordered_fd.get(), 0, dataset_size * dataset_dim * sizeof(T)) != 0) {
       RAFT_FAIL("Failed to pre-allocate space for reordered dataset file");
     }
@@ -1029,7 +1029,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
   // performance.
   if (use_disk) {
     ace_reorder_and_store_dataset<T, IdxT>(res,
-                                           params,
+                                           ace_build_dir,
                                            dataset,
                                            partition_labels.view(),
                                            partition_histogram.view(),
@@ -1054,9 +1054,9 @@ index<T, IdxT> build_ace(raft::resources const& res,
     auto start = std::chrono::high_resolution_clock::now();
 
     // Extract vectors for this partition
-    IdxT primary_sub_dataset_size   = partition_histogram(partition_id, 0);
-    IdxT augmented_sub_dataset_size = partition_histogram(partition_id, 1);
-    IdxT sub_dataset_size           = primary_sub_dataset_size + augmented_sub_dataset_size;
+    size_t primary_sub_dataset_size   = partition_histogram(partition_id, 0);
+    size_t augmented_sub_dataset_size = partition_histogram(partition_id, 1);
+    size_t sub_dataset_size           = primary_sub_dataset_size + augmented_sub_dataset_size;
 
     RAFT_LOG_DEBUG("ACE: Sub-dataset size: %lu (%lu + %lu)",
                    sub_dataset_size,
@@ -1068,7 +1068,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
     if (use_disk) {
       // Load partition dataset from disk files
       ace_load_partition_dataset_from_disk<T, IdxT>(res,
-                                                    params,
+                                                    ace_build_dir,
                                                     partition_id,
                                                     dataset_dim,
                                                     partition_histogram.view(),
@@ -1094,13 +1094,15 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
     // Create index for this partition
     cuvs::neighbors::cagra::index_params sub_index_params;
-    ace_set_index_params<IdxT>(res,
-                               params,
-                               sub_dataset_size,
-                               dataset_dim,
-                               graph_degree,
-                               intermediate_degree,
-                               sub_index_params);
+    ace_set_index_params<T, IdxT>(res,
+                                  params.metric,
+                                  sub_dataset_size,
+                                  dataset_dim,
+                                  graph_degree,
+                                  intermediate_degree,
+                                  params.guarantee_connectivity,
+                                  ace_ef_construction,
+                                  sub_index_params);
 
     auto sub_index = cuvs::neighbors::cagra::build(
       res, sub_index_params, raft::make_const_mdspan(sub_dataset.view()));
@@ -1131,9 +1133,9 @@ index<T, IdxT> build_ace(raft::resources const& res,
                                           augmented_backward_mapping.view(),
                                           primary_forward_mapping.view());
 
-      const IdxT graph_offset =
-        primary_partition_offsets(partition_id) * graph_degree * sizeof(IdxT);
-      const IdxT graph_bytes = primary_sub_dataset_size * graph_degree * sizeof(IdxT);
+      const size_t graph_offset =
+        static_cast<size_t>(primary_partition_offsets(partition_id)) * graph_degree * sizeof(IdxT);
+      const size_t graph_bytes = primary_sub_dataset_size * graph_degree * sizeof(IdxT);
       cuvs::util::write_large_file(
         graph_fd, sub_search_graph.data_handle(), graph_bytes, graph_offset);
     } else {
@@ -1180,6 +1182,16 @@ index<T, IdxT> build_ace(raft::resources const& res,
                 partition_processing_elapsed,
                 n_partitions);
 
+  // Clean up augmented dataset file to save disk space (no longer needed after partitions
+  // processed)
+  if (use_disk) {
+    const std::string augmented_dataset_path = ace_build_dir + "/augmented_dataset.bin";
+    if (std::filesystem::exists(augmented_dataset_path)) {
+      std::filesystem::remove(augmented_dataset_path);
+      RAFT_LOG_INFO("ACE: Removed augmented dataset file to save disk space");
+    }
+  }
+
   auto index_creation_start = std::chrono::high_resolution_clock::now();
   index<T, IdxT> idx(res, params.metric);
   // Only add graph and dataset if not using disk storage. The returned index is empty if using disk
@@ -1199,7 +1211,14 @@ index<T, IdxT> build_ace(raft::resources const& res,
       }
     }
   } else {
-    idx.set_disk_storage(true, params.ace_build_dir, dataset_size, dataset_dim, graph_degree);
+    idx.set_disk_storage(true, ace_build_dir, dataset_size, dataset_dim, graph_degree);
+    RAFT_LOG_INFO(
+      "ACE: Set disk storage at %s with dataset size %zu and dataset dimension %zu and graph "
+      "degree %zu",
+      ace_build_dir.c_str(),
+      dataset_size,
+      dataset_dim,
+      graph_degree);
   }
 
   auto index_creation_end = std::chrono::high_resolution_clock::now();

@@ -226,6 +226,13 @@ CAGRA uses a graph-based index, which creates an intermediate, approximate kNN g
    - ""
    - The directory to use for the ACE build. Must be specified when using ACE build.
 
+ * - `ace_ef_construction`
+   - `build`
+   - Y
+   - Positive integer >0
+   -
+   - Controls index time and accuracy. Bigger values increase the index quality. At some point, increasing this will no longer improve the quality.
+
  * - `query_memory_type`
    - `search`
    - N

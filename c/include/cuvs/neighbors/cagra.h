@@ -45,7 +45,9 @@ enum cuvsCagraGraphBuildAlgo {
   /* Experimental, use NN-Descent to build all-neighbors knn graph */
   NN_DESCENT = 2,
   /* Experimental, use iterative cagra search and optimize to build the knn graph */
-  ITERATIVE_CAGRA_SEARCH = 3
+  ITERATIVE_CAGRA_SEARCH = 3,
+  /* Use ACE (Augmented Core Extraction) to build the graph */
+  ACE = 4
 };
 
 /** Parameters for VPQ compression. */
@@ -94,6 +96,36 @@ struct cuvsIvfPqParams {
 };
 
 typedef struct cuvsIvfPqParams* cuvsIvfPqParams_t;
+
+/** Parameters for ACE (Augmented Core Extraction) graph build */
+struct cuvsAceParams {
+  /**
+   * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
+   * Small values might improve recall but potentially degrade performance and
+   * increase memory usage. Partitions should not be too small to prevent issues
+   * in KNN graph construction. 100k - 5M vectors per partition is recommended
+   * depending on the available host and GPU memory.
+   */
+  size_t ace_npartitions;
+  /**
+   * The index quality for the ACE build.
+   * Bigger values increase the index quality. At some point, increasing this will no longer
+   * improve the quality.
+   */
+  size_t ace_ef_construction;
+  /**
+   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).
+   * Used when `ace_npartitions` > 1 or `ace_use_disk` is true.
+   */
+  const char* ace_build_dir;
+  /**
+   * Whether to use disk-based storage for ACE build.
+   * When true, enables disk-based operations for memory-efficient graph construction.
+   */
+  bool ace_use_disk;
+};
+
+typedef struct cuvsAceParams* cuvsAceParams_t;
 
 /**
  * @brief Supplemental parameters to build CAGRA Index
@@ -155,6 +187,22 @@ cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* param
  * @return cuvsError_t
  */
 cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params);
+
+/**
+ * @brief Allocate ACE params, and populate with default values
+ *
+ * @param[in] params cuvsAceParams_t to allocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params);
+
+/**
+ * @brief De-allocate ACE params
+ *
+ * @param[in] params
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params);
 
 /**
  * @}

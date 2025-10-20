@@ -50,19 +50,6 @@ struct index_params : cuvs::neighbors::index_params {
   /** Degree of output graph. */
   size_t graph_degree = 64;
   /**
-   * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
-   *
-   * The search graph for very large datasets can be larger than the device or host memory of
-   * the systems. Although such graphs cannot be searched by CAGRA, we can still
-   * create such large graphs to be searched by other search methods.
-   *
-   * To build such large graph, we need to divide the graph into smaller partitions.
-   * The parameter ace_npartitions defines the number of such partitions.
-   * When set to a value > 1, enables the ACE partitioned approach for very large graphs.
-   * Set to 0 or 1 to disable ACE and use standard build.
-   */
-  size_t ace_npartitions = 1;
-  /**
    * Specify compression parameters if compression is desired. If set, overrides the
    * attach_dataset_on_build (and the compressed dataset is always added to the index).
    */
@@ -70,9 +57,9 @@ struct index_params : cuvs::neighbors::index_params {
 
   /** Parameters for graph building.
    *
-   * Set ivf_pq_params, nn_descent_params, or iterative_search_params to select the graph build
-   * algorithm and control their parameters. The default (std::monostate) is to use a heuristic
-   *  to decide the algorithm and its parameters.
+   * Set ivf_pq_params, nn_descent_params, ace_params, or iterative_search_params to select the
+   * graph build algorithm and control their parameters. The default (std::monostate) is to use a
+   * heuristic to decide the algorithm and its parameters.
    *
    * @code{.cpp}
    * cagra::index_params params;
@@ -84,7 +71,10 @@ struct index_params : cuvs::neighbors::index_params {
    * params.graph_build_params =
    * cagra::graph_build_params::nn_descent_params(params.intermediate_graph_degree);
    *
-   * // 3. Choose iterative graph building using CAGRA's search() and optimize()  [Experimental]
+   * // 3. Choose ACE algorithm for graph construction
+   * params.graph_build_params = cagra::graph_build_params::ace_params();
+   *
+   * // 4. Choose iterative graph building using CAGRA's search() and optimize()  [Experimental]
    * params.graph_build_params =
    * cagra::graph_build_params::iterative_search_params();
    * @endcode
@@ -92,13 +82,9 @@ struct index_params : cuvs::neighbors::index_params {
   std::variant<std::monostate,
                graph_build_params::ivf_pq_params,
                graph_build_params::nn_descent_params,
+               graph_build_params::ace_params,
                graph_build_params::iterative_search_params>
     graph_build_params;
-  /**
-   * Directory to store ACE build artifacts (e.g., KNN graph,
-   * optimized graph). Used when `ace_npartitions` > 1.
-   */
-  std::string ace_build_dir = "";
   /**
    * Whether to use MST optimization to guarantee graph connectivity.
    */
@@ -135,6 +121,52 @@ struct index_params : cuvs::neighbors::index_params {
    */
   bool attach_dataset_on_build = true;
 };
+
+/**
+ * @brief Create a CAGRA index parameters compatible with HNSW index
+ *
+ * @param dataset The shape of the input dataset.
+ * @param M HNSW index parameter M.
+ * @param ef_construction HNSW index parameter ef_construction.
+ * @param metric The distance metric to search.
+ *
+ *
+ * * IMPORTANT NOTE *
+ *
+ * The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce
+ * the same recalls and QPS for the same parameter `ef`. The graphs are different internally. For
+ * the same `ef`, the from-CAGRA index likely has a slightly higher recall and slightly lower QPS.
+ * However, the Recall-QPS curves should be similar (i.e. the points are just shifted along the
+ * curve).
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   raft::resources res;
+ *   auto dataset = raft::make_device_matrix<float, int64_t>(res, N, D);
+ *   auto cagra_params = hnsw_to_cagra_params(dataset.extents(), M, efc);
+ *   auto cagra_index = cagra::build(res, cagra_params, dataset);
+ *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, cagra_index);
+ * @endcode
+ */
+template <typename T, typename IdxT>
+auto hnsw_to_cagra_params(raft::matrix_extent<int64_t> dataset,
+                          int M,
+                          int ef_construction,
+                          cuvs::distance::DistanceType metric)
+  -> cuvs::neighbors::cagra::index_params
+{
+  auto ivf_pq_params = cuvs::neighbors::graph_build_params::ivf_pq_params(dataset, metric);
+  ivf_pq_params.search_params.n_probes =
+    std::round(std::sqrt(ivf_pq_params.build_params.n_lists) / 20 + ef_construction / 16);
+
+  cagra::index_params params;
+  params.graph_build_params        = ivf_pq_params;
+  params.graph_degree              = M * 2;
+  params.intermediate_graph_degree = M * 3;
+
+  return params;
+}
 
 /**
  * @}
