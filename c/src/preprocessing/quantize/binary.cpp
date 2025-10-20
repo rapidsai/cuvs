@@ -105,7 +105,10 @@ void* _train(cuvsResources_t res,
 
 extern "C" cuvsError_t cuvsBinaryQuantizerParamsCreate(cuvsBinaryQuantizerParams_t* params)
 {
-  return cuvs::core::translate_exceptions([=] { *params = new cuvsBinaryQuantizerParams; });
+  return cuvs::core::translate_exceptions([=] {
+    *params =
+        new cuvsBinaryQuantizerParams{.threshold = MEAN, .sampling_ratio = 0.1};
+  });
 }
 
 extern "C" cuvsError_t cuvsBinaryQuantizerParamsDestroy(cuvsBinaryQuantizerParams_t params)

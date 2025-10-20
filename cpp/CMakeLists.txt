@@ -762,12 +762,18 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
       COMPONENT c_api
       EXPORT cuvs-c-exports
     )
+
+    install(
+      FILES ${CUVS_C_BINARY_DIR}/include/cuvs/core/c_config.h
+      COMPONENT cuvs
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs/core/
+    )
   endif()
 
   install(
     FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.h
     COMPONENT cuvs
-    DESTINATION include/cuvs
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs
   )
 
   if(TARGET cuvs_c)
