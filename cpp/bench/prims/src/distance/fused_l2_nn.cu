@@ -261,92 +261,106 @@ static void CustomArguments(benchmark::internal::Benchmark* b)
 
 int main(int argc, char** argv)
 {
-  benchmark::internal::Benchmark* bench;
-  /*int64_t M = 1024;
-  int64_t N = 1024;
+  using IdxT = int64_t;
+  IdxT M = 1024;
+  IdxT N = 1024;
+  IdxT K = 128;
   for (int i = 0; i < argc; i++) {
-    if (strcmp(argv[i], "--M") == 0) {
+    if (strcmp(argv[i], "-M") == 0) {
       M = std::stoi(argv[i + 1]);
       for(int j = i; j < argc - 2; j++) {
         argv[j] = argv[j + 2];
       }
       argc -= 2;
       i -= 2;
-    } else if (strcmp(argv[i], "--N") == 0) {
+    } else if (strcmp(argv[i], "-N") == 0) {
       N = std::stoi(argv[i + 1]);
       for(int j = i; j < argc - 2; j++) {
         argv[j] = argv[j + 2];
       }
       argc -= 2;
       i -= 2;
-    } else if (strcmp(argv[i], "--method") == 0) {
-      N = std::stoi(argv[i + 1]);
+    } else if (strcmp(argv[i], "-K") == 0) {
+      K = std::stoi(argv[i + 1]);
       for(int j = i; j < argc - 2; j++) {
         argv[j] = argv[j + 2];
       }
       argc -= 2;
       i -= 2;
     }
-  }*/
+  }
 
-  // fused path
-  /*bench = benchmark::RegisterBenchmark(
-    "fusedl2nn/float/float/<int64_t, float>",
-    benchmark_fusedl2nn<float, float, raft::KeyValuePair<int64_t, float>, int64_t,
-  AlgorithmType::fused>); bench->Apply(CustomArguments<int64_t>);*/
+  bool sqrt = false;
+  DistanceType dist = DistanceType::L2Expanded;
 
-  bench = benchmark::RegisterBenchmark("unfused/float/int/<int, float>",
+  benchmark::internal::Benchmark* bench;
+
+  // Method: Fused, DataT: float, AccT: float, OutT <int64_t, float>
+  bench = benchmark::RegisterBenchmark("fused/float/int64_t/<int64_t, float>",
+                                       benchmark_fusedl2nn<float,
+                                                           float,
+                                                           raft::KeyValuePair<int64_t, float>,
+                                                           int64_t,
+                                                           AlgorithmType::fused>);
+  bench -> Args({M, N, K, sqrt, dist});
+
+  // In the following instances IdxT is either int64_t or int, it does not seem to matter much
+  // on the performance anyway
+  // OutT is always <IdxT, AccT>
+  // Method: unfused, DataT: float, AccT: float
+  bench = benchmark::RegisterBenchmark("unfused/float/int64_t/<int64_t, float>",
+                                       benchmark_fusedl2nn<float,
+                                                           float,
+                                                           raft::KeyValuePair<int64_t, float>,
+                                                           int64_t,
+                                                           AlgorithmType::unfused>);
+  bench -> Args({M, N, K , sqrt, dist});
+
+  // Method: gemm, DataT: float, AccT: float
+  bench = benchmark::RegisterBenchmark("gemm/float/int64_t/<int64_t, float>",
                                        benchmark_fusedl2nn<float,
                                                            float,
                                                            raft::KeyValuePair<int64_t, float>,
                                                            int64_t,
                                                            AlgorithmType::gemm>);
-  bench->Apply(CustomArguments<int64_t>);
-  // unfused path
-  // half -> half
-  /*bench = benchmark::RegisterBenchmark("unfused/half/int/<int, half>",
-                                       benchmark_fusedl2nn<half,
-                                                           half,
-                                                           raft::KeyValuePair<int64_t, half>,
-                                                           int64_t,
-                                                           AlgorithmType::unfused>);
-  bench->Apply(CustomArguments<int64_t>);
+  bench -> Args({M, N, K , sqrt, dist});
 
-  // half -> float
+  // Method: unfused, DataT: half, AccT: float
   bench = benchmark::RegisterBenchmark("unfused/half/int/<int, float>",
                                        benchmark_fusedl2nn<half,
                                                            float,
-                                                           raft::KeyValuePair<int64_t, float>,
-                                                           int64_t,
+                                                           raft::KeyValuePair<int, float>,
+                                                           int,
                                                            AlgorithmType::unfused>);
-  bench->Apply(CustomArguments<int64_t>);
+  bench -> Args({int(M), int(N), int(K), sqrt, dist});
 
-  // float -> float
-  bench = benchmark::RegisterBenchmark("unfused/float/int/<int, float>",
-                                       benchmark_fusedl2nn<float,
+  // Method: gemm, DataT: half, AccT: float
+  bench = benchmark::RegisterBenchmark("gemm/half/int/<int, float>",
+                                       benchmark_fusedl2nn<half,
                                                            float,
-                                                           raft::KeyValuePair<int64_t, float>,
-                                                           int64_t,
+                                                           raft::KeyValuePair<int, float>,
+                                                           int,
+                                                           AlgorithmType::gemm>);
+  bench -> Args({int(M), int(N), int(K), sqrt, dist});
+
+  // Method: unfused, DataT: half, AccT: half
+  bench = benchmark::RegisterBenchmark("unfused/half/int/<int, half>",
+                                       benchmark_fusedl2nn<half,
+                                                           half,
+                                                           raft::KeyValuePair<int, half>,
+                                                           int,
                                                            AlgorithmType::unfused>);
+  bench -> Args({int(M), int(N), int(K), sqrt, dist});
 
-  bench->Apply(CustomArguments<int64_t>);
+  // Method: gemm, DataT: int8_t, AccT: int32_t
+  bench = benchmark::RegisterBenchmark("gemm/int8_t/int/<int, int32_t>",
+                                       benchmark_fusedl2nn<int8_t,
+                                                           int32_t,
+                                                           raft::KeyValuePair<int, int32_t>,
+                                                           int,
+                                                           AlgorithmType::gemm>);
+  bench -> Args({int(M), int(N), int(K), sqrt, dist});
 
-  // just gemm
-  // half -> half
-  bench = benchmark::RegisterBenchmark(
-    "gemm/half/int/<int, half>",
-    benchmark_fusedl2nn<half, half, raft::KeyValuePair<int64_t, half>, int64_t,
-  AlgorithmType::gemm>); bench->Apply(CustomArguments<int64_t>);
-  // half -> float
-  bench = benchmark::RegisterBenchmark(
-    "gemm/half/int/<int, float>",
-    benchmark_fusedl2nn<half, float, raft::KeyValuePair<int64_t, float>, int64_t,
-  AlgorithmType::gemm>); bench->Apply(CustomArguments<int64_t>);
-  // float -> float
-  bench = benchmark::RegisterBenchmark(
-    "gemm/float/int/<int, float>",
-    benchmark_fusedl2nn<float, float, raft::KeyValuePair<int64_t, float>, int64_t,
-  AlgorithmType::gemm>); bench->Apply(CustomArguments<int64_t>);*/
 
   // Initialize benchmark
   ::benchmark::Initialize(&argc, argv);
