@@ -10,3 +10,4 @@ Preprocessing
    :caption: Contents:
 
    preprocessing_quantize.rst
+   preprocessing_spectral_embedding.rst

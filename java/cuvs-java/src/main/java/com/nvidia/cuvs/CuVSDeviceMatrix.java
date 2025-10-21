@@ -21,16 +21,7 @@ package com.nvidia.cuvs;
 public interface CuVSDeviceMatrix extends CuVSMatrix {
 
   /**
-   * Fills the provided, pre-allocated host matrix with data from this device matrix.
-   * The content of the provided host matrix will be overwritten; the 2 matrices must have the
-   * same element type and dimension.
-   *
-   * @param hostMatrix  the host-memory-backed matrix to fill.
-   */
-  void toHost(CuVSHostMatrix hostMatrix);
-
-  /**
-   * Returns a new, host matrix with data from this device matrix.
+   * Returns a new host matrix with data from this device matrix.
    * The returned host matrix will need to be managed by the caller, which will be
    * responsible to call {@link CuVSMatrix#close()} to free its resources when done.
    */

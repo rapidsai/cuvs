@@ -135,10 +135,9 @@ inline std::vector<float> parse_rotation_matrix_file(const std::string& path, co
 }
 
 template <typename T>
-index_params::codebook_params<T> deserialize_codebooks(const std::string& codebook_prefix,
-                                                       const int dim)
+codebook_params<T> deserialize_codebooks(const std::string& codebook_prefix, const int dim)
 {
-  index_params::codebook_params<T> codebooks;
+  codebook_params<T> codebooks;
   codebooks.pq_encoding_table = parse_pq_pivots_file(
     codebook_prefix + "_pq_pivots.bin", dim, codebooks.pq_codebook_size, codebooks.pq_dim);
   codebooks.rotation_matrix =
