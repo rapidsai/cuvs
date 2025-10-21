@@ -128,6 +128,7 @@ void ace_get_partition_labels(
   auto _sub_distances_dev = raft::make_device_matrix<float, int64_t>(res, chunk_size, n_partitions);
   size_t report_interval  = dataset_size / 10;
   report_interval         = (report_interval / chunk_size) * chunk_size;
+  report_interval         = std::max(report_interval, chunk_size);
 
   for (size_t i_base = 0; i_base < dataset_size; i_base += chunk_size) {
     const size_t sub_dataset_size = std::min(chunk_size, dataset_size - i_base);
@@ -650,7 +651,7 @@ void ace_reorder_and_store_dataset(
   };
 
   size_t vectors_processed  = 0;
-  const size_t log_interval = dataset_size / 10;
+  const size_t log_interval = std::max(dataset_size / 10, size_t(1));
   for (size_t i = 0; i < dataset_size; i++) {
     size_t primary_partition   = partition_labels(i, 0);
     size_t secondary_partition = partition_labels(i, 1);
