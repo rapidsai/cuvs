@@ -119,24 +119,6 @@ for type_path, (data_t, idx_t, distance_t) in search_types.items():
                             f.write(template.format(includes=includes, content=content))
                             cmake_list.append(f"  src/neighbors/detail/cagra/{path}")
 
-# CAGRA-RaBitQ
-for (mxdim, team) in vrq_mxdim_team:
-    for vq_code_t in ['uint32_t']:
-        for rabitq_code_t in ['uint64_t']:
-            for metric in ['L2Expanded']:
-                data_t = 'float'
-                idx_t = 'uint32_t'
-                distance_t = 'float'
-                path = f"compute_distance_vrabitq_{metric}_dim{mxdim}_t{team}_{vq_code_t}_{rabitq_code_t}.cu"
-                includes = '#include "compute_distance_vrabitq-impl.cuh"'
-                params = f"{metric_prefix}{metric}, {team}, {mxdim}, {data_t}, {idx_t}, {vq_code_t}, {rabitq_code_t}, float, {distance_t}"
-                spec = f"vrabitq_descriptor_spec<{params}>"
-                content = f"""template struct {spec};"""
-                specs.append(spec)
-                with open(path, "w") as f:
-                    f.write(template.format(includes=includes, content=content))
-                    cmake_list.append(f"  src/neighbors/detail/cagra/{path}")
-
 # CAGRA (Binary Hamming distance)
 for (mxdim, team) in mxdim_team:
     metric = 'BitwiseHamming'
@@ -161,7 +143,6 @@ with open("compute_distance-ext.cuh", "w") as f:
 
 #include "compute_distance_standard.hpp"
 #include "compute_distance_vpq.hpp"
-#include "compute_distance_vrabitq.hpp"
 '''
     newline = "\n"
     contents = f'''
