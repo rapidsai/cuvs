@@ -891,10 +891,8 @@ index<T, IdxT> build_ace(raft::resources const& res,
   if (use_disk) {
     bool valid_build_dir = !ace_build_dir.empty();
     valid_build_dir &= ace_build_dir.length() <= 255;
-    const std::string invalid_chars = "\\/:*?\"<>|";
-    for (char c : invalid_chars) {
-      valid_build_dir &= ace_build_dir.find(c) == std::string::npos;
-    }
+    valid_build_dir &= ace_build_dir.find('\0') == std::string::npos;
+    valid_build_dir &= ace_build_dir.find("//") == std::string::npos;
     if (!valid_build_dir) {
       RAFT_LOG_WARN("ACE: Invalid ace_build_dir path, resetting to default: /tmp/ace_build");
       ace_build_dir = "/tmp/ace_build";
