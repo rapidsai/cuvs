@@ -174,9 +174,13 @@ void transform(raft::resources const& handle,
  * @}
  */
 
+}  // namespace cuvs::preprocessing::spectral_embedding
+
+namespace cuvs::preprocessing::spectral_embedding::helpers {
+
 void create_connectivity_graph(raft::resources const& handle,
                                params spectral_embedding_config,
                                raft::device_matrix_view<float, int, raft::row_major> dataset,
                                raft::device_coo_matrix<float, int, int, int>& connectivity_graph);
 
-}  // namespace cuvs::preprocessing::spectral_embedding
+}  // namespace cuvs::preprocessing::spectral_embedding::helpers

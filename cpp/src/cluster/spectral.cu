@@ -15,13 +15,13 @@
  */
 
 #include <cuvs/cluster/kmeans.hpp>
-#include <cuvs/cluster/spectral_clustering.hpp>
+#include <cuvs/cluster/spectral.hpp>
 #include <cuvs/preprocessing/spectral_embedding.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/linalg/transpose.cuh>
 #include <raft/random/rng_state.hpp>
 
-namespace cuvs::cluster::spectral_clustering {
+namespace cuvs::cluster::spectral {
 
 void fit_predict(raft::resources const& handle,
                  params config,
@@ -43,9 +43,9 @@ void fit_predict(raft::resources const& handle,
   spectral_embedding_config.seed           = config.seed;
 
   cuvs::cluster::kmeans::params kmeans_config;
-  kmeans_config.n_clusters = config.n_clusters;
-  kmeans_config.rng_state  = raft::random::RngState(config.seed);
-  kmeans_config.n_init     = config.n_init;
+  kmeans_config.n_clusters          = config.n_clusters;
+  kmeans_config.rng_state           = raft::random::RngState(config.seed);
+  kmeans_config.n_init              = config.n_init;
   kmeans_config.oversampling_factor = 0.0;
 
   cuvs::preprocessing::spectral_embedding::transform(
@@ -67,4 +67,4 @@ void fit_predict(raft::resources const& handle,
                                      raft::make_host_scalar_view(&inertia),
                                      raft::make_host_scalar_view(&n_iter));
 }
-}  // namespace cuvs::cluster::spectral_clustering
+}  // namespace cuvs::cluster::spectral

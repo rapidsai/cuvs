@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <cuvs/cluster/spectral_clustering.hpp>
+#include <cuvs/cluster/spectral.hpp>
 #include <cuvs/preprocessing/spectral_embedding.hpp>
 #include <raft/core/device_coo_matrix.hpp>
 #include <raft/core/device_mdspan.hpp>
@@ -58,7 +58,7 @@ class SpectralClusteringTest : public ::testing::TestWithParam<SpectralClusterin
     int n_samples  = testparams.n_row;
     int n_features = testparams.n_col;
 
-    cluster::spectral_clustering::params params;
+    cluster::spectral::params params;
     params.n_clusters   = testparams.n_clusters;
     params.n_components = testparams.n_components;
     params.n_neighbors  = testparams.n_neighbors;
@@ -96,10 +96,10 @@ class SpectralClusteringTest : public ::testing::TestWithParam<SpectralClusterin
     embed_params.n_neighbors = params.n_neighbors;
     embed_params.seed        = params.seed;
 
-    cuvs::preprocessing::spectral_embedding::create_connectivity_graph(
+    cuvs::preprocessing::spectral_embedding::helpers::create_connectivity_graph(
       handle, embed_params, X.view(), connectivity_graph);
 
-    cluster::spectral_clustering::fit_predict(
+    cluster::spectral::fit_predict(
       handle,
       params,
       connectivity_graph.view(),
@@ -129,7 +129,7 @@ class SpectralClusteringTest : public ::testing::TestWithParam<SpectralClusterin
   rmm::device_uvector<int> d_labels;
   rmm::device_uvector<int> d_labels_ref;
   double score;
-  cluster::spectral_clustering::params params;
+  cluster::spectral::params params;
 };
 
 const std::vector<SpectralClusteringInputs> inputs = {

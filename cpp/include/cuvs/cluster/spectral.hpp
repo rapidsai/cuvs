@@ -20,7 +20,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
 
-namespace cuvs::cluster::spectral_clustering {
+namespace cuvs::cluster::spectral {
 
 struct params {
   int n_clusters;
@@ -35,4 +35,4 @@ void fit_predict(raft::resources const& handle,
                  raft::device_coo_matrix_view<float, int, int, int> connectivity_graph,
                  raft::device_vector_view<int, int> labels);
 
-}  // namespace cuvs::cluster::spectral_clustering
+}  // namespace cuvs::cluster::spectral
