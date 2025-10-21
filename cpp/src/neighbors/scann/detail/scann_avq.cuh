@@ -547,7 +547,7 @@ class cluster_loader {
       auto pinned_cluster = raft::make_pinned_matrix_view<T, int64_t>(
         cluster_buf_.data_handle(), cluster_vectors.extent(0), cluster_vectors.extent(1));
 
-      int n_threads = std::min<int>(omp_get_max_threads(), 32);
+      int n_threads = std::min<int>(cuvs::core::omp::get_max_threads(), 32);
 #pragma omp parallel for num_threads(n_threads)
       for (int i = 0; i < h_cluster_ids.extent(0); i++) {
         memcpy(pinned_cluster.data_handle() + i * pinned_cluster.extent(1),
