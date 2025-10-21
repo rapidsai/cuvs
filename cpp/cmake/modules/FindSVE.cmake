@@ -1,4 +1,5 @@
-# Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 # =============================================================================
 # FindSVE.cmake This module finds the SVE (Scalable Vector Extension) support in the compiler.
 # =============================================================================
