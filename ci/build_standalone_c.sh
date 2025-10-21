@@ -14,8 +14,6 @@ dnf install -y \
       make \
       wget
 
-scl_source enable gcc-toolset-${TOOLSET_VERSION}
-
 # Fetch and install CMake.
 pushd /usr/local
 wget --quiet https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-${CMAKE_ARCH}.tar.gz
@@ -43,25 +41,27 @@ mkdir -p "${RAPIDS_ARTIFACTS_DIR}"
 export RAPIDS_ARTIFACTS_DIR
 
 
-cmake -S cpp -B cpp/build/ \
-      -DCMAKE_CUDA_ARCHITECTURES=RAPIDS \
-      -DBUILD_SHARED_LIBS=OFF \
-      -DCUTLASS_ENABLE_TESTS=OFF \
-      -DDISABLE_OPENMP=ON \
-      -DBUILD_TESTS=OFF \
-      -DBUILD_SHARED_LIBS=ON \
-      -DCUVS_STATIC_RAPIDS_LIBRARIES=ON
-cmake --build cpp/build
+scl enable gcc-toolset-${TOOLSET_VERSION} -- \
+      cmake -S cpp -B cpp/build/temp/ \
+            -DCMAKE_CUDA_ARCHITECTURES=RAPIDS \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCUTLASS_ENABLE_TESTS=OFF \
+            -DDISABLE_OPENMP=ON \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCUVS_STATIC_RAPIDS_LIBRARIES=ON
+cmake --build cpp/build/temp
 
 
 rapids-logger "Begin c build"
 
-cmake -S c -B c/build \
-      -DCUVSC_STATIC_CUVS_LIBRARY=ON \
-      -DCMAKE_PREFIX_PATH="cpp/build" \
-      -DBUILD_TESTS=OFF && \
-cmake --install c/build --prefix c/build/install
-tar czf libcuvs_c.tar.gz -C c/build/install/ .
+scl enable gcc-toolset-${TOOLSET_VERSION} -- \
+      cmake -S c -B c/build/temp \
+            -DCUVSC_STATIC_CUVS_LIBRARY=ON \
+            -DCMAKE_PREFIX_PATH="cpp/build" \
+            -DBUILD_TESTS=OFF && \
+cmake --install c/build/temp --prefix c/build/temp/install
+tar czf libcuvs_c.tar.gz -C c/build/temp/install/ .
 
 sccache --show-adv-stats
 
