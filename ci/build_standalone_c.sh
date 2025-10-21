@@ -68,8 +68,6 @@ cmake --install c/build/temp --prefix c/build/temp/install
 
 rapids-logger "Begin c tarball creation"
 tar czf libcuvs_c.tar.gz -C c/build/temp/install/ .
+ls -lh libcuvs_c.tar.gz
 
 sccache --show-adv-stats
-
-# remove build_cache directory
-rm -rf "$RAPIDS_CONDA_BLD_OUTPUT_DIR"/build_cache
