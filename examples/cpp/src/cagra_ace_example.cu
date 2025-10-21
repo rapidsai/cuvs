@@ -15,11 +15,15 @@
  */
 
 #include <cstdint>
+#include <filesystem>
+#include <memory>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/random/make_blobs.cuh>
+#include <string>
 
 #include <cuvs/neighbors/cagra.hpp>
+#include <cuvs/neighbors/hnsw.hpp>
 
 #include <rmm/mr/device/device_memory_resource.hpp>
 #include <rmm/mr/device/pool_memory_resource.hpp>
@@ -47,8 +51,18 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   // ace_params.ace_use_disk         = true;  // Uncomment to use disk storage
   index_params.graph_build_params = ace_params;
 
+  // ACE requires the dataset to be on the host
+  auto dataset_host = raft::make_host_matrix<float, int64_t>(dataset.extent(0), dataset.extent(1));
+  raft::copy(dataset_host.data_handle(),
+             dataset.data_handle(),
+             dataset.extent(0) * dataset.extent(1),
+             raft::resource::get_cuda_stream(dev_resources));
+  raft::resource::sync_stream(dev_resources);
+  auto dataset_host_view = raft::make_host_matrix_view<const float, int64_t, raft::row_major>(
+    dataset_host.data_handle(), dataset_host.extent(0), dataset_host.extent(1));
+
   std::cout << "Building CAGRA index (search graph)" << std::endl;
-  auto index = cagra::build(dev_resources, index_params, dataset);
+  auto index = cagra::build(dev_resources, index_params, dataset_host_view);
 
   std::cout << "CAGRA index has " << index.size() << " vectors" << std::endl;
   std::cout << "CAGRA graph has degree " << index.graph_degree() << ", graph size ["
@@ -60,9 +74,53 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   // Check if the partitioned build used disk storage
   if (index.on_disk()) {
     std::cout << "CAGRA index used disk storage. Create HNSW index from disk." << std::endl;
-    auto hnsw_index = hnsw::from_cagra(dev_resources, hnsw::index_params(), index);
-    cuvs::neighbors::hnsw::search(
-      dev_resources, search_params, *hnsw_index, queries, neighbors.view(), distances.view());
+
+    hnsw::index_params hnsw_params;
+    hnsw_params.hierarchy = hnsw::HnswHierarchy::GPU;
+
+    auto hnsw_index = hnsw::from_cagra(dev_resources, hnsw_params, index);
+    std::cout << "HNSW index serialized to disk. Deserializing..." << std::endl;
+
+    // Deserialize the HNSW index from disk
+    std::string hnsw_index_path        = index.file_directory() + "/hnsw_index.bin";
+    hnsw::index<float>* hnsw_index_raw = nullptr;
+    hnsw::deserialize(
+      dev_resources, hnsw_params, hnsw_index_path, index.dim(), index.metric(), &hnsw_index_raw);
+
+    std::unique_ptr<hnsw::index<float>> hnsw_index_deserialized(hnsw_index_raw);
+
+    // HNSW search requires host matrices
+    auto queries_host = raft::make_host_matrix<float, int64_t>(n_queries, queries.extent(1));
+    raft::copy(queries_host.data_handle(),
+               queries.data_handle(),
+               n_queries * queries.extent(1),
+               raft::resource::get_cuda_stream(dev_resources));
+    raft::resource::sync_stream(dev_resources);
+
+    // HNSW search outputs uint64_t indices
+    auto indices_hnsw_host   = raft::make_host_matrix<uint64_t, int64_t>(n_queries, topk);
+    auto distances_hnsw_host = raft::make_host_matrix<float, int64_t>(n_queries, topk);
+
+    hnsw::search_params hnsw_search_params;
+    hnsw_search_params.ef          = std::max(200, static_cast<int>(topk) * 2);
+    hnsw_search_params.num_threads = 1;
+
+    hnsw::search(dev_resources,
+                 hnsw_search_params,
+                 *hnsw_index_deserialized,
+                 queries_host.view(),
+                 indices_hnsw_host.view(),
+                 distances_hnsw_host.view());
+
+    // Convert uint64_t indices back to uint32_t and copy to device
+    for (int64_t i = 0; i < n_queries * topk; i++) {
+      neighbors.data_handle()[i] = static_cast<uint32_t>(indices_hnsw_host.data_handle()[i]);
+    }
+    raft::copy(distances.data_handle(),
+               distances_hnsw_host.data_handle(),
+               n_queries * topk,
+               raft::resource::get_cuda_stream(dev_resources));
+    raft::resource::sync_stream(dev_resources);
   } else {
     std::cout << "CAGRA index created in memory." << std::endl;
 
