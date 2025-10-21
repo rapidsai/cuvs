@@ -20,6 +20,7 @@
 #include "cagra/device_common.hpp"
 #include "nn_descent_gnnd.hpp"
 
+#include "../../core/omp_wrapper.hpp"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 
@@ -46,7 +47,6 @@
 #include <cuda_runtime.h>
 
 #include <mma.h>
-#include <omp.h>
 
 #include <limits>
 #include <optional>

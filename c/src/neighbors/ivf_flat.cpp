@@ -318,7 +318,7 @@ extern "C" cuvsError_t cuvsIvfFlatDeserialize(cuvsResources_t res,
     if (dtype.kind == 'f' && dtype.itemsize == 4) {
       index->addr       = reinterpret_cast<uintptr_t>(_deserialize<float, int64_t>(res, filename));
       index->dtype.code = kDLFloat;
-    } else if (dtype.kind == 'f' && dtype.itemsize == 2) {
+    } else if (dtype.kind == 'e' && dtype.itemsize == 2) {
       index->addr       = reinterpret_cast<uintptr_t>(_deserialize<half, int64_t>(res, filename));
       index->dtype.code = kDLFloat;
       index->dtype.bits = 16;
