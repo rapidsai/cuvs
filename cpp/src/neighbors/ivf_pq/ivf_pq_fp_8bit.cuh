@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -109,6 +109,12 @@ struct fp_8bit {
     }
     return r;
   }
+};
+
+template <uint32_t ExpBits, bool Signed>
+struct fp_8bit4 {
+  fp_8bit<ExpBits, Signed> x, y, z, w;
+  HDI fp_8bit4() : x(0), y(0), z(0), w(0) {}
 };
 
 }  // namespace cuvs::neighbors::ivf_pq::detail
