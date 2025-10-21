@@ -875,19 +875,18 @@ index<T, IdxT> build_ace(raft::resources const& res,
                 total_size / (1024.0 * 1024.0 * 1024.0),
                 available_memory / (1024.0 * 1024.0 * 1024.0));
   // TODO: Adjust overhead factor if needed
-  bool use_disk = ace_use_disk || static_cast<size_t>(0.8 * available_memory) < total_size;
+  bool host_memory_limited = static_cast<size_t>(0.8 * available_memory) < total_size;
 
-  if (!use_disk) {
-    // GPU is mostly limited by the index size (update_graph() in the end of this routine).
-    // Check if GPU has enough memory for the final graph or use disk mode instead.
-    // TODO: Extend model or use managed memory if running out of GPU memory.
-    auto available_gpu_memory = rmm::available_device_memory().second;
-    use_disk                  = static_cast<size_t>(0.8 * available_gpu_memory) < cagra_graph_size;
-    RAFT_LOG_INFO("ACE: Estimated GPU memory required: %.2f GiB, available: %.2f GiB",
-                  cagra_graph_size / (1024.0 * 1024.0 * 1024.0),
-                  available_gpu_memory / (1024.0 * 1024.0 * 1024.0));
-  }
+  // GPU is mostly limited by the index size (update_graph() in the end of this routine).
+  // Check if GPU has enough memory for the final graph or use disk mode instead.
+  // TODO: Extend model or use managed memory if running out of GPU memory.
+  auto available_gpu_memory = rmm::available_device_memory().second;
+  bool gpu_memory_limited   = static_cast<size_t>(0.8 * available_gpu_memory) < cagra_graph_size;
+  RAFT_LOG_INFO("ACE: Estimated GPU memory required: %.2f GiB, available: %.2f GiB",
+                cagra_graph_size / (1024.0 * 1024.0 * 1024.0),
+                available_gpu_memory / (1024.0 * 1024.0 * 1024.0));
 
+  bool use_disk = ace_use_disk || host_memory_limited || gpu_memory_limited;
   if (use_disk) {
     bool valid_build_dir = !ace_build_dir.empty();
     valid_build_dir &= ace_build_dir.length() <= 255;
@@ -897,12 +896,30 @@ index<T, IdxT> build_ace(raft::resources const& res,
       RAFT_LOG_WARN("ACE: Invalid ace_build_dir path, resetting to default: /tmp/ace_build");
       ace_build_dir = "/tmp/ace_build";
     }
-    RAFT_LOG_INFO("ACE: Graph does not fit in memory, using disk at %s", ace_build_dir.c_str());
     if (mkdir(ace_build_dir.c_str(), 0755) != 0 && errno != EEXIST) {
       RAFT_EXPECTS(false, "Failed to create ACE build directory: %s", ace_build_dir.c_str());
     }
+  }
+
+  if (host_memory_limited && gpu_memory_limited) {
+    RAFT_LOG_INFO(
+      "ACE: Graph does not fit in host and GPU memory. Using disk-mode with temporary storage %s",
+      ace_build_dir.c_str());
+  } else if (host_memory_limited) {
+    RAFT_LOG_INFO(
+      "ACE: Graph does not fit in host memory. Using disk-mode with temporary storage %s",
+      ace_build_dir.c_str());
+  } else if (gpu_memory_limited) {
+    RAFT_LOG_INFO(
+      "ACE: Graph does not fit in GPU memory. Using disk-mode with temporary storage %s",
+      ace_build_dir.c_str());
+  } else if (ace_use_disk) {
+    RAFT_LOG_INFO(
+      "ACE: Graph fits in host and GPU memory but disk mode is forced. Using disk-mode with "
+      "temporary storage %s",
+      ace_build_dir.c_str());
   } else {
-    RAFT_LOG_INFO("ACE: Graph fits in memory");
+    RAFT_LOG_INFO("ACE: Graph fits in host and GPU memory. Using in-memory mode.");
   }
 
   // Preallocate space for files for better performance and fail early if not enough space.
