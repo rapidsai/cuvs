@@ -92,8 +92,6 @@ void create_connectivity_graph(
       return 0.5f * (a + b);
     });
 
-  raft::sparse::matrix::set_diagonal(handle, sym_coo1_matrix.view(), static_cast<float>(0.0f));
-
   raft::sparse::op::coo_sort<float>(n_samples,
                                     n_samples,
                                     sym_coo1_matrix.structure_view().get_nnz(),

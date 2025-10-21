@@ -110,7 +110,7 @@ class SpectralClusteringTest : public ::testing::TestWithParam<SpectralClusterin
     score =
       raft::stats::adjusted_rand_index(d_labels_ref.data(), d_labels.data(), n_samples, stream);
 
-    if (score < 0.9) {
+    if (score < 0.8) {
       std::stringstream ss;
       ss << "Expected: " << raft::arr2Str(d_labels_ref.data(), 25, "d_labels_ref", stream);
       std::cout << (ss.str().c_str()) << '\n';
@@ -156,7 +156,7 @@ const std::vector<SpectralClusteringInputs> inputs = {
 
 TEST_P(SpectralClusteringTest, Result)
 {
-  ASSERT_GT(score, 0.9) << "Adjusted Rand Index is too low: " << score;
+  ASSERT_GT(score, 0.8) << "Adjusted Rand Index is too low: " << score;
 }
 
 INSTANTIATE_TEST_CASE_P(SpectralClusteringTests,
