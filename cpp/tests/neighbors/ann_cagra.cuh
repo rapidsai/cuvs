@@ -299,11 +299,16 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
     return "Unknown";
   };
 
-  std::vector<std::string> algo       = {"single-cta", "multi_cta", "multi_kernel", "auto"};
+  std::map<search_algo, std::string> algo_name = {
+    {search_algo::SINGLE_CTA, "single-cta"},      //
+    {search_algo::MULTI_CTA, "multi_cta"},        //
+    {search_algo::MULTI_KERNEL, "multi_kernel"},  //
+    {search_algo::AUTO, "auto"}                   //
+  };
   std::vector<std::string> build_algo = {"IVF_PQ", "NN_DESCENT", "ITERATIVE_CAGRA_SEARCH", "AUTO"};
   std::vector<std::string> merge_strategy = {"PHYSICAL", "LOGICAL"};
   os << "{n_queries=" << p.n_queries << ", dataset shape=" << p.n_rows << "x" << p.dim
-     << ", k=" << p.k << ", " << algo.at((int)p.algo) << ", max_queries=" << p.max_queries
+     << ", k=" << p.k << ", " << algo_name[p.algo] << ", max_queries=" << p.max_queries
      << ", itopk_size=" << p.itopk_size << ", search_width=" << p.search_width
      << ", metric=" << metric_str(p.metric) << ", " << (p.host_dataset ? "host" : "device")
      << ", build_algo=" << build_algo.at((int)p.build_algo)

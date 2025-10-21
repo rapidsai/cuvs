@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "../../../core/omp_wrapper.hpp"
+
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/matrix/gather.cuh>
@@ -49,7 +51,7 @@ struct gather_functor {
 
     raft::resource::sync_stream(res, stream);
 
-    int n_threads = std::min<int>(omp_get_max_threads(), 32);
+    int n_threads = std::min<int>(cuvs::core::omp::get_max_threads(), 32);
 
 #pragma omp parallel for num_threads(n_threads)
     for (int i = 0; i < h_cluster_ids.extent(0); i++) {

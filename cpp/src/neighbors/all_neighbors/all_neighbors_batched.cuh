@@ -15,6 +15,7 @@
  */
 
 #pragma once
+#include "../../core/omp_wrapper.hpp"
 #include "../detail/reachability.cuh"
 #include "all_neighbors_builder.cuh"
 #include "raft/core/logger_macros.hpp"
@@ -483,7 +484,7 @@ void batch_build(
 {
   if (raft::resource::is_multi_gpu(handle)) {
     // For efficient CPU-computation of omp parallel for regions per GPU
-    omp_set_nested(1);
+    cuvs::core::omp::set_nested(1);
   }
 
   size_t num_rows = static_cast<size_t>(dataset.extent(0));

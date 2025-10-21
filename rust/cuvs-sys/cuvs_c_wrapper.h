@@ -14,12 +14,6 @@
  * limitations under the License.
  */
 
-// wrapper file containing all the C-API's we should automatically be creating rust
-// bindings for
-#include <cuvs/core/c_api.h>
-#include <cuvs/cluster/kmeans.h>
-#include <cuvs/distance/pairwise_distance.h>
-#include <cuvs/neighbors/brute_force.h>
-#include <cuvs/neighbors/ivf_flat.h>
-#include <cuvs/neighbors/cagra.h>
-#include <cuvs/neighbors/ivf_pq.h>
+#include <cuvs/core/all.h>
+
+// Please add any extra required header files below for which rust bindings are needed

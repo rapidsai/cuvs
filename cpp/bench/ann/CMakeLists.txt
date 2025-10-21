@@ -188,6 +188,7 @@ function(ConfigureAnnBench)
   target_include_directories(
     ${BENCH_NAME}
     PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/include>"
+           "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/../c/include>"
     PRIVATE ${ConfigureAnnBench_INCLUDES}
   )
 
