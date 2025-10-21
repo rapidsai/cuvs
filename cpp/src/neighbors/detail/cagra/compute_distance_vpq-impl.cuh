@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "../../ivf_pq/ivf_pq_fp_8bit.cuh"
 #include "compute_distance_vpq.hpp"
 
 #include <cuvs/distance/distance.hpp>
@@ -26,10 +27,10 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
-using pq_val_t                              = half;
-using pq_val_pack_t                         = half2;
+using pq_val_t                              = ivf_pq::detail::fp_8bit<5, true>;
+using pq_val_pack_t                         = ivf_pq::detail::fp_8bit4<5, true>;
 using pq_val_pack_uint_t                    = uint32_t;
-constexpr uint32_t pq_val_pack_num_elements = 2;
+constexpr uint32_t pq_val_pack_num_elements = 4;
 
 template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
@@ -188,16 +189,26 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
       constexpr auto num_elements_per_bank =
         pq_val_pack_num_elements /
         (utils::size_of<pq_val_pack_uint_t>() / utils::size_of<uint32_t>());
-      constexpr auto num_banks_per_subspace = PQ_LEN / num_elements_per_bank;
-      const auto j                          = i / num_elements_per_bank;
-      const auto smem_index =
-        (j / num_banks_per_subspace) + (j % num_banks_per_subspace) * (1 << PQ_BITS);
 
-      if constexpr (std::is_same_v<pq_val_t, half>) {
-        half2 buf2;
-        buf2.x = r->pq_code_book_ptr()[i];
-        buf2.y = r->pq_code_book_ptr()[i + 1];
-        device::sts(codebook_buf + smem_index * sizeof(half2), buf2);
+      if constexpr (PQ_LEN > num_elements_per_bank) {  // safety
+        constexpr auto num_banks_per_subspace = PQ_LEN / num_elements_per_bank;
+        const auto j                          = i / num_elements_per_bank;
+        const auto smem_index =
+          (j / num_banks_per_subspace) + (j % num_banks_per_subspace) * (1 << PQ_BITS);
+
+        if constexpr (std::is_same_v<pq_val_t, half>) {
+          pq_val_pack_t buf2;
+          buf2.x = r->pq_code_book_ptr()[i];
+          buf2.y = r->pq_code_book_ptr()[i + 1];
+          device::sts(codebook_buf + smem_index * sizeof(pq_val_pack_t), buf2);
+        } else {
+          pq_val_pack_t buf4;
+          buf4.x = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i]));
+          buf4.y = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 1]));
+          buf4.z = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 2]));
+          buf4.w = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 3]));
+          device::sts(codebook_buf + smem_index * sizeof(pq_val_pack_t), buf4.as_u32());
+        }
       }
     }
   }
@@ -275,49 +286,81 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
     }
     //
     if constexpr (PQ_LEN % 2 == 0) {
-      // **** Use half2 for distance computation ****
+      if constexpr (PQ_LEN >= pq_val_pack_num_elements) {  // safety
+        // **** Use half2 for distance computation ****
 #pragma unroll
-      for (std::uint32_t e = 0; e < nelem; e++) {
-        const std::uint32_t k = e * kTeamVLen + elem_offset + laneId * vlen;
-        if (k >= n_subspace) break;
-        // Loading VQ code-book
-        half2 vq_vals[PQ_LEN][vlen / 2];
+        for (std::uint32_t e = 0; e < nelem; e++) {
+          const std::uint32_t k = e * kTeamVLen + elem_offset + laneId * vlen;
+          if (k >= n_subspace) break;
+          // Loading VQ code-book
+          half2 vq_vals[PQ_LEN][vlen / 2];
 #pragma unroll
-        for (std::uint32_t m = 0; m < PQ_LEN; m++) {
-          const uint32_t d = (vlen * m) + (PQ_LEN * k);
-          if (d >= dim) break;
-          device::ldg_ca(vq_vals[m], vq_code_book_ptr + d);
-        }
-        // Compute distance
-        PQ_CODEBOOK_LOAD_T pq_code = pq_codes[e];
-#pragma unroll
-        for (std::uint32_t v = 0; v < vlen; v++) {
-          if (PQ_LEN * (v + k) >= dim) break;
-#pragma unroll
-          for (std::uint32_t m = 0; m < PQ_LEN / pq_val_pack_num_elements; m++) {
-            constexpr auto kQueryBlock = DatasetBlockDim / (vlen * PQ_LEN);
-            const std::uint32_t d1     = m + (PQ_LEN / pq_val_pack_num_elements) * v;
-            const std::uint32_t d      = d1 * kQueryBlock +
-                                    elem_offset * (PQ_LEN / pq_val_pack_num_elements) +
-                                    e * TeamSize + laneId;
-            half2 q2;
-            pq_val_pack_t c2;
-            // Loading PQ code book from smem
-            device::lds(c2,
-                        pq_codebook_ptr +
-                          sizeof(pq_val_pack_uint_t) * ((1 << PQ_BITS) * m + ((pq_code & 0xff))));
-
-            if constexpr (std::is_same_v<pq_val_t, half>) {
-              // Loading query vector from smem
-              device::lds(q2, query_ptr + sizeof(half2) * d);
-              // L2 distance
-              auto dist = q2 - c2 - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[d1];
-              dist      = dist * dist;
-              norm += static_cast<DISTANCE_T>(dist.x + dist.y);
-            } else {
-            }
+          for (std::uint32_t m = 0; m < PQ_LEN; m++) {
+            const uint32_t d = (vlen * m) + (PQ_LEN * k);
+            if (d >= dim) break;
+            device::ldg_ca(vq_vals[m], vq_code_book_ptr + d);
           }
-          pq_code >>= 8;
+          // Compute distance
+          PQ_CODEBOOK_LOAD_T pq_code = pq_codes[e];
+#pragma unroll
+          for (std::uint32_t v = 0; v < vlen; v++) {
+            if (PQ_LEN * (v + k) >= dim) break;
+#pragma unroll
+            for (std::uint32_t m = 0; m < PQ_LEN / pq_val_pack_num_elements; m++) {
+              constexpr auto kQueryBlock = DatasetBlockDim / (vlen * PQ_LEN);
+              std::uint32_t d1 =
+                m * (pq_val_pack_num_elements / 2) + (PQ_LEN / pq_val_pack_num_elements) * v;
+              std::uint32_t d = d1 * kQueryBlock +
+                                elem_offset * (PQ_LEN / pq_val_pack_num_elements) + e * TeamSize +
+                                laneId;
+              half2 q2;
+              // if constexpr (false) {
+              if constexpr (std::is_same_v<pq_val_t, half>) {
+                half2 c2;
+                // Loading PQ code book from smem
+                device::lds(c2,
+                            pq_codebook_ptr + sizeof(pq_val_pack_uint_t) *
+                                                ((1 << PQ_BITS) * m + ((pq_code & 0xff))));
+
+                // Loading query vector from smem
+                device::lds(q2, query_ptr + sizeof(half2) * d);
+                half2 c2_ = c2;
+                // L2 distance
+                auto dist = q2 - c2_ - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[d1];
+                dist      = dist * dist;
+                norm += static_cast<DISTANCE_T>(dist.x + dist.y);
+              } else {
+                pq_val_pack_t c2;
+                // Loading PQ code book from smem
+                device::lds(c2.as_u32(),
+                            pq_codebook_ptr + sizeof(pq_val_pack_uint_t) *
+                                                ((1 << PQ_BITS) * m + ((pq_code & 0xff))));
+
+                half2 c2_;
+
+                // Loading query vector from smem
+                device::lds(q2, query_ptr + sizeof(half2) * d);
+                c2_.x = static_cast<half>(c2.x);
+                c2_.y = static_cast<half>(c2.y);
+                // L2 distance
+                auto dist = q2 - c2_ - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[d1];
+                dist      = dist * dist;
+                norm += static_cast<DISTANCE_T>(dist.x + dist.y);
+
+                d1 += 1;
+                d += kQueryBlock;
+
+                device::lds(q2, query_ptr + sizeof(half2) * d);
+                c2_.x = static_cast<half>(c2.z);
+                c2_.y = static_cast<half>(c2.w);
+                // L2 distance
+                dist = q2 - c2_ - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[d1];
+                dist = dist * dist;
+                norm += static_cast<DISTANCE_T>(dist.x + dist.y);
+              }
+            }
+            pq_code >>= 8;
+          }
         }
       }
     } else {
