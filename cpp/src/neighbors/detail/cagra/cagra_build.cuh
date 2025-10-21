@@ -95,58 +95,32 @@ void ace_get_partition_labels(
   RAFT_EXPECTS(partition_histogram.extent(1) == 2, "Partition histogram must have 2 columns");
   cudaStream_t stream = raft::resource::get_cuda_stream(res);
 
-  // Sampling vectors from dataset
+  // Sampling vectors from dataset. Uses float conversion on host instead of
+  // raft::matrix::sample_rows to minimize GPU memory usage.
   size_t n_samples         = dataset_size * sampling_rate;
   const size_t min_samples = 100 * n_partitions;
   n_samples                = std::max(n_samples, min_samples);
-  const size_t max_samples = 1000000;  // Limit due to memory constraints
-  n_samples                = std::min(n_samples, max_samples);
   n_samples                = std::min(n_samples, dataset_size);
   RAFT_LOG_DEBUG("ACE: n_samples: %lu", n_samples);
 
-  raft::random::RngState random_state{137};
-  auto device_memory = raft::resource::get_workspace_resource(res);
-  auto sample_db_dev =
-    raft::make_device_mdarray<float>(res, device_memory, raft::make_extents<int64_t>(0, 0));
-  try {
-    sample_db_dev = raft::make_device_mdarray<float>(
-      res, device_memory, raft::make_extents<int64_t>(n_samples, dataset_dim));
-  } catch (raft::logic_error& e) {
-    RAFT_LOG_ERROR(
-      "Insufficient memory for kmeans training set allocation. Please decrease "
-      "sampling_rate, or use managed memory.");
-    throw;
+  auto sample_db = raft::make_host_matrix<float, int64_t>(n_samples, dataset_dim);
+#pragma omp parallel for
+  for (size_t i = 0; i < n_samples; i++) {
+    size_t j = i * dataset_size / n_samples;
+    for (size_t k = 0; k < dataset_dim; k++) {
+      sample_db(i, k) = static_cast<float>(dataset(j, k));
+    }
   }
-  if constexpr (std::is_same_v<T, float>) {
-    raft::matrix::sample_rows<T, int64_t>(res, random_state, dataset, sample_db_dev.view());
-  } else {
-    raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
-      "   cagra::build_ace(%zu, %zu)/sample rows with tmp trainset (%zu rows).",
-      size_t(dataset_size),
-      size_t(dataset_dim),
-      size_t(n_samples));
+  auto sample_db_dev = raft::make_device_matrix<float, int64_t>(res, n_samples, dataset_dim);
+  raft::update_device(
+    sample_db_dev.data_handle(), sample_db.data_handle(), sample_db.size(), stream);
 
-    // TODO(tfeher): Enable codebook generation with any type T, and then remove trainset tmp.
-    auto sample_db_tmp = raft::make_device_mdarray<T>(
-      res, device_memory, raft::make_extents<int64_t>(n_samples, dataset_dim));
-
-    raft::matrix::sample_rows<T, int64_t>(res, random_state, dataset, sample_db_tmp.view());
-
-    raft::linalg::unaryOp(sample_db_dev.data_handle(),
-                          sample_db_tmp.data_handle(),
-                          sample_db_dev.size(),
-                          cuvs::spatial::knn::detail::utils::mapping<float>{},
-                          stream);
-  }
-
-  auto centroids_dev = raft::make_device_matrix<float, int64_t>(res, n_partitions, dataset_dim);
   cuvs::cluster::kmeans::balanced_params kmeans_params;
-  auto sample_db_const_view = raft::make_device_matrix_view<const float, int64_t>(
-    sample_db_dev.data_handle(), n_samples, dataset_dim);
-  cuvs::cluster::kmeans::fit(
-    res, kmeans_params, raft::make_const_mdspan(sample_db_const_view), centroids_dev.view());
+  auto centroids_dev = raft::make_device_matrix<float, int64_t>(res, n_partitions, dataset_dim);
+  cuvs::cluster::kmeans::fit(res, kmeans_params, sample_db_dev.view(), centroids_dev.view());
 
   // Compute distances between dataset and centroid vectors
+  // Uses float conversion on host instead of batch_load_iterator to minimize GPU memory usage.
   const size_t chunk_size = 32 * 1024;
   auto _sub_dataset       = raft::make_host_matrix<float, int64_t>(chunk_size, dataset_dim);
   auto _sub_distances     = raft::make_host_matrix<float, int64_t>(chunk_size, n_partitions);

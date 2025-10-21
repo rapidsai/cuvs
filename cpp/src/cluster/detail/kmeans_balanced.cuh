@@ -813,7 +813,7 @@ void build_clusters(const raft::resources& handle,
                      cluster_labels,
                      cluster_sizes,
                      2,
-                     MathT{params.balancing_threshold},
+                     MathT{0.25},
                      mapping_op,
                      device_memory);
 }
@@ -1160,7 +1160,7 @@ void build_hierarchical(const raft::resources& handle,
                      labels.data(),
                      cluster_sizes.data(),
                      5,
-                     MathT{params.balancing_threshold},
+                     MathT{0.2},
                      mapping_op,
                      device_memory);
 }
