@@ -220,23 +220,24 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
         nvtxRangePop();
       } else {
         if (print_guard < 5) printf("unfused called\n");
-        cuvs::distance::unfusedDistanceNNMinReduce<MathT, MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
-          handle,
-          minClusterAndDistance.data_handle(),
-          dataset,
-          centers,
-          dataset_norm,
-          centroidsNorm.data_handle(),
-          n_rows,
-          n_clusters,
-          dim,
-          (void*)workspace.data_handle(),
-          (params.metric == cuvs::distance::DistanceType::L2Expanded) ? false : true,
-          false,
-          true,
-          params.metric,
-          0.0f,
-          stream);
+        cuvs::distance::
+          unfusedDistanceNNMinReduce<MathT, MathT, raft::KeyValuePair<IdxT, MathT>, IdxT>(
+            handle,
+            minClusterAndDistance.data_handle(),
+            dataset,
+            centers,
+            dataset_norm,
+            centroidsNorm.data_handle(),
+            n_rows,
+            n_clusters,
+            dim,
+            (void*)workspace.data_handle(),
+            (params.metric == cuvs::distance::DistanceType::L2Expanded) ? false : true,
+            false,
+            true,
+            params.metric,
+            0.0f,
+            stream);
       }
       print_guard++;
 

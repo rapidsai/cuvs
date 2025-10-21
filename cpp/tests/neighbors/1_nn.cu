@@ -110,22 +110,23 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
                       "fusedDistanceNNMinReduce is not implemented for datatype other than float");
       }
     } else if constexpr (impl == ImplType::unfused) {
-      cuvs::distance::unfusedDistanceNNMinReduce<DataT, AccT, OutT, IdxT>(handle,
-                                                                   out.data_handle(),
-                                                                   x.data_handle(),
-                                                                   y.data_handle(),
-                                                                   x_norm.data_handle(),
-                                                                   y_norm.data_handle(),
-                                                                   m,
-                                                                   n,
-                                                                   k,
-                                                                   (AccT*)workspace.data_handle(),
-                                                                   false,
-                                                                   true,
-                                                                   true,
-                                                                   cuvs::distance::DistanceType::L2Expanded,
-                                                                   0.0,
-                                                                   stream);
+      cuvs::distance::unfusedDistanceNNMinReduce<DataT, AccT, OutT, IdxT>(
+        handle,
+        out.data_handle(),
+        x.data_handle(),
+        y.data_handle(),
+        x_norm.data_handle(),
+        y_norm.data_handle(),
+        m,
+        n,
+        k,
+        (AccT*)workspace.data_handle(),
+        false,
+        true,
+        true,
+        cuvs::distance::DistanceType::L2Expanded,
+        0.0,
+        stream);
     }
   }
 
