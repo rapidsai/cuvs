@@ -115,6 +115,9 @@ template <uint32_t ExpBits, bool Signed>
 struct fp_8bit4 {
   fp_8bit<ExpBits, Signed> x, y, z, w;
   HDI fp_8bit4() : x(0), y(0), z(0), w(0) {}
+
+  HDI uint32_t& as_u32() { return *reinterpret_cast<uint32_t*>(this); }
+  HDI uint32_t as_u32() const { return *reinterpret_cast<const uint32_t*>(this); }
 };
 
 }  // namespace cuvs::neighbors::ivf_pq::detail
