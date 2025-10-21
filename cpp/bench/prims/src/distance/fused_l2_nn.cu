@@ -295,9 +295,9 @@ int main(int argc, char** argv)
 
   benchmark::internal::Benchmark* bench;
 
-  // In the following instances IdxT is either int64_t or int, it does not seem to matter much
-  // on the performance anyway
+  // In the following instances IdxT is int64_t, it does not seem to have much impact on the performance
   // OutT is always <IdxT, AccT>
+
   // Method: Fused, DataT: float, AccT: float
   bench = benchmark::RegisterBenchmark("fused/float/float",
                                        benchmark_fusedl2nn<float,
@@ -308,7 +308,7 @@ int main(int argc, char** argv)
   bench -> Args({M, N, K, sqrt, dist});
 
   // Method: unfused, DataT: float, AccT: float
-  bench = benchmark::RegisterBenchmark("unfused/float/float>",
+  bench = benchmark::RegisterBenchmark("unfused/float/float",
                                        benchmark_fusedl2nn<float,
                                                            float,
                                                            raft::KeyValuePair<int64_t, float>,
@@ -317,7 +317,7 @@ int main(int argc, char** argv)
   bench -> Args({M, N, K , sqrt, dist});
 
   // Method: gemm, DataT: float, AccT: float
-  bench = benchmark::RegisterBenchmark("gemm/float/float>",
+  bench = benchmark::RegisterBenchmark("gemm/float/float",
                                        benchmark_fusedl2nn<float,
                                                            float,
                                                            raft::KeyValuePair<int64_t, float>,
@@ -335,7 +335,7 @@ int main(int argc, char** argv)
   bench -> Args({int(M), int(N), int(K), sqrt, dist});
 
   // Method: gemm, DataT: half, AccT: float
-  bench = benchmark::RegisterBenchmark("gemm/half/float>",
+  bench = benchmark::RegisterBenchmark("gemm/half/float",
                                        benchmark_fusedl2nn<half,
                                                            float,
                                                            raft::KeyValuePair<int64_t, float>,
@@ -344,7 +344,7 @@ int main(int argc, char** argv)
   bench -> Args({int(M), int(N), int(K), sqrt, dist});
 
   // Method: unfused, DataT: half, AccT: half
-  bench = benchmark::RegisterBenchmark("unfused/half/half>",
+  bench = benchmark::RegisterBenchmark("unfused/half/half",
                                        benchmark_fusedl2nn<half,
                                                            half,
                                                            raft::KeyValuePair<int64_t, half>,
@@ -353,7 +353,7 @@ int main(int argc, char** argv)
   bench -> Args({int(M), int(N), int(K), sqrt, dist});
 
   // Method: gemm, DataT: half, AccT: half
-  bench = benchmark::RegisterBenchmark("gemm/half/half>",
+  bench = benchmark::RegisterBenchmark("gemm/half/half",
                                        benchmark_fusedl2nn<half,
                                                            half,
                                                            raft::KeyValuePair<int64_t, half>,
