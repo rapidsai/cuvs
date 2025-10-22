@@ -17,7 +17,11 @@
 #pragma once
 
 #include "../detail/ann_utils.cuh"
+#if CUDART_VERSION >= 13000
+#include "ivf_flat_interleaved_scan_jit.cuh"
+#else
 #include "ivf_flat_interleaved_scan.cuh"
+#endif
 #include <cstdint>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>

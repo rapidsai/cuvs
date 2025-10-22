@@ -67,14 +67,7 @@ Filename: interleaved_scan_kernel_0_1_false_false_f_f_l_n_inner_1_id.cu
 Each generated `.cu` file contains:
 
 1. **Apache 2.0 License Header**
-2. **Include**: `#include "../ivf_flat_interleaved_scan.cuh"`
+2. **Include**: `#include "../ivf_flat_interleaved_scan_jit.cuh"`
 3. **Conditional compilation**:
    - `#ifdef BUILD_KERNEL`: Template instantiation
    - `#else`: Registration function for JIT/LTO system
-
-## Notes
-
-- All files are generated in the same directory as the script
-- The script automatically creates CMake files with all generated filenames
-- Progress is printed every 100 files during generation
-- Files are sorted alphabetically in the CMake lists

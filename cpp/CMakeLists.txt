@@ -215,12 +215,21 @@ if(BUILD_CAGRA_HNSWLIB)
   include(cmake/thirdparty/get_hnswlib.cmake)
 endif()
 
-# this is needed to embed fatbins to JIT at runtime
-include(cmake/modules/embed_fatbins.cmake)
+set(JIT_LTO_TARGET_ARCHITECTURE "")
+set(JIT_LTO_COMPILATION OFF)
+if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
+  set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
+  set(JIT_LTO_COMPILATION ON)
+endif()
 
-# Generate interleaved scan kernel files at build time
-include(cmake/modules/generate_interleaved_scan_kernels.cmake)
-generate_interleaved_scan_kernels()
+if(JIT_LTO_COMPILATION)
+  # this is needed to embed fatbins to JIT at runtime
+  include(cmake/modules/embed_fatbins.cmake)
+
+  # Generate interleaved scan kernel files at build time
+  include(cmake/modules/generate_interleaved_scan_kernels.cmake)
+  generate_interleaved_scan_kernels()
+endif()
 
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
@@ -545,7 +554,7 @@ if(NOT BUILD_CPU_ONLY)
     src/stats/silhouette_score.cu
     src/stats/trustworthiness_score.cu
     ${CUVS_MG_ALGOS}
-    ${JIT_LTO_FILES}
+    $<$<BOOL:${JIT_LTO_COMPILATION}>:${JIT_LTO_FILES}>
   )
 
   set_target_properties(
@@ -579,67 +588,63 @@ if(NOT BUILD_CPU_ONLY)
     INTERFACE "$<INSTALL_INTERFACE:include>"
   )
 
-  add_library(
-    jit_lto_fatbins OBJECT ${INTERLEAVED_SCAN_KERNEL_FILES} ${METRIC_DEVICE_FUNCTION_FILES}
-                           ${FILTER_DEVICE_FUNCTION_FILES} ${POST_LAMBDA_DEVICE_FUNCTION_FILES}
-  )
+  if(JIT_LTO_COMPILATION)
+    add_library(
+      jit_lto_fatbins OBJECT ${INTERLEAVED_SCAN_KERNEL_FILES} ${METRIC_DEVICE_FUNCTION_FILES}
+                             ${FILTER_DEVICE_FUNCTION_FILES} ${POST_LAMBDA_DEVICE_FUNCTION_FILES}
+    )
 
-  # Make sure the kernels are generated before we try to build them
-  add_dependencies(jit_lto_fatbins ${INTERLEAVED_SCAN_KERNELS_TARGET})
+    # Make sure the kernels are generated before we try to build them
+    add_dependencies(jit_lto_fatbins ${INTERLEAVED_SCAN_KERNELS_TARGET})
 
-  target_compile_definitions(jit_lto_fatbins PRIVATE BUILD_KERNEL)
-  target_include_directories(
-    jit_lto_fatbins PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-                            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
-  )
-  target_compile_options(jit_lto_fatbins PRIVATE -Xfatbin=--compress-all --compress-mode=size)
-  target_compile_options(
-    jit_lto_fatbins PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
-                            "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
-  )
+    target_compile_definitions(jit_lto_fatbins PRIVATE BUILD_KERNEL)
+    target_include_directories(
+      jit_lto_fatbins PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+                              "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
+    )
+    target_compile_options(jit_lto_fatbins PRIVATE -Xfatbin=--compress-all --compress-mode=size)
+    target_compile_options(
+      jit_lto_fatbins PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+                              "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+    )
 
-  set(JIT_LTO_TARGET_ARCHITECTURE "")
-  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
-    set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
-  elseif(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 12.0)
-    set(JIT_LTO_TARGET_ARCHITECTURE "70-real")
+    set_target_properties(
+      jit_lto_fatbins
+      PROPERTIES CUDA_ARCHITECTURES ${JIT_LTO_TARGET_ARCHITECTURE}
+                 CXX_STANDARD 17
+                 CXX_STANDARD_REQUIRED ON
+                 CUDA_STANDARD 17
+                 CUDA_STANDARD_REQUIRED ON
+                 CUDA_SEPARABLE_COMPILATION ON
+                 CUDA_FATBIN_COMPILATION ON
+                 POSITION_INDEPENDENT_CODE ON
+                 INTERPROCEDURAL_OPTIMIZATION ON
+    )
+    target_link_libraries(jit_lto_fatbins PRIVATE rmm::rmm raft::raft CCCL::CCCL)
+
+    add_library(jit_lto_fatbins_as_cpp_sources STATIC src/detail/jit_lto/AlgorithmPlanner.cu)
+
+    # Set PIC for the static library since it will be linked into a shared library
+    set_target_properties(
+      jit_lto_fatbins_as_cpp_sources
+      PROPERTIES CXX_STANDARD 17
+                 CXX_STANDARD_REQUIRED ON
+                 CUDA_STANDARD 17
+                 CUDA_STANDARD_REQUIRED ON
+                 POSITION_INDEPENDENT_CODE ON
+    )
+
+    # Make sure the kernels are generated before embedding fatbins
+    add_dependencies(jit_lto_fatbins_as_cpp_sources ${INTERLEAVED_SCAN_KERNELS_TARGET})
+
+    target_include_directories(
+      jit_lto_fatbins_as_cpp_sources
+      PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+              "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
+    )
+
+    embed_fatbins(jit_lto_fatbins_as_cpp_sources jit_lto_fatbins)
   endif()
-
-  set_target_properties(
-    jit_lto_fatbins
-    PROPERTIES CUDA_ARCHITECTURES ${JIT_LTO_TARGET_ARCHITECTURE}
-               CXX_STANDARD 17
-               CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 17
-               CUDA_STANDARD_REQUIRED ON
-               CUDA_SEPARABLE_COMPILATION ON
-               CUDA_FATBIN_COMPILATION ON
-               POSITION_INDEPENDENT_CODE ON
-               INTERPROCEDURAL_OPTIMIZATION ON
-  )
-  target_link_libraries(jit_lto_fatbins PRIVATE rmm::rmm raft::raft CCCL::CCCL)
-
-  add_library(jit_lto_fatbins_as_cpp_sources STATIC src/detail/jit_lto/AlgorithmPlanner.cu)
-
-  # Set PIC for the static library since it will be linked into a shared library
-  set_target_properties(
-    jit_lto_fatbins_as_cpp_sources
-    PROPERTIES CXX_STANDARD 17
-               CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 17
-               CUDA_STANDARD_REQUIRED ON
-               POSITION_INDEPENDENT_CODE ON
-  )
-
-  # Make sure the kernels are generated before embedding fatbins
-  add_dependencies(jit_lto_fatbins_as_cpp_sources ${INTERLEAVED_SCAN_KERNELS_TARGET})
-
-  target_include_directories(
-    jit_lto_fatbins_as_cpp_sources PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-                                           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
-  )
-
-  embed_fatbins(jit_lto_fatbins_as_cpp_sources jit_lto_fatbins)
 
   # Endian detection
   include(TestBigEndian)
@@ -711,11 +716,12 @@ if(NOT BUILD_CPU_ONLY)
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
-      PRIVATE nvidia::cutlass::cutlass
-              $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              cuvs-cagra-search
-              $<LINK_LIBRARY:WHOLE_ARCHIVE,jit_lto_fatbins_as_cpp_sources>
-              CUDA::nvJitLink
+      PRIVATE
+        nvidia::cutlass::cutlass
+        $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+        cuvs-cagra-search
+        $<$<BOOL:${JIT_LTO_COMPILATION}>:$<LINK_LIBRARY:WHOLE_ARCHIVE,jit_lto_fatbins_as_cpp_sources>>
+        $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -775,8 +781,11 @@ SECTIONS
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
-      PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              $<LINK_LIBRARY:WHOLE_ARCHIVE,jit_lto_fatbins_as_cpp_sources> CUDA::nvJitLink
+      PRIVATE
+        nvidia::cutlass::cutlass
+        $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+        $<$<BOOL:${JIT_LTO_COMPILATION}>:$<LINK_LIBRARY:WHOLE_ARCHIVE,jit_lto_fatbins_as_cpp_sources>>
+        $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
     )
   endif()
 
