@@ -73,13 +73,15 @@ struct index_params : cuvs::neighbors::index_params {
  * @param metric The distance metric to search.
  *
  *
- * * IMPORTANT NOTE *
+ * This parameter heuristic yields a graph that is very similar to an HNSW graph in
+ * terms of the number of nodes and search performance. Since HNSW produces a variable-degree
+ * graph (2M being the max graph degree) and CAGRA produces a fixed-degree graph, there's always a
+ * difference in the performance of the two.
  *
- * The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce
- * the same recalls and QPS for the same parameter `ef`. The graphs are different internally. For
- * the same `ef`, the from-CAGRA index likely has a slightly higher recall and slightly lower QPS.
- * However, the Recall-QPS curves should be similar (i.e. the points are just shifted along the
- * curve).
+ * This function attempts to produce such a graph that the QPS and recall of the two graphs being
+ * searched by HNSW are close for any search parameter combination. The CAGRA-produced graph tends
+ * to have a "longer tail" on the low recall side (that is being slightly faster and less
+ * precise).
  *
  * Usage example:
  * @code{.cpp}
@@ -91,6 +93,7 @@ struct index_params : cuvs::neighbors::index_params {
  *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, cagra_index);
  * @endcode
  */
+[[deprecated("Use cagra::index_params::from_hnsw_soft_m instead")]]
 cuvs::neighbors::cagra::index_params to_cagra_params(
   raft::matrix_extent<int64_t> dataset,
   int M,
