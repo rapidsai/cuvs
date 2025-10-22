@@ -198,7 +198,7 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
         pq_val_pack_num_elements /
         (utils::size_of<pq_val_pack_uint_t>() / utils::size_of<uint32_t>());
 
-      if constexpr (PQ_LEN > num_elements_per_bank) {  // safety
+      if constexpr (PQ_LEN >= num_elements_per_bank) {  // safety
         constexpr auto num_banks_per_subspace = PQ_LEN / num_elements_per_bank;
         const auto j                          = i / num_elements_per_bank;
         const auto smem_index =
