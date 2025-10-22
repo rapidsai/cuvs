@@ -2869,7 +2869,7 @@ auto distribute(const raft::resources& clique, const std::string& filename)
  * @param[in] res raft resources
  * @param[in] dataset a matrix view (host or device) to a row-major matrix [n_rows, dim]
  * @param[out] knn_graph a host matrix view to store the output knn graph [n_rows, graph_degree]
- * @param[in] ivf_pq_params ivf-pq parameters for graph build
+ * @param[in] build_params ivf-pq parameters for graph build
  */
 void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
@@ -2909,7 +2909,7 @@ void build_knn_graph(raft::resources const& res,
  * @param[in] res raft resources
  * @param[in] dataset a matrix view (host or device) to a row-major matrix [n_rows, dim]
  * @param[out] knn_graph a host matrix view to store the output knn graph [n_rows, graph_degree]
- * @param[in] ivf_pq_params ivf-pq parameters for graph build
+ * @param[in] build_params ivf-pq parameters for graph build
  */
 void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<const half, int64_t, raft::row_major> dataset,
@@ -2949,7 +2949,7 @@ void build_knn_graph(raft::resources const& res,
  * @param[in] res raft resources
  * @param[in] dataset a matrix view (host or device) to a row-major matrix [n_rows, dim]
  * @param[out] knn_graph a host matrix view to store the output knn graph [n_rows, graph_degree]
- * @param[in] ivf_pq_params ivf-pq parameters for graph build
+ * @param[in] build_params ivf-pq parameters for graph build
  */
 void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
@@ -2989,7 +2989,7 @@ void build_knn_graph(raft::resources const& res,
  * @param[in] res raft resources
  * @param[in] dataset a matrix view (host or device) to a row-major matrix [n_rows, dim]
  * @param[out] knn_graph a host matrix view to store the output knn graph [n_rows, graph_degree]
- * @param[in] ivf_pq_params ivf-pq parameters for graph build
+ * @param[in] build_params ivf-pq parameters for graph build
  */
 void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
