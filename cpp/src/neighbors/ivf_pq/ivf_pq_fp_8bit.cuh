@@ -32,6 +32,7 @@
 
 #include <cub/cub.cuh>
 #include <cuda_fp16.h>
+#include <cuda_fp8.h>
 
 namespace cuvs::neighbors::ivf_pq::detail {
 
@@ -111,9 +112,20 @@ struct fp_8bit {
   }
 };
 
-template <uint32_t ExpBits, bool Signed>
+template <uint32_t ExpBits, bool Signed, bool SW_Emulation = true>
 struct fp_8bit4 {
-  fp_8bit<ExpBits, Signed> x, y, z, w;
+  using unit_t = fp_8bit<ExpBits, Signed>;
+  unit_t x, y, z, w;
+  HDI fp_8bit4() : x(0.f), y(0.f), z(0.f), w(0.f) {}
+
+  HDI uint32_t& as_u32() { return *reinterpret_cast<uint32_t*>(this); }
+  HDI uint32_t as_u32() const { return *reinterpret_cast<const uint32_t*>(this); }
+};
+
+template <>
+struct fp_8bit4<5, true, false> {
+  using unit_t = __nv_fp8_e5m2;
+  unit_t x, y, z, w;
   HDI fp_8bit4() : x(0.f), y(0.f), z(0.f), w(0.f) {}
 
   HDI uint32_t& as_u32() { return *reinterpret_cast<uint32_t*>(this); }

@@ -28,8 +28,8 @@
 namespace cuvs::neighbors::cagra::detail {
 
 #if 1
-using pq_val_t                              = ivf_pq::detail::fp_8bit<5, true>;
-using pq_val_pack_t                         = ivf_pq::detail::fp_8bit4<5, true>;
+using pq_val_pack_t                         = ivf_pq::detail::fp_8bit4<5, true, false>;
+using pq_val_t                              = typename pq_val_pack_t::unit_t;
 using pq_val_pack_uint_t                    = uint32_t;
 constexpr uint32_t pq_val_pack_num_elements = 4;
 #else
