@@ -19,6 +19,7 @@
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
+#include <cmath>
 #include <optional>
 #include <variant>
 
@@ -63,9 +64,20 @@ struct index_params : cuvs::neighbors::index_params {
   uint32_t pq_train_iters = 10;
 
   /** whether to apply bf16 quantization of dataset vectors **/
-  bool bf16_enabled = false;
+  bool reordering_bf16 = false;
 
-  // TODO - add other scann build params
+  /** Threshold T for computing AVQ eta = (dim - 1) ( T^2 / || x ||^2) / ( 1 - T^2 / || x ||^2)
+   *
+   * When quantizing a vector x to x_q, AVQ minimizes the loss function
+   * L(x, x_q) = eta * || r_para ||^2 + || r_perp ||^2, where
+   * r = x - x_q, r_para = <r, x> * x / || x ||^2, r_perp = r - r_para
+   *
+   * Compared to L2 loss, This produces an x_q which better approximates
+   * the dot product of a query vector with x
+   *
+   * If the threshold is NAN, AVQ is not performed during bfloat16 quant
+   */
+  float reordering_noise_shaping_threshold = NAN;
 };
 
 /**
@@ -125,7 +137,7 @@ struct index : cuvs::neighbors::index {
         IdxT dim,
         uint32_t pq_clusters,
         uint32_t pq_num_subspaces,
-        bool bf16_enabled)
+        bool reordering_bf16)
     : cuvs::neighbors::index(),
       metric_(metric),
       pq_dim_(pq_dim),
@@ -143,7 +155,7 @@ struct index : cuvs::neighbors::index {
       n_rows_(n_rows),
       dim_(dim),
       bf16_dataset_(raft::make_host_matrix<int16_t, IdxT, raft::row_major>(
-        bf16_enabled ? n_rows : 0, bf16_enabled ? dim : 0))
+        reordering_bf16 ? n_rows : 0, reordering_bf16 ? dim : 0))
 
   {
   }
@@ -158,7 +170,7 @@ struct index : cuvs::neighbors::index {
             dim,
             1 << params.pq_bits,
             dim / params.pq_dim,
-            params.bf16_enabled)
+            params.reordering_bf16)
   {
     RAFT_EXPECTS(params.pq_bits == 4 || params.pq_bits == 8, "ScaNN only supports 4 or 8 bit PQ");
     RAFT_EXPECTS(dim >= params.pq_dim,
@@ -249,9 +261,21 @@ struct index : cuvs::neighbors::index {
   raft::device_matrix<float, uint32_t, raft::row_major> pq_codebook_;
   raft::host_matrix<uint8_t, IdxT, raft::row_major> quantized_residuals_;
   raft::host_matrix<uint8_t, IdxT, raft::row_major> quantized_soar_residuals_;
+
+  /* Internally, __nv_bfloat16 is used for float <-> __nv_bfloat16 conversion.
+   * The bits of __nv_bfloat16 are stored here reinterpreted as int16_t
+   *
+   * int16_t is used for two reaosns:
+   * * OSS ScaNN expects int16_t, so the serialzed bf16_dataset_ can be consumed
+   *   without any additional post-processing
+   * * For AVQ, we need to find the next bfloat16 number that is larger/smaller than a
+   *   given float. This is equivalent to incrementing/decrementing the mantissa
+   *   in IEEE representation of the bfloat16 number, which in turn is equivalent
+   *   to incrementing/decrementing the int16_t representation
+   */
   raft::host_matrix<int16_t, IdxT, raft::row_major> bf16_dataset_;
-  // TODO - add any data, pointers or structures needed
 };
+
 /**
  * @}
  */
