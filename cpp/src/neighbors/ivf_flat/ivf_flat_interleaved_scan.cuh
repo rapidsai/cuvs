@@ -97,8 +97,47 @@ __device__ inline void copy_vectorized(uint8_t* out,
 {
   // For byte_arithmetic_ptr, copy element by element with normalization to uint8_t
   for (int i = threadIdx.x; i < n; i += blockDim.x) {
-    out[i] = static_cast<uint8_t>(in[i]);
+    out[i] = in.get_uint8_ptr()[i];
   }
+}
+
+/**
+ * Pack 4 uint8_t values into a single uint32_t for vectorized operations.
+ */
+__device__ __forceinline__ uint32_t pack_bytes_uint32(uint8_t b0,
+                                                      uint8_t b1,
+                                                      uint8_t b2,
+                                                      uint8_t b3)
+{
+  return (static_cast<uint32_t>(b0) << 0) | (static_cast<uint32_t>(b1) << 8) |
+         (static_cast<uint32_t>(b2) << 16) | (static_cast<uint32_t>(b3) << 24);
+}
+
+/**
+ * Normalize int8_t bytes (stored as raw uint8_t) to actual uint8_t values by adding 128 to each
+ * byte. This is only needed for Euclidean distance with signed data, as Euclidean distance is
+ * translation-invariant.
+ */
+__device__ __forceinline__ uint32_t normalize_int8_packed(uint32_t packed)
+{
+  // Unpack 4 bytes, reinterpret as signed, add 128 to each, repack
+  uint8_t b0 = static_cast<uint8_t>(static_cast<int16_t>(static_cast<int8_t>(packed >> 0)) + 128);
+  uint8_t b1 = static_cast<uint8_t>(static_cast<int16_t>(static_cast<int8_t>(packed >> 8)) + 128);
+  uint8_t b2 = static_cast<uint8_t>(static_cast<int16_t>(static_cast<int8_t>(packed >> 16)) + 128);
+  uint8_t b3 = static_cast<uint8_t>(static_cast<int16_t>(static_cast<int8_t>(packed >> 24)) + 128);
+  return pack_bytes_uint32(b0, b1, b2, b3);
+}
+
+/**
+ * Normalize int8_t bytes packed in uint16_t (2 bytes).
+ */
+__device__ __forceinline__ uint32_t normalize_int8_packed_u16(uint32_t packed)
+{
+  // Unpack 2 bytes, reinterpret as signed, add 128 to each, repack (result fits in uint16_t but
+  // returned as uint32_t)
+  uint8_t b0 = static_cast<uint8_t>(static_cast<int16_t>(static_cast<int8_t>(packed >> 0)) + 128);
+  uint8_t b1 = static_cast<uint8_t>(static_cast<int16_t>(static_cast<int8_t>(packed >> 8)) + 128);
+  return (static_cast<uint32_t>(b0) << 0) | (static_cast<uint32_t>(b1) << 8);
 }
 
 /**
@@ -217,38 +256,16 @@ struct loadAndComputeDist {
   }
 };
 
-// Helper to pack 4 bytes into a uint32_t register
-__device__ __forceinline__ uint32_t pack_bytes_uint32(uint8_t b0,
-                                                      uint8_t b1,
-                                                      uint8_t b2,
-                                                      uint8_t b3)
-{
-  return (static_cast<uint32_t>(b0) << 0) | (static_cast<uint32_t>(b1) << 8) |
-         (static_cast<uint32_t>(b2) << 16) | (static_cast<uint32_t>(b3) << 24);
-}
-
-// Forward declare inner_prod_dist
-template <int Veclen, typename T, typename AccT>
-struct inner_prod_dist;
-
-// Type trait to check if Lambda is inner_prod_dist
-template <typename T>
-struct is_inner_prod_dist : std::false_type {};
-
-template <int Veclen, typename DataT, typename AccT>
-struct is_inner_prod_dist<inner_prod_dist<Veclen, DataT, AccT>> : std::true_type {};
-
-// This handles uint8_t 8, 16 Veclens (also handles int8_t via byte_arithmetic_ptr with int32
-// accumulator)
+// This handles uint8_t 8, 16 Veclens
 template <int kUnroll, typename Lambda, int uint8_veclen, bool ComputeNorm>
-struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, int32_t, ComputeNorm> {
+struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, uint32_t, ComputeNorm> {
   Lambda compute_dist;
-  int32_t& dist;
-  int32_t& norm_query;
-  int32_t& norm_data;
+  uint32_t& dist;
+  uint32_t& norm_query;
+  uint32_t& norm_data;
 
   __device__ __forceinline__
-  loadAndComputeDist(int32_t& dist, Lambda op, int32_t& norm_query, int32_t& norm_data)
+  loadAndComputeDist(uint32_t& dist, Lambda op, uint32_t& norm_query, uint32_t& norm_data)
     : dist(dist), compute_dist(op), norm_query(norm_query), norm_data(norm_data)
   {
   }
@@ -258,175 +275,127 @@ struct loadAndComputeDist<kUnroll, Lambda, uint8_veclen, uint8_t, int32_t, Compu
                                                       int loadIndex,
                                                       int shmemIndex)
   {
-    constexpr int veclen_int     = uint8_veclen / 4;  // converting uint8_t veclens to int
-    loadIndex                    = loadIndex * veclen_int;
-    const bool is_signed         = data.is_signed;
-    constexpr int32_t offset_reg = 0x80808080;  // 128 in each byte position
+    const uint8_t* data_ptr  = data.get_uint8_ptr();
+    const bool is_signed     = data.is_signed;
+    constexpr int veclen_int = uint8_veclen / 4;  // converting uint8_t veclens to int
+    loadIndex                = loadIndex * veclen_int;
 #pragma unroll
     for (int j = 0; j < kUnroll; ++j) {
       uint32_t encV[veclen_int];
-      const int byte_offset = (loadIndex + j * kIndexGroupSize * veclen_int) * 4;
-#pragma unroll
-      for (int i = 0; i < veclen_int; i++) {
-        encV[i] = pack_bytes_uint32(data[byte_offset + i * 4 + 0],
-                                    data[byte_offset + i * 4 + 1],
-                                    data[byte_offset + i * 4 + 2],
-                                    data[byte_offset + i * 4 + 3]);
-      }
+      raft::ldg(
+        encV,
+        reinterpret_cast<unsigned const*>(data_ptr) + loadIndex + j * kIndexGroupSize * veclen_int);
       uint32_t queryRegs[veclen_int];
       raft::lds(queryRegs,
                 reinterpret_cast<unsigned const*>(query_shared + shmemIndex) + j * veclen_int);
 #pragma unroll
       for (int k = 0; k < veclen_int; k++) {
-        if constexpr (is_inner_prod_dist<Lambda>::value) {
-          int32_t q = is_signed ? (static_cast<int32_t>(queryRegs[k]) - offset_reg)
-                                : static_cast<int32_t>(queryRegs[k]);
-          int32_t e = is_signed ? (static_cast<int32_t>(encV[k]) - offset_reg)
-                                : static_cast<int32_t>(encV[k]);
-          compute_dist(dist, q, e);
-          if constexpr (ComputeNorm) {
-            norm_query = raft::dp4a(q, q, norm_query);
-            norm_data  = raft::dp4a(e, e, norm_data);
-          }
-        } else {
-          compute_dist(dist, static_cast<int32_t>(queryRegs[k]), static_cast<int32_t>(encV[k]));
-          if constexpr (ComputeNorm) {
-            int32_t q_i32 = static_cast<int32_t>(queryRegs[k]);
-            int32_t e_i32 = static_cast<int32_t>(encV[k]);
-            norm_query    = raft::dp4a(q_i32, q_i32, norm_query);
-            norm_data     = raft::dp4a(e_i32, e_i32, norm_data);
-          }
+        // Normalize int8_t bytes to uint8_t for Euclidean distance (translation-invariant)
+        if (is_signed) {
+          encV[k]      = normalize_int8_packed(encV[k]);
+          queryRegs[k] = normalize_int8_packed(queryRegs[k]);
+        }
+        compute_dist(dist, queryRegs[k], encV[k]);
+        if constexpr (ComputeNorm) {
+          norm_query = raft::dp4a(queryRegs[k], queryRegs[k], norm_query);
+          norm_data  = raft::dp4a(encV[k], encV[k], norm_data);
         }
       }
     }
   }
-
   __device__ __forceinline__ void runLoadShflAndCompute(
-    cuvs::detail::byte_arithmetic_ptr data,
+    cuvs::detail::byte_arithmetic_ptr& data,
     const cuvs::detail::byte_arithmetic_ptr& query,
     int baseLoadIndex,
     const int lane_id)
   {
-    constexpr int veclen_int     = uint8_veclen / 4;  // converting uint8_t veclens to int
-    const bool is_signed         = data.is_signed;
-    constexpr int32_t offset_reg = 0x80808080;  // 128 in each byte position
-    uint32_t queryReg            = 0;
-    if (lane_id < 8) {
-      const int byte_offset = baseLoadIndex + lane_id * 4;
-      queryReg              = pack_bytes_uint32(query[byte_offset + 0],
-                                   query[byte_offset + 1],
-                                   query[byte_offset + 2],
-                                   query[byte_offset + 3]);
-    }
+    const uint8_t* query_ptr = query.get_uint8_ptr();
+    const bool is_signed     = data.is_signed;
+    constexpr int veclen_int = uint8_veclen / 4;  // converting uint8_t veclens to int
+    uint32_t queryReg =
+      (lane_id < 8) ? reinterpret_cast<unsigned const*>(query_ptr + baseLoadIndex)[lane_id] : 0;
     constexpr int stride = kUnroll * uint8_veclen;
 
+    const uint8_t* data_ptr = data.get_uint8_ptr();
 #pragma unroll
-    for (int i = 0; i < raft::WarpSize / stride; ++i, data = data + stride * kIndexGroupSize) {
+    for (int i = 0; i < raft::WarpSize / stride; ++i, data_ptr += stride * kIndexGroupSize) {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
         uint32_t encV[veclen_int];
-        const int byte_offset = (lane_id + j * kIndexGroupSize) * veclen_int * 4;
-#pragma unroll
-        for (int v = 0; v < veclen_int; v++) {
-          encV[v] = pack_bytes_uint32(data[byte_offset + v * 4 + 0],
-                                      data[byte_offset + v * 4 + 1],
-                                      data[byte_offset + v * 4 + 2],
-                                      data[byte_offset + v * 4 + 3]);
-        }
+        raft::ldg(encV,
+                  reinterpret_cast<unsigned const*>(data_ptr) +
+                    (lane_id + j * kIndexGroupSize) * veclen_int);
         const int d = (i * kUnroll + j) * veclen_int;
 #pragma unroll
         for (int k = 0; k < veclen_int; ++k) {
-          uint32_t q_raw = raft::shfl(queryReg, d + k, raft::WarpSize);
-          if constexpr (is_inner_prod_dist<Lambda>::value) {
-            int32_t q =
-              is_signed ? (static_cast<int32_t>(q_raw) - offset_reg) : static_cast<int32_t>(q_raw);
-            int32_t e = is_signed ? (static_cast<int32_t>(encV[k]) - offset_reg)
-                                  : static_cast<int32_t>(encV[k]);
-            compute_dist(dist, q, e);
-            if constexpr (ComputeNorm) {
-              norm_query = raft::dp4a(q, q, norm_query);
-              norm_data  = raft::dp4a(e, e, norm_data);
-            }
-          } else {
-            int32_t q_i32 = static_cast<int32_t>(q_raw);
-            int32_t e_i32 = static_cast<int32_t>(encV[k]);
-            compute_dist(dist, q_i32, e_i32);
-            if constexpr (ComputeNorm) {
-              norm_query = raft::dp4a(q_i32, q_i32, norm_query);
-              norm_data  = raft::dp4a(e_i32, e_i32, norm_data);
-            }
+          uint32_t q = raft::shfl(queryReg, d + k, raft::WarpSize);
+          // Normalize int8_t bytes to uint8_t for Euclidean distance (translation-invariant)
+          if (is_signed) {
+            encV[k] = normalize_int8_packed(encV[k]);
+            q       = normalize_int8_packed(q);
+          }
+          compute_dist(dist, q, encV[k]);
+          if constexpr (ComputeNorm) {
+            norm_query = raft::dp4a(q, q, norm_query);
+            norm_data  = raft::dp4a(encV[k], encV[k], norm_data);
           }
         }
       }
     }
+    // Update the byte_arithmetic_ptr by the total offset
+    data = cuvs::detail::byte_arithmetic_ptr(const_cast<uint8_t*>(data_ptr), is_signed);
   }
 
   __device__ __forceinline__ void runLoadShflAndComputeRemainder(
-    cuvs::detail::byte_arithmetic_ptr data,
+    cuvs::detail::byte_arithmetic_ptr& data,
     const cuvs::detail::byte_arithmetic_ptr& query,
     const int lane_id,
     const int dim,
     const int dimBlocks)
   {
-    constexpr int veclen_int     = uint8_veclen / 4;
-    const bool is_signed         = data.is_signed;
-    constexpr int32_t offset_reg = 0x80808080;               // 128 in each byte position
-    const int loadDim            = dimBlocks + lane_id * 4;  // Here 4 is for 1 - int
-    uint32_t queryReg            = 0;
-    if (loadDim < dim) {
-      queryReg = pack_bytes_uint32(
-        query[loadDim + 0], query[loadDim + 1], query[loadDim + 2], query[loadDim + 3]);
-    }
+    const uint8_t* query_ptr = query.get_uint8_ptr();
+    const bool is_signed     = data.is_signed;
+    constexpr int veclen_int = uint8_veclen / 4;
+    const int loadDim        = dimBlocks + lane_id * 4;  // Here 4 is for 1 - int
+    uint32_t queryReg =
+      loadDim < dim ? reinterpret_cast<uint32_t const*>(query_ptr + loadDim)[0] : 0;
+
+    const uint8_t* data_ptr = data.get_uint8_ptr();
     for (int d = 0; d < dim - dimBlocks;
-         d += uint8_veclen, data = data + kIndexGroupSize * uint8_veclen) {
+         d += uint8_veclen, data_ptr += kIndexGroupSize * uint8_veclen) {
       uint32_t enc[veclen_int];
-      const int byte_offset = lane_id * veclen_int * 4;
-#pragma unroll
-      for (int v = 0; v < veclen_int; v++) {
-        enc[v] = pack_bytes_uint32(data[byte_offset + v * 4 + 0],
-                                   data[byte_offset + v * 4 + 1],
-                                   data[byte_offset + v * 4 + 2],
-                                   data[byte_offset + v * 4 + 3]);
-      }
+      raft::ldg(enc, reinterpret_cast<uint32_t const*>(data_ptr) + lane_id * veclen_int);
 #pragma unroll
       for (int k = 0; k < veclen_int; k++) {
-        uint32_t q_raw = raft::shfl(queryReg, (d / 4) + k, raft::WarpSize);
-        if constexpr (is_inner_prod_dist<Lambda>::value) {
-          int32_t q =
-            is_signed ? (static_cast<int32_t>(q_raw) - offset_reg) : static_cast<int32_t>(q_raw);
-          int32_t e =
-            is_signed ? (static_cast<int32_t>(enc[k]) - offset_reg) : static_cast<int32_t>(enc[k]);
-          compute_dist(dist, q, e);
-          if constexpr (ComputeNorm) {
-            norm_query = raft::dp4a(q, q, norm_query);
-            norm_data  = raft::dp4a(e, e, norm_data);
-          }
-        } else {
-          int32_t q_i32 = static_cast<int32_t>(q_raw);
-          int32_t e_i32 = static_cast<int32_t>(enc[k]);
-          compute_dist(dist, q_i32, e_i32);
-          if constexpr (ComputeNorm) {
-            norm_query = raft::dp4a(q_i32, q_i32, norm_query);
-            norm_data  = raft::dp4a(e_i32, e_i32, norm_data);
-          }
+        uint32_t q = raft::shfl(queryReg, (d / 4) + k, raft::WarpSize);
+        // Normalize int8_t bytes to uint8_t for Euclidean distance (translation-invariant)
+        if (is_signed) {
+          enc[k] = normalize_int8_packed(enc[k]);
+          q      = normalize_int8_packed(q);
+        }
+        compute_dist(dist, q, enc[k]);
+        if constexpr (ComputeNorm) {
+          norm_query = raft::dp4a(q, q, norm_query);
+          norm_data  = raft::dp4a(enc[k], enc[k], norm_data);
         }
       }
     }
+    // Update the byte_arithmetic_ptr by the total offset
+    data = cuvs::detail::byte_arithmetic_ptr(const_cast<uint8_t*>(data_ptr), is_signed);
   }
 };
 
 // Keep this specialized uint8 Veclen = 4, because compiler is generating suboptimal code while
-// using above common template of int2/int4 (also handles int8_t via byte_arithmetic_ptr with int32
-// accumulator)
+// using above common template of int2/int4
 template <int kUnroll, typename Lambda, bool ComputeNorm>
-struct loadAndComputeDist<kUnroll, Lambda, 4, uint8_t, int32_t, ComputeNorm> {
+struct loadAndComputeDist<kUnroll, Lambda, 4, uint8_t, uint32_t, ComputeNorm> {
   Lambda compute_dist;
-  int32_t& dist;
-  int32_t& norm_query;
-  int32_t& norm_data;
+  uint32_t& dist;
+  uint32_t& norm_query;
+  uint32_t& norm_data;
 
   __device__ __forceinline__
-  loadAndComputeDist(int32_t& dist, Lambda op, int32_t& norm_query, int32_t& norm_data)
+  loadAndComputeDist(uint32_t& dist, Lambda op, uint32_t& norm_query, uint32_t& norm_data)
     : dist(dist), compute_dist(op), norm_query(norm_query), norm_data(norm_data)
   {
   }
@@ -436,144 +405,102 @@ struct loadAndComputeDist<kUnroll, Lambda, 4, uint8_t, int32_t, ComputeNorm> {
                                                       int loadIndex,
                                                       int shmemIndex)
   {
-    const bool is_signed         = data.is_signed;
-    constexpr int32_t offset_reg = 0x80808080;  // 128 in each byte position
+    const uint8_t* data_ptr = data.get_uint8_ptr();
+    const bool is_signed    = data.is_signed;
 #pragma unroll
     for (int j = 0; j < kUnroll; ++j) {
-      uint32_t encV;
-      const int byte_offset = (loadIndex + j * kIndexGroupSize) * 4;
-      encV                  = pack_bytes_uint32(
-        data[byte_offset + 0], data[byte_offset + 1], data[byte_offset + 2], data[byte_offset + 3]);
+      uint32_t encV = reinterpret_cast<unsigned const*>(data_ptr)[loadIndex + j * kIndexGroupSize];
       uint32_t queryRegs = reinterpret_cast<unsigned const*>(query_shared + shmemIndex)[j];
-      if constexpr (is_inner_prod_dist<Lambda>::value) {
-        int32_t q = is_signed ? (static_cast<int32_t>(queryRegs) - offset_reg)
-                              : static_cast<int32_t>(queryRegs);
-        int32_t e =
-          is_signed ? (static_cast<int32_t>(encV) - offset_reg) : static_cast<int32_t>(encV);
-        compute_dist(dist, q, e);
-        if constexpr (ComputeNorm) {
-          norm_query = raft::dp4a(q, q, norm_query);
-          norm_data  = raft::dp4a(e, e, norm_data);
-        }
-      } else {
-        int32_t q_i32 = static_cast<int32_t>(queryRegs);
-        int32_t e_i32 = static_cast<int32_t>(encV);
-        compute_dist(dist, q_i32, e_i32);
-        if constexpr (ComputeNorm) {
-          norm_query = raft::dp4a(q_i32, q_i32, norm_query);
-          norm_data  = raft::dp4a(e_i32, e_i32, norm_data);
-        }
+      // Normalize int8_t bytes to uint8_t for Euclidean distance (translation-invariant)
+      if (is_signed) {
+        encV      = normalize_int8_packed(encV);
+        queryRegs = normalize_int8_packed(queryRegs);
+      }
+      compute_dist(dist, queryRegs, encV);
+      if constexpr (ComputeNorm) {
+        norm_query = raft::dp4a(queryRegs, queryRegs, norm_query);
+        norm_data  = raft::dp4a(encV, encV, norm_data);
       }
     }
   }
-
   __device__ __forceinline__ void runLoadShflAndCompute(
-    cuvs::detail::byte_arithmetic_ptr data,
+    cuvs::detail::byte_arithmetic_ptr& data,
     const cuvs::detail::byte_arithmetic_ptr& query,
     int baseLoadIndex,
     const int lane_id)
   {
-    const bool is_signed         = data.is_signed;
-    constexpr int32_t offset_reg = 0x80808080;  // 128 in each byte position
-    uint32_t queryReg            = 0;
-    if (lane_id < 8) {
-      const int byte_offset = baseLoadIndex + lane_id * 4;
-      queryReg              = pack_bytes_uint32(query[byte_offset + 0],
-                                   query[byte_offset + 1],
-                                   query[byte_offset + 2],
-                                   query[byte_offset + 3]);
-    }
+    const uint8_t* query_ptr = query.get_uint8_ptr();
+    const bool is_signed     = data.is_signed;
+    uint32_t queryReg =
+      (lane_id < 8) ? reinterpret_cast<unsigned const*>(query_ptr + baseLoadIndex)[lane_id] : 0;
     constexpr int veclen = 4;
     constexpr int stride = kUnroll * veclen;
 
+    const uint8_t* data_ptr = data.get_uint8_ptr();
 #pragma unroll
-    for (int i = 0; i < raft::WarpSize / stride; ++i, data = data + stride * kIndexGroupSize) {
+    for (int i = 0; i < raft::WarpSize / stride; ++i, data_ptr += stride * kIndexGroupSize) {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
-        uint32_t encV;
-        const int byte_offset = (lane_id + j * kIndexGroupSize) * 4;
-        encV                  = pack_bytes_uint32(data[byte_offset + 0],
-                                 data[byte_offset + 1],
-                                 data[byte_offset + 2],
-                                 data[byte_offset + 3]);
-        uint32_t q_raw        = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
-        if constexpr (is_inner_prod_dist<Lambda>::value) {
-          int32_t q =
-            is_signed ? (static_cast<int32_t>(q_raw) - offset_reg) : static_cast<int32_t>(q_raw);
-          int32_t e =
-            is_signed ? (static_cast<int32_t>(encV) - offset_reg) : static_cast<int32_t>(encV);
-          compute_dist(dist, q, e);
-          if constexpr (ComputeNorm) {
-            norm_query = raft::dp4a(q, q, norm_query);
-            norm_data  = raft::dp4a(e, e, norm_data);
-          }
-        } else {
-          int32_t q_i32 = static_cast<int32_t>(q_raw);
-          int32_t e_i32 = static_cast<int32_t>(encV);
-          compute_dist(dist, q_i32, e_i32);
-          if constexpr (ComputeNorm) {
-            norm_query = raft::dp4a(q_i32, q_i32, norm_query);
-            norm_data  = raft::dp4a(e_i32, e_i32, norm_data);
-          }
+        uint32_t encV = reinterpret_cast<unsigned const*>(data_ptr)[lane_id + j * kIndexGroupSize];
+        uint32_t q    = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
+        // Normalize int8_t bytes to uint8_t for Euclidean distance (translation-invariant)
+        if (is_signed) {
+          encV = normalize_int8_packed(encV);
+          q    = normalize_int8_packed(q);
+        }
+        compute_dist(dist, q, encV);
+        if constexpr (ComputeNorm) {
+          norm_query = raft::dp4a(q, q, norm_query);
+          norm_data  = raft::dp4a(encV, encV, norm_data);
         }
       }
     }
+    // Update the byte_arithmetic_ptr by the total offset
+    data = cuvs::detail::byte_arithmetic_ptr(const_cast<uint8_t*>(data_ptr), is_signed);
   }
 
   __device__ __forceinline__ void runLoadShflAndComputeRemainder(
-    cuvs::detail::byte_arithmetic_ptr data,
+    cuvs::detail::byte_arithmetic_ptr& data,
     const cuvs::detail::byte_arithmetic_ptr& query,
     const int lane_id,
     const int dim,
     const int dimBlocks)
   {
-    constexpr int veclen         = 4;
-    const bool is_signed         = data.is_signed;
-    constexpr int32_t offset_reg = 0x80808080;  // 128 in each byte position
-    const int loadDim            = dimBlocks + lane_id * 4;
-    uint32_t queryReg            = 0;
-    if (loadDim < dim) {
-      queryReg = pack_bytes_uint32(
-        query[loadDim + 0], query[loadDim + 1], query[loadDim + 2], query[loadDim + 3]);
-    }
-    for (int d = 0; d < dim - dimBlocks; d += veclen, data = data + kIndexGroupSize * veclen) {
-      uint32_t enc;
-      const int byte_offset = lane_id * 4;
-      enc                   = pack_bytes_uint32(
-        data[byte_offset + 0], data[byte_offset + 1], data[byte_offset + 2], data[byte_offset + 3]);
-      uint32_t q_raw = raft::shfl(queryReg, d / veclen, raft::WarpSize);
-      if constexpr (is_inner_prod_dist<Lambda>::value) {
-        int32_t q =
-          is_signed ? (static_cast<int32_t>(q_raw) - offset_reg) : static_cast<int32_t>(q_raw);
-        int32_t e =
-          is_signed ? (static_cast<int32_t>(enc) - offset_reg) : static_cast<int32_t>(enc);
-        compute_dist(dist, q, e);
-        if constexpr (ComputeNorm) {
-          norm_query = raft::dp4a(q, q, norm_query);
-          norm_data  = raft::dp4a(e, e, norm_data);
-        }
-      } else {
-        int32_t q_i32 = static_cast<int32_t>(q_raw);
-        int32_t e_i32 = static_cast<int32_t>(enc);
-        compute_dist(dist, q_i32, e_i32);
-        if constexpr (ComputeNorm) {
-          norm_query = raft::dp4a(q_i32, q_i32, norm_query);
-          norm_data  = raft::dp4a(e_i32, e_i32, norm_data);
-        }
+    constexpr int veclen     = 4;
+    const int loadDim        = dimBlocks + lane_id;
+    const uint8_t* query_ptr = query.get_uint8_ptr();
+    const bool is_signed     = data.is_signed;
+    uint32_t queryReg = loadDim < dim ? reinterpret_cast<unsigned const*>(query_ptr)[loadDim] : 0;
+
+    const uint8_t* data_ptr = data.get_uint8_ptr();
+    for (int d = 0; d < dim - dimBlocks; d += veclen, data_ptr += kIndexGroupSize * veclen) {
+      uint32_t enc = reinterpret_cast<unsigned const*>(data_ptr)[lane_id];
+      uint32_t q   = raft::shfl(queryReg, d / veclen, raft::WarpSize);
+      // Normalize int8_t bytes to uint8_t for Euclidean distance (translation-invariant)
+      if (is_signed) {
+        enc = normalize_int8_packed(enc);
+        q   = normalize_int8_packed(q);
+      }
+      compute_dist(dist, q, enc);
+      if constexpr (ComputeNorm) {
+        norm_query = raft::dp4a(q, q, norm_query);
+        norm_data  = raft::dp4a(enc, enc, norm_data);
       }
     }
+    // Update the byte_arithmetic_ptr by the total offset
+    data = cuvs::detail::byte_arithmetic_ptr(const_cast<uint8_t*>(data_ptr), is_signed);
   }
 };
 
 template <int kUnroll, typename Lambda, bool ComputeNorm>
-struct loadAndComputeDist<kUnroll, Lambda, 2, uint8_t, int32_t, ComputeNorm> {
+struct loadAndComputeDist<kUnroll, Lambda, 2, uint8_t, uint32_t, ComputeNorm> {
   Lambda compute_dist;
-  int32_t& dist;
-  int32_t& norm_query;
-  int32_t& norm_data;
+  uint32_t& dist;
+  uint32_t& norm_query;
+  uint32_t& norm_data;
 
   __device__ __forceinline__
-  loadAndComputeDist(int32_t& dist, Lambda op, int32_t& norm_query, int32_t& norm_data)
+  loadAndComputeDist(uint32_t& dist, Lambda op, uint32_t& norm_query, uint32_t& norm_data)
     : dist(dist), compute_dist(op), norm_query(norm_query), norm_data(norm_data)
   {
   }
@@ -583,140 +510,104 @@ struct loadAndComputeDist<kUnroll, Lambda, 2, uint8_t, int32_t, ComputeNorm> {
                                                       int loadIndex,
                                                       int shmemIndex)
   {
-    const bool is_signed         = data.is_signed;
-    constexpr int32_t offset_reg = 0x8080;  // 128 in each of 2 byte positions
+    const uint8_t* data_ptr = data.get_uint8_ptr();
+    const bool is_signed    = data.is_signed;
 #pragma unroll
     for (int j = 0; j < kUnroll; ++j) {
-      uint32_t encV;
-      const int byte_offset = (loadIndex + j * kIndexGroupSize) * 2;
-      encV = (static_cast<uint32_t>(static_cast<uint8_t>(data[byte_offset + 0])) << 0) |
-             (static_cast<uint32_t>(static_cast<uint8_t>(data[byte_offset + 1])) << 8);
+      uint32_t encV = reinterpret_cast<uint16_t const*>(data_ptr)[loadIndex + j * kIndexGroupSize];
       uint32_t queryRegs = reinterpret_cast<uint16_t const*>(query_shared + shmemIndex)[j];
-      if constexpr (is_inner_prod_dist<Lambda>::value) {
-        int32_t q = is_signed ? (static_cast<int32_t>(queryRegs) - offset_reg)
-                              : static_cast<int32_t>(queryRegs);
-        int32_t e =
-          is_signed ? (static_cast<int32_t>(encV) - offset_reg) : static_cast<int32_t>(encV);
-        compute_dist(dist, q, e);
-        if constexpr (ComputeNorm) {
-          norm_query = raft::dp4a(q, q, norm_query);
-          norm_data  = raft::dp4a(e, e, norm_data);
-        }
-      } else {
-        int32_t q_i32 = static_cast<int32_t>(queryRegs);
-        int32_t e_i32 = static_cast<int32_t>(encV);
-        compute_dist(dist, q_i32, e_i32);
-        if constexpr (ComputeNorm) {
-          norm_query = raft::dp4a(q_i32, q_i32, norm_query);
-          norm_data  = raft::dp4a(e_i32, e_i32, norm_data);
-        }
+      // Normalize int8_t bytes to uint8_t for Euclidean distance (translation-invariant)
+      if (is_signed) {
+        encV      = normalize_int8_packed_u16(encV);
+        queryRegs = normalize_int8_packed_u16(queryRegs);
+      }
+      compute_dist(dist, queryRegs, encV);
+      if constexpr (ComputeNorm) {
+        norm_query = raft::dp4a(queryRegs, queryRegs, norm_query);
+        norm_data  = raft::dp4a(encV, encV, norm_data);
       }
     }
   }
 
   __device__ __forceinline__ void runLoadShflAndCompute(
-    cuvs::detail::byte_arithmetic_ptr data,
+    cuvs::detail::byte_arithmetic_ptr& data,
     const cuvs::detail::byte_arithmetic_ptr& query,
     int baseLoadIndex,
     const int lane_id)
   {
-    const bool is_signed         = data.is_signed;
-    constexpr int32_t offset_reg = 0x8080;  // 128 in each of 2 byte positions
-    uint32_t queryReg            = 0;
-    if (lane_id < 16) {
-      const int byte_offset = baseLoadIndex + lane_id * 2;
-      queryReg = (static_cast<uint32_t>(static_cast<uint8_t>(query[byte_offset + 0])) << 0) |
-                 (static_cast<uint32_t>(static_cast<uint8_t>(query[byte_offset + 1])) << 8);
-    }
+    const uint8_t* query_ptr = query.get_uint8_ptr();
+    const bool is_signed     = data.is_signed;
+    uint32_t queryReg =
+      (lane_id < 16) ? reinterpret_cast<uint16_t const*>(query_ptr + baseLoadIndex)[lane_id] : 0;
     constexpr int veclen = 2;
     constexpr int stride = kUnroll * veclen;
 
+    const uint8_t* data_ptr = data.get_uint8_ptr();
 #pragma unroll
-    for (int i = 0; i < raft::WarpSize / stride; ++i, data = data + stride * kIndexGroupSize) {
+    for (int i = 0; i < raft::WarpSize / stride; ++i, data_ptr += stride * kIndexGroupSize) {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
-        uint32_t encV;
-        const int byte_offset = (lane_id + j * kIndexGroupSize) * 2;
-        encV = (static_cast<uint32_t>(static_cast<uint8_t>(data[byte_offset + 0])) << 0) |
-               (static_cast<uint32_t>(static_cast<uint8_t>(data[byte_offset + 1])) << 8);
-        uint32_t q_raw = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
-        if constexpr (is_inner_prod_dist<Lambda>::value) {
-          int32_t q =
-            is_signed ? (static_cast<int32_t>(q_raw) - offset_reg) : static_cast<int32_t>(q_raw);
-          int32_t e =
-            is_signed ? (static_cast<int32_t>(encV) - offset_reg) : static_cast<int32_t>(encV);
-          compute_dist(dist, q, e);
-          if constexpr (ComputeNorm) {
-            norm_query = raft::dp4a(q, q, norm_query);
-            norm_data  = raft::dp4a(e, e, norm_data);
-          }
-        } else {
-          int32_t q_i32 = static_cast<int32_t>(q_raw);
-          int32_t e_i32 = static_cast<int32_t>(encV);
-          compute_dist(dist, q_i32, e_i32);
-          if constexpr (ComputeNorm) {
-            norm_query = raft::dp4a(q_i32, q_i32, norm_query);
-            norm_data  = raft::dp4a(e_i32, e_i32, norm_data);
-          }
+        uint32_t encV = reinterpret_cast<uint16_t const*>(data_ptr)[lane_id + j * kIndexGroupSize];
+        uint32_t q    = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
+        // Normalize int8_t bytes to uint8_t for Euclidean distance (translation-invariant)
+        if (is_signed) {
+          encV = normalize_int8_packed_u16(encV);
+          q    = normalize_int8_packed_u16(q);
+        }
+        compute_dist(dist, q, encV);
+        if constexpr (ComputeNorm) {
+          norm_query = raft::dp4a(q, q, norm_query);
+          norm_data  = raft::dp4a(encV, encV, norm_data);
         }
       }
     }
+    // Update the byte_arithmetic_ptr by the total offset
+    data = cuvs::detail::byte_arithmetic_ptr(const_cast<uint8_t*>(data_ptr), is_signed);
   }
 
   __device__ __forceinline__ void runLoadShflAndComputeRemainder(
-    cuvs::detail::byte_arithmetic_ptr data,
+    cuvs::detail::byte_arithmetic_ptr& data,
     const cuvs::detail::byte_arithmetic_ptr& query,
     const int lane_id,
     const int dim,
     const int dimBlocks)
   {
-    constexpr int veclen         = 2;
-    const bool is_signed         = data.is_signed;
-    constexpr int32_t offset_reg = 0x8080;  // 128 in each of 2 byte positions
-    int loadDim                  = dimBlocks + lane_id * veclen;
-    uint32_t queryReg            = 0;
-    if (loadDim < dim) {
-      queryReg = (static_cast<uint32_t>(static_cast<uint8_t>(query[loadDim + 0])) << 0) |
-                 (static_cast<uint32_t>(static_cast<uint8_t>(query[loadDim + 1])) << 8);
-    }
-    for (int d = 0; d < dim - dimBlocks; d += veclen, data = data + kIndexGroupSize * veclen) {
-      uint32_t enc;
-      const int byte_offset = lane_id * 2;
-      enc = (static_cast<uint32_t>(static_cast<uint8_t>(data[byte_offset + 0])) << 0) |
-            (static_cast<uint32_t>(static_cast<uint8_t>(data[byte_offset + 1])) << 8);
-      uint32_t q_raw = raft::shfl(queryReg, d / veclen, raft::WarpSize);
-      if constexpr (is_inner_prod_dist<Lambda>::value) {
-        int32_t q =
-          is_signed ? (static_cast<int32_t>(q_raw) - offset_reg) : static_cast<int32_t>(q_raw);
-        int32_t e =
-          is_signed ? (static_cast<int32_t>(enc) - offset_reg) : static_cast<int32_t>(enc);
-        compute_dist(dist, q, e);
-        if constexpr (ComputeNorm) {
-          norm_query = raft::dp4a(q, q, norm_query);
-          norm_data  = raft::dp4a(e, e, norm_data);
-        }
-      } else {
-        int32_t q_i32 = static_cast<int32_t>(q_raw);
-        int32_t e_i32 = static_cast<int32_t>(enc);
-        compute_dist(dist, q_i32, e_i32);
-        if constexpr (ComputeNorm) {
-          norm_query = raft::dp4a(q_i32, q_i32, norm_query);
-          norm_data  = raft::dp4a(e_i32, e_i32, norm_data);
-        }
+    constexpr int veclen     = 2;
+    int loadDim              = dimBlocks + lane_id * veclen;
+    const uint8_t* query_ptr = query.get_uint8_ptr();
+    const bool is_signed     = data.is_signed;
+    uint32_t queryReg =
+      loadDim < dim ? reinterpret_cast<uint16_t const*>(query_ptr + loadDim)[0] : 0;
+
+    const uint8_t* data_ptr = data.get_uint8_ptr();
+    for (int d = 0; d < dim - dimBlocks; d += veclen, data_ptr += kIndexGroupSize * veclen) {
+      uint32_t enc = reinterpret_cast<uint16_t const*>(data_ptr)[lane_id];
+      uint32_t q   = raft::shfl(queryReg, d / veclen, raft::WarpSize);
+      // Normalize int8_t bytes to uint8_t for Euclidean distance (translation-invariant)
+      if (is_signed) {
+        enc = normalize_int8_packed_u16(enc);
+        q   = normalize_int8_packed_u16(q);
+      }
+      compute_dist(dist, q, enc);
+      if constexpr (ComputeNorm) {
+        norm_query = raft::dp4a(q, q, norm_query);
+        norm_data  = raft::dp4a(enc, enc, norm_data);
       }
     }
+    // Update the byte_arithmetic_ptr by the total offset
+    data = cuvs::detail::byte_arithmetic_ptr(const_cast<uint8_t*>(data_ptr), is_signed);
   }
 };
 
 template <int kUnroll, typename Lambda, bool ComputeNorm>
-struct loadAndComputeDist<kUnroll, Lambda, 1, uint8_t, int32_t, ComputeNorm> {
+struct loadAndComputeDist<kUnroll, Lambda, 1, uint8_t, uint32_t, ComputeNorm> {
   Lambda compute_dist;
-  int32_t& dist;
-  int32_t& norm_query;
-  int32_t& norm_data;
+  uint32_t& dist;
+  uint32_t& norm_query;
+  uint32_t& norm_data;
 
   __device__ __forceinline__
-  loadAndComputeDist(int32_t& dist, Lambda op, int32_t& norm_query, int32_t& norm_data)
+  loadAndComputeDist(uint32_t& dist, Lambda op, uint32_t& norm_query, uint32_t& norm_data)
     : dist(dist), compute_dist(op), norm_query(norm_query), norm_data(norm_data)
   {
   }
@@ -726,69 +617,141 @@ struct loadAndComputeDist<kUnroll, Lambda, 1, uint8_t, int32_t, ComputeNorm> {
                                                       int loadIndex,
                                                       int shmemIndex)
   {
-    const bool is_signed          = data.is_signed;
-    constexpr int32_t offset_byte = 128;
+    const bool is_signed = data.is_signed;
 #pragma unroll
     for (int j = 0; j < kUnroll; ++j) {
       uint32_t encV      = static_cast<uint8_t>(data[loadIndex + j * kIndexGroupSize]);
       uint32_t queryRegs = query_shared[shmemIndex + j];
-      if constexpr (is_inner_prod_dist<Lambda>::value) {
-        int32_t q = is_signed ? (static_cast<int32_t>(queryRegs) - offset_byte)
-                              : static_cast<int32_t>(queryRegs);
-        int32_t e =
-          is_signed ? (static_cast<int32_t>(encV) - offset_byte) : static_cast<int32_t>(encV);
-        compute_dist(dist, q, e);
-        if constexpr (ComputeNorm) {
-          norm_query += q * q;
-          norm_data += e * e;
-        }
-      } else {
-        int32_t q_i32 = static_cast<int32_t>(queryRegs);
-        int32_t e_i32 = static_cast<int32_t>(encV);
-        compute_dist(dist, q_i32, e_i32);
-        if constexpr (ComputeNorm) {
-          norm_query += q_i32 * q_i32;
-          norm_data += e_i32 * e_i32;
-        }
+      // Normalize int8_t bytes to uint8_t for Euclidean distance (translation-invariant)
+      if (is_signed) {
+        queryRegs =
+          static_cast<uint8_t>(static_cast<int16_t>(static_cast<int8_t>(queryRegs)) + 128);
+      }
+      compute_dist(dist, queryRegs, encV);
+      if constexpr (ComputeNorm) {
+        norm_query += queryRegs * queryRegs;
+        norm_data += encV * encV;
       }
     }
   }
 
   __device__ __forceinline__ void runLoadShflAndCompute(
-    cuvs::detail::byte_arithmetic_ptr data,
+    cuvs::detail::byte_arithmetic_ptr& data,
     const cuvs::detail::byte_arithmetic_ptr& query,
     int baseLoadIndex,
     const int lane_id)
   {
-    const bool is_signed          = data.is_signed;
-    constexpr int32_t offset_byte = 128;
-    uint32_t queryReg             = static_cast<uint8_t>(query[baseLoadIndex + lane_id]);
-    constexpr int veclen          = 1;
-    constexpr int stride          = kUnroll * veclen;
+    uint32_t queryReg    = static_cast<uint8_t>(query[baseLoadIndex + lane_id]);
+    constexpr int veclen = 1;
+    constexpr int stride = kUnroll * veclen;
 
 #pragma unroll
     for (int i = 0; i < raft::WarpSize / stride; ++i, data = data + stride * kIndexGroupSize) {
 #pragma unroll
       for (int j = 0; j < kUnroll; ++j) {
-        uint32_t encV  = static_cast<uint8_t>(data[lane_id + j * kIndexGroupSize]);
-        uint32_t q_raw = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
-        if constexpr (is_inner_prod_dist<Lambda>::value) {
-          int32_t q =
-            is_signed ? (static_cast<int32_t>(q_raw) - offset_byte) : static_cast<int32_t>(q_raw);
-          int32_t e =
-            is_signed ? (static_cast<int32_t>(encV) - offset_byte) : static_cast<int32_t>(encV);
-          compute_dist(dist, q, e);
+        uint32_t encV = static_cast<uint8_t>(data[lane_id + j * kIndexGroupSize]);
+        uint32_t q    = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
+        // Normalize int8_t bytes to uint8_t for Euclidean distance (translation-invariant)
+        compute_dist(dist, q, encV);
+        if constexpr (ComputeNorm) {
+          norm_query += q * q;
+          norm_data += encV * encV;
+        }
+      }
+    }
+  }
+
+  __device__ __forceinline__ void runLoadShflAndComputeRemainder(
+    cuvs::detail::byte_arithmetic_ptr& data,
+    const cuvs::detail::byte_arithmetic_ptr& query,
+    const int lane_id,
+    const int dim,
+    const int dimBlocks)
+  {
+    constexpr int veclen = 1;
+    int loadDim          = dimBlocks + lane_id;
+    uint32_t queryReg    = loadDim < dim ? static_cast<uint8_t>(query[loadDim]) : 0;
+
+    for (int d = 0; d < dim - dimBlocks; d += veclen, data = data + kIndexGroupSize * veclen) {
+      uint32_t enc = static_cast<uint8_t>(data[lane_id]);
+      uint32_t q   = raft::shfl(queryReg, d, raft::WarpSize);
+      compute_dist(dist, q, enc);
+      if constexpr (ComputeNorm) {
+        norm_query += q * q;
+        norm_data += enc * enc;
+      }
+    }
+  }
+};
+
+// This device function is for int8 veclens 4, 8 and 16
+template <int kUnroll, typename Lambda, int int8_veclen, bool ComputeNorm>
+struct loadAndComputeDist<kUnroll, Lambda, int8_veclen, int8_t, int32_t, ComputeNorm> {
+  Lambda compute_dist;
+  int32_t& dist;
+  int32_t& norm_query;
+  int32_t& norm_data;
+
+  __device__ __forceinline__
+  loadAndComputeDist(int32_t& dist, Lambda op, int32_t& norm_query, int32_t& norm_data)
+    : dist(dist), compute_dist(op), norm_query(norm_query), norm_data(norm_data)
+  {
+  }
+
+  __device__ __forceinline__ void runLoadShmemCompute(const int8_t* const& data,
+                                                      const int8_t* query_shared,
+                                                      int loadIndex,
+                                                      int shmemIndex)
+  {
+    constexpr int veclen_int = int8_veclen / 4;  // converting int8_t veclens to int
+
+#pragma unroll
+    for (int j = 0; j < kUnroll; ++j) {
+      int32_t encV[veclen_int];
+      raft::ldg(
+        encV,
+        reinterpret_cast<int32_t const*>(data) + (loadIndex + j * kIndexGroupSize) * veclen_int);
+      int32_t queryRegs[veclen_int];
+      raft::lds(queryRegs,
+                reinterpret_cast<int32_t const*>(query_shared + shmemIndex) + j * veclen_int);
+#pragma unroll
+      for (int k = 0; k < veclen_int; k++) {
+        compute_dist(dist, queryRegs[k], encV[k]);
+        if constexpr (ComputeNorm) {
+          norm_query = raft::dp4a(queryRegs[k], queryRegs[k], norm_query);
+          norm_data  = raft::dp4a(encV[k], encV[k], norm_data);
+        }
+      }
+    }
+  }
+
+  __device__ __forceinline__ void runLoadShflAndCompute(const int8_t*& data,
+                                                        const int8_t* query,
+                                                        int baseLoadIndex,
+                                                        const int lane_id)
+  {
+    constexpr int veclen_int = int8_veclen / 4;  // converting int8_t veclens to int
+
+    int32_t queryReg =
+      (lane_id < 8) ? reinterpret_cast<int32_t const*>(query + baseLoadIndex)[lane_id] : 0;
+    constexpr int stride = kUnroll * int8_veclen;
+
+#pragma unroll
+    for (int i = 0; i < raft::WarpSize / stride; ++i, data += stride * kIndexGroupSize) {
+#pragma unroll
+      for (int j = 0; j < kUnroll; ++j) {
+        int32_t encV[veclen_int];
+        raft::ldg(
+          encV,
+          reinterpret_cast<int32_t const*>(data) + (lane_id + j * kIndexGroupSize) * veclen_int);
+        const int d = (i * kUnroll + j) * veclen_int;
+#pragma unroll
+        for (int k = 0; k < veclen_int; ++k) {
+          int32_t q = raft::shfl(queryReg, d + k, raft::WarpSize);
+          compute_dist(dist, q, encV[k]);
           if constexpr (ComputeNorm) {
-            norm_query += q * q;
-            norm_data += e * e;
-          }
-        } else {
-          int32_t q_i32 = static_cast<int32_t>(q_raw);
-          int32_t e_i32 = static_cast<int32_t>(encV);
-          compute_dist(dist, q_i32, e_i32);
-          if constexpr (ComputeNorm) {
-            norm_query += q_i32 * q_i32;
-            norm_data += e_i32 * e_i32;
+            norm_query = raft::dp4a(q, q, norm_query);
+            norm_data  = raft::dp4a(encV[k], encV[k], norm_data);
           }
         }
       }
@@ -796,38 +759,160 @@ struct loadAndComputeDist<kUnroll, Lambda, 1, uint8_t, int32_t, ComputeNorm> {
   }
 
   __device__ __forceinline__ void runLoadShflAndComputeRemainder(
-    cuvs::detail::byte_arithmetic_ptr data,
-    const cuvs::detail::byte_arithmetic_ptr& query,
-    const int lane_id,
-    const int dim,
-    const int dimBlocks)
+    const int8_t*& data, const int8_t* query, const int lane_id, const int dim, const int dimBlocks)
   {
-    constexpr int veclen          = 1;
-    const bool is_signed          = data.is_signed;
-    constexpr int32_t offset_byte = 128;
-    int loadDim                   = dimBlocks + lane_id;
-    uint32_t queryReg             = loadDim < dim ? static_cast<uint8_t>(query[loadDim]) : 0;
-    for (int d = 0; d < dim - dimBlocks; d += veclen, data = data + kIndexGroupSize * veclen) {
-      uint32_t enc   = static_cast<uint8_t>(data[lane_id]);
-      uint32_t q_raw = raft::shfl(queryReg, d, raft::WarpSize);
-      if constexpr (is_inner_prod_dist<Lambda>::value) {
-        int32_t q =
-          is_signed ? (static_cast<int32_t>(q_raw) - offset_byte) : static_cast<int32_t>(q_raw);
-        int32_t e =
-          is_signed ? (static_cast<int32_t>(enc) - offset_byte) : static_cast<int32_t>(enc);
-        compute_dist(dist, q, e);
+    constexpr int veclen_int = int8_veclen / 4;
+    const int loadDim        = dimBlocks + lane_id * 4;  // Here 4 is for 1 - int;
+    int32_t queryReg = loadDim < dim ? reinterpret_cast<int32_t const*>(query + loadDim)[0] : 0;
+    for (int d = 0; d < dim - dimBlocks; d += int8_veclen, data += kIndexGroupSize * int8_veclen) {
+      int32_t enc[veclen_int];
+      raft::ldg(enc, reinterpret_cast<int32_t const*>(data) + lane_id * veclen_int);
+#pragma unroll
+      for (int k = 0; k < veclen_int; k++) {
+        int32_t q = raft::shfl(queryReg, (d / 4) + k, raft::WarpSize);  // Here 4 is for 1 - int;
+        compute_dist(dist, q, enc[k]);
+        if constexpr (ComputeNorm) {
+          norm_query = raft::dp4a(q, q, norm_query);
+          norm_data  = raft::dp4a(enc[k], enc[k], norm_data);
+        }
+      }
+    }
+  }
+};
+
+template <int kUnroll, typename Lambda, bool ComputeNorm>
+struct loadAndComputeDist<kUnroll, Lambda, 2, int8_t, int32_t, ComputeNorm> {
+  Lambda compute_dist;
+  int32_t& dist;
+  int32_t& norm_query;
+  int32_t& norm_data;
+  __device__ __forceinline__
+  loadAndComputeDist(int32_t& dist, Lambda op, int32_t& norm_query, int32_t& norm_data)
+    : dist(dist), compute_dist(op), norm_query(norm_query), norm_data(norm_data)
+  {
+  }
+  __device__ __forceinline__ void runLoadShmemCompute(const int8_t* const& data,
+                                                      const int8_t* query_shared,
+                                                      int loadIndex,
+                                                      int shmemIndex)
+  {
+#pragma unroll
+    for (int j = 0; j < kUnroll; ++j) {
+      int32_t encV      = reinterpret_cast<uint16_t const*>(data)[loadIndex + j * kIndexGroupSize];
+      int32_t queryRegs = reinterpret_cast<uint16_t const*>(query_shared + shmemIndex)[j];
+      compute_dist(dist, queryRegs, encV);
+      if constexpr (ComputeNorm) {
+        norm_query = raft::dp4a(queryRegs, queryRegs, norm_query);
+        norm_data  = raft::dp4a(encV, encV, norm_data);
+      }
+    }
+  }
+
+  __device__ __forceinline__ void runLoadShflAndCompute(const int8_t*& data,
+                                                        const int8_t* query,
+                                                        int baseLoadIndex,
+                                                        const int lane_id)
+  {
+    int32_t queryReg =
+      (lane_id < 16) ? reinterpret_cast<uint16_t const*>(query + baseLoadIndex)[lane_id] : 0;
+    constexpr int veclen = 2;
+    constexpr int stride = kUnroll * veclen;
+
+#pragma unroll
+    for (int i = 0; i < raft::WarpSize / stride; ++i, data += stride * kIndexGroupSize) {
+#pragma unroll
+      for (int j = 0; j < kUnroll; ++j) {
+        int32_t encV = reinterpret_cast<uint16_t const*>(data)[lane_id + j * kIndexGroupSize];
+        int32_t q    = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
+        compute_dist(dist, q, encV);
+        if constexpr (ComputeNorm) {
+          norm_query = raft::dp4a(queryReg, queryReg, norm_query);
+          norm_data  = raft::dp4a(encV, encV, norm_data);
+        }
+      }
+    }
+  }
+
+  __device__ __forceinline__ void runLoadShflAndComputeRemainder(
+    const int8_t*& data, const int8_t* query, const int lane_id, const int dim, const int dimBlocks)
+  {
+    constexpr int veclen = 2;
+    int loadDim          = dimBlocks + lane_id * veclen;
+    int32_t queryReg = loadDim < dim ? reinterpret_cast<uint16_t const*>(query + loadDim)[0] : 0;
+    for (int d = 0; d < dim - dimBlocks; d += veclen, data += kIndexGroupSize * veclen) {
+      int32_t enc = reinterpret_cast<uint16_t const*>(data + lane_id * veclen)[0];
+      int32_t q   = raft::shfl(queryReg, d / veclen, raft::WarpSize);
+      compute_dist(dist, q, enc);
+      if constexpr (ComputeNorm) {
+        norm_query = raft::dp4a(q, q, norm_query);
+        norm_data  = raft::dp4a(enc, enc, norm_data);
+      }
+    }
+  }
+};
+
+template <int kUnroll, typename Lambda, bool ComputeNorm>
+struct loadAndComputeDist<kUnroll, Lambda, 1, int8_t, int32_t, ComputeNorm> {
+  Lambda compute_dist;
+  int32_t& dist;
+  int32_t& norm_query;
+  int32_t& norm_data;
+  __device__ __forceinline__
+  loadAndComputeDist(int32_t& dist, Lambda op, int32_t& norm_query, int32_t& norm_data)
+    : dist(dist), compute_dist(op), norm_query(norm_query), norm_data(norm_data)
+  {
+  }
+
+  __device__ __forceinline__ void runLoadShmemCompute(const int8_t* const& data,
+                                                      const int8_t* query_shared,
+                                                      int loadIndex,
+                                                      int shmemIndex)
+  {
+#pragma unroll
+    for (int j = 0; j < kUnroll; ++j) {
+      compute_dist(dist, query_shared[shmemIndex + j], data[loadIndex + j * kIndexGroupSize]);
+      if constexpr (ComputeNorm) {
+        norm_query += int32_t{query_shared[shmemIndex + j]} * int32_t{query_shared[shmemIndex + j]};
+        norm_data += int32_t{data[loadIndex + j * kIndexGroupSize]} *
+                     int32_t{data[loadIndex + j * kIndexGroupSize]};
+      }
+    }
+  }
+
+  __device__ __forceinline__ void runLoadShflAndCompute(const int8_t*& data,
+                                                        const int8_t* query,
+                                                        int baseLoadIndex,
+                                                        const int lane_id)
+  {
+    constexpr int veclen = 1;
+    constexpr int stride = kUnroll * veclen;
+    int32_t queryReg     = query[baseLoadIndex + lane_id];
+
+#pragma unroll
+    for (int i = 0; i < raft::WarpSize / stride; ++i, data += stride * kIndexGroupSize) {
+#pragma unroll
+      for (int j = 0; j < kUnroll; ++j) {
+        int32_t q = raft::shfl(queryReg, i * kUnroll + j, raft::WarpSize);
+        compute_dist(dist, q, data[lane_id + j * kIndexGroupSize]);
         if constexpr (ComputeNorm) {
           norm_query += q * q;
-          norm_data += e * e;
+          norm_data += data[lane_id + j * kIndexGroupSize] * data[lane_id + j * kIndexGroupSize];
         }
-      } else {
-        int32_t q_i32 = static_cast<int32_t>(q_raw);
-        int32_t e_i32 = static_cast<int32_t>(enc);
-        compute_dist(dist, q_i32, e_i32);
-        if constexpr (ComputeNorm) {
-          norm_query += q_i32 * q_i32;
-          norm_data += e_i32 * e_i32;
-        }
+      }
+    }
+  }
+  __device__ __forceinline__ void runLoadShflAndComputeRemainder(
+    const int8_t*& data, const int8_t* query, const int lane_id, const int dim, const int dimBlocks)
+  {
+    constexpr int veclen = 1;
+    const int loadDim    = dimBlocks + lane_id;
+    int32_t queryReg     = loadDim < dim ? query[loadDim] : 0;
+    for (int d = 0; d < dim - dimBlocks; d += veclen, data += kIndexGroupSize * veclen) {
+      int32_t q = raft::shfl(queryReg, d, raft::WarpSize);
+      compute_dist(dist, q, data[lane_id]);
+      if constexpr (ComputeNorm) {
+        norm_query += q * q;
+        norm_data += int32_t{data[lane_id]} * int32_t{data[lane_id]};
       }
     }
   }
@@ -878,23 +963,38 @@ using block_sort_t = typename flat_block_sort<Capacity, Ascending, T, IdxT>::typ
  * @param[out] neighbors
  * @param[out] distances
  */
-template <
-  int Capacity,
-  int Veclen,
-  bool Ascending,
-  bool ComputeNorm,
-  typename T,
-  typename AccT,
-  typename IdxT,
-  typename IvfSampleFilterT,
-  typename Lambda,
-  typename PostLambda,
-  typename DataT     = std::conditional_t<std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>,
-                                          cuvs::detail::byte_arithmetic_ptr,
-                                          const T*>,
-  typename ListDataT = std::conditional_t<std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>,
-                                          cuvs::detail::byte_arithmetic_ptr*,
-                                          const T* const*>>
+
+// Forward declaration for euclidean_dist
+template <int Veclen, typename T, typename AccT>
+struct euclidean_dist;
+
+// Type trait to detect euclidean_dist
+template <typename T>
+struct is_euclidean_dist : std::false_type {};
+
+template <int Veclen, typename DataT, typename AccT>
+struct is_euclidean_dist<euclidean_dist<Veclen, DataT, AccT>> : std::true_type {};
+
+template <typename T, typename Lambda>
+constexpr bool byte_arithmetic_dispatch =
+  std::is_same_v<T, uint8_t> || (std::is_same_v<T, int8_t> && is_euclidean_dist<Lambda>::value);
+
+template <int Capacity,
+          int Veclen,
+          bool Ascending,
+          bool ComputeNorm,
+          typename T,
+          typename AccT,
+          typename IdxT,
+          typename IvfSampleFilterT,
+          typename Lambda,
+          typename PostLambda,
+          typename DataT     = std::conditional_t<byte_arithmetic_dispatch<T, Lambda>,
+                                                  cuvs::detail::byte_arithmetic_ptr,
+                                                  const T*>,
+          typename ListDataT = std::conditional_t<byte_arithmetic_dispatch<T, Lambda>,
+                                                  cuvs::detail::byte_arithmetic_ptr*,
+                                                  const T* const*>>
 RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
   interleaved_scan_kernel(Lambda compute_dist,
                           PostLambda post_process,
@@ -1114,18 +1214,22 @@ void launch_kernel(Lambda lambda,
 {
   RAFT_EXPECTS(Veclen == index.veclen(),
                "Configured Veclen does not match the index interleaving pattern.");
-  using InstantiateT =
-    std::conditional_t<std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>, uint8_t, T>;
-  constexpr auto kKernel   = interleaved_scan_kernel<Capacity,
-                                                     Veclen,
-                                                     Ascending,
-                                                     ComputeNorm,
-                                                     InstantiateT,
-                                                     AccT,
-                                                     IdxT,
-                                                     IvfSampleFilterT,
-                                                     Lambda,
-                                                     PostLambda>;
+  // Only dispatch int8_t to uint8_t for euclidean_dist (to unify kernels)
+  // For inner_prod_dist, keep separate instantiations
+  using InstantiateT = std::conditional_t<byte_arithmetic_dispatch<T, Lambda>, uint8_t, T>;
+  // Also dispatch AccT to uint32_t for euclidean_dist with byte types (to match loadAndComputeDist
+  // specializations)
+  using InstantiateAccT  = std::conditional_t<byte_arithmetic_dispatch<T, Lambda>, uint32_t, AccT>;
+  constexpr auto kKernel = interleaved_scan_kernel<Capacity,
+                                                   Veclen,
+                                                   Ascending,
+                                                   ComputeNorm,
+                                                   InstantiateT,
+                                                   InstantiateAccT,
+                                                   IdxT,
+                                                   IvfSampleFilterT,
+                                                   Lambda,
+                                                   PostLambda>;
   const int max_query_smem = 16384;
   int query_smem_elems     = std::min<int>(max_query_smem / sizeof(T),
                                        raft::Pow2<Veclen * raft::WarpSize>::roundUp(index.dim()));
@@ -1147,11 +1251,11 @@ void launch_kernel(Lambda lambda,
     return;
   }
 
-  // For int8_t/uint8_t, pre-convert data pointers to byte_arithmetic_ptrs (only needs to be done
-  // once)
+  // For int8_t/uint8_t with euclidean_dist, pre-convert data pointers to byte_arithmetic_ptrs
+  // (only needs to be done once)
   std::optional<rmm::device_uvector<cuvs::detail::byte_arithmetic_ptr>>
     byte_arithmetic_ptr_list_data_ptrs;
-  if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) {
+  if constexpr (byte_arithmetic_dispatch<T, Lambda>) {
     constexpr bool is_signed = std::is_same_v<T, int8_t>;
     byte_arithmetic_ptr_list_data_ptrs.emplace(index.data_ptrs().size(), stream);
     // Cast to uint8_t* and use functor to ensure identical thrust::transform instantiation
@@ -1176,9 +1280,8 @@ void launch_kernel(Lambda lambda,
       block_dim.x,
       n_probes,
       smem_size);
-    if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) {
-      // For both int8_t and uint8_t, wrap query batch in byte_arithmetic_ptr (is_signed determines
-      // normalization)
+    if constexpr (byte_arithmetic_dispatch<T, Lambda>) {
+      // For int8_t/uint8_t with euclidean_dist, wrap in byte_arithmetic_ptr with normalization
       constexpr bool is_signed = std::is_same_v<T, int8_t>;
       auto byte_arithmetic_ptr_queries =
         cuvs::detail::byte_arithmetic_ptr(const_cast<T*>(queries), is_signed);
@@ -1200,7 +1303,7 @@ void launch_kernel(Lambda lambda,
         neighbors,
         distances);
     } else {
-      // For other types (float, etc.), use raw pointers directly
+      // For inner_prod_dist with int8_t/uint8_t, or other types (float, etc.), use raw pointers
       kKernel<<<grid_dim, block_dim, smem_size, stream>>>(lambda,
                                                           post_process,
                                                           query_smem_elems,
@@ -1239,16 +1342,16 @@ struct euclidean_dist {
   }
 };
 
+// Specialization for uint8_t (handles both uint8_t and normalized int8_t via byte_arithmetic_ptr)
 template <int Veclen>
-struct euclidean_dist<Veclen, uint8_t, int32_t> {
-  __device__ __forceinline__ void operator()(int32_t& acc, int32_t x, int32_t y)
+struct euclidean_dist<Veclen, uint8_t, uint32_t> {
+  __device__ __forceinline__ void operator()(uint32_t& acc, uint32_t x, uint32_t y)
   {
     if constexpr (Veclen > 1) {
-      const uint32_t diff_u32 = __vabsdiffu4(static_cast<uint32_t>(x), static_cast<uint32_t>(y));
-      const int32_t diff      = static_cast<int32_t>(diff_u32);
-      acc                     = raft::dp4a(diff, diff, acc);
+      const uint32_t diff_u32 = __vabsdiffu4(x, y);
+      acc                     = raft::dp4a(diff_u32, diff_u32, acc);
     } else {
-      const auto diff = __usad(static_cast<uint32_t>(x), static_cast<uint32_t>(y), 0u);
+      const auto diff = __usad(x, y, 0u);
       acc += diff * diff;
     }
   }
@@ -1279,58 +1382,34 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
 {
   // Dispatch int8_t to uint8_t for the metric lambda types to match kernel instantiation
   using MetricT = std::conditional_t<std::is_same_v<T, int8_t>, uint8_t, T>;
+  // Also dispatch AccT to uint32_t for byte types with Euclidean (to match the kernel's
+  // InstantiateAccT)
+  using MetricAccT =
+    std::conditional_t<std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>, uint32_t, AccT>;
 
   switch (metric) {
     case cuvs::distance::DistanceType::L2Expanded:
     case cuvs::distance::DistanceType::L2Unexpanded:
-      return launch_kernel<Capacity,
-                           Veclen,
-                           Ascending,
-                           false,
-                           T,
-                           AccT,
-                           IdxT,
-                           IvfSampleFilterT,
-                           euclidean_dist<Veclen, MetricT, AccT>,
-                           raft::identity_op>({}, {}, std::forward<Args>(args)...);
+      // For Euclidean distances, use MetricT and MetricAccT for the distance functor
+      return launch_kernel<Capacity, Veclen, Ascending, false, T, AccT, IdxT, IvfSampleFilterT>(
+        euclidean_dist<Veclen, MetricT, MetricAccT>{},
+        raft::identity_op{},
+        std::forward<Args>(args)...);
     case cuvs::distance::DistanceType::L2SqrtExpanded:
     case cuvs::distance::DistanceType::L2SqrtUnexpanded:
-      return launch_kernel<Capacity,
-                           Veclen,
-                           Ascending,
-                           false,
-                           T,
-                           AccT,
-                           IdxT,
-                           IvfSampleFilterT,
-                           euclidean_dist<Veclen, MetricT, AccT>,
-                           raft::sqrt_op>({}, {}, std::forward<Args>(args)...);
+      return launch_kernel<Capacity, Veclen, Ascending, false, T, AccT, IdxT, IvfSampleFilterT>(
+        euclidean_dist<Veclen, MetricT, MetricAccT>{},
+        raft::sqrt_op{},
+        std::forward<Args>(args)...);
     case cuvs::distance::DistanceType::InnerProduct:
-      return launch_kernel<Capacity,
-                           Veclen,
-                           Ascending,
-                           false,
-                           T,
-                           AccT,
-                           IdxT,
-                           IvfSampleFilterT,
-                           inner_prod_dist<Veclen, MetricT, AccT>,
-                           raft::identity_op>({}, {}, std::forward<Args>(args)...);
+      return launch_kernel<Capacity, Veclen, Ascending, false, T, AccT, IdxT, IvfSampleFilterT>(
+        inner_prod_dist<Veclen, T, AccT>{}, raft::identity_op{}, std::forward<Args>(args)...);
     case cuvs::distance::DistanceType::CosineExpanded:
       // NB: "Ascending" is reversed because the post-processing step is done after that sort
-      return launch_kernel<Capacity,
-                           Veclen,
-                           !Ascending,
-                           true,
-                           T,
-                           AccT,
-                           IdxT,
-                           IvfSampleFilterT,
-                           inner_prod_dist<Veclen, MetricT, AccT>>(
-        {},
+      return launch_kernel<Capacity, Veclen, !Ascending, true, T, AccT, IdxT, IvfSampleFilterT>(
+        inner_prod_dist<Veclen, T, AccT>{},
         raft::compose_op(raft::add_const_op<float>{1.0f}, raft::mul_const_op<float>{-1.0f}),
-        std::forward<Args>(args)...);  // NB: update the description of `knn::ivf_flat::build` when
-                                       // adding here a new metric.
+        std::forward<Args>(args)...);
     default: RAFT_FAIL("The chosen distance metric is not supported (%d)", int(metric));
   }
 }
@@ -1453,29 +1532,24 @@ void ivfflat_interleaved_scan(const index<T, IdxT>& index,
   auto filter_adapter = cuvs::neighbors::filtering::ivf_to_sample_filter(
     index.inds_ptrs().data_handle(), sample_filter);
 
-  // Dispatch int8_t to use int32_t accumulator for signed arithmetic
-  using InstantiateAccT =
-    std::conditional_t<std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>, int32_t, AccT>;
-
-  select_interleaved_scan_kernel<T, InstantiateAccT, IdxT, decltype(filter_adapter)>::run(
-    capacity,
-    index.veclen(),
-    select_min,
-    metric,
-    index,
-    queries,
-    coarse_query_results,
-    n_queries,
-    queries_offset,
-    n_probes,
-    k,
-    max_samples,
-    chunk_indices,
-    filter_adapter,
-    neighbors,
-    distances,
-    grid_dim_x,
-    stream);
+  select_interleaved_scan_kernel<T, AccT, IdxT, decltype(filter_adapter)>::run(capacity,
+                                                                               index.veclen(),
+                                                                               select_min,
+                                                                               metric,
+                                                                               index,
+                                                                               queries,
+                                                                               coarse_query_results,
+                                                                               n_queries,
+                                                                               queries_offset,
+                                                                               n_probes,
+                                                                               k,
+                                                                               max_samples,
+                                                                               chunk_indices,
+                                                                               filter_adapter,
+                                                                               neighbors,
+                                                                               distances,
+                                                                               grid_dim_x,
+                                                                               stream);
 }
 
 }  // namespace cuvs::neighbors::ivf_flat::detail

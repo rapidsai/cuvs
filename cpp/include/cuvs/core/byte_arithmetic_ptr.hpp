@@ -124,6 +124,8 @@ struct byte_arithmetic_ptr {
   {
     return !(*this == other);
   }
+
+  __host__ __device__ uint8_t* get_uint8_ptr() const { return reinterpret_cast<uint8_t*>(data); }
 };
 
 }  // namespace cuvs::detail
