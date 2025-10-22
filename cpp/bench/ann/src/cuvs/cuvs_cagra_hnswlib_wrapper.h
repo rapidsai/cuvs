@@ -87,8 +87,8 @@ class cuvs_cagra_hnswlib : public algo<T>, public algo_gpu {
   search_param search_param_;
   std::shared_ptr<cuvs::neighbors::hnsw::index<T>> hnsw_index_;
 
-  bool cagra_ace_build_;
-  std::string cagra_ace_build_directory_;
+  bool cagra_ace_build_                  = false;
+  std::string cagra_ace_build_directory_ = "";
 };
 
 template <typename T, typename IdxT>
