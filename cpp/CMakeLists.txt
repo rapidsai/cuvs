@@ -596,9 +596,10 @@ if(NOT BUILD_CPU_ONLY)
 
     target_compile_definitions(jit_lto_fatbins PRIVATE BUILD_KERNEL)
     target_include_directories(
-      jit_lto_fatbins PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-                              "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
-                              "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
+      jit_lto_fatbins
+      PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+              "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
+              "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
     )
     target_compile_options(jit_lto_fatbins PRIVATE -Xfatbin=--compress-all --compress-mode=size)
     target_compile_options(
