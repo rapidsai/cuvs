@@ -69,6 +69,8 @@ index<T, IdxT>::index(raft::resources const& res,
               typeid(T).name());
   }
 
+  binary_index_ = metric == cuvs::distance::DistanceType::BitwiseHamming;
+
   check_consistency();
   accum_sorted_sizes_(n_lists) = 0;
 }
