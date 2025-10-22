@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -258,7 +258,7 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, Outp
                    smem_size,
                    hash_bitlen,
                    hashmap.data(),
-                   small_hash_bitlen,
+                   (small_hash_bitlen > 0 ? 1u : 0u),
                    small_hash_reset_interval,
                    num_seeds,
                    sample_filter,
