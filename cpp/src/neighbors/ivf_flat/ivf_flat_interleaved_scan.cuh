@@ -988,7 +988,6 @@ template <int Capacity,
           typename IdxT,
           typename IvfSampleFilterT,
           typename Lambda,
-          typename PostLambda,
           typename DataT     = std::conditional_t<byte_arithmetic_dispatch<T, Lambda>,
                                                   cuvs::detail::byte_arithmetic_ptr,
                                                   const T*>,
@@ -997,7 +996,7 @@ template <int Capacity,
                                                   const T* const*>>
 RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
   interleaved_scan_kernel(Lambda compute_dist,
-                          PostLambda post_process,
+                          cuvs::distance::DistanceType metric,
                           const uint32_t query_smem_elems,
                           DataT query,
                           const uint32_t* coarse_index,
@@ -1143,7 +1142,18 @@ RAFT_KERNEL __launch_bounds__(kThreadsPerBlock)
   if constexpr (kManageLocalTopK) {
     __syncthreads();
     queue.done(interleaved_scan_kernel_smem);
-    queue.store(distances, neighbors, post_process);
+    // Apply post-processing based on metric (runtime dispatch for acceptable one-time cost)
+    if (metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+        metric == cuvs::distance::DistanceType::L2SqrtUnexpanded) {
+      queue.store(distances, neighbors, raft::sqrt_op{});
+    } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+      queue.store(
+        distances,
+        neighbors,
+        raft::compose_op(raft::add_const_op<float>{1.0f}, raft::mul_const_op<float>{-1.0f}));
+    } else {
+      queue.store(distances, neighbors, raft::identity_op{});
+    }
   }
 }
 
@@ -1193,10 +1203,9 @@ template <int Capacity,
           typename AccT,
           typename IdxT,
           typename IvfSampleFilterT,
-          typename Lambda,
-          typename PostLambda>
+          typename Lambda>
 void launch_kernel(Lambda lambda,
-                   PostLambda post_process,
+                   cuvs::distance::DistanceType metric,
                    const index<T, IdxT>& index,
                    const T* queries,
                    const uint32_t* coarse_index,
@@ -1228,8 +1237,7 @@ void launch_kernel(Lambda lambda,
                                                    InstantiateAccT,
                                                    IdxT,
                                                    IvfSampleFilterT,
-                                                   Lambda,
-                                                   PostLambda>;
+                                                   Lambda>;
   const int max_query_smem = 16384;
   int query_smem_elems     = std::min<int>(max_query_smem / sizeof(T),
                                        raft::Pow2<Veclen * raft::WarpSize>::roundUp(index.dim()));
@@ -1287,7 +1295,7 @@ void launch_kernel(Lambda lambda,
         cuvs::detail::byte_arithmetic_ptr(const_cast<T*>(queries), is_signed);
       kKernel<<<grid_dim, block_dim, smem_size, stream>>>(
         lambda,
-        post_process,
+        metric,
         query_smem_elems,
         byte_arithmetic_ptr_queries,
         coarse_index,
@@ -1305,7 +1313,7 @@ void launch_kernel(Lambda lambda,
     } else {
       // For inner_prod_dist with int8_t/uint8_t, or other types (float, etc.), use raw pointers
       kKernel<<<grid_dim, block_dim, smem_size, stream>>>(lambda,
-                                                          post_process,
+                                                          metric,
                                                           query_smem_elems,
                                                           queries,
                                                           coarse_index,
@@ -1387,30 +1395,22 @@ void launch_with_fixed_consts(cuvs::distance::DistanceType metric, Args&&... arg
   using MetricAccT =
     std::conditional_t<std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>, uint32_t, AccT>;
 
-  switch (metric) {
-    case cuvs::distance::DistanceType::L2Expanded:
-    case cuvs::distance::DistanceType::L2Unexpanded:
-      // For Euclidean distances, use MetricT and MetricAccT for the distance functor
-      return launch_kernel<Capacity, Veclen, Ascending, false, T, AccT, IdxT, IvfSampleFilterT>(
-        euclidean_dist<Veclen, MetricT, MetricAccT>{},
-        raft::identity_op{},
-        std::forward<Args>(args)...);
-    case cuvs::distance::DistanceType::L2SqrtExpanded:
-    case cuvs::distance::DistanceType::L2SqrtUnexpanded:
-      return launch_kernel<Capacity, Veclen, Ascending, false, T, AccT, IdxT, IvfSampleFilterT>(
-        euclidean_dist<Veclen, MetricT, MetricAccT>{},
-        raft::sqrt_op{},
-        std::forward<Args>(args)...);
-    case cuvs::distance::DistanceType::InnerProduct:
-      return launch_kernel<Capacity, Veclen, Ascending, false, T, AccT, IdxT, IvfSampleFilterT>(
-        inner_prod_dist<Veclen, T, AccT>{}, raft::identity_op{}, std::forward<Args>(args)...);
-    case cuvs::distance::DistanceType::CosineExpanded:
-      // NB: "Ascending" is reversed because the post-processing step is done after that sort
-      return launch_kernel<Capacity, Veclen, !Ascending, true, T, AccT, IdxT, IvfSampleFilterT>(
-        inner_prod_dist<Veclen, T, AccT>{},
-        raft::compose_op(raft::add_const_op<float>{1.0f}, raft::mul_const_op<float>{-1.0f}),
-        std::forward<Args>(args)...);
-    default: RAFT_FAIL("The chosen distance metric is not supported (%d)", int(metric));
+  if (metric == cuvs::distance::DistanceType::L2Expanded ||
+      metric == cuvs::distance::DistanceType::L2Unexpanded ||
+      metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
+      metric == cuvs::distance::DistanceType::L2SqrtUnexpanded) {
+    // For Euclidean distances, use MetricT and MetricAccT for the distance functor
+    return launch_kernel<Capacity, Veclen, Ascending, false, T, AccT, IdxT, IvfSampleFilterT>(
+      euclidean_dist<Veclen, MetricT, MetricAccT>{}, metric, std::forward<Args>(args)...);
+  } else if (metric == cuvs::distance::DistanceType::InnerProduct) {
+    return launch_kernel<Capacity, Veclen, Ascending, false, T, AccT, IdxT, IvfSampleFilterT>(
+      inner_prod_dist<Veclen, T, AccT>{}, metric, std::forward<Args>(args)...);
+  } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+    // NB: "Ascending" is reversed because the post-processing step is done after that sort
+    return launch_kernel<Capacity, Veclen, !Ascending, true, T, AccT, IdxT, IvfSampleFilterT>(
+      inner_prod_dist<Veclen, T, AccT>{}, metric, std::forward<Args>(args)...);
+  } else {
+    RAFT_FAIL("The chosen distance metric is not supported (%d)", int(metric));
   }
 }
 
