@@ -27,10 +27,17 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
+#if 1
 using pq_val_t                              = ivf_pq::detail::fp_8bit<5, true>;
 using pq_val_pack_t                         = ivf_pq::detail::fp_8bit4<5, true>;
 using pq_val_pack_uint_t                    = uint32_t;
 constexpr uint32_t pq_val_pack_num_elements = 4;
+#else
+using pq_val_t                              = half;
+using pq_val_pack_t                         = half2;
+using pq_val_pack_uint_t                    = uint32_t;
+constexpr uint32_t pq_val_pack_num_elements = 2;
+#endif
 
 template <cuvs::distance::DistanceType Metric,
           uint32_t TeamSize,
@@ -183,7 +190,8 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
     __syncthreads();
 
     // Copy PQ table
-    for (unsigned i = threadIdx.x * 2; i < (1 << PQ_BITS) * PQ_LEN; i += blockDim.x * 2) {
+    for (unsigned i = threadIdx.x * pq_val_pack_num_elements; i < (1 << PQ_BITS) * PQ_LEN;
+         i += blockDim.x * pq_val_pack_num_elements) {
       // Change the order of PQ code book array to reduce the
       // frequency of bank conflicts.
       constexpr auto num_elements_per_bank =
@@ -308,11 +316,9 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
 #pragma unroll
             for (std::uint32_t m = 0; m < PQ_LEN / pq_val_pack_num_elements; m++) {
               constexpr auto kQueryBlock = DatasetBlockDim / (vlen * PQ_LEN);
-              std::uint32_t d1 =
-                m * (pq_val_pack_num_elements / 2) + (PQ_LEN / pq_val_pack_num_elements) * v;
-              std::uint32_t d = d1 * kQueryBlock +
-                                elem_offset * (PQ_LEN / pq_val_pack_num_elements) + e * TeamSize +
-                                laneId;
+              std::uint32_t d1           = m * (pq_val_pack_num_elements / 2) + (PQ_LEN / 2) * v;
+              std::uint32_t d =
+                d1 * kQueryBlock + elem_offset * (PQ_LEN / 2) + e * TeamSize + laneId;
               half2 q2;
               // if constexpr (false) {
               if constexpr (std::is_same_v<pq_val_t, half>) {
