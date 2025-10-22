@@ -2836,6 +2836,166 @@ template <typename T, typename IdxT>
 auto distribute(const raft::resources& clique, const std::string& filename)
   -> cuvs::neighbors::mg_index<cagra::index<T, IdxT>, T, IdxT>;
 
+/**
+ * @brief Build a kNN graph using IVF-PQ.
+ *
+ * The kNN graph is the first building block for CAGRA index.
+ *
+ * The output is a dense matrix that stores the neighbor indices for each point in the dataset.
+ * Each point has the same number of neighbors.
+ *
+ * See [cagra::build](#cagra::build) for an alternative method.
+ *
+ * The following distance metrics are supported:
+ * - L2Expanded
+ * - InnerProduct
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters based on shape of the dataset
+ *   ivf_pq::index_params build_params = ivf_pq::index_params::from_dataset(dataset);
+ *   ivf_pq::search_params search_params;
+ *   auto knn_graph      = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 128);
+ *   // create knn graph
+ *   cagra::build_knn_graph(res, dataset, knn_graph.view(), 2, build_params, search_params);
+ *   auto optimized_gaph = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 64);
+ *   cagra::optimize(res, dataset, knn_graph.view(), optimized_graph.view());
+ *   // Construct an index from dataset and optimized knn_graph
+ *   auto index = cagra::index<T, IdxT>(res, build_params.metric(), dataset,
+ *                                      optimized_graph.view());
+ * @endcode
+ *
+ * @param[in] res raft resources
+ * @param[in] dataset a matrix view (host or device) to a row-major matrix [n_rows, dim]
+ * @param[out] knn_graph a host matrix view to store the output knn graph [n_rows, graph_degree]
+ * @param[in] ivf_pq_params ivf-pq parameters for graph build
+ */
+void build_knn_graph(raft::resources const& res,
+                     raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
+                     raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
+                     cuvs::neighbors::cagra::graph_build_params::ivf_pq_params build_params);
+
+/**
+ * @brief Build a kNN graph using IVF-PQ.
+ *
+ * The kNN graph is the first building block for CAGRA index.
+ *
+ * The output is a dense matrix that stores the neighbor indices for each point in the dataset.
+ * Each point has the same number of neighbors.
+ *
+ * See [cagra::build](#cagra::build) for an alternative method.
+ *
+ * The following distance metrics are supported:
+ * - L2Expanded
+ * - InnerProduct
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters based on shape of the dataset
+ *   ivf_pq::index_params build_params = ivf_pq::index_params::from_dataset(dataset);
+ *   ivf_pq::search_params search_params;
+ *   auto knn_graph      = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 128);
+ *   // create knn graph
+ *   cagra::build_knn_graph(res, dataset, knn_graph.view(), 2, build_params, search_params);
+ *   auto optimized_gaph = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 64);
+ *   cagra::optimize(res, dataset, knn_graph.view(), optimized_graph.view());
+ *   // Construct an index from dataset and optimized knn_graph
+ *   auto index = cagra::index<T, IdxT>(res, build_params.metric(), dataset,
+ *                                      optimized_graph.view());
+ * @endcode
+ *
+ * @param[in] res raft resources
+ * @param[in] dataset a matrix view (host or device) to a row-major matrix [n_rows, dim]
+ * @param[out] knn_graph a host matrix view to store the output knn graph [n_rows, graph_degree]
+ * @param[in] ivf_pq_params ivf-pq parameters for graph build
+ */
+void build_knn_graph(raft::resources const& res,
+                     raft::host_matrix_view<const half, int64_t, raft::row_major> dataset,
+                     raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
+                     cuvs::neighbors::cagra::graph_build_params::ivf_pq_params build_params);
+
+/**
+ * @brief Build a kNN graph using IVF-PQ.
+ *
+ * The kNN graph is the first building block for CAGRA index.
+ *
+ * The output is a dense matrix that stores the neighbor indices for each point in the dataset.
+ * Each point has the same number of neighbors.
+ *
+ * See [cagra::build](#cagra::build) for an alternative method.
+ *
+ * The following distance metrics are supported:
+ * - L2Expanded
+ * - InnerProduct
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters based on shape of the dataset
+ *   ivf_pq::index_params build_params = ivf_pq::index_params::from_dataset(dataset);
+ *   ivf_pq::search_params search_params;
+ *   auto knn_graph      = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 128);
+ *   // create knn graph
+ *   cagra::build_knn_graph(res, dataset, knn_graph.view(), 2, build_params, search_params);
+ *   auto optimized_gaph = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 64);
+ *   cagra::optimize(res, dataset, knn_graph.view(), optimized_graph.view());
+ *   // Construct an index from dataset and optimized knn_graph
+ *   auto index = cagra::index<T, IdxT>(res, build_params.metric(), dataset,
+ *                                      optimized_graph.view());
+ * @endcode
+ *
+ * @param[in] res raft resources
+ * @param[in] dataset a matrix view (host or device) to a row-major matrix [n_rows, dim]
+ * @param[out] knn_graph a host matrix view to store the output knn graph [n_rows, graph_degree]
+ * @param[in] ivf_pq_params ivf-pq parameters for graph build
+ */
+void build_knn_graph(raft::resources const& res,
+                     raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
+                     raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
+                     cuvs::neighbors::cagra::graph_build_params::ivf_pq_params build_params);
+
+/**
+ * @brief Build a kNN graph using IVF-PQ.
+ *
+ * The kNN graph is the first building block for CAGRA index.
+ *
+ * The output is a dense matrix that stores the neighbor indices for each point in the dataset.
+ * Each point has the same number of neighbors.
+ *
+ * See [cagra::build](#cagra::build) for an alternative method.
+ *
+ * The following distance metrics are supported:
+ * - L2Expanded
+ * - InnerProduct
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters based on shape of the dataset
+ *   ivf_pq::index_params build_params = ivf_pq::index_params::from_dataset(dataset);
+ *   ivf_pq::search_params search_params;
+ *   auto knn_graph      = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 128);
+ *   // create knn graph
+ *   cagra::build_knn_graph(res, dataset, knn_graph.view(), 2, build_params, search_params);
+ *   auto optimized_gaph = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 64);
+ *   cagra::optimize(res, dataset, knn_graph.view(), optimized_graph.view());
+ *   // Construct an index from dataset and optimized knn_graph
+ *   auto index = cagra::index<T, IdxT>(res, build_params.metric(), dataset,
+ *                                      optimized_graph.view());
+ * @endcode
+ *
+ * @param[in] res raft resources
+ * @param[in] dataset a matrix view (host or device) to a row-major matrix [n_rows, dim]
+ * @param[out] knn_graph a host matrix view to store the output knn graph [n_rows, graph_degree]
+ * @param[in] ivf_pq_params ivf-pq parameters for graph build
+ */
+void build_knn_graph(raft::resources const& res,
+                     raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
+                     raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
+                     cuvs::neighbors::cagra::graph_build_params::ivf_pq_params build_params);
+
 }  // namespace cuvs::neighbors::cagra
 
 #include <cuvs/neighbors/cagra_index_wrapper.hpp>
