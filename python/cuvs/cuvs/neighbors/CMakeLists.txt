@@ -21,6 +21,7 @@ add_subdirectory(nn_descent)
 add_subdirectory(tiered_index)
 add_subdirectory(mg)
 add_subdirectory(all_neighbors)
+add_subdirectory(vamana)
 
 # Set the list of Cython files to build
 set(cython_sources refine.pyx)
