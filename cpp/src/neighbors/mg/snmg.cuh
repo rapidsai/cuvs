@@ -22,6 +22,7 @@
 #include <raft/linalg/add.cuh>
 #include <raft/util/cuda_dev_essentials.cuh>
 
+#include "../../core/omp_wrapper.hpp"
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
@@ -41,10 +42,6 @@ void search(const raft::resources& handle,
             raft::device_matrix_view<searchIdxT, int64_t, row_major> d_neighbors,
             raft::device_matrix_view<float, int64_t, row_major> d_distances);
 }  // namespace cuvs::neighbors
-
-namespace cuvs::neighbors::snmg {
-void check_omp_threads(const int requirements);
-}  // namespace cuvs::neighbors::snmg
 
 namespace cuvs::neighbors::snmg::detail {
 using namespace cuvs::neighbors;
@@ -215,7 +212,8 @@ void sharded_search_with_direct_merge(
       queries.data_handle() + query_offset, n_rows_of_current_batch, n_cols);
 
     const int& requirements = index.num_ranks_;
-    check_omp_threads(requirements);  // should use at least num_ranks_ threads to avoid NCCL hang
+    cuvs::core::omp::check_threads(
+      requirements);  // should use at least num_ranks_ threads to avoid NCCL hang
 #pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
       const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
@@ -335,7 +333,8 @@ void sharded_search_with_tree_merge(
       queries.data_handle() + query_offset, n_rows_of_current_batch, n_cols);
 
     const int& requirements = index.num_ranks_;
-    check_omp_threads(requirements);  // should use at least num_ranks_ threads to avoid NCCL hang
+    cuvs::core::omp::check_threads(
+      requirements);  // should use at least num_ranks_ threads to avoid NCCL hang
 #pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
       const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);

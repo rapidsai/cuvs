@@ -14,15 +14,9 @@
  * limitations under the License.
  */
 
-// Please add the required header files below for which panama FFM API bindings are needed
+#include <cuvs/core/all.h>
 
-#include <cuvs/core/c_api.h>
-#include <cuvs/neighbors/cagra.h>
-#include <cuvs/neighbors/brute_force.h>
-#include <cuvs/neighbors/hnsw.h>
-#include <cuvs/neighbors/ivf_pq.h>
-#include <cuvs/neighbors/common.h>
-#include <cuvs/neighbors/tiered_index.h>
+// Please add any extra required header files below for which panama FFM API bindings are needed
 #include <cuda_runtime.h>
 
 /**
