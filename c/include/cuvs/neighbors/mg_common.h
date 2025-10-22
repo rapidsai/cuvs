@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include <cuvs/core/c_api.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
