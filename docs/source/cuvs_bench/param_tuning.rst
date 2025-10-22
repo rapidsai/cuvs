@@ -212,6 +212,27 @@ CAGRA uses a graph-based index, which creates an intermediate, approximate kNN g
    - `mmap`
    - Where should the dataset reside?
 
+ * - `ace_npartitions`
+   - `build`
+   - N
+   - Positive integer >0
+   - 1
+   - The number of partitions to use for the ACE build. When set to a value >1, enables the ACE partitioned approach for very large graphs. Set to 1 to disable ACE and use standard build.
+
+ * - `ace_build_dir`
+   - `build`
+   - N
+   - String
+   - ""
+   - The directory to use for the ACE build. Must be specified when using ACE build.
+
+ * - `ace_ef_construction`
+   - `build`
+   - Y
+   - Positive integer >0
+   -
+   - Controls index time and accuracy. Bigger values increase the index quality. At some point, increasing this will no longer improve the quality.
+
  * - `query_memory_type`
    - `search`
    - N
