@@ -1,4 +1,5 @@
-# Copyright (c) 2022-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
 repos:
       - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -126,17 +127,29 @@ repos:
                 pom[.]xml$|
                 ^java/cuvs-java/src/assembly/native-with-deps[.]xml$|
                 ^java/docker-build/build-in-docker$|
-                ^java/docker-build/run-in-docker$
+                ^java/docker-build/run-in-docker$|
+                ^[.]flake8$|
+                recipe[.]yaml$|
+                ^[.]pre-commit-config[.]yaml$
             exclude: |
               (?x)
                 ^docs/source/sphinxext/github_link[.]py$|
-                ^cpp/cmake/modules/FindAVX[.]cmake$
+                ^cpp/cmake/modules/FindAVX[.]cmake$|
+                ^cpp/src/neighbors/detail/faiss_distance_utils[.]h$
           - id: verify-copyright
             name: verify-copyright-scikit-learn
             args: [--fix, --spdx, "--spdx-license-identifier=Apache-2.0 AND BSD-3-Clause"]
             files: |
-              (?x)
-                ^docs/source/sphinxext/github_link[.]py$
+              (?x)^(
+                docs/source/sphinxext/github_link[.]py$
+              )
+          - id: verify-copyright
+            name: verify-copyright-faiss
+            args: [--fix, --spdx, "--spdx-license-identifier=Apache-2.0 AND MIT"]
+            files: |
+              (?x)^(
+                cpp/src/neighbors/detail/faiss_distance_utils[.]h$
+              )
           - id: verify-alpha-spec
           - id: verify-codeowners
             args: [--fix, --project-prefix=cuvs]
