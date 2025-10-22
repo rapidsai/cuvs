@@ -676,6 +676,94 @@ extern "C" cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionPar
   return cuvs::core::translate_exceptions([=] { delete params; });
 }
 
+// Helper function to populate C IVF-PQ params from C++ params
+static void populate_c_ivf_pq_params(cuvsIvfPqParams* c_ivf_pq,
+                                       const cuvs::neighbors::cagra::graph_build_params::ivf_pq_params& cpp_ivf_pq)
+{
+  // Populate the IVF-PQ build params
+  auto& bp = cpp_ivf_pq.build_params;
+  c_ivf_pq->ivf_pq_build_params->metric = static_cast<cuvsDistanceType>(bp.metric);
+  c_ivf_pq->ivf_pq_build_params->metric_arg = bp.metric_arg;
+  c_ivf_pq->ivf_pq_build_params->add_data_on_build = bp.add_data_on_build;
+  c_ivf_pq->ivf_pq_build_params->n_lists = bp.n_lists;
+  c_ivf_pq->ivf_pq_build_params->kmeans_n_iters = bp.kmeans_n_iters;
+  c_ivf_pq->ivf_pq_build_params->kmeans_trainset_fraction = bp.kmeans_trainset_fraction;
+  c_ivf_pq->ivf_pq_build_params->pq_bits = bp.pq_bits;
+  c_ivf_pq->ivf_pq_build_params->pq_dim = bp.pq_dim;
+  c_ivf_pq->ivf_pq_build_params->codebook_kind = static_cast<int>(bp.codebook_kind);
+  c_ivf_pq->ivf_pq_build_params->force_random_rotation = bp.force_random_rotation;
+  c_ivf_pq->ivf_pq_build_params->conservative_memory_allocation = bp.conservative_memory_allocation;
+  c_ivf_pq->ivf_pq_build_params->max_train_points_per_pq_code = bp.max_train_points_per_pq_code;
+
+  // Populate the IVF-PQ search params
+  auto& sp = cpp_ivf_pq.search_params;
+  c_ivf_pq->ivf_pq_search_params->n_probes = sp.n_probes;
+  c_ivf_pq->ivf_pq_search_params->lut_dtype = static_cast<int>(sp.lut_dtype);
+  c_ivf_pq->ivf_pq_search_params->internal_distance_dtype = static_cast<int>(sp.internal_distance_dtype);
+  c_ivf_pq->ivf_pq_search_params->preferred_shmem_carveout = sp.preferred_shmem_carveout;
+
+  c_ivf_pq->refinement_rate = cpp_ivf_pq.refinement_rate;
+}
+
+// Helper function to populate C struct from C++ index_params
+static void populate_cagra_index_params_from_cpp(cuvsCagraIndexParams_t c_params,
+                                                   const cuvs::neighbors::cagra::index_params& cpp_params)
+{
+  c_params->metric = static_cast<cuvsDistanceType>(cpp_params.metric);
+  c_params->intermediate_graph_degree = cpp_params.intermediate_graph_degree;
+  c_params->graph_degree = cpp_params.graph_degree;
+
+  // Set build algo and parameters based on the variant
+  if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::nn_descent_params>(
+        cpp_params.graph_build_params)) {
+    c_params->build_algo = NN_DESCENT;
+    auto nn_params =
+      std::get<cuvs::neighbors::cagra::graph_build_params::nn_descent_params>(
+        cpp_params.graph_build_params);
+    c_params->nn_descent_niter = nn_params.max_iterations;
+  } else if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
+               cpp_params.graph_build_params)) {
+    c_params->build_algo = IVF_PQ;
+    auto ivf_pq_params =
+      std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
+        cpp_params.graph_build_params);
+
+    populate_c_ivf_pq_params(c_params->graph_build_params, ivf_pq_params);
+  }
+}
+
+extern "C" cuvsError_t cuvsCagraIndexParamsFromHnswHardM(cuvsCagraIndexParams_t params,
+                                                          int64_t n_rows,
+                                                          int64_t dim,
+                                                          int M,
+                                                          int ef_construction,
+                                                          cuvsDistanceType metric)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto cpp_metric = static_cast<cuvs::distance::DistanceType>((int)metric);
+    auto cpp_params = cuvs::neighbors::cagra::index_params::from_hnsw_hard_m(
+      raft::matrix_extent<int64_t>(n_rows, dim), M, ef_construction, cpp_metric);
+
+    populate_cagra_index_params_from_cpp(params, cpp_params);
+  });
+}
+
+extern "C" cuvsError_t cuvsCagraIndexParamsFromHnswSoftM(cuvsCagraIndexParams_t params,
+                                                          int64_t n_rows,
+                                                          int64_t dim,
+                                                          int M,
+                                                          int ef_construction,
+                                                          cuvsDistanceType metric)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto cpp_metric = static_cast<cuvs::distance::DistanceType>((int)metric);
+    auto cpp_params = cuvs::neighbors::cagra::index_params::from_hnsw_soft_m(
+      raft::matrix_extent<int64_t>(n_rows, dim), M, ef_construction, cpp_metric);
+
+    populate_cagra_index_params_from_cpp(params, cpp_params);
+  });
+}
+
 extern "C" cuvsError_t cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params)
 {
   return cuvs::core::translate_exceptions(
