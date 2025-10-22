@@ -1,6 +1,8 @@
 # =============================================================================
+# cmake-format: off
 # SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
 
 # Use RAPIDS_VERSION_MAJOR_MINOR from rapids_config.cmake
 set(RAFT_VERSION "${RAPIDS_VERSION_MAJOR_MINOR}")
