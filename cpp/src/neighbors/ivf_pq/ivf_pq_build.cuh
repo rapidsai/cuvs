@@ -135,6 +135,7 @@ void select_residuals(raft::resources const& handle,
  * The residual has the form
  *  `rotation_matrix %* (dataset[:, :] - centers[labels[:], 0:dim])`
  *
+ * For cosine metric, normalizes the data after type conversion before computing residuals.
  */
 template <typename T, typename IdxT>
 void flat_compute_residuals(
@@ -146,21 +147,38 @@ void flat_compute_residuals(
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,  // [n_lists, dim_ext]
   const T* dataset,                                                          // [n_rows, dim]
   std::variant<uint32_t, const uint32_t*> labels,                            // [n_rows]
-  rmm::device_async_resource_ref device_memory)
+  rmm::device_async_resource_ref device_memory,
+  cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
 {
   auto stream  = raft::resource::get_cuda_stream(handle);
   auto dim     = rotation_matrix.extent(1);
   auto rot_dim = rotation_matrix.extent(0);
   rmm::device_uvector<float> tmp(n_rows * dim, stream, device_memory);
-  auto tmp_view = raft::make_device_vector_view<float, IdxT>(tmp.data(), tmp.size());
-  raft::linalg::map_offset(handle, tmp_view, [centers, dataset, labels, dim] __device__(size_t i) {
-    auto row_ix = i / dim;
-    auto el_ix  = i % dim;
-    auto label  = std::holds_alternative<uint32_t>(labels)
-                    ? std::get<uint32_t>(labels)
-                    : std::get<const uint32_t*>(labels)[row_ix];
-    return utils::mapping<float>{}(dataset[i]) - centers(label, el_ix);
-  });
+  auto tmp_view = raft::make_device_vector_view<float, size_t>(tmp.data(), tmp.size());
+
+  if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+    raft::linalg::map(handle,
+                      tmp_view,
+                      raft::cast_op<float>{},
+                      raft::make_device_vector_view<const T, IdxT>(dataset, n_rows * dim));
+    auto tmp_matrix_view = raft::make_device_matrix_view<float, size_t>(tmp.data(), n_rows, dim);
+    raft::linalg::row_normalize<raft::linalg::L2Norm>(
+      handle, raft::make_const_mdspan(tmp_matrix_view), tmp_matrix_view);
+  } else {
+    raft::linalg::map_offset(handle, tmp_view, [dataset, dim] __device__(size_t i) {
+      return utils::mapping<float>{}(dataset[i]);
+    });
+  }
+
+  raft::linalg::map_offset(
+    handle, tmp_view, [centers, tmp = tmp.data(), labels, dim] __device__(size_t i) {
+      auto row_ix = i / dim;
+      auto el_ix  = i % dim;
+      auto label  = std::holds_alternative<uint32_t>(labels)
+                      ? std::get<uint32_t>(labels)
+                      : std::get<const uint32_t*>(labels)[row_ix];
+      return tmp[i] - centers(label, el_ix);
+    });
 
   float alpha = 1.0f;
   float beta  = 0.0f;
@@ -859,7 +877,8 @@ void encode_list_data(raft::resources const& res,
                                       index->centers(),
                                       new_vectors.data_handle(),
                                       label,
-                                      mr);
+                                      mr,
+                                      index->metric());
 
   constexpr uint32_t kBlockSize  = 256;
   const uint32_t threads_per_vec = std::min<uint32_t>(raft::WarpSize, index->pq_book_size());
@@ -931,7 +950,8 @@ void process_and_fill_codes(raft::resources const& handle,
                                   index.centers(),
                                   new_vectors,
                                   new_labels,
-                                  mr);
+                                  mr,
+                                  index.metric());
 
   launch_process_and_fill_codes_kernel(
     handle, index, new_vectors_residual.view(), src_offset_or_indices, new_labels, n_rows);
@@ -1093,13 +1113,6 @@ void extend(raft::resources const& handle,
   static_assert(std::is_same_v<T, float> || std::is_same_v<T, half> || std::is_same_v<T, uint8_t> ||
                   std::is_same_v<T, int8_t>,
                 "Unsupported data type");
-
-  if (index->metric() == distance::DistanceType::CosineExpanded) {
-    if constexpr (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>)
-      RAFT_FAIL(
-        "CosineExpanded distance metric is currently not supported for uint8_t and int8_t data "
-        "type");
-  }
 
   rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(handle);
   rmm::device_async_resource_ref large_memory =
@@ -1267,12 +1280,6 @@ void extend(raft::resources const& handle,
   vec_batches.prefetch_next_batch();
   for (const auto& vec_batch : vec_batches) {
     const auto& idx_batch = *idx_batches++;
-    if (index->metric() == CosineExpanded) {
-      auto vec_batch_view = raft::make_device_matrix_view<T, internal_extents_t>(
-        const_cast<T*>(vec_batch.data()), vec_batch.size(), index->dim());
-      raft::linalg::row_normalize<raft::linalg::L2Norm>(
-        handle, raft::make_const_mdspan(vec_batch_view), vec_batch_view);
-    }
     process_and_fill_codes(handle,
                            *index,
                            vec_batch.data(),
@@ -1321,13 +1328,6 @@ auto build(raft::resources const& handle,
 
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
-  if (params.metric == distance::DistanceType::CosineExpanded) {
-    // TODO: support int8_t and uint8_t types (https://github.com/rapidsai/cuvs/issues/389)
-    if constexpr (std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t>)
-      RAFT_FAIL(
-        "CosineExpanded distance metric is currently not supported for uint8_t and int8_t data "
-        "type");
-  }
 
   auto stream = raft::resource::get_cuda_stream(handle);
 

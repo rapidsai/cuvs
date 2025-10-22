@@ -139,12 +139,14 @@ cdef class IndexParams:
 
     metric : str, default = "sqeuclidean"
         String denoting the metric type, valid values for metric are
-        ["sqeuclidean", "inner_product"], where:
+        ["sqeuclidean", "inner_product", "cosine"], where:
 
             - sqeuclidean is the euclidean distance without the square root
               operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2
             - inner_product distance is defined as
               distance(a, b) = \\sum_i a_i * b_i.
+            - cosine distance is defined as
+              distance(a, b) = 1 - \\sum_i a_i * b_i / ( ||a||_2 * ||b||_2).
 
     intermediate_graph_degree : int, default = 128
     graph_degree : int, default = 64
@@ -339,6 +341,7 @@ def build(IndexParams index_params, dataset, resources=None):
     The following distance metrics are supported:
         - L2
         - InnerProduct
+        - Cosine
 
     Parameters
     ----------
