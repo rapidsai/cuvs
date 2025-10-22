@@ -437,10 +437,10 @@ inline auto graph_params_heuristic(raft::matrix_extent<int64_t> dataset,
   }
 }
 
-cagra::index_params index_params::from_hnsw_hard_m(raft::matrix_extent<int64_t> dataset,
-                                                   int M,
-                                                   int ef_construction,
-                                                   cuvs::distance::DistanceType metric)
+inline cagra::index_params index_params::from_hnsw_hard_m(raft::matrix_extent<int64_t> dataset,
+                                                          int M,
+                                                          int ef_construction,
+                                                          cuvs::distance::DistanceType metric)
 {
   cagra::index_params params;
   params.graph_degree              = M * 2;
@@ -450,10 +450,10 @@ cagra::index_params index_params::from_hnsw_hard_m(raft::matrix_extent<int64_t> 
   return params;
 }
 
-cagra::index_params index_params::from_hnsw_soft_m(raft::matrix_extent<int64_t> dataset,
-                                                   int M,
-                                                   int ef_construction,
-                                                   cuvs::distance::DistanceType metric)
+inline cagra::index_params index_params::from_hnsw_soft_m(raft::matrix_extent<int64_t> dataset,
+                                                          int M,
+                                                          int ef_construction,
+                                                          cuvs::distance::DistanceType metric)
 {
   cagra::index_params params;
   params.graph_degree              = 2 + M * 2 / 3;
