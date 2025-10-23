@@ -236,7 +236,7 @@ void compute_avq_centroid(raft::resources const& dev_resources,
 
   // Compute || x_i || ^ 0.5 * (eta -3)
   auto norms_eta_3 = raft::make_device_vector<float, int64_t>(dev_resources, x.extent(0));
-  auto eta_3       = raft::make_host_scalar<float>((eta - 3) / 2);
+  auto eta_3       = raft::make_host_scalar<float, int64_t>((eta - 3) / 2);
 
   raft::linalg::power_scalar(dev_resources,
                              raft::make_const_mdspan(norms.view()),
@@ -245,14 +245,14 @@ void compute_avq_centroid(raft::resources const& dev_resources,
 
   // Compute || x_i || ^ (eta - 1)
   auto norms_eta_1 = raft::make_device_vector<float, int64_t>(dev_resources, x.extent(0));
-  auto eta_1       = raft::make_host_scalar<float>(eta - 1);
+  auto eta_1       = raft::make_host_scalar<float, int64_t>(eta - 1);
 
   raft::linalg::power_scalar(dev_resources,
                              raft::make_const_mdspan(norms.view()),
                              norms_eta_1.view(),
                              raft::make_const_mdspan(eta_1.view()));
 
-  auto sum_norms_eta_1 = raft::make_device_scalar<float>(dev_resources, 0.0);
+  auto sum_norms_eta_1 = raft::make_device_scalar<float, int64_t>(dev_resources, 0.0);
 
   sum_reduce_vector(dev_resources, norms_eta_1.view(), sum_norms_eta_1.view());
 
@@ -294,7 +294,7 @@ void compute_avq_centroid(raft::resources const& dev_resources,
 
   raft::matrix::eye(dev_resources, x_trans_x.view());
 
-  auto eta_m_1       = raft::make_device_scalar<float>(dev_resources, eta - 1);
+  auto eta_m_1       = raft::make_device_scalar<float, int64_t>(dev_resources, eta - 1);
   auto cublas_handle = raft::resource::get_cublas_handle(dev_resources);
 
   raft::linalg::detail::cublas_device_pointer_mode<true> pm(cublas_handle);
@@ -318,7 +318,7 @@ void compute_avq_centroid(raft::resources const& dev_resources,
 
   cholesky_solver(dev_resources, x_trans_x.view(), avq_centroid, avq_centroid);
 
-  auto h_eta = raft::make_host_scalar<float>(eta);
+  auto h_eta = raft::make_host_scalar<float, int64_t>(eta);
 
   raft::linalg::multiply_scalar(dev_resources,
                                 raft::make_const_mdspan(avq_centroid),
@@ -357,8 +357,8 @@ void rescale_avq_centroids(raft::resources const& dev_resources,
                            raft::device_vector_view<uint32_t, int64_t> cluster_sizes,
                            uint32_t dataset_size)
 {
-  auto rescale_num   = raft::make_device_scalar<float>(dev_resources, 0);
-  auto rescale_denom = raft::make_device_scalar<float>(dev_resources, 0);
+  auto rescale_num   = raft::make_device_scalar<float, int64_t>(dev_resources, 0);
+  auto rescale_denom = raft::make_device_scalar<float, int64_t>(dev_resources, 0);
 
   sum_reduce_vector(dev_resources, rescale_num_v, rescale_num.view());
 

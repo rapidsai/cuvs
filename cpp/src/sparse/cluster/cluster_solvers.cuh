@@ -66,8 +66,8 @@ struct kmeans_solver_t {
     km_params.max_iter       = config_.maxIter;
     km_params.rng_state.seed = config_.seed;
 
-    auto X      = raft::make_device_matrix_view<const value_type_t>(obs, n_obs_vecs, dim);
-    auto labels = raft::make_device_vector_view<index_type_t>(codes, n_obs_vecs);
+    auto X = raft::make_device_matrix_view<const value_type_t, index_type_t>(obs, n_obs_vecs, dim);
+    auto labels = raft::make_device_vector_view<index_type_t, index_type_t>(codes, n_obs_vecs);
     auto centroids =
       raft::make_device_matrix<value_type_t, index_type_t>(handle, config_.n_clusters, dim);
     auto weight = raft::make_device_vector<value_type_t, index_type_t>(handle, n_obs_vecs);
@@ -76,7 +76,8 @@ struct kmeans_solver_t {
                  weight.data_handle() + n_obs_vecs,
                  1);
 
-    auto sw = std::make_optional((raft::device_vector_view<const value_type_t>)weight.view());
+    auto sw =
+      std::make_optional((raft::device_vector_view<const value_type_t, index_type_t>)weight.view());
     cuvs::cluster::kmeans::fit_predict(
       handle,
       km_params,

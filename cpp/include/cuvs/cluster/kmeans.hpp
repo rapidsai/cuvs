@@ -1233,7 +1233,7 @@ namespace helpers {
  *
  *   #include <raft/random/make_blobs.cuh>
  *
- *   using namespace  cuvs::cluster;
+ *   using namespace cuvs::cluster;
  *
  *   raft::handle_t handle;
  *   int n_samples = 100, n_features = 15, n_clusters = 10;
@@ -1242,9 +1242,9 @@ namespace helpers {
  *
  *   raft::random::make_blobs(handle, X, labels, n_clusters);
  *
- *   auto best_k = raft::make_host_scalar<int>(0);
- *   auto n_iter = raft::make_host_scalar<int>(0);
- *   auto inertia = raft::make_host_scalar<int>(0);
+ *   auto best_k = raft::make_host_scalar<int, int>(0);
+ *   auto n_iter = raft::make_host_scalar<int, int>(0);
+ *   auto inertia = raft::make_host_scalar<int, int>(0);
  *
  *   kmeans::find_k(handle, X, best_k.view(), inertia.view(), n_iter.view(), n_clusters+1);
  *
