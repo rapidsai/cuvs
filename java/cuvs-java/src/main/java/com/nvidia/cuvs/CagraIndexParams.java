@@ -46,7 +46,15 @@ public class CagraIndexParams {
     /**
      * Experimental, use NN-Descent to build all-neighbors knn graph
      */
-    NN_DESCENT(2);
+    NN_DESCENT(2),
+    /**
+     * Experimental, use iterative cagra search and optimize to build the knn graph
+     */
+    ITERATIVE_CAGRA_SEARCH(3),
+    /**
+     * Use ACE (Augmented Core Extraction) to build the graph
+     */
+    ACE(4);
 
     /**
      * The value for the enum choice.

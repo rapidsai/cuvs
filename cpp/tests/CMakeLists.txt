@@ -202,6 +202,34 @@ ConfigureTest(
 )
 
 ConfigureTest(
+  NAME NEIGHBORS_ANN_CAGRA_ACE_FLOAT_UINT32_TEST
+  PATH neighbors/ann_cagra_ace/test_float_uint32_t.cu
+  GPUS 1
+  PERCENT 100
+)
+
+ConfigureTest(
+  NAME NEIGHBORS_ANN_CAGRA_ACE_HALF_UINT32_TEST
+  PATH neighbors/ann_cagra_ace/test_half_uint32_t.cu
+  GPUS 1
+  PERCENT 100
+)
+
+ConfigureTest(
+  NAME NEIGHBORS_ANN_CAGRA_ACE_INT8_UINT32_TEST
+  PATH neighbors/ann_cagra_ace/test_int8_t_uint32_t.cu
+  GPUS 1
+  PERCENT 100
+)
+
+ConfigureTest(
+  NAME NEIGHBORS_ANN_CAGRA_ACE_UINT8_UINT32_TEST
+  PATH neighbors/ann_cagra_ace/test_uint8_t_uint32_t.cu
+  GPUS 1
+  PERCENT 100
+)
+
+ConfigureTest(
   NAME NEIGHBORS_ANN_NN_DESCENT_TEST
   PATH neighbors/ann_nn_descent/test_float_uint32_t.cu
        neighbors/ann_nn_descent/test_int8_t_uint32_t.cu
