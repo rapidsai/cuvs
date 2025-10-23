@@ -1,4 +1,3 @@
-# =============================================================================
 # SPDX-FileCopyrightText: Copyright (c) 2016-     Facebook, Inc            (Adam Paszke)
 # SPDX-FileCopyrightText: Copyright (c) 2014-     Facebook, Inc            (Soumith Chintala)
 # SPDX-FileCopyrightText: Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
@@ -9,6 +8,17 @@
 # SPDX-FileCopyrightText: Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
 # SPDX-FileCopyrightText: Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
 # SPDX-License-Identifier: BSD-3-Clause
+
+# =============================================================================
+# Copyright (c) 2016-     Facebook, Inc            (Adam Paszke)
+# Copyright (c) 2014-     Facebook, Inc            (Soumith Chintala)
+# Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+# Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+# Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+# Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+# Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+# Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+# Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
 #
 # Note: This file was copied from PyTorch and modified for use in the RAFT library.
 # Refer to thirdparty/LICENSES/LICENSE.pytorch for license and additional

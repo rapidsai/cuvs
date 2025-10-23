@@ -1,4 +1,5 @@
 /*
+ * SPDX-FileCopyrightText: Copyright (c) Facebook, Inc. and its affiliates.
  * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0 AND MIT
  */

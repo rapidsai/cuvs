@@ -1,6 +1,12 @@
 // clang-format off
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2017 - 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
+ */
+// clang-format on
 /***************************************************************************************************
- * SPDX-FileCopyrightText: Copyright (c) 2017-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2017 - 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,11 +34,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  **************************************************************************************************/
-// clang-format on
-/*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
- * SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
- */
 
 /*! \file
 
