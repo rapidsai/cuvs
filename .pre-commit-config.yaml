@@ -110,7 +110,7 @@ repos:
                     ^CHANGELOG[.]md$|
                     ^cpp/cmake/patches/cutlass/build-export[.]patch$
       - repo: https://github.com/rapidsai/pre-commit-hooks
-        rev: v1.1.0
+        rev: v1.2.0
         hooks:
           - id: verify-copyright
             name: verify-copyright-cuvs
