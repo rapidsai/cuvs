@@ -1111,12 +1111,6 @@ index<T, IdxT> build_ace(raft::resources const& res,
                                           augmented_partition_offsets.view(),
                                           augmented_backward_mapping.view(),
                                           core_forward_mapping.view());
-
-      const size_t graph_offset =
-        static_cast<size_t>(core_partition_offsets(partition_id)) * graph_degree * sizeof(IdxT);
-      const size_t graph_bytes = core_sub_dataset_size * graph_degree * sizeof(IdxT);
-      cuvs::util::write_large_file(
-        graph_fd, sub_search_graph.data_handle(), graph_bytes, graph_offset);
     } else {
       // Adjust IDs in sub_search_graph and save to search_graph
       ace_adjust_sub_graph_ids<IdxT>(core_sub_dataset_size,
@@ -1131,9 +1125,21 @@ index<T, IdxT> build_ace(raft::resources const& res,
                                      augmented_backward_mapping.view());
     }
 
+    auto adjust_end = std::chrono::high_resolution_clock::now();
+    auto adjust_elapsed =
+      std::chrono::duration_cast<std::chrono::milliseconds>(adjust_end - optimize_end).count();
+
+    if (use_disk) {
+      const size_t graph_offset =
+        static_cast<size_t>(core_partition_offsets(partition_id)) * graph_degree * sizeof(IdxT);
+      const size_t graph_bytes = core_sub_dataset_size * graph_degree * sizeof(IdxT);
+      cuvs::util::write_large_file(
+        graph_fd, sub_search_graph.data_handle(), graph_bytes, graph_offset);
+    }
+
     auto end = std::chrono::high_resolution_clock::now();
     auto write_elapsed =
-      std::chrono::duration_cast<std::chrono::milliseconds>(end - optimize_end).count();
+      std::chrono::duration_cast<std::chrono::milliseconds>(end - adjust_end).count();
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     double read_throughput =
       sub_dataset_size * dataset_dim * sizeof(T) / (1024.0 * 1024.0) / (read_elapsed / 1000.0);
@@ -1142,7 +1148,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
     RAFT_LOG_INFO(
       "ACE: Partition %4lu (%8lu + %8lu) completed in %6ld ms: read %6ld ms (%7.1f MiB/s), "
       "optimize "
-      "%6ld ms, write %6ld ms (%7.1f MiB/s)",
+      "%6ld ms, adjust %6ld ms, write %6ld ms (%7.1f MiB/s)",
       partition_id,
       core_sub_dataset_size,
       augmented_sub_dataset_size,
@@ -1150,6 +1156,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
       read_elapsed,
       read_throughput,
       optimize_elapsed,
+      adjust_elapsed,
       write_elapsed,
       write_throughput);
   }
