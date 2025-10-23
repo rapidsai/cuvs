@@ -595,10 +595,7 @@ if(NOT BUILD_CPU_ONLY)
   )
 
   if(NOT cuvs_compile_mode STREQUAL "static_only")
-    add_library(cuvs SHARED
-      $<TARGET_OBJECTS:cuvs_objs>
-      $<TARGET_OBJECTS:cuvs-cagra-search>
-    )
+    add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs> $<TARGET_OBJECTS:cuvs-cagra-search>)
     add_library(cuvs::cuvs ALIAS cuvs)
     set_target_properties(
       cuvs
@@ -659,10 +656,7 @@ SECTIONS
   endif()
 
   if(NOT cuvs_compile_mode STREQUAL "shared_only")
-    add_library(cuvs_static STATIC
-      $<TARGET_OBJECTS:cuvs_objs>
-      $<TARGET_OBJECTS:cuvs-cagra-search>
-    )
+    add_library(cuvs_static STATIC $<TARGET_OBJECTS:cuvs_objs> $<TARGET_OBJECTS:cuvs-cagra-search>)
     add_library(cuvs::cuvs_static ALIAS cuvs_static)
 
     set_target_properties(
