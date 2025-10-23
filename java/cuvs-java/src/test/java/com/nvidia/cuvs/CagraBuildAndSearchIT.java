@@ -23,6 +23,7 @@ import com.carrotsearch.randomizedtesting.RandomizedRunner;
 import com.nvidia.cuvs.CagraIndexParams.CagraGraphBuildAlgo;
 import com.nvidia.cuvs.CagraIndexParams.CuvsDistanceType;
 import com.nvidia.cuvs.CagraMergeParams.MergeStrategy;
+import com.nvidia.cuvs.spi.CuVSProvider;
 import java.lang.foreign.Arena;
 import java.lang.foreign.Linker;
 import java.lang.foreign.MemoryLayout;
@@ -61,9 +62,13 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     log.trace("Random context initialized for test.");
   }
 
-  private static void runConcurrently(int nThreads, Supplier<Runnable> runnableSupplier)
+  private static void runConcurrently(
+      boolean usePooledMemory, int nThreads, Supplier<Runnable> runnableSupplier)
       throws ExecutionException, InterruptedException, TimeoutException {
     try (ExecutorService parallelExecutor = Executors.newFixedThreadPool(nThreads)) {
+      if (usePooledMemory) {
+        CuVSProvider.provider().enableRMMPooledMemory(10, 60);
+      }
       var futures = new CompletableFuture[nThreads];
       for (int j = 0; j < nThreads; j++) {
         futures[j] = CompletableFuture.runAsync(runnableSupplier.get(), parallelExecutor);
@@ -77,6 +82,10 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
                 return null;
               })
           .get(2000, TimeUnit.SECONDS);
+    } finally {
+      if (usePooledMemory) {
+        CuVSProvider.provider().resetRMMPooledMemory();
+      }
     }
   }
 
@@ -189,6 +198,15 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
    */
   @Test
   public void testIndexingAndSearchingFlowConcurrently() throws Throwable {
+    testIndexingAndSearchingFlowConcurrently(false);
+  }
+
+  @Test
+  public void testIndexingAndSearchingFlowConcurrentlyWithPooledMemory() throws Throwable {
+    testIndexingAndSearchingFlowConcurrently(true);
+  }
+
+  private void testIndexingAndSearchingFlowConcurrently(boolean usePooledMemory) throws Throwable {
     final float[][] dataset = createSampleData();
     float[][] queries = createSampleQueries();
     List<Map<Integer, Float>> expectedResults = getExpectedResults();
@@ -196,6 +214,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     int numTestsRuns = 10;
 
     runConcurrently(
+        usePooledMemory,
         numTestsRuns,
         () ->
             () -> {
@@ -220,10 +239,20 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
   @Test
   public void testIndexing() throws Throwable {
+    testIndexing(false);
+  }
+
+  @Test
+  public void testIndexingWithPooledMemory() throws Throwable {
+    testIndexing(true);
+  }
+
+  public void testIndexing(boolean usePooledMemory) throws Throwable {
     for (int i = 0; i < 100; ++i) {
       final float[][] dataset = createSampleData();
       int numTestsRuns = 10;
       runConcurrently(
+          usePooledMemory,
           numTestsRuns,
           () ->
               () -> {
@@ -239,10 +268,20 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
   @Test
   public void testSerialization() throws Throwable {
+    testSerialization(false);
+  }
+
+  @Test
+  public void testSerializationWithPooledMemory() throws Throwable {
+    testSerialization(true);
+  }
+
+  private void testSerialization(boolean usePooledMemory) throws Throwable {
     for (int i = 0; i < 100; ++i) {
       final float[][] dataset = createSampleData();
       int numTestsRuns = 10;
       runConcurrently(
+          usePooledMemory,
           numTestsRuns,
           () ->
               () -> {
@@ -259,10 +298,20 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
   @Test
   public void testDeserialization() throws Throwable {
+    testDeserialization(false);
+  }
+
+  @Test
+  public void testDeserializationWithPooledMemory() throws Throwable {
+    testDeserialization(true);
+  }
+
+  private void testDeserialization(boolean usePooledMemory) throws Throwable {
     var indexPath = createSerializedIndex(CuVSMatrix.ofArray(createSampleData()));
     for (int i = 0; i < 100; ++i) {
       int numTestsRuns = 10;
       runConcurrently(
+          usePooledMemory,
           numTestsRuns,
           () ->
               () -> {
