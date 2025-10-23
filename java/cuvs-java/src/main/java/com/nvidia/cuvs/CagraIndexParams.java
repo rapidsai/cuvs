@@ -15,6 +15,12 @@
  */
 package com.nvidia.cuvs;
 
+import com.nvidia.cuvs.spi.CuVSProvider;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 /**
  * Supplemental parameters to build CAGRA Index.
  *
@@ -24,9 +30,9 @@ public class CagraIndexParams {
 
   private final CagraGraphBuildAlgo cuvsCagraGraphBuildAlgo;
   private final CuvsDistanceType cuvsDistanceType;
-  private final int intermediateGraphDegree;
-  private final int graphDegree;
-  private final int nnDescentNiter;
+  private final long intermediateGraphDegree;
+  private final long graphDegree;
+  private final long nnDescentNiter;
   private final int numWriterThreads;
   private final CuVSIvfPqParams cuVSIvfPqParams;
   private final CagraCompressionParams cagraCompressionParams;
@@ -55,6 +61,14 @@ public class CagraIndexParams {
 
     private CagraGraphBuildAlgo(int value) {
       this.value = value;
+    }
+
+    private static final Map<Integer, CagraGraphBuildAlgo> VALUES =
+        Arrays.stream(CagraGraphBuildAlgo.values())
+            .collect(Collectors.toUnmodifiableMap(x -> x.value, Function.identity()));
+
+    public static CagraGraphBuildAlgo of(int i) {
+      return VALUES.get(i);
     }
   }
 
@@ -156,6 +170,14 @@ public class CagraIndexParams {
     private CuvsDistanceType(int value) {
       this.value = value;
     }
+
+    private static final Map<Integer, CuvsDistanceType> VALUES =
+        Arrays.stream(CuvsDistanceType.values())
+            .collect(Collectors.toUnmodifiableMap(x -> x.value, Function.identity()));
+
+    public static CuvsDistanceType of(int value) {
+      return VALUES.get(value);
+    }
   }
 
   /**
@@ -173,6 +195,14 @@ public class CagraIndexParams {
 
     private CodebookGen(int value) {
       this.value = value;
+    }
+
+    private static final Map<Integer, CodebookGen> VALUES =
+        Arrays.stream(CodebookGen.values())
+            .collect(Collectors.toUnmodifiableMap(x -> x.value, Function.identity()));
+
+    public static CodebookGen of(int value) {
+      return VALUES.get(value);
     }
   }
 
@@ -245,13 +275,21 @@ public class CagraIndexParams {
     private CudaDataType(int value) {
       this.value = value;
     }
+
+    private static final Map<Integer, CudaDataType> VALUES =
+        Arrays.stream(CudaDataType.values())
+            .collect(Collectors.toUnmodifiableMap(x -> x.value, Function.identity()));
+
+    public static CudaDataType of(int value) {
+      return VALUES.get(value);
+    }
   }
 
   private CagraIndexParams(
-      int intermediateGraphDegree,
-      int graphDegree,
+      long intermediateGraphDegree,
+      long graphDegree,
       CagraGraphBuildAlgo CuvsCagraGraphBuildAlgo,
-      int nnDescentNiter,
+      long nnDescentNiter,
       int writerThreads,
       CuvsDistanceType cuvsDistanceType,
       CuVSIvfPqParams cuVSIvfPqParams,
@@ -266,12 +304,24 @@ public class CagraIndexParams {
     this.cagraCompressionParams = cagraCompressionParams;
   }
 
+  public static CagraIndexParams fromHnswHardM(
+      long rows, long dim, int M, int efConstruction, CuvsDistanceType metric) {
+    return CuVSProvider.provider()
+        .cagraIndexParamsFromHnswHardM(rows, dim, M, efConstruction, metric);
+  }
+
+  public static CagraIndexParams fromHnswSoftM(
+      long rows, long dim, int M, int efConstruction, CuvsDistanceType metric) {
+    return CuVSProvider.provider()
+        .cagraIndexParamsFromHnswSoftM(rows, dim, M, efConstruction, metric);
+  }
+
   /**
    * Gets the degree of input graph for pruning.
    *
    * @return the degree of input graph
    */
-  public int getIntermediateGraphDegree() {
+  public long getIntermediateGraphDegree() {
     return intermediateGraphDegree;
   }
 
@@ -280,7 +330,7 @@ public class CagraIndexParams {
    *
    * @return the degree of output graph
    */
-  public int getGraphDegree() {
+  public long getGraphDegree() {
     return graphDegree;
   }
 
@@ -295,7 +345,7 @@ public class CagraIndexParams {
    * Gets the number of iterations to run if building with
    * {@link CagraGraphBuildAlgo#NN_DESCENT}
    */
-  public int getNNDescentNumIterations() {
+  public long getNNDescentNumIterations() {
     return nnDescentNiter;
   }
 
@@ -325,13 +375,6 @@ public class CagraIndexParams {
    */
   public CagraGraphBuildAlgo getCuvsCagraGraphBuildAlgo() {
     return cuvsCagraGraphBuildAlgo;
-  }
-
-  /**
-   * Gets the number of Iterations to run.
-   */
-  public int getNnDescentNiter() {
-    return nnDescentNiter;
   }
 
   /**
@@ -369,9 +412,9 @@ public class CagraIndexParams {
 
     private CagraGraphBuildAlgo cuvsCagraGraphBuildAlgo = CagraGraphBuildAlgo.NN_DESCENT;
     private CuvsDistanceType cuvsDistanceType = CuvsDistanceType.L2Expanded;
-    private int intermediateGraphDegree = 128;
-    private int graphDegree = 64;
-    private int nnDescentNumIterations = 20;
+    private long intermediateGraphDegree = 128;
+    private long graphDegree = 64;
+    private long nnDescentNumIterations = 20;
     private int numWriterThreads = 2;
     private CuVSIvfPqParams cuVSIvfPqParams = new CuVSIvfPqParams.Builder().build();
     private CagraCompressionParams cagraCompressionParams;
@@ -384,7 +427,7 @@ public class CagraIndexParams {
      * @param intermediateGraphDegree degree of input graph for pruning
      * @return an instance of Builder
      */
-    public Builder withIntermediateGraphDegree(int intermediateGraphDegree) {
+    public Builder withIntermediateGraphDegree(long intermediateGraphDegree) {
       this.intermediateGraphDegree = intermediateGraphDegree;
       return this;
     }
@@ -395,7 +438,7 @@ public class CagraIndexParams {
      * @param graphDegree degree of output graph
      * @return an instance to Builder
      */
-    public Builder withGraphDegree(int graphDegree) {
+    public Builder withGraphDegree(long graphDegree) {
       this.graphDegree = graphDegree;
       return this;
     }
@@ -430,7 +473,7 @@ public class CagraIndexParams {
      *                       {@link CagraGraphBuildAlgo#NN_DESCENT}
      * @return an instance of Builder
      */
-    public Builder withNNDescentNumIterations(int nnDescentNiter) {
+    public Builder withNNDescentNumIterations(long nnDescentNiter) {
       this.nnDescentNumIterations = nnDescentNiter;
       return this;
     }
