@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,8 +35,8 @@ function(find_and_configure_nlohmann_json)
 
 endfunction()
 
-find_and_configure_nlohmann_json(VERSION  3.11.2
+find_and_configure_nlohmann_json(VERSION  3.12.0
         FORK             nlohmann
-        PINNED_TAG       v3.11.2
+        PINNED_TAG       v3.12.0
         EXCLUDE_FROM_ALL ON
         )
