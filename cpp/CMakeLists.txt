@@ -351,8 +351,8 @@ if(NOT BUILD_CPU_ONLY)
     )
   endif()
 
-  set(JIT_LTO_FILES src/detail/jit_lto/AlgorithmLauncher.cu src/detail/jit_lto/FragmentDatabase.cu
-                    src/detail/jit_lto/FragmentEntry.cu
+  set(JIT_LTO_FILES src/detail/jit_lto/AlgorithmLauncher.cu src/detail/jit_lto/AlgorithmPlanner.cu
+                    src/detail/jit_lto/FragmentDatabase.cu src/detail/jit_lto/FragmentEntry.cu
   )
 
   add_library(
@@ -621,7 +621,7 @@ if(NOT BUILD_CPU_ONLY)
     )
     target_link_libraries(jit_lto_fatbins PRIVATE rmm::rmm raft::raft CCCL::CCCL)
 
-    add_library(jit_lto_fatbins_as_cpp_sources STATIC src/detail/jit_lto/AlgorithmPlanner.cu)
+    add_library(jit_lto_fatbins_as_cpp_sources STATIC)
 
     # Set PIC for the static library since it will be linked into a shared library
     set_target_properties(
