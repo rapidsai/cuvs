@@ -58,7 +58,9 @@ cache:
       - ninja
       - ${{ stdlib("c") }}
     host:
-      - libnvjitlink-dev
+      - if: cuda_major == "13"
+        then:
+          - libnvjitlink-dev
       - librmm =${{ minor_version }}
       - libraft-headers =${{ minor_version }}
       - nccl ${{ nccl_version }}
@@ -107,7 +109,9 @@ outputs:
         - libcurand-dev
         - libcusolver-dev
         - libcusparse-dev
-        - libnvjitlink-dev
+        - if: cuda_major == "13"
+          then:
+            - libnvjitlink-dev
       run:
         - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
         - libraft-headers =${{ minor_version }}
@@ -117,7 +121,9 @@ outputs:
         - libcurand
         - libcusolver
         - libcusparse
-        - libnvjitlink
+        - if: cuda_major == "13"
+          then:
+            - libnvjitlink
       ignore_run_exports:
         by_name:
           - cuda-cudart
@@ -128,7 +134,9 @@ outputs:
           - libcurand
           - libcusolver
           - libcusparse
-          - libnvjitlink
+          - if: cuda_major == "13"
+            then:
+              - libnvjitlink
           - librmm
           - mkl
           - nccl
