@@ -690,7 +690,7 @@ static void populate_c_ivf_pq_params(cuvsIvfPqParams* c_ivf_pq,
   c_ivf_pq->ivf_pq_build_params->kmeans_trainset_fraction = bp.kmeans_trainset_fraction;
   c_ivf_pq->ivf_pq_build_params->pq_bits = bp.pq_bits;
   c_ivf_pq->ivf_pq_build_params->pq_dim = bp.pq_dim;
-  c_ivf_pq->ivf_pq_build_params->codebook_kind = static_cast<int>(bp.codebook_kind);
+  c_ivf_pq->ivf_pq_build_params->codebook_kind = static_cast<codebook_gen>(bp.codebook_kind);
   c_ivf_pq->ivf_pq_build_params->force_random_rotation = bp.force_random_rotation;
   c_ivf_pq->ivf_pq_build_params->conservative_memory_allocation = bp.conservative_memory_allocation;
   c_ivf_pq->ivf_pq_build_params->max_train_points_per_pq_code = bp.max_train_points_per_pq_code;
@@ -698,8 +698,8 @@ static void populate_c_ivf_pq_params(cuvsIvfPqParams* c_ivf_pq,
   // Populate the IVF-PQ search params
   auto& sp = cpp_ivf_pq.search_params;
   c_ivf_pq->ivf_pq_search_params->n_probes = sp.n_probes;
-  c_ivf_pq->ivf_pq_search_params->lut_dtype = static_cast<int>(sp.lut_dtype);
-  c_ivf_pq->ivf_pq_search_params->internal_distance_dtype = static_cast<int>(sp.internal_distance_dtype);
+  c_ivf_pq->ivf_pq_search_params->lut_dtype = sp.lut_dtype;
+  c_ivf_pq->ivf_pq_search_params->internal_distance_dtype = sp.internal_distance_dtype;
   c_ivf_pq->ivf_pq_search_params->preferred_shmem_carveout = sp.preferred_shmem_carveout;
 
   c_ivf_pq->refinement_rate = cpp_ivf_pq.refinement_rate;
