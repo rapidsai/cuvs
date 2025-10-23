@@ -408,12 +408,23 @@ void extend(
 
 template <class T, class IdxT>
 index<T, IdxT> merge(raft::resources const& handle,
-                     const cagra::merge_params& params,
-                     std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices)
+                     const cagra::index_params& params,
+                     std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,
+                     const cuvs::neighbors::filtering::base_filter& row_filter)
 {
-  return cagra::detail::merge<T, IdxT>(handle, params, indices);
+  return cagra::detail::merge<T, IdxT>(handle, params, indices, row_filter);
 }
 
 /** @} */  // end group cagra
 
 }  // namespace cuvs::neighbors::cagra
+
+#define CUVS_INST_CAGRA_MERGE(T, IdxT)                                                  \
+  auto merge(raft::resources const& handle,                                             \
+             const cuvs::neighbors::cagra::index_params& params,                        \
+             std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices,             \
+             const cuvs::neighbors::filtering::base_filter& row_filter)                 \
+    -> cuvs::neighbors::cagra::index<T, IdxT>                                           \
+  {                                                                                     \
+    return cuvs::neighbors::cagra::merge<T, IdxT>(handle, params, indices, row_filter); \
+  }
