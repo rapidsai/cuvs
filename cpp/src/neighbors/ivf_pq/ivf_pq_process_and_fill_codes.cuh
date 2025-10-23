@@ -138,11 +138,12 @@ struct encode_vectors {
 };
 
 template <typename IdxT>
-void launch_process_and_fill_codes_kernel(raft::resources const& handle,
-                                          index<IdxT>& index,
-                                          raft::device_matrix_view<float> new_vectors_residual,
-                                          std::variant<IdxT, const IdxT*> src_offset_or_indices,
-                                          const uint32_t* new_labels,
-                                          IdxT n_rows);
+void launch_process_and_fill_codes_kernel(
+  raft::resources const& handle,
+  index<IdxT>& index,
+  raft::device_matrix_view<float, IdxT> new_vectors_residual,
+  std::variant<IdxT, const IdxT*> src_offset_or_indices,
+  const uint32_t* new_labels,
+  IdxT n_rows);
 
 }  // namespace cuvs::neighbors::ivf_pq::detail
