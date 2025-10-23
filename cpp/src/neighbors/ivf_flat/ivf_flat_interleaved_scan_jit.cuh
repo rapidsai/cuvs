@@ -207,7 +207,7 @@ void launch_kernel(const index<T, IdxT>& index,
 
   if (grid_dim_x == 0) {
     grid_dim_x = configure_launch_x(
-      std::min(kMaxGridY, num_queries), n_probes, smem_size, kernel_launcher.get_kernel());
+      std::min(kMaxGridY, num_queries), n_probes, smem_size, kernel_launcher->get_kernel());
     return;
   }
 
@@ -223,28 +223,28 @@ void launch_kernel(const index<T, IdxT>& index,
       block_dim.x,
       n_probes,
       smem_size);
-    kernel_launcher(stream,
-                    grid_dim,
-                    block_dim,
-                    smem_size,
-                    query_smem_elems,
-                    queries,
-                    coarse_index,
-                    index.data_ptrs().data_handle(),
-                    index.list_sizes().data_handle(),
-                    queries_offset + query_offset,
-                    n_probes,
-                    k,
-                    max_samples,
-                    chunk_indices,
-                    index.dim(),
-                    // sample_filter,
-                    inds_ptrs,
-                    bitset_ptr.value_or(nullptr),
-                    bitset_len.value_or(0),
-                    original_nbits.value_or(0),
-                    neighbors,
-                    distances);
+    kernel_launcher->dispatch(stream,
+                              grid_dim,
+                              block_dim,
+                              smem_size,
+                              query_smem_elems,
+                              queries,
+                              coarse_index,
+                              index.data_ptrs().data_handle(),
+                              index.list_sizes().data_handle(),
+                              queries_offset + query_offset,
+                              n_probes,
+                              k,
+                              max_samples,
+                              chunk_indices,
+                              index.dim(),
+                              // sample_filter,
+                              inds_ptrs,
+                              bitset_ptr.value_or(nullptr),
+                              bitset_len.value_or(0),
+                              original_nbits.value_or(0),
+                              neighbors,
+                              distances);
     queries += grid_dim_y * index.dim();
     if constexpr (Capacity > 0) {
       neighbors += grid_dim_y * grid_dim_x * k;

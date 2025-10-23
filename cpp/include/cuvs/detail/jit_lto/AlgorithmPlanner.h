@@ -26,7 +26,7 @@ struct FragmentEntry;
 struct AlgorithmPlanner {
   AlgorithmPlanner(std::string const& n, std::string const& p) : entrypoint(n + "_" + p) {}
 
-  AlgorithmLauncher get_launcher();
+  std::shared_ptr<AlgorithmLauncher> get_launcher();
 
   std::string entrypoint;
   std::vector<std::string> device_functions;
@@ -36,5 +36,5 @@ struct AlgorithmPlanner {
   void add_entrypoint();
   void add_device_functions();
   std::string get_device_functions_key();
-  AlgorithmLauncher build();
+  std::shared_ptr<AlgorithmLauncher> build();
 };

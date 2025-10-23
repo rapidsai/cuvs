@@ -28,6 +28,8 @@
 #include "cuda_runtime.h"
 #include "nvJitLink.h"
 
+#include <raft/util/cuda_rt_essentials.hpp>
+
 namespace {
 // We can make a better RAII wrapper around nvjitlinkhandle
 void check_nvjitlink_result(nvJitLinkHandle handle, nvJitLinkResult result)
@@ -71,12 +73,11 @@ std::string AlgorithmPlanner::get_device_functions_key()
   return key;
 }
 
-AlgorithmLauncher AlgorithmPlanner::get_launcher()
+std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::get_launcher()
 {
   auto& launchers = get_cached_launchers();
   auto launch_key = this->entrypoint + this->get_device_functions_key();
   if (launchers.count(launch_key) == 0) {
-    auto start = std::chrono::high_resolution_clock::now();
     add_entrypoint();
     add_device_functions();
     launchers[launch_key] = this->build();
@@ -84,14 +85,14 @@ AlgorithmLauncher AlgorithmPlanner::get_launcher()
   return launchers[launch_key];
 }
 
-AlgorithmLauncher AlgorithmPlanner::build()
+std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
 {
   int device = 0;
   int major  = 0;
   int minor  = 0;
-  cudaGetDevice(&device);
-  cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device);
-  cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
+  RAFT_CUDA_TRY(cudaGetDevice(&device));
+  RAFT_CUDA_TRY(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
+  RAFT_CUDA_TRY(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
 
   std::string archs = "-arch=sm_" + std::to_string((major * 10 + minor));
 
@@ -124,12 +125,13 @@ AlgorithmLauncher AlgorithmPlanner::build()
 
   // cubin is linked, so now load it
   cudaLibrary_t library;
-  cudaLibraryLoadData(&library, cubin.get(), nullptr, nullptr, 0, nullptr, nullptr, 0);
+  RAFT_CUDA_TRY(
+    cudaLibraryLoadData(&library, cubin.get(), nullptr, nullptr, 0, nullptr, nullptr, 0));
 
-  unsigned int count = 1;
+  constexpr unsigned int count = 1;
   // Still need to cache/compute the mangled name
-  std::unique_ptr<cudaKernel_t[]> kernels_{new cudaKernel_t[count]};
-  cudaLibraryEnumerateKernels(kernels_.get(), count, library);
+  std::unique_ptr<cudaKernel_t[]> kernels{new cudaKernel_t[count]};
+  RAFT_CUDA_TRY(cudaLibraryEnumerateKernels(kernels.get(), count, library));
 
-  return AlgorithmLauncher{library, kernels_[0]};
+  return std::make_shared<AlgorithmLauncher>(kernels.release()[0]);
 }

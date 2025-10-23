@@ -23,16 +23,15 @@
 #include <vector_types.h>
 
 #include <cuda_runtime.h>
-#include <nvJitLink.h>
+#include <memory>
 
 struct AlgorithmLauncher {
   AlgorithmLauncher() = default;
 
-  AlgorithmLauncher(cudaLibrary_t l, cudaKernel_t k);
+  AlgorithmLauncher(cudaKernel_t k);
 
   template <typename... Args>
-  void operator()(
-    cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, Args&&... args)
+  void dispatch(cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, Args&&... args)
   {
     void* kernel_args[] = {const_cast<void*>(static_cast<void const*>(&args))...};
     this->call(stream, grid, block, shared_mem, kernel_args);
@@ -42,8 +41,7 @@ struct AlgorithmLauncher {
 
  private:
   void call(cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, void** args);
-  cudaLibrary_t library;
   cudaKernel_t kernel;
 };
 
-std::unordered_map<std::string, AlgorithmLauncher>& get_cached_launchers();
+std::unordered_map<std::string, std::shared_ptr<AlgorithmLauncher>>& get_cached_launchers();

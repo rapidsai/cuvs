@@ -23,14 +23,6 @@
 #include "FragmentEntry.h"
 #include "MakeFragmentKey.h"
 
-struct NRTCLTOFragmentCompiler;
-
-// struct PerEntryCachedInfo {
-//   std::unordered_set<std::unique_ptr<FragmentEntry>, FragmentEntryHash,
-//                      FragmentEntryEqual>
-//       entries;
-// };
-
 class FragmentDatabase {
  public:
   FragmentDatabase(FragmentDatabase const&) = delete;

@@ -16,7 +16,9 @@
 
 #include <cuvs/detail/jit_lto/AlgorithmLauncher.h>
 
-AlgorithmLauncher::AlgorithmLauncher(cudaLibrary_t l, cudaKernel_t k) : library{l}, kernel{k} {}
+#include <raft/util/cuda_rt_essentials.hpp>
+
+AlgorithmLauncher::AlgorithmLauncher(cudaKernel_t k) : kernel{k} {}
 
 void AlgorithmLauncher::call(
   cudaStream_t stream, dim3 grid, dim3 block, std::size_t shared_mem, void** kernel_args)
@@ -33,11 +35,11 @@ void AlgorithmLauncher::call(
   config.numAttrs         = 1;
   config.dynamicSmemBytes = shared_mem;
 
-  cudaLaunchKernelExC(&config, kernel, kernel_args);
+  RAFT_CUDA_TRY(cudaLaunchKernelExC(&config, kernel, kernel_args));
 }
 
-std::unordered_map<std::string, AlgorithmLauncher>& get_cached_launchers()
+std::unordered_map<std::string, std::shared_ptr<AlgorithmLauncher>>& get_cached_launchers()
 {
-  static std::unordered_map<std::string, AlgorithmLauncher> launchers;
+  static std::unordered_map<std::string, std::shared_ptr<AlgorithmLauncher>> launchers;
   return launchers;
 }
