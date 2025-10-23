@@ -94,7 +94,7 @@ public class TieredIndexImpl implements TieredIndex {
    * Invokes the native destroy_tiered_index to de-allocate the Tiered index
    */
   @Override
-  public void destroyIndex() {
+  public void close() {
     checkNotDestroyed();
     try {
       int returnValue = cuvsTieredIndexDestroy(tieredIndexReference.getMemorySegment());
@@ -122,7 +122,7 @@ public class TieredIndexImpl implements TieredIndex {
       long cols = dataset.columns();
 
       // Get host data
-      MemorySegment hostDataSeg = ((CuVSHostMatrixImpl) dataset).memorySegment();
+      MemorySegment hostDataSeg = ((CuVSMatrixInternal) dataset).memorySegment();
 
       try (var resourceAccess = resources.access();
           var indexParamsHandle =
@@ -143,7 +143,7 @@ public class TieredIndexImpl implements TieredIndex {
           long[] datasetShape = {rows, cols};
           MemorySegment datasetTensor =
               prepareTensor(
-                  localArena, datasetDP.handle(), datasetShape, kDLFloat(), 32, kDLCUDA(), 1);
+                  localArena, datasetDP.handle(), datasetShape, kDLFloat(), 32, kDLCUDA());
 
           MemorySegment index = localArena.allocate(cuvsTieredIndex_t);
           var returnValue = cuvsTieredIndexCreate(index);
@@ -205,6 +205,7 @@ public class TieredIndexImpl implements TieredIndex {
           hasPreFilter ? new BitSet[] {query.getPrefilter()} : EMPTY_PREFILTER_BITSET;
       final long prefilterDataLength = hasPreFilter ? query.getNumDocs() * prefilters.length : 0;
       final long prefilterLen = hasPreFilter ? (prefilterDataLength + 31) / 32 : 0;
+      // TODO: is this correct? prefilters is a LONG array
       final long prefilterBytes = C_INT_BYTE_SIZE * prefilterLen;
 
       try (var resourceAccess = query.getResources().access()) {
@@ -229,7 +230,7 @@ public class TieredIndexImpl implements TieredIndex {
           long[] queriesShape = {numQueries, vectorDimension};
           MemorySegment queriesTensor =
               prepareTensor(
-                  localArena, queriesDP.handle(), queriesShape, kDLFloat(), 32, kDLCUDA(), 1);
+                  localArena, queriesDP.handle(), queriesShape, kDLFloat(), 32, kDLCUDA());
           long[] neighborsShape = {numQueries, topK};
           MemorySegment neighborsTensor =
               prepareTensor(
@@ -238,12 +239,11 @@ public class TieredIndexImpl implements TieredIndex {
                   neighborsShape,
                   kDLInt(),
                   64,
-                  kDLCUDA(),
-                  1); // 64-bit int
+                  kDLCUDA()); // 64-bit int
           long[] distancesShape = {numQueries, topK};
           MemorySegment distancesTensor =
               prepareTensor(
-                  localArena, distancesDP.handle(), distancesShape, kDLFloat(), 32, kDLCUDA(), 1);
+                  localArena, distancesDP.handle(), distancesShape, kDLFloat(), 32, kDLCUDA());
 
           // Sync before prefilter setup
           returnValue = cuvsStreamSync(cuvsRes);
@@ -270,7 +270,7 @@ public class TieredIndexImpl implements TieredIndex {
 
             MemorySegment prefilterTensor =
                 prepareTensor(
-                    localArena, prefilterDP.handle(), prefilterShape, kDLUInt(), 32, kDLCUDA(), 1);
+                    localArena, prefilterDP.handle(), prefilterShape, kDLUInt(), 32, kDLCUDA());
 
             cuvsFilter.type(prefilter, 1); // BITSET
             cuvsFilter.addr(prefilter, prefilterTensor.address());
@@ -330,7 +330,7 @@ public class TieredIndexImpl implements TieredIndex {
       long cols = extendDataset.columns();
 
       // Get host data
-      MemorySegment hostDataSeg = ((CuVSMatrixBaseImpl) extendDataset).memorySegment();
+      MemorySegment hostDataSeg = ((CuVSMatrixInternal) extendDataset).memorySegment();
 
       try (var resourceAccess = resources.access()) {
         long cuvsRes = resourceAccess.handle();
@@ -347,7 +347,7 @@ public class TieredIndexImpl implements TieredIndex {
           long[] datasetShape = {rows, cols};
           MemorySegment datasetTensor =
               prepareTensor(
-                  localArena, datasetDP.handle(), datasetShape, kDLFloat(), 32, kDLCUDA(), 1);
+                  localArena, datasetDP.handle(), datasetShape, kDLFloat(), 32, kDLCUDA());
 
           checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync");
 

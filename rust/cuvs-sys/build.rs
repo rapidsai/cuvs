@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,7 @@ use std::path::PathBuf;
 
 fn main() {
     // build the cuvs c-api library with cmake, and link it into this crate
-    let cuvs_build = cmake::Config::new(".")
-        .build();
+    let cuvs_build = cmake::Config::new(".").build();
 
     println!(
         "cargo:rustc-link-search=native={}/lib",

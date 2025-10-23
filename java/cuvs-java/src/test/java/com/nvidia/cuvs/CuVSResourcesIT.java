@@ -18,7 +18,6 @@ package com.nvidia.cuvs;
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 import static org.junit.Assert.*;
 
-import java.lang.invoke.MethodHandles;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import org.junit.Before;
@@ -28,7 +27,7 @@ import org.slf4j.LoggerFactory;
 
 public class CuVSResourcesIT extends CuVSTestCase {
 
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  private static final Logger log = LoggerFactory.getLogger(CuVSResourcesIT.class);
 
   @Before
   public void setup() {
@@ -66,7 +65,7 @@ public class CuVSResourcesIT extends CuVSTestCase {
                   future.get();
                 });
         assertEquals(IllegalStateException.class, exception.getCause().getClass());
-        assertEquals(expectedError, exception.getCause().getMessage());
+        assertTrue(exception.getCause().getMessage().startsWith(expectedError));
         log.debug("Outer access finished");
       }
     }

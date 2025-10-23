@@ -1,4 +1,4 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -112,6 +112,11 @@ def run_ivf_pq_build_search_test(
 
     centers = index.centers
     assert centers.shape[0] == n_lists
+    assert centers.shape[1] == index.dim
+
+    pq_centers = index.pq_centers
+    assert len(pq_centers.shape) == 3
+    assert pq_centers.shape[2] == 1 << pq_bits
 
     if not compare:
         return

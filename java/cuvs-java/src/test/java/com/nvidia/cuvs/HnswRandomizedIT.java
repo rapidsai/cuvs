@@ -114,7 +114,7 @@ public class HnswRandomizedIT extends CuVSTestCase {
       final CagraIndex index;
       if (useNativeMemoryDataset) {
         var datasetBuilder =
-            CuVSMatrix.builder(vectors.length, vectors[0].length, CuVSMatrix.DataType.FLOAT);
+            CuVSMatrix.hostBuilder(vectors.length, vectors[0].length, CuVSMatrix.DataType.FLOAT);
         for (float[] v : vectors) {
           datasetBuilder.addVector(v);
         }
@@ -164,10 +164,10 @@ public class HnswRandomizedIT extends CuVSTestCase {
           SearchResults results = hnswIndex.search(hnswQuery);
           compareResults(results, expected, topK, datasetSize, numQueries);
 
-          hnswIndex.destroyIndex();
+          hnswIndex.close();
         }
       } finally {
-        index.destroyIndex();
+        index.close();
         Files.deleteIfExists(hnswIndexPath);
       }
     }
