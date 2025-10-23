@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ list<SpecT, SizeT, SpecExtraArgs...>::list(raft::resources const& res,
     capacity = std::min<SizeT>(capacity, spec.align_max);
   }
   try {
-    data    = raft::make_device_mdarray<value_type>(res, spec.make_list_extents(capacity));
+    data    = raft::make_device_mdarray<value_type, SizeT>(res, spec.make_list_extents(capacity));
     indices = raft::make_device_vector<index_type, SizeT>(res, capacity);
   } catch (std::bad_alloc& e) {
     RAFT_FAIL(

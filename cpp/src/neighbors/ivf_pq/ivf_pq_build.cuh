@@ -1359,10 +1359,10 @@ auto build(raft::resources const& handle,
 
     // Besides just sampling, we transform the input dataset into floats to make it easier
     // to use gemm operations from cublas.
-    auto trainset = raft::make_device_mdarray<float>(
+    auto trainset = raft::make_device_mdarray<float, int64_t>(
       handle, big_memory_resource, raft::make_extents<int64_t>(0, 0));
     try {
-      trainset = raft::make_device_mdarray<float>(
+      trainset = raft::make_device_mdarray<float, int64_t>(
         handle, big_memory_resource, raft::make_extents<int64_t>(n_rows_train, dim));
     } catch (raft::logic_error& e) {
       RAFT_LOG_ERROR(
@@ -1381,7 +1381,7 @@ auto build(raft::resources const& handle,
         size_t(n_rows_train));
 
       // TODO(tfeher): Enable codebook generation with any type T, and then remove trainset tmp.
-      auto trainset_tmp = raft::make_device_mdarray<T>(
+      auto trainset_tmp = raft::make_device_mdarray<T, int64_t>(
         handle, big_memory_resource, raft::make_extents<int64_t>(n_rows_train, dim));
 
       raft::matrix::sample_rows<T, int64_t>(handle, random_state, dataset, trainset_tmp.view());

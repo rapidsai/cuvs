@@ -100,7 +100,7 @@ inline MdspanType from_dlpack(DLManagedTensor* managed_tensor)
                "ndim mismatch between return mdspan and DLTensor");
 
   // auto exts = typename MdspanType::extents_type{tensor.shape};
-  std::array<int64_t, MdspanType::extents_type::rank()> shape{};
+  cuda::std::array<int64_t, MdspanType::extents_type::rank()> shape{};
   for (int64_t i = 0; i < tensor.ndim; ++i) {
     shape[i] = tensor.shape[i];
   }
