@@ -215,7 +215,7 @@ endif()
 # * cuvs ---------------------------------------------------------------------
 if(NOT BUILD_CPU_ONLY)
   add_library(
-    cuvs-cagra-search STATIC
+    cuvs-cagra-search OBJECT
     src/neighbors/cagra_search_float.cu
     src/neighbors/cagra_search_half.cu
     src/neighbors/cagra_search_int8.cu
@@ -305,7 +305,6 @@ if(NOT BUILD_CPU_ONLY)
                CUDA_STANDARD 17
                CUDA_STANDARD_REQUIRED ON
                CUDA_SEPARABLE_COMPILATION ON
-               INTERFACE_POSITION_INDEPENDENT_CODE ON
                POSITION_INDEPENDENT_CODE ON
   )
   target_link_libraries(cuvs-cagra-search PRIVATE raft::raft)
@@ -596,7 +595,10 @@ if(NOT BUILD_CPU_ONLY)
   )
 
   if(NOT cuvs_compile_mode STREQUAL "static_only")
-    add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs>)
+    add_library(cuvs SHARED
+      $<TARGET_OBJECTS:cuvs_objs>
+      $<TARGET_OBJECTS:cuvs-cagra-search>
+    )
     add_library(cuvs::cuvs ALIAS cuvs)
     set_target_properties(
       cuvs
@@ -606,6 +608,7 @@ if(NOT BUILD_CPU_ONLY)
                  CXX_STANDARD_REQUIRED ON
                  CUDA_STANDARD 17
                  CUDA_STANDARD_REQUIRED ON
+                 CUDA_RESOLVE_DEVICE_SYMBOLS ON
                  INTERFACE_POSITION_INDEPENDENT_CODE ON
                  POSITION_INDEPENDENT_CODE ON
     )
@@ -638,7 +641,6 @@ if(NOT BUILD_CPU_ONLY)
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              cuvs-cagra-search
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -657,7 +659,10 @@ SECTIONS
   endif()
 
   if(NOT cuvs_compile_mode STREQUAL "shared_only")
-    add_library(cuvs_static STATIC $<TARGET_OBJECTS:cuvs_objs>)
+    add_library(cuvs_static STATIC
+      $<TARGET_OBJECTS:cuvs_objs>
+      $<TARGET_OBJECTS:cuvs-cagra-search>
+    )
     add_library(cuvs::cuvs_static ALIAS cuvs_static)
 
     set_target_properties(
@@ -666,6 +671,9 @@ SECTIONS
                  INSTALL_RPATH "\$ORIGIN"
                  CXX_STANDARD 17
                  CXX_STANDARD_REQUIRED ON
+                 CUDA_STANDARD 17
+                 CUDA_STANDARD_REQUIRED ON
+                 CUDA_RESOLVE_DEVICE_SYMBOLS ON
                  POSITION_INDEPENDENT_CODE ON
                  INTERFACE_POSITION_INDEPENDENT_CODE ON
                  EXPORT_NAME cuvs_static
