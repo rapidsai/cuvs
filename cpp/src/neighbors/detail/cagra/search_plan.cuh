@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -137,7 +137,8 @@ template <typename DataT,
           typename IndexT,
           typename DistanceT,
           typename SAMPLE_FILTER_T,
-          typename OutputIndexT = IndexT>
+          typename SourceIndexT = IndexT,
+          typename OutputIndexT = SourceIndexT>
 struct search_plan_impl : public search_plan_impl_base {
   using DATA_T     = DataT;
   using INDEX_T    = IndexT;
@@ -183,16 +184,18 @@ struct search_plan_impl : public search_plan_impl_base {
 
   virtual ~search_plan_impl() {}
 
-  virtual void operator()(raft::resources const& res,
-                          raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
-                          OutputIndexT* const result_indices_ptr,  // [num_queries, topk]
-                          DISTANCE_T* const result_distances_ptr,  // [num_queries, topk]
-                          const DATA_T* const queries_ptr,         // [num_queries, dataset_dim]
-                          const std::uint32_t num_queries,
-                          const INDEX_T* dev_seed_ptr,                   // [num_queries, num_seeds]
-                          std::uint32_t* const num_executed_iterations,  // [num_queries]
-                          uint32_t topk,
-                          SAMPLE_FILTER_T sample_filter) {};
+  virtual void operator()(
+    raft::resources const& res,
+    raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
+    std::optional<raft::device_vector_view<const SourceIndexT, int64_t>> source_indices,
+    OutputIndexT* const result_indices_ptr,  // [num_queries, topk]
+    DISTANCE_T* const result_distances_ptr,  // [num_queries, topk]
+    const DATA_T* const queries_ptr,         // [num_queries, dataset_dim]
+    const std::uint32_t num_queries,
+    const INDEX_T* dev_seed_ptr,                   // [num_queries, num_seeds]
+    std::uint32_t* const num_executed_iterations,  // [num_queries]
+    uint32_t topk,
+    SAMPLE_FILTER_T sample_filter) {};
 
   void adjust_search_params()
   {
