@@ -145,7 +145,10 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort(float* distances,  // [num
 //
 // multiple CTAs per single query
 //
-template <std::uint32_t MAX_ELEMENTS, class DATASET_DESCRIPTOR_T, class SAMPLE_FILTER_T>
+template <std::uint32_t MAX_ELEMENTS,
+          class DATASET_DESCRIPTOR_T,
+          class SourceIndexT,
+          class SAMPLE_FILTER_T>
 RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   typename DATASET_DESCRIPTOR_T::INDEX_T* const
     result_indices_ptr,  // [num_queries, num_cta_per_query, itopk_size]
@@ -155,6 +158,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   const typename DATASET_DESCRIPTOR_T::DATA_T* const queries_ptr,  // [num_queries, dataset_dim]
   const typename DATASET_DESCRIPTOR_T::INDEX_T* const knn_graph,   // [dataset_size, graph_degree]
   const uint32_t graph_degree,
+  const SourceIndexT* source_indices_ptr,  // [num_queries, search_width]
   const unsigned num_distilation,
   const uint64_t rand_xor_mask,
   const typename DATASET_DESCRIPTOR_T::INDEX_T* seed_ptr,  // [num_queries, num_seeds]
@@ -172,6 +176,10 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   using DATA_T     = typename DATASET_DESCRIPTOR_T::DATA_T;
   using INDEX_T    = typename DATASET_DESCRIPTOR_T::INDEX_T;
   using DISTANCE_T = typename DATASET_DESCRIPTOR_T::DISTANCE_T;
+
+  auto to_source_index = [source_indices_ptr](INDEX_T x) {
+    return source_indices_ptr == nullptr ? static_cast<SourceIndexT>(x) : source_indices_ptr[x];
+  };
 
   const auto num_queries       = gridDim.y;
   const auto query_id          = blockIdx.y;
@@ -344,7 +352,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
         if (parent_indices_buffer[p] != invalid_index) {
           const auto parent_id =
             result_indices_buffer[parent_indices_buffer[p]] & ~index_msb_1_mask;
-          if (!sample_filter(query_id, parent_id)) {
+          if (!sample_filter(query_id, to_source_index(parent_id))) {
             // If the parent must not be in the resulting top-k list, remove from the parent list
             result_distances_buffer[parent_indices_buffer[p]] = utils::get_max_value<DISTANCE_T>();
             result_indices_buffer[parent_indices_buffer[p]]   = invalid_index;
@@ -364,7 +372,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
       INDEX_T index = result_indices_buffer[i];
       if (index == invalid_index) { continue; }
       index &= ~index_msb_1_mask;
-      if (!sample_filter(query_id, index)) {
+      if (!sample_filter(query_id, to_source_index(index))) {
         result_indices_buffer[i]   = invalid_index;
         result_distances_buffer[i] = utils::get_max_value<DISTANCE_T>();
       }
@@ -474,29 +482,35 @@ void set_value_batch(T* const dev_ptr,
     <<<grid_size, block_size, 0, cuda_stream>>>(dev_ptr, ld, val, count, batch_size);
 }
 
-template <typename DATASET_DESCRIPTOR_T, typename SAMPLE_FILTER_T>
+template <typename DATASET_DESCRIPTOR_T, typename SourceIndexT, typename SAMPLE_FILTER_T>
 struct search_kernel_config {
   // Search kernel function type. Note that the actual values for the template value
   // parameters do not matter, because they are not part of the function signature. The
   // second to fourth value parameters will be selected by the choose_* functions below.
-  using kernel_t = decltype(&search_kernel<128, DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T>);
+  using kernel_t =
+    decltype(&search_kernel<128, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>);
 
   static auto choose_buffer_size(unsigned result_buffer_size, unsigned block_size) -> kernel_t
   {
     if (result_buffer_size <= 64) {
-      return search_kernel<64, DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T>;
+      return search_kernel<64, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
     } else if (result_buffer_size <= 128) {
-      return search_kernel<128, DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T>;
+      return search_kernel<128, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
     } else if (result_buffer_size <= 256) {
-      return search_kernel<256, DATASET_DESCRIPTOR_T, SAMPLE_FILTER_T>;
+      return search_kernel<256, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
     }
     THROW("Result buffer size %u larger than max buffer size %u", result_buffer_size, 256);
   }
 };
 
-template <typename DataT, typename IndexT, typename DistanceT, typename SampleFilterT>
+template <typename DataT,
+          typename IndexT,
+          typename DistanceT,
+          typename SourceIndexT,
+          typename SampleFilterT>
 void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
                     raft::device_matrix_view<const IndexT, int64_t, raft::row_major> graph,
+                    const SourceIndexT* source_indices_ptr,
                     IndexT* topk_indices_ptr,       // [num_queries, topk]
                     DistanceT* topk_distances_ptr,  // [num_queries, topk]
                     const DataT* queries_ptr,       // [num_queries, dataset_dim]
@@ -519,6 +533,7 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
 {
   auto kernel =
     search_kernel_config<dataset_descriptor_base_t<DataT, IndexT, DistanceT>,
+                         SourceIndexT,
                          SampleFilterT>::choose_buffer_size(result_buffer_size, block_size);
 
   RAFT_CUDA_TRY(
@@ -546,6 +561,7 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                                                        queries_ptr,
                                                        graph.data_handle(),
                                                        graph.extent(1),
+                                                       source_indices_ptr,
                                                        ps.num_random_samplings,
                                                        ps.rand_xor_mask,
                                                        dev_seed_ptr,

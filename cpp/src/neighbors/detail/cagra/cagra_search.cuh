@@ -39,16 +39,21 @@ template <typename DataT,
           typename IndexT,
           typename DistanceT,
           typename CagraSampleFilterT,
-          typename OutputIdxT = IndexT>
-void search_main_core(raft::resources const& res,
-                      search_params params,
-                      const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
-                      raft::device_matrix_view<const IndexT, int64_t, raft::row_major> graph,
-                      raft::device_matrix_view<const DataT, int64_t, raft::row_major> queries,
-                      raft::device_matrix_view<OutputIdxT, int64_t, raft::row_major> neighbors,
-                      raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
-                      CagraSampleFilterT sample_filter = CagraSampleFilterT())
+          typename SourceIdxT = IndexT,
+          typename OutputIdxT = SourceIdxT>
+void search_main_core(
+  raft::resources const& res,
+  search_params params,
+  const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
+  raft::device_matrix_view<const IndexT, int64_t, raft::row_major> graph,
+  std::optional<raft::device_vector_view<const SourceIdxT, int64_t>> source_indices,
+  raft::device_matrix_view<const DataT, int64_t, raft::row_major> queries,
+  raft::device_matrix_view<OutputIdxT, int64_t, raft::row_major> neighbors,
+  raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
+  CagraSampleFilterT sample_filter = CagraSampleFilterT())
 {
+  static_assert(std::is_same_v<IndexT, uint32_t>,
+                "Only uint32_t is supported as the graph element type (internal index type)");
   RAFT_LOG_DEBUG("# dataset size = %lu, dim = %lu\n",
                  static_cast<size_t>(graph.extent(0)),
                  static_cast<size_t>(queries.extent(1)));
@@ -69,8 +74,9 @@ void search_main_core(raft::resources const& res,
     queries.extent(1));
 
   using CagraSampleFilterT_s = typename CagraSampleFilterT_Selector<CagraSampleFilterT>::type;
-  std::unique_ptr<search_plan_impl<DataT, IndexT, DistanceT, CagraSampleFilterT_s, OutputIdxT>>
-    plan = factory<DataT, IndexT, DistanceT, CagraSampleFilterT_s, OutputIdxT>::create(
+  std::unique_ptr<
+    search_plan_impl<DataT, IndexT, DistanceT, CagraSampleFilterT_s, SourceIdxT, OutputIdxT>>
+    plan = factory<DataT, IndexT, DistanceT, CagraSampleFilterT_s, SourceIdxT, OutputIdxT>::create(
       res, params, dataset_desc, queries.extent(1), graph.extent(0), graph.extent(1), topk);
 
   plan->check(topk);
@@ -93,6 +99,7 @@ void search_main_core(raft::resources const& res,
 
     (*plan)(res,
             graph,
+            source_indices,
             _topk_indices_ptr,
             _topk_distances_ptr,
             _query_ptr,
@@ -136,10 +143,12 @@ void search_main(raft::resources const& res,
                  CagraSampleFilterT sample_filter = CagraSampleFilterT())
 {
   // n_rows has the same type as the dataset index (the array extents type)
-  using ds_idx_type = decltype(index.data().n_rows());
+  using ds_idx_type    = decltype(index.data().n_rows());
+  using graph_idx_type = uint32_t;
   // Dispatch search parameters based on the dataset kind.
   if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index.data());
       strided_dset != nullptr) {
+    // Search using a plain (strided) row-major dataset
     RAFT_EXPECTS(index.metric() != cuvs::distance::DistanceType::CosineExpanded ||
                    index.dataset_norms().has_value(),
                  "Dataset norms must be provided for CosineExpanded metric");
@@ -148,20 +157,36 @@ void search_main(raft::resources const& res,
     if (index.metric() == cuvs::distance::DistanceType::CosineExpanded) {
       dataset_norms_ptr = index.dataset_norms().value().data_handle();
     }
-    auto desc = dataset_descriptor_init_with_cache<T, IdxT, DistanceT>(
+    auto desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
       res, params, *strided_dset, index.metric(), dataset_norms_ptr);
-    search_main_core<T, IdxT, DistanceT, CagraSampleFilterT, OutputIdxT>(
-      res, params, desc, index.graph(), queries, neighbors, distances, sample_filter);
+    search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
+      res,
+      params,
+      desc,
+      index.graph(),
+      index.source_indices(),
+      queries,
+      neighbors,
+      distances,
+      sample_filter);
   } else if (auto* vpq_dset = dynamic_cast<const vpq_dataset<float, ds_idx_type>*>(&index.data());
              vpq_dset != nullptr) {
     // Search using a compressed dataset
     RAFT_FAIL("FP32 VPQ dataset support is coming soon");
   } else if (auto* vpq_dset = dynamic_cast<const vpq_dataset<half, ds_idx_type>*>(&index.data());
              vpq_dset != nullptr) {
-    auto desc = dataset_descriptor_init_with_cache<T, IdxT, DistanceT>(
+    auto desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
       res, params, *vpq_dset, index.metric(), nullptr);
-    search_main_core<T, IdxT, DistanceT, CagraSampleFilterT, OutputIdxT>(
-      res, params, desc, index.graph(), queries, neighbors, distances, sample_filter);
+    search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
+      res,
+      params,
+      desc,
+      index.graph(),
+      index.source_indices(),
+      queries,
+      neighbors,
+      distances,
+      sample_filter);
   } else if (auto* empty_dset = dynamic_cast<const empty_dataset<ds_idx_type>*>(&index.data());
              empty_dset != nullptr) {
     // Forgot to add a dataset.

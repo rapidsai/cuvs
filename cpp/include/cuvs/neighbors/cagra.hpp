@@ -280,6 +280,7 @@ struct index : cuvs::neighbors::index {
   using index_type         = IdxT;
   using value_type         = T;
   using dataset_index_type = int64_t;
+  using graph_index_type   = uint32_t;
 
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
@@ -323,9 +324,19 @@ struct index : cuvs::neighbors::index {
 
   /** neighborhood graph [size, graph-degree] */
   [[nodiscard]] inline auto graph() const noexcept
-    -> raft::device_matrix_view<const IdxT, int64_t, raft::row_major>
+    -> raft::device_matrix_view<const graph_index_type, int64_t, raft::row_major>
   {
     return graph_view_;
+  }
+
+  /** Mapping from internal graph node indices to the original user-provided indices. */
+  [[nodiscard]] inline auto source_indices() const noexcept
+    -> std::optional<raft::device_vector_view<const index_type, int64_t>>
+  {
+    return source_indices_.has_value()
+             ? std::optional<raft::device_vector_view<const index_type, int64_t>>(
+                 source_indices_->view())
+             : std::nullopt;
   }
 
   /** Dataset norms for cosine distance [size] */
@@ -350,7 +361,7 @@ struct index : cuvs::neighbors::index {
         cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
     : cuvs::neighbors::index(),
       metric_(metric),
-      graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0)),
+      graph_(raft::make_device_matrix<graph_index_type, int64_t>(res, 0, 0)),
       dataset_(new cuvs::neighbors::empty_dataset<int64_t>(0)),
       dataset_norms_(std::nullopt)
   {
@@ -394,7 +405,7 @@ struct index : cuvs::neighbors::index {
    *   using namespace raft::neighbors::experimental;
    *
    *   auto dataset = raft::make_device_matrix<float, int64_t>(res, n_rows, n_cols);
-   *   auto knn_graph = raft::make_device_matrix<uint32_n, int64_t>(res, n_rows, graph_degree);
+   *   auto knn_graph = raft::make_device_matrix<uint32_t, int64_t>(res, n_rows, graph_degree);
    *
    *   // custom loading and graph creation
    *   // load_dataset(dataset.view());
@@ -413,11 +424,13 @@ struct index : cuvs::neighbors::index {
   index(raft::resources const& res,
         cuvs::distance::DistanceType metric,
         raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, data_accessor> dataset,
-        raft::mdspan<const IdxT, raft::matrix_extent<int64_t>, raft::row_major, graph_accessor>
-          knn_graph)
+        raft::mdspan<const graph_index_type,
+                     raft::matrix_extent<int64_t>,
+                     raft::row_major,
+                     graph_accessor> knn_graph)
     : cuvs::neighbors::index(),
       metric_(metric),
-      graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0)),
+      graph_(raft::make_device_matrix<graph_index_type, int64_t>(res, 0, 0)),
       dataset_(make_aligned_dataset(res, dataset, 16)),
       dataset_norms_(std::nullopt)
   {
@@ -525,8 +538,9 @@ struct index : cuvs::neighbors::index {
    * Since the new graph is a device array, we store a reference to that, and it is
    * the caller's responsibility to ensure that knn_graph stays alive as long as the index.
    */
-  void update_graph(raft::resources const& res,
-                    raft::device_matrix_view<const IdxT, int64_t, raft::row_major> knn_graph)
+  void update_graph(
+    raft::resources const& res,
+    raft::device_matrix_view<const graph_index_type, int64_t, raft::row_major> knn_graph)
   {
     graph_view_ = knn_graph;
   }
@@ -536,16 +550,19 @@ struct index : cuvs::neighbors::index {
    *
    * We create a copy of the graph on the device. The index manages the lifetime of this copy.
    */
-  void update_graph(raft::resources const& res,
-                    raft::host_matrix_view<const IdxT, int64_t, raft::row_major> knn_graph)
+  void update_graph(
+    raft::resources const& res,
+    raft::host_matrix_view<const graph_index_type, int64_t, raft::row_major> knn_graph)
   {
     RAFT_LOG_DEBUG("Copying CAGRA knn graph from host to device");
 
     if ((graph_.extent(0) != knn_graph.extent(0)) || (graph_.extent(1) != knn_graph.extent(1))) {
       // clear existing memory before allocating to prevent OOM errors on large graphs
-      if (graph_.size()) { graph_ = raft::make_device_matrix<IdxT, int64_t>(res, 0, 0); }
-      graph_ =
-        raft::make_device_matrix<IdxT, int64_t>(res, knn_graph.extent(0), knn_graph.extent(1));
+      if (graph_.size()) {
+        graph_ = raft::make_device_matrix<graph_index_type, int64_t>(res, 0, 0);
+      }
+      graph_ = raft::make_device_matrix<graph_index_type, int64_t>(
+        res, knn_graph.extent(0), knn_graph.extent(1));
     }
     raft::copy(graph_.data_handle(),
                knn_graph.data_handle(),
@@ -554,11 +571,52 @@ struct index : cuvs::neighbors::index {
     graph_view_ = graph_.view();
   }
 
+  /**
+   * Replace the source indices with a new source indices taking the ownership of the passed vector.
+   */
+  void update_source_indices(raft::device_vector<index_type, int64_t>&& source_indices)
+  {
+    RAFT_EXPECTS(source_indices.extent(0) == size(),
+                 "Source indices must have the same number of rows as the index");
+    source_indices_.emplace(std::move(source_indices));
+  }
+
+  /**
+   * Copy the provided source indices into the index.
+   */
+  template <typename Accessor>
+  void update_source_indices(
+    raft::resources const& res,
+    raft::mdspan<const index_type, raft::vector_extent<int64_t>, raft::row_major, Accessor>
+      source_indices)
+  {
+    RAFT_EXPECTS(source_indices.extent(0) == size(),
+                 "Source indices must have the same number of rows as the index");
+    // Reset the array if it's not compatible to avoid using more memory than necessary.
+    // NB: this likely is never triggered because we check the invariant above (but it doesn't
+    // hurt).
+    if (source_indices_.has_value()) {
+      if (source_indices_->extent(0) != source_indices.extent(0)) { source_indices_.reset(); }
+    }
+    // Allocate the new array if needed.
+    if (!source_indices_.has_value()) {
+      source_indices_.emplace(
+        raft::make_device_vector<index_type, int64_t>(res, source_indices.extent(0)));
+    }
+    // Copy the data.
+    raft::copy(source_indices_->data_handle(),
+               source_indices.data_handle(),
+               source_indices.extent(0),
+               raft::resource::get_cuda_stream(res));
+  }
+
  private:
   cuvs::distance::DistanceType metric_;
-  raft::device_matrix<IdxT, int64_t, raft::row_major> graph_;
-  raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
+  raft::device_matrix<graph_index_type, int64_t, raft::row_major> graph_;
+  raft::device_matrix_view<const graph_index_type, int64_t, raft::row_major> graph_view_;
   std::unique_ptr<neighbors::dataset<dataset_index_type>> dataset_;
+  // Mapping from internal graph node indices to the original user-provided indices.
+  std::optional<raft::device_vector<IdxT, int64_t>> source_indices_;
   // only float distances supported at the moment
   std::optional<raft::device_vector<float, int64_t>> dataset_norms_;
 

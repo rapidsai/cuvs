@@ -10,9 +10,14 @@
 
 namespace cuvs::neighbors::cagra::detail::multi_cta_search {
 
-template <typename DataT, typename IndexT, typename DistanceT, typename SampleFilterT>
+template <typename DataT,
+          typename IndexT,
+          typename DistanceT,
+          typename SourceIndexT,
+          typename SampleFilterT>
 void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
                     raft::device_matrix_view<const IndexT, int64_t, raft::row_major> graph,
+                    const SourceIndexT* source_indices_ptr,
                     IndexT* topk_indices_ptr,       // [num_queries, topk]
                     DistanceT* topk_distances_ptr,  // [num_queries, topk]
                     const DataT* queries_ptr,       // [num_queries, dataset_dim]
