@@ -132,4 +132,24 @@ struct fp_8bit4<5, true, false> {
   HDI uint32_t as_u32() const { return *reinterpret_cast<const uint32_t*>(this); }
 };
 
+template <uint32_t ExpBits, bool Signed, bool SW_Emulation = true>
+struct fp_8bit8 {
+  using unit_t = fp_8bit<ExpBits, Signed>;
+  unit_t x0, x1, x2, x3, x4, x5, x6, x7;
+  HDI fp_8bit8() : x0(0.f), x1(0.f), x2(0.f), x3(0.f), x4(0.f), x5(0.f), x6(0.f), x7(0.f) {}
+
+  HDI uint64_t& as_u64() { return *reinterpret_cast<uint64_t*>(this); }
+  HDI uint64_t as_u64() const { return *reinterpret_cast<const uint64_t*>(this); }
+};
+
+template <>
+struct fp_8bit8<5, true, false> {
+  using unit_t = __nv_fp8_e5m2;
+  unit_t x0, x1, x2, x3, x4, x5, x6, x7;
+  HDI fp_8bit8() : x0(0.f), x1(0.f), x2(0.f), x3(0.f), x4(0.f), x5(0.f), x6(0.f), x7(0.f) {}
+
+  HDI uint64_t& as_u64() { return *reinterpret_cast<uint64_t*>(this); }
+  HDI uint64_t as_u64() const { return *reinterpret_cast<const uint64_t*>(this); }
+};
+
 }  // namespace cuvs::neighbors::ivf_pq::detail

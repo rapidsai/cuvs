@@ -304,6 +304,11 @@ RAFT_DEVICE_INLINE_FUNCTION void lds(uint32_t& x, uint32_t addr)
   asm volatile("ld.shared.u32 {%0}, [%1];" : "=r"(x) : "r"(addr));
 }
 
+RAFT_DEVICE_INLINE_FUNCTION void lds(uint64_t& x, uint32_t addr)
+{
+  asm volatile("ld.shared.u64 {%0}, [%1];" : "=l"(x) : "r"(addr));
+}
+
 RAFT_DEVICE_INLINE_FUNCTION void lds(uint32_t& x, const uint32_t* addr)
 {
   lds(x, uint32_t(__cvta_generic_to_shared(addr)));
