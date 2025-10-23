@@ -25,12 +25,14 @@
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/composite/merge.hpp>
 #include <cuvs/neighbors/index_wrappers.hpp>
+#include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/device_resources.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/linalg/add.cuh>
+#include <raft/linalg/map.cuh>
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/normalize.cuh>
@@ -276,6 +278,7 @@ struct AnnCagraInputs {
   cuvs::distance::DistanceType metric;
   bool host_dataset;
   bool include_serialized_dataset;
+  bool use_source_indices;
   // std::optional<double>
   double min_recall;  // = std::nullopt;
   std::optional<float> ivf_pq_search_refine_ratio = std::nullopt;
@@ -437,6 +440,13 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
           } else {
             index = cagra::build(handle_, index_params, database_view);
           };
+
+          if (ps.use_source_indices) {
+            auto source_indices =
+              raft::make_device_vector<IdxT, int64_t>(handle_, static_cast<int64_t>(index.size()));
+            raft::linalg::map_offset(handle_, source_indices.view(), raft::cast_op<IdxT>{});
+            index.update_source_indices(handle_, raft::make_const_mdspan(source_indices.view()));
+          }
 
           cagra::serialize(handle_, index_file.filename, index, ps.include_serialized_dataset);
         }
@@ -851,6 +861,13 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
 
         if (!ps.include_serialized_dataset) { index.update_dataset(handle_, database_view); }
 
+        if (ps.use_source_indices) {
+          auto source_indices =
+            raft::make_device_vector<IdxT, int64_t>(handle_, static_cast<int64_t>(index.size()));
+          raft::linalg::map_offset(handle_, source_indices.view(), raft::cast_op<IdxT>{});
+          index.update_source_indices(std::move(source_indices));
+        }
+
         auto search_queries_view = raft::make_device_matrix_view<const DataT, int64_t>(
           search_queries.data(), ps.n_queries, ps.dim);
         auto indices_out_view =
@@ -1175,6 +1192,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
      cuvs::distance::DistanceType::CosineExpanded},
     {false},
     {true},
+    {true, false},
     {0.995},
     {std::optional<float>{std::nullopt}},
     {std::optional<vpq_params>{std::nullopt}},
@@ -1198,6 +1216,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
      cuvs::distance::DistanceType::CosineExpanded},
     {false},
     {true},
+    {false},
     {0.995},
     {std::optional<float>{std::nullopt}},
     {std::optional<vpq_params>{std::nullopt}},
@@ -1206,23 +1225,28 @@ inline std::vector<AnnCagraInputs> generate_inputs()
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Additional distances tested with a single search algo.
-  inputs2 =
-    raft::util::itertools::product<AnnCagraInputs>({1, 100},
-                                                   {1000},
-                                                   {8},
-                                                   {1, 16},  // k
-                                                   {graph_build_algo::NN_DESCENT},
-                                                   {search_algo::SINGLE_CTA},
-                                                   {0},  // query size
-                                                   {0},
-                                                   {256},
-                                                   {1},
-                                                   {cuvs::distance::DistanceType::InnerProduct,
-                                                    cuvs::distance::DistanceType::BitwiseHamming,
-                                                    cuvs::distance::DistanceType::CosineExpanded},
-                                                   {false},
-                                                   {true},
-                                                   {0.995});
+  inputs2 = raft::util::itertools::product<AnnCagraInputs>(
+    {1, 100},
+    {1000},
+    {8},
+    {1, 16},  // k
+    {graph_build_algo::NN_DESCENT},
+    {search_algo::SINGLE_CTA},
+    {0},  // query size
+    {0},
+    {256},
+    {1},
+    {cuvs::distance::DistanceType::InnerProduct,
+     cuvs::distance::DistanceType::BitwiseHamming,
+     cuvs::distance::DistanceType::CosineExpanded},
+    {false},
+    {true},
+    {false},
+    {0.995},
+    {std::optional<float>{std::nullopt}},
+    {std::optional<vpq_params>{std::nullopt}},
+    {std::optional<bool>{std::nullopt}},
+    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // Corner cases for small datasets
@@ -1239,6 +1263,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {1},
     {cuvs::distance::DistanceType::L2Expanded},
     {false},
+    {true},
     {true},
     {0.995},
     {std::optional<float>{std::nullopt}},
@@ -1267,6 +1292,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
      cuvs::distance::DistanceType::BitwiseHamming},
     {false},
     {true},
+    {false},
     {0.995},
     {std::optional<float>{std::nullopt}},
     {std::optional<vpq_params>{std::nullopt}},
@@ -1295,6 +1321,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
      cuvs::distance::DistanceType::CosineExpanded},
     {false},
     {false},
+    {false},
     {0.995},
     {std::optional<float>{std::nullopt}},
     {std::optional<vpq_params>{std::nullopt}},
@@ -1321,6 +1348,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
      cuvs::distance::DistanceType::CosineExpanded},
     {false},
     {false},
+    {false},
     {0.995},
     {std::optional<float>{std::nullopt}},
     {std::optional<vpq_params>{std::nullopt}},
@@ -1343,6 +1371,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false, true},
     {false},
+    {true},
     {0.985},
     {std::optional<float>{std::nullopt}},
     {std::optional<vpq_params>{std::nullopt}},
@@ -1367,6 +1396,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded},
     {false},
     {true},
+    {false},
     {0.6},
     {std::optional<float>{std::nullopt}},
     {std::optional<vpq_params>{std::nullopt}},
@@ -1402,6 +1432,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false, true},
     {false},
+    {true},
     {0.99},
     {1.0f, 2.0f, 3.0f},
     {std::optional<vpq_params>{std::nullopt}},
@@ -1423,6 +1454,7 @@ inline std::vector<AnnCagraInputs> generate_inputs()
     {64},
     {1},
     {cuvs::distance::DistanceType::L2Expanded},
+    {false},
     {false},
     {false},
     {0.995},
@@ -1458,26 +1490,32 @@ inline std::vector<AnnCagraInputs> generate_addnode_inputs()
                                                     cuvs::distance::DistanceType::BitwiseHamming},
                                                    {false},
                                                    {true},
+                                                   {true},
                                                    {0.995});
 
   // testing host and device datasets
-  auto inputs2 =
-    raft::util::itertools::product<AnnCagraInputs>({100},
-                                                   {10000},
-                                                   {32},
-                                                   {10},
-                                                   {graph_build_algo::AUTO},
-                                                   {search_algo::AUTO},
-                                                   {10},
-                                                   {0},  // team_size
-                                                   {64},
-                                                   {1},
-                                                   {cuvs::distance::DistanceType::L2Expanded,
-                                                    cuvs::distance::DistanceType::InnerProduct,
-                                                    cuvs::distance::DistanceType::CosineExpanded},
-                                                   {false, true},
-                                                   {false},
-                                                   {0.985});
+  auto inputs2 = raft::util::itertools::product<AnnCagraInputs>(
+    {100},
+    {10000},
+    {32},
+    {10},
+    {graph_build_algo::AUTO},
+    {search_algo::AUTO},
+    {10},
+    {0},  // team_size
+    {64},
+    {1},
+    {cuvs::distance::DistanceType::L2Expanded,
+     cuvs::distance::DistanceType::InnerProduct,
+     cuvs::distance::DistanceType::CosineExpanded},
+    {false, true},
+    {false},
+    {false},
+    {0.985},
+    {std::optional<float>{std::nullopt}},
+    {std::optional<vpq_params>{std::nullopt}},
+    {std::optional<bool>{std::nullopt}},
+    {cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
   // a few PQ configurations
@@ -1494,6 +1532,7 @@ inline std::vector<AnnCagraInputs> generate_addnode_inputs()
     {1},
     {cuvs::distance::DistanceType::L2Expanded},
     {false},
+    {true},
     {true},
     {0.6});                      // don't demand high recall without refinement
   for (uint32_t pq_len : {2}) {  // for now, only pq_len = 2 is supported, more options coming soon
@@ -1528,6 +1567,7 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
     {cuvs::distance::DistanceType::L2Expanded},
     {false},
     {true},
+    {false},
     {0.995});
 
   // Fixed dim, and changing neighbors and query size (output matrix size)
@@ -1545,6 +1585,7 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
     {cuvs::distance::DistanceType::L2Expanded, cuvs::distance::DistanceType::InnerProduct},
     {false},
     {true},
+    {false},
     {0.995});
   inputs.insert(inputs.end(), inputs2.begin(), inputs2.end());
 
@@ -1562,6 +1603,7 @@ inline std::vector<AnnCagraInputs> generate_filtering_inputs()
     {1},
     {cuvs::distance::DistanceType::L2Expanded},
     {false},
+    {true},
     {true},
     {0.6});                      // don't demand high recall without refinement
   for (uint32_t pq_len : {2}) {  // for now, only pq_len = 2 is supported, more options coming soon
