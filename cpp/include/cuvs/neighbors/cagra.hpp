@@ -44,6 +44,7 @@ namespace graph_build_params = cuvs::neighbors::graph_build_params;
  */
 
 struct index_params : cuvs::neighbors::index_params {
+  friend class cuvs::core::generic<index_params>;
   /** Degree of input graph for pruning. */
   size_t intermediate_graph_degree = 128;
   /** Degree of output graph. */
@@ -139,6 +140,7 @@ enum class search_algo {
 enum class hash_mode { HASH, SMALL, AUTO };
 
 struct search_params : cuvs::neighbors::search_params {
+  friend class cuvs::core::generic<search_params>;
   /** Maximum number of queries to search at the same time (batch size). Auto select when 0.*/
   size_t max_queries = 0;
 

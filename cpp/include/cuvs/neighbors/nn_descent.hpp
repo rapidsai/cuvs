@@ -50,6 +50,7 @@ namespace cuvs::neighbors::nn_descent {
  * - `return_distances`: Boolean to decide whether to return distances array
  */
 struct index_params : cuvs::neighbors::index_params {
+  friend class cuvs::core::generic<index_params>;
   size_t graph_degree              = 64;
   size_t intermediate_graph_degree = 128;
   size_t max_iterations            = 20;

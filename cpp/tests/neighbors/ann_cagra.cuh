@@ -21,6 +21,7 @@
 
 #include "naive_knn.cuh"
 
+#include <cuvs/core/generic.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/composite/merge.hpp>
@@ -262,6 +263,7 @@ enum class graph_build_algo {
 }  // namespace
 
 struct AnnCagraInputs {
+  friend class cuvs::core::generic<AnnCagraInputs>;
   int n_queries;
   int n_rows;
   int dim;
@@ -315,6 +317,7 @@ inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraInputs& p)
        << ", vq_n_centers=" << vpq.vq_n_centers;
   }
   os << '}' << std::endl;
+  os << cuvs::generic::to_string(p) << std::endl;
   return os;
 }
 
@@ -333,6 +336,7 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
   template <typename SearchIdxT = IdxT>
   void testCagra()
   {
+    std::cout << cuvs::generic::to_string(ps) << std::endl;
     // IVF_PQ graph build does not support BitwiseHamming
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         ((!std::is_same_v<DataT, uint8_t>) || (ps.build_algo == graph_build_algo::IVF_PQ)))
@@ -410,6 +414,8 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
         auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
           (const DataT*)database.data(), ps.n_rows, ps.dim);
 
+        std::cout << "index_params: " << cuvs::generic::to_string(index_params) << std::endl;
+        std::cout << "search_params: " << cuvs::generic::to_string(search_params) << std::endl;
         tmp_index_file index_file;
         {
           std::optional<raft::host_matrix<DataT, int64_t>> database_host{std::nullopt};

@@ -29,6 +29,7 @@
 
 #include <cuvs/core/bitmap.hpp>
 #include <cuvs/core/bitset.hpp>
+#include <cuvs/core/generic.hpp>
 #include <raft/core/detail/macros.hpp>
 
 #include <memory>
@@ -43,6 +44,7 @@ namespace cuvs::neighbors {
 
 /** Parameters for VPQ compression. */
 struct vpq_params {
+  friend class cuvs::core::generic<vpq_params>;  // a mark for code generation
   /**
    * The bit length of the vector element after compression by PQ.
    *
@@ -88,13 +90,16 @@ struct index {};
 
 /** The base for KNN index parameters. */
 struct index_params {
+  friend class cuvs::core::generic<index_params>;  // a mark for code generation
   /** Distance type. */
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded;
   /** The argument used by some distance metrics. */
   float metric_arg = 2.0f;
 };
 
-struct search_params {};
+struct search_params {
+  friend class cuvs::core::generic<search_params>;  // a mark for code generation
+};
 
 /**
  * @brief Strategy for merging indices.
