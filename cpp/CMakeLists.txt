@@ -335,6 +335,31 @@ if(NOT BUILD_CPU_ONLY)
     )
   endif()
 
+  set(JIT_LTO_TARGET_ARCHITECTURE "")
+  set(JIT_LTO_COMPILATION OFF)
+  set(JIT_LTO_FILES "")
+  if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
+    set(JIT_LTO_TARGET_ARCHITECTURE "75-real")
+    set(JIT_LTO_COMPILATION ON)
+  endif()
+
+  if(JIT_LTO_COMPILATION)
+    # this is needed to embed fatbins to JIT at runtime
+    include(cmake/modules/embed_fatbins.cmake)
+
+    # Generate interleaved scan kernel files at build time
+    include(cmake/modules/generate_jit_lto_kernels.cmake)
+    generate_jit_lto_kernels(
+      "interleaved_scan"
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/neighbors/ivf_flat/jit_lto_kernels/generate_kernels.py"
+    )
+
+    set(JIT_LTO_FILES
+        src/detail/jit_lto/AlgorithmLauncher.cu src/detail/jit_lto/AlgorithmPlanner.cu
+        src/detail/jit_lto/FragmentDatabase.cu src/detail/jit_lto/FragmentEntry.cu
+    )
+  endif()
+
   add_library(
     cuvs_objs OBJECT
     src/cluster/kmeans_balanced_fit_float.cu
@@ -531,6 +556,7 @@ if(NOT BUILD_CPU_ONLY)
     src/stats/silhouette_score.cu
     src/stats/trustworthiness_score.cu
     ${CUVS_MG_ALGOS}
+    $<$<BOOL:${JIT_LTO_COMPILATION}>:${JIT_LTO_FILES}>
   )
 
   set_target_properties(
@@ -563,6 +589,44 @@ if(NOT BUILD_CPU_ONLY)
            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
     INTERFACE "$<INSTALL_INTERFACE:include>"
   )
+
+  if(JIT_LTO_COMPILATION)
+    add_library(
+      cuvs_jit_lto_fatbins OBJECT
+      ${INTERLEAVED_SCAN_KERNEL_FILES} ${METRIC_DEVICE_FUNCTION_FILES}
+      ${FILTER_DEVICE_FUNCTION_FILES} ${POST_LAMBDA_DEVICE_FUNCTION_FILES}
+    )
+
+    # Make sure the kernels are generated before we try to build them
+    add_dependencies(cuvs_jit_lto_fatbins ${INTERLEAVED_SCAN_KERNELS_TARGET})
+
+    target_compile_definitions(cuvs_jit_lto_fatbins PRIVATE BUILD_KERNEL)
+    target_include_directories(
+      cuvs_jit_lto_fatbins
+      PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+              "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
+              "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
+    )
+    target_compile_options(
+      cuvs_jit_lto_fatbins PRIVATE -Xfatbin=--compress-all --compress-mode=size
+    )
+    target_compile_options(
+      cuvs_jit_lto_fatbins PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+                                   "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+    )
+
+    set_target_properties(
+      cuvs_jit_lto_fatbins
+      PROPERTIES CUDA_ARCHITECTURES ${JIT_LTO_TARGET_ARCHITECTURE}
+                 CUDA_STANDARD 17
+                 CUDA_STANDARD_REQUIRED ON
+                 CUDA_SEPARABLE_COMPILATION ON
+                 CUDA_FATBIN_COMPILATION ON
+                 POSITION_INDEPENDENT_CODE ON
+                 INTERPROCEDURAL_OPTIMIZATION ON
+    )
+    target_link_libraries(cuvs_jit_lto_fatbins PRIVATE rmm::rmm raft::raft CCCL::CCCL)
+  endif()
 
   # Endian detection
   include(TestBigEndian)
@@ -638,8 +702,13 @@ if(NOT BUILD_CPU_ONLY)
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              cuvs-cagra-search
+              cuvs-cagra-search $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
     )
+
+    if(JIT_LTO_COMPILATION)
+      add_dependencies(cuvs ${INTERLEAVED_SCAN_KERNELS_TARGET})
+      embed_fatbins(cuvs cuvs_jit_lto_fatbins)
+    endif()
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
     file(
@@ -698,7 +767,13 @@ SECTIONS
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+              $<$<BOOL:${JIT_LTO_COMPILATION}>:CUDA::nvJitLink>
     )
+
+    if(JIT_LTO_COMPILATION)
+      add_dependencies(cuvs_static ${INTERLEAVED_SCAN_KERNELS_TARGET})
+      embed_fatbins(cuvs_static cuvs_jit_lto_fatbins)
+    endif()
   endif()
 
   # ################################################################################################
