@@ -47,7 +47,7 @@ groups:
       ratio: [1]
       niter: [20]
     search:
-      nprobe: [5]
+      nprobe: [1, 5]
       internalDistanceDtype: ["float"]
       smemLutDtype: ["half"]
-      refine_ratio: [1, 2]
+      refine_ratio: [1]
