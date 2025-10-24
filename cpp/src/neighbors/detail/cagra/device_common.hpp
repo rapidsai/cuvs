@@ -331,6 +331,11 @@ RAFT_DEVICE_INLINE_FUNCTION void sts(uint32_t addr, const uint32_t& x)
   asm volatile("st.shared.u32 [%0], %1;" : : "r"(addr), "r"(reinterpret_cast<const uint32_t&>(x)));
 }
 
+RAFT_DEVICE_INLINE_FUNCTION void sts(uint32_t addr, const uint64_t& x)
+{
+  asm volatile("st.shared.u64 [%0], %1;" : : "r"(addr), "l"(reinterpret_cast<const uint64_t&>(x)));
+}
+
 RAFT_DEVICE_INLINE_FUNCTION void sts(uint32_t addr, const half2& x)
 {
   asm volatile("st.shared.v2.u16 [%0], {%1, %2};"

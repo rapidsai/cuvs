@@ -219,7 +219,7 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
           buf8.x5 = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 5]));
           buf8.x6 = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 6]));
           buf8.x7 = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 7]));
-          device::sts(codebook_buf + smem_index * sizeof(pq_val_pack_t), buf8.as_u64());
+          device::sts(codebook_buf + smem_index * sizeof(pq_val_pack_uint_t), buf8.as_u64());
         }
       }
     }
@@ -319,10 +319,13 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
             if (PQ_LEN * (v + k) >= dim) break;
 #pragma unroll
             for (std::uint32_t m = 0; m < PQ_LEN / pq_val_pack_num_elements; m++) {
-              constexpr auto kQueryBlock = DatasetBlockDim / (vlen * PQ_LEN);
-              std::uint32_t d1           = m * (pq_val_pack_num_elements / 2) + (PQ_LEN / 2) * v;
-              std::uint32_t d =
-                d1 * kQueryBlock + elem_offset * (PQ_LEN / 2) + e * TeamSize + laneId;
+              constexpr uint32_t vq_val_pack_num_elements = 2;
+              constexpr auto kQueryBlock                  = DatasetBlockDim / (vlen * PQ_LEN);
+              std::uint32_t vq_half2_index =
+                m * (pq_val_pack_num_elements / vq_val_pack_num_elements) +
+                (PQ_LEN / vq_val_pack_num_elements) * v;
+              std::uint32_t query_val_index =
+                vq_half2_index * kQueryBlock + elem_offset * (PQ_LEN / 2) + e * TeamSize + laneId;
               half2 q2;
               // if constexpr (false) {
               if constexpr (std::is_same_v<pq_val_t, half>) {
@@ -345,48 +348,51 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
                 device::lds(c_vec.as_u64(),
                             pq_codebook_ptr + sizeof(pq_val_pack_uint_t) *
                                                 ((1 << PQ_BITS) * m + ((pq_code & 0xff))));
-
                 half2 c2_;
 
                 // Loading query vector from smem
-                device::lds(q2, query_ptr + sizeof(half2) * d);
+                device::lds(q2, query_ptr + sizeof(half2) * query_val_index);
                 c2_.x = static_cast<half>(c_vec.x0);
                 c2_.y = static_cast<half>(c_vec.x1);
                 // L2 distance
-                auto dist = q2 - c2_ - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[d1];
-                dist      = dist * dist;
+                auto dist =
+                  q2 - c2_ - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[vq_half2_index];
+                dist = dist * dist;
                 norm += static_cast<DISTANCE_T>(dist.x + dist.y);
 
-                d1 += 1;
-                d += kQueryBlock;
+                vq_half2_index += 1;
+                query_val_index += kQueryBlock;
 
-                device::lds(q2, query_ptr + sizeof(half2) * d);
+                device::lds(q2, query_ptr + sizeof(half2) * query_val_index);
                 c2_.x = static_cast<half>(c_vec.x2);
                 c2_.y = static_cast<half>(c_vec.x3);
                 // L2 distance
-                dist = q2 - c2_ - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[d1];
+                dist =
+                  q2 - c2_ - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[vq_half2_index];
                 dist = dist * dist;
                 norm += static_cast<DISTANCE_T>(dist.x + dist.y);
 
-                d1 += 1;
-                d += kQueryBlock;
+                vq_half2_index += 1;
+                query_val_index += kQueryBlock;
 
-                device::lds(q2, query_ptr + sizeof(half2) * d);
+                device::lds(q2, query_ptr + sizeof(half2) * query_val_index);
                 c2_.x = static_cast<half>(c_vec.x4);
                 c2_.y = static_cast<half>(c_vec.x5);
                 // L2 distance
-                dist = q2 - c2_ - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[d1];
+                dist =
+                  q2 - c2_ - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[vq_half2_index];
                 dist = dist * dist;
                 norm += static_cast<DISTANCE_T>(dist.x + dist.y);
 
-                d1 += 1;
-                d += kQueryBlock;
+                vq_half2_index += 1;
+                query_val_index += kQueryBlock;
 
-                device::lds(q2, query_ptr + sizeof(half2) * d);
+                device::lds(q2, query_ptr + sizeof(half2) * query_val_index);
                 c2_.x = static_cast<half>(c_vec.x6);
                 c2_.y = static_cast<half>(c_vec.x7);
                 // L2 distance
-                dist = q2 - c2_ - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[d1];
+                dist =
+                  q2 - c2_ - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[vq_half2_index];
                 dist = dist * dist;
                 norm += static_cast<DISTANCE_T>(dist.x + dist.y);
               }
