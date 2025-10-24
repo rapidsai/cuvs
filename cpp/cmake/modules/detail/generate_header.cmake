@@ -18,9 +18,6 @@ if(DEFINED OBJECTS_RESPONSE_FILE)
   string(STRIP "${objects_content}" objects_content)
   # Split by newlines since we joined with \n in the CMake file
   string(REPLACE "\n" ";" objects_list "${objects_content}")
-else()
-  # Fallback to direct objects (for backward compatibility)
-  set(objects_list "${OBJECTS}")
 endif()
 
 # Create output directory if it doesn't exist

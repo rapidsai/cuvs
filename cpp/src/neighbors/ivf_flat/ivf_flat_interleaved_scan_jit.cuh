@@ -18,8 +18,8 @@
 
 #include "../ivf_common.cuh"
 #include "jit_lto_kernels/interleaved_scan_planner.hpp"
-#include "jit_lto_kernels/interleaved_scan_tags.hpp"
 #include <cstdint>
+#include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
 

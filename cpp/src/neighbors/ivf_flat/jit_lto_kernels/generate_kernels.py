@@ -141,7 +141,7 @@ template __global__ void interleaved_scan_kernel<{capacity}, {veclen}, {ascendin
 #else
 
 #include <cuvs/detail/jit_lto/RegisterKernelFragment.h>
-#include <neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_tags.hpp>
+#include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>
 #include "interleaved_scan_kernel_{capacity}_{veclen}_{ascending}_{compute_norm}_{params['type_abbrev']}_{params['acc_abbrev']}_{params['idx_abbrev']}.h"
 
 using namespace cuvs::neighbors::ivf_flat::detail;
@@ -203,7 +203,7 @@ template __device__ void compute_dist<{veclen}, {data_type}, {acc_type}>({acc_ty
 #else
 
 #include <cuvs/detail/jit_lto/RegisterKernelFragment.h>
-#include <neighbors/ivf_flat/jit_lto_kernels/interleaved_scan_tags.hpp>
+#include <cuvs/detail/jit_lto/ivf_flat/interleaved_scan_tags.hpp>
 #include "metric_{metric_name}_{veclen}_{type_abbrev}_{acc_abbrev}.h"
 
 using namespace cuvs::neighbors::ivf_flat::detail;
@@ -408,6 +408,10 @@ def main():
 
     # Output directory - use CMAKE_CURRENT_BINARY_DIR if provided, otherwise use source dir
     output_base_dir = Path(sys.argv[1]).absolute() if len(sys.argv) > 1 else script_dir
+
+    # Kernel name - use provided name if available, otherwise default to "interleaved_scan"
+    kernel_name = sys.argv[2] if len(sys.argv) > 2 else "interleaved_scan"
+
     output_dir = output_base_dir / 'interleaved_scan_kernels'
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -435,11 +439,13 @@ def main():
 
     # Generate post lambda device function files
     post_lambda_files = generate_post_lambda_device_functions(output_base_dir)
+
     # Generate CMake file listing all generated files
-    cmake_file = output_base_dir / 'interleaved_scan.cmake'
+    cmake_file = output_base_dir / f'{kernel_name}.cmake'
 
     cmake_content = "# Auto-generated file listing all kernel and device function files\n\n"
 
+    # Set relative path lists
     cmake_content += "set(INTERLEAVED_SCAN_KERNEL_FILES\n"
     for filename in sorted(generated_files):
         cmake_content += f"  generated_kernels/interleaved_scan_kernels/{filename}\n"
@@ -458,7 +464,55 @@ def main():
     cmake_content += "set(POST_LAMBDA_DEVICE_FUNCTION_FILES\n"
     for filename in sorted(post_lambda_files):
         cmake_content += f"  generated_kernels/post_lambda_device_functions/{filename}\n"
-    cmake_content += ")\n"
+    cmake_content += ")\n\n"
+
+    # Add logic to prepend CMAKE_CURRENT_BINARY_DIR and set variables to PARENT_SCOPE
+    cmake_content += f"""# Prepend the binary directory path to all kernel files
+set(FULL_PATH_KERNEL_FILES)
+foreach(kernel_file ${{INTERLEAVED_SCAN_KERNEL_FILES}})
+  list(APPEND FULL_PATH_KERNEL_FILES ${{CMAKE_CURRENT_BINARY_DIR}}/${{kernel_file}})
+endforeach()
+
+# Prepend the binary directory path to all metric device function files
+set(FULL_PATH_METRIC_FILES)
+foreach(metric_file ${{METRIC_DEVICE_FUNCTION_FILES}})
+  list(APPEND FULL_PATH_METRIC_FILES ${{CMAKE_CURRENT_BINARY_DIR}}/${{metric_file}})
+endforeach()
+
+# Prepend the binary directory path to all filter device function files
+set(FULL_PATH_FILTER_FILES)
+foreach(filter_file ${{FILTER_DEVICE_FUNCTION_FILES}})
+  list(APPEND FULL_PATH_FILTER_FILES ${{CMAKE_CURRENT_BINARY_DIR}}/${{filter_file}})
+endforeach()
+
+# Prepend the binary directory path to all post lambda device function files
+set(FULL_PATH_POST_LAMBDA_FILES)
+foreach(post_lambda_file ${{POST_LAMBDA_DEVICE_FUNCTION_FILES}})
+  list(APPEND FULL_PATH_POST_LAMBDA_FILES ${{CMAKE_CURRENT_BINARY_DIR}}/${{post_lambda_file}})
+endforeach()
+
+# Return the lists to parent scope
+set(INTERLEAVED_SCAN_KERNEL_FILES
+    ${{FULL_PATH_KERNEL_FILES}}
+    PARENT_SCOPE
+)
+set(METRIC_DEVICE_FUNCTION_FILES
+    ${{FULL_PATH_METRIC_FILES}}
+    PARENT_SCOPE
+)
+set(FILTER_DEVICE_FUNCTION_FILES
+    ${{FULL_PATH_FILTER_FILES}}
+    PARENT_SCOPE
+)
+set(POST_LAMBDA_DEVICE_FUNCTION_FILES
+    ${{FULL_PATH_POST_LAMBDA_FILES}}
+    PARENT_SCOPE
+)
+set(INTERLEAVED_SCAN_KERNELS_TARGET
+    generate_{kernel_name}_kernels_target
+    PARENT_SCOPE
+)
+"""
 
     # Only write if content has changed
     if not cmake_file.exists() or cmake_file.read_text() != cmake_content:
