@@ -171,7 +171,6 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
             ],
             "rows": 1,
         },
-        # Note: cuvs_brute_force typically doesn't have a build phase
         # Search files:
         "test-data/result/search/cuvs_cagra_hnswlib,test,k10,bs100,raw.csv": {
             "header": common_search_header
@@ -440,7 +439,6 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
             ],
             "rows": 3,
         },
-        
     }
 
     for rel_path, expectations in expected_files.items():
