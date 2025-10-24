@@ -81,7 +81,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "--dataset-path",
         dataset_path_arg,
         "--algorithms",
-        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq,",  # noqa: E501
+        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq"  # noqa: E501
         "--batch-size",
         "100",
         "-k",
