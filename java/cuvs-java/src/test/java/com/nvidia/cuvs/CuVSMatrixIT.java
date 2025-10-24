@@ -49,40 +49,6 @@ public class CuVSMatrixIT extends CuVSTestCase {
     {0, 4, 2}
   };
 
-  private int[][] createIntMatrix() {
-    int rows = randomIntBetween(1, 32);
-    int cols = randomIntBetween(1, 100);
-
-    int[][] result = new int[rows][cols];
-
-    for (int r = 0; r < rows; ++r) {
-      for (int c = 0; c < cols; ++c) {
-        result[r][c] = randomInt();
-      }
-    }
-    return result;
-  }
-
-  private float[][] createFloatMatrix() {
-    int rows = randomIntBetween(1, 32);
-    int cols = randomIntBetween(1, 100);
-
-    return createFloatMatrix(rows, cols);
-  }
-
-  private float[][] createFloatMatrix(int rows, int cols) {
-    float[][] result = new float[rows][cols];
-
-    float value = 1;
-    for (int r = 0; r < rows; ++r) {
-      for (int c = 0; c < cols; ++c) {
-        result[r][c] = value;
-        value += 1;
-      }
-    }
-    return result;
-  }
-
   private void testByteDatasetRowGetAccess(CuVSMatrix dataset) {
     for (int n = 0; n < dataset.size(); ++n) {
       var row = dataset.getRow(n);
@@ -505,8 +471,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
   }
 
   @Test
-  public void testHostBuilderWithDifferentStrides() throws Throwable {
-
+  public void testHostBuilderWithDifferentStrides() {
     int size = randomIntBetween(1, 32 * 1024);
     int columns = randomIntBetween(16, 2048);
     int rowStride1 = randomIntBetween(columns, columns * 2);
