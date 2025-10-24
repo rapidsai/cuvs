@@ -29,6 +29,10 @@ cdef extern from "cuvs/cluster/kmeans.h" nogil:
         Random
         Array
 
+    ctypedef enum cuvsKMeansType:
+        KMeans
+        KMeansBalanced
+
     ctypedef struct cuvsKMeansParams:
         cuvsDistanceType metric,
         int n_clusters,

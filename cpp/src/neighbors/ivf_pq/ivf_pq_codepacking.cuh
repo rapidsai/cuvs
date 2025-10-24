@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2023-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,11 +37,11 @@ using pq_vec_t = raft::TxN_t<uint8_t, kIndexGroupVecLen>::io_t;
  *
  * @tparam Bits number of bits comprising the value.
  */
-template <uint32_t Bits>
+template <uint32_t Bits, typename PtrT = uint8_t>
 struct bitfield_ref_t {
   static_assert(Bits <= 8 && Bits > 0, "Bit code must fit one byte");
   constexpr static uint8_t kMask = static_cast<uint8_t>((1u << Bits) - 1u);
-  uint8_t* ptr;
+  PtrT* ptr;
   uint32_t offset;
 
   constexpr operator uint8_t()  // NOLINT
@@ -72,16 +72,16 @@ struct bitfield_ref_t {
  *
  * @tparam Bits number of bits comprising a single element of the array.
  */
-template <uint32_t Bits>
+template <uint32_t Bits, typename PtrT = uint8_t>
 struct bitfield_view_t {
   static_assert(Bits <= 8 && Bits > 0, "Bit code must fit one byte");
-  uint8_t* raw;
+  PtrT* raw;
 
-  constexpr auto operator[](uint32_t i) -> bitfield_ref_t<Bits>
+  constexpr auto operator[](uint32_t i) -> bitfield_ref_t<Bits, PtrT>
   {
     uint32_t bit_offset = i * Bits;
-    return bitfield_ref_t<Bits>{raw + raft::Pow2<8>::div(bit_offset),
-                                raft::Pow2<8>::mod(bit_offset)};
+    return bitfield_ref_t<Bits, PtrT>{raw + raft::Pow2<8>::div(bit_offset),
+                                      raft::Pow2<8>::mod(bit_offset)};
   }
 };
 

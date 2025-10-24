@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
 #include <raft/core/device_csr_matrix.hpp>
 #include <raft/core/device_mdarray.hpp>
@@ -62,6 +63,7 @@ struct vpq_params {
   /**
    * Vector Quantization (VQ) codebook size - number of "coarse cluster centers".
    * When zero, an optimal value is selected using a heuristic.
+   * When one, only product quantization is used.
    */
   uint32_t vq_n_centers = 0;
   /** The number of iterations searching for kmeans centers (both VQ & PQ phases). */
@@ -76,6 +78,11 @@ struct vpq_params {
    * When zero, an optimal value is selected using a heuristic.
    */
   double pq_kmeans_trainset_fraction = 0;
+  /**
+   * Type of k-means algorithm for PQ training.
+   */
+  cuvs::cluster::kmeans::kmeans_type pq_kmeans_type =
+    cuvs::cluster::kmeans::kmeans_type::KMeansBalanced;
 };
 
 /**
