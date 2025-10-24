@@ -69,10 +69,50 @@ inline bool is_dlpack_host_compatible(DLTensor tensor)
          tensor.device.device_type == kDLCPU;
 }
 
+inline bool is_f_contiguous(DLManagedTensor* managed_tensor)
+{
+  auto tensor = managed_tensor->dl_tensor;
+
+  if (!tensor.strides) { return false; }
+  int64_t expected_stride = 1;
+  for (int64_t i = 0; i < tensor.ndim; ++i) {
+    if (tensor.strides[i] != expected_stride) { return false; }
+    expected_stride *= tensor.shape[i];
+  }
+
+  return true;
+}
+
+inline bool is_c_contiguous(DLManagedTensor* managed_tensor)
+{
+  auto tensor = managed_tensor->dl_tensor;
+
+  if (!tensor.strides) {
+    // no stride information indicates a row-major tensor according to the dlpack spec
+    return true;
+  }
+
+  int64_t expected_stride = 1;
+  for (int64_t i = tensor.ndim - 1; i >= 0; --i) {
+    if (tensor.strides[i] != expected_stride) { return false; }
+    expected_stride *= tensor.shape[i];
+  }
+
+  return true;
+}
+
 template <typename MdspanType, typename = raft::is_mdspan_t<MdspanType>>
 inline MdspanType from_dlpack(DLManagedTensor* managed_tensor)
 {
   auto tensor = managed_tensor->dl_tensor;
+
+  if constexpr (std::is_same_v<typename MdspanType::layout_type, raft::row_major>) {
+    RAFT_EXPECTS(is_c_contiguous(managed_tensor), "Expected a row-major matrix");
+  }
+
+  if constexpr (std::is_same_v<typename MdspanType::layout_type, raft::col_major>) {
+    RAFT_EXPECTS(is_f_contiguous(managed_tensor), "Expected a col-major matrix");
+  }
 
   auto to_data_type = data_type_to_DLDataType<typename MdspanType::value_type>();
   RAFT_EXPECTS(to_data_type.code == tensor.dtype.code,
@@ -107,38 +147,6 @@ inline MdspanType from_dlpack(DLManagedTensor* managed_tensor)
   auto exts = typename MdspanType::extents_type{shape};
 
   return MdspanType{reinterpret_cast<typename MdspanType::data_handle_type>(tensor.data), exts};
-}
-
-inline bool is_f_contiguous(DLManagedTensor* managed_tensor)
-{
-  auto tensor = managed_tensor->dl_tensor;
-
-  if (!tensor.strides) { return false; }
-  int64_t expected_stride = 1;
-  for (int64_t i = 0; i < tensor.ndim; ++i) {
-    if (tensor.strides[i] != expected_stride) { return false; }
-    expected_stride *= tensor.shape[i];
-  }
-
-  return true;
-}
-
-inline bool is_c_contiguous(DLManagedTensor* managed_tensor)
-{
-  auto tensor = managed_tensor->dl_tensor;
-
-  if (!tensor.strides) {
-    // no stride information indicates a row-major tensor according to the dlpack spec
-    return true;
-  }
-
-  int64_t expected_stride = 1;
-  for (int64_t i = tensor.ndim - 1; i >= 0; --i) {
-    if (tensor.strides[i] != expected_stride) { return false; }
-    expected_stride *= tensor.shape[i];
-  }
-
-  return true;
 }
 
 #pragma GCC diagnostic push
