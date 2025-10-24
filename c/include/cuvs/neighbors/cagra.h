@@ -157,6 +157,48 @@ cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* param
 cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params);
 
 /**
+ * @brief Create CAGRA index parameters similar to an HNSW index with hard M constraint
+ *
+ * This factory function creates CAGRA parameters that yield a graph of the same size
+ * as an HNSW graph with the given parameters.
+ *
+ * @param[out] params The CAGRA index params to populate
+ * @param[in] n_rows Number of rows in the dataset
+ * @param[in] dim Number of dimensions in the dataset
+ * @param[in] M HNSW index parameter M
+ * @param[in] ef_construction HNSW index parameter ef_construction
+ * @param[in] metric Distance metric to use
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexParamsFromHnswHardM(cuvsCagraIndexParams_t params,
+                                               int64_t n_rows,
+                                               int64_t dim,
+                                               int M,
+                                               int ef_construction,
+                                               cuvsDistanceType metric);
+
+/**
+ * @brief Create CAGRA index parameters similar to an HNSW index with soft M constraint
+ *
+ * This factory function creates CAGRA parameters that yield a graph with similar search
+ * performance as an HNSW graph with the given parameters.
+ *
+ * @param[out] params The CAGRA index params to populate
+ * @param[in] n_rows Number of rows in the dataset
+ * @param[in] dim Number of dimensions in the dataset
+ * @param[in] M HNSW index parameter M
+ * @param[in] ef_construction HNSW index parameter ef_construction
+ * @param[in] metric Distance metric to use
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexParamsFromHnswSoftM(cuvsCagraIndexParams_t params,
+                                               int64_t n_rows,
+                                               int64_t dim,
+                                               int M,
+                                               int ef_construction,
+                                               cuvsDistanceType metric);
+
+/**
  * @}
  */
 
