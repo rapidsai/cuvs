@@ -29,7 +29,7 @@
 #include <rmm/mr/device/owning_wrapper.hpp>
 #include <rmm/mr/device/per_device_resource.hpp>
 #include <rmm/mr/device/pool_memory_resource.hpp>
-#include <rmm/mr/host/pinned_memory_resource.hpp>
+#include <rmm/mr/pinned_host_memory_resource.hpp>
 
 #include "../core/exceptions.hpp"
 
@@ -191,12 +191,12 @@ extern "C" cuvsError_t cuvsRMMMemoryResourceReset()
   });
 }
 
-thread_local std::unique_ptr<rmm::mr::pinned_memory_resource> pinned_mr;
+thread_local std::unique_ptr<rmm::mr::pinned_host_memory_resource> pinned_mr;
 
 extern "C" cuvsError_t cuvsRMMHostAlloc(void** ptr, size_t bytes)
 {
   return cuvs::core::translate_exceptions([=] {
-    if (pinned_mr == nullptr) { pinned_mr = std::make_unique<rmm::mr::pinned_memory_resource>(); }
+    if (pinned_mr == nullptr) { pinned_mr = std::make_unique<rmm::mr::pinned_host_memory_resource>(); }
     *ptr = pinned_mr->allocate(bytes);
   });
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * Copyright (c) 2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,18 +14,12 @@
  * limitations under the License.
  */
 
-#include "../ann_scann.cuh"
+// Basic smoke test to verify non of the C API headers
+// ever use a C++ only construct
+#include <cuvs/core/all.h>
+#include <cuvs/core/all.h> //smoke out missing include guards
 
-namespace cuvs::neighbors::experimental::scann {
-
-using f32_i64 = scann_test<float, int64_t>;
-
-TEST_BUILD(f32_i64)
-TEST_BUILD_HOST_INPUT(f32_i64)
-TEST_BUILD_HOST_INPUT_OVERLAP(f32_i64);
-
-INSTANTIATE(f32_i64,
-            defaults() + small_dims_all_pq_bits() + big_dims_all_pq_bits() + bf16() + bf16_avq() +
-              avq() + soar());
-
-}  // namespace cuvs::neighbors::experimental::scann
+int main()
+{
+  return 0;
+}
