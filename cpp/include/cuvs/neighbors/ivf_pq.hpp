@@ -346,8 +346,8 @@ struct index : cuvs::neighbors::index {
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 
-  using pq_centers_extents = std::experimental::
-    extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
+  using pq_centers_extents =
+    cuda::std::extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
 
  public:
   index(const index&)                    = delete;

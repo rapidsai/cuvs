@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
+ * Copyright (c) 2024-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,8 +25,8 @@ void fit_predict(raft::resources const& handle,
                  std::optional<raft::device_vector_view<const double, int>> sample_weight,
                  std::optional<raft::device_matrix_view<double, int>> centroids,
                  raft::device_vector_view<int, int> labels,
-                 raft::host_scalar_view<double> inertia,
-                 raft::host_scalar_view<int> n_iter)
+                 raft::host_scalar_view<double, int> inertia,
+                 raft::host_scalar_view<int, int> n_iter)
 
 {
   cuvs::cluster::kmeans::fit_predict<double, int>(
@@ -39,8 +39,8 @@ void fit_predict(raft::resources const& handle,
                  std::optional<raft::device_vector_view<const double, int64_t>> sample_weight,
                  std::optional<raft::device_matrix_view<double, int64_t>> centroids,
                  raft::device_vector_view<int64_t, int64_t> labels,
-                 raft::host_scalar_view<double> inertia,
-                 raft::host_scalar_view<int64_t> n_iter)
+                 raft::host_scalar_view<double, int64_t> inertia,
+                 raft::host_scalar_view<int64_t, int64_t> n_iter)
 
 {
   cuvs::cluster::kmeans::fit_predict<double, int64_t>(

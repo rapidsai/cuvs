@@ -451,9 +451,9 @@ __global__ void populate_reverse_list_struct(QueryCandidates<IdxT, accT>* revers
 // Recompute distances of reverse list. Allows us to avoid keeping distances during sort
 template <typename T,
           typename accT,
-          typename IdxT     = uint32_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT = uint32_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 __global__ void recompute_reverse_dists(
   QueryCandidates<IdxT, accT>* reverse_list,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset,

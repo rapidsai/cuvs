@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * Copyright (c) 2022-2025, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -129,8 +129,8 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
                                X_view,
                                d_sw,
                                centroids_view,
-                               raft::make_host_scalar_view<T>(&inertia),
-                               raft::make_host_scalar_view<int>(&n_iter));
+                               raft::make_host_scalar_view<T, int>(&inertia),
+                               raft::make_host_scalar_view<int, int>(&n_iter));
 
     cuvs::cluster::kmeans::predict(
       handle,
@@ -140,7 +140,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
       d_centroids.data(),
       raft::make_device_vector_view<int, int>(d_labels.data(), n_samples),
       true,
-      raft::make_host_scalar_view<T>(&inertia));
+      raft::make_host_scalar_view<T, int>(&inertia));
     score = raft::stats::adjusted_rand_index(
       d_labels_ref.data(), d_labels.data(), n_samples, raft::resource::get_cuda_stream(handle));
     handle.sync_stream(stream);
