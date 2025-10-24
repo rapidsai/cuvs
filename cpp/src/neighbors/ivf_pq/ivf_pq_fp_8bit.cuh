@@ -114,42 +114,50 @@ struct fp_8bit {
 
 template <uint32_t ExpBits, bool Signed, bool SW_Emulation = true>
 struct fp_8bit4 {
-  using unit_t = fp_8bit<ExpBits, Signed>;
+  using unit_t                           = fp_8bit<ExpBits, Signed>;
+  using uint_t                           = uint32_t;
+  static constexpr uint32_t num_elements = 4;
   unit_t x, y, z, w;
   HDI fp_8bit4() : x(0.f), y(0.f), z(0.f), w(0.f) {}
 
-  HDI uint32_t& as_u32() { return *reinterpret_cast<uint32_t*>(this); }
-  HDI uint32_t as_u32() const { return *reinterpret_cast<const uint32_t*>(this); }
+  HDI uint_t& as_uint() { return *reinterpret_cast<uint_t*>(this); }
+  HDI uint_t as_uint() const { return *reinterpret_cast<const uint_t*>(this); }
 };
 
 template <>
 struct fp_8bit4<5, true, false> {
-  using unit_t = __nv_fp8_e5m2;
+  using unit_t                           = __nv_fp8_e5m2;
+  using uint_t                           = uint32_t;
+  static constexpr uint32_t num_elements = 4;
   unit_t x, y, z, w;
   HDI fp_8bit4() : x(0.f), y(0.f), z(0.f), w(0.f) {}
 
-  HDI uint32_t& as_u32() { return *reinterpret_cast<uint32_t*>(this); }
-  HDI uint32_t as_u32() const { return *reinterpret_cast<const uint32_t*>(this); }
+  HDI uint_t& as_uint() { return *reinterpret_cast<uint_t*>(this); }
+  HDI uint_t as_uint() const { return *reinterpret_cast<const uint_t*>(this); }
 };
 
 template <uint32_t ExpBits, bool Signed, bool SW_Emulation = true>
 struct fp_8bit8 {
-  using unit_t = fp_8bit<ExpBits, Signed>;
+  using unit_t                           = fp_8bit<ExpBits, Signed>;
+  using uint_t                           = uint64_t;
+  static constexpr uint32_t num_elements = 8;
   unit_t x0, x1, x2, x3, x4, x5, x6, x7;
   HDI fp_8bit8() : x0(0.f), x1(0.f), x2(0.f), x3(0.f), x4(0.f), x5(0.f), x6(0.f), x7(0.f) {}
 
-  HDI uint64_t& as_u64() { return *reinterpret_cast<uint64_t*>(this); }
-  HDI uint64_t as_u64() const { return *reinterpret_cast<const uint64_t*>(this); }
+  HDI uint_t& as_uint() { return *reinterpret_cast<uint_t*>(this); }
+  HDI uint_t as_uint() const { return *reinterpret_cast<const uint_t*>(this); }
 };
 
 template <>
 struct fp_8bit8<5, true, false> {
-  using unit_t = __nv_fp8_e5m2;
+  using unit_t                           = __nv_fp8_e5m2;
+  using uint_t                           = uint64_t;
+  static constexpr uint32_t num_elements = 8;
   unit_t x0, x1, x2, x3, x4, x5, x6, x7;
   HDI fp_8bit8() : x0(0.f), x1(0.f), x2(0.f), x3(0.f), x4(0.f), x5(0.f), x6(0.f), x7(0.f) {}
 
-  HDI uint64_t& as_u64() { return *reinterpret_cast<uint64_t*>(this); }
-  HDI uint64_t as_u64() const { return *reinterpret_cast<const uint64_t*>(this); }
+  HDI uint_t& as_uint() { return *reinterpret_cast<uint_t*>(this); }
+  HDI uint_t as_uint() const { return *reinterpret_cast<const uint_t*>(this); }
 };
 
 }  // namespace cuvs::neighbors::ivf_pq::detail
