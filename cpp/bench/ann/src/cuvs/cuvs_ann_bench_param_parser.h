@@ -60,7 +60,7 @@ extern template class cuvs::bench::cuvs_cagra<int8_t, uint32_t>;
 template <typename ParamT>
 void parse_dynamic_batching_params(const nlohmann::json& conf, ParamT& param)
 {
-  if (!conf.value("dynamic_batching", false)) { return; }
+  if (conf.is_null() || !conf.value("dynamic_batching", false)) { return; }
   param.dynamic_batching = true;
   if (conf.contains("dynamic_batching_max_batch_size")) {
     param.dynamic_batching_max_batch_size = conf.at("dynamic_batching_max_batch_size");
