@@ -62,7 +62,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
 
         python -m cuvs_bench.run --dataset test-data --dataset-path datasets/ \
             --algorithms faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,\
-            cuvs_cagra,ggnn,cuvs_cagra_hnswlib, \
+            cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq \
             --batch-size 100 -k 10 --groups test -m latency --force
 
     It then verifies that the set of expected result files
@@ -81,7 +81,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "--dataset-path",
         dataset_path_arg,
         "--algorithms",
-        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq"  # noqa: E501
+        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq",  # noqa: E501
         "--batch-size",
         "100",
         "-k",
@@ -466,7 +466,7 @@ def test_plot_command_creates_png_files(temp_datasets_dir: Path):
 
       python -m cuvs_bench.plot --dataset test-data --dataset-path datasets/ \
           --algorithms faiss_gpu_ivf_flat,faiss_gpu_ivf_sq, \
-          cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib \
+          cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq \
           --batch-size 100 -k 10 --groups test -m latency
 
     and then verifies that the following files are produced in the
@@ -490,7 +490,7 @@ def test_plot_command_creates_png_files(temp_datasets_dir: Path):
         "--output-filepath",
         dataset_path_arg,
         "--algorithms",
-        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib",  # noqa: E501
+        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq",  # noqa: E501
         "--batch-size",
         "100",
         "-k",
