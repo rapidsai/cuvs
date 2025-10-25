@@ -133,7 +133,7 @@ void build_knn_graph(
 
   uint32_t node_degree = knn_graph.extent(1);
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
-    "cagra::build_graph(%zu, %zu, %u)",
+    "cagra::build_knn_graph<IVF-PQ>(%zu, %zu, %u)",
     size_t(dataset.extent(0)),
     size_t(dataset.extent(1)),
     node_degree);
@@ -391,6 +391,12 @@ void build_knn_graph(
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
   cuvs::neighbors::nn_descent::index_params build_params)
 {
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
+    "cagra::build_knn_graph<NN-DESCENT>(%zu, %zu, %u)",
+    size_t(dataset.extent(0)),
+    size_t(dataset.extent(1)),
+    size_t(knn_graph.extent(1)));
+
   std::optional<raft::host_matrix_view<IdxT, int64_t, row_major>> graph_view = knn_graph;
   auto nn_descent_idx = cuvs::neighbors::nn_descent::build(res, build_params, dataset, graph_view);
 
