@@ -115,6 +115,10 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
                                                        uint32_t label,
                                                        uint32_t offset)
 
+    cuvsError_t cuvsIvfPqIndexGetListIndices(cuvsIvfPqIndex_t index,
+                                             uint32_t label,
+                                             DLManagedTensor* out)
+
     cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
                                cuvsIvfPqIndexParams* params,
                                DLManagedTensor* dataset,

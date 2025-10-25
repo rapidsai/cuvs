@@ -344,7 +344,10 @@ cdef class Index:
         """
         list_sizes = self.list_sizes.copy_to_host()
         for i, list_size in enumerate(list_sizes):
-            yield self.list_data(i, n_rows=list_size, resources=resources)
+            indices = self.list_indices(i, n_rows=list_size)
+            list_data = self.list_data(i, n_rows=list_size,
+                                       resources=resources)
+            yield indices, list_data
 
     @auto_sync_resources
     def list_data(self, label, n_rows=0, offset=0, out_codes=None,
@@ -386,6 +389,30 @@ cdef class Index:
                                                           label,
                                                           offset))
         return out_codes
+
+    def list_indices(self, label, n_rows=0):
+        """ Gets indices for a single cluster (list)
+
+        Parameters
+        ----------
+        label, int:
+            The cluster to get data for
+        n_rows, int, optional
+            Number of rows in the list
+        """
+        output = DeviceTensorView()
+        cdef cydlpack.DLManagedTensor * tensor = \
+            <cydlpack.DLManagedTensor*><size_t>output.get_handle()
+        check_cuvs(cuvsIvfPqIndexGetListIndices(self.index, label, tensor))
+        output.parent = self
+
+        # the indices tensor being returned here is larger than the number of
+        # rows in the actual list, and the remaining values are padded out
+        # with -1.
+        # fix this by slicing down to the number of rows in the actual list
+        if n_rows == 0:
+            n_rows = self.list_sizes.copy_to_host()[label]
+        return output.slice_rows(0, n_rows)
 
 
 @auto_sync_resources

@@ -330,21 +330,26 @@ extern "C" cuvsError_t cuvsMatrixSliceRows(cuvsResources_t res,
 
     DLTensor& src = src_managed->dl_tensor;
     DLTensor& dst = dst_managed->dl_tensor;
-    RAFT_EXPECTS(src.ndim == 2, "src should be a 2 dimensional tensor");
+    RAFT_EXPECTS(src.ndim <= 2, "src should be a 1 or 2 dimensional tensor");
     RAFT_EXPECTS(src.shape != nullptr, "shape should be initialized in the src tensor");
 
     dst.dtype    = src.dtype;
     dst.device   = src.device;
-    dst.ndim     = 2;
-    dst.shape    = new int64_t[2];
+    dst.ndim     = src.ndim;
+    dst.shape    = new int64_t[dst.ndim];
     dst.shape[0] = end - start;
-    dst.shape[1] = src.shape[1];
 
-    int64_t row_strides = dst.shape[1];
-    if (src.strides) {
-      dst.strides = new int64_t[2];
-      row_strides = dst.strides[0] = src.strides[0];
-      dst.strides[1]               = src.strides[1];
+    int64_t row_strides = 1;
+
+    if (dst.ndim == 2) {
+      dst.shape[1] = src.shape[1];
+      row_strides = dst.shape[1];
+
+      if (src.strides) {
+        dst.strides = new int64_t[2];
+        row_strides = dst.strides[0] = src.strides[0];
+        dst.strides[1]               = src.strides[1];
+      }
     }
 
     dst.data = static_cast<char*>(src.data) + start * row_strides * (dst.dtype.bits / 8);

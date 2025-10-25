@@ -201,6 +201,15 @@ void _unpack_contiguous_list_data(cuvsResources_t res,
   cuvs::neighbors::ivf_pq::helpers::codepacker::unpack_contiguous_list_data(
     *res_ptr, *index_ptr, mds.data_handle(), mds.extent(0), label, offset);
 }
+
+template <typename IdxT>
+void _get_list_indices(cuvsIvfPqIndex index,
+                       uint32_t label,
+                       DLManagedTensor* out_labels)
+{
+  auto index_ptr    = reinterpret_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(index.addr);
+  cuvs::core::to_dlpack(index_ptr->lists()[label]->indices.view(), out_labels);
+}
 }  // namespace
 
 extern "C" cuvsError_t cuvsIvfPqIndexCreate(cuvsIvfPqIndex_t* index)
@@ -444,4 +453,12 @@ extern "C" cuvsError_t cuvsIvfPqIndexUnpackContiguousListData(cuvsResources_t re
 {
   return cuvs::core::translate_exceptions(
     [=] { _unpack_contiguous_list_data<int64_t>(res, *index, out_codes, label, offset); });
+}
+
+extern "C" cuvsError_t cuvsIvfPqIndexGetListIndices(cuvsIvfPqIndex_t index,
+                                                    uint32_t label,
+                                                    DLManagedTensor* out_labels)
+{
+  return cuvs::core::translate_exceptions(
+    [=] { _get_list_indices<int64_t>(*index, label, out_labels); });
 }

@@ -333,6 +333,19 @@ cuvsError_t cuvsIvfPqIndexUnpackContiguousListData(cuvsResources_t res,
                                                    uint32_t label,
                                                    uint32_t offset);
 /**
+ * @brief Get the indices of each vector in a ivf-pq list
+ *
+ * @param[in] index cuvsIvfPqIndex_t Built Ivf-Pq index
+ * @param[in] label
+ *   The id of the list (cluster) to decode.
+ * @param[out] out_labels
+ *   output tensor that will be populated with a non-owning view of the data
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsIvfPqIndexGetListIndices(cuvsIvfPqIndex_t index,
+                                         uint32_t label,
+                                         DLManagedTensor* out_labels);
+/**
  * @}
  */
 
