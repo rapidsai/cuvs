@@ -75,21 +75,26 @@ def run_filtered_search_test(
     queries_device = device_ndarray(queries)
     bitset_device = device_ndarray(bitset)
 
-    # Adjust parameters based on sparsity to maximize recall
-    # With higher sparsity (more filtered items), we need:
-    # - Fewer clusters (lower n_lists) to ensure each cluster has enough
-    #   unfiltered points
-    # - More probes to search through enough clusters to find k neighbors
+    is_ivf = "ivf" in str(search_module).lower()
 
-    n_lists = math.isqrt(n_rows) * sparsity
-    n_probes = n_lists // (10 * sparsity)
+    if is_ivf:
+        # Adjust parameters based on sparsity to maximize recall for IVF
+        # With higher sparsity (more filtered items), we need:
+        # - Fewer clusters (lower n_lists) to ensure each cluster has enough
+        #   unfiltered points
+        # - More probes to search through enough clusters to find k neighbors
 
-    build_params = search_module.IndexParams(n_lists=n_lists)
+        n_lists = math.isqrt(n_rows) * sparsity
+        n_probes = max(1, n_lists // (10 * sparsity))
+
+        build_params = search_module.IndexParams(n_lists=n_lists)
+        search_params = search_module.SearchParams(n_probes=n_probes)
+    else:
+        build_params = search_module.IndexParams()
+        search_params = search_module.SearchParams()
+
     index = search_module.build(build_params, dataset_device)
-
     filter_ = filters.from_bitset(bitset_device)
-
-    search_params = search_module.SearchParams(n_probes=n_probes)
     ret_distances, ret_indices = search_module.search(
         search_params,
         index,
