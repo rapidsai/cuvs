@@ -46,8 +46,8 @@ function(find_and_configure_raft)
             COMPONENTS          ${RAFT_COMPONENTS}
             CPM_ARGS
               EXCLUDE_FROM_ALL TRUE
-              GIT_REPOSITORY        https://github.com/${PKG_FORK}/raft.git
-              GIT_TAG               ${PKG_PINNED_TAG}
+              GIT_REPOSITORY        https://github.com/tarang-jain/raft.git
+              GIT_TAG               uint8-policy
               SOURCE_SUBDIR         cpp
               OPTIONS
               "BUILD_TESTS OFF"

@@ -219,6 +219,83 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
 }
 
 /**
+ * @brief Predict labels for the dataset; uint8_t only (specialization for BitwiseHamming).
+ */
+template <typename IdxT, typename LabelT>
+inline void predict_bitwise_hamming(const raft::resources& handle,
+                                    const cuvs::cluster::kmeans::balanced_params& params,
+                                    const uint8_t* centers,
+                                    IdxT n_clusters,
+                                    IdxT dim,
+                                    const uint8_t* dataset,
+                                    const uint8_t* dataset_norm,
+                                    IdxT n_rows,
+                                    LabelT* labels,
+                                    rmm::device_async_resource_ref mr)
+{
+  RAFT_EXPECTS(params.metric == cuvs::distance::DistanceType::BitwiseHamming,
+               "uint8_t data only supports BitwiseHamming distance");
+
+  auto stream = raft::resource::get_cuda_stream(handle);
+
+  auto workspace = raft::make_device_mdarray<char, IdxT>(
+    handle, mr, raft::make_extents<IdxT>((sizeof(int)) * n_rows));
+
+  auto minClusterAndDistance = raft::make_device_mdarray<raft::KeyValuePair<IdxT, uint32_t>, IdxT>(
+    handle, mr, raft::make_extents<IdxT>(n_rows));
+
+  raft::KeyValuePair<IdxT, uint32_t> initial_value(0, std::numeric_limits<uint32_t>::max());
+  thrust::fill(raft::resource::get_thrust_policy(handle),
+               minClusterAndDistance.data_handle(),
+               minClusterAndDistance.data_handle() + n_rows,
+               initial_value);
+
+  cuvs::distance::fusedDistanceNNMinReduce<uint8_t, raft::KeyValuePair<IdxT, uint32_t>, IdxT>(
+    minClusterAndDistance.data_handle(),
+    dataset,
+    centers,
+    nullptr,
+    nullptr,
+    n_rows,
+    n_clusters,
+    dim,
+    (void*)workspace.data_handle(),
+    false,
+    false,
+    true,
+    params.metric,
+    0.0f,
+    stream);
+
+  thrust::transform(raft::resource::get_thrust_policy(handle),
+                    minClusterAndDistance.data_handle(),
+                    minClusterAndDistance.data_handle() + n_rows,
+                    labels,
+                    raft::compose_op<raft::cast_op<LabelT>, raft::key_op>());
+}
+
+template <typename IdxT, typename LabelT>
+inline void predict_bitwise_hamming(const raft::resources& handle,
+                                    raft::device_matrix_view<const uint8_t, IdxT> dataset,
+                                    raft::device_matrix_view<const uint8_t, IdxT> centers,
+                                    raft::device_vector_view<LabelT, IdxT> labels)
+{
+  cuvs::cluster::kmeans::balanced_params params;
+  params.metric = cuvs::distance::DistanceType::BitwiseHamming;
+
+  predict_bitwise_hamming(handle,
+                          params,
+                          centers.data_handle(),
+                          centers.extent(0),
+                          centers.extent(1),
+                          dataset.data_handle(),
+                          nullptr,
+                          dataset.extent(0),
+                          labels.data_handle(),
+                          raft::resource::get_workspace_resource(handle));
+}
+
+/**
  * @brief Suggest a minibatch size for kmeans prediction.
  *
  * This function is used as a heuristic to split the work over a large dataset

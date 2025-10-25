@@ -5,6 +5,9 @@ set -euo pipefail
 
 source rapids-init-pip
 
+# Use RAFT wheel artifacts from PR
+source ./ci/use_wheels_from_prs.sh
+
 package_name="libcuvs"
 package_dir="python/libcuvs"
 
