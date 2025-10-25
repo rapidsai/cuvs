@@ -127,6 +127,11 @@ def run_ivf_pq_build_search_test(
     assert len(pq_centers.shape) == 3
     assert pq_centers.shape[2] == 1 << pq_bits
 
+    all_list_ids = set()
+    for list_ids, list_data in index.lists():
+        all_list_ids.update(list_ids.copy_to_host())
+    assert all_list_ids == set(np.arange(n_rows))
+
     if not compare:
         return
 
