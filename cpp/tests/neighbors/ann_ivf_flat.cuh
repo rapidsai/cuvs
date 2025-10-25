@@ -463,15 +463,6 @@ class AnnIVFFlatTest : public ::testing::TestWithParam<AnnIvfFlatInputs<IdxT>> {
       // recall
       double min_recall = static_cast<double>(ps.nprobe) / static_cast<double>(ps.nlist);
 
-      // For BitwiseHamming with dimensions not divisible by 16, we need to be more lenient
-      // because veclen falls back to 1, which can affect recall slightly
-      if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming) {
-        uint32_t veclen = std::max<uint32_t>(1, 16 / sizeof(DataT));
-        if (ps.dim % veclen != 0) {
-          min_recall = min_recall * 0.9;  // Allow 10% lower recall for veclen=1 path
-        }
-      }
-
       auto distances_ivfflat_dev = raft::make_device_matrix<T, IdxT>(handle_, ps.num_queries, ps.k);
       auto indices_ivfflat_dev =
         raft::make_device_matrix<IdxT, IdxT>(handle_, ps.num_queries, ps.k);
