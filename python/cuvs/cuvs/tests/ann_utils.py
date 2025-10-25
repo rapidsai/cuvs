@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
+
 import numpy as np
 from pylibraft.common import device_ndarray
 from sklearn.neighbors import NearestNeighbors
@@ -73,12 +75,21 @@ def run_filtered_search_test(
     queries_device = device_ndarray(queries)
     bitset_device = device_ndarray(bitset)
 
-    build_params = search_module.IndexParams()
+    # Adjust parameters based on sparsity to maximize recall
+    # With higher sparsity (more filtered items), we need:
+    # - Fewer clusters (lower n_lists) to ensure each cluster has enough
+    #   unfiltered points
+    # - More probes to search through enough clusters to find k neighbors
+
+    n_lists = math.isqrt(n_rows) * sparsity
+    n_probes = n_lists // (10 * sparsity)
+
+    build_params = search_module.IndexParams(n_lists=n_lists)
     index = search_module.build(build_params, dataset_device)
 
     filter_ = filters.from_bitset(bitset_device)
 
-    search_params = search_module.SearchParams()
+    search_params = search_module.SearchParams(n_probes=n_probes)
     ret_distances, ret_indices = search_module.search(
         search_params,
         index,
