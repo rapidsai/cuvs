@@ -16,9 +16,7 @@
 package com.nvidia.cuvs.spi;
 
 import static com.nvidia.cuvs.internal.common.Util.*;
-import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemcpy2DAsync;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsVersionGet;
-import static com.nvidia.cuvs.internal.panama.headers_h.uint16_t;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
 import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaStreamSynchronize;
 
 import com.nvidia.cuvs.*;
@@ -42,6 +40,9 @@ final class JDKProvider implements CuVSProvider {
 
   private static final MethodHandle createNativeDataset$mh;
   private static final MethodHandle createNativeDatasetWithStrides$mh;
+
+  private final cuvsRMMMemoryResourceReset cuvsRMMMemoryResourceResetInvoker =
+      cuvsRMMMemoryResourceReset.makeInvoker();
 
   static {
     try {
@@ -184,6 +185,25 @@ final class JDKProvider implements CuVSProvider {
   @Override
   public GPUInfoProvider gpuInfoProvider() {
     return new GPUInfoProviderImpl();
+  }
+
+  @Override
+  public void enableRMMPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent) {
+    checkCuVSError(
+        cuvsRMMPoolMemoryResourceEnable(initialPoolSizePercent, maxPoolSizePercent, false),
+        "cuvsRMMPoolMemoryResourceEnable");
+  }
+
+  @Override
+  public void enableRMMManagedPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent) {
+    checkCuVSError(
+        cuvsRMMPoolMemoryResourceEnable(initialPoolSizePercent, maxPoolSizePercent, true),
+        "cuvsRMMPoolMemoryResourceEnable");
+  }
+
+  @Override
+  public void resetRMMPooledMemory() {
+    checkCuVSError(cuvsRMMMemoryResourceResetInvoker.apply(), "cuvsRMMMemoryResourceReset");
   }
 
   @Override
