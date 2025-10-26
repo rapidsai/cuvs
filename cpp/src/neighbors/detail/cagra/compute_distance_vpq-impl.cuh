@@ -38,7 +38,7 @@ struct pq_val_type_t<2> {
 };
 template <>
 struct pq_val_type_t<4> {
-  using pq_val_pack_t                                = ivf_pq::detail::fp_8bit8<5, true, false>;
+  using pq_val_pack_t                                = ivf_pq::detail::fp_8bit4<5, true, false>;
   using pq_val_t                                     = typename pq_val_pack_t::unit_t;
   using pq_val_pack_uint_t                           = typename pq_val_pack_t::uint_t;
   static constexpr uint32_t pq_val_pack_num_elements = pq_val_pack_t::num_elements;
@@ -228,15 +228,13 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
           buf2.y = r->pq_code_book_ptr()[i + 1];
           device::sts(codebook_buf + smem_index * sizeof(pq_val_pack_t), buf2);
         } else if constexpr (PQ_LEN == 4) {
-          using pq_val_pack_t = ivf_pq::detail::fp_8bit4<5, true, false>;
           pq_val_pack_t buf4;
           buf4.x = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i]));
           buf4.y = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 1]));
           buf4.z = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 2]));
           buf4.w = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 3]));
           device::sts(codebook_buf + smem_index * sizeof(pq_val_pack_uint_t), buf4.as_uint());
-        } else {
-          using pq_val_pack_t = ivf_pq::detail::fp_8bit8<5, true, false>;
+        } else if constexpr (PQ_LEN == 8) {
           pq_val_pack_t buf8;
           buf8.x0 = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i]));
           buf8.x1 = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 1]));
