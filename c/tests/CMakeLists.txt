@@ -71,6 +71,7 @@ ConfigureTest(NAME BRUTEFORCE_C_TEST PATH neighbors/run_brute_force_c.c neighbor
 ConfigureTest(NAME IVF_FLAT_C_TEST PATH neighbors/run_ivf_flat_c.c neighbors/ann_ivf_flat_c.cu)
 ConfigureTest(NAME IVF_PQ_C_TEST PATH neighbors/run_ivf_pq_c.c neighbors/ann_ivf_pq_c.cu)
 ConfigureTest(NAME CAGRA_C_TEST PATH neighbors/ann_cagra_c.cu)
+ConfigureTest(NAME TIERED_INDEX_C_TEST PATH neighbors/ann_tiered_index_c.cu)
 ConfigureTest(NAME MG_C_TEST PATH neighbors/run_mg_c.c neighbors/ann_mg_c.cu)
 ConfigureTest(
   NAME ALL_NEIGHBORS_C_TEST PATH neighbors/run_all_neighbors_c.c neighbors/all_neighbors_c.cu
