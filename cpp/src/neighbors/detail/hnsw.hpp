@@ -527,6 +527,8 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
   RAFT_LOG_INFO("Writing base level");
   size_t bytes_written = 0;
   float GiB            = 1 << 30;
+  assert(appr_algo->size_data_per_element_ ==
+         dim * sizeof(T) + appr_algo->maxM0_ * sizeof(IdxT) + sizeof(int) + sizeof(size_t));
   for (int64_t i = 0; i < n_rows; i++) {
     os.write(reinterpret_cast<char*>(&graph_degree_int), sizeof(int));
 
@@ -549,8 +551,6 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
     os.write(reinterpret_cast<char*>(&label), sizeof(std::size_t));
 
     bytes_written += appr_algo->size_data_per_element_;
-    assert(appr_algo->size_data_per_element_ ==
-           dim * sizeof(T) + graph_degree_int * sizeof(IdxT) + sizeof(int) + sizeof(size_t));
 
     const auto end_clock = std::chrono::system_clock::now();
     // if (!os.good()) { RAFT_FAIL("Error writing HNSW file, row %zu", i); }

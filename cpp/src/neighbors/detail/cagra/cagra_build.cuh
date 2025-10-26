@@ -29,6 +29,7 @@
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
+#include <raft/util/integer_utils.hpp>
 
 #include <cuvs/cluster/kmeans.hpp>
 #include <cuvs/distance/distance.hpp>
@@ -97,6 +98,8 @@ void ace_get_partition_labels(
 
   // Sampling vectors from dataset. Uses float conversion on host instead of
   // raft::matrix::sample_rows to minimize GPU memory usage.
+  // TODO(julianmi): Switch to sample_rows when https://github.com/rapidsai/cuvs/issues/1461 is
+  // addressed.
   size_t n_samples         = dataset_size * sampling_rate;
   const size_t min_samples = 100 * n_partitions;
   n_samples                = std::max(n_samples, min_samples);
@@ -239,7 +242,7 @@ void ace_check_partition_sizes(
   double avg_total_vectors     = 2.0 * static_cast<double>(dataset_size) / n_partitions;
   double expected_avg_vectors  = 2.0 * static_cast<double>(dataset_size) / n_partitions;
 
-  RAFT_LOG_INFO("ACE: core vectors     - Total: %lu, Avg: %.1f, Min: %lu, Max: %lu",
+  RAFT_LOG_INFO("ACE: Core vectors       - Total: %lu, Avg: %.1f, Min: %lu, Max: %lu",
                 total_core_vectors,
                 avg_core_vectors,
                 min_core_vectors,
@@ -378,25 +381,11 @@ void ace_set_index_params(raft::resources const& res,
       graph_degree / 2,
       ace_ef_construction,
       metric);
-    RAFT_LOG_DEBUG(
-      "ACE: IVF-PQ nlists: %u, pq_bits: %u, pq_dim: %u, nprobes: %u, refinement_rate: %.2f",
-      ivf_pq_params.build_params.n_lists,
-      ivf_pq_params.build_params.pq_bits,
-      ivf_pq_params.build_params.pq_dim,
-      ivf_pq_params.search_params.n_probes,
-      ivf_pq_params.refinement_rate);
   } else {
     sub_index_params.graph_build_params =
       cuvs::neighbors::cagra::graph_build_params::nn_descent_params(intermediate_degree, metric);
     sub_index_params.graph_degree              = graph_degree;
     sub_index_params.intermediate_graph_degree = intermediate_degree;
-    RAFT_LOG_DEBUG(
-      "ACE: NN descent graph_degree: %u, intermediate_graph_degree: %u, max_iterations: %u, "
-      "termination_threshold: %f",
-      sub_index_params.graph_degree,
-      sub_index_params.intermediate_graph_degree,
-      sub_index_params.max_iterations,
-      sub_index_params.termination_threshold);
   }
   sub_index_params.attach_dataset_on_build = false;
   sub_index_params.guarantee_connectivity  = guarantee_connectivity;
@@ -416,22 +405,20 @@ void ace_gather_partition_dataset(
   raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_partition_offsets,
   raft::host_matrix_view<T, int64_t, raft::row_major> sub_dataset)
 {
-  // Copy vectors belonging to this as closest partition
+  const size_t vector_size_bytes = dataset_dim * sizeof(T);
+
+  // Copy core partition vectors
 #pragma omp parallel for
   for (size_t j = 0; j < core_sub_dataset_size; j++) {
     size_t i = core_backward_mapping(j + core_partition_offsets(partition_id));
-    for (size_t k = 0; k < dataset_dim; k++) {
-      sub_dataset(j, k) = dataset(i, k);
-    }
+    memcpy(&sub_dataset(j, 0), &dataset(i, 0), vector_size_bytes);
   }
 
-// Copy vectors belonging to this as 2nd closest partition
+  // Copy augmented partition vectors (2nd closest partition)
 #pragma omp parallel for
   for (size_t j = 0; j < augmented_sub_dataset_size; j++) {
     size_t i = augmented_backward_mapping(j + augmented_partition_offsets(partition_id));
-    for (size_t k = 0; k < dataset_dim; k++) {
-      sub_dataset(j + core_sub_dataset_size, k) = dataset(i, k);
-    }
+    memcpy(&sub_dataset(j + core_sub_dataset_size, 0), &dataset(i, 0), vector_size_bytes);
   }
 }
 
@@ -563,23 +550,33 @@ void ace_reorder_and_store_dataset(
                  augmented_file_size / (1024.0 * 1024.0 * 1024.0));
 
   // Calculate partition start offsets for reordered and augmented datasets
-  auto core_partition_starts       = raft::make_host_vector<size_t, int64_t>(n_partitions + 1);
-  auto augmented_partition_starts  = raft::make_host_vector<size_t, int64_t>(n_partitions + 1);
-  auto core_partition_current      = raft::make_host_vector<size_t, int64_t>(n_partitions);
+  auto core_partition_starts = raft::make_host_vector<size_t, int64_t>(n_partitions + 1);
+  memset(core_partition_starts.data_handle(), 0, (n_partitions + 1) * sizeof(size_t));
+  auto augmented_partition_starts = raft::make_host_vector<size_t, int64_t>(n_partitions + 1);
+  memset(augmented_partition_starts.data_handle(), 0, (n_partitions + 1) * sizeof(size_t));
+  auto core_partition_current = raft::make_host_vector<size_t, int64_t>(n_partitions);
+  memset(core_partition_current.data_handle(), 0, n_partitions * sizeof(size_t));
   auto augmented_partition_current = raft::make_host_vector<size_t, int64_t>(n_partitions);
+  memset(augmented_partition_current.data_handle(), 0, n_partitions * sizeof(size_t));
 
-  for (size_t p = 0; p <= n_partitions; p++) {
-    core_partition_starts(p)      = 0;
-    augmented_partition_starts(p) = 0;
-  }
-  for (size_t p = 0; p < n_partitions; p++) {
-    core_partition_current(p)      = 0;
-    augmented_partition_current(p) = 0;
-  }
   for (size_t p = 0; p < n_partitions; p++) {
     core_partition_starts(p + 1)      = core_partition_starts(p) + partition_histogram(p, 0);
     augmented_partition_starts(p + 1) = augmented_partition_starts(p) + partition_histogram(p, 1);
   }
+
+  const size_t free_memory = cuvs::util::get_free_host_memory();
+  // Conservatively allocate 50% of free memory per partition. Accounts for internal buffers and
+  // overhead.
+  // TODO: Adjust overhead if needed.
+  const size_t memory_per_partition = 0.5 * free_memory / (n_partitions * 2);
+  size_t disk_write_size            = raft::bound_by_power_of_two<size_t>(memory_per_partition);
+  // 64MB should be enough to saturate typical NVMe SSDs.
+  disk_write_size           = std::min<size_t>(disk_write_size, 64 * 1024 * 1024);
+  size_t vectors_per_buffer = std::max<size_t>(64, disk_write_size / vector_size);
+
+  RAFT_LOG_DEBUG("ACE: Reorder buffers: %lu vectors per buffer (%.2f MB)",
+                 vectors_per_buffer,
+                 vectors_per_buffer * vector_size / (1024.0 * 1024.0));
 
   std::vector<raft::host_matrix<T, int64_t>> core_buffers;
   std::vector<raft::host_matrix<T, int64_t>> augmented_buffers;
@@ -588,26 +585,6 @@ void ace_reorder_and_store_dataset(
 
   core_buffers.reserve(n_partitions);
   augmented_buffers.reserve(n_partitions);
-
-  // Calculate the number of buffers (core and augmented) that fit into main memory.
-  size_t available_memory = cuvs::util::get_free_host_memory();
-  // TODO: Adjust overhead factor if needed
-  const size_t disk_write_size = available_memory * 0.5 / (n_partitions * 2);
-  size_t vectors_per_buffer    = std::max<size_t>(1, disk_write_size / vector_size);
-  // Limit the number of vectors per buffer to the maximum number of vectors in a partition.
-  const size_t max_vectors_per_buffer = std::max<size_t>(max_core_vectors, max_augmented_vectors);
-  vectors_per_buffer = std::min<size_t>(vectors_per_buffer, max_vectors_per_buffer);
-  if (disk_write_size < 1024 * 1024) {
-    RAFT_LOG_WARN(
-      "ACE: Reorder buffers are smaller than 1MB. Increase host memory for better disk "
-      "throughputs.");
-  }
-  RAFT_LOG_DEBUG("ACE: %.2f GiB available memory, %.2f GiB disk write size",
-                 available_memory / (1024.0 * 1024.0 * 1024.0),
-                 disk_write_size / (1024.0 * 1024.0 * 1024.0));
-  RAFT_LOG_DEBUG("ACE: Reorder buffers: %lu vectors per buffer (%.2f MB)",
-                 vectors_per_buffer,
-                 vectors_per_buffer * vector_size / (1024.0 * 1024.0));
 
   for (size_t p = 0; p < n_partitions; p++) {
     core_buffers.emplace_back(raft::make_host_matrix<T, int64_t>(vectors_per_buffer, dataset_dim));
@@ -655,9 +632,8 @@ void ace_reorder_and_store_dataset(
 
     // Add vector to core partition buffer
     size_t core_buffer_row = core_buffer_counts(core_partition);
-    for (size_t d = 0; d < dataset_dim; d++) {
-      core_buffers[core_partition](core_buffer_row, d) = dataset(i, d);
-    }
+    memcpy(
+      &core_buffers[core_partition](core_buffer_row, 0), &dataset(i, 0), dataset_dim * sizeof(T));
     core_buffer_counts(core_partition)++;
 
     // Flush core buffer if full
@@ -667,9 +643,9 @@ void ace_reorder_and_store_dataset(
 
     // Add vector to augmented partition buffer
     size_t augmented_buffer_row = augmented_buffer_counts(secondary_partition);
-    for (size_t d = 0; d < dataset_dim; d++) {
-      augmented_buffers[secondary_partition](augmented_buffer_row, d) = dataset(i, d);
-    }
+    memcpy(&augmented_buffers[secondary_partition](augmented_buffer_row, 0),
+           &dataset(i, 0),
+           dataset_dim * sizeof(T));
     augmented_buffer_counts(secondary_partition)++;
 
     // Flush augmented buffer if full
@@ -688,6 +664,7 @@ void ace_reorder_and_store_dataset(
 
   // Flush all remaining buffers
   RAFT_LOG_DEBUG("ACE: Flushing remaining buffers...");
+#pragma omp parallel for
   for (size_t p = 0; p < n_partitions; p++) {
     flush_core_buffer(p);
     flush_augmented_buffer(p);
@@ -754,9 +731,6 @@ void ace_load_partition_dataset_from_disk(
   const std::string reordered_dataset_path = ace_build_dir + "/reordered_dataset.bin";
   const std::string augmented_dataset_path = ace_build_dir + "/augmented_dataset.bin";
 
-  cuvs::util::file_descriptor reordered_fd(reordered_dataset_path, O_RDONLY);
-  cuvs::util::file_descriptor augmented_fd(augmented_dataset_path, O_RDONLY);
-
   size_t core_file_offset      = 0;
   size_t augmented_file_offset = 0;
 
@@ -772,22 +746,32 @@ void ace_load_partition_dataset_from_disk(
                  core_file_offset,
                  augmented_file_offset);
 
-  if (core_size > 0) {
-    RAFT_LOG_DEBUG("ACE: Reading %lu core vectors from offset %lu", core_size, core_file_offset);
-
-    const size_t core_bytes = core_size * vector_size;
-    cuvs::util::read_large_file(
-      reordered_fd, sub_dataset.data_handle(), core_bytes, core_file_offset);
-  }
-
-  if (augmented_size > 0) {
-    RAFT_LOG_DEBUG(
-      "ACE: Reading %lu augmented vectors from offset %lu", augmented_size, augmented_file_offset);
-
-    const size_t augmented_bytes = augmented_size * vector_size;
-    T* augmented_dest            = sub_dataset.data_handle() + (core_size * dataset_dim);
-    cuvs::util::read_large_file(
-      augmented_fd, augmented_dest, augmented_bytes, augmented_file_offset);
+  // Read core and augmented data in parallel
+#pragma omp parallel sections
+  {
+#pragma omp section
+    {
+      if (core_size > 0) {
+        RAFT_LOG_INFO("ACE: Reading %lu core vectors from offset %lu", core_size, core_file_offset);
+        cuvs::util::file_descriptor reordered_fd(reordered_dataset_path, O_RDONLY);
+        const size_t core_bytes = core_size * vector_size;
+        cuvs::util::read_large_file(
+          reordered_fd, sub_dataset.data_handle(), core_bytes, core_file_offset);
+      }
+    }
+#pragma omp section
+    {
+      if (augmented_size > 0) {
+        RAFT_LOG_INFO("ACE: Reading %lu augmented vectors from offset %lu",
+                      augmented_size,
+                      augmented_file_offset);
+        cuvs::util::file_descriptor augmented_fd(augmented_dataset_path, O_RDONLY);
+        const size_t augmented_bytes = augmented_size * vector_size;
+        T* augmented_dest            = sub_dataset.data_handle() + (core_size * dataset_dim);
+        cuvs::util::read_large_file(
+          augmented_fd, augmented_dest, augmented_bytes, augmented_file_offset);
+      }
+    }
   }
 }
 
@@ -837,8 +821,15 @@ index<T, IdxT> build_ace(raft::resources const& res,
   size_t min_required_per_partition = 1000;
   if (n_partitions > dataset_size / min_required_per_partition) {
     n_partitions = dataset_size / min_required_per_partition;
-    RAFT_LOG_WARN("ACE: Reduced number of partitions to %zu to avoid tiny partitions",
-                  n_partitions);
+    if (n_partitions < 2) {
+      RAFT_LOG_WARN(
+        "ACE: Reduced number of partitions to the minimum of 2 to avoid tiny partitions. Consider "
+        "using regular CAGRA build instead.");
+      n_partitions = 2;
+    } else {
+      RAFT_LOG_WARN("ACE: Reduced number of partitions to %zu to avoid tiny partitions",
+                    n_partitions);
+    }
   }
 
   auto total_start = std::chrono::high_resolution_clock::now();
