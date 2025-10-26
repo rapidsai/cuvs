@@ -21,10 +21,11 @@
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/random/make_blobs.cuh>
 #include <raft/util/cudart_utils.hpp>
+#include <type_traits>
 
 namespace cuvs::preprocessing::spectral_embedding {
 
-template <typename T>
+template <typename T, typename IndexT>
 struct SpectralEmbeddingInputs {
   int n_samples;        // Number of samples in the dataset
   int n_features;       // Number of features in the dataset
@@ -37,8 +38,8 @@ struct SpectralEmbeddingInputs {
   uint64_t seed;        // Random seed
 };
 
-template <typename T>
-std::ostream& operator<<(std::ostream& os, const SpectralEmbeddingInputs<T>& inputs)
+template <typename T, typename IndexT>
+std::ostream& operator<<(std::ostream& os, const SpectralEmbeddingInputs<T, IndexT>& inputs)
 {
   return os << "n_samples:" << inputs.n_samples << " n_features:" << inputs.n_features
             << " n_clusters:" << inputs.n_clusters << " n_components:" << inputs.n_components
@@ -47,16 +48,16 @@ std::ostream& operator<<(std::ostream& os, const SpectralEmbeddingInputs<T>& inp
             << " seed:" << inputs.seed;
 }
 
-template <typename T>
-class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingInputs<T>> {
+template <typename T, typename IndexT = int32_t>
+class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingInputs<T, IndexT>> {
  public:
   SpectralEmbeddingTest()
-    : params_(::testing::TestWithParam<SpectralEmbeddingInputs<T>>::GetParam()),
+    : params_(::testing::TestWithParam<SpectralEmbeddingInputs<T, IndexT>>::GetParam()),
       stream(raft::resource::get_cuda_stream(handle)),
-      input_(raft::make_device_matrix<T, int, raft::row_major>(
+      input_(raft::make_device_matrix<T, IndexT, raft::row_major>(
         handle, params_.n_samples, params_.n_features)),
-      labels_(raft::make_device_vector<int, int, raft::row_major>(handle, params_.n_samples)),
-      embedding_(raft::make_device_matrix<T, int, raft::col_major>(
+      labels_(raft::make_device_vector<IndexT, IndexT, raft::row_major>(handle, params_.n_samples)),
+      embedding_(raft::make_device_matrix<T, IndexT, raft::col_major>(
         handle, params_.n_samples, params_.n_components))
   {
   }
@@ -70,7 +71,7 @@ class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingI
     n_components_ = params_.n_components;
 
     // Generate clusters using make_blobs
-    raft::random::make_blobs<T, int, raft::row_major>(
+    raft::random::make_blobs<T, IndexT, raft::row_major>(
       handle,
       input_.view(),
       labels_.view(),
@@ -85,7 +86,7 @@ class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingI
 
     // Output embedding matrix
     embedding_ =
-      raft::make_device_matrix<T, int, raft::col_major>(handle, n_samples_, n_components_);
+      raft::make_device_matrix<T, IndexT, raft::col_major>(handle, n_samples_, n_components_);
 
     // Configure spectral embedding
     config_.n_neighbors    = params_.n_neighbors;
@@ -111,8 +112,8 @@ class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingI
     ASSERT_EQ(embedding_.extent(1), expected_components);
 
     // 2. Verify that the embedding is not all zeros or NaNs
-    auto h_embedding =
-      raft::make_host_matrix<T, int, raft::col_major>(embedding_.extent(0), embedding_.extent(1));
+    auto h_embedding = raft::make_host_matrix<T, IndexT, raft::col_major>(embedding_.extent(0),
+                                                                          embedding_.extent(1));
     raft::update_host(h_embedding.data_handle(),
                       embedding_.data_handle(),
                       embedding_.extent(0) * embedding_.extent(1),
@@ -139,7 +140,7 @@ class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingI
       input_.data_handle(), input_.extent(0), input_.extent(1));
 
     // Need to convert embedding to row-major format for trustworthiness calculation
-    auto embedding_row_major = raft::make_device_matrix<float, int, raft::row_major>(
+    auto embedding_row_major = raft::make_device_matrix<float, IndexT, raft::row_major>(
       handle, embedding_.extent(0), embedding_.extent(1));
 
     // Copy and transpose from col-major to row-major
@@ -179,22 +180,22 @@ class SpectralEmbeddingTest : public ::testing::TestWithParam<SpectralEmbeddingI
   raft::resources handle;
   cudaStream_t stream;
 
-  SpectralEmbeddingInputs<T> params_;
+  SpectralEmbeddingInputs<T, IndexT> params_;
   int n_samples_;
   int n_features_;
   int n_clusters_;
   int n_components_;
 
-  raft::device_matrix<T, int, raft::row_major> input_;
-  raft::device_vector<int, int, raft::row_major> labels_;
-  raft::device_matrix<T, int, raft::col_major> embedding_;
+  raft::device_matrix<T, IndexT, raft::row_major> input_;
+  raft::device_vector<IndexT, IndexT, raft::row_major> labels_;
+  raft::device_matrix<T, IndexT, raft::col_major> embedding_;
 
   params config_;
 };
 
 // Define test cases with different parameters
-template <typename T>
-const std::vector<SpectralEmbeddingInputs<T>> inputs = {
+template <typename T, typename IndexT>
+const std::vector<SpectralEmbeddingInputs<T, IndexT>> inputs = {
   // Small dataset with 2 components
   {100, 10, 3, 2, 10, 1.0f, true, false, 42ULL},
 
@@ -213,11 +214,41 @@ const std::vector<SpectralEmbeddingInputs<T>> inputs = {
   // Larger dataset
   {10000, 20, 8, 2, 12, 1.0f, true, true, 42ULL}};
 
-typedef SpectralEmbeddingTest<float> SpectralEmbeddingTestF;
-TEST_P(SpectralEmbeddingTestF, Result) { this->testSpectralEmbedding(); }
+// Test with int32_t index type
+typedef SpectralEmbeddingTest<float, int32_t> SpectralEmbeddingTestF_Int32;
+TEST_P(SpectralEmbeddingTestF_Int32, Result) { this->testSpectralEmbedding(); }
 
-INSTANTIATE_TEST_CASE_P(SpectralEmbeddingTests,
-                        SpectralEmbeddingTestF,
-                        ::testing::ValuesIn(inputs<float>));
+INSTANTIATE_TEST_CASE_P(SpectralEmbeddingTests_Int32,
+                        SpectralEmbeddingTestF_Int32,
+                        ::testing::ValuesIn(inputs<float, int32_t>));
+
+// Test with int64_t index type
+typedef SpectralEmbeddingTest<float, int64_t> SpectralEmbeddingTestF_Int64;
+TEST_P(SpectralEmbeddingTestF_Int64, Result) { this->testSpectralEmbedding(); }
+
+// Use smaller dataset sizes for int64_t tests to avoid memory issues
+template <typename T>
+const std::vector<SpectralEmbeddingInputs<T, int64_t>> inputs_int64 = {
+  // Small dataset with 2 components
+  {100, 10, 3, 2, 10, 1.0f, true, false, 42ULL},
+
+  // Medium dataset with 3 components
+  {500, 20, 5, 3, 15, 1.0f, true, false, 42ULL},
+
+  // Small dataset with varying cluster standard deviation
+  {100, 10, 3, 2, 10, 0.5f, true, false, 42ULL},
+
+  // Test with different Laplacian normalization
+  {100, 10, 3, 2, 10, 1.0f, false, false, 42ULL},
+
+  // Test with dropping first eigenvector
+  {100, 10, 3, 2, 10, 1.0f, true, true, 42ULL},
+
+  // Larger dataset
+  {10000, 20, 8, 2, 12, 1.0f, true, true, 42ULL}};
+
+INSTANTIATE_TEST_CASE_P(SpectralEmbeddingTests_Int64,
+                        SpectralEmbeddingTestF_Int64,
+                        ::testing::ValuesIn(inputs_int64<float>));
 
 }  // namespace cuvs::preprocessing::spectral_embedding
