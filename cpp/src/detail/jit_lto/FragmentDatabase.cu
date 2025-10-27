@@ -21,7 +21,6 @@ bool FragmentDatabase::make_cache_entry(std::string const& name, std::string con
 
 FragmentDatabase& fragment_database()
 {
-  // Left to the reader to make this thread safe
   static FragmentDatabase database;
   return database;
 }
