@@ -399,9 +399,9 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
 
   buffered_ofstream os(&os_raw, 1 << 20 /*1MB*/);
 
-  ASSERT(index_.on_disk(), "Function only implements serialization from disk.");
-  ASSERT(params.hierarchy != HnswHierarchy::CPU,
-         "Disk2disk serialization not supported for CPU hierarchy.");
+  RAFT_EXPECTS(index_.on_disk(), "Function only implements serialization from disk.");
+  RAFT_EXPECTS(params.hierarchy != HnswHierarchy::CPU,
+               "Disk2disk serialization not supported for CPU hierarchy.");
 
   auto n_rows           = index_.size();
   auto dim              = index_.dim();
