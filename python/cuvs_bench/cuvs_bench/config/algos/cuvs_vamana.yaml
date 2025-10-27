@@ -15,4 +15,3 @@ groups:
       alpha: [1.2]
     search:
       L_search: [10]
-      num_threads: [32]
