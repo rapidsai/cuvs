@@ -12,6 +12,8 @@
 # the License.
 # =============================================================================
 
+include_guard()
+
 function(embed_fatbins library_name kernel_target)
   find_package(CUDAToolkit REQUIRED)
   find_program(
