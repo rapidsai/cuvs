@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <iostream>
-
 #include <cuvs/detail/jit_lto/FragmentDatabase.h>
 #include <cuvs/detail/jit_lto/FragmentEntry.h>
+
+#include <raft/core/error.hpp>
 
 FragmentDatabase::FragmentDatabase() {}
 
@@ -29,10 +29,7 @@ FragmentEntry* FragmentDatabase::get_fragment(std::string const& key)
 {
   auto& db = fragment_database();
   auto val = db.cache.find(key);
-  if (val == db.cache.end()) {
-    std::cout << "FragmentDatabase: Key not found" << std::endl;
-    return nullptr;
-  }
+  RAFT_EXPECTS(val != db.cache.end(), "FragmentDatabase: Key not found");
   return val->second.get();
 }
 
