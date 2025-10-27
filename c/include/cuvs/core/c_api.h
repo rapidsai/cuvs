@@ -18,6 +18,7 @@
 
 #include <cuda_runtime.h>
 #include <dlpack/dlpack.h>
+#include <rapids_logger/log_levels.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -45,6 +46,35 @@ const char* cuvsGetLastErrorText();
  *        clears any previously seen error message.
  */
 void cuvsSetLastErrorText(const char* error);
+
+/** @} */
+
+/**
+ * @defgroup log_c cuVS Logging
+ * @{
+ */
+
+/**
+ * @brief An enum denoting log levels
+ *
+ */
+typedef enum {
+  CUVS_LOG_LEVEL_TRACE    = RAPIDS_LOGGER_LOG_LEVEL_TRACE,
+  CUVS_LOG_LEVEL_DEBUG    = RAPIDS_LOGGER_LOG_LEVEL_DEBUG,
+  CUVS_LOG_LEVEL_INFO     = RAPIDS_LOGGER_LOG_LEVEL_INFO,
+  CUVS_LOG_LEVEL_WARN     = RAPIDS_LOGGER_LOG_LEVEL_WARN,
+  CUVS_LOG_LEVEL_ERROR    = RAPIDS_LOGGER_LOG_LEVEL_ERROR,
+  CUVS_LOG_LEVEL_CRITICAL = RAPIDS_LOGGER_LOG_LEVEL_CRITICAL,
+  CUVS_LOG_LEVEL_OFF      = RAPIDS_LOGGER_LOG_LEVEL_OFF
+} cuvsLogLevel_t;
+
+/** @brief Returns the current log level
+ */
+cuvsLogLevel_t cuvsGetLogLevel();
+
+/** @brief Sets the log level
+ */
+void cuvsSetLogLevel(cuvsLogLevel_t);
 
 /** @} */
 
