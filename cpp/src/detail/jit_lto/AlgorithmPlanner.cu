@@ -124,12 +124,13 @@ std::shared_ptr<AlgorithmLauncher> AlgorithmPlanner::build()
   check_nvjitlink_result(handle, result);
 
   // cubin is linked, so now load it
+  // NOTE: cudaLibrary_t does not need to be freed explicitly
   cudaLibrary_t library;
   RAFT_CUDA_TRY(
     cudaLibraryLoadData(&library, cubin.get(), nullptr, nullptr, 0, nullptr, nullptr, 0));
 
   constexpr unsigned int count = 1;
-  // Still need to cache/compute the mangled name
+  // NOTE: cudaKernel_t does not need to be freed explicitly
   std::unique_ptr<cudaKernel_t[]> kernels{new cudaKernel_t[count]};
   RAFT_CUDA_TRY(cudaLibraryEnumerateKernels(kernels.get(), count, library));
 

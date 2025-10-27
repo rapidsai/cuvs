@@ -30,7 +30,6 @@ struct FragmentEntry {
 
   virtual bool add_to(nvJitLinkHandle& handle) const = 0;
 
-  // std::size_t compute_arg_count = 0; //optimization for equality checks
   std::string compute_key{};
 };
 
