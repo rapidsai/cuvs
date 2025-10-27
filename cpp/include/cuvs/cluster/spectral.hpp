@@ -15,10 +15,10 @@
  */
 #pragma once
 
-#include <cstdint>
 #include <raft/core/device_coo_matrix.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/random/rng_state.hpp>
 
 namespace cuvs::cluster::spectral {
 
@@ -27,7 +27,7 @@ struct params {
   int n_components;
   int n_init;
   int n_neighbors;
-  uint64_t seed;
+  raft::random::RngState rng_state{0};
 };
 
 void fit_predict(raft::resources const& handle,

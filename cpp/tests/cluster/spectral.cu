@@ -63,7 +63,7 @@ class SpectralClusteringTest : public ::testing::TestWithParam<SpectralClusterin
     params.n_components = testparams.n_components;
     params.n_neighbors  = testparams.n_neighbors;
     params.n_init       = testparams.n_init;
-    params.seed         = testparams.seed;
+    params.rng_state    = raft::random::RngState(testparams.seed);
 
     auto X      = raft::make_device_matrix<float, int>(handle, n_samples, n_features);
     auto labels = raft::make_device_vector<int, int>(handle, n_samples);
@@ -94,7 +94,7 @@ class SpectralClusteringTest : public ::testing::TestWithParam<SpectralClusterin
 
     cuvs::preprocessing::spectral_embedding::params embed_params;
     embed_params.n_neighbors = params.n_neighbors;
-    embed_params.seed        = params.seed;
+    embed_params.seed        = params.rng_state.seed;
 
     cuvs::preprocessing::spectral_embedding::helpers::create_connectivity_graph(
       handle, embed_params, X.view(), connectivity_graph);

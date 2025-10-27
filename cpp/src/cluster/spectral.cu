@@ -40,11 +40,11 @@ void fit_predict(raft::resources const& handle,
   spectral_embedding_config.n_neighbors    = config.n_neighbors;
   spectral_embedding_config.norm_laplacian = true;
   spectral_embedding_config.drop_first     = false;
-  spectral_embedding_config.seed           = config.seed;
+  spectral_embedding_config.seed           = config.rng_state.seed;
 
   cuvs::cluster::kmeans::params kmeans_config;
   kmeans_config.n_clusters          = config.n_clusters;
-  kmeans_config.rng_state           = raft::random::RngState(config.seed);
+  kmeans_config.rng_state           = config.rng_state;
   kmeans_config.n_init              = config.n_init;
   kmeans_config.oversampling_factor = 0.0;
 
