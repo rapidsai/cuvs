@@ -15,6 +15,7 @@
  */
 
 #include <cstdint>
+#include <cstring>
 #include <dlpack/dlpack.h>
 
 #include <raft/core/error.hpp>
@@ -26,6 +27,7 @@
 #include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/common.h>
 #include <cuvs/neighbors/cagra.hpp>
+#include <cuvs/neighbors/graph_build_types.hpp>
 
 #include "../core/exceptions.hpp"
 #include "../core/interop.hpp"
@@ -456,6 +458,28 @@ extern "C" cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int6
   });
 }
 
+extern "C" cuvsError_t cuvsCagraIndexIsOnDisk(cuvsCagraIndex_t index, bool* on_disk)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index->addr);
+    *on_disk       = index_ptr->on_disk();
+  });
+}
+
+extern "C" cuvsError_t cuvsCagraIndexGetFileDirectory(cuvsCagraIndex_t index,
+                                                      char** file_directory,
+                                                      size_t* length)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto index_ptr     = reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index->addr);
+    const auto& dir    = index_ptr->file_directory();
+    *length            = dir.length();
+    *file_directory    = static_cast<char*>(malloc((*length + 1) * sizeof(char)));
+    std::strncpy(*file_directory, dir.c_str(), *length);
+    (*file_directory)[*length] = '\0';
+  });
+}
+
 extern "C" cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index, DLManagedTensor* dataset)
 {
   return cuvs::core::translate_exceptions([=] {
@@ -671,9 +695,13 @@ extern "C" cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params
       case cuvsCagraGraphBuildAlgo::IVF_PQ:
         delete static_cast<cuvsIvfPqParams *>(params->graph_build_params);
         break;
-      case cuvsCagraGraphBuildAlgo::ACE:
-        delete static_cast<cuvsAceParams *>(params->graph_build_params);
+      case cuvsCagraGraphBuildAlgo::ACE: {
+        auto ace_params = static_cast<cuvsAceParams *>(params->graph_build_params);
+        // Free the allocated build directory string
+        if (ace_params->ace_build_dir) { free(const_cast<char*>(ace_params->ace_build_dir)); }
+        delete ace_params;
         break;
+      }
       case cuvsCagraGraphBuildAlgo::AUTO_SELECT:
       case cuvsCagraGraphBuildAlgo::NN_DESCENT:
       case cuvsCagraGraphBuildAlgo::ITERATIVE_CAGRA_SEARCH:
@@ -702,6 +730,32 @@ extern "C" cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionPara
 extern "C" cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params)
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
+}
+
+extern "C" cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto ps = cuvs::neighbors::cagra::graph_build_params::ace_params();
+
+    // Allocate and copy the build directory string
+    const char* build_dir = strdup(ps.ace_build_dir.c_str());
+
+    *params = new cuvsAceParams{.ace_npartitions     = ps.ace_npartitions,
+                                .ace_ef_construction = ps.ace_ef_construction,
+                                .ace_build_dir       = build_dir,
+                                .ace_use_disk        = ps.ace_use_disk};
+  });
+}
+
+extern "C" cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (params) {
+      // Free the allocated build directory string
+      if (params->ace_build_dir) { free(const_cast<char*>(params->ace_build_dir)); }
+      delete params;
+    }
+  });
 }
 
 extern "C" cuvsError_t cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params)

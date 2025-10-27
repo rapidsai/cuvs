@@ -428,6 +428,25 @@ cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* size);
 cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int64_t* graph_degree);
 
 /**
+ * @brief Check if the CAGRA index is stored on disk
+ *
+ * @param[in] index CAGRA index
+ * @param[out] on_disk return true if index is on disk, false otherwise
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexIsOnDisk(cuvsCagraIndex_t index, bool* on_disk);
+
+/**
+ * @brief Get the file directory where the CAGRA index is stored (if on disk)
+ *
+ * @param[in] index CAGRA index
+ * @param[out] file_directory return file directory path (caller must free)
+ * @param[out] length length of the file_directory string
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexGetFileDirectory(cuvsCagraIndex_t index, char** file_directory, size_t* length);
+
+/**
  * @brief Returns a view of the CAGRA dataset
  *
  * This function returns a non-owning view of the CAGRA dataset.
