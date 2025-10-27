@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
 
@@ -48,40 +37,6 @@ public class CuVSMatrixIT extends CuVSTestCase {
     {3, 0, 2},
     {0, 4, 2}
   };
-
-  private int[][] createIntMatrix() {
-    int rows = randomIntBetween(1, 32);
-    int cols = randomIntBetween(1, 100);
-
-    int[][] result = new int[rows][cols];
-
-    for (int r = 0; r < rows; ++r) {
-      for (int c = 0; c < cols; ++c) {
-        result[r][c] = randomInt();
-      }
-    }
-    return result;
-  }
-
-  private float[][] createFloatMatrix() {
-    int rows = randomIntBetween(1, 32);
-    int cols = randomIntBetween(1, 100);
-
-    return createFloatMatrix(rows, cols);
-  }
-
-  private float[][] createFloatMatrix(int rows, int cols) {
-    float[][] result = new float[rows][cols];
-
-    float value = 1;
-    for (int r = 0; r < rows; ++r) {
-      for (int c = 0; c < cols; ++c) {
-        result[r][c] = value;
-        value += 1;
-      }
-    }
-    return result;
-  }
 
   private void testByteDatasetRowGetAccess(CuVSMatrix dataset) {
     for (int n = 0; n < dataset.size(); ++n) {
@@ -505,8 +460,7 @@ public class CuVSMatrixIT extends CuVSTestCase {
   }
 
   @Test
-  public void testHostBuilderWithDifferentStrides() throws Throwable {
-
+  public void testHostBuilderWithDifferentStrides() {
     int size = randomIntBetween(1, 32 * 1024);
     int columns = randomIntBetween(16, 2048);
     int rowStride1 = randomIntBetween(columns, columns * 2);

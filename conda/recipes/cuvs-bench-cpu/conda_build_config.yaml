@@ -20,4 +20,4 @@ h5py_version:
   - ">=3.8.0"
 
 nlohmann_json_version:
-  - ">=3.11.2"
+  - ">=3.12.0"
