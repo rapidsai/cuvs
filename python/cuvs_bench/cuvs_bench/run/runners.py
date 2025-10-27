@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -148,7 +148,7 @@ def cuvs_bench_cpp(
                 "--benchmark_counters_tabular=true",
                 f"--override_kv=k:{k}",
                 f"--override_kv=n_queries:{batch_size}",
-                "--benchmark_min_warmup_time=1",
+                "--benchmark_min_warmup_time=4",
                 "--benchmark_out_format=json",
                 f"--mode={mode}",
                 f"--benchmark_out={os.path.join(search_folder, search_file)}",
