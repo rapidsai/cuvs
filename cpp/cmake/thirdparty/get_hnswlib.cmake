@@ -28,8 +28,8 @@ function(find_and_configure_hnswlib)
     FIND_VAR find_args
     CPM_VAR cpm_args
     TO_INSTALL_VAR to_install
-    BUILD_EXPORT_SET hnswlib-exports
-    INSTALL_EXPORT_SET hnswlib-exports
+    BUILD_EXPORT_SET cuvs-exports
+    INSTALL_EXPORT_SET cuvs-exports
   )
 
   rapids_cpm_find(
@@ -71,11 +71,6 @@ function(find_and_configure_hnswlib)
       EXPORT_SET hnswlib-exports
       GLOBAL_TARGETS hnswlib
       NAMESPACE hnswlib::)
-
-    include("${rapids-cmake-dir}/export/package.cmake")
-    rapids_export_package(INSTALL hnswlib cuvs-exports VERSION ${version} GLOBAL_TARGETS hnswlib hnswlib::hnswlib)
-    rapids_export_package(BUILD hnswlib cuvs-exports VERSION ${version} GLOBAL_TARGETS hnswlib hnswlib::hnswlib)
-
 
     # When using cuVS from the build dir, ensure hnswlib is also found in cuVS' build dir. This
     # line adds `set(hnswlib_ROOT "${CMAKE_CURRENT_LIST_DIR}")` to build/cuvs-dependencies.cmake
