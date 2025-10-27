@@ -62,7 +62,8 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
 
         python -m cuvs_bench.run --dataset test-data --dataset-path datasets/ \
             --algorithms faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,\
-            cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq \
+            cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq,cuvs_vamana,\
+            diskann_memory \
             --batch-size 100 -k 10 --groups test -m latency --force
 
     It then verifies that the set of expected result files
@@ -81,7 +82,7 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "--dataset-path",
         dataset_path_arg,
         "--algorithms",
-        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq",  # noqa: E501
+        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq,cuvs_vamana,diskann_memory",  # noqa: E501
         "--batch-size",
         "100",
         "-k",
@@ -167,6 +168,27 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
                 "pq_bits",
                 "pq_dim",
                 "ratio",
+            ],
+            "rows": 1,
+        },
+        "test-data/result/build/cuvs_vamana,test.csv": {
+            "header": common_build_header
+            + [
+                "GPU",
+                "alpha",
+                "graph_degree",
+                "num_threads",
+                "visited_size",
+            ],
+            "rows": 1,
+        },
+        "test-data/result/build/diskann_memory,test.csv": {
+            "header": common_build_header
+            + [
+                "L_build",
+                "R",
+                "alpha",
+                "num_threads",
             ],
             "rows": 1,
         },
@@ -432,6 +454,123 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
             ],
             "rows": 2,
         },
+        "test-data/result/search/cuvs_vamana,test,k10,bs100,raw.csv": {
+            "header": common_search_header
+            + [
+                "GPU",
+                "L_search",
+                "end_to_end",
+                "k",
+                "n_queries",
+                "num_threads",
+                "total_queries",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "build GPU",
+                "alpha",
+                "graph_degree",
+                "build num_threads",
+                "visited_size",
+            ],
+            "rows": 1,
+        },
+        "test-data/result/search/cuvs_vamana,test,k10,bs100,latency.csv": {
+            "header": common_search_header
+            + [
+                "GPU",
+                "L_search",
+                "end_to_end",
+                "k",
+                "n_queries",
+                "num_threads",
+                "total_queries",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "build GPU",
+                "alpha",
+                "graph_degree",
+                "build num_threads",
+                "visited_size",
+            ],
+            "rows": 1,
+        },
+        "test-data/result/search/cuvs_vamana,test,k10,bs100,throughput.csv": {
+            "header": common_search_header
+            + [
+                "GPU",
+                "L_search",
+                "end_to_end",
+                "k",
+                "n_queries",
+                "num_threads",
+                "total_queries",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "build GPU",
+                "alpha",
+                "graph_degree",
+                "build num_threads",
+                "visited_size",
+            ],
+            "rows": 1,
+        },
+        "test-data/result/search/diskann_memory,test,k10,bs100,raw.csv": {
+            "header": common_search_header
+            + [
+                "L_search",
+                "end_to_end",
+                "k",
+                "n_queries",
+                "total_queries",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "L_build",
+                "R",
+                "alpha",
+                "build num_threads",
+            ],
+            "rows": 1,
+        },
+        "test-data/result/search/diskann_memory,test,k10,bs100,latency.csv": {
+            "header": common_search_header
+            + [
+                "L_search",
+                "end_to_end",
+                "k",
+                "n_queries",
+                "total_queries",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "L_build",
+                "R",
+                "alpha",
+                "build num_threads",
+            ],
+            "rows": 1,
+        },
+        "test-data/result/search/diskann_memory,test,k10,bs100,throughput.csv": {
+            "header": common_search_header
+            + [
+                "L_search",
+                "end_to_end",
+                "k",
+                "n_queries",
+                "total_queries",
+                "build time",
+                "build threads",
+                "build cpu_time",
+                "L_build",
+                "R",
+                "alpha",
+                "build num_threads",
+            ],
+            "rows": 1,
+        },
     }
 
     for rel_path, expectations in expected_files.items():
@@ -459,7 +598,8 @@ def test_plot_command_creates_png_files(temp_datasets_dir: Path):
 
       python -m cuvs_bench.plot --dataset test-data --dataset-path datasets/ \
           --algorithms faiss_gpu_ivf_flat,faiss_gpu_ivf_sq, \
-          cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq \
+          cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq,\
+          cuvs_vamana,diskann_memory \
           --batch-size 100 -k 10 --groups test -m latency
 
     and then verifies that the following files are produced in the
@@ -483,7 +623,7 @@ def test_plot_command_creates_png_files(temp_datasets_dir: Path):
         "--output-filepath",
         dataset_path_arg,
         "--algorithms",
-        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq",  # noqa: E501
+        "faiss_gpu_ivf_flat,faiss_gpu_ivf_sq,cuvs_ivf_flat,cuvs_cagra,ggnn,cuvs_cagra_hnswlib,cuvs_ivf_pq,cuvs_vamana,diskann_memory",  # noqa: E501
         "--batch-size",
         "100",
         "-k",
