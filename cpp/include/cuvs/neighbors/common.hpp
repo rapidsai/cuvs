@@ -30,6 +30,10 @@
 #endif
 
 namespace cuvs::neighbors {
+/**
+ * @addtogroup cagra_cpp_index_params
+ * @{
+ */
 
 /** Parameters for VPQ compression. */
 struct vpq_params {
@@ -73,6 +77,8 @@ struct vpq_params {
   cuvs::cluster::kmeans::kmeans_type pq_kmeans_type =
     cuvs::cluster::kmeans::kmeans_type::KMeansBalanced;
 };
+
+/** @} */  // end group cagra_cpp_index_params
 
 /**
  * @defgroup neighbors_index Approximate Nearest Neighbors Types
