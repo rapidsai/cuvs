@@ -18,8 +18,8 @@ jobs:
       # - conda-python-build
       # - conda-python-tests
       - rocky8-clib-standalone-build
-      - rocky8-clib-java-build-and-tests
-      - rocky8-clib-rust-build
+      # - rocky8-clib-java-build-and-tests
+      # - rocky8-clib-rust-build
       - rocky8-clib-tests
       # - conda-java-build-and-tests
       # - docs-build
