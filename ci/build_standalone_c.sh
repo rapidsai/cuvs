@@ -8,11 +8,9 @@ CMAKE_VERSION=3.31.8
 CMAKE_ARCH=x86_64
 
 dnf install -y \
-      gcc-toolset-${TOOLSET_VERSION} \
       patch \
       tar \
-      make \
-      wget
+      make
 
 # Fetch and install CMake.
 pushd /usr/local
@@ -39,7 +37,6 @@ export RAPIDS_PACKAGE_VERSION
 RAPIDS_ARTIFACTS_DIR=${RAPIDS_ARTIFACTS_DIR:-"${PWD}/artifacts"}
 mkdir -p "${RAPIDS_ARTIFACTS_DIR}"
 export RAPIDS_ARTIFACTS_DIR
-
 
 scl enable gcc-toolset-${TOOLSET_VERSION} -- \
       cmake -S cpp -B cpp/build/temp/ \
