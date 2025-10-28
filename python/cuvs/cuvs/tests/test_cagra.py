@@ -1,17 +1,8 @@
-# Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     h ttp://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
+
+import tempfile
 
 import cupy as cp
 import numpy as np
@@ -44,6 +35,7 @@ def run_cagra_build_search_test(
     test_extend=False,
     search_params={},
     compression=None,
+    serialize=False,
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
     if metric == "inner_product" or metric == "cosine":
@@ -78,6 +70,12 @@ def run_cagra_build_search_test(
             index = cagra.build(build_params, dataset_device)
         else:
             index = cagra.build(build_params, dataset)
+
+    if serialize:
+        with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as f:
+            temp_filename = f.name
+        cagra.save(temp_filename, index)
+        index = cagra.load(temp_filename)
 
     queries = generate_data((n_queries, n_cols), dtype)
     out_idx = np.zeros((n_queries, k), dtype=np.uint32)
@@ -159,8 +157,9 @@ def run_cagra_build_search_test(
 @pytest.mark.parametrize("array_type", ["device"])
 @pytest.mark.parametrize("build_algo", ["ivf_pq", "nn_descent"])
 @pytest.mark.parametrize("metric", ["sqeuclidean", "inner_product", "cosine"])
+@pytest.mark.parametrize("serialize", [True, False])
 def test_cagra_dataset_dtype_host_device(
-    dtype, array_type, inplace, build_algo, metric
+    dtype, array_type, inplace, build_algo, metric, serialize
 ):
 
     # Note that inner_product tests use normalized input which we cannot
@@ -171,6 +170,7 @@ def test_cagra_dataset_dtype_host_device(
         array_type=array_type,
         build_algo=build_algo,
         metric=metric,
+        serialize=serialize,
     )
 
 

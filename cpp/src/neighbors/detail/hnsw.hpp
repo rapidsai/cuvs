@@ -1,22 +1,12 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
 #include "../../core/nvtx.hpp"
+#include "../../core/omp_wrapper.hpp"
 
 #include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/hnsw.hpp>
@@ -29,7 +19,6 @@
 
 #include <filesystem>
 #include <memory>
-#include <omp.h>
 #include <random>
 #include <thread>
 
@@ -194,7 +183,7 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
     params.ef_construction);
   appr_algo->base_layer_init = false;  // tell hnswlib to build upper layers only
   [[maybe_unused]] auto num_threads =
-    params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
+    params.num_threads == 0 ? cuvs::core::omp::get_max_threads() : params.num_threads;
 #pragma omp parallel for num_threads(num_threads)
   for (int64_t i = 0; i < host_dataset_view.extent(0); i++) {
     appr_algo->addPoint((void*)(host_dataset_view.data_handle() + i * host_dataset_view.extent(1)),
@@ -284,8 +273,9 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
   common::nvtx::range<common::nvtx::domain::cuvs> fun_scope("hnsw::from_cagra<GPU>");
-  auto stream      = raft::resource::get_cuda_stream(res);
-  auto num_threads = params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
+  auto stream = raft::resource::get_cuda_stream(res);
+  auto num_threads =
+    params.num_threads == 0 ? cuvs::core::omp::get_max_threads() : params.num_threads;
 
   /* Note: NNSW data layout
 
@@ -546,7 +536,7 @@ void extend(raft::resources const& res,
   auto current_element_count = hnswlib_index->getCurrentElementCount();
   auto new_element_count     = additional_dataset.extent(0);
   [[maybe_unused]] auto num_threads =
-    params.num_threads == 0 ? omp_get_max_threads() : params.num_threads;
+    params.num_threads == 0 ? cuvs::core::omp::get_max_threads() : params.num_threads;
 
   hnswlib_index->resizeIndex(current_element_count + new_element_count);
 #pragma omp parallel for num_threads(num_threads)
