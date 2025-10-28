@@ -18,11 +18,12 @@ function(find_and_configure_faiss)
   set(patch_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../patches")
   rapids_cpm_package_override("${patch_dir}/faiss_override.json")
 
-  include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
-  rapids_cpm_package_details(faiss version repository tag shallow exclude)
-
-  include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
-  rapids_cpm_generate_patch_command(faiss ${version} patch_command build_patch_only)
+  include("${rapids-cmake-dir}/cpm/detail/package_info.cmake")
+  rapids_cpm_package_info(faiss
+    VERSION_VAR version
+    FIND_VAR find_args
+    CPM_VAR cpm_args
+  )
 
   set(BUILD_SHARED_LIBS ON)
   if (PKG_BUILD_STATIC_LIBS)
@@ -38,13 +39,9 @@ function(find_and_configure_faiss)
   endif()
 
 
-  rapids_cpm_find(faiss ${version} ${build_patch_only}
+  rapids_cpm_find(faiss ${version} ${find_args}
     GLOBAL_TARGETS faiss faiss_avx2 faiss_gpu_objs faiss::faiss faiss::faiss_avx2
-    CPM_ARGS
-    GIT_REPOSITORY ${repository}
-    GIT_TAG ${tag}
-    GIT_SHALLOW ${shallow} ${patch_command}
-    EXCLUDE_FROM_ALL ${exclude}
+    CPM_ARGS ${cpm_args}
     OPTIONS
     "FAISS_ENABLE_GPU ${PKG_ENABLE_GPU}"
     "FAISS_ENABLE_CUVS ${PKG_ENABLE_GPU}"
