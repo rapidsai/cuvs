@@ -137,7 +137,7 @@ void compute_cluster_offsets(raft::resources const& dev_resources,
 template <typename T>
 void sum_reduce_vector(raft::resources const& dev_resources,
                        raft::device_vector_view<T, int64_t> v,
-                       raft::device_scalar_view<T> s)
+                       raft::device_scalar_view<T, int64_t> s)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(dev_resources);
   rmm::device_async_resource_ref device_memory =

@@ -236,7 +236,7 @@ void initKMeansPlusPlus(const raft::resources& handle,
   auto uniformRands       = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
 
   // <<< Step-2 >>>: psi <- phi_X (C)
-  auto clusterCost = raft::make_device_scalar<DataT>(handle, 0);
+  auto clusterCost = raft::make_device_scalar<DataT, IndexT>(handle, 0);
 
   cuvs::cluster::kmeans::min_cluster_distance(handle,
                                               X,
