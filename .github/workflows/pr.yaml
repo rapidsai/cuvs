@@ -18,12 +18,11 @@ jobs:
       - conda-python-build
       - conda-python-tests
       - rocky8-clib-standalone-build
-      - rocky8-clib-java-build
+      - rocky8-clib-java-build-and-tests
       - rocky8-clib-rust-build
       - rocky8-clib-tests
-      - conda-java-tests
+      - conda-java-build-and-tests
       - docs-build
-      - rust-build
       - go-build
       - wheel-build-libcuvs
       - wheel-build-cuvs
@@ -196,7 +195,7 @@ jobs:
       artifact-name: "libcuvs_c_${{ matrix.cuda_version }}.tar.gz"
       file_to_upload: "libcuvs_c.tar.gz"
       sha: ${{ inputs.sha }}
-  rocky8-clib-java-build:
+  rocky8-clib-java-build-and-tests:
     needs: [rocky8-clib-standalone-build, changed-files]
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.12
@@ -259,7 +258,7 @@ jobs:
       script: "ci/test_standalone_c.sh"
       sha: ${{ inputs.sha }}
       artifact-dependencies: "libcuvs_c_${{ matrix.cuda_version }}.tar.gz"
-  conda-java-tests:
+  conda-java-build-and-tests:
     needs: [conda-cpp-build, changed-files]
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
@@ -290,25 +289,6 @@ jobs:
       arch: "amd64"
       container_image: "rapidsai/ci-conda:25.12-latest"
       script: "ci/build_docs.sh"
-  rust-build:
-    needs: [conda-cpp-build, changed-files]
-    secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
-    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_rust || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
-    # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
-    # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
-    strategy:
-      fail-fast: false
-      matrix:
-        cuda_version:
-          - *latest_cuda12
-          - *latest_cuda13
-    with:
-      build_type: pull-request
-      node_type: "gpu-l4-latest-1"
-      arch: "amd64"
-      container_image: "rapidsai/ci-conda:25.12-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
-      script: "ci/build_rust.sh"
   go-build:
     needs: [conda-cpp-build, changed-files]
     secrets: inherit
