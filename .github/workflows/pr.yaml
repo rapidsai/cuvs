@@ -18,6 +18,9 @@ jobs:
       - conda-python-build
       - conda-python-tests
       - rocky8-clib-standalone-build
+      - rocky8-clib-java-build
+      - rocky8-clib-rust-build
+      - rocky8-clib-tests
       - conda-java-tests
       - docs-build
       - rust-build
@@ -104,6 +107,30 @@ jobs:
           - '!rust/**'
           - '!go/**'
           - '!thirdparty/LICENSES/**'
+        test_rust:
+          - '**'
+          - '!.devcontainer/**'
+          - '!.pre-commit-config.yaml'
+          - '!README.md'
+          - '!docs/**'
+          - '!img/**'
+          - '!notebooks/**'
+          - '!python/**'
+          - '!java/**'
+          - '!go/**'
+          - '!thirdparty/LICENSES/**'
+        test_go:
+          - '**'
+          - '!.devcontainer/**'
+          - '!.pre-commit-config.yaml'
+          - '!README.md'
+          - '!docs/**'
+          - '!img/**'
+          - '!notebooks/**'
+          - '!python/**'
+          - '!java/**'
+          - '!rust/**'
+          - '!thirdparty/LICENSES/**'
   checks:
     needs: telemetry-setup
     secrets: inherit
@@ -169,11 +196,74 @@ jobs:
       artifact-name: "libcuvs_c_${{ matrix.cuda_version }}.tar.gz"
       file_to_upload: "libcuvs_c.tar.gz"
       sha: ${{ inputs.sha }}
+  rocky8-clib-java-build:
+    needs: [rocky8-clib-standalone-build, changed-files]
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.12
+    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_java || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
+    strategy:
+      fail-fast: false
+      matrix:
+        cuda_version:
+          - &latest_cuda12 '12.9.1'
+          - &latest_cuda13 '13.0.1'
+    with:
+      build_type: ${{ inputs.build_type || 'branch' }}
+      branch: ${{ inputs.branch }}
+      arch: "amd64"
+      date: ${{ inputs.date }}_c
+      container_image: "rapidsai/ci-wheel:25.12-cuda${{ matrix.cuda_version }}-rockylinux8-py3.10"
+      script: "ci/build_java.sh"
+      artifact-name: "cuvs-java-clib-cuda${{ matrix.cuda_version }}"
+      file_to_upload: "java/cuvs-java/target/"
+      sha: ${{ inputs.sha }}
+      artifact-dependencies: "libcuvs_c_${{ matrix.cuda_version }}.tar.gz"
+  rocky8-clib-rust-build:
+    needs: [rocky8-clib-standalone-build, changed-files]
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.12
+    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_rust || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
+    strategy:
+      fail-fast: false
+      matrix:
+        cuda_version:
+          - *latest_cuda12
+          - *latest_cuda13
+    with:
+      build_type: ${{ inputs.build_type || 'branch' }}
+      branch: ${{ inputs.branch }}
+      arch: "amd64"
+      date: ${{ inputs.date }}_c
+      container_image: "rapidsai/ci-wheel:25.12-cuda${{ matrix.cuda_version }}-rockylinux8-py3.10"
+      script: "ci/build_rust.sh"
+      sha: ${{ inputs.sha }}
+      artifact-dependencies: "libcuvs_c_${{ matrix.cuda_version }}.tar.gz"
+  rocky8-clib-tests:
+    needs: [rocky8-clib-standalone-build, changed-files]
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.12
+    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
+    strategy:
+      fail-fast: false
+      matrix:
+        cuda_version:
+          - *latest_cuda12
+          - *latest_cuda13
+    with:
+      build_type: ${{ inputs.build_type || 'branch' }}
+      branch: ${{ inputs.branch }}
+      node_type: "gpu-l4-latest-1"
+      arch: "amd64"
+      date: ${{ inputs.date }}_c
+      container_image: "rapidsai/ci-wheel:25.12-cuda${{ matrix.cuda_version }}-rockylinux8-py3.10"
+      script: "ci/test_standalone_c.sh"
+      sha: ${{ inputs.sha }}
+      artifact-dependencies: "libcuvs_c_${{ matrix.cuda_version }}.tar.gz"
   conda-java-tests:
     needs: [conda-cpp-build, changed-files]
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
-    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_java
+    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_java || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
     strategy:
@@ -201,9 +291,10 @@ jobs:
       container_image: "rapidsai/ci-conda:25.12-latest"
       script: "ci/build_docs.sh"
   rust-build:
-    needs: conda-cpp-build
+    needs: [conda-cpp-build, changed-files]
     secrets: inherit
     uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
+    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_rust || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
     strategy:
@@ -219,9 +310,10 @@ jobs:
       container_image: "rapidsai/ci-conda:25.12-cuda${{ matrix.cuda_version }}-ubuntu24.04-py3.13"
       script: "ci/build_rust.sh"
   go-build:
-    needs: conda-cpp-build
+    needs: [conda-cpp-build, changed-files]
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@branch-25.12
+    if: fromJSON(needs.changed-files.outputs.changed_file_groups).test_go || fromJSON(needs.changed-files.outputs.changed_file_groups).test_cpp
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
     strategy:
