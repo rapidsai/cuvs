@@ -1,15 +1,8 @@
 # =============================================================================
-# Copyright (c) 2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
-# in compliance with the License. You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software distributed under the License
-# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
-# or implied. See the License for the specific language governing permissions and limitations under
-# the License.
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
 # =============================================================================
 
 cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
@@ -107,7 +100,29 @@ set_target_properties(
              EXPORT_NAME c_api
 )
 
-target_compile_definitions(cuvs_c PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>)
+# Encode what optional components we are building
+set(CUVS_BUILD_CAGRA_HNSWLIB ${BUILD_CAGRA_HNSWLIB})
+set(CUVS_BUILD_MG_ALGOS ${BUILD_MG_ALGOS})
+# cmake-lint: disable=E1126
+file(
+  CONFIGURE
+  OUTPUT
+  "${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/core/c_config.h"
+  CONTENT
+  [=[
+  #pragma once
+  #ifndef CUVS_BUILD_CAGRA_HNSWLIB
+    #cmakedefine CUVS_BUILD_CAGRA_HNSWLIB
+  #endif
+  #ifndef CUVS_BUILD_MG_ALGOS
+    #cmakedefine CUVS_BUILD_MG_ALGOS
+  #endif
+]=]
+)
+target_compile_definitions(
+  cuvs_c PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
+                $<$<BOOL:${BUILD_MG_ALGOS}>:CUVS_BUILD_MG_ALGOS>
+)
 
 target_compile_options(cuvs_c PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
 
@@ -115,6 +130,7 @@ target_include_directories(
   cuvs_c
   PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
          "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+         "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
   INTERFACE "$<INSTALL_INTERFACE:include>"
 )
 
@@ -160,6 +176,11 @@ if(PROJECT_IS_TOP_LEVEL)
     DIRECTORY include/cuvs
     COMPONENT cuvs_c
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  )
+  install(
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/core/c_config.h
+    COMPONENT cuvs_c
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs/core/
   )
 endif()
 
