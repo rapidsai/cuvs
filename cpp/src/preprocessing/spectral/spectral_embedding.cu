@@ -101,15 +101,16 @@ void create_connectivity_graph(
 
 namespace cuvs::preprocessing::spectral_embedding {
 
-raft::device_csr_matrix_view<float, int, int, int> coo_to_csr_matrix(
+template <typename DataT>
+raft::device_csr_matrix_view<DataT, int, int, int> coo_to_csr_matrix(
   raft::resources const& handle,
   const int n_samples,
   raft::device_vector_view<int> sym_coo_row_ind,
-  raft::device_coo_matrix_view<float, int, int, int> sym_coo_matrix_view)
+  raft::device_coo_matrix_view<DataT, int, int, int> sym_coo_matrix_view)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  raft::sparse::op::coo_sort<float>(n_samples,
+  raft::sparse::op::coo_sort<DataT>(n_samples,
                                     n_samples,
                                     sym_coo_matrix_view.structure_view().get_nnz(),
                                     sym_coo_matrix_view.structure_view().get_rows().data(),
@@ -126,8 +127,8 @@ raft::device_csr_matrix_view<float, int, int, int> coo_to_csr_matrix(
   auto sym_coo_nnz = sym_coo_matrix_view.structure_view().get_nnz();
   raft::copy(sym_coo_row_ind.data_handle() + sym_coo_row_ind.size() - 1, &sym_coo_nnz, 1, stream);
 
-  auto csr_matrix_view = raft::make_device_csr_matrix_view<float, int, int, int>(
-    const_cast<float*>(sym_coo_matrix_view.get_elements().data()),
+  auto csr_matrix_view = raft::make_device_csr_matrix_view<DataT, int, int, int>(
+    const_cast<DataT*>(sym_coo_matrix_view.get_elements().data()),
     raft::make_device_compressed_structure_view<int, int, int>(
       const_cast<int*>(sym_coo_row_ind.data_handle()),
       const_cast<int*>(sym_coo_matrix_view.structure_view().get_cols().data()),
@@ -137,35 +138,37 @@ raft::device_csr_matrix_view<float, int, int, int> coo_to_csr_matrix(
   return csr_matrix_view;
 }
 
-raft::device_csr_matrix<float, int, int, int> create_laplacian(
+template <typename DataT>
+raft::device_csr_matrix<DataT, int, int, int> create_laplacian(
   raft::resources const& handle,
   params spectral_embedding_config,
-  raft::device_csr_matrix_view<float, int, int, int> csr_matrix_view,
-  raft::device_vector_view<float, int> diagonal)
+  raft::device_csr_matrix_view<DataT, int, int, int> csr_matrix_view,
+  raft::device_vector_view<DataT, int> diagonal)
 {
   auto laplacian = spectral_embedding_config.norm_laplacian
                      ? raft::sparse::linalg::laplacian_normalized(handle, csr_matrix_view, diagonal)
                      : raft::sparse::linalg::compute_graph_laplacian(handle, csr_matrix_view);
 
-  auto laplacian_elements_view = raft::make_device_vector_view<float, int>(
+  auto laplacian_elements_view = raft::make_device_vector_view<DataT, int>(
     laplacian.get_elements().data(), laplacian.structure_view().get_nnz());
 
   raft::linalg::unary_op(handle,
                          raft::make_const_mdspan(laplacian_elements_view),
                          laplacian_elements_view,
-                         [] __device__(float x) { return -x; });
+                         [] __device__(DataT x) { return -x; });
 
   return laplacian;
 }
 
+template <typename DataT>
 void compute_eigenpairs(raft::resources const& handle,
                         params spectral_embedding_config,
                         const int n_samples,
-                        raft::device_csr_matrix<float, int, int, int>& laplacian,
-                        raft::device_vector_view<float, int> diagonal,
-                        raft::device_matrix_view<float, int, raft::col_major> embedding)
+                        raft::device_csr_matrix<DataT, int, int, int>& laplacian,
+                        raft::device_vector_view<DataT, int> diagonal,
+                        raft::device_matrix_view<DataT, int, raft::col_major> embedding)
 {
-  auto config           = raft::sparse::solver::lanczos_solver_config<float>();
+  auto config           = raft::sparse::solver::lanczos_solver_config<DataT>();
   config.n_components   = spectral_embedding_config.n_components;
   config.max_iterations = 10 * n_samples;
   config.ncv            = std::min(n_samples, std::max(2 * config.n_components + 1, 20));
@@ -174,14 +177,14 @@ void compute_eigenpairs(raft::resources const& handle,
   config.seed           = spectral_embedding_config.seed;
 
   auto eigenvalues =
-    raft::make_device_vector<float, int, raft::col_major>(handle, config.n_components);
+    raft::make_device_vector<DataT, int, raft::col_major>(handle, config.n_components);
   auto eigenvectors =
-    raft::make_device_matrix<float, int, raft::col_major>(handle, n_samples, config.n_components);
+    raft::make_device_matrix<DataT, int, raft::col_major>(handle, n_samples, config.n_components);
 
-  raft::sparse::solver::lanczos_compute_smallest_eigenvectors<int, float>(
+  raft::sparse::solver::lanczos_compute_smallest_eigenvectors<int, DataT>(
     handle,
     config,
-    raft::make_device_csr_matrix_view<float, int, int, int>(laplacian.get_elements().data(),
+    raft::make_device_csr_matrix_view<DataT, int, int, int>(laplacian.get_elements().data(),
                                                             laplacian.structure_view()),
     std::nullopt,
     eigenvalues.view(),
@@ -193,7 +196,7 @@ void compute_eigenpairs(raft::resources const& handle,
       raft::make_const_mdspan(eigenvectors.view()),  // input matrix view
       raft::make_const_mdspan(diagonal),             // input vector view
       eigenvectors.view(),                           // output matrix view (in-place)
-      [] __device__(float elem, float diag) { return elem / diag; });
+      [] __device__(DataT elem, DataT diag) { return elem / diag; });
   }
 
   // Create a sequence of reversed column indices
@@ -211,17 +214,17 @@ void compute_eigenpairs(raft::resources const& handle,
 
   // Create row-major views of the column-major matrices
   // This is just a view re-interpretation, no data movement
-  auto eigenvectors_row_view = raft::make_device_matrix_view<float, int, raft::row_major>(
+  auto eigenvectors_row_view = raft::make_device_matrix_view<DataT, int, raft::row_major>(
     eigenvectors.data_handle(),
     eigenvectors.extent(1),  // Swap dimensions for the view
     eigenvectors.extent(0));
 
-  auto embedding_row_view = raft::make_device_matrix_view<float, int, raft::row_major>(
+  auto embedding_row_view = raft::make_device_matrix_view<DataT, int, raft::row_major>(
     embedding.data_handle(),
     embedding.extent(1),  // Swap dimensions for the view
     embedding.extent(0));
 
-  raft::matrix::gather<float, int, int>(
+  raft::matrix::gather<DataT, int, int>(
     handle,
     raft::make_const_mdspan(eigenvectors_row_view),  // Source matrix (as row-major view)
     raft::make_const_mdspan(col_indices.view()),     // Column indices to gather
@@ -250,15 +253,16 @@ void transform(raft::resources const& handle,
     handle, spectral_embedding_config, n_samples, laplacian, diagonal.view(), embedding);
 }
 
+template <typename DataT>
 void transform(raft::resources const& handle,
                params spectral_embedding_config,
-               raft::device_coo_matrix_view<float, int, int, int> connectivity_graph,
-               raft::device_matrix_view<float, int, raft::col_major> embedding)
+               raft::device_coo_matrix_view<DataT, int, int, int> connectivity_graph,
+               raft::device_matrix_view<DataT, int, raft::col_major> embedding)
 {
   const int n_samples = connectivity_graph.structure_view().get_n_rows();
 
   auto sym_coo_row_ind = raft::make_device_vector<int>(handle, n_samples + 1);
-  auto diagonal        = raft::make_device_vector<float, int>(handle, n_samples);
+  auto diagonal        = raft::make_device_vector<DataT, int>(handle, n_samples);
 
   auto csr_matrix_view =
     coo_to_csr_matrix(handle, n_samples, sym_coo_row_ind.view(), connectivity_graph);
@@ -267,5 +271,17 @@ void transform(raft::resources const& handle,
   compute_eigenpairs(
     handle, spectral_embedding_config, n_samples, laplacian, diagonal.view(), embedding);
 }
+
+template void transform<float>(
+  raft::resources const& handle,
+  params spectral_embedding_config,
+  raft::device_coo_matrix_view<float, int, int, int> connectivity_graph,
+  raft::device_matrix_view<float, int, raft::col_major> embedding);
+
+template void transform<double>(
+  raft::resources const& handle,
+  params spectral_embedding_config,
+  raft::device_coo_matrix_view<double, int, int, int> connectivity_graph,
+  raft::device_matrix_view<double, int, raft::col_major> embedding);
 
 }  // namespace cuvs::preprocessing::spectral_embedding

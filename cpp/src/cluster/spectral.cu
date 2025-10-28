@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <cuvs/cluster/kmeans.hpp>
@@ -23,18 +12,19 @@
 
 namespace cuvs::cluster::spectral {
 
+template <typename DataT>
 void fit_predict(raft::resources const& handle,
                  params config,
-                 raft::device_coo_matrix_view<float, int, int, int> connectivity_graph,
+                 raft::device_coo_matrix_view<DataT, int, int, int> connectivity_graph,
                  raft::device_vector_view<int, int> labels)
 {
   int n_samples = connectivity_graph.structure_view().get_n_rows();
-  float inertia;
+  DataT inertia;
   int n_iter;
   auto embedding_col_major =
-    raft::make_device_matrix<float, int, raft::col_major>(handle, n_samples, config.n_components);
+    raft::make_device_matrix<DataT, int, raft::col_major>(handle, n_samples, config.n_components);
   auto embedding_row_major =
-    raft::make_device_matrix<float, int, raft::row_major>(handle, n_samples, config.n_components);
+    raft::make_device_matrix<DataT, int, raft::row_major>(handle, n_samples, config.n_components);
   cuvs::preprocessing::spectral_embedding::params spectral_embedding_config;
   spectral_embedding_config.n_components   = config.n_components;
   spectral_embedding_config.n_neighbors    = config.n_neighbors;
@@ -67,4 +57,17 @@ void fit_predict(raft::resources const& handle,
                                      raft::make_host_scalar_view(&inertia),
                                      raft::make_host_scalar_view(&n_iter));
 }
+
+template void fit_predict<float>(
+  raft::resources const& handle,
+  params config,
+  raft::device_coo_matrix_view<float, int, int, int> connectivity_graph,
+  raft::device_vector_view<int, int> labels);
+
+template void fit_predict<double>(
+  raft::resources const& handle,
+  params config,
+  raft::device_coo_matrix_view<double, int, int, int> connectivity_graph,
+  raft::device_vector_view<int, int> labels);
+
 }  // namespace cuvs::cluster::spectral

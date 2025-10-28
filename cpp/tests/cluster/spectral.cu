@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <cuvs/cluster/spectral.hpp>
@@ -20,6 +9,7 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/unary_op.cuh>
 #include <raft/random/make_blobs.cuh>
 #include <raft/stats/adjusted_rand_index.cuh>
 #include <raft/util/cuda_utils.cuh>
@@ -28,6 +18,7 @@
 
 #include <gtest/gtest.h>
 
+#include <type_traits>
 #include <vector>
 
 namespace cuvs {
@@ -43,6 +34,7 @@ struct SpectralClusteringInputs {
   uint64_t seed;
 };
 
+template <typename T>
 class SpectralClusteringTest : public ::testing::TestWithParam<SpectralClusteringInputs> {
  public:
   SpectralClusteringTest()
@@ -89,7 +81,7 @@ class SpectralClusteringTest : public ::testing::TestWithParam<SpectralClusterin
 
     raft::copy(d_labels_ref.data(), labels.data_handle(), n_samples, stream);
 
-    auto connectivity_graph =
+    auto connectivity_graph_float =
       raft::make_device_coo_matrix<float, int, int, int>(handle, n_samples, n_samples);
 
     cuvs::preprocessing::spectral_embedding::params embed_params;
@@ -97,13 +89,45 @@ class SpectralClusteringTest : public ::testing::TestWithParam<SpectralClusterin
     embed_params.seed        = params.rng_state.seed;
 
     cuvs::preprocessing::spectral_embedding::helpers::create_connectivity_graph(
-      handle, embed_params, X.view(), connectivity_graph);
+      handle, embed_params, X.view(), connectivity_graph_float);
 
-    cluster::spectral::fit_predict(
-      handle,
-      params,
-      connectivity_graph.view(),
-      raft::make_device_vector_view<int, int>(d_labels.data(), n_samples));
+    // For double precision test, convert the graph from float to double
+    if constexpr (std::is_same_v<T, double>) {
+      auto nnz = connectivity_graph_float.structure_view().get_nnz();
+      auto connectivity_graph_double =
+        raft::make_device_coo_matrix<double, int, int, int>(handle, n_samples, n_samples, nnz);
+
+      raft::copy(connectivity_graph_double.structure_view().get_rows().data(),
+                 connectivity_graph_float.structure_view().get_rows().data(),
+                 nnz,
+                 stream);
+      raft::copy(connectivity_graph_double.structure_view().get_cols().data(),
+                 connectivity_graph_float.structure_view().get_cols().data(),
+                 nnz,
+                 stream);
+
+      auto float_elements_view = raft::make_device_vector_view<const float, int>(
+        connectivity_graph_float.view().get_elements().data(), nnz);
+      auto double_elements_view = raft::make_device_vector_view<double, int>(
+        connectivity_graph_double.view().get_elements().data(), nnz);
+
+      raft::linalg::unary_op(
+        handle, float_elements_view, double_elements_view, [] __device__(float x) {
+          return static_cast<double>(x);
+        });
+
+      cluster::spectral::fit_predict(
+        handle,
+        params,
+        connectivity_graph_double.view(),
+        raft::make_device_vector_view<int, int>(d_labels.data(), n_samples));
+    } else {
+      cluster::spectral::fit_predict(
+        handle,
+        params,
+        connectivity_graph_float.view(),
+        raft::make_device_vector_view<int, int>(d_labels.data(), n_samples));
+    }
 
     raft::resource::sync_stream(handle, stream);
 
@@ -154,13 +178,25 @@ const std::vector<SpectralClusteringInputs> inputs = {
   {500, 20, 3, 3, 15, 3, 0.5f, 777ULL},  // More spread but still reasonable
 };
 
-TEST_P(SpectralClusteringTest, Result)
+typedef SpectralClusteringTest<float> SpectralClusteringTestF;
+typedef SpectralClusteringTest<double> SpectralClusteringTestD;
+
+TEST_P(SpectralClusteringTestF, Result)
 {
   ASSERT_GT(score, 0.8) << "Adjusted Rand Index is too low: " << score;
 }
 
+TEST_P(SpectralClusteringTestD, Result)
+{
+  ASSERT_GT(score, 0.8) << "Adjusted Rand Index (double) is too low: " << score;
+}
+
 INSTANTIATE_TEST_CASE_P(SpectralClusteringTests,
-                        SpectralClusteringTest,
+                        SpectralClusteringTestF,
+                        ::testing::ValuesIn(inputs));
+
+INSTANTIATE_TEST_CASE_P(SpectralClusteringTests,
+                        SpectralClusteringTestD,
                         ::testing::ValuesIn(inputs));
 
 }  // namespace cuvs
