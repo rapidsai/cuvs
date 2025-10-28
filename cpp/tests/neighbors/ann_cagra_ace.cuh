@@ -121,16 +121,16 @@ class AnnCagraAceTest : public ::testing::TestWithParam<AnnCagraAceInputs> {
         EXPECT_TRUE(index.on_disk());
         EXPECT_EQ(index.file_directory(), temp_dir);
 
-        EXPECT_TRUE(std::filesystem::exists(temp_dir + "/cagra_graph.bin"));
-        EXPECT_EQ(std::filesystem::file_size(temp_dir + "/cagra_graph.bin"),
+        EXPECT_TRUE(std::filesystem::exists(temp_dir + "/cagra_graph.npy"));
+        EXPECT_GE(std::filesystem::file_size(temp_dir + "/cagra_graph.npy"),
                   ps.n_rows * index_params.graph_degree * sizeof(IdxT));
 
-        EXPECT_TRUE(std::filesystem::exists(temp_dir + "/reordered_dataset.bin"));
-        EXPECT_EQ(std::filesystem::file_size(temp_dir + "/reordered_dataset.bin"),
+        EXPECT_TRUE(std::filesystem::exists(temp_dir + "/reordered_dataset.npy"));
+        EXPECT_GE(std::filesystem::file_size(temp_dir + "/reordered_dataset.npy"),
                   ps.n_rows * ps.dim * sizeof(DataT));
 
-        EXPECT_TRUE(std::filesystem::exists(temp_dir + "/dataset_mapping.bin"));
-        EXPECT_EQ(std::filesystem::file_size(temp_dir + "/dataset_mapping.bin"),
+        EXPECT_TRUE(std::filesystem::exists(temp_dir + "/dataset_mapping.npy"));
+        EXPECT_GE(std::filesystem::file_size(temp_dir + "/dataset_mapping.npy"),
                   ps.n_rows * sizeof(IdxT));
 
         hnsw::index_params hnsw_params;

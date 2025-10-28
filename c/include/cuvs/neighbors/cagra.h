@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -426,6 +415,25 @@ cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* size);
  * @return cuvsError_t
  */
 cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int64_t* graph_degree);
+
+/**
+ * @brief Check if the CAGRA index is stored on disk
+ *
+ * @param[in] index CAGRA index
+ * @param[out] on_disk return true if index is on disk, false otherwise
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexIsOnDisk(cuvsCagraIndex_t index, bool* on_disk);
+
+/**
+ * @brief Get the file directory where the CAGRA index is stored (if on disk)
+ *
+ * @param[in] index CAGRA index
+ * @param[out] file_directory return file directory path (caller must free)
+ * @param[out] length length of the file_directory string
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexGetFileDirectory(cuvsCagraIndex_t index, char** file_directory, size_t* length);
 
 /**
  * @brief Returns a view of the CAGRA dataset

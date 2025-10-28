@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -28,6 +17,9 @@
 #include <raft/core/mdspan.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/stream_view.hpp>
+#include <raft/core/serialize.hpp>
+
+#include <fstream>
 #include <raft/core/resources.hpp>
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
@@ -341,6 +333,7 @@ struct index : cuvs::neighbors::index {
   using index_type         = IdxT;
   using value_type         = T;
   using dataset_index_type = int64_t;
+  using graph_index_type   = uint32_t;
 
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
@@ -388,9 +381,19 @@ struct index : cuvs::neighbors::index {
 
   /** neighborhood graph [size, graph-degree] */
   [[nodiscard]] inline auto graph() const noexcept
-    -> raft::device_matrix_view<const IdxT, int64_t, raft::row_major>
+    -> raft::device_matrix_view<const graph_index_type, int64_t, raft::row_major>
   {
     return graph_view_;
+  }
+
+  /** Mapping from internal graph node indices to the original user-provided indices. */
+  [[nodiscard]] inline auto source_indices() const noexcept
+    -> std::optional<raft::device_vector_view<const index_type, int64_t>>
+  {
+    return source_indices_.has_value()
+             ? std::optional<raft::device_vector_view<const index_type, int64_t>>(
+                 source_indices_->view())
+             : std::nullopt;
   }
 
   /** Whether the index is stored on disk */
@@ -424,7 +427,7 @@ struct index : cuvs::neighbors::index {
         cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded)
     : cuvs::neighbors::index(),
       metric_(metric),
-      graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0)),
+      graph_(raft::make_device_matrix<graph_index_type, int64_t>(res, 0, 0)),
       dataset_(new cuvs::neighbors::empty_dataset<int64_t>(0)),
       dataset_norms_(std::nullopt)
   {
@@ -468,7 +471,7 @@ struct index : cuvs::neighbors::index {
    *   using namespace raft::neighbors::experimental;
    *
    *   auto dataset = raft::make_device_matrix<float, int64_t>(res, n_rows, n_cols);
-   *   auto knn_graph = raft::make_device_matrix<uint32_n, int64_t>(res, n_rows, graph_degree);
+   *   auto knn_graph = raft::make_device_matrix<uint32_t, int64_t>(res, n_rows, graph_degree);
    *
    *   // custom loading and graph creation
    *   // load_dataset(dataset.view());
@@ -487,11 +490,13 @@ struct index : cuvs::neighbors::index {
   index(raft::resources const& res,
         cuvs::distance::DistanceType metric,
         raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, data_accessor> dataset,
-        raft::mdspan<const IdxT, raft::matrix_extent<int64_t>, raft::row_major, graph_accessor>
-          knn_graph)
+        raft::mdspan<const graph_index_type,
+                     raft::matrix_extent<int64_t>,
+                     raft::row_major,
+                     graph_accessor> knn_graph)
     : cuvs::neighbors::index(),
       metric_(metric),
-      graph_(raft::make_device_matrix<IdxT, int64_t>(res, 0, 0)),
+      graph_(raft::make_device_matrix<graph_index_type, int64_t>(res, 0, 0)),
       dataset_(make_aligned_dataset(res, dataset, 16)),
       dataset_norms_(std::nullopt)
   {
@@ -599,8 +604,9 @@ struct index : cuvs::neighbors::index {
    * Since the new graph is a device array, we store a reference to that, and it is
    * the caller's responsibility to ensure that knn_graph stays alive as long as the index.
    */
-  void update_graph(raft::resources const& res,
-                    raft::device_matrix_view<const IdxT, int64_t, raft::row_major> knn_graph)
+  void update_graph(
+    raft::resources const& res,
+    raft::device_matrix_view<const graph_index_type, int64_t, raft::row_major> knn_graph)
   {
     graph_view_ = knn_graph;
   }
@@ -610,16 +616,19 @@ struct index : cuvs::neighbors::index {
    *
    * We create a copy of the graph on the device. The index manages the lifetime of this copy.
    */
-  void update_graph(raft::resources const& res,
-                    raft::host_matrix_view<const IdxT, int64_t, raft::row_major> knn_graph)
+  void update_graph(
+    raft::resources const& res,
+    raft::host_matrix_view<const graph_index_type, int64_t, raft::row_major> knn_graph)
   {
     RAFT_LOG_DEBUG("Copying CAGRA knn graph from host to device");
 
     if ((graph_.extent(0) != knn_graph.extent(0)) || (graph_.extent(1) != knn_graph.extent(1))) {
       // clear existing memory before allocating to prevent OOM errors on large graphs
-      if (graph_.size()) { graph_ = raft::make_device_matrix<IdxT, int64_t>(res, 0, 0); }
-      graph_ =
-        raft::make_device_matrix<IdxT, int64_t>(res, knn_graph.extent(0), knn_graph.extent(1));
+      if (graph_.size()) {
+        graph_ = raft::make_device_matrix<graph_index_type, int64_t>(res, 0, 0);
+      }
+      graph_ = raft::make_device_matrix<graph_index_type, int64_t>(
+        res, knn_graph.extent(0), knn_graph.extent(1));
     }
     raft::copy(graph_.data_handle(),
                knn_graph.data_handle(),
@@ -629,26 +638,133 @@ struct index : cuvs::neighbors::index {
   }
 
   /**
-   * Set whether the index is stored on disk and the directory where files are stored.
+   * Replace the source indices with a new source indices taking the ownership of the passed vector.
    */
-  void set_disk_storage(bool on_disk,
-                        const std::string& file_directory = "",
-                        size_t n_rows                     = 0,
-                        size_t dim                        = 0,
-                        size_t graph_degree               = 0)
+  void update_source_indices(raft::device_vector<index_type, int64_t>&& source_indices)
   {
-    on_disk_        = on_disk;
-    file_directory_ = file_directory;
-    n_rows_         = n_rows;
-    dim_            = dim;
-    graph_degree_   = graph_degree;
+    RAFT_EXPECTS(source_indices.extent(0) == size(),
+                 "Source indices must have the same number of rows as the index");
+    source_indices_.emplace(std::move(source_indices));
+  }
+
+  /**
+   * Copy the provided source indices into the index.
+   */
+  template <typename Accessor>
+  void update_source_indices(
+    raft::resources const& res,
+    raft::mdspan<const index_type, raft::vector_extent<int64_t>, raft::row_major, Accessor>
+      source_indices)
+  {
+    RAFT_EXPECTS(source_indices.extent(0) == size(),
+                 "Source indices must have the same number of rows as the index");
+    // Reset the array if it's not compatible to avoid using more memory than necessary.
+    // NB: this likely is never triggered because we check the invariant above (but it doesn't
+    // hurt).
+    if (source_indices_.has_value()) {
+      if (source_indices_->extent(0) != source_indices.extent(0)) { source_indices_.reset(); }
+    }
+    // Allocate the new array if needed.
+    if (!source_indices_.has_value()) {
+      source_indices_.emplace(
+        raft::make_device_vector<index_type, int64_t>(res, source_indices.extent(0)));
+    }
+    // Copy the data.
+    raft::copy(source_indices_->data_handle(),
+               source_indices.data_handle(),
+               source_indices.extent(0),
+               raft::resource::get_cuda_stream(res));
+  }
+
+  /**
+   * Update the dataset from a disk file.
+   *
+   * This method configures the index to use a disk-based dataset stored in the specified file.
+   * The dataset file should contain a numpy header followed by vectors in row-major format.
+   * The number of rows and dimensionality are read from the numpy header.
+   *
+   * @param[in] res raft resources
+   * @param[in] file_path Path to the dataset file
+   */
+  void update_dataset(raft::resources const& res, const std::string& file_path)
+  {
+    std::ifstream is(file_path, std::ios::in | std::ios::binary);
+    if (!is) { RAFT_FAIL("Cannot open dataset file %s", file_path.c_str()); }
+
+    raft::detail::numpy_serializer::header_t header =
+      raft::detail::numpy_serializer::read_header(is);
+
+    auto last_slash = file_path.find_last_of('/');
+    if (last_slash != std::string::npos) {
+      file_directory_ = file_path.substr(0, last_slash);
+    } else {
+      file_directory_ = ".";
+    }
+
+    on_disk_ = true;
+    n_rows_  = header.shape[0];
+    dim_     = header.shape[1];
+
+    RAFT_LOG_DEBUG("ACE: Dataset at %s has shape [%zu, %zu]", file_path.c_str(), n_rows_, dim_);
+
+    dataset_ = std::make_unique<cuvs::neighbors::empty_dataset<int64_t>>(0);
+    dataset_norms_.reset();
+  }
+
+  /**
+   * Update the graph from a disk file.
+   *
+   * This method configures the index to use a disk-based graph stored in the specified file.
+   * The graph file should contain a numpy header followed by neighbor indices in row-major format.
+   * The number of rows and graph degree are read from the numpy header.
+   * The file directory is derived from the file path.
+   *
+   * @param[in] res raft resources
+   * @param[in] file_path Path to the graph file
+   */
+  void update_graph(raft::resources const& res, const std::string& file_path)
+  {
+    std::ifstream is(file_path, std::ios::in | std::ios::binary);
+    if (!is) { RAFT_FAIL("Cannot open graph file %s", file_path.c_str()); }
+
+    raft::detail::numpy_serializer::header_t header =
+      raft::detail::numpy_serializer::read_header(is);
+
+    if (on_disk_ && n_rows_ != 0) {
+      RAFT_EXPECTS(n_rows_ == header.shape[0],
+                   "Graph size (%zu) must match dataset size (%zu)",
+                   header.shape[0],
+                   n_rows_);
+    }
+
+    auto last_slash = file_path.find_last_of('/');
+    if (last_slash != std::string::npos) {
+      std::string graph_dir = file_path.substr(0, last_slash);
+      if (!file_directory_.empty() && file_directory_ != graph_dir) {
+        RAFT_LOG_WARN("Graph directory (%s) differs from dataset directory (%s)",
+                      graph_dir.c_str(),
+                      file_directory_.c_str());
+      }
+      file_directory_ = graph_dir;
+    }
+    on_disk_      = true;
+    n_rows_       = header.shape[0];
+    graph_degree_ = header.shape[1];
+
+    RAFT_LOG_DEBUG(
+      "ACE: Graph at %s has shape [%zu, %zu]", file_path.c_str(), n_rows_, graph_degree_);
+
+    graph_      = raft::make_device_matrix<IdxT, int64_t>(res, 0, 0);
+    graph_view_ = graph_.view();
   }
 
  private:
   cuvs::distance::DistanceType metric_;
-  raft::device_matrix<IdxT, int64_t, raft::row_major> graph_;
-  raft::device_matrix_view<const IdxT, int64_t, raft::row_major> graph_view_;
+  raft::device_matrix<graph_index_type, int64_t, raft::row_major> graph_;
+  raft::device_matrix_view<const graph_index_type, int64_t, raft::row_major> graph_view_;
   std::unique_ptr<neighbors::dataset<dataset_index_type>> dataset_;
+  // Mapping from internal graph node indices to the original user-provided indices.
+  std::optional<raft::device_vector<IdxT, int64_t>> source_indices_;
   // only float distances supported at the moment
   std::optional<raft::device_vector<float, int64_t>> dataset_norms_;
 
@@ -2869,7 +2985,7 @@ auto distribute(const raft::resources& clique, const std::string& filename)
  * @param[in] res raft resources
  * @param[in] dataset a matrix view (host or device) to a row-major matrix [n_rows, dim]
  * @param[out] knn_graph a host matrix view to store the output knn graph [n_rows, graph_degree]
- * @param[in] ivf_pq_params ivf-pq parameters for graph build
+ * @param[in] build_params ivf-pq parameters for graph build
  */
 void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
@@ -2909,7 +3025,7 @@ void build_knn_graph(raft::resources const& res,
  * @param[in] res raft resources
  * @param[in] dataset a matrix view (host or device) to a row-major matrix [n_rows, dim]
  * @param[out] knn_graph a host matrix view to store the output knn graph [n_rows, graph_degree]
- * @param[in] ivf_pq_params ivf-pq parameters for graph build
+ * @param[in] build_params ivf-pq parameters for graph build
  */
 void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<const half, int64_t, raft::row_major> dataset,
@@ -2949,7 +3065,7 @@ void build_knn_graph(raft::resources const& res,
  * @param[in] res raft resources
  * @param[in] dataset a matrix view (host or device) to a row-major matrix [n_rows, dim]
  * @param[out] knn_graph a host matrix view to store the output knn graph [n_rows, graph_degree]
- * @param[in] ivf_pq_params ivf-pq parameters for graph build
+ * @param[in] build_params ivf-pq parameters for graph build
  */
 void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
@@ -2989,7 +3105,7 @@ void build_knn_graph(raft::resources const& res,
  * @param[in] res raft resources
  * @param[in] dataset a matrix view (host or device) to a row-major matrix [n_rows, dim]
  * @param[out] knn_graph a host matrix view to store the output knn graph [n_rows, graph_degree]
- * @param[in] ivf_pq_params ivf-pq parameters for graph build
+ * @param[in] build_params ivf-pq parameters for graph build
  */
 void build_knn_graph(raft::resources const& res,
                      raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
