@@ -242,7 +242,7 @@ void ace_check_partition_sizes(
   double avg_total_vectors     = 2.0 * static_cast<double>(dataset_size) / n_partitions;
   double expected_avg_vectors  = 2.0 * static_cast<double>(dataset_size) / n_partitions;
 
-  RAFT_LOG_INFO("ACE: Core vectors       - Total: %lu, Avg: %.1f, Min: %lu, Max: %lu",
+  RAFT_LOG_INFO("ACE: Core vectors        - Total: %lu, Avg: %.1f, Min: %lu, Max: %lu",
                 total_core_vectors,
                 avg_core_vectors,
                 min_core_vectors,
@@ -742,7 +742,7 @@ void ace_load_partition_dataset_from_disk(
   core_file_offset *= vector_size;
   augmented_file_offset *= vector_size;
 
-  RAFT_LOG_DEBUG("ACE: core file offset: %lu bytes, Augmented file offset: %lu bytes",
+  RAFT_LOG_DEBUG("ACE: Core file offset: %lu bytes, Augmented file offset: %lu bytes",
                  core_file_offset,
                  augmented_file_offset);
 
