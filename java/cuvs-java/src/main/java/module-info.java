@@ -4,6 +4,8 @@
  */
 
 module com.nvidia.cuvs {
+  requires java.logging;
+
   exports com.nvidia.cuvs;
   exports com.nvidia.cuvs.spi;
 
