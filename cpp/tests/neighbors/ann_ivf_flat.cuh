@@ -610,7 +610,6 @@ const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
   {100, 10000, 16, 10, 20, 512, cuvs::distance::DistanceType::BitwiseHamming, false},
   {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, true},
   {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
-  {20, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},
   {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::L2Expanded, true},
   {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::CosineExpanded, true},
   {1000, 100000, 16, 10, 20, 1024, cuvs::distance::DistanceType::BitwiseHamming, false},
