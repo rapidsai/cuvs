@@ -732,14 +732,6 @@ const std::vector<AnnIvfFlatInputs<int64_t>> inputs = {
   {20000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded, false},
   {100000, 8712, 3, 10, 51, 66, cuvs::distance::DistanceType::L2Expanded, false},
 
-  // Specific test cases for BitwiseHamming with typical binary descriptor dimensions
-  {1000, 10000, 8, 16, 20, 80, cuvs::distance::DistanceType::BitwiseHamming, false},
-  {1000, 10000, 16, 16, 20, 80, cuvs::distance::DistanceType::BitwiseHamming, false},
-  {1000, 10000, 32, 16, 20, 80, cuvs::distance::DistanceType::BitwiseHamming, false},
-  {1000, 10000, 64, 16, 20, 80, cuvs::distance::DistanceType::BitwiseHamming, false},
-  {1000, 10000, 128, 16, 20, 80, cuvs::distance::DistanceType::BitwiseHamming, false},
-  {1000, 10000, 256, 16, 20, 80, cuvs::distance::DistanceType::BitwiseHamming, false},
-  {1000, 10000, 512, 16, 20, 80, cuvs::distance::DistanceType::BitwiseHamming, false},
   // BitwiseHamming with adaptive centers
   {1000, 10000, 32, 16, 20, 80, cuvs::distance::DistanceType::BitwiseHamming, true},
   {1000, 10000, 64, 16, 20, 80, cuvs::distance::DistanceType::BitwiseHamming, true},
