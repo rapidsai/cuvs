@@ -22,7 +22,7 @@ namespace cuvs::cluster::kmeans {
 void cluster_cost(const raft::resources& handle,
                   raft::device_matrix_view<const float, int> X,
                   raft::device_matrix_view<const float, int> centroids,
-                  raft::host_scalar_view<float> cost)
+                  raft::host_scalar_view<float, int> cost)
 {
   cuvs::cluster::kmeans::cluster_cost<float, int>(handle, X, centroids, cost);
 }
@@ -30,7 +30,7 @@ void cluster_cost(const raft::resources& handle,
 void cluster_cost(const raft::resources& handle,
                   raft::device_matrix_view<const double, int> X,
                   raft::device_matrix_view<const double, int> centroids,
-                  raft::host_scalar_view<double> cost)
+                  raft::host_scalar_view<double, int> cost)
 {
   cuvs::cluster::kmeans::cluster_cost<double, int>(handle, X, centroids, cost);
 }

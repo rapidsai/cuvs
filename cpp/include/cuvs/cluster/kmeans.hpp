@@ -1192,7 +1192,7 @@ void transform(raft::resources const& handle,
 void cluster_cost(const raft::resources& handle,
                   raft::device_matrix_view<const float, int> X,
                   raft::device_matrix_view<const float, int> centroids,
-                  raft::host_scalar_view<float> cost);
+                  raft::host_scalar_view<float, int> cost);
 
 /**
  * @brief Compute cluster cost
@@ -1210,7 +1210,7 @@ void cluster_cost(const raft::resources& handle,
 void cluster_cost(const raft::resources& handle,
                   raft::device_matrix_view<const double, int> X,
                   raft::device_matrix_view<const double, int> centroids,
-                  raft::host_scalar_view<double> cost);
+                  raft::host_scalar_view<double, int> cost);
 
 /**
  * @}
