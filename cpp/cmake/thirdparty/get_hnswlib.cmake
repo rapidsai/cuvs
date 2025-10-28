@@ -13,20 +13,20 @@ function(find_and_configure_hnswlib)
   set(patch_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../patches")
   rapids_cpm_package_override("${patch_dir}/hnswlib_override.json")
 
-  include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
-  rapids_cpm_package_details(hnswlib version repository tag shallow exclude)
-
-  include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
-  rapids_cpm_generate_patch_command(hnswlib ${version} patch_command build_patch_only)
+  include("${rapids-cmake-dir}/cpm/detail/package_info.cmake")
+  rapids_cpm_package_info(hnswlib
+    VERSION_VAR version
+    FIND_VAR find_args
+    CPM_VAR cpm_args
+    TO_INSTALL_VAR to_install
+    BUILD_EXPORT_SET cuvs-exports
+    INSTALL_EXPORT_SET cuvs-exports
+  )
 
   rapids_cpm_find(
-    hnswlib ${version} ${build_patch_only}
+    hnswlib ${version} ${find_args}
     GLOBAL_TARGETS hnswlib hnswlib::hnswlib
-    CPM_ARGS
-    GIT_REPOSITORY ${repository}
-    GIT_TAG ${tag}
-    GIT_SHALLOW ${shallow} ${patch_command}
-    EXCLUDE_FROM_ALL ${exclude}
+    CPM_ARGS ${cpm_args}
     DOWNLOAD_ONLY ON
   )
 
@@ -44,7 +44,7 @@ function(find_and_configure_hnswlib)
   if(hnswlib_ADDED)
     # write build export rules
     install(TARGETS hnswlib EXPORT hnswlib-exports)
-    if(NOT exclude)
+    if(to_install)
       install(DIRECTORY "${hnswlib_SOURCE_DIR}/hnswlib/" DESTINATION include/hnswlib)
 
       # write install export rules
@@ -62,11 +62,6 @@ function(find_and_configure_hnswlib)
       EXPORT_SET hnswlib-exports
       GLOBAL_TARGETS hnswlib
       NAMESPACE hnswlib::)
-
-    include("${rapids-cmake-dir}/export/package.cmake")
-    rapids_export_package(INSTALL hnswlib cuvs-exports VERSION ${version} GLOBAL_TARGETS hnswlib hnswlib::hnswlib)
-    rapids_export_package(BUILD hnswlib cuvs-exports VERSION ${version} GLOBAL_TARGETS hnswlib hnswlib::hnswlib)
-
 
     # When using cuVS from the build dir, ensure hnswlib is also found in cuVS' build dir. This
     # line adds `set(hnswlib_ROOT "${CMAKE_CURRENT_LIST_DIR}")` to build/cuvs-dependencies.cmake
