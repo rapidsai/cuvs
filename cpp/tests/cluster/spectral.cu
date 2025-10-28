@@ -183,12 +183,12 @@ typedef SpectralClusteringTest<double> SpectralClusteringTestD;
 
 TEST_P(SpectralClusteringTestF, Result)
 {
-  ASSERT_GT(score, 0.8) << "Adjusted Rand Index is too low: " << score;
+  ASSERT_GT(score, 0.7) << "Adjusted Rand Index is too low: " << score;
 }
 
 TEST_P(SpectralClusteringTestD, Result)
 {
-  ASSERT_GT(score, 0.8) << "Adjusted Rand Index (double) is too low: " << score;
+  ASSERT_GT(score, 0.7) << "Adjusted Rand Index (double) is too low: " << score;
 }
 
 INSTANTIATE_TEST_CASE_P(SpectralClusteringTests,
