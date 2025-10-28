@@ -1,5 +1,6 @@
 #!/bin/bash
-# Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
 # download CI artifacts from RAFT PR #2770
 LIBRAFT_CHANNEL=$(rapids-get-pr-artifact raft 2770 cpp conda)
