@@ -194,7 +194,7 @@ std::enable_if_t<hierarchy == HnswHierarchy::CPU, std::unique_ptr<index<T>>> fro
   auto appr_algo  = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
     hnsw_index->get_space(),
     host_dataset_view.extent(0),
-    cagra_index.graph().extent(1) / 2,
+    (cagra_index.graph().extent(1) + 1) / 2,
     params.ef_construction);
   appr_algo->base_layer_init = false;  // tell hnswlib to build upper layers only
   [[maybe_unused]] auto num_threads =
@@ -444,8 +444,10 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
 
   // initialize dummy HNSW index to retrieve constants
   auto hnsw_index = std::make_unique<index_impl<T>>(dim, index_.metric(), params.hierarchy);
-  auto appr_algo  = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
-    hnsw_index->get_space(), 1, graph_degree_int / 2, params.ef_construction);
+
+  int odd_graph_degree = graph_degree_int % 2;
+  auto appr_algo       = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
+    hnsw_index->get_space(), 1, (graph_degree_int + 1) / 2, params.ef_construction);
 
   bool create_hierarchy = params.hierarchy != HnswHierarchy::NONE;
 
@@ -524,17 +526,30 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
   int64_t next_report_offset = d_report_offset;
   auto start_clock           = std::chrono::system_clock::now();
 
+  assert(appr_algo->size_data_per_element_ ==
+         dim * sizeof(T) + appr_algo->maxM0_ * sizeof(IdxT) + sizeof(int) + sizeof(size_t));
+
   RAFT_LOG_INFO("Writing base level");
   size_t bytes_written = 0;
   float GiB            = 1 << 30;
+  IdxT zero            = 0;
   for (int64_t i = 0; i < n_rows; i++) {
     os.write(reinterpret_cast<char*>(&graph_degree_int), sizeof(int));
+    bytes_written += sizeof(int);
 
     const IdxT* graph_row = &host_graph_view(i, 0);
     os.write(reinterpret_cast<const char*>(graph_row), sizeof(IdxT) * graph_degree_int);
+    bytes_written += sizeof(IdxT) * graph_degree_int;
+
+    if (odd_graph_degree) {
+      assert(odd_graph_degree == appr_algo->maxM0_ - graph_degree_int);
+      os.write(reinterpret_cast<char*>(zero), sizeof(IdxT));
+      bytes_written += sizeof(IdxT);
+    }
 
     const T* data_row = &host_dataset_view(i, 0);
     os.write(reinterpret_cast<const char*>(data_row), sizeof(T) * dim);
+    bytes_written += sizeof(T) * dim;
 
     // copy out host data to query storage
     if (create_hierarchy && levels[i] > 0) {
@@ -547,10 +562,9 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
     // assign original label
     auto label = static_cast<size_t>(host_label_view[i]);
     os.write(reinterpret_cast<char*>(&label), sizeof(std::size_t));
+    bytes_written += sizeof(std::size_t);
 
-    bytes_written += appr_algo->size_data_per_element_;
-    assert(appr_algo->size_data_per_element_ ==
-           dim * sizeof(T) + graph_degree_int * sizeof(IdxT) + sizeof(int) + sizeof(size_t));
+    assert(bytes_written == appr_algo->size_data_per_element_ * (i + 1));
 
     const auto end_clock = std::chrono::system_clock::now();
     // if (!os.good()) { RAFT_FAIL("Error writing HNSW file, row %zu", i); }
@@ -601,7 +615,6 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
   }
   bytes_written = 0;
   start_clock   = std::chrono::system_clock::now();
-  IdxT zero     = 0;
 
   for (int64_t i = 0; i < n_rows; i++) {
     size_t cur_level = create_hierarchy ? levels[i] : 0;
@@ -704,7 +717,10 @@ std::enable_if_t<hierarchy == HnswHierarchy::GPU, std::unique_ptr<index<T>>> fro
   // initialize HNSW index
   auto hnsw_index = std::make_unique<index_impl<T>>(dim, cagra_index.metric(), hierarchy);
   auto appr_algo  = std::make_unique<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>>(
-    hnsw_index->get_space(), n_rows, cagra_index.graph().extent(1) / 2, params.ef_construction);
+    hnsw_index->get_space(),
+    n_rows,
+    (cagra_index.graph().extent(1) + 1) / 2,
+    params.ef_construction);
   appr_algo->cur_element_count = n_rows;
 
   // Initialize linked lists
