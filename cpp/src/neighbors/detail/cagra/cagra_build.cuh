@@ -493,7 +493,7 @@ void ace_adjust_sub_graph_ids_disk(
 }
 
 // ACE: Reorder dataset based on partition assignments and store to disk
-// Writes two files: reordered_dataset.bin (core partitions) and augmented_dataset.bin (secondary
+// Writes two files: reordered_dataset.npy (core partitions) and augmented_dataset.npy (secondary
 // partitions). Uses buffered writes optimized for NVMe storage.
 template <typename T, typename IdxT>
 void ace_reorder_and_store_dataset(
@@ -507,7 +507,10 @@ void ace_reorder_and_store_dataset(
   raft::host_vector_view<IdxT, int64_t, raft::row_major> augmented_partition_offsets,
   cuvs::util::file_descriptor& reordered_fd,
   cuvs::util::file_descriptor& augmented_fd,
-  cuvs::util::file_descriptor& mapping_fd)
+  cuvs::util::file_descriptor& mapping_fd,
+  size_t reordered_header_size,
+  size_t augmented_header_size,
+  size_t mapping_header_size)
 {
   auto start = std::chrono::high_resolution_clock::now();
 
@@ -598,7 +601,8 @@ void ace_reorder_and_store_dataset(
     if (count > 0) {
       const size_t bytes_to_write = count * vector_size;
       const size_t file_offset =
-        (core_partition_starts(partition_id) + core_partition_current(partition_id)) * vector_size;
+        (core_partition_starts(partition_id) + core_partition_current(partition_id)) * vector_size +
+        reordered_header_size;
 
       cuvs::util::write_large_file(
         reordered_fd, core_buffers[partition_id].data_handle(), bytes_to_write, file_offset);
@@ -614,7 +618,8 @@ void ace_reorder_and_store_dataset(
       const size_t bytes_to_write = count * vector_size;
       const size_t file_offset =
         (augmented_partition_starts(partition_id) + augmented_partition_current(partition_id)) *
-        vector_size;
+          vector_size +
+        augmented_header_size;
 
       cuvs::util::write_large_file(
         augmented_fd, augmented_buffers[partition_id].data_handle(), bytes_to_write, file_offset);
@@ -672,7 +677,7 @@ void ace_reorder_and_store_dataset(
 
   const size_t mapping_file_size = dataset_size * sizeof(IdxT);
   cuvs::util::write_large_file(
-    mapping_fd, core_backward_mapping.data_handle(), mapping_file_size, 0);
+    mapping_fd, core_backward_mapping.data_handle(), mapping_file_size, mapping_header_size);
 
   auto end        = std::chrono::high_resolution_clock::now();
   auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -728,11 +733,27 @@ void ace_load_partition_dataset_from_disk(
 
   const size_t vector_size = dataset_dim * sizeof(T);
 
-  const std::string reordered_dataset_path = ace_build_dir + "/reordered_dataset.bin";
-  const std::string augmented_dataset_path = ace_build_dir + "/augmented_dataset.bin";
+  const std::string reordered_dataset_path = ace_build_dir + "/reordered_dataset.npy";
+  const std::string augmented_dataset_path = ace_build_dir + "/augmented_dataset.npy";
 
+  size_t core_header_size      = 0;
+  size_t augmented_header_size = 0;
   size_t core_file_offset      = 0;
   size_t augmented_file_offset = 0;
+  {
+    std::ifstream is(reordered_dataset_path, std::ios::in | std::ios::binary);
+    if (!is) { RAFT_FAIL("Cannot open file %s", reordered_dataset_path.c_str()); }
+    auto start_pos = is.tellg();
+    raft::detail::numpy_serializer::read_header(is);
+    core_header_size = static_cast<size_t>(is.tellg() - start_pos);
+  }
+  {
+    std::ifstream is(augmented_dataset_path, std::ios::in | std::ios::binary);
+    if (!is) { RAFT_FAIL("Cannot open file %s", augmented_dataset_path.c_str()); }
+    auto start_pos = is.tellg();
+    raft::detail::numpy_serializer::read_header(is);
+    augmented_header_size = static_cast<size_t>(is.tellg() - start_pos);
+  }
 
   for (size_t p = 0; p < partition_id; p++) {
     core_file_offset += partition_histogram(p, 0);
@@ -741,6 +762,9 @@ void ace_load_partition_dataset_from_disk(
 
   core_file_offset *= vector_size;
   augmented_file_offset *= vector_size;
+
+  core_file_offset += core_header_size;
+  augmented_file_offset += augmented_header_size;
 
   RAFT_LOG_DEBUG("ACE: Core file offset: %lu bytes, Augmented file offset: %lu bytes",
                  core_file_offset,
@@ -752,7 +776,8 @@ void ace_load_partition_dataset_from_disk(
 #pragma omp section
     {
       if (core_size > 0) {
-        RAFT_LOG_INFO("ACE: Reading %lu core vectors from offset %lu", core_size, core_file_offset);
+        RAFT_LOG_DEBUG(
+          "ACE: Reading %lu core vectors from offset %lu", core_size, core_file_offset);
         cuvs::util::file_descriptor reordered_fd(reordered_dataset_path, O_RDONLY);
         const size_t core_bytes = core_size * vector_size;
         cuvs::util::read_large_file(
@@ -762,9 +787,9 @@ void ace_load_partition_dataset_from_disk(
 #pragma omp section
     {
       if (augmented_size > 0) {
-        RAFT_LOG_INFO("ACE: Reading %lu augmented vectors from offset %lu",
-                      augmented_size,
-                      augmented_file_offset);
+        RAFT_LOG_DEBUG("ACE: Reading %lu augmented vectors from offset %lu",
+                       augmented_size,
+                       augmented_file_offset);
         cuvs::util::file_descriptor augmented_fd(augmented_dataset_path, O_RDONLY);
         const size_t augmented_bytes = augmented_size * vector_size;
         T* augmented_dest            = sub_dataset.data_handle() + (core_size * dataset_dim);
@@ -915,30 +940,149 @@ index<T, IdxT> build_ace(raft::resources const& res,
   cuvs::util::file_descriptor augmented_fd;
   cuvs::util::file_descriptor mapping_fd;
   cuvs::util::file_descriptor graph_fd;
+  size_t reordered_header_size = 0;
+  size_t augmented_header_size = 0;
+  size_t mapping_header_size   = 0;
+  size_t graph_header_size     = 0;
+
   if (use_disk) {
     if (mkdir(ace_build_dir.c_str(), 0755) != 0 && errno != EEXIST) {
       RAFT_EXPECTS(false, "Failed to create ACE build directory: %s", ace_build_dir.c_str());
     }
+
+    // Helper lambda to write numpy header to file descriptor
+    auto write_numpy_header = [](int fd,
+                                 const std::vector<size_t>& shape,
+                                 const raft::detail::numpy_serializer::dtype_t& dtype) {
+      std::stringstream ss;
+
+      const bool fortran_order                              = false;
+      const raft::detail::numpy_serializer::header_t header = {dtype, fortran_order, shape};
+
+      raft::detail::numpy_serializer::write_header(ss, header);
+
+      std::string header_str = ss.str();
+      ssize_t written        = write(fd, header_str.data(), header_str.size());
+      if (written < 0 || static_cast<size_t>(written) != header_str.size()) {
+        RAFT_FAIL("Failed to write numpy header to file descriptor");
+      }
+      return header_str.size();
+    };
+
+    // Create and allocate dataset file
     reordered_fd = cuvs::util::file_descriptor(
-      ace_build_dir + "/reordered_dataset.bin", O_CREAT | O_WRONLY | O_TRUNC, 0644);
-    augmented_fd = cuvs::util::file_descriptor(
-      ace_build_dir + "/augmented_dataset.bin", O_CREAT | O_WRONLY | O_TRUNC, 0644);
-    mapping_fd = cuvs::util::file_descriptor(
-      ace_build_dir + "/dataset_mapping.bin", O_CREAT | O_WRONLY | O_TRUNC, 0644);
-    graph_fd = cuvs::util::file_descriptor(
-      ace_build_dir + "/cagra_graph.bin", O_CREAT | O_WRONLY | O_TRUNC, 0644);
-    if (posix_fallocate(reordered_fd.get(), 0, dataset_size * dataset_dim * sizeof(T)) != 0) {
+      ace_build_dir + "/reordered_dataset.npy", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    {
+      std::stringstream ss;
+      const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<T>();
+      const bool fortran_order = false;
+      const raft::detail::numpy_serializer::header_t header = {
+        dtype, fortran_order, {dataset_size, dataset_dim}};
+      raft::detail::numpy_serializer::write_header(ss, header);
+      reordered_header_size = ss.str().size();
+    }
+    if (posix_fallocate(reordered_fd.get(),
+                        0,
+                        reordered_header_size + dataset_size * dataset_dim * sizeof(T)) != 0) {
       RAFT_FAIL("Failed to pre-allocate space for reordered dataset file");
     }
-    if (posix_fallocate(augmented_fd.get(), 0, dataset_size * dataset_dim * sizeof(T)) != 0) {
+    {
+      auto dtype_for_dataset = raft::detail::numpy_serializer::get_numpy_dtype<T>();
+      RAFT_LOG_DEBUG("Writing reordered_dataset.npy header: shape=[%zu,%zu], dtype=%c",
+                     dataset_size,
+                     dataset_dim,
+                     dtype_for_dataset.kind);
+      if (lseek(reordered_fd.get(), 0, SEEK_SET) == -1) {
+        RAFT_FAIL("Failed to seek to beginning of reordered dataset file");
+      }
+      write_numpy_header(reordered_fd.get(), {dataset_size, dataset_dim}, dtype_for_dataset);
+    }
+
+    // Create and allocate augmented dataset file
+    augmented_fd = cuvs::util::file_descriptor(
+      ace_build_dir + "/augmented_dataset.npy", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    {
+      std::stringstream ss;
+      const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<T>();
+      const bool fortran_order = false;
+      const raft::detail::numpy_serializer::header_t header = {
+        dtype, fortran_order, {dataset_size, dataset_dim}};
+      raft::detail::numpy_serializer::write_header(ss, header);
+      augmented_header_size = ss.str().size();
+    }
+    if (posix_fallocate(augmented_fd.get(),
+                        0,
+                        augmented_header_size + dataset_size * dataset_dim * sizeof(T)) != 0) {
       RAFT_FAIL("Failed to pre-allocate space for augmented dataset file");
     }
-    if (posix_fallocate(mapping_fd.get(), 0, dataset_size * sizeof(IdxT)) != 0) {
+    // Seek to beginning before writing header
+    if (lseek(augmented_fd.get(), 0, SEEK_SET) == -1) {
+      RAFT_FAIL("Failed to seek to beginning of augmented dataset file");
+    }
+    write_numpy_header(augmented_fd.get(),
+                       {dataset_size, dataset_dim},
+                       raft::detail::numpy_serializer::get_numpy_dtype<T>());
+
+    // Create and allocate mapping file
+    mapping_fd = cuvs::util::file_descriptor(
+      ace_build_dir + "/dataset_mapping.npy", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    {
+      std::stringstream ss;
+      const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
+      const bool fortran_order = false;
+      const raft::detail::numpy_serializer::header_t header = {
+        dtype, fortran_order, {dataset_size}};
+      raft::detail::numpy_serializer::write_header(ss, header);
+      mapping_header_size = ss.str().size();
+    }
+    if (posix_fallocate(mapping_fd.get(), 0, mapping_header_size + dataset_size * sizeof(IdxT)) !=
+        0) {
       RAFT_FAIL("Failed to pre-allocate space for dataset mapping file");
     }
-    if (posix_fallocate(graph_fd.get(), 0, cagra_graph_size) != 0) {
+    {
+      auto dtype_for_mapping = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
+      RAFT_LOG_DEBUG("Writing dataset_mapping.npy header: shape=[%zu], dtype=%c",
+                     dataset_size,
+                     dtype_for_mapping.kind);
+      if (lseek(mapping_fd.get(), 0, SEEK_SET) == -1) {
+        RAFT_FAIL("Failed to seek to beginning of mapping file");
+      }
+      write_numpy_header(mapping_fd.get(), {dataset_size}, dtype_for_mapping);
+    }
+
+    // Create and allocate graph file
+    graph_fd = cuvs::util::file_descriptor(
+      ace_build_dir + "/cagra_graph.npy", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    {
+      std::stringstream ss;
+      const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
+      const bool fortran_order = false;
+      const raft::detail::numpy_serializer::header_t header = {
+        dtype, fortran_order, {dataset_size, graph_degree}};
+      raft::detail::numpy_serializer::write_header(ss, header);
+      graph_header_size = ss.str().size();
+    }
+    if (posix_fallocate(graph_fd.get(), 0, graph_header_size + cagra_graph_size) != 0) {
       RAFT_FAIL("Failed to pre-allocate space for graph file");
     }
+    {
+      auto dtype_for_graph = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
+      RAFT_LOG_DEBUG("Writing cagra_graph.npy header: shape=[%zu,%zu], dtype=%c",
+                     dataset_size,
+                     graph_degree,
+                     dtype_for_graph.kind);
+      if (lseek(graph_fd.get(), 0, SEEK_SET) == -1) {
+        RAFT_FAIL("Failed to seek to beginning of graph file");
+      }
+      write_numpy_header(graph_fd.get(), {dataset_size, graph_degree}, dtype_for_graph);
+    }
+
+    RAFT_LOG_DEBUG(
+      "ACE: Wrote numpy headers (reordered: %zu, augmented: %zu, mapping: %zu, graph: %zu bytes)",
+      reordered_header_size,
+      augmented_header_size,
+      mapping_header_size,
+      graph_header_size);
   }
 
   auto partition_start     = std::chrono::high_resolution_clock::now();
@@ -1008,7 +1152,10 @@ index<T, IdxT> build_ace(raft::resources const& res,
                                            augmented_partition_offsets.view(),
                                            reordered_fd,
                                            augmented_fd,
-                                           mapping_fd);
+                                           mapping_fd,
+                                           reordered_header_size,
+                                           augmented_header_size,
+                                           mapping_header_size);
     // core_backward_mapping is not needed anymore.
     core_backward_mapping = raft::make_host_vector<IdxT, int64_t>(0);
   }
@@ -1122,7 +1269,8 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
     if (use_disk) {
       const size_t graph_offset =
-        static_cast<size_t>(core_partition_offsets(partition_id)) * graph_degree * sizeof(IdxT);
+        static_cast<size_t>(core_partition_offsets(partition_id)) * graph_degree * sizeof(IdxT) +
+        graph_header_size;
       const size_t graph_bytes = core_sub_dataset_size * graph_degree * sizeof(IdxT);
       cuvs::util::write_large_file(
         graph_fd, sub_search_graph.data_handle(), graph_bytes, graph_offset);
@@ -1163,7 +1311,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
   // Clean up augmented dataset file to save disk space (no longer needed after partitions
   // processed)
   if (use_disk) {
-    const std::string augmented_dataset_path = ace_build_dir + "/augmented_dataset.bin";
+    const std::string augmented_dataset_path = ace_build_dir + "/augmented_dataset.npy";
     if (std::filesystem::exists(augmented_dataset_path)) {
       std::filesystem::remove(augmented_dataset_path);
       RAFT_LOG_INFO("ACE: Removed augmented dataset file to save disk space");
@@ -1189,14 +1337,18 @@ index<T, IdxT> build_ace(raft::resources const& res,
       }
     }
   } else {
-    idx.set_disk_storage(true, ace_build_dir, dataset_size, dataset_dim, graph_degree);
-    RAFT_LOG_INFO(
-      "ACE: Set disk storage at %s with dataset size %zu and dataset dimension %zu and graph "
-      "degree %zu",
-      ace_build_dir.c_str(),
-      dataset_size,
-      dataset_dim,
-      graph_degree);
+    std::string dataset_file = ace_build_dir + "/reordered_dataset.npy";
+    std::string graph_file   = ace_build_dir + "/cagra_graph.npy";
+
+    idx.update_dataset(res, dataset_file);
+    idx.update_graph(res, graph_file);
+
+    RAFT_LOG_INFO("ACE: Set disk storage at %s (dataset shape [%zu, %zu], graph shape [%zu, %zu])",
+                  ace_build_dir.c_str(),
+                  idx.size(),
+                  idx.dim(),
+                  idx.size(),
+                  idx.graph_degree());
   }
 
   auto index_creation_end = std::chrono::high_resolution_clock::now();

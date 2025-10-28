@@ -28,6 +28,9 @@
 #include <raft/core/mdspan.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/stream_view.hpp>
+#include <raft/core/serialize.hpp>
+
+#include <fstream>
 #include <raft/core/resources.hpp>
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
@@ -629,19 +632,85 @@ struct index : cuvs::neighbors::index {
   }
 
   /**
-   * Set whether the index is stored on disk and the directory where files are stored.
+   * Update the dataset from a disk file.
+   *
+   * This method configures the index to use a disk-based dataset stored in the specified file.
+   * The dataset file should contain a numpy header followed by vectors in row-major format.
+   * The number of rows and dimensionality are read from the numpy header.
+   *
+   * @param[in] res raft resources
+   * @param[in] file_path Path to the dataset file
    */
-  void set_disk_storage(bool on_disk,
-                        const std::string& file_directory = "",
-                        size_t n_rows                     = 0,
-                        size_t dim                        = 0,
-                        size_t graph_degree               = 0)
+  void update_dataset(raft::resources const& res, const std::string& file_path)
   {
-    on_disk_        = on_disk;
-    file_directory_ = file_directory;
-    n_rows_         = n_rows;
-    dim_            = dim;
-    graph_degree_   = graph_degree;
+    std::ifstream is(file_path, std::ios::in | std::ios::binary);
+    if (!is) { RAFT_FAIL("Cannot open dataset file %s", file_path.c_str()); }
+
+    raft::detail::numpy_serializer::header_t header =
+      raft::detail::numpy_serializer::read_header(is);
+
+    auto last_slash = file_path.find_last_of('/');
+    if (last_slash != std::string::npos) {
+      file_directory_ = file_path.substr(0, last_slash);
+    } else {
+      file_directory_ = ".";
+    }
+
+    on_disk_ = true;
+    n_rows_  = header.shape[0];
+    dim_     = header.shape[1];
+
+    RAFT_LOG_DEBUG("ACE: Dataset at %s has shape [%zu, %zu]", file_path.c_str(), n_rows_, dim_);
+
+    dataset_ = std::make_unique<cuvs::neighbors::empty_dataset<int64_t>>(0);
+    dataset_norms_.reset();
+  }
+
+  /**
+   * Update the graph from a disk file.
+   *
+   * This method configures the index to use a disk-based graph stored in the specified file.
+   * The graph file should contain a numpy header followed by neighbor indices in row-major format.
+   * The number of rows and graph degree are read from the numpy header.
+   * The file directory is derived from the file path.
+   *
+   * @param[in] res raft resources
+   * @param[in] file_path Path to the graph file
+   */
+  void update_graph(raft::resources const& res, const std::string& file_path)
+  {
+    std::ifstream is(file_path, std::ios::in | std::ios::binary);
+    if (!is) { RAFT_FAIL("Cannot open graph file %s", file_path.c_str()); }
+
+    raft::detail::numpy_serializer::header_t header =
+      raft::detail::numpy_serializer::read_header(is);
+
+    if (on_disk_ && n_rows_ != 0) {
+      RAFT_EXPECTS(n_rows_ == header.shape[0],
+                   "Graph size (%zu) must match dataset size (%zu)",
+                   header.shape[0],
+                   n_rows_);
+    }
+
+    auto last_slash = file_path.find_last_of('/');
+    if (last_slash != std::string::npos) {
+      std::string graph_dir = file_path.substr(0, last_slash);
+      if (!file_directory_.empty() && file_directory_ != graph_dir) {
+        RAFT_LOG_WARN("Graph directory (%s) differs from dataset directory (%s)",
+                      graph_dir.c_str(),
+                      file_directory_.c_str());
+      }
+      file_directory_ = graph_dir;
+    }
+    on_disk_      = true;
+    n_rows_       = header.shape[0];
+    graph_degree_ = header.shape[1];
+
+    RAFT_LOG_DEBUG(
+      "ACE: Graph at %s has shape [%zu, %zu]", file_path.c_str(), n_rows_, graph_degree_);
+
+    graph_      = raft::make_device_matrix<IdxT, int64_t>(res, 0, 0);
+    graph_view_ = graph_.view();
   }
 
  private:

@@ -19,7 +19,9 @@
 
 #include <algorithm>
 #include <cstring>
+#include <ostream>
 #include <string>
+#include <vector>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -169,5 +171,47 @@ inline void write_large_file(const file_descriptor& fd,
     offset += chunk_size;
   }
 }
+
+/**
+ * @brief Buffered output stream wrapper
+ *
+ * Wraps an std::ostream with a buffer to improve write performance by
+ * reducing the number of system calls. Automatically flushes on destruction.
+ * Non-copyable, non-movable.
+ */
+class buffered_ofstream {
+ public:
+  buffered_ofstream(std::ostream* os, size_t buffer_size) : os_(os), buffer_(buffer_size), pos_(0)
+  {
+  }
+
+  ~buffered_ofstream() noexcept { flush(); }
+
+  buffered_ofstream(const buffered_ofstream& res)                      = delete;
+  auto operator=(const buffered_ofstream& other) -> buffered_ofstream& = delete;
+  buffered_ofstream(buffered_ofstream&& other)                         = delete;
+  auto operator=(buffered_ofstream&& other) -> buffered_ofstream&      = delete;
+
+  void flush()
+  {
+    if (pos_ > 0) {
+      os_->write(reinterpret_cast<char*>(&buffer_.front()), pos_);
+      if (!os_->good()) { RAFT_FAIL("Error writing HNSW file!"); }
+      pos_ = 0;
+    }
+  }
+
+  void write(const char* input, size_t size)
+  {
+    if (pos_ + size > buffer_.size()) { flush(); }
+    std::copy(input, input + size, &buffer_[pos_]);
+    pos_ += size;
+  }
+
+ private:
+  std::vector<char> buffer_;
+  std::ostream* os_;
+  size_t pos_;
+};
 
 }  // namespace cuvs::util

@@ -18,6 +18,7 @@
 
 #include "../../core/nvtx.hpp"
 #include "../../core/omp_wrapper.hpp"
+#include "../../util/file_io.hpp"
 
 #include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/cagra.hpp>
@@ -30,12 +31,14 @@
 #include <hnswlib/hnswalg.h>
 #include <hnswlib/hnswlib.h>
 
+#include <fcntl.h>
 #include <filesystem>
 #include <fstream>
 #include <memory>
 #include <random>
 #include <sys/mman.h>
 #include <thread>
+#include <unistd.h>
 
 namespace cuvs::neighbors::hnsw::detail {
 
@@ -266,107 +269,6 @@ int initialize_point_in_hnsw(hnswlib::HierarchicalNSW<DistT>* appr_algo,
   return cur_c;
 }
 
-// RAII mmap reader wrapper
-template <typename T, typename idx_t>
-struct mmap_reader {
-  mmap_reader(const std::string& filename, size_t num_elements) : size_{num_elements * sizeof(T)}
-  {
-    fd_ = open(filename.c_str(), O_RDONLY);
-    if (fd_ == -1) { throw std::runtime_error("cuvs::mmap_reader error opening file"); }
-
-    float file_size_gb = size_ / 1e9;
-    RAFT_LOG_INFO("mmap opening file %s, num_elements [%zu] size %.2f GB",
-                  filename.c_str(),
-                  num_elements,
-                  file_size_gb);
-
-    data_ = mmap(nullptr, size_, PROT_READ, MAP_PRIVATE, fd_, 0);
-    // close(fd_);
-    if (data_ == MAP_FAILED) { throw std::runtime_error("cuvs::mmap_reader error"); }
-    if (madvise(data_, size_, MADV_HUGEPAGE) != 0) {
-      munmap(data_, size_);
-      data_ = nullptr;
-      throw std::runtime_error("cuvs::mmap_reader madvise error");
-    }
-  }
-
-  ~mmap_reader() noexcept
-  {
-    if (data_ != nullptr) { munmap(data_, size_); }
-    close(fd_);
-  }
-
-  mmap_reader(const mmap_reader& res)                      = delete;
-  auto operator=(const mmap_reader& other) -> mmap_reader& = delete;
-  // Moving is fine
-  mmap_reader(mmap_reader&& other)
-    : fd_{std::exchange(other.fd_, -1)},
-      data_{std::exchange(other.data_, nullptr)},
-      size_{std::exchange(other.size_, 0)}
-  {
-  }
-  auto operator=(mmap_reader&& other) -> mmap_reader&
-  {
-    std::swap(this->fd_, other.fd_);
-    std::swap(this->data_, other.data_);
-    std::swap(this->size_, other.size_);
-    return *this;
-  }
-
-  [[nodiscard]] auto view(idx_t n_rows, idx_t n_cols) const -> raft::host_matrix_view<T, idx_t>
-  {
-    return raft::make_host_matrix_view<T, idx_t>(
-      reinterpret_cast<T*>((char*)data_), n_rows, n_cols);
-  }
-  [[nodiscard]] auto view(idx_t n_rows) const -> raft::host_vector_view<T, idx_t>
-  {
-    return raft::make_host_vector_view<T, idx_t>(reinterpret_cast<T*>((char*)data_), n_rows);
-  }
-
- private:
-  int fd_ = -1;
-  void* data_;
-  size_t size_;
-};
-
-struct buffered_ofstream {
-  buffered_ofstream(std::ostream* os, size_t buffer_size) : os_(os), buffer_(buffer_size), pos_(0)
-  {
-  }
-
-  ~buffered_ofstream() noexcept
-  {
-    // flush it
-    flush();
-  }
-
-  buffered_ofstream(const buffered_ofstream& res)                      = delete;
-  auto operator=(const buffered_ofstream& other) -> buffered_ofstream& = delete;
-  buffered_ofstream(buffered_ofstream&& other)                         = delete;
-  auto operator=(buffered_ofstream&& other) -> buffered_ofstream&      = delete;
-
-  void flush()
-  {
-    if (pos_ > 0) {
-      os_->write(reinterpret_cast<char*>(&buffer_.front()), pos_);
-      if (!os_->good()) { RAFT_FAIL("Error writing HNSW file!"); }
-      pos_ = 0;
-    }
-  }
-
-  void write(const char* input, size_t size)
-  {
-    if (pos_ + size > buffer_.size()) { flush(); }
-    std::copy(input, input + size, &buffer_[pos_]);
-    pos_ += size;
-  }
-
- private:
-  std::vector<char> buffer_;
-  std::ostream* os_;
-  size_t pos_;
-};
-
 template <typename T>
 void all_neighbors_graph(raft::resources const& res,
                          raft::host_matrix_view<const T, int64_t, raft::row_major> dataset,
@@ -397,7 +299,9 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::serialize");
 
-  buffered_ofstream os(&os_raw, 1 << 20 /*1MB*/);
+  auto start_time = std::chrono::system_clock::now();
+
+  cuvs::util::buffered_ofstream os(&os_raw, 1 << 20 /*1MB*/);
 
   RAFT_EXPECTS(index_.on_disk(), "Function only implements serialization from disk.");
   RAFT_EXPECTS(params.hierarchy != HnswHierarchy::CPU,
@@ -417,30 +321,133 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
          index_directory.c_str());
 
   std::string graph_filename =
-    (std::filesystem::path(index_directory) / "cagra_graph.bin").string();
+    (std::filesystem::path(index_directory) / "cagra_graph.npy").string();
   ASSERT(std::filesystem::exists(graph_filename),
          "Graph file '%s' does not exist.",
          graph_filename.c_str());
+  size_t graph_header_size = 0;
+  size_t graph_n_rows      = 0;
+  size_t graph_n_cols      = 0;
+  {
+    std::ifstream is(graph_filename, std::ios::in | std::ios::binary);
+    ASSERT(is, "Cannot open graph file %s", graph_filename.c_str());
+    auto start_pos    = is.tellg();
+    auto header       = raft::detail::numpy_serializer::read_header(is);
+    graph_header_size = static_cast<size_t>(is.tellg() - start_pos);
+    ASSERT(
+      header.shape.size() == 2, "Graph file should be 2D, got %zu dimensions", header.shape.size());
 
-  mmap_reader<uint32_t, int64_t> graph_handle(graph_filename,
-                                              static_cast<size_t>(n_rows) * graph_degree_int);
-  auto host_graph_view = graph_handle.view(n_rows, graph_degree_int);
+    graph_n_rows = header.shape[0];
+    graph_n_cols = header.shape[1];
+    RAFT_LOG_DEBUG("Graph file: %zu x %zu, dtype=%c, header size: %zu bytes",
+                   graph_n_rows,
+                   graph_n_cols,
+                   header.dtype.kind,
+                   graph_header_size);
+  }
 
   std::string dataset_filename =
-    (std::filesystem::path(index_directory) / "reordered_dataset.bin").string();
+    (std::filesystem::path(index_directory) / "reordered_dataset.npy").string();
   ASSERT(std::filesystem::exists(dataset_filename),
          "Dataset file '%s' does not exist.",
          dataset_filename.c_str());
-  mmap_reader<T, int64_t> dataset_handle(dataset_filename, static_cast<size_t>(n_rows) * dim);
-  auto host_dataset_view = dataset_handle.view(n_rows, dim);
+  size_t dataset_header_size = 0;
+  size_t dataset_n_rows      = 0;
+  size_t dataset_n_cols      = 0;
+  {
+    std::ifstream is(dataset_filename, std::ios::in | std::ios::binary);
+    ASSERT(is, "Cannot open dataset file %s", dataset_filename.c_str());
+    auto start_pos      = is.tellg();
+    auto header         = raft::detail::numpy_serializer::read_header(is);
+    dataset_header_size = static_cast<size_t>(is.tellg() - start_pos);
+    ASSERT(header.shape.size() == 2,
+           "Dataset file should be 2D, got %zu dimensions",
+           header.shape.size());
+
+    dataset_n_rows = header.shape[0];
+    dataset_n_cols = header.shape[1];
+    RAFT_LOG_DEBUG("Dataset file: %zu x %zu, dtype=%c, header size: %zu bytes",
+                   dataset_n_rows,
+                   dataset_n_cols,
+                   header.dtype.kind,
+                   dataset_header_size);
+  }
 
   std::string label_filename =
-    (std::filesystem::path(index_directory) / "dataset_mapping.bin").string();
+    (std::filesystem::path(index_directory) / "dataset_mapping.npy").string();
   ASSERT(std::filesystem::exists(label_filename),
          "Label file '%s' does not exist.",
          label_filename.c_str());
-  mmap_reader<uint32_t, int64_t> label_handle(label_filename, n_rows);
-  auto host_label_view = label_handle.view(n_rows);
+  size_t label_header_size = 0;
+  size_t label_n_elements  = 0;
+  {
+    std::ifstream is(label_filename, std::ios::in | std::ios::binary);
+    ASSERT(is, "Cannot open label file %s", label_filename.c_str());
+    auto start_pos    = is.tellg();
+    auto header       = raft::detail::numpy_serializer::read_header(is);
+    label_header_size = static_cast<size_t>(is.tellg() - start_pos);
+    ASSERT(
+      header.shape.size() == 1, "Label file should be 1D, got %zu dimensions", header.shape.size());
+
+    label_n_elements = header.shape[0];
+    RAFT_LOG_DEBUG("Label file: %zu elements, dtype=%c, header size: %zu bytes",
+                   label_n_elements,
+                   header.dtype.kind,
+                   label_header_size);
+  }
+
+  // Verify consistency
+  ASSERT(graph_n_rows == static_cast<size_t>(n_rows),
+         "Graph rows (%zu) != index size (%zu)",
+         graph_n_rows,
+         static_cast<size_t>(n_rows));
+  ASSERT(dataset_n_rows == static_cast<size_t>(n_rows),
+         "Dataset rows (%zu) != index size (%zu)",
+         dataset_n_rows,
+         static_cast<size_t>(n_rows));
+  ASSERT(label_n_elements == static_cast<size_t>(n_rows),
+         "Label elements (%zu) != index size (%zu)",
+         label_n_elements,
+         static_cast<size_t>(n_rows));
+  ASSERT(graph_n_cols == static_cast<size_t>(graph_degree_int),
+         "Graph cols (%zu) != graph degree (%d)",
+         graph_n_cols,
+         graph_degree_int);
+  ASSERT(dataset_n_cols == static_cast<size_t>(dim),
+         "Dataset cols (%zu) != dimensions (%zu)",
+         dataset_n_cols,
+         static_cast<size_t>(dim));
+
+  // Open file descriptors for batched reading
+  int graph_fd = open(graph_filename.c_str(), O_RDONLY);
+  ASSERT(graph_fd >= 0, "Failed to open graph file %s", graph_filename.c_str());
+
+  int dataset_fd = open(dataset_filename.c_str(), O_RDONLY);
+  ASSERT(dataset_fd >= 0, "Failed to open dataset file %s", dataset_filename.c_str());
+
+  int label_fd = open(label_filename.c_str(), O_RDONLY);
+  ASSERT(label_fd >= 0, "Failed to open label file %s", label_filename.c_str());
+
+  const size_t row_size_bytes =
+    graph_degree_int * sizeof(IdxT) + dim * sizeof(T) + sizeof(uint32_t);
+  const size_t target_batch_bytes = 64 * 1024 * 1024;
+  const size_t batch_size         = std::max<size_t>(1, target_batch_bytes / row_size_bytes);
+
+  RAFT_LOG_DEBUG("Using batch size %zu rows (~%.2f MiB/batch)",
+                 batch_size,
+                 (batch_size * row_size_bytes) / (1024.0 * 1024.0));
+
+  // Allocate buffers for batched reading
+  auto graph_buffer   = raft::make_host_matrix<IdxT, int64_t>(batch_size, graph_degree_int);
+  auto dataset_buffer = raft::make_host_matrix<T, int64_t>(batch_size, dim);
+  auto label_buffer   = raft::make_host_vector<uint32_t, int64_t>(batch_size);
+
+  RAFT_LOG_DEBUG("Allocated buffers: graph[%ld,%d], dataset[%ld,%ld], labels[%ld]",
+                 graph_buffer.extent(0),
+                 graph_degree_int,
+                 dataset_buffer.extent(0),
+                 dataset_buffer.extent(1),
+                 label_buffer.extent(0));
 
   // initialize dummy HNSW index to retrieve constants
   auto hnsw_index = std::make_unique<index_impl<T>>(dim, index_.metric(), params.hierarchy);
@@ -488,6 +495,17 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
   appr_algo->maxlevel_        = create_hierarchy ? hist.size() - 1 : 1;
 
   // write header information
+  RAFT_LOG_DEBUG("Writing HNSW header: offsetLevel0=%zu, n_rows=%zu, size_data_per_element=%zu",
+                 appr_algo->offsetLevel0_,
+                 static_cast<size_t>(n_rows),
+                 appr_algo->size_data_per_element_);
+  RAFT_LOG_DEBUG("  maxlevel=%d, enterpoint=%d, maxM=%zu, maxM0=%zu, M=%zu",
+                 appr_algo->maxlevel_,
+                 appr_algo->enterpoint_node_,
+                 appr_algo->maxM_,
+                 appr_algo->maxM0_,
+                 appr_algo->M_);
+
   // offset_level_0
   os.write(reinterpret_cast<char*>(&appr_algo->offsetLevel0_), sizeof(std::size_t));
   // 8 max_element - override with n_rows
@@ -520,7 +538,7 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
   auto host_query_set =
     raft::make_host_matrix<T, int64_t>(create_hierarchy ? n_rows - hist[0] : 0, dim);
 
-  int64_t d_report_offset    = n_rows / 20;  // Report progress in 5% steps.
+  int64_t d_report_offset    = n_rows / 10;  // Report progress in 10% steps.
   int64_t next_report_offset = d_report_offset;
   auto start_clock           = std::chrono::system_clock::now();
 
@@ -529,50 +547,134 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
   float GiB            = 1 << 30;
   assert(appr_algo->size_data_per_element_ ==
          dim * sizeof(T) + appr_algo->maxM0_ * sizeof(IdxT) + sizeof(int) + sizeof(size_t));
-  for (int64_t i = 0; i < n_rows; i++) {
-    os.write(reinterpret_cast<char*>(&graph_degree_int), sizeof(int));
 
-    const IdxT* graph_row = &host_graph_view(i, 0);
-    os.write(reinterpret_cast<const char*>(graph_row), sizeof(IdxT) * graph_degree_int);
+  // Helper lambda for parallel reading of batches
+  auto read_batch = [&](int64_t start_row, int64_t rows_to_read) {
+    const size_t graph_bytes   = rows_to_read * graph_degree_int * sizeof(IdxT);
+    const size_t dataset_bytes = rows_to_read * dim * sizeof(T);
+    const size_t label_bytes   = rows_to_read * sizeof(uint32_t);
 
-    const T* data_row = &host_dataset_view(i, 0);
-    os.write(reinterpret_cast<const char*>(data_row), sizeof(T) * dim);
+    const off_t graph_offset   = graph_header_size + start_row * graph_degree_int * sizeof(IdxT);
+    const off_t dataset_offset = dataset_header_size + start_row * dim * sizeof(T);
+    const off_t label_offset   = label_header_size + start_row * sizeof(uint32_t);
 
-    // copy out host data to query storage
-    if (create_hierarchy && levels[i] > 0) {
-      // position in query: order_bw[i]-hist[0]
-      std::copy(data_row,
-                data_row + dim,
-                reinterpret_cast<char*>(&host_query_set(order_bw[i] - hist[0], 0)));
+    RAFT_LOG_DEBUG("Reading batch: row=%ld, rows=%ld", start_row, rows_to_read);
+    RAFT_LOG_DEBUG(
+      "  graph: offset=%zu, bytes=%zu", static_cast<size_t>(graph_offset), graph_bytes);
+    RAFT_LOG_DEBUG(
+      "  dataset: offset=%zu, bytes=%zu", static_cast<size_t>(dataset_offset), dataset_bytes);
+    RAFT_LOG_DEBUG(
+      "  label: offset=%zu, bytes=%zu", static_cast<size_t>(label_offset), label_bytes);
+
+#pragma omp parallel sections num_threads(3)
+    {
+#pragma omp section
+      {
+        ssize_t bytes_read = pread(graph_fd, graph_buffer.data_handle(), graph_bytes, graph_offset);
+        ASSERT(bytes_read == static_cast<ssize_t>(graph_bytes),
+               "Failed to read graph data: expected %zu, got %zd",
+               graph_bytes,
+               bytes_read);
+      }
+#pragma omp section
+      {
+        ssize_t bytes_read =
+          pread(dataset_fd, dataset_buffer.data_handle(), dataset_bytes, dataset_offset);
+        ASSERT(bytes_read == static_cast<ssize_t>(dataset_bytes),
+               "Failed to read dataset data: expected %zu, got %zd",
+               dataset_bytes,
+               bytes_read);
+      }
+#pragma omp section
+      {
+        ssize_t bytes_read = pread(label_fd, label_buffer.data_handle(), label_bytes, label_offset);
+        ASSERT(bytes_read == static_cast<ssize_t>(label_bytes),
+               "Failed to read label data: expected %zu, got %zd",
+               label_bytes,
+               bytes_read);
+      }
     }
 
-    // assign original label
-    auto label = static_cast<size_t>(host_label_view[i]);
-    os.write(reinterpret_cast<char*>(&label), sizeof(std::size_t));
+    // Log first few values from first batch for debugging
+    if (start_row == 0 && rows_to_read > 0) {
+      RAFT_LOG_DEBUG("First graph row: [%u, %u, %u, ...]",
+                     static_cast<unsigned int>(graph_buffer(0, 0)),
+                     graph_degree_int > 1 ? static_cast<unsigned int>(graph_buffer(0, 1)) : 0,
+                     graph_degree_int > 2 ? static_cast<unsigned int>(graph_buffer(0, 2)) : 0);
+      RAFT_LOG_DEBUG("First dataset row: [%f, %f, %f, ...]",
+                     static_cast<float>(dataset_buffer(0, 0)),
+                     dim > 1 ? static_cast<float>(dataset_buffer(0, 1)) : 0.0f,
+                     dim > 2 ? static_cast<float>(dataset_buffer(0, 2)) : 0.0f);
+      RAFT_LOG_DEBUG("First labels: [%u, %u, %u, ...]",
+                     static_cast<unsigned int>(label_buffer(0)),
+                     rows_to_read > 1 ? static_cast<unsigned int>(label_buffer(1)) : 0,
+                     rows_to_read > 2 ? static_cast<unsigned int>(label_buffer(2)) : 0);
+    }
+  };
 
-    bytes_written += appr_algo->size_data_per_element_;
+  for (int64_t batch_start = 0; batch_start < n_rows; batch_start += batch_size) {
+    const int64_t current_batch_size = std::min<int64_t>(batch_size, n_rows - batch_start);
 
-    const auto end_clock = std::chrono::system_clock::now();
-    // if (!os.good()) { RAFT_FAIL("Error writing HNSW file, row %zu", i); }
-    if (i > next_report_offset) {
-      next_report_offset += d_report_offset;
-      const auto time =
-        std::chrono::duration_cast<std::chrono::microseconds>(end_clock - start_clock).count() *
-        1e-6;
-      float throughput      = bytes_written / GiB / time;
-      float rows_throughput = i / time;
-      float ETA             = (n_rows - i) / rows_throughput;
-      RAFT_LOG_INFO(
-        "# Writing rows %12lu / %12lu (%3.2f %%), %3.2f GiB/sec, ETA %d:%3.1f, written %3.2f GiB\r",
-        i,
-        n_rows,
-        i / static_cast<double>(n_rows) * 100,
-        throughput,
-        int(ETA / 60),
-        std::fmod(ETA, 60.0f),
-        bytes_written / GiB);
+    RAFT_LOG_DEBUG("Reading batch: start=%ld, size=%ld (batch_size=%zu)",
+                   batch_start,
+                   current_batch_size,
+                   batch_size);
+    read_batch(batch_start, current_batch_size);
+
+    for (int64_t batch_idx = 0; batch_idx < current_batch_size; batch_idx++) {
+      const int64_t i = batch_start + batch_idx;
+
+      os.write(reinterpret_cast<char*>(&graph_degree_int), sizeof(int));
+
+      const IdxT* graph_row = &graph_buffer(batch_idx, 0);
+      os.write(reinterpret_cast<const char*>(graph_row), sizeof(IdxT) * graph_degree_int);
+
+      const T* data_row = &dataset_buffer(batch_idx, 0);
+      os.write(reinterpret_cast<const char*>(data_row), sizeof(T) * dim);
+
+      if (create_hierarchy && levels[i] > 0) {
+        // position in query: order_bw[i]-hist[0]
+        std::copy(data_row,
+                  data_row + dim,
+                  reinterpret_cast<char*>(&host_query_set(order_bw[i] - hist[0], 0)));
+      }
+
+      // assign original label
+      auto label = static_cast<size_t>(label_buffer(batch_idx));
+      os.write(reinterpret_cast<char*>(&label), sizeof(std::size_t));
+
+      bytes_written += appr_algo->size_data_per_element_;
+
+      const auto end_clock = std::chrono::system_clock::now();
+      // if (!os.good()) { RAFT_FAIL("Error writing HNSW file, row %zu", i); }
+      if (i > next_report_offset) {
+        next_report_offset += d_report_offset;
+        const auto time =
+          std::chrono::duration_cast<std::chrono::microseconds>(end_clock - start_clock).count() *
+          1e-6;
+        float throughput      = bytes_written / GiB / time;
+        float rows_throughput = i / time;
+        float ETA             = (n_rows - i) / rows_throughput;
+        RAFT_LOG_INFO(
+          "# Writing rows %12lu / %12lu (%3.2f %%), %3.2f GiB/sec, ETA %d:%3.1f, written %3.2f "
+          "GiB\r",
+          i,
+          n_rows,
+          i / static_cast<double>(n_rows) * 100,
+          throughput,
+          int(ETA / 60),
+          std::fmod(ETA, 60.0f),
+          bytes_written / GiB);
+      }
     }
   }
+
+  // Close file descriptors
+  close(graph_fd);
+  close(dataset_fd);
+  close(label_fd);
+
+  RAFT_LOG_DEBUG("Completed writing %ld base level rows", n_rows);
 
   // trigger knn builds for all levels
   std::vector<raft::host_matrix<IdxT, int64_t>> host_neighbors;
@@ -652,6 +754,18 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
         bytes_written / GiB);
     }
   }
+
+  // Flush buffered output and check data was written
+  os.flush();
+  os_raw.flush();
+  auto final_pos = os_raw.tellp();
+  RAFT_LOG_DEBUG("HNSW file size: %ld bytes", static_cast<int64_t>(final_pos));
+  if (!os_raw.good()) { RAFT_LOG_WARN("Output stream is not in good state after serialization"); }
+
+  auto end_time = std::chrono::system_clock::now();
+  auto elapsed_time =
+    std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+  RAFT_LOG_INFO("HNSW serialization from disk complete in %ld ms", elapsed_time);
 }
 
 template <typename T, HnswHierarchy hierarchy>
