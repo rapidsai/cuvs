@@ -378,7 +378,7 @@ final class JDKProvider implements CuVSProvider {
 
     private final MemorySegment stream;
 
-    private final PinnedMemoryBuffer hostBuffer;
+    private final CuVSResources resources;
     private final long bufferRowCount;
     private int currentBufferRow;
 
@@ -386,9 +386,9 @@ final class JDKProvider implements CuVSProvider {
         CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType) {
       super(CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType), size, columns);
       this.stream = Util.getStream(resources);
+      this.resources = resources;
 
-      this.hostBuffer = new PinnedMemoryBuffer(size, columns, matrix.valueLayout());
-      this.bufferRowCount = Math.min((hostBuffer.size() / rowBytes), size);
+      this.bufferRowCount = Math.min((PinnedMemoryBuffer.CHUNK_BYTES / rowBytes), size);
       this.currentBufferRow = 0;
     }
 
@@ -407,9 +407,9 @@ final class JDKProvider implements CuVSProvider {
           rowStride);
 
       this.stream = Util.getStream(resources);
+      this.resources = resources;
 
-      this.hostBuffer = new PinnedMemoryBuffer(size, columns, matrix.valueLayout());
-      this.bufferRowCount = Math.min((hostBuffer.size() / rowBytes), size);
+      this.bufferRowCount = Math.min((PinnedMemoryBuffer.CHUNK_BYTES / rowBytes), size);
       this.currentBufferRow = 0;
     }
 
@@ -419,16 +419,19 @@ final class JDKProvider implements CuVSProvider {
         throw new ArrayIndexOutOfBoundsException();
       }
       var hostBufferOffset = currentBufferRow * rowBytes;
-      MemorySegment.copy(vector, 0, hostBuffer.address(), hostBufferOffset, rowBytes);
+      try (var access = resources.access()) {
+        var hostBuffer = CuVSResourcesImpl.getHostBuffer(access);
+        MemorySegment.copy(vector, 0, hostBuffer, hostBufferOffset, rowBytes);
 
-      currentRow++;
-      currentBufferRow++;
-      if (currentBufferRow == bufferRowCount) {
-        flushBuffer();
+        currentRow++;
+        currentBufferRow++;
+        if (currentBufferRow == bufferRowCount) {
+          flushBuffer(hostBuffer);
+        }
       }
     }
 
-    private void flushBuffer() {
+    private void flushBuffer(MemorySegment hostBuffer) {
       if (currentBufferRow > 0) {
         var deviceMemoryOffset = (currentRow - currentBufferRow) * rowSize;
         var dst = matrix.memorySegment().asSlice(deviceMemoryOffset);
@@ -436,7 +439,7 @@ final class JDKProvider implements CuVSProvider {
             cudaMemcpy2DAsync(
                 dst,
                 rowSize,
-                hostBuffer.address(),
+                hostBuffer,
                 rowBytes,
                 rowBytes,
                 currentBufferRow,
@@ -451,8 +454,10 @@ final class JDKProvider implements CuVSProvider {
 
     @Override
     public CuVSDeviceMatrix build() {
-      flushBuffer();
-      hostBuffer.close();
+      try (var access = resources.access()) {
+        var hostBuffer = CuVSResourcesImpl.getHostBuffer(access);
+        flushBuffer(hostBuffer);
+      }
       return matrix;
     }
   }
