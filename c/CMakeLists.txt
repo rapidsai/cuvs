@@ -101,10 +101,8 @@ set_target_properties(
 
 # Setup the VERSION and SOVERSION of our library
 #
-# Long term goal is that every release that breaks the
-# C ABI will update `cuvs_abi_version` allowing us to have
-# multiple releases of libcuvs_c that don't need consumers
-# to rebuild against
+# Long term goal is that every release that breaks the C ABI will update `cuvs_abi_version` allowing
+# us to have multiple releases of libcuvs_c that don't need consumers to rebuild against
 if(PROJECT_IS_TOP_LEVEL)
   set(cuvs_abi_version "1")
   set(cuvs_version "${cuvs_abi_version}.${RAPIDS_VERSION}")
