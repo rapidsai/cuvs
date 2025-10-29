@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -22,6 +11,7 @@
 #include <raft/linalg/add.cuh>
 #include <raft/util/cuda_dev_essentials.cuh>
 
+#include "../../core/omp_wrapper.hpp"
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/common.hpp>
 #include <cuvs/neighbors/ivf_flat.hpp>
@@ -41,10 +31,6 @@ void search(const raft::resources& handle,
             raft::device_matrix_view<searchIdxT, int64_t, row_major> d_neighbors,
             raft::device_matrix_view<float, int64_t, row_major> d_distances);
 }  // namespace cuvs::neighbors
-
-namespace cuvs::neighbors::snmg {
-void check_omp_threads(const int requirements);
-}  // namespace cuvs::neighbors::snmg
 
 namespace cuvs::neighbors::snmg::detail {
 using namespace cuvs::neighbors;
@@ -72,9 +58,13 @@ void deserialize(const raft::resources& clique,
   std::ifstream is(filename, std::ios::in | std::ios::binary);
   if (!is) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
+  char dtype_string[4];
+  is.read(dtype_string, 4);
+
   const auto& handle = raft::resource::set_current_device_to_root_rank(clique);
-  index.mode_        = (cuvs::neighbors::distribution_mode)deserialize_scalar<int>(handle, is);
-  index.num_ranks_   = deserialize_scalar<int>(handle, is);
+  index.mode_ =
+    static_cast<cuvs::neighbors::distribution_mode>(deserialize_scalar<int>(handle, is));
+  index.num_ranks_ = deserialize_scalar<int>(handle, is);
 
   if (index.num_ranks_ != raft::resource::get_num_ranks(clique)) {
     RAFT_FAIL("Serialized index has %d ranks whereas NCCL clique has %d ranks",
@@ -211,7 +201,8 @@ void sharded_search_with_direct_merge(
       queries.data_handle() + query_offset, n_rows_of_current_batch, n_cols);
 
     const int& requirements = index.num_ranks_;
-    check_omp_threads(requirements);  // should use at least num_ranks_ threads to avoid NCCL hang
+    cuvs::core::omp::check_threads(
+      requirements);  // should use at least num_ranks_ threads to avoid NCCL hang
 #pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
       const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
@@ -331,7 +322,8 @@ void sharded_search_with_tree_merge(
       queries.data_handle() + query_offset, n_rows_of_current_batch, n_cols);
 
     const int& requirements = index.num_ranks_;
-    check_omp_threads(requirements);  // should use at least num_ranks_ threads to avoid NCCL hang
+    cuvs::core::omp::check_threads(
+      requirements);  // should use at least num_ranks_ threads to avoid NCCL hang
 #pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
       const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
@@ -665,9 +657,14 @@ void serialize(const raft::resources& clique,
   std::ofstream of(filename, std::ios::out | std::ios::binary);
   if (!of) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
+  std::string dtype_string = raft::detail::numpy_serializer::get_numpy_dtype<T>().to_string();
+  dtype_string.resize(4);
+  of << dtype_string;
+
   const auto& handle = raft::resource::set_current_device_to_root_rank(clique);
+
   serialize_scalar(handle, of, (int)index.mode_);
-  serialize_scalar(handle, of, index.num_ranks_);
+  serialize_scalar(handle, of, (int)index.num_ranks_);
 
   for (int rank = 0; rank < index.num_ranks_; rank++) {
     const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);

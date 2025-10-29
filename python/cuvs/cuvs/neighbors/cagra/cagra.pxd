@@ -1,17 +1,6 @@
 #
-# Copyright (c) 2024-2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
 
@@ -134,10 +123,10 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
 
     cuvsError_t cuvsCagraIndexDestroy(cuvsCagraIndex_t index)
 
-    cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int32_t* dim)
-    cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, uint32_t* size)
+    cuvsError_t cuvsCagraIndexGetDims(cuvsCagraIndex_t index, int64_t* dim)
+    cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* size)
     cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index,
-                                             uint32_t* degree)
+                                             int64_t* degree)
     cuvsError_t cuvsCagraIndexGetGraph(cuvsCagraIndex_t index,
                                        DLManagedTensor * graph)
     cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index,
@@ -175,6 +164,19 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
                                        DLManagedTensor * dataset,
                                        cuvsCagraIndex_t index)
 
+    ctypedef struct cuvsCagraExtendParams:
+        uint32_t max_chunk_size
+
+    ctypedef cuvsCagraExtendParams* cuvsCagraExtendParams_t
+
+    cuvsError_t cuvsCagraExtendParamsCreate(cuvsCagraExtendParams_t* params)
+    cuvsError_t cuvsCagraExtendParamsDestroy(cuvsCagraExtendParams_t params)
+    cuvsError_t cuvsCagraExtend(cuvsResources_t res,
+                                cuvsCagraExtendParams_t params,
+                                DLManagedTensor* additional_dataset,
+                                cuvsCagraIndex_t index)
+
+
 cdef class Index:
     """
     CAGRA index object. This object stores the trained CAGRA index state
@@ -184,3 +186,13 @@ cdef class Index:
     cdef cuvsCagraIndex_t index
     cdef bool trained
     cdef str active_index_type
+
+
+cdef class IndexParams:
+    cdef cuvsCagraIndexParams* params
+    cdef public object compression
+    cdef public object ivf_pq_build_params
+    cdef public object ivf_pq_search_params
+
+cdef class SearchParams:
+    cdef cuvsCagraSearchParams * params

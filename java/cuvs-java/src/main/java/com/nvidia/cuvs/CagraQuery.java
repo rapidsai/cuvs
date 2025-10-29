@@ -1,21 +1,9 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
 
-import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Objects;
 import java.util.function.LongToIntFunction;
@@ -34,7 +22,7 @@ public class CagraQuery {
 
   private final CagraSearchParams cagraSearchParameters;
   private final LongToIntFunction mapping;
-  private final float[][] queryVectors;
+  private final CuVSMatrix queryVectors;
   private final int topK;
   private final BitSet prefilter;
   private final int numDocs;
@@ -53,9 +41,9 @@ public class CagraQuery {
    * @param numDocs               Total number of dataset vectors; used to align the prefilter correctly
    * @param resources             CuVSResources instance to use for this query
    */
-  public CagraQuery(
+  private CagraQuery(
       CagraSearchParams cagraSearchParameters,
-      float[][] queryVectors,
+      CuVSMatrix queryVectors,
       LongToIntFunction mapping,
       int topK,
       BitSet prefilter,
@@ -81,11 +69,9 @@ public class CagraQuery {
   }
 
   /**
-   * Gets the query vector 2D float array.
-   *
-   * @return 2D float array
+   * Gets the query vector matrix.
    */
-  public float[][] getQueryVectors() {
+  public CuVSMatrix getQueryVectors() {
     return queryVectors;
   }
 
@@ -137,7 +123,7 @@ public class CagraQuery {
     return "CuVSQuery [cagraSearchParameters="
         + cagraSearchParameters
         + ", queryVectors="
-        + Arrays.toString(queryVectors)
+        + queryVectors.toString()
         + ", mapping="
         + mapping
         + ", topK="
@@ -151,7 +137,7 @@ public class CagraQuery {
   public static class Builder {
 
     private CagraSearchParams cagraSearchParams;
-    private float[][] queryVectors;
+    private CuVSMatrix queryVectors;
     private LongToIntFunction mapping = SearchResults.IDENTITY_MAPPING;
     private int topK = 2;
     private BitSet prefilter;
@@ -186,10 +172,10 @@ public class CagraQuery {
     /**
      * Registers the query vectors to be passed in the search call.
      *
-     * @param queryVectors 2D float query vector array
+     * @param queryVectors 2D query vector array
      * @return an instance of this Builder
      */
-    public Builder withQueryVectors(float[][] queryVectors) {
+    public Builder withQueryVectors(CuVSMatrix queryVectors) {
       this.queryVectors = queryVectors;
       return this;
     }

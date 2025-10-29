@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.internal;
 
@@ -98,18 +87,23 @@ public class HnswIndexImpl implements HnswIndex {
 
       SequenceLayout neighborsSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_LONG);
       SequenceLayout distancesSequenceLayout = MemoryLayout.sequenceLayout(numBlocks, C_FLOAT);
+      // TODO: these could be CuVSHostMatrix
       MemorySegment neighborsMemorySegment = localArena.allocate(neighborsSequenceLayout);
       MemorySegment distancesMemorySegment = localArena.allocate(distancesSequenceLayout);
       MemorySegment querySeg = buildMemorySegment(localArena, queryVectors);
 
       long[] queriesShape = {numQueries, vectorDimension};
-      MemorySegment queriesTensor = prepareTensor(localArena, querySeg, queriesShape, 2, 32, 1, 1);
+      MemorySegment queriesTensor =
+          prepareTensor(localArena, querySeg, queriesShape, kDLFloat(), 32, kDLCPU());
       long[] neighborsShape = {numQueries, topK};
+      // TODO: check type code and bits across all implementations -- they are inconsistent
       MemorySegment neighborsTensor =
-          prepareTensor(localArena, neighborsMemorySegment, neighborsShape, 1, 64, 1, 1);
+          prepareTensor(
+              localArena, neighborsMemorySegment, neighborsShape, kDLUInt(), 64, kDLCPU());
       long[] distancesShape = {numQueries, topK};
       MemorySegment distancesTensor =
-          prepareTensor(localArena, distancesMemorySegment, distancesShape, 2, 32, 1, 1);
+          prepareTensor(
+              localArena, distancesMemorySegment, distancesShape, kDLFloat(), 32, kDLCPU());
 
       try (var resourcesAccessor = query.getResources().access()) {
         var cuvsRes = resourcesAccessor.handle();

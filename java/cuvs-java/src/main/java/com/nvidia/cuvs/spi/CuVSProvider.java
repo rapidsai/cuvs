@@ -1,27 +1,10 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.spi;
 
-import com.nvidia.cuvs.BruteForceIndex;
-import com.nvidia.cuvs.CagraIndex;
-import com.nvidia.cuvs.CagraMergeParams;
-import com.nvidia.cuvs.CuVSMatrix;
-import com.nvidia.cuvs.CuVSResources;
-import com.nvidia.cuvs.HnswIndex;
-import com.nvidia.cuvs.TieredIndex;
+import com.nvidia.cuvs.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 import java.nio.file.Path;
@@ -52,25 +35,62 @@ public interface CuVSProvider {
   /** Creates a new CuVSResources. */
   CuVSResources newCuVSResources(Path tempDirectory) throws Throwable;
 
-  /** Create a {@link CuVSMatrix.Builder} instance **/
-  CuVSMatrix.Builder newMatrixBuilder(int size, int dimensions, CuVSMatrix.DataType dataType);
+  /** Create a {@link CuVSMatrix.Builder} instance for a host memory matrix **/
+  CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
+      long size, long dimensions, CuVSMatrix.DataType dataType);
+
+  /** Create a {@link CuVSMatrix.Builder} instance for a host memory matrix **/
+  CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
+      long size, long columns, int rowStride, int columnStride, CuVSMatrix.DataType dataType);
+
+  /** Create a {@link CuVSMatrix.Builder} instance for a device memory matrix **/
+  CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
+      CuVSResources cuVSResources, long size, long dimensions, CuVSMatrix.DataType dataType);
+
+  /** Create a {@link CuVSMatrix.Builder} instance for a device memory matrix **/
+  CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
+      CuVSResources cuVSResources,
+      long size,
+      long dimensions,
+      int rowStride,
+      int columnStride,
+      CuVSMatrix.DataType dataType);
 
   /**
-   * Returns the factory method used to build a Dataset from native memory.
+   * Returns the factory method used to build a CuVSMatrix from native memory.
    * The factory method will have this signature:
-   * {@code Dataset createNativeDataset(memorySegment, size, dimensions, dataType)},
+   * {@code CuVSMatrix createNativeMatrix(memorySegment, size, dimensions, dataType)},
    * where {@code memorySegment} is a {@code java.lang.foreign.MemorySegment} containing {@code int size} vectors of
    * {@code int dimensions} length of type {@link CuVSMatrix.DataType}.
    * <p>
    * In order to expose this factory in a way that is compatible with Java 21, the factory method is returned as a
    * {@link MethodHandle} with {@link MethodType} equal to
-   * {@code (Dataset.class, MemorySegment.class, int.class, int.class, Dataset.DataType.class)}.
+   * {@code (CuVSMatrix.class, MemorySegment.class, int.class, int.class, CuVSMatrix.DataType.class)}.
    * The caller will need to invoke the factory via the {@link MethodHandle#invokeExact} method:
-   * {@code Dataset dataset = (Dataset)newNativeDatasetBuilder().invokeExact(memorySegment, size, dimensions, dataType)}
+   * {@code var matrix = (CuVSMatrix)newNativeMatrixBuilder().invokeExact(memorySegment, size, dimensions, dataType)}
    * </p>
-   * @return a MethodHandle which can be invoked to build a Dataset from an external {@code MemorySegment}
+   * @return a MethodHandle which can be invoked to build a CuVSMatrix from an external {@code MemorySegment}
    */
   MethodHandle newNativeMatrixBuilder();
+
+  /**
+   * Returns the factory method used to build a CuVSMatrix from native memory, with strides.
+   * The factory method will have this signature:
+   * {@code CuVSMatrix createNativeMatrix(memorySegment, size, dimensions, rowStride, columnStride, dataType)},
+   * where {@code memorySegment} is a {@code java.lang.foreign.MemorySegment} containing {@code int size} vectors of
+   * {@code int dimensions} length of type {@link CuVSMatrix.DataType}. Rows have a stride of {@code rowStride},
+   * where 0 indicates "no stride" (a stride equal to the number of columns), and columns have a stride of
+   * {@code columnStride}
+   * <p>
+   * In order to expose this factory in a way that is compatible with Java 21, the factory method is returned as a
+   * {@link MethodHandle} with {@link MethodType} equal to
+   * {@code (CuVSMatrix.class, MemorySegment.class, int.class, int.class, int.class, int.class, DataType.class)}.
+   * The caller will need to invoke the factory via the {@link MethodHandle#invokeExact} method:
+   * {@code var matrix = (CuVSMatrix)newNativeMatrixBuilder().invokeExact(memorySegment, size, dimensions, rowStride, columnStride, dataType)}
+   * </p>
+   * @return a MethodHandle which can be invoked to build a CuVSMatrix from an external {@code MemorySegment}
+   */
+  MethodHandle newNativeMatrixBuilderWithStrides();
 
   /** Create a {@link CuVSMatrix} from an on-heap array **/
   CuVSMatrix newMatrixFromArray(float[][] vectors);
@@ -119,6 +139,13 @@ public interface CuVSProvider {
     // Default implementation falls back to the method without parameters
     return mergeCagraIndexes(indexes);
   }
+
+  /** Returns a {@link GPUInfoProvider} to query the system for GPU related information */
+  GPUInfoProvider gpuInfoProvider();
+
+  void setLogLevel(java.util.logging.Level level);
+
+  java.util.logging.Level getLogLevel();
 
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {

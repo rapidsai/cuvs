@@ -1,21 +1,10 @@
 #
-# Copyright (c) 2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
 
-from libc.stdint cimport uint32_t, uintptr_t
+from libc.stdint cimport int64_t, uint32_t, uintptr_t
 from libcpp cimport bool
 
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
@@ -84,13 +73,18 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
 
     cuvsError_t cuvsIvfPqIndexDestroy(cuvsIvfPqIndex_t index)
 
-    uint32_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index)
+    cuvsError_t cuvsIvfPqIndexGetNLists(cuvsIvfPqIndex_t index,
+                                        int64_t * n_lists)
 
-    uint32_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index)
+    cuvsError_t cuvsIvfPqIndexGetDim(cuvsIvfPqIndex_t index, int64_t * dim)
 
-    cuvsError_t cuvsIvfPqIndexGetCenters(cuvsResources_t res,
-                                         cuvsIvfPqIndex_t index,
+    cuvsError_t cuvsIvfPqIndexGetSize(cuvsIvfPqIndex_t index, int64_t * size)
+
+    cuvsError_t cuvsIvfPqIndexGetCenters(cuvsIvfPqIndex_t index,
                                          DLManagedTensor * centers)
+
+    cuvsError_t cuvsIvfPqIndexGetPqCenters(cuvsIvfPqIndex_t index,
+                                           DLManagedTensor * centers)
 
     cuvsError_t cuvsIvfPqBuild(cuvsResources_t res,
                                cuvsIvfPqIndexParams* params,
@@ -116,3 +110,11 @@ cdef extern from "cuvs/neighbors/ivf_pq.h" nogil:
                                 DLManagedTensor* new_vectors,
                                 DLManagedTensor* new_indices,
                                 cuvsIvfPqIndex_t index)
+
+
+cdef class IndexParams:
+    cdef cuvsIvfPqIndexParams* params
+    cdef object _metric
+
+cdef class SearchParams:
+    cdef cuvsIvfPqSearchParams* params

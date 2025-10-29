@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #ifdef CUVS_BUILD_CAGRA_HNSWLIB
@@ -97,7 +86,9 @@ cuvs::neighbors::cagra::index_params to_cagra_params(
   int ef_construction,
   cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 
-/**@}*/
+/**
+ * @}
+ */
 
 /**
  * @defgroup hnsw_cpp_index hnswlib index wrapper
@@ -127,7 +118,7 @@ struct index : cuvs::neighbors::index {
   /**
   @brief Get underlying index
   */
-  virtual auto get_index() const -> void const* = 0;
+  virtual void const* get_index() const = 0;
 
   auto dim() const -> int const { return dim_; }
 
@@ -146,7 +137,9 @@ struct index : cuvs::neighbors::index {
   HnswHierarchy hierarchy_;
 };
 
-/**@}*/
+/**
+ * @}
+ */
 
 /**
  * @defgroup hnsw_cpp_extend_params HNSW index extend parameters
@@ -158,6 +151,10 @@ struct extend_params {
   Value of 0 automatically maximizes parallelism. */
   int num_threads = 0;
 };
+
+/**
+ * @}
+ */
 
 /**
  * @defgroup hnsw_cpp_index_load Load CAGRA index as hnswlib index
@@ -308,7 +305,9 @@ std::unique_ptr<index<int8_t>> from_cagra(
   std::optional<raft::host_matrix_view<const int8_t, int64_t, raft::row_major>> dataset =
     std::nullopt);
 
-/**@}*/
+/**
+ * @}
+ */
 
 /**
  * @defgroup hnsw_cpp_index_extend Extend HNSW index with additional vectors
@@ -342,6 +341,7 @@ std::unique_ptr<index<int8_t>> from_cagra(
  *   auto additional_dataset = raft::make_host_matrix<float>(res, add_size, index->dim());
  *   hnsw::extend_params extend_params;
  *   hnsw::extend(res, extend_params, additional_dataset, *hnsw_index.get());
+ * @endcode
  */
 void extend(raft::resources const& res,
             const extend_params& params,
@@ -375,6 +375,7 @@ void extend(raft::resources const& res,
  *   auto additional_dataset = raft::make_host_matrix<half>(res, add_size, index->dim());
  *   hnsw::extend_params extend_params;
  *   hnsw::extend(res, extend_params, additional_dataset, *hnsw_index.get());
+ * @endcode
  */
 void extend(raft::resources const& res,
             const extend_params& params,
@@ -408,6 +409,7 @@ void extend(raft::resources const& res,
  *   auto additional_dataset = raft::make_host_matrix<uint8_t>(res, add_size, index->dim());
  *   hnsw::extend_params extend_params;
  *   hnsw::extend(res, extend_params, additional_dataset, *hnsw_index.get());
+ * @endcode
  */
 void extend(raft::resources const& res,
             const extend_params& params,
@@ -441,13 +443,16 @@ void extend(raft::resources const& res,
  *   auto additional_dataset = raft::make_host_matrix<int8_t>(res, add_size, index->dim());
  *   hnsw::extend_params extend_params;
  *   hnsw::extend(res, extend_params, additional_dataset, *hnsw_index.get());
+ * @endcode
  */
 void extend(raft::resources const& res,
             const extend_params& params,
             raft::host_matrix_view<const int8_t, int64_t, raft::row_major> additional_dataset,
             index<int8_t>& idx);
 
-/**@} */
+/**
+ * @}
+ */
 
 /**
  * @defgroup hnsw_cpp_search_params Build CAGRA index and search with hnswlib
@@ -460,7 +465,9 @@ struct search_params : cuvs::neighbors::search_params {
                         // automatically maximizes parallelism
 };
 
-/**@}*/
+/**
+ * @}
+ */
 
 // TODO: Filtered Search APIs: https://github.com/rapidsai/cuvs/issues/363
 
@@ -645,7 +652,9 @@ void search(raft::resources const& res,
             raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
             raft::host_matrix_view<float, int64_t, raft::row_major> distances);
 
-/**@}*/
+/**
+ * @}
+ */
 
 /**
  * @defgroup hnsw_cpp_index_serialize Deserialize CAGRA index as hnswlib index
@@ -940,7 +949,9 @@ void deserialize(raft::resources const& res,
                  cuvs::distance::DistanceType metric,
                  index<int8_t>** index);
 
-/**@}*/
+/**
+ * @}
+ */
 
 }  // namespace cuvs::neighbors::hnsw
 

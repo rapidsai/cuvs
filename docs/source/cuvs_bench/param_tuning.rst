@@ -1,6 +1,6 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 cuVS Bench Parameter Tuning Guide
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This guide outlines the various parameter settings that can be specified in :doc:`cuVS Benchmarks <index>` yaml configuration files and explains the impact they have on corresponding algorithms to help inform their settings for benchmarking across desired levels of recall.
 
@@ -32,6 +32,7 @@ IVF-flat is a simple algorithm which won't save any space, but it provides compe
    - `build`
    - Y
    - Positive integer >0
+   - 1024
    - Number of clusters to partition the vectors into. Larger values will put less points into each cluster but this will impact index build time as more clusters need to be trained.
 
  * - `niter`
@@ -48,25 +49,27 @@ IVF-flat is a simple algorithm which won't save any space, but it provides compe
    - 2
    - `1/ratio` is the number of training points which should be used to train the clusters.
 
-  * - `dataset_memory_type`
-    - `build`
-    - N
-    - [`device`, `host`, `mmap`]
-    - `mmap`
-    - Where should the dataset reside?
+ * - `dataset_memory_type`
+   - `build`
+   - N
+   - [`device`, `host`, `mmap`]
+   - `mmap`
+   - Where should the dataset reside?
 
-  * - `query_memory_type`
-    - `search`
-    - [`device`, `host`, `mmap`]
-    - `device`
-    - Where should the queries reside?
+ * - `query_memory_type`
+   - `search`
+   - N
+   - [`device`, `host`, `mmap`]
+   - `device`
+   - Where should the queries reside?
 
-  * - `nprobe`
-    - `search`
-    - Y
-    - Positive integer >0
-    -
-    - The closest number of clusters to search for each query vector. Larger values will improve recall but will search more points in the index.
+ * - `nprobe`
+   - `search`
+   - Y
+   - Positive integer >0
+   -
+   - The closest number of clusters to search for each query vector. Larger values will improve recall but will search more points in the index.
+
 
 cuvs_ivf_pq
 -----------
@@ -86,6 +89,7 @@ IVF-pq is an inverted-file index, which partitions the vectors into a series of 
    - `build`
    - Y
    - Positive integer >0
+   - 1024
    - Number of clusters to partition the vectors into. Larger values will put less points into each cluster but this will impact index build time as more clusters need to be trained.
 
  * - `niter`
@@ -121,7 +125,7 @@ IVF-pq is an inverted-file index, which partitions the vectors into a series of 
    - N
    - [`cluster`, `subspace`]
    - `subspace`
-   - Type of codebook. See :doc:`IVF-PQ index overview <../indexes/ivfpq>` for more detail
+   - Type of codebook. See :doc:`IVF-PQ index overview <../neighbors/ivfpq>` for more detail
 
  * - `dataset_memory_type`
    - `build`
@@ -132,6 +136,7 @@ IVF-pq is an inverted-file index, which partitions the vectors into a series of 
 
  * - `query_memory_type`
    - `search`
+   - N
    - [`device`, `host`, `mmap`]
    - `device`
    - Where should the queries reside?
@@ -140,7 +145,7 @@ IVF-pq is an inverted-file index, which partitions the vectors into a series of 
    - `search`
    - Y
    - Positive integer >0
-   -
+   - 20
    - The closest number of clusters to search for each query vector. Larger values will improve recall but will search more points in the index.
 
  * - `internalDistanceDtype`
@@ -195,8 +200,8 @@ CAGRA uses a graph-based index, which creates an intermediate, approximate kNN g
 
  * - `graph_build_algo`
    - `build`
-   - `N
-   - [`IVF_PQ`, NN_DESCENT`]
+   - `N`
+   - [`IVF_PQ`, `NN_DESCENT`]
    - `IVF_PQ`
    - Algorithm to use for building the initial kNN graph, from which CAGRA will optimize into the navigable CAGRA graph
 
@@ -209,6 +214,7 @@ CAGRA uses a graph-based index, which creates an intermediate, approximate kNN g
 
  * - `query_memory_type`
    - `search`
+   - N
    - [`device`, `host`, `mmap`]
    - `device`
    - Where should the queries reside?
@@ -308,7 +314,7 @@ To fine tune CAGRA index building we can customize IVF-PQ index builder options 
    - N
    - [`cluster`, `subspace`]
    - `subspace`
-   - Type of codebook. See :doc:`IVF-PQ index overview <../indexes/ivfpq>` for more detail
+   - Type of codebook. See :doc:`IVF-PQ index overview <../neighbors/ivfpq>` for more detail
 
  * - `ivf_pq_build_nprobe`
    - `search`
@@ -356,7 +362,7 @@ Alternatively, if `graph_build_algo == "NN_DESCENT"`, then we can customize the 
    - 20
    - Number of nn-descent iterations
 
- * - `nn_descent_intermediate_graph_degree
+ * - `nn_descent_intermediate_graph_degree`
    - `build`
    - N
    - Positive integer >0
@@ -463,7 +469,7 @@ IVF-flat is a simple algorithm which won't save any space, but it provides compe
    - `search`
    - Y
    - Positive integer >0
-   -
+   - 20
    - The closest number of clusters to search for each query vector. Larger values will improve recall but will search more points in the index.
 
 faiss_gpu_ivf_pq

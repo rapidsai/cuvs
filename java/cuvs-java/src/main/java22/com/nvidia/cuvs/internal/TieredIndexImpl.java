@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.internal;
 
@@ -122,7 +111,7 @@ public class TieredIndexImpl implements TieredIndex {
       long cols = dataset.columns();
 
       // Get host data
-      MemorySegment hostDataSeg = ((CuVSHostMatrixImpl) dataset).memorySegment();
+      MemorySegment hostDataSeg = ((CuVSMatrixInternal) dataset).memorySegment();
 
       try (var resourceAccess = resources.access();
           var indexParamsHandle =
@@ -143,7 +132,7 @@ public class TieredIndexImpl implements TieredIndex {
           long[] datasetShape = {rows, cols};
           MemorySegment datasetTensor =
               prepareTensor(
-                  localArena, datasetDP.handle(), datasetShape, kDLFloat(), 32, kDLCUDA(), 1);
+                  localArena, datasetDP.handle(), datasetShape, kDLFloat(), 32, kDLCUDA());
 
           MemorySegment index = localArena.allocate(cuvsTieredIndex_t);
           var returnValue = cuvsTieredIndexCreate(index);
@@ -205,6 +194,7 @@ public class TieredIndexImpl implements TieredIndex {
           hasPreFilter ? new BitSet[] {query.getPrefilter()} : EMPTY_PREFILTER_BITSET;
       final long prefilterDataLength = hasPreFilter ? query.getNumDocs() * prefilters.length : 0;
       final long prefilterLen = hasPreFilter ? (prefilterDataLength + 31) / 32 : 0;
+      // TODO: is this correct? prefilters is a LONG array
       final long prefilterBytes = C_INT_BYTE_SIZE * prefilterLen;
 
       try (var resourceAccess = query.getResources().access()) {
@@ -229,7 +219,7 @@ public class TieredIndexImpl implements TieredIndex {
           long[] queriesShape = {numQueries, vectorDimension};
           MemorySegment queriesTensor =
               prepareTensor(
-                  localArena, queriesDP.handle(), queriesShape, kDLFloat(), 32, kDLCUDA(), 1);
+                  localArena, queriesDP.handle(), queriesShape, kDLFloat(), 32, kDLCUDA());
           long[] neighborsShape = {numQueries, topK};
           MemorySegment neighborsTensor =
               prepareTensor(
@@ -238,12 +228,11 @@ public class TieredIndexImpl implements TieredIndex {
                   neighborsShape,
                   kDLInt(),
                   64,
-                  kDLCUDA(),
-                  1); // 64-bit int
+                  kDLCUDA()); // 64-bit int
           long[] distancesShape = {numQueries, topK};
           MemorySegment distancesTensor =
               prepareTensor(
-                  localArena, distancesDP.handle(), distancesShape, kDLFloat(), 32, kDLCUDA(), 1);
+                  localArena, distancesDP.handle(), distancesShape, kDLFloat(), 32, kDLCUDA());
 
           // Sync before prefilter setup
           returnValue = cuvsStreamSync(cuvsRes);
@@ -270,7 +259,7 @@ public class TieredIndexImpl implements TieredIndex {
 
             MemorySegment prefilterTensor =
                 prepareTensor(
-                    localArena, prefilterDP.handle(), prefilterShape, kDLUInt(), 32, kDLCUDA(), 1);
+                    localArena, prefilterDP.handle(), prefilterShape, kDLUInt(), 32, kDLCUDA());
 
             cuvsFilter.type(prefilter, 1); // BITSET
             cuvsFilter.addr(prefilter, prefilterTensor.address());
@@ -330,7 +319,7 @@ public class TieredIndexImpl implements TieredIndex {
       long cols = extendDataset.columns();
 
       // Get host data
-      MemorySegment hostDataSeg = ((CuVSMatrixBaseImpl) extendDataset).memorySegment();
+      MemorySegment hostDataSeg = ((CuVSMatrixInternal) extendDataset).memorySegment();
 
       try (var resourceAccess = resources.access()) {
         long cuvsRes = resourceAccess.handle();
@@ -347,7 +336,7 @@ public class TieredIndexImpl implements TieredIndex {
           long[] datasetShape = {rows, cols};
           MemorySegment datasetTensor =
               prepareTensor(
-                  localArena, datasetDP.handle(), datasetShape, kDLFloat(), 32, kDLCUDA(), 1);
+                  localArena, datasetDP.handle(), datasetShape, kDLFloat(), 32, kDLCUDA());
 
           checkCuVSError(cuvsStreamSync(cuvsRes), "cuvsStreamSync");
 

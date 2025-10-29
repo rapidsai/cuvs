@@ -1,17 +1,6 @@
 #
-# Copyright (c) 2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
 
@@ -72,6 +61,8 @@ cdef class IndexParams:
         More iterations produce a better quality graph at cost of performance
     termination_threshold : float
         The delta at which nn-descent will terminate its iterations
+    return_distances : bool
+        Whether to return distances array
     """
 
     cdef cuvsNNDescentIndexParams* params
@@ -90,7 +81,6 @@ cdef class IndexParams:
                  intermediate_graph_degree=None,
                  max_iterations=None,
                  termination_threshold=None,
-                 n_clusters=None,
                  return_distances=None
                  ):
         if metric is not None:
@@ -103,8 +93,6 @@ cdef class IndexParams:
             self.params.max_iterations = max_iterations
         if termination_threshold is not None:
             self.params.termination_threshold = termination_threshold
-        if n_clusters is not None:
-            self.params.n_clusters = n_clusters
         if return_distances is not None:
             self.params.return_distances = return_distances
 
@@ -132,9 +120,9 @@ cdef class IndexParams:
     def termination_threshold(self):
         return self.params.termination_threshold
 
-    @property
-    def n_clusters(self):
-        return self.params.n_clusters
+    def get_handle(self):
+        """Get a pointer to the underlying C object."""
+        return <size_t>self.params
 
 cdef class Index:
     """

@@ -1,5 +1,6 @@
 #!/bin/bash
-# Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
 set -euo pipefail
 
@@ -40,6 +41,9 @@ trap "EXITCODE=1" ERR
 set +e
 
 rapids-logger "Run Java build"
+
+RAPIDS_CUDA_MAJOR="${RAPIDS_CUDA_VERSION%%.*}"
+export RAPIDS_CUDA_MAJOR
 
 bash ./build.sh java "${EXTRA_BUILD_ARGS[@]}"
 
