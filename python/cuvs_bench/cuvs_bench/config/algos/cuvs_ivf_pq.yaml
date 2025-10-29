@@ -42,12 +42,12 @@ groups:
   test:
     build:
       nlist: [1024]
-      pq_dim: [64]
-      pq_bits: [8]
-      ratio: [10]
-      niter: [25]
+      pq_dim: [16]
+      pq_bits: [6]
+      ratio: [1]
+      niter: [20]
     search:
-      nprobe: [1]
+      nprobe: [1, 5]
       internalDistanceDtype: ["float"]
-      smemLutDtype: ["float", "fp8", "half"]
+      smemLutDtype: ["half"]
       refine_ratio: [1]
