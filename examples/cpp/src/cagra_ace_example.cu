@@ -34,10 +34,10 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
 
   // use ACE index parameters
   cagra::index_params index_params;
-  auto ace_params            = cagra::graph_build_params::ace_params();
-  ace_params.ace_npartitions = 4;
-  ace_params.ace_build_dir   = "/tmp/ace_build";
-  // ace_params.ace_use_disk         = true;  // Uncomment to use disk storage
+  auto ace_params        = cagra::graph_build_params::ace_params();
+  ace_params.npartitions = 4;
+  ace_params.build_dir   = "/tmp/ace_build";
+  // ace_params.use_disk  = true;  // Uncomment to use disk storage
   index_params.graph_build_params = ace_params;
 
   // ACE requires the dataset to be on the host

@@ -52,17 +52,15 @@ auto parse_build_param(const nlohmann::json& conf) ->
         extents, conf.at("M"), hnsw_params.ef_construction, dist_type);
       ps.metric = dist_type;
       // Parse ACE parameters if provided
-      if (conf.contains("ace_npartitions") || conf.contains("ace_build_dir") ||
-          conf.contains("ace_ef_construction") || conf.contains("ace_use_disk")) {
+      if (conf.contains("npartitions") || conf.contains("build_dir") ||
+          conf.contains("ef_construction") || conf.contains("use_disk")) {
         auto ace_params = cuvs::neighbors::cagra::graph_build_params::ace_params();
-        if (conf.contains("ace_npartitions")) {
-          ace_params.ace_npartitions = conf.at("ace_npartitions");
+        if (conf.contains("npartitions")) { ace_params.npartitions = conf.at("npartitions"); }
+        if (conf.contains("build_dir")) { ace_params.build_dir = conf.at("build_dir"); }
+        if (conf.contains("ef_construction")) {
+          ace_params.ef_construction = conf.at("ef_construction");
         }
-        if (conf.contains("ace_build_dir")) { ace_params.ace_build_dir = conf.at("ace_build_dir"); }
-        if (conf.contains("ace_ef_construction")) {
-          ace_params.ace_ef_construction = conf.at("ace_ef_construction");
-        }
-        if (conf.contains("ace_use_disk")) { ace_params.ace_use_disk = conf.at("ace_use_disk"); }
+        if (conf.contains("use_disk")) { ace_params.use_disk = conf.at("use_disk"); }
         ps.graph_build_params = ace_params;
       }
       // NB: above, we only provide the defaults. Below we parse the explicit parameters as usual.

@@ -359,7 +359,7 @@ void ace_set_index_params(raft::resources const& res,
                           size_t graph_degree,
                           size_t intermediate_degree,
                           bool guarantee_connectivity,
-                          size_t ace_ef_construction,
+                          size_t ef_construction,
                           cuvs::neighbors::cagra::index_params& sub_index_params)
 {
   // ACE drops the default graph build params and sets the default params based on the partition
@@ -368,7 +368,7 @@ void ace_set_index_params(raft::resources const& res,
     sub_index_params = cuvs::neighbors::cagra::hnsw_to_cagra_params<T, IdxT>(
       raft::make_extents<int64_t>(sub_dataset_size, dataset_dim),
       graph_degree / 2,
-      ace_ef_construction,
+      ef_construction,
       metric);
   } else {
     sub_index_params.graph_build_params =
@@ -487,7 +487,7 @@ void ace_adjust_sub_graph_ids_disk(
 template <typename T, typename IdxT>
 void ace_reorder_and_store_dataset(
   raft::resources const& res,
-  const std::string& ace_build_dir,
+  const std::string& build_dir,
   raft::host_matrix_view<const T, int64_t, row_major> dataset,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_labels,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_histogram,
@@ -689,7 +689,7 @@ void ace_reorder_and_store_dataset(
 template <typename T, typename IdxT>
 void ace_load_partition_dataset_from_disk(
   raft::resources const& res,
-  const std::string& ace_build_dir,
+  const std::string& build_dir,
   size_t partition_id,
   size_t dataset_dim,
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> partition_histogram,
@@ -722,8 +722,8 @@ void ace_load_partition_dataset_from_disk(
 
   const size_t vector_size = dataset_dim * sizeof(T);
 
-  const std::string reordered_dataset_path = ace_build_dir + "/reordered_dataset.npy";
-  const std::string augmented_dataset_path = ace_build_dir + "/augmented_dataset.npy";
+  const std::string reordered_dataset_path = build_dir + "/reordered_dataset.npy";
+  const std::string augmented_dataset_path = build_dir + "/augmented_dataset.npy";
 
   size_t core_header_size      = 0;
   size_t augmented_header_size = 0;
@@ -796,7 +796,7 @@ void ace_load_partition_dataset_from_disk(
 // 2. Building sub-indices for each partition independently
 // 3. Concatenating sub-graphs (of core partitions) into a final unified index
 // Supports both in-memory and disk-based modes depending on available host memory.
-// In disk mode, the graph is stored in ace_build_dir and dataset is reordered on disk.
+// In disk mode, the graph is stored in build_dir and dataset is reordered on disk.
 // The returned index is not usable for search. Use the created files for search instead.
 template <typename T, typename IdxT>
 index<T, IdxT> build_ace(raft::resources const& res,
@@ -808,17 +808,17 @@ index<T, IdxT> build_ace(raft::resources const& res,
     std::holds_alternative<cagra::graph_build_params::ace_params>(params.graph_build_params),
     "ACE build requires graph_build_params to be set to ace_params");
 
-  auto ace_params = std::get<cagra::graph_build_params::ace_params>(params.graph_build_params);
-  size_t ace_npartitions     = ace_params.ace_npartitions;
-  size_t ace_ef_construction = ace_params.ace_ef_construction;
-  std::string ace_build_dir  = ace_params.ace_build_dir;
-  bool ace_use_disk          = ace_params.ace_use_disk;
+  auto ace_params    = std::get<cagra::graph_build_params::ace_params>(params.graph_build_params);
+  size_t npartitions = ace_params.npartitions;
+  size_t ef_construction = ace_params.ef_construction;
+  std::string build_dir  = ace_params.build_dir;
+  bool use_disk          = ace_params.use_disk;
 
   common::nvtx::range<common::nvtx::domain::cuvs> function_scope(
     "cagra::build_ace<host>(%zu, %zu, %zu)",
     params.intermediate_graph_degree,
     params.graph_degree,
-    ace_npartitions);
+    npartitions);
 
   size_t dataset_size = dataset.extent(0);
   size_t dataset_dim  = dataset.extent(1);
@@ -829,8 +829,8 @@ index<T, IdxT> build_ace(raft::resources const& res,
                "ACE: Intermediate graph degree must be greater than 0");
   RAFT_EXPECTS(params.graph_degree > 0, "ACE: Graph degree must be greater than 0");
 
-  size_t n_partitions = ace_npartitions;
-  RAFT_EXPECTS(n_partitions > 0, "ACE: ace_npartitions must be greater than 0");
+  size_t n_partitions = npartitions;
+  RAFT_EXPECTS(n_partitions > 0, "ACE: npartitions must be greater than 0");
 
   size_t min_required_per_partition = 1000;
   if (n_partitions > dataset_size / min_required_per_partition) {
@@ -888,38 +888,38 @@ index<T, IdxT> build_ace(raft::resources const& res,
                 cagra_graph_size / (1024.0 * 1024.0 * 1024.0),
                 available_gpu_memory / (1024.0 * 1024.0 * 1024.0));
 
-  bool use_disk = ace_use_disk || host_memory_limited || gpu_memory_limited;
-  if (use_disk) {
-    bool valid_build_dir = !ace_build_dir.empty();
-    valid_build_dir &= ace_build_dir.length() <= 255;
-    valid_build_dir &= ace_build_dir.find('\0') == std::string::npos;
-    valid_build_dir &= ace_build_dir.find("//") == std::string::npos;
+  bool use_disk_mode = use_disk || host_memory_limited || gpu_memory_limited;
+  if (use_disk_mode) {
+    bool valid_build_dir = !build_dir.empty();
+    valid_build_dir &= build_dir.length() <= 255;
+    valid_build_dir &= build_dir.find('\0') == std::string::npos;
+    valid_build_dir &= build_dir.find("//") == std::string::npos;
     if (!valid_build_dir) {
-      RAFT_LOG_WARN("ACE: Invalid ace_build_dir path, resetting to default: /tmp/ace_build");
-      ace_build_dir = "/tmp/ace_build";
+      RAFT_LOG_WARN("ACE: Invalid build_dir path, resetting to default: /tmp/ace_build");
+      build_dir = "/tmp/ace_build";
     }
-    if (mkdir(ace_build_dir.c_str(), 0755) != 0 && errno != EEXIST) {
-      RAFT_EXPECTS(false, "Failed to create ACE build directory: %s", ace_build_dir.c_str());
+    if (mkdir(build_dir.c_str(), 0755) != 0 && errno != EEXIST) {
+      RAFT_EXPECTS(false, "Failed to create ACE build directory: %s", build_dir.c_str());
     }
   }
 
   if (host_memory_limited && gpu_memory_limited) {
     RAFT_LOG_INFO(
       "ACE: Graph does not fit in host and GPU memory. Using disk-mode with temporary storage %s",
-      ace_build_dir.c_str());
+      build_dir.c_str());
   } else if (host_memory_limited) {
     RAFT_LOG_INFO(
       "ACE: Graph does not fit in host memory. Using disk-mode with temporary storage %s",
-      ace_build_dir.c_str());
+      build_dir.c_str());
   } else if (gpu_memory_limited) {
     RAFT_LOG_INFO(
       "ACE: Graph does not fit in GPU memory. Using disk-mode with temporary storage %s",
-      ace_build_dir.c_str());
-  } else if (ace_use_disk) {
+      build_dir.c_str());
+  } else if (use_disk) {
     RAFT_LOG_INFO(
       "ACE: Graph fits in host and GPU memory but disk mode is forced. Using disk-mode with "
       "temporary storage %s",
-      ace_build_dir.c_str());
+      build_dir.c_str());
   } else {
     RAFT_LOG_INFO("ACE: Graph fits in host and GPU memory. Using in-memory mode.");
   }
@@ -934,9 +934,9 @@ index<T, IdxT> build_ace(raft::resources const& res,
   size_t mapping_header_size   = 0;
   size_t graph_header_size     = 0;
 
-  if (use_disk) {
-    if (mkdir(ace_build_dir.c_str(), 0755) != 0 && errno != EEXIST) {
-      RAFT_EXPECTS(false, "Failed to create ACE build directory: %s", ace_build_dir.c_str());
+  if (use_disk_mode) {
+    if (mkdir(build_dir.c_str(), 0755) != 0 && errno != EEXIST) {
+      RAFT_EXPECTS(false, "Failed to create ACE build directory: %s", build_dir.c_str());
     }
 
     // Helper lambda to write numpy header to file descriptor
@@ -960,7 +960,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
     // Create and allocate dataset file
     reordered_fd = cuvs::util::file_descriptor(
-      ace_build_dir + "/reordered_dataset.npy", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+      build_dir + "/reordered_dataset.npy", O_CREAT | O_WRONLY | O_TRUNC, 0644);
     {
       std::stringstream ss;
       const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<T>();
@@ -989,7 +989,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
     // Create and allocate augmented dataset file
     augmented_fd = cuvs::util::file_descriptor(
-      ace_build_dir + "/augmented_dataset.npy", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+      build_dir + "/augmented_dataset.npy", O_CREAT | O_WRONLY | O_TRUNC, 0644);
     {
       std::stringstream ss;
       const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<T>();
@@ -1014,7 +1014,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
     // Create and allocate mapping file
     mapping_fd = cuvs::util::file_descriptor(
-      ace_build_dir + "/dataset_mapping.npy", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+      build_dir + "/dataset_mapping.npy", O_CREAT | O_WRONLY | O_TRUNC, 0644);
     {
       std::stringstream ss;
       const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
@@ -1041,7 +1041,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
     // Create and allocate graph file
     graph_fd = cuvs::util::file_descriptor(
-      ace_build_dir + "/cagra_graph.npy", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+      build_dir + "/cagra_graph.npy", O_CREAT | O_WRONLY | O_TRUNC, 0644);
     {
       std::stringstream ss;
       const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
@@ -1130,9 +1130,9 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
   // Reorder the dataset based on partitions and store to disk. Uses write buffers to improve
   // performance.
-  if (use_disk) {
+  if (use_disk_mode) {
     ace_reorder_and_store_dataset<T, IdxT>(res,
-                                           ace_build_dir,
+                                           build_dir,
                                            dataset,
                                            partition_labels.view(),
                                            partition_histogram.view(),
@@ -1171,10 +1171,10 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
     auto sub_dataset = raft::make_host_matrix<T, int64_t>(sub_dataset_size, dataset_dim);
 
-    if (use_disk) {
+    if (use_disk_mode) {
       // Load partition dataset from disk files
       ace_load_partition_dataset_from_disk<T, IdxT>(res,
-                                                    ace_build_dir,
+                                                    build_dir,
                                                     partition_id,
                                                     dataset_dim,
                                                     partition_histogram.view(),
@@ -1207,7 +1207,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
                                   graph_degree,
                                   intermediate_degree,
                                   params.guarantee_connectivity,
-                                  ace_ef_construction,
+                                  ef_construction,
                                   sub_index_params);
 
     auto sub_index = cuvs::neighbors::cagra::build(
@@ -1299,8 +1299,8 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
   // Clean up augmented dataset file to save disk space (no longer needed after partitions
   // processed)
-  if (use_disk) {
-    const std::string augmented_dataset_path = ace_build_dir + "/augmented_dataset.npy";
+  if (use_disk_mode) {
+    const std::string augmented_dataset_path = build_dir + "/augmented_dataset.npy";
     if (std::filesystem::exists(augmented_dataset_path)) {
       std::filesystem::remove(augmented_dataset_path);
       RAFT_LOG_INFO("ACE: Removed augmented dataset file to save disk space");
@@ -1326,14 +1326,14 @@ index<T, IdxT> build_ace(raft::resources const& res,
       }
     }
   } else {
-    std::string dataset_file = ace_build_dir + "/reordered_dataset.npy";
-    std::string graph_file   = ace_build_dir + "/cagra_graph.npy";
+    std::string dataset_file = build_dir + "/reordered_dataset.npy";
+    std::string graph_file   = build_dir + "/cagra_graph.npy";
 
     idx.update_dataset(res, dataset_file);
     idx.update_graph(res, graph_file);
 
     RAFT_LOG_INFO("ACE: Set disk storage at %s (dataset shape [%zu, %zu], graph shape [%zu, %zu])",
-                  ace_build_dir.c_str(),
+                  build_dir.c_str(),
                   idx.size(),
                   idx.dim(),
                   idx.size(),

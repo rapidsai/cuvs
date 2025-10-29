@@ -86,10 +86,10 @@ static void _set_graph_build_params(
       cuvs::neighbors::cagra::graph_build_params::ace_params ace_p;
       if (params.graph_build_params) {
         auto ace_params_c             = static_cast<cuvsAceParams*>(params.graph_build_params);
-        ace_p.ace_npartitions         = ace_params_c->ace_npartitions;
-        ace_p.ace_ef_construction     = ace_params_c->ace_ef_construction;
-        ace_p.ace_build_dir           = std::string(ace_params_c->ace_build_dir);
-        ace_p.ace_use_disk            = ace_params_c->ace_use_disk;
+        ace_p.npartitions     = ace_params_c->npartitions;
+        ace_p.ef_construction = ace_params_c->ef_construction;
+        ace_p.build_dir       = std::string(ace_params_c->build_dir);
+        ace_p.use_disk        = ace_params_c->use_disk;
       }
       out_params = ace_p;
       break;
@@ -687,7 +687,7 @@ extern "C" cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params
       case cuvsCagraGraphBuildAlgo::ACE: {
         auto ace_params = static_cast<cuvsAceParams *>(params->graph_build_params);
         // Free the allocated build directory string
-        if (ace_params->ace_build_dir) { free(const_cast<char*>(ace_params->ace_build_dir)); }
+        if (ace_params->build_dir) { free(const_cast<char*>(ace_params->build_dir)); }
         delete ace_params;
         break;
       }
@@ -727,12 +727,12 @@ extern "C" cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params)
     auto ps = cuvs::neighbors::cagra::graph_build_params::ace_params();
 
     // Allocate and copy the build directory string
-    const char* build_dir = strdup(ps.ace_build_dir.c_str());
+    const char* build_dir = strdup(ps.build_dir.c_str());
 
-    *params = new cuvsAceParams{.ace_npartitions     = ps.ace_npartitions,
-                                .ace_ef_construction = ps.ace_ef_construction,
-                                .ace_build_dir       = build_dir,
-                                .ace_use_disk        = ps.ace_use_disk};
+    *params = new cuvsAceParams{.npartitions     = ps.npartitions,
+                                .ef_construction = ps.ef_construction,
+                                .build_dir       = build_dir,
+                                .use_disk        = ps.use_disk};
   });
 }
 
@@ -741,7 +741,7 @@ extern "C" cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params)
   return cuvs::core::translate_exceptions([=] {
     if (params) {
       // Free the allocated build directory string
-      if (params->ace_build_dir) { free(const_cast<char*>(params->ace_build_dir)); }
+      if (params->build_dir) { free(const_cast<char*>(params->build_dir)); }
       delete params;
     }
   });

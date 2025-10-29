@@ -102,24 +102,24 @@ struct ace_params {
    * The search graph for very large datasets can be larger than the device or host memory.
    * To build such large graphs, we divide the graph into smaller partitions.
    */
-  size_t ace_npartitions = 1;
+  size_t npartitions = 1;
   /**
    * The index quality for the ACE build.
    *
    * Bigger values increase the index quality. At some point, increasing this will no longer
    * improve the quality.
    */
-  size_t ace_ef_construction = 120;
+  size_t ef_construction = 120;
   /**
    * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).
-   * Used when `ace_npartitions` > 1 or `ace_use_disk` is true.
+   * Used when `npartitions` > 1 or `use_disk` is true.
    */
-  std::string ace_build_dir = "/tmp/ace_build";
+  std::string build_dir = "/tmp/ace_build";
   /**
    * Whether to use disk-based storage for ACE build.
    * When true, enables disk-based operations for memory-efficient graph construction.
    */
-  bool ace_use_disk = false;
+  bool use_disk = false;
 
   ace_params() = default;
 };

@@ -602,9 +602,9 @@ TEST(CagraC, BuildSearchACEMemory)
 
   cuvsAceParams_t ace_params;
   cuvsAceParamsCreate(&ace_params);
-  ace_params->ace_npartitions = 2;
-  ace_params->ace_ef_construction = 120;
-  ace_params->ace_use_disk = false;
+  ace_params->npartitions = 2;
+  ace_params->ef_construction = 120;
+  ace_params->use_disk = false;
 
   build_params->graph_build_params = ace_params;
   cuvsCagraBuild(res, build_params, &dataset_tensor, index);
@@ -704,10 +704,10 @@ TEST(CagraC, BuildSearchACEDisk)
 
   cuvsAceParams_t ace_params;
   cuvsAceParamsCreate(&ace_params);
-  ace_params->ace_npartitions = 2;
-  ace_params->ace_ef_construction = 120;
-  ace_params->ace_use_disk = true;
-  ace_params->ace_build_dir = strdup("/tmp/cagra_ace_test_disk");
+  ace_params->npartitions = 2;
+  ace_params->ef_construction = 120;
+  ace_params->use_disk = true;
+  ace_params->build_dir = strdup("/tmp/cagra_ace_test_disk");
 
   build_params->graph_build_params = ace_params;
   cuvsCagraBuild(res, build_params, &dataset_tensor, index);

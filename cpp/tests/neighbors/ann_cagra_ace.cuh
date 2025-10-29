@@ -18,9 +18,9 @@ struct AnnCagraAceInputs {
   int n_rows;
   int dim;
   int k;
-  int ace_npartitions;
-  int ace_ef_construction;
-  bool ace_use_disk;
+  int npartitions;
+  int ef_construction;
+  bool use_disk;
   cuvs::distance::DistanceType metric;
   double min_recall;
 };
@@ -28,9 +28,9 @@ struct AnnCagraAceInputs {
 inline ::std::ostream& operator<<(::std::ostream& os, const AnnCagraAceInputs& p)
 {
   os << "{n_queries=" << p.n_queries << ", dataset shape=" << p.n_rows << "x" << p.dim
-     << ", k=" << p.k << ", ace_npartitions=" << p.ace_npartitions
-     << ", ace_ef_construction=" << p.ace_ef_construction
-     << ", ace_use_disk=" << (p.ace_use_disk ? "true" : "false") << ", metric=";
+     << ", k=" << p.k << ", npartitions=" << p.npartitions
+     << ", ef_construction=" << p.ef_construction
+     << ", use_disk=" << (p.use_disk ? "true" : "false") << ", metric=";
   switch (p.metric) {
     case cuvs::distance::DistanceType::L2Expanded: os << "L2"; break;
     case cuvs::distance::DistanceType::InnerProduct: os << "InnerProduct"; break;
@@ -94,10 +94,10 @@ class AnnCagraAceTest : public ::testing::TestWithParam<AnnCagraAceInputs> {
       index_params.intermediate_graph_degree = 128;
       index_params.graph_degree              = 64;
       auto ace_params                        = graph_build_params::ace_params();
-      ace_params.ace_npartitions             = ps.ace_npartitions;
-      ace_params.ace_ef_construction         = ps.ace_ef_construction;
-      ace_params.ace_build_dir               = temp_dir;
-      ace_params.ace_use_disk                = ps.ace_use_disk;
+      ace_params.npartitions                 = ps.npartitions;
+      ace_params.ef_construction             = ps.ef_construction;
+      ace_params.build_dir                   = temp_dir;
+      ace_params.use_disk                    = ps.use_disk;
       index_params.graph_build_params        = ace_params;
 
       auto index =
@@ -105,7 +105,7 @@ class AnnCagraAceTest : public ::testing::TestWithParam<AnnCagraAceInputs> {
 
       ASSERT_EQ(index.size(), ps.n_rows);
 
-      if (ps.ace_use_disk) {
+      if (ps.use_disk) {
         // Verify disk-based ACE index using HNSW index from disk
         EXPECT_TRUE(index.on_disk());
         EXPECT_EQ(index.file_directory(), temp_dir);
@@ -153,7 +153,7 @@ class AnnCagraAceTest : public ::testing::TestWithParam<AnnCagraAceInputs> {
         auto distances_hnsw_host = raft::make_host_matrix<DistanceT, int64_t>(ps.n_queries, ps.k);
 
         hnsw::search_params search_params;
-        search_params.ef          = std::max(ps.ace_ef_construction, ps.k * 2);
+        search_params.ef          = std::max(ps.ef_construction, ps.k * 2);
         search_params.num_threads = 1;
 
         hnsw::search(handle_,
@@ -250,9 +250,9 @@ inline std::vector<AnnCagraAceInputs> generate_ace_inputs()
     {5000},         // n_rows
     {64, 128},      // dim
     {10},           // k
-    {2, 4},         // ace_npartitions
-    {100},          // ace_ef_construction
-    {false, true},  // ace_use_disk (test both modes)
+    {2, 4},         // npartitions
+    {100},          // ef_construction
+    {false, true},  // use_disk (test both modes)
     {cuvs::distance::DistanceType::L2Expanded,
      cuvs::distance::DistanceType::InnerProduct},  // metric
     {0.95}                                         // min_recall

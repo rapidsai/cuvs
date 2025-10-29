@@ -59,10 +59,10 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
     ctypedef cuvsIvfPqParams* cuvsIvfPqParams_t
 
     ctypedef struct cuvsAceParams:
-        size_t ace_npartitions
-        size_t ace_ef_construction
-        const char* ace_build_dir
-        bool ace_use_disk
+        size_t npartitions
+        size_t ef_construction
+        const char* build_dir
+        bool use_disk
     ctypedef cuvsAceParams* cuvsAceParams_t
 
     ctypedef struct cuvsCagraIndexParams:
