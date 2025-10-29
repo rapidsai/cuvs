@@ -108,11 +108,8 @@ set_target_properties(
 if(PROJECT_IS_TOP_LEVEL)
   set(cuvs_abi_version "1")
   set(cuvs_version "${cuvs_abi_version}.${RAPIDS_VERSION}")
-  set_target_properties(
-    cuvs_c
-    PROPERTIES VERSION "${cuvs_version}"
-               SOVERSION "${cuvs_abi_version}"
-  )
+  set_target_properties(cuvs_c PROPERTIES VERSION "${cuvs_version}")
+  set_target_properties(cuvs_c PROPERTIES SOVERSION "${cuvs_abi_version}")
 endif()
 
 # Encode what optional components we are building
