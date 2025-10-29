@@ -88,13 +88,12 @@ public class CuVSHostMatrixImpl extends CuVSMatrixBaseImpl implements CuVSHostMa
     assert (index < size)
         : String.format(Locale.ROOT, "Index out of bound ([%d], size [%d])", index, size);
 
-    var valueByteSize = valueLayout.byteSize();
     return new SliceRowView(
-        memorySegment.asSlice(index * columns * valueByteSize, columns * valueByteSize),
+        memorySegment.asSlice(index * rowSize, rowBytes),
         columns,
         valueLayout,
         dataType,
-        valueByteSize);
+        elementSize);
   }
 
   @Override
