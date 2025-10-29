@@ -444,8 +444,8 @@ def search(SearchParams search_params,
            k,
            neighbors=None,
            distances=None,
-           filter=None,
-           resources=None):
+           resources=None,
+           filter=None):
     """
     Find the k nearest neighbors for each query.
 
@@ -465,8 +465,8 @@ def search(SearchParams search_params,
     distances : Optional CUDA array interface compliant matrix shape
                 (n_queries, k) If supplied, the distances to the
                 neighbors will be written here in-place. (default None)
-    filter : Optional cuvs.neighbors.filters.Filter for prefiltering
     {resources_docstring}
+    filter : Optional cuvs.neighbors.filters.Filter for prefiltering
 
     Examples
     --------
