@@ -57,14 +57,15 @@ requirements:
     - rmm =${{ minor_version }}
     - scikit-learn>=1.5
     - if: linux64
-      then: mkl =2023
+      then:
+        - libaio  # Required for diskann_ssd at runtime
+        - mkl =2023
   ignore_run_exports:
     by_name:
       - cuda-version
       - cuda-cudart
       - glog
       - libaio
-      - libboost
       - libcublas
       - mkl
 
