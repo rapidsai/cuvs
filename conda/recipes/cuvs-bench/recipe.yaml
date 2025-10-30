@@ -65,7 +65,7 @@ requirements:
       - cuda-version
       - cuda-cudart
       - glog
-      - libaio
+      - libboost
       - libcublas
       - mkl
 
