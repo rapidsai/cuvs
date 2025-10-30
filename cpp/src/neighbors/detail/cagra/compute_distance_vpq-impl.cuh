@@ -399,13 +399,19 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
               std::uint32_t vq_half2_index =
                 m * (pq_val_pack_num_elements / vq_val_pack_num_elements) +
                 (PQ_LEN / vq_val_pack_num_elements) * v;
-              const uint32_t query_vec_element_id =
-                (elem_offset + e * vlen * TeamSize + v + laneId * vlen) * PQ_LEN;
 
-              constexpr auto kStride = vlen * PQ_LEN / pq_val_pack_num_elements;
-              const auto query_val_index =
-                transpose<DatasetBlockDim / pq_val_pack_num_elements, kStride>(
-                  query_vec_element_id / pq_val_pack_num_elements);
+              uint32_t query_val_index;
+              if constexpr (PQ_LEN == 2) {
+                query_val_index =
+                  vq_half2_index * kQueryBlock + elem_offset * (PQ_LEN / 2) + e * TeamSize + laneId;
+              } else {
+                const uint32_t query_vec_element_id =
+                  (elem_offset + e * vlen * TeamSize + v + laneId * vlen) * PQ_LEN /
+                  pq_val_pack_num_elements;
+                constexpr auto kStride = vlen * PQ_LEN / pq_val_pack_num_elements;
+                query_val_index = transpose<DatasetBlockDim / pq_val_pack_num_elements, kStride>(
+                  query_vec_element_id);
+              }
 
               if constexpr (PQ_LEN == 2) {
                 pq_val_pack_t c2, q2;
