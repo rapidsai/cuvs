@@ -258,10 +258,10 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
 
   constexpr cuvs::spatial::knn::detail::utils::mapping<QUERY_T> mapping{};
   auto smem_query_ptr =
-    reinterpret_cast<QUERY_T*>(reinterpret_cast<uint8_t*>(smem_ptr) + sizeof(DescriptorT) +
-                               DescriptorT::kSMemCodeBookSizeInBytes);
-  for (unsigned i = threadIdx.x * pq_val_config::pq_val_pack_num_elements; i < dim;
-       i += blockDim.x * pq_val_config::pq_val_pack_num_elements) {
+    reinterpret_cast<pq_val_t*>(reinterpret_cast<uint8_t*>(smem_ptr) + sizeof(DescriptorT) +
+                                DescriptorT::kSMemCodeBookSizeInBytes);
+  for (unsigned i = threadIdx.x * pq_val_pack_num_elements; i < dim;
+       i += blockDim.x * pq_val_pack_num_elements) {
     pq_val_pack_t buf;
     if constexpr (PQ_LEN == 2) {
       if (i < dim) { static_cast<pq_val_t>(static_cast<float>(buf.x = mapping(queries_ptr[i]))); }
@@ -399,10 +399,14 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
               std::uint32_t vq_half2_index =
                 m * (pq_val_pack_num_elements / vq_val_pack_num_elements) +
                 (PQ_LEN / vq_val_pack_num_elements) * v;
-              std::uint32_t query_val_index = vq_half2_index * kQueryBlock +
-                                              elem_offset * (PQ_LEN / pq_val_pack_num_elements) +
-                                              e * TeamSize + laneId;  // Index in pack_t
-              // if constexpr (false) {
+              const uint32_t query_vec_element_id =
+                (elem_offset + e * vlen * TeamSize + v + laneId * vlen) * PQ_LEN;
+
+              constexpr auto kStride = vlen * PQ_LEN / pq_val_pack_num_elements;
+              const auto query_val_index =
+                transpose<DatasetBlockDim / pq_val_pack_num_elements, kStride>(
+                  query_vec_element_id / pq_val_pack_num_elements);
+
               if constexpr (PQ_LEN == 2) {
                 pq_val_pack_t c2, q2;
                 // Loading PQ code book from smem
