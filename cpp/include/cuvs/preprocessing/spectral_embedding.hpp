@@ -154,7 +154,6 @@ void transform(raft::resources const& handle,
  * @param[out] embedding Output embedding in column-major format [n_samples x n_components]
  *
  */
-
 void transform(raft::resources const& handle,
                params config,
                raft::device_coo_matrix_view<float, int, int, int> connectivity_graph,
