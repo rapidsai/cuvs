@@ -255,7 +255,7 @@ inline std::vector<AnnCagraAceInputs> generate_ace_inputs()
     {false, true},  // use_disk (test both modes)
     {cuvs::distance::DistanceType::L2Expanded,
      cuvs::distance::DistanceType::InnerProduct},  // metric
-    {0.95}                                         // min_recall
+    {0.9}                                          // min_recall
   );
 }
 

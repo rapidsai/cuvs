@@ -824,6 +824,10 @@ index<T, IdxT> build_ace(raft::resources const& res,
   size_t dataset_dim  = dataset.extent(1);
 
   RAFT_EXPECTS(dataset_size > 0, "ACE: Dataset must not be empty");
+  if (dataset_size < 1000) {
+    RAFT_LOG_WARN("ACE: Very small dataset size (%zu), consider using regular CAGRA build instead.",
+                  dataset_size);
+  }
   RAFT_EXPECTS(dataset_dim > 0, "ACE: Dataset dimension must be greater than 0");
   RAFT_EXPECTS(params.intermediate_graph_degree > 0,
                "ACE: Intermediate graph degree must be greater than 0");
@@ -1275,8 +1279,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
                               (write_elapsed / 1000.0);
     RAFT_LOG_INFO(
       "ACE: Partition %4lu (%8lu + %8lu) completed in %6ld ms: read %6ld ms (%7.1f MiB/s), "
-      "optimize "
-      "%6ld ms, adjust %6ld ms, write %6ld ms (%7.1f MiB/s)",
+      "optimize %6ld ms, adjust %6ld ms, write %6ld ms (%7.1f MiB/s)",
       partition_id,
       core_sub_dataset_size,
       augmented_sub_dataset_size,

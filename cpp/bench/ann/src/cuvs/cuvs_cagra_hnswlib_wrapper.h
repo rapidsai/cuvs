@@ -135,13 +135,15 @@ void cuvs_cagra_hnswlib<T, IdxT>::save(const std::string& file) const
   if (cagra_ace_build_) {
     std::string index_filename =
       (std::filesystem::path(cagra_ace_build_directory_) / "hnsw_index.bin").string();
-    ASSERT(std::filesystem::exists(index_filename),
-           "Index file '%s' does not exist.",
-           index_filename.c_str());
-
+    RAFT_EXPECTS(std::filesystem::exists(index_filename),
+                 "Index file '%s' does not exist.",
+                 index_filename.c_str());
     if (std::filesystem::exists(file)) { std::filesystem::remove(file); }
     // might fail when using 2 different filesystems
-    std::filesystem::rename(index_filename, file);
+    std::error_code ec;
+    std::filesystem::rename(index_filename, file, ec);
+    RAFT_EXPECTS(
+      !ec, "Failed to rename index file '%s' to '%s'.", index_filename.c_str(), file.c_str());
   } else {
     cuvs::neighbors::hnsw::serialize(handle_, file, *(hnsw_index_.get()));
   }
