@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -44,7 +44,7 @@ list<SpecT, SizeT, SpecExtraArgs...>::list(raft::resources const& res,
     capacity = std::min<SizeT>(capacity, spec.align_max);
   }
   try {
-    data    = raft::make_device_mdarray<value_type>(res, spec.make_list_extents(capacity));
+    data    = raft::make_device_mdarray<value_type, SizeT>(res, spec.make_list_extents(capacity));
     indices = raft::make_device_vector<index_type, SizeT>(res, capacity);
   } catch (std::bad_alloc& e) {
     RAFT_FAIL(

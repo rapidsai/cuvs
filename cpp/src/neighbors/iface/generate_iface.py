@@ -33,10 +33,10 @@ footer = """
 
 flat_macro = """
 #define CUVS_INST_MG_FLAT(T, IdxT)                                                                                              \\
-  using T_ha = raft::host_device_accessor<std::experimental::default_accessor<const T>, raft::memory_type::device>;             \\
-  using T_da= raft::host_device_accessor<std::experimental::default_accessor<const T>, raft::memory_type::host>;                \\
-  using IdxT_ha = raft::host_device_accessor<std::experimental::default_accessor<const IdxT>, raft::memory_type::device>;       \\
-  using IdxT_da = raft::host_device_accessor<std::experimental::default_accessor<const IdxT>, raft::memory_type::host>;         \\
+  using T_ha = raft::host_device_accessor<cuda::std::default_accessor<const T>, raft::memory_type::device>;                     \\
+  using T_da = raft::host_device_accessor<cuda::std::default_accessor<const T>, raft::memory_type::host>;                       \\
+  using IdxT_ha = raft::host_device_accessor<cuda::std::default_accessor<const IdxT>, raft::memory_type::device>;               \\
+  using IdxT_da = raft::host_device_accessor<cuda::std::default_accessor<const IdxT>, raft::memory_type::host>;                 \\
                                                                                                                                 \\
   template void build(const raft::resources& handle,                                                                            \\
              cuvs::neighbors::iface<ivf_flat::index<T, IdxT>, T, IdxT>& interface,                                              \\
@@ -87,10 +87,10 @@ flat_macro = """
 
 pq_macro = """
 #define CUVS_INST_MG_PQ(T, IdxT)                                                                                                \\
-  using T_ha = raft::host_device_accessor<std::experimental::default_accessor<const T>, raft::memory_type::device>;             \\
-  using T_da= raft::host_device_accessor<std::experimental::default_accessor<const T>, raft::memory_type::host>;                \\
-  using IdxT_ha = raft::host_device_accessor<std::experimental::default_accessor<const IdxT>, raft::memory_type::device>;       \\
-  using IdxT_da = raft::host_device_accessor<std::experimental::default_accessor<const IdxT>, raft::memory_type::host>;         \\
+  using T_ha = raft::host_device_accessor<cuda::std::default_accessor<const T>, raft::memory_type::device>;                     \\
+  using T_da = raft::host_device_accessor<cuda::std::default_accessor<const T>, raft::memory_type::host>;                       \\
+  using IdxT_ha = raft::host_device_accessor<cuda::std::default_accessor<const IdxT>, raft::memory_type::device>;               \\
+  using IdxT_da = raft::host_device_accessor<cuda::std::default_accessor<const IdxT>, raft::memory_type::host>;                 \\
                                                                                                                                 \\
   template void build(const raft::resources& handle,                                                                            \\
              cuvs::neighbors::iface<ivf_pq::index<IdxT>, T, IdxT>& interface,                                                   \\
@@ -141,10 +141,10 @@ pq_macro = """
 
 cagra_macro = """
 #define CUVS_INST_MG_CAGRA(T, IdxT)                                                                                             \\
-  using T_ha = raft::host_device_accessor<std::experimental::default_accessor<const T>, raft::memory_type::device>;             \\
-  using T_da= raft::host_device_accessor<std::experimental::default_accessor<const T>, raft::memory_type::host>;                \\
-  using IdxT_ha = raft::host_device_accessor<std::experimental::default_accessor<const IdxT>, raft::memory_type::device>;       \\
-  using IdxT_da = raft::host_device_accessor<std::experimental::default_accessor<const IdxT>, raft::memory_type::host>;         \\
+  using T_ha = raft::host_device_accessor<cuda::std::default_accessor<const T>, raft::memory_type::device>;                     \\
+  using T_da = raft::host_device_accessor<cuda::std::default_accessor<const T>, raft::memory_type::host>;                       \\
+  using IdxT_ha = raft::host_device_accessor<cuda::std::default_accessor<const IdxT>, raft::memory_type::device>;               \\
+  using IdxT_da = raft::host_device_accessor<cuda::std::default_accessor<const IdxT>, raft::memory_type::host>;                 \\
                                                                                                                                 \\
   template void build(const raft::resources& handle,                                                                            \\
              cuvs::neighbors::iface<cagra::index<T, IdxT>, T, IdxT>& interface,                                                 \\

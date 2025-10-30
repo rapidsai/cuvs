@@ -335,8 +335,8 @@ struct index : cuvs::neighbors::index {
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 
-  using pq_centers_extents = std::experimental::
-    extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
+  using pq_centers_extents =
+    cuda::std::extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
 
  public:
   index(const index&)                    = delete;
@@ -2855,7 +2855,7 @@ void make_rotation_matrix(raft::resources const& res,
  * @code{.cpp}
  *   raft::resources res;
  *   // allocate the buffer for the input centers
- *   auto cluster_centers = raft::make_device_matrix<float, uint32_t>(res, index.n_lists(),
+ *   auto cluster_centers = raft::make_device_matrix<float, int64_t>(res, index.n_lists(),
  index.dim());
  *   ... prepare ivf centroids in cluster_centers ...
  *   // reset the index
@@ -2875,7 +2875,7 @@ void make_rotation_matrix(raft::resources const& res,
  */
 void set_centers(raft::resources const& res,
                  index<int64_t>* index,
-                 raft::device_matrix_view<const float, uint32_t> cluster_centers);
+                 raft::device_matrix_view<const float, int64_t> cluster_centers);
 
 /**
  * @brief Public helper API for fetching a trained index's IVF centroids

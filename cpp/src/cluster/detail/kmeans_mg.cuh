@@ -409,8 +409,8 @@ void initKMeansPlusPlus(const raft::resources& handle,
     cuvs::cluster::kmeans::init_plus_plus(
       handle, params, const_centroids, centroidsRawData, workspace);
 
-    auto inertia = raft::make_host_scalar<DataT>(0);
-    auto n_iter  = raft::make_host_scalar<IndexT>(0);
+    auto inertia = raft::make_host_scalar<DataT, IndexT>(0);
+    auto n_iter  = raft::make_host_scalar<IndexT, IndexT>(0);
     auto weight_view =
       raft::make_device_vector_view<const DataT, IndexT>(weight.data_handle(), weight.extent(0));
     cuvs::cluster::kmeans::params params_copy = params;
@@ -508,8 +508,8 @@ void fit(const raft::resources& handle,
          raft::device_matrix_view<const DataT, IndexT> X,
          std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
          raft::device_matrix_view<DataT, IndexT> centroids,
-         raft::host_scalar_view<DataT> inertia,
-         raft::host_scalar_view<IndexT> n_iter,
+         raft::host_scalar_view<DataT, IndexT> inertia,
+         raft::host_scalar_view<IndexT, IndexT> n_iter,
          rmm::device_uvector<char>& workspace)
 {
   const auto& comm    = raft::resource::get_comms(handle);
