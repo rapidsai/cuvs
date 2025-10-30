@@ -154,11 +154,16 @@ void transform(raft::resources const& handle,
  * @param[out] embedding Output embedding in column-major format [n_samples x n_components]
  *
  */
-template <typename DataT>
+
 void transform(raft::resources const& handle,
                params config,
-               raft::device_coo_matrix_view<DataT, int, int, int> connectivity_graph,
-               raft::device_matrix_view<DataT, int, raft::col_major> embedding);
+               raft::device_coo_matrix_view<float, int, int, int> connectivity_graph,
+               raft::device_matrix_view<float, int, raft::col_major> embedding);
+
+void transform(raft::resources const& handle,
+               params config,
+               raft::device_coo_matrix_view<double, int, int, int> connectivity_graph,
+               raft::device_matrix_view<double, int, raft::col_major> embedding);
 
 /**
  * @}

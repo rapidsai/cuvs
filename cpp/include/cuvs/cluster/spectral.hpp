@@ -19,10 +19,14 @@ struct params {
   raft::random::RngState rng_state{0};
 };
 
-template <typename DataT>
 void fit_predict(raft::resources const& handle,
                  params config,
-                 raft::device_coo_matrix_view<DataT, int, int, int> connectivity_graph,
+                 raft::device_coo_matrix_view<float, int, int, int> connectivity_graph,
+                 raft::device_vector_view<int, int> labels);
+
+void fit_predict(raft::resources const& handle,
+                 params config,
+                 raft::device_coo_matrix_view<double, int, int, int> connectivity_graph,
                  raft::device_vector_view<int, int> labels);
 
 }  // namespace cuvs::cluster::spectral
