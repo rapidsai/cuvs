@@ -100,7 +100,8 @@ final class JDKProvider implements CuVSProvider {
   }
 
   /**
-   * Read cuvs-java version from this Jar Manifest, or null if these are not available
+   * Read cuvs-java version from this Jar Manifest, or null if these are not
+   * available
    */
   private static String readCuVSVersionFromManifest() {
     try (var jarFile =
@@ -209,6 +210,7 @@ final class JDKProvider implements CuVSProvider {
           ivfPqIndexParams,
           ivfPqSearchParams,
           cuvsIvfPqParamsMemorySegment);
+    }
   }
 
   @Override
@@ -495,8 +497,10 @@ final class JDKProvider implements CuVSProvider {
   }
 
   /**
-   * This {@link CuVSDeviceMatrix} builder implementation returns a {@link CuVSDeviceMatrix} backed by managed RMM
-   * device memory. It uses a {@link PinnedMemoryBuffer} to batch data before copying it to the GPU.
+   * This {@link CuVSDeviceMatrix} builder implementation returns a
+   * {@link CuVSDeviceMatrix} backed by managed RMM
+   * device memory. It uses a {@link PinnedMemoryBuffer} to batch data before
+   * copying it to the GPU.
    */
   private static final class DeviceMatrixBuilder extends MatrixBuilder<CuVSDeviceMatrixImpl>
       implements CuVSMatrix.Builder<CuVSDeviceMatrix> {
