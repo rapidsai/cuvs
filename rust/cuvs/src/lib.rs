@@ -14,6 +14,7 @@ pub mod distance;
 pub mod distance_type;
 mod dlpack;
 mod error;
+pub mod filters;
 pub mod ivf_flat;
 pub mod ivf_pq;
 mod resources;
