@@ -229,21 +229,21 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
           device::sts(codebook_buf + smem_index * sizeof(pq_val_pack_t), buf2);
         } else if constexpr (PQ_LEN == 4) {
           pq_val_pack_t buf4;
-          buf4.x = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i]));
-          buf4.y = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 1]));
-          buf4.z = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 2]));
-          buf4.w = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 3]));
+          buf4.data.x1[0] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i]));
+          buf4.data.x1[1] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 1]));
+          buf4.data.x1[2] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 2]));
+          buf4.data.x1[3] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 3]));
           device::sts(codebook_buf + smem_index * sizeof(pq_val_pack_uint_t), buf4.as_uint());
         } else if constexpr (PQ_LEN == 8) {
           pq_val_pack_t buf8;
-          buf8.x0 = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i]));
-          buf8.x1 = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 1]));
-          buf8.x2 = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 2]));
-          buf8.x3 = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 3]));
-          buf8.x4 = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 4]));
-          buf8.x5 = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 5]));
-          buf8.x6 = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 6]));
-          buf8.x7 = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 7]));
+          buf8.data.x1[0] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i]));
+          buf8.data.x1[1] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 1]));
+          buf8.data.x1[2] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 2]));
+          buf8.data.x1[3] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 3]));
+          buf8.data.x1[4] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 4]));
+          buf8.data.x1[5] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 5]));
+          buf8.data.x1[6] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 6]));
+          buf8.data.x1[7] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 7]));
           device::sts(codebook_buf + smem_index * sizeof(pq_val_pack_uint_t), buf8.as_uint());
         }
       }
@@ -383,8 +383,7 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
 
                 // Loading query vector from smem
                 device::lds(q2, query_ptr + sizeof(half2) * query_val_index);
-                c2_.x = static_cast<half>(c_vec.x);
-                c2_.y = static_cast<half>(c_vec.y);
+                c2_ = c_vec.as_half2(0);
                 // L2 distance
                 auto dist =
                   q2 - c2_ - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[vq_half2_index];
@@ -395,8 +394,7 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
                 query_val_index += kQueryBlock;
 
                 device::lds(q2, query_ptr + sizeof(half2) * query_val_index);
-                c2_.x = static_cast<half>(c_vec.z);
-                c2_.y = static_cast<half>(c_vec.w);
+                c2_ = c_vec.as_half2(1);
                 // L2 distance
                 dist =
                   q2 - c2_ - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[vq_half2_index];
@@ -412,8 +410,7 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
 
                 // Loading query vector from smem
                 device::lds(q2, query_ptr + sizeof(half2) * query_val_index);
-                c2_.x = static_cast<half>(c_vec.x0);
-                c2_.y = static_cast<half>(c_vec.x1);
+                c2_ = c_vec.as_half2(0);
                 // L2 distance
                 auto dist =
                   q2 - c2_ - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[vq_half2_index];
@@ -424,8 +421,7 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
                 query_val_index += kQueryBlock;
 
                 device::lds(q2, query_ptr + sizeof(half2) * query_val_index);
-                c2_.x = static_cast<half>(c_vec.x2);
-                c2_.y = static_cast<half>(c_vec.x3);
+                c2_ = c_vec.as_half2(1);
                 // L2 distance
                 dist =
                   q2 - c2_ - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[vq_half2_index];
@@ -436,8 +432,7 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
                 query_val_index += kQueryBlock;
 
                 device::lds(q2, query_ptr + sizeof(half2) * query_val_index);
-                c2_.x = static_cast<half>(c_vec.x4);
-                c2_.y = static_cast<half>(c_vec.x5);
+                c2_ = c_vec.as_half2(2);
                 // L2 distance
                 dist =
                   q2 - c2_ - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[vq_half2_index];
@@ -448,8 +443,7 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
                 query_val_index += kQueryBlock;
 
                 device::lds(q2, query_ptr + sizeof(half2) * query_val_index);
-                c2_.x = static_cast<half>(c_vec.x6);
-                c2_.y = static_cast<half>(c_vec.x7);
+                c2_ = c_vec.as_half2(3);
                 // L2 distance
                 dist =
                   q2 - c2_ - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[vq_half2_index];
