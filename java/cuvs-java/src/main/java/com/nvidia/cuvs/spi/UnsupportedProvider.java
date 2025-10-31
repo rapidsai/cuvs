@@ -74,14 +74,13 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
-  public CagraIndexParams cagraIndexParamsFromHnswHardM(
-      long rows, long dim, int m, int efConstruction, CagraIndexParams.CuvsDistanceType metric) {
-    throw new UnsupportedOperationException(reasons);
-  }
-
-  @Override
-  public CagraIndexParams cagraIndexParamsFromHnswSoftM(
-      long rows, long dim, int m, int efConstruction, CagraIndexParams.CuvsDistanceType metric) {
+  public CagraIndexParams cagraIndexParamsFromHnswParams(
+      long rows,
+      long dim,
+      int m,
+      int efConstruction,
+      CagraIndexParams.HnswHeuristicType heuristic,
+      CagraIndexParams.CuvsDistanceType metric) {
     throw new UnsupportedOperationException(reasons);
   }
 

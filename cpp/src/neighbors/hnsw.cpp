@@ -18,8 +18,12 @@ auto to_cagra_params(raft::matrix_extent<int64_t> dataset,
                      int ef_construction,
                      cuvs::distance::DistanceType metric) -> cuvs::neighbors::cagra::index_params
 {
-  return cuvs::neighbors::cagra::index_params::from_hnsw_soft_m(
-    dataset, M, ef_construction, metric);
+  return cuvs::neighbors::cagra::index_params::from_hnsw_params(
+    dataset,
+    M,
+    ef_construction,
+    cuvs::neighbors::cagra::hnsw_heuristic_type::SAME_GRAPH_FOOTPRINT,
+    metric);
 }
 
 #define CUVS_INST_HNSW_FROM_CAGRA(T)                                                  \

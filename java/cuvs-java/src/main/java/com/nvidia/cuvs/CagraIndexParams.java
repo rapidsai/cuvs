@@ -62,6 +62,53 @@ public class CagraIndexParams {
   }
 
   /**
+   * A strategy for selecting the graph build parameters based on similar HNSW index
+   * parameters.
+   */
+  public enum HnswHeuristicType {
+    /**
+     * Create a graph that is very similar to an HNSW graph in
+     * terms of the number of nodes and search performance. Since HNSW produces a variable-degree
+     * graph (2M being the max graph degree) and CAGRA produces a fixed-degree graph, there's always a
+     * difference in the performance of the two.
+     *
+     * This function attempts to produce such a graph that the QPS and recall of the two graphs being
+     * searched by HNSW are close for any search parameter combination. The CAGRA-produced graph tends
+     * to have a "longer tail" on the low recall side (that is being slightly faster and less
+     * precise).
+     */
+    SIMILAR_SEARCH_PERFORMANCE(0),
+    /**
+     * Create a graph that has the same binary size as an HNSW graph with the given parameters
+     * (graph_degree = 2 * M) while trying to match the search performance as closely as possible.
+     *
+     * The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce
+     * the same recalls and QPS for the same parameter ef. The graphs are different internally. For
+     * the same ef, the from-CAGRA index likely has a slightly higher recall and slightly lower QPS.
+     * However, the Recall-QPS curves should be similar (i.e. the points are just shifted along the
+     * curve).
+     */
+    SAME_GRAPH_FOOTPRINT(1);
+
+    /**
+     * The value for the enum choice.
+     */
+    public final int value;
+
+    private HnswHeuristicType(int value) {
+      this.value = value;
+    }
+
+    private static final Map<Integer, HnswHeuristicType> VALUES =
+        Arrays.stream(HnswHeuristicType.values())
+            .collect(Collectors.toUnmodifiableMap(x -> x.value, Function.identity()));
+
+    public static HnswHeuristicType of(int i) {
+      return VALUES.get(i);
+    }
+  }
+
+  /**
    * Enum that denotes how to compute distance.
    */
   public enum CuvsDistanceType {
@@ -293,16 +340,15 @@ public class CagraIndexParams {
     this.cagraCompressionParams = cagraCompressionParams;
   }
 
-  public static CagraIndexParams fromHnswHardM(
-      long rows, long dim, int M, int efConstruction, CuvsDistanceType metric) {
+  public static CagraIndexParams fromHnswParams(
+      long rows,
+      long dim,
+      int M,
+      int efConstruction,
+      HnswHeuristicType heuristic,
+      CuvsDistanceType metric) {
     return CuVSProvider.provider()
-        .cagraIndexParamsFromHnswHardM(rows, dim, M, efConstruction, metric);
-  }
-
-  public static CagraIndexParams fromHnswSoftM(
-      long rows, long dim, int M, int efConstruction, CuvsDistanceType metric) {
-    return CuVSProvider.provider()
-        .cagraIndexParamsFromHnswSoftM(rows, dim, M, efConstruction, metric);
+        .cagraIndexParamsFromHnswParams(rows, dim, M, efConstruction, heuristic, metric);
   }
 
   /**

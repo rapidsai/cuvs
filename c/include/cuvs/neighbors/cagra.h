@@ -37,6 +37,40 @@ enum cuvsCagraGraphBuildAlgo {
   ITERATIVE_CAGRA_SEARCH = 3
 };
 
+/**
+ * @brief A strategy for selecting the graph build parameters based on similar HNSW index
+ * parameters.
+ *
+ * Define how cuvsCagraIndexParamsFromHnswParams should construct a graph to construct a graph
+ * that is to be converted to (used by) a CPU HNSW index.
+ */
+enum cuvsCagraHnswHeuristicType {
+  /**
+   * Create a graph that is very similar to an HNSW graph in
+   * terms of the number of nodes and search performance. Since HNSW produces a variable-degree
+   * graph (2M being the max graph degree) and CAGRA produces a fixed-degree graph, there's always a
+   * difference in the performance of the two.
+   *
+   * This function attempts to produce such a graph that the QPS and recall of the two graphs being
+   * searched by HNSW are close for any search parameter combination. The CAGRA-produced graph tends
+   * to have a "longer tail" on the low recall side (that is being slightly faster and less
+   * precise).
+   *
+   */
+  SIMILAR_SEARCH_PERFORMANCE = 0,
+  /**
+   * Create a graph that has the same binary size as an HNSW graph with the given parameters
+   * (graph_degree = 2 * M) while trying to match the search performance as closely as possible.
+   *
+   * The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce
+   * the same recalls and QPS for the same parameter ef. The graphs are different internally. For
+   * the same ef, the from-CAGRA index likely has a slightly higher recall and slightly lower QPS.
+   * However, the Recall-QPS curves should be similar (i.e. the points are just shifted along the
+   * curve).
+   */
+  SAME_GRAPH_FOOTPRINT = 1
+};
+
 /** Parameters for VPQ compression. */
 struct cuvsCagraCompressionParams {
   /**
@@ -146,46 +180,27 @@ cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* param
 cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params);
 
 /**
- * @brief Create CAGRA index parameters similar to an HNSW index with hard M constraint
+ * @brief Create CAGRA index parameters similar to an HNSW index
  *
- * This factory function creates CAGRA parameters that yield a graph of the same size
- * as an HNSW graph with the given parameters.
- *
- * @param[out] params The CAGRA index params to populate
- * @param[in] n_rows Number of rows in the dataset
- * @param[in] dim Number of dimensions in the dataset
- * @param[in] M HNSW index parameter M
- * @param[in] ef_construction HNSW index parameter ef_construction
- * @param[in] metric Distance metric to use
- * @return cuvsError_t
- */
-cuvsError_t cuvsCagraIndexParamsFromHnswHardM(cuvsCagraIndexParams_t params,
-                                               int64_t n_rows,
-                                               int64_t dim,
-                                               int M,
-                                               int ef_construction,
-                                               cuvsDistanceType metric);
-
-/**
- * @brief Create CAGRA index parameters similar to an HNSW index with soft M constraint
- *
- * This factory function creates CAGRA parameters that yield a graph with similar search
- * performance as an HNSW graph with the given parameters.
+ * This factory function creates CAGRA parameters that yield a graph compatible with
+ * an HNSW graph with the given parameters.
  *
  * @param[out] params The CAGRA index params to populate
  * @param[in] n_rows Number of rows in the dataset
  * @param[in] dim Number of dimensions in the dataset
  * @param[in] M HNSW index parameter M
  * @param[in] ef_construction HNSW index parameter ef_construction
+ * @param[in] heuristic Strategy for parameter selection
  * @param[in] metric Distance metric to use
  * @return cuvsError_t
  */
-cuvsError_t cuvsCagraIndexParamsFromHnswSoftM(cuvsCagraIndexParams_t params,
-                                               int64_t n_rows,
-                                               int64_t dim,
-                                               int M,
-                                               int ef_construction,
-                                               cuvsDistanceType metric);
+cuvsError_t cuvsCagraIndexParamsFromHnswParams(cuvsCagraIndexParams_t params,
+                                                int64_t n_rows,
+                                                int64_t dim,
+                                                int M,
+                                                int ef_construction,
+                                                enum cuvsCagraHnswHeuristicType heuristic,
+                                                cuvsDistanceType metric);
 
 /**
  * @}

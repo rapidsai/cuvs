@@ -721,33 +721,19 @@ static void populate_cagra_index_params_from_cpp(cuvsCagraIndexParams_t c_params
   }
 }
 
-extern "C" cuvsError_t cuvsCagraIndexParamsFromHnswHardM(cuvsCagraIndexParams_t params,
-                                                          int64_t n_rows,
-                                                          int64_t dim,
-                                                          int M,
-                                                          int ef_construction,
-                                                          cuvsDistanceType metric)
+extern "C" cuvsError_t cuvsCagraIndexParamsFromHnswParams(cuvsCagraIndexParams_t params,
+                                                           int64_t n_rows,
+                                                           int64_t dim,
+                                                           int M,
+                                                           int ef_construction,
+                                                           enum cuvsCagraHnswHeuristicType heuristic,
+                                                           cuvsDistanceType metric)
 {
   return cuvs::core::translate_exceptions([=] {
     auto cpp_metric = static_cast<cuvs::distance::DistanceType>((int)metric);
-    auto cpp_params = cuvs::neighbors::cagra::index_params::from_hnsw_hard_m(
-      raft::matrix_extent<int64_t>(n_rows, dim), M, ef_construction, cpp_metric);
-
-    populate_cagra_index_params_from_cpp(params, cpp_params);
-  });
-}
-
-extern "C" cuvsError_t cuvsCagraIndexParamsFromHnswSoftM(cuvsCagraIndexParams_t params,
-                                                          int64_t n_rows,
-                                                          int64_t dim,
-                                                          int M,
-                                                          int ef_construction,
-                                                          cuvsDistanceType metric)
-{
-  return cuvs::core::translate_exceptions([=] {
-    auto cpp_metric = static_cast<cuvs::distance::DistanceType>((int)metric);
-    auto cpp_params = cuvs::neighbors::cagra::index_params::from_hnsw_soft_m(
-      raft::matrix_extent<int64_t>(n_rows, dim), M, ef_construction, cpp_metric);
+    auto cpp_heuristic = static_cast<cuvs::neighbors::cagra::hnsw_heuristic_type>((int)heuristic);
+    auto cpp_params = cuvs::neighbors::cagra::index_params::from_hnsw_params(
+      raft::matrix_extent<int64_t>(n_rows, dim), M, ef_construction, cpp_heuristic, cpp_metric);
 
     populate_cagra_index_params_from_cpp(params, cpp_params);
   });

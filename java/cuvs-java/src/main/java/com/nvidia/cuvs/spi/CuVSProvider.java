@@ -152,9 +152,11 @@ public interface CuVSProvider {
     return CuVSServiceProvider.Holder.INSTANCE;
   }
 
-  CagraIndexParams cagraIndexParamsFromHnswHardM(
-      long rows, long dim, int m, int efConstruction, CagraIndexParams.CuvsDistanceType metric);
-
-  CagraIndexParams cagraIndexParamsFromHnswSoftM(
-      long rows, long dim, int m, int efConstruction, CagraIndexParams.CuvsDistanceType metric);
+  CagraIndexParams cagraIndexParamsFromHnswParams(
+      long rows,
+      long dim,
+      int m,
+      int efConstruction,
+      CagraIndexParams.HnswHeuristicType heuristic,
+      CagraIndexParams.CuvsDistanceType metric);
 }

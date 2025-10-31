@@ -184,8 +184,13 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
-  public CagraIndexParams cagraIndexParamsFromHnswHardM(
-      long rows, long dim, int m, int efConstruction, CagraIndexParams.CuvsDistanceType metric) {
+  public CagraIndexParams cagraIndexParamsFromHnswParams(
+      long rows,
+      long dim,
+      int m,
+      int efConstruction,
+      CagraIndexParams.HnswHeuristicType heuristic,
+      CagraIndexParams.CuvsDistanceType metric) {
     try (var nativeCagraIndexParams = createCagraIndexParams();
         var ivfPqIndexParams = createIvfPqIndexParams();
         var ivfPqSearchParams = createIvfPqSearchParams()) {
@@ -201,9 +206,15 @@ final class JDKProvider implements CuVSProvider {
       cuvsCagraIndexParams.graph_build_params(
           nativeCagraIndexParams.handle(), cuvsIvfPqParamsMemorySegment);
       checkCuVSError(
-          cuvsCagraIndexParamsFromHnswHardM(
-              nativeCagraIndexParams.handle(), rows, dim, m, efConstruction, metric.value),
-          "cuvsCagraIndexParamsFromHnswHardM");
+          cuvsCagraIndexParamsFromHnswParams(
+              nativeCagraIndexParams.handle(),
+              rows,
+              dim,
+              m,
+              efConstruction,
+              heuristic.value,
+              metric.value),
+          "cuvsCagraIndexParamsFromHnswParams");
 
       return populateCagraIndexParamsFromNative(
           nativeCagraIndexParams,
@@ -229,36 +240,6 @@ final class JDKProvider implements CuVSProvider {
       cuvsSetLogLevel(CUVS_LOG_LEVEL_OFF());
     } else {
       throw new UnsupportedOperationException("Unsupported log level [" + level + "]");
-    }
-  }
-
-  @Override
-  public CagraIndexParams cagraIndexParamsFromHnswSoftM(
-      long rows, long dim, int m, int efConstruction, CagraIndexParams.CuvsDistanceType metric) {
-    try (var nativeCagraIndexParams = createCagraIndexParams();
-        var ivfPqIndexParams = createIvfPqIndexParams();
-        var ivfPqSearchParams = createIvfPqSearchParams()) {
-
-      // This is already allocated by cuvsCagraIndexParamsCreate,
-      // we just need to populate it.
-      MemorySegment cuvsIvfPqParamsMemorySegment =
-          cuvsCagraIndexParams.graph_build_params(nativeCagraIndexParams.handle());
-      cuvsIvfPqParams.ivf_pq_build_params(cuvsIvfPqParamsMemorySegment, ivfPqIndexParams.handle());
-      cuvsIvfPqParams.ivf_pq_search_params(
-          cuvsIvfPqParamsMemorySegment, ivfPqSearchParams.handle());
-
-      cuvsCagraIndexParams.graph_build_params(
-          nativeCagraIndexParams.handle(), cuvsIvfPqParamsMemorySegment);
-      checkCuVSError(
-          cuvsCagraIndexParamsFromHnswSoftM(
-              nativeCagraIndexParams.handle(), rows, dim, m, efConstruction, metric.value),
-          "cuvsCagraIndexParamsFromHnswSoftM");
-
-      return populateCagraIndexParamsFromNative(
-          nativeCagraIndexParams,
-          ivfPqIndexParams,
-          ivfPqSearchParams,
-          cuvsIvfPqParamsMemorySegment);
     }
   }
 
