@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,7 +10,8 @@
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <raft/core/mdspan_types.hpp>
 
-namespace cuvs::neighbors::ivf_pq::helpers {
+namespace cuvs::neighbors::ivf_pq {
+namespace helpers {
 
 namespace codepacker {
 
@@ -273,10 +274,71 @@ void set_centers(raft::resources const& handle,
 {
   RAFT_EXPECTS(cluster_centers.extent(0) == index->n_lists(),
                "Number of rows in the new centers must be equal to the number of IVF lists");
-  RAFT_EXPECTS(cluster_centers.extent(1) == index->dim(),
-               "Number of columns in the new cluster centers and index dim are different");
-  RAFT_EXPECTS(index->size() == 0, "Index must be empty");
-  detail::set_centers(handle, index, cluster_centers.data_handle());
+  RAFT_EXPECTS(
+    cluster_centers.extent(1) == index->dim() || cluster_centers.extent(1) == index->dim_ext(),
+    "Number of columns in the new cluster centers must be equal to dim or dim_ext");
+
+  // Note: We keep the empty index check for backward compatibility
+  // New code should use update_centers directly if updating a non-empty index
+  RAFT_EXPECTS(index->size() == 0,
+               "set_centers requires an empty index. Use update_centers() for non-empty indices.");
+
+  // Use the new update_centers method which handles format conversion
+  index->update_centers(handle, cluster_centers);
+
+  // Compute rotated centers if rotation matrix exists
+  // This is what differentiates set_centers from update_centers
+  if (index->rotation_matrix().extent(0) > 0 && index->rotation_matrix().extent(1) > 0) {
+    // Allocate centers_rot if needed
+    if (!index->centers_rot().data_handle()) {
+      RAFT_FAIL("centers_rot must be allocated before calling set_centers");
+    }
+
+    float alpha = 1.0;
+    float beta  = 0.0;
+
+    // Handle both dim and dim_ext input formats
+    uint32_t input_dim =
+      (cluster_centers.extent(1) == index->dim()) ? index->dim() : index->dim_ext();
+
+    raft::linalg::gemm(handle,
+                       true,
+                       false,
+                       index->rot_dim(),
+                       index->n_lists(),
+                       index->dim(),
+                       &alpha,
+                       index->rotation_matrix().data_handle(),
+                       index->dim(),
+                       cluster_centers.data_handle(),
+                       input_dim,
+                       &beta,
+                       index->centers_rot().data_handle(),
+                       index->rot_dim(),
+                       raft::resource::get_cuda_stream(handle));
+
+    // Update the view
+    index->update_centers_rot(handle, index->centers_rot());
+  }
+}
+
+void set_centers(
+  raft::resources const& handle,
+  index<int64_t>* index,
+  raft::host_matrix_view<const float, uint32_t, raft::row_major> cluster_centers)
+{
+  auto stream = raft::resource::get_cuda_stream(handle);
+
+  // Copy centers from host to device
+  auto centers_dev = raft::make_device_matrix<float, uint32_t>(
+    handle, cluster_centers.extent(0), cluster_centers.extent(1));
+  raft::copy(centers_dev.data_handle(),
+             cluster_centers.data_handle(),
+             cluster_centers.size(),
+             stream);
+
+  // Call the device version
+  set_centers(handle, index, centers_dev.view());
 }
 
 void extract_centers(raft::resources const& res,
@@ -298,4 +360,47 @@ void recompute_internal_state(const raft::resources& res, index<int64_t>* index)
   ivf::detail::recompute_internal_state(res, *index);
 }
 
-}  // namespace cuvs::neighbors::ivf_pq::helpers
+}  // namespace helpers
+
+// Instantiate host data build functions
+auto build(
+  raft::resources const& handle,
+  const index_params& index_params,
+  const uint32_t dim,
+  raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>>
+    rotation_matrix) -> index<int64_t>
+{
+  return detail::build<int64_t>(handle,
+                                index_params,
+                                dim,
+                                pq_centers,
+                                centers,
+                                centers_rot,
+                                rotation_matrix);
+}
+
+void build(
+  raft::resources const& handle,
+  const index_params& index_params,
+  const uint32_t dim,
+  raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>>
+    rotation_matrix,
+  index<int64_t>* idx)
+{
+  detail::build<int64_t>(handle,
+                         index_params,
+                         dim,
+                         pq_centers,
+                         centers,
+                         centers_rot,
+                         rotation_matrix,
+                         idx);
+}
+
+}  // namespace cuvs::neighbors::ivf_pq
