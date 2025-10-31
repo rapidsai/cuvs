@@ -1580,11 +1580,11 @@ auto build(
   raft::resources const& handle,
   const cuvs::neighbors::ivf_pq::index_params& index_params,
   const uint32_t dim,
-  raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers_host,
-  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers_host,
-  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot_host,
+  raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
   std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>>
-    rotation_matrix_host) -> cuvs::neighbors::ivf_pq::index<IdxT>
+    rotation_matrix) -> cuvs::neighbors::ivf_pq::index<IdxT>
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::build_from_host(%u)", dim);
@@ -1593,13 +1593,13 @@ auto build(
 
   // Copy host data to device
   // For pq_centers and centers (required parameters)
-  auto pq_centers_dev = raft::make_device_mdarray<float>(handle, mr, pq_centers_host.extents());
+  auto pq_centers_dev = raft::make_device_mdarray<float>(handle, mr, pq_centers.extents());
   raft::copy(
-    pq_centers_dev.data_handle(), pq_centers_host.data_handle(), pq_centers_host.size(), stream);
+    pq_centers_dev.data_handle(), pq_centers.data_handle(), pq_centers.size(), stream);
 
   auto centers_dev = raft::make_device_matrix<float, uint32_t>(
-    handle, centers_host.extent(0), centers_host.extent(1));
-  raft::copy(centers_dev.data_handle(), centers_host.data_handle(), centers_host.size(), stream);
+    handle, centers.extent(0), centers.extent(1));
+  raft::copy(centers_dev.data_handle(), centers.data_handle(), centers.size(), stream);
 
   // For optional parameters
   std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> centers_rot_view;
@@ -1610,16 +1610,16 @@ auto build(
   std::optional<raft::device_matrix<float, uint32_t, raft::row_major>> centers_rot_dev;
   std::optional<raft::device_matrix<float, uint32_t, raft::row_major>> rotation_matrix_dev;
 
-  if (centers_rot_host.has_value()) {
-    auto& host_view = centers_rot_host.value();
+  if (centers_rot.has_value()) {
+    auto& host_view = centers_rot.value();
     centers_rot_dev.emplace(
       raft::make_device_matrix<float>(handle, host_view.extent(0), host_view.extent(1)));
     raft::copy(centers_rot_dev->data_handle(), host_view.data_handle(), host_view.size(), stream);
     centers_rot_view = centers_rot_dev->view();
   }
 
-  if (rotation_matrix_host.has_value()) {
-    auto& host_view = rotation_matrix_host.value();
+  if (rotation_matrix.has_value()) {
+    auto& host_view = rotation_matrix.value();
     rotation_matrix_dev.emplace(
       raft::make_device_matrix<float>(handle, host_view.extent(0), host_view.extent(1)));
     raft::copy(
@@ -1645,20 +1645,20 @@ void build(
   raft::resources const& handle,
   const cuvs::neighbors::ivf_pq::index_params& index_params,
   const uint32_t dim,
-  raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers_host,
-  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers_host,
-  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot_host,
+  raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
   std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>>
-    rotation_matrix_host,
+    rotation_matrix,
   index<IdxT>* idx)
 {
   *idx = build<IdxT>(handle,
                      index_params,
                      dim,
-                     pq_centers_host,
-                     centers_host,
-                     centers_rot_host,
-                     rotation_matrix_host);
+                     pq_centers,
+                     centers,
+                     centers_rot,
+                     rotation_matrix);
 }
 
 template <typename output_mdspan_type>

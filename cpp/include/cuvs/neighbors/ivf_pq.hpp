@@ -1062,15 +1062,15 @@ auto build(
  *   using namespace cuvs::neighbors;
  *   raft::resources res;
  *   // Prepare host data
- *   auto pq_centers_host = raft::make_host_mdarray<float>(...);
- *   auto centers_host = raft::make_host_matrix<float>(...);
+ *   auto pq_centers = raft::make_host_mdarray<float>(...);
+ *   auto centers = raft::make_host_matrix<float>(...);
  *   // ... fill with pre-computed values ...
  *
  *   // Build index from host data
  *   ivf_pq::index_params params;
  *   auto index = ivf_pq::build(res, params, dim,
- *                              pq_centers_host.view(),
- *                              centers_host.view(),
+ *                              pq_centers.view(),
+ *                              centers.view(),
  *                              std::nullopt,
  *                              std::nullopt);
  * @endcode
@@ -1078,12 +1078,12 @@ auto build(
  * @param[in] handle raft resources handle
  * @param[in] index_params configure the index building
  * @param[in] dim dimensionality of the input data
- * @param[in] pq_centers_host PQ codebook on host memory
+ * @param[in] pq_centers PQ codebook on host memory
  *   - codebook_gen::PER_SUBSPACE: [pq_dim , pq_len, pq_book_size]
  *   - codebook_gen::PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
- * @param[in] centers_host Cluster centers on host memory [n_lists, dim] or [n_lists, dim_ext]
- * @param[in] centers_rot_host Optional rotated cluster centers on host [n_lists, rot_dim]
- * @param[in] rotation_matrix_host Optional rotation matrix on host [rot_dim, dim]
+ * @param[in] centers Cluster centers on host memory [n_lists, dim] or [n_lists, dim_ext]
+ * @param[in] centers_rot Optional rotated cluster centers on host [n_lists, rot_dim]
+ * @param[in] rotation_matrix Optional rotation matrix on host [rot_dim, dim]
  *
  * @return the constructed IVF-PQ index
  */
@@ -1091,11 +1091,11 @@ auto build(
   raft::resources const& handle,
   const cuvs::neighbors::ivf_pq::index_params& index_params,
   const uint32_t dim,
-  raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers_host,
-  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers_host,
-  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot_host,
+  raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
   std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>>
-    rotation_matrix_host) -> cuvs::neighbors::ivf_pq::index<int64_t>;
+    rotation_matrix) -> cuvs::neighbors::ivf_pq::index<int64_t>;
 
 /**
  * @brief Build an IVF-PQ index from host memory centroids and codebook (in-place).
@@ -1103,21 +1103,21 @@ auto build(
  * @param[in] handle raft resources handle
  * @param[in] index_params configure the index building
  * @param[in] dim dimensionality of the input data
- * @param[in] pq_centers_host PQ codebook on host memory
- * @param[in] centers_host Cluster centers on host memory
- * @param[in] centers_rot_host Optional rotated cluster centers on host
- * @param[in] rotation_matrix_host Optional rotation matrix on host
+ * @param[in] pq_centers PQ codebook on host memory
+ * @param[in] centers Cluster centers on host memory
+ * @param[in] centers_rot Optional rotated cluster centers on host
+ * @param[in] rotation_matrix Optional rotation matrix on host
  * @param[out] idx pointer to IVF-PQ index to be built
  */
 void build(
   raft::resources const& handle,
   const cuvs::neighbors::ivf_pq::index_params& index_params,
   const uint32_t dim,
-  raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers_host,
-  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers_host,
-  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot_host,
+  raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
   std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>>
-    rotation_matrix_host,
+    rotation_matrix,
   cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 
 /**
@@ -3051,11 +3051,11 @@ void set_centers(raft::resources const& res,
  *   ivf_pq::index<int64_t> index(res, params, D);
  *
  *   // Prepare centers on host
- *   auto centers_host = raft::make_host_matrix<float>(params.n_lists, D);
+ *   auto centers = raft::make_host_matrix<float>(params.n_lists, D);
  *   // ... fill centers ...
  *
  *   // Set centers from host memory
- *   ivf_pq::helpers::set_centers(res, &index, centers_host.view());
+ *   ivf_pq::helpers::set_centers(res, &index, centers.view());
  * @endcode
  *
  * Note: This function requires the index to be empty (no data added yet).
@@ -3064,12 +3064,12 @@ void set_centers(raft::resources const& res,
  *
  * @param[in] res raft resources handle
  * @param[inout] index pointer to the IVF-PQ index
- * @param[in] cluster_centers_host new cluster centers on host memory [n_lists, dim] or [n_lists,
+ * @param[in] cluster_centers new cluster centers on host memory [n_lists, dim] or [n_lists,
  * dim_ext]
  */
 void set_centers(raft::resources const& res,
                  index<int64_t>* index,
-                 raft::host_matrix_view<const float, uint32_t> cluster_centers_host);
+                 raft::host_matrix_view<const float, uint32_t> cluster_centers);
 
 /**
  * @brief Public helper API for fetching a trained index's IVF centroids
