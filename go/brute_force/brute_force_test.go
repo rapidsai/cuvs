@@ -7,7 +7,7 @@ import (
 	cuvs "github.com/rapidsai/cuvs/go"
 )
 
-func TestCagra(t *testing.T) {
+func TestBruteForce(t *testing.T) {
 	const (
 		nDataPoints = 1024
 		nFeatures   = 16
@@ -33,12 +33,18 @@ func TestCagra(t *testing.T) {
 	}
 	defer dataset.Close()
 
-	index, _ := CreateIndex()
+	index, err := CreateIndex()
+	if err != nil {
+		t.Fatalf("error creating index: %v", err)
+	}
 	defer index.Close()
 
-	// use the first 4 points from the dataset as queries : will test that we get them back
+	// Use the first 4 points from the dataset as queries : will test that we get them back
 	// as their own nearest neighbor
-	queries, _ := cuvs.NewTensor(testDataset[:nQueries])
+	queries, err := cuvs.NewTensor(testDataset[:nQueries])
+	if err != nil {
+		t.Fatalf("error creating queries tensor: %v", err)
+	}
 	defer queries.Close()
 
 	neighbors, err := cuvs.NewTensorOnDevice[int64](&resource, []int64{int64(nQueries), int64(k)})

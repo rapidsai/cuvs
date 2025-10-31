@@ -1,17 +1,8 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
+
+import tempfile
 
 import numpy as np
 import pytest
@@ -38,6 +29,7 @@ def run_ivf_flat_build_search_test(
     compare=True,
     inplace=True,
     search_params={},
+    serialize=False,
 ):
     dataset = generate_data((n_rows, n_cols), dtype)
     if metric == "inner_product":
@@ -50,6 +42,12 @@ def run_ivf_flat_build_search_test(
     )
 
     index = ivf_flat.build(build_params, dataset_device)
+
+    if serialize:
+        with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as f:
+            temp_filename = f.name
+        ivf_flat.save(temp_filename, index)
+        index = ivf_flat.load(temp_filename)
 
     if not add_data_on_build:
         dataset_1 = dataset[: n_rows // 2, :]
@@ -127,7 +125,8 @@ def test_ivf_flat(inplace, dtype, metric):
 
 
 @pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int8, np.uint8])
-def test_extend(dtype):
+@pytest.mark.parametrize("serialize", [True, False])
+def test_extend(dtype, serialize):
     run_ivf_flat_build_search_test(
         n_rows=10000,
         n_cols=10,
@@ -136,6 +135,7 @@ def test_extend(dtype):
         metric="sqeuclidean",
         dtype=dtype,
         add_data_on_build=False,
+        serialize=serialize,
     )
 
 

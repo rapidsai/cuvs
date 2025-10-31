@@ -1,22 +1,20 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.spi;
 
 import static com.nvidia.cuvs.internal.common.Util.*;
+import static com.nvidia.cuvs.internal.panama.headers_h.CUVS_LOG_LEVEL_CRITICAL;
+import static com.nvidia.cuvs.internal.panama.headers_h.CUVS_LOG_LEVEL_DEBUG;
+import static com.nvidia.cuvs.internal.panama.headers_h.CUVS_LOG_LEVEL_ERROR;
+import static com.nvidia.cuvs.internal.panama.headers_h.CUVS_LOG_LEVEL_INFO;
+import static com.nvidia.cuvs.internal.panama.headers_h.CUVS_LOG_LEVEL_OFF;
+import static com.nvidia.cuvs.internal.panama.headers_h.CUVS_LOG_LEVEL_TRACE;
+import static com.nvidia.cuvs.internal.panama.headers_h.CUVS_LOG_LEVEL_WARN;
 import static com.nvidia.cuvs.internal.panama.headers_h.cudaMemcpy2DAsync;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsGetLogLevel;
+import static com.nvidia.cuvs.internal.panama.headers_h.cuvsSetLogLevel;
 import static com.nvidia.cuvs.internal.panama.headers_h.cuvsVersionGet;
 import static com.nvidia.cuvs.internal.panama.headers_h.uint16_t;
 import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaStreamSynchronize;
@@ -37,6 +35,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
+import java.util.logging.Level;
 
 final class JDKProvider implements CuVSProvider {
 
@@ -73,6 +72,8 @@ final class JDKProvider implements CuVSProvider {
       throw new RuntimeException(e);
     }
   }
+
+  private final cuvsGetLogLevel GET_LOG_LEVEL_INVOKER = cuvsGetLogLevel.makeInvoker();
 
   private JDKProvider() {}
 
@@ -184,6 +185,44 @@ final class JDKProvider implements CuVSProvider {
   @Override
   public GPUInfoProvider gpuInfoProvider() {
     return new GPUInfoProviderImpl();
+  }
+
+  @Override
+  public void setLogLevel(Level level) {
+    if (level.equals(Level.ALL) || level.equals(Level.FINEST)) {
+      cuvsSetLogLevel(CUVS_LOG_LEVEL_TRACE());
+    } else if (level.equals(Level.FINER) || level.equals(Level.FINE)) {
+      cuvsSetLogLevel(CUVS_LOG_LEVEL_DEBUG());
+    } else if (level.equals(Level.CONFIG) || level.equals(Level.INFO)) {
+      cuvsSetLogLevel(CUVS_LOG_LEVEL_INFO());
+    } else if (level.equals(Level.WARNING)) {
+      cuvsSetLogLevel(CUVS_LOG_LEVEL_WARN());
+    } else if (level.equals(Level.SEVERE)) {
+      cuvsSetLogLevel(CUVS_LOG_LEVEL_ERROR());
+    } else if (level.equals(Level.OFF)) {
+      cuvsSetLogLevel(CUVS_LOG_LEVEL_OFF());
+    } else {
+      throw new UnsupportedOperationException("Unsupported log level [" + level + "]");
+    }
+  }
+
+  @Override
+  public Level getLogLevel() {
+    int logLevel = GET_LOG_LEVEL_INVOKER.apply();
+    if (logLevel == CUVS_LOG_LEVEL_TRACE()) {
+      return Level.ALL;
+    } else if (logLevel == CUVS_LOG_LEVEL_DEBUG()) {
+      return Level.FINE;
+    } else if (logLevel == CUVS_LOG_LEVEL_INFO()) {
+      return Level.INFO;
+    } else if (logLevel == CUVS_LOG_LEVEL_WARN()) {
+      return Level.WARNING;
+    } else if (logLevel == CUVS_LOG_LEVEL_ERROR() || logLevel == CUVS_LOG_LEVEL_CRITICAL()) {
+      return Level.SEVERE;
+    } else if (logLevel == CUVS_LOG_LEVEL_OFF()) {
+      return Level.OFF;
+    }
+    throw new IllegalArgumentException("Unexpected log level [" + logLevel + "]");
   }
 
   @Override

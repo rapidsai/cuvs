@@ -287,10 +287,6 @@ dependencies:
       - output_types: conda
         matrices:
           - matrix:
-              cuda: "12.0"
-            packages:
-              - cuda-version=12.0
-          - matrix:
               cuda: "12.2"
             packages:
               - cuda-version=12.2
@@ -453,7 +449,7 @@ dependencies:
     common:
       - output_types: [conda, pyproject, requirements]
         packages:
-          - nlohmann_json>=3.11.2
+          - nlohmann_json>=3.12.0
           - glog>=0.6.0
           - h5py>=3.8.0
           - benchmark>=1.8.2
