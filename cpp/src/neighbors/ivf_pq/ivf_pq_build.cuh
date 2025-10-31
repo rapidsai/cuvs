@@ -1461,7 +1461,7 @@ auto build(
   raft::resources const& handle,
   const cuvs::neighbors::ivf_pq::index_params& index_params,
   const uint32_t dim,
-  raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major>> pq_centers,
+  raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
   std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
   std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>>
@@ -1483,7 +1483,8 @@ auto build(
                     centers_rot,
                     rotation_matrix);
 
-  RAFT_EXPECTS(centers.extent(1) == index.dim_ext(), "Invalid centers dimension");
+  RAFT_EXPECTS(centers.extent(1) == index.dim() || centers.extent(1) == index.dim_ext(), 
+               "Invalid centers dimension");
 
   utils::memzero(
     index.accum_sorted_sizes().data_handle(), index.accum_sorted_sizes().size(), stream);
@@ -1572,6 +1573,84 @@ void extend(
                   new_vectors.data_handle(),
                   new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
                   n_rows);
+}
+
+template <typename IdxT>
+auto build(
+  raft::resources const& handle,
+  const cuvs::neighbors::ivf_pq::index_params& index_params,
+  const uint32_t dim,
+  std::optional<raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major>> pq_centers_host,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_host,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot_host,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix_host)
+  -> cuvs::neighbors::ivf_pq::index<IdxT>
+{
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
+    "ivf_pq::build_from_host(%u)", dim);
+  auto stream = raft::resource::get_cuda_stream(handle);
+  auto mr = raft::resource::get_workspace_resource(handle);
+
+  // Copy host data to device if provided
+  std::optional<raft::device_mdarray<float, raft::extent_3d<uint32_t>, raft::row_major>> pq_centers_dev;
+  std::optional<raft::device_matrix<float, uint32_t, raft::row_major>> centers_dev;
+  std::optional<raft::device_matrix<float, uint32_t, raft::row_major>> centers_rot_dev;
+  std::optional<raft::device_matrix<float, uint32_t, raft::row_major>> rotation_matrix_dev;
+
+  raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers_view;
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_view;
+  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> centers_rot_view;
+  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix_view;
+
+  // Handle pq_centers
+  if (pq_centers_host.has_value()) {
+    auto& host_view = pq_centers_host.value();
+    pq_centers_dev.emplace(raft::make_device_mdarray<float>(handle, mr, host_view.extents()));
+    raft::copy(pq_centers_dev->data_handle(), host_view.data_handle(), 
+               host_view.size(), stream);
+    pq_centers_view = pq_centers_dev->view();
+  } else {
+    RAFT_FAIL("pq_centers must be provided when building from host data");
+  }
+
+  // Handle centers
+  if (centers_host.has_value()) {
+    auto& host_view = centers_host.value();
+    centers_dev.emplace(raft::make_device_matrix<float>(handle, mr, 
+                                                        host_view.extent(0), 
+                                                        host_view.extent(1)));
+    raft::copy(centers_dev->data_handle(), host_view.data_handle(), 
+               host_view.size(), stream);
+    centers_view = centers_dev->view();
+  } else {
+    RAFT_FAIL("centers must be provided when building from host data");
+  }
+
+  // Handle centers_rot
+  if (centers_rot_host.has_value()) {
+    auto& host_view = centers_rot_host.value();
+    centers_rot_dev.emplace(raft::make_device_matrix<float>(handle, mr,
+                                                            host_view.extent(0),
+                                                            host_view.extent(1)));
+    raft::copy(centers_rot_dev->data_handle(), host_view.data_handle(),
+               host_view.size(), stream);
+    centers_rot_view = centers_rot_dev->view();
+  }
+
+  // Handle rotation_matrix
+  if (rotation_matrix_host.has_value()) {
+    auto& host_view = rotation_matrix_host.value();
+    rotation_matrix_dev.emplace(raft::make_device_matrix<float>(handle, mr,
+                                                                host_view.extent(0),
+                                                                host_view.extent(1)));
+    raft::copy(rotation_matrix_dev->data_handle(), host_view.data_handle(),
+               host_view.size(), stream);
+    rotation_matrix_view = rotation_matrix_dev->view();
+  }
+
+  // Call the device version of build
+  return build<IdxT>(handle, index_params, dim, pq_centers_view, centers_view, 
+                     centers_rot_view, rotation_matrix_view);
 }
 
 template <typename output_mdspan_type>

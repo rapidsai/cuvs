@@ -547,6 +547,26 @@ struct index : cuvs::neighbors::index {
   pq_centers_extents make_pq_centers_extents();
 
   static uint32_t calculate_pq_dim(uint32_t dim);
+
+ public:
+  /** 
+   * @brief Update centers_rot from current centers and rotation_matrix.
+   * This computes centers_rot = rotation_matrix @ centers
+   */
+  void update_centers_rot(raft::resources const& res,
+                          raft::device_matrix_view<const float, uint32_t, raft::row_major> new_centers_rot);
+  
+  /**
+   * @brief Update centers from user-provided data
+   */
+  void update_centers(raft::resources const& res,
+                     raft::device_matrix_view<const float, uint32_t, raft::row_major> new_centers);
+  
+  /**
+   * @brief Update pq_centers from user-provided data
+   */
+  void update_pq_centers(raft::resources const& res,
+                        raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> new_pq_centers);
 };
 /**
  * @}

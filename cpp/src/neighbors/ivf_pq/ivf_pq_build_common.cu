@@ -273,10 +273,37 @@ void set_centers(raft::resources const& handle,
 {
   RAFT_EXPECTS(cluster_centers.extent(0) == index->n_lists(),
                "Number of rows in the new centers must be equal to the number of IVF lists");
-  RAFT_EXPECTS(cluster_centers.extent(1) == index->dim(),
-               "Number of columns in the new cluster centers and index dim are different");
+  RAFT_EXPECTS(cluster_centers.extent(1) == index->dim() || 
+               cluster_centers.extent(1) == index->dim_ext(),
+               "Number of columns in the new cluster centers must be equal to dim or dim_ext");
   RAFT_EXPECTS(index->size() == 0, "Index must be empty");
-  detail::set_centers(handle, index, cluster_centers.data_handle());
+  
+  // Use the new update_centers method which handles format conversion
+  index->update_centers(handle, cluster_centers);
+  
+  // If we have rotation matrix, compute rotated centers
+  if (index->rotation_matrix().extent(0) > 0 && index->rotation_matrix().extent(1) > 0) {
+    float alpha = 1.0;
+    float beta  = 0.0;
+    raft::linalg::gemm(handle,
+                       true,
+                       false,
+                       index->rot_dim(),
+                       index->n_lists(),
+                       index->dim(),
+                       &alpha,
+                       index->rotation_matrix().data_handle(),
+                       index->dim(),
+                       cluster_centers.data_handle(),
+                       cluster_centers.extent(1),
+                       &beta,
+                       index->centers_rot().data_handle(),
+                       index->rot_dim(),
+                       raft::resource::get_cuda_stream(handle));
+    
+    // Update the view
+    index->update_centers_rot(handle, index->centers_rot());
+  }
 }
 
 void extract_centers(raft::resources const& res,
