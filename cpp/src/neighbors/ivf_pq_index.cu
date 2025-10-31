@@ -10,8 +10,13 @@
 #include <raft/core/operators.hpp>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/reduce.cuh>
+#include <raft/linalg/norm.cuh>
+#include <raft/core/device_mdarray.hpp>
+#include <raft/core/resource/cuda_stream.hpp>
 
 #include <raft/util/cudart_utils.hpp>
+#include <rmm/cuda_stream_view.hpp>
+#include <rmm/device_uvector.hpp>
 
 namespace cuvs::neighbors::ivf_pq {
 index_params index_params::from_dataset(raft::matrix_extent<int64_t> dataset,
@@ -85,8 +90,149 @@ index<IdxT>::index(raft::resources const& handle,
       raft::make_device_matrix<float, uint32_t>(handle, this->rot_dim(), this->dim())},
     data_ptrs_{raft::make_device_vector<uint8_t*, uint32_t>(handle, n_lists)},
     inds_ptrs_{raft::make_device_vector<IdxT*, uint32_t>(handle, n_lists)},
-    accum_sorted_sizes_{raft::make_host_vector<IdxT, uint32_t>(n_lists + 1)}
+    accum_sorted_sizes_{raft::make_host_vector<IdxT, uint32_t>(n_lists + 1)},
+    pq_centers_view_{pq_centers_->view()},
+    centers_view_{centers_->view()},
+    centers_rot_view_{centers_rot_->view()},
+    rotation_matrix_view_{rotation_matrix_->view()}
 {
+  check_consistency();
+  accum_sorted_sizes_(n_lists) = 0;
+}
+
+template <typename IdxT>
+index<IdxT>::index(
+  raft::resources const& handle,
+  cuvs::distance::DistanceType metric,
+  codebook_gen codebook_kind,
+  uint32_t n_lists,
+  uint32_t dim,
+  uint32_t pq_bits,
+  uint32_t pq_dim,
+  bool conservative_memory_allocation,
+  raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers_view,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_view,
+  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>>
+    centers_rot_view,
+  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>>
+    rotation_matrix_view)
+  : cuvs::neighbors::index(),
+    metric_(metric),
+    codebook_kind_(codebook_kind),
+    dim_(dim),
+    pq_bits_(pq_bits),
+    pq_dim_(pq_dim == 0 ? calculate_pq_dim(dim) : pq_dim),
+    conservative_memory_allocation_(conservative_memory_allocation),
+    lists_{n_lists},
+    list_sizes_{raft::make_device_vector<uint32_t, uint32_t>(handle, n_lists)},
+    data_ptrs_{raft::make_device_vector<uint8_t*, uint32_t>(handle, n_lists)},
+    inds_ptrs_{raft::make_device_vector<IdxT*, uint32_t>(handle, n_lists)},
+    accum_sorted_sizes_{raft::make_host_vector<IdxT, uint32_t>(n_lists + 1)},
+    pq_centers_view_{pq_centers_view},
+    centers_view_{centers_view},
+    centers_rot_view_{centers_rot_view.value_or(
+      raft::device_matrix_view<const float, uint32_t, raft::row_major>{})},
+    rotation_matrix_view_{rotation_matrix_view.value_or(
+      raft::device_matrix_view<const float, uint32_t, raft::row_major>{})}
+{
+  auto stream = raft::resource::get_cuda_stream(handle);
+  
+  // Check if we need to own the pq_centers (format conversion needed)
+  auto expected_pq_extents = make_pq_centers_extents();
+  bool pq_centers_match = (pq_centers_view.extent(0) == expected_pq_extents.extent(0)) &&
+                          (pq_centers_view.extent(1) == expected_pq_extents.extent(1)) &&
+                          (pq_centers_view.extent(2) == expected_pq_extents.extent(2));
+  
+  if (!pq_centers_match) {
+    // Need to own and potentially transpose/convert the pq_centers
+    pq_centers_ = raft::make_device_mdarray<float>(handle, expected_pq_extents);
+    // TODO: Add conversion logic here
+    pq_centers_view_ = pq_centers_->view();
+  }
+  
+  // Check if we need to own the centers (format conversion needed)
+  bool centers_match = (centers_view.extent(0) == n_lists) && 
+                       (centers_view.extent(1) == this->dim_ext());
+  
+  if (!centers_match) {
+    // Need to own and convert centers
+    centers_ = raft::make_device_matrix<float, uint32_t>(handle, n_lists, this->dim_ext());
+    
+    // Clear the memory for the extended dimension
+    RAFT_CUDA_TRY(cudaMemsetAsync(
+      centers_->data_handle(), 0, centers_->size() * sizeof(float), stream));
+    
+    // Copy the centers, handling different dimensions
+    if (centers_view.extent(1) == this->dim()) {
+      // Centers provided with exact dimension, need to add padding and norms
+      RAFT_CUDA_TRY(cudaMemcpy2DAsync(centers_->data_handle(),
+                                      sizeof(float) * this->dim_ext(),
+                                      centers_view.data_handle(),
+                                      sizeof(float) * this->dim(),
+                                      sizeof(float) * this->dim(),
+                                      n_lists,
+                                      cudaMemcpyDefault,
+                                      stream));
+      
+      // Compute and add norms
+      rmm::device_uvector<float> center_norms(n_lists, stream);
+      raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+        center_norms.data(), centers_view.data_handle(), this->dim(), n_lists, stream);
+      
+      RAFT_CUDA_TRY(cudaMemcpy2DAsync(centers_->data_handle() + this->dim(),
+                                      sizeof(float) * this->dim_ext(),
+                                      center_norms.data(),
+                                      sizeof(float),
+                                      sizeof(float),
+                                      n_lists,
+                                      cudaMemcpyDefault,
+                                      stream));
+    } else {
+      // Centers already have extended dimension
+      raft::copy(centers_->data_handle(), centers_view.data_handle(), 
+                 centers_view.size(), stream);
+    }
+    centers_view_ = centers_->view();
+  }
+  
+  // Check if we need centers_rot
+  if (centers_rot_view.has_value()) {
+    bool centers_rot_match = (centers_rot_view.value().extent(0) == n_lists) &&
+                             (centers_rot_view.value().extent(1) == this->rot_dim());
+    if (!centers_rot_match) {
+      // Need to own and convert centers_rot
+      centers_rot_ = raft::make_device_matrix<float, uint32_t>(handle, n_lists, this->rot_dim());
+      // TODO: Add conversion logic here if needed
+      centers_rot_view_ = centers_rot_->view();
+    } else {
+      centers_rot_view_ = centers_rot_view.value();
+    }
+  } else {
+    // Need to compute centers_rot if not provided
+    centers_rot_ = raft::make_device_matrix<float, uint32_t>(handle, n_lists, this->rot_dim());
+    centers_rot_view_ = centers_rot_->view();
+  }
+  
+  // Check if we need rotation_matrix
+  if (rotation_matrix_view.has_value()) {
+    bool rotation_match = (rotation_matrix_view.value().extent(0) == this->rot_dim()) &&
+                         (rotation_matrix_view.value().extent(1) == this->dim());
+    if (!rotation_match) {
+      // Need to own and convert rotation_matrix
+      rotation_matrix_ = raft::make_device_matrix<float, uint32_t>(
+        handle, this->rot_dim(), this->dim());
+      // TODO: Add conversion logic here if needed
+      rotation_matrix_view_ = rotation_matrix_->view();
+    } else {
+      rotation_matrix_view_ = rotation_matrix_view.value();
+    }
+  } else {
+    // Need to compute rotation_matrix if not provided
+    rotation_matrix_ = raft::make_device_matrix<float, uint32_t>(
+      handle, this->rot_dim(), this->dim());
+    rotation_matrix_view_ = rotation_matrix_->view();
+  }
+  
   check_consistency();
   accum_sorted_sizes_(n_lists) = 0;
 }
@@ -169,7 +315,8 @@ raft::device_mdspan<float,
                     raft::row_major>
 index<IdxT>::pq_centers() noexcept
 {
-  return pq_centers_.view();
+  return raft::make_device_mdspan<float, typename pq_centers_extents, raft::row_major>(
+    const_cast<float*>(pq_centers_view_.data_handle()), pq_centers_view_.extents());
 }
 
 template <typename IdxT>
@@ -178,7 +325,7 @@ raft::device_mdspan<const float,
                     raft::row_major>
 index<IdxT>::pq_centers() const noexcept
 {
-  return pq_centers_.view();
+  return pq_centers_view_;
 }
 
 template <typename IdxT>
@@ -224,14 +371,17 @@ raft::device_vector_view<const IdxT* const, uint32_t, raft::row_major> index<Idx
 template <typename IdxT>
 raft::device_matrix_view<float, uint32_t, raft::row_major> index<IdxT>::rotation_matrix() noexcept
 {
-  return rotation_matrix_.view();
+  return raft::make_device_matrix_view<float, uint32_t, raft::row_major>(
+    const_cast<float*>(rotation_matrix_view_.data_handle()),
+    rotation_matrix_view_.extent(0),
+    rotation_matrix_view_.extent(1));
 }
 
 template <typename IdxT>
 raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::rotation_matrix()
   const noexcept
 {
-  return rotation_matrix_.view();
+  return rotation_matrix_view_;
 }
 
 template <typename IdxT>
@@ -263,27 +413,33 @@ raft::device_vector_view<const uint32_t, uint32_t, raft::row_major> index<IdxT>:
 template <typename IdxT>
 raft::device_matrix_view<float, uint32_t, raft::row_major> index<IdxT>::centers() noexcept
 {
-  return centers_.view();
+  return raft::make_device_matrix_view<float, uint32_t, raft::row_major>(
+    const_cast<float*>(centers_view_.data_handle()),
+    centers_view_.extent(0),
+    centers_view_.extent(1));
 }
 
 template <typename IdxT>
 raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::centers()
   const noexcept
 {
-  return centers_.view();
+  return centers_view_;
 }
 
 template <typename IdxT>
 raft::device_matrix_view<float, uint32_t, raft::row_major> index<IdxT>::centers_rot() noexcept
 {
-  return centers_rot_.view();
+  return raft::make_device_matrix_view<float, uint32_t, raft::row_major>(
+    const_cast<float*>(centers_rot_view_.data_handle()),
+    centers_rot_view_.extent(0),
+    centers_rot_view_.extent(1));
 }
 
 template <typename IdxT>
 raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::centers_rot()
   const noexcept
 {
-  return centers_rot_.view();
+  return centers_rot_view_;
 }
 
 template <typename IdxT>
@@ -437,6 +593,115 @@ raft::device_matrix_view<const half, uint32_t, raft::row_major> index<IdxT>::cen
     raft::linalg::map(res, centers_half_->view(), raft::cast_op<half>{}, centers());
   }
   return centers_half_->view();
+}
+
+template <typename IdxT>
+void index<IdxT>::update_centers_rot(
+  raft::resources const& res,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> new_centers_rot)
+{
+  RAFT_EXPECTS(new_centers_rot.extent(0) == n_lists(),
+               "Number of rows in centers_rot must equal n_lists");
+  RAFT_EXPECTS(new_centers_rot.extent(1) == rot_dim(),
+               "Number of columns in centers_rot must equal rot_dim");
+  
+  if (centers_rot_.has_value()) {
+    // Copy into owned storage
+    raft::copy(centers_rot_->data_handle(), 
+               new_centers_rot.data_handle(),
+               new_centers_rot.size(),
+               raft::resource::get_cuda_stream(res));
+  } else {
+    // Just update the view
+    centers_rot_view_ = new_centers_rot;
+  }
+}
+
+template <typename IdxT>
+void index<IdxT>::update_centers(
+  raft::resources const& res,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> new_centers)
+{
+  RAFT_EXPECTS(new_centers.extent(0) == n_lists(),
+               "Number of rows in centers must equal n_lists");
+  
+  auto stream = raft::resource::get_cuda_stream(res);
+  
+  if (new_centers.extent(1) == dim_ext()) {
+    // Direct update if dimensions match
+    if (centers_.has_value()) {
+      raft::copy(centers_->data_handle(), 
+                 new_centers.data_handle(),
+                 new_centers.size(),
+                 stream);
+    } else {
+      centers_view_ = new_centers;
+    }
+  } else if (new_centers.extent(1) == dim()) {
+    // Need to add padding and norms
+    if (!centers_.has_value()) {
+      centers_ = raft::make_device_matrix<float, uint32_t>(res, n_lists(), dim_ext());
+    }
+    
+    // Clear the memory
+    RAFT_CUDA_TRY(cudaMemsetAsync(centers_->data_handle(), 0, 
+                                  centers_->size() * sizeof(float), stream));
+    
+    // Copy centers
+    RAFT_CUDA_TRY(cudaMemcpy2DAsync(centers_->data_handle(),
+                                    sizeof(float) * dim_ext(),
+                                    new_centers.data_handle(),
+                                    sizeof(float) * dim(),
+                                    sizeof(float) * dim(),
+                                    n_lists(),
+                                    cudaMemcpyDefault,
+                                    stream));
+    
+    // Compute and add norms
+    rmm::device_uvector<float> center_norms(n_lists(), stream);
+    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+      center_norms.data(), new_centers.data_handle(), dim(), n_lists(), stream);
+    
+    RAFT_CUDA_TRY(cudaMemcpy2DAsync(centers_->data_handle() + dim(),
+                                    sizeof(float) * dim_ext(),
+                                    center_norms.data(),
+                                    sizeof(float),
+                                    sizeof(float),
+                                    n_lists(),
+                                    cudaMemcpyDefault,
+                                    stream));
+    
+    centers_view_ = centers_->view();
+  } else {
+    RAFT_FAIL("Invalid centers dimensions: expected %u or %u columns, got %u",
+              dim(), dim_ext(), new_centers.extent(1));
+  }
+}
+
+template <typename IdxT>
+void index<IdxT>::update_pq_centers(
+  raft::resources const& res,
+  raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> new_pq_centers)
+{
+  auto expected_extents = make_pq_centers_extents();
+  
+  RAFT_EXPECTS(new_pq_centers.extent(0) == expected_extents.extent(0),
+               "PQ centers extent 0 mismatch");
+  RAFT_EXPECTS(new_pq_centers.extent(1) == expected_extents.extent(1),
+               "PQ centers extent 1 mismatch");
+  RAFT_EXPECTS(new_pq_centers.extent(2) == expected_extents.extent(2),
+               "PQ centers extent 2 mismatch");
+  
+  if (pq_centers_.has_value()) {
+    // Copy into owned storage
+    raft::copy(pq_centers_->data_handle(),
+               new_pq_centers.data_handle(),
+               new_pq_centers.size(),
+               raft::resource::get_cuda_stream(res));
+  } else {
+    // Just update the view
+    pq_centers_view_ = new_pq_centers;
+  }
 }
 
 template struct index<int64_t>;
