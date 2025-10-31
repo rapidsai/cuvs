@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -106,6 +106,7 @@ inline auto operator<<(std::ostream& os, const print_metric& p) -> std::ostream&
       break;
     case cuvs::distance::DistanceType::DiceExpanded: os << "distance::DiceExpanded"; break;
     case cuvs::distance::DistanceType::Precomputed: os << "distance::Precomputed"; break;
+    case cuvs::distance::DistanceType::BitwiseHamming: os << "distance::BitwiseHamming"; break;
     default: RAFT_FAIL("unreachable code");
   }
   return os;
