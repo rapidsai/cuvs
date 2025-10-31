@@ -151,4 +151,12 @@ public interface CuVSProvider {
   static CuVSProvider provider() {
     return CuVSServiceProvider.Holder.INSTANCE;
   }
+
+  CagraIndexParams cagraIndexParamsFromHnswParams(
+      long rows,
+      long dim,
+      int m,
+      int efConstruction,
+      CagraIndexParams.HnswHeuristicType heuristic,
+      CagraIndexParams.CuvsDistanceType metric);
 }
