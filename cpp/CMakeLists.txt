@@ -767,7 +767,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     )
   endif()
 
-  if (NOT CUVS_COMPILE_DYNAMIC_ONLY)
+  if(NOT CUVS_COMPILE_DYNAMIC_ONLY)
     install(
       TARGETS cuvs_static
       DESTINATION ${lib_dir}
