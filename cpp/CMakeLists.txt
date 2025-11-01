@@ -734,7 +734,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
   include(CPack)
 
   install(
-    TARGETS ${_cuvs_lib_targets}
+    TARGETS cuvs
     DESTINATION ${lib_dir}
     COMPONENT cuvs
     EXPORT cuvs-exports
@@ -746,23 +746,56 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   )
 
-  if(BUILD_C_LIBRARY)
-    install(
-      DIRECTORY ../c/include/cuvs
-      COMPONENT cuvs
-      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    )
+  install(
+    DIRECTORY ../c/include/cuvs
+    COMPONENT cuvs
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  )
 
+  install(
+    FILES ${CUVS_C_BINARY_DIR}/include/cuvs/core/c_config.h
+    COMPONENT cuvs
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs/core/
+  )
+
+  if(BUILD_C_LIBRARY)
     install(
       TARGETS cuvs_c
       DESTINATION ${lib_dir}
       COMPONENT c_api
       EXPORT cuvs-c-exports
     )
+  endif()
+
+  if(NOT CUVS_COMPILE_DYNAMIC_ONLY)
+    install(
+      TARGETS cuvs_static
+      DESTINATION ${lib_dir}
+      COMPONENT cuvs_static
+      EXPORT cuvs-static-exports
+    )
+
+    install(
+      DIRECTORY include/cuvs
+      COMPONENT cuvs_static
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+
+    install(
+      DIRECTORY ../c/include/cuvs
+      COMPONENT cuvs_static
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+
+    install(
+      FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.h
+      COMPONENT cuvs_static
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs
+    )
 
     install(
       FILES ${CUVS_C_BINARY_DIR}/include/cuvs/core/c_config.h
-      COMPONENT cuvs
+      COMPONENT cuvs_static
       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs/core/
     )
   endif()
@@ -779,13 +812,19 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     set(CUVS_C_TARGET cuvs_c)
   endif()
 
+  if(TARGET cuvs_static)
+    list(APPEND cuvs_components cuvs_static)
+    list(APPEND cuvs_export_sets cuvs-static-exports)
+    set(CUVS_STATIC_TARGET cuvs_static)
+  endif()
+
   # Use `rapids_export` for 22.04 as it will have COMPONENT support
   rapids_export(
     INSTALL cuvs
     EXPORT_SET cuvs-exports
     COMPONENTS ${cuvs_components}
     COMPONENTS_EXPORT_SET ${cuvs_export_sets}
-    GLOBAL_TARGETS cuvs ${CUVS_C_TARGET}
+    GLOBAL_TARGETS cuvs ${CUVS_C_TARGET} ${CUVS_STATIC_TARGET}
     NAMESPACE cuvs::
   )
 
@@ -796,7 +835,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     EXPORT_SET cuvs-exports
     COMPONENTS ${cuvs_components}
     COMPONENTS_EXPORT_SET ${cuvs_export_sets}
-    GLOBAL_TARGETS cuvs ${CUVS_C_TARGET}
+    GLOBAL_TARGETS cuvs ${CUVS_C_TARGET} ${CUVS_STATIC_TARGET}
     NAMESPACE cuvs::
   )
 endif()
