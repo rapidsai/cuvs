@@ -794,7 +794,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     EXPORT_SET cuvs-exports
     COMPONENTS ${cuvs_components}
     COMPONENTS_EXPORT_SET ${cuvs_export_sets}
-    GLOBAL_TARGETS cuvs ${CUVS_C_TARGET}
+    GLOBAL_TARGETS cuvs ${CUVS_C_TARGET} cuvs_static
     NAMESPACE cuvs::
   )
 
@@ -805,7 +805,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     EXPORT_SET cuvs-exports
     COMPONENTS ${cuvs_components}
     COMPONENTS_EXPORT_SET ${cuvs_export_sets}
-    GLOBAL_TARGETS cuvs ${CUVS_C_TARGET}
+    GLOBAL_TARGETS cuvs ${CUVS_C_TARGET} cuvs_static
     NAMESPACE cuvs::
   )
 endif()
