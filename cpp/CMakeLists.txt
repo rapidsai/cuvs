@@ -734,7 +734,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
   include(CPack)
 
   install(
-    TARGETS ${_cuvs_lib_targets}
+    TARGETS cuvs
     DESTINATION ${lib_dir}
     COMPONENT cuvs
     EXPORT cuvs-exports
@@ -767,6 +767,15 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     )
   endif()
 
+  if (NOT CUVS_COMPILE_DYNAMIC_ONLY)
+    install(
+      TARGETS cuvs_static
+      DESTINATION ${lib_dir}
+      COMPONENT cuvs_static
+      EXPORT cuvs-static-exports
+    )
+  endif()
+
   install(
     FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.h
     COMPONENT cuvs
@@ -774,8 +783,8 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
   )
 
   if(TARGET cuvs_c)
-    list(APPEND cuvs_components c_api)
-    list(APPEND cuvs_export_sets cuvs-c-exports)
+    list(APPEND cuvs_components c_api cuvs_static)
+    list(APPEND cuvs_export_sets cuvs-c-exports cuvs-static-exports)
     set(CUVS_C_TARGET cuvs_c)
   endif()
 
