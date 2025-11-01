@@ -201,7 +201,7 @@ CAGRA uses a graph-based index, which creates an intermediate, approximate kNN g
  * - `graph_build_algo`
    - `build`
    - `N`
-   - [`IVF_PQ`, `NN_DESCENT`]
+   - [`IVF_PQ`, `NN_DESCENT`, `ACE`]
    - `IVF_PQ`
    - Algorithm to use for building the initial kNN graph, from which CAGRA will optimize into the navigable CAGRA graph
 
@@ -211,6 +211,34 @@ CAGRA uses a graph-based index, which creates an intermediate, approximate kNN g
    - [`device`, `host`, `mmap`]
    - `mmap`
    - Where should the dataset reside?
+
+ * - `npartitions`
+   - `build`
+   - N
+   - Positive integer >0
+   - 1
+   - The number of partitions to use for the ACE build. When set to a value >1, enables the ACE partitioned approach for very large graphs. Set to 1 to disable ACE and use standard build.
+
+ * - `build_dir`
+   - `build`
+   - N
+   - String
+   - ""
+   - The directory to use for the ACE build. Must be specified when using ACE build.
+
+ * - `ef_construction`
+   - `build`
+   - Y
+   - Positive integer >0
+   -
+   - Controls index time and accuracy when using ACE build. Bigger values increase the index quality. At some point, increasing this will no longer improve the quality.
+
+ * - `use_disk`
+   - `build`
+   - N
+   - Boolean
+   - `false`
+   - Whether to use disk-based storage for ACE build. When true, forces ACE to use disk-based storage even if the graph fits in host and GPU memory. When false, ACE will use in-memory storage if the graph fits in host and GPU memory and disk-based storage otherwise.
 
  * - `query_memory_type`
    - `search`

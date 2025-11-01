@@ -16,7 +16,7 @@ namespace cuvs::neighbors {
  * @{
  */
 
-enum GRAPH_BUILD_ALGO { BRUTE_FORCE = 0, IVF_PQ = 1, NN_DESCENT = 2 };
+enum GRAPH_BUILD_ALGO { BRUTE_FORCE = 0, IVF_PQ = 1, NN_DESCENT = 2, ACE = 3 };
 
 namespace graph_build_params {
 
@@ -92,6 +92,36 @@ using nn_descent_params = cuvs::neighbors::nn_descent::index_params;
 struct brute_force_params {
   cuvs::neighbors::brute_force::index_params build_params;
   cuvs::neighbors::brute_force::search_params search_params;
+};
+
+/** Specialized parameters for ACE (Augmented Core Extraction) graph build */
+struct ace_params {
+  /**
+   * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
+   *
+   * The search graph for very large datasets can be larger than the device or host memory.
+   * To build such large graphs, we divide the graph into smaller partitions.
+   */
+  size_t npartitions = 1;
+  /**
+   * The index quality for the ACE build.
+   *
+   * Bigger values increase the index quality. At some point, increasing this will no longer
+   * improve the quality.
+   */
+  size_t ef_construction = 120;
+  /**
+   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).
+   * Used when `npartitions` > 1 or `use_disk` is true.
+   */
+  std::string build_dir = "/tmp/ace_build";
+  /**
+   * Whether to use disk-based storage for ACE build.
+   * When true, enables disk-based operations for memory-efficient graph construction.
+   */
+  bool use_disk = false;
+
+  ace_params() = default;
 };
 
 // **** Experimental ****

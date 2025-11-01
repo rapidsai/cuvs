@@ -329,6 +329,18 @@ void parse_build_param(const nlohmann::json& conf,
           conf.value("intermediate_graph_degree", cagra_params.intermediate_graph_degree),
           dist_type);
     }
+    // Parse ACE parameters if provided
+    if (conf.contains("npartitions") || conf.contains("build_dir") ||
+        conf.contains("ef_construction") || conf.contains("use_disk")) {
+      auto ace_params = cuvs::neighbors::cagra::graph_build_params::ace_params();
+      if (conf.contains("npartitions")) { ace_params.npartitions = conf.at("npartitions"); }
+      if (conf.contains("build_dir")) { ace_params.build_dir = conf.at("build_dir"); }
+      if (conf.contains("ef_construction")) {
+        ace_params.ef_construction = conf.at("ef_construction");
+      }
+      if (conf.contains("use_disk")) { ace_params.use_disk = conf.at("use_disk"); }
+      cagra_params.graph_build_params = ace_params;
+    }
     ::parse_build_param<T, IdxT>(conf, cagra_params);
     return cagra_params;
   };

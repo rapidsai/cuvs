@@ -34,7 +34,9 @@ enum cuvsCagraGraphBuildAlgo {
   /* Experimental, use NN-Descent to build all-neighbors knn graph */
   NN_DESCENT = 2,
   /* Experimental, use iterative cagra search and optimize to build the knn graph */
-  ITERATIVE_CAGRA_SEARCH = 3
+  ITERATIVE_CAGRA_SEARCH = 3,
+  /* Use ACE (Augmented Core Extraction) to build the graph */
+  ACE = 4
 };
 
 /** Parameters for VPQ compression. */
@@ -84,6 +86,36 @@ struct cuvsIvfPqParams {
 
 typedef struct cuvsIvfPqParams* cuvsIvfPqParams_t;
 
+/** Parameters for ACE (Augmented Core Extraction) graph build */
+struct cuvsAceParams {
+  /**
+   * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
+   * Small values might improve recall but potentially degrade performance and
+   * increase memory usage. Partitions should not be too small to prevent issues
+   * in KNN graph construction. 100k - 5M vectors per partition is recommended
+   * depending on the available host and GPU memory.
+   */
+  size_t npartitions;
+  /**
+   * The index quality for the ACE build.
+   * Bigger values increase the index quality. At some point, increasing this will no longer
+   * improve the quality.
+   */
+  size_t ef_construction;
+  /**
+   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).
+   * Used when `npartitions` > 1 or `use_disk` is true.
+   */
+  const char* build_dir;
+  /**
+   * Whether to use disk-based storage for ACE build.
+   * When true, enables disk-based operations for memory-efficient graph construction.
+   */
+  bool use_disk;
+};
+
+typedef struct cuvsAceParams* cuvsAceParams_t;
+
 /**
  * @brief Supplemental parameters to build CAGRA Index
  *
@@ -106,9 +138,12 @@ struct cuvsCagraIndexParams {
    */
   cuvsCagraCompressionParams_t compression;
   /**
-   * Optional: specify ivf pq params when `build_algo = IVF_PQ`
+   * Optional: specify graph build params based on build_algo
+   * - IVF_PQ: cuvsIvfPqParams_t
+   * - ACE: cuvsAceParams_t
+   * - Others: nullptr
    */
-  cuvsIvfPqParams_t graph_build_params;
+  void* graph_build_params;
 };
 
 typedef struct cuvsCagraIndexParams* cuvsCagraIndexParams_t;
@@ -144,6 +179,22 @@ cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionParams_t* param
  * @return cuvsError_t
  */
 cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params);
+
+/**
+ * @brief Allocate ACE params, and populate with default values
+ *
+ * @param[in] params cuvsAceParams_t to allocate
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params);
+
+/**
+ * @brief De-allocate ACE params
+ *
+ * @param[in] params
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params);
 
 /**
  * @}
@@ -364,6 +415,25 @@ cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* size);
  * @return cuvsError_t
  */
 cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int64_t* graph_degree);
+
+/**
+ * @brief Check if the CAGRA index is stored on disk
+ *
+ * @param[in] index CAGRA index
+ * @param[out] on_disk return true if index is on disk, false otherwise
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexIsOnDisk(cuvsCagraIndex_t index, bool* on_disk);
+
+/**
+ * @brief Get the file directory where the CAGRA index is stored (if on disk)
+ *
+ * @param[in] index CAGRA index
+ * @param[out] file_directory return file directory path (caller must free)
+ * @param[out] length length of the file_directory string
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsCagraIndexGetFileDirectory(cuvsCagraIndex_t index, char** file_directory, size_t* length);
 
 /**
  * @brief Returns a view of the CAGRA dataset
