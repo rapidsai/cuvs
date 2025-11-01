@@ -16,9 +16,7 @@ auto to_cagra_params(raft::matrix_extent<int64_t> dataset,
                      int ef_construction,
                      cuvs::distance::DistanceType metric) -> cuvs::neighbors::cagra::index_params
 {
-  // Template parameters are used to avoid type errors with instantiation in the header file.
-  return cuvs::neighbors::cagra::hnsw_to_cagra_params<float, uint32_t>(
-    dataset, M, ef_construction, metric);
+  return cuvs::neighbors::cagra::hnsw_to_cagra_params(dataset, M, ef_construction, metric);
 }
 
 #define CUVS_INST_HNSW_FROM_CAGRA(T)                                                  \

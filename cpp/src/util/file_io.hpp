@@ -39,15 +39,11 @@ class file_descriptor {
   file_descriptor(const file_descriptor&)            = delete;
   file_descriptor& operator=(const file_descriptor&) = delete;
 
-  file_descriptor(file_descriptor&& other) noexcept : fd_(other.fd_) { other.fd_ = -1; }
+  file_descriptor(file_descriptor&& other) noexcept : fd_{std::exchange(other.fd_, -1)} {}
 
   file_descriptor& operator=(file_descriptor&& other) noexcept
   {
-    if (this != &other) {
-      close();
-      fd_       = other.fd_;
-      other.fd_ = -1;
-    }
+    std::swap(this->fd_, other.fd_);
     return *this;
   }
 
