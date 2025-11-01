@@ -783,9 +783,15 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
   )
 
   if(TARGET cuvs_c)
-    list(APPEND cuvs_components c_api cuvs_static)
-    list(APPEND cuvs_export_sets cuvs-c-exports cuvs-static-exports)
+    list(APPEND cuvs_components c_api)
+    list(APPEND cuvs_export_sets cuvs-c-exports)
     set(CUVS_C_TARGET cuvs_c)
+  endif()
+
+  if(TARGET cuvs_static)
+    list(APPEND cuvs_components cuvs_static)
+    list(APPEND cuvs_export_sets cuvs-static-exports)
+    set(CUVS_STATIC_TARGET cuvs_static)
   endif()
 
   # Use `rapids_export` for 22.04 as it will have COMPONENT support
@@ -794,7 +800,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     EXPORT_SET cuvs-exports
     COMPONENTS ${cuvs_components}
     COMPONENTS_EXPORT_SET ${cuvs_export_sets}
-    GLOBAL_TARGETS cuvs ${CUVS_C_TARGET} cuvs_static
+    GLOBAL_TARGETS cuvs ${CUVS_C_TARGET} ${CUVS_STATIC_TARGET}
     NAMESPACE cuvs::
   )
 
@@ -805,7 +811,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     EXPORT_SET cuvs-exports
     COMPONENTS ${cuvs_components}
     COMPONENTS_EXPORT_SET ${cuvs_export_sets}
-    GLOBAL_TARGETS cuvs ${CUVS_C_TARGET} cuvs_static
+    GLOBAL_TARGETS cuvs ${CUVS_C_TARGET} ${CUVS_STATIC_TARGET}
     NAMESPACE cuvs::
   )
 endif()
