@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -26,6 +15,7 @@
 #include <raft/core/logger.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/map.cuh>
 
 #include <cuvs/distance/distance.hpp>
 
@@ -299,6 +289,7 @@ void pickup_next_parents(INDEX_T* const parent_candidates_ptr,  // [num_queries,
 }
 
 template <class DATASET_DESCRIPTOR_T,
+          class SourceIndexT,
           class SAMPLE_FILTER_T>
 RAFT_KERNEL compute_distance_to_child_nodes_kernel(
   const typename DATASET_DESCRIPTOR_T::INDEX_T* const
@@ -313,6 +304,7 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
   const typename DATASET_DESCRIPTOR_T::INDEX_T* const
     neighbor_graph_ptr,  // [dataset_size, graph_degree]
   const std::uint32_t graph_degree,
+  const SourceIndexT* source_indices_ptr,
   const typename DATASET_DESCRIPTOR_T::DATA_T* query_ptr,  // [num_queries, data_dim]
   typename DATASET_DESCRIPTOR_T::INDEX_T* const
     visited_hashmap_ptr,  // [num_queries, 1 << hash_bitlen]
@@ -375,7 +367,9 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
 
   if constexpr (!std::is_same<SAMPLE_FILTER_T,
                               cuvs::neighbors::filtering::none_sample_filter>::value) {
-    if (!sample_filter(query_id, parent_index)) {
+    if (!sample_filter(
+          query_id,
+          source_indices_ptr == nullptr ? parent_index : source_indices_ptr[parent_index])) {
       parent_candidates_ptr[parent_list_index + (lds * query_id)] = utils::get_max_value<INDEX_T>();
       parent_distance_ptr[parent_list_index + (lds * query_id)] =
         utils::get_max_value<DISTANCE_T>();
@@ -386,6 +380,7 @@ RAFT_KERNEL compute_distance_to_child_nodes_kernel(
 template <typename DataT,
           typename IndexT,
           typename DistanceT,
+          class SourceIndexT,
           class SAMPLE_FILTER_T>
 void compute_distance_to_child_nodes(
   const IndexT* parent_node_list,        // [num_queries, search_width]
@@ -396,6 +391,7 @@ void compute_distance_to_child_nodes(
   const dataset_descriptor_host<DataT, IndexT, DistanceT>& dataset_desc,
   const IndexT* neighbor_graph_ptr,  // [dataset_size, graph_degree]
   std::uint32_t graph_degree,
+  const SourceIndexT* source_indices_ptr,
   const DataT* query_ptr,  // [num_queries, data_dim]
   std::uint32_t num_queries,
   IndexT* visited_hashmap_ptr,  // [num_queries, 1 << hash_bitlen]
@@ -422,6 +418,7 @@ void compute_distance_to_child_nodes(
                                                           dataset_desc.dev_ptr(cuda_stream),
                                                           neighbor_graph_ptr,
                                                           graph_degree,
+                                                          source_indices_ptr,
                                                           query_ptr,
                                                           visited_hashmap_ptr,
                                                           hash_bitlen,
@@ -461,14 +458,16 @@ void remove_parent_bit(const std::uint32_t num_queries,
 }
 
 // This function called after the `remove_parent_bit` function
-template <class INDEX_T, class DISTANCE_T, class SAMPLE_FILTER_T>
-RAFT_KERNEL apply_filter_kernel(INDEX_T* const result_indices_ptr,
-                                DISTANCE_T* const result_distances_ptr,
-                                const std::size_t lds,
-                                const std::uint32_t result_buffer_size,
-                                const std::uint32_t num_queries,
-                                const INDEX_T query_id_offset,
-                                SAMPLE_FILTER_T sample_filter)
+template <class INDEX_T, class DISTANCE_T, class SourceIndexT, class SAMPLE_FILTER_T>
+RAFT_KERNEL apply_filter_kernel(
+  const SourceIndexT* source_indices_ptr,  // [num_queries, search_width]
+  INDEX_T* const result_indices_ptr,
+  DISTANCE_T* const result_distances_ptr,
+  const std::size_t lds,
+  const std::uint32_t result_buffer_size,
+  const std::uint32_t num_queries,
+  const INDEX_T query_id_offset,
+  SAMPLE_FILTER_T sample_filter)
 {
   constexpr INDEX_T index_msb_1_mask = utils::gen_index_msb_1_mask<INDEX_T>::value;
   const auto tid                     = threadIdx.x + blockIdx.x * blockDim.x;
@@ -478,14 +477,18 @@ RAFT_KERNEL apply_filter_kernel(INDEX_T* const result_indices_ptr,
   const auto index = i + j * lds;
 
   if (result_indices_ptr[index] != ~index_msb_1_mask &&
-      !sample_filter(query_id_offset + j, result_indices_ptr[index])) {
+      !sample_filter(query_id_offset + j,
+                     source_indices_ptr == nullptr
+                       ? result_indices_ptr[index]
+                       : source_indices_ptr[result_indices_ptr[index]])) {
     result_indices_ptr[index]   = utils::get_max_value<INDEX_T>();
     result_distances_ptr[index] = utils::get_max_value<DISTANCE_T>();
   }
 }
 
-template <class INDEX_T, class DISTANCE_T, class SAMPLE_FILTER_T>
-void apply_filter(INDEX_T* const result_indices_ptr,
+template <class INDEX_T, class DISTANCE_T, class SourceIndexT, class SAMPLE_FILTER_T>
+void apply_filter(const SourceIndexT* source_indices_ptr,
+                  INDEX_T* const result_indices_ptr,
                   DISTANCE_T* const result_distances_ptr,
                   const std::size_t lds,
                   const std::uint32_t result_buffer_size,
@@ -497,7 +500,8 @@ void apply_filter(INDEX_T* const result_indices_ptr,
   const std::uint32_t block_size = 256;
   const std::uint32_t grid_size  = raft::ceildiv(num_queries * result_buffer_size, block_size);
 
-  apply_filter_kernel<<<grid_size, block_size, 0, cuda_stream>>>(result_indices_ptr,
+  apply_filter_kernel<<<grid_size, block_size, 0, cuda_stream>>>(source_indices_ptr,
+                                                                 result_indices_ptr,
                                                                  result_distances_ptr,
                                                                  lds,
                                                                  result_buffer_size,
@@ -578,9 +582,12 @@ template <typename DataT,
           typename IndexT,
           typename DistanceT,
           typename SAMPLE_FILTER_T,
-          typename OutputIndexT = IndexT>
-struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, OutputIndexT> {
-  using base_type  = search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, OutputIndexT>;
+          typename SourceIndexT = IndexT,
+          typename OutputIndexT = SourceIndexT>
+struct search
+  : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, SourceIndexT, OutputIndexT> {
+  using base_type =
+    search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, SourceIndexT, OutputIndexT>;
   using DATA_T     = typename base_type::DATA_T;
   using INDEX_T    = typename base_type::INDEX_T;
   using DISTANCE_T = typename base_type::DISTANCE_T;
@@ -774,22 +781,26 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, Outp
     }
   }
 
-  void operator()(raft::resources const& res,
-                  raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
-                  OutputIndexT* const topk_indices_ptr,  // [num_queries, topk]
-                  DISTANCE_T* const topk_distances_ptr,  // [num_queries, topk]
-                  const DATA_T* const queries_ptr,       // [num_queries, dataset_dim]
-                  const uint32_t num_queries,
-                  const INDEX_T* dev_seed_ptr,              // [num_queries, num_seeds]
-                  uint32_t* const num_executed_iterations,  // [num_queries,]
-                  uint32_t topk,
-                  SAMPLE_FILTER_T sample_filter)
+  void operator()(
+    raft::resources const& res,
+    raft::device_matrix_view<const INDEX_T, int64_t, raft::row_major> graph,
+    std::optional<raft::device_vector_view<const SourceIndexT, int64_t>> source_indices,
+    OutputIndexT* const topk_indices_ptr,  // [num_queries, topk]
+    DISTANCE_T* const topk_distances_ptr,  // [num_queries, topk]
+    const DATA_T* const queries_ptr,       // [num_queries, dataset_dim]
+    const uint32_t num_queries,
+    const INDEX_T* dev_seed_ptr,              // [num_queries, num_seeds]
+    uint32_t* const num_executed_iterations,  // [num_queries,]
+    uint32_t topk,
+    SAMPLE_FILTER_T sample_filter)
   {
     // Init hashmap
     cudaStream_t stream      = raft::resource::get_cuda_stream(res);
     const uint32_t hash_size = hashmap::get_size(hash_bitlen);
     set_value_batch(
       hashmap.data(), hash_size, utils::get_max_value<INDEX_T>(), hash_size, num_queries, stream);
+
+    auto source_indices_ptr = source_indices.has_value() ? source_indices->data_handle() : nullptr;
 
     // Topk hint can not be used when applying a filter
     uint32_t* const top_hint_ptr =
@@ -876,6 +887,7 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, Outp
         dataset_desc,
         graph.data_handle(),
         graph.extent(1),
+        source_indices_ptr,
         queries_ptr,
         num_queries,
         hashmap.data(),
@@ -900,7 +912,8 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, Outp
                         result_buffer_allocation_size,
                         stream);
 
-      apply_filter<INDEX_T, DISTANCE_T, SAMPLE_FILTER_T>(
+      apply_filter<INDEX_T, DISTANCE_T, SourceIndexT, SAMPLE_FILTER_T>(
+        source_indices_ptr,
         result_indices.data() + (iter & 0x1) * itopk_size,
         result_distances.data() + (iter & 0x1) * itopk_size,
         result_buffer_allocation_size,
@@ -934,13 +947,26 @@ struct search : search_plan_impl<DataT, IndexT, DistanceT, SAMPLE_FILTER_T, Outp
     }
 
     // Copy results from working buffer to final buffer
-    batched_memcpy(topk_indices_ptr,
-                   topk,
-                   result_indices_ptr,
-                   result_buffer_allocation_size,
-                   topk,
-                   num_queries,
-                   stream);
+    if (source_indices_ptr != nullptr) {
+      auto buf_result_indices = raft::make_device_matrix_view<const INDEX_T, int64_t>(
+        result_indices_ptr, num_queries, result_buffer_allocation_size);
+      raft::linalg::map_offset(
+        res,
+        raft::make_device_matrix_view<OutputIndexT, int64_t>(topk_indices_ptr, num_queries, topk),
+        [source_indices_ptr, buf_result_indices, topk] __device__(auto offset) {
+          auto i = offset / topk;
+          auto j = offset % topk;
+          return static_cast<OutputIndexT>(source_indices_ptr[buf_result_indices(i, j)]);
+        });
+    } else {
+      batched_memcpy(topk_indices_ptr,
+                     topk,
+                     result_indices_ptr,
+                     result_buffer_allocation_size,
+                     topk,
+                     num_queries,
+                     stream);
+    }
     if (topk_distances_ptr) {
       batched_memcpy(topk_distances_ptr,
                      topk,
