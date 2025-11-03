@@ -313,18 +313,14 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
     uint8_t code = compute_code<kSubWarpSize>(dataset, vq_centers, pq_centers, row_ix, j, vq_label);
     // stage the code and maybe write
     if (lane_id == 0) {
+      staging_codes |= (static_cast<LabelT>(code) << filled_bits);
       filled_bits += PqBits;
-      if (filled_bits <= BitsPerLabel) {
-        staging_codes |= (static_cast<LabelT>(code) << (BitsPerLabel - filled_bits));
-      } else {
-        staging_codes |= (static_cast<LabelT>(code) >> (filled_bits - BitsPerLabel));
-      }
       if (filled_bits >= BitsPerLabel) {
-        // write the codes to global memory
         filled_bits -= BitsPerLabel;
+        // write the codes to global memory
         *out_codes_ptr++ = staging_codes;
-        // stage the leftover
-        staging_codes = (static_cast<LabelT>(code) << (BitsPerLabel - filled_bits));
+        // stage the leftover (or zero the buffer if no bits are left)
+        staging_codes = (static_cast<LabelT>(code) >> (PqBits - filled_bits));
       }
     }
   }
