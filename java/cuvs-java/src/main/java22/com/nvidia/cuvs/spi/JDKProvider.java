@@ -1,27 +1,23 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.spi;
 
+import static com.nvidia.cuvs.internal.CuVSParamsHelper.*;
 import static com.nvidia.cuvs.internal.common.Util.*;
-import static com.nvidia.cuvs.internal.panama.headers_h.cuvsVersionGet;
-import static com.nvidia.cuvs.internal.panama.headers_h.uint16_t;
+import static com.nvidia.cuvs.internal.panama.headers_h.*;
+import static com.nvidia.cuvs.internal.panama.headers_h_1.cudaStreamSynchronize;
 
 import com.nvidia.cuvs.*;
 import com.nvidia.cuvs.internal.*;
+import com.nvidia.cuvs.internal.common.CloseableHandle;
+import com.nvidia.cuvs.internal.common.PinnedMemoryBuffer;
 import com.nvidia.cuvs.internal.common.Util;
+import com.nvidia.cuvs.internal.panama.cuvsCagraIndexParams;
+import com.nvidia.cuvs.internal.panama.cuvsIvfPqIndexParams;
+import com.nvidia.cuvs.internal.panama.cuvsIvfPqParams;
+import com.nvidia.cuvs.internal.panama.cuvsIvfPqSearchParams;
 import java.io.IOException;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -34,16 +30,51 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
+import java.util.logging.Level;
 
 final class JDKProvider implements CuVSProvider {
 
+  private static final MethodHandle createNativeDataset$mh;
+  private static final MethodHandle createNativeDatasetWithStrides$mh;
+
   static {
-    OptionalNativeDependencyLoader.loadLibraries();
+    try {
+      var lookup = MethodHandles.lookup();
+      createNativeDataset$mh =
+          lookup.findStatic(
+              JDKProvider.class,
+              "createNativeDataset",
+              MethodType.methodType(
+                  CuVSMatrix.class,
+                  MemorySegment.class,
+                  int.class,
+                  int.class,
+                  CuVSMatrix.DataType.class));
+
+      createNativeDatasetWithStrides$mh =
+          lookup.findStatic(
+              JDKProvider.class,
+              "createNativeDatasetWithStrides",
+              MethodType.methodType(
+                  CuVSMatrix.class,
+                  MemorySegment.class,
+                  int.class,
+                  int.class,
+                  int.class,
+                  int.class,
+                  CuVSMatrix.DataType.class));
+    } catch (NoSuchMethodException | IllegalAccessException e) {
+      throw new RuntimeException(e);
+    }
   }
 
-  private static final MethodHandle createNativeDataset$mh = createNativeDatasetBuilder();
+  private final cuvsGetLogLevel GET_LOG_LEVEL_INVOKER = cuvsGetLogLevel.makeInvoker();
 
-  static CuVSProvider create() throws Throwable {
+  private JDKProvider() {}
+
+  static CuVSProvider create() throws ProviderInitializationException {
+    NativeDependencyLoader.loadLibraries();
+
     var mavenVersion = readCuVSVersionFromManifest();
 
     try (var localArena = Arena.ofConfined()) {
@@ -82,25 +113,20 @@ final class JDKProvider implements CuVSProvider {
     }
   }
 
-  static MethodHandle createNativeDatasetBuilder() {
-    try {
-      var lookup = MethodHandles.lookup();
-      var mt =
-          MethodType.methodType(
-              CuVSMatrix.class,
-              MemorySegment.class,
-              int.class,
-              int.class,
-              CuVSMatrix.DataType.class);
-      return lookup.findStatic(JDKProvider.class, "createNativeDataset", mt);
-    } catch (NoSuchMethodException | IllegalAccessException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
   private static CuVSMatrix createNativeDataset(
       MemorySegment memorySegment, int size, int dimensions, CuVSMatrix.DataType dataType) {
     return new CuVSHostMatrixImpl(memorySegment, size, dimensions, dataType);
+  }
+
+  private static CuVSMatrix createNativeDatasetWithStrides(
+      MemorySegment memorySegment,
+      int size,
+      int dimensions,
+      int rowStride,
+      int columnStride,
+      CuVSMatrix.DataType dataType) {
+    return new CuVSHostMatrixImpl(
+        memorySegment, size, dimensions, rowStride, columnStride, dataType);
   }
 
   @Override
@@ -157,66 +183,173 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
+  public CagraIndexParams cagraIndexParamsFromHnswParams(
+      long rows,
+      long dim,
+      int m,
+      int efConstruction,
+      CagraIndexParams.HnswHeuristicType heuristic,
+      CagraIndexParams.CuvsDistanceType metric) {
+    try (var nativeCagraIndexParams = createCagraIndexParams();
+        var ivfPqIndexParams = createIvfPqIndexParams();
+        var ivfPqSearchParams = createIvfPqSearchParams()) {
+
+      // This is already allocated by cuvsCagraIndexParamsCreate,
+      // we just need to populate it.
+      MemorySegment cuvsIvfPqParamsMemorySegment =
+          cuvsCagraIndexParams.graph_build_params(nativeCagraIndexParams.handle());
+      cuvsIvfPqParams.ivf_pq_build_params(cuvsIvfPqParamsMemorySegment, ivfPqIndexParams.handle());
+      cuvsIvfPqParams.ivf_pq_search_params(
+          cuvsIvfPqParamsMemorySegment, ivfPqSearchParams.handle());
+
+      cuvsCagraIndexParams.graph_build_params(
+          nativeCagraIndexParams.handle(), cuvsIvfPqParamsMemorySegment);
+      checkCuVSError(
+          cuvsCagraIndexParamsFromHnswParams(
+              nativeCagraIndexParams.handle(),
+              rows,
+              dim,
+              m,
+              efConstruction,
+              heuristic.value,
+              metric.value),
+          "cuvsCagraIndexParamsFromHnswParams");
+
+      return populateCagraIndexParamsFromNative(
+          nativeCagraIndexParams,
+          ivfPqIndexParams,
+          ivfPqSearchParams,
+          cuvsIvfPqParamsMemorySegment);
+    }
+  }
+
+  @Override
+  public void setLogLevel(Level level) {
+    if (level.equals(Level.ALL) || level.equals(Level.FINEST)) {
+      cuvsSetLogLevel(CUVS_LOG_LEVEL_TRACE());
+    } else if (level.equals(Level.FINER) || level.equals(Level.FINE)) {
+      cuvsSetLogLevel(CUVS_LOG_LEVEL_DEBUG());
+    } else if (level.equals(Level.CONFIG) || level.equals(Level.INFO)) {
+      cuvsSetLogLevel(CUVS_LOG_LEVEL_INFO());
+    } else if (level.equals(Level.WARNING)) {
+      cuvsSetLogLevel(CUVS_LOG_LEVEL_WARN());
+    } else if (level.equals(Level.SEVERE)) {
+      cuvsSetLogLevel(CUVS_LOG_LEVEL_ERROR());
+    } else if (level.equals(Level.OFF)) {
+      cuvsSetLogLevel(CUVS_LOG_LEVEL_OFF());
+    } else {
+      throw new UnsupportedOperationException("Unsupported log level [" + level + "]");
+    }
+  }
+
+  private static CagraIndexParams populateCagraIndexParamsFromNative(
+      CloseableHandle nativeCagraIndexParams,
+      CloseableHandle ivfPqIndexParams,
+      CloseableHandle ivfPqSearchParams,
+      MemorySegment cuvsIvfPqParamsMemorySegment) {
+    var algo =
+        CagraIndexParams.CagraGraphBuildAlgo.of(
+            cuvsCagraIndexParams.build_algo(nativeCagraIndexParams.handle()));
+    var builder =
+        new CagraIndexParams.Builder()
+            .withMetric(
+                CagraIndexParams.CuvsDistanceType.of(
+                    cuvsCagraIndexParams.metric(nativeCagraIndexParams.handle())))
+            .withIntermediateGraphDegree(
+                cuvsCagraIndexParams.intermediate_graph_degree(nativeCagraIndexParams.handle()))
+            .withGraphDegree(cuvsCagraIndexParams.graph_degree(nativeCagraIndexParams.handle()))
+            .withCagraGraphBuildAlgo(algo);
+
+    if (algo == CagraIndexParams.CagraGraphBuildAlgo.NN_DESCENT) {
+      builder.withNNDescentNumIterations(
+          cuvsCagraIndexParams.nn_descent_niter(nativeCagraIndexParams.handle()));
+    } else if (algo == CagraIndexParams.CagraGraphBuildAlgo.IVF_PQ) {
+      builder.withCuVSIvfPqParams(
+          new CuVSIvfPqParams.Builder()
+              .withCuVSIvfPqIndexParams(
+                  new CuVSIvfPqIndexParams.Builder()
+                      .withMaxTrainPointsPerPqCode(
+                          cuvsIvfPqIndexParams.max_train_points_per_pq_code(
+                              ivfPqIndexParams.handle()))
+                      .withAddDataOnBuild(
+                          cuvsIvfPqIndexParams.add_data_on_build(ivfPqIndexParams.handle()))
+                      .withMetric(
+                          CagraIndexParams.CuvsDistanceType.of(
+                              cuvsIvfPqIndexParams.metric(ivfPqIndexParams.handle())))
+                      .withMetricArg(cuvsIvfPqIndexParams.metric_arg(ivfPqIndexParams.handle()))
+                      .withNLists(cuvsIvfPqIndexParams.n_lists(ivfPqIndexParams.handle()))
+                      .withKmeansNIters(
+                          cuvsIvfPqIndexParams.kmeans_n_iters(ivfPqIndexParams.handle()))
+                      .withKmeansTrainsetFraction(
+                          cuvsIvfPqIndexParams.kmeans_trainset_fraction(ivfPqIndexParams.handle()))
+                      .withPqBits(cuvsIvfPqIndexParams.pq_bits(ivfPqIndexParams.handle()))
+                      .withPqDim(cuvsIvfPqIndexParams.pq_dim(ivfPqIndexParams.handle()))
+                      .withCodebookKind(
+                          CagraIndexParams.CodebookGen.of(
+                              cuvsIvfPqIndexParams.codebook_kind(ivfPqIndexParams.handle())))
+                      .withForceRandomRotation(
+                          cuvsIvfPqIndexParams.force_random_rotation(ivfPqIndexParams.handle()))
+                      .withConservativeMemoryAllocation(
+                          cuvsIvfPqIndexParams.conservative_memory_allocation(
+                              ivfPqIndexParams.handle()))
+                      .build())
+              .withCuVSIvfPqSearchParams(
+                  new CuVSIvfPqSearchParams.Builder()
+                      .withNProbes(cuvsIvfPqSearchParams.n_probes(ivfPqSearchParams.handle()))
+                      .withLutDtype(
+                          CagraIndexParams.CudaDataType.of(
+                              cuvsIvfPqSearchParams.lut_dtype(ivfPqSearchParams.handle())))
+                      .withInternalDistanceDtype(
+                          CagraIndexParams.CudaDataType.of(
+                              cuvsIvfPqSearchParams.internal_distance_dtype(
+                                  ivfPqSearchParams.handle())))
+                      .withPreferredShmemCarveout(
+                          cuvsIvfPqSearchParams.preferred_shmem_carveout(
+                              ivfPqSearchParams.handle()))
+                      .build())
+              .withRefinementRate(cuvsIvfPqParams.refinement_rate(cuvsIvfPqParamsMemorySegment))
+              .build());
+    }
+    return builder.build();
+  }
+
+  @Override
+  public Level getLogLevel() {
+    int logLevel = GET_LOG_LEVEL_INVOKER.apply();
+    if (logLevel == CUVS_LOG_LEVEL_TRACE()) {
+      return Level.ALL;
+    } else if (logLevel == CUVS_LOG_LEVEL_DEBUG()) {
+      return Level.FINE;
+    } else if (logLevel == CUVS_LOG_LEVEL_INFO()) {
+      return Level.INFO;
+    } else if (logLevel == CUVS_LOG_LEVEL_WARN()) {
+      return Level.WARNING;
+    } else if (logLevel == CUVS_LOG_LEVEL_ERROR() || logLevel == CUVS_LOG_LEVEL_CRITICAL()) {
+      return Level.SEVERE;
+    } else if (logLevel == CUVS_LOG_LEVEL_OFF()) {
+      return Level.OFF;
+    }
+    throw new IllegalArgumentException("Unexpected log level [" + logLevel + "]");
+  }
+
+  @Override
   public CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
-      long size, long columns, CuVSMatrix.DataType dataType) throws UnsupportedOperationException {
+      long size, long columns, CuVSMatrix.DataType dataType) {
 
-    return new CuVSMatrix.Builder<>() {
-      final CuVSHostMatrixArenaImpl matrix = new CuVSHostMatrixArenaImpl(size, columns, dataType);
-      int current = 0;
+    return new HostMatrixBuilder(size, columns, dataType);
+  }
 
-      @Override
-      public void addVector(float[] vector) {
-        if (vector.length != columns) {
-          throw new IllegalArgumentException(
-              String.format(
-                  Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
-        }
-        internalAddVector(vector);
-      }
+  @Override
+  public CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
+      long size, long columns, int rowStride, int columnStride, CuVSMatrix.DataType dataType) {
 
-      @Override
-      public void addVector(byte[] vector) {
-        if (vector.length != columns) {
-          throw new IllegalArgumentException(
-              String.format(
-                  Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
-        }
-        internalAddVector(vector);
-      }
-
-      @Override
-      public void addVector(int[] vector) {
-        if (vector.length != columns) {
-          throw new IllegalArgumentException(
-              String.format(
-                  Locale.ROOT, "Expected a vector of size [%d], got [%d]", columns, vector.length));
-        }
-        internalAddVector(vector);
-      }
-
-      private void internalAddVector(Object vector) {
-        if (current >= size) throw new ArrayIndexOutOfBoundsException();
-        MemorySegment.copy(
-            vector,
-            0,
-            matrix.memorySegment(),
-            matrix.valueLayout(),
-            ((current++) * columns * matrix.valueLayout().byteSize()),
-            (int) columns);
-      }
-
-      @Override
-      public CuVSHostMatrix build() {
-        return matrix;
-      }
-    };
+    return new HostMatrixBuilder(size, columns, rowStride, columnStride, dataType);
   }
 
   @Override
   public CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
-      CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType)
-      throws UnsupportedOperationException {
-    return new HeapSegmentBuilder(resources, size, columns, dataType);
+      CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType) {
+    return new DeviceMatrixBuilder(resources, size, columns, dataType);
   }
 
   @Override
@@ -227,12 +360,17 @@ final class JDKProvider implements CuVSProvider {
       int rowStride,
       int columnStride,
       CuVSMatrix.DataType dataType) {
-    return new HeapSegmentBuilder(resources, size, columns, rowStride, columnStride, dataType);
+    return new DeviceMatrixBuilder(resources, size, columns, rowStride, columnStride, dataType);
   }
 
   @Override
   public MethodHandle newNativeMatrixBuilder() {
     return createNativeDataset$mh;
+  }
+
+  @Override
+  public MethodHandle newNativeMatrixBuilderWithStrides() {
+    return createNativeDatasetWithStrides$mh;
   }
 
   @Override
@@ -277,46 +415,37 @@ final class JDKProvider implements CuVSProvider {
     return dataset;
   }
 
-  /**
-   * This {@link CuVSDeviceMatrix} builder implementation returns a {@link CuVSDeviceMatrix} backed by managed RMM
-   * device memory. It uses a non-native {@link MemorySegment} created directly from on-heap java arrays to avoid
-   * an intermediate allocation and copy to a native (off-heap) segment.
-   * It requires the copy function ({@code cudaMemcpyAsync}) to have the {@code Critical} linker option in order
-   * to allow the access to on-heap memory (see {@link Util#cudaMemcpyAsync}).
-   */
-  private static class HeapSegmentBuilder implements CuVSMatrix.Builder<CuVSDeviceMatrix> {
-    private final long columns;
-    private final long size;
-    private final CuVSDeviceMatrixImpl matrix;
-    private final MemorySegment stream;
-    private int current;
+  private abstract static class MatrixBuilder<T extends CuVSMatrixInternal> {
 
-    private HeapSegmentBuilder(
-        CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType) {
+    protected final long columns;
+    protected final long size;
+    protected final T matrix;
+    protected final long elementSize;
+    protected final long rowSize;
+    protected final long rowBytes;
+    protected int currentRow;
+
+    protected MatrixBuilder(T matrix, long size, long columns) {
       this.columns = columns;
       this.size = size;
-      this.matrix = CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType);
-      this.stream = Util.getStream(resources);
-      this.current = 0;
+      this.matrix = matrix;
+      this.elementSize = matrix.valueLayout().byteSize();
+      this.rowSize = columns * elementSize;
+      this.rowBytes = rowSize;
+      this.currentRow = 0;
     }
 
-    private HeapSegmentBuilder(
-        CuVSResources resources,
-        long size,
-        long columns,
-        int rowStride,
-        int columnStride,
-        CuVSMatrix.DataType dataType) {
+    protected MatrixBuilder(T matrix, long size, long columns, int rowStride) {
       this.columns = columns;
       this.size = size;
-      this.matrix =
-          CuVSDeviceMatrixRMMImpl.create(
-              resources, size, columns, rowStride, columnStride, dataType);
-      this.stream = Util.getStream(resources);
-      this.current = 0;
+      this.matrix = matrix;
+      this.elementSize = matrix.valueLayout().byteSize();
+      this.rowSize = rowStride > 0 ? rowStride * elementSize : columns * elementSize;
+      this.rowBytes = columns * elementSize;
+
+      this.currentRow = 0;
     }
 
-    @Override
     public void addVector(float[] vector) {
       if (vector.length != columns) {
         throw new IllegalArgumentException(
@@ -326,7 +455,6 @@ final class JDKProvider implements CuVSProvider {
       internalAddVector(MemorySegment.ofArray(vector));
     }
 
-    @Override
     public void addVector(byte[] vector) {
       if (vector.length != columns) {
         throw new IllegalArgumentException(
@@ -336,7 +464,6 @@ final class JDKProvider implements CuVSProvider {
       internalAddVector(MemorySegment.ofArray(vector));
     }
 
-    @Override
     public void addVector(int[] vector) {
       if (vector.length != columns) {
         throw new IllegalArgumentException(
@@ -346,20 +473,123 @@ final class JDKProvider implements CuVSProvider {
       internalAddVector(MemorySegment.ofArray(vector));
     }
 
-    private void internalAddVector(MemorySegment vector) {
-      if (current >= size) {
+    protected abstract void internalAddVector(MemorySegment vector);
+  }
+
+  /**
+   * This {@link CuVSDeviceMatrix} builder implementation returns a {@link CuVSDeviceMatrix} backed by managed RMM
+   * device memory. It uses a {@link PinnedMemoryBuffer} to batch data before copying it to the GPU.
+   */
+  private static final class DeviceMatrixBuilder extends MatrixBuilder<CuVSDeviceMatrixImpl>
+      implements CuVSMatrix.Builder<CuVSDeviceMatrix> {
+
+    private final MemorySegment stream;
+
+    private final PinnedMemoryBuffer hostBuffer;
+    private final long bufferRowCount;
+    private int currentBufferRow;
+
+    private DeviceMatrixBuilder(
+        CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType) {
+      super(CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType), size, columns);
+      this.stream = Util.getStream(resources);
+
+      this.hostBuffer = new PinnedMemoryBuffer(size, columns, matrix.valueLayout());
+      this.bufferRowCount = Math.min((hostBuffer.size() / rowBytes), size);
+      this.currentBufferRow = 0;
+    }
+
+    private DeviceMatrixBuilder(
+        CuVSResources resources,
+        long size,
+        long columns,
+        int rowStride,
+        int columnStride,
+        CuVSMatrix.DataType dataType) {
+      super(
+          CuVSDeviceMatrixRMMImpl.create(
+              resources, size, columns, rowStride, columnStride, dataType),
+          size,
+          columns,
+          rowStride);
+
+      this.stream = Util.getStream(resources);
+
+      this.hostBuffer = new PinnedMemoryBuffer(size, columns, matrix.valueLayout());
+      this.bufferRowCount = Math.min((hostBuffer.size() / rowBytes), size);
+      this.currentBufferRow = 0;
+    }
+
+    @Override
+    protected void internalAddVector(MemorySegment vector) {
+      if (currentRow >= size) {
         throw new ArrayIndexOutOfBoundsException();
       }
+      var hostBufferOffset = currentBufferRow * rowBytes;
+      MemorySegment.copy(vector, 0, hostBuffer.address(), hostBufferOffset, rowBytes);
 
-      long rowBytes = columns * matrix.valueLayout().byteSize();
+      currentRow++;
+      currentBufferRow++;
+      if (currentBufferRow == bufferRowCount) {
+        flushBuffer();
+      }
+    }
 
-      var dstOffset = ((current++) * rowBytes);
-      var dst = matrix.memorySegment().asSlice(dstOffset);
-      cudaMemcpyAsync(dst, vector, rowBytes, CudaMemcpyKind.HOST_TO_DEVICE, stream);
+    private void flushBuffer() {
+      if (currentBufferRow > 0) {
+        var deviceMemoryOffset = (currentRow - currentBufferRow) * rowSize;
+        var dst = matrix.memorySegment().asSlice(deviceMemoryOffset);
+        checkCudaError(
+            cudaMemcpy2DAsync(
+                dst,
+                rowSize,
+                hostBuffer.address(),
+                rowBytes,
+                rowBytes,
+                currentBufferRow,
+                CudaMemcpyKind.HOST_TO_DEVICE.kind,
+                stream),
+            "cudaMemcpy2DAsync");
+
+        currentBufferRow = 0;
+        checkCudaError(cudaStreamSynchronize(stream), "cudaStreamSynchronize");
+      }
     }
 
     @Override
     public CuVSDeviceMatrix build() {
+      flushBuffer();
+      hostBuffer.close();
+      return matrix;
+    }
+  }
+
+  private static class HostMatrixBuilder extends MatrixBuilder<CuVSHostMatrixImpl>
+      implements CuVSMatrix.Builder<CuVSHostMatrix> {
+
+    private HostMatrixBuilder(long size, long columns, CuVSMatrix.DataType dataType) {
+      super(new CuVSHostMatrixArenaImpl(size, columns, dataType), size, columns);
+    }
+
+    private HostMatrixBuilder(
+        long size, long columns, int rowStride, int columnStride, CuVSMatrix.DataType dataType) {
+      super(
+          new CuVSHostMatrixArenaImpl(size, columns, rowStride, columnStride, dataType),
+          size,
+          columns,
+          rowStride);
+    }
+
+    @Override
+    protected void internalAddVector(MemorySegment vector) {
+      if (currentRow >= size) {
+        throw new ArrayIndexOutOfBoundsException();
+      }
+      MemorySegment.copy(vector, 0, matrix.memorySegment(), ((currentRow++) * rowSize), rowBytes);
+    }
+
+    @Override
+    public CuVSHostMatrix build() {
       return matrix;
     }
   }

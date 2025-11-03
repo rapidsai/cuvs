@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2019-2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2019-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -24,6 +13,7 @@
 #include "../../cluster_solvers.cuh"
 #include "../../eigen_solvers.cuh"
 #include "spectral_util.cuh"
+#include <raft/sparse/linalg/laplacian.cuh>
 #include <raft/spectral/matrix_wrappers.hpp>
 
 #include <cuda.h>
@@ -39,10 +29,6 @@
 namespace cuvs {
 namespace spectral {
 namespace detail {
-
-// =========================================================
-// Spectral partitioner
-// =========================================================
 
 /// Compute spectral graph partition
 /** Compute partition for a weighted undirected graph. This
@@ -100,14 +86,15 @@ std::tuple<vertex_t, weight_t, vertex_t> partition(
   // Compute eigenvectors of Laplacian
 
   // Initialize Laplacian
-  /// sparse_matrix_t<vertex_t, weight_t> A{handle, graph};
-  raft::spectral::matrix::laplacian_matrix_t<vertex_t, weight_t, nnz_t> L{handle, csr_m};
+  auto laplacian =
+    raft::sparse::linalg::compute_graph_laplacian(handle, csr_m.to_csr_matrix_view());
 
   auto eigen_config = eigen_solver.get_config();
   auto nEigVecs     = eigen_config.n_eigVecs;
 
   // Compute smallest eigenvalues and eigenvectors
-  std::get<0>(stats) = eigen_solver.solve_smallest_eigenvectors(handle, L, eigVals, eigVecs);
+  std::get<0>(stats) =
+    eigen_solver.solve_smallest_eigenvectors(handle, laplacian.view(), eigVals, eigVecs);
 
   // Whiten eigenvector matrix
   transform_eigen_matrix(handle, n, nEigVecs, eigVecs);

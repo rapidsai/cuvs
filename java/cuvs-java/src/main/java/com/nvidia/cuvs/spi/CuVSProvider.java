@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.spi;
 
@@ -50,6 +39,10 @@ public interface CuVSProvider {
   CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
       long size, long dimensions, CuVSMatrix.DataType dataType);
 
+  /** Create a {@link CuVSMatrix.Builder} instance for a host memory matrix **/
+  CuVSMatrix.Builder<CuVSHostMatrix> newHostMatrixBuilder(
+      long size, long columns, int rowStride, int columnStride, CuVSMatrix.DataType dataType);
+
   /** Create a {@link CuVSMatrix.Builder} instance for a device memory matrix **/
   CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
       CuVSResources cuVSResources, long size, long dimensions, CuVSMatrix.DataType dataType);
@@ -79,6 +72,25 @@ public interface CuVSProvider {
    * @return a MethodHandle which can be invoked to build a CuVSMatrix from an external {@code MemorySegment}
    */
   MethodHandle newNativeMatrixBuilder();
+
+  /**
+   * Returns the factory method used to build a CuVSMatrix from native memory, with strides.
+   * The factory method will have this signature:
+   * {@code CuVSMatrix createNativeMatrix(memorySegment, size, dimensions, rowStride, columnStride, dataType)},
+   * where {@code memorySegment} is a {@code java.lang.foreign.MemorySegment} containing {@code int size} vectors of
+   * {@code int dimensions} length of type {@link CuVSMatrix.DataType}. Rows have a stride of {@code rowStride},
+   * where 0 indicates "no stride" (a stride equal to the number of columns), and columns have a stride of
+   * {@code columnStride}
+   * <p>
+   * In order to expose this factory in a way that is compatible with Java 21, the factory method is returned as a
+   * {@link MethodHandle} with {@link MethodType} equal to
+   * {@code (CuVSMatrix.class, MemorySegment.class, int.class, int.class, int.class, int.class, DataType.class)}.
+   * The caller will need to invoke the factory via the {@link MethodHandle#invokeExact} method:
+   * {@code var matrix = (CuVSMatrix)newNativeMatrixBuilder().invokeExact(memorySegment, size, dimensions, rowStride, columnStride, dataType)}
+   * </p>
+   * @return a MethodHandle which can be invoked to build a CuVSMatrix from an external {@code MemorySegment}
+   */
+  MethodHandle newNativeMatrixBuilderWithStrides();
 
   /** Create a {@link CuVSMatrix} from an on-heap array **/
   CuVSMatrix newMatrixFromArray(float[][] vectors);
@@ -131,8 +143,36 @@ public interface CuVSProvider {
   /** Returns a {@link GPUInfoProvider} to query the system for GPU related information */
   GPUInfoProvider gpuInfoProvider();
 
+  void setLogLevel(java.util.logging.Level level);
+
+  java.util.logging.Level getLogLevel();
+
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {
     return CuVSServiceProvider.Holder.INSTANCE;
   }
+
+  /**
+   * Create a CAGRA index parameters compatible with HNSW index
+   *
+   * Note: The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce
+   * exactly the same recalls and QPS for the same parameter `ef`. The graphs are different
+   * internally. Depending on the selected heuristics, the CAGRA-produced graph's QPS-Recall curve
+   * may be shifted along the curve right or left. See the heuristics descriptions for more details.
+   *
+   * @param rows The number of rows in the input dataset
+   * @param dim The number of dimensions in the input dataset
+   * @param m HNSW index parameter M
+   * @param efConstruction HNSW index parameter ef_construction
+   * @param heuristic The heuristic to use for selecting the graph build parameters
+   * @param metric The distance metric to search
+   * @return A new CAGRA index parameters object
+   */
+  CagraIndexParams cagraIndexParamsFromHnswParams(
+      long rows,
+      long dim,
+      int m,
+      int efConstruction,
+      CagraIndexParams.HnswHeuristicType heuristic,
+      CagraIndexParams.CuvsDistanceType metric);
 }

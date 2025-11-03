@@ -1,15 +1,8 @@
 # =============================================================================
-# Copyright (c) 2024-2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
-# in compliance with the License. You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software distributed under the License
-# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
-# or implied. See the License for the specific language governing permissions and limitations under
-# the License.
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
 # =============================================================================
 
 list(APPEND CMAKE_MODULE_PATH "${CUVS_SOURCE_DIR}")
@@ -39,9 +32,13 @@ option(CUVS_ANN_BENCH_USE_HNSWLIB "Include hnsw algorithm in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_GGNN "Include ggnn algorithm in benchmark" OFF)
 option(CUVS_ANN_BENCH_USE_DISKANN "Include DISKANN search in benchmark" ON)
 option(CUVS_ANN_BENCH_USE_CUVS_VAMANA "Include cuVS Vamana with DiskANN search in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN "Include cuVS CAGRA with DISKANN search in benchmark"
+       ON
+)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "(ARM|arm|aarch64)")
   set(CUVS_ANN_BENCH_USE_DISKANN OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_VAMANA OFF)
+  set(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN OFF)
 endif()
 option(CUVS_ANN_BENCH_USE_CUVS_MG "Include cuVS ann mg algorithm in benchmark" ${BUILD_MG_ALGOS})
 option(CUVS_ANN_BENCH_SINGLE_EXE
@@ -69,6 +66,7 @@ if(BUILD_CPU_ONLY)
   set(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_MG OFF)
   set(CUVS_ANN_BENCH_USE_CUVS_VAMANA OFF)
+  set(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN OFF)
 else()
   set(CUVS_FAISS_ENABLE_GPU ON)
 endif()
@@ -82,6 +80,7 @@ if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
    OR CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE
    OR CUVS_ANN_BENCH_USE_CUVS_MG
    OR CUVS_ANN_BENCH_USE_CUVS_VAMANA
+   OR CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN
 )
   set(CUVS_ANN_BENCH_USE_CUVS ON)
 endif()
@@ -99,7 +98,10 @@ if(CUVS_ANN_BENCH_USE_GGNN)
   include(cmake/thirdparty/get_ggnn)
 endif()
 
-if(CUVS_ANN_BENCH_USE_DISKANN OR CUVS_ANN_BENCH_USE_CUVS_VAMANA)
+if(CUVS_ANN_BENCH_USE_DISKANN
+   OR CUVS_ANN_BENCH_USE_CUVS_VAMANA
+   OR CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN
+)
   include(cmake/thirdparty/get_diskann)
 endif()
 
@@ -179,6 +181,7 @@ function(ConfigureAnnBench)
   target_include_directories(
     ${BENCH_NAME}
     PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/include>"
+           "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/../c/include>"
     PRIVATE ${ConfigureAnnBench_INCLUDES}
   )
 
@@ -339,6 +342,12 @@ endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_VAMANA)
   ConfigureAnnBench(NAME CUVS_VAMANA PATH src/cuvs/cuvs_vamana.cu LINKS cuvs diskann::diskann aio)
+endif()
+
+if(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN)
+  ConfigureAnnBench(
+    NAME CUVS_CAGRA_DISKANN PATH src/cuvs/cuvs_cagra_diskann.cu LINKS cuvs diskann::diskann aio
+  )
 endif()
 
 # ##################################################################################################

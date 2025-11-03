@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.internal.common;
 
@@ -106,13 +95,6 @@ public class Util {
     }
   }
 
-  private static final long UNSIGNED_INT_MASK = 0xFFFFFFFFL;
-
-  public static long dereferenceUnsignedInt(MemorySegment ptr) {
-    assert ptr.byteSize() == 4;
-    return ptr.get(uint32_t, 0) & UNSIGNED_INT_MASK;
-  }
-
   /**
    * Java analog to CUDA's cudaMemcpyKind, used for cudaMemcpy() calls.
    * @see <a href="https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html">CUDA Runtime API</a>
@@ -184,10 +166,18 @@ public class Util {
    * Helper to get the CUDA stream associated with a {@link CuVSResources}
    */
   public static MemorySegment getStream(CuVSResources resources) {
-    try (var resourcesAccess = resources.access();
-        var localArena = Arena.ofConfined()) {
+    try (var resourcesAccess = resources.access()) {
+      return getStream(resourcesAccess.handle());
+    }
+  }
+
+  /**
+   * Helper to get the CUDA stream associated with a {@link CuVSResources} handle
+   */
+  public static MemorySegment getStream(long resourcesHandle) {
+    try (var localArena = Arena.ofConfined()) {
       var streamPointer = localArena.allocate(cudaStream_t);
-      checkCuVSError(cuvsStreamGet(resourcesAccess.handle(), streamPointer), "cuvsStreamGet");
+      checkCuVSError(cuvsStreamGet(resourcesHandle, streamPointer), "cuvsStreamGet");
       return streamPointer.get(cudaStream_t, 0);
     }
   }

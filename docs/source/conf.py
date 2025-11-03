@@ -1,4 +1,5 @@
-# Copyright (c) 2018-2024, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2018-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
 import os
 import sys
@@ -192,6 +193,7 @@ def setup(app):
     app.add_js_file(
         "https://docs.rapids.ai/assets/js/custom.js", loading_method="defer"
     )
+    app.add_js_file("collapse_overloads.js")
 
 
 # The following is used by sphinx.ext.linkcode to provide links to github
@@ -206,3 +208,5 @@ linkcode_resolve = make_linkcode_resolve(
 # backticks`) to be a python object. See
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-default_role
 default_role = "py:obj"
+
+suppress_warnings = ["duplicate_declaration.cpp"]

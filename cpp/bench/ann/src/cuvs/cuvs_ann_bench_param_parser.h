@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -27,7 +16,7 @@ extern template class cuvs::bench::cuvs_ivf_flat<uint8_t, int64_t>;
 extern template class cuvs::bench::cuvs_ivf_flat<int8_t, int64_t>;
 #endif
 #if defined(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || \
-  defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
+  defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN)
 #include "cuvs_ivf_pq_wrapper.h"
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_IVF_PQ
@@ -35,7 +24,8 @@ extern template class cuvs::bench::cuvs_ivf_pq<float, int64_t>;
 extern template class cuvs::bench::cuvs_ivf_pq<uint8_t, int64_t>;
 extern template class cuvs::bench::cuvs_ivf_pq<int8_t, int64_t>;
 #endif
-#if defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
+#if defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB) || \
+  defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN)
 #include "cuvs_cagra_wrapper.h"
 #endif
 #ifdef CUVS_ANN_BENCH_USE_CUVS_CAGRA
@@ -59,7 +49,7 @@ extern template class cuvs::bench::cuvs_cagra<int8_t, uint32_t>;
 template <typename ParamT>
 void parse_dynamic_batching_params(const nlohmann::json& conf, ParamT& param)
 {
-  if (!conf.value("dynamic_batching", false)) { return; }
+  if (conf.is_null() || !conf.value("dynamic_batching", false)) { return; }
   param.dynamic_batching = true;
   if (conf.contains("dynamic_batching_max_batch_size")) {
     param.dynamic_batching_max_batch_size = conf.at("dynamic_batching_max_batch_size");
@@ -96,8 +86,9 @@ void parse_search_param(const nlohmann::json& conf,
 }
 #endif
 
-#if defined(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || \
-  defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB) || defined(CUVS_ANN_BENCH_USE_CUVS_MG)
+#if defined(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) ||   \
+  defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB) || defined(CUVS_ANN_BENCH_USE_CUVS_MG) || \
+  defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN)
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf,
                        typename cuvs::bench::cuvs_ivf_pq<T, IdxT>::build_param& param)
@@ -188,7 +179,7 @@ void parse_search_param(const nlohmann::json& conf,
 #endif
 
 #if defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB) || \
-  defined(CUVS_ANN_BENCH_USE_CUVS_MG)
+  defined(CUVS_ANN_BENCH_USE_CUVS_MG) || defined(CUVS_ANN_BENCH_USE_CUVS_CAGRA_DISKANN)
 template <typename T, typename IdxT>
 void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::nn_descent::index_params& param)
 {

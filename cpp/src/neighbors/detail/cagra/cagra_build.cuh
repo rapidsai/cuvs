@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -127,12 +116,13 @@ void build_knn_graph(
   cuvs::neighbors::cagra::graph_build_params::ivf_pq_params pq)
 {
   RAFT_EXPECTS(pq.build_params.metric == cuvs::distance::DistanceType::L2Expanded ||
-                 pq.build_params.metric == cuvs::distance::DistanceType::InnerProduct,
-               "Currently only L2Expanded or InnerProduct metric are supported");
+                 pq.build_params.metric == cuvs::distance::DistanceType::InnerProduct ||
+                 pq.build_params.metric == cuvs::distance::DistanceType::CosineExpanded,
+               "Currently only L2Expanded, InnerProduct and CosineExpanded metrics are supported");
 
   uint32_t node_degree = knn_graph.extent(1);
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
-    "cagra::build_graph(%zu, %zu, %u)",
+    "cagra::build_knn_graph<IVF-PQ>(%zu, %zu, %u)",
     size_t(dataset.extent(0)),
     size_t(dataset.extent(1)),
     node_degree);
@@ -390,6 +380,12 @@ void build_knn_graph(
   raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
   cuvs::neighbors::nn_descent::index_params build_params)
 {
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
+    "cagra::build_knn_graph<NN-DESCENT>(%zu, %zu, %u)",
+    size_t(dataset.extent(0)),
+    size_t(dataset.extent(1)),
+    size_t(knn_graph.extent(1)));
+
   std::optional<raft::host_matrix_view<IdxT, int64_t, row_major>> graph_view = knn_graph;
   auto nn_descent_idx = cuvs::neighbors::nn_descent::build(res, build_params, dataset, graph_view);
 
@@ -710,6 +706,11 @@ index<T, IdxT> build(
       std::holds_alternative<cagra::graph_build_params::nn_descent_params>(knn_build_params),
     "IVF_PQ for CAGRA graph build does not support BitwiseHamming as a metric. Please "
     "use nn-descent or the iterative CAGRA search build.");
+  RAFT_EXPECTS(
+    params.metric != cuvs::distance::DistanceType::CosineExpanded ||
+      std::holds_alternative<cagra::graph_build_params::ivf_pq_params>(knn_build_params) ||
+      std::holds_alternative<cagra::graph_build_params::nn_descent_params>(knn_build_params),
+    "CosineExpanded distance is not supported for iterative CAGRA graph build.");
 
   // Validate data type for BitwiseHamming metric
   RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::BitwiseHamming ||

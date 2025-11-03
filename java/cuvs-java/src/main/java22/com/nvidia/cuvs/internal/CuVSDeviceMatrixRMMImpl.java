@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.internal;
 
@@ -79,11 +68,27 @@ public class CuVSDeviceMatrixRMMImpl extends CuVSDeviceMatrixImpl implements CuV
       long rowStride,
       long columnStride,
       DataType dataType) {
+
+    var valueLayout = valueLayoutFromType(dataType);
+    var elementSize = valueLayout.byteSize();
+
+    final long rowSize;
+    if (rowStride <= 0) {
+      rowSize = columns * elementSize;
+    } else if (rowStride >= columns) {
+      rowSize = rowStride * elementSize;
+    } else {
+      throw new IllegalArgumentException("Row stride cannot be less than the number of columns");
+    }
+    if (columnStride != -1) {
+      throw new UnsupportedOperationException(
+          "Stridden columns are currently not supported; columnStride must be equal to -1");
+    }
+
     try (var resourcesAccess = resources.access()) {
-      var valueLayout = valueLayoutFromType(dataType);
+
       var rmmAllocation =
-          CloseableRMMAllocation.allocateRMMSegment(
-              resourcesAccess.handle(), size * columns * valueLayout.byteSize());
+          CloseableRMMAllocation.allocateRMMSegment(resourcesAccess.handle(), size * rowSize);
       return new CuVSDeviceMatrixRMMImpl(
           resources, rmmAllocation, size, columns, rowStride, columnStride, dataType, valueLayout);
     }

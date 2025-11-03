@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <raft/core/device_mdarray.hpp>
@@ -89,10 +78,10 @@ RAFT_KERNEL init_adj(AdjacencyPattern pattern,
 
 template <typename DataT, typename ReduceOpT, int NWARPS>
 __launch_bounds__(32 * NWARPS, 2) RAFT_KERNEL referenceKernel(raft::KeyValuePair<int, DataT>* min,
-                                                              DataT* x,
-                                                              DataT* y,
-                                                              bool* adj,
-                                                              int* group_idxs,
+                                                              const DataT* x,
+                                                              const DataT* y,
+                                                              const bool* adj,
+                                                              const int* group_idxs,
                                                               int m,
                                                               int n,
                                                               int k,
@@ -196,7 +185,7 @@ struct Inputs {
 };
 
 template <typename DataT, typename OutT = raft::KeyValuePair<int, DataT>>
-auto reference(const raft::handle_t& handle, Inputs<DataT> inp, const Params& p)
+auto reference(const raft::handle_t& handle, const Inputs<DataT>& inp, const Params& p)
   -> raft::device_vector<OutT, int>
 {
   int m          = inp.x.extent(0);
@@ -244,7 +233,7 @@ auto reference(const raft::handle_t& handle, Inputs<DataT> inp, const Params& p)
 }
 
 template <typename DataT, typename OutT = raft::KeyValuePair<int, DataT>>
-auto run_masked_nn(const raft::handle_t& handle, Inputs<DataT> inp, const Params& p)
+auto run_masked_nn(const raft::handle_t& handle, const Inputs<DataT>& inp, const Params& p)
   -> raft::device_vector<OutT, int>
 {
   // Compute norms:
