@@ -491,7 +491,7 @@ void cluster_cost(raft::resources const& handle,
     n_clusters,
     workspace);
 
-  rmm::device_scalar<DataT, IndexT> device_cost(0, stream);
+  rmm::device_scalar<DataT> device_cost(0, stream);
 
   cuvs::cluster::kmeans::cluster_cost(
     handle,
