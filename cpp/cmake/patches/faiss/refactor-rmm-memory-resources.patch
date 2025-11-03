@@ -1,0 +1,105 @@
+From 0aa03d6eaf4bacc4d669254499966d892453961d Mon Sep 17 00:00:00 2001
+From: Bradley Dice <bdice@bradleydice.com>
+Date: Wed, 29 Oct 2025 12:37:57 -0500
+Subject: [PATCH] Refactor RMM memory resources
+
+---
+ faiss/gpu/StandardGpuResources.cpp | 14 +++++++-------
+ faiss/gpu/StandardGpuResources.h   |  7 ++++---
+ 2 files changed, 11 insertions(+), 10 deletions(-)
+
+diff --git a/faiss/gpu/StandardGpuResources.cpp b/faiss/gpu/StandardGpuResources.cpp
+index 649b7cb5c..765fdb3d0 100644
+--- a/faiss/gpu/StandardGpuResources.cpp
++++ b/faiss/gpu/StandardGpuResources.cpp
+@@ -24,8 +24,8 @@
+ #if defined USE_NVIDIA_CUVS
+ #include <raft/core/device_resources.hpp>
+ #include <rmm/mr/device/managed_memory_resource.hpp>
++#include <rmm/mr/pinned_host_memory_resource.hpp>
+ #include <rmm/mr/device/per_device_resource.hpp>
+-#include <rmm/mr/host/pinned_memory_resource.hpp>
+ #include <memory>
+ #endif
+
+@@ -93,7 +93,7 @@ StandardGpuResourcesImpl::StandardGpuResourcesImpl()
+         :
+ #if defined USE_NVIDIA_CUVS
+           mmr_(new rmm::mr::managed_memory_resource),
+-          pmr_(new rmm::mr::pinned_memory_resource),
++          pmr_(new rmm::mr::pinned_host_memory_resource),
+ #endif
+           pinnedMemAlloc_(nullptr),
+           pinnedMemAllocSize_(0),
+@@ -164,7 +164,7 @@ StandardGpuResourcesImpl::~StandardGpuResourcesImpl() {
+
+     if (pinnedMemAlloc_) {
+ #if defined USE_NVIDIA_CUVS
+-        pmr_->deallocate(pinnedMemAlloc_, pinnedMemAllocSize_);
++        pmr_->deallocate_sync(pinnedMemAlloc_, pinnedMemAllocSize_);
+ #else
+         auto err = cudaFreeHost(pinnedMemAlloc_);
+         FAISS_ASSERT_FMT(
+@@ -350,7 +350,7 @@ void StandardGpuResourcesImpl::initializeForDevice(int device) {
+         // pinned memory allocation
+         if (defaultStreams_.empty() && pinnedMemSize_ > 0) {
+             try {
+-                pinnedMemAlloc_ = pmr_->allocate(pinnedMemSize_);
++                pinnedMemAlloc_ = pmr_->allocate_sync(pinnedMemSize_);
+             } catch (const std::bad_alloc& rmm_ex) {
+                 FAISS_THROW_MSG("CUDA memory allocation error");
+             }
+@@ -549,7 +549,7 @@ void* StandardGpuResourcesImpl::allocMemory(const AllocRequest& req) {
+             rmm::mr::device_memory_resource* current_mr =
+                     rmm::mr::get_per_device_resource(
+                             rmm::cuda_device_id{adjReq.device});
+-            p = current_mr->allocate_async(adjReq.size, adjReq.stream);
++            p = current_mr->allocate(adjReq.stream, adjReq.size);
+             adjReq.mr = current_mr;
+         } catch (const std::bad_alloc& rmm_ex) {
+             FAISS_THROW_MSG("CUDA memory allocation error");
+@@ -584,7 +584,7 @@ void* StandardGpuResourcesImpl::allocMemory(const AllocRequest& req) {
+             // TODO: change this to use the current device resource once RMM has
+             // a way to retrieve a "guaranteed" managed memory resource for a
+             // device.
+-            p = mmr_->allocate_async(adjReq.size, adjReq.stream);
++            p = mmr_->allocate(adjReq.stream, adjReq.size);
+             adjReq.mr = mmr_.get();
+         } catch (const std::bad_alloc& rmm_ex) {
+             FAISS_THROW_MSG("CUDA memory allocation error");
+@@ -648,7 +648,7 @@ void StandardGpuResourcesImpl::deallocMemory(int device, void* p) {
+             req.space == MemorySpace::Device ||
+             req.space == MemorySpace::Unified) {
+ #if defined USE_NVIDIA_CUVS
+-        req.mr->deallocate_async(p, req.size, req.stream);
++        req.mr->deallocate(req.stream, p, req.size);
+ #else
+         auto err = cudaFree(p);
+         FAISS_ASSERT_FMT(
+diff --git a/faiss/gpu/StandardGpuResources.h b/faiss/gpu/StandardGpuResources.h
+index f23ca19d8..c43926fce 100644
+--- a/faiss/gpu/StandardGpuResources.h
++++ b/faiss/gpu/StandardGpuResources.h
+@@ -25,7 +25,8 @@
+
+ #if defined USE_NVIDIA_CUVS
+ #include <raft/core/device_resources.hpp>
+-#include <rmm/mr/host/pinned_memory_resource.hpp>
++#include <rmm/mr/device/device_memory_resource.hpp>
++#include <rmm/mr/pinned_host_memory_resource.hpp>
+ #endif
+
+ #include <faiss/gpu/GpuResources.h>
+@@ -172,8 +173,8 @@ class StandardGpuResourcesImpl : public GpuResources {
+     // managed_memory_resource
+     std::unique_ptr<rmm::mr::device_memory_resource> mmr_;
+
+-    // pinned_memory_resource
+-    std::unique_ptr<rmm::mr::host_memory_resource> pmr_;
++    // pinned_host_memory_resource
++    std::unique_ptr<rmm::mr::pinned_host_memory_resource> pmr_;
+ #endif
+
+     /// Pinned memory allocation for use with this GPU
+--
+2.51.0
