@@ -206,19 +206,15 @@ cdef class IndexParams:
             if ivf_pq_build_params.metric != self.metric:
                 raise ValueError("Metric mismatch with IVF-PQ build params")
             self.ivf_pq_build_params = ivf_pq_build_params
-            (
-                <cuvsIvfPqParams_t>self.params.graph_build_params
-            ).ivf_pq_build_params = <cuvsIvfPqIndexParams_t><size_t> \
+            self.params.graph_build_params.ivf_pq_build_params = \
+                <cuvsIvfPqIndexParams_t><size_t> \
                 ivf_pq_build_params.get_handle()
         if ivf_pq_search_params is not None:
             self.ivf_pq_search_params = ivf_pq_search_params
-            (
-                <cuvsIvfPqParams_t>self.params.graph_build_params
-            ).ivf_pq_search_params = <cuvsIvfPqSearchParams_t><size_t> \
+            self.params.graph_build_params.ivf_pq_search_params = \
+                <cuvsIvfPqSearchParams_t><size_t> \
                 ivf_pq_search_params.get_handle()
-        (
-            <cuvsIvfPqParams_t>self.params.graph_build_params
-        ).refinement_rate = refinement_rate
+        self.params.graph_build_params.refinement_rate = refinement_rate
 
     def get_handle(self):
         return <size_t> self.params
@@ -245,9 +241,7 @@ cdef class IndexParams:
 
     @property
     def refinement_rate(self):
-        return (
-            <cuvsIvfPqParams_t>self.params.graph_build_params
-        ).refinement_rate
+        return self.params.graph_build_params.refinement_rate
 
 
 cdef class Index:
