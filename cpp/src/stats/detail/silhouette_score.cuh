@@ -263,12 +263,12 @@ DataT silhouette_score(
   RAFT_CUDA_TRY(cudaMemsetAsync(
     averageDistanceBetweenSampleAndCluster.data(), 0, nRows * nLabels * sizeof(DataT), stream));
 
-  auto averageDistanceBetweenSampleAndClusterView = raft::make_device_matrix_view<DataT>(
+  auto averageDistanceBetweenSampleAndClusterView = raft::make_device_matrix_view<DataT, int64_t>(
     averageDistanceBetweenSampleAndCluster.data(), nRows, nLabels);
-  auto sampleToClusterSumOfDistancesView = raft::make_device_matrix_view<const DataT>(
+  auto sampleToClusterSumOfDistancesView = raft::make_device_matrix_view<const DataT, int64_t>(
     sampleToClusterSumOfDistances.data(), nRows, nLabels);
   auto binCountArrayView =
-    raft::make_device_vector_view<const DataT>(binCountArray.data(), nLabels);
+    raft::make_device_vector_view<const DataT, int64_t>(binCountArray.data(), nLabels);
 
   raft::linalg::matrix_vector_op<raft::Apply::ALONG_ROWS>(
     handle,

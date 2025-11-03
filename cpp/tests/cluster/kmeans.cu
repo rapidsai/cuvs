@@ -39,7 +39,7 @@ struct KmeansInputs {
 // void run_cluster_cost(const raft::resources& handle,
 //                       raft::device_vector_view<DataT, IndexT> minClusterDistance,
 //                       rmm::device_uvector<char>& workspace,
-//                       raft::device_scalar_view<DataT> clusterCost)
+//                       raft::device_scalar_view<DataT, IndexT> clusterCost)
 //{
 //   cuvs::cluster::kmeans::cluster_cost(
 //     handle, minClusterDistance, workspace, clusterCost, raft::add_op{});

@@ -667,7 +667,7 @@ void initScalableKMeansPlusPlus(raft::resources const& handle,
       handle,
       minClusterDistanceVec.view(),
       workspace,
-      raft::make_device_scalar_view<DataT>(clusterCost.data()),
+      raft::make_device_scalar_view<DataT, IndexT>(clusterCost.data()),
       raft::identity_op{},
       raft::add_op{});
 

@@ -269,10 +269,10 @@ constexpr typename list_spec<SizeT, IdxT>::list_extents list_spec<SizeT, IdxT>::
 {
   // how many elems of pq_dim fit into one kIndexGroupVecLen-byte chunk
   auto pq_chunk = (kIndexGroupVecLen * 8u) / pq_bits;
-  return raft::make_extents<SizeT>(raft::div_rounding_up_safe<SizeT>(n_rows, kIndexGroupSize),
-                                   raft::div_rounding_up_safe<SizeT>(pq_dim, pq_chunk),
-                                   kIndexGroupSize,
-                                   kIndexGroupVecLen);
+  return raft::make_extents<IdxT>(raft::div_rounding_up_safe<SizeT>(n_rows, kIndexGroupSize),
+                                  raft::div_rounding_up_safe<SizeT>(pq_dim, pq_chunk),
+                                  kIndexGroupSize,
+                                  kIndexGroupVecLen);
 }
 
 template <typename IdxT, typename SizeT = uint32_t>

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -183,7 +183,7 @@ template <typename InputT,
 void computeClusterCost(raft::resources const& handle,
                         raft::device_vector_view<InputT, IndexT> minClusterDistance,
                         rmm::device_uvector<char>& workspace,
-                        raft::device_scalar_view<OutputT> clusterCost,
+                        raft::device_scalar_view<OutputT, IndexT> clusterCost,
                         MainOpT main_op,
                         ReductionOpT reduction_op)
 {

@@ -947,7 +947,7 @@ template <typename DataT, typename IndexT, typename ReductionOpT>
 void computeClusterCost(raft::resources const& handle,
                         raft::device_vector_view<DataT, IndexT> minClusterDistance,
                         rmm::device_uvector<char>& workspace,
-                        raft::device_scalar_view<DataT> clusterCost,
+                        raft::device_scalar_view<DataT, IndexT> clusterCost,
                         ReductionOpT reduction_op)
 {
   kmeans::cluster_cost(handle, minClusterDistance, workspace, clusterCost, reduction_op);

@@ -303,8 +303,9 @@ void calc_centers_and_sizes(const raft::resources& handle,
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  auto centersView      = raft::make_device_matrix_view<MathT>(centers, n_clusters, dim);
-  auto clusterSizesView = raft::make_device_vector_view<const CounterT>(cluster_sizes, n_clusters);
+  auto centersView = raft::make_device_matrix_view<MathT, IdxT>(centers, n_clusters, dim);
+  auto clusterSizesView =
+    raft::make_device_vector_view<const CounterT, IdxT>(cluster_sizes, n_clusters);
 
   if (!reset_counters) {
     raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
