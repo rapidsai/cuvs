@@ -57,7 +57,7 @@ enum cuvsCagraHnswHeuristicType {
    * precise).
    *
    */
-  SIMILAR_SEARCH_PERFORMANCE = 0,
+   CUVS_CAGRA_HEURISTIC_SIMILAR_SEARCH_PERFORMANCE = 0,
   /**
    * Create a graph that has the same binary size as an HNSW graph with the given parameters
    * (graph_degree = 2 * M) while trying to match the search performance as closely as possible.
@@ -68,7 +68,7 @@ enum cuvsCagraHnswHeuristicType {
    * However, the Recall-QPS curves should be similar (i.e. the points are just shifted along the
    * curve).
    */
-  SAME_GRAPH_FOOTPRINT = 1
+   CUVS_CAGRA_HEURISTIC_SAME_GRAPH_FOOTPRINT = 1
 };
 
 /** Parameters for VPQ compression. */
