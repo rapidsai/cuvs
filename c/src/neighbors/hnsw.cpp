@@ -13,7 +13,6 @@
 #include <raft/core/serialize.hpp>
 
 #include <cuvs/core/c_api.h>
-#include <cuvs/distance/distance.h>
 #include <cuvs/neighbors/hnsw.h>
 #include <cuvs/neighbors/hnsw.hpp>
 
@@ -110,8 +109,9 @@ void* _deserialize(cuvsResources_t res,
   cuvs::neighbors::hnsw::index<T>* index = nullptr;
   auto cpp_params                        = cuvs::neighbors::hnsw::index_params();
   cpp_params.hierarchy = static_cast<cuvs::neighbors::hnsw::HnswHierarchy>(params->hierarchy);
+  auto metric_type     = static_cast<cuvs::distance::DistanceType>(metric);
   cuvs::neighbors::hnsw::deserialize(
-    *res_ptr, cpp_params, std::string(filename), dim, metric, &index);
+    *res_ptr, cpp_params, std::string(filename), dim, metric_type, &index);
   return index;
 }
 }  // namespace

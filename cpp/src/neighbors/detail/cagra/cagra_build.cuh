@@ -700,7 +700,7 @@ index<T, IdxT> build(
     }
   }
   RAFT_EXPECTS(
-    params.metric != BitwiseHamming ||
+    params.metric != cuvs::distance::DistanceType::BitwiseHamming ||
       std::holds_alternative<cagra::graph_build_params::iterative_search_params>(
         knn_build_params) ||
       std::holds_alternative<cagra::graph_build_params::nn_descent_params>(knn_build_params),

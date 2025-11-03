@@ -35,7 +35,7 @@ void* _build(cuvsResources_t res,
   auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
 
   cuvs::neighbors::brute_force::index_params params;
-  params.metric     = metric;
+  params.metric     = static_cast<cuvs::distance::DistanceType>((int)metric);
   params.metric_arg = metric_arg;
 
   auto index_on_stack = cuvs::neighbors::brute_force::build(*res_ptr, params, mds);

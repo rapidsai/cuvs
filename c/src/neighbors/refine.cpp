@@ -41,7 +41,7 @@ void _refine(bool on_device,
     auto candidates       = cuvs::core::from_dlpack<candidates_type>(candidates_tensor);
     auto indices          = cuvs::core::from_dlpack<indices_type>(indices_tensor);
     auto distances        = cuvs::core::from_dlpack<distances_type>(distances_tensor);
-    cuvs::neighbors::refine(*res_ptr, dataset, queries, candidates, indices, distances, metric);
+    cuvs::neighbors::refine(*res_ptr, dataset, queries, candidates, indices, distances, static_cast<cuvs::distance::DistanceType>((int)metric));
   } else {
     using queries_type    = raft::host_matrix_view<const T, int64_t, raft::row_major>;
     using candidates_type = raft::host_matrix_view<const int64_t, int64_t, raft::row_major>;
@@ -52,7 +52,7 @@ void _refine(bool on_device,
     auto candidates       = cuvs::core::from_dlpack<candidates_type>(candidates_tensor);
     auto indices          = cuvs::core::from_dlpack<indices_type>(indices_tensor);
     auto distances        = cuvs::core::from_dlpack<distances_type>(distances_tensor);
-    cuvs::neighbors::refine(*res_ptr, dataset, queries, candidates, indices, distances, metric);
+    cuvs::neighbors::refine(*res_ptr, dataset, queries, candidates, indices, distances, static_cast<cuvs::distance::DistanceType>((int)metric));
   }
 }
 }  // namespace
