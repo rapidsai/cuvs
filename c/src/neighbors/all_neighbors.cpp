@@ -11,6 +11,7 @@
 #include <raft/util/cudart_utils.hpp>
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/all_neighbors.h>
 #include <cuvs/neighbors/ivf_pq.h>
 #include <cuvs/neighbors/nn_descent.h>

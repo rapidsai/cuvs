@@ -377,7 +377,7 @@ void recall_eval_with_filter(T* query_data,
                               n_neighbors,
                               nnz,
                               select_min,
-                              static_cast<cuvs::distance::DistanceType>((int)metric));
+                              metric);
 
   // verify output
   double min_recall = 0.95;
