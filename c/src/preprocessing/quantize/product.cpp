@@ -63,9 +63,8 @@ void* _train(cuvsResources_t res,
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-    auto return_value =
-      cuvs::preprocessing::quantize::product::train(*res_ptr, quantizer_params, mds);
-    ret = new cuvs::preprocessing::quantize::product::quantizer<T>(return_value);
+    ret = new cuvs::preprocessing::quantize::product::quantizer<T>{
+      cuvs::preprocessing::quantize::product::train(*res_ptr, quantizer_params, mds)};
   } else {
     RAFT_FAIL("dataset must be accessible on device memory");
   }

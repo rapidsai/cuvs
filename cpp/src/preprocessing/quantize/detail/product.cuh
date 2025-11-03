@@ -47,6 +47,11 @@ void transform(raft::resources const& res,
                raft::device_matrix_view<const T, int64_t> dataset,
                raft::device_matrix_view<QuantI, int64_t> out)
 {
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
+    "preprocessing::quantize::product::transform(%zu, %zu, %zu)",
+    size_t(dataset.extent(0)),
+    size_t(dataset.extent(1)),
+    size_t(out.extent(1)));
   RAFT_EXPECTS(out.extent(0) == dataset.extent(0),
                "Output matrix must have the same number of rows as the input dataset");
   RAFT_EXPECTS(out.extent(1) == cuvs::preprocessing::quantize::product::get_quantized_dim<uint32_t>(
@@ -147,6 +152,11 @@ void inverse_transform(raft::resources const& res,
                        raft::device_matrix_view<const QuantI, int64_t> codes,
                        raft::device_matrix_view<T, int64_t> out)
 {
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
+    "preprocessing::quantize::product::inverse_transform(%zu, %zu, %zu)",
+    size_t(codes.extent(0)),
+    size_t(codes.extent(1)),
+    size_t(out.extent(1)));
   using label_t = uint32_t;
   using idx_t   = int64_t;
   RAFT_EXPECTS(out.extent(0) == codes.extent(0),
