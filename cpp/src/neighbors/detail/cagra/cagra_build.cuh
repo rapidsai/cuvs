@@ -131,7 +131,7 @@ void build_knn_graph(
   const std::string model_name = [&]() {
     char model_name[1024];
     sprintf(model_name,
-            "%s-%lux%lu.cluster_%u.pq_%u.%ubit.itr_%u.metric_%u.pqcenter_%u",
+            "%s-%lux%lu.cluster_%u.pq_%u.%ubit.itr_%u.metric_%d.pqcenter_%u",
             "IVF-PQ",
             static_cast<size_t>(dataset.extent(0)),
             static_cast<size_t>(dataset.extent(1)),
@@ -139,7 +139,7 @@ void build_knn_graph(
             pq.build_params.pq_dim,
             pq.build_params.pq_bits,
             pq.build_params.kmeans_n_iters,
-            pq.build_params.metric,
+            static_cast<int>(pq.build_params.metric),
             static_cast<uint32_t>(pq.build_params.codebook_kind));
     return std::string(model_name);
   }();

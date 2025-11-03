@@ -14,6 +14,8 @@
 #include <raft/core/serialize.hpp>
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/distance/distance.h>
+#include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/brute_force.h>
 #include <cuvs/neighbors/common.h>
 #include <cuvs/neighbors/brute_force.hpp>

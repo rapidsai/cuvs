@@ -13,6 +13,8 @@
 #include <raft/core/serialize.hpp>
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/distance/distance.h>
+#include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/hnsw.h>
 #include <cuvs/neighbors/hnsw.hpp>
 

@@ -11,6 +11,8 @@
 #include <raft/core/resources.hpp>
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/distance/distance.h>
+#include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/refine.h>
 #include <cuvs/neighbors/refine.hpp>
 
