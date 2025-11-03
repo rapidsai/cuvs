@@ -152,6 +152,22 @@ public interface CuVSProvider {
     return CuVSServiceProvider.Holder.INSTANCE;
   }
 
+  /**
+   * Create a CAGRA index parameters compatible with HNSW index
+   *
+   * Note: The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce
+   * exactly the same recalls and QPS for the same parameter `ef`. The graphs are different
+   * internally. Depending on the selected heuristics, the CAGRA-produced graph's QPS-Recall curve
+   * may be shifted along the curve right or left. See the heuristics descriptions for more details.
+   *
+   * @param rows The number of rows in the input dataset
+   * @param dim The number of dimensions in the input dataset
+   * @param m HNSW index parameter M
+   * @param efConstruction HNSW index parameter ef_construction
+   * @param heuristic The heuristic to use for selecting the graph build parameters
+   * @param metric The distance metric to search
+   * @return A new CAGRA index parameters object
+   */
   CagraIndexParams cagraIndexParamsFromHnswParams(
       long rows,
       long dim,
