@@ -305,25 +305,26 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
                 static_cast<size_t>(graph_degree_int));
 
   auto index_directory = index_.file_directory();
-  ASSERT(std::filesystem::exists(index_directory) && std::filesystem::is_directory(index_directory),
-         "Directory '%s' does not exist",
-         index_directory.c_str());
+  RAFT_EXPECTS(
+    std::filesystem::exists(index_directory) && std::filesystem::is_directory(index_directory),
+    "Directory '%s' does not exist",
+    index_directory.c_str());
 
   std::string graph_filename =
     (std::filesystem::path(index_directory) / "cagra_graph.npy").string();
-  ASSERT(std::filesystem::exists(graph_filename),
-         "Graph file '%s' does not exist.",
-         graph_filename.c_str());
+  RAFT_EXPECTS(std::filesystem::exists(graph_filename),
+               "Graph file '%s' does not exist.",
+               graph_filename.c_str());
   size_t graph_header_size = 0;
   size_t graph_n_rows      = 0;
   size_t graph_n_cols      = 0;
   {
     std::ifstream is(graph_filename, std::ios::in | std::ios::binary);
-    ASSERT(is, "Cannot open graph file %s", graph_filename.c_str());
+    RAFT_EXPECTS(is, "Cannot open graph file %s", graph_filename.c_str());
     auto start_pos    = is.tellg();
     auto header       = raft::detail::numpy_serializer::read_header(is);
     graph_header_size = static_cast<size_t>(is.tellg() - start_pos);
-    ASSERT(
+    RAFT_EXPECTS(
       header.shape.size() == 2, "Graph file should be 2D, got %zu dimensions", header.shape.size());
 
     graph_n_rows = header.shape[0];
@@ -337,21 +338,21 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
 
   std::string dataset_filename =
     (std::filesystem::path(index_directory) / "reordered_dataset.npy").string();
-  ASSERT(std::filesystem::exists(dataset_filename),
-         "Dataset file '%s' does not exist.",
-         dataset_filename.c_str());
+  RAFT_EXPECTS(std::filesystem::exists(dataset_filename),
+               "Dataset file '%s' does not exist.",
+               dataset_filename.c_str());
   size_t dataset_header_size = 0;
   size_t dataset_n_rows      = 0;
   size_t dataset_n_cols      = 0;
   {
     std::ifstream is(dataset_filename, std::ios::in | std::ios::binary);
-    ASSERT(is, "Cannot open dataset file %s", dataset_filename.c_str());
+    RAFT_EXPECTS(is, "Cannot open dataset file %s", dataset_filename.c_str());
     auto start_pos      = is.tellg();
     auto header         = raft::detail::numpy_serializer::read_header(is);
     dataset_header_size = static_cast<size_t>(is.tellg() - start_pos);
-    ASSERT(header.shape.size() == 2,
-           "Dataset file should be 2D, got %zu dimensions",
-           header.shape.size());
+    RAFT_EXPECTS(header.shape.size() == 2,
+                 "Dataset file should be 2D, got %zu dimensions",
+                 header.shape.size());
 
     dataset_n_rows = header.shape[0];
     dataset_n_cols = header.shape[1];
@@ -364,18 +365,18 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
 
   std::string label_filename =
     (std::filesystem::path(index_directory) / "dataset_mapping.npy").string();
-  ASSERT(std::filesystem::exists(label_filename),
-         "Label file '%s' does not exist.",
-         label_filename.c_str());
+  RAFT_EXPECTS(std::filesystem::exists(label_filename),
+               "Label file '%s' does not exist.",
+               label_filename.c_str());
   size_t label_header_size = 0;
   size_t label_n_elements  = 0;
   {
     std::ifstream is(label_filename, std::ios::in | std::ios::binary);
-    ASSERT(is, "Cannot open label file %s", label_filename.c_str());
+    RAFT_EXPECTS(is, "Cannot open label file %s", label_filename.c_str());
     auto start_pos    = is.tellg();
     auto header       = raft::detail::numpy_serializer::read_header(is);
     label_header_size = static_cast<size_t>(is.tellg() - start_pos);
-    ASSERT(
+    RAFT_EXPECTS(
       header.shape.size() == 1, "Label file should be 1D, got %zu dimensions", header.shape.size());
 
     label_n_elements = header.shape[0];
@@ -386,36 +387,36 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
   }
 
   // Verify consistency
-  ASSERT(graph_n_rows == static_cast<size_t>(n_rows),
-         "Graph rows (%zu) != index size (%zu)",
-         graph_n_rows,
-         static_cast<size_t>(n_rows));
-  ASSERT(dataset_n_rows == static_cast<size_t>(n_rows),
-         "Dataset rows (%zu) != index size (%zu)",
-         dataset_n_rows,
-         static_cast<size_t>(n_rows));
-  ASSERT(label_n_elements == static_cast<size_t>(n_rows),
-         "Label elements (%zu) != index size (%zu)",
-         label_n_elements,
-         static_cast<size_t>(n_rows));
-  ASSERT(graph_n_cols == static_cast<size_t>(graph_degree_int),
-         "Graph cols (%zu) != graph degree (%d)",
-         graph_n_cols,
-         graph_degree_int);
-  ASSERT(dataset_n_cols == static_cast<size_t>(dim),
-         "Dataset cols (%zu) != dimensions (%zu)",
-         dataset_n_cols,
-         static_cast<size_t>(dim));
+  RAFT_EXPECTS(graph_n_rows == static_cast<size_t>(n_rows),
+               "Graph rows (%zu) != index size (%zu)",
+               graph_n_rows,
+               static_cast<size_t>(n_rows));
+  RAFT_EXPECTS(dataset_n_rows == static_cast<size_t>(n_rows),
+               "Dataset rows (%zu) != index size (%zu)",
+               dataset_n_rows,
+               static_cast<size_t>(n_rows));
+  RAFT_EXPECTS(label_n_elements == static_cast<size_t>(n_rows),
+               "Label elements (%zu) != index size (%zu)",
+               label_n_elements,
+               static_cast<size_t>(n_rows));
+  RAFT_EXPECTS(graph_n_cols == static_cast<size_t>(graph_degree_int),
+               "Graph cols (%zu) != graph degree (%d)",
+               graph_n_cols,
+               graph_degree_int);
+  RAFT_EXPECTS(dataset_n_cols == static_cast<size_t>(dim),
+               "Dataset cols (%zu) != dimensions (%zu)",
+               dataset_n_cols,
+               static_cast<size_t>(dim));
 
   // Open file descriptors for batched reading
   int graph_fd = open(graph_filename.c_str(), O_RDONLY);
-  ASSERT(graph_fd >= 0, "Failed to open graph file %s", graph_filename.c_str());
+  RAFT_EXPECTS(graph_fd >= 0, "Failed to open graph file %s", graph_filename.c_str());
 
   int dataset_fd = open(dataset_filename.c_str(), O_RDONLY);
-  ASSERT(dataset_fd >= 0, "Failed to open dataset file %s", dataset_filename.c_str());
+  RAFT_EXPECTS(dataset_fd >= 0, "Failed to open dataset file %s", dataset_filename.c_str());
 
   int label_fd = open(label_filename.c_str(), O_RDONLY);
-  ASSERT(label_fd >= 0, "Failed to open label file %s", label_filename.c_str());
+  RAFT_EXPECTS(label_fd >= 0, "Failed to open label file %s", label_filename.c_str());
 
   const size_t row_size_bytes =
     graph_degree_int * sizeof(IdxT) + dim * sizeof(T) + sizeof(uint32_t);
@@ -533,15 +534,17 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
   int64_t next_report_offset = d_report_offset;
   auto start_clock           = std::chrono::system_clock::now();
 
-  assert(appr_algo->size_data_per_element_ ==
-         dim * sizeof(T) + appr_algo->maxM0_ * sizeof(IdxT) + sizeof(int) + sizeof(size_t));
+  RAFT_EXPECTS(appr_algo->size_data_per_element_ ==
+                 dim * sizeof(T) + appr_algo->maxM0_ * sizeof(IdxT) + sizeof(int) + sizeof(size_t),
+               "Size data per element mismatch");
 
   RAFT_LOG_INFO("Writing base level");
   size_t bytes_written = 0;
   float GiB            = 1 << 30;
   IdxT zero            = 0;
-  assert(appr_algo->size_data_per_element_ ==
-         dim * sizeof(T) + appr_algo->maxM0_ * sizeof(IdxT) + sizeof(int) + sizeof(size_t));
+  RAFT_EXPECTS(appr_algo->size_data_per_element_ ==
+                 dim * sizeof(T) + appr_algo->maxM0_ * sizeof(IdxT) + sizeof(int) + sizeof(size_t),
+               "Size data per element mismatch");
 
   // Helper lambda for parallel reading of batches
   auto read_batch = [&](int64_t start_row, int64_t rows_to_read) {
@@ -566,27 +569,27 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
 #pragma omp section
       {
         ssize_t bytes_read = pread(graph_fd, graph_buffer.data_handle(), graph_bytes, graph_offset);
-        ASSERT(bytes_read == static_cast<ssize_t>(graph_bytes),
-               "Failed to read graph data: expected %zu, got %zd",
-               graph_bytes,
-               bytes_read);
+        RAFT_EXPECTS(bytes_read == static_cast<ssize_t>(graph_bytes),
+                     "Failed to read graph data: expected %zu, got %zd",
+                     graph_bytes,
+                     bytes_read);
       }
 #pragma omp section
       {
         ssize_t bytes_read =
           pread(dataset_fd, dataset_buffer.data_handle(), dataset_bytes, dataset_offset);
-        ASSERT(bytes_read == static_cast<ssize_t>(dataset_bytes),
-               "Failed to read dataset data: expected %zu, got %zd",
-               dataset_bytes,
-               bytes_read);
+        RAFT_EXPECTS(bytes_read == static_cast<ssize_t>(dataset_bytes),
+                     "Failed to read dataset data: expected %zu, got %zd",
+                     dataset_bytes,
+                     bytes_read);
       }
 #pragma omp section
       {
         ssize_t bytes_read = pread(label_fd, label_buffer.data_handle(), label_bytes, label_offset);
-        ASSERT(bytes_read == static_cast<ssize_t>(label_bytes),
-               "Failed to read label data: expected %zu, got %zd",
-               label_bytes,
-               bytes_read);
+        RAFT_EXPECTS(bytes_read == static_cast<ssize_t>(label_bytes),
+                     "Failed to read label data: expected %zu, got %zd",
+                     label_bytes,
+                     bytes_read);
       }
     }
 
@@ -625,7 +628,8 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
       os.write(reinterpret_cast<const char*>(graph_row), sizeof(IdxT) * graph_degree_int);
 
       if (odd_graph_degree) {
-        assert(odd_graph_degree == appr_algo->maxM0_ - graph_degree_int);
+        RAFT_EXPECTS(odd_graph_degree == static_cast<int>(appr_algo->maxM0_) - graph_degree_int,
+                     "Odd graph degree mismatch");
         os.write(reinterpret_cast<char*>(&zero), sizeof(IdxT));
       }
 
@@ -727,13 +731,13 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
           os.write(reinterpret_cast<char*>(&zero), sizeof(IdxT));
         }
         bytes_written += (neighbor_view.extent(1) + remainder) * sizeof(IdxT) + sizeof(int);
-        assert(appr_algo->size_links_per_element_ ==
-               (neighbor_view.extent(1) + remainder) * sizeof(IdxT) + sizeof(int));
+        RAFT_EXPECTS(appr_algo->size_links_per_element_ ==
+                       (neighbor_view.extent(1) + remainder) * sizeof(IdxT) + sizeof(int),
+                     "Size links per element mismatch");
       }
     }
 
     const auto end_clock = std::chrono::system_clock::now();
-    // if (!os.good()) { RAFT_FAIL("Error writing HNSW file, row %zu", i); }
     if (i > next_report_offset) {
       next_report_offset += d_report_offset;
       const auto time =
@@ -1022,7 +1026,7 @@ std::unique_ptr<index<T>> from_cagra(
   // special treatment for index on disk
   if (cagra_index.on_disk()) {
     auto index_directory = cagra_index.file_directory();
-    ASSERT(
+    RAFT_EXPECTS(
       std::filesystem::exists(index_directory) && std::filesystem::is_directory(index_directory),
       "Directory '%s' does not exist",
       index_directory.c_str());
@@ -1031,12 +1035,12 @@ std::unique_ptr<index<T>> from_cagra(
 
     std::ofstream of(index_filename, std::ios::out | std::ios::binary);
 
-    if (!of) { RAFT_FAIL("Cannot open file %s", index_filename.c_str()); }
+    RAFT_EXPECTS(of, "Cannot open file %s", index_filename.c_str());
 
     serialize_to_hnswlib_from_disk(res, of, params, cagra_index);
 
     of.close();
-    if (!of) { RAFT_FAIL("Error writing output %s", index_filename.c_str()); }
+    RAFT_EXPECTS(of, "Error writing output %s", index_filename.c_str());
 
     return nullptr;
   }
