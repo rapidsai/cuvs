@@ -348,6 +348,75 @@ void get_graph_view(cuvsCagraIndex_t index, DLManagedTensor* graph)
   auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<T, IdxT>*>(index->addr);
   cuvs::core::to_dlpack(index_ptr->graph(), graph);
 }
+
+// Helper function to populate C IVF-PQ params from C++ params
+static void _populate_c_ivf_pq_params(cuvsIvfPqParams* c_ivf_pq,
+                                    const cuvs::neighbors::cagra::graph_build_params::ivf_pq_params& cpp_ivf_pq)
+{
+  // Populate the IVF-PQ build params
+  auto& bp = cpp_ivf_pq.build_params;
+  c_ivf_pq->ivf_pq_build_params->metric = static_cast<cuvsDistanceType>(bp.metric);
+  c_ivf_pq->ivf_pq_build_params->metric_arg = bp.metric_arg;
+  c_ivf_pq->ivf_pq_build_params->add_data_on_build = bp.add_data_on_build;
+  c_ivf_pq->ivf_pq_build_params->n_lists = bp.n_lists;
+  c_ivf_pq->ivf_pq_build_params->kmeans_n_iters = bp.kmeans_n_iters;
+  c_ivf_pq->ivf_pq_build_params->kmeans_trainset_fraction = bp.kmeans_trainset_fraction;
+  c_ivf_pq->ivf_pq_build_params->pq_bits = bp.pq_bits;
+  c_ivf_pq->ivf_pq_build_params->pq_dim = bp.pq_dim;
+  c_ivf_pq->ivf_pq_build_params->codebook_kind = static_cast<codebook_gen>(bp.codebook_kind);
+  c_ivf_pq->ivf_pq_build_params->force_random_rotation = bp.force_random_rotation;
+  c_ivf_pq->ivf_pq_build_params->conservative_memory_allocation = bp.conservative_memory_allocation;
+  c_ivf_pq->ivf_pq_build_params->max_train_points_per_pq_code = bp.max_train_points_per_pq_code;
+
+  // Populate the IVF-PQ search params
+  auto& sp = cpp_ivf_pq.search_params;
+  c_ivf_pq->ivf_pq_search_params->n_probes = sp.n_probes;
+  c_ivf_pq->ivf_pq_search_params->lut_dtype = sp.lut_dtype;
+  c_ivf_pq->ivf_pq_search_params->internal_distance_dtype = sp.internal_distance_dtype;
+  c_ivf_pq->ivf_pq_search_params->preferred_shmem_carveout = sp.preferred_shmem_carveout;
+
+  c_ivf_pq->refinement_rate = cpp_ivf_pq.refinement_rate;
+}
+
+// Helper function to populate C struct from C++ index_params
+static void _populate_cagra_index_params_from_cpp(cuvsCagraIndexParams_t c_params,
+                                                 const cuvs::neighbors::cagra::index_params& cpp_params)
+{
+  c_params->metric = static_cast<cuvsDistanceType>(cpp_params.metric);
+  c_params->intermediate_graph_degree = cpp_params.intermediate_graph_degree;
+  c_params->graph_degree = cpp_params.graph_degree;
+
+  // Set build algo and parameters based on the variant
+  if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::nn_descent_params>(
+        cpp_params.graph_build_params)) {
+    c_params->build_algo = NN_DESCENT;
+    auto nn_params =
+      std::get<cuvs::neighbors::cagra::graph_build_params::nn_descent_params>(
+        cpp_params.graph_build_params);
+    c_params->nn_descent_niter = nn_params.max_iterations;
+  } else if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
+               cpp_params.graph_build_params)) {
+    c_params->build_algo = IVF_PQ;
+    auto ivf_pq_params =
+      std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
+        cpp_params.graph_build_params);
+
+    _populate_c_ivf_pq_params(static_cast<cuvsIvfPqParams*>(c_params->graph_build_params), ivf_pq_params);
+  } else if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ace_params>(
+               cpp_params.graph_build_params)) {
+    c_params->build_algo = ACE;
+    auto ace_params =
+      std::get<cuvs::neighbors::cagra::graph_build_params::ace_params>(
+        cpp_params.graph_build_params);
+    cuvsAceParams* c_ace_params = new cuvsAceParams;
+    c_ace_params->npartitions = ace_params.npartitions;
+    c_ace_params->ef_construction = ace_params.ef_construction;
+    c_ace_params->build_dir = ace_params.build_dir.empty() ? nullptr : strdup(ace_params.build_dir.c_str());
+    c_ace_params->use_disk = ace_params.use_disk;
+    c_params->graph_build_params = c_ace_params;
+  }
+}
+
 }  // namespace
 
 namespace cuvs::neighbors::cagra {
@@ -744,6 +813,24 @@ extern "C" cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params)
       if (params->build_dir) { free(const_cast<char*>(params->build_dir)); }
       delete params;
     }
+  });
+}
+
+extern "C" cuvsError_t cuvsCagraIndexParamsFromHnswParams(cuvsCagraIndexParams_t params,
+                                                           int64_t n_rows,
+                                                           int64_t dim,
+                                                           int M,
+                                                           int ef_construction,
+                                                           enum cuvsCagraHnswHeuristicType heuristic,
+                                                           cuvsDistanceType metric)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto cpp_metric = static_cast<cuvs::distance::DistanceType>((int)metric);
+    auto cpp_heuristic = static_cast<cuvs::neighbors::cagra::hnsw_heuristic_type>((int)heuristic);
+    auto cpp_params = cuvs::neighbors::cagra::index_params::from_hnsw_params(
+      raft::matrix_extent<int64_t>(n_rows, dim), M, ef_construction, cpp_heuristic, cpp_metric);
+
+    _populate_cagra_index_params_from_cpp(params, cpp_params);
   });
 }
 

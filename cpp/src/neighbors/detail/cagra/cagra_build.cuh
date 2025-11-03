@@ -365,10 +365,11 @@ void ace_set_index_params(raft::resources const& res,
   // ACE drops the default graph build params and sets the default params based on the partition
   // size
   if (sub_dataset_size > 100000) {
-    sub_index_params = cuvs::neighbors::cagra::hnsw_to_cagra_params(
+    sub_index_params = cuvs::neighbors::cagra::index_params::from_hnsw_params(
       raft::make_extents<int64_t>(sub_dataset_size, dataset_dim),
       graph_degree / 2,
       ef_construction,
+      cuvs::neighbors::cagra::hnsw_heuristic_type::SAME_GRAPH_FOOTPRINT,
       metric);
   } else {
     sub_index_params.graph_build_params =
