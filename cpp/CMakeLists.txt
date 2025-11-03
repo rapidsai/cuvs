@@ -349,6 +349,7 @@ if(NOT BUILD_CPU_ONLY)
     src/cluster/kmeans_transform_double.cu
     src/cluster/kmeans_transform_float.cu
     src/cluster/single_linkage_float.cu
+    src/cluster/spectral.cu
     src/core/bitset.cu
     src/core/omp_wrapper.cpp
     src/distance/detail/kernels/gram_matrix.cu
@@ -408,6 +409,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ball_cover/detail/ball_cover/registers_pass_two.cu
     src/neighbors/brute_force.cu
     src/neighbors/brute_force_serialize.cu
+    src/neighbors/cagra.cpp
     src/neighbors/cagra_build_float.cu
     src/neighbors/cagra_build_half.cu
     src/neighbors/cagra_build_int8.cu
