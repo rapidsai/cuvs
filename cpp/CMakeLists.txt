@@ -208,6 +208,45 @@ endif()
 # * cuvs ---------------------------------------------------------------------
 if(NOT BUILD_CPU_ONLY)
   add_library(
+    gpu_index_lib STATIC
+    src/neighbors/ivf_rabitq/utils/space_cuda.cu
+    src/neighbors/ivf_rabitq/gpu_index/ivf_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/initializer_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/quantizer_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/rotator_gpu.cu
+    src/neighbors/ivf_rabitq/utils/tools_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/pool_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/searcher_gpu.cu
+    src/neighbors/ivf_rabitq/gpu_index/query_gatherer.cu
+    src/neighbors/ivf_rabitq/gpu_index/searcher_gpu_batch.cu
+    src/neighbors/ivf_rabitq/gpu_index/quantizer_gpu_fast.cu
+  )
+
+  set_target_properties(gpu_index_lib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+
+  target_link_libraries(
+    gpu_index_lib
+    PRIVATE OpenMP::OpenMP_CXX
+            ${CUDA_CUBLAS_LIBRARIES}
+            CUDA::cudart
+            # CUDA::cudadevrt
+            rmm
+            cuvs
+  ) # fix rmm dependencies
+
+  target_include_directories(
+    gpu_index_lib PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  )
+
+  target_compile_options(
+    gpu_index_lib
+    PRIVATE $<$<COMPILE_LANGUAGE:CUDA>: $<$<CONFIG:Debug>:-G;-g> --extended-lambda
+            --expt-relaxed-constexpr -Xcompiler=-fopenmp > $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>
+  )
+
+  target_compile_definitions(gpu_index_lib PRIVATE HIGH_ACC_FAST_SCAN)
+
+  add_library(
     cuvs-cagra-search STATIC
     src/neighbors/cagra_search_float.cu
     src/neighbors/cagra_search_half.cu
@@ -486,6 +525,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_pq/detail/ivf_pq_search_half_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_int8_t_int64_t.cu
     src/neighbors/ivf_pq/detail/ivf_pq_search_uint8_t_int64_t.cu
+    src/neighbors/ivf_rabitq.cu
     src/neighbors/knn_merge_parts.cu
     src/neighbors/nn_descent.cu
     src/neighbors/nn_descent_float.cu

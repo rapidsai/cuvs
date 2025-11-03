@@ -1,0 +1,1087 @@
+/*
+ * Copyright (c) 2025, NVIDIA CORPORATION.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+//
+// Created by Stardust on 10/8/25.
+//
+
+#include <cuvs/neighbors/ivf_rabitq/gpu_index/quantizer_gpu.cuh>
+#include <queue>
+
+//---------------------------------------------------------------------------
+// Kernel: subtract_normalize_binarize_Kernel (Fused)
+// This single kernel performs three sequential operations:
+// 1. Subtracts the rotated centroid (d_CP) from each row of rotated data (d_XP).
+// 2. Normalizes each resulting row (residual).
+// 3. Binarizes the normalized row.
+// It uses a block-per-row strategy with shared memory for the reduction.
+//
+// Template parameters:
+// - BlockSize: The number of threads per block, should be a power of 2.
+template <unsigned int BlockSize>
+__global__ void subtract_normalize_binarize_Kernel(
+  const float* __restrict__ d_XP,
+  const float* __restrict__ d_CP,
+  float* d_XP_residuals,  // Output for final residuals
+  float* d_XP_norm,       // Output for normalized data
+  int* d_bin_XP,          // Output for binarized data
+  size_t num_points,
+  size_t D)
+{
+  // Use one block to process one row.
+  int row = blockIdx.x;
+  if (row >= num_points) { return; }
+
+  // Shared memory for the reduction and for broadcasting the final norm.
+  extern __shared__ float s_mem[];
+  float* s_partials = s_mem;  // Used for the reduction sum
+
+  int tid_in_block    = threadIdx.x;
+  float thread_sum_sq = 0.0f;
+
+  // Each thread processes multiple elements if D > BlockSize
+  for (int j = tid_in_block; j < D; j += BlockSize) {
+    // Step 1: Calculate the residual (XP - CP)
+    float residual = d_XP[row * D + j] - d_CP[j];
+
+    // Step 2: Store the residual for later use and accumulate sum of squares
+    thread_sum_sq += residual * residual;
+
+    // Step 3 (part 1): Write the residual to its final output location
+    d_XP_residuals[row * D + j] = residual;
+  }
+
+  s_partials[tid_in_block] = thread_sum_sq;
+  __syncthreads();
+
+  // Step 4: Parallel reduction within the block to find the total sum of squares
+  for (unsigned int s = BlockSize / 2; s > 0; s >>= 1) {
+    if (tid_in_block < s) { s_partials[tid_in_block] += s_partials[tid_in_block + s]; }
+    __syncthreads();
+  }
+
+  // The final L2 norm is calculated by thread 0 and broadcast via shared memory
+  if (tid_in_block == 0) { s_partials[0] = sqrtf(s_partials[0]); }
+  __syncthreads();
+
+  float norm = s_partials[0];
+
+  // Step 5: Normalize and Binarize
+  // Each thread calculates and writes the final normalized and binary values
+  if (norm > 0 /*1e-6f*/) {  // Avoid division by zero
+    for (int j = tid_in_block; j < D; j += BlockSize) {
+      float residual         = d_XP_residuals[row * D + j];  // Read the just-written residual
+      float normalized_val   = residual / norm;
+      d_XP_norm[row * D + j] = normalized_val;
+      d_bin_XP[row * D + j]  = (normalized_val > 0.0f) ? 1 : 0;
+    }
+  } else {  // Handle zero-norm case
+    for (int j = tid_in_block; j < D; j += BlockSize) {
+      d_XP_norm[row * D + j] = 0.0f;
+      d_bin_XP[row * D + j]  = 0;
+    }
+  }
+}
+
+//---------------------------------------------------------------------------
+// Kernel: gatherAndPadKernel (Combined)
+// Populates a (num_points + 1) x D matrix, d_X_and_C_pad.
+// - The first num_points rows are filled by gathering data points from d_data
+//   using d_IDs and padding them to length D.
+// - The last row (index num_points) is filled with the padded centroid.
+// This kernel replaces gatherKernel and copyCentroidKernel.
+__global__ void gatherAndPadKernel(const float* __restrict__ d_data,
+                                   const PID* __restrict__ d_IDs,
+                                   const float* __restrict__ d_centroid,
+                                   float* d_X_and_C_pad,
+                                   size_t num_points,
+                                   size_t DIM,
+                                   size_t D)
+{
+  // Calculate the global thread ID for a 1D grid over all elements.
+  int global_idx        = blockIdx.x * blockDim.x + threadIdx.x;
+  size_t total_elements = (num_points + 1) * D;
+
+  if (global_idx < total_elements) {
+    // Determine which row and column this thread is responsible for.
+    int row_idx = global_idx / D;
+    int col_idx = global_idx % D;
+
+    if (row_idx < num_points) {
+      // This thread is processing a data point.
+      if (col_idx < DIM) {
+        // Gather the data from the source using the ID.
+        // Source row starts at d_data[d_IDs[row_idx] * DIM].
+        d_X_and_C_pad[global_idx] = d_data[d_IDs[row_idx] * DIM + col_idx];
+      } else {
+        // Pad with zero.
+        d_X_and_C_pad[global_idx] = 0.0f;
+      }
+    } else {
+      // This thread is processing the centroid (row_idx == num_points).
+      if (col_idx < DIM) {
+        // Copy from the centroid vector.
+        d_X_and_C_pad[global_idx] = d_centroid[col_idx];
+      } else {
+        // Pad with zero.
+        d_X_and_C_pad[global_idx] = 0.0f;
+      }
+    }
+  }
+}
+
+__inline__ __device__ float warpReduceSumdup(float v)
+{
+  for (int offset = 16; offset > 0; offset >>= 1)
+    v += __shfl_down_sync(0xffffffff, v, offset);
+  return v;
+}
+
+__inline__ __device__ float blockReduceSumdup(float v)
+{
+  __shared__ float shared[32];  // up to 1024 threads -> 32 warps
+  int lane = threadIdx.x & 31;
+  int wid  = threadIdx.x >> 5;
+
+  v = warpReduceSumdup(v);
+  if (lane == 0) shared[wid] = v;
+  __syncthreads();
+
+  float out = (threadIdx.x < blockDim.x / 32) ? shared[lane] : 0.f;
+  if (wid == 0) out = warpReduceSumdup(out);
+  return out;
+}
+
+//---------------------------------------------------------------------------
+// Kernel: pack_and_compute_factors_kernel (Fused)
+//
+// This single kernel performs two independent operations for each data point (row):
+// 1. Computes the RaBitQ factors (logic from RowwisePackedKernel).
+// 2. Packs the binary representation into uint32_t codes (logic from pack_binary_kernel).
+//
+// It is launched with one block per data point (row).
+__global__ void pack_and_compute_factors_kernel(
+  // Inputs for factor computation
+  const float* __restrict__ d_centroid,  // [D]
+  const int* __restrict__ d_bin_XP,      // [N*D], values in {0,1}
+  const float* __restrict__ d_XP,        // [N*D], residuals
+  float kConstEpsilon,                   // e.g. 1.9f
+  // Inputs for packing (d_bin_XP is shared)
+  // Common parameters
+  size_t N,
+  size_t D,
+  // Outputs
+  float* __restrict__ d_factors,        // [3*N], packed factors
+  uint32_t* __restrict__ d_packed_code  // [N * (D/32)], packed codes
+)
+{
+  // Each block is responsible for one data point (row).
+  size_t row = blockIdx.x;
+  if (row >= N) return;
+
+  //=========================================================================
+  // Part 1: Compute RaBitQ factors (from RowwisePackedKernel)
+  //=========================================================================
+  float l2_sqr       = 0.f;
+  float ip_resi_xucb = 0.f;
+  float ip_cent_xucb = 0.f;
+  float xu_sq        = 0.f;
+
+  // Each thread in the block processes a subset of the columns
+  for (size_t d = threadIdx.x; d < D; d += blockDim.x) {
+    float res = d_XP[row * D + d];
+    float xu  = float(d_bin_XP[row * D + d]) - 0.5f;
+    float c   = d_centroid[d];
+
+    l2_sqr += res * res;
+    ip_resi_xucb += res * xu;
+    ip_cent_xucb += c * xu;
+    xu_sq += xu * xu;
+  }
+
+  // Perform parallel reduction within the block
+  l2_sqr       = blockReduceSumdup(l2_sqr);
+  ip_resi_xucb = blockReduceSumdup(ip_resi_xucb);
+  ip_cent_xucb = blockReduceSumdup(ip_cent_xucb);
+  xu_sq        = blockReduceSumdup(xu_sq);
+
+  // Thread 0 performs the final calculations and writes the factors
+  if (threadIdx.x == 0) {
+    if (ip_resi_xucb == 0.0f) ip_resi_xucb = INFINITY;
+
+    float l2_norm = sqrtf(fmaxf(l2_sqr, 0.f));
+    float denom   = ip_resi_xucb;
+
+    float fadd     = l2_sqr + 2.f * l2_sqr * (ip_cent_xucb / denom);
+    float frescale = -2.f * l2_sqr / denom;
+
+    float ratio     = (l2_sqr * xu_sq) / (denom * denom);
+    float inner     = (ratio - 1.f) / fmaxf(float(D - 1), 1.f);
+    inner           = fmaxf(inner, 0.f);
+    float tmp_error = l2_norm * kConstEpsilon * sqrtf(inner);
+    float ferr      = 2.f * tmp_error;
+
+    size_t base         = 3 * row;
+    d_factors[base + 0] = fadd;
+    d_factors[base + 1] = frescale;
+    d_factors[base + 2] = ferr;
+  }
+
+  //=========================================================================
+  // Part 2: Pack binary codes (from pack_binary_kernel)
+  //=========================================================================
+  // Ensure all threads have finished with d_bin_XP for factor calculation
+  // before potentially reusing registers for packing. A sync is good practice here.
+  __syncthreads();
+
+  // Each thread processes one or more blocks of 32 bits for the current row.
+  size_t blocks_per_point = D / 32;
+  for (size_t block_id = threadIdx.x; block_id < blocks_per_point; block_id += blockDim.x) {
+    uint32_t cur = 0;
+    // Process 32 bits for this block_id
+    for (int i = 0; i < 32; i++) {
+      int bit = d_bin_XP[row * D + block_id * 32 + i];
+      cur |= ((uint32_t)bit << (31 - i));
+    }
+    d_packed_code[row * blocks_per_point + block_id] = cur;
+  }
+}
+
+//---------------------------------------------------------------------------
+// Kernel: exrabitq_fused_kernel_batch (Definitive Optimized Version)
+//
+// Fuses ExRaBitQ code generation and factor computation into a single kernel.
+// Uses a "one block per row" strategy with shared memory, coalesced access,
+// efficient reductions, and a fully parallel, minimal-read packing algorithm.
+//
+template <unsigned int BlockSize>
+__global__ void exrabitq_fused_kernel_batch(
+  // Inputs
+  const int* __restrict__ d_bin_XP,
+  const float* __restrict__ d_XP_norm,
+  const float* __restrict__ d_XP,
+  const float* __restrict__ d_centroid,
+  size_t num_points,
+  size_t D,
+  size_t EX_BITS,
+  float const_scaling_factor,
+  float kConstEpsilon,
+  // Outputs
+  uint8_t* d_long_code,
+  float* d_ex_factor)
+{
+  //=========================================================================
+  // Setup: One block per row
+  //=========================================================================
+  int row = blockIdx.x;
+  if (row >= num_points) return;
+
+  // Dynamically allocated shared memory for one row's data.
+  extern __shared__ float s_mem[];
+  float* s_xp_norm    = s_mem;
+  int* s_bin_xp       = (int*)(s_xp_norm + D);
+  float* s_xp         = (float*)(s_bin_xp + D);
+  uint8_t* s_tmp_code = (uint8_t*)(s_xp + D);
+
+  int tid = threadIdx.x;
+
+  //=========================================================================
+  // Step 1: Coalesced load of all necessary data into shared memory
+  //=========================================================================
+  for (int j = tid; j < D; j += BlockSize) {
+    s_xp_norm[j] = d_XP_norm[row * D + j];
+    s_bin_xp[j]  = d_bin_XP[row * D + j];
+    s_xp[j]      = d_XP[row * D + j];
+  }
+  __syncthreads();
+
+  //=========================================================================
+  // Part A: ExRaBitQ Code Generation
+  //=========================================================================
+  const int mask          = (1 << EX_BITS) - 1;
+  float thread_ipnorm_sum = 0.0f;
+
+  // Parallel quantization and start of ip_norm reduction
+  for (int j = tid; j < D; j += BlockSize) {
+    float val    = fabsf(s_xp_norm[j]);
+    int code_val = static_cast<int>((const_scaling_factor * val) + 1e-5f);
+    if (code_val >= (1 << EX_BITS)) code_val = (1 << EX_BITS) - 1;
+    s_tmp_code[j] = static_cast<uint8_t>(code_val);
+    thread_ipnorm_sum += (code_val + 0.5f) * val;
+  }
+  __syncthreads();
+
+  // Parallel bit-flipping
+  for (int j = tid; j < D; j += BlockSize) {
+    if (s_bin_xp[j] == 0) { s_tmp_code[j] = (~s_tmp_code[j]) & mask; }
+  }
+  __syncthreads();
+
+  // Finish ip_norm reduction
+  float total_ipnorm = blockReduceSumdup(thread_ipnorm_sum);
+  float ip_norm_inv  = 1.0f;
+  if (tid == 0) {
+    float inv   = 1.0f / total_ipnorm;
+    ip_norm_inv = isfinite(inv) ? inv : 1.0f;
+  }
+  // Broadcast ip_norm_inv to all threads in the block
+  ip_norm_inv = __shfl_sync(0xffffffff, ip_norm_inv, 0);
+
+  //=========================================================================
+  // Part B: Factor Computation
+  //=========================================================================
+  float l2_sqr = 0.f, ip_resi_xucb = 0.f, ip_cent_xucb = 0.f, xu_sq = 0.f;
+
+  for (size_t j = tid; j < D; j += BlockSize) {
+    float res  = s_xp[j];
+    int xu_pre = s_tmp_code[j];
+    xu_pre += static_cast<int>(res >= 0) << EX_BITS;
+    float xu = float(xu_pre) - (static_cast<float>(1 << EX_BITS) - 0.5f);
+    float c  = d_centroid[j];
+    l2_sqr += res * res;
+    ip_resi_xucb += res * xu;
+    ip_cent_xucb += c * xu;
+    xu_sq += xu * xu;
+  }
+
+  // Perform parallel reductions for all factor components
+  l2_sqr       = blockReduceSumdup(l2_sqr);
+  ip_resi_xucb = blockReduceSumdup(ip_resi_xucb);
+  ip_cent_xucb = blockReduceSumdup(ip_cent_xucb);
+  xu_sq        = blockReduceSumdup(xu_sq);
+
+  // Thread 0 computes and writes the final factors
+  if (tid == 0) {
+    float denom = ip_resi_xucb;
+    if (denom == 0.0f) denom = INFINITY;
+    float l2_norm = sqrtf(fmaxf(l2_sqr, 0.f));
+
+    float fadd     = l2_sqr + 2.f * l2_sqr * ip_cent_xucb / denom;
+    float frescale = -2.f * l2_norm * ip_norm_inv;
+
+    float ratio     = (l2_sqr * xu_sq) / (ip_resi_xucb * ip_resi_xucb);
+    float inner     = (ratio - 1.f) / fmaxf(float(D - 1), 1.f);
+    float tmp_error = l2_norm * kConstEpsilon * sqrtf(fmaxf(inner, 0.f));
+    float ferr      = 2.f * tmp_error;
+
+    size_t base           = 2 * row;
+    d_ex_factor[base + 0] = fadd;
+    d_ex_factor[base + 1] = frescale;
+    //        d_ex_factor[base + 2] = ferr;
+  }
+
+  //=========================================================================
+  // Part C: Pack and Write Long Code (MINIMAL READS, PARALLEL, COALESCED)
+  //=========================================================================
+  int long_code_length = (D * EX_BITS + 7) / 8;
+  uint8_t* out_ptr     = d_long_code + row * long_code_length;
+
+  if (EX_BITS == 8) {
+    for (int j = tid; j < D; j += BlockSize)
+      out_ptr[j] = s_tmp_code[j];
+  } else {
+    const int num_codes_to_read = (8 + EX_BITS - 2) / EX_BITS + 1;
+    for (int out_byte_idx = tid; out_byte_idx < long_code_length; out_byte_idx += BlockSize) {
+      int start_bit       = out_byte_idx * 8;
+      int start_code_idx  = start_bit / EX_BITS;
+      int bit_offset      = start_bit % EX_BITS;
+      uint64_t bit_buffer = 0;
+
+      switch (num_codes_to_read) {
+        case 2:
+          if (start_code_idx < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx];
+          bit_buffer <<= EX_BITS;
+          if (start_code_idx + 1 < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx + 1];
+          break;
+        case 3:
+          if (start_code_idx < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx];
+          bit_buffer <<= EX_BITS;
+          if (start_code_idx + 1 < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx + 1];
+          bit_buffer <<= EX_BITS;
+          if (start_code_idx + 2 < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx + 2];
+          break;
+        case 4:
+          if (start_code_idx < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx];
+          bit_buffer <<= EX_BITS;
+          if (start_code_idx + 1 < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx + 1];
+          bit_buffer <<= EX_BITS;
+          if (start_code_idx + 2 < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx + 2];
+          bit_buffer <<= EX_BITS;
+          if (start_code_idx + 3 < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx + 3];
+          break;
+        default:
+          for (int k = 0; k < num_codes_to_read; ++k) {
+            bit_buffer <<= EX_BITS;
+            if (start_code_idx + k < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx + k];
+          }
+          break;
+      }
+      int total_bits_in_buffer = num_codes_to_read * EX_BITS;
+      int shift                = total_bits_in_buffer - bit_offset - 8;
+      uint8_t out_byte         = (shift >= 0) ? (uint8_t)(bit_buffer >> shift) : 0;
+      out_ptr[out_byte_idx]    = out_byte;
+    }
+  }
+}
+
+void DataQuantizerGPU::data_transformation_batch_opt(
+  const float* d_data,
+  const float* d_centroid,
+  const PID* d_IDs,
+  size_t num_points,
+  const RotatorGPU& rotator,
+  float* d_rotated_c,
+  float* d_XP_norm,
+  int* d_bin_XP,
+  float* d_XP_output  // XP_output is (num_points + 1) * D to store extra centroid
+) const
+{
+  // 1. Allocate a single temporary buffer for both padded data and the padded centroid.
+  float* d_X_and_C_pad;
+  cudaMalloc((void**)&d_X_and_C_pad, (num_points + 1) * D * sizeof(float));
+
+  // Create a pointer to the start of the centroid section for the kernel.
+  float* d_C_pad_ptr = d_X_and_C_pad + num_points * D;
+
+  // 2. Launch a single kernel to gather and pad both data and centroid.
+  int blockSize           = 256;
+  size_t totalPadElements = (num_points + 1) * D;
+  int gridPadSize         = (totalPadElements + blockSize - 1) / blockSize;
+  gatherAndPadKernel<<<gridPadSize, blockSize>>>(
+    d_data, d_IDs, d_centroid, d_X_and_C_pad, num_points, DIM, D);
+
+#ifdef DEBUG_BATCH_CONSTRUCT
+  CUDA_CHECK(cudaGetLastError());
+  // No sync needed here, the next GPU operation will wait.
+#endif
+
+  // 3. Allocate a single output buffer for both rotated data (XP) and rotated centroid (CP).
+  float* d_XP_and_CP = d_XP_output;
+
+  // 4. Perform a single, combined rotation.
+  // The input is d_X_and_C_pad, output is d_XP_and_CP. The number of "points" is num_points + 1.
+  rotator.rotate(d_X_and_C_pad, d_XP_and_CP, num_points + 1);
+
+  // Create pointers to the specific results within the combined buffer.
+  float* d_XP = d_XP_and_CP;
+  float* d_CP = d_XP_and_CP + num_points * D;
+
+  // 5. Save the rotated centroid: copy CP into d_rotated_c.
+  cudaMemcpy(d_rotated_c, d_CP, D * sizeof(float), cudaMemcpyDeviceToDevice);
+
+  // 6. Launch the single FUSED kernel for subtract, normalize, and binarize.
+  const unsigned int FusedBlockSize = 256;  // A good default, can be tuned.
+  dim3 gridDim(num_points);
+  dim3 blockDim(FusedBlockSize);
+  size_t sharedMemSize = FusedBlockSize * sizeof(float);
+
+  subtract_normalize_binarize_Kernel<FusedBlockSize>
+    <<<gridDim, blockDim, sharedMemSize>>>(d_XP,         // Input: Rotated data
+                                           d_CP,         // Input: Rotated centroid
+                                           d_XP_output,  // Output 1: Final residuals
+                                           d_XP_norm,    // Output 2: Normalized residuals
+                                           d_bin_XP,     // Output 3: Binarized data
+                                           num_points,
+                                           D);
+#ifdef DEBUG_BATCH_CONSTRUCT
+  CUDA_CHECK(cudaGetLastError());
+#endif
+
+  // Free temporary buffers.
+  cudaFree(d_X_and_C_pad);
+}
+
+// Fused function to compute RaBitQ codes and factors in a single pass.
+void DataQuantizerGPU::rabitq_codes_and_factors_fused(const float* d_rotated_c,
+                                                      const int* d_bin_XP,
+                                                      const float* d_XP,
+                                                      uint32_t* d_short_data,
+                                                      float* d_short_data_factors,
+                                                      size_t num_points) const
+{
+  int threads_per_block = 256;  // A good default, can be tuned
+  dim3 grid(num_points);
+  dim3 block(threads_per_block);
+
+  pack_and_compute_factors_kernel<<<grid, block>>>(
+    d_rotated_c,
+    d_bin_XP,
+    d_XP,
+    1.9f,  // kConstEpsilon, hardcoded from original call
+    num_points,
+    D,
+    d_short_data_factors,
+    d_short_data);
+}
+
+//---------------------------------------------------------------------------
+// Host function: DataQuantizerGPU::exrabitq_codes_batch (Optimized)
+// Launches a single fused kernel to compute ExRaBitQ codes and factors.
+void DataQuantizerGPU::exrabitq_codes_and_factors_fused(const int* d_bin_XP,
+                                                        const float* d_XP_norm,
+                                                        float* d_XP,
+                                                        uint8_t* d_long_code,
+                                                        float* d_ex_factor,
+                                                        const float* d_centroid,
+                                                        size_t num_points) const
+{
+  const unsigned int BlockSize = 256;  // A good default, can be tuned
+  dim3 gridDim(num_points);
+  dim3 blockDim(BlockSize);
+
+  // Calculate required shared memory size
+  size_t shared_mem_size = D * sizeof(float) +         // s_xp_norm
+                           D * sizeof(int) +           // s_bin_xp
+                           D * sizeof(float) +         // s_xp
+                           D * sizeof(uint8_t) +       // s_tmp_code
+                           BlockSize * sizeof(float);  // s_partials for reduction
+
+  exrabitq_fused_kernel_batch<BlockSize><<<gridDim, blockDim, shared_mem_size>>>(
+    d_bin_XP,
+    d_XP_norm,
+    d_XP,
+    d_centroid,
+    num_points,
+    D,
+    EX_BITS,
+    const_scaling_factor,  // Assuming this is a member variable
+    1.9f,                  // kConstEpsilon
+    d_long_code,
+    d_ex_factor);
+}
+
+void DataQuantizerGPU::quantize_batch_opt(const float* d_data,
+                                          const float* d_centroid,
+                                          const PID* d_IDs,
+                                          size_t num_points,
+                                          const RotatorGPU& rotator,
+                                          uint32_t* d_short_data,
+                                          float* d_short_data_factors,
+                                          uint8_t* d_long_code,
+                                          float* d_ex_factor,
+                                          float* d_rotated_c) const
+{
+#ifdef DEBUG_BATCH_CONSTRUCT
+//    printf("Scaling factor: %f\n", const_scaling_factor);
+#endif
+  // 1. Data Transformation:
+
+  float* d_XP_norm = nullptr;
+  int* d_bin_XP    = nullptr;
+  float* d_XP;
+  cudaMalloc((void**)&d_XP_norm, num_points * D * sizeof(float));
+  cudaMalloc((void**)&d_bin_XP, num_points * D * sizeof(int));
+  cudaMalloc((void**)&d_XP, (num_points + 1) * D * sizeof(float));
+  data_transformation_batch_opt(
+    d_data, d_centroid, d_IDs, num_points, rotator, d_rotated_c, d_XP_norm, d_bin_XP, d_XP);
+
+#ifdef DEBUG_BATCH_CONSTRUCT
+//    if (debug_first_cluster_count_2 == 0) {
+//        debug_first_cluster_count_2++;
+//        std::cout << "First vector of the first cluster's first 20 short codes:\n";
+//        int h_bin_XP[20];
+//        CUDA_CHECK(cudaMemcpy(h_bin_XP, d_bin_XP, 20 * sizeof(int), cudaMemcpyDeviceToHost));
+//
+//        // Print them
+//        for (int i = 0; i < 20; i++) {
+//            std::cout << "d_bin_XP[" << i << "] = " << h_bin_XP[i] << std::endl;
+//        }
+//    }
+#endif
+  rabitq_codes_and_factors_fused(
+    d_rotated_c, d_bin_XP, d_XP, d_short_data, d_short_data_factors, num_points);
+
+  // 5. Compute ExRaBitQ quantization codes.
+  if (fast_quantize_flag) {
+    exrabitq_codes_and_factors_fused(
+      d_bin_XP, d_XP_norm, d_XP, d_long_code, d_ex_factor, d_rotated_c, num_points);
+  } else {
+    exrabitq_codes_and_factors_fused_ori(
+      d_bin_XP, d_XP_norm, d_XP, d_long_code, d_ex_factor, d_rotated_c, num_points);
+  }
+
+  // Free intermediate buffers.
+  cudaFree(d_XP_norm);
+  cudaFree(d_bin_XP);
+  // jamxia edit
+  cudaFree(d_XP);
+}
+
+constexpr std::array<float, 9> kTightStart = {
+  0,
+  0.15,
+  0.20,
+  0.52,
+  0.59,
+  0.71,
+  0.75,
+  0.77,
+  0.81,
+};
+
+template <typename T>
+inline double best_rescale_factor(const T* o_abs, size_t dim, size_t ex_bits)
+{
+  constexpr double kEps = 1e-5;
+  constexpr int kNEnum  = 10;
+  double max_o          = *std::max_element(o_abs, o_abs + dim);
+
+  double t_end   = static_cast<double>(((1 << ex_bits) - 1) + kNEnum) / max_o;
+  double t_start = t_end * kTightStart[ex_bits];
+
+  std::vector<int> cur_o_bar(dim);
+  double sqr_denominator = static_cast<double>(dim) * 0.25;
+  double numerator       = 0;
+
+  for (size_t i = 0; i < dim; ++i) {
+    int cur      = static_cast<int>((t_start * o_abs[i]) + kEps);
+    cur_o_bar[i] = cur;
+    sqr_denominator += cur * cur + cur;
+    numerator += (cur + 0.5) * o_abs[i];
+  }
+
+  std::priority_queue<std::pair<double, size_t>,
+                      std::vector<std::pair<double, size_t>>,
+                      std::greater<>>
+    next_t;
+
+  for (size_t i = 0; i < dim; ++i) {
+    next_t.emplace(static_cast<double>(cur_o_bar[i] + 1) / o_abs[i], i);
+  }
+
+  double max_ip = 0;
+  double t      = 0;
+
+  while (!next_t.empty()) {
+    double cur_t     = next_t.top().first;
+    size_t update_id = next_t.top().second;
+    next_t.pop();
+
+    cur_o_bar[update_id]++;
+    int update_o_bar = cur_o_bar[update_id];
+    sqr_denominator += 2 * update_o_bar;
+    numerator += o_abs[update_id];
+
+    double cur_ip = numerator / std::sqrt(sqr_denominator);
+    if (cur_ip > max_ip) {
+      max_ip = cur_ip;
+      t      = cur_t;
+    }
+
+    if (update_o_bar < (1 << ex_bits) - 1) {
+      double t_next = static_cast<double>(update_o_bar + 1) / o_abs[update_id];
+      if (t_next < t_end) { next_t.emplace(t_next, update_id); }
+    }
+  }
+
+  return t;
+}
+
+float DataQuantizerGPU::get_const_scaling_factors(size_t dim, size_t ex_bits)
+{
+  constexpr long kConstNum = 100;
+
+  RowMajorArray<double> rand = random_gaussian_matrix<double>(kConstNum, dim);
+  rand                       = rand.rowwise().normalized().abs();
+
+  double sum = 0;
+  for (long j = 0; j < kConstNum; ++j) {
+    sum += best_rescale_factor(&rand(j, 0), dim, ex_bits);
+  }
+
+  double t_const = sum / kConstNum;
+
+  return (float)t_const;
+}
+
+extern __constant__ float d_kTightStart_opt[9] = {
+  0.0f,
+  0.15f,
+  0.20f,
+  0.52f,
+  0.59f,
+  0.71f,
+  0.75f,
+  0.77f,
+  0.81f,
+};
+
+__device__ float compute_best_rescale_parallel(
+  float* s_xp_norm, int D, int EX_BITS, float* reuse_space, int BlockSize)
+{
+  int tid              = threadIdx.x;
+  constexpr float kEps = 1e-5f;
+  constexpr int kNEnum = 10;
+
+  //=========================================================================
+  // Step 1: Find maximum value using parallel reduction
+  //=========================================================================
+  float local_max = 0.0f;
+  for (int i = tid; i < D; i += BlockSize) {
+    local_max = fmaxf(local_max, fabsf(s_xp_norm[i]));
+  }
+
+  // Block-level reduction for max
+  __shared__ float* s_reduce;
+  s_reduce      = reuse_space;
+  s_reduce[tid] = local_max;
+  __syncthreads();
+
+  for (int stride = BlockSize / 2; stride > 0; stride >>= 1) {
+    if (tid < stride) { s_reduce[tid] = fmaxf(s_reduce[tid], s_reduce[tid + stride]); }
+    __syncthreads();
+  }
+
+  __shared__ float max_o;
+  if (tid == 0) { max_o = s_reduce[0]; }
+  __syncthreads();
+
+  if (max_o < kEps) return 1.0f;
+
+  //=========================================================================
+  // Step 2: Each thread evaluates multiple critical points
+  //=========================================================================
+  float t_end   = static_cast<float>((1 << EX_BITS) - 1 + kNEnum) / max_o;
+  float t_start = t_end * d_kTightStart_opt[EX_BITS];
+
+  //=========================================================================
+  // Phase 1: Coarse grid search
+  //=========================================================================
+  const int COARSE_SAMPLES = 64;  // Though not fully utilize each thread, but very fast
+  //    const int COARSE_SAMPLES = BlockSize;  // Adjust based on BlockSize
+  float best_coarse_ip = 0.0f;
+  float best_coarse_t  = t_start;
+
+  for (int i = tid; i < COARSE_SAMPLES; i += BlockSize) {
+    float t = t_start + (t_end - t_start) * i / (COARSE_SAMPLES - 1);
+
+    // Quick approximate evaluation (sample subset of dimensions)
+    float numerator       = 0.0f;
+    float sqr_denominator = static_cast<float>(D) * 0.25f;
+
+    // Full evaluation for coarse grid
+    for (int j = 0; j < D; j++) {
+      float val     = fabsf(s_xp_norm[j]);
+      int quantized = min(static_cast<int>((t * val) + kEps), (1 << EX_BITS) - 1);
+      numerator += (quantized + 0.5f) * val;
+      sqr_denominator += quantized * quantized + quantized;
+    }
+
+    float ip = numerator / sqrtf(sqr_denominator);
+    if (ip > best_coarse_ip) {
+      best_coarse_ip = ip;
+      best_coarse_t  = t;
+    }
+  }
+
+  // Parallel reduction to find best coarse point
+  __shared__ float* s_coarse_ip;
+  s_coarse_ip = reuse_space + BlockSize;
+  __shared__ float* s_coarse_t;
+  s_coarse_t       = s_coarse_ip + BlockSize;
+  s_coarse_ip[tid] = best_coarse_ip;
+  s_coarse_t[tid]  = best_coarse_t;
+  __syncthreads();
+
+  for (int stride = BlockSize / 2; stride > 0; stride >>= 1) {
+    if (tid < stride) {
+      if (s_coarse_ip[tid + stride] > s_coarse_ip[tid]) {
+        s_coarse_ip[tid] = s_coarse_ip[tid + stride];
+        s_coarse_t[tid]  = s_coarse_t[tid + stride];
+      }
+    }
+    __syncthreads();
+  }
+
+  //=========================================================================
+  // Phase 2: Fine search around best coarse point
+  //=========================================================================
+  float center_t   = s_coarse_t[0];
+  float range      = (t_end - t_start) / COARSE_SAMPLES;
+  float fine_start = fmaxf(t_start, center_t - range);
+  float fine_end   = fminf(t_end, center_t + range);
+
+  const int FINE_SAMPLES = 32;
+  //    const int FINE_SAMPLES = BlockSize;
+  float best_fine_ip = 0.0f;
+  float best_fine_t  = center_t;
+
+  for (int i = tid; i < FINE_SAMPLES; i += BlockSize) {
+    float t = fine_start + (fine_end - fine_start) * i / (FINE_SAMPLES - 1);
+
+    // Full evaluation
+    float numerator       = 0.0f;
+    float sqr_denominator = static_cast<float>(D) * 0.25f;
+
+    for (int j = 0; j < D; j++) {
+      float val     = fabsf(s_xp_norm[j]);
+      int quantized = min(static_cast<int>((t * val) + kEps), (1 << EX_BITS) - 1);
+      numerator += (quantized + 0.5f) * val;
+      sqr_denominator += quantized * quantized + quantized;
+    }
+
+    float ip = numerator / sqrtf(sqr_denominator);
+    if (ip > best_fine_ip) {
+      best_fine_ip = ip;
+      best_fine_t  = t;
+    }
+  }
+
+  // Final reduction
+  __shared__ float* s_fine_ip;
+  s_fine_ip = s_coarse_ip;
+  __shared__ float* s_fine_t;
+  s_fine_t       = s_coarse_t;
+  s_fine_ip[tid] = best_fine_ip;
+  s_fine_t[tid]  = best_fine_t;
+  __syncthreads();
+
+  for (int stride = BlockSize / 2; stride > 0; stride >>= 1) {
+    if (tid < stride) {
+      if (s_fine_ip[tid + stride] > s_fine_ip[tid]) {
+        s_fine_ip[tid] = s_fine_ip[tid + stride];
+        s_fine_t[tid]  = s_fine_t[tid + stride];
+      }
+    }
+    __syncthreads();
+  }
+
+  return s_fine_t[0];
+}
+
+template <unsigned int BlockSize>
+__global__ void exrabitq_fused_kernel_batch_ori(
+  // Inputs
+  const int* __restrict__ d_bin_XP,
+  const float* __restrict__ d_XP_norm,
+  const float* __restrict__ d_XP,
+  const float* __restrict__ d_centroid,
+  size_t num_points,
+  size_t D,
+  size_t EX_BITS,
+  float kConstEpsilon,
+  // Outputs
+  uint8_t* d_long_code,
+  float* d_ex_factor)
+{
+  //=========================================================================
+  // Setup: One block per row
+  //=========================================================================
+  int row = blockIdx.x;
+  if (row >= num_points) return;
+
+  // Dynamically allocated shared memory for one row's data.
+  extern __shared__ float s_mem[];
+  float* s_xp_norm    = s_mem;
+  int* s_bin_xp       = (int*)(s_xp_norm + D);
+  float* s_xp         = (float*)(s_bin_xp + D);
+  uint8_t* s_tmp_code = (uint8_t*)(s_xp + D);
+
+  int tid = threadIdx.x;
+
+  //=========================================================================
+  // Step 1: Coalesced load of all necessary data into shared memory
+  //=========================================================================
+  // Load data
+  for (int j = tid; j < D; j += BlockSize) {
+    s_xp_norm[j] = d_XP_norm[row * D + j];
+    // Note: s_bin_xp, s_xp not loaded yet - we'll reuse as workspace
+  }
+  // Compute scaling factor (reusing unused buffers)
+  float const_scaling_factor =
+    compute_best_rescale_parallel(s_xp_norm,
+                                  D,
+                                  EX_BITS,
+                                  (float*)s_bin_xp,  // Reused as workspace
+                                  BlockSize);
+
+  // NOW load the actual data we need
+  for (int j = tid; j < D; j += BlockSize) {
+    s_bin_xp[j] = d_bin_XP[row * D + j];
+    s_xp[j]     = d_XP[row * D + j];
+  }
+  __syncthreads();
+
+  //=========================================================================
+  // Part A: ExRaBitQ Code Generation
+  //=========================================================================
+  const int mask          = (1 << EX_BITS) - 1;
+  float thread_ipnorm_sum = 0.0f;
+
+  // Parallel quantization and start of ip_norm reduction
+  for (int j = tid; j < D; j += BlockSize) {
+    float val    = fabsf(s_xp_norm[j]);
+    int code_val = static_cast<int>((const_scaling_factor * val) + 1e-5f);
+    if (code_val >= (1 << EX_BITS)) code_val = (1 << EX_BITS) - 1;
+    s_tmp_code[j] = static_cast<uint8_t>(code_val);
+    thread_ipnorm_sum += (code_val + 0.5f) * val;
+  }
+  __syncthreads();
+
+  // Parallel bit-flipping
+  for (int j = tid; j < D; j += BlockSize) {
+    if (s_bin_xp[j] == 0) { s_tmp_code[j] = (~s_tmp_code[j]) & mask; }
+  }
+  __syncthreads();
+
+  // Finish ip_norm reduction
+  float total_ipnorm = blockReduceSumdup(thread_ipnorm_sum);
+  float ip_norm_inv  = 1.0f;
+  if (tid == 0) {
+    float inv   = 1.0f / total_ipnorm;
+    ip_norm_inv = isfinite(inv) ? inv : 1.0f;
+  }
+  // Broadcast ip_norm_inv to all threads in the block
+  ip_norm_inv = __shfl_sync(0xffffffff, ip_norm_inv, 0);
+
+  //=========================================================================
+  // Part B: Factor Computation
+  //=========================================================================
+  float l2_sqr = 0.f, ip_resi_xucb = 0.f, ip_cent_xucb = 0.f, xu_sq = 0.f;
+
+  for (size_t j = tid; j < D; j += BlockSize) {
+    float res  = s_xp[j];
+    int xu_pre = s_tmp_code[j];
+    xu_pre += static_cast<int>(res >= 0) << EX_BITS;
+    float xu = float(xu_pre) - (static_cast<float>(1 << EX_BITS) - 0.5f);
+    float c  = d_centroid[j];
+    l2_sqr += res * res;
+    ip_resi_xucb += res * xu;
+    ip_cent_xucb += c * xu;
+    xu_sq += xu * xu;
+  }
+
+  // Perform parallel reductions for all factor components
+  l2_sqr       = blockReduceSumdup(l2_sqr);
+  ip_resi_xucb = blockReduceSumdup(ip_resi_xucb);
+  ip_cent_xucb = blockReduceSumdup(ip_cent_xucb);
+  xu_sq        = blockReduceSumdup(xu_sq);
+
+  // Thread 0 computes and writes the final factors
+  if (tid == 0) {
+    float denom = ip_resi_xucb;
+    if (denom == 0.0f) denom = INFINITY;
+    float l2_norm = sqrtf(fmaxf(l2_sqr, 0.f));
+
+    float fadd     = l2_sqr + 2.f * l2_sqr * ip_cent_xucb / denom;
+    float frescale = -2.f * l2_norm * ip_norm_inv;
+
+    float ratio     = (l2_sqr * xu_sq) / (ip_resi_xucb * ip_resi_xucb);
+    float inner     = (ratio - 1.f) / fmaxf(float(D - 1), 1.f);
+    float tmp_error = l2_norm * kConstEpsilon * sqrtf(fmaxf(inner, 0.f));
+    float ferr      = 2.f * tmp_error;
+
+    size_t base           = 2 * row;
+    d_ex_factor[base + 0] = fadd;
+    d_ex_factor[base + 1] = frescale;
+    //        d_ex_factor[base + 2] = ferr;
+  }
+
+  //=========================================================================
+  // Part C: Pack and Write Long Code (MINIMAL READS, PARALLEL, COALESCED)
+  //=========================================================================
+  int long_code_length = (D * EX_BITS + 7) / 8;
+  uint8_t* out_ptr     = d_long_code + row * long_code_length;
+
+  if (EX_BITS == 8) {
+    for (int j = tid; j < D; j += BlockSize)
+      out_ptr[j] = s_tmp_code[j];
+  } else {
+    const int num_codes_to_read = (8 + EX_BITS - 2) / EX_BITS + 1;
+    for (int out_byte_idx = tid; out_byte_idx < long_code_length; out_byte_idx += BlockSize) {
+      int start_bit       = out_byte_idx * 8;
+      int start_code_idx  = start_bit / EX_BITS;
+      int bit_offset      = start_bit % EX_BITS;
+      uint64_t bit_buffer = 0;
+
+      switch (num_codes_to_read) {
+        case 2:
+          if (start_code_idx < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx];
+          bit_buffer <<= EX_BITS;
+          if (start_code_idx + 1 < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx + 1];
+          break;
+        case 3:
+          if (start_code_idx < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx];
+          bit_buffer <<= EX_BITS;
+          if (start_code_idx + 1 < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx + 1];
+          bit_buffer <<= EX_BITS;
+          if (start_code_idx + 2 < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx + 2];
+          break;
+        case 4:
+          if (start_code_idx < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx];
+          bit_buffer <<= EX_BITS;
+          if (start_code_idx + 1 < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx + 1];
+          bit_buffer <<= EX_BITS;
+          if (start_code_idx + 2 < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx + 2];
+          bit_buffer <<= EX_BITS;
+          if (start_code_idx + 3 < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx + 3];
+          break;
+        default:
+          for (int k = 0; k < num_codes_to_read; ++k) {
+            bit_buffer <<= EX_BITS;
+            if (start_code_idx + k < D) bit_buffer |= (uint64_t)s_tmp_code[start_code_idx + k];
+          }
+          break;
+      }
+      int total_bits_in_buffer = num_codes_to_read * EX_BITS;
+      int shift                = total_bits_in_buffer - bit_offset - 8;
+      uint8_t out_byte         = (shift >= 0) ? (uint8_t)(bit_buffer >> shift) : 0;
+      out_ptr[out_byte_idx]    = out_byte;
+    }
+  }
+}
+
+//---------------------------------------------------------------------------
+// Host function: DataQuantizerGPU::exrabitq_codes_batch (Optimized)
+// No fast quantization version
+void DataQuantizerGPU::exrabitq_codes_and_factors_fused_ori(const int* d_bin_XP,
+                                                            const float* d_XP_norm,
+                                                            float* d_XP,
+                                                            uint8_t* d_long_code,
+                                                            float* d_ex_factor,
+                                                            const float* d_centroid,
+                                                            size_t num_points) const
+{
+  const unsigned int BlockSize = 256;  // A good default, can be tuned
+  dim3 gridDim(num_points);
+  dim3 blockDim(BlockSize);
+
+  // Calculate required shared memory size
+  size_t shared_mem_size = D * sizeof(float) +         // s_xp_norm
+                           D * sizeof(int) +           // s_bin_xp
+                           D * sizeof(float) +         // s_xp
+                           D * sizeof(uint8_t) +       // s_tmp_code
+                           BlockSize * sizeof(float);  // s_partials for reduction
+
+  if (shared_mem_size <= D * sizeof(float) + 3 * BlockSize * sizeof(float)) {
+    shared_mem_size =
+      D * sizeof(float) +
+      3 * BlockSize *
+        sizeof(float);  // Make sure there are space to reuse for finding scaling factors
+  }
+
+  exrabitq_fused_kernel_batch_ori<BlockSize>
+    <<<gridDim, blockDim, shared_mem_size>>>(d_bin_XP,
+                                             d_XP_norm,
+                                             d_XP,
+                                             d_centroid,
+                                             num_points,
+                                             D,
+                                             EX_BITS,
+                                             1.9f,  // kConstEpsilon
+                                             d_long_code,
+                                             d_ex_factor);
+}
