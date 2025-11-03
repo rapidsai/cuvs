@@ -1,17 +1,6 @@
 #
-# Copyright (c) 2024-2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
 
@@ -139,12 +128,14 @@ cdef class IndexParams:
 
     metric : str, default = "sqeuclidean"
         String denoting the metric type, valid values for metric are
-        ["sqeuclidean", "inner_product"], where:
+        ["sqeuclidean", "inner_product", "cosine"], where:
 
             - sqeuclidean is the euclidean distance without the square root
               operation, i.e.: distance(a,b) = \\sum_i (a_i - b_i)^2
             - inner_product distance is defined as
               distance(a, b) = \\sum_i a_i * b_i.
+            - cosine distance is defined as
+              distance(a, b) = 1 - \\sum_i a_i * b_i / ( ||a||_2 * ||b||_2).
 
     intermediate_graph_degree : int, default = 128
     graph_degree : int, default = 64
@@ -339,6 +330,7 @@ def build(IndexParams index_params, dataset, resources=None):
     The following distance metrics are supported:
         - L2
         - InnerProduct
+        - Cosine
 
     Parameters
     ----------

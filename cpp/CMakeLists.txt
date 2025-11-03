@@ -1,15 +1,8 @@
 # =============================================================================
-# Copyright (c) 2020-2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
-# in compliance with the License. You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software distributed under the License
-# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
-# or implied. See the License for the specific language governing permissions and limitations under
-# the License.
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
 cmake_minimum_required(VERSION 3.30.4 FATAL_ERROR)
 include(../cmake/rapids_config.cmake)
 include(rapids-cmake)
@@ -21,7 +14,7 @@ option(BUILD_CPU_ONLY "Build CPU only components. Applies to CUVS benchmarks cur
 
 # workaround for rapids_cuda_init_architectures not working for arch detection with
 # enable_language(CUDA)
-set(lang_list "CXX")
+set(lang_list "CXX" "C")
 
 if(NOT BUILD_CPU_ONLY)
   include(rapids-cuda)
@@ -197,10 +190,6 @@ if(NOT BUILD_CPU_ONLY)
   include(cmake/thirdparty/get_cutlass.cmake)
 endif()
 
-if(BUILD_C_LIBRARY)
-  include(cmake/thirdparty/get_dlpack.cmake)
-endif()
-
 if(BUILD_TESTS OR BUILD_C_TESTS)
   include(${rapids-cmake-dir}/cpm/gtest.cmake)
   rapids_cpm_gtest(BUILD_STATIC)
@@ -219,7 +208,7 @@ endif()
 # * cuvs ---------------------------------------------------------------------
 if(NOT BUILD_CPU_ONLY)
   add_library(
-    cuvs-cagra-search STATIC
+    cuvs-cagra-search OBJECT
     src/neighbors/cagra_search_float.cu
     src/neighbors/cagra_search_half.cu
     src/neighbors/cagra_search_int8.cu
@@ -231,6 +220,9 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_float_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_float_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_float_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_float_uint32_dim512_t32.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_half_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_half_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_InnerProduct_half_uint32_dim512_t32.cu
@@ -246,6 +238,15 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_half_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_half_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_half_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_half_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_half_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_half_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_int8_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_int8_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_int8_uint32_dim512_t32.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_uint8_uint32_dim128_t8.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_uint8_uint32_dim256_t16.cu
+    src/neighbors/detail/cagra/compute_distance_standard_CosineExpanded_uint8_uint32_dim512_t32.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_int8_uint32_dim128_t8.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_int8_uint32_dim256_t16.cu
     src/neighbors/detail/cagra/compute_distance_standard_L2Expanded_int8_uint32_dim512_t32.cu
@@ -297,12 +298,12 @@ if(NOT BUILD_CPU_ONLY)
                CUDA_STANDARD 17
                CUDA_STANDARD_REQUIRED ON
                CUDA_SEPARABLE_COMPILATION ON
-               INTERFACE_POSITION_INDEPENDENT_CODE ON
                POSITION_INDEPENDENT_CODE ON
   )
   target_link_libraries(cuvs-cagra-search PRIVATE raft::raft)
   target_include_directories(
     cuvs-cagra-search PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+                              "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
   )
   target_compile_options(
     cuvs-cagra-search PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
@@ -323,7 +324,6 @@ if(NOT BUILD_CPU_ONLY)
         src/neighbors/mg/mg_cagra_half_uint32_t.cu
         src/neighbors/mg/mg_cagra_int8_t_uint32_t.cu
         src/neighbors/mg/mg_cagra_uint8_t_uint32_t.cu
-        src/neighbors/mg/omp_checks.cpp
     )
   endif()
 
@@ -349,7 +349,9 @@ if(NOT BUILD_CPU_ONLY)
     src/cluster/kmeans_transform_double.cu
     src/cluster/kmeans_transform_float.cu
     src/cluster/single_linkage_float.cu
+    src/cluster/spectral.cu
     src/core/bitset.cu
+    src/core/omp_wrapper.cpp
     src/distance/detail/kernels/gram_matrix.cu
     src/distance/detail/kernels/kernel_factory.cu
     src/distance/detail/kernels/kernel_matrices.cu
@@ -407,6 +409,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ball_cover/detail/ball_cover/registers_pass_two.cu
     src/neighbors/brute_force.cu
     src/neighbors/brute_force_serialize.cu
+    src/neighbors/cagra.cpp
     src/neighbors/cagra_build_float.cu
     src/neighbors/cagra_build_half.cu
     src/neighbors/cagra_build_int8.cu
@@ -550,8 +553,8 @@ if(NOT BUILD_CPU_ONLY)
 
   target_include_directories(
     cuvs_objs
-    PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
-           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
     INTERFACE "$<INSTALL_INTERFACE:include>"
   )
 
@@ -587,7 +590,7 @@ if(NOT BUILD_CPU_ONLY)
   )
 
   if(NOT cuvs_compile_mode STREQUAL "static_only")
-    add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs>)
+    add_library(cuvs SHARED $<TARGET_OBJECTS:cuvs_objs> $<TARGET_OBJECTS:cuvs-cagra-search>)
     add_library(cuvs::cuvs ALIAS cuvs)
     set_target_properties(
       cuvs
@@ -597,6 +600,7 @@ if(NOT BUILD_CPU_ONLY)
                  CXX_STANDARD_REQUIRED ON
                  CUDA_STANDARD 17
                  CUDA_STANDARD_REQUIRED ON
+                 CUDA_RESOLVE_DEVICE_SYMBOLS ON
                  INTERFACE_POSITION_INDEPENDENT_CODE ON
                  POSITION_INDEPENDENT_CODE ON
     )
@@ -613,8 +617,11 @@ if(NOT BUILD_CPU_ONLY)
     )
 
     target_include_directories(
-      cuvs PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-                  "$<INSTALL_INTERFACE:include>"
+      cuvs
+      PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+             "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
+             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
+             "$<INSTALL_INTERFACE:include>"
     )
 
     target_link_libraries(
@@ -626,7 +633,6 @@ if(NOT BUILD_CPU_ONLY)
              $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
-              cuvs-cagra-search
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
@@ -645,7 +651,7 @@ SECTIONS
   endif()
 
   if(NOT cuvs_compile_mode STREQUAL "shared_only")
-    add_library(cuvs_static STATIC $<TARGET_OBJECTS:cuvs_objs>)
+    add_library(cuvs_static STATIC $<TARGET_OBJECTS:cuvs_objs> $<TARGET_OBJECTS:cuvs-cagra-search>)
     add_library(cuvs::cuvs_static ALIAS cuvs_static)
 
     set_target_properties(
@@ -654,6 +660,9 @@ SECTIONS
                  INSTALL_RPATH "\$ORIGIN"
                  CXX_STANDARD 17
                  CXX_STANDARD_REQUIRED ON
+                 CUDA_STANDARD 17
+                 CUDA_STANDARD_REQUIRED ON
+                 CUDA_RESOLVE_DEVICE_SYMBOLS ON
                  POSITION_INDEPENDENT_CODE ON
                  INTERFACE_POSITION_INDEPENDENT_CODE ON
                  EXPORT_NAME cuvs_static
@@ -665,18 +674,17 @@ SECTIONS
                          $<$<BOOL:${CUVS_NVTX}>:NVTX_ENABLED>
     )
 
-    target_include_directories(
-      cuvs_static
-      PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
-      INTERFACE "$<INSTALL_INTERFACE:include>"
-    )
+    target_include_directories(cuvs_static INTERFACE "$<INSTALL_INTERFACE:include>")
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
     target_link_options(cuvs_static PRIVATE $<HOST_LINK:${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld>)
 
     target_include_directories(
-      cuvs_static PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-                         "$<INSTALL_INTERFACE:include>"
+      cuvs_static
+      PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+             "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
+             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
+             "$<INSTALL_INTERFACE:include>"
     )
     target_link_libraries(
       cuvs_static
@@ -717,66 +725,8 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
 
   # ################################################################################################
   # * cuvs_c -------------------------------------------------------------------------------
-
-  if(BUILD_MG_ALGOS)
-    set(CUVS_C_MG_ALGOS src/neighbors/mg_ivf_pq_c.cpp src/neighbors/mg_ivf_flat_c.cpp
-                        src/neighbors/mg_cagra_c.cpp
-    )
-  endif()
-
   if(BUILD_C_LIBRARY)
-    add_library(
-      cuvs_c SHARED
-      src/core/c_api.cpp
-      src/cluster/kmeans_c.cpp
-      src/neighbors/brute_force_c.cpp
-      src/neighbors/ivf_flat_c.cpp
-      src/neighbors/ivf_pq_c.cpp
-      src/neighbors/cagra_c.cpp
-      $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw_c.cpp>
-      src/neighbors/nn_descent_c.cpp
-      src/neighbors/vamana_c.cpp
-      src/neighbors/refine/refine_c.cpp
-      src/neighbors/tiered_index_c.cpp
-      src/neighbors/all_neighbors_c.cpp
-      src/preprocessing/quantize/binary_c.cpp
-      src/preprocessing/quantize/scalar_c.cpp
-      src/distance/pairwise_distance_c.cpp
-      ${CUVS_C_MG_ALGOS}
-    )
-    add_library(cuvs::c_api ALIAS cuvs_c)
-    set_target_properties(
-      cuvs_c
-      PROPERTIES BUILD_RPATH "\$ORIGIN"
-                 INSTALL_RPATH "\$ORIGIN"
-                 CXX_STANDARD 17
-                 CXX_STANDARD_REQUIRED ON
-                 POSITION_INDEPENDENT_CODE ON
-                 INTERFACE_POSITION_INDEPENDENT_CODE ON
-                 EXPORT_NAME c_api
-    )
-
-    target_compile_definitions(
-      cuvs_c PUBLIC $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:CUVS_BUILD_CAGRA_HNSWLIB>
-    )
-
-    target_compile_options(cuvs_c PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>")
-
-    target_include_directories(
-      cuvs_c
-      PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>"
-             "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
-      INTERFACE "$<INSTALL_INTERFACE:include>"
-    )
-
-    target_link_libraries(
-      cuvs_c
-      PUBLIC cuvs::cuvs ${CUVS_CTK_MATH_DEPENDENCIES}
-      PRIVATE raft::raft $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
-    )
-
-    # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
-    target_link_options(cuvs_c PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/fatbin.ld")
+    add_subdirectory(../c c)
   endif()
 
   # ################################################################################################
@@ -800,17 +750,29 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
 
   if(BUILD_C_LIBRARY)
     install(
+      DIRECTORY ../c/include/cuvs
+      COMPONENT cuvs
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+
+    install(
       TARGETS cuvs_c
       DESTINATION ${lib_dir}
       COMPONENT c_api
       EXPORT cuvs-c-exports
+    )
+
+    install(
+      FILES ${CUVS_C_BINARY_DIR}/include/cuvs/core/c_config.h
+      COMPONENT cuvs
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs/core/
     )
   endif()
 
   install(
     FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.h
     COMPONENT cuvs
-    DESTINATION include/cuvs
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs
   )
 
   if(TARGET cuvs_c)

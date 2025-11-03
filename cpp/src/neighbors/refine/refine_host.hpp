@@ -1,27 +1,16 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
 #include "../../core/nvtx.hpp"
+#include "../../core/omp_wrapper.hpp"
 #include "refine_common.hpp"
+
 #include <raft/core/host_mdspan.hpp>
 #include <raft/util/integer_utils.hpp>
-
-#include <omp.h>
 
 #include <algorithm>
 
@@ -69,6 +58,7 @@ DistanceT euclidean_distance_squared_generic(DataT const* a, DataT const* b, siz
 
 struct distance_comp_l2;
 struct distance_comp_inner;
+struct distance_comp_cosine;
 
 // fallback
 template <typename DC, typename DistanceT, typename DataT>
@@ -339,6 +329,26 @@ inline float euclidean_distance_squared<distance_comp_inner, float, ::std::uint8
 //  Refine kernel
 // -----------------------------------------------------------------------------
 
+// Cosine distance: 1 - (a·b)/(||a||·||b||)
+template <typename DistanceT, typename DataT>
+inline DistanceT cosine_distance(DataT const* a, DataT const* b, size_t n)
+{
+  using AccT = double;
+  AccT dot   = AccT{0};
+  AccT na2   = AccT{0};
+  AccT nb2   = AccT{0};
+  for (size_t i = 0; i < n; ++i) {
+    AccT va = static_cast<AccT>(a[i]);
+    AccT vb = static_cast<AccT>(b[i]);
+    dot += va * vb;
+    na2 += va * va;
+    nb2 += vb * vb;
+  }
+  AccT denom = std::sqrt(na2) * std::sqrt(nb2);
+  AccT dist  = denom > AccT{0} ? AccT{1} - (dot / denom) : AccT{1};
+  return static_cast<DistanceT>(dist);
+}
+
 template <typename DC, typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
 [[gnu::optimize(3), gnu::optimize("tree-vectorize")]] void refine_host_impl(
   raft::host_matrix_view<const DataT, ExtentsT, raft::row_major> dataset,
@@ -356,7 +366,8 @@ template <typename DC, typename IdxT, typename DataT, typename DistanceT, typena
   cuvs::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "neighbors::refine_host(%zu, %zu -> %zu)", n_queries, orig_k, refined_k);
 
-  auto suggested_n_threads = std::max(1, std::min(omp_get_num_procs(), omp_get_max_threads()));
+  auto suggested_n_threads =
+    std::max(1, std::min(cuvs::core::omp::get_num_procs(), cuvs::core::omp::get_max_threads()));
 
   // If the number of queries is small, separate the distance calculation and
   // the top-k calculation into separate loops, and apply finer-grained thread
@@ -370,10 +381,12 @@ template <typename DC, typename IdxT, typename DataT, typename DistanceT, typena
     // taking this into account.
     auto n_elements    = std::max(size_t(512), dim);
     auto max_n_threads = raft::div_rounding_up_safe<size_t>(n_queries * orig_k * dim, n_elements);
-    auto suggested_n_threads_for_distance = std::min(size_t(suggested_n_threads), max_n_threads);
+    [[maybe_unused]] auto suggested_n_threads_for_distance =
+      std::min(size_t(suggested_n_threads), max_n_threads);
 
     // The max number of threads for topk computation is the number of queries.
-    auto suggested_n_threads_for_topk = std::min(size_t(suggested_n_threads), n_queries);
+    [[maybe_unused]] auto suggested_n_threads_for_topk =
+      std::min(size_t(suggested_n_threads), n_queries);
 
     // Compute the refined distance using original dataset vectors
 #pragma omp parallel for collapse(2) num_threads(suggested_n_threads_for_distance)
@@ -416,8 +429,8 @@ template <typename DC, typename IdxT, typename DataT, typename DistanceT, typena
       suggested_n_threads, std::vector<std::tuple<DistanceT, IdxT>>(orig_k));
 #pragma omp parallel num_threads(suggested_n_threads)
     {
-      auto tid = omp_get_thread_num();
-      for (size_t i = tid; i < n_queries; i += omp_get_num_threads()) {
+      auto tid = cuvs::core::omp::get_thread_num();
+      for (size_t i = tid; i < n_queries; i += cuvs::core::omp::get_num_threads()) {
         // Compute the refined distance using original dataset vectors
         const DataT* query = queries.data_handle() + dim * i;
         for (size_t j = 0; j < orig_k; j++) {
@@ -427,7 +440,11 @@ template <typename DC, typename IdxT, typename DataT, typename DistanceT, typena
             distance = std::numeric_limits<DistanceT>::max();
           } else {
             const DataT* row = dataset.data_handle() + dim * id;
-            distance         = euclidean_distance_squared<DC, DistanceT, DataT>(query, row, dim);
+            if constexpr (std::is_same_v<DC, distance_comp_cosine>) {
+              distance = cosine_distance<DistanceT, DataT>(query, row, dim);
+            } else {
+              distance = euclidean_distance_squared<DC, DistanceT, DataT>(query, row, dim);
+            }
           }
           refined_pairs[tid][j] = std::make_tuple(distance, id);
         }
@@ -472,6 +489,19 @@ struct distance_comp_inner {
   }
 };
 
+struct distance_comp_cosine {
+  template <typename DistanceT>
+  static inline auto eval(const DistanceT&, const DistanceT&) -> DistanceT
+  {
+    return DistanceT{0};
+  }
+  template <typename DistanceT>
+  static inline auto postprocess(const DistanceT& a) -> DistanceT
+  {
+    return a;
+  }
+};
+
 /**
  * Naive CPU implementation of refine operation
  *
@@ -499,6 +529,9 @@ template <typename IdxT, typename DataT, typename DistanceT, typename ExtentsT>
         dataset, queries, neighbor_candidates, indices, distances);
     case cuvs::distance::DistanceType::InnerProduct:
       return refine_host_impl<distance_comp_inner>(
+        dataset, queries, neighbor_candidates, indices, distances);
+    case cuvs::distance::DistanceType::CosineExpanded:
+      return refine_host_impl<distance_comp_cosine>(
         dataset, queries, neighbor_candidates, indices, distances);
     default: throw raft::logic_error("Unsupported metric");
   }

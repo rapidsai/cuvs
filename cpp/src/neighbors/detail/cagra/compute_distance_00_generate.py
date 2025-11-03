@@ -1,33 +1,12 @@
-# Copyright (c) 2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+import datetime
 import os
 import glob
 
-template = """/*
- * Copyright (c) 2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+template = f"""/*
+ * SPDX-FileCopyrightText: Copyright (c) 2024-{datetime.datetime.today().year}, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 /*
@@ -87,7 +66,8 @@ for f in glob.glob("compute_distance_vpq_*.cu"):
 for type_path, (data_t, idx_t, distance_t) in search_types.items():
     for (mxdim, team) in mxdim_team:
         # CAGRA
-        for metric in ['L2Expanded', 'InnerProduct']:
+        for metric in ['L2Expanded', 'InnerProduct', 'CosineExpanded']:
+
             path = f"compute_distance_standard_{metric}_{type_path}_dim{mxdim}_t{team}.cu"
             includes = '#include "compute_distance_standard-impl.cuh"'
             params = f"{metric_prefix}{metric}, {team}, {mxdim}, {data_t}, {idx_t}, {distance_t}"
@@ -151,14 +131,15 @@ using descriptor_instances =
 template <typename DataT, typename IndexT, typename DistanceT, typename DatasetT>
 auto dataset_descriptor_init(const cagra::search_params& params,
                              const DatasetT& dataset,
-                             cuvs::distance::DistanceType metric)
+                             cuvs::distance::DistanceType metric,
+                             const DistanceT* dataset_norms = nullptr)
   -> dataset_descriptor_host<DataT, IndexT, DistanceT>
 {{
-  auto [init, priority] = descriptor_instances::select<DataT, IndexT, DistanceT>(params, dataset, metric);
+  auto [init, priority] = descriptor_instances::select<DataT, IndexT, DistanceT>(params, dataset, metric, dataset_norms);
   if (init == nullptr || priority < 0) {{
     RAFT_FAIL("No dataset descriptor instance compiled for this parameter combination.");
   }}
-  return init(params, dataset, metric);
+  return init(params, dataset, metric, dataset_norms);
 }}
 '''
     f.write(template.format(includes=includes, content=contents))
