@@ -208,7 +208,7 @@ endif()
 # * cuvs ---------------------------------------------------------------------
 if(NOT BUILD_CPU_ONLY)
   add_library(
-    gpu_index_lib STATIC
+    ivf_rabitq_lib STATIC
     src/neighbors/ivf_rabitq/utils/space_cuda.cu
     src/neighbors/ivf_rabitq/gpu_index/ivf_gpu.cu
     src/neighbors/ivf_rabitq/gpu_index/initializer_gpu.cu
@@ -222,10 +222,10 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ivf_rabitq/gpu_index/quantizer_gpu_fast.cu
   )
 
-  set_target_properties(gpu_index_lib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+  set_target_properties(ivf_rabitq_lib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
   target_link_libraries(
-    gpu_index_lib
+    ivf_rabitq_lib
     PRIVATE OpenMP::OpenMP_CXX
             ${CUDA_CUBLAS_LIBRARIES}
             CUDA::cudart
@@ -235,16 +235,16 @@ if(NOT BUILD_CPU_ONLY)
   ) # fix rmm dependencies
 
   target_include_directories(
-    gpu_index_lib PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    ivf_rabitq_lib PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   )
 
   target_compile_options(
-    gpu_index_lib
+    ivf_rabitq_lib
     PRIVATE $<$<COMPILE_LANGUAGE:CUDA>: $<$<CONFIG:Debug>:-G;-g> --extended-lambda
             --expt-relaxed-constexpr -Xcompiler=-fopenmp > $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>
   )
 
-  target_compile_definitions(gpu_index_lib PRIVATE HIGH_ACC_FAST_SCAN)
+  target_compile_definitions(ivf_rabitq_lib PRIVATE HIGH_ACC_FAST_SCAN)
 
   add_library(
     cuvs-cagra-search STATIC

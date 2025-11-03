@@ -45,6 +45,7 @@ option(CUVS_ANN_BENCH_SINGLE_EXE
        "Make a single executable with benchmark as shared library modules" OFF
 )
 option(CUVS_KNN_BENCH_USE_CUVS_BRUTE_FORCE "Include cuVS brute force knn in benchmark" ON)
+option(CUVS_ANN_BENCH_USE_CUVS_IVF_RABITQ "Include cuVS ivf RaBitQ algorithm in benchmark" ON)
 
 # ##################################################################################################
 # * Process options ----------------------------------------------------------
@@ -209,12 +210,20 @@ endif()
 if(CUVS_ANN_BENCH_USE_CUVS_IVF_PQ)
   ConfigureAnnBench(
     NAME CUVS_IVF_PQ PATH src/cuvs/cuvs_benchmark.cu src/cuvs/cuvs_ivf_pq.cu LINKS cuvs
+    ivf_rabitq_lib
   )
 endif()
 
 if(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT)
   ConfigureAnnBench(
     NAME CUVS_IVF_FLAT PATH src/cuvs/cuvs_benchmark.cu src/cuvs/cuvs_ivf_flat.cu LINKS cuvs
+  )
+endif()
+
+if(CUVS_ANN_BENCH_USE_CUVS_IVF_RABITQ)
+  ConfigureAnnBench(
+    NAME CUVS_IVF_RABITQ PATH src/cuvs/cuvs_benchmark.cu src/cuvs/cuvs_ivf_rabitq.cu LINKS cuvs
+    ivf_rabitq_lib
   )
 endif()
 
@@ -384,6 +393,35 @@ if(CUVS_ANN_BENCH_SINGLE_EXE)
   install(
     TARGETS ANN_BENCH
     COMPONENT ann_bench
+    DESTINATION bin/ann
+    EXCLUDE_FROM_ALL
+  )
+endif()
+
+if(CUVS_ANN_BENCH_USE_CUVS_IVF_RABITQ)
+  add_executable(RABITQ_BENCH_TEST src/cuvs/cuvs_ivf_rabitq_test.cu)
+
+  target_link_libraries(RABITQ_BENCH_TEST PRIVATE ivf_rabitq_lib)
+
+  target_include_directories(
+    RABITQ_BENCH_TEST PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/include>"
+  )
+
+  set_target_properties(
+    RABITQ_BENCH_TEST
+    PROPERTIES # set target compile options
+               CXX_STANDARD 17
+               CXX_STANDARD_REQUIRED ON
+               CUDA_STANDARD 17
+               CUDA_STANDARD_REQUIRED ON
+               BUILD_RPATH "\$ORIGIN"
+               INSTALL_RPATH "\$ORIGIN"
+               CUDA_SEPARABLE_COMPILATION ON
+  )
+
+  install(
+    TARGETS RABITQ_BENCH_TEST
+    COMPONENT rabitq_bench_test
     DESTINATION bin/ann
     EXCLUDE_FROM_ALL
   )
