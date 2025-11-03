@@ -395,6 +395,10 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
               if constexpr (PQ_LEN == 2) {
                 query_val_index =
                   vq_half2_index * kQueryBlock + elem_offset * (PQ_LEN / 2) + e * TeamSize + laneId;
+              } else if constexpr (PQ_LEN == pq_val_pack_num_elements) {
+                query_val_index = elem_offset +
+                                  v * (DatasetBlockDim / (pq_val_pack_num_elements * vlen)) +
+                                  e * TeamSize + laneId;
               } else {
                 const uint32_t query_vec_element_id =
                   (elem_offset + e * vlen * TeamSize + v + laneId * vlen) * PQ_LEN /
