@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -306,7 +306,8 @@ void pairwise_distance_kmeans(raft::resources const& handle,
                              raft::layout_c_contiguous,
                              IndexT>(handle, X, centroids, pairwiseDistance);
   } else {
-    RAFT_FAIL("kmeans requires L2Expanded or L2SqrtExpanded distance, have %i", metric);
+    RAFT_FAIL("kmeans requires L2Expanded or L2SqrtExpanded distance, have %i",
+              static_cast<int>(metric));
   }
 }
 
