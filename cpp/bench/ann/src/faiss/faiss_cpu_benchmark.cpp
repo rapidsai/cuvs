@@ -51,6 +51,13 @@ void parse_build_param(const nlohmann::json& conf,
 
 template <typename T>
 void parse_build_param(const nlohmann::json& conf,
+                       typename cuvs::bench::faiss_cpu_ivfrabitq<T>::build_param& param)
+{
+  parse_base_build_param<T>(conf, param);
+}
+
+template <typename T>
+void parse_build_param(const nlohmann::json& conf,
                        typename cuvs::bench::faiss_cpu_ivfsq<T>::build_param& param)
 {
   parse_base_build_param<T>(conf, param);
@@ -114,6 +121,8 @@ auto create_algo(const std::string& algo_name,
       a = make_algo<T, cuvs::bench::faiss_cpu_ivf_flat>(metric, dim, conf);
     } else if (algo_name == "faiss_cpu_ivf_pq") {
       a = make_algo<T, cuvs::bench::faiss_cpu_ivfpq>(metric, dim, conf);
+    } else if (algo_name == "faiss_cpu_ivf_rabitq") {
+      a = make_algo<T, cuvs::bench::faiss_cpu_ivfrabitq>(metric, dim, conf);
     } else if (algo_name == "faiss_cpu_ivf_sq") {
       a = make_algo<T, cuvs::bench::faiss_cpu_ivfsq>(metric, dim, conf);
     } else if (algo_name == "faiss_cpu_flat") {
@@ -135,7 +144,7 @@ auto create_search_param(const std::string& algo_name, const nlohmann::json& con
   -> std::unique_ptr<typename cuvs::bench::algo<T>::search_param>
 {
   if (algo_name == "faiss_cpu_ivf_flat" || algo_name == "faiss_cpu_ivf_pq" ||
-      algo_name == "faiss_cpu_ivf_sq") {
+      algo_name == "faiss_cpu_ivf_rabitq" || algo_name == "faiss_cpu_ivf_sq") {
     auto param = std::make_unique<typename cuvs::bench::faiss_cpu<T>::search_param>();
     parse_search_param<T>(conf, *param);
     return param;
