@@ -36,13 +36,13 @@ var cBuildAlgos = map[BuildAlgo]int{
 func CreateCompressionParams() (*CompressionParams, error) {
 	var params C.cuvsCagraCompressionParams_t
 
-	if params == nil {
-		return nil, errors.New("memory allocation failed")
-	}
-
 	err := cuvs.CheckCuvs(cuvs.CuvsError(C.cuvsCagraCompressionParamsCreate(&params)))
 	if err != nil {
 		return nil, err
+	}
+
+	if params == nil {
+		return nil, errors.New("memory allocation failed")
 	}
 
 	return &CompressionParams{params: params}, nil
