@@ -350,7 +350,9 @@ class AnnCagraTest : public ::testing::TestWithParam<AnnCagraInputs> {
       }
     }
     // Dataset size must be larger than 33 for NN Descent
-    if (ps.build_algo == graph_build_algo::NN_DESCENT && (ps.n_rows < 33)) GTEST_SKIP();
+    if (ps.build_algo == graph_build_algo::NN_DESCENT &&
+        ((ps.n_rows < 33) || raft::round_up_safe(ps.n_rows, 32) <= ps.graph_degree * 3))
+      GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<SearchIdxT> indices_Cagra(queries_size);
@@ -555,8 +557,10 @@ class AnnCagraAddNodesTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
-    // Dataset size must be larger than 33 for NN Descent
-    if (ps.build_algo == graph_build_algo::NN_DESCENT && (ps.n_rows < 33)) GTEST_SKIP();
+    // Dataset size must be larger than both 33 and the intermediate graph degree
+    if (ps.build_algo == graph_build_algo::NN_DESCENT &&
+        ((ps.n_rows < 33) || raft::round_up_safe(ps.n_rows, 32) <= ps.graph_degree * 3))
+      GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<IdxT> indices_Cagra(queries_size);
@@ -772,8 +776,10 @@ class AnnCagraFilterTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
-    // Dataset size must be larger than 33 for NN Descent
-    if (ps.build_algo == graph_build_algo::NN_DESCENT && (ps.n_rows < 33)) GTEST_SKIP();
+    // Dataset size must be larger than both 33 and the intermediate graph degree
+    if (ps.build_algo == graph_build_algo::NN_DESCENT &&
+        ((ps.n_rows < 33) || raft::round_up_safe(ps.n_rows, 32) <= ps.graph_degree * 3))
+      GTEST_SKIP();
 
     size_t queries_size = ps.n_queries * ps.k;
     std::vector<IdxT> indices_Cagra(queries_size);
@@ -996,8 +1002,19 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
     if (ps.metric == cuvs::distance::DistanceType::BitwiseHamming &&
         (ps.k * ps.dim * 8 / 5 /*(=magic number)*/ < ps.n_rows))
       GTEST_SKIP();
-    // Dataset size must be larger than 33 for NN Descent
-    if (ps.build_algo == graph_build_algo::NN_DESCENT && (ps.n_rows < 33)) GTEST_SKIP();
+
+    const double splite_ratio        = 0.55;
+    const std::size_t database0_size = ps.n_rows * splite_ratio;
+    const std::size_t database1_size = ps.n_rows - database0_size;
+    // Dataset size must be larger than both 33 and the intermediate graph degree
+    if (ps.build_algo == graph_build_algo::NN_DESCENT &&
+        ((database0_size < 33) ||
+         raft::round_up_safe(database0_size, 32lu) <= ps.graph_degree * 3lu))
+      GTEST_SKIP();
+    if (ps.build_algo == graph_build_algo::NN_DESCENT &&
+        ((database1_size < 33) ||
+         raft::round_up_safe(database1_size, 32lu) <= ps.graph_degree * 3lu))
+      GTEST_SKIP();
 
     // Avoid splitting datasets with a size of 0
     if (ps.n_rows <= 3) GTEST_SKIP();
@@ -1064,10 +1081,6 @@ class AnnCagraIndexMergeTest : public ::testing::TestWithParam<AnnCagraInputs> {
             // do nothing
             break;
         };
-
-        const double splite_ratio        = 0.55;
-        const std::size_t database0_size = ps.n_rows * splite_ratio;
-        const std::size_t database1_size = ps.n_rows - database0_size;
 
         auto database0_view = raft::make_device_matrix_view<const DataT, int64_t>(
           (const DataT*)database.data(), database0_size, ps.dim);
