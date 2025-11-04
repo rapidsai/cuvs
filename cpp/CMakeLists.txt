@@ -733,7 +733,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
       TARGETS cuvs_cpp_headers
       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
       COMPONENT cuvs_cpp_headers
-      EXPORT cuvs-cpp-headers-exports
+      EXPORT cuvs-exports
     )
 
     install(
@@ -741,9 +741,6 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
       COMPONENT cuvs_cpp_headers
       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs
     )
-
-    list(APPEND cuvs_components cuvs_cpp_headers)
-    list(APPEND cuvs_export_sets cuvs-cpp-headers-exports)
   endif()
 
   if(TARGET cuvs)
