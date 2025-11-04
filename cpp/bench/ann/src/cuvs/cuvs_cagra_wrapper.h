@@ -7,8 +7,8 @@
 #include "../../../../src/neighbors/detail/cagra/utils.hpp"
 #include "../common/ann_types.hpp"
 #include "../common/cuda_huge_page_resource.hpp"
-#include "../common/cuda_pinned_resource.hpp"
 #include "cuvs_ann_bench_utils.h"
+#include <rmm/mr/pinned_host_memory_resource.hpp>
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
@@ -142,7 +142,7 @@ class cuvs_cagra : public algo<T>, public algo_gpu {
  private:
   // handle_ must go first to make sure it dies last and all memory allocated in pool
   configured_raft_resources handle_{};
-  raft::mr::cuda_pinned_resource mr_pinned_;
+  rmm::mr::pinned_host_memory_resource mr_pinned_;
   raft::mr::cuda_huge_page_resource mr_huge_page_;
   AllocatorType graph_mem_{AllocatorType::kDevice};
   AllocatorType dataset_mem_{AllocatorType::kDevice};
