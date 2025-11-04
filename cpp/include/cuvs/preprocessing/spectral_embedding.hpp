@@ -51,7 +51,7 @@ struct params {
    * The tolerance for the eigenvalue solver. This is used to determine
    * when to stop the eigenvalue solver.
    */
-  float eigen_tolerance{1e-5f};
+  float tolerance{1e-5f};
 
   /**
    * @brief Random seed for reproducibility.
