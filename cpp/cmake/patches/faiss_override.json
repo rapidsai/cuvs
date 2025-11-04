@@ -6,7 +6,7 @@
       "git_tag": "v1.12.0",
       "patches" : [
         {
-          "file" : "${current_json_dir}/faiss/faiss.diff",
+          "file" : "${current_json_dir}/faiss.diff",
           "issue" : "Multiple fixes for cuVS compatibility",
           "fixed_in" : ""
         }
