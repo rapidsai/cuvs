@@ -12,6 +12,7 @@
 #include <raft/core/resources.hpp>
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/distance/distance.h>
 #include <cuvs/distance/distance.hpp>
 
 #include "../core/exceptions.hpp"
@@ -35,8 +36,9 @@ void _pairwise_distance(cuvsResources_t res,
   auto x_mds         = cuvs::core::from_dlpack<mdspan_type>(x_tensor);
   auto y_mds         = cuvs::core::from_dlpack<mdspan_type>(y_tensor);
   auto distances_mds = cuvs::core::from_dlpack<distances_mdspan_type>(distances_tensor);
+  auto metric_type   = static_cast<cuvs::distance::DistanceType>(metric);
 
-  cuvs::distance::pairwise_distance(*res_ptr, x_mds, y_mds, distances_mds, metric, metric_arg);
+  cuvs::distance::pairwise_distance(*res_ptr, x_mds, y_mds, distances_mds, metric_type, metric_arg);
 }
 }  // namespace
 
