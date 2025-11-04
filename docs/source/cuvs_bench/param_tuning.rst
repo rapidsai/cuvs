@@ -217,20 +217,20 @@ CAGRA uses a graph-based index, which creates an intermediate, approximate kNN g
    - N
    - Positive integer >0
    - 1
-   - The number of partitions to use for the ACE build. When set to a value >1, enables the ACE partitioned approach for very large graphs. Set to 1 to disable ACE and use standard build.
+   - The number of partitions to use for the ACE build. Small values might improve recall but potentially degrade performance and increase memory usage. Partitions should not be too small to prevent issues in KNN graph construction. 100k - 5M vectors per partition is recommended depending on the available host and GPU memory. The partition size is on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in our tests).
 
  * - `build_dir`
    - `build`
    - N
    - String
-   - ""
-   - The directory to use for the ACE build. Must be specified when using ACE build.
+   - "/tmp/ace_build"
+   - The directory to use for the ACE build. Must be specified when using ACE build. This should be the fastest disk in the system and hold enough space for twice the dataset, final graph, and label mapping.
 
  * - `ef_construction`
    - `build`
    - Y
    - Positive integer >0
-   -
+   - 120
    - Controls index time and accuracy when using ACE build. Bigger values increase the index quality. At some point, increasing this will no longer improve the quality.
 
  * - `use_disk`

@@ -124,25 +124,34 @@ typedef struct cuvsIvfPqParams* cuvsIvfPqParams_t;
 struct cuvsAceParams {
   /**
    * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
+   *
    * Small values might improve recall but potentially degrade performance and
    * increase memory usage. Partitions should not be too small to prevent issues
    * in KNN graph construction. 100k - 5M vectors per partition is recommended
-   * depending on the available host and GPU memory.
+   * depending on the available host and GPU memory. The partition size is on
+   * average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the
+   * core and augmented vectors. Please account for imbalance in the partition
+   * sizes (up to 3x in our tests).
    */
   size_t npartitions;
   /**
    * The index quality for the ACE build.
+   *
    * Bigger values increase the index quality. At some point, increasing this will no longer
    * improve the quality.
    */
   size_t ef_construction;
   /**
    * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).
-   * Used when `npartitions` > 1 or `use_disk` is true.
+   *
+   * Used when `use_disk` is true or when the graph does not fit in host and GPU
+   * memory. This should be the fastest disk in the system and hold enough space
+   * for twice the dataset, final graph, and label mapping.
    */
   const char* build_dir;
   /**
    * Whether to use disk-based storage for ACE build.
+   *
    * When true, enables disk-based operations for memory-efficient graph construction.
    */
   bool use_disk;
