@@ -28,11 +28,12 @@ void fit_predict(raft::resources const& handle,
   auto embedding_row_major =
     raft::make_device_matrix<DataT, int, raft::row_major>(handle, n_samples, config.n_components);
   cuvs::preprocessing::spectral_embedding::params spectral_embedding_config;
-  spectral_embedding_config.n_components   = config.n_components;
-  spectral_embedding_config.n_neighbors    = config.n_neighbors;
-  spectral_embedding_config.norm_laplacian = true;
-  spectral_embedding_config.drop_first     = false;
-  spectral_embedding_config.seed           = config.rng_state.seed;
+  spectral_embedding_config.n_components    = config.n_components;
+  spectral_embedding_config.n_neighbors     = config.n_neighbors;
+  spectral_embedding_config.norm_laplacian  = true;
+  spectral_embedding_config.drop_first      = false;
+  spectral_embedding_config.seed            = config.rng_state.seed;
+  spectral_embedding_config.eigen_tolerance = config.eigen_tolerance;
 
   cuvs::cluster::kmeans::params kmeans_config;
   kmeans_config.n_clusters          = config.n_clusters;

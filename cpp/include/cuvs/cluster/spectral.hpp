@@ -16,6 +16,7 @@ struct params {
   int n_components;
   int n_init;
   int n_neighbors;
+  float eigen_tolerance;
   raft::random::RngState rng_state{0};
 };
 

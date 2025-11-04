@@ -51,11 +51,12 @@ class SpectralClusteringTest : public ::testing::TestWithParam<SpectralClusterin
     int n_features = testparams.n_col;
 
     cluster::spectral::params params;
-    params.n_clusters   = testparams.n_clusters;
-    params.n_components = testparams.n_components;
-    params.n_neighbors  = testparams.n_neighbors;
-    params.n_init       = testparams.n_init;
-    params.rng_state    = raft::random::RngState(testparams.seed);
+    params.n_clusters      = testparams.n_clusters;
+    params.n_components    = testparams.n_components;
+    params.n_neighbors     = testparams.n_neighbors;
+    params.n_init          = testparams.n_init;
+    params.eigen_tolerance = 0.0f;
+    params.rng_state       = raft::random::RngState(testparams.seed);
 
     auto X      = raft::make_device_matrix<float, int>(handle, n_samples, n_features);
     auto labels = raft::make_device_vector<int, int>(handle, n_samples);

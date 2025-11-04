@@ -46,6 +46,14 @@ struct params {
   bool drop_first;
 
   /**
+   * @brief Tolerance for the eigenvalue solver.
+   *
+   * The tolerance for the eigenvalue solver. This is used to determine
+   * when to stop the eigenvalue solver.
+   */
+  float eigen_tolerance{1e-5f};
+
+  /**
    * @brief Random seed for reproducibility.
    *
    * Controls the random number generation for k-NN graph construction
