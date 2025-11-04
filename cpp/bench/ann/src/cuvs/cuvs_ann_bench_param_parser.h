@@ -260,6 +260,11 @@ void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::cagra::index
             params.graph_build_params)) {
         params.graph_build_params = cuvs::neighbors::graph_build_params::nn_descent_params{};
       }
+    } else if (conf.at("graph_build_algo") == "ACE") {
+      if (!std::holds_alternative<cuvs::neighbors::graph_build_params::ace_params>(
+            params.graph_build_params)) {
+        params.graph_build_params = cuvs::neighbors::graph_build_params::ace_params{};
+      }
     }
   }
 
@@ -267,12 +272,15 @@ void parse_build_param(const nlohmann::json& conf, cuvs::neighbors::cagra::index
   nlohmann::json ivf_pq_build_conf  = collect_conf_with_prefix(conf, "ivf_pq_build_");
   nlohmann::json ivf_pq_search_conf = collect_conf_with_prefix(conf, "ivf_pq_search_");
   nlohmann::json nn_descent_conf    = collect_conf_with_prefix(conf, "nn_descent_");
+  nlohmann::json ace_conf           = collect_conf_with_prefix(conf, "ace_");
 
   if (std::holds_alternative<std::monostate>(params.graph_build_params)) {
     if (!ivf_pq_build_conf.empty() || !ivf_pq_search_conf.empty()) {
       params.graph_build_params = cuvs::neighbors::graph_build_params::ivf_pq_params{};
     } else if (!nn_descent_conf.empty()) {
       params.graph_build_params = cuvs::neighbors::graph_build_params::nn_descent_params{};
+    } else if (!ace_conf.empty()) {
+      params.graph_build_params = cuvs::neighbors::graph_build_params::ace_params{};
     } else {
       params.graph_build_params = cuvs::neighbors::graph_build_params::iterative_search_params{};
     }
@@ -328,17 +336,19 @@ void parse_build_param(const nlohmann::json& conf,
         cuvs::neighbors::cagra::graph_build_params::nn_descent_params(
           conf.value("intermediate_graph_degree", cagra_params.intermediate_graph_degree),
           dist_type);
+    } else if (conf.value("graph_build_algo", "") == "ACE") {
+      cagra_params.graph_build_params = cuvs::neighbors::cagra::graph_build_params::ace_params{};
     }
     // Parse ACE parameters if provided
-    if (conf.contains("npartitions") || conf.contains("build_dir") ||
-        conf.contains("ef_construction") || conf.contains("use_disk")) {
+    nlohmann::json ace_conf = collect_conf_with_prefix(conf, "ace_");
+    if (!ace_conf.empty()) {
       auto ace_params = cuvs::neighbors::cagra::graph_build_params::ace_params();
-      if (conf.contains("npartitions")) { ace_params.npartitions = conf.at("npartitions"); }
-      if (conf.contains("build_dir")) { ace_params.build_dir = conf.at("build_dir"); }
-      if (conf.contains("ef_construction")) {
-        ace_params.ef_construction = conf.at("ef_construction");
+      if (ace_conf.contains("npartitions")) { ace_params.npartitions = ace_conf.at("npartitions"); }
+      if (ace_conf.contains("build_dir")) { ace_params.build_dir = ace_conf.at("build_dir"); }
+      if (ace_conf.contains("ef_construction")) {
+        ace_params.ef_construction = ace_conf.at("ef_construction");
       }
-      if (conf.contains("use_disk")) { ace_params.use_disk = conf.at("use_disk"); }
+      if (ace_conf.contains("use_disk")) { ace_params.use_disk = ace_conf.at("use_disk"); }
       cagra_params.graph_build_params = ace_params;
     }
     ::parse_build_param<T, IdxT>(conf, cagra_params);
