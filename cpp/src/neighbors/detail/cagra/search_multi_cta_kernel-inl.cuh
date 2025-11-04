@@ -131,7 +131,7 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort(float* distances,  // [num
     }
   }
   /* Warp Sort */
-  bitonic::warp_sort<float, INDEX_T, N>(key, val);
+  bitonic::warp_sort<float, INDEX_T>(key, val, N);
   /* Store sorted results */
   for (unsigned i = 0; i < N; i++) {
     unsigned j = (N * lane_id) + i;

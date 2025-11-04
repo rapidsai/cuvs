@@ -133,9 +133,9 @@ struct search
       // Tentatively calculate the required share memory size when radix
       // sort based topk is used, assuming the block size is the maximum.
       if (itopk_size <= 256) {
-        additional_smem_size += topk_by_radix_sort<256, INDEX_T>::smem_size * sizeof(std::uint32_t);
+        additional_smem_size += topk_by_radix_sort<INDEX_T>::smem_size(256) * sizeof(std::uint32_t);
       } else {
-        additional_smem_size += topk_by_radix_sort<512, INDEX_T>::smem_size * sizeof(std::uint32_t);
+        additional_smem_size += topk_by_radix_sort<INDEX_T>::smem_size(512) * sizeof(std::uint32_t);
       }
     }
 
@@ -197,10 +197,10 @@ struct search
       smem_size = base_smem_size;
       if (itopk_size <= 256) {
         constexpr unsigned MAX_ITOPK = 256;
-        smem_size += topk_by_radix_sort<MAX_ITOPK, INDEX_T>::smem_size * sizeof(std::uint32_t);
+        smem_size += topk_by_radix_sort<INDEX_T>::smem_size(MAX_ITOPK) * sizeof(std::uint32_t);
       } else {
         constexpr unsigned MAX_ITOPK = 512;
-        smem_size += topk_by_radix_sort<MAX_ITOPK, INDEX_T>::smem_size * sizeof(std::uint32_t);
+        smem_size += topk_by_radix_sort<INDEX_T>::smem_size(MAX_ITOPK) * sizeof(std::uint32_t);
       }
     }
     RAFT_LOG_DEBUG("# smem_size: %u", smem_size);
