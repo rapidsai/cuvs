@@ -100,7 +100,7 @@ void compute_eigenpairs(raft::resources const& handle,
   config.n_components   = spectral_embedding_config.n_components;
   config.max_iterations = 10 * n_samples;
   config.ncv            = std::min(n_samples, std::max(2 * config.n_components + 1, 20));
-  config.tolerance      = spectral_embedding_config.eigen_tolerance;
+  config.tolerance      = spectral_embedding_config.tolerance;
   config.which          = raft::sparse::solver::LANCZOS_WHICH::LA;
   config.seed           = spectral_embedding_config.seed;
 
