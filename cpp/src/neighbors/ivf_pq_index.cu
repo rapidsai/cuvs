@@ -8,12 +8,13 @@
 #include "detail/ann_utils.cuh"
 
 #include <raft/core/device_mdarray.hpp>
+#include <raft/core/logger.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/map.cuh>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/reduce.cuh>
-
+#include <raft/core/device_mdspan.hpp>
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/device_uvector.hpp>
@@ -145,8 +146,13 @@ index<IdxT>::index(
   if (!pq_centers_match) {
     // Need to own and potentially transpose/convert the pq_centers
     pq_centers_ = raft::make_device_mdarray<float>(handle, expected_pq_extents);
-    // TODO: Add conversion logic here
-    pq_centers_view_ = pq_centers_->view();
+    
+    // Copy and/or convert the PQ centers to the expected format
+    // Note: This requires proper conversion logic based on codebook_kind
+    // For now, just fail if dimensions don't match as it indicates incompatible formats
+    RAFT_FAIL("PQ centers dimensions don't match expected format. Expected [%u, %u, %u], got [%u, %u, %u]",
+              expected_pq_extents.extent(0), expected_pq_extents.extent(1), expected_pq_extents.extent(2),
+              pq_centers_view.extent(0), pq_centers_view.extent(1), pq_centers_view.extent(2));
   }
 
   // Check if we need to own the centers (format conversion needed)
@@ -198,29 +204,29 @@ index<IdxT>::index(
     bool centers_rot_match = (centers_rot_view.value().extent(0) == n_lists) &&
                              (centers_rot_view.value().extent(1) == this->rot_dim());
     if (!centers_rot_match) {
-      // Need to own and convert centers_rot
-      centers_rot_ = raft::make_device_matrix<float, uint32_t>(handle, n_lists, this->rot_dim());
-      // TODO: Add conversion logic here if needed
-      centers_rot_view_ = centers_rot_->view();
+      // Centers_rot dimensions don't match - this is an error as we can't convert
+      RAFT_FAIL("centers_rot dimensions don't match expected format. Expected [%u, %u], got [%u, %u]",
+                n_lists, this->rot_dim(),
+                centers_rot_view.value().extent(0), centers_rot_view.value().extent(1));
     } else {
       centers_rot_view_ = centers_rot_view.value();
     }
   } else {
-    // Need to compute centers_rot if not provided
+    // Need to allocate centers_rot - it will be computed after rotation_matrix is ready
     centers_rot_      = raft::make_device_matrix<float, uint32_t>(handle, n_lists, this->rot_dim());
     centers_rot_view_ = centers_rot_->view();
   }
 
   // Check if we need rotation_matrix
+  bool need_compute_rotation = false;
   if (rotation_matrix_view.has_value()) {
     bool rotation_match = (rotation_matrix_view.value().extent(0) == this->rot_dim()) &&
                           (rotation_matrix_view.value().extent(1) == this->dim());
     if (!rotation_match) {
-      // Need to own and convert rotation_matrix
-      rotation_matrix_ =
-        raft::make_device_matrix<float, uint32_t>(handle, this->rot_dim(), this->dim());
-      // TODO: Add conversion logic here if needed
-      rotation_matrix_view_ = rotation_matrix_->view();
+      // Rotation matrix dimensions don't match - this is an error as we can't convert
+      RAFT_FAIL("rotation_matrix dimensions don't match expected format. Expected [%u, %u], got [%u, %u]",
+                this->rot_dim(), this->dim(),
+                rotation_matrix_view.value().extent(0), rotation_matrix_view.value().extent(1));
     } else {
       rotation_matrix_view_ = rotation_matrix_view.value();
     }
@@ -229,6 +235,25 @@ index<IdxT>::index(
     rotation_matrix_ =
       raft::make_device_matrix<float, uint32_t>(handle, this->rot_dim(), this->dim());
     rotation_matrix_view_ = rotation_matrix_->view();
+    need_compute_rotation = true;
+  }
+
+  // If rotation matrix was not provided, we need to initialize it
+  // Note: This would typically be done during build, but for the constructor
+  // we'll just initialize it with identity or random depending on requirements
+  if (need_compute_rotation) {
+    // For now, we'll leave it uninitialized - it should be initialized during build
+    // via helpers::make_rotation_matrix
+    // If you need it initialized here, uncomment:
+    // helpers::make_rotation_matrix(handle, this, false);
+  }
+
+  // If centers_rot was not provided but we have centers and rotation_matrix, compute it
+  if (!centers_rot_view.has_value() && rotation_matrix_view_.extent(0) > 0 && 
+      rotation_matrix_view_.extent(1) > 0 && centers_view_.extent(0) > 0) {
+    // Compute centers_rot = rotation_matrix^T @ centers
+    // This would typically be done via set_centers, but can be done here if needed
+    // For now, leave uncomputed - it will be computed during build
   }
 
   check_consistency();
@@ -313,7 +338,16 @@ raft::device_mdspan<float,
                     raft::row_major>
 index<IdxT>::pq_centers() noexcept
 {
-  return raft::make_device_mdspan<float, typename pq_centers_extents, raft::row_major>(
+  // If we own the storage, return a mutable view of it
+  if (pq_centers_.has_value()) {
+    return pq_centers_->view();
+  }
+  // DANGEROUS: We're returning a mutable view to data we don't own!
+  // This should be prevented, but we need it for API compatibility.
+  // TODO: Fix the API to prevent mutable access to non-owned data
+  RAFT_LOG_WARN("WARNING: Returning mutable view to PQ centers not owned by the index. "
+                "Modifying this data leads to undefined behavior!");
+  return raft::device_mdspan<float, typename pq_centers_extents, raft::row_major>(
     const_cast<float*>(pq_centers_view_.data_handle()), pq_centers_view_.extents());
 }
 
@@ -369,6 +403,13 @@ raft::device_vector_view<const IdxT* const, uint32_t, raft::row_major> index<Idx
 template <typename IdxT>
 raft::device_matrix_view<float, uint32_t, raft::row_major> index<IdxT>::rotation_matrix() noexcept
 {
+  // If we own the storage, return a mutable view of it
+  if (rotation_matrix_.has_value()) {
+    return rotation_matrix_->view();
+  }
+  // DANGEROUS: We're returning a mutable view to data we don't own!
+  RAFT_LOG_WARN("WARNING: Returning mutable view to rotation matrix not owned by the index. "
+                "Modifying this data leads to undefined behavior!");
   return raft::make_device_matrix_view<float, uint32_t, raft::row_major>(
     const_cast<float*>(rotation_matrix_view_.data_handle()),
     rotation_matrix_view_.extent(0),
@@ -411,6 +452,13 @@ raft::device_vector_view<const uint32_t, uint32_t, raft::row_major> index<IdxT>:
 template <typename IdxT>
 raft::device_matrix_view<float, uint32_t, raft::row_major> index<IdxT>::centers() noexcept
 {
+  // If we own the storage, return a mutable view of it
+  if (centers_.has_value()) {
+    return centers_->view();
+  }
+  // DANGEROUS: We're returning a mutable view to data we don't own!
+  RAFT_LOG_WARN("WARNING: Returning mutable view to centers not owned by the index. "
+                "Modifying this data leads to undefined behavior!");
   return raft::make_device_matrix_view<float, uint32_t, raft::row_major>(
     const_cast<float*>(centers_view_.data_handle()),
     centers_view_.extent(0),
@@ -427,6 +475,13 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::ce
 template <typename IdxT>
 raft::device_matrix_view<float, uint32_t, raft::row_major> index<IdxT>::centers_rot() noexcept
 {
+  // If we own the storage, return a mutable view of it
+  if (centers_rot_.has_value()) {
+    return centers_rot_->view();
+  }
+  // DANGEROUS: We're returning a mutable view to data we don't own!
+  RAFT_LOG_WARN("WARNING: Returning mutable view to centers_rot not owned by the index. "
+                "Modifying this data leads to undefined behavior!");
   return raft::make_device_matrix_view<float, uint32_t, raft::row_major>(
     const_cast<float*>(centers_rot_view_.data_handle()),
     centers_rot_view_.extent(0),
