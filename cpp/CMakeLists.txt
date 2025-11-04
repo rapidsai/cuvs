@@ -753,6 +753,12 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     )
 
     install(
+      DIRECTORY ../c/include/cuvs/
+      component c_api
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+
+    install(
       FILES ${CUVS_C_BINARY_DIR}/include/cuvs/core/c_config.h
       COMPONENT cuvs
       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs/core/
