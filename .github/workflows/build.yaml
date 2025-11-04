@@ -39,8 +39,10 @@ jobs:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
       date: ${{ inputs.date }}
+      node_type: cpu8
       script: ci/build_cpp.sh
       sha: ${{ inputs.sha }}
+      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   rust-build:
     needs: cpp-build
     secrets: inherit
@@ -115,6 +117,7 @@ jobs:
       date: ${{ inputs.date }}
       script: ci/build_python.sh
       sha: ${{ inputs.sha }}
+      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   upload-conda:
     needs: [cpp-build, python-build]
     secrets: inherit
@@ -151,11 +154,13 @@ jobs:
       branch: ${{ inputs.branch }}
       sha: ${{ inputs.sha }}
       date: ${{ inputs.date }}
+      node_type: cpu8
       script: ci/build_wheel_libcuvs.sh
       # build for every combination of arch and CUDA version, but only for the latest Python
       matrix_filter: group_by([.ARCH, (.CUDA_VER|split(".")|map(tonumber)|.[0])]) | map(max_by(.PY_VER|split(".")|map(tonumber)))
       package-name: libcuvs
       package-type: cpp
+      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   wheel-publish-libcuvs:
     needs: wheel-build-libcuvs
     secrets: inherit
@@ -176,8 +181,10 @@ jobs:
       branch: ${{ inputs.branch }}
       sha: ${{ inputs.sha }}
       date: ${{ inputs.date }}
+      node_type: cpu8
       script: ci/build_wheel_cuvs.sh
       package-name: cuvs
+      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
       package-type: python
   wheel-publish-cuvs:
     needs: wheel-build-cuvs
