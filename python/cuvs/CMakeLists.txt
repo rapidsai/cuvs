@@ -36,7 +36,7 @@ include(rapids-find)
 rapids_cpm_init()
 
 # --- cuVS ---#
-find_package(cuvs "${RAPIDS_VERSION}" REQUIRED COMPONENTS c_api cuvs_cpp_headers)
+find_package(cuvs "${RAPIDS_VERSION}" REQUIRED COMPONENTS c_api)
 
 # --- dlpack ---#
 include(../../cpp/cmake/thirdparty/get_dlpack.cmake)
