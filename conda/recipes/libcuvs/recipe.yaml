@@ -204,6 +204,8 @@ outputs:
       script:
         content: |
           cmake --install cpp/build --component cuvs_static
+          cmake --install cpp/build --component c_api
+          cmake --install cpp/build --component hnswlib
     requirements:
       build:
         - cmake ${{ cmake_version }}

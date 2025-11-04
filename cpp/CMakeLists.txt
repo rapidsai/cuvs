@@ -728,6 +728,24 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
   include(GNUInstallDirs)
   include(CPack)
 
+  if(TARGET cuvs_cpp_headers)
+    install(
+      TARGETS cuvs_cpp_headers
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+      COMPONENT cuvs_cpp_headers
+      EXPORT cuvs-cpp-headers-exports
+    )
+
+    install(
+      FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.h
+      COMPONENT cuvs_cpp_headers
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs
+    )
+
+    list(APPEND cuvs_components cuvs_cpp_headers)
+    list(APPEND cuvs_export_sets cuvs-cpp-headers-exports)
+  endif()
+
   if(TARGET cuvs)
     install(
       TARGETS cuvs
@@ -735,21 +753,6 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
       COMPONENT cuvs
       EXPORT cuvs-exports
     )
-
-    if(TARGET cuvs_cpp_headers)
-      install(
-        TARGETS cuvs_cpp_headers
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-        COMPONENT cuvs_cpp_headers
-        EXPORT cuvs-exports
-      )
-
-      install(
-        FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.h
-        COMPONENT cuvs_cpp_headers
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs
-      )
-    endif()
   endif()
 
   if(TARGET cuvs_static)
@@ -760,20 +763,8 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
       EXPORT cuvs-static-exports
     )
 
-    if(TARGET cuvs_cpp_headers)
-      install(
-        TARGETS cuvs_cpp_headers
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-        COMPONENT cuvs_cpp_headers
-        EXPORT cuvs-static-exports
-      )
-
-      install(
-        FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/version_config.h
-        COMPONENT cuvs_cpp_headers
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs
-      )
-    endif()
+    list(APPEND cuvs_components cuvs_static)
+    list(APPEND cuvs_export_sets cuvs-static-exports)
   endif()
 
   if(TARGET cuvs_c)
@@ -806,7 +797,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     EXPORT_SET cuvs-exports
     COMPONENTS ${cuvs_components}
     COMPONENTS_EXPORT_SET ${cuvs_export_sets}
-    GLOBAL_TARGETS cuvs cuvs_cpp_headers cuvs_c
+    GLOBAL_TARGETS cuvs cuvs_cpp_headers cuvs_static cuvs_c
     NAMESPACE cuvs::
   )
 
@@ -817,27 +808,7 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
     EXPORT_SET cuvs-exports
     COMPONENTS ${cuvs_components}
     COMPONENTS_EXPORT_SET ${cuvs_export_sets}
-    GLOBAL_TARGETS cuvs cuvs_cpp_headers cuvs_c
-    NAMESPACE cuvs::
-  )
-
-  rapids_export(
-    INSTALL cuvs_static
-    EXPORT_SET cuvs-static-exports
-    COMPONENTS ${cuvs_components}
-    COMPONENTS_EXPORT_SET ${cuvs_export_sets}
-    GLOBAL_TARGETS cuvs_static cuvs_cpp_headers cuvs_c
-    NAMESPACE cuvs::
-  )
-
-  # ################################################################################################
-  # * build export -------------------------------------------------------------
-  rapids_export(
-    BUILD cuvs_static
-    EXPORT_SET cuvs-static-exports
-    COMPONENTS ${cuvs_components}
-    COMPONENTS_EXPORT_SET ${cuvs_export_sets}
-    GLOBAL_TARGETS cuvs_static cuvs_cpp_headers cuvs_c
+    GLOBAL_TARGETS cuvs cuvs_cpp_headers cuvs_static cuvs_c
     NAMESPACE cuvs::
   )
 endif()
