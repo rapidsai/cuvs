@@ -31,6 +31,8 @@ struct params {
 
   /** Number of nearest neighbors for constructing the connectivity graph */
   int n_neighbors;
+
+  /** Tolerance for the eigenvalue solver */
   float tolerance;
 
   /** Random number generator state for reproducibility */
