@@ -9,12 +9,12 @@
 #include <raft/core/resources.hpp>
 #include <raft/random/rng_state.hpp>
 
+namespace cuvs::cluster::spectral {
+
 /**
  * @defgroup spectral_params Spectral Clustering Parameters
  * @{
  */
-
-namespace cuvs::cluster::spectral {
 
 /**
  * @brief Parameters for spectral clustering
@@ -121,6 +121,8 @@ void fit_predict(raft::resources const& handle,
                  raft::device_coo_matrix_view<double, int, int, int> connectivity_graph,
                  raft::device_vector_view<int, int> labels);
 
-/** @} */  // end of spectral group
+/**
+ * @}
+ */
 
 }  // namespace cuvs::cluster::spectral
