@@ -579,6 +579,7 @@ def build(IndexParams index_params, dataset, resources=None):
     >>> # Check if index is on disk and get location
     >>> if idx.is_on_disk:
     ...     print("Index stored at:", idx.file_directory)
+    Index stored at: /tmp/ace
     """
 
     # Check if ACE build is requested
