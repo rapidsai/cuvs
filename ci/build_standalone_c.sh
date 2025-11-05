@@ -64,6 +64,11 @@ cmake --build c/build/temp -j9
 rapids-logger "Begin c install"
 cmake --install c/build/temp --prefix c/build/temp/install
 
+rapids-logger "Begin gathering licenses"
+cp LICENSE c/build/temp/install/
+python ./tool/extract_licenses_via_spdx.py "." --with-licenses > c/build/temp/install/licenses/INLINE-THIRD-PARTY
+python ./tool/find_and_copy_license_files.py "." --with-licenses > c/build/temp/install/licenses/
+
 rapids-logger "Begin c tarball creation"
 tar czf libcuvs_c.tar.gz -C c/build/temp/install/ .
 ls -lh libcuvs_c.tar.gz
