@@ -871,9 +871,10 @@ void GnndGraph<Index_t>::sample_graph_new(InternalID_t<Index_t>* new_neighbors, 
   }
 }
 
-// Initialize the graph with the segmentation rule. The details are in Sec 4.3 in H Wang et.al.
-// "Fast k-NN Graph Construction by GPU based NN-Descent". Split the neighbor list into num_segments
-// segments. Neighbor with index v is placed into segment (v % num_segments).
+// Initialize the graph with random neighbors and apply the segmentation rule. Split the neighbor
+// list into num_segments segments. A neighbor with index v is placed into segment (v %
+// num_segments). The details are in Sec 4.3 in H Wang et.al. "Fast k-NN Graph Construction by GPU
+// based NN-Descent".
 template <typename Index_t>
 void GnndGraph<Index_t>::init_random_graph()
 {
