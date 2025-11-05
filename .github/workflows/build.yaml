@@ -44,7 +44,7 @@ jobs:
 
   rocky8-clib-standalone-build:
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@license_builder_optional_step
     strategy:
       fail-fast: false
       matrix:
@@ -58,6 +58,7 @@ jobs:
       date: ${{ inputs.date }}
       container_image: "rapidsai/ci-wheel:25.12-cuda${{ matrix.cuda_version }}-rockylinux8-py3.10"
       name:  "${{ matrix.cuda_version }}, amd64, rockylinux8"
+      requires_license_builder: true
       script: ci/build_standalone_c.sh
       artifact-name: "libcuvs_c_${{ matrix.cuda_version }}.tar.gz"
       file_to_upload: "libcuvs_c.tar.gz"
