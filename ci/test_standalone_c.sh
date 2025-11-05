@@ -19,5 +19,7 @@ unzip "${pkg_name}.zip"
 tar -xzf "${pkg_name}" -C "${INSTALL_PREFIX}"
 
 rapids-logger "Run C API tests"
+cd "$INSTALL_PREFIX"/bin/gtests/libcuvs
+ctest -j8 --output-on-failure
 
 rapids-logger "C API tests completed successfully"

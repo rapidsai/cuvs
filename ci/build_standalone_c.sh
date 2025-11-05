@@ -8,6 +8,11 @@ TOOLSET_VERSION=14
 CMAKE_VERSION=3.31.8
 CMAKE_ARCH=x86_64
 
+BUILD_C_LIB_TESTS="OFF"
+if [[ "${1:-}" == "--build-tests" ]]; then
+  BUILD_C_LIB_TESTS+="ON"
+fi
+
 dnf install -y \
       patch \
       tar \
@@ -45,7 +50,7 @@ scl enable gcc-toolset-${TOOLSET_VERSION} -- \
             -DCMAKE_CUDA_ARCHITECTURES=RAPIDS \
             -DBUILD_SHARED_LIBS=OFF \
             -DCUTLASS_ENABLE_TESTS=OFF \
-            -DDISABLE_OPENMP=ON \
+            -DDISABLE_OPENMP=OFF \
             -DBUILD_TESTS=OFF \
             -DBUILD_SHARED_LIBS=ON \
             -DCUVS_STATIC_RAPIDS_LIBRARIES=ON
@@ -58,7 +63,7 @@ scl enable gcc-toolset-${TOOLSET_VERSION} -- \
             -DCMAKE_CUDA_HOST_COMPILER=/opt/rh/gcc-toolset-${TOOLSET_VERSION}/root/usr/bin/gcc \
             -DCUVSC_STATIC_CUVS_LIBRARY=ON \
             -DCMAKE_PREFIX_PATH="$PWD/cpp/build/temp" \
-            -DBUILD_TESTS=OFF
+            -DBUILD_TESTS=${BUILD_C_LIB_TESTS}
 cmake --build c/build/temp -j9
 
 rapids-logger "Begin c install"
@@ -66,8 +71,7 @@ cmake --install c/build/temp --prefix c/build/temp/install
 
 rapids-logger "Begin gathering licenses"
 cp LICENSE c/build/temp/install/
-python ./tool/extract_licenses_via_spdx.py "." --with-licenses > c/build/temp/install/licenses/INLINE-THIRD-PARTY
-python ./tool/find_and_copy_license_files.py "." --with-licenses > c/build/temp/install/licenses/
+python ./tool/extract_licenses_via_spdx.py "." --with-licenses >> c/build/temp/install/LICENSE
 
 rapids-logger "Begin c tarball creation"
 tar czf libcuvs_c.tar.gz -C c/build/temp/install/ .
