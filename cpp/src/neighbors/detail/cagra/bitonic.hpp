@@ -18,8 +18,12 @@ template <class K, class V>
 RAFT_DEVICE_INLINE_FUNCTION void swap_if_needed(K& k0, V& v0, K& k1, V& v1, const bool asc)
 {
   if ((k0 != k1) && ((k0 < k1) != asc)) {
-    cuda::std::swap(k0, k1);
-    cuda::std::swap(v0, v1);
+    const auto tmp_k = k0;
+    k0               = k1;
+    k1               = tmp_k;
+    const auto tmp_v = v0;
+    v0               = v1;
+    v1               = tmp_v;
   }
 }
 
@@ -80,38 +84,6 @@ struct warp_merge_core_n {
 };
 
 template <class K, class V, unsigned warp_size>
-struct warp_merge_core_3 {
-  RAFT_DEVICE_INLINE_FUNCTION void operator()(K* ks,
-                                              V* vs,
-                                              const std::uint32_t range,
-                                              const bool asc)
-  {
-    constexpr unsigned N = 3;
-    const auto lane_id   = threadIdx.x % warp_size;
-
-    if (range == 1) {
-      const auto p = ((lane_id & 1) == 0);
-      swap_if_needed(ks[0], vs[0], ks[1], vs[1], p);
-      swap_if_needed(ks[1], vs[1], ks[2], vs[2], p);
-      swap_if_needed(ks[0], vs[0], ks[1], vs[1], p);
-    } else {
-      const std::uint32_t b = range;
-      for (std::uint32_t c = b / 2; c >= 1; c >>= 1) {
-        const auto p = static_cast<bool>(lane_id & b) == static_cast<bool>(lane_id & c);
-#pragma unroll
-        for (std::uint32_t i = 0; i < N; i++) {
-          swap_if_needed(ks[i], vs[i], c, p);
-        }
-      }
-      const auto p = ((lane_id & b) == 0);
-      swap_if_needed(ks[0], vs[0], ks[1], vs[1], p);
-      swap_if_needed(ks[1], vs[1], ks[2], vs[2], p);
-      swap_if_needed(ks[0], vs[0], ks[1], vs[1], p);
-    }
-  }
-};
-
-template <class K, class V, unsigned warp_size>
 struct warp_merge_core_2 {
   RAFT_DEVICE_INLINE_FUNCTION void operator()(K* ks,
                                               V* vs,
@@ -165,8 +137,6 @@ RAFT_DEVICE_INLINE_FUNCTION void warp_merge(
     detail::warp_merge_core_1<K, V, warp_size>{}(ks, vs, range, asc);
   } else if (n == 2) {
     detail::warp_merge_core_2<K, V, warp_size>{}(ks, vs, range, asc);
-  } else if (n == 3) {
-    detail::warp_merge_core_3<K, V, warp_size>{}(ks, vs, range, asc);
   } else {
     detail::warp_merge_core_n<K, V, warp_size>{}(ks, vs, n, range, asc);
   }
@@ -175,6 +145,7 @@ RAFT_DEVICE_INLINE_FUNCTION void warp_merge(
 template <class K, class V, unsigned warp_size = 32>
 RAFT_DEVICE_INLINE_FUNCTION void warp_sort(K* ks, V* vs, unsigned n, const bool asc = true)
 {
+#pragma unroll 1
   for (std::uint32_t range = 1; range <= warp_size; range <<= 1) {
     warp_merge<K, V, warp_size>(ks, vs, n, range, asc);
   }
