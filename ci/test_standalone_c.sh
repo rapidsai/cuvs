@@ -6,17 +6,16 @@ set -euo pipefail
 
 
 # Download the standalone C library artifact
-pkg_key="libcuvs_c_${RAPIDS_CUDA_VERSION}.tar.gz"
-pkg_name="libcuvs_c_${RAPIDS_CUDA_VERSION}.tar.gz"
-rapids-logger "Download artifacts from previous jobs"
-rapids-logger "pkg_key ${pkg_key}"
-rapids-download-from-github "${pkg_key}"
+payload_name="libcuvs_c_${RAPIDS_CUDA_VERSION}.tar.gz"
+pkg_name="libcuvs_c.tar.gz"
+rapids-logger "Download ${payload_name} artifacts from previous jobs"
+DOWNLOAD_LOCATION=$(rapids-download-from-github "${payload_name}")
 
 # Extract the artifact to a staging directory
 INSTALL_PREFIX="${PWD}/libcuvs_c_install"
 mkdir -p "${INSTALL_PREFIX}"
-unzip "${pkg_name}.zip"
-tar -xzf "${pkg_name}" -C "${INSTALL_PREFIX}"
+ls -l "${DOWNLOAD_LOCATION}"
+tar -xzf "${DOWNLOAD_LOCATION}/${pkg_name}" -C "${INSTALL_PREFIX}"
 
 rapids-logger "Run C API tests"
 cd "$INSTALL_PREFIX"/bin/gtests/libcuvs
