@@ -520,7 +520,6 @@ def main(
     time_unit: str,
     raw: bool,
 ) -> None:
-
     args = locals()
 
     if args["algorithms"]:
