@@ -15,6 +15,7 @@
 #include <raft/util/cudart_utils.hpp>
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/distance/distance.h>
 #include <cuvs/neighbors/nn_descent.h>
 #include <cuvs/neighbors/nn_descent.hpp>
 
@@ -170,7 +171,7 @@ extern "C" cuvsError_t cuvsNNDescentIndexParamsCreate(cuvsNNDescentIndexParams_t
     cuvs::neighbors::nn_descent::index_params cpp_params;
 
     *params = new cuvsNNDescentIndexParams{
-      .metric                    = cpp_params.metric,
+      .metric                    = static_cast<cuvsDistanceType>((int)cpp_params.metric),
       .metric_arg                = cpp_params.metric_arg,
       .graph_degree              = cpp_params.graph_degree,
       .intermediate_graph_degree = cpp_params.intermediate_graph_degree,

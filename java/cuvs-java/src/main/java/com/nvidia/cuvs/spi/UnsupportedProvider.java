@@ -74,6 +74,17 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
+  public CagraIndexParams cagraIndexParamsFromHnswParams(
+      long rows,
+      long dim,
+      int m,
+      int efConstruction,
+      CagraIndexParams.HnswHeuristicType heuristic,
+      CagraIndexParams.CuvsDistanceType metric) {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
   public void setLogLevel(Level level) {
     throw new UnsupportedOperationException(reasons);
   }

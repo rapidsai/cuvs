@@ -12,6 +12,8 @@
 #include <raft/core/serialize.hpp>
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/distance/distance.h>
+#include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/tiered_index.h>
 #include <cuvs/neighbors/tiered_index.hpp>
 
@@ -35,7 +37,7 @@ void convert_c_index_params(cuvsTieredIndexParams params,
 {
   out->min_ann_rows               = params.min_ann_rows;
   out->create_ann_index_on_extend = params.create_ann_index_on_extend;
-  out->metric                     = params.metric;
+  out->metric                     = static_cast<cuvs::distance::DistanceType>((int)params.metric);
 
   if constexpr (std::is_same_v<T, cagra::index_params>) {
     if (params.cagra_params != NULL) {
@@ -314,7 +316,7 @@ extern "C" cuvsError_t cuvsTieredIndexParamsCreate(cuvsTieredIndexParams_t* para
   return cuvs::core::translate_exceptions([=] {
     cuvs::neighbors::tiered_index::index_params<cagra::index_params> cpp_params;
     *params = new cuvsTieredIndexParams{
-      .metric                     = cpp_params.metric,
+      .metric                     = static_cast<cuvsDistanceType>((int)cpp_params.metric),
       .algo                       = CUVS_TIERED_INDEX_ALGO_CAGRA,
       .min_ann_rows               = cpp_params.min_ann_rows,
       .create_ann_index_on_extend = cpp_params.create_ann_index_on_extend};
