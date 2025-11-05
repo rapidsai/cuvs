@@ -109,19 +109,25 @@ RAFT_DEVICE_INLINE_FUNCTION void pickup_next_parent(
   }
 }
 
-template <unsigned MAX_ELEMENTS, class INDEX_T>
+template <class INDEX_T>
 RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort(float* distances,  // [num_elements]
                                                       INDEX_T* indices,  // [num_elements]
+                                                      const uint32_t max_elements,
                                                       const uint32_t num_elements)
 {
-  const unsigned warp_id = threadIdx.x / 32;
+  const unsigned warp_id = threadIdx.x / raft::warp_size();
   if (warp_id > 0) { return; }
-  const unsigned lane_id = threadIdx.x % 32;
-  constexpr unsigned N   = (MAX_ELEMENTS + 31) / 32;
-  float key[N];
-  INDEX_T val[N];
+  const unsigned lane_id = threadIdx.x % raft::warp_size();
+  assert(max_elements <= 256);
+  constexpr unsigned MAX_N =
+    8;  // if MAX_N >> N, we may have negative performance impact, if this is significant, we may
+        // get memory space from dynamically sized shared memory
+  const unsigned N = (max_elements + (raft::warp_size() - 1)) / raft::warp_size();
+  assert(N <= MAX_N);
+  float key[MAX_N];
+  INDEX_T val[MAX_N];
   for (unsigned i = 0; i < N; i++) {
-    unsigned j = lane_id + (32 * i);
+    unsigned j = lane_id + (raft::warp_size() * i);
     if (j < num_elements) {
       key[i] = distances[j];
       val[i] = indices[j];
@@ -145,10 +151,7 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort(float* distances,  // [num
 //
 // multiple CTAs per single query
 //
-template <std::uint32_t MAX_ELEMENTS,
-          class DATASET_DESCRIPTOR_T,
-          class SourceIndexT,
-          class SAMPLE_FILTER_T>
+template <class DATASET_DESCRIPTOR_T, class SourceIndexT, class SAMPLE_FILTER_T>
 RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   typename DATASET_DESCRIPTOR_T::INDEX_T* const
     result_indices_ptr,  // [num_queries, num_cta_per_query, itopk_size]
@@ -157,6 +160,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   const DATASET_DESCRIPTOR_T* dataset_desc,
   const typename DATASET_DESCRIPTOR_T::DATA_T* const queries_ptr,  // [num_queries, dataset_dim]
   const typename DATASET_DESCRIPTOR_T::INDEX_T* const knn_graph,   // [dataset_size, graph_degree]
+  const uint32_t max_elements,
   const uint32_t graph_degree,
   const SourceIndexT* source_indices_ptr,  // [num_queries, search_width]
   const unsigned num_distilation,
@@ -211,7 +215,7 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
   // |<---        result_buffer_size_32                 --->|
   const auto result_buffer_size    = itopk_size + graph_degree;
   const auto result_buffer_size_32 = raft::round_up_safe<uint32_t>(result_buffer_size, 32);
-  assert(result_buffer_size_32 <= MAX_ELEMENTS);
+  assert(result_buffer_size_32 <= max_elements);
 
   // Set smem working buffer for the distance calculation
   dataset_desc = dataset_desc->setup_workspace(smem, queries_ptr, query_id);
@@ -268,8 +272,8 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
     _CLK_START();
     if (threadIdx.x < 32) {
       // [1st warp] Topk with bitonic sort
-      topk_by_bitonic_sort<MAX_ELEMENTS, INDEX_T>(
-        result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+      topk_by_bitonic_sort<INDEX_T>(
+        result_distances_buffer, result_indices_buffer, max_elements, result_buffer_size_32);
     }
     __syncthreads();
     _CLK_REC(clk_topk);
@@ -487,17 +491,12 @@ struct search_kernel_config {
   // Search kernel function type. Note that the actual values for the template value
   // parameters do not matter, because they are not part of the function signature. The
   // second to fourth value parameters will be selected by the choose_* functions below.
-  using kernel_t =
-    decltype(&search_kernel<128, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>);
+  using kernel_t = decltype(&search_kernel<DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>);
 
   static auto choose_buffer_size(unsigned result_buffer_size, unsigned block_size) -> kernel_t
   {
-    if (result_buffer_size <= 64) {
-      return search_kernel<64, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
-    } else if (result_buffer_size <= 128) {
-      return search_kernel<128, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
-    } else if (result_buffer_size <= 256) {
-      return search_kernel<256, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
+    if (result_buffer_size <= 256) {
+      return search_kernel<DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
     }
     THROW("Result buffer size %u larger than max buffer size %u", result_buffer_size, 256);
   }
@@ -536,6 +535,17 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                          SourceIndexT,
                          SampleFilterT>::choose_buffer_size(result_buffer_size, block_size);
 
+  uint32_t max_elements{};
+  if (result_buffer_size <= 64) {
+    max_elements = 64;
+  } else if (result_buffer_size <= 128) {
+    max_elements = 128;
+  } else if (result_buffer_size <= 256) {
+    max_elements = 256;
+  } else {
+    THROW("Result buffer size %u larger than max buffer size %u", result_buffer_size, 256);
+  }
+
   RAFT_CUDA_TRY(
     cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
   // Initialize hash table
@@ -560,6 +570,7 @@ void select_and_run(const dataset_descriptor_host<DataT, IndexT, DistanceT>& dat
                                                        dataset_desc.dev_ptr(stream),
                                                        queries_ptr,
                                                        graph.data_handle(),
+                                                       max_elements,
                                                        graph.extent(1),
                                                        source_indices_ptr,
                                                        ps.num_random_samplings,
