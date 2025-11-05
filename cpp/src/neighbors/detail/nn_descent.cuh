@@ -840,8 +840,14 @@ GnndGraph<Index_t>::GnndGraph(raft::resources const& res,
     h_list_sizes_old{raft::make_pinned_vector<int2, size_t>(res, nrow)}
 {
   // node_degree must be a multiple of segment_size;
-  assert(node_degree % segment_size == 0);
-  assert(internal_node_degree % segment_size == 0);
+  RAFT_EXPECTS(node_degree % segment_size == 0,
+               "node_degree (%u) %% segment_size (%u) == 0",
+               static_cast<uint32_t>(node_degree),
+               static_cast<uint32_t>(segment_size));
+  RAFT_EXPECTS(internal_node_degree % segment_size == 0,
+               "internal_node_degree (%u) %% segment_size (%u) == 0",
+               static_cast<uint32_t>(internal_node_degree),
+               static_cast<uint32_t>(segment_size));
 
   num_segments = node_degree / segment_size;
   // To save the CPU memory, graph should be allocated by external function
@@ -995,7 +1001,6 @@ void GnndGraph<Index_t>::clear()
 template <typename Index_t>
 GnndGraph<Index_t>::~GnndGraph()
 {
-  assert(h_graph == nullptr);
 }
 
 template <typename Data_t, typename Index_t>
