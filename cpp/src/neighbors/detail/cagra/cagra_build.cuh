@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -142,7 +131,7 @@ void build_knn_graph(
   const std::string model_name = [&]() {
     char model_name[1024];
     sprintf(model_name,
-            "%s-%lux%lu.cluster_%u.pq_%u.%ubit.itr_%u.metric_%u.pqcenter_%u",
+            "%s-%lux%lu.cluster_%u.pq_%u.%ubit.itr_%u.metric_%d.pqcenter_%u",
             "IVF-PQ",
             static_cast<size_t>(dataset.extent(0)),
             static_cast<size_t>(dataset.extent(1)),
@@ -150,7 +139,7 @@ void build_knn_graph(
             pq.build_params.pq_dim,
             pq.build_params.pq_bits,
             pq.build_params.kmeans_n_iters,
-            pq.build_params.metric,
+            static_cast<int>(pq.build_params.metric),
             static_cast<uint32_t>(pq.build_params.codebook_kind));
     return std::string(model_name);
   }();
@@ -711,7 +700,7 @@ index<T, IdxT> build(
     }
   }
   RAFT_EXPECTS(
-    params.metric != BitwiseHamming ||
+    params.metric != cuvs::distance::DistanceType::BitwiseHamming ||
       std::holds_alternative<cagra::graph_build_params::iterative_search_params>(
         knn_build_params) ||
       std::holds_alternative<cagra::graph_build_params::nn_descent_params>(knn_build_params),

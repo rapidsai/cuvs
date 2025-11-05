@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #ifdef CUVS_BUILD_CAGRA_HNSWLIB
@@ -68,7 +57,7 @@ struct index_params : cuvs::neighbors::index_params {
  * @brief Create a CAGRA index parameters compatible with HNSW index
  *
  * @param dataset The shape of the input dataset.
- * @param M HNSW index parameter M.
+ * @param M HNSW index parameter M (graph degree = 2*M).
  * @param ef_construction HNSW index parameter ef_construction.
  * @param metric The distance metric to search.
  *
@@ -91,6 +80,7 @@ struct index_params : cuvs::neighbors::index_params {
  *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, cagra_index);
  * @endcode
  */
+[[deprecated("Use cagra::index_params::from_hnsw_params instead")]]
 cuvs::neighbors::cagra::index_params to_cagra_params(
   raft::matrix_extent<int64_t> dataset,
   int M,
