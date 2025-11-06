@@ -21,6 +21,7 @@
 #include <raft/linalg/map.cuh>
 #include <raft/util/integer_utils.hpp>
 #include <raft/util/pow2_utils.cuh>
+#include <raft/util/vectorized.cuh>
 
 // A temporary stub till https://github.com/rapidsai/raft/pull/2077 is re-merged
 namespace cuvs::util {
@@ -254,20 +255,40 @@ template <uint32_t SubWarpSize, typename DataT, typename MathT, typename IdxT, t
 __device__ auto compute_code(
   raft::device_matrix_view<const DataT, IdxT, raft::row_major> dataset,
   std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers,
+  std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> pq_centers_smem,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
   IdxT i,
   uint32_t j,
   LabelT vq_label) -> uint8_t
 {
-  auto data_mapping = cuvs::spatial::knn::detail::utils::mapping<MathT>{};
-  uint32_t lane_id  = raft::Pow2<SubWarpSize>::mod(raft::laneId());
+  auto data_mapping      = cuvs::spatial::knn::detail::utils::mapping<MathT>{};
+  const uint32_t lane_id = raft::Pow2<SubWarpSize>::mod(raft::laneId());
 
   const uint32_t pq_book_size = pq_centers.extent(0);
   const uint32_t pq_len       = pq_centers.extent(1);
   float min_dist              = std::numeric_limits<float>::infinity();
   uint8_t code                = 0;
   // calculate the distance for each PQ cluster, find the minimum for each thread
-  for (uint32_t l = lane_id; l < pq_book_size; l += SubWarpSize) {
+  uint32_t l = lane_id;
+  if (pq_centers_smem) {
+    for (; l < pq_centers_smem.value().extent(0); l += SubWarpSize) {
+      // NB: the L2 quantifiers on residuals are always trained on L2 metric.
+      float d = 0.0f;
+      for (uint32_t k = 0; k < pq_len; k++) {
+        auto jk = j * pq_len + k;
+        auto x  = data_mapping(dataset(i, jk));
+        if (vq_centers) { x -= vq_centers.value()(vq_label, jk); }
+        auto t = x - pq_centers_smem.value()(l, k);
+        d += t * t;
+      }
+      if (d < min_dist) {
+        min_dist = d;
+        code     = uint8_t(l);
+      }
+    }
+  }
+  // if there are more rows than the shared memory size, compute the distance for the remaining rows
+  for (; l < pq_book_size; l += SubWarpSize) {
     // NB: the L2 quantifiers on residuals are always trained on L2 metric.
     float d = 0.0f;
     for (uint32_t k = 0; k < pq_len; k++) {
@@ -295,6 +316,45 @@ __device__ auto compute_code(
   return code;
 }
 
+template <int VecBytes = 16, typename T>
+__device__ inline void copy_vectorized(T* out, const T* in, uint32_t n)
+{
+  constexpr int VecElems = VecBytes / sizeof(T);  // NOLINT
+  using align_bytes      = raft::Pow2<(size_t)VecBytes>;
+  if constexpr (VecElems > 1) {
+    using align_elems = raft::Pow2<VecElems>;
+    if (!align_bytes::areSameAlignOffsets(out, in)) {
+      return copy_vectorized<(VecBytes >> 1), T>(out, in, n);
+    }
+    {  // process unaligned head
+      const uint32_t head = align_bytes::roundUp(in) - in;
+      if (head > 0) {
+        copy_vectorized<sizeof(T), T>(out, in, head);
+        n -= head;
+        in += head;
+        out += head;
+      }
+    }
+    {  // process main part vectorized
+      using vec_t = typename raft::IOType<T, VecElems>::Type;
+      copy_vectorized<sizeof(vec_t), vec_t>(
+        reinterpret_cast<vec_t*>(out), reinterpret_cast<const vec_t*>(in), align_elems::div(n));
+    }
+    {  // process unaligned tail
+      const uint32_t tail = align_elems::mod(n);
+      if (tail > 0) {
+        n -= tail;
+        copy_vectorized<sizeof(T), T>(out + n, in + n, tail);
+      }
+    }
+  }
+  if constexpr (VecElems <= 1) {
+    for (uint32_t i = threadIdx.x; i < n; i += blockDim.x) {
+      out[i] = in[i];
+    }
+  }
+}
+
 template <uint32_t BlockSize,
           uint32_t PqBits,
           typename DataT,
@@ -306,14 +366,25 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
   raft::device_matrix_view<const DataT, IdxT, raft::row_major> dataset,
   std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers,
   std::optional<raft::device_vector_view<const LabelT, IdxT, raft::row_major>> vq_labels,
-  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers)
+  raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
+  const uint32_t shared_memory_size)
 {
+  extern __shared__ __align__(256) uint8_t pq_centers_smem[];
   constexpr uint32_t kSubWarpSize = std::min<uint32_t>(raft::WarpSize, 1u << PqBits);
   using subwarp_align             = raft::Pow2<kSubWarpSize>;
   const IdxT row_ix = subwarp_align::div(IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x});
   if (row_ix >= out_codes.extent(0)) { return; }
 
   const uint32_t pq_dim = raft::div_rounding_up_unsafe(dataset.extent(1), pq_centers.extent(1));
+
+  // Copy the pq_centers into shared memory for faster processing
+  const IdxT rows_in_shared_memory = shared_memory_size / (sizeof(MathT) * pq_centers.extent(1));
+  copy_vectorized<4>(reinterpret_cast<MathT*>(pq_centers_smem),
+                     pq_centers.data_handle(),
+                     rows_in_shared_memory * pq_centers.extent(1));
+  __syncthreads();
+  auto pq_centers_smem_view = raft::make_device_matrix_view<const MathT, uint32_t, raft::row_major>(
+    reinterpret_cast<const MathT*>(pq_centers_smem), rows_in_shared_memory, pq_centers.extent(1));
 
   const uint32_t lane_id = raft::Pow2<kSubWarpSize>::mod(threadIdx.x);
   const LabelT vq_label  = vq_labels ? vq_labels.value()(row_ix) : 0;
@@ -326,7 +397,13 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
   cuvs::neighbors::ivf_pq::detail::bitfield_view_t<PqBits> code_view{out_codes_ptr};
   for (uint32_t j = 0; j < pq_dim; j++) {
     // find PQ label
-    uint8_t code = compute_code<kSubWarpSize>(dataset, vq_centers, pq_centers, row_ix, j, vq_label);
+    uint8_t code = compute_code<kSubWarpSize>(dataset,
+                                              vq_centers,
+                                              std::make_optional(pq_centers_smem_view),
+                                              pq_centers,
+                                              row_ix,
+                                              j,
+                                              vq_label);
     // TODO: this writes in global memory one byte per warp, which is very slow.
     //  It's better to keep the codes in the shared memory or registers and dump them at once.
     if (lane_id == 0) { code_view[j] = code; }
@@ -364,7 +441,10 @@ void process_and_fill_codes(
   // TODO: with scaling workspace we could choose the batch size dynamically
   constexpr ix_t kReasonableMaxBatchSize = 65536;
   constexpr ix_t kBlockSize              = 256;
-  const ix_t threads_per_vec             = std::min<ix_t>(raft::WarpSize, pq_n_centers);
+  constexpr ix_t kMaxSharedMemorySize    = 16384;
+  const ix_t kSharedMemorySize           = std::min<ix_t>(
+    kMaxSharedMemorySize, pq_centers.extent(0) * pq_centers.extent(1) * sizeof(MathT));
+  const ix_t threads_per_vec = std::min<ix_t>(raft::WarpSize, pq_n_centers);
   dim3 threads(kBlockSize, 1, 1);
   ix_t max_batch_size = std::min<ix_t>(n_rows, kReasonableMaxBatchSize);
   auto kernel         = [](uint32_t pq_bits) {
@@ -393,13 +473,14 @@ void process_and_fill_codes(
       labels_view = raft::make_const_mdspan(labels->view());
     }
     dim3 blocks(raft::div_rounding_up_safe<ix_t>(n_rows, kBlockSize / threads_per_vec), 1, 1);
-    kernel<<<blocks, threads, 0, stream>>>(
+    kernel<<<blocks, threads, kSharedMemorySize, stream>>>(
       raft::make_device_matrix_view<uint8_t, IdxT>(
         codes.data_handle() + batch.offset() * codes_rowlen, batch.size(), codes_rowlen),
       batch_view,
       vq_centers,
       labels_view,
-      pq_centers);
+      pq_centers,
+      kSharedMemorySize);
     RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 }
@@ -457,8 +538,15 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_subspaces_kernel
     int subspace_offset   = j * pq_centers.extent(1) * (1 << PqBits);
     auto pq_subspace_view = raft::make_device_matrix_view(
       pq_centers.data_handle() + subspace_offset, (uint32_t)(1 << PqBits), pq_centers.extent(1));
-    uint8_t code = compute_code<kSubWarpSize>(
-      dataset, std::make_optional(vq_centers), pq_subspace_view, row_ix, j, vq_label);
+    std::optional<raft::device_matrix_view<const MathT, uint32_t, raft::row_major>>
+      pq_centers_smem = std::nullopt;
+    uint8_t code      = compute_code<kSubWarpSize>(dataset,
+                                              std::make_optional(vq_centers),
+                                              pq_centers_smem,
+                                              pq_subspace_view,
+                                              row_ix,
+                                              j,
+                                              vq_label);
     // TODO: this writes in global memory one byte per warp, which is very slow.
     //  It's better to keep the codes in the shared memory or registers and dump them at once.
     if (lane_id == 0) { code_view[j] = code; }
