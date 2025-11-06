@@ -884,22 +884,32 @@ void GnndGraph<Index_t>::sample_graph_new(InternalID_t<Index_t>* new_neighbors, 
 template <typename Index_t>
 void GnndGraph<Index_t>::init_random_graph()
 {
+  const auto extended_nrows = raft::round_up_safe(nrow, static_cast<uint32_t>(num_segments));
   for (uint32_t seg_id = 0; seg_id < static_cast<uint32_t>(num_segments); seg_id++) {
     const auto actual_segment_size =
       std::min(static_cast<uint64_t>(segment_size), node_degree - seg_id * segment_size);
 
-    uint64_t stride = nrow / (actual_segment_size * num_segments);
-    while (std::gcd(nrow, stride) != 1 || std::gcd(actual_segment_size, stride) != 1) {
+    uint64_t stride = nrow / segment_size;
+    while (std::gcd(extended_nrows, stride) != 1 || std::gcd(actual_segment_size, stride) != 1) {
       stride++;
     }
 
 #pragma omp parallel for
     for (uint64_t i = 0; i < nrow; i++) {
-      uint32_t id = ((i / num_segments) * num_segments +
-                     num_segments * (1 + (i + num_segments - seg_id) % num_segments) + seg_id) %
-                    nrow;
+      // Generate a starting index. The node ((i + 1) % nrow) will be included in the neighbor list
+      // of node i. This rule guarantees the connectivity of the graph.
+      uint32_t id;
+      if ((i + 1) % num_segments == seg_id) {
+        id = i + 1;
+        if (id >= nrow) { id = seg_id; }
+      } else {
+        id = (i + 1) * num_segments + seg_id;
+      }
+
       for (uint32_t j = 0; j < actual_segment_size; j++) {
-        id = (id / num_segments) * num_segments + seg_id;
+        while (id >= nrow || id == i) {
+          id = (id + stride * num_segments) % extended_nrows;
+        }
 
         const auto store_index              = i * node_degree + seg_id * segment_size + j;
         h_graph[store_index].id_with_flag() = id;
