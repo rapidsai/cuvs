@@ -50,7 +50,7 @@ __launch_bounds__(BlockSize) static __global__ void process_and_fill_codes_kerne
   // write the codes (one record per subwarp):
   const uint32_t pq_dim = new_vectors.extent(1) / pq_centers.extent(1);
   auto pq_extents = list_spec<uint32_t, IdxT>{PqBits, pq_dim, true}.make_list_extents(out_ix + 1);
-  auto pq_dataset = raft::make_mdspan<uint8_t, uint32_t, raft::row_major, false, true>(
+  auto pq_dataset = raft::make_mdspan<uint8_t, IdxT, raft::row_major, false, true>(
     data_ptrs[cluster_ix], pq_extents);
   write_vector<PqBits, kSubWarpSize>(
     pq_dataset,

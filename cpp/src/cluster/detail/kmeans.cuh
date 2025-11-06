@@ -460,7 +460,7 @@ void kmeans_fit_main(raft::resources const& handle,
         handle,
         minClusterAndDistance.view(),
         workspace,
-        raft::make_device_scalar_view(clusterCostD.data()),
+        raft::make_device_scalar_view<DataT, IndexT>(clusterCostD.data()),
         raft::value_op{},
         raft::add_op{});
 
@@ -519,7 +519,7 @@ void kmeans_fit_main(raft::resources const& handle,
     handle,
     minClusterAndDistance.view(),
     workspace,
-    raft::make_device_scalar_view(clusterCostD.data()),
+    raft::make_device_scalar_view<DataT, IndexT>(clusterCostD.data()),
     raft::value_op{},
     raft::add_op{});
 
@@ -632,7 +632,7 @@ void initScalableKMeansPlusPlus(raft::resources const& handle,
     handle,
     minClusterDistanceVec.view(),
     workspace,
-    raft::make_device_scalar_view(clusterCost.data()),
+    raft::make_device_scalar_view<DataT, IndexT>(clusterCost.data()),
     raft::identity_op{},
     raft::add_op{});
 
@@ -1059,7 +1059,7 @@ void kmeans_predict(raft::resources const& handle,
     handle,
     minClusterAndDistance.view(),
     workspace,
-    raft::make_device_scalar_view(clusterCostD.data()),
+    raft::make_device_scalar_view<DataT, IndexT>(clusterCostD.data()),
     raft::value_op{},
     raft::add_op{});
 

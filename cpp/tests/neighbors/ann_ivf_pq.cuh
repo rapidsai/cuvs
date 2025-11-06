@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -405,11 +405,11 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       return;
     }
     auto codes2 = raft::make_device_matrix<uint8_t>(handle_, n_take, index->pq_dim());
-    ivf_pq::helpers::codepacker::unpack(
-      handle_, list_data, index->pq_bits(), row_offset, codes2.view());
+    ivf_pq::helpers::codepacker::unpack<IdxT>(
+      handle_, make_const_mdspan(list_data), index->pq_bits(), row_offset, codes2.view());
 
     // Write it back
-    ivf_pq::helpers::codepacker::pack(
+    ivf_pq::helpers::codepacker::pack<IdxT>(
       handle_, make_const_mdspan(codes2.view()), index->pq_bits(), row_offset, list_data);
     ASSERT_TRUE(cuvs::devArrMatch(old_list->data.data_handle(),
                                   new_list->data.data_handle(),

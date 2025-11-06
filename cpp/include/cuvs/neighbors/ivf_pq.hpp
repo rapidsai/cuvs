@@ -225,7 +225,7 @@ struct list_spec {
    *    ].
    */
   using list_extents = raft::
-    extents<SizeT, raft::dynamic_extent, raft::dynamic_extent, kIndexGroupSize, kIndexGroupVecLen>;
+    extents<IdxT, raft::dynamic_extent, raft::dynamic_extent, kIndexGroupSize, kIndexGroupVecLen>;
 
   SizeT align_max;
   SizeT align_min;
@@ -269,10 +269,8 @@ constexpr typename list_spec<SizeT, IdxT>::list_extents list_spec<SizeT, IdxT>::
 {
   // how many elems of pq_dim fit into one kIndexGroupVecLen-byte chunk
   auto pq_chunk = (kIndexGroupVecLen * 8u) / pq_bits;
-  return raft::make_extents<IdxT>(raft::div_rounding_up_safe<SizeT>(n_rows, kIndexGroupSize),
-                                  raft::div_rounding_up_safe<SizeT>(pq_dim, pq_chunk),
-                                  kIndexGroupSize,
-                                  kIndexGroupVecLen);
+  return list_extents{raft::div_rounding_up_safe<SizeT>(n_rows, kIndexGroupSize),
+                      raft::div_rounding_up_safe<SizeT>(pq_dim, pq_chunk)};
 }
 
 template <typename IdxT, typename SizeT = uint32_t>
@@ -2285,13 +2283,14 @@ namespace codepacker {
  *   The length `n_take` defines how many records to unpack,
  *   it must be smaller than the list size.
  */
-void unpack(
-  raft::resources const& res,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
-  uint32_t pq_bits,
-  uint32_t offset,
-  raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes);
+template <typename IdxT>
+void unpack(raft::resources const& res,
+            raft::device_mdspan<const uint8_t,
+                                typename list_spec<uint32_t, IdxT>::list_extents,
+                                raft::row_major> list_data,
+            uint32_t pq_bits,
+            uint32_t offset,
+            raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes);
 
 /**
  * @brief Unpack `n_rows` consecutive records of a single list (cluster) in the compressed index
@@ -2325,15 +2324,16 @@ void unpack(
  *   The length `n_rows` defines how many records to unpack,
  *   it must be smaller than the list size.
  */
-void unpack_contiguous(
-  raft::resources const& res,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
-  uint32_t pq_bits,
-  uint32_t offset,
-  uint32_t n_rows,
-  uint32_t pq_dim,
-  uint8_t* codes);
+template <typename IdxT>
+void unpack_contiguous(raft::resources const& res,
+                       raft::device_mdspan<const uint8_t,
+                                           typename list_spec<uint32_t, IdxT>::list_extents,
+                                           raft::row_major> list_data,
+                       uint32_t pq_bits,
+                       uint32_t offset,
+                       uint32_t n_rows,
+                       uint32_t pq_dim,
+                       uint8_t* codes);
 
 /**
  * Write flat PQ codes into an existing list by the given offset.
@@ -2357,12 +2357,14 @@ void unpack_contiguous(
  * @param[in] offset how many records to skip before writing the data into the list
  * @param[in] list_data block to write into
  */
-void pack(raft::resources const& res,
-          raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
-          uint32_t pq_bits,
-          uint32_t offset,
-          raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-            list_data);
+template <typename IdxT>
+void pack(
+  raft::resources const& res,
+  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
+  uint32_t pq_bits,
+  uint32_t offset,
+  raft::device_mdspan<uint8_t, typename list_spec<uint32_t, IdxT>::list_extents, raft::row_major>
+    list_data);
 
 /**
  * Write flat PQ codes into an existing list by the given offset. The input codes of a single vector
@@ -2392,6 +2394,7 @@ void pack(raft::resources const& res,
  * @param[in] offset how many records to skip before writing the data into the list
  * @param[in] list_data block to write into
  */
+template <typename IdxT>
 void pack_contiguous(
   raft::resources const& res,
   const uint8_t* codes,
@@ -2399,7 +2402,7 @@ void pack_contiguous(
   uint32_t pq_dim,
   uint32_t pq_bits,
   uint32_t offset,
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+  raft::device_mdspan<uint8_t, typename list_spec<uint32_t, IdxT>::list_extents, raft::row_major>
     list_data);
 
 /**

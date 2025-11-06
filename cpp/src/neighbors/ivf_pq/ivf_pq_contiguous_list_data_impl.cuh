@@ -40,16 +40,17 @@ struct unpack_contiguous {
   }
 };
 
-template <uint32_t BlockSize, uint32_t PqBits>
+template <uint32_t BlockSize, uint32_t PqBits, typename IdxT>
 __launch_bounds__(BlockSize) static __global__ void unpack_contiguous_list_data_kernel(
   uint8_t* out_codes,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    in_list_data,
+  raft::device_mdspan<const uint8_t,
+                      typename list_spec<uint32_t, IdxT>::list_extents,
+                      raft::row_major> in_list_data,
   uint32_t n_rows,
   uint32_t pq_dim,
   std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
-  run_on_list<PqBits>(
+  run_on_list<PqBits, IdxT>(
     in_list_data, offset_or_indices, n_rows, pq_dim, unpack_contiguous<PqBits>(out_codes, pq_dim));
 }
 
@@ -62,10 +63,12 @@ __launch_bounds__(BlockSize) static __global__ void unpack_contiguous_list_data_
  * @param[in] pq_bits codebook size (1 << pq_bits)
  * @param[in] stream
  */
+template <typename IdxT>
 inline void unpack_contiguous_list_data_impl(
   uint8_t* codes,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
+  raft::device_mdspan<const uint8_t,
+                      typename list_spec<uint32_t, IdxT>::list_extents,
+                      raft::row_major> list_data,
   uint32_t n_rows,
   uint32_t pq_dim,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
@@ -79,11 +82,11 @@ inline void unpack_contiguous_list_data_impl(
   dim3 threads(kBlockSize, 1, 1);
   auto kernel = [pq_bits]() {
     switch (pq_bits) {
-      case 4: return unpack_contiguous_list_data_kernel<kBlockSize, 4>;
-      case 5: return unpack_contiguous_list_data_kernel<kBlockSize, 5>;
-      case 6: return unpack_contiguous_list_data_kernel<kBlockSize, 6>;
-      case 7: return unpack_contiguous_list_data_kernel<kBlockSize, 7>;
-      case 8: return unpack_contiguous_list_data_kernel<kBlockSize, 8>;
+      case 4: return unpack_contiguous_list_data_kernel<kBlockSize, 4, IdxT>;
+      case 5: return unpack_contiguous_list_data_kernel<kBlockSize, 5, IdxT>;
+      case 6: return unpack_contiguous_list_data_kernel<kBlockSize, 6, IdxT>;
+      case 7: return unpack_contiguous_list_data_kernel<kBlockSize, 7, IdxT>;
+      case 8: return unpack_contiguous_list_data_kernel<kBlockSize, 8, IdxT>;
       default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
     }
   }();
@@ -118,16 +121,16 @@ struct pack_contiguous {
   }
 };
 
-template <uint32_t BlockSize, uint32_t PqBits>
+template <uint32_t BlockSize, uint32_t PqBits, typename IdxT>
 __launch_bounds__(BlockSize) static __global__ void pack_contiguous_list_data_kernel(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+  raft::device_mdspan<uint8_t, typename list_spec<uint32_t, IdxT>::list_extents, raft::row_major>
     list_data,
   const uint8_t* codes,
   uint32_t n_rows,
   uint32_t pq_dim,
   std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
-  write_list<PqBits, 1>(
+  write_list<PqBits, 1, IdxT>(
     list_data, offset_or_indices, n_rows, pq_dim, pack_contiguous<PqBits>(codes, pq_dim));
 }
 
@@ -142,8 +145,9 @@ __launch_bounds__(BlockSize) static __global__ void pack_contiguous_list_data_ke
  * @param[in] pq_bits codebook size (1 << pq_bits)
  * @param[in] stream
  */
+template <typename IdxT>
 inline void pack_contiguous_list_data_impl(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+  raft::device_mdspan<uint8_t, typename list_spec<uint32_t, IdxT>::list_extents, raft::row_major>
     list_data,
   const uint8_t* codes,
   uint32_t n_rows,
@@ -159,11 +163,11 @@ inline void pack_contiguous_list_data_impl(
   dim3 threads(kBlockSize, 1, 1);
   auto kernel = [pq_bits]() {
     switch (pq_bits) {
-      case 4: return pack_contiguous_list_data_kernel<kBlockSize, 4>;
-      case 5: return pack_contiguous_list_data_kernel<kBlockSize, 5>;
-      case 6: return pack_contiguous_list_data_kernel<kBlockSize, 6>;
-      case 7: return pack_contiguous_list_data_kernel<kBlockSize, 7>;
-      case 8: return pack_contiguous_list_data_kernel<kBlockSize, 8>;
+      case 4: return pack_contiguous_list_data_kernel<kBlockSize, 4, IdxT>;
+      case 5: return pack_contiguous_list_data_kernel<kBlockSize, 5, IdxT>;
+      case 6: return pack_contiguous_list_data_kernel<kBlockSize, 6, IdxT>;
+      case 7: return pack_contiguous_list_data_kernel<kBlockSize, 7, IdxT>;
+      case 8: return pack_contiguous_list_data_kernel<kBlockSize, 8, IdxT>;
       default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
     }
   }();

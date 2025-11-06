@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -78,6 +78,7 @@ struct bitfield_view_t {
  * Process a single vector in a list.
  *
  * @tparam PqBits
+ * @tparam IdxT type of the index in list_spec
  * @tparam Action tells how to process a single vector (e.g. reconstruct or just unpack)
  *
  * @param[in] in_list_data the encoded cluster data.
@@ -87,14 +88,14 @@ struct bitfield_view_t {
  * @param action a callable action to be invoked on each PQ code (component of the encoding)
  *    type: void (uint8_t code, uint32_t out_ix, uint32_t j), where j = [0..pq_dim).
  */
-template <uint32_t PqBits, typename Action>
-__device__ void run_on_vector(
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    in_list_data,
-  uint32_t in_ix,
-  uint32_t out_ix,
-  uint32_t pq_dim,
-  Action action)
+template <uint32_t PqBits, typename IdxT, typename Action>
+__device__ void run_on_vector(raft::device_mdspan<const uint8_t,
+                                                  typename list_spec<uint32_t, IdxT>::list_extents,
+                                                  raft::row_major> in_list_data,
+                              uint32_t in_ix,
+                              uint32_t out_ix,
+                              uint32_t pq_dim,
+                              Action action)
 {
   using group_align         = raft::Pow2<kIndexGroupSize>;
   const uint32_t group_ix   = group_align::div(in_ix);
@@ -132,7 +133,7 @@ __device__ void run_on_vector(
  */
 template <uint32_t PqBits, uint32_t SubWarpSize, typename IdxT, typename Action>
 __device__ void write_vector(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+  raft::device_mdspan<uint8_t, typename list_spec<uint32_t, IdxT>::list_extents, raft::row_major>
     out_list_data,
   uint32_t out_ix,
   IdxT in_ix,
@@ -166,27 +167,27 @@ __device__ void write_vector(
 }
 
 /** Process the given indices or a block of a single list (cluster). */
-template <uint32_t PqBits, typename Action>
-__device__ void run_on_list(
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    in_list_data,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices,
-  uint32_t len,
-  uint32_t pq_dim,
-  Action action)
+template <uint32_t PqBits, typename IdxT, typename Action>
+__device__ void run_on_list(raft::device_mdspan<const uint8_t,
+                                                typename list_spec<uint32_t, IdxT>::list_extents,
+                                                raft::row_major> in_list_data,
+                            std::variant<uint32_t, const uint32_t*> offset_or_indices,
+                            uint32_t len,
+                            uint32_t pq_dim,
+                            Action action)
 {
   for (uint32_t ix = threadIdx.x + blockDim.x * blockIdx.x; ix < len; ix += blockDim.x) {
     const uint32_t src_ix = std::holds_alternative<uint32_t>(offset_or_indices)
                               ? std::get<uint32_t>(offset_or_indices) + ix
                               : std::get<const uint32_t*>(offset_or_indices)[ix];
-    run_on_vector<PqBits>(in_list_data, src_ix, ix, pq_dim, action);
+    run_on_vector<PqBits, IdxT>(in_list_data, src_ix, ix, pq_dim, action);
   }
 }
 
 /** Process the given indices or a block of a single list (cluster). */
-template <uint32_t PqBits, uint32_t SubWarpSize, typename Action>
+template <uint32_t PqBits, uint32_t SubWarpSize, typename IdxT, typename Action>
 __device__ void write_list(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+  raft::device_mdspan<uint8_t, typename list_spec<uint32_t, IdxT>::list_extents, raft::row_major>
     out_list_data,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
   uint32_t len,

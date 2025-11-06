@@ -44,7 +44,7 @@ list<SpecT, SizeT, SpecExtraArgs...>::list(raft::resources const& res,
     capacity = std::min<SizeT>(capacity, spec.align_max);
   }
   try {
-    data    = raft::make_device_mdarray<value_type, SizeT>(res, spec.make_list_extents(capacity));
+    data = raft::make_device_mdarray<value_type, index_type>(res, spec.make_list_extents(capacity));
     indices = raft::make_device_vector<index_type, SizeT>(res, capacity);
   } catch (std::bad_alloc& e) {
     RAFT_FAIL(
@@ -90,7 +90,7 @@ void resize_list(raft::resources const& res,
   if (old_used_size > 0) {
     auto copied_data_extents = spec.make_list_extents(old_used_size);
     auto copied_view         = raft::make_mdspan<typename ListT::value_type,
-                                                 typename ListT::size_type,
+                                                 typename ListT::index_type,
                                                  raft::row_major,
                                                  false,
                                                  true>(new_list->data.data_handle(), copied_data_extents);
@@ -120,10 +120,13 @@ enable_if_valid_list_t<ListT> serialize_list(const raft::resources& handle,
   if (size == 0) { return; }
 
   auto data_extents = store_spec.make_list_extents(size);
-  auto data_array =
-    raft::make_host_mdarray<typename ListT::value_type, size_type, raft::row_major>(data_extents);
-  auto inds_array = raft::make_host_mdarray<typename ListT::index_type, size_type, raft::row_major>(
-    raft::make_extents<size_type>(size));
+  auto data_array   = raft::make_host_mdarray<typename ListT::value_type,
+                                              typename ListT::index_type,
+                                              raft::row_major>(data_extents);
+  auto inds_array =
+    raft::make_host_mdarray<typename ListT::index_type,
+                            typename ListT::index_type,
+                            raft::row_major>(raft::make_extents<typename ListT::index_type>(size));
   raft::copy(data_array.data_handle(),
              ld.data.data_handle(),
              data_array.size(),
@@ -163,10 +166,13 @@ enable_if_valid_list_t<ListT> deserialize_list(const raft::resources& handle,
   if (size == 0) { return ld.reset(); }
   std::make_shared<ListT>(handle, device_spec, size).swap(ld);
   auto data_extents = store_spec.make_list_extents(size);
-  auto data_array =
-    raft::make_host_mdarray<typename ListT::value_type, size_type, raft::row_major>(data_extents);
-  auto inds_array = raft::make_host_mdarray<typename ListT::index_type, size_type, raft::row_major>(
-    raft::make_extents<size_type>(size));
+  auto data_array   = raft::make_host_mdarray<typename ListT::value_type,
+                                              typename ListT::index_type,
+                                              raft::row_major>(data_extents);
+  auto inds_array =
+    raft::make_host_mdarray<typename ListT::index_type,
+                            typename ListT::index_type,
+                            raft::row_major>(raft::make_extents<typename ListT::index_type>(size));
   raft::deserialize_mdspan(handle, is, data_array.view());
   raft::deserialize_mdspan(handle, is, inds_array.view());
   raft::copy(ld->data.data_handle(),

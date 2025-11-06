@@ -517,16 +517,18 @@ struct unpack_codes {
   }
 };
 
-template <uint32_t BlockSize, uint32_t PqBits>
+template <uint32_t BlockSize, uint32_t PqBits, typename IdxT>
 __launch_bounds__(BlockSize) static __global__ void unpack_list_data_kernel(
   raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> out_codes,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    in_list_data,
+  raft::device_mdspan<const uint8_t,
+                      typename list_spec<uint32_t, IdxT>::list_extents,
+                      raft::row_major> in_list_data,
   std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
   const uint32_t pq_dim = out_codes.extent(1);
   auto unpack_action    = unpack_codes{out_codes};
-  run_on_list<PqBits>(in_list_data, offset_or_indices, out_codes.extent(0), pq_dim, unpack_action);
+  run_on_list<PqBits, IdxT>(
+    in_list_data, offset_or_indices, out_codes.extent(0), pq_dim, unpack_action);
 }
 
 /**
@@ -538,13 +540,14 @@ __launch_bounds__(BlockSize) static __global__ void unpack_list_data_kernel(
  * @param[in] pq_bits codebook size (1 << pq_bits)
  * @param[in] stream
  */
-inline void unpack_list_data(
-  raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
-  std::variant<uint32_t, const uint32_t*> offset_or_indices,
-  uint32_t pq_bits,
-  rmm::cuda_stream_view stream)
+template <typename IdxT>
+inline void unpack_list_data(raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes,
+                             raft::device_mdspan<const uint8_t,
+                                                 typename list_spec<uint32_t, IdxT>::list_extents,
+                                                 raft::row_major> list_data,
+                             std::variant<uint32_t, const uint32_t*> offset_or_indices,
+                             uint32_t pq_bits,
+                             rmm::cuda_stream_view stream)
 {
   auto n_rows = codes.extent(0);
   if (n_rows == 0) { return; }
@@ -554,11 +557,11 @@ inline void unpack_list_data(
   dim3 threads(kBlockSize, 1, 1);
   auto kernel = [pq_bits]() {
     switch (pq_bits) {
-      case 4: return unpack_list_data_kernel<kBlockSize, 4>;
-      case 5: return unpack_list_data_kernel<kBlockSize, 5>;
-      case 6: return unpack_list_data_kernel<kBlockSize, 6>;
-      case 7: return unpack_list_data_kernel<kBlockSize, 7>;
-      case 8: return unpack_list_data_kernel<kBlockSize, 8>;
+      case 4: return unpack_list_data_kernel<kBlockSize, 4, IdxT>;
+      case 5: return unpack_list_data_kernel<kBlockSize, 5, IdxT>;
+      case 6: return unpack_list_data_kernel<kBlockSize, 6, IdxT>;
+      case 7: return unpack_list_data_kernel<kBlockSize, 7, IdxT>;
+      case 8: return unpack_list_data_kernel<kBlockSize, 8, IdxT>;
       default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
     }
   }();
@@ -574,11 +577,11 @@ void unpack_list_data(raft::resources const& res,
                       uint32_t label,
                       std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
-  unpack_list_data(out_codes,
-                   index.lists()[label]->data.view(),
-                   offset_or_indices,
-                   index.pq_bits(),
-                   raft::resource::get_cuda_stream(res));
+  unpack_list_data<IdxT>(out_codes,
+                         index.lists()[label]->data.view(),
+                         offset_or_indices,
+                         index.pq_bits(),
+                         raft::resource::get_cuda_stream(res));
 }
 
 /** A consumer for the `run_on_list` and `run_on_vector` that approximates the original input data.
@@ -637,11 +640,12 @@ struct reconstruct_vectors {
   }
 };
 
-template <uint32_t BlockSize, uint32_t PqBits>
+template <uint32_t BlockSize, uint32_t PqBits, typename IdxT>
 __launch_bounds__(BlockSize) static __global__ void reconstruct_list_data_kernel(
   raft::device_matrix_view<float, uint32_t, raft::row_major> out_vectors,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    in_list_data,
+  raft::device_mdspan<const uint8_t,
+                      typename list_spec<uint32_t, IdxT>::list_extents,
+                      raft::row_major> in_list_data,
   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot,
   codebook_gen codebook_kind,
@@ -651,7 +655,7 @@ __launch_bounds__(BlockSize) static __global__ void reconstruct_list_data_kernel
   const uint32_t pq_dim = out_vectors.extent(1) / pq_centers.extent(1);
   auto reconstruct_action =
     reconstruct_vectors{out_vectors, pq_centers, centers_rot, codebook_kind, cluster_ix};
-  run_on_list<PqBits>(
+  run_on_list<PqBits, IdxT>(
     in_list_data, offset_or_indices, out_vectors.extent(0), pq_dim, reconstruct_action);
 }
 
@@ -684,11 +688,11 @@ void reconstruct_list_data(raft::resources const& res,
   dim3 threads(kBlockSize, 1, 1);
   auto kernel = [](uint32_t pq_bits) {
     switch (pq_bits) {
-      case 4: return reconstruct_list_data_kernel<kBlockSize, 4>;
-      case 5: return reconstruct_list_data_kernel<kBlockSize, 5>;
-      case 6: return reconstruct_list_data_kernel<kBlockSize, 6>;
-      case 7: return reconstruct_list_data_kernel<kBlockSize, 7>;
-      case 8: return reconstruct_list_data_kernel<kBlockSize, 8>;
+      case 4: return reconstruct_list_data_kernel<kBlockSize, 4, IdxT>;
+      case 5: return reconstruct_list_data_kernel<kBlockSize, 5, IdxT>;
+      case 6: return reconstruct_list_data_kernel<kBlockSize, 6, IdxT>;
+      case 7: return reconstruct_list_data_kernel<kBlockSize, 7, IdxT>;
+      case 8: return reconstruct_list_data_kernel<kBlockSize, 8, IdxT>;
       default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
     }
   }(index.pq_bits());
@@ -762,14 +766,14 @@ struct pass_codes {
   __device__ inline auto operator()(uint32_t i, uint32_t j) const -> uint8_t { return codes(i, j); }
 };
 
-template <uint32_t BlockSize, uint32_t PqBits>
+template <uint32_t BlockSize, uint32_t PqBits, typename IdxT>
 __launch_bounds__(BlockSize) static __global__ void pack_list_data_kernel(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+  raft::device_mdspan<uint8_t, typename list_spec<uint32_t, IdxT>::list_extents, raft::row_major>
     list_data,
   raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
   std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
-  write_list<PqBits, 1>(
+  write_list<PqBits, 1, IdxT>(
     list_data, offset_or_indices, codes.extent(0), codes.extent(1), pass_codes{codes});
 }
 
@@ -784,8 +788,9 @@ __launch_bounds__(BlockSize) static __global__ void pack_list_data_kernel(
  * @param[in] pq_bits codebook size (1 << pq_bits)
  * @param[in] stream
  */
+template <typename IdxT>
 inline void pack_list_data(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+  raft::device_mdspan<uint8_t, typename list_spec<uint32_t, IdxT>::list_extents, raft::row_major>
     list_data,
   raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
   std::variant<uint32_t, const uint32_t*> offset_or_indices,
@@ -800,11 +805,11 @@ inline void pack_list_data(
   dim3 threads(kBlockSize, 1, 1);
   auto kernel = [pq_bits]() {
     switch (pq_bits) {
-      case 4: return pack_list_data_kernel<kBlockSize, 4>;
-      case 5: return pack_list_data_kernel<kBlockSize, 5>;
-      case 6: return pack_list_data_kernel<kBlockSize, 6>;
-      case 7: return pack_list_data_kernel<kBlockSize, 7>;
-      case 8: return pack_list_data_kernel<kBlockSize, 8>;
+      case 4: return pack_list_data_kernel<kBlockSize, 4, IdxT>;
+      case 5: return pack_list_data_kernel<kBlockSize, 5, IdxT>;
+      case 6: return pack_list_data_kernel<kBlockSize, 6, IdxT>;
+      case 7: return pack_list_data_kernel<kBlockSize, 7, IdxT>;
+      case 8: return pack_list_data_kernel<kBlockSize, 8, IdxT>;
       default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
     }
   }();
@@ -819,16 +824,16 @@ void pack_list_data(raft::resources const& res,
                     uint32_t label,
                     std::variant<uint32_t, const uint32_t*> offset_or_indices)
 {
-  pack_list_data(index->lists()[label]->data.view(),
-                 new_codes,
-                 offset_or_indices,
-                 index->pq_bits(),
-                 raft::resource::get_cuda_stream(res));
+  pack_list_data<IdxT>(index->lists()[label]->data.view(),
+                       new_codes,
+                       offset_or_indices,
+                       index->pq_bits(),
+                       raft::resource::get_cuda_stream(res));
 }
 
-template <uint32_t BlockSize, uint32_t PqBits>
+template <uint32_t BlockSize, uint32_t PqBits, typename IdxT>
 __launch_bounds__(BlockSize) static __global__ void encode_list_data_kernel(
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+  raft::device_mdspan<uint8_t, typename list_spec<uint32_t, IdxT>::list_extents, raft::row_major>
     list_data,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> new_vectors,
   raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
@@ -840,7 +845,7 @@ __launch_bounds__(BlockSize) static __global__ void encode_list_data_kernel(
   const uint32_t pq_dim           = new_vectors.extent(1) / pq_centers.extent(1);
   auto encode_action =
     encode_vectors<kSubWarpSize, uint32_t>{pq_centers, new_vectors, codebook_kind, cluster_ix};
-  write_list<PqBits, kSubWarpSize>(
+  write_list<PqBits, kSubWarpSize, IdxT>(
     list_data, offset_or_indices, new_vectors.extent(0), pq_dim, encode_action);
 }
 
@@ -875,11 +880,11 @@ void encode_list_data(raft::resources const& res,
   dim3 threads(kBlockSize, 1, 1);
   auto kernel = [](uint32_t pq_bits) {
     switch (pq_bits) {
-      case 4: return encode_list_data_kernel<kBlockSize, 4>;
-      case 5: return encode_list_data_kernel<kBlockSize, 5>;
-      case 6: return encode_list_data_kernel<kBlockSize, 6>;
-      case 7: return encode_list_data_kernel<kBlockSize, 7>;
-      case 8: return encode_list_data_kernel<kBlockSize, 8>;
+      case 4: return encode_list_data_kernel<kBlockSize, 4, IdxT>;
+      case 5: return encode_list_data_kernel<kBlockSize, 5, IdxT>;
+      case 6: return encode_list_data_kernel<kBlockSize, 6, IdxT>;
+      case 7: return encode_list_data_kernel<kBlockSize, 7, IdxT>;
+      case 8: return encode_list_data_kernel<kBlockSize, 8, IdxT>;
       default: RAFT_FAIL("Invalid pq_bits (%u), the value must be within [4, 8]", pq_bits);
     }
   }(index->pq_bits());

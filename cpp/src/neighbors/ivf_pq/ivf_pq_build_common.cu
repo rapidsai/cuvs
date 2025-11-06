@@ -14,40 +14,47 @@ namespace cuvs::neighbors::ivf_pq::helpers {
 
 namespace codepacker {
 
-void unpack(
-  raft::resources const& res,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
-  uint32_t pq_bits,
-  uint32_t offset,
-  raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes)
+template <typename IdxT>
+void unpack(raft::resources const& res,
+            raft::device_mdspan<const uint8_t,
+                                typename list_spec<uint32_t, IdxT>::list_extents,
+                                raft::row_major> list_data,
+            uint32_t pq_bits,
+            uint32_t offset,
+            raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes)
 {
-  detail::unpack_list_data(codes, list_data, offset, pq_bits, raft::resource::get_cuda_stream(res));
+  detail::unpack_list_data<IdxT>(
+    codes, list_data, offset, pq_bits, raft::resource::get_cuda_stream(res));
 }
 
-void unpack_contiguous(
-  raft::resources const& res,
-  raft::device_mdspan<const uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-    list_data,
-  uint32_t pq_bits,
-  uint32_t offset,
-  uint32_t n_rows,
-  uint32_t pq_dim,
-  uint8_t* codes)
+template <typename IdxT>
+void unpack_contiguous(raft::resources const& res,
+                       raft::device_mdspan<const uint8_t,
+                                           typename list_spec<uint32_t, IdxT>::list_extents,
+                                           raft::row_major> list_data,
+                       uint32_t pq_bits,
+                       uint32_t offset,
+                       uint32_t n_rows,
+                       uint32_t pq_dim,
+                       uint8_t* codes)
 {
-  detail::unpack_contiguous_list_data(
+  detail::unpack_contiguous_list_data<IdxT>(
     codes, list_data, n_rows, pq_dim, offset, pq_bits, raft::resource::get_cuda_stream(res));
 }
-void pack(raft::resources const& res,
-          raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
-          uint32_t pq_bits,
-          uint32_t offset,
-          raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
-            list_data)
+template <typename IdxT>
+void pack(
+  raft::resources const& res,
+  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
+  uint32_t pq_bits,
+  uint32_t offset,
+  raft::device_mdspan<uint8_t, typename list_spec<uint32_t, IdxT>::list_extents, raft::row_major>
+    list_data)
 {
-  detail::pack_list_data(list_data, codes, offset, pq_bits, raft::resource::get_cuda_stream(res));
+  detail::pack_list_data<IdxT>(
+    list_data, codes, offset, pq_bits, raft::resource::get_cuda_stream(res));
 }
 
+template <typename IdxT>
 void pack_contiguous(
   raft::resources const& res,
   const uint8_t* codes,
@@ -55,10 +62,10 @@ void pack_contiguous(
   uint32_t pq_dim,
   uint32_t pq_bits,
   uint32_t offset,
-  raft::device_mdspan<uint8_t, list_spec<uint32_t, uint32_t>::list_extents, raft::row_major>
+  raft::device_mdspan<uint8_t, typename list_spec<uint32_t, IdxT>::list_extents, raft::row_major>
     list_data)
 {
-  detail::pack_contiguous_list_data(
+  detail::pack_contiguous_list_data<IdxT>(
     list_data, codes, n_rows, pq_dim, offset, pq_bits, raft::resource::get_cuda_stream(res));
 }
 
@@ -197,6 +204,85 @@ void extend_list(raft::resources const& res,
 {
   detail::extend_list<uint8_t, int64_t>(res, index, new_vectors, new_indices, label);
 }
+
+// Explicit instantiations
+template void unpack<uint32_t>(
+  raft::resources const& res,
+  raft::device_mdspan<const uint8_t,
+                      typename list_spec<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> list_data,
+  uint32_t pq_bits,
+  uint32_t offset,
+  raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes);
+
+template void unpack<int64_t>(
+  raft::resources const& res,
+  raft::device_mdspan<const uint8_t,
+                      typename list_spec<uint32_t, int64_t>::list_extents,
+                      raft::row_major> list_data,
+  uint32_t pq_bits,
+  uint32_t offset,
+  raft::device_matrix_view<uint8_t, uint32_t, raft::row_major> codes);
+
+template void unpack_contiguous<uint32_t>(
+  raft::resources const& res,
+  raft::device_mdspan<const uint8_t,
+                      typename list_spec<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> list_data,
+  uint32_t pq_bits,
+  uint32_t offset,
+  uint32_t n_rows,
+  uint32_t pq_dim,
+  uint8_t* codes);
+
+template void unpack_contiguous<int64_t>(
+  raft::resources const& res,
+  raft::device_mdspan<const uint8_t,
+                      typename list_spec<uint32_t, int64_t>::list_extents,
+                      raft::row_major> list_data,
+  uint32_t pq_bits,
+  uint32_t offset,
+  uint32_t n_rows,
+  uint32_t pq_dim,
+  uint8_t* codes);
+
+template void pack<uint32_t>(
+  raft::resources const& res,
+  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
+  uint32_t pq_bits,
+  uint32_t offset,
+  raft::device_mdspan<uint8_t,
+                      typename list_spec<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> list_data);
+
+template void pack<int64_t>(
+  raft::resources const& res,
+  raft::device_matrix_view<const uint8_t, uint32_t, raft::row_major> codes,
+  uint32_t pq_bits,
+  uint32_t offset,
+  raft::device_mdspan<uint8_t, typename list_spec<uint32_t, int64_t>::list_extents, raft::row_major>
+    list_data);
+
+template void pack_contiguous<uint32_t>(
+  raft::resources const& res,
+  const uint8_t* codes,
+  uint32_t n_rows,
+  uint32_t pq_dim,
+  uint32_t pq_bits,
+  uint32_t offset,
+  raft::device_mdspan<uint8_t,
+                      typename list_spec<uint32_t, uint32_t>::list_extents,
+                      raft::row_major> list_data);
+
+template void pack_contiguous<int64_t>(
+  raft::resources const& res,
+  const uint8_t* codes,
+  uint32_t n_rows,
+  uint32_t pq_dim,
+  uint32_t pq_bits,
+  uint32_t offset,
+  raft::device_mdspan<uint8_t, typename list_spec<uint32_t, int64_t>::list_extents, raft::row_major>
+    list_data);
 
 };  // namespace codepacker
 

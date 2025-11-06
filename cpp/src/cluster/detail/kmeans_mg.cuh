@@ -718,7 +718,8 @@ void fit(const raft::resources& handle,
         handle,
         minClusterAndDistance.view(),
         workspace,
-        raft::make_device_scalar_view(clusterCostD.data()),
+        raft::make_device_scalar_view<raft::KeyValuePair<IndexT, DataT>, IndexT>(
+          clusterCostD.data()),
         cuda::proclaim_return_type<raft::KeyValuePair<IndexT, DataT>>(
           [] __device__(const raft::KeyValuePair<IndexT, DataT>& a,
                         const raft::KeyValuePair<IndexT, DataT>& b) {
