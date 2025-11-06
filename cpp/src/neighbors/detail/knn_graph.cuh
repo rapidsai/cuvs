@@ -87,7 +87,10 @@ void knn_graph(raft::resources const& res,
     indices_view,
     distances_view);
 
-  raft::linalg::unaryOp(indices.data(), indices_64.data(), nnz, raft::cast_op<value_idx>{}, stream);
+  auto indices_view = raft::make_device_vector_view<value_idx, nnz_t>(indices.data(), nnz);
+  auto indices_64_view =
+    raft::make_device_vector_view<const int64_t, nnz_t>(indices_64.data(), nnz);
+  raft::linalg::unary_op(res, indices_64_view, indices_view, raft::cast_op<value_idx>{});
 
   raft::sparse::linalg::symmetrize(res,
                                    rows.data(),
