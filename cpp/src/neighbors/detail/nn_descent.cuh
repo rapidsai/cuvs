@@ -884,7 +884,8 @@ void GnndGraph<Index_t>::sample_graph_new(InternalID_t<Index_t>* new_neighbors, 
 template <typename Index_t>
 void GnndGraph<Index_t>::init_random_graph()
 {
-  const auto extended_nrows = raft::round_up_safe(nrow, static_cast<uint32_t>(num_segments));
+  const auto extended_nrows =
+    raft::round_up_safe(static_cast<uint32_t>(nrow), static_cast<uint32_t>(num_segments));
   for (uint32_t seg_id = 0; seg_id < static_cast<uint32_t>(num_segments); seg_id++) {
     const auto actual_segment_size =
       std::min(static_cast<uint64_t>(segment_size), node_degree - seg_id * segment_size);
