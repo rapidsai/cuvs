@@ -355,7 +355,10 @@ final class JDKProvider implements CuVSProvider {
   @Override
   public CuVSMatrix.Builder<CuVSDeviceMatrix> newDeviceMatrixBuilder(
       CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType) {
-    return new DeviceMatrixBuilder(resources, size, columns, dataType);
+    var rowBytes = columns * dataType.bytes();
+    return rowBytes > PinnedMemoryBuffer.CHUNK_BYTES
+        ? new DirectDeviceMatrixBuilder(resources, size, columns, dataType)
+        : new BufferedDeviceMatrixBuilder(resources, size, columns, dataType);
   }
 
   @Override
@@ -366,7 +369,11 @@ final class JDKProvider implements CuVSProvider {
       int rowStride,
       int columnStride,
       CuVSMatrix.DataType dataType) {
-    return new DeviceMatrixBuilder(resources, size, columns, rowStride, columnStride, dataType);
+    var rowBytes = columns * dataType.bytes();
+    return rowBytes > PinnedMemoryBuffer.CHUNK_BYTES
+        ? new DirectDeviceMatrixBuilder(resources, size, columns, rowStride, columnStride, dataType)
+        : new BufferedDeviceMatrixBuilder(
+            resources, size, columns, rowStride, columnStride, dataType);
   }
 
   @Override
@@ -486,7 +493,7 @@ final class JDKProvider implements CuVSProvider {
    * This {@link CuVSDeviceMatrix} builder implementation returns a {@link CuVSDeviceMatrix} backed by managed RMM
    * device memory. It uses a {@link PinnedMemoryBuffer} to batch data before copying it to the GPU.
    */
-  private static final class DeviceMatrixBuilder extends MatrixBuilder<CuVSDeviceMatrixImpl>
+  private static final class BufferedDeviceMatrixBuilder extends MatrixBuilder<CuVSDeviceMatrixImpl>
       implements CuVSMatrix.Builder<CuVSDeviceMatrix> {
 
     private final MemorySegment stream;
@@ -495,7 +502,7 @@ final class JDKProvider implements CuVSProvider {
     private final long bufferRowCount;
     private int currentBufferRow;
 
-    private DeviceMatrixBuilder(
+    private BufferedDeviceMatrixBuilder(
         CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType) {
       super(CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType), size, columns);
       this.stream = Util.getStream(resources);
@@ -505,7 +512,7 @@ final class JDKProvider implements CuVSProvider {
       this.currentBufferRow = 0;
     }
 
-    private DeviceMatrixBuilder(
+    private BufferedDeviceMatrixBuilder(
         CuVSResources resources,
         long size,
         long columns,
@@ -571,6 +578,61 @@ final class JDKProvider implements CuVSProvider {
         var hostBuffer = CuVSResourcesImpl.getHostBuffer(access);
         flushBuffer(hostBuffer);
       }
+      return matrix;
+    }
+  }
+
+  /**
+   * This {@link CuVSDeviceMatrix} builder implementation returns a {@link CuVSDeviceMatrix} backed by managed RMM
+   * device memory. It uses a {@link PinnedMemoryBuffer} to batch data before copying it to the GPU.
+   */
+  private static final class DirectDeviceMatrixBuilder extends MatrixBuilder<CuVSDeviceMatrixImpl>
+      implements CuVSMatrix.Builder<CuVSDeviceMatrix> {
+
+    private final MemorySegment stream;
+
+    private int currentRow;
+
+    private DirectDeviceMatrixBuilder(
+        CuVSResources resources, long size, long columns, CuVSMatrix.DataType dataType) {
+      super(CuVSDeviceMatrixRMMImpl.create(resources, size, columns, dataType), size, columns);
+      this.stream = Util.getStream(resources);
+      this.currentRow = 0;
+    }
+
+    private DirectDeviceMatrixBuilder(
+        CuVSResources resources,
+        long size,
+        long columns,
+        int rowStride,
+        int columnStride,
+        CuVSMatrix.DataType dataType) {
+      super(
+          CuVSDeviceMatrixRMMImpl.create(
+              resources, size, columns, rowStride, columnStride, dataType),
+          size,
+          columns,
+          rowStride);
+
+      this.stream = Util.getStream(resources);
+      this.currentRow = 0;
+    }
+
+    @Override
+    protected void internalAddVector(MemorySegment vector) {
+      if (currentRow >= size) {
+        throw new ArrayIndexOutOfBoundsException();
+      }
+
+      var deviceMemoryOffset = currentRow * rowSize;
+      var dst = matrix.memorySegment().asSlice(deviceMemoryOffset);
+      Util.cudaMemcpyAsync(dst, vector, rowBytes, CudaMemcpyKind.HOST_TO_DEVICE, stream);
+      checkCudaError(cudaStreamSynchronize(stream), "cudaStreamSynchronize");
+      currentRow++;
+    }
+
+    @Override
+    public CuVSDeviceMatrix build() {
       return matrix;
     }
   }

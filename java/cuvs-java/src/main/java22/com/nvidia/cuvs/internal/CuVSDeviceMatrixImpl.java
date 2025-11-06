@@ -54,6 +54,17 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
     }
   }
 
+  private class DirectRowAccessStrategy implements RowAccessStrategy {
+    @Override
+    public RowView getRow(long row) {
+      try (var access = resources.access()) {
+        var memorySegment = Arena.ofAuto().allocate(size * valueByteSize);
+        populateBuffer(access, row, row + 1, memorySegment);
+        return new SliceRowView(memorySegment, columns, valueLayout, dataType, valueByteSize);
+      }
+    }
+  }
+
   protected CuVSDeviceMatrixImpl(
       CuVSResources resources,
       MemorySegment deviceMemorySegment,
@@ -80,12 +91,12 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
 
     this.valueByteSize = valueLayout.byteSize();
     this.rowSize = rowStride > 0 ? rowStride * valueByteSize : columns * valueByteSize;
-    //    if (rowSize > PinnedMemoryBuffer.CHUNK_BYTES) {
-    //      // The shared buffer is too small for this row size, use a direct access strategy
-    //      this.rowAccessStrategy = new DirectRowAccessStrategy();
-    //    } else {
-    this.rowAccessStrategy = new BufferedRowAccessStrategy();
-    //   }
+    if (rowSize > PinnedMemoryBuffer.CHUNK_BYTES) {
+      // The shared buffer is too small for this row size, use a direct access strategy
+      this.rowAccessStrategy = new DirectRowAccessStrategy();
+    } else {
+      this.rowAccessStrategy = new BufferedRowAccessStrategy();
+    }
   }
 
   @Override
