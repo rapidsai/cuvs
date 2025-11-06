@@ -496,6 +496,60 @@ public class CagraIndexImpl implements CagraIndex {
   }
 
   /**
+   * Checks if the CAGRA index is stored on disk (disk-based ACE index).
+   *
+   * @return true if index is on disk, false otherwise
+   */
+  @Override
+  public boolean isOnDisk() {
+    checkNotDestroyed();
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment onDiskPtr = localArena.allocate(ValueLayout.JAVA_BOOLEAN);
+      int returnValue = cuvsCagraIndexIsOnDisk(cagraIndexReference.getMemorySegment(), onDiskPtr);
+      checkCuVSError(returnValue, "cuvsCagraIndexIsOnDisk");
+      return onDiskPtr.get(ValueLayout.JAVA_BOOLEAN, 0);
+    }
+  }
+
+  /**
+   * Gets the file directory where the CAGRA index is stored (for disk-based ACE indices).
+   *
+   * @return the file directory path, or empty string if not on disk
+   */
+  @Override
+  public String getFileDirectory() {
+    checkNotDestroyed();
+    if (!isOnDisk()) {
+      return "";
+    }
+    try (var localArena = Arena.ofConfined()) {
+      // Allocate pointer to char* and size_t
+      MemorySegment fileDirectoryPtr = localArena.allocate(ValueLayout.ADDRESS);
+      MemorySegment lengthPtr = localArena.allocate(ValueLayout.JAVA_LONG);
+
+      int returnValue = cuvsCagraIndexGetFileDirectory(
+          cagraIndexReference.getMemorySegment(),
+          fileDirectoryPtr,
+          lengthPtr);
+      checkCuVSError(returnValue, "cuvsCagraIndexGetFileDirectory");
+
+      // Get the pointer to the string
+      MemorySegment strPtr = fileDirectoryPtr.get(ValueLayout.ADDRESS, 0);
+      if (strPtr.address() == 0) {
+        return "";
+      }
+
+      // Get the length
+      long length = lengthPtr.get(ValueLayout.JAVA_LONG, 0);
+
+      // Read the string
+      String result = strPtr.reinterpret(length + 1).getString(0);
+
+      return result;
+    }
+  }
+
+  /**
    * Gets an instance of {@link CuVSResources}
    *
    * @return an instance of {@link CuVSResources}
@@ -503,6 +557,20 @@ public class CagraIndexImpl implements CagraIndex {
   @Override
   public CuVSResources getCuVSResources() {
     return resources;
+  }
+
+  /**
+   * Gets the CAGRA index reference (for internal use).
+   * Package-private to allow access from HnswIndexImpl.
+   *
+   * @return the memory segment representing the CAGRA index
+   */
+  MemorySegment getCagraIndexReference() {
+    return cagraIndexReference.getMemorySegment();
+  }
+
+  CuVSMatrix getDatasetForConversion() {
+    return cagraIndexReference.dataset;
   }
 
   /**
@@ -610,6 +678,25 @@ public class CagraIndexImpl implements CagraIndex {
           cuvsIvfPqParamsMemorySegment, params.getCuVSIvfPqParams().getRefinementRate());
 
       cuvsCagraIndexParams.graph_build_params(indexPtr, cuvsIvfPqParamsMemorySegment);
+    } else if (params.getCagraGraphBuildAlgo().equals(CagraGraphBuildAlgo.ACE)) {
+      var aceParams = createAceParams();
+      // Note: Do NOT add aceParams to handles list.
+      // The cuvsCagraIndexParamsDestroy will handle freeing the ACE params
+      // when graph_build_algo is ACE, just like it does for IVF-PQ params.
+      MemorySegment cuvsAceParamsMemorySegment = aceParams.handle();
+      CuVSAceParams cuVSAceParams = params.getCuVSAceParams();
+
+      cuvsAceParams.npartitions(cuvsAceParamsMemorySegment, cuVSAceParams.getNpartitions());
+      cuvsAceParams.ef_construction(cuvsAceParamsMemorySegment, cuVSAceParams.getEfConstruction());
+      cuvsAceParams.use_disk(cuvsAceParamsMemorySegment, cuVSAceParams.isUseDisk());
+
+      String buildDir = cuVSAceParams.getBuildDir();
+      if (buildDir != null && !buildDir.isEmpty()) {
+        MemorySegment buildDirSegment = Util.duplicateNativeString(buildDir);
+        cuvsAceParams.build_dir(cuvsAceParamsMemorySegment, buildDirSegment);
+      }
+
+      cuvsCagraIndexParams.graph_build_params(indexPtr, cuvsAceParamsMemorySegment);
     }
   }
 
