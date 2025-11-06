@@ -16,18 +16,40 @@ package com.nvidia.cuvs;
  */
 public class CuVSAceParams {
 
-  /** Number of partitions to split the dataset into */
+  /**
+   * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
+   *
+   * Small values might improve recall but potentially degrade performance and increase memory usage.
+   * Partitions should not be too small to prevent issues in KNN graph construction. 100k - 5M
+   * vectors per partition is recommended depending on the available host and GPU memory. The
+   * partition size is on average {@code 2 * (n_rows / npartitions) * dim * sizeof(T)}—the factor 2
+   * accounts for core and augmented vectors. Please account for imbalance in the partition sizes
+   * (up to 3x in our tests).
+   */
   private final long npartitions;
 
-  /** ef_construction parameter to control index quality in ACE */
+  /**
+   * The index quality for the ACE build.
+   *
+   * Bigger values increase the index quality. At some point, increasing this will no longer improve
+   * the quality.
+   */
   private final long efConstruction;
 
   /**
-   * Directory to store intermediate build files.
+   * Directory to store ACE build artifacts (e.g., KNN graph, optimized graph).
+   *
+   * Used when {@link #isUseDisk()} is true or when the graph does not fit in host and GPU memory.
+   * This should be the fastest disk in the system and hold enough space for twice the dataset, final
+   * graph, and label mapping.
    */
   private final String buildDir;
 
-  /** Whether to use disk-based mode for very large datasets */
+  /**
+   * Whether to use disk-based storage for ACE builds.
+   *
+   * When true, enables disk-based operations for memory-efficient graph construction.
+   */
   private final boolean useDisk;
 
   private CuVSAceParams(
@@ -42,15 +64,16 @@ public class CuVSAceParams {
    * Gets the number of partitions.
    *
    * @return the number of partitions
+   * @see #withNpartitions(long)
    */
   public long getNpartitions() {
     return npartitions;
   }
 
   /**
-   * Gets the ef_construction parameter.
+   * Gets the {@code ef_construction} parameter.
    *
-   * @return the ef_construction parameter
+   * @return the {@code ef_construction} parameter
    */
   public long getEfConstruction() {
     return efConstruction;

@@ -35,7 +35,12 @@ enum cuvsCagraGraphBuildAlgo {
   NN_DESCENT = 2,
   /* Experimental, use iterative cagra search and optimize to build the knn graph */
   ITERATIVE_CAGRA_SEARCH = 3,
-  /* Use ACE (Augmented Core Extraction) to build the graph */
+  /**
+   * Experimental, use ACE (Augmented Core Extraction) to build the graph. ACE partitions the
+   * dataset into core and augmented partitions and builds a sub-index for each partition. This
+   * enables building indices for datasets too large to fit in GPU or host memory.
+   * See cuvsAceParams for more details about the ACE algorithm and its parameters.
+   */
   ACE = 4
 };
 
@@ -120,7 +125,14 @@ struct cuvsIvfPqParams {
 
 typedef struct cuvsIvfPqParams* cuvsIvfPqParams_t;
 
-/** Parameters for ACE (Augmented Core Extraction) graph build */
+/**
+ * Parameters for ACE (Augmented Core Extraction) graph build.
+ * ACE enables building indices for datasets too large to fit in GPU memory by:
+ * 1. Partitioning the dataset in core (closest) and augmented (second-closest)
+ * partitions using balanced k-means.
+ * 2. Building sub-indices for each partition independently
+ * 3. Concatenating sub-graphs into a final unified index
+ */
 struct cuvsAceParams {
   /**
    * Number of partitions for ACE (Augmented Core Extraction) partitioned build.
@@ -501,6 +513,11 @@ cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int64_t* graph_
 /**
  * @brief Check if the CAGRA index is stored on disk
  *
+ * When ACE in disk mode is used to build the index, the index is stored on disk. The disk mode can be
+ * enabled by setting the `use_disk` flag in the `cuvsAceParams` struct or when the graph does not fit
+ * in host and GPU memory. Query if the index is on disk using this function. If true, the index needs to
+ * be loaded from disk using cuvsHnswFromCagra.
+ *
  * @param[in] index CAGRA index
  * @param[out] on_disk return true if index is on disk, false otherwise
  * @return cuvsError_t
@@ -509,6 +526,11 @@ cuvsError_t cuvsCagraIndexIsOnDisk(cuvsCagraIndex_t index, bool* on_disk);
 
 /**
  * @brief Get the file directory where the CAGRA index is stored (if on disk)
+ *
+ * When ACE in disk mode is used to build the index, the index is stored on disk. The file directory
+ * that contains the intermediate files and final HNSW index built by cuvsHnswFromCagra can be queried
+ * using this function. The HNSW index can be loaded from disk using cuvsHnswDeserialize. The file path
+ * is the directory returned by this function + "/hnsw_index.bin".
  *
  * @param[in] index CAGRA index
  * @param[out] file_directory return file directory path (caller must free)
