@@ -10,7 +10,7 @@ CMAKE_ARCH=x86_64
 
 BUILD_C_LIB_TESTS="OFF"
 if [[ "${1:-}" == "--build-tests" ]]; then
-  BUILD_C_LIB_TESTS+="ON"
+  BUILD_C_LIB_TESTS="ON"
 fi
 
 dnf install -y \
@@ -68,6 +68,12 @@ cmake --build c/build/temp -j9
 
 rapids-logger "Begin c install"
 cmake --install c/build/temp --prefix c/build/temp/install
+
+# need to install the tests
+if [ "${BUILD_C_LIB_TESTS}" != "OFF" ]; then
+      cmake --install c/build/temp --prefix c/build/temp/install --component testing
+fi
+
 
 rapids-logger "Begin gathering licenses"
 cp LICENSE c/build/temp/install/

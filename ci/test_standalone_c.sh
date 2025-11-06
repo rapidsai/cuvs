@@ -15,9 +15,10 @@ DOWNLOAD_LOCATION=$(rapids-download-from-github "${payload_name}")
 INSTALL_PREFIX="${PWD}/libcuvs_c_install"
 mkdir -p "${INSTALL_PREFIX}"
 ls -l "${DOWNLOAD_LOCATION}"
-tar -xzf "${DOWNLOAD_LOCATION}/${pkg_name}" -C "${INSTALL_PREFIX}"
+tar -xf "${DOWNLOAD_LOCATION}/${pkg_name}" -C "${INSTALL_PREFIX}"
 
 rapids-logger "Run C API tests"
+ls -l "${INSTALL_PREFIX}"
 cd "$INSTALL_PREFIX"/bin/gtests/libcuvs
 ctest -j8 --output-on-failure
 
