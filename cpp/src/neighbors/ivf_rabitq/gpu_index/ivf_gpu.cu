@@ -20,12 +20,12 @@
 #include <raft/matrix/select_k.cuh>
 #include <thrust/sort.h>
 
-IVFGPU::IVFGPU(size_t n, size_t dim, size_t k, size_t ex_bits, bool batch_flag = false)
+IVFGPU::IVFGPU(size_t n, size_t dim, size_t k, size_t bits_per_dim, bool batch_flag = false)
   : num_vectors(n),
     num_dimensions(dim),
     num_padded_dim(rd_up_to_multiple_of_new(dim, 64)),
     num_centroids(k),
-    ex_bits(ex_bits - 1),
+    ex_bits(bits_per_dim - 1),
     batch_flag(batch_flag),
     initializer(nullptr),
     d_short_data(nullptr),
@@ -38,7 +38,7 @@ IVFGPU::IVFGPU(size_t n, size_t dim, size_t k, size_t ex_bits, bool batch_flag =
     h_long_code(nullptr),
     h_ex_factor(nullptr),
     h_ids(nullptr),
-    DQ(dim, ex_bits - 1, batch_flag),
+    DQ(dim, bits_per_dim - 1, batch_flag),
     Rota(dim)
 {
 }

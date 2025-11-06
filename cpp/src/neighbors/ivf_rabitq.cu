@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <cuvs/neighbors/ivf_rabitq.hpp>
@@ -277,9 +266,10 @@ index<IdxT>::index()
 }
 
 template <typename IdxT>
-index<IdxT>::index(size_t n_rows, uint32_t dim, uint32_t n_lists, uint32_t ex_bits)
-  : rabitq_index_(n_rows, dim, n_lists, ex_bits, /* batch_flag = */ true)
+index<IdxT>::index(size_t n_rows, uint32_t dim, uint32_t n_lists, uint32_t bits_per_dim)
+  : rabitq_index_(n_rows, dim, n_lists, bits_per_dim, /* batch_flag = */ true)
 {
+  RAFT_EXPECTS(bits_per_dim >= 2 && bits_per_dim <= 9, "Unsupported bits_per_dim");
 }
 
 template <typename IdxT>

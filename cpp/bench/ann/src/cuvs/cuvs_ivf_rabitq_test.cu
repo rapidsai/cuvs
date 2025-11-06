@@ -38,8 +38,8 @@ int test_ivf_rabitq_construct_batch(int argc, char* argv[])
   } else {
     std::cout << "Using Normal Quantization Config!" << std::endl;
   }
-  // B must be one of: 9, 5, 7, 3, 4, or 8.
-  assert(B == 9 || B == 5 || B == 7 || B == 3 || B == 4 || B == 8);
+  // B must be between 2 and 9, inclusive.
+  assert(B >= 2 && B <= 9);
 
   char data_file[500];
   char centroids_file[500];
@@ -173,7 +173,7 @@ int test_ivf_rabitq_search_batch(int argc, char* argv[])
     rabitq_quantize_flag = (arg_str == "true" || arg_str == "1");
   }
   if (argc > 7) { EXPAND_FACTOR = atoi(argv[7]); }
-  assert(B == 9 || B == 5 || B == 7 || B == 3 || B == 4 || B == 8);
+  assert(B >= 2 && B <= 9);
 
   char data_file[500];
   char query_file[500];

@@ -37,14 +37,15 @@ struct index_params : cuvs::neighbors::index_params {
    */
   uint32_t n_lists = 1024;
   /**
-   * The number of extended bits (beyond the single bit required for the binary RaBitQ algorithm).
+   * The total number of bits per dimension (single bit required for the binary RaBitQ algorithm +
+   * additional bits for extended RaBitQ).
    *
-   * Supported values: [3, 4, 5, 7, 8, 9].
+   * Supported values: [2, 3, 4, 5, 6, 7, 8, 9].
    *
-   * Hint: the smaller the 'ex_bits', the smaller the index size and the better the search
+   * Hint: the smaller the 'bits_per_dim', the smaller the index size and the better the search
    * performance, but the lower the recall.
    */
-  uint32_t ex_bits = 3;
+  uint32_t bits_per_dim = 3;
   /** The number of iterations searching for kmeans centers (index building). */
   uint32_t kmeans_n_iters = 20;
   /** Flag for using the fast quantize method */
@@ -110,7 +111,7 @@ struct index : cuvs::neighbors::index {
   index();
 
   /** Construct an empty index yet to be populated. */
-  index(size_t n_rows, uint32_t dim, uint32_t n_lists, uint32_t ex_bits);
+  index(size_t n_rows, uint32_t dim, uint32_t n_lists, uint32_t bits_per_dim);
 
   /** Construct an empty index. It needs to be trained and then populated. */
   index(const index_params& params, uint32_t dim);

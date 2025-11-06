@@ -176,9 +176,9 @@ class IVFGPU {
    * @param n Num of data points.
    * @param dim Dimension of data points.
    * @param k Num of centroids.
-   * @param ex_bits totalbits = EX_BITS+1
+   * @param bits_per_dim totalbits = EX_BITS+1
    */
-  IVFGPU(size_t n, size_t dim, size_t k, size_t ex_bits, bool batch_flag);
+  IVFGPU(size_t n, size_t dim, size_t k, size_t bits_per_dim, bool batch_flag);
   IVFGPU()
     : Rota(128),
       d_short_data(nullptr),
