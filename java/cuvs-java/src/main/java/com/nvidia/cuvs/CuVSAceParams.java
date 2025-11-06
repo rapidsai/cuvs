@@ -64,7 +64,6 @@ public class CuVSAceParams {
    * Gets the number of partitions.
    *
    * @return the number of partitions
-   * @see #withNpartitions(long)
    */
   public long getNpartitions() {
     return npartitions;
