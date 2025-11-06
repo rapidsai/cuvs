@@ -19,6 +19,7 @@
 
 // TODO (cjnolet): This should be using an exposed API instead of circumventing the public APIs.
 #include "../../cluster/kmeans_balanced.cuh"
+#include <cuvs/cluster/kmeans.hpp>
 
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/logger.hpp>
@@ -1214,12 +1215,8 @@ void extend(raft::resources const& handle,
         cluster_centers.data(), n_clusters, index->dim());
       cuvs::cluster::kmeans::balanced_params kmeans_params;
       kmeans_params.metric = static_cast<cuvs::distance::DistanceType>((int)index->metric());
-      cuvs::cluster::kmeans_balanced::predict(handle,
-                                              kmeans_params,
-                                              batch_data_view,
-                                              centers_view,
-                                              batch_labels_view,
-                                              utils::mapping<float>{});
+      cuvs::cluster::kmeans::predict(
+        handle, kmeans_params, batch_data_view, centers_view, batch_labels_view);
       vec_batches.prefetch_next_batch();
       // User needs to make sure kernel finishes its work before we overwrite batch in the next
       // iteration if different streams are used for kernel and copy.
@@ -1400,8 +1397,7 @@ auto build(raft::resources const& handle,
       raft::linalg::row_normalize<raft::linalg::L2Norm>(
         handle, trainset_const_view, trainset.view());
     }
-    cuvs::cluster::kmeans_balanced::fit(
-      handle, kmeans_params, trainset_const_view, centers_view, utils::mapping<float>{});
+    cuvs::cluster::kmeans::fit(handle, kmeans_params, trainset_const_view, centers_view);
 
     // Trainset labels are needed for training PQ codebooks
     rmm::device_uvector<uint32_t> labels(n_rows_train, stream, big_memory_resource);
@@ -1412,12 +1408,8 @@ auto build(raft::resources const& handle,
     }
     auto labels_view =
       raft::make_device_vector_view<uint32_t, internal_extents_t>(labels.data(), n_rows_train);
-    cuvs::cluster::kmeans_balanced::predict(handle,
-                                            kmeans_params,
-                                            trainset_const_view,
-                                            centers_const_view,
-                                            labels_view,
-                                            utils::mapping<float>());
+    cuvs::cluster::kmeans::predict(
+      handle, kmeans_params, trainset_const_view, centers_const_view, labels_view);
 
     // Make rotation matrix
     helpers::make_rotation_matrix(handle, &index, params.force_random_rotation);

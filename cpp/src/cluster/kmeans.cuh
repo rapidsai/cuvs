@@ -282,51 +282,6 @@ extern template void predict<float, int64_t>(
   bool normalize_weight,
   raft::host_scalar_view<float> inertia);
 
-template <typename DataT, typename IndexT>
-void fit_predict(raft::resources const& handle,
-                 const kmeans::params& params,
-                 raft::device_matrix_view<const DataT, IndexT> X,
-                 std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
-                 std::optional<raft::device_matrix_view<DataT, IndexT>> centroids,
-                 raft::device_vector_view<IndexT, IndexT> labels,
-                 raft::host_scalar_view<DataT> inertia,
-                 raft::host_scalar_view<IndexT> n_iter);
-extern template void fit_predict<double, int>(
-  raft::resources const& handle,
-  const kmeans::params& params,
-  raft::device_matrix_view<const double, int> X,
-  std::optional<raft::device_vector_view<const double, int>> sample_weight,
-  std::optional<raft::device_matrix_view<double, int>> centroids,
-  raft::device_vector_view<int, int> labels,
-  raft::host_scalar_view<double> inertia,
-  raft::host_scalar_view<int> n_iter);
-extern template void fit_predict<double, int64_t>(
-  raft::resources const& handle,
-  const kmeans::params& params,
-  raft::device_matrix_view<const double, int64_t> X,
-  std::optional<raft::device_vector_view<const double, int64_t>> sample_weight,
-  std::optional<raft::device_matrix_view<double, int64_t>> centroids,
-  raft::device_vector_view<int64_t, int64_t> labels,
-  raft::host_scalar_view<double> inertia,
-  raft::host_scalar_view<int64_t> n_iter);
-extern template void fit_predict<float, int>(
-  raft::resources const& handle,
-  const kmeans::params& params,
-  raft::device_matrix_view<const float, int> X,
-  std::optional<raft::device_vector_view<const float, int>> sample_weight,
-  std::optional<raft::device_matrix_view<float, int>> centroids,
-  raft::device_vector_view<int, int> labels,
-  raft::host_scalar_view<float> inertia,
-  raft::host_scalar_view<int> n_iter);
-extern template void fit_predict<float, int64_t>(
-  raft::resources const& handle,
-  const kmeans::params& params,
-  raft::device_matrix_view<const float, int64_t> X,
-  std::optional<raft::device_vector_view<const float, int64_t>> sample_weight,
-  std::optional<raft::device_matrix_view<float, int64_t>> centroids,
-  raft::device_vector_view<int64_t, int64_t> labels,
-  raft::host_scalar_view<float> inertia,
-  raft::host_scalar_view<int64_t> n_iter);
 /**
  * @brief Transform X to a cluster-distance space.
  *
