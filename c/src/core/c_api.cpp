@@ -187,13 +187,13 @@ extern "C" cuvsError_t cuvsRMMHostAlloc(void** ptr, size_t bytes)
 {
   return cuvs::core::translate_exceptions([=] {
     if (pinned_mr == nullptr) { pinned_mr = std::make_unique<rmm::mr::pinned_host_memory_resource>(); }
-    *ptr = pinned_mr->allocate_sync(bytes, rmm::RMM_DEFAULT_HOST_ALIGNMENT);
+    *ptr = pinned_mr->allocate_sync(bytes);
   });
 }
 
 extern "C" cuvsError_t cuvsRMMHostFree(void* ptr, size_t bytes)
 {
-  return cuvs::core::translate_exceptions([=] { pinned_mr->deallocate_sync(ptr, bytes, rmm::RMM_DEFAULT_HOST_ALIGNMENT); });
+  return cuvs::core::translate_exceptions([=] { pinned_mr->deallocate_sync(ptr, bytes); });
 }
 
 thread_local std::string last_error_text = "";
