@@ -7,8 +7,8 @@
 #include <dlpack/dlpack.h>
 
 #include <cuvs/core/c_api.h>
-#include <cuvs/preprocessing/quantize/product.h>
-#include <cuvs/preprocessing/quantize/product.hpp>
+#include <cuvs/preprocessing/quantize/pq.h>
+#include <cuvs/preprocessing/quantize/pq.hpp>
 #include "../../core/exceptions.hpp"
 #include "../../core/interop.hpp"
 
@@ -21,14 +21,14 @@ void _transform(cuvsResources_t res,
                 DLManagedTensor* out_tensor)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
-  auto q = reinterpret_cast<cuvs::preprocessing::quantize::product::quantizer<T>*>(quantizer->addr);
+  auto q = reinterpret_cast<cuvs::preprocessing::quantize::pq::quantizer<T>*>(quantizer->addr);
 
   auto dataset = dataset_tensor->dl_tensor;
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type     = raft::device_matrix_view<T const, int64_t, raft::row_major>;
     using out_mdspan_type = raft::device_matrix_view<OutputT, int64_t, raft::row_major>;
 
-    cuvs::preprocessing::quantize::product::transform(
+    cuvs::preprocessing::quantize::pq::transform(
       *res_ptr,
       *q,
       cuvs::core::from_dlpack<mdspan_type>(dataset_tensor),
@@ -48,7 +48,7 @@ void* _train(cuvsResources_t res,
 
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
 
-  auto quantizer_params                        = cuvs::preprocessing::quantize::product::params();
+  auto quantizer_params                        = cuvs::preprocessing::quantize::pq::params();
   quantizer_params.pq_bits                     = params->pq_bits;
   quantizer_params.pq_dim                      = params->pq_dim;
   quantizer_params.vq_n_centers                = params->vq_n_centers;
@@ -58,13 +58,13 @@ void* _train(cuvsResources_t res,
   quantizer_params.pq_kmeans_type =
     static_cast<cuvs::cluster::kmeans::kmeans_type>(params->pq_kmeans_type);
 
-  cuvs::preprocessing::quantize::product::quantizer<T>* ret = nullptr;
+  cuvs::preprocessing::quantize::pq::quantizer<T>* ret = nullptr;
 
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type = raft::device_matrix_view<T const, int64_t, raft::row_major>;
     auto mds          = cuvs::core::from_dlpack<mdspan_type>(dataset_tensor);
-    ret = new cuvs::preprocessing::quantize::product::quantizer<T>{
-      cuvs::preprocessing::quantize::product::train(*res_ptr, quantizer_params, mds)};
+    ret = new cuvs::preprocessing::quantize::pq::quantizer<T>{
+      cuvs::preprocessing::quantize::pq::train(*res_ptr, quantizer_params, mds)};
   } else {
     RAFT_FAIL("dataset must be accessible on device memory");
   }
@@ -78,14 +78,14 @@ void _inverse_transform(cuvsResources_t res,
                 DLManagedTensor* out_tensor)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
-  auto q = reinterpret_cast<cuvs::preprocessing::quantize::product::quantizer<DataT>*>(quantizer->addr);
+  auto q = reinterpret_cast<cuvs::preprocessing::quantize::pq::quantizer<DataT>*>(quantizer->addr);
 
   auto codes = codes_tensor->dl_tensor;
   if (cuvs::core::is_dlpack_device_compatible(codes)) {
     using codes_mdspan_type     = raft::device_matrix_view<QuantT const, int64_t, raft::row_major>;
     using data_mdspan_type = raft::device_matrix_view<DataT, int64_t, raft::row_major>;
 
-    cuvs::preprocessing::quantize::product::inverse_transform(
+    cuvs::preprocessing::quantize::pq::inverse_transform(
       *res_ptr,
       *q,
       cuvs::core::from_dlpack<codes_mdspan_type>(codes_tensor),
@@ -186,11 +186,11 @@ extern "C" cuvsError_t cuvsProductQuantizerGetPqBits(cuvsProductQuantizer_t quan
       auto quant_addr = quantizer->addr;
       if (quantizer->dtype.code == kDLFloat && quantizer->dtype.bits == 32) {
         *pq_bits =
-          (reinterpret_cast<cuvs::preprocessing::quantize::product::quantizer<float>*>(quant_addr))
+          (reinterpret_cast<cuvs::preprocessing::quantize::pq::quantizer<float>*>(quant_addr))
             ->params_quantizer.pq_bits;
       } else if (quantizer->dtype.code == kDLFloat && quantizer->dtype.bits == 64) {
         *pq_bits =
-          (reinterpret_cast<cuvs::preprocessing::quantize::product::quantizer<double>*>(quant_addr))
+          (reinterpret_cast<cuvs::preprocessing::quantize::pq::quantizer<double>*>(quant_addr))
             ->params_quantizer.pq_bits;
       } else {
         RAFT_FAIL("Unsupported quantizer dtype: %d and bits: %d",
@@ -211,11 +211,11 @@ extern "C" cuvsError_t cuvsProductQuantizerGetPqDim(cuvsProductQuantizer_t quant
       auto quant_addr = quantizer->addr;
       if (quantizer->dtype.code == kDLFloat && quantizer->dtype.bits == 32) {
         *pq_dim =
-          (reinterpret_cast<cuvs::preprocessing::quantize::product::quantizer<float>*>(quant_addr))
+          (reinterpret_cast<cuvs::preprocessing::quantize::pq::quantizer<float>*>(quant_addr))
             ->params_quantizer.pq_dim;
       } else if (quantizer->dtype.code == kDLFloat && quantizer->dtype.bits == 64) {
         *pq_dim =
-          (reinterpret_cast<cuvs::preprocessing::quantize::product::quantizer<double>*>(quant_addr))
+          (reinterpret_cast<cuvs::preprocessing::quantize::pq::quantizer<double>*>(quant_addr))
             ->params_quantizer.pq_dim;
       } else {
         RAFT_FAIL("Unsupported quantizer dtype: %d and bits: %d",
@@ -236,12 +236,12 @@ extern "C" cuvsError_t cuvsProductQuantizerGetPqCodebook(cuvsProductQuantizer_t 
       auto quant_addr = quantizer->addr;
       if (quantizer->dtype.code == kDLFloat && quantizer->dtype.bits == 32) {
         auto pq_mdspan =
-          (reinterpret_cast<cuvs::preprocessing::quantize::product::quantizer<float>*>(quant_addr))
+          (reinterpret_cast<cuvs::preprocessing::quantize::pq::quantizer<float>*>(quant_addr))
             ->vpq_codebooks.pq_code_book.view();
         cuvs::core::to_dlpack(pq_mdspan, pq_codebook);
       } else if (quantizer->dtype.code == kDLFloat && quantizer->dtype.bits == 64) {
         auto pq_mdspan =
-          (reinterpret_cast<cuvs::preprocessing::quantize::product::quantizer<double>*>(quant_addr))
+          (reinterpret_cast<cuvs::preprocessing::quantize::pq::quantizer<double>*>(quant_addr))
             ->vpq_codebooks.pq_code_book.view();
         cuvs::core::to_dlpack(pq_mdspan, pq_codebook);
       } else {
@@ -263,12 +263,12 @@ extern "C" cuvsError_t cuvsProductQuantizerGetVqCodebook(cuvsProductQuantizer_t 
       auto quant_addr = quantizer->addr;
       if (quantizer->dtype.code == kDLFloat && quantizer->dtype.bits == 32) {
         auto pq_mdspan =
-          (reinterpret_cast<cuvs::preprocessing::quantize::product::quantizer<float>*>(quant_addr))
+          (reinterpret_cast<cuvs::preprocessing::quantize::pq::quantizer<float>*>(quant_addr))
             ->vpq_codebooks.vq_code_book.view();
         cuvs::core::to_dlpack(pq_mdspan, vq_codebook);
       } else if (quantizer->dtype.code == kDLFloat && quantizer->dtype.bits == 64) {
         auto pq_mdspan =
-          (reinterpret_cast<cuvs::preprocessing::quantize::product::quantizer<double>*>(quant_addr))
+          (reinterpret_cast<cuvs::preprocessing::quantize::pq::quantizer<double>*>(quant_addr))
             ->vpq_codebooks.vq_code_book.view();
         cuvs::core::to_dlpack(pq_mdspan, vq_codebook);
       } else {
@@ -289,11 +289,11 @@ extern "C" cuvsError_t cuvsProductQuantizerGetEncodedDim(cuvsProductQuantizer_t 
     if (quantizer != nullptr) {
       auto quant_addr = quantizer->addr;
       if (quantizer->dtype.code == kDLFloat && quantizer->dtype.bits == 32) {
-        *encoded_dim = cuvs::preprocessing::quantize::product::get_quantized_dim<uint32_t>(
-          reinterpret_cast<cuvs::preprocessing::quantize::product::quantizer<float>*>(quant_addr)->params_quantizer);
+        *encoded_dim = cuvs::preprocessing::quantize::pq::get_quantized_dim<uint32_t>(
+          reinterpret_cast<cuvs::preprocessing::quantize::pq::quantizer<float>*>(quant_addr)->params_quantizer);
       } else if (quantizer->dtype.code == kDLFloat && quantizer->dtype.bits == 64) {
-        *encoded_dim = cuvs::preprocessing::quantize::product::get_quantized_dim<uint32_t>(
-          reinterpret_cast<cuvs::preprocessing::quantize::product::quantizer<double>*>(quant_addr)->params_quantizer);
+        *encoded_dim = cuvs::preprocessing::quantize::pq::get_quantized_dim<uint32_t>(
+          reinterpret_cast<cuvs::preprocessing::quantize::pq::quantizer<double>*>(quant_addr)->params_quantizer);
       } else {
         RAFT_FAIL("Unsupported quantizer dtype: %d and bits: %d",
                   quantizer->dtype.code,

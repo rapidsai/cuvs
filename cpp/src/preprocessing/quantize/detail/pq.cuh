@@ -8,20 +8,20 @@
 #include "../../../core/nvtx.hpp"
 #include "../../../neighbors/detail/vpq_dataset.cuh"
 #include "../../../neighbors/ivf_pq/ivf_pq_codepacking.cuh"  // pq_bits-bitfield
-#include <cuvs/preprocessing/quantize/product.hpp>
+#include <cuvs/preprocessing/quantize/pq.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/matrix/init.cuh>
 
-namespace cuvs::preprocessing::quantize::product::detail {
+namespace cuvs::preprocessing::quantize::pq::detail {
 template <typename T>
 quantizer<T> train(raft::resources const& res,
-                   const cuvs::preprocessing::quantize::product::params params,
+                   const cuvs::preprocessing::quantize::pq::params params,
                    raft::device_matrix_view<const T, int64_t> dataset)
 {
   auto n_rows = dataset.extent(0);
   auto dim    = dataset.extent(1);
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
-    "preprocessing::quantize::product::train(%zu, %u)", size_t(n_rows), dim);
+    "preprocessing::quantize::pq::train(%zu, %u)", size_t(n_rows), dim);
 
   auto ps = cuvs::neighbors::detail::fill_missing_params_heuristics(params, dataset);
   std::optional<raft::device_matrix_view<const T, uint32_t, raft::row_major>>
@@ -48,13 +48,13 @@ void transform(raft::resources const& res,
                raft::device_matrix_view<QuantI, int64_t> out)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
-    "preprocessing::quantize::product::transform(%zu, %zu, %zu)",
+    "preprocessing::quantize::pq::transform(%zu, %zu, %zu)",
     size_t(dataset.extent(0)),
     size_t(dataset.extent(1)),
     size_t(out.extent(1)));
   RAFT_EXPECTS(out.extent(0) == dataset.extent(0),
                "Output matrix must have the same number of rows as the input dataset");
-  RAFT_EXPECTS(out.extent(1) == cuvs::preprocessing::quantize::product::get_quantized_dim<uint32_t>(
+  RAFT_EXPECTS(out.extent(1) == cuvs::preprocessing::quantize::pq::get_quantized_dim<uint32_t>(
                                   quantizer.params_quantizer),
                "Output matrix doesn't have the correct number of columns");
   // Encode dataset
@@ -86,14 +86,17 @@ __launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_vectors_kernel(
   const uint32_t pq_dim,
   std::optional<raft::device_matrix_view<const DataT, IdxT, raft::row_major>> vq_centers)
 {
-  const IdxT row_ix = IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x};
+  const uint32_t kSubWarpSize = raft::WarpSize;
+  using subwarp_align         = raft::Pow2<kSubWarpSize>;
+  const IdxT row_ix = subwarp_align::div(IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x});
   if (row_ix >= dataset.extent(0)) { return; }
+  uint32_t lane_id = subwarp_align::mod(raft::laneId());
 
   const uint8_t* out_codes_ptr = &codes(row_ix, 0);
   LabelT vq_label              = *reinterpret_cast<const LabelT*>(out_codes_ptr);
   out_codes_ptr                = (&codes(row_ix, 0)) + sizeof(LabelT);
   cuvs::neighbors::ivf_pq::detail::bitfield_view_t<PqBits, const uint8_t> code_view{out_codes_ptr};
-  for (uint32_t j = 0; j < pq_dim; j++) {
+  for (uint32_t j = lane_id; j < pq_dim; j += kSubWarpSize) {
     uint8_t code = code_view[j];
     for (uint32_t k = 0; k < pq_centers.extent(1); k++) {
       const auto col = j * pq_centers.extent(1) + k;
@@ -127,7 +130,7 @@ auto reconstruct_vectors(
   auto stream = raft::resource::get_cuda_stream(res);
 
   constexpr ix_t kBlockSize  = 256;
-  const ix_t threads_per_vec = 1;
+  const ix_t threads_per_vec = raft::WarpSize;
   dim3 threads(kBlockSize, 1, 1);
   auto kernel = [](uint32_t pq_bits) {
     switch (pq_bits) {
@@ -153,7 +156,7 @@ void inverse_transform(raft::resources const& res,
                        raft::device_matrix_view<T, int64_t> out)
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
-    "preprocessing::quantize::product::inverse_transform(%zu, %zu, %zu)",
+    "preprocessing::quantize::pq::inverse_transform(%zu, %zu, %zu)",
     size_t(codes.extent(0)),
     size_t(codes.extent(1)),
     size_t(out.extent(1)));
@@ -161,10 +164,9 @@ void inverse_transform(raft::resources const& res,
   using idx_t   = int64_t;
   RAFT_EXPECTS(out.extent(0) == codes.extent(0),
                "Output matrix must have the same number of rows as the input codes");
-  RAFT_EXPECTS(
-    codes.extent(1) ==
-      cuvs::preprocessing::quantize::product::get_quantized_dim<label_t>(quant.params_quantizer),
-    "Codes matrix doesn't have the correct number of columns");
+  RAFT_EXPECTS(codes.extent(1) == cuvs::preprocessing::quantize::pq::get_quantized_dim<label_t>(
+                                    quant.params_quantizer),
+               "Codes matrix doesn't have the correct number of columns");
 
   std::optional<raft::device_matrix_view<const T, uint32_t, raft::row_major>> vq_centers_opt =
     std::nullopt;
@@ -180,4 +182,4 @@ void inverse_transform(raft::resources const& res,
     vq_centers_opt,
     out);
 }
-}  // namespace cuvs::preprocessing::quantize::product::detail
+}  // namespace cuvs::preprocessing::quantize::pq::detail

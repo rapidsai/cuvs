@@ -5,7 +5,7 @@
 
 #include "../test_utils.cuh"
 #include <chrono>
-#include <cuvs/preprocessing/quantize/product.hpp>
+#include <cuvs/preprocessing/quantize/pq.hpp>
 #include <cuvs/stats/trustworthiness_score.hpp>
 #include <raft/core/host_mdarray.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
@@ -15,7 +15,7 @@
 #include <raft/util/cudart_utils.hpp>
 #include <rmm/mr/device/managed_memory_resource.hpp>
 
-namespace cuvs::preprocessing::quantize::product {
+namespace cuvs::preprocessing::quantize::pq {
 
 template <typename T>
 struct ProductQuantizationInputs {
@@ -128,7 +128,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
 
   void TearDown() override {}
 
-  void check_reconstruction(const cuvs::preprocessing::quantize::product::quantizer<T>& quantizer,
+  void check_reconstruction(const cuvs::preprocessing::quantize::pq::quantizer<T>& quantizer,
                             raft::device_matrix_view<uint8_t, int64_t, raft::row_major> codes,
                             double compression_ratio,
                             uint32_t n_take)
@@ -256,4 +256,4 @@ INSTANTIATE_TEST_CASE_P(ProductQuantizationTests,
                         ProductQuantizationTestD,
                         ::testing::ValuesIn(inputs<double>));
 
-}  // namespace cuvs::preprocessing::quantize::product
+}  // namespace cuvs::preprocessing::quantize::pq

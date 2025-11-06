@@ -3,11 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "./detail/product.cuh"
+#include "./detail/pq.cuh"
 
-#include <cuvs/preprocessing/quantize/product.hpp>
+#include <cuvs/preprocessing/quantize/pq.hpp>
 
-namespace cuvs::preprocessing::quantize::product {
+namespace cuvs::preprocessing::quantize::pq {
 
 #define CUVS_INST_QUANTIZATION(T, QuantI)                                         \
   auto train(raft::resources const& res,                                          \
@@ -36,4 +36,4 @@ CUVS_INST_QUANTIZATION(double, uint8_t);
 
 #undef CUVS_INST_QUANTIZATION
 
-}  // namespace cuvs::preprocessing::quantize::product
+}  // namespace cuvs::preprocessing::quantize::pq

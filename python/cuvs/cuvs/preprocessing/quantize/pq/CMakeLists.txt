@@ -5,7 +5,7 @@
 # =============================================================================
 
 # Set the list of Cython files to build
-set(cython_sources product.pyx)
+set(cython_sources pq.pyx)
 set(linked_libraries cuvs::cuvs cuvs::c_api)
 
 # Build all of the Cython targets
@@ -13,5 +13,5 @@ rapids_cython_create_modules(
   CXX
   SOURCE_FILES "${cython_sources}"
   LINKED_LIBRARIES "${linked_libraries}" ASSOCIATED_TARGETS cuvs MODULE_PREFIX
-                   preprocessing_quantize_product_
+                   preprocessing_quantize_pq_
 )

@@ -10,10 +10,10 @@
 #include <raft/core/handle.hpp>
 #include <raft/core/host_mdspan.hpp>
 
-namespace cuvs::preprocessing::quantize::product {
+namespace cuvs::preprocessing::quantize::pq {
 
 /**
- * @defgroup product Product Quantizer utilities
+ * @defgroup pq Product Quantizer utilities
  * @{
  */
 
@@ -41,8 +41,8 @@ struct quantizer {
  * Usage example:
  * @code{.cpp}
  * raft::handle_t handle;
- * cuvs::preprocessing::quantize::product::params params;
- * auto quantizer = cuvs::preprocessing::quantize::product::train(handle, params, dataset);
+ * cuvs::preprocessing::quantize::pq::params params;
+ * auto quantizer = cuvs::preprocessing::quantize::pq::train(handle, params, dataset);
  * @endcode
  *
  * @param[in] res raft resource
@@ -66,12 +66,12 @@ quantizer<double> train(raft::resources const& res,
  * Usage example:
  * @code{.cpp}
  * raft::handle_t handle;
- * cuvs::preprocessing::quantize::product::params params;
- * auto quantizer = cuvs::preprocessing::quantize::product::train(handle, params, dataset);
+ * cuvs::preprocessing::quantize::pq::params params;
+ * auto quantizer = cuvs::preprocessing::quantize::pq::train(handle, params, dataset);
  * auto quantized_dim = get_quantized_dim(quantizer.params_quantizer);
  * auto quantized_dataset =
  *   raft::make_device_matrix<uint8_t, int64_t>(handle, samples, quantized_dim);
- * cuvs::preprocessing::quantize::product::transform(handle, quantizer, dataset,
+ * cuvs::preprocessing::quantize::pq::transform(handle, quantizer, dataset,
  *   quantized_dataset.view());
  *
  * @endcode
@@ -127,4 +127,4 @@ void inverse_transform(raft::resources const& res,
                        raft::device_matrix_view<double, int64_t> out);
 /** @} */  // end of group product
 
-}  // namespace cuvs::preprocessing::quantize::product
+}  // namespace cuvs::preprocessing::quantize::pq

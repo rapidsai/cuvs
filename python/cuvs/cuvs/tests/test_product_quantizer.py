@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from pylibraft.common import device_ndarray
 
-from cuvs.preprocessing.quantize import product
+from cuvs.preprocessing.quantize import pq
 
 
 @pytest.mark.parametrize("n_rows", [500, 1000])
@@ -24,13 +24,13 @@ def test_product_quantizer(
     input1 = np.random.random_sample((n_rows, n_cols)).astype(dtype)
     input1_device = device_ndarray(input1)
 
-    params = product.QuantizerParams(
+    params = pq.QuantizerParams(
         pq_bits=pq_bits,
         pq_dim=pq_dim,
         pq_kmeans_type=pq_kmeans_type,
         vq_n_centers=vq_n_centers,
     )
-    quantizer = product.train(params, input1_device)
+    quantizer = pq.train(params, input1_device)
 
     output = (
         np.zeros((n_rows, quantizer.encoded_dim), dtype="uint8")
@@ -38,9 +38,7 @@ def test_product_quantizer(
         else None
     )
     output_device = device_ndarray(output) if inplace else None
-    transformed = product.transform(
-        quantizer, input1_device, output=output_device
-    )
+    transformed = pq.transform(quantizer, input1_device, output=output_device)
     actual = transformed if not inplace else output_device
     actual = actual.copy_to_host()
 
@@ -50,7 +48,7 @@ def test_product_quantizer(
     assert cp.array(quantizer.pq_codebook).any()
 
     reconstructed = cp.empty((n_rows, n_cols), dtype=dtype)
-    product.inverse_transform(quantizer, transformed, reconstructed)
+    pq.inverse_transform(quantizer, transformed, reconstructed)
     reconstructed = cp.array(reconstructed)
     assert reconstructed.shape == input1.shape
     reconstruction_error = cp.linalg.norm(

@@ -6,5 +6,5 @@
 # =============================================================================
 
 add_subdirectory(quantize/binary)
-add_subdirectory(quantize/product)
+add_subdirectory(quantize/pq)
 add_subdirectory(quantize/scalar)

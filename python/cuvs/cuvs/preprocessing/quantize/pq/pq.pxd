@@ -11,7 +11,7 @@ from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
 
 
-cdef extern from "cuvs/preprocessing/quantize/product.h" nogil:
+cdef extern from "cuvs/preprocessing/quantize/pq.h" nogil:
 
     ctypedef struct cuvsProductQuantizerParams:
         uint32_t pq_bits
