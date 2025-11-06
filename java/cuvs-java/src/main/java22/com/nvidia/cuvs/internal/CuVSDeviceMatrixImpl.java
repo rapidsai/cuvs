@@ -95,14 +95,13 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
 
   @Override
   public RowView getRow(long row) {
-    var valueByteSize = valueLayout.byteSize();
-    var startRow = row - bufferedMatrixRowStart;
-
     try (var access = resources.access()) {
       var hostBuffer = CuVSResourcesImpl.getHostBuffer(access);
       if (row < bufferedMatrixRowStart || row >= bufferedMatrixRowEnd) {
         populateBuffer(row, hostBuffer);
       }
+      var valueByteSize = valueLayout.byteSize();
+      var startRow = row - bufferedMatrixRowStart;
 
       return new SliceRowView(
           hostBuffer.asSlice(startRow * columns * valueByteSize, columns * valueByteSize),
