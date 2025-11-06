@@ -71,22 +71,23 @@ void knn_graph(raft::resources const& res,
 
   cuvs::neighbors::graph_build_params::brute_force_params bf_params;
   bf_params.build_params.metric = metric;
-  params.graph_build_params = bf_params;
+  params.graph_build_params     = bf_params;
 
-  params.n_clusters = 1;
+  params.n_clusters     = 1;
   params.overlap_factor = 1;
-  
+
   rmm::device_uvector<int64_t> indices_64(nnz, stream);
-  auto indices_view = raft::make_device_matrix_view<int64_t, int64_t>(indices_64.data(), m, k);
+  auto indices_view   = raft::make_device_matrix_view<int64_t, int64_t>(indices_64.data(), m, k);
   auto distances_view = raft::make_device_matrix_view<value_t, int64_t>(data.data(), m, k);
-  
-  cuvs::neighbors::all_neighbors::build(res, params, 
+
+  cuvs::neighbors::all_neighbors::build(
+    res,
+    params,
     raft::make_device_matrix_view<const value_t, int64_t>(X.data_handle(), m, n),
-    indices_view, distances_view);
-  
-  raft::linalg::unaryOp(
-    indices.data(), indices_64.data(), nnz, 
-    raft::cast_op<value_idx>{}, stream);
+    indices_view,
+    distances_view);
+
+  raft::linalg::unaryOp(indices.data(), indices_64.data(), nnz, raft::cast_op<value_idx>{}, stream);
 
   raft::sparse::linalg::symmetrize(res,
                                    rows.data(),
