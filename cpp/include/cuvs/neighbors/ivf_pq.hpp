@@ -461,9 +461,9 @@ struct index : cuvs::neighbors::index {
     const raft::resources& res) const;
 
   /** Cluster centers corresponding to the lists in the rotated space [n_lists, rot_dim] */
-  virtual raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept;
+  virtual raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept = 0;
   virtual raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot()
-    const noexcept;
+    const noexcept = 0;
 
   /** fetch size of a particular IVF list in bytes using the list extents.
    * Usage example:
@@ -491,6 +491,7 @@ struct index : cuvs::neighbors::index {
   uint32_t pq_dim_;
   bool conservative_memory_allocation_;
 
+  // Primary data members
   std::vector<std::shared_ptr<list_data<IdxT>>> lists_;
   raft::device_vector<uint32_t, uint32_t, raft::row_major> list_sizes_;
 
@@ -565,44 +566,21 @@ struct ivf_pq_owning : public index<IdxT> {
   ~ivf_pq_owning()                                       = default;
 
   // Override virtual accessors to return owned data
-  raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept override
-  {
-    return pq_centers_.view();
-  }
+  raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept override;
   raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers()
-    const noexcept override
-  {
-    return pq_centers_.view();
-  }
+    const noexcept override;
 
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept override
-  {
-    return centers_.view();
-  }
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept override
-  {
-    return centers_.view();
-  }
+  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept override;
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers()
+    const noexcept override;
 
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept override
-  {
-    return centers_rot_.view();
-  }
+  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept override;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot()
-    const noexcept override
-  {
-    return centers_rot_.view();
-  }
+    const noexcept override;
 
-  raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() noexcept override
-  {
-    return rotation_matrix_.view();
-  }
+  raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() noexcept override;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix()
-    const noexcept override
-  {
-    return rotation_matrix_.view();
-  }
+    const noexcept override;
 
  private:
   raft::device_mdarray<float, pq_centers_extents, raft::row_major> pq_centers_;
@@ -665,49 +643,21 @@ struct ivf_pq_view : public index<IdxT> {
   ~ivf_pq_view()                                     = default;
 
   // Override virtual accessors to return views (non-const versions cast away const)
-  raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept override
-  {
-    // View variant returns mutable view by const-casting (use with caution!)
-    return raft::make_mdspan<float, pq_centers_extents, raft::row_major>(
-      const_cast<float*>(pq_centers_view_.data_handle()), pq_centers_view_.extents());
-  }
+  raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept override;
   raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers()
-    const noexcept override
-  {
-    return pq_centers_view_;
-  }
+    const noexcept override;
 
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept override
-  {
-    return raft::make_mdspan<float, uint32_t, raft::row_major>(
-      const_cast<float*>(centers_view_.data_handle()), centers_view_.extents());
-  }
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept override
-  {
-    return centers_view_;
-  }
+  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept override;
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers()
+    const noexcept override;
 
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept override
-  {
-    return raft::make_mdspan<float, uint32_t, raft::row_major>(
-      const_cast<float*>(centers_rot_view_.data_handle()), centers_rot_view_.extents());
-  }
+  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept override;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot()
-    const noexcept override
-  {
-    return centers_rot_view_;
-  }
+    const noexcept override;
 
-  raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() noexcept override
-  {
-    return raft::make_mdspan<float, uint32_t, raft::row_major>(
-      const_cast<float*>(rotation_matrix_view_.data_handle()), rotation_matrix_view_.extents());
-  }
+  raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() noexcept override;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix()
-    const noexcept override
-  {
-    return rotation_matrix_view_;
-  }
+    const noexcept override;
 
  private:
   // View members (non-owning)
