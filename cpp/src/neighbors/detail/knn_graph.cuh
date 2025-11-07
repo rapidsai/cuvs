@@ -77,20 +77,20 @@ void knn_graph(raft::resources const& res,
   params.overlap_factor = 1;
 
   rmm::device_uvector<int64_t> indices_64(nnz, stream);
-  auto indices_view   = raft::make_device_matrix_view<int64_t, int64_t>(indices_64.data(), m, k);
-  auto distances_view = raft::make_device_matrix_view<value_t, int64_t>(data.data(), m, k);
+  auto indices_64_view = raft::make_device_matrix_view<int64_t, int64_t>(indices_64.data(), m, k);
+  auto distances_view  = raft::make_device_matrix_view<value_t, int64_t>(data.data(), m, k);
 
   cuvs::neighbors::all_neighbors::build(
     res,
     params,
     raft::make_device_matrix_view<const value_t, int64_t>(X.data_handle(), m, n),
-    indices_view,
+    indices_64_view,
     distances_view);
 
-  auto indices_view = raft::make_device_vector_view<value_idx, nnz_t>(indices.data(), nnz);
-  auto indices_64_view =
-    raft::make_device_vector_view<const int64_t, nnz_t>(indices_64.data(), nnz);
-  raft::linalg::unary_op(res, indices_64_view, indices_view, raft::cast_op<value_idx>{});
+  raft::linalg::unary_op(res,
+                         raft::make_const_mdspan(indices_64_view),
+                         raft::make_device_vector_view<value_idx, nnz_t>(indices.data(), nnz),
+                         raft::cast_op<value_idx>{});
 
   raft::sparse::linalg::symmetrize(res,
                                    rows.data(),
