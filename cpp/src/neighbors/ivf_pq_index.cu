@@ -30,7 +30,6 @@ index_params index_params::from_dataset(raft::matrix_extent<int64_t> dataset,
   return params;
 }
 
-// Base class constructor (for derived classes that will provide centers/matrices)
 template <typename IdxT>
 index<IdxT>::index(raft::resources const& handle,
                    cuvs::distance::DistanceType metric,
