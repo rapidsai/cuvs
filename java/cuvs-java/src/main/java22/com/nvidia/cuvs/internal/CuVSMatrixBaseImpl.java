@@ -39,6 +39,11 @@ abstract class CuVSMatrixBaseImpl implements CuVSMatrixInternal {
     this.columns = columns;
   }
 
+  @Override
+  public String toString() {
+    return String.format("%dx%d %s @ 0x%016X", size, columns, dataType, memorySegment.address());
+  }
+
   protected static void copyMatrix(
       CuVSMatrixInternal sourceMatrix, CuVSMatrixInternal targetMatrix, CuVSResources resources) {
     if (targetMatrix.columns() != sourceMatrix.columns()
