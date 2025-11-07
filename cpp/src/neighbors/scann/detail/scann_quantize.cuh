@@ -4,6 +4,7 @@
  */
 
 #include "../../detail/vpq_dataset.cuh"
+#include "../../detail/vpq_dataset_subspaces.hpp"
 #include <chrono>
 #include <cmath>
 #include <cuvs/neighbors/common.hpp>
@@ -104,7 +105,7 @@ auto quantize_residuals(raft::resources const& res,
                                 vq_codebook.size() * sizeof(T),
                                 raft::resource::get_cuda_stream(res)));
 
-  auto codes = cuvs::neighbors::detail::process_and_fill_codes_subspaces<T, IdxT>(
+  auto codes = cuvs::neighbors::detail::process_and_fill_codes_subspaces(
     res, ps, residuals, raft::make_const_mdspan(vq_codebook.view()), pq_codebook);
 
   return codes;

@@ -438,6 +438,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/iface/iface_pq_int8_t_int64_t.cu
     src/neighbors/iface/iface_pq_uint8_t_int64_t.cu
     src/neighbors/detail/cagra/topk_for_cagra/topk.cu
+    src/neighbors/detail/vpq_dataset_subspaces.cu
     src/neighbors/dynamic_batching.cu
     src/neighbors/cagra_index_wrapper.cu
     src/neighbors/composite/index.cu
