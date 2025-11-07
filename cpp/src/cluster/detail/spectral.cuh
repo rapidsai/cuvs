@@ -33,6 +33,7 @@ void fit_predict(raft::resources const& handle,
   spectral_embedding_config.norm_laplacian = true;
   spectral_embedding_config.drop_first     = false;
   spectral_embedding_config.seed           = config.rng_state.seed;
+  spectral_embedding_config.tolerance      = config.tolerance;
 
   cuvs::cluster::kmeans::params kmeans_config;
   kmeans_config.n_clusters          = config.n_clusters;
