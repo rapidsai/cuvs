@@ -497,7 +497,6 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/nn_descent_index.cpp
     src/neighbors/nn_descent_int8.cu
     src/neighbors/nn_descent_uint8.cu
-    src/neighbors/reachability.cu
     src/neighbors/refine/detail/refine_device_float_float.cu
     src/neighbors/refine/detail/refine_device_half_float.cu
     src/neighbors/refine/detail/refine_device_int8_t_float.cu
