@@ -360,46 +360,46 @@ struct index : cuvs::neighbors::index {
   IdxT size() const noexcept;
 
   /** Dimensionality of the input data. */
-  uint32_t dim() const noexcept { return dim_; }
+  uint32_t dim() const noexcept;
 
   /**
    * Dimensionality of the cluster centers:
    * input data dim extended with vector norms and padded to 8 elems.
    */
-  uint32_t dim_ext() const noexcept { return raft::round_up_safe(dim() + 1, 8u); }
+  uint32_t dim_ext() const noexcept;
 
   /**
    * Dimensionality of the data after transforming it for PQ processing
    * (rotated and augmented to be muplitple of `pq_dim`).
    */
-  uint32_t rot_dim() const noexcept { return pq_len() * pq_dim(); }
+  uint32_t rot_dim() const noexcept;
 
   /** The bit length of an encoded vector element after compression by PQ. */
-  uint32_t pq_bits() const noexcept { return pq_bits_; }
+  uint32_t pq_bits() const noexcept;
 
   /** The dimensionality of an encoded vector after compression by PQ. */
-  uint32_t pq_dim() const noexcept { return pq_dim_; }
+  uint32_t pq_dim() const noexcept;
 
   /** Dimensionality of a subspaces, i.e. the number of vector components mapped to a subspace */
-  uint32_t pq_len() const noexcept { return raft::div_rounding_up_unsafe(dim(), pq_dim()); }
+  uint32_t pq_len() const noexcept;
 
   /** The number of vectors in a PQ codebook (`1 << pq_bits`). */
-  uint32_t pq_book_size() const noexcept { return 1 << pq_bits(); }
+  uint32_t pq_book_size() const noexcept;
 
   /** Distance metric used for clustering. */
-  cuvs::distance::DistanceType metric() const noexcept { return metric_; }
+  cuvs::distance::DistanceType metric() const noexcept;
 
   /** How PQ codebooks are created. */
-  codebook_gen codebook_kind() const noexcept { return codebook_kind_; }
+  codebook_gen codebook_kind() const noexcept;
 
   /** Number of clusters/inverted lists (first level quantization). */
-  uint32_t n_lists() const noexcept { return lists_.size(); }
+  uint32_t n_lists() const noexcept;
 
   /**
    * Whether to use convervative memory allocation when extending the list (cluster) data
    * (see index_params.conservative_memory_allocation).
    */
-  bool conservative_memory_allocation() const noexcept { return conservative_memory_allocation_; }
+  bool conservative_memory_allocation() const noexcept;
 
   /**
    * PQ cluster centers
