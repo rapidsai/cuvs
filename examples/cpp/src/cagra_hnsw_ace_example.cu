@@ -32,12 +32,30 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   auto neighbors = raft::make_device_matrix<uint32_t>(dev_resources, n_queries, topk);
   auto distances = raft::make_device_matrix<float>(dev_resources, n_queries, topk);
 
-  // use ACE index parameters
+  // CAGRA index parameters
   cagra::index_params index_params;
-  auto ace_params        = cagra::graph_build_params::ace_params();
+  index_params.intermediate_graph_degree = 128;
+  index_params.graph_degree              = 64;
+
+  // ACE index parameters
+  auto ace_params = cagra::graph_build_params::ace_params();
+  // Set the number of partitions. Small values might improve recall but potentially degrade
+  // performance and increase memory usage. Partitions should not be too small to prevent issues in
+  // KNN graph construction. 100k - 5M vectors per partition is recommended depending on the
+  // available host and GPU memory. The partition size is on average 2 * (n_rows / npartitions) *
+  // dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance
+  // in the partition sizes (up to 3x in our tests).
   ace_params.npartitions = 4;
-  ace_params.build_dir   = "/tmp/ace_build";
-  // ace_params.use_disk  = true;  // Uncomment to use disk storage
+  // Set the index quality for the ACE build. Bigger values increase the index quality. At some
+  // point, increasing this will no longer improve the quality.
+  ace_params.ef_construction = 120;
+  // Set the directory to store the ACE build artifacts. This should be the fastest disk in the
+  // system and hold enough space for twice the dataset, final graph, and label mapping.
+  ace_params.build_dir = "/tmp/ace_build";
+  // Set whether to use disk-based storage for ACE build. When true, enables disk-based operations
+  // for memory-efficient graph construction. If not set, the index will be built in memory if the
+  // graph fits in host and GPU memory, and on disk otherwise.
+  // ace_params.use_disk  = true;
   index_params.graph_build_params = ace_params;
 
   // ACE requires the dataset to be on the host
