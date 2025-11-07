@@ -4,6 +4,9 @@
 
 set -euo pipefail
 
+CMAKE_VERSION=3.31.8
+CMAKE_ARCH=x86_64
+
 # Fetch and install CMake.
 if [ ! -e "/usr/local/bin/cmake" ]; then
       pushd /usr/local
