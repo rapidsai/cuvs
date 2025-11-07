@@ -246,6 +246,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     }
   }
 
+  @Ignore // https://github.com/rapidsai/cuvs/issues/1467
   @Test
   public void testFloatSerialization() throws Throwable {
     testSerialization(
