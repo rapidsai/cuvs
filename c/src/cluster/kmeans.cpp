@@ -18,7 +18,7 @@ namespace {
 cuvs::cluster::kmeans::params convert_params(const cuvsKMeansParams& params)
 {
   auto kmeans_params       = cuvs::cluster::kmeans::params();
-  kmeans_params.metric     = params.metric;
+  kmeans_params.metric     = static_cast<cuvs::distance::DistanceType>(params.metric);
   kmeans_params.init       = static_cast<cuvs::cluster::kmeans::params::InitMethod>(params.init);
   kmeans_params.n_clusters = params.n_clusters;
   kmeans_params.max_iter   = params.max_iter;
@@ -33,7 +33,7 @@ cuvs::cluster::kmeans::params convert_params(const cuvsKMeansParams& params)
 cuvs::cluster::kmeans::balanced_params convert_balanced_params(const cuvsKMeansParams& params)
 {
   auto kmeans_params    = cuvs::cluster::kmeans::balanced_params();
-  kmeans_params.metric  = params.metric;
+  kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>(params.metric);
   kmeans_params.n_iters = params.hierarchical_n_iters;
   return kmeans_params;
 }
@@ -185,7 +185,7 @@ extern "C" cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params)
     cuvs::cluster::kmeans::params cpp_params;
     cuvs::cluster::kmeans::balanced_params cpp_balanced_params;
     *params =
-      new cuvsKMeansParams{.metric     = cpp_params.metric,
+      new cuvsKMeansParams{.metric     = static_cast<cuvsDistanceType>(cpp_params.metric),
                            .n_clusters = cpp_params.n_clusters,
                            .init       = static_cast<cuvsKMeansInitMethod>(cpp_params.init),
                            .max_iter   = cpp_params.max_iter,

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -97,7 +97,7 @@ void pairwiseDistance(value_t* out,
         .compute(out);
       break;
 
-    default: THROW("Unsupported distance: %d", metric);
+    default: THROW("Unsupported distance: %d", static_cast<int>(metric));
   }
 }
 };  // namespace distance
