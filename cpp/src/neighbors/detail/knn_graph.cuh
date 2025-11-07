@@ -68,6 +68,7 @@ void knn_graph(raft::resources const& res,
   raft::linalg::map_offset(res, rows_view, [k] __device__(nnz_t i) { return value_idx(i / k); });
 
   cuvs::neighbors::all_neighbors::all_neighbors_params params;
+  params.metric = metric;
 
   cuvs::neighbors::graph_build_params::brute_force_params bf_params;
   bf_params.build_params.metric = metric;
