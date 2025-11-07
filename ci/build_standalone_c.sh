@@ -19,12 +19,14 @@ dnf install -y \
       make
 
 # Fetch and install CMake.
-pushd /usr/local
-wget --quiet https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-${CMAKE_ARCH}.tar.gz
-tar zxf cmake-${CMAKE_VERSION}-linux-${CMAKE_ARCH}.tar.gz
-rm cmake-${CMAKE_VERSION}-linux-${CMAKE_ARCH}.tar.gz
-ln -s /usr/local/cmake-${CMAKE_VERSION}-linux-${CMAKE_ARCH}/bin/cmake /usr/local/bin/cmake
-popd
+if [ ! -e "/usr/local/bin/cmake" ]; then
+      pushd /usr/local
+      wget --quiet https://github.com/Kitware/CMake/releases/download/v"${CMAKE_VERSION}"/cmake-"${CMAKE_VERSION}"-linux-"${CMAKE_ARCH}".tar.gz
+      tar zxf cmake-"${CMAKE_VERSION}"-linux-"${CMAKE_ARCH}".tar.gz
+      rm cmake-"${CMAKE_VERSION}"-linux-"${CMAKE_ARCH}".tar.gz
+      ln -s /usr/local/cmake-"${CMAKE_VERSION}"-linux-"${CMAKE_ARCH}"/bin/cmake /usr/local/bin/cmake
+      popd
+fi
 
 source rapids-configure-sccache
 
