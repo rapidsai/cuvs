@@ -322,20 +322,17 @@ void set_centers(raft::resources const& handle,
   }
 }
 
-void set_centers(
-  raft::resources const& handle,
-  index<int64_t>* index,
-  raft::host_matrix_view<const float, uint32_t, raft::row_major> cluster_centers)
+void set_centers(raft::resources const& handle,
+                 index<int64_t>* index,
+                 raft::host_matrix_view<const float, uint32_t, raft::row_major> cluster_centers)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
   // Copy centers from host to device
   auto centers_dev = raft::make_device_matrix<float, uint32_t>(
     handle, cluster_centers.extent(0), cluster_centers.extent(1));
-  raft::copy(centers_dev.data_handle(),
-             cluster_centers.data_handle(),
-             cluster_centers.size(),
-             stream);
+  raft::copy(
+    centers_dev.data_handle(), cluster_centers.data_handle(), cluster_centers.size(), stream);
 
   // Call the device version
   set_centers(handle, index, centers_dev.view());
@@ -370,16 +367,11 @@ auto build(
   raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
   raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
   std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
-  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>>
-    rotation_matrix) -> index<int64_t>
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix)
+  -> ivf_pq_owning<int64_t>
 {
-  return detail::build<int64_t>(handle,
-                                index_params,
-                                dim,
-                                pq_centers,
-                                centers,
-                                centers_rot,
-                                rotation_matrix);
+  return detail::build<int64_t>(
+    handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix);
 }
 
 void build(
@@ -389,18 +381,11 @@ void build(
   raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
   raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
   std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
-  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>>
-    rotation_matrix,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix,
   index<int64_t>* idx)
 {
-  detail::build<int64_t>(handle,
-                         index_params,
-                         dim,
-                         pq_centers,
-                         centers,
-                         centers_rot,
-                         rotation_matrix,
-                         idx);
+  *idx = detail::build<int64_t>(
+    handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix);
 }
 
 }  // namespace cuvs::neighbors::ivf_pq
