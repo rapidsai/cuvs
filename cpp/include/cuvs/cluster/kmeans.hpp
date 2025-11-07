@@ -905,7 +905,7 @@ void predict(const raft::resources& handle,
  *               X,
  *               centroids.view());
  *   ...
- *   auto labels = raft::make_device_vector<int, int64_t>(handle, X.extent(0));
+ *   auto labels = raft::make_device_vector<uint32_t, int64_t>(handle, X.extent(0));
  *
  *   kmeans::predict(handle,
  *                   params,
@@ -949,7 +949,7 @@ void predict(const raft::resources& handle,
  *               X,
  *               centroids.view());
  *   ...
- *   auto labels = raft::make_device_vector<int, int64_t>(handle, X.extent(0));
+ *   auto labels = raft::make_device_vector<uint32_t, int64_t>(handle, X.extent(0));
  *
  *   kmeans::predict(handle,
  *                   params,
@@ -993,7 +993,7 @@ void predict(const raft::resources& handle,
  *               X,
  *               centroids.view());
  *   ...
- *   auto labels = raft::make_device_vector<int, int64_t>(handle, X.extent(0));
+ *   auto labels = raft::make_device_vector<uint32_t, int64_t>(handle, X.extent(0));
  *
  *   kmeans::predict(handle,
  *                   params,
