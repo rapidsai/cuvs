@@ -139,11 +139,71 @@ IdxT index<IdxT>::size() const noexcept
   return accum_sorted_sizes_(n_lists());
 }
 
-// Common methods are now inline in the header file:
-// - dim(), dim_ext(), rot_dim()
-// - pq_bits(), pq_dim(), pq_len(), pq_book_size()
-// - metric(), codebook_kind(), n_lists()
-// - conservative_memory_allocation()
+template <typename IdxT>
+uint32_t index<IdxT>::dim() const noexcept
+{
+  return dim_;
+}
+
+template <typename IdxT>
+uint32_t index<IdxT>::dim_ext() const noexcept
+{
+  return raft::round_up_safe(dim() + 1, 8u);
+}
+
+template <typename IdxT>
+uint32_t index<IdxT>::rot_dim() const noexcept
+{
+  return pq_len() * pq_dim();
+}
+
+template <typename IdxT>
+uint32_t index<IdxT>::pq_bits() const noexcept
+{
+  return pq_bits_;
+}
+
+template <typename IdxT>
+uint32_t index<IdxT>::pq_dim() const noexcept
+{
+  return pq_dim_;
+}
+
+template <typename IdxT>
+uint32_t index<IdxT>::pq_len() const noexcept
+{
+  return raft::div_rounding_up_unsafe(dim(), pq_dim());
+}
+
+template <typename IdxT>
+uint32_t index<IdxT>::pq_book_size() const noexcept
+{
+  return 1 << pq_bits();
+}
+
+template <typename IdxT>
+cuvs::distance::DistanceType index<IdxT>::metric() const noexcept
+{
+  return metric_;
+}
+
+template <typename IdxT>
+codebook_gen index<IdxT>::codebook_kind() const noexcept
+{
+  return codebook_kind_;
+}
+
+template <typename IdxT>
+uint32_t index<IdxT>::n_lists() const noexcept
+{
+  return lists_.size();
+}
+
+template <typename IdxT>
+bool index<IdxT>::conservative_memory_allocation() const noexcept
+{
+  return conservative_memory_allocation_;
+}
 
 // pq_centers() is now pure virtual and implemented in derived classes
 
