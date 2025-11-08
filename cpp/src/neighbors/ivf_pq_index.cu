@@ -204,8 +204,6 @@ bool index<IdxT>::conservative_memory_allocation() const noexcept
   return conservative_memory_allocation_;
 }
 
-// pq_centers() is now pure virtual and implemented in derived classes
-
 // ivf_pq_owning implementations
 template <typename IdxT>
 raft::device_mdspan<float, typename index<IdxT>::pq_centers_extents, raft::row_major>
@@ -296,8 +294,7 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> ivf_pq_view<Idx
 template <typename IdxT>
 raft::device_matrix_view<float, uint32_t, raft::row_major> ivf_pq_view<IdxT>::centers_rot() noexcept
 {
-  return raft::make_mdspan<float, uint32_t, raft::row_major>(
-    const_cast<float*>(centers_rot_view_.data_handle()), centers_rot_view_.extents());
+  return raft::make_device_matrix_view<float, uint32_t, raft::row_major>(const_cast<float*>(centers_rot_view_.data_handle()), centers_rot_view_.extent(0), centers_rot_view_.extent(1));
 }
 
 template <typename IdxT>
@@ -311,8 +308,7 @@ template <typename IdxT>
 raft::device_matrix_view<float, uint32_t, raft::row_major>
 ivf_pq_view<IdxT>::rotation_matrix() noexcept
 {
-  return raft::make_mdspan<float, uint32_t, raft::row_major>(
-    const_cast<float*>(rotation_matrix_view_.data_handle()), rotation_matrix_view_.extents());
+  return rotation_matrix_view_;
 }
 
 template <typename IdxT>
@@ -344,8 +340,7 @@ template <typename IdxT>
 raft::device_vector_view<const uint8_t* const, uint32_t, raft::row_major> index<IdxT>::data_ptrs()
   const noexcept
 {
-  return raft::make_mdspan<const uint8_t* const, uint32_t, raft::row_major, false, true>(
-    data_ptrs_.data_handle(), data_ptrs_.extents());
+  return data_ptrs_.view();
 }
 
 template <typename IdxT>
