@@ -111,7 +111,7 @@ void serialize(raft::resources const& handle_,
  *
  */
 template <typename IdxT>
-auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT>
+auto deserialize(raft::resources const& handle_, std::istream& is) -> ivf_pq_owning<IdxT>
 {
   auto ver = raft::deserialize_scalar<int>(handle_, is);
   if (ver != kSerializationVersion) {
@@ -134,7 +134,7 @@ auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT
                  static_cast<int>(pq_bits),
                  static_cast<int>(n_lists));
 
-  auto index = cuvs::neighbors::ivf_pq::index<IdxT>(
+  auto index = cuvs::neighbors::ivf_pq::ivf_pq_owning<IdxT>(
     handle_, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, cma);
 
   raft::deserialize_mdspan(handle_, is, index.pq_centers());

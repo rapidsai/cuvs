@@ -204,6 +204,9 @@ bool index<IdxT>::conservative_memory_allocation() const noexcept
   return conservative_memory_allocation_;
 }
 
+// Base class virtual functions - should not be called (no implementations needed)
+// If they are called, it would be a logic error since base class has no storage
+
 // ivf_pq_owning implementations
 template <typename IdxT>
 raft::device_mdspan<float, typename index<IdxT>::pq_centers_extents, raft::row_major>
@@ -266,7 +269,7 @@ raft::device_mdspan<float, typename index<IdxT>::pq_centers_extents, raft::row_m
 ivf_pq_view<IdxT>::pq_centers() noexcept
 {
   // View variant returns mutable view by const-casting (use with caution!)
-  return raft::make_mdspan<float, typename index<IdxT>::pq_centers_extents, raft::row_major>(
+  return raft::mdspan<float, typename index<IdxT>::pq_centers_extents, raft::row_major>(
     const_cast<float*>(pq_centers_view_.data_handle()), pq_centers_view_.extents());
 }
 
@@ -280,8 +283,8 @@ ivf_pq_view<IdxT>::pq_centers() const noexcept
 template <typename IdxT>
 raft::device_matrix_view<float, uint32_t, raft::row_major> ivf_pq_view<IdxT>::centers() noexcept
 {
-  return raft::make_mdspan<float, uint32_t, raft::row_major>(
-    const_cast<float*>(centers_view_.data_handle()), centers_view_.extents());
+  return raft::make_device_matrix_view<float, uint32_t>(
+    const_cast<float*>(centers_view_.data_handle()), centers_view_.extent(0), centers_view_.extent(1));
 }
 
 template <typename IdxT>
@@ -294,7 +297,7 @@ raft::device_matrix_view<const float, uint32_t, raft::row_major> ivf_pq_view<Idx
 template <typename IdxT>
 raft::device_matrix_view<float, uint32_t, raft::row_major> ivf_pq_view<IdxT>::centers_rot() noexcept
 {
-  return raft::make_device_matrix_view<float, uint32_t, raft::row_major>(const_cast<float*>(centers_rot_view_.data_handle()), centers_rot_view_.extent(0), centers_rot_view_.extent(1));
+  return raft::make_device_matrix_view<float, uint32_t>(const_cast<float*>(centers_rot_view_.data_handle()), centers_rot_view_.extent(0), centers_rot_view_.extent(1));
 }
 
 template <typename IdxT>
