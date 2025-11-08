@@ -1035,18 +1035,19 @@ void erase_list(raft::resources const& res, index<IdxT>* index, uint32_t label)
 
 /** raft::copy the state of an index into a new index, but share the list data among the two. */
 template <typename IdxT>
-auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
+auto clone(const raft::resources& res, const index<IdxT>& source) -> ivf_pq_owning<IdxT>
 {
   auto stream = raft::resource::get_cuda_stream(res);
 
-  // Allocate the new index
-  index<IdxT> target(res,
-                     source.metric(),
-                     source.codebook_kind(),
-                     source.n_lists(),
-                     source.dim(),
-                     source.pq_bits(),
-                     source.pq_dim());
+  // Allocate the new owning index
+  ivf_pq_owning<IdxT> target(res,
+                             source.metric(),
+                             source.codebook_kind(),
+                             source.n_lists(),
+                             source.dim(),
+                             source.pq_bits(),
+                             source.pq_dim(),
+                             source.conservative_memory_allocation());
 
   // raft::copy the independent parts
   raft::copy(target.list_sizes().data_handle(),
@@ -1294,7 +1295,7 @@ auto extend(raft::resources const& handle,
             const index<IdxT>& orig_index,
             const T* new_vectors,
             const IdxT* new_indices,
-            IdxT n_rows) -> index<IdxT>
+            IdxT n_rows) -> ivf_pq_owning<IdxT>
 {
   auto ext_index = clone(handle, orig_index);
   detail::extend(handle, &ext_index, new_vectors, new_indices, n_rows);
@@ -1646,7 +1647,7 @@ auto extend(
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, accessor> new_vectors,
   std::optional<raft::mdspan<const IdxT, raft::vector_extent<int64_t>, raft::row_major, accessor2>>
     new_indices,
-  const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index) -> index<IdxT>
+  const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index) -> ivf_pq_owning<IdxT>
 {
   ASSERT(new_vectors.extent(1) == orig_index.dim(),
          "new_vectors should have the same dimension as the index");
@@ -1664,6 +1665,7 @@ auto extend(
                 n_rows);
 }
 
+// In-place extend for base class pointer (clones, extends, moves back)
 template <typename T, typename IdxT, typename accessor, typename accessor2>
 void extend(
   raft::resources const& handle,
@@ -1686,6 +1688,32 @@ void extend(
                   new_vectors.data_handle(),
                   new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
                   n_rows);
+}
+
+// Truly in-place extend for ivf_pq_view (no cloning, only extends lists)
+template <typename T, typename IdxT, typename accessor, typename accessor2>
+void extend(
+  raft::resources const& handle,
+  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, accessor> new_vectors,
+  std::optional<raft::mdspan<const IdxT, raft::vector_extent<int64_t>, raft::row_major, accessor2>>
+    new_indices,
+  ivf_pq_view<IdxT>* index)
+{
+  ASSERT(new_vectors.extent(1) == index->dim(),
+         "new_vectors should have the same dimension as the index");
+
+  IdxT n_rows = new_vectors.extent(0);
+  if (new_indices.has_value()) {
+    ASSERT(n_rows == new_indices.value().extent(0),
+           "new_vectors and new_indices have different number of rows");
+  }
+
+  // Call detail::extend directly for true in-place modification (no cloning)
+  detail::extend(handle,
+                 index,
+                 new_vectors.data_handle(),
+                 new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
+                 n_rows);
 }
 
 // Host version - always returns owning variant since we create device copies

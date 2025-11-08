@@ -353,7 +353,8 @@ struct index : cuvs::neighbors::index {
    */
   index(raft::resources const& handle);
 
-  /** Construct an empty index. It needs to be trained and then populated. */
+ protected:
+  /** Protected constructor for derived classes to initialize base class members. */
   index(raft::resources const& handle,
         cuvs::distance::DistanceType metric,
         codebook_gen codebook_kind,
@@ -363,25 +364,7 @@ struct index : cuvs::neighbors::index {
         uint32_t pq_dim                     = 0,
         bool conservative_memory_allocation = false);
 
-  /** Construct an empty index. It needs to be trained and then populated. */
-  index(raft::resources const& handle, const index_params& params, uint32_t dim);
-
-  index(
-    raft::resources const& handle,
-    cuvs::distance::DistanceType metric,
-    codebook_gen codebook_kind,
-    uint32_t n_lists,
-    uint32_t dim,
-    uint32_t pq_bits,
-    uint32_t pq_dim,
-    bool conservative_memory_allocation,
-    raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers_view,
-    raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_view,
-    std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>>
-      centers_rot_view,
-    std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>>
-      rotation_matrix_view);
-
+ public:
   /** Total length of the index. */
   IdxT size() const noexcept;
 
@@ -516,11 +499,6 @@ struct index : cuvs::neighbors::index {
   // Primary data members
   std::vector<std::shared_ptr<list_data<IdxT>>> lists_;
   raft::device_vector<uint32_t, uint32_t, raft::row_major> list_sizes_;
-
-  // Views of the data members
-  raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers_view_;
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_view_;
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot_view_;
 
   // Lazy-initialized low-precision variants of index members - for low-precision coarse search.
   // These are never serialized and not touched during build/extend.
@@ -1195,7 +1173,7 @@ auto build(
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
   std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> centers_rot_opt,
   std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix)
-  -> cuvs::neighbors::ivf_pq::index<int64_t>;
+  -> cuvs::neighbors::ivf_pq::ivf_pq_owning<int64_t>;
 
 /**
  * @brief Build an IVF-PQ index from host memory centroids and codebook.
@@ -1241,7 +1219,7 @@ auto build(
   raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
   std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
   std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>>
-    rotation_matrix) -> cuvs::neighbors::ivf_pq::index<int64_t>;
+    rotation_matrix) -> cuvs::neighbors::ivf_pq::ivf_pq_owning<int64_t>;
 
 /**
  * @brief Build an IVF-PQ index from host memory centroids and codebook (in-place).
@@ -1338,7 +1316,7 @@ auto extend(raft::resources const& handle,
             raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
             const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
-  -> cuvs::neighbors::ivf_pq::index<int64_t>;
+  -> cuvs::neighbors::ivf_pq::ivf_pq_owning<int64_t>;
 
 /**
  * @brief Extend the index with the new data.
@@ -1369,6 +1347,22 @@ void extend(raft::resources const& handle,
             cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 
 /**
+ * @brief Extend the index with the new data (truly in-place, no copying of codebooks).
+ * 
+ * This overload modifies the ivf_pq_view index in-place without copying codebooks or matrices.
+ * Only the inverted lists are extended.
+ *
+ * @param[in] handle
+ * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
+ * @param[in] new_indices a device vector view to a vector of indices [n_rows].
+ * @param[inout] idx pointer to ivf_pq_view index to extend in-place
+ */
+void extend(raft::resources const& handle,
+            raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
+            std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
+            cuvs::neighbors::ivf_pq::ivf_pq_view<int64_t>* idx);
+
+/**
  * @brief Extend the index with the new data.
  *
  * Usage example:
@@ -1395,7 +1389,7 @@ auto extend(raft::resources const& handle,
             raft::device_matrix_view<const half, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
             const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
-  -> cuvs::neighbors::ivf_pq::index<int64_t>;
+  -> cuvs::neighbors::ivf_pq::ivf_pq_owning<int64_t>;
 
 /**
  * @brief Extend the index with the new data.
@@ -1424,6 +1418,17 @@ void extend(raft::resources const& handle,
             raft::device_matrix_view<const half, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
             cuvs::neighbors::ivf_pq::index<int64_t>* idx);
+
+/**
+ * @brief Extend the index with the new data (truly in-place, no copying of codebooks).
+ *
+ * @param[inout] idx pointer to ivf_pq_view index to extend in-place
+ */
+void extend(raft::resources const& handle,
+            raft::device_matrix_view<const half, int64_t, raft::row_major> new_vectors,
+            std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
+            cuvs::neighbors::ivf_pq::ivf_pq_view<int64_t>* idx);
+
 /**
  * @brief Extend the index with the new data.
  *
@@ -1451,7 +1456,7 @@ auto extend(raft::resources const& handle,
             raft::device_matrix_view<const int8_t, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
             const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
-  -> cuvs::neighbors::ivf_pq::index<int64_t>;
+  -> cuvs::neighbors::ivf_pq::ivf_pq_owning<int64_t>;
 
 /**
  * @brief Extend the index with the new data.
@@ -1480,6 +1485,16 @@ void extend(raft::resources const& handle,
             raft::device_matrix_view<const int8_t, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
             cuvs::neighbors::ivf_pq::index<int64_t>* idx);
+
+/**
+ * @brief Extend the index with the new data (truly in-place, no copying of codebooks).
+ *
+ * @param[inout] idx pointer to ivf_pq_view index to extend in-place
+ */
+void extend(raft::resources const& handle,
+            raft::device_matrix_view<const int8_t, int64_t, raft::row_major> new_vectors,
+            std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
+            cuvs::neighbors::ivf_pq::ivf_pq_view<int64_t>* idx);
 
 /**
  * @brief Extend the index with the new data.
@@ -1508,7 +1523,7 @@ auto extend(raft::resources const& handle,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> new_vectors,
             std::optional<raft::device_vector_view<const int64_t, int64_t>> new_indices,
             const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
-  -> cuvs::neighbors::ivf_pq::index<int64_t>;
+  -> cuvs::neighbors::ivf_pq::ivf_pq_owning<int64_t>;
 
 /**
  * @brief Extend the index with the new data.
@@ -1571,7 +1586,7 @@ auto extend(raft::resources const& handle,
             raft::host_matrix_view<const float, int64_t, raft::row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
             const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
-  -> cuvs::neighbors::ivf_pq::index<int64_t>;
+  -> cuvs::neighbors::ivf_pq::ivf_pq_owning<int64_t>;
 
 /**
  * @brief Extend the index with the new data.
@@ -1640,7 +1655,7 @@ auto extend(raft::resources const& handle,
             raft::host_matrix_view<const half, int64_t, raft::row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
             const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
-  -> cuvs::neighbors::ivf_pq::index<int64_t>;
+  -> cuvs::neighbors::ivf_pq::ivf_pq_owning<int64_t>;
 
 /**
  * @brief Extend the index with the new data.
@@ -1709,7 +1724,7 @@ auto extend(raft::resources const& handle,
             raft::host_matrix_view<const int8_t, int64_t, raft::row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
             const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
-  -> cuvs::neighbors::ivf_pq::index<int64_t>;
+  -> cuvs::neighbors::ivf_pq::ivf_pq_owning<int64_t>;
 
 /**
  * @brief Extend the index with the new data.
@@ -1778,7 +1793,7 @@ auto extend(raft::resources const& handle,
             raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> new_vectors,
             std::optional<raft::host_vector_view<const int64_t, int64_t>> new_indices,
             const cuvs::neighbors::ivf_pq::index<int64_t>& idx)
-  -> cuvs::neighbors::ivf_pq::index<int64_t>;
+  -> cuvs::neighbors::ivf_pq::ivf_pq_owning<int64_t>;
 
 /**
  * @brief Extend the index with the new data.
