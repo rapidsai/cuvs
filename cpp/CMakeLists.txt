@@ -513,6 +513,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/vamana_serialize_float.cu
     src/neighbors/vamana_serialize_uint8.cu
     src/neighbors/vamana_serialize_int8.cu
+    src/preprocessing/linear_transform/random_orthogonal.cu
     src/preprocessing/quantize/scalar.cu
     src/preprocessing/quantize/binary.cu
     src/preprocessing/spectral/spectral_embedding.cu
