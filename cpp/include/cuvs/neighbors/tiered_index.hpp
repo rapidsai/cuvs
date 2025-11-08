@@ -17,8 +17,11 @@ namespace cuvs::neighbors::ivf_pq {
 // However, the tiered index code needs a value_type (for the bfknn tier),
 // defined in the ann index - so this class adds this for compatibility
 template <typename T, typename IdxT>
-struct typed_index : index<IdxT> {
+struct typed_index : ivf_pq_owning<IdxT> {
   using value_type = T;
+  
+  // Inherit constructors from ivf_pq_owning
+  using ivf_pq_owning<IdxT>::ivf_pq_owning;
 };
 }  // namespace cuvs::neighbors::ivf_pq
 

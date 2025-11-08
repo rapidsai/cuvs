@@ -269,7 +269,7 @@ void make_rotation_matrix(raft::resources const& res,
 }
 
 void set_centers(raft::resources const& handle,
-                 index<int64_t>* index,
+                 ivf_pq_owning<int64_t>* index,
                  raft::device_matrix_view<const float, uint32_t, raft::row_major> cluster_centers)
 {
   RAFT_EXPECTS(cluster_centers.extent(0) == index->n_lists(),
@@ -278,26 +278,38 @@ void set_centers(raft::resources const& handle,
     cluster_centers.extent(1) == index->dim() || cluster_centers.extent(1) == index->dim_ext(),
     "Number of columns in the new cluster centers must be equal to dim or dim_ext");
 
-  // Note: We keep the empty index check for backward compatibility
-  // New code should use update_centers directly if updating a non-empty index
   RAFT_EXPECTS(index->size() == 0,
-               "set_centers requires an empty index. Use update_centers() for non-empty indices.");
+               "set_centers requires an empty index.");
 
-  // Use the new update_centers method which handles format conversion
-  index->update_centers(handle, cluster_centers);
+  auto stream = raft::resource::get_cuda_stream(handle);
+
+  // Copy centers, handling padding if needed
+  if (cluster_centers.extent(1) == index->dim_ext()) {
+    // Already padded, just copy
+    raft::copy(index->centers().data_handle(),
+               cluster_centers.data_handle(),
+               cluster_centers.size(),
+               stream);
+  } else {
+    // Need to pad - zero out first
+    cuvs::spatial::knn::detail::utils::memzero(
+      index->centers().data_handle(), index->centers().size(), stream);
+    // Copy the actual data
+    RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle(),
+                                    sizeof(float) * index->dim_ext(),
+                                    cluster_centers.data_handle(),
+                                    sizeof(float) * cluster_centers.extent(1),
+                                    sizeof(float) * cluster_centers.extent(1),
+                                    cluster_centers.extent(0),
+                                    cudaMemcpyDefault,
+                                    stream));
+  }
 
   // Compute rotated centers if rotation matrix exists
-  // This is what differentiates set_centers from update_centers
   if (index->rotation_matrix().extent(0) > 0 && index->rotation_matrix().extent(1) > 0) {
-    // Allocate centers_rot if needed
-    if (!index->centers_rot().data_handle()) {
-      RAFT_FAIL("centers_rot must be allocated before calling set_centers");
-    }
-
     float alpha = 1.0;
     float beta  = 0.0;
 
-    // Handle both dim and dim_ext input formats
     uint32_t input_dim =
       (cluster_centers.extent(1) == index->dim()) ? index->dim() : index->dim_ext();
 
@@ -315,15 +327,12 @@ void set_centers(raft::resources const& handle,
                        &beta,
                        index->centers_rot().data_handle(),
                        index->rot_dim(),
-                       raft::resource::get_cuda_stream(handle));
-
-    // Update the view
-    index->update_centers_rot(handle, index->centers_rot());
+                       stream);
   }
 }
 
 void set_centers(raft::resources const& handle,
-                 index<int64_t>* index,
+                 ivf_pq_owning<int64_t>* index,
                  raft::host_matrix_view<const float, uint32_t, raft::row_major> cluster_centers)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
@@ -334,8 +343,8 @@ void set_centers(raft::resources const& handle,
   raft::copy(
     centers_dev.data_handle(), cluster_centers.data_handle(), cluster_centers.size(), stream);
 
-  // Call the device version
-  set_centers(handle, index, centers_dev.view());
+  // Call the device version with const view
+  set_centers(handle, index, raft::make_const_mdspan(centers_dev.view()));
 }
 
 void extract_centers(raft::resources const& res,

@@ -243,7 +243,7 @@ auto calculate_offsets_and_indices(IdxT n_rows,
 }
 
 template <typename IdxT>
-void set_centers(raft::resources const& handle, index<IdxT>* index, const float* cluster_centers)
+void set_centers(raft::resources const& handle, ivf_pq_owning<IdxT>* index, const float* cluster_centers)
 {
   auto stream         = raft::resource::get_cuda_stream(handle);
   auto* device_memory = raft::resource::get_workspace_resource(handle);
@@ -1306,7 +1306,7 @@ template <typename T, typename IdxT, typename accessor>
 auto build(raft::resources const& handle,
            const index_params& params,
            raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, accessor> dataset)
-  -> index<IdxT>
+  -> ivf_pq_owning<IdxT>
 {
   IdxT n_rows = dataset.extent(0);
   IdxT dim    = dataset.extent(1);
@@ -1321,7 +1321,7 @@ auto build(raft::resources const& handle,
 
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  index<IdxT> index(handle, params, dim);
+  ivf_pq_owning<IdxT> index(handle, params, dim);
   utils::memzero(
     index.accum_sorted_sizes().data_handle(), index.accum_sorted_sizes().size(), stream);
   utils::memzero(index.list_sizes().data_handle(), index.list_sizes().size(), stream);
@@ -1539,7 +1539,6 @@ auto build(
   uint32_t pq_dim =
     index_params.pq_dim > 0 ? index_params.pq_dim : index<IdxT>::calculate_pq_dim(dim);
   uint32_t pq_len       = raft::div_rounding_up_unsafe(dim, pq_dim);
-  uint32_t rot_dim      = pq_len * pq_dim;
   uint32_t dim_ext      = raft::round_up_safe(dim + 1, 8u);
   uint32_t pq_book_size = 1u << index_params.pq_bits;
 
