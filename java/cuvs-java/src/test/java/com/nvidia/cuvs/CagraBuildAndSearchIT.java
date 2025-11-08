@@ -198,7 +198,8 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             () -> {
               log.debug("Indexing threadIdx:{}-{}", threadIdx, Thread.currentThread().getName());
               try (CuVSResources resources = CheckedCuVSResources.create();
-                  var index = indexOnce(CuVSMatrix.ofArray(dataset), resources)) {
+                  var matrix = CuVSMatrix.ofArray(dataset);
+                  var index = indexOnce(matrix, resources)) {
                 var indexPath = serializeOnce(index);
                 try (var loadedIndex = deserializeOnce(indexPath, resources)) {
                   log.debug(
@@ -238,29 +239,30 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
   private void testIndexing(Supplier<CuVSMatrix> matrixFactory) throws Exception {
     for (int i = 0; i < 10; ++i) {
-      var dataset = matrixFactory.get();
-      int numRunners = 4;
-      final int iteration = i;
-      runConcurrently(
-          numRunners,
-          threadIdx ->
-              () -> {
-                try (CuVSResources resources = CheckedCuVSResources.create()) {
-                  // Create a local reference to the dataset, as index will close the dataset too
-                  // when it gets closed.
-                  var indexDatasetReference = dataset.toHost();
-                  log.debug(
-                      "Indexing iteration:{} threadIdx:{} dataset:{}",
-                      iteration,
-                      threadIdx,
-                      dataset);
-                  var index = indexOnce(indexDatasetReference, resources);
-                  log.debug("Done {} {}", iteration, threadIdx);
-                  index.close();
-                } catch (Throwable e) {
-                  throw new RuntimeException(e);
-                }
-              });
+      try (var dataset = matrixFactory.get()) {
+        int numRunners = 4;
+        final int iteration = i;
+        runConcurrently(
+            numRunners,
+            threadIdx ->
+                () -> {
+                  try (CuVSResources resources = CheckedCuVSResources.create()) {
+                    // Create a local reference to the dataset, as index will close the dataset too
+                    // when it gets closed.
+                    var indexDatasetReference = dataset.toHost();
+                    log.debug(
+                        "Indexing iteration:{} threadIdx:{} dataset:{}",
+                        iteration,
+                        threadIdx,
+                        dataset);
+                    var index = indexOnce(indexDatasetReference, resources);
+                    log.debug("Done {} {}", iteration, threadIdx);
+                    index.close();
+                  } catch (Throwable e) {
+                    throw new RuntimeException(e);
+                  }
+                });
+      }
     }
   }
 
@@ -282,23 +284,24 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
   private void testSerialization(Supplier<CuVSMatrix> matrixFactory) throws Throwable {
     for (int i = 0; i < 10; ++i) {
-      final var dataset = matrixFactory.get();
-      int numTestsRuns = 4;
-      runConcurrently(
-          numTestsRuns,
-          threadIdx ->
-              () -> {
-                // Create a local reference to the dataset, as index will close the dataset too
-                // when it gets closed.
-                var indexDatasetReference = dataset.toHost();
-                try (CuVSResources resources = CheckedCuVSResources.create();
-                    var index = indexOnce(indexDatasetReference, resources)) {
-                  var indexPath = serializeOnce(index);
-                  Files.deleteIfExists(indexPath);
-                } catch (Throwable e) {
-                  throw new RuntimeException(e);
-                }
-              });
+      try (final var dataset = matrixFactory.get()) {
+        int numRunners = 4;
+        runConcurrently(
+            numRunners,
+            threadIdx ->
+                () -> {
+                  // Create a local reference to the dataset, as index will close the dataset too
+                  // when it gets closed.
+                  var indexDatasetReference = dataset.toHost();
+                  try (CuVSResources resources = CheckedCuVSResources.create();
+                      var index = indexOnce(indexDatasetReference, resources)) {
+                    var indexPath = serializeOnce(index);
+                    Files.deleteIfExists(indexPath);
+                  } catch (Throwable e) {
+                    throw new RuntimeException(e);
+                  }
+                });
+      }
     }
   }
 
