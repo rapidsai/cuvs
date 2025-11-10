@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -35,7 +24,7 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
-constexpr int serialization_version = 4;
+constexpr int serialization_version = 5;
 
 /**
  * Save the index to file.
@@ -71,14 +60,18 @@ void serialize(raft::resources const& res,
   raft::serialize_mdspan(res, os, index_.graph());
 
   include_dataset &= (index_.data().n_rows() > 0);
+  bool has_source_indices = index_.source_indices().has_value();
+  uint32_t content_map    = 0x1u * include_dataset + 0x2u * has_source_indices;
 
-  raft::serialize_scalar(res, os, include_dataset);
+  raft::serialize_scalar(res, os, content_map);
   if (include_dataset) {
     RAFT_LOG_DEBUG("Saving CAGRA index with dataset");
     neighbors::detail::serialize(res, os, index_.data());
   } else {
     RAFT_LOG_DEBUG("Saving CAGRA index WITHOUT dataset");
   }
+
+  if (has_source_indices) { raft::serialize_mdspan(res, os, index_.source_indices().value()); }
 }
 
 template <typename T, typename IdxT>
@@ -284,9 +277,20 @@ void deserialize(raft::resources const& res, std::istream& is, index<T, IdxT>* i
 
   *index_ = index<T, IdxT>(res, metric);
   index_->update_graph(res, raft::make_const_mdspan(graph.view()));
-  bool has_dataset = raft::deserialize_scalar<bool>(res, is);
+
+  auto content_map = raft::deserialize_scalar<uint32_t>(res, is);
+  bool has_dataset = content_map & 0x1u;
   if (has_dataset) {
     index_->update_dataset(res, cuvs::neighbors::detail::deserialize_dataset<int64_t>(res, is));
+  }
+
+  bool has_source_indices = content_map & 0x2u;
+  if (has_source_indices) {
+    auto source_indices = raft::make_host_vector<IdxT, int64_t>(n_rows);
+    deserialize_mdspan(res, is, source_indices.view());
+    index_->update_source_indices(res, raft::make_const_mdspan(source_indices.view()));
+    raft::resource::sync_stream(
+      res);  // Don't let the vector out of the scope before the copy is finished
   }
 }
 

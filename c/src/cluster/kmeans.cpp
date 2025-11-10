@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <cstdint>
@@ -29,7 +18,7 @@ namespace {
 cuvs::cluster::kmeans::params convert_params(const cuvsKMeansParams& params)
 {
   auto kmeans_params       = cuvs::cluster::kmeans::params();
-  kmeans_params.metric     = params.metric;
+  kmeans_params.metric     = static_cast<cuvs::distance::DistanceType>(params.metric);
   kmeans_params.init       = static_cast<cuvs::cluster::kmeans::params::InitMethod>(params.init);
   kmeans_params.n_clusters = params.n_clusters;
   kmeans_params.max_iter   = params.max_iter;
@@ -44,7 +33,7 @@ cuvs::cluster::kmeans::params convert_params(const cuvsKMeansParams& params)
 cuvs::cluster::kmeans::balanced_params convert_balanced_params(const cuvsKMeansParams& params)
 {
   auto kmeans_params    = cuvs::cluster::kmeans::balanced_params();
-  kmeans_params.metric  = params.metric;
+  kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>(params.metric);
   kmeans_params.n_iters = params.hierarchical_n_iters;
   return kmeans_params;
 }
@@ -196,7 +185,7 @@ extern "C" cuvsError_t cuvsKMeansParamsCreate(cuvsKMeansParams_t* params)
     cuvs::cluster::kmeans::params cpp_params;
     cuvs::cluster::kmeans::balanced_params cpp_balanced_params;
     *params =
-      new cuvsKMeansParams{.metric     = cpp_params.metric,
+      new cuvsKMeansParams{.metric     = static_cast<cuvsDistanceType>(cpp_params.metric),
                            .n_clusters = cpp_params.n_clusters,
                            .init       = static_cast<cuvsKMeansInitMethod>(cpp_params.init),
                            .max_iter   = cpp_params.max_iter,

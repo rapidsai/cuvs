@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <cstdint>
@@ -22,6 +11,8 @@
 #include <raft/core/resources.hpp>
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/distance/distance.h>
+#include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/refine.h>
 #include <cuvs/neighbors/refine.hpp>
 
@@ -52,7 +43,7 @@ void _refine(bool on_device,
     auto candidates       = cuvs::core::from_dlpack<candidates_type>(candidates_tensor);
     auto indices          = cuvs::core::from_dlpack<indices_type>(indices_tensor);
     auto distances        = cuvs::core::from_dlpack<distances_type>(distances_tensor);
-    cuvs::neighbors::refine(*res_ptr, dataset, queries, candidates, indices, distances, metric);
+    cuvs::neighbors::refine(*res_ptr, dataset, queries, candidates, indices, distances, static_cast<cuvs::distance::DistanceType>((int)metric));
   } else {
     using queries_type    = raft::host_matrix_view<const T, int64_t, raft::row_major>;
     using candidates_type = raft::host_matrix_view<const int64_t, int64_t, raft::row_major>;
@@ -63,7 +54,7 @@ void _refine(bool on_device,
     auto candidates       = cuvs::core::from_dlpack<candidates_type>(candidates_tensor);
     auto indices          = cuvs::core::from_dlpack<indices_type>(indices_tensor);
     auto distances        = cuvs::core::from_dlpack<distances_type>(distances_tensor);
-    cuvs::neighbors::refine(*res_ptr, dataset, queries, candidates, indices, distances, metric);
+    cuvs::neighbors::refine(*res_ptr, dataset, queries, candidates, indices, distances, static_cast<cuvs::distance::DistanceType>((int)metric));
   }
 }
 }  // namespace

@@ -1,21 +1,11 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
+import static com.carrotsearch.randomizedtesting.RandomizedTest.randomIntBetween;
 import static com.nvidia.cuvs.CuVSMatrixIT.assertSame2dArray;
 import static org.junit.Assert.*;
 
@@ -142,18 +132,19 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     int numTestsRuns = 5;
     try (CuVSResources resources = CheckedCuVSResources.create()) {
       for (int j = 0; j < numTestsRuns; j++) {
-        var index = indexOnce(CuVSMatrix.ofArray(dataset), resources);
-        var indexPath = serializeOnce(index);
-        var loadedIndex = deserializeOnce(indexPath, resources);
-        queryAndCompare(
-            index,
-            loadedIndex,
-            SearchResults.IDENTITY_MAPPING,
-            queries,
-            expectedResults,
-            resources);
-        cleanup(index, loadedIndex);
-        Files.deleteIfExists(indexPath);
+        try (var index = indexOnce(CuVSMatrix.ofArray(dataset), resources)) {
+          var indexPath = serializeOnce(index);
+          try (var loadedIndex = deserializeOnce(indexPath, resources)) {
+            queryAndCompare(
+                index,
+                loadedIndex,
+                SearchResults.IDENTITY_MAPPING,
+                queries,
+                expectedResults,
+                resources);
+            Files.deleteIfExists(indexPath);
+          }
+        }
       }
     }
   }
@@ -172,19 +163,19 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
       for (int j = 0; j < numTestsRuns; j++) {
         runInAnotherThread(
             () -> {
-              try {
-                var index = indexOnce(CuVSMatrix.ofArray(dataset), resources);
+              try (var index = indexOnce(CuVSMatrix.ofArray(dataset), resources)) {
                 var indexPath = serializeOnce(index);
-                var loadedIndex = deserializeOnce(indexPath, resources);
-                queryAndCompare(
-                    index,
-                    loadedIndex,
-                    SearchResults.IDENTITY_MAPPING,
-                    queries,
-                    expectedResults,
-                    resources);
-                cleanup(index, loadedIndex);
-                Files.deleteIfExists(indexPath);
+                try (var loadedIndex = deserializeOnce(indexPath, resources)) {
+                  queryAndCompare(
+                      index,
+                      loadedIndex,
+                      SearchResults.IDENTITY_MAPPING,
+                      queries,
+                      expectedResults,
+                      resources);
+                } finally {
+                  Files.deleteIfExists(indexPath);
+                }
               } catch (Throwable e) {
                 throw new RuntimeException(e);
               }
@@ -218,19 +209,20 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
         numTestsRuns,
         () ->
             () -> {
-              try (CuVSResources resources = CheckedCuVSResources.create()) {
-                var index = indexOnce(CuVSMatrix.ofArray(dataset), resources);
+              try (CuVSResources resources = CheckedCuVSResources.create();
+                  var index = indexOnce(CuVSMatrix.ofArray(dataset), resources)) {
                 var indexPath = serializeOnce(index);
-                var loadedIndex = deserializeOnce(indexPath, resources);
-                queryAndCompare(
-                    index,
-                    loadedIndex,
-                    SearchResults.IDENTITY_MAPPING,
-                    queries,
-                    expectedResults,
-                    resources);
-                cleanup(index, loadedIndex);
-                Files.deleteIfExists(indexPath);
+                try (var loadedIndex = deserializeOnce(indexPath, resources)) {
+                  queryAndCompare(
+                      index,
+                      loadedIndex,
+                      SearchResults.IDENTITY_MAPPING,
+                      queries,
+                      expectedResults,
+                      resources);
+                } finally {
+                  Files.deleteIfExists(indexPath);
+                }
               } catch (Throwable e) {
                 throw new RuntimeException(e);
               }
@@ -238,26 +230,53 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
   }
 
   @Test
-  public void testIndexing() throws Throwable {
-    testIndexing(false);
+  public void testFloatIndexing() throws Throwable {
+    testIndexing(
+        false,
+        () ->
+            CuVSMatrix.ofArray(
+                createFloatMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
   }
 
   @Test
-  public void testIndexingWithPooledMemory() throws Throwable {
-    testIndexing(true);
+  public void testFloatIndexingWithPooledMemory() throws Throwable {
+    testIndexing(
+        true,
+        () ->
+            CuVSMatrix.ofArray(
+                createFloatMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
   }
 
-  public void testIndexing(boolean usePooledMemory) throws Throwable {
-    for (int i = 0; i < 100; ++i) {
-      final float[][] dataset = createSampleData();
-      int numTestsRuns = 10;
+  @Test
+  public void testByteIndexing() throws Throwable {
+    testIndexing(
+        false,
+        () ->
+            CuVSMatrix.ofArray(
+                createByteMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
+  }
+
+  @Test
+  public void testByteIndexingWithPooledMemory() throws Throwable {
+    testIndexing(
+        true,
+        () ->
+            CuVSMatrix.ofArray(
+                createByteMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
+  }
+
+  private void testIndexing(boolean usePooledMemory, Supplier<CuVSMatrix> matrixFactory)
+      throws Exception {
+    for (int i = 0; i < 10; ++i) {
+      var dataset = matrixFactory.get();
+      int numTestsRuns = 4;
       runConcurrently(
           usePooledMemory,
           numTestsRuns,
           () ->
               () -> {
                 try (CuVSResources resources = CheckedCuVSResources.create()) {
-                  var index = indexOnce(CuVSMatrix.ofArray(dataset), resources);
+                  var index = indexOnce(dataset, resources);
                   index.close();
                 } catch (Throwable e) {
                   throw new RuntimeException(e);
@@ -267,26 +286,53 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
   }
 
   @Test
-  public void testSerialization() throws Throwable {
-    testSerialization(false);
+  public void testFloatSerialization() throws Throwable {
+    testSerialization(
+        false,
+        () ->
+            CuVSMatrix.ofArray(
+                createFloatMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
   }
 
   @Test
-  public void testSerializationWithPooledMemory() throws Throwable {
-    testSerialization(true);
+  public void testFloatSerializationWithPooledMemory() throws Throwable {
+    testSerialization(
+        true,
+        () ->
+            CuVSMatrix.ofArray(
+                createFloatMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
   }
 
-  private void testSerialization(boolean usePooledMemory) throws Throwable {
-    for (int i = 0; i < 100; ++i) {
-      final float[][] dataset = createSampleData();
-      int numTestsRuns = 10;
+  @Test
+  public void testByteSerialization() throws Throwable {
+    testSerialization(
+        false,
+        () ->
+            CuVSMatrix.ofArray(
+                createByteMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
+  }
+
+  @Test
+  public void testByteSerializationWithPooledMemory() throws Throwable {
+    testSerialization(
+        true,
+        () ->
+            CuVSMatrix.ofArray(
+                createByteMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
+  }
+
+  private void testSerialization(boolean usePooledMemory, Supplier<CuVSMatrix> matrixFactory)
+      throws Throwable {
+    for (int i = 0; i < 10; ++i) {
+      final var dataset = matrixFactory.get();
+      int numTestsRuns = 4;
       runConcurrently(
           usePooledMemory,
           numTestsRuns,
           () ->
               () -> {
                 try (CuVSResources resources = CheckedCuVSResources.create();
-                    var index = indexOnce(CuVSMatrix.ofArray(dataset), resources)) {
+                    var index = indexOnce(dataset, resources)) {
                   var indexPath = serializeOnce(index);
                   Files.deleteIfExists(indexPath);
                 } catch (Throwable e) {
@@ -297,32 +343,65 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
   }
 
   @Test
-  public void testDeserialization() throws Throwable {
-    testDeserialization(false);
+  public void testFloatDeserialization() throws Throwable {
+    testDeserialization(
+        false,
+        () ->
+            CuVSMatrix.ofArray(
+                createFloatMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
   }
 
   @Test
-  public void testDeserializationWithPooledMemory() throws Throwable {
-    testDeserialization(true);
+  public void testFloatDeserializationWithPooledMemory() throws Throwable {
+    testDeserialization(
+        true,
+        () ->
+            CuVSMatrix.ofArray(
+                createFloatMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
   }
 
-  private void testDeserialization(boolean usePooledMemory) throws Throwable {
-    var indexPath = createSerializedIndex(CuVSMatrix.ofArray(createSampleData()));
-    for (int i = 0; i < 100; ++i) {
-      int numTestsRuns = 10;
-      runConcurrently(
-          usePooledMemory,
-          numTestsRuns,
-          () ->
-              () -> {
-                try (CuVSResources resources = CheckedCuVSResources.create()) {
-                  deserializeOnce(indexPath, resources).close();
-                } catch (Throwable e) {
-                  throw new RuntimeException(e);
-                }
-              });
+  @Test
+  public void testByteDeserialization() throws Throwable {
+    testDeserialization(
+        false,
+        () ->
+            CuVSMatrix.ofArray(
+                createByteMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
+  }
+
+  @Test
+  public void testByteDeserializationWithPooledMemory() throws Throwable {
+    testDeserialization(
+        true,
+        () ->
+            CuVSMatrix.ofArray(
+                createByteMatrix(randomIntBetween(2, 1024), randomIntBetween(2, 2048))));
+  }
+
+  private void testDeserialization(boolean usePooledMemory, Supplier<CuVSMatrix> matrixFactory)
+      throws Throwable {
+    Path indexPath;
+    try (var dataset = matrixFactory.get()) {
+      indexPath = createSerializedIndex(dataset);
     }
-    Files.deleteIfExists(indexPath);
+    try {
+      for (int i = 0; i < 10; ++i) {
+        int numTestsRuns = 4;
+        runConcurrently(
+            usePooledMemory,
+            numTestsRuns,
+            () ->
+                () -> {
+                  try (CuVSResources resources = CheckedCuVSResources.create()) {
+                    deserializeOnce(indexPath, resources).close();
+                  } catch (Throwable e) {
+                    throw new RuntimeException(e);
+                  }
+                });
+      }
+    } finally {
+      Files.deleteIfExists(indexPath);
+    }
   }
 
   private Path createSerializedIndex(CuVSMatrix dataset) throws Throwable {
@@ -384,13 +463,14 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             Map.of(2, 0.15224178f, 1, 0.59063464f, 0, 0.5986642f));
 
     LongToIntFunction rotate = l -> (int) ((l + 1) % dataset.size());
-    try (CuVSResources resources = CheckedCuVSResources.create()) {
-      var index = indexOnce(dataset, resources);
+    try (CuVSResources resources = CheckedCuVSResources.create();
+        var index = indexOnce(dataset, resources)) {
       var indexPath = serializeOnce(index);
-      var loadedIndex = deserializeOnce(indexPath, resources);
-      queryAndCompare(index, loadedIndex, rotate, queries, expectedResults, resources);
-      cleanup(index, loadedIndex);
-      Files.deleteIfExists(indexPath);
+      try (var loadedIndex = deserializeOnce(indexPath, resources)) {
+        queryAndCompare(index, loadedIndex, rotate, queries, expectedResults, resources);
+      } finally {
+        Files.deleteIfExists(indexPath);
+      }
     }
   }
 
@@ -407,13 +487,14 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             Map.of(3, 0.15224178f, 4, 0.59063464f, 1, 0.5986642f));
 
     LongToIntFunction rotate = SearchResults.mappingsFromList(mappings);
-    try (CuVSResources resources = CheckedCuVSResources.create()) {
-      var index = indexOnce(dataset, resources);
+    try (CuVSResources resources = CheckedCuVSResources.create();
+        var index = indexOnce(dataset, resources)) {
       var indexPath = serializeOnce(index);
-      var loadedIndex = deserializeOnce(indexPath, resources);
-      queryAndCompare(index, loadedIndex, rotate, queries, expectedResults, resources);
-      cleanup(index, loadedIndex);
-      Files.deleteIfExists(indexPath);
+      try (var loadedIndex = deserializeOnce(indexPath, resources)) {
+        queryAndCompare(index, loadedIndex, rotate, queries, expectedResults, resources);
+      } finally {
+        Files.deleteIfExists(indexPath);
+      }
     }
   }
 
@@ -560,12 +641,6 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     }
   }
 
-  private void cleanup(CagraIndex index, CagraIndex loadedIndex) throws Throwable {
-    // Cleanup
-    index.close();
-    loadedIndex.close();
-  }
-
   /**
    * Tests that an index built starting from a native MemorySegment is identical to one built from
    * Java heap arrays
@@ -594,11 +669,10 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
           var javaDataset = CuVSMatrix.ofArray(sampleData);
           var nativeDataset =
               DatasetHelper.fromMemorySegment(
-                  dataMemorySegment, rows, cols, CuVSMatrix.DataType.FLOAT)) {
-
-        // Indexing with an on-heap and native datasets produce the same results
-        var javaIndex = indexOnce(javaDataset, resources);
-        var nativeIndex = indexOnce(nativeDataset, resources);
+                  dataMemorySegment, rows, cols, CuVSMatrix.DataType.FLOAT);
+          // Indexing with an on-heap and native datasets produce the same results
+          var javaIndex = indexOnce(javaDataset, resources);
+          var nativeIndex = indexOnce(nativeDataset, resources)) {
         queryAndCompare(
             javaIndex,
             nativeIndex,
@@ -606,7 +680,6 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
             queries,
             expectedResults,
             resources);
-        cleanup(javaIndex, nativeIndex);
       }
     }
   }

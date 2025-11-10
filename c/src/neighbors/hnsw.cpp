@@ -1,18 +1,7 @@
 
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <cstdint>
@@ -25,6 +14,7 @@
 
 #include <cuvs/core/c_api.h>
 #include <cuvs/distance/distance.h>
+#include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/hnsw.h>
 #include <cuvs/neighbors/hnsw.hpp>
 
@@ -121,8 +111,9 @@ void* _deserialize(cuvsResources_t res,
   cuvs::neighbors::hnsw::index<T>* index = nullptr;
   auto cpp_params                        = cuvs::neighbors::hnsw::index_params();
   cpp_params.hierarchy = static_cast<cuvs::neighbors::hnsw::HnswHierarchy>(params->hierarchy);
+  auto metric_type     = static_cast<cuvs::distance::DistanceType>(metric);
   cuvs::neighbors::hnsw::deserialize(
-    *res_ptr, cpp_params, std::string(filename), dim, metric, &index);
+    *res_ptr, cpp_params, std::string(filename), dim, metric_type, &index);
   return index;
 }
 }  // namespace

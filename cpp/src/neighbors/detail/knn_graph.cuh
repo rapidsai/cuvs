@@ -1,25 +1,16 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
-#include "knn_brute_force.cuh"
 #include <cuvs/distance/distance.hpp>
+#include <cuvs/neighbors/all_neighbors.hpp>
 
+#include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/linalg/map.cuh>
+#include <raft/linalg/unary_op.cuh>
 #include <raft/sparse/coo.hpp>
 #include <raft/sparse/linalg/symmetrize.cuh>
 #include <raft/util/cuda_dev_essentials.cuh>
@@ -76,25 +67,31 @@ void knn_graph(raft::resources const& res,
 
   raft::linalg::map_offset(res, rows_view, [k] __device__(nnz_t i) { return value_idx(i / k); });
 
-  std::vector<value_t*> inputs;
-  inputs.push_back(const_cast<value_t*>(X.data_handle()));
+  cuvs::neighbors::all_neighbors::all_neighbors_params params;
+  params.metric = metric;
 
-  std::vector<size_t> sizes;
-  sizes.push_back(m);
+  cuvs::neighbors::graph_build_params::brute_force_params bf_params;
+  bf_params.build_params.metric = metric;
+  params.graph_build_params     = bf_params;
 
-  brute_force_knn_impl<size_t, value_idx, value_t, value_t>(res,
-                                                            inputs,
-                                                            sizes,
-                                                            n,
-                                                            const_cast<value_t*>(X.data_handle()),
-                                                            m,
-                                                            indices.data(),
-                                                            data.data(),
-                                                            k,
-                                                            true,
-                                                            true,
-                                                            nullptr,
-                                                            metric);
+  params.n_clusters     = 1;
+  params.overlap_factor = 1;
+
+  rmm::device_uvector<int64_t> indices_64(nnz, stream);
+  auto indices_64_view = raft::make_device_matrix_view<int64_t, int64_t>(indices_64.data(), m, k);
+  auto distances_view  = raft::make_device_matrix_view<value_t, int64_t>(data.data(), m, k);
+
+  cuvs::neighbors::all_neighbors::build(
+    res,
+    params,
+    raft::make_device_matrix_view<const value_t, int64_t>(X.data_handle(), m, n),
+    indices_64_view,
+    distances_view);
+
+  raft::linalg::unary_op(res,
+                         raft::make_const_mdspan(indices_64_view),
+                         raft::make_device_vector_view<value_idx, nnz_t>(indices.data(), nnz),
+                         raft::cast_op<value_idx>{});
 
   raft::sparse::linalg::symmetrize(res,
                                    rows.data(),

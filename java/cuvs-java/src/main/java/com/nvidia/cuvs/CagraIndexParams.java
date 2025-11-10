@@ -1,19 +1,14 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs;
+
+import com.nvidia.cuvs.spi.CuVSProvider;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Supplemental parameters to build CAGRA Index.
@@ -24,9 +19,9 @@ public class CagraIndexParams {
 
   private final CagraGraphBuildAlgo cuvsCagraGraphBuildAlgo;
   private final CuvsDistanceType cuvsDistanceType;
-  private final int intermediateGraphDegree;
-  private final int graphDegree;
-  private final int nnDescentNiter;
+  private final long intermediateGraphDegree;
+  private final long graphDegree;
+  private final long nnDescentNiter;
   private final int numWriterThreads;
   private final CuVSIvfPqParams cuVSIvfPqParams;
   private final CagraCompressionParams cagraCompressionParams;
@@ -55,6 +50,61 @@ public class CagraIndexParams {
 
     private CagraGraphBuildAlgo(int value) {
       this.value = value;
+    }
+
+    private static final Map<Integer, CagraGraphBuildAlgo> VALUES =
+        Arrays.stream(CagraGraphBuildAlgo.values())
+            .collect(Collectors.toUnmodifiableMap(x -> x.value, Function.identity()));
+
+    public static CagraGraphBuildAlgo of(int i) {
+      return VALUES.get(i);
+    }
+  }
+
+  /**
+   * A strategy for selecting the graph build parameters based on similar HNSW index
+   * parameters.
+   */
+  public enum HnswHeuristicType {
+    /**
+     * Create a graph that is very similar to an HNSW graph in
+     * terms of the number of nodes and search performance. Since HNSW produces a variable-degree
+     * graph (2M being the max graph degree) and CAGRA produces a fixed-degree graph, there's always a
+     * difference in the performance of the two.
+     *
+     * This function attempts to produce such a graph that the QPS and recall of the two graphs being
+     * searched by HNSW are close for any search parameter combination. The CAGRA-produced graph tends
+     * to have a "longer tail" on the low recall side (that is being slightly faster and less
+     * precise).
+     */
+    SIMILAR_SEARCH_PERFORMANCE(0),
+    /**
+     * Create a graph that has the same binary size as an HNSW graph with the given parameters
+     * (graph_degree = 2 * M) while trying to match the search performance as closely as possible.
+     *
+     * The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce
+     * the same recalls and QPS for the same parameter ef. The graphs are different internally. For
+     * the same ef, the from-CAGRA index likely has a slightly higher recall and slightly lower QPS.
+     * However, the Recall-QPS curves should be similar (i.e. the points are just shifted along the
+     * curve).
+     */
+    SAME_GRAPH_FOOTPRINT(1);
+
+    /**
+     * The value for the enum choice.
+     */
+    public final int value;
+
+    private HnswHeuristicType(int value) {
+      this.value = value;
+    }
+
+    private static final Map<Integer, HnswHeuristicType> VALUES =
+        Arrays.stream(HnswHeuristicType.values())
+            .collect(Collectors.toUnmodifiableMap(x -> x.value, Function.identity()));
+
+    public static HnswHeuristicType of(int i) {
+      return VALUES.get(i);
     }
   }
 
@@ -156,6 +206,14 @@ public class CagraIndexParams {
     private CuvsDistanceType(int value) {
       this.value = value;
     }
+
+    private static final Map<Integer, CuvsDistanceType> VALUES =
+        Arrays.stream(CuvsDistanceType.values())
+            .collect(Collectors.toUnmodifiableMap(x -> x.value, Function.identity()));
+
+    public static CuvsDistanceType of(int value) {
+      return VALUES.get(value);
+    }
   }
 
   /**
@@ -173,6 +231,14 @@ public class CagraIndexParams {
 
     private CodebookGen(int value) {
       this.value = value;
+    }
+
+    private static final Map<Integer, CodebookGen> VALUES =
+        Arrays.stream(CodebookGen.values())
+            .collect(Collectors.toUnmodifiableMap(x -> x.value, Function.identity()));
+
+    public static CodebookGen of(int value) {
+      return VALUES.get(value);
     }
   }
 
@@ -245,13 +311,21 @@ public class CagraIndexParams {
     private CudaDataType(int value) {
       this.value = value;
     }
+
+    private static final Map<Integer, CudaDataType> VALUES =
+        Arrays.stream(CudaDataType.values())
+            .collect(Collectors.toUnmodifiableMap(x -> x.value, Function.identity()));
+
+    public static CudaDataType of(int value) {
+      return VALUES.get(value);
+    }
   }
 
   private CagraIndexParams(
-      int intermediateGraphDegree,
-      int graphDegree,
+      long intermediateGraphDegree,
+      long graphDegree,
       CagraGraphBuildAlgo CuvsCagraGraphBuildAlgo,
-      int nnDescentNiter,
+      long nnDescentNiter,
       int writerThreads,
       CuvsDistanceType cuvsDistanceType,
       CuVSIvfPqParams cuVSIvfPqParams,
@@ -266,12 +340,23 @@ public class CagraIndexParams {
     this.cagraCompressionParams = cagraCompressionParams;
   }
 
+  public static CagraIndexParams fromHnswParams(
+      long rows,
+      long dim,
+      int M,
+      int efConstruction,
+      HnswHeuristicType heuristic,
+      CuvsDistanceType metric) {
+    return CuVSProvider.provider()
+        .cagraIndexParamsFromHnswParams(rows, dim, M, efConstruction, heuristic, metric);
+  }
+
   /**
    * Gets the degree of input graph for pruning.
    *
    * @return the degree of input graph
    */
-  public int getIntermediateGraphDegree() {
+  public long getIntermediateGraphDegree() {
     return intermediateGraphDegree;
   }
 
@@ -280,7 +365,7 @@ public class CagraIndexParams {
    *
    * @return the degree of output graph
    */
-  public int getGraphDegree() {
+  public long getGraphDegree() {
     return graphDegree;
   }
 
@@ -295,7 +380,7 @@ public class CagraIndexParams {
    * Gets the number of iterations to run if building with
    * {@link CagraGraphBuildAlgo#NN_DESCENT}
    */
-  public int getNNDescentNumIterations() {
+  public long getNNDescentNumIterations() {
     return nnDescentNiter;
   }
 
@@ -325,13 +410,6 @@ public class CagraIndexParams {
    */
   public CagraGraphBuildAlgo getCuvsCagraGraphBuildAlgo() {
     return cuvsCagraGraphBuildAlgo;
-  }
-
-  /**
-   * Gets the number of Iterations to run.
-   */
-  public int getNnDescentNiter() {
-    return nnDescentNiter;
   }
 
   /**
@@ -369,9 +447,9 @@ public class CagraIndexParams {
 
     private CagraGraphBuildAlgo cuvsCagraGraphBuildAlgo = CagraGraphBuildAlgo.NN_DESCENT;
     private CuvsDistanceType cuvsDistanceType = CuvsDistanceType.L2Expanded;
-    private int intermediateGraphDegree = 128;
-    private int graphDegree = 64;
-    private int nnDescentNumIterations = 20;
+    private long intermediateGraphDegree = 128;
+    private long graphDegree = 64;
+    private long nnDescentNumIterations = 20;
     private int numWriterThreads = 2;
     private CuVSIvfPqParams cuVSIvfPqParams = new CuVSIvfPqParams.Builder().build();
     private CagraCompressionParams cagraCompressionParams;
@@ -384,7 +462,7 @@ public class CagraIndexParams {
      * @param intermediateGraphDegree degree of input graph for pruning
      * @return an instance of Builder
      */
-    public Builder withIntermediateGraphDegree(int intermediateGraphDegree) {
+    public Builder withIntermediateGraphDegree(long intermediateGraphDegree) {
       this.intermediateGraphDegree = intermediateGraphDegree;
       return this;
     }
@@ -395,7 +473,7 @@ public class CagraIndexParams {
      * @param graphDegree degree of output graph
      * @return an instance to Builder
      */
-    public Builder withGraphDegree(int graphDegree) {
+    public Builder withGraphDegree(long graphDegree) {
       this.graphDegree = graphDegree;
       return this;
     }
@@ -430,7 +508,7 @@ public class CagraIndexParams {
      *                       {@link CagraGraphBuildAlgo#NN_DESCENT}
      * @return an instance of Builder
      */
-    public Builder withNNDescentNumIterations(int nnDescentNiter) {
+    public Builder withNNDescentNumIterations(long nnDescentNiter) {
       this.nnDescentNumIterations = nnDescentNiter;
       return this;
     }

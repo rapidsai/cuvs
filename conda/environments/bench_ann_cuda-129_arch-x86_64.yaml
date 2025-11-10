@@ -5,7 +5,6 @@ channels:
 - rapidsai-nightly
 - conda-forge
 dependencies:
-- benchmark>=1.8.2
 - c-compiler
 - clang-tools==20.1.4
 - clang==20.1.4
