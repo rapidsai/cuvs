@@ -145,50 +145,25 @@ void minClusterAndDistanceCompute(
   }
 }
 
-template void minClusterAndDistanceCompute<float, int64_t>(
-  raft::resources const& handle,
-  raft::device_matrix_view<const float, int64_t> X,
-  raft::device_matrix_view<const float, int64_t> centroids,
-  raft::device_vector_view<raft::KeyValuePair<int64_t, float>, int64_t> minClusterAndDistance,
-  raft::device_vector_view<const float, int64_t> L2NormX,
-  rmm::device_uvector<float>& L2NormBuf_OR_DistBuf,
-  cuvs::distance::DistanceType metric,
-  int batch_samples,
-  int batch_centroids,
-  rmm::device_uvector<char>& workspace);
-template void minClusterAndDistanceCompute<double, int64_t>(
-  raft::resources const& handle,
-  raft::device_matrix_view<const double, int64_t> X,
-  raft::device_matrix_view<const double, int64_t> centroids,
-  raft::device_vector_view<raft::KeyValuePair<int64_t, double>, int64_t> minClusterAndDistance,
-  raft::device_vector_view<const double, int64_t> L2NormX,
-  rmm::device_uvector<double>& L2NormBuf_OR_DistBuf,
-  cuvs::distance::DistanceType metric,
-  int batch_samples,
-  int batch_centroids,
-  rmm::device_uvector<char>& workspace);
-template void minClusterAndDistanceCompute<float, int>(
-  raft::resources const& handle,
-  raft::device_matrix_view<const float, int> X,
-  raft::device_matrix_view<const float, int> centroids,
-  raft::device_vector_view<raft::KeyValuePair<int, float>, int> minClusterAndDistance,
-  raft::device_vector_view<const float, int> L2NormX,
-  rmm::device_uvector<float>& L2NormBuf_OR_DistBuf,
-  cuvs::distance::DistanceType metric,
-  int batch_samples,
-  int batch_centroids,
-  rmm::device_uvector<char>& workspace);
-template void minClusterAndDistanceCompute<double, int>(
-  raft::resources const& handle,
-  raft::device_matrix_view<const double, int> X,
-  raft::device_matrix_view<const double, int> centroids,
-  raft::device_vector_view<raft::KeyValuePair<int, double>, int> minClusterAndDistance,
-  raft::device_vector_view<const double, int> L2NormX,
-  rmm::device_uvector<double>& L2NormBuf_OR_DistBuf,
-  cuvs::distance::DistanceType metric,
-  int batch_samples,
-  int batch_centroids,
-  rmm::device_uvector<char>& workspace);
+#define INSTANTIATE_MIN_CLUSTER_AND_DISTANCE(DataT, IndexT)                                    \
+  template void minClusterAndDistanceCompute<DataT, IndexT>(                                   \
+    raft::resources const& handle,                                                             \
+    raft::device_matrix_view<const DataT, IndexT> X,                                           \
+    raft::device_matrix_view<const DataT, IndexT> centroids,                                   \
+    raft::device_vector_view<raft::KeyValuePair<IndexT, DataT>, IndexT> minClusterAndDistance, \
+    raft::device_vector_view<const DataT, IndexT> L2NormX,                                     \
+    rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,                                          \
+    cuvs::distance::DistanceType metric,                                                       \
+    int batch_samples,                                                                         \
+    int batch_centroids,                                                                       \
+    rmm::device_uvector<char>& workspace);
+
+INSTANTIATE_MIN_CLUSTER_AND_DISTANCE(float, int64_t)
+INSTANTIATE_MIN_CLUSTER_AND_DISTANCE(double, int64_t)
+INSTANTIATE_MIN_CLUSTER_AND_DISTANCE(float, int)
+INSTANTIATE_MIN_CLUSTER_AND_DISTANCE(double, int)
+
+#undef INSTANTIATE_MIN_CLUSTER_AND_DISTANCE
 
 template <typename DataT, typename IndexT>
 void minClusterDistanceCompute(raft::resources const& handle,
@@ -309,49 +284,24 @@ void minClusterDistanceCompute(raft::resources const& handle,
   }
 }
 
-template void minClusterDistanceCompute<float, int64_t>(
-  raft::resources const& handle,
-  raft::device_matrix_view<const float, int64_t> X,
-  raft::device_matrix_view<float, int64_t> centroids,
-  raft::device_vector_view<float, int64_t> minClusterDistance,
-  raft::device_vector_view<float, int64_t> L2NormX,
-  rmm::device_uvector<float>& L2NormBuf_OR_DistBuf,
-  cuvs::distance::DistanceType metric,
-  int batch_samples,
-  int batch_centroids,
-  rmm::device_uvector<char>& workspace);
-template void minClusterDistanceCompute<double, int64_t>(
-  raft::resources const& handle,
-  raft::device_matrix_view<const double, int64_t> X,
-  raft::device_matrix_view<double, int64_t> centroids,
-  raft::device_vector_view<double, int64_t> minClusterDistance,
-  raft::device_vector_view<double, int64_t> L2NormX,
-  rmm::device_uvector<double>& L2NormBuf_OR_DistBuf,
-  cuvs::distance::DistanceType metric,
-  int batch_samples,
-  int batch_centroids,
-  rmm::device_uvector<char>& workspace);
-template void minClusterDistanceCompute<float, int>(
-  raft::resources const& handle,
-  raft::device_matrix_view<const float, int> X,
-  raft::device_matrix_view<float, int> centroids,
-  raft::device_vector_view<float, int> minClusterDistance,
-  raft::device_vector_view<float, int> L2NormX,
-  rmm::device_uvector<float>& L2NormBuf_OR_DistBuf,
-  cuvs::distance::DistanceType metric,
-  int batch_samples,
-  int batch_centroids,
-  rmm::device_uvector<char>& workspace);
-template void minClusterDistanceCompute<double, int>(
-  raft::resources const& handle,
-  raft::device_matrix_view<const double, int> X,
-  raft::device_matrix_view<double, int> centroids,
-  raft::device_vector_view<double, int> minClusterDistance,
-  raft::device_vector_view<double, int> L2NormX,
-  rmm::device_uvector<double>& L2NormBuf_OR_DistBuf,
-  cuvs::distance::DistanceType metric,
-  int batch_samples,
-  int batch_centroids,
-  rmm::device_uvector<char>& workspace);
+#define INSTANTIATE_MIN_CLUSTER_DISTANCE(DataT, IndexT)         \
+  template void minClusterDistanceCompute<DataT, IndexT>(       \
+    raft::resources const& handle,                              \
+    raft::device_matrix_view<const DataT, IndexT> X,            \
+    raft::device_matrix_view<DataT, IndexT> centroids,          \
+    raft::device_vector_view<DataT, IndexT> minClusterDistance, \
+    raft::device_vector_view<DataT, IndexT> L2NormX,            \
+    rmm::device_uvector<DataT>& L2NormBuf_OR_DistBuf,           \
+    cuvs::distance::DistanceType metric,                        \
+    int batch_samples,                                          \
+    int batch_centroids,                                        \
+    rmm::device_uvector<char>& workspace);
+
+INSTANTIATE_MIN_CLUSTER_DISTANCE(float, int64_t)
+INSTANTIATE_MIN_CLUSTER_DISTANCE(double, int64_t)
+INSTANTIATE_MIN_CLUSTER_DISTANCE(float, int)
+INSTANTIATE_MIN_CLUSTER_DISTANCE(double, int)
+
+#undef INSTANTIATE_MIN_CLUSTER_DISTANCE
 
 }  // namespace cuvs::cluster::kmeans::detail

@@ -9,26 +9,21 @@
 
 namespace cuvs::cluster::kmeans {
 
-// Explicit instantiations (required because of extern template in header)
-template void predict<float, int>(
-  raft::resources const& handle,
-  const kmeans::params& params,
-  raft::device_matrix_view<const float, int> X,
-  std::optional<raft::device_vector_view<const float, int>> sample_weight,
-  raft::device_matrix_view<const float, int> centroids,
-  raft::device_vector_view<int, int> labels,
-  bool normalize_weight,
-  raft::host_scalar_view<float> inertia);
+#define INSTANTIATE_PREDICT(DataT, IndexT)                                      \
+  template void predict<DataT, IndexT>(                                         \
+    raft::resources const& handle,                                              \
+    const kmeans::params& params,                                               \
+    raft::device_matrix_view<const DataT, IndexT> X,                            \
+    std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight, \
+    raft::device_matrix_view<const DataT, IndexT> centroids,                    \
+    raft::device_vector_view<IndexT, IndexT> labels,                            \
+    bool normalize_weight,                                                      \
+    raft::host_scalar_view<DataT> inertia);
 
-template void predict<float, int64_t>(
-  raft::resources const& handle,
-  const kmeans::params& params,
-  raft::device_matrix_view<const float, int64_t> X,
-  std::optional<raft::device_vector_view<const float, int64_t>> sample_weight,
-  raft::device_matrix_view<const float, int64_t> centroids,
-  raft::device_vector_view<int64_t, int64_t> labels,
-  bool normalize_weight,
-  raft::host_scalar_view<float> inertia);
+INSTANTIATE_PREDICT(float, int)
+INSTANTIATE_PREDICT(float, int64_t)
+
+#undef INSTANTIATE_PREDICT
 
 void predict(raft::resources const& handle,
              const kmeans::params& params,
