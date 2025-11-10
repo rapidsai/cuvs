@@ -41,6 +41,28 @@ jobs:
       date: ${{ inputs.date }}
       script: ci/build_cpp.sh
       sha: ${{ inputs.sha }}
+
+  rocky8-clib-standalone-build:
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
+    strategy:
+      fail-fast: false
+      matrix:
+        cuda_version:
+          - &latest_cuda12 '12.9.1'
+          - &latest_cuda13 '13.0.2'
+    with:
+      build_type: ${{ inputs.build_type || 'branch' }}
+      branch: ${{ inputs.branch }}
+      arch: "amd64"
+      date: ${{ inputs.date }}
+      container_image: "rapidsai/ci-wheel:25.12-cuda${{ matrix.cuda_version }}-rockylinux8-py3.10"
+      name:  "${{ matrix.cuda_version }}, amd64, rockylinux8"
+      requires_license_builder: false
+      script: "ci/build_standalone_c.sh"
+      artifact-name: "libcuvs_c_${{ matrix.cuda_version }}.tar.gz"
+      file_to_upload: "libcuvs_c.tar.gz"
+      sha: ${{ inputs.sha }}
   rust-build:
     needs: cpp-build
     secrets: inherit
@@ -51,8 +73,8 @@ jobs:
       fail-fast: false
       matrix:
         cuda_version:
-          - &latest_cuda12 '12.9.1'
-          - &latest_cuda13 '13.0.2'
+          - *latest_cuda12
+          - *latest_cuda13
     with:
       build_type: ${{ inputs.build_type || 'branch' }}
       branch: ${{ inputs.branch }}
