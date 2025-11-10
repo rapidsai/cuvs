@@ -60,6 +60,11 @@ struct cuvsProductQuantizerParams {
    * The type of kmeans algorithm to use for PQ training.
    */
   cuvsKMeansType pq_kmeans_type;
+  /**
+   * Whether to use vector quantization (VQ) before product quantization (PQ).
+   * When true, VQ is used before PQ. When false, only product quantization is used.
+   */
+  bool use_vq;
 };
 
 typedef struct cuvsProductQuantizerParams* cuvsProductQuantizerParams_t;

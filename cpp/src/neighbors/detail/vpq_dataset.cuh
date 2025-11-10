@@ -88,6 +88,7 @@ auto fill_missing_params_heuristics(const vpq_params& params, const DatasetT& da
     double pq_trainset_size       = 1000.0 * (1u << r.pq_bits);
     r.pq_kmeans_trainset_fraction = std::min(1.0, pq_trainset_size / n_rows);
   }
+  r.use_vq = params.use_vq;
   return r;
 }
 
@@ -388,12 +389,15 @@ __launch_bounds__(BlockSize) RAFT_KERNEL process_and_fill_codes_kernel(
 
   const uint32_t lane_id = raft::Pow2<kSubWarpSize>::mod(threadIdx.x);
   const LabelT vq_label  = vq_labels ? vq_labels.value()(row_ix) : 0;
+  auto* out_codes_ptr    = &out_codes(row_ix, 0);
 
   // write label
-  auto* out_label_ptr = reinterpret_cast<LabelT*>(&out_codes(row_ix, 0));
-  if (lane_id == 0) { *out_label_ptr = vq_label; }
+  if (vq_centers) {
+    auto* out_label_ptr = reinterpret_cast<LabelT*>(out_codes_ptr);
+    if (lane_id == 0) { *out_label_ptr = vq_label; }
+    out_codes_ptr += sizeof(LabelT);
+  }
 
-  auto* out_codes_ptr = reinterpret_cast<uint8_t*>(out_label_ptr + 1);
   cuvs::neighbors::ivf_pq::detail::bitfield_view_t<PqBits> code_view{out_codes_ptr};
   for (uint32_t j = 0; j < pq_dim; j++) {
     // find PQ label
@@ -428,9 +432,14 @@ void process_and_fill_codes(
   const ix_t pq_dim       = params.pq_dim;
   const ix_t pq_bits      = params.pq_bits;
   const ix_t pq_n_centers = ix_t{1} << pq_bits;
-  // NB: codes must be aligned at least to sizeof(label_t) to be able to read labels.
-  const ix_t codes_rowlen =
-    sizeof(label_t) * (1 + raft::div_rounding_up_safe<ix_t>(pq_dim * pq_bits, 8 * sizeof(label_t)));
+  ix_t codes_rowlen       = 0;
+  if (params.use_vq) {
+    // NB: codes must be aligned at least to sizeof(label_t) to be able to read labels.
+    codes_rowlen = sizeof(label_t) *
+                   (1 + raft::div_rounding_up_safe<ix_t>(pq_dim * pq_bits, 8 * sizeof(label_t)));
+  } else {
+    codes_rowlen = pq_dim * pq_bits;
+  }
   RAFT_EXPECTS(codes.extent(0) == n_rows,
                "Codes matrix must have the same number of rows as the input dataset");
   RAFT_EXPECTS(codes.extent(1) == codes_rowlen,

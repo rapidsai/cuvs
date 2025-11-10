@@ -18,7 +18,7 @@ namespace cuvs::preprocessing::quantize::pq {
  */
 
 /**
- * @brief Product Quantizer parameters. If vector quantization is not needed, set vq_n_centers to 1.
+ * @brief Product Quantizer parameters.
  * @see cuvs::neighbors::vpq_params
  */
 using params = cuvs::neighbors::vpq_params;
@@ -102,8 +102,12 @@ void transform(raft::resources const& res,
 template <typename LabelT = uint32_t>
 inline int64_t get_quantized_dim(const params& config)
 {
-  return sizeof(LabelT) * (1 + raft::div_rounding_up_safe<int64_t>(config.pq_dim * config.pq_bits,
-                                                                   8 * sizeof(LabelT)));
+  if (config.use_vq) {
+    return sizeof(LabelT) * (1 + raft::div_rounding_up_safe<int64_t>(config.pq_dim * config.pq_bits,
+                                                                     8 * sizeof(LabelT)));
+  } else {
+    return config.pq_dim * config.pq_bits;
+  }
 }
 
 /**

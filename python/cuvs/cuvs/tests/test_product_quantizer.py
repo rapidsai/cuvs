@@ -15,12 +15,13 @@ from cuvs.preprocessing.quantize import pq
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("dtype", [np.float32, np.float64])
 @pytest.mark.parametrize("pq_kmeans_type", ["kmeans", "kmeans_balanced"])
-@pytest.mark.parametrize("vq_n_centers", [1, 5])
+@pytest.mark.parametrize("use_vq", [True, False])
 def test_product_quantizer(
-    n_rows, n_cols, inplace, dtype, pq_kmeans_type, vq_n_centers
+    n_rows, n_cols, inplace, dtype, pq_kmeans_type, use_vq
 ):
     pq_dim = 32
     pq_bits = 8
+    vq_n_centers = 3
     input1 = np.random.random_sample((n_rows, n_cols)).astype(dtype)
     input1_device = device_ndarray(input1)
 
@@ -29,6 +30,7 @@ def test_product_quantizer(
         pq_dim=pq_dim,
         pq_kmeans_type=pq_kmeans_type,
         vq_n_centers=vq_n_centers,
+        use_vq=use_vq,
     )
     quantizer = pq.train(params, input1_device)
 

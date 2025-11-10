@@ -50,6 +50,9 @@ cdef class QuantizerParams:
     pq_kmeans_type: str
         specifies the type of kmeans algorithm to use for PQ training
         possible values: "kmeans", "kmeans_balanced"
+    use_vq: bool
+        specifies whether to use vector quantization (VQ) before product
+        quantization (PQ).
     """
 
     cdef cuvsProductQuantizerParams * params
@@ -63,7 +66,8 @@ cdef class QuantizerParams:
     def __init__(self, *, pq_bits=8, pq_dim=0, vq_n_centers=0,
                  kmeans_n_iters=25, vq_kmeans_trainset_fraction=0.0,
                  pq_kmeans_trainset_fraction=0.0,
-                 pq_kmeans_type="kmeans_balanced"):
+                 pq_kmeans_type="kmeans_balanced",
+                 use_vq=True):
         if pq_bits not in [4, 5, 6, 7, 8]:
             raise ValueError("pq_bits must be one of [4, 5, 6, 7, 8]")
         self.params.pq_bits = pq_bits
@@ -74,6 +78,7 @@ cdef class QuantizerParams:
         self.params.pq_kmeans_trainset_fraction = pq_kmeans_trainset_fraction
         pq_kmeans_type_c = PQ_KMEANS_TYPES[pq_kmeans_type]
         self.params.pq_kmeans_type = <cuvsKMeansType>pq_kmeans_type_c
+        self.params.use_vq = use_vq
 
     @property
     def pq_bits(self):
@@ -102,6 +107,10 @@ cdef class QuantizerParams:
     @property
     def pq_kmeans_type(self):
         return self.params.pq_kmeans_type
+
+    @property
+    def use_vq(self):
+        return self.params.use_vq
 
 
 cdef class Quantizer:

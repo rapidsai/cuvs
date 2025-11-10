@@ -5,6 +5,7 @@
 # cython: language_level=3
 
 from libc.stdint cimport uint32_t, uintptr_t
+from libcpp cimport bool
 
 from cuvs.cluster.kmeans.kmeans cimport cuvsKMeansType
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
@@ -21,6 +22,7 @@ cdef extern from "cuvs/preprocessing/quantize/pq.h" nogil:
         double vq_kmeans_trainset_fraction
         double pq_kmeans_trainset_fraction
         cuvsKMeansType pq_kmeans_type
+        bool use_vq
 
     ctypedef cuvsProductQuantizerParams* cuvsProductQuantizerParams_t
 

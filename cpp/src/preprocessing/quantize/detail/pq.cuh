@@ -27,11 +27,11 @@ quantizer<T> train(raft::resources const& res,
   std::optional<raft::device_matrix_view<const T, uint32_t, raft::row_major>>
     vq_code_book_view_opt                                                           = std::nullopt;
   std::optional<raft::device_matrix<T, uint32_t, raft::row_major>> vq_code_book_opt = std::nullopt;
-  if (params.vq_n_centers == 1) {
-    vq_code_book_opt = raft::make_device_matrix<T, uint32_t, raft::row_major>(res, 0, 0);
-  } else {
+  if (ps.use_vq) {
     vq_code_book_opt      = cuvs::neighbors::detail::train_vq<T>(res, ps, dataset);
     vq_code_book_view_opt = raft::make_const_mdspan(vq_code_book_opt.value().view());
+  } else {
+    vq_code_book_opt = raft::make_device_matrix<T, uint32_t, raft::row_major>(res, 0, 0);
   }
 
   auto pq_code_book = cuvs::neighbors::detail::train_pq<T>(res, ps, dataset, vq_code_book_view_opt);
@@ -54,13 +54,12 @@ void transform(raft::resources const& res,
     size_t(out.extent(1)));
   RAFT_EXPECTS(out.extent(0) == dataset.extent(0),
                "Output matrix must have the same number of rows as the input dataset");
-  RAFT_EXPECTS(out.extent(1) == cuvs::preprocessing::quantize::pq::get_quantized_dim<uint32_t>(
-                                  quantizer.params_quantizer),
+  RAFT_EXPECTS(out.extent(1) == get_quantized_dim<uint32_t>(quantizer.params_quantizer),
                "Output matrix doesn't have the correct number of columns");
   // Encode dataset
   std::optional<raft::device_matrix_view<const T, uint32_t, raft::row_major>> vq_centers =
     std::nullopt;
-  if (quantizer.params_quantizer.vq_n_centers != 1) {
+  if (quantizer.params_quantizer.use_vq) {
     vq_centers = raft::make_const_mdspan(quantizer.vpq_codebooks.vq_code_book.view());
   }
 
@@ -93,8 +92,11 @@ __launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_vectors_kernel(
   uint32_t lane_id = subwarp_align::mod(raft::laneId());
 
   const uint8_t* out_codes_ptr = &codes(row_ix, 0);
-  LabelT vq_label              = *reinterpret_cast<const LabelT*>(out_codes_ptr);
-  out_codes_ptr                = (&codes(row_ix, 0)) + sizeof(LabelT);
+  LabelT vq_label              = 0;
+  if (vq_centers) {
+    vq_label      = *reinterpret_cast<const LabelT*>(out_codes_ptr);
+    out_codes_ptr = (&codes(row_ix, 0)) + sizeof(LabelT);
+  }
   cuvs::neighbors::ivf_pq::detail::bitfield_view_t<PqBits, const uint8_t> code_view{out_codes_ptr};
   for (uint32_t j = lane_id; j < pq_dim; j += kSubWarpSize) {
     uint8_t code = code_view[j];
@@ -164,13 +166,12 @@ void inverse_transform(raft::resources const& res,
   using idx_t   = int64_t;
   RAFT_EXPECTS(out.extent(0) == codes.extent(0),
                "Output matrix must have the same number of rows as the input codes");
-  RAFT_EXPECTS(codes.extent(1) == cuvs::preprocessing::quantize::pq::get_quantized_dim<label_t>(
-                                    quant.params_quantizer),
+  RAFT_EXPECTS(codes.extent(1) == get_quantized_dim<label_t>(quant.params_quantizer),
                "Codes matrix doesn't have the correct number of columns");
 
   std::optional<raft::device_matrix_view<const T, uint32_t, raft::row_major>> vq_centers_opt =
     std::nullopt;
-  if (quant.params_quantizer.vq_n_centers != 1) {
+  if (quant.params_quantizer.use_vq) {
     vq_centers_opt = raft::make_const_mdspan(quant.vpq_codebooks.vq_code_book.view());
   }
 

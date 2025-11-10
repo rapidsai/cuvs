@@ -57,6 +57,7 @@ void* _train(cuvsResources_t res,
   quantizer_params.vq_kmeans_trainset_fraction = params->vq_kmeans_trainset_fraction;
   quantizer_params.pq_kmeans_type =
     static_cast<cuvs::cluster::kmeans::kmeans_type>(params->pq_kmeans_type);
+  quantizer_params.use_vq = params->use_vq;
 
   cuvs::preprocessing::quantize::pq::quantizer<T>* ret = nullptr;
 
@@ -103,7 +104,7 @@ extern "C" cuvsError_t cuvsProductQuantizerParamsCreate(cuvsProductQuantizerPara
     *params = new cuvsProductQuantizerParams{
       .pq_bits = 8, .pq_dim = 0, .vq_n_centers = 0, .kmeans_n_iters = 25,
       .vq_kmeans_trainset_fraction = 0, .pq_kmeans_trainset_fraction = 0,
-      .pq_kmeans_type = cuvsKMeansType::KMeansBalanced}; });
+      .pq_kmeans_type = cuvsKMeansType::KMeansBalanced, .use_vq = false}; });
 }
 
 extern "C" cuvsError_t cuvsProductQuantizerParamsDestroy(cuvsProductQuantizerParams_t params)
