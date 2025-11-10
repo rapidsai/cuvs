@@ -526,20 +526,6 @@ extern "C" cuvsError_t cuvsCagraIndexIsOnDisk(cuvsCagraIndex_t index, bool* on_d
   });
 }
 
-extern "C" cuvsError_t cuvsCagraIndexGetFileDirectory(cuvsCagraIndex_t index,
-                                                      char** file_directory,
-                                                      size_t* length)
-{
-  return cuvs::core::translate_exceptions([=] {
-    auto index_ptr     = reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index->addr);
-    const auto& dir    = index_ptr->file_directory();
-    *length            = dir.length();
-    *file_directory    = static_cast<char*>(malloc((*length + 1) * sizeof(char)));
-    std::strncpy(*file_directory, dir.c_str(), *length);
-    (*file_directory)[*length] = '\0';
-  });
-}
-
 extern "C" cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index, DLManagedTensor* dataset)
 {
   return cuvs::core::translate_exceptions([=] {

@@ -70,7 +70,6 @@ def run_cagra_ace_build_search_test(
         if not use_disk:
             # Verify in-memory index
             assert not index.is_on_disk
-            assert index.file_directory == ""
 
             # For in-memory mode, we can search directly
             # But queries need to be on device
@@ -111,7 +110,6 @@ def run_cagra_ace_build_search_test(
         else:
             # For disk-based mode, verify that expected files were created
             assert index.is_on_disk
-            assert index.file_directory == temp_dir
             assert os.path.exists(os.path.join(temp_dir, "cagra_graph.npy"))
             assert os.path.exists(
                 os.path.join(temp_dir, "reordered_dataset.npy")

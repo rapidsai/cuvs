@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "../../../src/util/file_io.hpp"
+
 #include "common.hpp"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/common.hpp>
@@ -19,6 +21,8 @@
 #include <raft/core/resource/stream_view.hpp>
 #include <raft/core/serialize.hpp>
 
+#include <fcntl.h>
+#include <filesystem>
 #include <fstream>
 #include <raft/core/resources.hpp>
 #include <raft/util/integer_utils.hpp>
@@ -420,10 +424,25 @@ struct index : cuvs::neighbors::index {
   /** Whether the index is stored on disk */
   [[nodiscard]] constexpr inline auto on_disk() const noexcept -> bool { return on_disk_; }
 
-  /** Directory where index files are stored (empty if not on disk) */
-  [[nodiscard]] inline auto file_directory() const noexcept -> const std::string&
+  /** Get the dataset file descriptor (for disk-backed index) */
+  [[nodiscard]] inline auto dataset_fd() const noexcept
+    -> const std::optional<cuvs::util::file_descriptor>&
   {
-    return file_directory_;
+    return dataset_fd_;
+  }
+
+  /** Get the graph file descriptor (for disk-backed index) */
+  [[nodiscard]] inline auto graph_fd() const noexcept
+    -> const std::optional<cuvs::util::file_descriptor>&
+  {
+    return graph_fd_;
+  }
+
+  /** Get the mapping file descriptor (for disk-backed index) */
+  [[nodiscard]] inline auto mapping_fd() const noexcept
+    -> const std::optional<cuvs::util::file_descriptor>&
+  {
+    return mapping_fd_;
   }
 
   /** Dataset norms for cosine distance [size] */
@@ -698,58 +717,67 @@ struct index : cuvs::neighbors::index {
   }
 
   /**
-   * Update the dataset from a disk file.
+   * Update the dataset from a disk file using a file descriptor.
    *
-   * This method configures the index to use a disk-based dataset stored in the specified file.
+   * This method configures the index to use a disk-based dataset.
    * The dataset file should contain a numpy header followed by vectors in row-major format.
    * The number of rows and dimensionality are read from the numpy header.
    *
    * @param[in] res raft resources
-   * @param[in] file_path Path to the dataset file
+   * @param[in] fd File descriptor (will be moved into the index for lifetime management)
    */
-  void update_dataset(raft::resources const& res, const std::string& file_path)
+  void update_dataset(raft::resources const& res, cuvs::util::file_descriptor&& fd)
   {
-    std::ifstream is(file_path, std::ios::in | std::ios::binary);
-    if (!is) { RAFT_FAIL("Cannot open dataset file %s", file_path.c_str()); }
+    RAFT_EXPECTS(fd.is_valid(), "Invalid file descriptor provided for dataset");
 
-    raft::detail::numpy_serializer::header_t header =
-      raft::detail::numpy_serializer::read_header(is);
+    std::string file_path = fd.get_path();
+    RAFT_EXPECTS(!file_path.empty(), "Unable to get path from dataset file descriptor");
 
-    auto last_slash = file_path.find_last_of('/');
-    if (last_slash != std::string::npos) {
-      file_directory_ = file_path.substr(0, last_slash);
-    } else {
-      file_directory_ = ".";
-    }
+    std::ifstream file_stream(file_path, std::ios::binary);
+    RAFT_EXPECTS(file_stream.good(), "Failed to open dataset file: %s", file_path.c_str());
 
+    auto header = raft::detail::numpy_serializer::read_header(file_stream);
+    RAFT_EXPECTS(header.shape.size() == 2,
+                 "Dataset file should be 2D, got %zu dimensions",
+                 header.shape.size());
+
+    n_rows_ = header.shape[0];
+    dim_    = header.shape[1];
+
+    RAFT_LOG_DEBUG("ACE: Dataset has shape [%zu, %zu]", n_rows_, dim_);
+
+    // Re-open the file descriptor in read-only mode for subsequent operations
+    dataset_fd_.emplace(file_path, O_RDONLY);
     on_disk_ = true;
-    n_rows_  = header.shape[0];
-    dim_     = header.shape[1];
-
-    RAFT_LOG_DEBUG("ACE: Dataset at %s has shape [%zu, %zu]", file_path.c_str(), n_rows_, dim_);
 
     dataset_ = std::make_unique<cuvs::neighbors::empty_dataset<int64_t>>(0);
     dataset_norms_.reset();
   }
 
   /**
-   * Update the graph from a disk file.
+   * Update the graph from a disk file using a file descriptor.
    *
-   * This method configures the index to use a disk-based graph stored in the specified file.
+   * This method configures the index to use a disk-based graph.
    * The graph file should contain a numpy header followed by neighbor indices in row-major format.
    * The number of rows and graph degree are read from the numpy header.
-   * The file directory is derived from the file path.
    *
    * @param[in] res raft resources
-   * @param[in] file_path Path to the graph file
+   * @param[in] fd File descriptor (will be moved into the index for lifetime management)
    */
-  void update_graph(raft::resources const& res, const std::string& file_path)
+  void update_graph(raft::resources const& res, cuvs::util::file_descriptor&& fd)
   {
-    std::ifstream is(file_path, std::ios::in | std::ios::binary);
-    if (!is) { RAFT_FAIL("Cannot open graph file %s", file_path.c_str()); }
+    RAFT_EXPECTS(fd.is_valid(), "Invalid file descriptor provided for graph");
 
-    raft::detail::numpy_serializer::header_t header =
-      raft::detail::numpy_serializer::read_header(is);
+    // Read header from file using ifstream
+    std::string file_path = fd.get_path();
+    RAFT_EXPECTS(!file_path.empty(), "Unable to get path from graph file descriptor");
+
+    std::ifstream file_stream(file_path, std::ios::binary);
+    RAFT_EXPECTS(file_stream.good(), "Failed to open graph file: %s", file_path.c_str());
+
+    auto header = raft::detail::numpy_serializer::read_header(file_stream);
+    RAFT_EXPECTS(
+      header.shape.size() == 2, "Graph file should be 2D, got %zu dimensions", header.shape.size());
 
     if (on_disk_ && n_rows_ != 0) {
       RAFT_EXPECTS(n_rows_ == header.shape[0],
@@ -758,25 +786,56 @@ struct index : cuvs::neighbors::index {
                    n_rows_);
     }
 
-    auto last_slash = file_path.find_last_of('/');
-    if (last_slash != std::string::npos) {
-      std::string graph_dir = file_path.substr(0, last_slash);
-      if (!file_directory_.empty() && file_directory_ != graph_dir) {
-        RAFT_LOG_WARN("Graph directory (%s) differs from dataset directory (%s)",
-                      graph_dir.c_str(),
-                      file_directory_.c_str());
-      }
-      file_directory_ = graph_dir;
-    }
-    on_disk_      = true;
     n_rows_       = header.shape[0];
     graph_degree_ = header.shape[1];
 
-    RAFT_LOG_DEBUG(
-      "ACE: Graph at %s has shape [%zu, %zu]", file_path.c_str(), n_rows_, graph_degree_);
+    RAFT_LOG_DEBUG("ACE: Graph has shape [%zu, %zu]", n_rows_, graph_degree_);
+
+    // Re-open the file descriptor in read-only mode for subsequent operations
+    graph_fd_.emplace(file_path, O_RDONLY);
+    on_disk_ = true;
 
     graph_      = raft::make_device_matrix<IdxT, int64_t>(res, 0, 0);
     graph_view_ = graph_.view();
+  }
+
+  /**
+   * Update the dataset mapping from a disk file using a file descriptor.
+   *
+   * This method configures the index to use a disk-based dataset mapping.
+   * The mapping file should contain a numpy header followed by index mappings.
+   *
+   * @param[in] res raft resources
+   * @param[in] fd File descriptor (will be moved into the index for lifetime management)
+   */
+  void update_mapping(raft::resources const& res, cuvs::util::file_descriptor&& fd)
+  {
+    RAFT_EXPECTS(fd.is_valid(), "Invalid file descriptor provided for mapping");
+
+    // Read header from file using ifstream
+    std::string file_path = fd.get_path();
+    RAFT_EXPECTS(!file_path.empty(), "Unable to get path from mapping file descriptor");
+
+    std::ifstream file_stream(file_path, std::ios::binary);
+    RAFT_EXPECTS(file_stream.good(), "Failed to open mapping file: %s", file_path.c_str());
+
+    auto header = raft::detail::numpy_serializer::read_header(file_stream);
+    RAFT_EXPECTS(header.shape.size() == 1,
+                 "Mapping file should be 1D, got %zu dimensions",
+                 header.shape.size());
+
+    if (on_disk_ && n_rows_ != 0) {
+      RAFT_EXPECTS(header.shape[0] == n_rows_,
+                   "Mapping size (%zu) must match dataset size (%zu)",
+                   header.shape[0],
+                   n_rows_);
+    }
+
+    RAFT_LOG_DEBUG("ACE: Mapping has %zu elements", header.shape[0]);
+
+    // Re-open the file descriptor in read-only mode for subsequent operations
+    mapping_fd_.emplace(file_path, O_RDONLY);
+    on_disk_ = true;
   }
 
  private:
@@ -789,12 +848,16 @@ struct index : cuvs::neighbors::index {
   // only float distances supported at the moment
   std::optional<raft::device_vector<float, int64_t>> dataset_norms_;
 
+  // File descriptors for disk-backed index components (ACE disk mode)
+  std::optional<cuvs::util::file_descriptor> dataset_fd_;
+  std::optional<cuvs::util::file_descriptor> graph_fd_;
+  std::optional<cuvs::util::file_descriptor> mapping_fd_;
+
   void compute_dataset_norms_(raft::resources const& res);
-  bool on_disk_               = false;
-  std::string file_directory_ = "";
-  size_t n_rows_              = 0;
-  size_t dim_                 = 0;
-  size_t graph_degree_        = 0;
+  bool on_disk_        = false;
+  size_t n_rows_       = 0;
+  size_t dim_          = 0;
+  size_t graph_degree_ = 0;
 };
 /**
  * @}

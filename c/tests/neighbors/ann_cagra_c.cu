@@ -724,7 +724,7 @@ TEST(CagraC, BuildSearchACEDisk)
   cuvsHnswIndexParamsCreate(&hnsw_params);
 
   cuvsHnswFromCagra(res, hnsw_params, index, hnsw_index_ser);
-  ASSERT_EQ(hnsw_index_ser->addr, 0);
+  ASSERT_NE(hnsw_index_ser->addr, 0);
   cuvsHnswIndexDestroy(hnsw_index_ser);
 
   DLManagedTensor queries_tensor;

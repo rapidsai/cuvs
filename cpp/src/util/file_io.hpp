@@ -29,7 +29,7 @@ class file_descriptor {
   explicit file_descriptor(int fd = -1) : fd_(fd) {}
 
   file_descriptor(const std::string& path, int flags, mode_t mode = 0644)
-    : fd_(open(path.c_str(), flags, mode))
+    : fd_(open(path.c_str(), flags, mode)), path_(path)
   {
     if (fd_ == -1) {
       RAFT_FAIL("Failed to open file: %s (errno: %d, %s)", path.c_str(), errno, strerror(errno));
@@ -39,11 +39,15 @@ class file_descriptor {
   file_descriptor(const file_descriptor&)            = delete;
   file_descriptor& operator=(const file_descriptor&) = delete;
 
-  file_descriptor(file_descriptor&& other) noexcept : fd_{std::exchange(other.fd_, -1)} {}
+  file_descriptor(file_descriptor&& other) noexcept
+    : fd_{std::exchange(other.fd_, -1)}, path_{std::move(other.path_)}
+  {
+  }
 
   file_descriptor& operator=(file_descriptor&& other) noexcept
   {
     std::swap(this->fd_, other.fd_);
+    std::swap(this->path_, other.path_);
     return *this;
   }
 
@@ -67,8 +71,11 @@ class file_descriptor {
     return fd;
   }
 
+  [[nodiscard]] std::string get_path() const { return path_; }
+
  private:
   int fd_;
+  std::string path_;
 };
 
 /**

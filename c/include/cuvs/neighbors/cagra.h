@@ -525,21 +525,6 @@ cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int64_t* graph_
 cuvsError_t cuvsCagraIndexIsOnDisk(cuvsCagraIndex_t index, bool* on_disk);
 
 /**
- * @brief Get the file directory where the CAGRA index is stored (if on disk)
- *
- * When ACE in disk mode is used to build the index, the index is stored on disk. The file directory
- * that contains the intermediate files and final HNSW index built by cuvsHnswFromCagra can be queried
- * using this function. The HNSW index can be loaded from disk using cuvsHnswDeserialize. The file path
- * is the directory returned by this function + "/hnsw_index.bin".
- *
- * @param[in] index CAGRA index
- * @param[out] file_directory return file directory path (caller must free)
- * @param[out] length length of the file_directory string
- * @return cuvsError_t
- */
-cuvsError_t cuvsCagraIndexGetFileDirectory(cuvsCagraIndex_t index, char** file_directory, size_t* length);
-
-/**
  * @brief Returns a view of the CAGRA dataset
  *
  * This function returns a non-owning view of the CAGRA dataset.

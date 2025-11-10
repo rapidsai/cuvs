@@ -114,9 +114,37 @@ struct index_impl : index<T> {
     return space_.get();
   }
 
+  /**
+  @brief Set file descriptor for disk-backed index
+   */
+  void set_file_descriptor(cuvs::util::file_descriptor&& fd) { hnsw_fd_.emplace(std::move(fd)); }
+
+  /**
+  @brief Get file descriptor
+   */
+  auto file_descriptor() const -> const std::optional<cuvs::util::file_descriptor>&
+  {
+    return hnsw_fd_;
+  }
+
+  /**
+  @brief Check if index is stored on disk
+   */
+  bool on_disk() const override { return hnsw_fd_.has_value() && hnsw_fd_->is_valid(); }
+
+  /**
+  @brief Get file path for disk-backed index
+   */
+  std::string file_path() const override
+  {
+    if (hnsw_fd_.has_value() && hnsw_fd_->is_valid()) { return hnsw_fd_->get_path(); }
+    return "";
+  }
+
  private:
   std::unique_ptr<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>> appr_alg_;
   std::unique_ptr<hnswlib::SpaceInterface<typename hnsw_dist_t<T>::type>> space_;
+  std::optional<cuvs::util::file_descriptor> hnsw_fd_;
 };
 
 template <typename T, HnswHierarchy hierarchy>
@@ -304,86 +332,88 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
                 static_cast<size_t>(dim),
                 static_cast<size_t>(graph_degree_int));
 
-  auto index_directory = index_.file_directory();
-  RAFT_EXPECTS(
-    std::filesystem::exists(index_directory) && std::filesystem::is_directory(index_directory),
-    "Directory '%s' does not exist",
-    index_directory.c_str());
+  // Get file descriptors from index
+  const auto& graph_fd_opt   = index_.graph_fd();
+  const auto& dataset_fd_opt = index_.dataset_fd();
+  const auto& mapping_fd_opt = index_.mapping_fd();
 
-  std::string graph_filename =
-    (std::filesystem::path(index_directory) / "cagra_graph.npy").string();
-  RAFT_EXPECTS(std::filesystem::exists(graph_filename),
-               "Graph file '%s' does not exist.",
-               graph_filename.c_str());
+  RAFT_EXPECTS(graph_fd_opt.has_value() && graph_fd_opt->is_valid(),
+               "Graph file descriptor is not available");
+  RAFT_EXPECTS(dataset_fd_opt.has_value() && dataset_fd_opt->is_valid(),
+               "Dataset file descriptor is not available");
+  RAFT_EXPECTS(mapping_fd_opt.has_value() && mapping_fd_opt->is_valid(),
+               "Mapping file descriptor is not available");
+
+  // Get file paths from file descriptors
+  std::string graph_path   = graph_fd_opt->get_path();
+  std::string dataset_path = dataset_fd_opt->get_path();
+  std::string mapping_path = mapping_fd_opt->get_path();
+
+  RAFT_EXPECTS(!graph_path.empty(), "Unable to get path from graph file descriptor");
+  RAFT_EXPECTS(!dataset_path.empty(), "Unable to get path from dataset file descriptor");
+  RAFT_EXPECTS(!mapping_path.empty(), "Unable to get path from mapping file descriptor");
+
+  int graph_fd   = graph_fd_opt->get();
+  int dataset_fd = dataset_fd_opt->get();
+  int label_fd   = mapping_fd_opt->get();
+
+  // Read headers from files to get dimensions
   size_t graph_header_size = 0;
   size_t graph_n_rows      = 0;
   size_t graph_n_cols      = 0;
   {
-    std::ifstream is(graph_filename, std::ios::in | std::ios::binary);
-    RAFT_EXPECTS(is, "Cannot open graph file %s", graph_filename.c_str());
-    auto start_pos    = is.tellg();
-    auto header       = raft::detail::numpy_serializer::read_header(is);
-    graph_header_size = static_cast<size_t>(is.tellg() - start_pos);
+    std::ifstream graph_stream(graph_path, std::ios::binary);
+    RAFT_EXPECTS(graph_stream.good(), "Failed to open graph file: %s", graph_path.c_str());
+
+    auto header       = raft::detail::numpy_serializer::read_header(graph_stream);
+    graph_header_size = static_cast<size_t>(graph_stream.tellg());
     RAFT_EXPECTS(
       header.shape.size() == 2, "Graph file should be 2D, got %zu dimensions", header.shape.size());
 
     graph_n_rows = header.shape[0];
     graph_n_cols = header.shape[1];
-    RAFT_LOG_DEBUG("Graph file: %zu x %zu, dtype=%c, header size: %zu bytes",
+    RAFT_LOG_DEBUG("Graph file: %zu x %zu, header size: %zu bytes",
                    graph_n_rows,
                    graph_n_cols,
-                   header.dtype.kind,
                    graph_header_size);
   }
 
-  std::string dataset_filename =
-    (std::filesystem::path(index_directory) / "reordered_dataset.npy").string();
-  RAFT_EXPECTS(std::filesystem::exists(dataset_filename),
-               "Dataset file '%s' does not exist.",
-               dataset_filename.c_str());
   size_t dataset_header_size = 0;
   size_t dataset_n_rows      = 0;
   size_t dataset_n_cols      = 0;
   {
-    std::ifstream is(dataset_filename, std::ios::in | std::ios::binary);
-    RAFT_EXPECTS(is, "Cannot open dataset file %s", dataset_filename.c_str());
-    auto start_pos      = is.tellg();
-    auto header         = raft::detail::numpy_serializer::read_header(is);
-    dataset_header_size = static_cast<size_t>(is.tellg() - start_pos);
+    std::ifstream dataset_stream(dataset_path, std::ios::binary);
+    RAFT_EXPECTS(dataset_stream.good(), "Failed to open dataset file: %s", dataset_path.c_str());
+
+    auto header         = raft::detail::numpy_serializer::read_header(dataset_stream);
+    dataset_header_size = static_cast<size_t>(dataset_stream.tellg());
     RAFT_EXPECTS(header.shape.size() == 2,
                  "Dataset file should be 2D, got %zu dimensions",
                  header.shape.size());
 
     dataset_n_rows = header.shape[0];
     dataset_n_cols = header.shape[1];
-    RAFT_LOG_DEBUG("Dataset file: %zu x %zu, dtype=%c, header size: %zu bytes",
+    RAFT_LOG_DEBUG("Dataset file: %zu x %zu, header size: %zu bytes",
                    dataset_n_rows,
                    dataset_n_cols,
-                   header.dtype.kind,
                    dataset_header_size);
   }
 
-  std::string label_filename =
-    (std::filesystem::path(index_directory) / "dataset_mapping.npy").string();
-  RAFT_EXPECTS(std::filesystem::exists(label_filename),
-               "Label file '%s' does not exist.",
-               label_filename.c_str());
   size_t label_header_size = 0;
   size_t label_n_elements  = 0;
   {
-    std::ifstream is(label_filename, std::ios::in | std::ios::binary);
-    RAFT_EXPECTS(is, "Cannot open label file %s", label_filename.c_str());
-    auto start_pos    = is.tellg();
-    auto header       = raft::detail::numpy_serializer::read_header(is);
-    label_header_size = static_cast<size_t>(is.tellg() - start_pos);
-    RAFT_EXPECTS(
-      header.shape.size() == 1, "Label file should be 1D, got %zu dimensions", header.shape.size());
+    std::ifstream mapping_stream(mapping_path, std::ios::binary);
+    RAFT_EXPECTS(mapping_stream.good(), "Failed to open mapping file: %s", mapping_path.c_str());
+
+    auto header       = raft::detail::numpy_serializer::read_header(mapping_stream);
+    label_header_size = static_cast<size_t>(mapping_stream.tellg());
+    RAFT_EXPECTS(header.shape.size() == 1,
+                 "Mapping file should be 1D, got %zu dimensions",
+                 header.shape.size());
 
     label_n_elements = header.shape[0];
-    RAFT_LOG_DEBUG("Label file: %zu elements, dtype=%c, header size: %zu bytes",
-                   label_n_elements,
-                   header.dtype.kind,
-                   label_header_size);
+    RAFT_LOG_DEBUG(
+      "Mapping file: %zu elements, header size: %zu bytes", label_n_elements, label_header_size);
   }
 
   // Verify consistency
@@ -407,16 +437,6 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
                "Dataset cols (%zu) != dimensions (%zu)",
                dataset_n_cols,
                static_cast<size_t>(dim));
-
-  // Open file descriptors for batched reading
-  int graph_fd = open(graph_filename.c_str(), O_RDONLY);
-  RAFT_EXPECTS(graph_fd >= 0, "Failed to open graph file %s", graph_filename.c_str());
-
-  int dataset_fd = open(dataset_filename.c_str(), O_RDONLY);
-  RAFT_EXPECTS(dataset_fd >= 0, "Failed to open dataset file %s", dataset_filename.c_str());
-
-  int label_fd = open(label_filename.c_str(), O_RDONLY);
-  RAFT_EXPECTS(label_fd >= 0, "Failed to open label file %s", label_filename.c_str());
 
   const size_t row_size_bytes =
     graph_degree_int * sizeof(IdxT) + dim * sizeof(T) + sizeof(uint32_t);
@@ -672,11 +692,6 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
       }
     }
   }
-
-  // Close file descriptors
-  close(graph_fd);
-  close(dataset_fd);
-  close(label_fd);
 
   RAFT_LOG_DEBUG("Completed writing %ld base level rows", n_rows);
 
@@ -1025,7 +1040,15 @@ std::unique_ptr<index<T>> from_cagra(
 {
   // special treatment for index on disk
   if (cagra_index.on_disk()) {
-    auto index_directory = cagra_index.file_directory();
+    // Get directory from graph file descriptor
+    const auto& graph_fd = cagra_index.graph_fd();
+    RAFT_EXPECTS(graph_fd.has_value() && graph_fd->is_valid(),
+                 "Graph file descriptor is not available for disk-backed index");
+
+    std::string graph_path = graph_fd->get_path();
+    RAFT_EXPECTS(!graph_path.empty(), "Unable to get path from graph file descriptor");
+
+    std::string index_directory = std::filesystem::path(graph_path).parent_path().string();
     RAFT_EXPECTS(
       std::filesystem::exists(index_directory) && std::filesystem::is_directory(index_directory),
       "Directory '%s' does not exist",
@@ -1042,7 +1065,16 @@ std::unique_ptr<index<T>> from_cagra(
     of.close();
     RAFT_EXPECTS(of, "Error writing output %s", index_filename.c_str());
 
-    return nullptr;
+    // Create an empty HNSW index that holds the file descriptor
+    auto hnsw_index =
+      std::make_unique<index_impl<T>>(cagra_index.dim(), cagra_index.metric(), params.hierarchy);
+
+    // Open file descriptor for the HNSW index file and transfer ownership to the index
+    hnsw_index->set_file_descriptor(cuvs::util::file_descriptor(index_filename, O_RDONLY));
+
+    RAFT_LOG_INFO("HNSW index written to disk at: %s", index_filename.c_str());
+
+    return hnsw_index;
   }
 
   if (params.hierarchy == HnswHierarchy::NONE) {
@@ -1103,6 +1135,10 @@ void search(raft::resources const& res,
             raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
             raft::host_matrix_view<float, int64_t, raft::row_major> distances)
 {
+  RAFT_EXPECTS(!idx.on_disk(),
+               "Cannot search an HNSW index that is stored on disk. "
+               "The index must be deserialized into memory first using hnsw::deserialize().");
+
   RAFT_EXPECTS(queries.extent(0) == neighbors.extent(0) && queries.extent(0) == distances.extent(0),
                "Number of rows in output neighbors and distances matrices must equal the number of "
                "queries.");

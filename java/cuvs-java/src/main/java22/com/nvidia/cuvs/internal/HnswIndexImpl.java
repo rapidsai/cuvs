@@ -85,6 +85,22 @@ public class HnswIndexImpl implements HnswIndex {
   }
 
   /**
+   * Check if the HNSW index is stored on disk.
+   *
+   * @return true if the index is stored on disk, false otherwise
+   */
+  @Override
+  public boolean isOnDisk() {
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment onDiskPtr = localArena.allocate(C_LONG);
+      int returnValue =
+          cuvsHnswIndexIsOnDisk(hnswIndexReference.getMemorySegment(), onDiskPtr);
+      checkCuVSError(returnValue, "cuvsHnswIndexIsOnDisk");
+      return onDiskPtr.get(C_LONG, 0) != 0;
+    }
+  }
+
+  /**
    * Invokes the native search_hnsw_index via the Panama API for searching a HNSW
    * index.
    *
@@ -94,6 +110,12 @@ public class HnswIndexImpl implements HnswIndex {
    */
   @Override
   public SearchResults search(HnswQuery query) throws Throwable {
+    if (isOnDisk()) {
+      throw new IllegalStateException(
+          "Cannot search an HNSW index that is stored on disk. "
+              + "The index must be deserialized into memory first using HnswIndex.newBuilder().");
+    }
+
     try (var localArena = Arena.ofConfined()) {
       int topK = query.getTopK();
       float[][] queryVectors = query.getQueryVectors();
@@ -294,16 +316,6 @@ public class HnswIndexImpl implements HnswIndex {
         checkCuVSError(returnValue, "cuvsStreamSync");
       }
     }
-
-    // For disk-based ACE indices, the C++ implementation writes to disk and returns nullptr
-    // Check if the index address is null (0)
-    if (cuvsHnswIndex.addr(hnswIndex) == 0) {
-      // Disk-based case: HNSW index was written to {file_directory}/hnsw_index.bin
-      // Destroy the empty index handle and return null
-      cuvsHnswIndexDestroy(hnswIndex);
-      return null;
-    }
-
     return new HnswIndexImpl(new IndexReference(hnswIndex), resources, hnswParams);
   }
 

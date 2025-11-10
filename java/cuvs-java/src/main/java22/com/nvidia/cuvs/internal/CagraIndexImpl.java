@@ -512,44 +512,6 @@ public class CagraIndexImpl implements CagraIndex {
   }
 
   /**
-   * Gets the file directory where the CAGRA index is stored (for disk-based ACE indices).
-   *
-   * @return the file directory path, or empty string if not on disk
-   */
-  @Override
-  public String getFileDirectory() {
-    checkNotDestroyed();
-    if (!isOnDisk()) {
-      return "";
-    }
-    try (var localArena = Arena.ofConfined()) {
-      // Allocate pointer to char* and size_t
-      MemorySegment fileDirectoryPtr = localArena.allocate(ValueLayout.ADDRESS);
-      MemorySegment lengthPtr = localArena.allocate(ValueLayout.JAVA_LONG);
-
-      int returnValue = cuvsCagraIndexGetFileDirectory(
-          cagraIndexReference.getMemorySegment(),
-          fileDirectoryPtr,
-          lengthPtr);
-      checkCuVSError(returnValue, "cuvsCagraIndexGetFileDirectory");
-
-      // Get the pointer to the string
-      MemorySegment strPtr = fileDirectoryPtr.get(ValueLayout.ADDRESS, 0);
-      if (strPtr.address() == 0) {
-        return "";
-      }
-
-      // Get the length
-      long length = lengthPtr.get(ValueLayout.JAVA_LONG, 0);
-
-      // Read the string
-      String result = strPtr.reinterpret(length + 1).getString(0);
-
-      return result;
-    }
-  }
-
-  /**
    * Gets an instance of {@link CuVSResources}
    *
    * @return an instance of {@link CuVSResources}

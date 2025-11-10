@@ -115,6 +115,13 @@ cdef class Index:
     def trained(self):
         return self.trained
 
+    @property
+    def is_on_disk(self):
+        """Check if index is stored on disk"""
+        cdef bool c_on_disk
+        check_cuvs(cuvsHnswIndexIsOnDisk(self.index, &c_on_disk))
+        return c_on_disk
+
     def __repr__(self):
         # todo(dgd): update repr as we expose data through C API
         attr_str = []
@@ -493,6 +500,13 @@ def search(SearchParams search_params,
     """
     if not index.trained:
         raise ValueError("Index needs to be built before calling search.")
+
+    if index.is_on_disk:
+        raise ValueError(
+            "Cannot search an HNSW index that is stored on disk. "
+            "The index must be deserialized into memory first using "
+            "hnsw.load()."
+        )
 
     # todo(dgd): we can make the check of dtype a parameter of wrap_array
     # in RAFT to make this a single call

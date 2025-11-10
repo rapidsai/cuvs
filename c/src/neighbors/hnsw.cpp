@@ -78,6 +78,10 @@ void _search(cuvsResources_t res,
   auto res_ptr   = reinterpret_cast<raft::resources*>(res);
   auto index_ptr = reinterpret_cast<cuvs::neighbors::hnsw::index<T>*>(index.addr);
 
+  RAFT_EXPECTS(!index_ptr->on_disk(),
+               "Cannot search an HNSW index that is stored on disk. "
+               "The index must be deserialized into memory first using cuvsHnswDeserialize().");
+
   auto search_params        = cuvs::neighbors::hnsw::search_params();
   search_params.ef          = params.ef;
   search_params.num_threads = params.num_threads;
@@ -154,6 +158,29 @@ extern "C" cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index_c_ptr)
       delete index_ptr;
     }
     delete index_c_ptr;
+  });
+}
+
+extern "C" cuvsError_t cuvsHnswIndexIsOnDisk(cuvsHnswIndex_t index_c_ptr, bool* on_disk)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto index = *index_c_ptr;
+
+    if (index.dtype.code == kDLFloat && index.dtype.bits == 32) {
+      auto index_ptr = reinterpret_cast<cuvs::neighbors::hnsw::index<float>*>(index.addr);
+      *on_disk       = index_ptr->on_disk();
+    } else if (index.dtype.code == kDLFloat && index.dtype.bits == 16) {
+      auto index_ptr = reinterpret_cast<cuvs::neighbors::hnsw::index<half>*>(index.addr);
+      *on_disk       = index_ptr->on_disk();
+    } else if (index.dtype.code == kDLInt) {
+      auto index_ptr = reinterpret_cast<cuvs::neighbors::hnsw::index<int8_t>*>(index.addr);
+      *on_disk       = index_ptr->on_disk();
+    } else if (index.dtype.code == kDLUInt) {
+      auto index_ptr = reinterpret_cast<cuvs::neighbors::hnsw::index<uint8_t>*>(index.addr);
+      *on_disk       = index_ptr->on_disk();
+    } else {
+      RAFT_FAIL("Unsupported dtype: %d", index.dtype.code);
+    }
   });
 }
 

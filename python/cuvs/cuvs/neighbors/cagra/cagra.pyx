@@ -468,40 +468,9 @@ cdef class Index:
         bool
             True if the index is on disk, False otherwise.
         """
-        cdef bool on_disk = False
-        check_cuvs(cuvsCagraIndexIsOnDisk(self.index, &on_disk))
-        return on_disk
-
-    @property
-    def file_directory(self):
-        """
-        Get the directory where the index files are stored.
-
-        Returns
-        -------
-        str
-            Directory path where index files are stored. Empty string if
-            not on disk.
-        """
-        cdef char* file_dir = NULL
-        cdef size_t length = 0
-
-        check_cuvs(
-            cuvsCagraIndexGetFileDirectory(self.index, &file_dir, &length)
-        )
-
-        if file_dir == NULL or length == 0:
-            return ""
-
-        try:
-            # Convert C string to Python string
-            result = file_dir[:length].decode('utf-8')
-        finally:
-            # Free the C string allocated by the C API
-            if file_dir != NULL:
-                free(file_dir)
-
-        return result
+        cdef bool c_on_disk
+        check_cuvs(cuvsCagraIndexIsOnDisk(self.index, &c_on_disk))
+        return c_on_disk
 
     def __repr__(self):
         # todo(dgd): update repr as we expose data through C API
@@ -576,10 +545,10 @@ def build(IndexParams index_params, dataset, resources=None):
     ...     ace_params=ace_params
     ... )
     >>> idx = cagra.build(build_params, dataset_host)
-    >>> # Check if index is on disk and get location
+    >>> # Check if index is on disk
     >>> if idx.is_on_disk:
-    ...     print("Index stored at:", idx.file_directory)
-    Index stored at: /tmp/ace
+    ...     print("Index is stored on disk")
+    Index is stored on disk
     """
 
     # Check if ACE build is requested

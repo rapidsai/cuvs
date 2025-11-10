@@ -74,10 +74,11 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   // cagra::search
 
   // On-disk build of ACE stores the reordered dataset, the dataset mapping, and the graph on disk.
-  // The index is not usable for search. Use the created files to create a HNSW index on disk
-  // instead.
+  // The index is not directly usable for CAGRA search. Convert to HNSW for search operations.
 
-  // Convert CAGRA index to HNSW (automatically serializes to disk for ACE)
+  // Convert CAGRA index to HNSW
+  // For disk-based indices: serializes CAGRA to HNSW format on disk, returns an index with file
+  // descriptor For in-memory indices: creates HNSW index in memory
   std::cout << "Converting CAGRA index to HNSW" << std::endl;
   hnsw::index_params hnsw_params;
   auto hnsw_index = hnsw::from_cagra(dev_resources, hnsw_params, index);
@@ -98,10 +99,14 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   hnsw_search_params.ef          = std::max(200, static_cast<int>(topk) * 2);
   hnsw_search_params.num_threads = 1;
 
-  // Check if the partitioned build used disk storage
-  if (index.on_disk()) {
-    std::cout << "CAGRA index used disk storage. Deserializing HNSW index from disk." << std::endl;
-    std::string hnsw_index_path = index.file_directory() + "/hnsw_index.bin";
+  // Check if the HNSW index is stored on disk
+  if (hnsw_index->on_disk()) {
+    std::cout << "HNSW index is stored on disk." << std::endl;
+
+    // For disk-based indices, the HNSW index file path can be obtained via file_path()
+    std::string hnsw_index_path = hnsw_index->file_path();
+    std::cout << "HNSW index file location: " << hnsw_index_path << std::endl;
+    std::cout << "Deserializing HNSW index from disk for search." << std::endl;
 
     hnsw::index<float>* hnsw_index_raw = nullptr;
     hnsw::deserialize(

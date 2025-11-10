@@ -108,7 +108,13 @@ class AnnCagraAceTest : public ::testing::TestWithParam<AnnCagraAceInputs> {
       if (ps.use_disk) {
         // Verify disk-based ACE index using HNSW index from disk
         EXPECT_TRUE(index.on_disk());
-        EXPECT_EQ(index.file_directory(), temp_dir);
+
+        // Verify file directory from graph file descriptor
+        const auto& graph_fd = index.graph_fd();
+        EXPECT_TRUE(graph_fd.has_value() && graph_fd->is_valid());
+        std::string graph_path = graph_fd->get_path();
+        std::string file_dir   = std::filesystem::path(graph_path).parent_path().string();
+        EXPECT_EQ(file_dir, temp_dir);
 
         EXPECT_TRUE(std::filesystem::exists(temp_dir + "/cagra_graph.npy"));
         EXPECT_GE(std::filesystem::file_size(temp_dir + "/cagra_graph.npy"),
@@ -126,7 +132,7 @@ class AnnCagraAceTest : public ::testing::TestWithParam<AnnCagraAceInputs> {
         hnsw_params.hierarchy = hnsw::HnswHierarchy::GPU;
 
         auto hnsw_index = hnsw::from_cagra(handle_, hnsw_params, index);
-        ASSERT_EQ(hnsw_index, nullptr);
+        ASSERT_NE(hnsw_index, nullptr);
 
         std::string hnsw_index_path = temp_dir + "/hnsw_index.bin";
         EXPECT_TRUE(std::filesystem::exists(hnsw_index_path));

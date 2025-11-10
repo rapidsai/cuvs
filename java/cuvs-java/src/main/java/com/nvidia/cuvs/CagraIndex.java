@@ -147,13 +147,6 @@ public interface CagraIndex extends AutoCloseable {
   boolean isOnDisk();
 
   /**
-   * Gets the file directory where the CAGRA index is stored (for disk-based ACE indices).
-   *
-   * @return the file directory path, or empty string if not on disk
-   */
-  String getFileDirectory();
-
-  /**
    * Gets an instance of {@link CuVSResources}
    *
    * @return an instance of {@link CuVSResources}

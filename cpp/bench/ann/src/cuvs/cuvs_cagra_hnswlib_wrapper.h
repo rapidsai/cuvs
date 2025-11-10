@@ -76,8 +76,7 @@ class cuvs_cagra_hnswlib : public algo<T>, public algo_gpu {
   search_param search_param_;
   std::shared_ptr<cuvs::neighbors::hnsw::index<T>> hnsw_index_;
 
-  bool cagra_ace_build_                  = false;
-  std::string cagra_ace_build_directory_ = "";
+  bool cagra_ace_build_ = false;
 };
 
 template <typename T, typename IdxT>
@@ -115,10 +114,7 @@ void cuvs_cagra_hnswlib<T, IdxT>::build(const T* dataset, size_t nrow)
     handle_, build_param_.hnsw_index_params, cagra_index, opt_dataset_view);
 
   // special treatment in save/serialize step
-  if (cagra_index.on_disk()) {
-    cagra_ace_build_           = true;
-    cagra_ace_build_directory_ = cagra_index.file_directory();
-  }
+  if (cagra_index.on_disk()) { cagra_ace_build_ = true; }
 }
 
 template <typename T, typename IdxT>
@@ -133,8 +129,8 @@ template <typename T, typename IdxT>
 void cuvs_cagra_hnswlib<T, IdxT>::save(const std::string& file) const
 {
   if (cagra_ace_build_) {
-    std::string index_filename =
-      (std::filesystem::path(cagra_ace_build_directory_) / "hnsw_index.bin").string();
+    std::string index_filename = hnsw_index_->file_path();
+    RAFT_EXPECTS(!index_filename.empty(), "HNSW index file path is not available.");
     RAFT_EXPECTS(std::filesystem::exists(index_filename),
                  "Index file '%s' does not exist.",
                  index_filename.c_str());

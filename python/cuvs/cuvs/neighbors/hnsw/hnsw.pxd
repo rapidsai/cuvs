@@ -1,10 +1,11 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
 
 from libc.stdint cimport int32_t, uintptr_t
+from libcpp cimport bool
 
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
@@ -39,6 +40,8 @@ cdef extern from "cuvs/neighbors/hnsw.h" nogil:
     cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t* index)
 
     cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index)
+
+    cuvsError_t cuvsHnswIndexIsOnDisk(cuvsHnswIndex_t index, bool* on_disk)
 
     ctypedef struct cuvsHnswExtendParams:
         int32_t num_threads
