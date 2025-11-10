@@ -47,7 +47,7 @@ mkdir -p "${RAPIDS_ARTIFACTS_DIR}"
 export RAPIDS_ARTIFACTS_DIR
 
 scl enable gcc-toolset-${TOOLSET_VERSION} -- \
-      cmake -S cpp -B cpp/build/temp/ \
+      cmake -S cpp -B cpp/build/ \
             -DCMAKE_CUDA_HOST_COMPILER=/opt/rh/gcc-toolset-${TOOLSET_VERSION}/root/usr/bin/gcc \
             -DCMAKE_CUDA_ARCHITECTURES=RAPIDS \
             -DBUILD_SHARED_LIBS=OFF \
@@ -56,35 +56,35 @@ scl enable gcc-toolset-${TOOLSET_VERSION} -- \
             -DBUILD_TESTS=OFF \
             -DBUILD_SHARED_LIBS=ON \
             -DCUVS_STATIC_RAPIDS_LIBRARIES=ON
-cmake --build cpp/build/temp -j9
+cmake --build cpp/build -j9
 
 rapids-logger "Begin c build"
 
 scl enable gcc-toolset-${TOOLSET_VERSION} -- \
-      cmake -S c -B c/build/temp \
+      cmake -S c -B c/build \
             -DCMAKE_CUDA_HOST_COMPILER=/opt/rh/gcc-toolset-${TOOLSET_VERSION}/root/usr/bin/gcc \
             -DCUVSC_STATIC_CUVS_LIBRARY=ON \
-            -DCMAKE_PREFIX_PATH="$PWD/cpp/build/temp" \
+            -DCMAKE_PREFIX_PATH="$PWD/cpp/build/" \
             -DBUILD_TESTS=${BUILD_C_LIB_TESTS}
-cmake --build c/build/temp -j9
+cmake --build c/build -j9
 
 rapids-logger "Begin c install"
-cmake --install c/build/temp --prefix c/build/temp/install
+cmake --install c/build --prefix c/build/install
 
 # need to install the tests
 if [ "${BUILD_C_LIB_TESTS}" != "OFF" ]; then
-      cmake --install c/build/temp --prefix c/build/temp/install --component testing
+      cmake --install c/build --prefix c/build/install --component testing
 fi
 
 
 rapids-logger "Begin gathering licenses"
-cp LICENSE c/build/temp/install/
+cp LICENSE c/build/install/
 if [ -e "./tool/extract_licenses_via_spdx.py" ]; then
-      python ./tool/extract_licenses_via_spdx.py "." --with-licenses >> c/build/temp/install/LICENSE
+      python ./tool/extract_licenses_via_spdx.py "." --with-licenses >> c/build/install/LICENSE
 fi
 
 rapids-logger "Begin c tarball creation"
-tar czf libcuvs_c.tar.gz -C c/build/temp/install/ .
+tar czf libcuvs_c.tar.gz -C c/build/install/ .
 ls -lh libcuvs_c.tar.gz
 
 sccache --show-adv-stats
