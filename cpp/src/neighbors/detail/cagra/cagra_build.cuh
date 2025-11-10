@@ -350,37 +350,6 @@ void ace_create_forward_and_backward_lists(
   augmented_partition_offsets(0) = 0;
 }
 
-// ACE: Set index parameters for each partition
-template <typename T, typename IdxT>
-void ace_set_index_params(raft::resources const& res,
-                          cuvs::distance::DistanceType metric,
-                          size_t sub_dataset_size,
-                          size_t dataset_dim,
-                          size_t graph_degree,
-                          size_t intermediate_degree,
-                          bool guarantee_connectivity,
-                          size_t ef_construction,
-                          cuvs::neighbors::cagra::index_params& sub_index_params)
-{
-  // ACE drops the default graph build params and sets the default params based on the partition
-  // size
-  if (sub_dataset_size > 100000) {
-    sub_index_params = cuvs::neighbors::cagra::index_params::from_hnsw_params(
-      raft::make_extents<int64_t>(sub_dataset_size, dataset_dim),
-      graph_degree / 2,
-      ef_construction,
-      cuvs::neighbors::cagra::hnsw_heuristic_type::SAME_GRAPH_FOOTPRINT,
-      metric);
-  } else {
-    sub_index_params.graph_build_params =
-      cuvs::neighbors::cagra::graph_build_params::nn_descent_params(intermediate_degree, metric);
-    sub_index_params.graph_degree              = graph_degree;
-    sub_index_params.intermediate_graph_degree = intermediate_degree;
-  }
-  sub_index_params.attach_dataset_on_build = false;
-  sub_index_params.guarantee_connectivity  = guarantee_connectivity;
-}
-
 // ACE: Gather partition dataset
 template <typename T, typename IdxT>
 void ace_gather_partition_dataset(
@@ -1213,15 +1182,14 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
       // Create index for this partition
       cuvs::neighbors::cagra::index_params sub_index_params;
-      ace_set_index_params<T, IdxT>(res,
-                                    params.metric,
-                                    sub_dataset_size,
-                                    dataset_dim,
-                                    graph_degree,
-                                    intermediate_degree,
-                                    params.guarantee_connectivity,
-                                    ef_construction,
-                                    sub_index_params);
+      sub_index_params = cuvs::neighbors::cagra::index_params::from_hnsw_params(
+        raft::make_extents<int64_t>(sub_dataset_size, dataset_dim),
+        graph_degree / 2,
+        ef_construction,
+        cuvs::neighbors::cagra::hnsw_heuristic_type::SAME_GRAPH_FOOTPRINT,
+        params.metric);
+      sub_index_params.attach_dataset_on_build = false;
+      sub_index_params.guarantee_connectivity  = params.guarantee_connectivity;
 
       auto sub_index = cuvs::neighbors::cagra::build(
         res, sub_index_params, raft::make_const_mdspan(sub_dataset.view()));
