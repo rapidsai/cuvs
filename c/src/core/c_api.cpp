@@ -124,7 +124,7 @@ extern "C" cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t byte
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
     auto mr      = rmm::mr::get_current_device_resource();
-    *ptr         = mr->allocate(bytes, raft::resource::get_cuda_stream(*res_ptr));
+    *ptr         = mr->allocate(raft::resource::get_cuda_stream(*res_ptr), bytes);
   });
 }
 
@@ -133,7 +133,7 @@ extern "C" cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes)
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
     auto mr      = rmm::mr::get_current_device_resource();
-    mr->deallocate(ptr, bytes, raft::resource::get_cuda_stream(*res_ptr));
+    mr->deallocate(raft::resource::get_cuda_stream(*res_ptr), ptr, bytes);
   });
 }
 
@@ -187,13 +187,13 @@ extern "C" cuvsError_t cuvsRMMHostAlloc(void** ptr, size_t bytes)
 {
   return cuvs::core::translate_exceptions([=] {
     if (pinned_mr == nullptr) { pinned_mr = std::make_unique<rmm::mr::pinned_host_memory_resource>(); }
-    *ptr = pinned_mr->allocate(bytes);
+    *ptr = pinned_mr->allocate_sync(bytes);
   });
 }
 
 extern "C" cuvsError_t cuvsRMMHostFree(void* ptr, size_t bytes)
 {
-  return cuvs::core::translate_exceptions([=] { pinned_mr->deallocate(ptr, bytes); });
+  return cuvs::core::translate_exceptions([=] { pinned_mr->deallocate_sync(ptr, bytes); });
 }
 
 thread_local std::string last_error_text = "";
