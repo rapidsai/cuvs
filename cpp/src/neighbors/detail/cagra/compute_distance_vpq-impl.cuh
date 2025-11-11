@@ -214,7 +214,8 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
           smem_val_pack_t buf;
 #pragma unroll
           for (uint32_t k = 0; k < num_packed_elements; k++) {
-            buf.data.x1[k] = static_cast<smem_val_t>(static_cast<float>(r->pq_code_book_ptr()[k]));
+            buf.data.x1[k] =
+              static_cast<smem_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + k]));
           }
           device::sts(codebook_buf + smem_index * sizeof(smem_val_pack_uint_t), buf.as_uint());
         }
