@@ -32,6 +32,7 @@
 
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
+#include <raft/core/resource/device_properties.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
 #include <raft/linalg/add.cuh>
 #include <raft/linalg/gemm.cuh>
@@ -66,30 +67,22 @@ namespace cuvs::cluster::kmeans::detail {
 constexpr static inline float kAdjustCentersWeight = 7.0f;
 
 template <typename MathT, typename IdxT, typename LabelT>
-bool use_fused(IdxT m, IdxT n, IdxT k)
+bool use_fused(const raft::resources& handle, IdxT m, IdxT n, IdxT k)
 {
-  // TODO: @tfeher Try using helpers from Try using the helpers from raft/util/arch.cuh
-  // https://github.com/rapidsai/cuvs/blob/1155a3a427cd1d1bfaf8fe74a937ed6dfa797ec7/cpp/src/neighbors/detail/nn_descent.cuh#L1210-L1222
-  /*#if __CUDA_ARCH__ > 800
-    // Use fused if unfused workspace size is great than 100 MB
-    if (size_t(m) * n * sizeof(MathT) > 100 * 1024 * 1024) {
-      return true;
-    } else {
-      return false;
-    }
-  #else
+  cudaDeviceProp prop;
+  prop = raft::resource::get_device_properties(handle);
+  if (prop.major <= 8) {
+    // Use fused for Ampere or before
     return true;
-  #endif*/
-  static bool init_done = false;
-  static bool ret       = true;
-
-  if (init_done == false) {
-    const char* NV_DEBUG = getenv("NV_DEBUG");
-    if (strcmp(NV_DEBUG, "unfused") == 0) { ret = false; }
-    if (strcmp(NV_DEBUG, "fused") == 0) { ret = true; }
-    init_done = true;
+  } else if (prop.major == 9 && (m >= 4096 || n >= 4096)) {
+    // On Hopper if m, n are bigger than 4096, use fused
+    return true;
+  } else if (prop.major >= 12) {
+    // On Blackwell onwards, use unfused
+    return false;
   }
-  return ret;
+  return false;
+
 }
 
 /**
@@ -162,7 +155,7 @@ inline std::enable_if_t<std::is_floating_point_v<MathT>> predict_core(
                        "_" + std::to_string(dim) + "_" + std::to_string(sizeof(MathT));
   nvtxRangePushA(result.c_str());
   auto stream           = raft::resource::get_cuda_stream(handle);
-  bool should_use_fused = use_fused<MathT, IdxT, LabelT>(n_rows, n_clusters, dim);
+  bool should_use_fused = use_fused<MathT, IdxT, LabelT>(handle, n_rows, n_clusters, dim);
 
   switch (params.metric) {
     case cuvs::distance::DistanceType::L2Expanded:
