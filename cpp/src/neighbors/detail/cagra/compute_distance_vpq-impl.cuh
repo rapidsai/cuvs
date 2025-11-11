@@ -15,19 +15,25 @@
 
 namespace cuvs::neighbors::cagra::detail {
 
-template <uint32_t PQ_LEN>
-struct smem_val_type_t {
-  using smem_val_pack_t                         = device::fp8xN<PQ_LEN, 5>;
-  using smem_val_t                              = typename smem_val_pack_t::unit_t;
-  using smem_val_pack_uint_t                    = typename smem_val_pack_t::uint_t;
-  static constexpr uint32_t num_packed_elements = smem_val_pack_t::num_elements;
-};
-template <>
-struct smem_val_type_t<2> {
+template <uint32_t PQ_LEN, bool EnableFP8, class Enable = void>
+struct smem_val_type_t;
+
+template <uint32_t PQ_LEN, bool EnableFP8>
+struct smem_val_type_t<PQ_LEN, EnableFP8, std::enable_if_t<PQ_LEN == 2 || !EnableFP8>> {
   using smem_val_pack_t                         = half2;
   using smem_val_t                              = half;
   using smem_val_pack_uint_t                    = uint32_t;
   static constexpr uint32_t num_packed_elements = 2;
+};
+
+template <uint32_t PQ_LEN, bool EnableFP8>
+struct smem_val_type_t<PQ_LEN,
+                       EnableFP8,
+                       std::enable_if_t<(PQ_LEN == 4 || PQ_LEN == 8) && EnableFP8>> {
+  using smem_val_pack_t                         = device::fp8xN<PQ_LEN, 5>;
+  using smem_val_t                              = typename smem_val_pack_t::unit_t;
+  using smem_val_pack_uint_t                    = typename smem_val_pack_t::uint_t;
+  static constexpr uint32_t num_packed_elements = smem_val_pack_t::num_elements;
 };
 
 template <cuvs::distance::DistanceType Metric,
@@ -38,7 +44,8 @@ template <cuvs::distance::DistanceType Metric,
           typename CodebookT,
           typename DataT,
           typename IndexT,
-          typename DistanceT>
+          typename DistanceT,
+          bool EnableFP8 = true>
 struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, IndexT, DistanceT> {
   using base_type   = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
   using CODE_BOOK_T = CodebookT;
@@ -57,6 +64,7 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
   constexpr static inline auto kDatasetBlockDim = DatasetBlockDim;
   constexpr static inline auto kPqBits          = PQ_BITS;
   constexpr static inline auto kPqLen           = PQ_LEN;
+  constexpr static inline auto kEnableFP8       = EnableFP8;
 
   static_assert(std::is_same_v<CODE_BOOK_T, half>, "Only CODE_BOOK_T = `half` is supported now");
 
@@ -101,8 +109,8 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
 
   static constexpr std::uint32_t kSMemCodeBookSizeInBytes =
     (1 << PQ_BITS) * PQ_LEN *
-    utils::size_of<typename smem_val_type_t<PQ_LEN>::smem_val_pack_uint_t>() /
-    smem_val_type_t<PQ_LEN>::num_packed_elements;
+    utils::size_of<typename smem_val_type_t<PQ_LEN, EnableFP8>::smem_val_pack_uint_t>() /
+    smem_val_type_t<PQ_LEN, EnableFP8>::num_packed_elements;
 
   _RAFT_HOST_DEVICE cagra_q_dataset_descriptor_t(setup_workspace_type* setup_workspace_impl,
                                                  compute_distance_type* compute_distance_impl,
@@ -137,8 +145,8 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
     */
     return sizeof(cagra_q_dataset_descriptor_t) + kSMemCodeBookSizeInBytes +
            raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) *
-             utils::size_of<typename smem_val_type_t<PQ_LEN>::smem_val_pack_uint_t>() /
-             smem_val_type_t<PQ_LEN>::num_packed_elements;
+             utils::size_of<typename smem_val_type_t<PQ_LEN, EnableFP8>::smem_val_pack_uint_t>() /
+             smem_val_type_t<PQ_LEN, EnableFP8>::num_packed_elements;
   }
 };
 
@@ -164,7 +172,8 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
   constexpr auto kDatasetBlockDim    = DescriptorT::kDatasetBlockDim;
   constexpr auto PQ_BITS             = DescriptorT::kPqBits;
   constexpr auto PQ_LEN              = DescriptorT::kPqLen;
-  using smem_val_config              = smem_val_type_t<PQ_LEN>;
+  constexpr auto EnableFP8           = DescriptorT::kEnableFP8;
+  using smem_val_config              = smem_val_type_t<PQ_LEN, EnableFP8>;
   using smem_val_t                   = typename smem_val_config::smem_val_t;
   using smem_val_pack_uint_t         = typename smem_val_config::smem_val_pack_uint_t;
   using smem_val_pack_t              = typename smem_val_config::smem_val_pack_t;
@@ -277,9 +286,10 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
   constexpr auto DatasetBlockDim = DescriptorT::kDatasetBlockDim;
   constexpr auto PQ_BITS         = DescriptorT::kPqBits;
   constexpr auto PQ_LEN          = DescriptorT::kPqLen;
+  constexpr auto EnableFP8       = DescriptorT::kEnableFP8;
   using PQ_CODEBOOK_LOAD_T       = uint32_t;
 
-  using smem_val_config                  = smem_val_type_t<PQ_LEN>;
+  using smem_val_config                  = smem_val_type_t<PQ_LEN, EnableFP8>;
   using smem_val_t                       = typename smem_val_config::smem_val_t;
   using smem_val_pack_uint_t             = typename smem_val_config::smem_val_pack_uint_t;
   using smem_val_pack_t                  = typename smem_val_config::smem_val_pack_t;
