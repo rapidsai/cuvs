@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include "../../ivf_pq/ivf_pq_fp_8bit.cuh"
 #include "compute_distance_vpq.hpp"
 
 #include <cuvs/distance/distance.hpp>
@@ -17,25 +16,18 @@
 namespace cuvs::neighbors::cagra::detail {
 
 template <uint32_t PQ_LEN>
-struct pq_val_type_t {
-  using pq_val_pack_t                                = half2;
-  using pq_val_t                                     = half;
-  using pq_val_pack_uint_t                           = uint32_t;
-  static constexpr uint32_t pq_val_pack_num_elements = 2;
+struct smem_val_type_t {
+  using smem_val_pack_t                         = device::fp8xN<PQ_LEN, 5>;
+  using smem_val_t                              = typename smem_val_pack_t::unit_t;
+  using smem_val_pack_uint_t                    = typename smem_val_pack_t::uint_t;
+  static constexpr uint32_t num_packed_elements = smem_val_pack_t::num_elements;
 };
 template <>
-struct pq_val_type_t<4> {
-  using pq_val_pack_t                                = ivf_pq::detail::fp_8bit4<5, true, false>;
-  using pq_val_t                                     = typename pq_val_pack_t::unit_t;
-  using pq_val_pack_uint_t                           = typename pq_val_pack_t::uint_t;
-  static constexpr uint32_t pq_val_pack_num_elements = pq_val_pack_t::num_elements;
-};
-template <>
-struct pq_val_type_t<8> {
-  using pq_val_pack_t                                = ivf_pq::detail::fp_8bit8<5, true, false>;
-  using pq_val_t                                     = typename pq_val_pack_t::unit_t;
-  using pq_val_pack_uint_t                           = typename pq_val_pack_t::uint_t;
-  static constexpr uint32_t pq_val_pack_num_elements = pq_val_pack_t::num_elements;
+struct smem_val_type_t<2> {
+  using smem_val_pack_t                         = half2;
+  using smem_val_t                              = half;
+  using smem_val_pack_uint_t                    = uint32_t;
+  static constexpr uint32_t num_packed_elements = 2;
 };
 
 template <cuvs::distance::DistanceType Metric,
@@ -108,8 +100,9 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
   }
 
   static constexpr std::uint32_t kSMemCodeBookSizeInBytes =
-    (1 << PQ_BITS) * PQ_LEN * utils::size_of<typename pq_val_type_t<PQ_LEN>::pq_val_pack_uint_t>() /
-    pq_val_type_t<PQ_LEN>::pq_val_pack_num_elements;
+    (1 << PQ_BITS) * PQ_LEN *
+    utils::size_of<typename smem_val_type_t<PQ_LEN>::smem_val_pack_uint_t>() /
+    smem_val_type_t<PQ_LEN>::num_packed_elements;
 
   _RAFT_HOST_DEVICE cagra_q_dataset_descriptor_t(setup_workspace_type* setup_workspace_impl,
                                                  compute_distance_type* compute_distance_impl,
@@ -144,8 +137,8 @@ struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, In
     */
     return sizeof(cagra_q_dataset_descriptor_t) + kSMemCodeBookSizeInBytes +
            raft::round_up_safe<uint32_t>(dim, DatasetBlockDim) *
-             utils::size_of<typename pq_val_type_t<PQ_LEN>::pq_val_pack_uint_t>() /
-             pq_val_type_t<PQ_LEN>::pq_val_pack_num_elements;
+             utils::size_of<typename smem_val_type_t<PQ_LEN>::smem_val_pack_uint_t>() /
+             smem_val_type_t<PQ_LEN>::num_packed_elements;
   }
 };
 
@@ -165,17 +158,17 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
                                                    const typename DescriptorT::DATA_T* queries_ptr,
                                                    uint32_t query_id) -> const DescriptorT*
 {
-  using QUERY_T                           = typename DescriptorT::QUERY_T;
-  using CODE_BOOK_T                       = typename DescriptorT::CODE_BOOK_T;
-  using word_type                         = uint32_t;
-  constexpr auto kDatasetBlockDim         = DescriptorT::kDatasetBlockDim;
-  constexpr auto PQ_BITS                  = DescriptorT::kPqBits;
-  constexpr auto PQ_LEN                   = DescriptorT::kPqLen;
-  using pq_val_config                     = pq_val_type_t<PQ_LEN>;
-  using pq_val_t                          = typename pq_val_config::pq_val_t;
-  using pq_val_pack_uint_t                = typename pq_val_config::pq_val_pack_uint_t;
-  using pq_val_pack_t                     = typename pq_val_config::pq_val_pack_t;
-  constexpr auto pq_val_pack_num_elements = pq_val_config::pq_val_pack_num_elements;
+  using QUERY_T                      = typename DescriptorT::QUERY_T;
+  using CODE_BOOK_T                  = typename DescriptorT::CODE_BOOK_T;
+  using word_type                    = uint32_t;
+  constexpr auto kDatasetBlockDim    = DescriptorT::kDatasetBlockDim;
+  constexpr auto PQ_BITS             = DescriptorT::kPqBits;
+  constexpr auto PQ_LEN              = DescriptorT::kPqLen;
+  using smem_val_config              = smem_val_type_t<PQ_LEN>;
+  using smem_val_t                   = typename smem_val_config::smem_val_t;
+  using smem_val_pack_uint_t         = typename smem_val_config::smem_val_pack_uint_t;
+  using smem_val_pack_t              = typename smem_val_config::smem_val_pack_t;
+  constexpr auto num_packed_elements = smem_val_config::num_packed_elements;
 
   auto* r = reinterpret_cast<DescriptorT*>(smem_ptr);
 
@@ -197,14 +190,14 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
     __syncthreads();
 
     // Copy PQ table
-    for (unsigned i = threadIdx.x * pq_val_config::pq_val_pack_num_elements;
+    for (unsigned i = threadIdx.x * smem_val_config::num_packed_elements;
          i < (1 << PQ_BITS) * PQ_LEN;
-         i += blockDim.x * pq_val_config::pq_val_pack_num_elements) {
+         i += blockDim.x * smem_val_config::num_packed_elements) {
       // Change the order of PQ code book array to reduce the
       // frequency of bank conflicts.
       constexpr auto num_elements_per_bank =
-        pq_val_config::pq_val_pack_num_elements /
-        (utils::size_of<pq_val_config::pq_val_pack_uint_t>() / utils::size_of<uint32_t>());
+        smem_val_config::num_packed_elements /
+        (utils::size_of<smem_val_config::smem_val_pack_uint_t>() / utils::size_of<uint32_t>());
 
       if constexpr (PQ_LEN >= num_elements_per_bank) {  // safety
         constexpr auto num_banks_per_subspace = PQ_LEN / num_elements_per_bank;
@@ -212,29 +205,39 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
         const auto smem_index =
           (j / num_banks_per_subspace) + (j % num_banks_per_subspace) * (1 << PQ_BITS);
 
-        if constexpr (pq_val_pack_num_elements == 2) {
+        if constexpr (num_packed_elements == 2) {
           half2 buf2;
           buf2.x = r->pq_code_book_ptr()[i];
           buf2.y = r->pq_code_book_ptr()[i + 1];
-          device::sts(codebook_buf + smem_index * sizeof(pq_val_pack_t), buf2);
-        } else if constexpr (pq_val_pack_num_elements == 4) {
-          pq_val_pack_t buf4;
-          buf4.data.x1[0] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i]));
-          buf4.data.x1[1] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 1]));
-          buf4.data.x1[2] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 2]));
-          buf4.data.x1[3] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 3]));
-          device::sts(codebook_buf + smem_index * sizeof(pq_val_pack_uint_t), buf4.as_uint());
-        } else if constexpr (pq_val_pack_num_elements == 8) {
-          pq_val_pack_t buf8;
-          buf8.data.x1[0] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i]));
-          buf8.data.x1[1] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 1]));
-          buf8.data.x1[2] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 2]));
-          buf8.data.x1[3] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 3]));
-          buf8.data.x1[4] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 4]));
-          buf8.data.x1[5] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 5]));
-          buf8.data.x1[6] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 6]));
-          buf8.data.x1[7] = static_cast<pq_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 7]));
-          device::sts(codebook_buf + smem_index * sizeof(pq_val_pack_uint_t), buf8.as_uint());
+          device::sts(codebook_buf + smem_index * sizeof(smem_val_pack_t), buf2);
+        } else if constexpr (num_packed_elements == 4) {
+          smem_val_pack_t buf4;
+          buf4.data.x1[0] = static_cast<smem_val_t>(static_cast<float>(r->pq_code_book_ptr()[i]));
+          buf4.data.x1[1] =
+            static_cast<smem_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 1]));
+          buf4.data.x1[2] =
+            static_cast<smem_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 2]));
+          buf4.data.x1[3] =
+            static_cast<smem_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 3]));
+          device::sts(codebook_buf + smem_index * sizeof(smem_val_pack_uint_t), buf4.as_uint());
+        } else if constexpr (num_packed_elements == 8) {
+          smem_val_pack_t buf8;
+          buf8.data.x1[0] = static_cast<smem_val_t>(static_cast<float>(r->pq_code_book_ptr()[i]));
+          buf8.data.x1[1] =
+            static_cast<smem_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 1]));
+          buf8.data.x1[2] =
+            static_cast<smem_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 2]));
+          buf8.data.x1[3] =
+            static_cast<smem_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 3]));
+          buf8.data.x1[4] =
+            static_cast<smem_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 4]));
+          buf8.data.x1[5] =
+            static_cast<smem_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 5]));
+          buf8.data.x1[6] =
+            static_cast<smem_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 6]));
+          buf8.data.x1[7] =
+            static_cast<smem_val_t>(static_cast<float>(r->pq_code_book_ptr()[i + 7]));
+          device::sts(codebook_buf + smem_index * sizeof(smem_val_pack_uint_t), buf8.as_uint());
         }
       }
     }
@@ -245,65 +248,65 @@ _RAFT_DEVICE __noinline__ auto setup_workspace_vpq(const DescriptorT* that,
 
   constexpr cuvs::spatial::knn::detail::utils::mapping<QUERY_T> mapping{};
   auto smem_query_ptr =
-    reinterpret_cast<pq_val_t*>(reinterpret_cast<uint8_t*>(smem_ptr) + sizeof(DescriptorT) +
-                                DescriptorT::kSMemCodeBookSizeInBytes);
-  for (unsigned i = threadIdx.x * pq_val_pack_num_elements; i < dim;
-       i += blockDim.x * pq_val_pack_num_elements) {
-    pq_val_pack_t buf;
-    if constexpr (pq_val_config::pq_val_pack_num_elements == 2) {
-      if (i < dim) { static_cast<pq_val_t>(static_cast<float>(buf.x = mapping(queries_ptr[i]))); }
+    reinterpret_cast<smem_val_t*>(reinterpret_cast<uint8_t*>(smem_ptr) + sizeof(DescriptorT) +
+                                  DescriptorT::kSMemCodeBookSizeInBytes);
+  for (unsigned i = threadIdx.x * num_packed_elements; i < dim;
+       i += blockDim.x * num_packed_elements) {
+    smem_val_pack_t buf;
+    if constexpr (smem_val_config::num_packed_elements == 2) {
+      if (i < dim) { static_cast<smem_val_t>(static_cast<float>(buf.x = mapping(queries_ptr[i]))); }
       if (i + 1 < dim) {
-        static_cast<pq_val_t>(static_cast<float>(buf.y = mapping(queries_ptr[i + 1])));
+        static_cast<smem_val_t>(static_cast<float>(buf.y = mapping(queries_ptr[i + 1])));
       }
-    } else if constexpr (pq_val_config::pq_val_pack_num_elements == 4) {
+    } else if constexpr (smem_val_config::num_packed_elements == 4) {
       if (i < dim) {
-        buf.data.x1[0] = static_cast<pq_val_t>(static_cast<float>(mapping(queries_ptr[i])));
+        buf.data.x1[0] = static_cast<smem_val_t>(static_cast<float>(mapping(queries_ptr[i])));
       }
       if (i + 1 < dim) {
-        buf.data.x1[1] = static_cast<pq_val_t>(static_cast<float>(mapping(queries_ptr[i + 1])));
+        buf.data.x1[1] = static_cast<smem_val_t>(static_cast<float>(mapping(queries_ptr[i + 1])));
       }
       if (i + 2 < dim) {
-        buf.data.x1[2] = static_cast<pq_val_t>(static_cast<float>(mapping(queries_ptr[i + 2])));
+        buf.data.x1[2] = static_cast<smem_val_t>(static_cast<float>(mapping(queries_ptr[i + 2])));
       }
       if (i + 3 < dim) {
-        buf.data.x1[3] = static_cast<pq_val_t>(static_cast<float>(mapping(queries_ptr[i + 3])));
+        buf.data.x1[3] = static_cast<smem_val_t>(static_cast<float>(mapping(queries_ptr[i + 3])));
       }
-    } else if constexpr (pq_val_config::pq_val_pack_num_elements == 8) {
+    } else if constexpr (smem_val_config::num_packed_elements == 8) {
       if (i < dim) {
-        buf.data.x1[0] = static_cast<pq_val_t>(static_cast<float>(mapping(queries_ptr[i])));
+        buf.data.x1[0] = static_cast<smem_val_t>(static_cast<float>(mapping(queries_ptr[i])));
       }
       if (i + 1 < dim) {
-        buf.data.x1[1] = static_cast<pq_val_t>(static_cast<float>(mapping(queries_ptr[i + 1])));
+        buf.data.x1[1] = static_cast<smem_val_t>(static_cast<float>(mapping(queries_ptr[i + 1])));
       }
       if (i + 2 < dim) {
-        buf.data.x1[2] = static_cast<pq_val_t>(static_cast<float>(mapping(queries_ptr[i + 2])));
+        buf.data.x1[2] = static_cast<smem_val_t>(static_cast<float>(mapping(queries_ptr[i + 2])));
       }
       if (i + 3 < dim) {
-        buf.data.x1[3] = static_cast<pq_val_t>(static_cast<float>(mapping(queries_ptr[i + 3])));
+        buf.data.x1[3] = static_cast<smem_val_t>(static_cast<float>(mapping(queries_ptr[i + 3])));
       }
       if (i + 4 < dim) {
-        buf.data.x1[4] = static_cast<pq_val_t>(static_cast<float>(mapping(queries_ptr[i + 4])));
+        buf.data.x1[4] = static_cast<smem_val_t>(static_cast<float>(mapping(queries_ptr[i + 4])));
       }
       if (i + 5 < dim) {
-        buf.data.x1[5] = static_cast<pq_val_t>(static_cast<float>(mapping(queries_ptr[i + 5])));
+        buf.data.x1[5] = static_cast<smem_val_t>(static_cast<float>(mapping(queries_ptr[i + 5])));
       }
       if (i + 6 < dim) {
-        buf.data.x1[6] = static_cast<pq_val_t>(static_cast<float>(mapping(queries_ptr[i + 6])));
+        buf.data.x1[6] = static_cast<smem_val_t>(static_cast<float>(mapping(queries_ptr[i + 6])));
       }
       if (i + 7 < dim) {
-        buf.data.x1[7] = static_cast<pq_val_t>(static_cast<float>(mapping(queries_ptr[i + 7])));
+        buf.data.x1[7] = static_cast<smem_val_t>(static_cast<float>(mapping(queries_ptr[i + 7])));
       }
     }
 
-    if constexpr ((PQ_BITS == 8) && (PQ_LEN % pq_val_pack_num_elements == 0)) {
+    if constexpr ((PQ_BITS == 8) && (PQ_LEN % num_packed_elements == 0)) {
       // Transpose the queries buffer to avoid bank conflicts in compute_distance.
       constexpr uint32_t vlen = 4;  // **** DO NOT CHANGE ****
-      constexpr auto kStride  = vlen * PQ_LEN / pq_val_pack_num_elements;
-      reinterpret_cast<pq_val_pack_t*>(
-        smem_query_ptr)[transpose<kDatasetBlockDim / pq_val_pack_num_elements, kStride>(
-        i / pq_val_pack_num_elements)] = buf;
+      constexpr auto kStride  = vlen * PQ_LEN / num_packed_elements;
+      reinterpret_cast<smem_val_pack_t*>(
+        smem_query_ptr)[transpose<kDatasetBlockDim / num_packed_elements, kStride>(
+        i / num_packed_elements)] = buf;
     } else {
-      (reinterpret_cast<pq_val_pack_t*>(smem_query_ptr + i))[0] = buf;
+      (reinterpret_cast<smem_val_pack_t*>(smem_query_ptr + i))[0] = buf;
     }
   }
 
@@ -327,11 +330,11 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
   constexpr auto PQ_LEN          = DescriptorT::kPqLen;
   using PQ_CODEBOOK_LOAD_T       = uint32_t;
 
-  using pq_val_config                         = pq_val_type_t<PQ_LEN>;
-  using pq_val_t                              = typename pq_val_config::pq_val_t;
-  using pq_val_pack_uint_t                    = typename pq_val_config::pq_val_pack_uint_t;
-  using pq_val_pack_t                         = typename pq_val_config::pq_val_pack_t;
-  constexpr uint32_t pq_val_pack_num_elements = pq_val_config::pq_val_pack_num_elements;
+  using smem_val_config                  = smem_val_type_t<PQ_LEN>;
+  using smem_val_t                       = typename smem_val_config::smem_val_t;
+  using smem_val_pack_uint_t             = typename smem_val_config::smem_val_pack_uint_t;
+  using smem_val_pack_t                  = typename smem_val_config::smem_val_pack_t;
+  constexpr uint32_t num_packed_elements = smem_val_config::num_packed_elements;
 
   const uint32_t query_ptr = pq_codebook_ptr + DescriptorT::kSMemCodeBookSizeInBytes;
   static_assert(PQ_BITS == 8, "Only pq_bits == 8 is supported at the moment.");
@@ -364,7 +367,7 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
     }
     //
     if constexpr (PQ_LEN % 2 == 0) {
-      if constexpr (PQ_LEN >= pq_val_pack_num_elements) {  // safety
+      if constexpr (PQ_LEN >= num_packed_elements) {  // safety
         // **** Use half2 for distance computation ****
 #pragma unroll
         for (std::uint32_t e = 0; e < nelem; e++) {
@@ -384,52 +387,51 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
           for (std::uint32_t v = 0; v < vlen; v++) {
             if (PQ_LEN * (v + k) >= dim) break;
 #pragma unroll
-            for (std::uint32_t m = 0; m < PQ_LEN / pq_val_pack_num_elements; m++) {
+            for (std::uint32_t m = 0; m < PQ_LEN / num_packed_elements; m++) {
               constexpr uint32_t vq_val_pack_num_elements = 2;
               constexpr auto kQueryBlock                  = DatasetBlockDim / (vlen * PQ_LEN);
-              std::uint32_t vq_half2_index =
-                m * (pq_val_pack_num_elements / vq_val_pack_num_elements) +
-                (PQ_LEN / vq_val_pack_num_elements) * v;
+              std::uint32_t vq_half2_index = m * (num_packed_elements / vq_val_pack_num_elements) +
+                                             (PQ_LEN / vq_val_pack_num_elements) * v;
 
               uint32_t query_val_index;
               if constexpr (PQ_LEN == 2) {
                 query_val_index =
                   vq_half2_index * kQueryBlock + elem_offset * (PQ_LEN / 2) + e * TeamSize + laneId;
-              } else if constexpr (PQ_LEN == pq_val_pack_num_elements) {
+              } else if constexpr (PQ_LEN == num_packed_elements) {
                 query_val_index = elem_offset +
-                                  v * (DatasetBlockDim / (pq_val_pack_num_elements * vlen)) +
+                                  v * (DatasetBlockDim / (num_packed_elements * vlen)) +
                                   e * TeamSize + laneId;
               } else {
                 const uint32_t query_vec_element_id =
                   (elem_offset + e * vlen * TeamSize + v + laneId * vlen) * PQ_LEN /
-                  pq_val_pack_num_elements;
-                constexpr auto kStride = vlen * PQ_LEN / pq_val_pack_num_elements;
-                query_val_index = transpose<DatasetBlockDim / pq_val_pack_num_elements, kStride>(
-                  query_vec_element_id);
+                  num_packed_elements;
+                constexpr auto kStride = vlen * PQ_LEN / num_packed_elements;
+                query_val_index =
+                  transpose<DatasetBlockDim / num_packed_elements, kStride>(query_vec_element_id);
               }
 
-              if constexpr (pq_val_pack_num_elements == 2) {
-                pq_val_pack_t c2, q2;
+              if constexpr (num_packed_elements == 2) {
+                smem_val_pack_t c2, q2;
                 // Loading PQ code book from smem
                 device::lds(c2,
-                            pq_codebook_ptr + sizeof(pq_val_pack_uint_t) *
+                            pq_codebook_ptr + sizeof(smem_val_pack_uint_t) *
                                                 ((1 << PQ_BITS) * m + ((pq_code & 0xff))));
 
                 // Loading query vector from smem
-                device::lds(q2, query_ptr + sizeof(pq_val_pack_t) * query_val_index);
+                device::lds(q2, query_ptr + sizeof(smem_val_pack_t) * query_val_index);
                 // L2 distance
                 auto dist =
                   q2 - c2 - reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[vq_half2_index];
                 dist = dist * dist;
                 norm += static_cast<DISTANCE_T>(dist.x + dist.y);
-              } else if constexpr (pq_val_pack_num_elements == 4) {
-                pq_val_pack_t c_vec, q_vec;
+              } else if constexpr (num_packed_elements == 4) {
+                smem_val_pack_t c_vec, q_vec;
                 // Loading PQ code book from smem
                 device::lds(c_vec.as_uint(),
-                            pq_codebook_ptr + sizeof(pq_val_pack_uint_t) *
+                            pq_codebook_ptr + sizeof(smem_val_pack_uint_t) *
                                                 ((1 << PQ_BITS) * m + ((pq_code & 0xff))));
                 device::lds(q_vec.as_uint(),
-                            query_ptr + sizeof(pq_val_pack_uint_t) * query_val_index);
+                            query_ptr + sizeof(smem_val_pack_uint_t) * query_val_index);
 
                 half2 c2_, q2_;
 
@@ -450,14 +452,14 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
                        reinterpret_cast<half2(&)[PQ_LEN * vlen / 2]>(vq_vals)[vq_half2_index];
                 dist = dist * dist;
                 norm += static_cast<DISTANCE_T>(dist.x + dist.y);
-              } else if constexpr (pq_val_pack_num_elements == 8) {
-                pq_val_pack_t c_vec, q_vec;
+              } else if constexpr (num_packed_elements == 8) {
+                smem_val_pack_t c_vec, q_vec;
                 // Loading PQ code book from smem
                 device::lds(c_vec.as_uint(),
-                            pq_codebook_ptr + sizeof(pq_val_pack_uint_t) *
+                            pq_codebook_ptr + sizeof(smem_val_pack_uint_t) *
                                                 ((1 << PQ_BITS) * m + ((pq_code & 0xff))));
                 device::lds(q_vec.as_uint(),
-                            query_ptr + sizeof(pq_val_pack_uint_t) * query_val_index);
+                            query_ptr + sizeof(smem_val_pack_uint_t) * query_val_index);
                 half2 c2_, q2_;
 
                 // Loading query vector from smem
@@ -521,8 +523,8 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
 #pragma unroll
         for (std::uint32_t v = 0; v < vlen; v++) {
           if (PQ_LEN * (v + k) >= dim) break;
-          CODE_BOOK_T pq_vals[PQ_LEN];
-          device::lds(pq_vals, pq_codebook_ptr + sizeof(CODE_BOOK_T) * PQ_LEN * (pq_code & 0xff));
+          CODE_BOOK_T smem_vals[PQ_LEN];
+          device::lds(smem_vals, pq_codebook_ptr + sizeof(CODE_BOOK_T) * PQ_LEN * (pq_code & 0xff));
 #pragma unroll
           for (std::uint32_t m = 0; m < PQ_LEN; m++) {
             const std::uint32_t d1 = m + (PQ_LEN * v);
@@ -530,7 +532,7 @@ _RAFT_DEVICE RAFT_DEVICE_INLINE_FUNCTION auto compute_distance_vpq_worker(
             // if (d >= dataset_dim) break;
             DISTANCE_T diff;
             device::lds(diff, query_ptr + sizeof(QUERY_T) * d);
-            diff -= static_cast<DISTANCE_T>(pq_vals[m]);
+            diff -= static_cast<DISTANCE_T>(smem_vals[m]);
             diff -=
               static_cast<DISTANCE_T>(reinterpret_cast<CODE_BOOK_T(&)[PQ_LEN * vlen]>(vq_vals)[d1]);
             norm += diff * diff;
