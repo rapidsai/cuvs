@@ -94,15 +94,14 @@ void build(const raft::resources& clique,
 
     index.ann_interfaces_.resize(index.num_ranks_);
 
-    // Enable nested parallelism: build uses OpenMP internally
+    // Enable nested parallelism
     int saved_omp_threads = omp_get_max_threads();
-    int threads_per_rank  = saved_omp_threads / index.num_ranks_;
+    int threads_per_rank  = std::max(1, saved_omp_threads / index.num_ranks_);
     omp_set_nested(1);
-    omp_set_num_threads(index.num_ranks_);
 
-#pragma omp parallel for
+#pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
-      // Each rank thread gets its share of CPU threads for internal parallelism
+      // Set thread limit for this rank's nested OpenMP regions
       omp_set_num_threads(threads_per_rank);
 
       const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
@@ -122,15 +121,14 @@ void build(const raft::resources& clique,
 
     index.ann_interfaces_.resize(index.num_ranks_);
 
-    // Enable nested parallelism: build uses OpenMP internally
+    // Enable nested parallelism
     int saved_omp_threads = omp_get_max_threads();
-    int threads_per_rank  = saved_omp_threads / index.num_ranks_;
+    int threads_per_rank  = std::max(1, saved_omp_threads / index.num_ranks_);
     omp_set_nested(1);
-    omp_set_num_threads(index.num_ranks_);
 
-#pragma omp parallel for
+#pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
-      // Each rank thread gets its share of CPU threads for internal parallelism
+      // Set thread limit for this rank's nested OpenMP regions
       omp_set_num_threads(threads_per_rank);
 
       const raft::resources& dev_res  = raft::resource::set_current_device_to_rank(clique, rank);
