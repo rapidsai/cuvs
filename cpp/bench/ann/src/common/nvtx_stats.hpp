@@ -15,6 +15,7 @@
 #include <climits>
 #include <cstdio>
 #include <cstring>
+#include <deque>
 #include <fstream>
 #include <map>
 #include <mutex>
@@ -113,112 +114,132 @@ extract_cpu_gpu_stats(sqlite3* db,
 
   if (activity_tables.empty()) { return {cpu_times, gpu_times}; }
 
-  // Build union subquery for all GPU activity tables
+  // Build union query for GPU activities
   std::string gpu_union = "(";
   for (size_t i = 0; i < activity_tables.size(); ++i) {
-    if (i > 0) gpu_union += " UNION ALL \n";
-    gpu_union +=
-      "SELECT correlationId, start as gpu_start, end as gpu_end FROM " + activity_tables[i] + "\n";
+    if (i > 0) gpu_union += " UNION ALL ";
+    gpu_union += "SELECT correlationId, start, end FROM " + activity_tables[i];
   }
   gpu_union += ")";
 
-  // Comprehensive query: aggregates CPU times and GPU times together
-  // Optimized by:
-  // 1. Pre-computing strip_params once with ROWID tracking
-  // 2. Computing CPU times separately (no joins, very fast)
-  // 3. Pre-joining RUNTIME with GPU activities before range join
-  // 4. Using ROWID-based grouping to avoid redundant operations
-  // This approach is ~14x faster than the naive double-GROUP-BY approach
-  std::string comprehensive_query =
-    "WITH nvtx_base AS ( \n"
-    "  SELECT \n"
-    "    ROWID as id, \n"
-    "    globalTid, \n"
-    "    start, \n"
-    "    end, \n"
-    "    text as full_name \n"
-    "  FROM NVTX_EVENTS \n"
-    "  WHERE end IS NOT NULL \n"
-    "    AND eventType = 59 \n"
-    "    AND domainId != ? \n"
-    "    AND full_name IS NOT NULL \n"
-    "), \n"
-    "cpu_times AS ( \n"
-    "  SELECT \n"
-    "    full_name, \n"
-    "    SUM(end - start) as total_cpu_duration \n"
-    "  FROM nvtx_base \n"
-    "  GROUP BY full_name \n"
-    "), \n"
-    "gpu_activities AS ( \n"
-    "  SELECT correlationId, MIN(gpu_start) as gpu_start, MAX(gpu_end) as gpu_end \n"
-    "  FROM " +
+  // Accumulate times by base_name
+  std::map<std::string, int64_t> cpu_ns;
+  std::map<std::string, int64_t> gpu_ns;
+
+  // Query 1: NVTX events sorted by start, then end
+  const char* nvtx_query =
+    "SELECT start, end, globalTid, strip_params(text) "
+    "FROM NVTX_EVENTS "
+    "WHERE end IS NOT NULL "
+    "  AND eventType = 59 "
+    "  AND domainId != ? "
+    "  AND strip_params(text) IS NOT NULL "
+    "ORDER BY start, end";
+
+  // Query 2: Runtime+GPU events sorted by start, then end
+  std::string runtime_query =
+    "SELECT r.start, r.end, r.globalTid, MIN(ga.start), MAX(ga.end) "
+    "FROM CUPTI_ACTIVITY_KIND_RUNTIME r "
+    "INNER JOIN (" +
     gpu_union +
-    " \n"
-    "  GROUP BY correlationId \n"
-    "), \n"
-    "runtime_gpu AS ( \n"
-    "  SELECT \n"
-    "    r.globalTid, \n"
-    "    r.start as rt_start, \n"
-    "    r.end as rt_end, \n"
-    "    ga.gpu_start, \n"
-    "    ga.gpu_end \n"
-    "  FROM CUPTI_ACTIVITY_KIND_RUNTIME r \n"
-    "  INNER JOIN gpu_activities ga ON r.correlationId = ga.correlationId \n"
-    "), \n"
-    "gpu_per_nvtx AS ( \n"
-    "  SELECT \n"
-    "    nb.id, \n"
-    "    nb.full_name, \n"
-    "    MAX(rg.gpu_end) - MIN(rg.gpu_start) as gpu_duration \n"
-    "  FROM nvtx_base nb \n"
-    "  LEFT JOIN runtime_gpu rg \n"
-    "     ON rg.globalTid = nb.globalTid AND rg.rt_start >= nb.start AND rg.rt_end <= nb.end \n"
-    "  GROUP BY nb.id, nb.full_name \n"
-    "), \n"
-    "gpu_times AS ( \n"
-    "  SELECT \n"
-    "    full_name, \n"
-    "    SUM(COALESCE(gpu_duration, 0)) as total_gpu_duration \n"
-    "  FROM gpu_per_nvtx \n"
-    "  GROUP BY full_name \n"
-    "), \n"
-    "merged_times AS (SELECT \n"
-    "  ct.full_name as full_name, \n"
-    "  ct.total_cpu_duration, \n"
-    "  COALESCE(gt.total_gpu_duration, 0) as total_gpu_duration \n"
-    "FROM cpu_times ct \n"
-    "LEFT JOIN gpu_times gt ON ct.full_name = gt.full_name \n"
-    ") \n"
-    "SELECT \n"
-    "  strip_params(full_name) as base_name, \n"
-    "  SUM(total_cpu_duration) as total_cpu_duration, \n"
-    "  SUM(total_gpu_duration) as total_gpu_duration \n"
-    "FROM merged_times \n"
-    "GROUP BY base_name \n"
-    "ORDER BY total_cpu_duration DESC";
-  sqlite3_stmt* stmt = nullptr;
-  int rc             = sqlite3_prepare_v2(db, comprehensive_query.c_str(), -1, &stmt, nullptr);
+    ") ga ON r.correlationId = ga.correlationId "
+    "GROUP BY r.start, r.end, r.globalTid, r.correlationId "
+    "ORDER BY r.start, r.end";
 
-  if (rc == SQLITE_OK) {
-    sqlite3_bind_int64(stmt, 1, algo_bench_domain_id);
+  sqlite3_stmt* nvtx_stmt    = nullptr;
+  sqlite3_stmt* runtime_stmt = nullptr;
 
-    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-      const char* base_name_ptr = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-      std::string base_name     = base_name_ptr ? base_name_ptr : "";
-      int64_t cpu_duration_ns   = sqlite3_column_int64(stmt, 1);
+  if (sqlite3_prepare_v2(db, nvtx_query, -1, &nvtx_stmt, nullptr) != SQLITE_OK) {
+    return {cpu_times, gpu_times};
+  }
+  sqlite3_bind_int64(nvtx_stmt, 1, algo_bench_domain_id);
 
-      // Store CPU time (already summed by SQL)
-      cpu_times[base_name] = cpu_duration_ns / 1e9;
+  if (sqlite3_prepare_v2(db, runtime_query.c_str(), -1, &runtime_stmt, nullptr) != SQLITE_OK) {
+    sqlite3_finalize(nvtx_stmt);
+    return {cpu_times, gpu_times};
+  }
 
-      // Store GPU time if available (already summed by SQL)
-      if (sqlite3_column_type(stmt, 2) != SQLITE_NULL) {
-        int64_t gpu_duration_ns = sqlite3_column_int64(stmt, 2);
-        if (gpu_duration_ns > 0) { gpu_times[base_name] = gpu_duration_ns / 1e9; }
+  // Structure to hold runtime events in a sliding window queue
+  struct RuntimeEvent {
+    int64_t rt_start;
+    int64_t rt_end;
+    int64_t globalTid;
+    int64_t gpu_start;
+    int64_t gpu_end;
+  };
+  std::deque<RuntimeEvent> runtime_queue;
+  bool runtime_exhausted = false;
+
+  // Process each NVTX event
+  while (sqlite3_step(nvtx_stmt) == SQLITE_ROW) {
+    int64_t nvtx_start    = sqlite3_column_int64(nvtx_stmt, 0);
+    int64_t nvtx_end      = sqlite3_column_int64(nvtx_stmt, 1);
+    int64_t nvtx_tid      = sqlite3_column_int64(nvtx_stmt, 2);
+    const char* name      = reinterpret_cast<const char*>(sqlite3_column_text(nvtx_stmt, 3));
+    std::string base_name = name ? name : "";
+
+    // Accumulate CPU time
+    cpu_ns[base_name] += (nvtx_end - nvtx_start);
+
+    // Remove runtime events that start before this NVTX event starts
+    // (they can't match this or any future NVTX events since NVTX is sorted)
+    while (!runtime_queue.empty() && runtime_queue.front().rt_start < nvtx_start) {
+      runtime_queue.pop_front();
+    }
+
+    // Load more runtime events into the queue until we have all that could match
+    while (!runtime_exhausted) {
+      // Peek: do we need more events?
+      if (!runtime_queue.empty() && runtime_queue.back().rt_start > nvtx_end) {
+        // We have enough events in queue for this NVTX
+        break;
+      }
+
+      // Fetch next runtime event
+      if (sqlite3_step(runtime_stmt) == SQLITE_ROW) {
+        RuntimeEvent evt;
+        evt.rt_start  = sqlite3_column_int64(runtime_stmt, 0);
+        evt.rt_end    = sqlite3_column_int64(runtime_stmt, 1);
+        evt.globalTid = sqlite3_column_int64(runtime_stmt, 2);
+        evt.gpu_start = sqlite3_column_int64(runtime_stmt, 3);
+        evt.gpu_end   = sqlite3_column_int64(runtime_stmt, 4);
+        runtime_queue.push_back(evt);
+      } else {
+        runtime_exhausted = true;
+        break;
       }
     }
-    sqlite3_finalize(stmt);
+
+    // Scan the queue to find all matching runtime events
+    int64_t gpu_min = INT64_MAX;
+    int64_t gpu_max = INT64_MIN;
+    bool found_any  = false;
+
+    for (const auto& rt : runtime_queue) {
+      // Stop if runtime event starts after NVTX event ends
+      if (rt.rt_start > nvtx_end) { break; }
+
+      // Check if this runtime event is contained in the NVTX event
+      if (rt.globalTid == nvtx_tid && rt.rt_start >= nvtx_start && rt.rt_end <= nvtx_end) {
+        gpu_min   = std::min(gpu_min, rt.gpu_start);
+        gpu_max   = std::max(gpu_max, rt.gpu_end);
+        found_any = true;
+      }
+    }
+
+    // Record GPU time
+    if (found_any && gpu_max > gpu_min) { gpu_ns[base_name] += (gpu_max - gpu_min); }
+  }
+
+  sqlite3_finalize(nvtx_stmt);
+  sqlite3_finalize(runtime_stmt);
+
+  // Convert to seconds
+  for (const auto& [name, ns] : cpu_ns) {
+    cpu_times[name] = ns / 1e9;
+  }
+  for (const auto& [name, ns] : gpu_ns) {
+    gpu_times[name] = ns / 1e9;
   }
 
   return {cpu_times, gpu_times};
