@@ -9,13 +9,13 @@
 
 #include <benchmark/benchmark.h>
 
-#include <algorithm>
 #include <cctype>
 #include <chrono>
 #include <climits>
 #include <cstdio>
 #include <cstring>
 #include <deque>
+#include <filesystem>
 #include <fstream>
 #include <map>
 #include <mutex>
@@ -495,8 +495,9 @@ struct nvtx_stats {
     if (debug_logs_enabled) { log_info("Extracting NVTX stats from SQLite database..."); }
 
     // Extract NVTX statistics from SQLite database
-    std::string sqlite_file     = report_path + ".sqlite";
-    std::string nsys_file       = report_path + ".nsys-rep";
+    std::string sqlite_file = report_path + ".sqlite";
+    std::string nsys_file   = report_path + ".nsys-rep";
+
     auto stats                  = detail::extract_nvtx_stats_from_sqlite(sqlite_file);
     auto [cpu_times, gpu_times] = detail::filter_stats(stats, min_time_ratio);
 
@@ -526,7 +527,10 @@ struct nvtx_stats {
   }
 
  private:
-  std::string report_path = std::tmpnam(nullptr);
+  std::string report_path =
+    std::filesystem::temp_directory_path() /
+    ("nvtx_stats_" + std::to_string(getpid()) + "_" +
+     std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
   ::benchmark::State& state_;
   double min_time_ratio;
   bool debug_logs_enabled;
