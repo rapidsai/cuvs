@@ -71,56 +71,14 @@ inline std::string strip_nvtx_parameters(const std::string& name)
   return result;
 }
 
-// Extract CPU-only NVTX statistics
-inline std::map<std::string, double> extract_cpu_stats(sqlite3* db, int64_t algo_bench_domain_id)
-{
-  std::map<std::string, double> cpu_times;
-
-  const char* cpu_query_sql =
-    "SELECT strip_params(text) as base_name, SUM(end - start) as total_duration "
-    "FROM NVTX_EVENTS "
-    "WHERE end IS NOT NULL "
-    "  AND eventType = 59 "
-    "  AND domainId != ? "
-    "GROUP BY base_name "
-    "HAVING base_name IS NOT NULL "
-    "ORDER BY total_duration DESC";
-  sqlite3_stmt* stmt = nullptr;
-  int rc             = sqlite3_prepare_v2(db, cpu_query_sql, -1, &stmt, nullptr);
-
-  if (rc == SQLITE_OK) {
-    sqlite3_bind_int64(stmt, 1, algo_bench_domain_id);
-
-    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-      const char* base_name_ptr = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-      std::string base_name     = base_name_ptr ? base_name_ptr : "";
-      int64_t duration_ns       = sqlite3_column_int64(stmt, 1);
-      cpu_times[base_name]      = duration_ns / 1e9;
-    }
-    sqlite3_finalize(stmt);
-  }
-
-  return cpu_times;
-}
-
 // Extract CPU and GPU NVTX statistics with correlation
 inline std::pair<std::map<std::string, double>, std::map<std::string, double>>
 extract_cpu_gpu_stats(sqlite3* db,
                       int64_t algo_bench_domain_id,
-                      const std::vector<std::string>& activity_tables)
+                      const std::vector<std::string>& activity_tables = {})
 {
   std::map<std::string, double> cpu_times;
   std::map<std::string, double> gpu_times;
-
-  if (activity_tables.empty()) { return {cpu_times, gpu_times}; }
-
-  // Build union query for GPU activities
-  std::string gpu_union = "(";
-  for (size_t i = 0; i < activity_tables.size(); ++i) {
-    if (i > 0) gpu_union += " UNION ALL ";
-    gpu_union += "SELECT correlationId, start, end FROM " + activity_tables[i];
-  }
-  gpu_union += ")";
 
   // Accumulate times by base_name
   std::map<std::string, int64_t> cpu_ns;
@@ -128,23 +86,39 @@ extract_cpu_gpu_stats(sqlite3* db,
 
   // Query 1: NVTX events sorted by start, then end
   const char* nvtx_query =
-    "SELECT start, end, globalTid, strip_params(text) "
+    "SELECT start, end, globalTid, text "
     "FROM NVTX_EVENTS "
     "WHERE end IS NOT NULL "
     "  AND eventType = 59 "
     "  AND domainId != ? "
-    "  AND strip_params(text) IS NOT NULL "
+    "  AND text IS NOT NULL "
     "ORDER BY start, end";
 
   // Query 2: Runtime+GPU events sorted by start, then end
-  std::string runtime_query =
-    "SELECT r.start, r.end, r.globalTid, MIN(ga.start), MAX(ga.end) "
-    "FROM CUPTI_ACTIVITY_KIND_RUNTIME r "
-    "INNER JOIN (" +
-    gpu_union +
-    ") ga ON r.correlationId = ga.correlationId "
-    "GROUP BY r.start, r.end, r.globalTid, r.correlationId "
-    "ORDER BY r.start, r.end";
+  std::string runtime_query;
+  if (activity_tables.empty()) {
+    // Return empty result set with correct schema
+    runtime_query =
+      "SELECT NULL as start, NULL as end, NULL as globalTid, NULL as min_start, NULL as max_end "
+      "WHERE 1=0";
+  } else {
+    // Build union query for GPU activities
+    std::string gpu_union = "(";
+    for (size_t i = 0; i < activity_tables.size(); ++i) {
+      if (i > 0) gpu_union += " UNION ALL ";
+      gpu_union += "SELECT correlationId, start, end FROM " + activity_tables[i];
+    }
+    gpu_union += ")";
+
+    runtime_query =
+      "SELECT r.start, r.end, r.globalTid, MIN(ga.start), MAX(ga.end) "
+      "FROM CUPTI_ACTIVITY_KIND_RUNTIME r "
+      "INNER JOIN (" +
+      gpu_union +
+      ") ga ON r.correlationId = ga.correlationId "
+      "GROUP BY r.start, r.end, r.globalTid, r.correlationId "
+      "ORDER BY r.start, r.end";
+  }
 
   sqlite3_stmt* nvtx_stmt    = nullptr;
   sqlite3_stmt* runtime_stmt = nullptr;
@@ -172,11 +146,14 @@ extract_cpu_gpu_stats(sqlite3* db,
 
   // Process each NVTX event
   while (sqlite3_step(nvtx_stmt) == SQLITE_ROW) {
-    int64_t nvtx_start    = sqlite3_column_int64(nvtx_stmt, 0);
-    int64_t nvtx_end      = sqlite3_column_int64(nvtx_stmt, 1);
-    int64_t nvtx_tid      = sqlite3_column_int64(nvtx_stmt, 2);
-    const char* name      = reinterpret_cast<const char*>(sqlite3_column_text(nvtx_stmt, 3));
-    std::string base_name = name ? name : "";
+    int64_t nvtx_start = sqlite3_column_int64(nvtx_stmt, 0);
+    int64_t nvtx_end   = sqlite3_column_int64(nvtx_stmt, 1);
+    int64_t nvtx_tid   = sqlite3_column_int64(nvtx_stmt, 2);
+    const char* name   = reinterpret_cast<const char*>(sqlite3_column_text(nvtx_stmt, 3));
+
+    // Apply strip_params in C++ instead of SQL
+    std::string base_name = name ? strip_nvtx_parameters(name) : "";
+    if (base_name.empty()) continue;  // Skip events with no name after stripping
 
     // Accumulate CPU time
     cpu_ns[base_name] += (nvtx_end - nvtx_start);
@@ -256,30 +233,6 @@ inline std::tuple<sqlite3*, int64_t, std::vector<std::string>> setup_nvtx_databa
     return {nullptr, -1, {}};
   }
 
-  // Register custom SQL function to strip parameters from NVTX range names
-  auto strip_params_func = [](sqlite3_context* ctx, int argc, sqlite3_value** argv) {
-    if (argc != 1) {
-      sqlite3_result_null(ctx);
-      return;
-    }
-
-    const char* text = reinterpret_cast<const char*>(sqlite3_value_text(argv[0]));
-    if (!text) {
-      sqlite3_result_null(ctx);
-      return;
-    }
-
-    std::string stripped = strip_nvtx_parameters(text);
-    if (stripped.empty()) {
-      sqlite3_result_null(ctx);
-    } else {
-      sqlite3_result_text(ctx, stripped.c_str(), stripped.length(), SQLITE_TRANSIENT);
-    }
-  };
-
-  sqlite3_create_function(
-    db, "strip_params", 1, SQLITE_UTF8, nullptr, strip_params_func, nullptr, nullptr);
-
   // Find the domainId for "algo benchmark" domain to exclude it
   const char* find_domain_sql =
     "SELECT domainId FROM NVTX_EVENTS WHERE text = 'algo benchmark' LIMIT 1";
@@ -357,13 +310,8 @@ extract_nvtx_stats_from_sqlite(const std::string& sqlite_file)
   auto [db, algo_bench_domain_id, activity_tables] = setup_nvtx_database(sqlite_file);
   if (!db) { return {cpu_times, gpu_times}; }
 
-  // Choose extraction method based on GPU table availability
-  if (!activity_tables.empty()) {
-    std::tie(cpu_times, gpu_times) =
-      extract_cpu_gpu_stats(db, algo_bench_domain_id, activity_tables);
-  } else {
-    cpu_times = extract_cpu_stats(db, algo_bench_domain_id);
-  }
+  // Extract CPU and GPU stats (works even if no GPU tables available)
+  std::tie(cpu_times, gpu_times) = extract_cpu_gpu_stats(db, algo_bench_domain_id, activity_tables);
 
   sqlite3_close(db);
   return {cpu_times, gpu_times};
