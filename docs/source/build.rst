@@ -98,7 +98,7 @@ Conda environment scripts are provided for installing the necessary dependencies
 
 .. code-block:: bash
 
-    conda env create --name cuvs -f conda/environments/all_cuda-130_arch-x86_64.yaml
+    conda env create --name cuvs -f conda/environments/all_cuda-130_arch-$(uname -m).yaml
     conda activate cuvs
 
 The recommended way to build and install cuVS from source is to use the `build.sh` script in the root of the repository. This script can build both the C++ and Python artifacts and provides CMake options for building and installing the headers, tests, benchmarks, and the pre-compiled shared library.
