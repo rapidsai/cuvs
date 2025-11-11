@@ -224,9 +224,9 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort_and_merge(
   const unsigned lane_id = threadIdx.x % raft::warp_size();
   const unsigned warp_id = threadIdx.x / raft::warp_size();
 
-  assert(max_itopk <= 1024);
+  assert(max_itopk <= 512);
   constexpr unsigned MAX_N =
-    32;  // if MAX_N >> N, we may have negative performance impact, if this is significant, we may
+    16;  // if MAX_N >> N, we may have negative performance impact, if this is significant, we may
          // get memory space from dynamically sized shared memory.
   float key[MAX_N];
   IdxT val[MAX_N];
