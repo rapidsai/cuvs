@@ -327,7 +327,6 @@ if(NOT BUILD_CPU_ONLY)
   target_link_libraries(cuvs-cagra-search PRIVATE raft::raft)
   target_include_directories(
     cuvs-cagra-search PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-                              "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
   )
   target_compile_options(
     cuvs-cagra-search PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
@@ -373,6 +372,7 @@ if(NOT BUILD_CPU_ONLY)
     src/cluster/kmeans_transform_double.cu
     src/cluster/kmeans_transform_float.cu
     src/cluster/single_linkage_float.cu
+    src/cluster/spectral.cu
     src/core/bitset.cu
     src/core/omp_wrapper.cpp
     src/distance/detail/kernels/gram_matrix.cu
@@ -432,6 +432,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/ball_cover/detail/ball_cover/registers_pass_two.cu
     src/neighbors/brute_force.cu
     src/neighbors/brute_force_serialize.cu
+    src/neighbors/cagra.cpp
     src/neighbors/cagra_build_float.cu
     src/neighbors/cagra_build_half.cu
     src/neighbors/cagra_build_int8.cu
@@ -516,7 +517,6 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/nn_descent_index.cpp
     src/neighbors/nn_descent_int8.cu
     src/neighbors/nn_descent_uint8.cu
-    src/neighbors/reachability.cu
     src/neighbors/refine/detail/refine_device_float_float.cu
     src/neighbors/refine/detail/refine_device_half_float.cu
     src/neighbors/refine/detail/refine_device_int8_t_float.cu
@@ -576,7 +576,6 @@ if(NOT BUILD_CPU_ONLY)
   target_include_directories(
     cuvs_objs
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-           "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
     INTERFACE "$<INSTALL_INTERFACE:include>"
   )
 
@@ -642,7 +641,6 @@ if(NOT BUILD_CPU_ONLY)
       cuvs
       PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
              "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
-             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
              "$<INSTALL_INTERFACE:include>"
     )
 
@@ -705,7 +703,6 @@ SECTIONS
       cuvs_static
       PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
              "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
-             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
              "$<INSTALL_INTERFACE:include>"
     )
     target_link_libraries(
@@ -772,16 +769,16 @@ target_compile_definitions(cuvs::cuvs INTERFACE $<$<BOOL:${CUVS_NVTX}>:NVTX_ENAB
 
   if(BUILD_C_LIBRARY)
     install(
-      DIRECTORY ../c/include/cuvs
-      COMPONENT cuvs
-      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    )
-
-    install(
       TARGETS cuvs_c
       DESTINATION ${lib_dir}
       COMPONENT c_api
       EXPORT cuvs-c-exports
+    )
+
+    install(
+      DIRECTORY ../c/include/cuvs/
+      COMPONENT c_api
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs
     )
 
     install(

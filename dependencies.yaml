@@ -452,7 +452,6 @@ dependencies:
           - nlohmann_json>=3.12.0
           - glog>=0.6.0
           - h5py>=3.8.0
-          - benchmark>=1.8.2
           - openblas
     specific:
       - output_types: conda
