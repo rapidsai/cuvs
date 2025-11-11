@@ -29,6 +29,8 @@ function(find_and_configure_sqlite)
             $<INSTALL_INTERFACE:include>
         )
 
+        target_link_libraries(sqlite3 PUBLIC dl)
+
         set_target_properties(sqlite3 PROPERTIES EXCLUDE_FROM_ALL ON)
     else()
         message(VERBOSE "cuVS: Using SQLite3 located in ${sqlite3_DIR}")
