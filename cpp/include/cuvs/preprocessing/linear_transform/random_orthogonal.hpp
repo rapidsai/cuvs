@@ -16,7 +16,7 @@
 namespace cuvs::preprocessing::linear_transform::random_orthogonal {
 
 /**
- * @defgroup scalar Scalar transformer utilities
+ * @defgroup random_orthogonal Random orthogonal transformer utilities
  * @{
  */
 
