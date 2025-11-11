@@ -72,17 +72,12 @@ inline std::string strip_nvtx_parameters(const std::string& name)
 }
 
 // Extract CPU and GPU NVTX statistics with correlation
-inline std::pair<std::map<std::string, double>, std::map<std::string, double>>
-extract_cpu_gpu_stats(sqlite3* db,
-                      int64_t algo_bench_domain_id,
-                      const std::vector<std::string>& activity_tables = {})
+inline auto extract_cpu_gpu_stats(sqlite3* db,
+                                  int64_t algo_bench_domain_id,
+                                  const std::vector<std::string>& activity_tables = {})
 {
-  std::map<std::string, double> cpu_times;
-  std::map<std::string, double> gpu_times;
-
   // Accumulate times by base_name
-  std::map<std::string, int64_t> cpu_ns;
-  std::map<std::string, int64_t> gpu_ns;
+  std::map<std::string, std::tuple<int64_t, int64_t>> stats;
 
   // Query 1: NVTX events sorted by start, then end
   const char* nvtx_query =
@@ -123,14 +118,12 @@ extract_cpu_gpu_stats(sqlite3* db,
   sqlite3_stmt* nvtx_stmt    = nullptr;
   sqlite3_stmt* runtime_stmt = nullptr;
 
-  if (sqlite3_prepare_v2(db, nvtx_query, -1, &nvtx_stmt, nullptr) != SQLITE_OK) {
-    return {cpu_times, gpu_times};
-  }
+  if (sqlite3_prepare_v2(db, nvtx_query, -1, &nvtx_stmt, nullptr) != SQLITE_OK) { return stats; }
   sqlite3_bind_int64(nvtx_stmt, 1, algo_bench_domain_id);
 
   if (sqlite3_prepare_v2(db, runtime_query.c_str(), -1, &runtime_stmt, nullptr) != SQLITE_OK) {
     sqlite3_finalize(nvtx_stmt);
-    return {cpu_times, gpu_times};
+    return stats;
   }
 
   // Structure to hold runtime events in a sliding window queue
@@ -156,7 +149,8 @@ extract_cpu_gpu_stats(sqlite3* db,
     if (base_name.empty()) continue;  // Skip events with no name after stripping
 
     // Accumulate CPU time
-    cpu_ns[base_name] += (nvtx_end - nvtx_start);
+    auto& [cpu_ns, gpu_ns] = stats[base_name];  // Creates with zeros if not exists
+    cpu_ns += (nvtx_end - nvtx_start);
 
     // Remove runtime events that start before this NVTX event starts
     // (they can't match this or any future NVTX events since NVTX is sorted)
@@ -205,21 +199,12 @@ extract_cpu_gpu_stats(sqlite3* db,
     }
 
     // Record GPU time
-    if (found_any && gpu_max > gpu_min) { gpu_ns[base_name] += (gpu_max - gpu_min); }
+    if (found_any && gpu_max > gpu_min) { gpu_ns += (gpu_max - gpu_min); }
   }
 
   sqlite3_finalize(nvtx_stmt);
   sqlite3_finalize(runtime_stmt);
-
-  // Convert to seconds
-  for (const auto& [name, ns] : cpu_ns) {
-    cpu_times[name] = ns / 1e9;
-  }
-  for (const auto& [name, ns] : gpu_ns) {
-    gpu_times[name] = ns / 1e9;
-  }
-
-  return {cpu_times, gpu_times};
+  return stats;  // Return the accumulated stats map
 }
 
 // Common setup: open database, register functions, find domain ID, discover GPU tables
@@ -301,19 +286,37 @@ inline std::tuple<sqlite3*, int64_t, std::vector<std::string>> setup_nvtx_databa
 
 // Extract NVTX statistics from SQLite database
 // Returns pair of (cpu_times, gpu_times) maps with times in seconds
-inline std::pair<std::map<std::string, double>, std::map<std::string, double>>
-extract_nvtx_stats_from_sqlite(const std::string& sqlite_file)
+inline auto extract_nvtx_stats_from_sqlite(const std::string& sqlite_file)
+{
+  auto [db, algo_bench_domain_id, activity_tables] = setup_nvtx_database(sqlite_file);
+  if (!db) { return std::map<std::string, std::tuple<int64_t, int64_t>>{}; }
+
+  // Extract CPU and GPU stats (works even if no GPU tables available)
+  auto stats = extract_cpu_gpu_stats(db, algo_bench_domain_id, activity_tables);
+
+  sqlite3_close(db);
+  return stats;
+}
+
+// Filter out the ranges with less than min_time_ratio of the max detected range time.
+inline auto filter_stats(const std::map<std::string, std::tuple<int64_t, int64_t>>& stats,
+                         double min_time_ratio)
+  -> std::pair<std::map<std::string, double>, std::map<std::string, double>>
 {
   std::map<std::string, double> cpu_times;
   std::map<std::string, double> gpu_times;
-
-  auto [db, algo_bench_domain_id, activity_tables] = setup_nvtx_database(sqlite_file);
-  if (!db) { return {cpu_times, gpu_times}; }
-
-  // Extract CPU and GPU stats (works even if no GPU tables available)
-  std::tie(cpu_times, gpu_times) = extract_cpu_gpu_stats(db, algo_bench_domain_id, activity_tables);
-
-  sqlite3_close(db);
+  int64_t cpu_threshold = 0;
+  int64_t gpu_threshold = 0;
+  for (const auto& [_, times] : stats) {
+    auto [cpu_time, gpu_time] = times;
+    cpu_threshold = std::max(cpu_threshold, static_cast<int64_t>(cpu_time * min_time_ratio));
+    gpu_threshold = std::max(gpu_threshold, static_cast<int64_t>(gpu_time * min_time_ratio));
+  }
+  for (const auto& [name, times] : stats) {
+    auto [cpu_time, gpu_time] = times;
+    if (cpu_time > cpu_threshold) { cpu_times[name] = static_cast<double>(cpu_time) / 1.0e9; }
+    if (gpu_time > gpu_threshold) { gpu_times[name] = static_cast<double>(gpu_time) / 1.0e9; }
+  }
   return {cpu_times, gpu_times};
 }
 
@@ -471,7 +474,10 @@ inline const nsys_launcher& get_nsys_launcher()
 }
 
 struct nvtx_stats {
-  explicit nvtx_stats(::benchmark::State& state) : state_(state)
+  explicit nvtx_stats(::benchmark::State& state,
+                      double min_time_ratio   = 0.01,
+                      bool debug_logs_enabled = false)
+    : state_(state), min_time_ratio(min_time_ratio), debug_logs_enabled(debug_logs_enabled)
   {
     if (state_.thread_index() != 0) { return; }
     if (get_nsys_launcher().is_enabled()) { get_nsys_launcher().start(report_path); }
@@ -486,19 +492,22 @@ struct nvtx_stats {
     if (!get_nsys_launcher().stop()) { return; }
 
     auto sql_start = std::chrono::high_resolution_clock::now();
-    log_info("Extracting NVTX stats from SQLite database...");
+    if (debug_logs_enabled) { log_info("Extracting NVTX stats from SQLite database..."); }
 
     // Extract NVTX statistics from SQLite database
     std::string sqlite_file     = report_path + ".sqlite";
     std::string nsys_file       = report_path + ".nsys-rep";
-    auto [cpu_times, gpu_times] = detail::extract_nvtx_stats_from_sqlite(sqlite_file);
+    auto stats                  = detail::extract_nvtx_stats_from_sqlite(sqlite_file);
+    auto [cpu_times, gpu_times] = detail::filter_stats(stats, min_time_ratio);
 
     auto sql_end      = std::chrono::high_resolution_clock::now();
     auto sql_duration = std::chrono::duration_cast<std::chrono::milliseconds>(sql_end - sql_start);
-    log_info("NVTX stats SQL query took %d ms (%zu CPU ranges, %zu GPU ranges)",
-             static_cast<int>(sql_duration.count()),
-             cpu_times.size(),
-             gpu_times.size());
+    if (debug_logs_enabled) {
+      log_info("NVTX stats SQL query took %d ms (%zu CPU ranges, %zu GPU ranges)",
+               static_cast<int>(sql_duration.count()),
+               cpu_times.size(),
+               gpu_times.size());
+    }
 
     // Insert counters into benchmark state
     for (const auto& [range_name, cpu_time] : cpu_times) {
@@ -507,10 +516,8 @@ struct nvtx_stats {
     }
 
     for (const auto& [range_name, gpu_time] : gpu_times) {
-      if (gpu_time > 0.0) {
-        state_.counters.insert(
-          {{"GPU::" + range_name, {gpu_time, benchmark::Counter::kAvgIterations}}});
-      }
+      state_.counters.insert(
+        {{"GPU::" + range_name, {gpu_time, benchmark::Counter::kAvgIterations}}});
     }
 
     // Clean up generated files (ignore errors if files don't exist)
@@ -521,6 +528,8 @@ struct nvtx_stats {
  private:
   std::string report_path = std::tmpnam(nullptr);
   ::benchmark::State& state_;
+  double min_time_ratio;
+  bool debug_logs_enabled;
 };
 
 };  // namespace cuvs::bench
