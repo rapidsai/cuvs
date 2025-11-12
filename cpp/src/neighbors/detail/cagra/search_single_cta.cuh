@@ -129,13 +129,34 @@ struct search
       sizeof(std::uint32_t) * topk_ws_size + sizeof(std::uint32_t);
 
     std::uint32_t additional_smem_size = 0;
-    if (num_itopk_candidates > 256) {
-      // Tentatively calculate the required share memory size when radix
-      // sort based topk is used, assuming the block size is the maximum.
+    if (num_itopk_candidates <= 256) {  // bitonic sort
+      // Tentatively calculate the required shared memory size when bitonic sort based topk is used,
+      // assuming the block size is the maximum.
+      uint32_t max_elements{0};
+      if (itopk_size > 128) {  // use shared memory instead of stack variables (which may or may not
+                               // be placed in registers) for bitonic sort
+        if (itopk_size <= 256) {
+          max_elements = 256;
+        } else {
+          static_assert(min_block_size >=
+                        64);  // multi_warps = true if (threadDim.x >= 64) && (itopk_size > 256)
+          max_elements = 512 / 2 /* multi_warps = true */;
+        }
+      }
+      additional_smem_size += max_block_size *
+                              ((max_elements + (raft::warp_size() - 1)) / raft::warp_size()) *
+                              (sizeof(float) + sizeof(INDEX_T));
+    } else {  // radix sort
+      // Tentatively calculate the required shared memory size when radix sort based topk is used,
+      // assuming the block size is the maximum.
       if (itopk_size <= 256) {
-        additional_smem_size += topk_by_radix_sort<INDEX_T>::smem_size(256) * sizeof(std::uint32_t);
+        constexpr unsigned MAX_ITOPK = 256;
+        additional_smem_size +=
+          topk_by_radix_sort<INDEX_T>::smem_size(MAX_ITOPK) * sizeof(std::uint32_t);
       } else {
-        additional_smem_size += topk_by_radix_sort<INDEX_T>::smem_size(512) * sizeof(std::uint32_t);
+        constexpr unsigned MAX_ITOPK = 512;
+        additional_smem_size +=
+          topk_by_radix_sort<INDEX_T>::smem_size(MAX_ITOPK) * sizeof(std::uint32_t);
       }
     }
 
@@ -152,7 +173,7 @@ struct search
     if (block_size == 0) {
       block_size = min_block_size;
 
-      if (num_itopk_candidates > 256) {
+      if (num_itopk_candidates > 256) {  // radix sort
         // radix-based topk is used.
         block_size = min_block_size_radix;
 
@@ -190,19 +211,6 @@ struct search
                  max_block_size);
     thread_block_size = block_size;
 
-    if (num_itopk_candidates <= 256) {
-      RAFT_LOG_DEBUG("# bitonic-sort based topk routine is used");
-    } else {
-      RAFT_LOG_DEBUG("# radix-sort based topk routine is used");
-      smem_size = base_smem_size;
-      if (itopk_size <= 256) {
-        constexpr unsigned MAX_ITOPK = 256;
-        smem_size += topk_by_radix_sort<INDEX_T>::smem_size(MAX_ITOPK) * sizeof(std::uint32_t);
-      } else {
-        constexpr unsigned MAX_ITOPK = 512;
-        smem_size += topk_by_radix_sort<INDEX_T>::smem_size(MAX_ITOPK) * sizeof(std::uint32_t);
-      }
-    }
     RAFT_LOG_DEBUG("# smem_size: %u", smem_size);
     hashmap_size = 0;
     if (small_hash_bitlen == 0 && !this->persistent) {
