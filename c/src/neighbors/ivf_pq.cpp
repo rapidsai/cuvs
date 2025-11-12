@@ -61,7 +61,7 @@ void* _build(cuvsResources_t res, cuvsIvfPqIndexParams params, DLManagedTensor* 
   auto dataset = dataset_tensor->dl_tensor;
   auto dim     = dataset.shape[1];
 
-  auto index = new cuvs::neighbors::ivf_pq::ivf_pq_owning<IdxT>(*res_ptr, build_params, dim);
+  auto index = new cuvs::neighbors::ivf_pq::index<IdxT>(*res_ptr, build_params, dim);
 
   if (cuvs::core::is_dlpack_device_compatible(dataset)) {
     using mdspan_type = raft::device_matrix_view<const T, IdxT, raft::row_major>;
@@ -113,7 +113,7 @@ template <typename IdxT>
 void* _deserialize(cuvsResources_t res, const char* filename)
 {
   auto res_ptr = reinterpret_cast<raft::resources*>(res);
-  auto index   = new cuvs::neighbors::ivf_pq::ivf_pq_owning<IdxT>(*res_ptr);
+  auto index   = new cuvs::neighbors::ivf_pq::index<IdxT>(*res_ptr);
   cuvs::neighbors::ivf_pq::deserialize(*res_ptr, std::string(filename), index);
   return index;
 }

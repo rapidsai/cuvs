@@ -244,7 +244,7 @@ auto calculate_offsets_and_indices(IdxT n_rows,
 }
 
 template <typename IdxT>
-void set_centers(raft::resources const& handle, ivf_pq_owning<IdxT>* index, const float* cluster_centers)
+void set_centers(raft::resources const& handle, index<IdxT>* index, const float* cluster_centers)
 {
   auto stream         = raft::resource::get_cuda_stream(handle);
   auto* device_memory = raft::resource::get_workspace_resource(handle);
@@ -1036,44 +1036,50 @@ void erase_list(raft::resources const& res, index<IdxT>* index, uint32_t label)
 
 /** raft::copy the state of an index into a new index, but share the list data among the two. */
 template <typename IdxT>
-auto clone(const raft::resources& res, const index<IdxT>& source) -> ivf_pq_owning<IdxT>
+auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
 {
   auto stream = raft::resource::get_cuda_stream(res);
 
-  // Allocate the new owning index
-  ivf_pq_owning<IdxT> target(res,
-                             source.metric(),
-                             source.codebook_kind(),
-                             source.n_lists(),
-                             source.dim(),
-                             source.pq_bits(),
-                             source.pq_dim(),
-                             source.conservative_memory_allocation());
+  // Create the owning implementation
+  auto impl = std::make_unique<owning_impl<IdxT>>(res,
+                                                   source.metric(),
+                                                   source.codebook_kind(),
+                                                   source.n_lists(),
+                                                   source.dim(),
+                                                   source.pq_bits(),
+                                                   source.pq_dim(),
+                                                   source.conservative_memory_allocation());
 
-  // raft::copy the independent parts
-  raft::copy(target.list_sizes().data_handle(),
-             source.list_sizes().data_handle(),
-             source.list_sizes().size(),
-             stream);
-  raft::copy(target.rotation_matrix().data_handle(),
+  // raft::copy the center/matrix data
+  raft::copy(impl->rotation_matrix().data_handle(),
              source.rotation_matrix().data_handle(),
              source.rotation_matrix().size(),
              stream);
-  raft::copy(target.pq_centers().data_handle(),
+  raft::copy(impl->pq_centers().data_handle(),
              source.pq_centers().data_handle(),
              source.pq_centers().size(),
              stream);
-  raft::copy(target.centers().data_handle(),
+  raft::copy(impl->centers().data_handle(),
              source.centers().data_handle(),
              source.centers().size(),
              stream);
-  raft::copy(target.centers_rot().data_handle(),
+  raft::copy(impl->centers_rot().data_handle(),
              source.centers_rot().data_handle(),
              source.centers_rot().size(),
              stream);
 
-  // raft::copy shared pointers
-  target.lists() = source.lists();
+  // Construct the target index from the impl
+  index<IdxT> target(std::move(impl));
+  
+  // Initialize the lists
+  target.lists().resize(source.n_lists());
+  target.lists() = source.lists();  // Share list pointers
+  
+  // Copy list sizes
+  raft::copy(target.list_sizes().data_handle(),
+             source.list_sizes().data_handle(),
+             source.list_sizes().size(),
+             stream);
 
   // Make sure the device pointers point to the new lists
   ivf::detail::recompute_internal_state(res, target);
@@ -1292,7 +1298,7 @@ auto extend(raft::resources const& handle,
             const index<IdxT>& orig_index,
             const T* new_vectors,
             const IdxT* new_indices,
-            IdxT n_rows) -> ivf_pq_owning<IdxT>
+            IdxT n_rows) -> index<IdxT>
 {
   auto ext_index = clone(handle, orig_index);
   detail::extend(handle, &ext_index, new_vectors, new_indices, n_rows);
@@ -1303,7 +1309,7 @@ template <typename T, typename IdxT, typename accessor>
 auto build(raft::resources const& handle,
            const index_params& params,
            raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, accessor> dataset)
-  -> ivf_pq_owning<IdxT>
+  -> index<IdxT>
 {
   IdxT n_rows = dataset.extent(0);
   IdxT dim    = dataset.extent(1);
@@ -1318,18 +1324,37 @@ auto build(raft::resources const& handle,
 
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  ivf_pq_owning<IdxT> index(handle, params, dim);
+  // Create owning implementation
+  auto impl = std::make_unique<owning_impl<IdxT>>(handle, 
+                                                   params.metric,
+                                                   params.codebook_kind,
+                                                   params.n_lists,
+                                                   dim,
+                                                   params.pq_bits,
+                                                   params.pq_dim,
+                                                   params.conservative_memory_allocation);
+  
+  // Construct the index with the owning impl
+  index<IdxT> idx(std::move(impl));
+  
+  // Initialize the list structures
+  idx.lists().resize(params.n_lists);
+  idx.list_sizes_ = raft::make_device_vector<uint32_t, uint32_t>(handle, params.n_lists);
+  idx.data_ptrs_ = raft::make_device_vector<uint8_t*, uint32_t>(handle, params.n_lists);
+  idx.inds_ptrs_ = raft::make_device_vector<IdxT*, uint32_t>(handle, params.n_lists);
+  idx.accum_sorted_sizes_ = raft::make_host_vector<IdxT, uint32_t>(params.n_lists + 1);
+  
   utils::memzero(
-    index.accum_sorted_sizes().data_handle(), index.accum_sorted_sizes().size(), stream);
-  utils::memzero(index.list_sizes().data_handle(), index.list_sizes().size(), stream);
-  utils::memzero(index.data_ptrs().data_handle(), index.data_ptrs().size(), stream);
-  utils::memzero(index.inds_ptrs().data_handle(), index.inds_ptrs().size(), stream);
+    idx.accum_sorted_sizes().data_handle(), idx.accum_sorted_sizes().size(), stream);
+  utils::memzero(idx.list_sizes().data_handle(), idx.list_sizes().size(), stream);
+  utils::memzero(idx.data_ptrs().data_handle(), idx.data_ptrs().size(), stream);
+  utils::memzero(idx.inds_ptrs().data_handle(), idx.inds_ptrs().size(), stream);
 
   {
     raft::random::RngState random_state{137};
     auto trainset_ratio = std::max<size_t>(
       1,
-      size_t(n_rows) / std::max<size_t>(params.kmeans_trainset_fraction * n_rows, index.n_lists()));
+      size_t(n_rows) / std::max<size_t>(params.kmeans_trainset_fraction * n_rows, idx.n_lists()));
     size_t n_rows_train = n_rows / trainset_ratio;
 
     rmm::device_async_resource_ref device_memory = raft::resource::get_workspace_resource(handle);
@@ -1339,7 +1364,7 @@ auto build(raft::resources const& handle,
     constexpr size_t kTolerableRatio = 4;
     rmm::device_async_resource_ref big_memory_resource =
       raft::resource::get_large_workspace_resource(handle);
-    if (sizeof(float) * n_rows_train * index.dim() * kTolerableRatio <
+    if (sizeof(float) * n_rows_train * idx.dim() * kTolerableRatio <
         raft::resource::get_workspace_free_bytes(handle)) {
       big_memory_resource = device_memory;
     }
@@ -1383,18 +1408,18 @@ auto build(raft::resources const& handle,
     // NB: here cluster_centers is used as if it is [n_clusters, data_dim] not [n_clusters,
     // dim_ext]!
     rmm::device_uvector<float> cluster_centers_buf(
-      index.n_lists() * index.dim(), stream, device_memory);
+      idx.n_lists() * idx.dim(), stream, device_memory);
     auto cluster_centers = cluster_centers_buf.data();
 
     // Train balanced hierarchical kmeans clustering
     auto trainset_const_view = raft::make_const_mdspan(trainset.view());
     auto centers_view        = raft::make_device_matrix_view<float, internal_extents_t>(
-      cluster_centers, index.n_lists(), index.dim());
+      cluster_centers, idx.n_lists(), idx.dim());
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
-    kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)index.metric());
+    kmeans_params.metric  = static_cast<cuvs::distance::DistanceType>((int)idx.metric());
 
-    if (index.metric() == distance::DistanceType::CosineExpanded) {
+    if (idx.metric() == distance::DistanceType::CosineExpanded) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(
         handle, trainset_const_view, trainset.view());
     }
@@ -1403,8 +1428,8 @@ auto build(raft::resources const& handle,
     // Trainset labels are needed for training PQ codebooks
     rmm::device_uvector<uint32_t> labels(n_rows_train, stream, big_memory_resource);
     auto centers_const_view = raft::make_device_matrix_view<const float, internal_extents_t>(
-      cluster_centers, index.n_lists(), index.dim());
-    if (index.metric() == distance::DistanceType::CosineExpanded) {
+      cluster_centers, idx.n_lists(), idx.dim());
+    if (idx.metric() == distance::DistanceType::CosineExpanded) {
       raft::linalg::row_normalize<raft::linalg::L2Norm>(handle, centers_const_view, centers_view);
     }
     auto labels_view =
@@ -1413,15 +1438,15 @@ auto build(raft::resources const& handle,
       handle, kmeans_params, trainset_const_view, centers_const_view, labels_view);
 
     // Make rotation matrix
-    helpers::make_rotation_matrix(handle, &index, params.force_random_rotation);
+    helpers::make_rotation_matrix(handle, &idx, params.force_random_rotation);
 
-    helpers::set_centers(handle, &index, raft::make_const_mdspan(centers_view));
+    helpers::set_centers(handle, &idx, raft::make_const_mdspan(centers_view));
 
     // Train PQ codebooks
-    switch (index.codebook_kind()) {
+    switch (idx.codebook_kind()) {
       case codebook_gen::PER_SUBSPACE:
         train_per_subset(handle,
-                         index,
+                         idx,
                          n_rows_train,
                          trainset.data_handle(),
                          labels.data(),
@@ -1430,7 +1455,7 @@ auto build(raft::resources const& handle,
         break;
       case codebook_gen::PER_CLUSTER:
         train_per_cluster(handle,
-                          index,
+                          idx,
                           n_rows_train,
                           trainset.data_handle(),
                           labels.data(),
@@ -1443,9 +1468,9 @@ auto build(raft::resources const& handle,
 
   // add the data if necessary
   if (params.add_data_on_build) {
-    detail::extend<T, IdxT>(handle, &index, dataset.data_handle(), nullptr, n_rows);
+    detail::extend<T, IdxT>(handle, &idx, dataset.data_handle(), nullptr, n_rows);
   }
-  return index;
+  return idx;
 }
 
 template <typename T, typename IdxT, typename accessor>
@@ -1457,7 +1482,7 @@ void build(raft::resources const& handle,
   *index = build(handle, params, dataset);
 }
 
-// Overload that returns ivf_pq_view when all device matrices are correctly provided
+// Build function that creates index with view_impl (non-owning) when all device matrices are provided
 template <typename IdxT>
 auto build(raft::resources const& handle,
            const cuvs::neighbors::ivf_pq::index_params& index_params,
@@ -1466,7 +1491,7 @@ auto build(raft::resources const& handle,
            raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
            raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot,
            raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix)
-  -> cuvs::neighbors::ivf_pq::ivf_pq_view<IdxT>
+  -> cuvs::neighbors::ivf_pq::index<IdxT>
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("ivf_pq::build_view(%u)",
                                                                         dim);
@@ -1481,7 +1506,7 @@ auto build(raft::resources const& handle,
 
   // Check pq_centers extents
   uint32_t expected_pq_extent_0 = (index_params.codebook_kind == codebook_gen::PER_SUBSPACE)
-                                    ? index_params.pq_dim
+                                    ? pq_dim
                                     : index_params.n_lists;
   RAFT_EXPECTS(pq_centers.extent(0) == expected_pq_extent_0 && pq_centers.extent(1) == pq_len &&
                  pq_centers.extent(2) == pq_book_size,
@@ -1499,9 +1524,28 @@ auto build(raft::resources const& handle,
   RAFT_EXPECTS(rotation_matrix.extent(0) == rot_dim && rotation_matrix.extent(1) == dim,
                "rotation_matrix must have extent [rot_dim, dim]");
 
-  // Create ivf_pq_view index (non-owning, uses external data)
-  auto view_index = cuvs::neighbors::ivf_pq::ivf_pq_view<IdxT>(
-    handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix);
+  // Create view implementation (non-owning, uses external data)
+  auto impl = std::make_unique<view_impl<IdxT>>(index_params.metric,
+                                                 index_params.codebook_kind,
+                                                 index_params.n_lists,
+                                                 dim,
+                                                 index_params.pq_bits,
+                                                 pq_dim,
+                                                 index_params.conservative_memory_allocation,
+                                                 pq_centers,
+                                                 centers,
+                                                 centers_rot,
+                                                 rotation_matrix);
+
+  // Construct the index with view impl
+  index<IdxT> view_index(std::move(impl));
+  
+  // Initialize the list structures
+  view_index.lists().resize(index_params.n_lists);
+  view_index.list_sizes_ = raft::make_device_vector<uint32_t, uint32_t>(handle, index_params.n_lists);
+  view_index.data_ptrs_ = raft::make_device_vector<uint8_t*, uint32_t>(handle, index_params.n_lists);
+  view_index.inds_ptrs_ = raft::make_device_vector<IdxT*, uint32_t>(handle, index_params.n_lists);
+  view_index.accum_sorted_sizes_ = raft::make_host_vector<IdxT, uint32_t>(index_params.n_lists + 1);
 
   utils::memzero(
     view_index.accum_sorted_sizes().data_handle(), view_index.accum_sorted_sizes().size(), stream);
@@ -1512,7 +1556,7 @@ auto build(raft::resources const& handle,
   return view_index;
 }
 
-// Overload that returns ivf_pq_owning and copies/computes data as needed
+// Build function that creates index with owning_impl and copies/computes data as needed
 template <typename IdxT>
 auto build(
   raft::resources const& handle,
@@ -1522,7 +1566,7 @@ auto build(
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
   std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
   std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix)
-  -> cuvs::neighbors::ivf_pq::ivf_pq_owning<IdxT>
+  -> cuvs::neighbors::ivf_pq::index<IdxT>
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("ivf_pq::build_owning(%u)",
                                                                         dim);
@@ -1536,7 +1580,7 @@ auto build(
 
   // Check pq_centers extents
   uint32_t expected_pq_extent_0 = (index_params.codebook_kind == codebook_gen::PER_SUBSPACE)
-                                    ? index_params.pq_dim
+                                    ? pq_dim
                                     : index_params.n_lists;
   RAFT_EXPECTS(pq_centers.extent(0) == expected_pq_extent_0 && pq_centers.extent(1) == pq_len &&
                  pq_centers.extent(2) == pq_book_size,
@@ -1547,16 +1591,25 @@ auto build(
                  (centers.extent(1) == dim || centers.extent(1) == dim_ext),
                "centers must have extent [n_lists, dim] or [n_lists, dim_ext]");
 
-  // Create ivf_pq_owning index
-  auto owning_index =
-    cuvs::neighbors::ivf_pq::ivf_pq_owning<IdxT>(handle,
-                                                 index_params.metric,
-                                                 index_params.codebook_kind,
-                                                 index_params.n_lists,
-                                                 dim,
-                                                 index_params.pq_bits,
-                                                 pq_dim,
-                                                 index_params.conservative_memory_allocation);
+  // Create owning implementation
+  auto impl = std::make_unique<owning_impl<IdxT>>(handle,
+                                                   index_params.metric,
+                                                   index_params.codebook_kind,
+                                                   index_params.n_lists,
+                                                   dim,
+                                                   index_params.pq_bits,
+                                                   pq_dim,
+                                                   index_params.conservative_memory_allocation);
+  
+  // Construct the index with owning impl
+  index<IdxT> owning_index(std::move(impl));
+  
+  // Initialize the list structures
+  owning_index.lists().resize(index_params.n_lists);
+  owning_index.list_sizes_ = raft::make_device_vector<uint32_t, uint32_t>(handle, index_params.n_lists);
+  owning_index.data_ptrs_ = raft::make_device_vector<uint8_t*, uint32_t>(handle, index_params.n_lists);
+  owning_index.inds_ptrs_ = raft::make_device_vector<IdxT*, uint32_t>(handle, index_params.n_lists);
+  owning_index.accum_sorted_sizes_ = raft::make_host_vector<IdxT, uint32_t>(index_params.n_lists + 1);
 
   utils::memzero(owning_index.accum_sorted_sizes().data_handle(),
                  owning_index.accum_sorted_sizes().size(),
@@ -1638,7 +1691,7 @@ auto extend(
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, accessor> new_vectors,
   std::optional<raft::mdspan<const IdxT, raft::vector_extent<int64_t>, raft::row_major, accessor2>>
     new_indices,
-  const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index) -> ivf_pq_owning<IdxT>
+  const cuvs::neighbors::ivf_pq::index<IdxT>& orig_index) -> index<IdxT>
 {
   ASSERT(new_vectors.extent(1) == orig_index.dim(),
          "new_vectors should have the same dimension as the index");
@@ -1681,33 +1734,8 @@ void extend(
                   n_rows);
 }
 
-// Truly in-place extend for ivf_pq_view (no cloning, only extends lists)
-template <typename T, typename IdxT, typename accessor, typename accessor2>
-void extend(
-  raft::resources const& handle,
-  raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, accessor> new_vectors,
-  std::optional<raft::mdspan<const IdxT, raft::vector_extent<int64_t>, raft::row_major, accessor2>>
-    new_indices,
-  ivf_pq_view<IdxT>* index)
-{
-  ASSERT(new_vectors.extent(1) == index->dim(),
-         "new_vectors should have the same dimension as the index");
 
-  IdxT n_rows = new_vectors.extent(0);
-  if (new_indices.has_value()) {
-    ASSERT(n_rows == new_indices.value().extent(0),
-           "new_vectors and new_indices have different number of rows");
-  }
-
-  // Call detail::extend directly for true in-place modification (no cloning)
-  detail::extend(handle,
-                 index,
-                 new_vectors.data_handle(),
-                 new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
-                 n_rows);
-}
-
-// Host version - always returns owning variant since we create device copies
+// Host version - always returns index with owning_impl since we create device copies
 template <typename IdxT>
 auto build(
   raft::resources const& handle,
@@ -1717,7 +1745,7 @@ auto build(
   raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
   std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
   std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix)
-  -> cuvs::neighbors::ivf_pq::ivf_pq_owning<IdxT>
+  -> cuvs::neighbors::ivf_pq::index<IdxT>
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope(
     "ivf_pq::build_from_host(%u)", dim);

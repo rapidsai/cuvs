@@ -23,6 +23,10 @@
 
 namespace cuvs::neighbors::ivf_pq {
 
+// Forward declarations for friend access
+template <typename IdxT> struct owning_impl;
+template <typename IdxT> struct view_impl;
+
 /**
  * @defgroup ivf_pq_cpp_index_params IVF-PQ index build parameters
  * @{
@@ -283,7 +287,7 @@ using list_data = ivf::list<list_spec, SizeT, IdxT>;
  * @{
  */
 /**
- * @brief IVF-PQ index with PIMPL pattern.
+ * @brief IVF-PQ index.
  *
  * In the IVF-PQ index, a database vector y is approximated with two level quantization:
  *
@@ -338,7 +342,6 @@ struct index : cuvs::neighbors::index {
   using pq_centers_extents = std::experimental::
     extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
 
-  // Forward declaration of implementation interface
   struct index_iface;
 
  public:
@@ -346,7 +349,7 @@ struct index : cuvs::neighbors::index {
   index(index&&) noexcept                = default;
   auto operator=(const index&) -> index& = delete;
   auto operator=(index&&) -> index& = default;
-  ~index();  // Must be defined where index_iface is complete
+  ~index();
 
   /**
    * @brief Construct an empty index.
@@ -355,6 +358,39 @@ struct index : cuvs::neighbors::index {
    * or loaded from a saved copy with `deserialize`
    */
   index(raft::resources const& handle);
+
+  /**
+   * @brief Construct an index with specified parameters.
+   *
+   * This constructor creates an owning index with the given parameters.
+   * The index will be empty and need to be populated with `extend` or loaded with `deserialize`.
+   *
+   * @param handle RAFT resources handle
+   * @param metric Distance metric for clustering
+   * @param codebook_kind How PQ codebooks are created
+   * @param n_lists Number of inverted lists (clusters)
+   * @param dim Dimensionality of the input data
+   * @param pq_bits Bit length of vector elements after PQ compression
+   * @param pq_dim Dimensionality after PQ compression (0 = auto-select)
+   * @param conservative_memory_allocation Memory allocation strategy
+   */
+  index(raft::resources const& handle,
+        cuvs::distance::DistanceType metric,
+        codebook_gen codebook_kind,
+        uint32_t n_lists,
+        uint32_t dim,
+        uint32_t pq_bits                    = 8,
+        uint32_t pq_dim                     = 0,
+        bool conservative_memory_allocation = false);
+
+  /**
+   * @brief Construct an index from index parameters.
+   *
+   * @param handle RAFT resources handle
+   * @param params Index parameters
+   * @param dim Dimensionality of the input data
+   */
+  index(raft::resources const& handle, const index_params& params, uint32_t dim);
 
   /** Total length of the index. */
   IdxT size() const noexcept;
@@ -492,20 +528,14 @@ struct index : cuvs::neighbors::index {
   explicit index(std::unique_ptr<index_iface> impl);
 
  private:
-  // PIMPL pointer - holds the actual implementation (owning or view)
-  // This contains: pq_centers, centers, centers_rot, rotation_matrix, and metadata
-  std::unique_ptr<index_iface> impl_;
+  // Friend impl structures that need to initialize private members
+  friend struct owning_impl<IdxT>;
+  friend struct view_impl<IdxT>;
   
-  // IVF lists data - always owned by the index (not in PIMPL)
-  // These are the same for both owning and view variants
+  std::unique_ptr<index_iface> impl_;
   std::vector<std::shared_ptr<list_data<IdxT>>> lists_;
   raft::device_vector<uint32_t, uint32_t, raft::row_major> list_sizes_;
-  
-  // Computed members for accelerating search
-  raft::device_vector<uint8_t*, uint32_t, raft::row_major> data_ptrs_;
-  raft::device_vector<IdxT*, uint32_t, raft::row_major> inds_ptrs_;
-  raft::host_vector<IdxT, uint32_t, raft::row_major> accum_sorted_sizes_;
-  
+
   // Lazy-initialized low-precision variants of index members - for low-precision coarse search.
   // These are never serialized and not touched during build/extend.
   mutable std::optional<raft::device_matrix<int8_t, uint32_t, raft::row_major>> centers_int8_;
@@ -513,8 +543,17 @@ struct index : cuvs::neighbors::index {
   mutable std::optional<raft::device_matrix<int8_t, uint32_t, raft::row_major>>
     rotation_matrix_int8_;
   mutable std::optional<raft::device_matrix<half, uint32_t, raft::row_major>> rotation_matrix_half_;
-};
 
+  // Computed members for accelerating search.
+  raft::device_vector<uint8_t*, uint32_t, raft::row_major> data_ptrs_;
+  raft::device_vector<IdxT*, uint32_t, raft::row_major> inds_ptrs_;
+  raft::host_vector<IdxT, uint32_t, raft::row_major> accum_sorted_sizes_;
+
+  /** Throw an error if the index content is inconsistent. */
+  void check_consistency();
+
+  pq_centers_extents make_pq_centers_extents();
+};
 /**
  * @}
  */
