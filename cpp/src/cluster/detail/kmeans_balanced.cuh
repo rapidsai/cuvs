@@ -82,7 +82,6 @@ bool use_fused(const raft::resources& handle, IdxT m, IdxT n, IdxT k)
     return false;
   }
   return false;
-
 }
 
 /**

@@ -244,30 +244,38 @@ void unfused_distance_nn(raft::resources const& handle,
   } else if constexpr (std::is_same_v<DataT, int8_t>) {
     xyType = CUDA_R_8I;
     if constexpr (std::is_same_v<AccT, int32_t>) {
-      zType = CUDA_R_32I;
+      zType       = CUDA_R_32I;
       computeType = CUBLAS_COMPUTE_32I;
-      alpha = reinterpret_cast<const void*>(&i32_alpha);
-      beta = reinterpret_cast<const void*>(&i32_beta);
+      alpha       = reinterpret_cast<const void*>(&i32_alpha);
+      beta        = reinterpret_cast<const void*>(&i32_beta);
     } else if constexpr (std::is_same_v<AccT, float>) {
-      zType = CUDA_R_32F;
+      zType       = CUDA_R_32F;
       computeType = CUBLAS_COMPUTE_32F;
-      alpha = reinterpret_cast<const void*>(&i8_alpha);
-      beta = reinterpret_cast<const void*>(&i8_beta);
+      alpha       = reinterpret_cast<const void*>(&i8_alpha);
+      beta        = reinterpret_cast<const void*>(&i8_beta);
     }
   }
   auto cublas_h = raft::resource::get_cublas_handle(handle);
-  RAFT_CUBLAS_TRY(cublasGemmEx(
-      cublas_h,
-      CUBLAS_OP_T, CUBLAS_OP_N,
-      N, M, K,                   // Dimensions (swapped due to row/col-major difference)
-      alpha,                    // alpha
-      y, xyType, K,            // B, its data type, and leading dimension
-      x, xyType, K,            // A, its data type, and leading dimension
-      beta,                     // beta
-      workspace, zType, N,            // C, its data type, and leading dimension
-      computeType,               // Computation type
-      CUBLAS_GEMM_DEFAULT        // Algorithm selection
-    ));
+  RAFT_CUBLAS_TRY(cublasGemmEx(cublas_h,
+                               CUBLAS_OP_T,
+                               CUBLAS_OP_N,
+                               N,
+                               M,
+                               K,      // Dimensions (swapped due to row/col-major difference)
+                               alpha,  // alpha
+                               y,
+                               xyType,
+                               K,  // B, its data type, and leading dimension
+                               x,
+                               xyType,
+                               K,     // A, its data type, and leading dimension
+                               beta,  // beta
+                               workspace,
+                               zType,
+                               N,                   // C, its data type, and leading dimension
+                               computeType,         // Computation type
+                               CUBLAS_GEMM_DEFAULT  // Algorithm selection
+                               ));
 
   if (reduce == true) {
     if (metric == DistanceType::L2Expanded) {
