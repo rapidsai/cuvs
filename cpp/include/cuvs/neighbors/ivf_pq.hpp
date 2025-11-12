@@ -516,8 +516,6 @@ struct index : cuvs::neighbors::index {
    */
   uint32_t get_list_size_in_bytes(uint32_t label);
 
-  static uint32_t calculate_pq_dim(uint32_t dim);
-
   /**
    * @brief Construct index from implementation pointer.
    *
@@ -536,7 +534,6 @@ struct index : cuvs::neighbors::index {
   // PIMPL pointer - only for data storage strategy (centers/matrices)
   std::unique_ptr<index_iface> impl_;
 
-  // Metadata - stored directly in index for fast access (no PIMPL indirection)
   cuvs::distance::DistanceType metric_;
   codebook_gen codebook_kind_;
   uint32_t dim_;
@@ -565,6 +562,8 @@ struct index : cuvs::neighbors::index {
   void check_consistency();
 
   pq_centers_extents make_pq_centers_extents();
+
+  static uint32_t calculate_pq_dim(uint32_t dim); 
 };
 /**
  * @}
