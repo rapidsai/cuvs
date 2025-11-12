@@ -194,6 +194,8 @@ enum class search_algo {
 
 enum class hash_mode { HASH = 0, SMALL = 1, AUTO = 100 };
 
+enum class internal_dtype { F16 = 0, E5M2 = 1, AUTO = 100 };
+
 struct search_params : cuvs::neighbors::search_params {
   /** Maximum number of queries to search at the same time (batch size). Auto select when 0.*/
   size_t max_queries = 0;
@@ -267,6 +269,10 @@ struct search_params : cuvs::neighbors::search_params {
    * negative, in which case the filtering rate is automatically calculated.
    */
   float filtering_rate = -1.0;
+
+  /** Data type of the query vector and codebook table on shared memory. Currently, only VPQ
+   * supports FP8. **/
+  internal_dtype smem_dtype = internal_dtype::AUTO;
 };
 
 /**

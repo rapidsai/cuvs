@@ -148,6 +148,10 @@ void search_main(raft::resources const& res,
   // Dispatch search parameters based on the dataset kind.
   if (auto* strided_dset = dynamic_cast<const strided_dataset<T, ds_idx_type>*>(&index.data());
       strided_dset != nullptr) {
+    if (params.smem_dtype != cuvs::neighbors::cagra::internal_dtype::AUTO ||
+        params.smem_dtype != cuvs::neighbors::cagra::internal_dtype::F16) {
+      RAFT_LOG_WARN("In this search mode, only AUTO or F16 are supported as the smem_dtype.");
+    }
     // Search using a plain (strided) row-major dataset
     RAFT_EXPECTS(index.metric() != cuvs::distance::DistanceType::CosineExpanded ||
                    index.dataset_norms().has_value(),
