@@ -56,7 +56,6 @@ void fusedL2NNImpl(OutT* min,
                    bool initOutBuffer,
                    cudaStream_t stream)
 {
-  nvtxRangePushA("pc::fused_kernel_prep");
   // The kernel policy is determined by fusedL2NN.
   typedef Policy P;
 
@@ -95,7 +94,6 @@ void fusedL2NNImpl(OutT* min,
   auto runtime_arch  = arch::kernel_virtual_arch(kernel_ptr);
   auto cutlass_range = arch::SM_range(arch::SM_80(), arch::SM_future());
 
-  nvtxRangePop();
   if (cutlass_range.contains(runtime_arch)) {
     // If device is SM_80 or later, use CUTLASS-based kernel.
     using L2Op                  = cuvs::distance::detail::ops::l2_exp_cutlass_op<DataT, DataT>;
