@@ -527,43 +527,12 @@ struct index : cuvs::neighbors::index {
   explicit index(std::unique_ptr<index_iface> impl);
 
  private:
-  // Friend impl structures that need to initialize private members
+  // Friend impl structures
   friend struct owning_impl<IdxT>;
   friend struct view_impl<IdxT>;
 
-  // PIMPL pointer - only for data storage strategy (centers/matrices)
+  // PIMPL pointer - contains EVERYTHING (metadata, lists, centers, matrices)
   std::unique_ptr<index_iface> impl_;
-
-  cuvs::distance::DistanceType metric_;
-  codebook_gen codebook_kind_;
-  uint32_t dim_;
-  uint32_t pq_bits_;
-  uint32_t pq_dim_;
-  bool conservative_memory_allocation_;
-
-  // IVF lists data - always owned, not in PIMPL
-  std::vector<std::shared_ptr<list_data<IdxT>>> lists_;
-  raft::device_vector<uint32_t, uint32_t, raft::row_major> list_sizes_;
-
-  // Lazy-initialized low-precision variants of index members - for low-precision coarse search.
-  // These are never serialized and not touched during build/extend.
-  mutable std::optional<raft::device_matrix<int8_t, uint32_t, raft::row_major>> centers_int8_;
-  mutable std::optional<raft::device_matrix<half, uint32_t, raft::row_major>> centers_half_;
-  mutable std::optional<raft::device_matrix<int8_t, uint32_t, raft::row_major>>
-    rotation_matrix_int8_;
-  mutable std::optional<raft::device_matrix<half, uint32_t, raft::row_major>> rotation_matrix_half_;
-
-  // Computed members for accelerating search.
-  raft::device_vector<uint8_t*, uint32_t, raft::row_major> data_ptrs_;
-  raft::device_vector<IdxT*, uint32_t, raft::row_major> inds_ptrs_;
-  raft::host_vector<IdxT, uint32_t, raft::row_major> accum_sorted_sizes_;
-
-  /** Throw an error if the index content is inconsistent. */
-  void check_consistency();
-
-  pq_centers_extents make_pq_centers_extents();
-
-  static uint32_t calculate_pq_dim(uint32_t dim); 
 };
 /**
  * @}
@@ -1161,7 +1130,7 @@ void build(
  * @{
  */
 /**
- * @brief Extend the index with the new data (returns new index by value).
+ * @brief Extend the index with the new data.
  *
  * Usage example:
  * @code{.cpp}
@@ -1219,7 +1188,7 @@ void extend(raft::resources const& handle,
             cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 
 /**
- * @brief Extend the index with the new data (returns new index by value).
+ * @brief Extend the index with the new data.
  *
  * Usage example:
  * @code{.cpp}
