@@ -1118,12 +1118,12 @@ index<T, IdxT> build_ace(raft::resources const& res,
       min_partition_size);
 
     // Create vector lists for each partition
-    auto vectorlist_start           = std::chrono::high_resolution_clock::now();
-    auto core_forward_mapping       = use_disk ? raft::make_host_vector<IdxT, int64_t>(dataset_size)
+    auto vectorlist_start      = std::chrono::high_resolution_clock::now();
+    auto core_forward_mapping  = use_disk_mode ? raft::make_host_vector<IdxT, int64_t>(dataset_size)
                                                : raft::make_host_vector<IdxT, int64_t>(0);
-    auto core_backward_mapping      = raft::make_host_vector<IdxT, int64_t>(dataset_size);
-    auto augmented_backward_mapping = raft::make_host_vector<IdxT, int64_t>(dataset_size);
-    auto core_partition_offsets     = raft::make_host_vector<IdxT, int64_t>(n_partitions + 1);
+    auto core_backward_mapping = raft::make_host_vector<IdxT, int64_t>(dataset_size);
+    auto augmented_backward_mapping  = raft::make_host_vector<IdxT, int64_t>(dataset_size);
+    auto core_partition_offsets      = raft::make_host_vector<IdxT, int64_t>(n_partitions + 1);
     auto augmented_partition_offsets = raft::make_host_vector<IdxT, int64_t>(n_partitions + 1);
 
     ace_create_forward_and_backward_lists<IdxT>(dataset_size,
@@ -1164,7 +1164,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
     }
 
     // Placeholder search graph for in-memory version
-    auto search_graph = use_disk
+    auto search_graph = use_disk_mode
                           ? raft::make_host_matrix<IdxT, int64_t>(0, 0)
                           : raft::make_host_matrix<IdxT, int64_t>(dataset_size, graph_degree);
 
@@ -1245,7 +1245,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
                         stream);
       raft::resource::sync_stream(res, stream);
 
-      if (use_disk) {
+      if (use_disk_mode) {
         // Adjust IDs in sub_search_graph in place for disk storage
         ace_adjust_sub_graph_ids_disk<IdxT>(core_sub_dataset_size,
                                             augmented_sub_dataset_size,
@@ -1274,7 +1274,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
       auto adjust_elapsed =
         std::chrono::duration_cast<std::chrono::milliseconds>(adjust_end - optimize_end).count();
 
-      if (use_disk) {
+      if (use_disk_mode) {
         const size_t graph_offset =
           static_cast<size_t>(core_partition_offsets(partition_id)) * graph_degree * sizeof(IdxT) +
           graph_header_size;
@@ -1331,7 +1331,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
     index<T, IdxT> idx(res, params.metric);
     // Only add graph and dataset if not using disk storage. The returned index is empty if using
     // disk storage. Use the files written to disk for search.
-    if (!use_disk) {
+    if (!use_disk_mode) {
       idx.update_graph(res, raft::make_const_mdspan(search_graph.view()));
 
       if (params.attach_dataset_on_build) {
