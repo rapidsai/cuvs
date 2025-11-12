@@ -342,7 +342,7 @@ void ace_create_forward_and_backward_lists(
   }
 
   // Restore idxptr arrays
-  for (size_t c = n_partitions + 1; c > 0; c--) {
+  for (size_t c = n_partitions; c > 0; c--) {
     core_partition_offsets(c)      = core_partition_offsets(c - 1);
     augmented_partition_offsets(c) = augmented_partition_offsets(c - 1);
   }
@@ -536,7 +536,7 @@ void ace_reorder_and_store_dataset(
   disk_write_size           = std::min<size_t>(disk_write_size, 64 * 1024 * 1024);
   size_t vectors_per_buffer = std::max<size_t>(64, disk_write_size / vector_size);
 
-  RAFT_LOG_DEBUG("ACE: Reorder buffers: %lu vectors per buffer (%.2f MB)",
+  RAFT_LOG_DEBUG("ACE: Reorder buffers: %lu vectors per buffer (%.2f MiB)",
                  vectors_per_buffer,
                  vectors_per_buffer * vector_size / (1024.0 * 1024.0));
 
@@ -628,10 +628,20 @@ void ace_reorder_and_store_dataset(
 
   // Flush all remaining buffers
   RAFT_LOG_DEBUG("ACE: Flushing remaining buffers...");
-#pragma omp parallel for
-  for (size_t p = 0; p < n_partitions; p++) {
-    flush_core_buffer(p);
-    flush_augmented_buffer(p);
+#pragma omp parallel sections
+  {
+#pragma omp section
+    {
+      for (size_t p = 0; p < n_partitions; p++) {
+        flush_core_buffer(p);
+      }
+    }
+#pragma omp section
+    {
+      for (size_t p = 0; p < n_partitions; p++) {
+        flush_augmented_buffer(p);
+      }
+    }
   }
 
   const size_t mapping_file_size = dataset_size * sizeof(IdxT);
@@ -643,7 +653,8 @@ void ace_reorder_and_store_dataset(
 
   // Calculate total bytes written
   size_t total_bytes_written = reordered_file_size + augmented_file_size + mapping_file_size;
-  double throughput_mb_s     = (total_bytes_written / (1024.0 * 1024.0)) / (elapsed_ms / 1000.0);
+  double throughput_mb_s =
+    elapsed_ms > 0 ? (total_bytes_written / (1024.0 * 1024.0)) / (elapsed_ms / 1000.0) : 0.0;
 
   RAFT_LOG_INFO(
     "ACE: Dataset (%.2f GiB reordered, %.2f GiB augmented, %.2f GiB mapping) reordering completed "
@@ -695,6 +706,13 @@ void ace_load_partition_dataset_from_disk(
   const std::string reordered_dataset_path = build_dir + "/reordered_dataset.npy";
   const std::string augmented_dataset_path = build_dir + "/augmented_dataset.npy";
 
+  if (!std::filesystem::exists(reordered_dataset_path)) {
+    RAFT_FAIL("ACE: Required file does not exist: %s", reordered_dataset_path.c_str());
+  }
+  if (!std::filesystem::exists(augmented_dataset_path)) {
+    RAFT_FAIL("ACE: Required file does not exist: %s", augmented_dataset_path.c_str());
+  }
+
   size_t core_header_size      = 0;
   size_t augmented_header_size = 0;
   size_t core_file_offset      = 0;
@@ -730,33 +748,48 @@ void ace_load_partition_dataset_from_disk(
                  augmented_file_offset);
 
   // Read core and augmented data in parallel
+  std::exception_ptr core_exception      = nullptr;
+  std::exception_ptr augmented_exception = nullptr;
+
 #pragma omp parallel sections
   {
 #pragma omp section
     {
-      if (core_size > 0) {
-        RAFT_LOG_DEBUG(
-          "ACE: Reading %lu core vectors from offset %lu", core_size, core_file_offset);
-        cuvs::util::file_descriptor reordered_fd(reordered_dataset_path, O_RDONLY);
-        const size_t core_bytes = core_size * vector_size;
-        cuvs::util::read_large_file(
-          reordered_fd, sub_dataset.data_handle(), core_bytes, core_file_offset);
+      try {
+        if (core_size > 0) {
+          RAFT_LOG_DEBUG(
+            "ACE: Reading %lu core vectors from offset %lu", core_size, core_file_offset);
+          cuvs::util::file_descriptor reordered_fd(reordered_dataset_path, O_RDONLY);
+          const size_t core_bytes = core_size * vector_size;
+          cuvs::util::read_large_file(
+            reordered_fd, sub_dataset.data_handle(), core_bytes, core_file_offset);
+        }
+      } catch (...) {
+        core_exception = std::current_exception();
       }
     }
 #pragma omp section
     {
-      if (augmented_size > 0) {
-        RAFT_LOG_DEBUG("ACE: Reading %lu augmented vectors from offset %lu",
-                       augmented_size,
-                       augmented_file_offset);
-        cuvs::util::file_descriptor augmented_fd(augmented_dataset_path, O_RDONLY);
-        const size_t augmented_bytes = augmented_size * vector_size;
-        T* augmented_dest            = sub_dataset.data_handle() + (core_size * dataset_dim);
-        cuvs::util::read_large_file(
-          augmented_fd, augmented_dest, augmented_bytes, augmented_file_offset);
+      try {
+        if (augmented_size > 0) {
+          RAFT_LOG_DEBUG("ACE: Reading %lu augmented vectors from offset %lu",
+                         augmented_size,
+                         augmented_file_offset);
+          cuvs::util::file_descriptor augmented_fd(augmented_dataset_path, O_RDONLY);
+          const size_t augmented_bytes = augmented_size * vector_size;
+          T* augmented_dest            = sub_dataset.data_handle() + (core_size * dataset_dim);
+          cuvs::util::read_large_file(
+            augmented_fd, augmented_dest, augmented_bytes, augmented_file_offset);
+        }
+      } catch (...) {
+        augmented_exception = std::current_exception();
       }
     }
   }
+
+  // Check for exceptions from parallel sections
+  if (core_exception) { std::rethrow_exception(core_exception); }
+  if (augmented_exception) { std::rethrow_exception(augmented_exception); }
 }
 
 // Build CAGRA index using ACE (Augmented Core Extraction) partitioning
@@ -1146,6 +1179,10 @@ index<T, IdxT> build_ace(raft::resources const& res,
       size_t augmented_sub_dataset_size = partition_histogram(partition_id, 1);
       size_t sub_dataset_size           = core_sub_dataset_size + augmented_sub_dataset_size;
 
+      if (sub_dataset_size == 0) {
+        RAFT_LOG_WARN("ACE: Skipping empty partition %lu", partition_id);
+        continue;
+      }
       RAFT_LOG_DEBUG("ACE: Sub-dataset size: %lu (%lu + %lu)",
                      sub_dataset_size,
                      core_sub_dataset_size,
@@ -1250,10 +1287,13 @@ index<T, IdxT> build_ace(raft::resources const& res,
       auto write_elapsed =
         std::chrono::duration_cast<std::chrono::milliseconds>(end - adjust_end).count();
       auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-      double read_throughput =
-        sub_dataset_size * dataset_dim * sizeof(T) / (1024.0 * 1024.0) / (read_elapsed / 1000.0);
-      double write_throughput = core_sub_dataset_size * dataset_dim * sizeof(T) /
-                                (1024.0 * 1024.0) / (write_elapsed / 1000.0);
+      double read_throughput  = read_elapsed > 0 ? sub_dataset_size * dataset_dim * sizeof(T) /
+                                                    (1024.0 * 1024.0) / (read_elapsed / 1000.0)
+                                                 : 0.0;
+      double write_throughput = write_elapsed > 0
+                                  ? core_sub_dataset_size * dataset_dim * sizeof(T) /
+                                      (1024.0 * 1024.0) / (write_elapsed / 1000.0)
+                                  : 0.0;
       RAFT_LOG_INFO(
         "ACE: Partition %4lu (%8lu + %8lu) completed in %6ld ms: read %6ld ms (%7.1f MiB/s), "
         "optimize %6ld ms, adjust %6ld ms, write %6ld ms (%7.1f MiB/s)",
