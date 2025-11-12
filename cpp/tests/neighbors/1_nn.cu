@@ -15,7 +15,7 @@
  */
 
 #include "../test_utils.cuh"
-#include "1_nn_utils.cuh"
+#include "1_nn_helper.cuh"
 
 #include "../../src/distance/fused_distance_nn.cuh"
 #include "../../src/distance/unfused_distance_nn.cuh"
@@ -81,11 +81,13 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
 
   void compute_1nn()
   {
+    DistanceType metric =  DistanceType::L2Expanded;
+    bool sqrt = false;
     raft::device_vector<char, IdxT> workspace =
       raft::make_device_vector<char, IdxT>(handle, workspace_size);
 
     ref_l2nn_api<DataT, AccT, OutT, IdxT>(
-      ref_out.data_handle(), x.data_handle(), y.data_handle(), m, n, k, stream);
+      ref_out.data_handle(), x.data_handle(), y.data_handle(), m, n, k, sqrt, metric, stream);
 
     if constexpr (impl == ImplType::fused) {
       if constexpr (std::is_same_v<DataT, float>) {
@@ -99,10 +101,10 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
           static_cast<IdxT>(n),
           static_cast<IdxT>(k),
           (void*)workspace.data_handle(),
-          false,
+          sqrt,
           true,
           true,
-          cuvs::distance::DistanceType::L2Expanded,
+          metric,
           0.0,
           stream);
       } else {
@@ -121,10 +123,10 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
         n,
         k,
         (AccT*)workspace.data_handle(),
-        false,
+        sqrt,
         true,
         true,
-        cuvs::distance::DistanceType::L2Expanded,
+        metric,
         0.0,
         stream);
     }

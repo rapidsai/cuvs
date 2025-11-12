@@ -45,48 +45,67 @@ _RAFT_HOST_DEVICE T min_val()
 }
 
 template <typename DataT, typename AccT, typename OutT, typename IdxT>
-RAFT_KERNEL ref_l2nn_dev(OutT* out, const DataT* A, const DataT* B, IdxT M, IdxT N, IdxT K)
+__device__ AccT l2_distance(const DataT* v1, const DataT* v2, IdxT K)
 {
-  IdxT tid     = threadIdx.x + blockIdx.x * size_t(blockDim.x);
-  IdxT n_warps = (size_t(blockDim.x) * gridDim.x) / 32;
+  AccT th_dist = AccT(0.0);
+  for (IdxT k = 0; k < K; k++) {
+    AccT diff = AccT(v1[k]) - AccT(v2[k]);
+    th_dist += (diff * diff);
+  }
+  return th_dist;
+}
 
-  IdxT warp_id        = tid / 32;
-  IdxT warp_lane      = threadIdx.x % 32;
-  const int warp_size = 32;
+template <typename DataT, typename AccT, typename OutT, typename IdxT>
+__device__ AccT cosine_distance(const DataT* v1, const DataT* v2, IdxT K)
+{
+  AccT v1_norm = AccT(0.0);
+  AccT v2_norm = AccT(0.0);
+  AccT v1v2    = AccT(0.0);
 
-  for (IdxT m = warp_id; m < M; m += n_warps) {
-    __shared__ AccT dist[4];
+  for (IdxT k = 0; k < K; k++) {
+    v1_norm += (AccT(v1[k]) * AccT(v1[k]));
+    v2_norm += (AccT(v2[k]) * AccT(v2[k]));
+    v1v2 += (AccT(v1[k]) * AccT(v2[k]));
+  }
 
+  return AccT(1.0) - (v1v2 / (v1_norm * v2_norm));
+}
+
+// This is a naive implementation of 1-NN computation
+template <typename DataT, typename AccT, typename OutT, typename IdxT>
+RAFT_KERNEL void ref_l2nn_dev(
+  OutT* out, const DataT* A, const DataT* B, IdxT M, IdxT N, IdxT K, bool sqrt, DistanceType metric)
+{
+  IdxT tid = threadIdx.x + blockIdx.x * IdxT(blockDim.x);
+
+  for (IdxT m = tid; m < M; m += (blockDim.x * gridDim.x)) {
     IdxT min_index = N + 1;
     AccT min_dist  = max_val<AccT>();
 
     for (IdxT n = 0; n < N; n++) {
-      if (warp_lane == 0) { dist[warp_id % 4] = AccT(0.0); }
-      AccT th_dist = AccT(0.0);
-      for (IdxT k = warp_lane; k < K; k += warp_size) {
-        AccT diff = AccT(A[m * K + k]) - AccT(B[n * K + k]);
-        th_dist += (diff * diff);
+      AccT dist;
+      if (metric == DistanceType::L2SqrtExpanded || metric == DistanceType::L2Expanded) {
+        dist = l2_distance<DataT, AccT, OutT, IdxT>(&A[m * K], &B[n * K], K);
+      } else if (metric == DistanceType::CosineExpanded) {
+        dist = cosine_distance<DataT, AccT, OutT, IdxT>(&A[m * K], &B[n * K], K);
       }
-      __syncwarp();
-      atomicAdd(&dist[warp_id % 4], th_dist);
-      __syncwarp();
-
-      if (warp_lane == 0 && dist[warp_id % 4] < min_dist) {
-        min_dist  = dist[warp_id % 4];
+      if (dist < min_dist) {
+        min_dist  = dist;
         min_index = n;
       }
     }
+
     if constexpr (std::is_fundamental<OutT>::value) {
-      if (warp_lane == 0) {
-        static_assert(std::is_same<OutT, AccT>::value, "OutT and AccT are not same type");
-        out[m] = AccT(min_dist);
-      }
+      static_assert(std::is_same<OutT, AccT>::value, "OutT and AccT are not same type");
+      out[m] = AccT(min_dist);
     } else {
       // output is a raft::KeyValuePair
-      if (warp_lane == 0) {
-        static_assert(std::is_same<OutT, raft::KeyValuePair<IdxT, AccT>>::value,
-                      "OutT is not raft::KeyValuePair<> type");
-        out[m].key   = IdxT(min_index);
+      static_assert(std::is_same<OutT, raft::KeyValuePair<IdxT, AccT>>::value,
+                    "OutT is not raft::KeyValuePair<> type");
+      out[m].key = IdxT(min_index);
+      if (sqrt) {
+        out[m].value = raft::sqrt(AccT(min_dist));
+      } else {
         out[m].value = AccT(min_dist);
       }
     }
@@ -94,14 +113,22 @@ RAFT_KERNEL ref_l2nn_dev(OutT* out, const DataT* A, const DataT* B, IdxT M, IdxT
 }
 
 template <typename DataT, typename AccT, typename OutT, typename IdxT>
-void ref_l2nn_api(
-  OutT* out, const DataT* A, const DataT* B, IdxT m, IdxT n, IdxT k, cudaStream_t stream)
+void ref_l2nn_api(OutT* out,
+                  const DataT* A,
+                  const DataT* B,
+                  IdxT m,
+                  IdxT n,
+                  IdxT k,
+                  bool sqrt,
+                  DistanceType metric,
+                  cudaStream_t stream)
 {
   // constexpr int block_dim = 128;
   // static_assert(block_dim % 32 == 0, "blockdim must be divisible by 32");
   // constexpr int warps_per_block = block_dim / 32;
   // int num_blocks = m ;
-  ref_l2nn_dev<DataT, AccT, OutT, IdxT><<<m / 4, 128, 0, stream>>>(out, A, B, m, n, k);
+  ref_l2nn_dev<DataT, AccT, OutT, IdxT>
+    <<<(m + 127) / 128, 128, 0, stream>>>(out, A, B, m, n, k, sqrt, metric);
   return;
 }
 
