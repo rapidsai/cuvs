@@ -98,6 +98,9 @@ void build(const raft::resources& clique,
     int threads_per_rank  = std::max(1, saved_omp_threads / index.num_ranks_);
     cuvs::core::omp::set_nested(1);
 
+    const int& requirements = index.num_ranks_;
+    cuvs::core::omp::check_threads(requirements);
+
 #pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
       // Set thread limit for this rank's nested OpenMP regions
@@ -124,6 +127,9 @@ void build(const raft::resources& clique,
     int saved_omp_threads = cuvs::core::omp::get_max_threads();
     int threads_per_rank  = std::max(1, saved_omp_threads / index.num_ranks_);
     cuvs::core::omp::set_nested(1);
+
+    const int& requirements = index.num_ranks_;
+    cuvs::core::omp::check_threads(requirements);
 
 #pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
