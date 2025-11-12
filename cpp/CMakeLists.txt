@@ -229,9 +229,9 @@ if(NOT BUILD_CPU_ONLY)
     PRIVATE OpenMP::OpenMP_CXX
             ${CUDA_CUBLAS_LIBRARIES}
             CUDA::cudart
+            raft::raft
             # CUDA::cudadevrt
             rmm
-            cuvs
   ) # fix rmm dependencies
 
   target_include_directories(
@@ -672,6 +672,7 @@ if(NOT BUILD_CPU_ONLY)
              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
               cuvs-cagra-search
+              ivf_rabitq_lib
     )
 
     # ensure CUDA symbols aren't relocated to the middle of the debug build binaries
