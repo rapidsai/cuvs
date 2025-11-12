@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -42,6 +31,40 @@ namespace graph_build_params = cuvs::neighbors::graph_build_params;
  * @defgroup cagra_cpp_index_params CAGRA index build parameters
  * @{
  */
+
+/**
+ * @brief A strategy for selecting the graph build parameters based on similar HNSW index
+ * parameters.
+ *
+ * Define how `cagra::index_params::from_hnsw_params` should construct a graph to construct a graph
+ * that is to be converted to (used by) a CPU HNSW index.
+ */
+enum class hnsw_heuristic_type : uint32_t {
+  /**
+   * Create a graph that is very similar to an HNSW graph in
+   * terms of the number of nodes and search performance. Since HNSW produces a variable-degree
+   * graph (2M being the max graph degree) and CAGRA produces a fixed-degree graph, there's always a
+   * difference in the performance of the two.
+   *
+   * This function attempts to produce such a graph that the QPS and recall of the two graphs being
+   * searched by HNSW are close for any search parameter combination. The CAGRA-produced graph tends
+   * to have a "longer tail" on the low recall side (that is being slightly faster and less
+   * precise).
+   *
+   */
+  SIMILAR_SEARCH_PERFORMANCE = 0,
+  /**
+   * Create a graph that has the same binary size as an HNSW graph with the given parameters
+   * (`graph_degree = 2 * M`) while trying to match the search performance as closely as possible.
+   *
+   * The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce
+   * the same recalls and QPS for the same parameter `ef`. The graphs are different internally. For
+   * the same `ef`, the from-CAGRA index likely has a slightly higher recall and slightly lower QPS.
+   * However, the Recall-QPS curves should be similar (i.e. the points are just shifted along the
+   * curve).
+   */
+  SAME_GRAPH_FOOTPRINT = 1
+};
 
 struct index_params : cuvs::neighbors::index_params {
   /** Degree of input graph for pruning. */
@@ -116,6 +139,39 @@ struct index_params : cuvs::neighbors::index_params {
    * @endcode
    */
   bool attach_dataset_on_build = true;
+
+  /**
+   * @brief Create a CAGRA index parameters compatible with HNSW index
+   *
+   * @param dataset The shape of the input dataset
+   * @param M HNSW index parameter M
+   * @param ef_construction HNSW index parameter ef_construction
+   * @param heuristic The heuristic to use for selecting the graph build parameters
+   * @param metric The distance metric to search
+   *
+   * * IMPORTANT NOTE *
+   *
+   * The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce
+   * exactly the same recalls and QPS for the same parameter `ef`. The graphs are different
+   * internally. Depending on the selected heuristics, the CAGRA-produced graph's QPS-Recall curve
+   * may be shifted along the curve right or left. See the heuristics descriptions for more details.
+   *
+   * Usage example:
+   * @code{.cpp}
+   *   using namespace cuvs::neighbors;
+   *   raft::resources res;
+   *   auto dataset = raft::make_device_matrix<float, int64_t>(res, N, D);
+   *   auto cagra_params = cagra::index_params::from_hnsw_params(dataset.extents(), M, efc);
+   *   auto cagra_index = cagra::build(res, cagra_params, dataset);
+   *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, cagra_index);
+   * @endcode
+   */
+  static cagra::index_params from_hnsw_params(
+    raft::matrix_extent<int64_t> dataset,
+    int M,
+    int ef_construction,
+    hnsw_heuristic_type heuristic       = hnsw_heuristic_type::SIMILAR_SEARCH_PERFORMANCE,
+    cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 };
 
 /**

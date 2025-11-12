@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <cuvs/core/c_api.h>
@@ -23,6 +12,7 @@
 #include <raft/core/resource/resource_types.hpp>
 #include <raft/core/resources.hpp>
 #include <raft/util/cudart_utils.hpp>
+#include <rapids_logger/logger.hpp>
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/mr/device/device_memory_resource.hpp>
 #include <rmm/mr/device/managed_memory_resource.hpp>
@@ -134,7 +124,7 @@ extern "C" cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t byte
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
     auto mr      = rmm::mr::get_current_device_resource();
-    *ptr         = mr->allocate(bytes, raft::resource::get_cuda_stream(*res_ptr));
+    *ptr         = mr->allocate(raft::resource::get_cuda_stream(*res_ptr), bytes);
   });
 }
 
@@ -143,7 +133,7 @@ extern "C" cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes)
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
     auto mr      = rmm::mr::get_current_device_resource();
-    mr->deallocate(ptr, bytes, raft::resource::get_cuda_stream(*res_ptr));
+    mr->deallocate(raft::resource::get_cuda_stream(*res_ptr), ptr, bytes);
   });
 }
 
@@ -197,13 +187,13 @@ extern "C" cuvsError_t cuvsRMMHostAlloc(void** ptr, size_t bytes)
 {
   return cuvs::core::translate_exceptions([=] {
     if (pinned_mr == nullptr) { pinned_mr = std::make_unique<rmm::mr::pinned_host_memory_resource>(); }
-    *ptr = pinned_mr->allocate(bytes);
+    *ptr = pinned_mr->allocate_sync(bytes);
   });
 }
 
 extern "C" cuvsError_t cuvsRMMHostFree(void* ptr, size_t bytes)
 {
-  return cuvs::core::translate_exceptions([=] { pinned_mr->deallocate(ptr, bytes); });
+  return cuvs::core::translate_exceptions([=] { pinned_mr->deallocate_sync(ptr, bytes); });
 }
 
 thread_local std::string last_error_text = "";
@@ -211,6 +201,16 @@ thread_local std::string last_error_text = "";
 extern "C" const char* cuvsGetLastErrorText()
 {
   return last_error_text.empty() ? NULL : last_error_text.c_str();
+}
+
+extern "C" void cuvsSetLogLevel(cuvsLogLevel_t verbosity)
+{
+  raft::default_logger().set_level(static_cast<rapids_logger::level_enum>(verbosity));
+}
+
+extern "C" cuvsLogLevel_t cuvsGetLogLevel()
+{
+  return static_cast<cuvsLogLevel_t>(raft::default_logger().level());
 }
 
 extern "C" void cuvsSetLastErrorText(const char* error) { last_error_text = error ? error : ""; }

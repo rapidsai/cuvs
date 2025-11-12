@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.spi;
 
@@ -154,8 +143,36 @@ public interface CuVSProvider {
   /** Returns a {@link GPUInfoProvider} to query the system for GPU related information */
   GPUInfoProvider gpuInfoProvider();
 
+  void setLogLevel(java.util.logging.Level level);
+
+  java.util.logging.Level getLogLevel();
+
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {
     return CuVSServiceProvider.Holder.INSTANCE;
   }
+
+  /**
+   * Create a CAGRA index parameters compatible with HNSW index
+   *
+   * Note: The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce
+   * exactly the same recalls and QPS for the same parameter `ef`. The graphs are different
+   * internally. Depending on the selected heuristics, the CAGRA-produced graph's QPS-Recall curve
+   * may be shifted along the curve right or left. See the heuristics descriptions for more details.
+   *
+   * @param rows The number of rows in the input dataset
+   * @param dim The number of dimensions in the input dataset
+   * @param m HNSW index parameter M
+   * @param efConstruction HNSW index parameter ef_construction
+   * @param heuristic The heuristic to use for selecting the graph build parameters
+   * @param metric The distance metric to search
+   * @return A new CAGRA index parameters object
+   */
+  CagraIndexParams cagraIndexParamsFromHnswParams(
+      long rows,
+      long dim,
+      int m,
+      int efConstruction,
+      CagraIndexParams.HnswHeuristicType heuristic,
+      CagraIndexParams.CuvsDistanceType metric);
 }

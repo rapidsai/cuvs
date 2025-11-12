@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -75,13 +64,13 @@ struct lightweight_uvector {
     auto& [r, s] = std::get<rmm_res_type>(res_);
     T* new_ptr   = nullptr;
     if (new_size > 0) {
-      new_ptr = reinterpret_cast<T*>(r.allocate_async(new_size * sizeof(T), kAlign, s));
+      new_ptr = reinterpret_cast<T*>(r.allocate(s, new_size * sizeof(T), kAlign));
     }
     auto copy_size = std::min(size_, new_size);
     if (copy_size > 0) {
       cudaMemcpyAsync(new_ptr, ptr_, copy_size * sizeof(T), cudaMemcpyDefault, s);
     }
-    if (size_ > 0) { r.deallocate_async(ptr_, size_ * sizeof(T), kAlign, s); }
+    if (size_ > 0) { r.deallocate(s, ptr_, size_ * sizeof(T), kAlign); }
     ptr_  = new_ptr;
     size_ = new_size;
   }
@@ -102,7 +91,7 @@ struct lightweight_uvector {
   {
     if (size_ > 0) {
       auto& [r, s] = std::get<rmm_res_type>(res_);
-      r.deallocate_async(ptr_, size_ * sizeof(T), kAlign, s);
+      r.deallocate(s, ptr_, size_ * sizeof(T), kAlign);
     }
   }
 };

@@ -1,17 +1,8 @@
 #=============================================================================
-# Copyright (c) 2023-2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
 #=============================================================================
 
 function(find_and_configure_ggnn)
@@ -20,19 +11,17 @@ function(find_and_configure_ggnn)
   set(patch_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../patches")
   rapids_cpm_package_override("${patch_dir}/ggnn_override.json")
 
-  include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
-  rapids_cpm_package_details(ggnn version repository tag shallow exclude)
-
-  include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
-  rapids_cpm_generate_patch_command(ggnn ${version} patch_command build_patch_only)
+  include("${rapids-cmake-dir}/cpm/detail/package_info.cmake")
+  rapids_cpm_package_info(ggnn
+    VERSION_VAR version
+    FIND_VAR find_args
+    CPM_VAR cpm_args
+  )
 
   rapids_cpm_find(
-    ggnn ${version} ${build_patch_only}
+    ggnn ${version} ${find_args}
     GLOBAL_TARGETS ggnn::ggnn
-    CPM_ARGS
-    GIT_REPOSITORY ${repository}
-    GIT_TAG ${tag}
-    GIT_SHALLOW ${shallow} ${patch_command}
+    CPM_ARGS ${cpm_args}
     DOWNLOAD_ONLY ON
   )
 
