@@ -1039,48 +1039,44 @@ auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
 {
   auto stream = raft::resource::get_cuda_stream(res);
 
-  // Create the owning implementation
-  auto impl = std::make_unique<owning_impl<IdxT>>(res,
-                                                   source.metric(),
-                                                   source.codebook_kind(),
-                                                   source.n_lists(),
-                                                   source.dim(),
-                                                   source.pq_bits(),
-                                                   source.pq_dim(),
-                                                   source.conservative_memory_allocation());
+  // Create new index with same parameters (creates owning_impl and initializes metadata/lists)
+  index<IdxT> target(res,
+                     source.metric(),
+                     source.codebook_kind(),
+                     source.n_lists(),
+                     source.dim(),
+                     source.pq_bits(),
+                     source.pq_dim(),
+                     source.conservative_memory_allocation());
 
-  // raft::copy the center/matrix data
-  raft::copy(impl->rotation_matrix().data_handle(),
+  // raft::copy the center/matrix data to the new impl
+  raft::copy(target.rotation_matrix().data_handle(),
              source.rotation_matrix().data_handle(),
              source.rotation_matrix().size(),
              stream);
-  raft::copy(impl->pq_centers().data_handle(),
+  raft::copy(target.pq_centers().data_handle(),
              source.pq_centers().data_handle(),
              source.pq_centers().size(),
              stream);
-  raft::copy(impl->centers().data_handle(),
+  raft::copy(target.centers().data_handle(),
              source.centers().data_handle(),
              source.centers().size(),
              stream);
-  raft::copy(impl->centers_rot().data_handle(),
+  raft::copy(target.centers_rot().data_handle(),
              source.centers_rot().data_handle(),
              source.centers_rot().size(),
              stream);
 
-  // Construct the target index from the impl
-  index<IdxT> target(std::move(impl));
-  
-  // Initialize the lists
-  target.lists().resize(source.n_lists());
-  target.lists() = source.lists();  // Share list pointers
-  
+  // Share list pointers (shallow copy)
+  target.lists() = source.lists();
+
   // Copy list sizes
   raft::copy(target.list_sizes().data_handle(),
              source.list_sizes().data_handle(),
              source.list_sizes().size(),
              stream);
 
-  // Make sure the device pointers point to the new lists
+  // Make sure the device pointers point to the lists
   ivf::detail::recompute_internal_state(res, target);
 
   return target;
@@ -1325,30 +1321,18 @@ auto build(raft::resources const& handle,
   RAFT_EXPECTS(n_rows > 0 && dim > 0, "empty dataset");
   RAFT_EXPECTS(n_rows >= params.n_lists, "number of rows can't be less than n_lists");
 
-  auto stream = raft::resource::get_cuda_stream(handle);
+  // Simply construct the index with all parameters - impl handles everything
+  index<IdxT> idx(handle,
+                  params.metric,
+                  params.codebook_kind,
+                  params.n_lists,
+                  dim,
+                  params.pq_bits,
+                  params.pq_dim,
+                  params.conservative_memory_allocation);
 
-  // Create owning implementation
-  auto impl = std::make_unique<owning_impl<IdxT>>(handle, 
-                                                   params.metric,
-                                                   params.codebook_kind,
-                                                   params.n_lists,
-                                                   dim,
-                                                   params.pq_bits,
-                                                   params.pq_dim,
-                                                   params.conservative_memory_allocation);
-  
-  // Construct the index with the owning impl
-  index<IdxT> idx(std::move(impl));
-  
-  // Initialize the list structures
-  idx.lists().resize(params.n_lists);
-  idx.list_sizes_ = raft::make_device_vector<uint32_t, uint32_t>(handle, params.n_lists);
-  idx.data_ptrs_ = raft::make_device_vector<uint8_t*, uint32_t>(handle, params.n_lists);
-  idx.inds_ptrs_ = raft::make_device_vector<IdxT*, uint32_t>(handle, params.n_lists);
-  idx.accum_sorted_sizes_ = raft::make_host_vector<IdxT, uint32_t>(params.n_lists + 1);
-  
-  utils::memzero(
-    idx.accum_sorted_sizes().data_handle(), idx.accum_sorted_sizes().size(), stream);
+  auto stream = raft::resource::get_cuda_stream(handle);
+  utils::memzero(idx.accum_sorted_sizes().data_handle(), idx.accum_sorted_sizes().size(), stream);
   utils::memzero(idx.list_sizes().data_handle(), idx.list_sizes().size(), stream);
   utils::memzero(idx.data_ptrs().data_handle(), idx.data_ptrs().size(), stream);
   utils::memzero(idx.inds_ptrs().data_handle(), idx.inds_ptrs().size(), stream);
@@ -1490,7 +1474,8 @@ void build(raft::resources const& handle,
   *index = build(handle, params, dataset);
 }
 
-// Build function that creates index with view_impl (non-owning) when all device matrices are provided
+// Build function that creates index with view_impl (non-owning) when all device matrices are
+// provided
 template <typename IdxT>
 auto build(raft::resources const& handle,
            const cuvs::neighbors::ivf_pq::index_params& index_params,
@@ -1513,9 +1498,8 @@ auto build(raft::resources const& handle,
   uint32_t pq_book_size = 1u << index_params.pq_bits;
 
   // Check pq_centers extents
-  uint32_t expected_pq_extent_0 = (index_params.codebook_kind == codebook_gen::PER_SUBSPACE)
-                                    ? pq_dim
-                                    : index_params.n_lists;
+  uint32_t expected_pq_extent_0 =
+    (index_params.codebook_kind == codebook_gen::PER_SUBSPACE) ? pq_dim : index_params.n_lists;
   RAFT_EXPECTS(pq_centers.extent(0) == expected_pq_extent_0 && pq_centers.extent(1) == pq_len &&
                  pq_centers.extent(2) == pq_book_size,
                "pq_centers has incorrect extents");
@@ -1533,27 +1517,22 @@ auto build(raft::resources const& handle,
                "rotation_matrix must have extent [rot_dim, dim]");
 
   // Create view implementation (non-owning, uses external data)
-  auto impl = std::make_unique<view_impl<IdxT>>(index_params.metric,
-                                                 index_params.codebook_kind,
-                                                 index_params.n_lists,
-                                                 dim,
-                                                 index_params.pq_bits,
-                                                 pq_dim,
-                                                 index_params.conservative_memory_allocation,
-                                                 pq_centers,
-                                                 centers,
-                                                 centers_rot,
-                                                 rotation_matrix);
+  // Note: view_impl needs metadata to be passed since it won't own centers to derive from
+  auto impl = std::make_unique<view_impl<IdxT>>(handle,
+                                                index_params.metric,
+                                                index_params.codebook_kind,
+                                                index_params.n_lists,
+                                                dim,
+                                                index_params.pq_bits,
+                                                pq_dim,
+                                                index_params.conservative_memory_allocation,
+                                                pq_centers,
+                                                centers,
+                                                centers_rot,
+                                                rotation_matrix);
 
-  // Construct the index with view impl
+  // Construct the index with view impl (metadata/lists already initialized in impl)
   index<IdxT> view_index(std::move(impl));
-  
-  // Initialize the list structures
-  view_index.lists().resize(index_params.n_lists);
-  view_index.list_sizes_ = raft::make_device_vector<uint32_t, uint32_t>(handle, index_params.n_lists);
-  view_index.data_ptrs_ = raft::make_device_vector<uint8_t*, uint32_t>(handle, index_params.n_lists);
-  view_index.inds_ptrs_ = raft::make_device_vector<IdxT*, uint32_t>(handle, index_params.n_lists);
-  view_index.accum_sorted_sizes_ = raft::make_host_vector<IdxT, uint32_t>(index_params.n_lists + 1);
 
   utils::memzero(
     view_index.accum_sorted_sizes().data_handle(), view_index.accum_sorted_sizes().size(), stream);
@@ -1587,9 +1566,8 @@ auto build(
   uint32_t pq_book_size = 1u << index_params.pq_bits;
 
   // Check pq_centers extents
-  uint32_t expected_pq_extent_0 = (index_params.codebook_kind == codebook_gen::PER_SUBSPACE)
-                                    ? pq_dim
-                                    : index_params.n_lists;
+  uint32_t expected_pq_extent_0 =
+    (index_params.codebook_kind == codebook_gen::PER_SUBSPACE) ? pq_dim : index_params.n_lists;
   RAFT_EXPECTS(pq_centers.extent(0) == expected_pq_extent_0 && pq_centers.extent(1) == pq_len &&
                  pq_centers.extent(2) == pq_book_size,
                "pq_centers has incorrect extents");
@@ -1599,25 +1577,15 @@ auto build(
                  (centers.extent(1) == dim || centers.extent(1) == dim_ext),
                "centers must have extent [n_lists, dim] or [n_lists, dim_ext]");
 
-  // Create owning implementation
-  auto impl = std::make_unique<owning_impl<IdxT>>(handle,
-                                                   index_params.metric,
-                                                   index_params.codebook_kind,
-                                                   index_params.n_lists,
-                                                   dim,
-                                                   index_params.pq_bits,
-                                                   pq_dim,
-                                                   index_params.conservative_memory_allocation);
-  
-  // Construct the index with owning impl
-  index<IdxT> owning_index(std::move(impl));
-  
-  // Initialize the list structures
-  owning_index.lists().resize(index_params.n_lists);
-  owning_index.list_sizes_ = raft::make_device_vector<uint32_t, uint32_t>(handle, index_params.n_lists);
-  owning_index.data_ptrs_ = raft::make_device_vector<uint8_t*, uint32_t>(handle, index_params.n_lists);
-  owning_index.inds_ptrs_ = raft::make_device_vector<IdxT*, uint32_t>(handle, index_params.n_lists);
-  owning_index.accum_sorted_sizes_ = raft::make_host_vector<IdxT, uint32_t>(index_params.n_lists + 1);
+  // Create index with constructor (handles metadata/lists initialization in impl)
+  index<IdxT> owning_index(handle,
+                           index_params.metric,
+                           index_params.codebook_kind,
+                           index_params.n_lists,
+                           dim,
+                           index_params.pq_bits,
+                           pq_dim,
+                           index_params.conservative_memory_allocation);
 
   utils::memzero(owning_index.accum_sorted_sizes().data_handle(),
                  owning_index.accum_sorted_sizes().size(),
@@ -1741,7 +1709,6 @@ void extend(
                   new_indices.has_value() ? new_indices.value().data_handle() : nullptr,
                   n_rows);
 }
-
 
 // Host version - always returns index with owning_impl since we create device copies
 template <typename IdxT>

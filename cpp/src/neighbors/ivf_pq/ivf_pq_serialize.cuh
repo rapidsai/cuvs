@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -134,20 +134,9 @@ auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT
                  static_cast<int>(pq_bits),
                  static_cast<int>(n_lists));
 
-  // Create owning implementation
-  auto impl = std::make_unique<owning_impl<IdxT>>(handle_, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, cma);
-  
-  // Construct the index
-  index<IdxT> index(std::move(impl));
-  
-  // Initialize list structures
-  index.lists().resize(n_lists);
-  index.list_sizes_ = raft::make_device_vector<uint32_t, uint32_t>(handle_, n_lists);
-  index.data_ptrs_ = raft::make_device_vector<uint8_t*, uint32_t>(handle_, n_lists);
-  index.inds_ptrs_ = raft::make_device_vector<IdxT*, uint32_t>(handle_, n_lists);
-  index.accum_sorted_sizes_ = raft::make_host_vector<IdxT, uint32_t>(n_lists + 1);
+  index<IdxT> index(handle_, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, cma);
 
-  // Deserialize data
+  // Deserialize center/matrix data
   raft::deserialize_mdspan(handle_, is, index.pq_centers());
   raft::deserialize_mdspan(handle_, is, index.centers());
   raft::deserialize_mdspan(handle_, is, index.centers_rot());
