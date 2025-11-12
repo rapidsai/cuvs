@@ -109,23 +109,17 @@ RAFT_DEVICE_INLINE_FUNCTION void pickup_next_parent(
   }
 }
 
-template <class INDEX_T>
+template <unsigned MAX_ELEMENTS, class INDEX_T>
 RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort(float* distances,  // [num_elements]
                                                       INDEX_T* indices,  // [num_elements]
-                                                      const uint32_t max_elements,
                                                       const uint32_t num_elements)
 {
   const unsigned warp_id = threadIdx.x / raft::warp_size();
   if (warp_id > 0) { return; }
   const unsigned lane_id = threadIdx.x % raft::warp_size();
-  assert(max_elements <= 256);
-  constexpr unsigned MAX_N =
-    8;  // if MAX_N >> N, we may have negative performance impact, if this is significant, we may
-        // get memory space from dynamically sized shared memory
-  const unsigned N = (max_elements + (raft::warp_size() - 1)) / raft::warp_size();
-  assert(N <= MAX_N);
-  float key[MAX_N];
-  INDEX_T val[MAX_N];
+  constexpr unsigned N   = (MAX_ELEMENTS + (raft::warp_size() - 1)) / raft::warp_size();
+  float key[N];
+  INDEX_T val[N];
   for (unsigned i = 0; i < N; i++) {
     unsigned j = lane_id + (raft::warp_size() * i);
     if (j < num_elements) {
@@ -137,7 +131,7 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort(float* distances,  // [num
     }
   }
   /* Warp Sort */
-  bitonic::warp_sort<float, INDEX_T>(key, val, N);
+  bitonic::warp_sort<float, INDEX_T, N>(key, val);
   /* Store sorted results */
   for (unsigned i = 0; i < N; i++) {
     unsigned j = (N * lane_id) + i;
@@ -272,8 +266,17 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
     _CLK_START();
     if (threadIdx.x < 32) {
       // [1st warp] Topk with bitonic sort
-      topk_by_bitonic_sort<INDEX_T>(
-        result_distances_buffer, result_indices_buffer, max_elements, result_buffer_size_32);
+      if (max_elements <= 64) {
+        topk_by_bitonic_sort<64, INDEX_T>(
+          result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+      } else if (max_elements <= 128) {
+        topk_by_bitonic_sort<128, INDEX_T>(
+          result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+      } else {
+        assert(max_elements <= 256);
+        topk_by_bitonic_sort<256, INDEX_T>(
+          result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+      }
     }
     __syncthreads();
     _CLK_REC(clk_topk);
