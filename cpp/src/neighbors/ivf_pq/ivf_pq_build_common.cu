@@ -278,8 +278,7 @@ void set_centers(raft::resources const& handle,
     cluster_centers.extent(1) == index->dim() || cluster_centers.extent(1) == index->dim_ext(),
     "Number of columns in the new cluster centers must be equal to dim or dim_ext");
 
-  RAFT_EXPECTS(index->size() == 0,
-               "set_centers requires an empty index.");
+  RAFT_EXPECTS(index->size() == 0, "set_centers requires an empty index.");
 
   auto stream = raft::resource::get_cuda_stream(handle);
 
