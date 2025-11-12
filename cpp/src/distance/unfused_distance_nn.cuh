@@ -255,8 +255,8 @@ void unfused_distance_nn(raft::resources const& handle,
       beta = reinterpret_cast<const void*>(&i8_beta);
     }
   }
-
-  CHECK_CUBLAS(cublasGemmEx(
+  auto cublas_h = raft::resource::get_cublas_handle(handle);
+  RAFT_CUBLAS_TRY(cublasGemmEx(
       cublas_h,
       CUBLAS_OP_T, CUBLAS_OP_N,
       N, M, K,                   // Dimensions (swapped due to row/col-major difference)
