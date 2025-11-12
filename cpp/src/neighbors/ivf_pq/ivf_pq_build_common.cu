@@ -269,7 +269,7 @@ void make_rotation_matrix(raft::resources const& res,
 }
 
 void set_centers(raft::resources const& handle,
-                 ivf_pq_owning<int64_t>* index,
+                 index<int64_t>* index,
                  raft::device_matrix_view<const float, uint32_t, raft::row_major> cluster_centers)
 {
   RAFT_EXPECTS(cluster_centers.extent(0) == index->n_lists(),
@@ -332,7 +332,7 @@ void set_centers(raft::resources const& handle,
 }
 
 void set_centers(raft::resources const& handle,
-                 ivf_pq_owning<int64_t>* index,
+                 index<int64_t>* index,
                  raft::host_matrix_view<const float, uint32_t, raft::row_major> cluster_centers)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
@@ -377,7 +377,7 @@ auto build(
   raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
   std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
   std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix)
-  -> ivf_pq_owning<int64_t>
+  -> index<int64_t>
 {
   return detail::build<int64_t>(
     handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix);

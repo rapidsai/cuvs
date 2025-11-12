@@ -261,7 +261,7 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
   {
     tmp_index_file index_file;
     cuvs::neighbors::ivf_pq::serialize(handle_, index_file.filename, build_only());
-    cuvs::neighbors::ivf_pq::ivf_pq_owning<IdxT> index(handle_);
+    cuvs::neighbors::ivf_pq::index<IdxT> index(handle_);
     cuvs::neighbors::ivf_pq::deserialize(handle_, index_file.filename, &index);
     return index;
   }

@@ -156,7 +156,7 @@ void deserialize(const raft::resources& handle,
     resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
-    ivf_pq::ivf_pq_owning<IdxT> idx(handle);
+    ivf_pq::index<IdxT> idx(handle);
     ivf_pq::deserialize(handle, is, &idx);
     resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
@@ -184,7 +184,7 @@ void deserialize(const raft::resources& handle,
     resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
   } else if constexpr (std::is_same<AnnIndexType, ivf_pq::index<IdxT>>::value) {
-    ivf_pq::ivf_pq_owning<IdxT> idx(handle);
+    ivf_pq::index<IdxT> idx(handle);
     ivf_pq::deserialize(handle, is, &idx);
     resource::sync_stream(handle);
     interface.index_.emplace(std::move(idx));
