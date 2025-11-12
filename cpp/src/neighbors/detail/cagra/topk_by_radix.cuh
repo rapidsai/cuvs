@@ -18,19 +18,19 @@ struct topk_by_radix_sort_base {
 
 template <class IdxT>
 struct topk_by_radix_sort : topk_by_radix_sort_base {
-  RAFT_DEVICE_INLINE_FUNCTION void operator()(uint32_t max_topk,
-                                              uint32_t num_sort_threads,
-                                              uint32_t topk,
-                                              uint32_t batch_size,
-                                              uint32_t len_x,
-                                              const uint32_t* _x,
-                                              const IdxT* _in_vals,
-                                              uint32_t* _y,
-                                              IdxT* _out_vals,
-                                              uint32_t* work,
-                                              uint32_t* _hints,
-                                              bool sort,
-                                              uint32_t* _smem)
+  __device__ void operator()(uint32_t max_topk,
+                             uint32_t num_sort_threads,
+                             uint32_t topk,
+                             uint32_t batch_size,
+                             uint32_t len_x,
+                             const uint32_t* _x,
+                             const IdxT* _in_vals,
+                             uint32_t* _y,
+                             IdxT* _out_vals,
+                             uint32_t* work,
+                             uint32_t* _hints,
+                             bool sort,
+                             uint32_t* _smem)
   {
     assert(max_topk / num_sort_threads <= 4);
     assert(blockDim.x >= V / 4);
