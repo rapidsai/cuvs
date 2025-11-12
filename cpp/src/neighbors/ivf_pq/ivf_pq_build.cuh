@@ -1067,7 +1067,6 @@ auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
              source.centers_rot().size(),
              stream);
 
-  // Share list pointers (shallow copy)
   target.lists() = source.lists();
 
   // Copy list sizes
