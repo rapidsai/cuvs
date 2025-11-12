@@ -15,6 +15,7 @@ int get_num_threads();
 int get_thread_num();
 
 void set_nested(int v);
+void set_num_threads(int v);
 
 void check_threads(const int requirements);
 

@@ -19,7 +19,6 @@
 #include <cuvs/neighbors/knn_merge_parts.hpp>
 
 #include <fstream>
-#include <omp.h>
 
 namespace cuvs::neighbors {
 using namespace raft;
@@ -95,14 +94,14 @@ void build(const raft::resources& clique,
     index.ann_interfaces_.resize(index.num_ranks_);
 
     // Enable nested parallelism
-    int saved_omp_threads = omp_get_max_threads();
+    int saved_omp_threads = cuvs::core::omp::get_max_threads();
     int threads_per_rank  = std::max(1, saved_omp_threads / index.num_ranks_);
-    omp_set_nested(1);
+    cuvs::core::omp::set_nested(1);
 
 #pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
       // Set thread limit for this rank's nested OpenMP regions
-      omp_set_num_threads(threads_per_rank);
+      cuvs::core::omp::set_num_threads(threads_per_rank);
 
       const raft::resources& dev_res = raft::resource::set_current_device_to_rank(clique, rank);
       auto& ann_if                   = index.ann_interfaces_[rank];
@@ -111,7 +110,7 @@ void build(const raft::resources& clique,
     }
 
     // Restore original thread count
-    omp_set_num_threads(saved_omp_threads);
+    cuvs::core::omp::set_num_threads(saved_omp_threads);
   } else if (index.mode_ == SHARDED) {
     int64_t n_rows           = index_dataset.extent(0);
     int64_t n_cols           = index_dataset.extent(1);
@@ -122,14 +121,14 @@ void build(const raft::resources& clique,
     index.ann_interfaces_.resize(index.num_ranks_);
 
     // Enable nested parallelism
-    int saved_omp_threads = omp_get_max_threads();
+    int saved_omp_threads = cuvs::core::omp::get_max_threads();
     int threads_per_rank  = std::max(1, saved_omp_threads / index.num_ranks_);
-    omp_set_nested(1);
+    cuvs::core::omp::set_nested(1);
 
 #pragma omp parallel for num_threads(index.num_ranks_)
     for (int rank = 0; rank < index.num_ranks_; rank++) {
       // Set thread limit for this rank's nested OpenMP regions
-      omp_set_num_threads(threads_per_rank);
+      cuvs::core::omp::set_num_threads(threads_per_rank);
 
       const raft::resources& dev_res  = raft::resource::set_current_device_to_rank(clique, rank);
       int64_t offset                  = rank * n_rows_per_shard;
@@ -143,7 +142,7 @@ void build(const raft::resources& clique,
     }
 
     // Restore original thread count
-    omp_set_num_threads(saved_omp_threads);
+    cuvs::core::omp::set_num_threads(saved_omp_threads);
   }
 }
 

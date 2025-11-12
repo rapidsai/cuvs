@@ -31,6 +31,12 @@ void set_nested(int v)
   if constexpr (is_omp_enabled()) { omp_set_nested(v); }
 }
 
+void set_num_threads(int v)
+{
+  (void)v;
+  if constexpr (is_omp_enabled()) { omp_set_num_threads(v); }
+}
+
 void check_threads(const int requirements)
 {
   const int max_threads = get_max_threads();
