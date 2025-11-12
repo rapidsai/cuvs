@@ -7,11 +7,11 @@
 
 #include "../../core/nvtx.hpp"
 #include "../../core/omp_wrapper.hpp"
-#include "../../util/file_io.hpp"
 
 #include <cuvs/neighbors/brute_force.hpp>
 #include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/hnsw.hpp>
+#include <cuvs/util/file_io.hpp>
 
 #include <raft/core/detail/mdspan_numpy_serializer.hpp>
 #include <raft/core/logger.hpp>

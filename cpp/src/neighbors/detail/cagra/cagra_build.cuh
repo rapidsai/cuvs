@@ -5,8 +5,6 @@
 #pragma once
 
 #include "../../../core/nvtx.hpp"
-#include "../../../util/file_io.hpp"
-#include "../../../util/host_memory.hpp"
 #include "../../vpq_dataset.cuh"
 #include "graph_core.cuh"
 
@@ -26,6 +24,8 @@
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
 #include <cuvs/neighbors/refine.hpp>
+#include <cuvs/util/file_io.hpp>
+#include <cuvs/util/host_memory.hpp>
 
 // TODO: This shouldn't be calling spatial/knn APIs
 #include "../ann_utils.cuh"
