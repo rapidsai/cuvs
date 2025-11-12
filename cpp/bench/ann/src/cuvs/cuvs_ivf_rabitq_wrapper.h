@@ -107,6 +107,9 @@ void cuvs_ivf_rabitq<T, IdxT>::build(const T* dataset, size_t nrow)
   index_         = std::make_shared<cuvs::neighbors::ivf_rabitq::index<IdxT>>(
     nrow, dim_, index_params_.n_lists, index_params_.bits_per_dim);
   cuvs::neighbors::ivf_rabitq::build(handle_, index_params_, dataset_v, index_.get());
+  // Note: internally the IVF-RaBitQ build works with simple pointers, and accepts both host and
+  // device pointer. Therefore, although we provide here a device_mdspan, this works with host
+  // pointer too.
 }
 
 template <typename T, typename IdxT>
