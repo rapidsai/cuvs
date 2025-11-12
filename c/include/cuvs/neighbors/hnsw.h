@@ -106,15 +106,6 @@ cuvsError_t cuvsHnswIndexCreate(cuvsHnswIndex_t* index);
 cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index);
 
 /**
- * @brief Check if HNSW index is stored on disk
- *
- * @param[in] index cuvsHnswIndex_t to check
- * @param[out] on_disk boolean indicating if index is on disk
- * @return cuvsError_t
- */
-cuvsError_t cuvsHnswIndexIsOnDisk(cuvsHnswIndex_t index, bool* on_disk);
-
-/**
  * @}
  */
 

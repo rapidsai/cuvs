@@ -41,8 +41,6 @@ cdef extern from "cuvs/neighbors/hnsw.h" nogil:
 
     cuvsError_t cuvsHnswIndexDestroy(cuvsHnswIndex_t index)
 
-    cuvsError_t cuvsHnswIndexIsOnDisk(cuvsHnswIndex_t index, bool* on_disk)
-
     ctypedef struct cuvsHnswExtendParams:
         int32_t num_threads
 

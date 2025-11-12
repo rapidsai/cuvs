@@ -496,22 +496,6 @@ public class CagraIndexImpl implements CagraIndex {
   }
 
   /**
-   * Checks if the CAGRA index is stored on disk (disk-based ACE index).
-   *
-   * @return true if index is on disk, false otherwise
-   */
-  @Override
-  public boolean isOnDisk() {
-    checkNotDestroyed();
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment onDiskPtr = localArena.allocate(ValueLayout.JAVA_BOOLEAN);
-      int returnValue = cuvsCagraIndexIsOnDisk(cagraIndexReference.getMemorySegment(), onDiskPtr);
-      checkCuVSError(returnValue, "cuvsCagraIndexIsOnDisk");
-      return onDiskPtr.get(ValueLayout.JAVA_BOOLEAN, 0);
-    }
-  }
-
-  /**
    * Gets an instance of {@link CuVSResources}
    *
    * @return an instance of {@link CuVSResources}

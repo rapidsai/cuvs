@@ -107,7 +107,7 @@ class AnnCagraAceTest : public ::testing::TestWithParam<AnnCagraAceInputs> {
 
       if (ps.use_disk) {
         // Verify disk-based ACE index using HNSW index from disk
-        EXPECT_TRUE(index.on_disk());
+        EXPECT_TRUE(index.dataset_fd().has_value() && index.graph_fd().has_value());
 
         // Verify file directory from graph file descriptor
         const auto& graph_fd = index.graph_fd();
@@ -185,7 +185,7 @@ class AnnCagraAceTest : public ::testing::TestWithParam<AnnCagraAceInputs> {
           << "Disk-based ACE index loaded via HNSW failed recall check";
       } else {
         // For in-memory ACE, we can search directly
-        EXPECT_FALSE(index.on_disk());
+        EXPECT_FALSE(index.dataset_fd().has_value() || index.graph_fd().has_value());
         ASSERT_GT(index.graph().size(), 0);
         EXPECT_EQ(index.graph_degree(), 64);
 

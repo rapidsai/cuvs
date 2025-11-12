@@ -85,22 +85,6 @@ public class HnswIndexImpl implements HnswIndex {
   }
 
   /**
-   * Check if the HNSW index is stored on disk.
-   *
-   * @return true if the index is stored on disk, false otherwise
-   */
-  @Override
-  public boolean isOnDisk() {
-    try (var localArena = Arena.ofConfined()) {
-      MemorySegment onDiskPtr = localArena.allocate(C_LONG);
-      int returnValue =
-          cuvsHnswIndexIsOnDisk(hnswIndexReference.getMemorySegment(), onDiskPtr);
-      checkCuVSError(returnValue, "cuvsHnswIndexIsOnDisk");
-      return onDiskPtr.get(C_LONG, 0) != 0;
-    }
-  }
-
-  /**
    * Invokes the native search_hnsw_index via the Panama API for searching a HNSW
    * index.
    *
@@ -110,12 +94,6 @@ public class HnswIndexImpl implements HnswIndex {
    */
   @Override
   public SearchResults search(HnswQuery query) throws Throwable {
-    if (isOnDisk()) {
-      throw new IllegalStateException(
-          "Cannot search an HNSW index that is stored on disk. "
-              + "The index must be deserialized into memory first using HnswIndex.newBuilder().");
-    }
-
     try (var localArena = Arena.ofConfined()) {
       int topK = query.getTopK();
       float[][] queryVectors = query.getQueryVectors();

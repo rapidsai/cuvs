@@ -712,11 +712,6 @@ TEST(CagraC, BuildSearchACEDisk)
   build_params->graph_build_params = ace_params;
   cuvsCagraBuild(res, build_params, &dataset_tensor, index);
 
-  // Verify the index is stored on disk
-  bool on_disk = false;
-  cuvsCagraIndexIsOnDisk(index, &on_disk);
-  ASSERT_TRUE(on_disk);
-
   // Convert CAGRA index to HNSW (automatically serializes to disk for ACE)
   cuvsHnswIndex_t hnsw_index_ser;
   cuvsHnswIndexCreate(&hnsw_index_ser);

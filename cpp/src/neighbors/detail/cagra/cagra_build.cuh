@@ -973,7 +973,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
       // Create and allocate dataset file
       reordered_fd = cuvs::util::file_descriptor(
-        build_dir + "/reordered_dataset.npy", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+        build_dir + "/reordered_dataset.npy", O_CREAT | O_RDWR | O_TRUNC, 0644);
       {
         std::stringstream ss;
         const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<T>();
@@ -1002,7 +1002,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
       // Create and allocate augmented dataset file
       augmented_fd = cuvs::util::file_descriptor(
-        build_dir + "/augmented_dataset.npy", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+        build_dir + "/augmented_dataset.npy", O_CREAT | O_RDWR | O_TRUNC, 0644);
       {
         std::stringstream ss;
         const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<T>();
@@ -1027,7 +1027,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
       // Create and allocate mapping file
       mapping_fd = cuvs::util::file_descriptor(
-        build_dir + "/dataset_mapping.npy", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+        build_dir + "/dataset_mapping.npy", O_CREAT | O_RDWR | O_TRUNC, 0644);
       {
         std::stringstream ss;
         const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();
@@ -1054,7 +1054,7 @@ index<T, IdxT> build_ace(raft::resources const& res,
 
       // Create and allocate graph file
       graph_fd = cuvs::util::file_descriptor(
-        build_dir + "/cagra_graph.npy", O_CREAT | O_WRONLY | O_TRUNC, 0644);
+        build_dir + "/cagra_graph.npy", O_CREAT | O_RDWR | O_TRUNC, 0644);
       {
         std::stringstream ss;
         const auto dtype         = raft::detail::numpy_serializer::get_numpy_dtype<IdxT>();

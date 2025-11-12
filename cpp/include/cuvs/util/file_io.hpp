@@ -83,6 +83,7 @@ class fd_istream : public std::istream {
     return *this;
   }
 };
+
 /**
  * @brief RAII wrapper for POSIX file descriptors
  *
@@ -137,6 +138,7 @@ class file_descriptor {
   }
 
   [[nodiscard]] std::string get_path() const { return path_; }
+
   /**
    * @brief Create an input stream from this file descriptor
    *
@@ -158,6 +160,7 @@ class file_descriptor {
     // Returned by value, uses move semantics
     return fd_istream(dup_fd);
   }
+
  private:
   int fd_;
   std::string path_;

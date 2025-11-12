@@ -140,13 +140,6 @@ public interface CagraIndex extends AutoCloseable {
   void serializeToHNSW(OutputStream outputStream, Path tempFile, int bufferLength) throws Throwable;
 
   /**
-   * Checks if the CAGRA index is stored on disk (disk-based ACE index).
-   *
-   * @return true if index is on disk, false otherwise
-   */
-  boolean isOnDisk();
-
-  /**
    * Gets an instance of {@link CuVSResources}
    *
    * @return an instance of {@link CuVSResources}

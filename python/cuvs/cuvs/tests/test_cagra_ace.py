@@ -68,9 +68,6 @@ def run_cagra_ace_build_search_test(
         # For disk-based mode, we can't search directly
         # (would need HNSW conversion which is tested separately)
         if not use_disk:
-            # Verify in-memory index
-            assert not index.is_on_disk
-
             # For in-memory mode, we can search directly
             # But queries need to be on device
             search_params = cagra.SearchParams(itopk_size=64)
@@ -109,7 +106,6 @@ def run_cagra_ace_build_search_test(
             assert cp_graph.shape == (n_rows, graph_degree)
         else:
             # For disk-based mode, verify that expected files were created
-            assert index.is_on_disk
             assert os.path.exists(os.path.join(temp_dir, "cagra_graph.npy"))
             assert os.path.exists(
                 os.path.join(temp_dir, "reordered_dataset.npy")

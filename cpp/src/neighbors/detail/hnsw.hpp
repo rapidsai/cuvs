@@ -128,11 +128,6 @@ struct index_impl : index<T> {
   }
 
   /**
-  @brief Check if index is stored on disk
-   */
-  bool on_disk() const override { return hnsw_fd_.has_value() && hnsw_fd_->is_valid(); }
-
-  /**
   @brief Get file path for disk-backed index
    */
   std::string file_path() const override
@@ -320,7 +315,8 @@ void serialize_to_hnswlib_from_disk(raft::resources const& res,
 
   cuvs::util::buffered_ofstream os(&os_raw, 1 << 20 /*1MB*/);
 
-  RAFT_EXPECTS(index_.on_disk(), "Function only implements serialization from disk.");
+  RAFT_EXPECTS(index_.dataset_fd().has_value() && index_.graph_fd().has_value(),
+               "Function only implements serialization from disk.");
   RAFT_EXPECTS(params.hierarchy != HnswHierarchy::CPU,
                "Disk2disk serialization not supported for CPU hierarchy.");
 
@@ -1039,7 +1035,7 @@ std::unique_ptr<index<T>> from_cagra(
   std::optional<raft::host_matrix_view<const T, int64_t, raft::row_major>> dataset)
 {
   // special treatment for index on disk
-  if (cagra_index.on_disk()) {
+  if (cagra_index.dataset_fd().has_value() && cagra_index.graph_fd().has_value()) {
     // Get directory from graph file descriptor
     const auto& graph_fd = cagra_index.graph_fd();
     RAFT_EXPECTS(graph_fd.has_value() && graph_fd->is_valid(),
@@ -1094,7 +1090,8 @@ void extend(raft::resources const& res,
             raft::host_matrix_view<const T, int64_t, raft::row_major> additional_dataset,
             index<T>& idx)
 {
-  RAFT_EXPECTS(!idx.on_disk(),
+  auto* idx_impl = dynamic_cast<index_impl<T>*>(&idx);
+  RAFT_EXPECTS(!idx_impl || !idx_impl->file_descriptor().has_value(),
                "Cannot extend an HNSW index that is stored on disk. "
                "The index must be deserialized into memory first using hnsw::deserialize().");
   auto* hnswlib_index = reinterpret_cast<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>*>(
@@ -1138,7 +1135,8 @@ void search(raft::resources const& res,
             raft::host_matrix_view<uint64_t, int64_t, raft::row_major> neighbors,
             raft::host_matrix_view<float, int64_t, raft::row_major> distances)
 {
-  RAFT_EXPECTS(!idx.on_disk(),
+  auto* idx_impl = dynamic_cast<const index_impl<T>*>(&idx);
+  RAFT_EXPECTS(!idx_impl || !idx_impl->file_descriptor().has_value(),
                "Cannot search an HNSW index that is stored on disk. "
                "The index must be deserialized into memory first using hnsw::deserialize().");
 
@@ -1181,7 +1179,8 @@ void search(raft::resources const& res,
 template <typename T>
 void serialize(raft::resources const& res, const std::string& filename, const index<T>& idx)
 {
-  RAFT_EXPECTS(!idx.on_disk(),
+  auto* idx_impl = dynamic_cast<const index_impl<T>*>(&idx);
+  RAFT_EXPECTS(!idx_impl || !idx_impl->file_descriptor().has_value(),
                "Cannot serialize an HNSW index that is stored on disk. "
                "The index must be deserialized into memory first using hnsw::deserialize().");
   auto* hnswlib_index = reinterpret_cast<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>*>(

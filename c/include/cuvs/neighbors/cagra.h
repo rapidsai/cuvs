@@ -511,20 +511,6 @@ cuvsError_t cuvsCagraIndexGetSize(cuvsCagraIndex_t index, int64_t* size);
 cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int64_t* graph_degree);
 
 /**
- * @brief Check if the CAGRA index is stored on disk
- *
- * When ACE in disk mode is used to build the index, the index is stored on disk. The disk mode can be
- * enabled by setting the `use_disk` flag in the `cuvsAceParams` struct or when the graph does not fit
- * in host and GPU memory. Query if the index is on disk using this function. If true, the index needs to
- * be loaded from disk using cuvsHnswFromCagra.
- *
- * @param[in] index CAGRA index
- * @param[out] on_disk return true if index is on disk, false otherwise
- * @return cuvsError_t
- */
-cuvsError_t cuvsCagraIndexIsOnDisk(cuvsCagraIndex_t index, bool* on_disk);
-
-/**
  * @brief Returns a view of the CAGRA dataset
  *
  * This function returns a non-owning view of the CAGRA dataset.

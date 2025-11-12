@@ -518,14 +518,6 @@ extern "C" cuvsError_t cuvsCagraIndexGetGraphDegree(cuvsCagraIndex_t index, int6
   });
 }
 
-extern "C" cuvsError_t cuvsCagraIndexIsOnDisk(cuvsCagraIndex_t index, bool* on_disk)
-{
-  return cuvs::core::translate_exceptions([=] {
-    auto index_ptr = reinterpret_cast<cuvs::neighbors::cagra::index<float, uint32_t>*>(index->addr);
-    *on_disk       = index_ptr->on_disk();
-  });
-}
-
 extern "C" cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index, DLManagedTensor* dataset)
 {
   return cuvs::core::translate_exceptions([=] {

@@ -133,11 +133,6 @@ struct index : cuvs::neighbors::index {
   virtual void set_ef(int ef) const;
 
   /**
-  @brief Check if index is stored on disk
-  */
-  virtual bool on_disk() const { return false; }
-
-  /**
   @brief Get file path for disk-backed index
   */
   virtual std::string file_path() const { return ""; }

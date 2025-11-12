@@ -373,19 +373,19 @@ struct index : cuvs::neighbors::index {
   [[nodiscard]] constexpr inline auto size() const noexcept -> IdxT
   {
     auto data_rows = dataset_->n_rows();
-    if (on_disk_) { return n_rows_; }
+    if (dataset_fd_.has_value()) { return n_rows_; }
     return data_rows > 0 ? data_rows : graph_view_.extent(0);
   }
 
   /** Dimensionality of the data. */
   [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t
   {
-    return on_disk_ ? dim_ : dataset_->dim();
+    return dataset_fd_.has_value() ? dim_ : dataset_->dim();
   }
   /** Graph degree */
   [[nodiscard]] constexpr inline auto graph_degree() const noexcept -> uint32_t
   {
-    return on_disk_ ? graph_degree_ : graph_view_.extent(1);
+    return dataset_fd_.has_value() ? graph_degree_ : graph_view_.extent(1);
   }
 
   [[nodiscard]] inline auto dataset() const noexcept
@@ -419,9 +419,6 @@ struct index : cuvs::neighbors::index {
                  source_indices_->view())
              : std::nullopt;
   }
-
-  /** Whether the index is stored on disk */
-  [[nodiscard]] constexpr inline auto on_disk() const noexcept -> bool { return on_disk_; }
 
   /** Get the dataset file descriptor (for disk-backed index) */
   [[nodiscard]] inline auto dataset_fd() const noexcept
@@ -730,6 +727,9 @@ struct index : cuvs::neighbors::index {
     RAFT_EXPECTS(fd.is_valid(), "Invalid file descriptor provided for dataset");
 
     auto stream = fd.make_istream();
+    if (lseek(fd.get(), 0, SEEK_SET) == -1) {
+      RAFT_FAIL("Failed to seek to beginning of dataset file");
+    }
     auto header = raft::detail::numpy_serializer::read_header(stream);
     RAFT_EXPECTS(header.shape.size() == 2,
                  "Dataset file should be 2D, got %zu dimensions",
@@ -741,8 +741,7 @@ struct index : cuvs::neighbors::index {
     RAFT_LOG_DEBUG("ACE: Dataset has shape [%zu, %zu]", n_rows_, dim_);
 
     // Re-open the file descriptor in read-only mode for subsequent operations
-    dataset_fd_.emplace(std::move(fd))
-    on_disk_ = true;
+    dataset_fd_.emplace(std::move(fd));
 
     dataset_ = std::make_unique<cuvs::neighbors::empty_dataset<int64_t>>(0);
     dataset_norms_.reset();
@@ -763,11 +762,14 @@ struct index : cuvs::neighbors::index {
     RAFT_EXPECTS(fd.is_valid(), "Invalid file descriptor provided for graph");
 
     auto stream = fd.make_istream();
+    if (lseek(fd.get(), 0, SEEK_SET) == -1) {
+      RAFT_FAIL("Failed to seek to beginning of graph file");
+    }
     auto header = raft::detail::numpy_serializer::read_header(stream);
     RAFT_EXPECTS(
       header.shape.size() == 2, "Graph file should be 2D, got %zu dimensions", header.shape.size());
 
-    if (on_disk_ && n_rows_ != 0) {
+    if (dataset_fd_.has_value() && n_rows_ != 0) {
       RAFT_EXPECTS(n_rows_ == header.shape[0],
                    "Graph size (%zu) must match dataset size (%zu)",
                    header.shape[0],
@@ -781,7 +783,6 @@ struct index : cuvs::neighbors::index {
 
     // Re-open the file descriptor in read-only mode for subsequent operations
     graph_fd_.emplace(std::move(fd));
-    on_disk_ = true;
 
     graph_      = raft::make_device_matrix<IdxT, int64_t>(res, 0, 0);
     graph_view_ = graph_.view();
@@ -802,12 +803,15 @@ struct index : cuvs::neighbors::index {
 
     // Read header from file using ifstream
     auto stream = fd.make_istream();
+    if (lseek(fd.get(), 0, SEEK_SET) == -1) {
+      RAFT_FAIL("Failed to seek to beginning of mapping file");
+    }
     auto header = raft::detail::numpy_serializer::read_header(stream);
     RAFT_EXPECTS(header.shape.size() == 1,
                  "Mapping file should be 1D, got %zu dimensions",
                  header.shape.size());
 
-    if (on_disk_ && n_rows_ != 0) {
+    if (dataset_fd_.has_value() && n_rows_ != 0) {
       RAFT_EXPECTS(header.shape[0] == n_rows_,
                    "Mapping size (%zu) must match dataset size (%zu)",
                    header.shape[0],
@@ -817,7 +821,6 @@ struct index : cuvs::neighbors::index {
     RAFT_LOG_DEBUG("ACE: Mapping has %zu elements", header.shape[0]);
 
     mapping_fd_.emplace(std::move(fd));
-    on_disk_ = true;
   }
 
  private:
@@ -836,7 +839,6 @@ struct index : cuvs::neighbors::index {
   std::optional<cuvs::util::file_descriptor> mapping_fd_;
 
   void compute_dataset_norms_(raft::resources const& res);
-  bool on_disk_        = false;
   size_t n_rows_       = 0;
   size_t dim_          = 0;
   size_t graph_degree_ = 0;

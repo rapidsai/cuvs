@@ -44,7 +44,7 @@ void serialize(raft::resources const& res,
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::serialize");
 
-  RAFT_EXPECTS(!index_.on_disk(),
+  RAFT_EXPECTS(!index_.dataset_fd().has_value(),
                "Cannot serialize a disk-backed CAGRA index. Convert it with "
                "cuvs::neighbors::hnsw::from_cagra() and load it into memory via "
                "cuvs::neighbors::hnsw::deserialize() before serialization.");
@@ -85,7 +85,7 @@ void serialize(raft::resources const& res,
                const index<T, IdxT>& index_,
                bool include_dataset)
 {
-  RAFT_EXPECTS(!index_.on_disk(),
+  RAFT_EXPECTS(!index_.dataset_fd().has_value(),
                "Cannot serialize a disk-backed CAGRA index. Convert it with "
                "cuvs::neighbors::hnsw::from_cagra() and load it into memory via "
                "cuvs::neighbors::hnsw::deserialize() before serialization.");

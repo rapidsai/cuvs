@@ -114,7 +114,9 @@ void cuvs_cagra_hnswlib<T, IdxT>::build(const T* dataset, size_t nrow)
     handle_, build_param_.hnsw_index_params, cagra_index, opt_dataset_view);
 
   // special treatment in save/serialize step
-  if (cagra_index.on_disk()) { cagra_ace_build_ = true; }
+  if (cagra_index.dataset_fd().has_value() && cagra_index.graph_fd().has_value()) {
+    cagra_ace_build_ = true;
+  }
 }
 
 template <typename T, typename IdxT>

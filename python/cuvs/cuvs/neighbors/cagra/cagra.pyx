@@ -458,20 +458,6 @@ cdef class Index:
         output.parent = self
         return output
 
-    @property
-    def is_on_disk(self):
-        """
-        Check if the index is stored on disk.
-
-        Returns
-        -------
-        bool
-            True if the index is on disk, False otherwise.
-        """
-        cdef bool c_on_disk
-        check_cuvs(cuvsCagraIndexIsOnDisk(self.index, &c_on_disk))
-        return c_on_disk
-
     def __repr__(self):
         # todo(dgd): update repr as we expose data through C API
         attr_str = []
@@ -545,10 +531,6 @@ def build(IndexParams index_params, dataset, resources=None):
     ...     ace_params=ace_params
     ... )
     >>> idx = cagra.build(build_params, dataset_host)
-    >>> # Check if index is on disk
-    >>> if idx.is_on_disk:
-    ...     print("Index is stored on disk")
-    Index is stored on disk
     """
 
     # Check if ACE build is requested

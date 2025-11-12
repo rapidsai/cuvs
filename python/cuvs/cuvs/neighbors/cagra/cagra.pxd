@@ -144,9 +144,6 @@ cdef extern from "cuvs/neighbors/cagra.h" nogil:
     cuvsError_t cuvsCagraIndexGetDataset(cuvsCagraIndex_t index,
                                          DLManagedTensor * dataset)
 
-    cuvsError_t cuvsCagraIndexIsOnDisk(cuvsCagraIndex_t index,
-                                       bool* on_disk)
-
     cuvsError_t cuvsCagraBuild(cuvsResources_t res,
                                cuvsCagraIndexParams* params,
                                DLManagedTensor* dataset,

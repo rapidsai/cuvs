@@ -33,13 +33,6 @@ public interface HnswIndex extends AutoCloseable {
   SearchResults search(HnswQuery query) throws Throwable;
 
   /**
-   * Check if the HNSW index is stored on disk.
-   *
-   * @return true if the index is stored on disk, false otherwise
-   */
-  boolean isOnDisk();
-
-  /**
    * Creates a new Builder with an instance of {@link CuVSResources}.
    *
    * @param cuvsResources an instance of {@link CuVSResources}
