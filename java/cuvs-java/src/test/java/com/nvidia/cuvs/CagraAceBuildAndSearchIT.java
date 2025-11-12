@@ -90,8 +90,8 @@ public class CagraAceBuildAndSearchIT extends CuVSTestCase {
       CagraIndexParams indexParams =
           new CagraIndexParams.Builder()
               .withCagraGraphBuildAlgo(CagraGraphBuildAlgo.ACE)
-              .withGraphDegree(1)
-              .withIntermediateGraphDegree(2)
+              .withGraphDegree(64)
+              .withIntermediateGraphDegree(128)
               .withNumWriterThreads(2)
               .withMetric(CuvsDistanceType.L2Expanded)
               .withCuVSAceParams(aceParams)
