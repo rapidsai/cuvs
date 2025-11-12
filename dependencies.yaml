@@ -233,7 +233,7 @@ dependencies:
     common:
       - output_types: [conda, requirements, pyproject]
         packages:
-          - cython>=3.0.0
+          - cython>=3.0.0,<3.2.0a0
   rapids_build:
     common:
       - output_types: [conda, requirements, pyproject]
@@ -430,7 +430,7 @@ dependencies:
     common:
       - output_types: [conda, requirements, pyproject]
         packages:
-          - pytest
+          - pytest<9.0.0a0
           - pytest-cov
   test_py_cuvs:
     common:
@@ -452,7 +452,6 @@ dependencies:
           - nlohmann_json>=3.12.0
           - glog>=0.6.0
           - h5py>=3.8.0
-          - benchmark>=1.8.2
           - openblas
     specific:
       - output_types: conda
