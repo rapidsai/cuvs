@@ -45,7 +45,7 @@ template <cuvs::distance::DistanceType Metric,
           typename DataT,
           typename IndexT,
           typename DistanceT,
-          bool EnableFP8 = true>
+          bool EnableFP8>
 struct cagra_q_dataset_descriptor_t : public dataset_descriptor_base_t<DataT, IndexT, DistanceT> {
   using base_type   = dataset_descriptor_base_t<DataT, IndexT, DistanceT>;
   using CODE_BOOK_T = CodebookT;
@@ -481,7 +481,8 @@ template <cuvs::distance::DistanceType Metric,
           typename CodebookT,
           typename DataT,
           typename IndexT,
-          typename DistanceT>
+          typename DistanceT,
+          bool EnableFP8>
 RAFT_KERNEL __launch_bounds__(1, 1)
   vpq_dataset_descriptor_init_kernel(dataset_descriptor_base_t<DataT, IndexT, DistanceT>* out,
                                      const std::uint8_t* encoded_dataset_ptr,
@@ -499,7 +500,8 @@ RAFT_KERNEL __launch_bounds__(1, 1)
                                                  CodebookT,
                                                  DataT,
                                                  IndexT,
-                                                 DistanceT>;
+                                                 DistanceT,
+                                                 EnableFP8>;
   using base_type = typename desc_type::base_type;
   new (out) desc_type(
     reinterpret_cast<typename base_type::setup_workspace_type*>(&setup_workspace_vpq<desc_type>),
@@ -520,7 +522,8 @@ template <cuvs::distance::DistanceType Metric,
           typename CodebookT,
           typename DataT,
           typename IndexT,
-          typename DistanceT>
+          typename DistanceT,
+          bool EnableFP8>
 dataset_descriptor_host<DataT, IndexT, DistanceT>
 vpq_descriptor_spec<Metric,
                     TeamSize,
@@ -530,7 +533,8 @@ vpq_descriptor_spec<Metric,
                     CodebookT,
                     DataT,
                     IndexT,
-                    DistanceT>::init_(const cagra::search_params& params,
+                    DistanceT,
+                    EnableFP8>::init_(const cagra::search_params& params,
                                       const std::uint8_t* encoded_dataset_ptr,
                                       uint32_t encoded_dataset_dim,
                                       const CodebookT* vq_code_book_ptr,
@@ -546,7 +550,8 @@ vpq_descriptor_spec<Metric,
                                                  CodebookT,
                                                  DataT,
                                                  IndexT,
-                                                 DistanceT>;
+                                                 DistanceT,
+                                                 EnableFP8>;
   using base_type = typename desc_type::base_type;
 
   desc_type dd_host{nullptr,
@@ -568,7 +573,8 @@ vpq_descriptor_spec<Metric,
                                                         CodebookT,
                                                         DataT,
                                                         IndexT,
-                                                        DistanceT>
+                                                        DistanceT,
+                                                        EnableFP8>
                        <<<1, 1, 0, stream>>>(dev_ptr,
                                              encoded_dataset_ptr,
                                              encoded_dataset_dim,

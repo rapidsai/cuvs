@@ -21,7 +21,8 @@ template <cuvs::distance::DistanceType Metric,
           typename CodebookT,
           typename DataT,
           typename IndexT,
-          typename DistanceT>
+          typename DistanceT,
+          bool EnableFP8>
 struct vpq_descriptor_spec : public instance_spec<DataT, IndexT, DistanceT> {
   using base_type = instance_spec<DataT, IndexT, DistanceT>;
   using typename base_type::data_type;
