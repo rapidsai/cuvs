@@ -31,10 +31,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.function.LongToIntFunction;
 import java.util.function.Supplier;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
@@ -52,12 +52,12 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
     log.trace("Random context initialized for test.");
   }
 
-  private static void runConcurrently(int nThreads, Supplier<Runnable> runnableSupplier)
+  private static void runConcurrently(int nThreads, Function<Integer, Runnable> runnableSupplier)
       throws ExecutionException, InterruptedException, TimeoutException {
     try (ExecutorService parallelExecutor = Executors.newFixedThreadPool(nThreads)) {
       var futures = new CompletableFuture[nThreads];
       for (int j = 0; j < nThreads; j++) {
-        futures[j] = CompletableFuture.runAsync(runnableSupplier.get(), parallelExecutor);
+        futures[j] = CompletableFuture.runAsync(runnableSupplier.apply(j), parallelExecutor);
       }
 
       CompletableFuture.allOf(futures)
@@ -68,6 +68,11 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
                 return null;
               })
           .get(2000, TimeUnit.SECONDS);
+
+      parallelExecutor.shutdown();
+      assertTrue(
+          "Timeout waiting for parallelExecutor to finish",
+          parallelExecutor.awaitTermination(10, TimeUnit.SECONDS));
     }
   }
 
@@ -189,12 +194,16 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
     runConcurrently(
         numTestsRuns,
-        () ->
+        threadIdx ->
             () -> {
+              log.debug("Indexing threadIdx:{}-{}", threadIdx, Thread.currentThread().getName());
               try (CuVSResources resources = CheckedCuVSResources.create();
-                  var index = indexOnce(CuVSMatrix.ofArray(dataset), resources)) {
+                  var matrix = CuVSMatrix.ofArray(dataset);
+                  var index = indexOnce(matrix, resources)) {
                 var indexPath = serializeOnce(index);
                 try (var loadedIndex = deserializeOnce(indexPath, resources)) {
+                  log.debug(
+                      "Querying threadIdx:{}-{}", threadIdx, Thread.currentThread().getName());
                   queryAndCompare(
                       index,
                       loadedIndex,
@@ -208,10 +217,10 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
               } catch (Throwable e) {
                 throw new RuntimeException(e);
               }
+              log.debug("Done threadIdx:{}-{}", threadIdx, Thread.currentThread().getName());
             });
   }
 
-  @Ignore // https://github.com/rapidsai/cuvs/issues/1467
   @Test
   public void testFloatIndexing() throws Throwable {
     testIndexing(
@@ -230,19 +239,30 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
   private void testIndexing(Supplier<CuVSMatrix> matrixFactory) throws Exception {
     for (int i = 0; i < 10; ++i) {
-      var dataset = matrixFactory.get();
-      int numTestsRuns = 4;
-      runConcurrently(
-          numTestsRuns,
-          () ->
-              () -> {
-                try (CuVSResources resources = CheckedCuVSResources.create()) {
-                  var index = indexOnce(dataset, resources);
-                  index.close();
-                } catch (Throwable e) {
-                  throw new RuntimeException(e);
-                }
-              });
+      try (var dataset = matrixFactory.get()) {
+        int numRunners = 4;
+        final int iteration = i;
+        runConcurrently(
+            numRunners,
+            threadIdx ->
+                () -> {
+                  try (CuVSResources resources = CheckedCuVSResources.create()) {
+                    // Create a local reference to the dataset, as index will close the dataset too
+                    // when it gets closed.
+                    var indexDatasetReference = dataset.toHost();
+                    log.debug(
+                        "Indexing iteration:{} threadIdx:{} dataset:{}",
+                        iteration,
+                        threadIdx,
+                        dataset);
+                    var index = indexOnce(indexDatasetReference, resources);
+                    log.debug("Done {} {}", iteration, threadIdx);
+                    index.close();
+                  } catch (Throwable e) {
+                    throw new RuntimeException(e);
+                  }
+                });
+      }
     }
   }
 
@@ -264,20 +284,24 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
 
   private void testSerialization(Supplier<CuVSMatrix> matrixFactory) throws Throwable {
     for (int i = 0; i < 10; ++i) {
-      final var dataset = matrixFactory.get();
-      int numTestsRuns = 4;
-      runConcurrently(
-          numTestsRuns,
-          () ->
-              () -> {
-                try (CuVSResources resources = CheckedCuVSResources.create();
-                    var index = indexOnce(dataset, resources)) {
-                  var indexPath = serializeOnce(index);
-                  Files.deleteIfExists(indexPath);
-                } catch (Throwable e) {
-                  throw new RuntimeException(e);
-                }
-              });
+      try (final var dataset = matrixFactory.get()) {
+        int numRunners = 4;
+        runConcurrently(
+            numRunners,
+            threadIdx ->
+                () -> {
+                  // Create a local reference to the dataset, as index will close the dataset too
+                  // when it gets closed.
+                  var indexDatasetReference = dataset.toHost();
+                  try (CuVSResources resources = CheckedCuVSResources.create();
+                      var index = indexOnce(indexDatasetReference, resources)) {
+                    var indexPath = serializeOnce(index);
+                    Files.deleteIfExists(indexPath);
+                  } catch (Throwable e) {
+                    throw new RuntimeException(e);
+                  }
+                });
+      }
     }
   }
 
@@ -307,7 +331,7 @@ public class CagraBuildAndSearchIT extends CuVSTestCase {
         int numTestsRuns = 4;
         runConcurrently(
             numTestsRuns,
-            () ->
+            threadIdx ->
                 () -> {
                   try (CuVSResources resources = CheckedCuVSResources.create()) {
                     deserializeOnce(indexPath, resources).close();

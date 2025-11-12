@@ -4,8 +4,11 @@
  */
 
 #include "detail/hnsw.hpp"
-#include <cstdint>
+
+#include <cuvs/neighbors/cagra.hpp>
 #include <cuvs/neighbors/hnsw.hpp>
+
+#include <cstdint>
 #include <sys/types.h>
 
 namespace cuvs::neighbors::hnsw {
@@ -15,16 +18,12 @@ auto to_cagra_params(raft::matrix_extent<int64_t> dataset,
                      int ef_construction,
                      cuvs::distance::DistanceType metric) -> cuvs::neighbors::cagra::index_params
 {
-  auto ivf_pq_params = cuvs::neighbors::graph_build_params::ivf_pq_params(dataset, metric);
-  ivf_pq_params.search_params.n_probes =
-    std::round(std::sqrt(ivf_pq_params.build_params.n_lists) / 20 + ef_construction / 16);
-
-  cagra::index_params params;
-  params.graph_build_params        = ivf_pq_params;
-  params.graph_degree              = M * 2;
-  params.intermediate_graph_degree = M * 3;
-
-  return params;
+  return cuvs::neighbors::cagra::index_params::from_hnsw_params(
+    dataset,
+    M,
+    ef_construction,
+    cuvs::neighbors::cagra::hnsw_heuristic_type::SAME_GRAPH_FOOTPRINT,
+    metric);
 }
 
 #define CUVS_INST_HNSW_FROM_CAGRA(T)                                                  \

@@ -58,7 +58,6 @@ requirements:
     - ninja
     - ${{ stdlib("c") }}
   host:
-    - benchmark
     - glog ${{ glog_version }}
     - nlohmann_json ${{ nlohmann_json_version }}
     - openblas
@@ -72,7 +71,6 @@ requirements:
         - libboost-devel=1.87
         - mkl-devel=2023
   run:
-    - benchmark
     - click
     - glog ${{ glog_version }}
     - h5py ${{ h5py_version }}
@@ -89,7 +87,6 @@ requirements:
   ignore_run_exports:
     by_name:
       - glog
-      - libaio
       - libboost
       - libcublas
       - mkl  # relaxes pin from host `mkl-devel`

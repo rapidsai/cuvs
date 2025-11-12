@@ -161,11 +161,11 @@ void cpu_sddmm(value_t* A,
         norms_B += B[b_index] * B[b_index];
       }
       vals[j] = alpha * sum + beta * vals[j];
-      if (metric == cuvs::distance::DistanceType::L2Expanded) {
+      if (metric == L2Expanded) {
         vals[j] = value_t(-2.0) * vals[j] + norms_A + norms_B;
-      } else if (metric == cuvs::distance::DistanceType::L2SqrtExpanded) {
+      } else if (metric == L2SqrtExpanded) {
         vals[j] = std::sqrt(value_t(-2.0) * vals[j] + norms_A + norms_B);
-      } else if (metric == cuvs::distance::DistanceType::CosineExpanded) {
+      } else if (metric == CosineExpanded) {
         vals[j] = value_t(1.0) - vals[j] / std::sqrt(norms_A * norms_B);
       }
     }
@@ -306,7 +306,7 @@ void recall_eval(T* query_data,
     n_rows,
     n_dim,
     n_neighbors,
-    static_cast<cuvs::distance::DistanceType>((uint16_t)metric));
+    static_cast<cuvs::distance::DistanceType>((int)metric));
 
   size_t size = n_queries * n_neighbors;
   std::vector<IdxT> neighbors_h(size);
@@ -363,7 +363,7 @@ void recall_eval_with_filter(T* query_data,
   raft::copy(queries_h.data(), query_data, n_queries * n_dim, stream);
   raft::copy(indices_h.data(), index_data, n_rows * n_dim, stream);
 
-  bool select_min = cuvs::distance::is_min_close(metric);
+  bool select_min = cuvs::distance::is_min_close(static_cast<cuvs::distance::DistanceType>((int)metric));
 
   cpu_brute_force_with_filter(queries_h.data(),
                               indices_h.data(),
@@ -377,7 +377,7 @@ void recall_eval_with_filter(T* query_data,
                               n_neighbors,
                               nnz,
                               select_min,
-                              static_cast<cuvs::distance::DistanceType>((uint16_t)metric));
+                              metric);
 
   // verify output
   double min_recall = 0.95;
@@ -453,7 +453,7 @@ void run_test_with_filter(int64_t n_samples,
   int64_t nnz = create_sparse_matrix(n_rows_filter, n_samples, sparsity, filter_h);
 
   cuvsDistanceType metric = L2Expanded;
-  bool select_min         = cuvs::distance::is_min_close(metric);
+  bool select_min         = cuvs::distance::is_min_close(static_cast<cuvs::distance::DistanceType>((int)metric));
 
   std::vector<float> distances_ref_h(
     n_queries * n_neighbors,
