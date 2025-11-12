@@ -357,6 +357,11 @@ void extend_core(
   std::optional<raft::device_matrix_view<T, int64_t, raft::layout_stride>> new_dataset_buffer_view,
   std::optional<raft::device_matrix_view<IdxT, int64_t>> new_graph_buffer_view)
 {
+  RAFT_EXPECTS(!index.on_disk(),
+               "Cannot extend a disk-backed CAGRA index. Convert it with "
+               "cuvs::neighbors::hnsw::from_cagra() and load it into memory via "
+               "cuvs::neighbors::hnsw::deserialize() before calling extend().");
+
   if (dynamic_cast<const non_owning_dataset<T, IdxT>*>(&index.data()) != nullptr &&
       !new_dataset_buffer_view.has_value()) {
     RAFT_LOG_WARN(

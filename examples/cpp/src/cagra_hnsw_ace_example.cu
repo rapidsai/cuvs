@@ -19,18 +19,59 @@
 
 #include "common.cuh"
 
-void cagra_build_search_ace(raft::device_resources const& dev_resources,
-                            raft::device_matrix_view<const float, int64_t> dataset,
-                            raft::device_matrix_view<const float, int64_t> queries)
+#include <cstdio>
+#include <cstdlib>  // for exit
+#include <fcntl.h>
+#include <stdint.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+int main()
 {
   using namespace cuvs::neighbors;
+  raft::device_resources dev_resources;
 
-  int64_t topk      = 12;
-  int64_t n_queries = queries.extent(0);
+  // Set pool memory resource with 1 GiB initial pool size. All allocations use the same pool.
+  rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource> pool_mr(
+    rmm::mr::get_current_device_resource(), 1024 * 1024 * 1024ull);
+  rmm::mr::set_current_device_resource(&pool_mr);
 
-  // create output arrays
-  auto neighbors = raft::make_device_matrix<uint32_t>(dev_resources, n_queries, topk);
-  auto distances = raft::make_device_matrix<float>(dev_resources, n_queries, topk);
+  // Alternatively, one could define a pool allocator for temporary arrays (used within RAFT
+  // algorithms). In that case only the internal arrays would use the pool, any other allocation
+  // uses the default RMM memory resource. Here is how to change the workspace memory resource to
+  // a pool with 2 GiB upper limit.
+  // raft::resource::set_workspace_to_pool_resource(dev_resources, 2 * 1024 * 1024 * 1024ull);
+
+  //// openai-5m
+  int64_t n_rows = 5000000;
+  int64_t n_cols = 1536;
+  int fd         = open("openai_5M/base.5M.fbin", O_RDONLY);
+  if (fd == -1) {
+    perror("Error opening file");
+    return EXIT_FAILURE;
+  }
+
+  uint32_t shape[2];
+  ssize_t bytesRead = read(fd, shape, 8);
+  if (bytesRead != 8) {
+    perror("Error reading shape");
+    close(fd);
+    return EXIT_FAILURE;
+  }
+  size_t data_size = shape[0] * static_cast<size_t>(shape[1]);
+  std::cout << "Dataset size " << data_size << std::endl;
+  size_t header_size = sizeof(shape);
+  size_t file_size   = data_size * sizeof(float) + header_size;
+  std::cout << "shape [" << shape[0] << ", " << shape[1] << "]" << std::endl;
+
+  void* dataset_ptr = mmap(nullptr, n_rows * n_cols * 4, PROT_READ, MAP_SHARED, fd, 0);
+  if (dataset_ptr == MAP_FAILED) {
+    perror("Error mmapping the file");
+    close(fd);
+    return EXIT_FAILURE;
+  }
+  auto dataset_host_view = raft::make_host_matrix_view<const float, int64_t, raft::row_major>(
+    (float*)dataset_ptr, n_rows, n_cols);
 
   // CAGRA index parameters
   cagra::index_params index_params;
@@ -51,133 +92,19 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   ace_params.ef_construction = 120;
   // Set the directory to store the ACE build artifacts. This should be the fastest disk in the
   // system and hold enough space for twice the dataset, final graph, and label mapping.
-  ace_params.build_dir = "/tmp/ace_build";
+  ace_params.build_dir = "/tmp/data/ace_build";
   // Set whether to use disk-based storage for ACE build. When true, enables disk-based operations
   // for memory-efficient graph construction. If not set, the index will be built in memory if the
   // graph fits in host and GPU memory, and on disk otherwise.
-  // ace_params.use_disk  = true;
+  ace_params.use_disk             = true;
   index_params.graph_build_params = ace_params;
-
-  // ACE requires the dataset to be on the host
-  auto dataset_host = raft::make_host_matrix<float, int64_t>(dataset.extent(0), dataset.extent(1));
-  raft::copy(dataset_host.data_handle(),
-             dataset.data_handle(),
-             dataset.extent(0) * dataset.extent(1),
-             raft::resource::get_cuda_stream(dev_resources));
-  raft::resource::sync_stream(dev_resources);
-  auto dataset_host_view = raft::make_host_matrix_view<const float, int64_t, raft::row_major>(
-    dataset_host.data_handle(), dataset_host.extent(0), dataset_host.extent(1));
 
   std::cout << "Building CAGRA index (search graph)" << std::endl;
   auto index = cagra::build(dev_resources, index_params, dataset_host_view);
-  // In-memory build of ACE provides the index in memory, so we can search it directly using
-  // cagra::search
 
-  // On-disk build of ACE stores the reordered dataset, the dataset mapping, and the graph on disk.
-  // The index is not directly usable for CAGRA search. Convert to HNSW for search operations.
-
-  // Convert CAGRA index to HNSW
-  // For disk-based indices: serializes CAGRA to HNSW format on disk, returns an index with file
-  // descriptor For in-memory indices: creates HNSW index in memory
   std::cout << "Converting CAGRA index to HNSW" << std::endl;
   hnsw::index_params hnsw_params;
   auto hnsw_index = hnsw::from_cagra(dev_resources, hnsw_params, index);
-
-  // HNSW search requires host matrices
-  auto queries_host = raft::make_host_matrix<float, int64_t>(n_queries, queries.extent(1));
-  raft::copy(queries_host.data_handle(),
-             queries.data_handle(),
-             n_queries * queries.extent(1),
-             raft::resource::get_cuda_stream(dev_resources));
-  raft::resource::sync_stream(dev_resources);
-
-  // HNSW search outputs uint64_t indices
-  auto indices_hnsw_host   = raft::make_host_matrix<uint64_t, int64_t>(n_queries, topk);
-  auto distances_hnsw_host = raft::make_host_matrix<float, int64_t>(n_queries, topk);
-
-  hnsw::search_params hnsw_search_params;
-  hnsw_search_params.ef          = std::max(200, static_cast<int>(topk) * 2);
-  hnsw_search_params.num_threads = 1;
-
-  // Check if the HNSW index is stored on disk
-  if (hnsw_index->on_disk()) {
-    std::cout << "HNSW index is stored on disk." << std::endl;
-
-    // For disk-based indices, the HNSW index file path can be obtained via file_path()
-    std::string hnsw_index_path = hnsw_index->file_path();
-    std::cout << "HNSW index file location: " << hnsw_index_path << std::endl;
-    std::cout << "Deserializing HNSW index from disk for search." << std::endl;
-
-    hnsw::index<float>* hnsw_index_raw = nullptr;
-    hnsw::deserialize(
-      dev_resources, hnsw_params, hnsw_index_path, index.dim(), index.metric(), &hnsw_index_raw);
-
-    std::unique_ptr<hnsw::index<float>> hnsw_index_deserialized(hnsw_index_raw);
-
-    std::cout << "Searching HNSW index." << std::endl;
-    hnsw::search(dev_resources,
-                 hnsw_search_params,
-                 *hnsw_index_deserialized,
-                 queries_host.view(),
-                 indices_hnsw_host.view(),
-                 distances_hnsw_host.view());
-  } else {
-    std::cout << "HNSW index in memory. Searching..." << std::endl;
-    hnsw::search(dev_resources,
-                 hnsw_search_params,
-                 *hnsw_index,
-                 queries_host.view(),
-                 indices_hnsw_host.view(),
-                 distances_hnsw_host.view());
-  }
-
-  // Convert HNSW uint64_t indices back to uint32_t for printing
-  auto neighbors_host = raft::make_host_matrix<uint32_t, int64_t>(n_queries, topk);
-  for (int64_t i = 0; i < n_queries; i++) {
-    for (int64_t j = 0; j < topk; j++) {
-      neighbors_host(i, j) = static_cast<uint32_t>(indices_hnsw_host(i, j));
-    }
-  }
-
-  // Copy results to device
-  raft::copy(neighbors.data_handle(),
-             neighbors_host.data_handle(),
-             n_queries * topk,
-             raft::resource::get_cuda_stream(dev_resources));
-  raft::copy(distances.data_handle(),
-             distances_hnsw_host.data_handle(),
-             n_queries * topk,
-             raft::resource::get_cuda_stream(dev_resources));
-  raft::resource::sync_stream(dev_resources);
-
-  print_results(dev_resources, neighbors.view(), distances.view());
-}
-
-int main()
-{
-  raft::device_resources dev_resources;
-
-  // Set pool memory resource with 1 GiB initial pool size. All allocations use the same pool.
-  rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource> pool_mr(
-    rmm::mr::get_current_device_resource(), 1024 * 1024 * 1024ull);
-  rmm::mr::set_current_device_resource(&pool_mr);
-
-  // Alternatively, one could define a pool allocator for temporary arrays (used within RAFT
-  // algorithms). In that case only the internal arrays would use the pool, any other allocation
-  // uses the default RMM memory resource. Here is how to change the workspace memory resource to
-  // a pool with 2 GiB upper limit.
-  // raft::resource::set_workspace_to_pool_resource(dev_resources, 2 * 1024 * 1024 * 1024ull);
-
-  // Create input arrays.
-  int64_t n_samples = 10000;
-  int64_t n_dim     = 90;
-  int64_t n_queries = 10;
-  auto dataset      = raft::make_device_matrix<float, int64_t>(dev_resources, n_samples, n_dim);
-  auto queries      = raft::make_device_matrix<float, int64_t>(dev_resources, n_queries, n_dim);
-  generate_dataset(dev_resources, dataset.view(), queries.view());
-
-  // ACE build and search example.
-  cagra_build_search_ace(dev_resources,
-                         raft::make_const_mdspan(dataset.view()),
-                         raft::make_const_mdspan(queries.view()));
+  hnsw::serialize(dev_resources, "./openai_hnsw_index.bin", *hnsw_index);
+  std::cout << "Done!" << std::endl;
 }

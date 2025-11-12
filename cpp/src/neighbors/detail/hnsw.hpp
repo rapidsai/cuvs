@@ -1094,6 +1094,9 @@ void extend(raft::resources const& res,
             raft::host_matrix_view<const T, int64_t, raft::row_major> additional_dataset,
             index<T>& idx)
 {
+  RAFT_EXPECTS(!idx.on_disk(),
+               "Cannot extend an HNSW index that is stored on disk. "
+               "The index must be deserialized into memory first using hnsw::deserialize().");
   auto* hnswlib_index = reinterpret_cast<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>*>(
     const_cast<void*>(idx.get_index()));
   auto current_element_count = hnswlib_index->getCurrentElementCount();
@@ -1178,6 +1181,9 @@ void search(raft::resources const& res,
 template <typename T>
 void serialize(raft::resources const& res, const std::string& filename, const index<T>& idx)
 {
+  RAFT_EXPECTS(!idx.on_disk(),
+               "Cannot serialize an HNSW index that is stored on disk. "
+               "The index must be deserialized into memory first using hnsw::deserialize().");
   auto* hnswlib_index = reinterpret_cast<hnswlib::HierarchicalNSW<typename hnsw_dist_t<T>::type>*>(
     const_cast<void*>(idx.get_index()));
   hnswlib_index->saveIndex(filename);

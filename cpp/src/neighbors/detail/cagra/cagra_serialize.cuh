@@ -44,6 +44,11 @@ void serialize(raft::resources const& res,
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("cagra::serialize");
 
+  RAFT_EXPECTS(!index_.on_disk(),
+               "Cannot serialize a disk-backed CAGRA index. Convert it with "
+               "cuvs::neighbors::hnsw::from_cagra() and load it into memory via "
+               "cuvs::neighbors::hnsw::deserialize() before serialization.");
+
   RAFT_LOG_DEBUG(
     "Saving CAGRA index, size %zu, dim %u", static_cast<size_t>(index_.size()), index_.dim());
 
@@ -80,6 +85,10 @@ void serialize(raft::resources const& res,
                const index<T, IdxT>& index_,
                bool include_dataset)
 {
+  RAFT_EXPECTS(!index_.on_disk(),
+               "Cannot serialize a disk-backed CAGRA index. Convert it with "
+               "cuvs::neighbors::hnsw::from_cagra() and load it into memory via "
+               "cuvs::neighbors::hnsw::deserialize() before serialization.");
   std::ofstream of(filename, std::ios::out | std::ios::binary);
   if (!of) { RAFT_FAIL("Cannot open file %s", filename.c_str()); }
 
