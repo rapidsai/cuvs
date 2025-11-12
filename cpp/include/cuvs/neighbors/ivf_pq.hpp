@@ -23,9 +23,10 @@
 
 namespace cuvs::neighbors::ivf_pq {
 
-// Forward declarations for friend access
-template <typename IdxT> struct owning_impl;
-template <typename IdxT> struct view_impl;
+template <typename IdxT>
+struct owning_impl;
+template <typename IdxT>
+struct view_impl;
 
 /**
  * @defgroup ivf_pq_cpp_index_params IVF-PQ index build parameters
@@ -348,7 +349,7 @@ struct index : cuvs::neighbors::index {
   index(const index&)                    = delete;
   index(index&&) noexcept                = default;
   auto operator=(const index&) -> index& = delete;
-  auto operator=(index&&) -> index& = default;
+  auto operator=(index&&) -> index&      = default;
   ~index();
 
   /**
@@ -519,10 +520,10 @@ struct index : cuvs::neighbors::index {
 
   /**
    * @brief Construct index from implementation pointer.
-   * 
+   *
    * This constructor is used internally by build/extend/deserialize functions.
    * Users typically don't call this directly.
-   * 
+   *
    * @param impl Implementation pointer (owning or view)
    */
   explicit index(std::unique_ptr<index_iface> impl);
@@ -531,8 +532,19 @@ struct index : cuvs::neighbors::index {
   // Friend impl structures that need to initialize private members
   friend struct owning_impl<IdxT>;
   friend struct view_impl<IdxT>;
-  
+
+  // PIMPL pointer - only for data storage strategy (centers/matrices)
   std::unique_ptr<index_iface> impl_;
+
+  // Metadata - stored directly in index for fast access (no PIMPL indirection)
+  cuvs::distance::DistanceType metric_;
+  codebook_gen codebook_kind_;
+  uint32_t dim_;
+  uint32_t pq_bits_;
+  uint32_t pq_dim_;
+  bool conservative_memory_allocation_;
+
+  // IVF lists data - always owned, not in PIMPL
   std::vector<std::shared_ptr<list_data<IdxT>>> lists_;
   raft::device_vector<uint32_t, uint32_t, raft::row_major> list_sizes_;
 
@@ -1079,8 +1091,8 @@ auto build(
   raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
   raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
   std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
-  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>>
-    rotation_matrix) -> cuvs::neighbors::ivf_pq::index<int64_t>;
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix)
+  -> cuvs::neighbors::ivf_pq::index<int64_t>;
 
 /**
  * @brief Build an IVF-PQ index from host memory centroids and codebook (in-place).
@@ -1101,8 +1113,7 @@ void build(
   raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
   raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
   std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
-  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>>
-    rotation_matrix,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix,
   cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 
 /**

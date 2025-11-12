@@ -20,76 +20,34 @@ namespace cuvs::neighbors::ivf_pq {
 // ============================================================================
 
 /**
- * @brief Base class for index implementation (PIMPL pattern)
- * 
- * This contains all common metadata shared between owning and view variants.
- * Only the data storage strategy varies (owned vs viewed).
+ * @brief Abstract interface for index implementation (PIMPL pattern)
+ *
+ * This interface only contains virtual methods for data access.
+ * Metadata is stored directly in index<IdxT> for performance.
+ * Only the data storage strategy (owned vs viewed) varies.
  */
 template <typename IdxT>
 struct index<IdxT>::index_iface {
-  // Common metadata - stored here, no duplication
-  cuvs::distance::DistanceType metric_;
-  codebook_gen codebook_kind_;
-  uint32_t dim_;
-  uint32_t pq_bits_;
-  uint32_t pq_dim_;
-  bool conservative_memory_allocation_;
-  uint32_t n_lists_;
-  
-  index_iface(cuvs::distance::DistanceType metric,
-              codebook_gen codebook_kind,
-              uint32_t n_lists,
-              uint32_t dim,
-              uint32_t pq_bits,
-              uint32_t pq_dim,
-              bool conservative_memory_allocation)
-    : metric_(metric),
-      codebook_kind_(codebook_kind),
-      dim_(dim),
-      pq_bits_(pq_bits),
-      pq_dim_(pq_dim),
-      conservative_memory_allocation_(conservative_memory_allocation),
-      n_lists_(n_lists)
-  {}
-  
   virtual ~index_iface() = default;
-  
-  // Concrete metadata accessors (no virtual calls needed!)
-  cuvs::distance::DistanceType metric() const noexcept { return metric_; }
-  codebook_gen codebook_kind() const noexcept { return codebook_kind_; }
-  uint32_t dim() const noexcept { return dim_; }
-  uint32_t pq_bits() const noexcept { return pq_bits_; }
-  uint32_t pq_dim() const noexcept { return pq_dim_; }
-  bool conservative_memory_allocation() const noexcept { return conservative_memory_allocation_; }
-  uint32_t n_lists() const noexcept { return n_lists_; }
-  
-  // Data accessors - THESE are virtual (different for owning vs view)
-  virtual raft::device_mdspan<float, typename index<IdxT>::pq_centers_extents, raft::row_major> 
-    pq_centers() noexcept = 0;
-  virtual raft::device_mdspan<const float, typename index<IdxT>::pq_centers_extents, raft::row_major> 
+
+  // Pure virtual data accessors - only these differ between owning and view
+  virtual raft::device_mdspan<float, typename index<IdxT>::pq_centers_extents, raft::row_major>
+  pq_centers() noexcept = 0;
+  virtual raft::
+    device_mdspan<const float, typename index<IdxT>::pq_centers_extents, raft::row_major>
     pq_centers() const noexcept = 0;
-  
+
   virtual raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept = 0;
-  virtual raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept = 0;
-  
+  virtual raft::device_matrix_view<const float, uint32_t, raft::row_major> centers()
+    const noexcept = 0;
+
   virtual raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept = 0;
-  virtual raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot() const noexcept = 0;
-  
+  virtual raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot()
+    const noexcept = 0;
+
   virtual raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() noexcept = 0;
-  virtual raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix() const noexcept = 0;
-  
-  // Helper method
-  typename index<IdxT>::pq_centers_extents make_pq_centers_extents() const {
-    uint32_t pq_len = raft::div_rounding_up_unsafe(dim_, pq_dim_);
-    uint32_t pq_book_size = 1u << pq_bits_;
-    switch (codebook_kind_) {
-      case codebook_gen::PER_SUBSPACE:
-        return raft::make_extents<uint32_t>(pq_dim_, pq_len, pq_book_size);
-      case codebook_gen::PER_CLUSTER:
-        return raft::make_extents<uint32_t>(n_lists_, pq_len, pq_book_size);
-      default: RAFT_FAIL("Unreachable code");
-    }
-  }
+  virtual raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix()
+    const noexcept = 0;
 };
 
 /**
@@ -98,62 +56,83 @@ struct index<IdxT>::index_iface {
 template <typename IdxT>
 struct owning_impl : index<IdxT>::index_iface {
   using pq_centers_extents = typename index<IdxT>::pq_centers_extents;
-  using base_type = typename index<IdxT>::index_iface;
-  
-  // Owned data (only what differs from view variant)
+
+  // Owned data
   raft::device_mdarray<float, pq_centers_extents, raft::row_major> pq_centers_;
   raft::device_matrix<float, uint32_t, raft::row_major> centers_;
   raft::device_matrix<float, uint32_t, raft::row_major> centers_rot_;
   raft::device_matrix<float, uint32_t, raft::row_major> rotation_matrix_;
-  
+
   owning_impl(raft::resources const& handle,
-              cuvs::distance::DistanceType metric,
-              codebook_gen codebook_kind,
               uint32_t n_lists,
               uint32_t dim,
-              uint32_t pq_bits,
               uint32_t pq_dim,
-              bool conservative_memory_allocation)
-    : base_type(metric,
-                codebook_kind,
-                n_lists,
-                dim,
-                pq_bits,
-                pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : pq_dim,
-                conservative_memory_allocation),
-      pq_centers_{raft::make_device_mdarray<float>(handle, this->make_pq_centers_extents())},
-      centers_{raft::make_device_matrix<float, uint32_t>(handle, n_lists, raft::round_up_safe(dim + 1, 8u))},
-      centers_rot_{raft::make_device_matrix<float, uint32_t>(handle, n_lists, raft::div_rounding_up_unsafe(dim, this->pq_dim_) * this->pq_dim_)},
-      rotation_matrix_{raft::make_device_matrix<float, uint32_t>(handle, raft::div_rounding_up_unsafe(dim, this->pq_dim_) * this->pq_dim_, dim)}
-  {}
-  
-  // Only override data accessors (metadata accessors are in base class)
-  raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept override {
+              uint32_t pq_bits,
+              codebook_gen codebook_kind)
+    : pq_centers_{raft::make_device_mdarray<float>(
+        handle, make_pq_centers_extents(dim, pq_dim, pq_bits, codebook_kind, n_lists))},
+      centers_{raft::make_device_matrix<float, uint32_t>(
+        handle, n_lists, raft::round_up_safe(dim + 1, 8u))},
+      centers_rot_{raft::make_device_matrix<float, uint32_t>(
+        handle, n_lists, raft::div_rounding_up_unsafe(dim, pq_dim) * pq_dim)},
+      rotation_matrix_{raft::make_device_matrix<float, uint32_t>(
+        handle, raft::div_rounding_up_unsafe(dim, pq_dim) * pq_dim, dim)}
+  {
+  }
+
+  // Override virtual data accessors
+  raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept override
+  {
     return pq_centers_.view();
   }
-  raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers() const noexcept override {
+  raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers()
+    const noexcept override
+  {
     return pq_centers_.view();
   }
-  
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept override {
+
+  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept override
+  {
     return centers_.view();
   }
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept override {
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept override
+  {
     return centers_.view();
   }
-  
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept override {
+
+  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept override
+  {
     return centers_rot_.view();
   }
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot() const noexcept override {
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot()
+    const noexcept override
+  {
     return centers_rot_.view();
   }
-  
-  raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() noexcept override {
+
+  raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() noexcept override
+  {
     return rotation_matrix_.view();
   }
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix() const noexcept override {
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix()
+    const noexcept override
+  {
     return rotation_matrix_.view();
+  }
+
+ private:
+  static typename index<IdxT>::pq_centers_extents make_pq_centers_extents(
+    uint32_t dim, uint32_t pq_dim, uint32_t pq_bits, codebook_gen codebook_kind, uint32_t n_lists)
+  {
+    uint32_t pq_len       = raft::div_rounding_up_unsafe(dim, pq_dim);
+    uint32_t pq_book_size = 1u << pq_bits;
+    switch (codebook_kind) {
+      case codebook_gen::PER_SUBSPACE:
+        return raft::make_extents<uint32_t>(pq_dim, pq_len, pq_book_size);
+      case codebook_gen::PER_CLUSTER:
+        return raft::make_extents<uint32_t>(n_lists, pq_len, pq_book_size);
+      default: RAFT_FAIL("Unreachable code");
+    }
   }
 };
 
@@ -163,62 +142,71 @@ struct owning_impl : index<IdxT>::index_iface {
 template <typename IdxT>
 struct view_impl : index<IdxT>::index_iface {
   using pq_centers_extents = typename index<IdxT>::pq_centers_extents;
-  using base_type = typename index<IdxT>::index_iface;
-  
-  // Views to external data (only what differs from owning variant)
+
+  // Views to external data
   raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers_view_;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_view_;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot_view_;
   raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix_view_;
-  
-  view_impl(cuvs::distance::DistanceType metric,
-            codebook_gen codebook_kind,
-            uint32_t n_lists,
-            uint32_t dim,
-            uint32_t pq_bits,
-            uint32_t pq_dim,
-            bool conservative_memory_allocation,
-            raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers_view,
+
+  view_impl(raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers_view,
             raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_view,
             raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot_view,
             raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix_view)
-    : base_type(metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, conservative_memory_allocation),
-      pq_centers_view_(pq_centers_view),
+    : pq_centers_view_(pq_centers_view),
       centers_view_(centers_view),
       centers_rot_view_(centers_rot_view),
       rotation_matrix_view_(rotation_matrix_view)
-  {}
-  
-  // Only override data accessors (metadata accessors are in base class)
-  raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept override {
+  {
+  }
+
+  // Override virtual data accessors
+  raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept override
+  {
     return raft::mdspan<float, pq_centers_extents, raft::row_major>(
       const_cast<float*>(pq_centers_view_.data_handle()), pq_centers_view_.extents());
   }
-  raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers() const noexcept override {
+  raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers()
+    const noexcept override
+  {
     return pq_centers_view_;
   }
-  
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept override {
+
+  raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept override
+  {
     return raft::make_device_matrix_view<float, uint32_t>(
-      const_cast<float*>(centers_view_.data_handle()), centers_view_.extent(0), centers_view_.extent(1));
+      const_cast<float*>(centers_view_.data_handle()),
+      centers_view_.extent(0),
+      centers_view_.extent(1));
   }
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept override {
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers() const noexcept override
+  {
     return centers_view_;
   }
-  
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept override {
+
+  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot() noexcept override
+  {
     return raft::make_device_matrix_view<float, uint32_t>(
-      const_cast<float*>(centers_rot_view_.data_handle()), centers_rot_view_.extent(0), centers_rot_view_.extent(1));
+      const_cast<float*>(centers_rot_view_.data_handle()),
+      centers_rot_view_.extent(0),
+      centers_rot_view_.extent(1));
   }
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot() const noexcept override {
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot()
+    const noexcept override
+  {
     return centers_rot_view_;
   }
-  
-  raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() noexcept override {
+
+  raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() noexcept override
+  {
     return raft::make_device_matrix_view<float, uint32_t>(
-      const_cast<float*>(rotation_matrix_view_.data_handle()), rotation_matrix_view_.extent(0), rotation_matrix_view_.extent(1));
+      const_cast<float*>(rotation_matrix_view_.data_handle()),
+      rotation_matrix_view_.extent(0),
+      rotation_matrix_view_.extent(1));
   }
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix() const noexcept override {
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix()
+    const noexcept override
+  {
     return rotation_matrix_view_;
   }
 };
@@ -264,15 +252,13 @@ index<IdxT>::index(std::unique_ptr<index_iface> impl)
 template <typename IdxT>
 index<IdxT>::index(raft::resources const& handle)
   : cuvs::neighbors::index(),
-    impl_(std::make_unique<owning_impl<IdxT>>(
-      handle,
-      cuvs::distance::DistanceType::L2Expanded,
-      codebook_gen::PER_SUBSPACE,
-      0,
-      0,
-      8,
-      0,
-      true)),
+    impl_(std::make_unique<owning_impl<IdxT>>(handle, 0, 0, 0, 8, codebook_gen::PER_SUBSPACE)),
+    metric_(cuvs::distance::DistanceType::L2Expanded),
+    codebook_kind_(codebook_gen::PER_SUBSPACE),
+    dim_(0),
+    pq_bits_(8),
+    pq_dim_(0),
+    conservative_memory_allocation_(true),
     lists_{0},
     list_sizes_{raft::make_device_vector<uint32_t, uint32_t>(handle, 0)},
     data_ptrs_{raft::make_device_vector<uint8_t*, uint32_t>(handle, 0)},
@@ -294,7 +280,13 @@ index<IdxT>::index(raft::resources const& handle,
                    bool conservative_memory_allocation)
   : cuvs::neighbors::index(),
     impl_(std::make_unique<owning_impl<IdxT>>(
-      handle, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, conservative_memory_allocation)),
+      handle, n_lists, dim, pq_dim == 0 ? calculate_pq_dim(dim) : pq_dim, pq_bits, codebook_kind)),
+    metric_(metric),
+    codebook_kind_(codebook_kind),
+    dim_(dim),
+    pq_bits_(pq_bits),
+    pq_dim_(pq_dim == 0 ? calculate_pq_dim(dim) : pq_dim),
+    conservative_memory_allocation_(conservative_memory_allocation),
     lists_{n_lists},
     list_sizes_{raft::make_device_vector<uint32_t, uint32_t>(handle, n_lists)},
     data_ptrs_{raft::make_device_vector<uint8_t*, uint32_t>(handle, n_lists)},
@@ -319,7 +311,7 @@ index<IdxT>::index(raft::resources const& handle, const index_params& params, ui
 {
 }
 
-// Delegation methods - forward to impl_
+// Metadata accessors - return direct members (fast, no PIMPL indirection)
 template <typename IdxT>
 IdxT index<IdxT>::size() const noexcept
 {
@@ -329,7 +321,7 @@ IdxT index<IdxT>::size() const noexcept
 template <typename IdxT>
 uint32_t index<IdxT>::dim() const noexcept
 {
-  return impl_->dim();
+  return dim_;
 }
 
 template <typename IdxT>
@@ -347,13 +339,13 @@ uint32_t index<IdxT>::rot_dim() const noexcept
 template <typename IdxT>
 uint32_t index<IdxT>::pq_bits() const noexcept
 {
-  return impl_->pq_bits();
+  return pq_bits_;
 }
 
 template <typename IdxT>
 uint32_t index<IdxT>::pq_dim() const noexcept
 {
-  return impl_->pq_dim();
+  return pq_dim_;
 }
 
 template <typename IdxT>
@@ -371,25 +363,25 @@ uint32_t index<IdxT>::pq_book_size() const noexcept
 template <typename IdxT>
 cuvs::distance::DistanceType index<IdxT>::metric() const noexcept
 {
-  return impl_->metric();
+  return metric_;
 }
 
 template <typename IdxT>
 codebook_gen index<IdxT>::codebook_kind() const noexcept
 {
-  return impl_->codebook_kind();
+  return codebook_kind_;
 }
 
 template <typename IdxT>
 uint32_t index<IdxT>::n_lists() const noexcept
 {
-  return impl_->n_lists();
+  return lists_.size();
 }
 
 template <typename IdxT>
 bool index<IdxT>::conservative_memory_allocation() const noexcept
 {
-  return impl_->conservative_memory_allocation();
+  return conservative_memory_allocation_;
 }
 
 template <typename IdxT>
@@ -413,7 +405,8 @@ raft::device_matrix_view<float, uint32_t, raft::row_major> index<IdxT>::centers(
 }
 
 template <typename IdxT>
-raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::centers() const noexcept
+raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::centers()
+  const noexcept
 {
   return impl_->centers();
 }
@@ -425,7 +418,8 @@ raft::device_matrix_view<float, uint32_t, raft::row_major> index<IdxT>::centers_
 }
 
 template <typename IdxT>
-raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::centers_rot() const noexcept
+raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::centers_rot()
+  const noexcept
 {
   return impl_->centers_rot();
 }
@@ -437,11 +431,11 @@ raft::device_matrix_view<float, uint32_t, raft::row_major> index<IdxT>::rotation
 }
 
 template <typename IdxT>
-raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::rotation_matrix() const noexcept
+raft::device_matrix_view<const float, uint32_t, raft::row_major> index<IdxT>::rotation_matrix()
+  const noexcept
 {
   return impl_->rotation_matrix();
 }
-
 
 template <typename IdxT>
 std::vector<std::shared_ptr<list_data<IdxT>>>& index<IdxT>::lists() noexcept
@@ -524,22 +518,22 @@ uint32_t index<IdxT>::get_list_size_in_bytes(uint32_t label)
 template <typename IdxT>
 void index<IdxT>::check_consistency()
 {
-  RAFT_EXPECTS(pq_bits() >= 4 && pq_bits() <= 8,
+  RAFT_EXPECTS(pq_bits_ >= 4 && pq_bits_ <= 8,
                "`pq_bits` must be within closed range [4,8], but got %u.",
-               pq_bits());
-  RAFT_EXPECTS((pq_bits() * pq_dim()) % 8 == 0,
+               pq_bits_);
+  RAFT_EXPECTS((pq_bits_ * pq_dim_) % 8 == 0,
                "`pq_bits * pq_dim` must be a multiple of 8, but got %u * %u = %u.",
-               pq_bits(),
-               pq_dim(),
-               pq_bits() * pq_dim());
+               pq_bits_,
+               pq_dim_,
+               pq_bits_ * pq_dim_);
 }
 
 template <typename IdxT>
 typename index<IdxT>::pq_centers_extents index<IdxT>::make_pq_centers_extents()
 {
-  switch (codebook_kind()) {
+  switch (codebook_kind_) {
     case codebook_gen::PER_SUBSPACE:
-      return raft::make_extents<uint32_t>(pq_dim(), pq_len(), pq_book_size());
+      return raft::make_extents<uint32_t>(pq_dim_, pq_len(), pq_book_size());
     case codebook_gen::PER_CLUSTER:
       return raft::make_extents<uint32_t>(n_lists(), pq_len(), pq_book_size());
     default: RAFT_FAIL("Unreachable code");
