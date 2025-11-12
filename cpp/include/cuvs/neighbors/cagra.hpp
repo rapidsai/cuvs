@@ -729,13 +729,8 @@ struct index : cuvs::neighbors::index {
   {
     RAFT_EXPECTS(fd.is_valid(), "Invalid file descriptor provided for dataset");
 
-    std::string file_path = fd.get_path();
-    RAFT_EXPECTS(!file_path.empty(), "Unable to get path from dataset file descriptor");
-
-    std::ifstream file_stream(file_path, std::ios::binary);
-    RAFT_EXPECTS(file_stream.good(), "Failed to open dataset file: %s", file_path.c_str());
-
-    auto header = raft::detail::numpy_serializer::read_header(file_stream);
+    auto stream = fd.make_istream();
+    auto header = raft::detail::numpy_serializer::read_header(stream);
     RAFT_EXPECTS(header.shape.size() == 2,
                  "Dataset file should be 2D, got %zu dimensions",
                  header.shape.size());
@@ -746,7 +741,7 @@ struct index : cuvs::neighbors::index {
     RAFT_LOG_DEBUG("ACE: Dataset has shape [%zu, %zu]", n_rows_, dim_);
 
     // Re-open the file descriptor in read-only mode for subsequent operations
-    dataset_fd_.emplace(file_path, O_RDONLY);
+    dataset_fd_.emplace(std::move(fd))
     on_disk_ = true;
 
     dataset_ = std::make_unique<cuvs::neighbors::empty_dataset<int64_t>>(0);
@@ -767,14 +762,8 @@ struct index : cuvs::neighbors::index {
   {
     RAFT_EXPECTS(fd.is_valid(), "Invalid file descriptor provided for graph");
 
-    // Read header from file using ifstream
-    std::string file_path = fd.get_path();
-    RAFT_EXPECTS(!file_path.empty(), "Unable to get path from graph file descriptor");
-
-    std::ifstream file_stream(file_path, std::ios::binary);
-    RAFT_EXPECTS(file_stream.good(), "Failed to open graph file: %s", file_path.c_str());
-
-    auto header = raft::detail::numpy_serializer::read_header(file_stream);
+    auto stream = fd.make_istream();
+    auto header = raft::detail::numpy_serializer::read_header(stream);
     RAFT_EXPECTS(
       header.shape.size() == 2, "Graph file should be 2D, got %zu dimensions", header.shape.size());
 
@@ -791,7 +780,7 @@ struct index : cuvs::neighbors::index {
     RAFT_LOG_DEBUG("ACE: Graph has shape [%zu, %zu]", n_rows_, graph_degree_);
 
     // Re-open the file descriptor in read-only mode for subsequent operations
-    graph_fd_.emplace(file_path, O_RDONLY);
+    graph_fd_.emplace(std::move(fd));
     on_disk_ = true;
 
     graph_      = raft::make_device_matrix<IdxT, int64_t>(res, 0, 0);
@@ -812,13 +801,8 @@ struct index : cuvs::neighbors::index {
     RAFT_EXPECTS(fd.is_valid(), "Invalid file descriptor provided for mapping");
 
     // Read header from file using ifstream
-    std::string file_path = fd.get_path();
-    RAFT_EXPECTS(!file_path.empty(), "Unable to get path from mapping file descriptor");
-
-    std::ifstream file_stream(file_path, std::ios::binary);
-    RAFT_EXPECTS(file_stream.good(), "Failed to open mapping file: %s", file_path.c_str());
-
-    auto header = raft::detail::numpy_serializer::read_header(file_stream);
+    auto stream = fd.make_istream();
+    auto header = raft::detail::numpy_serializer::read_header(stream);
     RAFT_EXPECTS(header.shape.size() == 1,
                  "Mapping file should be 1D, got %zu dimensions",
                  header.shape.size());
@@ -832,8 +816,7 @@ struct index : cuvs::neighbors::index {
 
     RAFT_LOG_DEBUG("ACE: Mapping has %zu elements", header.shape[0]);
 
-    // Re-open the file descriptor in read-only mode for subsequent operations
-    mapping_fd_.emplace(file_path, O_RDONLY);
+    mapping_fd_.emplace(std::move(fd));
     on_disk_ = true;
   }
 

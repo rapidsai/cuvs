@@ -8,8 +8,13 @@
 
 #include <algorithm>
 #include <cstring>
+#include <istream>
+#include <limits.h>
+#include <memory>
 #include <ostream>
+#include <streambuf>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <errno.h>
@@ -17,7 +22,67 @@
 #include <unistd.h>
 
 namespace cuvs::util {
+/**
+ * @brief Streambuf that reads from a POSIX file descriptor
+ */
+class fd_streambuf : public std::streambuf {
+  int fd_;
+  std::unique_ptr<char[]> buffer_;
+  size_t buffer_size_;
 
+ protected:
+  int_type underflow() override
+  {
+    if (gptr() < egptr()) return traits_type::to_int_type(*gptr());
+    ssize_t n = ::read(fd_, buffer_.get(), buffer_size_);
+    if (n <= 0) return traits_type::eof();
+    setg(buffer_.get(), buffer_.get(), buffer_.get() + n);
+    return traits_type::to_int_type(*gptr());
+  }
+
+ public:
+  explicit fd_streambuf(int fd, size_t buffer_size = 8192)
+    : fd_(fd), buffer_(new char[buffer_size]), buffer_size_(buffer_size)
+  {
+    setg(buffer_.get(), buffer_.get(), buffer_.get());
+  }
+
+  ~fd_streambuf()
+  {
+    if (fd_ != -1) ::close(fd_);
+  }
+
+  fd_streambuf(const fd_streambuf&)                = delete;
+  fd_streambuf& operator=(const fd_streambuf&)     = delete;
+  fd_streambuf(fd_streambuf&&) noexcept            = default;
+  fd_streambuf& operator=(fd_streambuf&&) noexcept = default;
+};
+
+/**
+ * @brief Istream that reads from a POSIX file descriptor
+ */
+class fd_istream : public std::istream {
+  fd_streambuf buf_;
+
+ public:
+  explicit fd_istream(int fd) : std::istream(&buf_), buf_(fd) {}
+
+  fd_istream(const fd_istream&)            = delete;
+  fd_istream& operator=(const fd_istream&) = delete;
+
+  fd_istream(fd_istream&& o) noexcept : std::istream(std::move(o)), buf_(std::move(o.buf_))
+  {
+    rdbuf(&buf_);
+  }
+
+  fd_istream& operator=(fd_istream&& o) noexcept
+  {
+    std::istream::operator=(std::move(o));
+    buf_ = std::move(o.buf_);
+    rdbuf(&buf_);
+    return *this;
+  }
+};
 /**
  * @brief RAII wrapper for POSIX file descriptors
  *
@@ -72,7 +137,27 @@ class file_descriptor {
   }
 
   [[nodiscard]] std::string get_path() const { return path_; }
+  /**
+   * @brief Create an input stream from this file descriptor
+   *
+   * Creates an istream that reads directly from the file descriptor using POSIX read().
+   * The original descriptor remains valid and unchanged (we duplicate it internally).
+   * Returns the stream by value (uses move semantics).
+   *
+   * @return fd_istream (movable istream)
+   */
+  [[nodiscard]] fd_istream make_istream() const
+  {
+    RAFT_EXPECTS(is_valid(), "Invalid file descriptor");
 
+    // Duplicate the fd to avoid consuming the original
+    int dup_fd = dup(fd_);
+    RAFT_EXPECTS(dup_fd != -1, "Failed to duplicate file descriptor");
+
+    // Create stream that owns the duplicated fd
+    // Returned by value, uses move semantics
+    return fd_istream(dup_fd);
+  }
  private:
   int fd_;
   std::string path_;
