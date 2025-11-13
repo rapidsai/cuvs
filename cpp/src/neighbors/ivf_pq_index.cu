@@ -17,12 +17,12 @@ namespace cuvs::neighbors::ivf_pq {
 
 /**
  * @brief Base class for index implementation (PIMPL pattern)
- *
+ * 
  * Contains ALL index state: metadata, lists, and center/matrix storage.
  * Only the storage strategy for centers/matrices varies (owned vs viewed).
  */
 template <typename IdxT>
-struct index<IdxT>::index_iface {
+struct index_iface {
   // Metadata
   cuvs::distance::DistanceType metric_;
   codebook_gen codebook_kind_;
@@ -68,7 +68,7 @@ struct index<IdxT>::index_iface {
     accum_sorted_sizes_(n_lists) = 0;
   }
 
-  virtual ~index_iface() = default;
+  ~index_iface() = default;
 
   // Concrete accessor methods for metadata and lists (non-virtual, fast)
   cuvs::distance::DistanceType metric() const noexcept { return metric_; }
@@ -143,7 +143,7 @@ struct index<IdxT>::index_iface {
  * @brief Owning implementation - owns all center and matrix data
  */
 template <typename IdxT>
-struct owning_impl : index<IdxT>::index_iface {
+struct owning_impl : index_iface<IdxT> {
   using pq_centers_extents = typename index<IdxT>::pq_centers_extents;
 
  public:
@@ -155,7 +155,7 @@ struct owning_impl : index<IdxT>::index_iface {
               uint32_t pq_bits,
               uint32_t pq_dim,
               bool conservative_memory_allocation)
-    : index_iface(handle,
+    : index_iface<IdxT>(handle,
                   metric,
                   codebook_kind,
                   n_lists,
@@ -173,6 +173,8 @@ struct owning_impl : index<IdxT>::index_iface {
         handle, raft::div_rounding_up_unsafe(dim, pq_dim) * pq_dim, dim)}
   {
   }
+
+  ~owning_impl() = default;
 
   // Override virtual data accessors
   raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept override
@@ -239,7 +241,7 @@ struct owning_impl : index<IdxT>::index_iface {
  * @brief View implementation - holds views to externally managed data
  */
 template <typename IdxT>
-struct view_impl : index<IdxT>::index_iface {
+struct view_impl : index_iface<IdxT> {
   using pq_centers_extents = typename index<IdxT>::pq_centers_extents;
 
  public:
@@ -255,7 +257,7 @@ struct view_impl : index<IdxT>::index_iface {
             raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_view,
             raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot_view,
             raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix_view)
-    : index_iface(handle,
+    : index_iface<IdxT>(handle,
                   metric,
                   codebook_kind,
                   n_lists,
@@ -269,6 +271,7 @@ struct view_impl : index<IdxT>::index_iface {
       rotation_matrix_view_(rotation_matrix_view)
   {
   }
+  ~view_impl() = default;
 
   // Override virtual data accessors
   raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept override
@@ -348,20 +351,12 @@ index_params index_params::from_dataset(raft::matrix_extent<int64_t> dataset,
   return params;
 }
 
-// Destructor must be defined where index_iface is complete
-template <typename IdxT>
-index<IdxT>::~index() = default;
 
 // Constructor from impl pointer
 template <typename IdxT>
-index<IdxT>::index(std::unique_ptr<index_iface> impl)
+index<IdxT>::index(std::unique_ptr<index_iface<IdxT>> impl)
   : cuvs::neighbors::index(),
-    impl_(std::move(impl)),
-    lists_{},
-    list_sizes_{},
-    data_ptrs_{},
-    inds_ptrs_{},
-    accum_sorted_sizes_{}
+    impl_(std::move(impl))
 {
 }
 
@@ -415,6 +410,16 @@ index<IdxT>::index(raft::resources const& handle, const index_params& params, ui
           params.conservative_memory_allocation)
 {
 }
+
+// Special member functions must be defined where index_iface is complete
+template <typename IdxT>
+index<IdxT>::~index() = default;
+
+template <typename IdxT>
+index<IdxT>::index(index&&) noexcept = default;
+
+template <typename IdxT>
+auto index<IdxT>::operator=(index&&) -> index& = default;
 
 // Delegation methods - forward to impl accessor methods
 template <typename IdxT>
@@ -766,6 +771,7 @@ raft::device_matrix_view<const half, uint32_t, raft::row_major> index<IdxT>::cen
 }
 
 // Explicit template instantiations
+template struct index_iface<int64_t>;
 template struct index<int64_t>;
 template struct owning_impl<int64_t>;
 template struct view_impl<int64_t>;
