@@ -93,22 +93,21 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
 
     if constexpr (impl == ImplType::fused) {
       if constexpr (std::is_same_v<DataT, float>) {
-        cuvs::distance::fusedDistanceNNMinReduce<DataT, OutT, IdxT>(
-          out.data_handle(),
-          x.data_handle(),
-          y.data_handle(),
-          x_norm.data_handle(),
-          y_norm.data_handle(),
-          m,
-          n,
-          k,
-          (void*)workspace.data_handle(),
-          sqrt,
-          true,
-          true,
-          metric,
-          0.0,
-          stream);
+        cuvs::distance::fusedDistanceNNMinReduce<DataT, OutT, IdxT>(out.data_handle(),
+                                                                    x.data_handle(),
+                                                                    y.data_handle(),
+                                                                    x_norm.data_handle(),
+                                                                    y_norm.data_handle(),
+                                                                    m,
+                                                                    n,
+                                                                    k,
+                                                                    (void*)workspace.data_handle(),
+                                                                    sqrt,
+                                                                    true,
+                                                                    true,
+                                                                    metric,
+                                                                    0.0,
+                                                                    stream);
       } else {
         static_assert(sizeof(DataT) == 0,
                       "fusedDistanceNNMinReduce is not implemented for datatype other than float");

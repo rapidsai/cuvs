@@ -117,14 +117,14 @@ RAFT_KERNEL ref_nn_kernel(
 
 template <typename DataT, typename AccT, typename OutT, typename IdxT>
 void ref_nn(OutT* out,
-                  const DataT* A,
-                  const DataT* B,
-                  IdxT m,
-                  IdxT n,
-                  IdxT k,
-                  bool sqrt,
-                  DistanceType metric,
-                  cudaStream_t stream)
+            const DataT* A,
+            const DataT* B,
+            IdxT m,
+            IdxT n,
+            IdxT k,
+            bool sqrt,
+            DistanceType metric,
+            cudaStream_t stream)
 {
   ref_nn_kernel<DataT, AccT, OutT, IdxT>
     <<<(m + 127) / 128, 128, 0, stream>>>(out, A, B, m, n, k, sqrt, metric);
