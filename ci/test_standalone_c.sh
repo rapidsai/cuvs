@@ -1,10 +1,10 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 set -euo pipefail
 
-CMAKE_VERSION=3.31.8
+CMAKE_VERSION=4.1.2
 CMAKE_ARCH=x86_64
 
 # Fetch and install CMake.

@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 set -euo pipefail
@@ -56,7 +56,7 @@ scl enable gcc-toolset-${TOOLSET_VERSION} -- \
             -DBUILD_TESTS=OFF \
             -DBUILD_SHARED_LIBS=ON \
             -DCUVS_STATIC_RAPIDS_LIBRARIES=ON
-cmake --build cpp/build -j9
+cmake --build cpp/build "-j${PARALLEL_LEVEL}"
 
 rapids-logger "Begin c build"
 
@@ -66,7 +66,7 @@ scl enable gcc-toolset-${TOOLSET_VERSION} -- \
             -DCUVSC_STATIC_CUVS_LIBRARY=ON \
             -DCMAKE_PREFIX_PATH="$PWD/cpp/build/" \
             -DBUILD_TESTS=${BUILD_C_LIB_TESTS}
-cmake --build c/build -j9
+cmake --build c/build "-j${PARALLEL_LEVEL}"
 
 rapids-logger "Begin c install"
 cmake --install c/build --prefix c/build/install
