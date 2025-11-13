@@ -14,6 +14,10 @@ extern "C" {
 #endif
 
 /**
+ * @defgroup preprocessing_c_scalar C API for Scalar Quantizer
+ * @{
+ */
+/**
  * @brief Scalar quantizer parameters.
  */
 struct cuvsScalarQuantizerParams {
@@ -113,6 +117,10 @@ cuvsError_t cuvsScalarQuantizerInverseTransform(cuvsResources_t res,
                                                 cuvsScalarQuantizer_t quantizer,
                                                 DLManagedTensor* dataset,
                                                 DLManagedTensor* out);
+
+/**
+ * @}
+ */
 
 #ifdef __cplusplus
 }
