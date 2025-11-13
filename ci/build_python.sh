@@ -5,6 +5,7 @@
 set -euo pipefail
 
 source rapids-configure-sccache
+export SCCACHE_RECACHE=1
 
 source rapids-date-string
 
@@ -21,7 +22,6 @@ export RAPIDS_PACKAGE_VERSION=${version}
 echo "${version}" > VERSION
 
 sccache --stop-server >/dev/null 2>&1 || true
-
 
 # populates `RATTLER_CHANNELS` array and `RATTLER_ARGS` array
 source rapids-rattler-channel-string
