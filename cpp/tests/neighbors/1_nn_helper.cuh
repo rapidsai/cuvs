@@ -73,7 +73,7 @@ __device__ AccT cosine_distance(const DataT* v1, const DataT* v2, IdxT K)
 
 // This is a naive implementation of 1-NN computation
 template <typename DataT, typename AccT, typename OutT, typename IdxT>
-RAFT_KERNEL void ref_l2nn_dev(
+RAFT_KERNEL void ref_nn_kernel(
   OutT* out, const DataT* A, const DataT* B, IdxT M, IdxT N, IdxT K, bool sqrt, DistanceType metric)
 {
   IdxT tid = threadIdx.x + blockIdx.x * IdxT(blockDim.x);
@@ -113,7 +113,7 @@ RAFT_KERNEL void ref_l2nn_dev(
 }
 
 template <typename DataT, typename AccT, typename OutT, typename IdxT>
-void ref_l2nn_api(OutT* out,
+void ref_nn(OutT* out,
                   const DataT* A,
                   const DataT* B,
                   IdxT m,
@@ -123,11 +123,7 @@ void ref_l2nn_api(OutT* out,
                   DistanceType metric,
                   cudaStream_t stream)
 {
-  // constexpr int block_dim = 128;
-  // static_assert(block_dim % 32 == 0, "blockdim must be divisible by 32");
-  // constexpr int warps_per_block = block_dim / 32;
-  // int num_blocks = m ;
-  ref_l2nn_dev<DataT, AccT, OutT, IdxT>
+  ref_nn_kernel<DataT, AccT, OutT, IdxT>
     <<<(m + 127) / 128, 128, 0, stream>>>(out, A, B, m, n, k, sqrt, metric);
   return;
 }

@@ -86,7 +86,7 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
     raft::device_vector<char, IdxT> workspace =
       raft::make_device_vector<char, IdxT>(handle, workspace_size);
 
-    ref_l2nn_api<DataT, AccT, OutT, IdxT>(
+    ref_nn<DataT, AccT, OutT, IdxT>(
       ref_out.data_handle(), x.data_handle(), y.data_handle(), m, n, k, sqrt, metric, stream);
 
     if constexpr (impl == ImplType::fused) {
@@ -97,9 +97,9 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
           y.data_handle(),
           x_norm.data_handle(),
           y_norm.data_handle(),
-          static_cast<IdxT>(m),
-          static_cast<IdxT>(n),
-          static_cast<IdxT>(k),
+          m,
+          n,
+          k,
           (void*)workspace.data_handle(),
           sqrt,
           true,
@@ -135,7 +135,7 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
   void compare()
   {
     vector_compare(handle, ref_out.data_handle(), out.data_handle(), m, summary);
-    // ASSERT_TRUE(summary.max_diff < params_.tol) << summary;
+    ASSERT_TRUE(summary.max_diff < params_.tol) << summary;
   }
 
  private:
