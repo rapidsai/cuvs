@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -15,7 +15,7 @@
 #include <raft/linalg/add.cuh>
 #include <raft/matrix/gather.cuh>
 #include <rmm/cuda_stream_pool.hpp>
-#include <rmm/mr/device/managed_memory_resource.hpp>
+#include <rmm/mr/managed_memory_resource.hpp>
 #include <thrust/sequence.h>
 
 namespace cuvs::neighbors::ivf_pq {
