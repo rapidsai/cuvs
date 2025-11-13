@@ -411,7 +411,7 @@ endif()
 if(CUVS_ANN_BENCH_USE_CUVS_IVF_RABITQ)
   add_executable(RABITQ_BENCH_TEST src/cuvs/cuvs_ivf_rabitq_test.cu)
 
-  target_link_libraries(RABITQ_BENCH_TEST PRIVATE ivf_rabitq_lib)
+  target_link_libraries(RABITQ_BENCH_TEST PRIVATE ivf_rabitq_lib CUDA::cublas)
 
   target_include_directories(
     RABITQ_BENCH_TEST PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/include>"
