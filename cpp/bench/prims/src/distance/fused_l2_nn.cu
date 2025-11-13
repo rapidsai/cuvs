@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "common.cuh"
+// #include "common.cuh"
 #include <benchmark/benchmark.h>
 #include <iostream>
 
@@ -23,6 +23,7 @@
 #include "../../../../src/distance/fused_distance_nn.cuh"
 #include "../../../../src/distance/unfused_distance_nn.cuh"
 
+#include <raft/core/device_resources.hpp>
 #include <raft/linalg/norm.cuh>
 #include <raft/linalg/norm_types.hpp>
 #include <raft/random/rng.cuh>
@@ -61,12 +62,11 @@ void benchmark_fusedl2nn(benchmark::State& state)
 
   stream = raft::resource::get_cuda_stream(handle);
 
-  auto x       = raft::make_device_matrix<DataT, IdxT>(handle, m, k);
-  auto y       = raft::make_device_matrix<DataT, IdxT>(handle, n, k);
-  auto x_norm  = raft::make_device_vector<AccT, IdxT>(handle, m);
-  auto y_norm  = raft::make_device_vector<AccT, IdxT>(handle, n);
-  auto out     = raft::make_device_vector<OutT, IdxT>(handle, m);
-  auto out_ref = raft::make_device_vector<OutT, IdxT>(handle, m);
+  auto x      = raft::make_device_matrix<DataT, IdxT>(handle, m, k);
+  auto y      = raft::make_device_matrix<DataT, IdxT>(handle, n, k);
+  auto x_norm = raft::make_device_vector<AccT, IdxT>(handle, m);
+  auto y_norm = raft::make_device_vector<AccT, IdxT>(handle, n);
+  auto out    = raft::make_device_vector<OutT, IdxT>(handle, m);
 
   raft::random::RngState rng{1234};
   if constexpr (std::is_same_v<DataT, int8_t>) {
@@ -92,12 +92,6 @@ void benchmark_fusedl2nn(benchmark::State& state)
   raft::device_vector<char, IdxT> workspace =
     raft::make_device_vector<char, IdxT>(handle, workspace_size);
 
-  CudaEventTimer timer(stream);
-
-  // Reference calculation
-  ref_l2nn_api<DataT, AccT, OutT, IdxT>(
-    out_ref.data_handle(), x.data_handle(), y.data_handle(), m, n, k, sqrt, metric, stream);
-
   // Warm up
   if constexpr (algo != AlgorithmType::fused) {
     unfusedDistanceNNMinReduce<DataT, AccT, OutT, IdxT>(handle,
@@ -122,8 +116,6 @@ void benchmark_fusedl2nn(benchmark::State& state)
   RAFT_CUDA_TRY(cudaMemsetAsync(out.data_handle(), 0, m * sizeof(OutT), stream));
   RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
 
-  // launch_memcpy();
-  timer.start();
   for (auto _ : state) {
     if constexpr (algo == AlgorithmType::fused) {
       fusedDistanceNNMinReduce<DataT, OutT, IdxT>(out.data_handle(),
@@ -181,7 +173,6 @@ void benchmark_fusedl2nn(benchmark::State& state)
                                                                  stream);
     }
   }
-  timer.stop();
   RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
   if constexpr (algo == AlgorithmType::gemm) {
     if (metric == DistanceType::L2Expanded) {
@@ -219,21 +210,13 @@ void benchmark_fusedl2nn(benchmark::State& state)
     }
   }
 
-  ComparisonSummary* global_summary = nullptr;
-  RAFT_CUDA_TRY(cudaMallocManaged(&global_summary, sizeof(ComparisonSummary)));
-  global_summary->init();
-
-  vector_compare(global_summary, out_ref.data_handle(), out.data_handle(), m, stream);
-  // global_summary->print();
-
-  state.counters["M"]         = m;
-  state.counters["N"]         = n;
-  state.counters["K"]         = k;
-  state.counters["iter_time"] = timer.elapsed_seconds() / state.iterations();
+  state.counters["M"] = m;
+  state.counters["N"] = n;
+  state.counters["K"] = k;
+  int64_t total_ops   = int64_t(2) * m * n * k;
   state.counters["FLOP/s"] =
-    (int64_t(state.iterations()) * 2 * m * n * k) / timer.elapsed_seconds();
-  state.counters["total_missed"] = global_summary->n_misses;
-  state.counters["max_diff"]     = global_summary->max_diff;
+    benchmark::Counter(total_ops, benchmark::Counter::kIsIterationInvariantRate);
+
   /*
        int64_t num_flops = int64_t(2) * m * n * k;
 
