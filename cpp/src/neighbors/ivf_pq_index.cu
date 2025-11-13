@@ -215,7 +215,6 @@ struct owning_impl : index<IdxT>::index_iface {
   }
 
  private:
-  // Owned data - only accessible through virtual methods
   raft::device_mdarray<float, pq_centers_extents, raft::row_major> pq_centers_;
   raft::device_matrix<float, uint32_t, raft::row_major> centers_;
   raft::device_matrix<float, uint32_t, raft::row_major> centers_rot_;
