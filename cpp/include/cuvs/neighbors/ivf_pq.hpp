@@ -24,6 +24,8 @@
 namespace cuvs::neighbors::ivf_pq {
 
 template <typename IdxT>
+struct index_iface;
+template <typename IdxT>
 struct owning_impl;
 template <typename IdxT>
 struct view_impl;
@@ -343,17 +345,15 @@ struct index : cuvs::neighbors::index {
   using pq_centers_extents = std::experimental::
     extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
 
-  struct index_iface;
-
  public:
   index(const index&)                    = delete;
-  index(index&&) noexcept                = default;
+  index(index&&) noexcept;
   auto operator=(const index&) -> index& = delete;
-  auto operator=(index&&) -> index&      = default;
+  auto operator=(index&&) -> index&;
   ~index();
 
-  /**
-   * @brief Construct an empty index.
+  /** 
+  * @brief Construct an empty index.
    *
    * Constructs an empty index. This index will either need to be trained with `build`
    * or loaded from a saved copy with `deserialize`
@@ -524,19 +524,25 @@ struct index : cuvs::neighbors::index {
    *
    * @param impl Implementation pointer (owning or view)
    */
-  explicit index(std::unique_ptr<index_iface> impl);
+  explicit index(std::unique_ptr<index_iface<IdxT>> impl);
 
  private:
-  // Friend impl structures
-  friend struct owning_impl<IdxT>;
-  friend struct view_impl<IdxT>;
+  /** Throw an error if the index content is inconsistent. */
+  void check_consistency();
 
-  // PIMPL pointer - contains EVERYTHING (metadata, lists, centers, matrices)
-  std::unique_ptr<index_iface> impl_;
+  pq_centers_extents make_pq_centers_extents();
+
+  static uint32_t calculate_pq_dim(uint32_t dim);
+
+  std::unique_ptr<index_iface<IdxT>> impl_;
 };
 /**
  * @}
  */
+
+// Extern template declarations to prevent implicit instantiation
+// The explicit instantiation is in ivf_pq_index.cu where index_iface is complete
+extern template struct index<int64_t>;
 
 /**
  * @defgroup ivf_pq_cpp_index_build IVF-PQ index build
