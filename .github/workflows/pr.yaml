@@ -189,6 +189,7 @@ jobs:
       arch: "amd64"
       date: ${{ inputs.date }}_c
       container_image: "rapidsai/ci-wheel:25.12-cuda${{ matrix.cuda_version }}-rockylinux8-py3.10"
+      node_type: "cpu16"
       # requires_license_builder: false
       script: "ci/build_standalone_c.sh --build-tests"
       artifact-name: "libcuvs_c_${{ matrix.cuda_version }}.tar.gz"
