@@ -146,12 +146,7 @@ template <typename IdxT>
 struct owning_impl : index<IdxT>::index_iface {
   using pq_centers_extents = typename index<IdxT>::pq_centers_extents;
 
-  // Owned data
-  raft::device_mdarray<float, pq_centers_extents, raft::row_major> pq_centers_;
-  raft::device_matrix<float, uint32_t, raft::row_major> centers_;
-  raft::device_matrix<float, uint32_t, raft::row_major> centers_rot_;
-  raft::device_matrix<float, uint32_t, raft::row_major> rotation_matrix_;
-
+ public:
   owning_impl(raft::resources const& handle,
               cuvs::distance::DistanceType metric,
               codebook_gen codebook_kind,
@@ -220,6 +215,12 @@ struct owning_impl : index<IdxT>::index_iface {
   }
 
  private:
+  // Owned data - only accessible through virtual methods
+  raft::device_mdarray<float, pq_centers_extents, raft::row_major> pq_centers_;
+  raft::device_matrix<float, uint32_t, raft::row_major> centers_;
+  raft::device_matrix<float, uint32_t, raft::row_major> centers_rot_;
+  raft::device_matrix<float, uint32_t, raft::row_major> rotation_matrix_;
+  
   static typename index<IdxT>::pq_centers_extents make_pq_centers_extents(
     uint32_t dim, uint32_t pq_dim, uint32_t pq_bits, codebook_gen codebook_kind, uint32_t n_lists)
   {
@@ -242,12 +243,7 @@ template <typename IdxT>
 struct view_impl : index<IdxT>::index_iface {
   using pq_centers_extents = typename index<IdxT>::pq_centers_extents;
 
-  // Views to external data
-  raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers_view_;
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_view_;
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot_view_;
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix_view_;
-
+ public:
   view_impl(raft::resources const& handle,
             cuvs::distance::DistanceType metric,
             codebook_gen codebook_kind,
@@ -324,6 +320,13 @@ struct view_impl : index<IdxT>::index_iface {
   {
     return rotation_matrix_view_;
   }
+
+ private:
+  // Views to external data - only accessible through virtual methods
+  raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers_view_;
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_view_;
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot_view_;
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix_view_;
 };
 
 // ============================================================================
@@ -430,7 +433,7 @@ uint32_t index<IdxT>::dim() const noexcept
 template <typename IdxT>
 uint32_t index<IdxT>::dim_ext() const noexcept
 {
-  return raft::round_up_safe(impl_->dim() + 1, 8u);
+  return raft::round_up_safe(dim() + 1, 8u);
 }
 
 template <typename IdxT>
