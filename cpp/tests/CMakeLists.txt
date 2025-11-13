@@ -324,7 +324,7 @@ ConfigureTest(
 ConfigureTest(
   NAME PREPROCESSING_TEST
   PATH preprocessing/scalar_quantization.cu preprocessing/binary_quantization.cu
-       preprocessing/spectral_embedding.cu
+       preprocessing/spectral_embedding.cu preprocessing/random_orthogonal_transformation.cu
   GPUS 1
   PERCENT 100
 )
