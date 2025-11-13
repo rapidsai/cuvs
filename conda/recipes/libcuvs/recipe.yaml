@@ -145,6 +145,7 @@ outputs:
       script:
         content: |
           cmake --install cpp/build --component cuvs
+          cmake --install cpp/build --component cuvs_shared
           cmake --install cpp/build --component c_api
           cmake --install cpp/build --component hnswlib
     requirements:
