@@ -34,7 +34,7 @@ jobs:
       symbol_exclusions: (void (thrust::|cub::))
   conda-cpp-tests:
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-tests.yaml@fea/sccache-dist-in-custom-jobs
+    uses: rapidsai/shared-workflows/.github/workflows/conda-cpp-tests.yaml@main
     with:
       build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
@@ -44,7 +44,7 @@ jobs:
       sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   conda-python-tests:
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/conda-python-tests.yaml@fea/sccache-dist-in-custom-jobs
+    uses: rapidsai/shared-workflows/.github/workflows/conda-python-tests.yaml@main
     with:
       build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
@@ -54,7 +54,7 @@ jobs:
       sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   conda-java-tests:
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@fea/sccache-dist-in-custom-jobs
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@main
     # Artifacts are not published from these jobs, so it's safe to run for multiple CUDA versions.
     # If these jobs start producing artifacts, the names will have to differentiate between CUDA versions.
     strategy:
@@ -74,7 +74,7 @@ jobs:
       script: "ci/test_java.sh"
   wheel-tests-cuvs:
     secrets: inherit
-    uses: rapidsai/shared-workflows/.github/workflows/wheels-test.yaml@fea/sccache-dist-in-custom-jobs
+    uses: rapidsai/shared-workflows/.github/workflows/wheels-test.yaml@main
     with:
       build_type: ${{ inputs.build_type }}
       branch: ${{ inputs.branch }}
