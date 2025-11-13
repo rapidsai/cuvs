@@ -55,7 +55,7 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   // Set whether to use disk-based storage for ACE build. When true, enables disk-based operations
   // for memory-efficient graph construction. If not set, the index will be built in memory if the
   // graph fits in host and GPU memory, and on disk otherwise.
-  // ace_params.use_disk  = true;
+  ace_params.use_disk             = true;
   index_params.graph_build_params = ace_params;
 
   // ACE requires the dataset to be on the host
@@ -99,35 +99,36 @@ void cagra_build_search_ace(raft::device_resources const& dev_resources,
   hnsw_search_params.ef          = std::max(200, static_cast<int>(topk) * 2);
   hnsw_search_params.num_threads = 1;
 
-  std::cout << "HNSW index in memory. Searching..." << std::endl;
-  hnsw::search(dev_resources,
-               hnsw_search_params,
-               *hnsw_index,
-               queries_host.view(),
-               indices_hnsw_host.view(),
-               distances_hnsw_host.view());
-
-  // If the HNSW index is stored on disk, deserialize it for searching
-  // std::cout << "HNSW index is stored on disk." << std::endl;
-
-  // // For disk-based indices, the HNSW index file path can be obtained via file_path()
-  // std::string hnsw_index_path = hnsw_index->file_path();
-  // std::cout << "HNSW index file location: " << hnsw_index_path << std::endl;
-  // std::cout << "Deserializing HNSW index from disk for search." << std::endl;
-
-  // hnsw::index<float>* hnsw_index_raw = nullptr;
-  // hnsw::deserialize(
-  //   dev_resources, hnsw_params, hnsw_index_path, index.dim(), index.metric(), &hnsw_index_raw);
-
-  // std::unique_ptr<hnsw::index<float>> hnsw_index_deserialized(hnsw_index_raw);
-
-  // std::cout << "Searching HNSW index." << std::endl;
+  // If the HNSW index is in memory, search directly
+  // std::cout << "HNSW index in memory. Searching..." << std::endl;
   // hnsw::search(dev_resources,
   //              hnsw_search_params,
-  //              *hnsw_index_deserialized,
+  //              *hnsw_index,
   //              queries_host.view(),
   //              indices_hnsw_host.view(),
   //              distances_hnsw_host.view());
+
+  // If the HNSW index is stored on disk, deserialize it for searching
+  std::cout << "HNSW index is stored on disk." << std::endl;
+
+  // For disk-based indices, the HNSW index file path can be obtained via file_path()
+  std::string hnsw_index_path = hnsw_index->file_path();
+  std::cout << "HNSW index file location: " << hnsw_index_path << std::endl;
+  std::cout << "Deserializing HNSW index from disk for search." << std::endl;
+
+  hnsw::index<float>* hnsw_index_raw = nullptr;
+  hnsw::deserialize(
+    dev_resources, hnsw_params, hnsw_index_path, index.dim(), index.metric(), &hnsw_index_raw);
+
+  std::unique_ptr<hnsw::index<float>> hnsw_index_deserialized(hnsw_index_raw);
+
+  std::cout << "Searching HNSW index." << std::endl;
+  hnsw::search(dev_resources,
+               hnsw_search_params,
+               *hnsw_index_deserialized,
+               queries_host.view(),
+               indices_hnsw_host.view(),
+               distances_hnsw_host.view());
 
   // Convert HNSW uint64_t indices back to uint32_t for printing
   auto neighbors_host = raft::make_host_matrix<uint32_t, int64_t>(n_queries, topk);
