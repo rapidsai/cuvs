@@ -351,6 +351,8 @@ if(NOT BUILD_CPU_ONLY)
     src/cluster/spectral.cu
     src/core/bitset.cu
     src/core/omp_wrapper.cpp
+    src/util/file_io.cpp
+    src/util/host_memory.cpp
     src/distance/detail/kernels/gram_matrix.cu
     src/distance/detail/kernels/kernel_factory.cu
     src/distance/detail/kernels/kernel_matrices.cu
