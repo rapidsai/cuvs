@@ -599,11 +599,9 @@ RAFT_INLINE_FUNCTION constexpr uint32_t get_state_size(uint32_t len_x)
   return 0;
 }
 
-// max_topk / num_sort_threads should never exceed maxTopkPerThread
-template <int stateBitLen, int vecLen, int maxTopkPerThread, class ValT>
-RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t max_topk,
-                                                  uint32_t num_sort_threads,
-                                                  uint32_t topk,
+//
+template <int stateBitLen, int vecLen, int maxTopk, int numSortThreads, class ValT>
+RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
                                                   uint32_t len_x,
                                                   const uint32_t* _x,    // [size_batch, ld_x,]
                                                   const ValT* _in_vals,  // [size_batch, ld_iv,]
@@ -615,9 +613,9 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t max_topk,
                                                   uint32_t* _smem)
 {
   uint32_t* const smem_out_vals = _smem;
-  uint32_t* const hist          = &(_smem[2 * max_topk]);
-  uint32_t* const best_index    = &(_smem[2 * max_topk + 2048]);
-  uint32_t* const best_csum     = &(_smem[2 * max_topk + 2048 + 3]);
+  uint32_t* const hist          = &(_smem[2 * maxTopk]);
+  uint32_t* const best_index    = &(_smem[2 * maxTopk + 2048]);
+  uint32_t* const best_csum     = &(_smem[2 * maxTopk + 2048 + 3]);
 
   const uint32_t num_threads = blockDim.x;
   const uint32_t thread_id   = threadIdx.x;
@@ -633,11 +631,11 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t max_topk,
   const uint32_t hint = (_hint == NULL ? ~0u : *_hint);
 
   // Initialize shared memory
-  for (int i = 2 * max_topk + thread_id; i < 2 * max_topk + 2048 + 8; i += num_threads) {
+  for (int i = 2 * maxTopk + thread_id; i < 2 * maxTopk + 2048 + 8; i += num_threads) {
     _smem[i] = 0;
   }
-  uint32_t* const output_count    = &(_smem[2 * max_topk + 2048 + 6]);
-  uint32_t* const output_count_eq = &(_smem[2 * max_topk + 2048 + 7]);
+  uint32_t* const output_count    = &(_smem[2 * maxTopk + 2048 + 6]);
+  uint32_t* const output_count_eq = &(_smem[2 * maxTopk + 2048 + 7]);
   uint32_t threshold              = 0;
   uint32_t nx_below_threshold     = 0;
   __syncthreads();
@@ -645,7 +643,6 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t max_topk,
   //
   // Search for the maximum threshold that satisfies "(x < threshold).sum() <= topk".
   //
-#pragma unroll
   for (int j = 0; j < 3; j += 1) {
     uint32_t num_bins;
     uint32_t shift;
@@ -723,18 +720,14 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t max_topk,
     return;
   }
 
-  const int num_topk_per_thread = max_topk / num_sort_threads;
-  static_assert(
-    maxTopkPerThread <=
-    4);  // we will end-up wasting too much stack memory if maxTopkPerThread >> num_topk_per_thread
-  assert(num_topk_per_thread <= maxTokenPerThread);
-  float my_keys[maxTopkPerThread];
-  ValT my_vals[maxTopkPerThread];
+  constexpr int numTopkPerThread = maxTopk / numSortThreads;
+  float my_keys[numTopkPerThread];
+  ValT my_vals[numTopkPerThread];
 
   // Read keys and values to registers
-  if (thread_id < num_sort_threads) {
-    for (int i = 0; i < num_topk_per_thread; i++) {
-      const int k = thread_id + (num_sort_threads * i);
+  if (thread_id < numSortThreads) {
+    for (int i = 0; i < numTopkPerThread; i++) {
+      const int k = thread_id + (numSortThreads * i);
       if (k < topk) {
         const int j = smem_out_vals[k];
         my_keys[i]  = ((float*)x)[j];
@@ -753,21 +746,21 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t max_topk,
   uint32_t mask = 1;
 
   // Sorting by thread
-  if (thread_id < num_sort_threads) {
+  if (thread_id < numSortThreads) {
     const bool ascending = ((thread_id & mask) == 0);
-    if (num_topk_per_thread == 3) {
+    if constexpr (numTopkPerThread == 3) {
       swap_if_needed<float, ValT>(my_keys[0], my_keys[1], my_vals[0], my_vals[1], ascending);
       swap_if_needed<float, ValT>(my_keys[0], my_keys[2], my_vals[0], my_vals[2], ascending);
       swap_if_needed<float, ValT>(my_keys[1], my_keys[2], my_vals[1], my_vals[2], ascending);
     } else {
-      for (int j = 0; j < num_topk_per_thread / 2; j += 1) {
+      for (int j = 0; j < numTopkPerThread / 2; j += 1) {
 #pragma unroll
-        for (int i = 0; i < num_topk_per_thread; i += 2) {
+        for (int i = 0; i < numTopkPerThread; i += 2) {
           swap_if_needed<float, ValT>(
             my_keys[i], my_keys[i + 1], my_vals[i], my_vals[i + 1], ascending);
         }
 #pragma unroll
-        for (int i = 1; i < num_topk_per_thread - 1; i += 2) {
+        for (int i = 1; i < numTopkPerThread - 1; i += 2) {
           swap_if_needed<float, ValT>(
             my_keys[i], my_keys[i + 1], my_vals[i], my_vals[i + 1], ascending);
         }
@@ -776,38 +769,38 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t max_topk,
   }
 
   // Bitonic Sorting
-  while (mask < num_sort_threads) {
+  while (mask < numSortThreads) {
     uint32_t next_mask = mask << 1;
 
     for (uint32_t curr_mask = mask; curr_mask > 0; curr_mask >>= 1) {
       const bool ascending = ((thread_id & curr_mask) == 0) == ((thread_id & next_mask) == 0);
       if (curr_mask >= 32) {
         // inter warp
-        ValT* const smem_vals  = reinterpret_cast<ValT*>(_smem);  // [max_topk]
-        float* const smem_keys = reinterpret_cast<float*>(
-          smem_vals + max_topk);  // [num_topk_per_thread, num_sort_threads]
+        ValT* const smem_vals = reinterpret_cast<ValT*>(_smem);  // [maxTopk]
+        float* const smem_keys =
+          reinterpret_cast<float*>(smem_vals + maxTopk);  // [numTopkPerThread, numSortThreads]
         __syncthreads();
-        if (thread_id < num_sort_threads) {
+        if (thread_id < numSortThreads) {
 #pragma unroll
-          for (int i = 0; i < num_topk_per_thread; i++) {
-            smem_keys[thread_id + (num_sort_threads * i)] = my_keys[i];
-            smem_vals[thread_id + (num_sort_threads * i)] = my_vals[i];
+          for (int i = 0; i < numTopkPerThread; i++) {
+            smem_keys[thread_id + (numSortThreads * i)] = my_keys[i];
+            smem_vals[thread_id + (numSortThreads * i)] = my_vals[i];
           }
         }
         __syncthreads();
-        if (thread_id < num_sort_threads) {
+        if (thread_id < numSortThreads) {
 #pragma unroll
-          for (int i = 0; i < num_topk_per_thread; i++) {
-            float opp_key = smem_keys[(thread_id ^ curr_mask) + (num_sort_threads * i)];
-            ValT opp_val  = smem_vals[(thread_id ^ curr_mask) + (num_sort_threads * i)];
+          for (int i = 0; i < numTopkPerThread; i++) {
+            float opp_key = smem_keys[(thread_id ^ curr_mask) + (numSortThreads * i)];
+            ValT opp_val  = smem_vals[(thread_id ^ curr_mask) + (numSortThreads * i)];
             swap_if_needed<float, ValT>(my_keys[i], opp_key, my_vals[i], opp_val, ascending);
           }
         }
       } else {
         // intra warp
-        if (thread_id < num_sort_threads) {
+        if (thread_id < numSortThreads) {
 #pragma unroll
-          for (int i = 0; i < num_topk_per_thread; i++) {
+          for (int i = 0; i < numTopkPerThread; i++) {
             float opp_key = __shfl_xor_sync(0xffffffff, my_keys[i], curr_mask);
             ValT opp_val  = __shfl_xor_sync(0xffffffff, my_vals[i], curr_mask);
             swap_if_needed<float, ValT>(my_keys[i], opp_key, my_vals[i], opp_val, ascending);
@@ -816,17 +809,17 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t max_topk,
       }
     }
 
-    if (thread_id < num_sort_threads) {
+    if (thread_id < numSortThreads) {
       const bool ascending = ((thread_id & next_mask) == 0);
-      if (num_topk_per_thread == 3) {
+      if constexpr (numTopkPerThread == 3) {
         swap_if_needed<float, ValT>(my_keys[0], my_keys[1], my_vals[0], my_vals[1], ascending);
         swap_if_needed<float, ValT>(my_keys[0], my_keys[2], my_vals[0], my_vals[2], ascending);
         swap_if_needed<float, ValT>(my_keys[1], my_keys[2], my_vals[1], my_vals[2], ascending);
       } else {
 #pragma unroll
-        for (uint32_t curr_mask = num_topk_per_thread / 2; curr_mask > 0; curr_mask >>= 1) {
+        for (uint32_t curr_mask = numTopkPerThread / 2; curr_mask > 0; curr_mask >>= 1) {
 #pragma unroll
-          for (int i = 0; i < num_topk_per_thread; i++) {
+          for (int i = 0; i < numTopkPerThread; i++) {
             const int j = i ^ curr_mask;
             if (i > j) continue;
             swap_if_needed<float, ValT>(my_keys[i], my_keys[j], my_vals[i], my_vals[j], ascending);
@@ -838,9 +831,9 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t max_topk,
   }
 
   // Write sorted keys and values
-  if (thread_id < num_sort_threads) {
-    for (int i = 0; i < num_topk_per_thread; i++) {
-      const int k = i + (num_topk_per_thread * thread_id);
+  if (thread_id < numSortThreads) {
+    for (int i = 0; i < numTopkPerThread; i++) {
+      const int k = i + (numTopkPerThread * thread_id);
       if (k < topk) {
         if (y) { y[k] = reinterpret_cast<uint32_t*>(my_keys)[i]; }
         if (out_vals) { out_vals[k] = my_vals[i]; }
@@ -868,11 +861,9 @@ int _get_vecLen(uint32_t maxSamples, int maxVecLen = MAX_VEC_LENGTH)
 }
 }  // unnamed namespace
 
-template <int stateBitLen, int vecLen, int maxTopkPerThread, class ValT>
+template <int stateBitLen, int vecLen, int maxTopk, int numSortThreads, class ValT>
 __launch_bounds__(1024, 1) RAFT_KERNEL
-  kern_topk_cta_11(uint32_t max_topk,
-                   uint32_t num_sort_threads,
-                   uint32_t topk,
+  kern_topk_cta_11(uint32_t topk,
                    uint32_t size_batch,
                    uint32_t len_x,
                    const uint32_t* _x,  // [size_batch, ld_x,]
@@ -890,11 +881,12 @@ __launch_bounds__(1024, 1) RAFT_KERNEL
   const uint32_t i_batch = blockIdx.x;
   if (i_batch >= size_batch) return;
 
-  extern __shared__ uint32_t _smem[];
+  constexpr uint32_t smem_len = 2 * maxTopk + 2048 + 8;
+  static_assert(maxTopk * (1 + utils::size_of<ValT>() / utils::size_of<uint32_t>()) <= smem_len,
+                "maxTopk * sizeof(ValT) must be smaller or equal to 8192 byte");
+  __shared__ uint32_t _smem[smem_len];
 
-  topk_cta_11_core<stateBitLen, vecLen, maxTopkPerThread, ValT>(
-    max_topk,
-    num_sort_threads,
+  topk_cta_11_core<stateBitLen, vecLen, maxTopk, numSortThreads, ValT>(
     topk,
     len_x,
     (_x == NULL ? NULL : _x + i_batch * ld_x),

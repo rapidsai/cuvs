@@ -19,9 +19,7 @@ struct topk_by_radix_sort_base {
 template <class IdxT>
 struct topk_by_radix_sort : topk_by_radix_sort_base {
   __device__ void operator()(uint32_t max_topk,
-                             uint32_t num_sort_threads,
                              uint32_t topk,
-                             uint32_t batch_size,
                              uint32_t len_x,
                              const uint32_t* _x,
                              const IdxT* _in_vals,
@@ -32,24 +30,88 @@ struct topk_by_radix_sort : topk_by_radix_sort_base {
                              bool sort,
                              uint32_t* _smem)
   {
-    assert(max_topk / num_sort_threads <= 4);
     assert(blockDim.x >= V / 4);
     std::uint8_t* const state = reinterpret_cast<std::uint8_t*>(work);
-    topk_cta_11_core<topk_by_radix_sort_base::state_bit_length,
-                     topk_by_radix_sort_base::vecLen,
-                     4,
-                     IdxT>(max_topk,
-                           num_sort_threads,
-                           topk,
-                           len_x,
-                           _x,
-                           _in_vals,
-                           _y,
-                           _out_vals,
-                           state,
-                           _hints,
-                           sort,
-                           _smem);
+    if (max_topk <= 64) {
+      topk_cta_11_core<topk_by_radix_sort_base::state_bit_length,
+                       topk_by_radix_sort_base::vecLen,
+                       64,
+                       32,
+                       IdxT>(topk,
+                             len_x,
+                             _x,
+                             _in_vals,
+                             _y,
+                             _out_vals,
+                             state,
+                             _hints,
+                             sort,
+                             _smem);
+    }
+    else if (max_topk <= 128) {
+      topk_cta_11_core<topk_by_radix_sort_base::state_bit_length,
+                       topk_by_radix_sort_base::vecLen,
+                       128,
+                       32,
+                       IdxT>(topk,
+                             len_x,
+                             _x,
+                             _in_vals,
+                             _y,
+                             _out_vals,
+                             state,
+                             _hints,
+                             sort,
+                             _smem);
+    }
+    else if (max_topk <= 256) {
+      topk_cta_11_core<topk_by_radix_sort_base::state_bit_length,
+                       topk_by_radix_sort_base::vecLen,
+                       256,
+                       64,
+                       IdxT>(topk,
+                             len_x,
+                             _x,
+                             _in_vals,
+                             _y,
+                             _out_vals,
+                             state,
+                             _hints,
+                             sort,
+                             _smem);
+    }
+    else if (max_topk <= 512) {
+      topk_cta_11_core<topk_by_radix_sort_base::state_bit_length,
+                       topk_by_radix_sort_base::vecLen,
+                       512,
+                       128,
+                       IdxT>(topk,
+                             len_x,
+                             _x,
+                             _in_vals,
+                             _y,
+                             _out_vals,
+                             state,
+                             _hints,
+                             sort,
+                             _smem);
+    }
+    else {
+      topk_cta_11_core<topk_by_radix_sort_base::state_bit_length,
+                       topk_by_radix_sort_base::vecLen,
+                       1024,
+                       256,
+                       IdxT>(topk,
+                             len_x,
+                             _x,
+                             _in_vals,
+                             _y,
+                             _out_vals,
+                             state,
+                             _hints,
+                             sort,
+                             _smem);
+    }
   }
 };
 

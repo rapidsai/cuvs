@@ -62,8 +62,6 @@ void _cuann_find_topk(uint32_t topK,
   void (*cta_kernel)(uint32_t,
                      uint32_t,
                      uint32_t,
-                     uint32_t,
-                     uint32_t,
                      const uint32_t*,
                      uint32_t,
                      const ValT*,
@@ -76,73 +74,69 @@ void _cuann_find_topk(uint32_t topK,
                      uint32_t*,
                      bool) = nullptr;
 
-  int _vecLen                    = _get_vecLen(ldIK, 2);
-  constexpr int maxTopkPerThread = 4;
+  // V:vecLen, K:maxTopk, T:numSortThreads
+#define SET_KERNEL_VKT(V, K, T, ValT)                          \
+  do {                                                         \
+    assert(numThreads >= T);                                   \
+    assert((K % T) == 0);                                      \
+    assert((K / T) <= 4);                                      \
+    cta_kernel = kern_topk_cta_11<stateBitLen, V, K, T, ValT>; \
+  } while (0)
 
+  // V: vecLen
+#define SET_KERNEL_V(V, ValT)                                \
+  do {                                                       \
+    if (topK <= 32) {                                        \
+      SET_KERNEL_VKT(V, 32, 32, ValT);                       \
+    } else if (topK <= 64) {                                 \
+      SET_KERNEL_VKT(V, 64, 32, ValT);                       \
+    } else if (topK <= 96) {                                 \
+      SET_KERNEL_VKT(V, 96, 32, ValT);                       \
+    } else if (topK <= 128) {                                \
+      SET_KERNEL_VKT(V, 128, 32, ValT);                      \
+    } else if (topK <= 192) {                                \
+      SET_KERNEL_VKT(V, 192, 64, ValT);                      \
+    } else if (topK <= 256) {                                \
+      SET_KERNEL_VKT(V, 256, 64, ValT);                      \
+    } else if (topK <= 384) {                                \
+      SET_KERNEL_VKT(V, 384, 128, ValT);                     \
+    } else if (topK <= 512) {                                \
+      SET_KERNEL_VKT(V, 512, 128, ValT);                     \
+    } else if (topK <= 768) {                                \
+      SET_KERNEL_VKT(V, 768, 256, ValT);                     \
+    } else if (topK <= 1024) {                               \
+      SET_KERNEL_VKT(V, 1024, 256, ValT);                    \
+    } \
+        /* else if (topK <= 1536) { SET_KERNEL_VKT(V, 1536, 512); } */ \
+        /* else if (topK <= 2048) { SET_KERNEL_VKT(V, 2048, 512); } */ \
+        /* else if (topK <= 3072) { SET_KERNEL_VKT(V, 3072, 1024); } */ \
+        /* else if (topK <= 4096) { SET_KERNEL_VKT(V, 4096, 1024); } */ \
+        else {                                                      \
+      RAFT_FAIL("topk must be lower than or equal to 1024"); \
+    }                                                        \
+  } while (0)
+
+  int _vecLen = _get_vecLen(ldIK, 2);
   if (_vecLen == 2) {
-    cta_kernel = kern_topk_cta_11<stateBitLen, 2, maxTopkPerThread, ValT>;
+    SET_KERNEL_V(2, ValT);
   } else if (_vecLen == 1) {
-    cta_kernel = kern_topk_cta_11<stateBitLen, 1, maxTopkPerThread, ValT>;
+    SET_KERNEL_V(1, ValT);
   }
 
-  int max_topk{};
-  int num_sort_threads{};
-  if (topK <= 32) {
-    max_topk         = 32;
-    num_sort_threads = 32;
-  } else if (topK <= 64) {
-    max_topk         = 64;
-    num_sort_threads = 32;
-  } else if (topK <= 96) {
-    max_topk         = 96;
-    num_sort_threads = 32;
-  } else if (topK <= 128) {
-    max_topk         = 128;
-    num_sort_threads = 32;
-  } else if (topK <= 192) {
-    max_topk         = 192;
-    num_sort_threads = 64;
-  } else if (topK <= 256) {
-    max_topk         = 256;
-    num_sort_threads = 64;
-  } else if (topK <= 384) {
-    max_topk         = 384;
-    num_sort_threads = 128;
-  } else if (topK <= 512) {
-    max_topk         = 512;
-    num_sort_threads = 128;
-  } else if (topK <= 768) {
-    max_topk         = 768;
-    num_sort_threads = 256;
-  } else if (topK <= 1024) {
-    max_topk         = 1024;
-    num_sort_threads = 256;
-  } else {
-    RAFT_FAIL("topK must be lower than or equal to 1024");
-  }
-
-  assert(max_topk % num_sort_threads == 0);
-  assert(max_topk / num_sort_threads <= maxTopkPerThread);
-
-  const size_t smem_len = 2 * max_topk + 2048 + 8;
-  assert(max_topk * (1 + utils::size_of<ValT>() / utils::size_of<uint32_t>()) <= smem_len);
-  const size_t smem_size = smem_len * sizeof(uint32_t);
-  cta_kernel<<<blocks, threads, smem_size, stream>>>(max_topk,
-                                                     num_sort_threads,
-                                                     topK,
-                                                     sizeBatch,
-                                                     numElements,
-                                                     (const uint32_t*)inputKeys,
-                                                     ldIK,
-                                                     inputVals,
-                                                     ldIV,
-                                                     (uint32_t*)outputKeys,
-                                                     ldOK,
-                                                     outputVals,
-                                                     ldOV,
-                                                     state,
-                                                     hints,
-                                                     sort);
+  cta_kernel<<<blocks, threads, 0, stream>>>(topK,
+                                             sizeBatch,
+                                             numElements,
+                                             (const uint32_t*)inputKeys,
+                                             ldIK,
+                                             inputVals,
+                                             ldIV,
+                                             (uint32_t*)outputKeys,
+                                             ldOK,
+                                             outputVals,
+                                             ldOV,
+                                             state,
+                                             hints,
+                                             sort);
 
   return;
 }
