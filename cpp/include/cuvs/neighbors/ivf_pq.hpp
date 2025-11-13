@@ -1150,8 +1150,7 @@ void build(
  * @param[in] new_indices a device vector view to a vector of indices [n_rows].
  *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
  *    here to imply a continuous range `[0...n_rows)`.
- * @param[in] idx
- * @return the extended index
+ * @param[inout] idx
  */
 auto extend(raft::resources const& handle,
             raft::device_matrix_view<const float, int64_t, raft::row_major> new_vectors,
@@ -1160,7 +1159,7 @@ auto extend(raft::resources const& handle,
   -> cuvs::neighbors::ivf_pq::index<int64_t>;
 
 /**
- * @brief Extend the index with the new data (in-place mutation).
+ * @brief Extend the index with the new data.
  *
  * Usage example:
  * @code{.cpp}
@@ -1208,8 +1207,7 @@ void extend(raft::resources const& handle,
  * @param[in] new_indices a device vector view to a vector of indices [n_rows].
  *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
  *    here to imply a continuous range `[0...n_rows)`.
- * @param[in] idx
- * @return the extended index
+ * @param[inout] idx
  */
 auto extend(raft::resources const& handle,
             raft::device_matrix_view<const half, int64_t, raft::row_major> new_vectors,
@@ -1218,7 +1216,7 @@ auto extend(raft::resources const& handle,
   -> cuvs::neighbors::ivf_pq::index<int64_t>;
 
 /**
- * @brief Extend the index with the new data (in-place mutation).
+ * @brief Extend the index with the new data.
  *
  * Usage example:
  * @code{.cpp}
@@ -1251,8 +1249,7 @@ void extend(raft::resources const& handle,
  * @param[in] handle
  * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
  * @param[in] new_indices a device vector view to a vector of indices [n_rows].
- * @param[in] idx
- * @return the extended index
+ * @param[inout] idx
  */
 auto extend(raft::resources const& handle,
             raft::device_matrix_view<const int8_t, int64_t, raft::row_major> new_vectors,
@@ -1261,7 +1258,7 @@ auto extend(raft::resources const& handle,
   -> cuvs::neighbors::ivf_pq::index<int64_t>;
 
 /**
- * @brief Extend the index with the new data (in-place mutation).
+ * @brief Extend the index with the new data.
  *
  * @param[in] handle
  * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
@@ -1279,8 +1276,7 @@ void extend(raft::resources const& handle,
  * @param[in] handle
  * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
  * @param[in] new_indices a device vector view to a vector of indices [n_rows].
- * @param[in] idx
- * @return the extended index
+ * @param[inout] idx
  */
 auto extend(raft::resources const& handle,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> new_vectors,
@@ -1289,7 +1285,7 @@ auto extend(raft::resources const& handle,
   -> cuvs::neighbors::ivf_pq::index<int64_t>;
 
 /**
- * @brief Extend the index with the new data (in-place mutation).
+ * @brief Extend the index with the new data.
  *
  * @param[in] handle
  * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
@@ -1307,8 +1303,7 @@ void extend(raft::resources const& handle,
  * @param[in] handle
  * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
  * @param[in] new_indices a host vector view to a vector of indices [n_rows].
- * @param[in] idx
- * @return the extended index
+ * @param[inout] idx
  */
 auto extend(raft::resources const& handle,
             raft::host_matrix_view<const float, int64_t, raft::row_major> new_vectors,
@@ -1317,7 +1312,7 @@ auto extend(raft::resources const& handle,
   -> cuvs::neighbors::ivf_pq::index<int64_t>;
 
 /**
- * @brief Extend the index with the new data (in-place mutation).
+ * @brief Extend the index with the new data.
  *
  * @param[in] handle
  * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
@@ -1335,8 +1330,7 @@ void extend(raft::resources const& handle,
  * @param[in] handle
  * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
  * @param[in] new_indices a host vector view to a vector of indices [n_rows].
- * @param[in] idx
- * @return the extended index
+ * @param[inout] idx
  */
 auto extend(raft::resources const& handle,
             raft::host_matrix_view<const half, int64_t, raft::row_major> new_vectors,
@@ -1345,7 +1339,7 @@ auto extend(raft::resources const& handle,
   -> cuvs::neighbors::ivf_pq::index<int64_t>;
 
 /**
- * @brief Extend the index with the new data (in-place mutation).
+ * @brief Extend the index with the new data.
  *
  * @param[in] handle
  * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
@@ -1363,8 +1357,7 @@ void extend(raft::resources const& handle,
  * @param[in] handle
  * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
  * @param[in] new_indices a host vector view to a vector of indices [n_rows].
- * @param[in] idx
- * @return the extended index
+ * @param[inout] idx
  */
 auto extend(raft::resources const& handle,
             raft::host_matrix_view<const int8_t, int64_t, raft::row_major> new_vectors,
@@ -1373,7 +1366,7 @@ auto extend(raft::resources const& handle,
   -> cuvs::neighbors::ivf_pq::index<int64_t>;
 
 /**
- * @brief Extend the index with the new data (in-place mutation).
+ * @brief Extend the index with the new data.
  *
  * @param[in] handle
  * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
@@ -1391,8 +1384,7 @@ void extend(raft::resources const& handle,
  * @param[in] handle
  * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
  * @param[in] new_indices a host vector view to a vector of indices [n_rows].
- * @param[in] idx
- * @return the extended index
+ * @param[inout] idx
  */
 auto extend(raft::resources const& handle,
             raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> new_vectors,
@@ -1401,7 +1393,7 @@ auto extend(raft::resources const& handle,
   -> cuvs::neighbors::ivf_pq::index<int64_t>;
 
 /**
- * @brief Extend the index with the new data (in-place mutation).
+ * @brief Extend the index with the new data.
  *
  * @param[in] handle
  * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
