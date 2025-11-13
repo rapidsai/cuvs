@@ -48,9 +48,25 @@ auto parse_build_param(const nlohmann::json& conf) ->
     // to override them.
     cagra_params.cagra_params = [conf, hnsw_params](raft::matrix_extent<int64_t> extents,
                                                     cuvs::distance::DistanceType dist_type) {
-      auto ps = cuvs::neighbors::hnsw::to_cagra_params(
-        extents, conf.at("M"), hnsw_params.ef_construction, dist_type);
+      auto ps = cuvs::neighbors::cagra::index_params::from_hnsw_params(
+        extents,
+        conf.at("M"),
+        hnsw_params.ef_construction,
+        cuvs::neighbors::cagra::hnsw_heuristic_type::SAME_GRAPH_FOOTPRINT,
+        dist_type);
       ps.metric = dist_type;
+      // Parse ACE parameters if provided
+      if (conf.contains("npartitions") || conf.contains("build_dir") ||
+          conf.contains("ef_construction") || conf.contains("use_disk")) {
+        auto ace_params = cuvs::neighbors::cagra::graph_build_params::ace_params();
+        if (conf.contains("npartitions")) { ace_params.npartitions = conf.at("npartitions"); }
+        if (conf.contains("build_dir")) { ace_params.build_dir = conf.at("build_dir"); }
+        if (conf.contains("ef_construction")) {
+          ace_params.ef_construction = conf.at("ef_construction");
+        }
+        if (conf.contains("use_disk")) { ace_params.use_disk = conf.at("use_disk"); }
+        ps.graph_build_params = ace_params;
+      }
       // NB: above, we only provide the defaults. Below we parse the explicit parameters as usual.
       ::parse_build_param<T, uint32_t>(conf, ps);
       return ps;
