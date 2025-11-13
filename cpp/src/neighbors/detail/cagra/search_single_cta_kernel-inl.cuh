@@ -801,9 +801,7 @@ __device__ void search_core(
       _CLK_START();
       // topk with radix block sort
       topk_by_radix_sort<INDEX_T>{}(max_itopk,
-                                    (max_itopk <= 64) ? 32 : max_itopk / 4,
                                     internal_topk,
-                                    gridDim.x,
                                     result_buffer_size,
                                     reinterpret_cast<std::uint32_t*>(result_distances_buffer),
                                     result_indices_buffer,
