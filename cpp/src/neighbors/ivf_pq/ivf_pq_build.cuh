@@ -1040,7 +1040,7 @@ auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
 {
   auto stream = raft::resource::get_cuda_stream(res);
 
-  // Create new index with same parameters (creates owning_impl and initializes metadata/lists)
+  // Allocate the new owning index
   index<IdxT> target(res,
                      source.metric(),
                      source.codebook_kind(),
@@ -1050,7 +1050,11 @@ auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
                      source.pq_dim(),
                      source.conservative_memory_allocation());
 
-  // raft::copy the center/matrix data to the new impl
+  // raft::copy the independent parts
+  raft::copy(target.list_sizes().data_handle(),
+             source.list_sizes().data_handle(),
+             source.list_sizes().size(),
+             stream);
   raft::copy(target.rotation_matrix().data_handle(),
              source.rotation_matrix().data_handle(),
              source.rotation_matrix().size(),
@@ -1068,15 +1072,10 @@ auto clone(const raft::resources& res, const index<IdxT>& source) -> index<IdxT>
              source.centers_rot().size(),
              stream);
 
+  // raft::copy shared pointers
   target.lists() = source.lists();
 
-  // Copy list sizes
-  raft::copy(target.list_sizes().data_handle(),
-             source.list_sizes().data_handle(),
-             source.list_sizes().size(),
-             stream);
-
-  // Make sure the device pointers point to the lists
+  // Make sure the device pointers point to the new lists
   ivf::detail::recompute_internal_state(res, target);
 
   return target;

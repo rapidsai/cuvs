@@ -19,9 +19,6 @@ namespace cuvs::neighbors::ivf_pq {
 template <typename T, typename IdxT>
 struct typed_index : index<IdxT> {
   using value_type = T;
-
-  // Inherit constructors from index
-  using index<IdxT>::index;
 };
 }  // namespace cuvs::neighbors::ivf_pq
 
