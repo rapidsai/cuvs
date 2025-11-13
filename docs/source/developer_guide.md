@@ -205,7 +205,7 @@ you can run  `codespell -i 3 -w .` from the repository root directory.
 This will bring up an interactive prompt to select which spelling fixes to apply.
 
 ### #include style
-[include_checker.py](https://github.com/rapidsai/raft/blob/main/cpp/scripts/include_checker.py) is used to enforce the include style as follows:
+[include_checker.py](https://github.com/rapidsai/cuvs/blob/main/cpp/scripts/include_checker.py) is used to enforce the include style as follows:
 1. `#include "..."` should be used for referencing local files only. It is acceptable to be used for referencing files in a sub-folder/parent-folder of the same algorithm, but should never be used to include files in other algorithms or between algorithms and the primitives or other dependencies.
 2. `#include <...>` should be used for referencing everything else
 
