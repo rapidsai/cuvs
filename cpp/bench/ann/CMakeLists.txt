@@ -93,6 +93,7 @@ if(CUVS_ANN_BENCH_USE_HNSWLIB OR CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
 endif()
 
 include(cmake/thirdparty/get_nlohmann_json)
+include(cmake/thirdparty/get_sqlite)
 
 if(CUVS_ANN_BENCH_USE_GGNN)
   include(cmake/thirdparty/get_ggnn)
@@ -144,6 +145,7 @@ function(ConfigureAnnBench)
     ${BENCH_NAME}
     PRIVATE ${ConfigureAnnBench_LINKS}
             nlohmann_json::nlohmann_json
+            sqlite3
             Threads::Threads
             $<$<BOOL:${GPU_BUILD}>:CUDA::cudart_static>
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
@@ -358,7 +360,7 @@ if(CUVS_ANN_BENCH_SINGLE_EXE)
   target_include_directories(ANN_BENCH PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 
   target_link_libraries(
-    ANN_BENCH PRIVATE raft::raft nlohmann_json::nlohmann_json benchmark::benchmark dl
+    ANN_BENCH PRIVATE raft::raft nlohmann_json::nlohmann_json sqlite3 benchmark::benchmark dl
                       $<$<TARGET_EXISTS:CUDA::nvtx3>:CUDA::nvtx3>
   )
   set_target_properties(

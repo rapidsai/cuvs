@@ -54,6 +54,11 @@ public class Util {
       LINKER.downcallHandle(
           cudaMemcpyAsync$address(), cudaMemcpyAsync$descriptor(), Linker.Option.critical(true));
 
+  private static final MethodHandle strdup$mh =
+      LINKER.downcallHandle(
+          SYMBOL_LOOKUP.find("strdup").orElseThrow(UnsatisfiedLinkError::new),
+          FunctionDescriptor.of(C_POINTER, C_POINTER));
+
   private static final MethodHandle cudaGetDeviceProperties$mh =
       LINKER.downcallHandle(
           SYMBOL_LOOKUP
@@ -213,6 +218,19 @@ public class Util {
       varHandle.set(stringMemorySegment, 0L, (byte) sb.charAt(i));
     }
     return stringMemorySegment;
+  }
+
+  /**
+   * Allocates a native (C-owned) copy of a string using strdup(). The returned memory must be freed
+   * by the native side (e.g. cuVS APIs) via free().
+   */
+  public static MemorySegment duplicateNativeString(String str) {
+    try (var arena = Arena.ofConfined()) {
+      MemorySegment src = buildMemorySegment(arena, str);
+      return (MemorySegment) strdup$mh.invokeExact(src);
+    } catch (Throwable t) {
+      throw new RuntimeException("Failed to duplicate native string", t);
+    }
   }
 
   /**

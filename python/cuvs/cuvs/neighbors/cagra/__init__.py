@@ -3,6 +3,7 @@
 
 
 from .cagra import (
+    AceParams,
     CompressionParams,
     ExtendParams,
     Index,
@@ -17,6 +18,7 @@ from .cagra import (
 )
 
 __all__ = [
+    "AceParams",
     "CompressionParams",
     "ExtendParams",
     "Index",

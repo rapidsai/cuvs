@@ -6,29 +6,16 @@
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
-#include <raft/core/host_device_accessor.hpp>
 #include <raft/core/host_mdarray.hpp>
-#include <raft/core/host_mdspan.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
-#include <raft/linalg/add.cuh>
-#include <raft/linalg/coalesced_reduction.cuh>
-#include <raft/linalg/dot.cuh>
 #include <raft/linalg/gemm.hpp>
-#include <raft/linalg/gemv.cuh>
-#include <raft/linalg/linalg_types.hpp>
 #include <raft/linalg/map.cuh>
-#include <raft/linalg/matrix_vector.cuh>
 #include <raft/linalg/matrix_vector_op.cuh>
-#include <raft/linalg/multiply.cuh>
 #include <raft/linalg/normalize.cuh>
-#include <raft/linalg/power.cuh>
 #include <raft/linalg/reduce.cuh>
 #include <raft/linalg/transpose.cuh>
 #include <raft/matrix/argmin.cuh>
-#include <raft/matrix/copy.cuh>
-#include <raft/matrix/diagonal.cuh>
-#include <raft/matrix/init.cuh>
 
 /**
  * @brief Compute SOAR labels for each dataset vector

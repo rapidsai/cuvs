@@ -169,15 +169,16 @@ __global__ void kern_prune(const IdxT* const knn_graph,  // [graph_chunk_size, g
   uint64_t* const num_retain = stats;
   uint64_t* const num_full   = stats + 1;
 
-  const uint64_t nid = blockIdx.x + (batch_size * batch_id);
-  if (nid >= graph_size) { return; }
+  const uint64_t iA = blockIdx.x + (batch_size * batch_id);
+  if (iA >= graph_size) { return; }
   for (uint32_t k = threadIdx.x; k < graph_degree; k += blockDim.x) {
     smem_num_detour[k] = 0;
+    if (knn_graph[k + ((uint64_t)graph_degree * iA)] == iA) {
+      // Lower the priority of self-edge
+      smem_num_detour[k] = graph_degree;
+    }
   }
   __syncthreads();
-
-  const uint64_t iA = nid;
-  if (iA >= graph_size) { return; }
 
   // count number of detours (A->D->B)
   for (uint32_t kAD = 0; kAD < graph_degree - 1; kAD++) {
@@ -1410,7 +1411,7 @@ void optimize(
       "overflows occur during the norm computation between the dataset vectors.");
 
     const double time_prune_end = cur_time();
-    RAFT_LOG_DEBUG("# Pruning time: %.1lf sec", time_prune_end - time_prune_start);
+    RAFT_LOG_DEBUG("# Pruning time: %.1lf ms", (time_prune_end - time_prune_start) * 1000.0);
   }
 
   auto rev_graph       = raft::make_host_matrix<IdxT, int64_t>(graph_size, output_graph_degree);
@@ -1480,7 +1481,8 @@ void optimize(
                raft::resource::get_cuda_stream(res));
 
     const double time_make_end = cur_time();
-    RAFT_LOG_DEBUG("# Making reverse graph time: %.1lf sec", time_make_end - time_make_start);
+    RAFT_LOG_DEBUG("# Making reverse graph time: %.1lf ms",
+                   (time_make_end - time_make_start) * 1000.0);
   }
 
   {
@@ -1567,7 +1569,8 @@ void optimize(
                  "many MST optimization edges.");
 
     const double time_replace_end = cur_time();
-    RAFT_LOG_DEBUG("# Replacing edges time: %.1lf sec", time_replace_end - time_replace_start);
+    RAFT_LOG_DEBUG("# Replacing edges time: %.1lf ms",
+                   (time_replace_end - time_replace_start) * 1000.0);
 
     /* stats */
     uint64_t num_replaced_edges = 0;
