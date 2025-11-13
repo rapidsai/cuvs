@@ -32,20 +32,23 @@ struct NNInputs {
   IdxT m;
   IdxT n;
   IdxT k;
+  DistanceType metric;
+  bool sqrt;
   uint64_t rng_seed;
   double tol;
 };
 
-template <typename DataT, typename IdxT, ImplType impl>
+template <typename DataT, typename AccT, typename IdxT, ImplType impl>
 class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
  public:
-  using AccT = DataT;
   using OutT = raft::KeyValuePair<IdxT, AccT>;
   NNTest()
     : params_{::testing::TestWithParam<NNInputs<IdxT>>::GetParam()},
       m{params_.m},
       n{params_.n},
       k{params_.k},
+      metric{params_.metric},
+      sqrt{params_.sqrt},
       stream{raft::resource::get_cuda_stream(handle)},
       x{raft::make_device_matrix<DataT, IdxT>(handle, m, k)},
       y{raft::make_device_matrix<DataT, IdxT>(handle, n, k)},
@@ -64,9 +67,10 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
     raft::random::uniform(handle, rng, y.data_handle(), n * k, DataT(-1.0), DataT(1.0));
 
     // Pre-compute norms
-    constexpr auto l2_row_norm = raft::linalg::rowNorm<raft::linalg::L2Norm, true, DataT, IdxT>;
-    l2_row_norm(x_norm.data_handle(), x.data_handle(), k, m, stream, raft::identity_op());
-    l2_row_norm(y_norm.data_handle(), y.data_handle(), k, n, stream, raft::identity_op());
+    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+      x_norm.data_handle(), x.data_handle(), k, m, stream);
+    raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+      y_norm.data_handle(), y.data_handle(), k, m, stream);
 
     if constexpr (impl == ImplType::fused) {
       workspace_size = n * sizeof(IdxT);
@@ -81,8 +85,6 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
 
   void compute_1nn()
   {
-    DistanceType metric =  DistanceType::L2Expanded;
-    bool sqrt = false;
     raft::device_vector<char, IdxT> workspace =
       raft::make_device_vector<char, IdxT>(handle, workspace_size);
 
@@ -146,6 +148,8 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
   IdxT m;
   IdxT n;
   IdxT k;
+  DistanceType metric;
+  bool sqrt;
   raft::device_matrix<DataT, IdxT> x;
   raft::device_matrix<DataT, IdxT> y;
   raft::device_vector<AccT, IdxT> x_norm;
@@ -157,12 +161,14 @@ class NNTest : public ::testing::TestWithParam<NNInputs<IdxT>> {
 
 template <typename IdxT>
 const std::vector<NNInputs<IdxT>> input_fp32 = {
-  {4096, 4096, 64, uint64_t(31415926), 0.1},
-  {4096, 4096, 128, uint64_t(31415926), 0.1},
+  {4096, 4096, 64, DistanceType::L2Expanded, false, uint64_t(31415926), 0.1},
+  {4096, 4096, 128, DistanceType::L2Expanded, true, uint64_t(31415926), 0.1},
+  {4096, 4096, 64, DistanceType::CosineExpanded, false, uint64_t(31415926), 0.1},
+  {4096, 4096, 128, DistanceType::CosineExpanded, true, uint64_t(31415926), 0.1},
 };
 
 // Test fused implementation with single-precision
-typedef NNTest<float, int32_t, ImplType::fused> NNTest_fp32_fused;
+typedef NNTest<float, float, int32_t, ImplType::fused> NNTest_fp32_fused;
 TEST_P(NNTest_fp32_fused, test)
 {
   this->compute_1nn();
@@ -172,7 +178,7 @@ TEST_P(NNTest_fp32_fused, test)
 INSTANTIATE_TEST_CASE_P(NNTest, NNTest_fp32_fused, ::testing::ValuesIn(input_fp32<int>));
 
 // Test unfused implementation with single-precision
-typedef NNTest<float, int32_t, ImplType::unfused> NNTest_fp32_unfused;
+typedef NNTest<float, float, int32_t, ImplType::unfused> NNTest_fp32_unfused;
 TEST_P(NNTest_fp32_unfused, test)
 {
   this->compute_1nn();
@@ -183,12 +189,15 @@ INSTANTIATE_TEST_CASE_P(NNTest, NNTest_fp32_unfused, ::testing::ValuesIn(input_f
 
 template <typename IdxT>
 const std::vector<NNInputs<IdxT>> input_fp16 = {
-  {4096, 4096, 64, uint64_t(31415926), 0.2},
-  {4096, 4096, 128, uint64_t(31415926), 0.2},
+  {4096, 4096, 64, DistanceType::L2Expanded, false, uint64_t(31415926), 0.1},
+  {4096, 4096, 128, DistanceType::L2Expanded, true, uint64_t(31415926), 0.1},
+  {4096, 4096, 64, DistanceType::CosineExpanded, false, uint64_t(31415926), 0.1},
+  {4096, 4096, 128, DistanceType::CosineExpanded, true, uint64_t(31415926), 0.1},
 };
 
 // Test unfused implementation with fp16
-typedef NNTest<half, int32_t, ImplType::unfused> NNTest_fp16_unfused;
+// Fused implementation has no support for fp16
+typedef NNTest<half, float, int32_t, ImplType::unfused> NNTest_fp16_unfused;
 TEST_P(NNTest_fp16_unfused, test)
 {
   this->compute_1nn();

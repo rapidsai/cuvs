@@ -22,6 +22,9 @@
 #include <raft/core/kvp.hpp>
 #include <raft/util/cuda_rt_essentials.hpp>
 
+#include <cuvs/distance/distance.hpp>
+using cuvs::distance::DistanceType;
+
 namespace cuvs::neighbors {
 
 template <typename T>
@@ -73,7 +76,7 @@ __device__ AccT cosine_distance(const DataT* v1, const DataT* v2, IdxT K)
 
 // This is a naive implementation of 1-NN computation
 template <typename DataT, typename AccT, typename OutT, typename IdxT>
-RAFT_KERNEL void ref_nn_kernel(
+RAFT_KERNEL ref_nn_kernel(
   OutT* out, const DataT* A, const DataT* B, IdxT M, IdxT N, IdxT K, bool sqrt, DistanceType metric)
 {
   IdxT tid = threadIdx.x + blockIdx.x * IdxT(blockDim.x);
