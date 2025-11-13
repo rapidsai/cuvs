@@ -8,7 +8,7 @@
 #include <random>
 #include <stdint.h>
 
-#include <cuvs/neighbors/ivf_rabitq/third/Eigen/Dense>
+#include <Eigen/Dense>
 
 #define FORCE_INLINE inline __attribute__((always_inline))
 #define likely(x)    __builtin_expect(!!(x), 1)

@@ -204,6 +204,8 @@ if(BUILD_CAGRA_HNSWLIB)
   include(cmake/thirdparty/get_hnswlib.cmake)
 endif()
 
+include(cmake/thirdparty/get_eigen.cmake)
+
 # ##################################################################################################
 # * cuvs ---------------------------------------------------------------------
 if(NOT BUILD_CPU_ONLY)
@@ -233,7 +235,8 @@ if(NOT BUILD_CPU_ONLY)
   ) # fix rmm dependencies
 
   target_include_directories(
-    ivf_rabitq_lib PRIVATE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    ivf_rabitq_lib PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" 
+    ${Eigen3_SOURCE_DIR}
   )
 
   target_compile_options(
@@ -592,6 +595,7 @@ if(NOT BUILD_CPU_ONLY)
     cuvs_objs
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../c/include>"
+           ${Eigen3_SOURCE_DIR}
     INTERFACE "$<INSTALL_INTERFACE:include>"
   )
 

@@ -1,3 +1,100 @@
+# cuVS RaBitQ benchmarks
+
+## 1. Connect to Brev GPU instance
+
+1. Go to brev login page https://brev.nvidia.com/org/org-349mMmwltH7qlP4grYeHrPERafd/environments/fdqzxyjd5#Access
+
+   If the node is stopped then press `Start`.
+   
+   Once you finished your work, then `Stop` the node.
+
+   Click in the `brev login --toke *****` field to copy the command together with the token.
+
+2. In a terminal
+
+```
+brev login --token *****
+brev shell cuvspersistentl40s-075bc8
+# connect to the container that is already started on the node
+docker exec -it workspace-cuvsdev-1 /bin/bash
+
+```  
+
+To copy (scp) files to your Brev instance:
+```
+# The `/ephemeral` directory is mapped as `/workspace` in the docker container
+brev copy myfile cuvspersistentl40s-075bc8:/ephemeral/
+
+```
+
+## 2. Get source files
+
+```
+git clone --branch tfeher https://github.com/Stardust-SJF/cuvs.git
+mkdir cuvs/cpp/build
+cd cuvs/cpp/build
+```
+
+## 3. Compile benchmarks
+```
+cmake .. -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX -DCUVS_NVTX=ON -DBUILD_MG_ALGOS=OFF -DBUILD_TESTS=OFF -DBUILD_C_TESTS=OFF -DBUILD_CUVS_BENCH=ON -DCUVS_ANN_BENCH_USE_CUVS_MG=OFF -DDISABLE_DEPRECATION_WARNINGS=ON -DCMAKE_CUDA_ARCHITECTURES="89" -DCMAKE_BUILD_TYPE=Release
+make -j install
+```
+
+The `-DCMAKE_CUDA_ARCHITECTURES="89"` compiles for L40S (and L4) GPU. Use `90` for Hopper and `100` for Blackwell GPUs.
+
+## 4. Get Dataset
+
+### 4.1 SIFT 1M
+```
+export PYTHONPATH=/workspace/cuvs_rabitq/python/cuvs_bench:$PYTHONPATH
+python -m cuvs_bench.get_dataset --dataset sift-128-euclidean
+mv datasets/sift-128-euclidean data
+rm datasets/sift-128-euclidean.hdf5
+```
+
+### 4.2 OpenAI (5M and 1M subsets)
+```
+wget https://gist.githubusercontent.com/tfeher/edf7ce247258d63e1fd2c6c3c174d087/raw/ee54fa1556bcedf48b7090e9e8f8d69f00338258/download_openai_5M.py
+python download_openai_5M.py
+rm /tmp/data/openai_5M/*.parquet
+mv /tmp/data/openai_5M /workspace/data/
+```
+
+Generate ground truth for smaller subsets:
+```
+python -m cuvs_bench.generate_groundtruth --queries data/openai_5M/queries.fbin -k 100 --metric euclidean --dtype=float32 --output data/openai_1M -N 1000000 -D 1536 data/openai_5M/base.5M.fbin
+mv data/openai_1M/groundtruth.neighbors.ibin data/openai_5M/groundtruth.1M.neighbors.ibin 
+```
+
+## 5. Run benchmarks
+
+### 5.1 Run benchmark executable directly
+The benchmark is configured using a json file. Example configs are in the `bench_config/openai_1M.json` folder
+
+#### 5.1.1 IVF-RaBitQ
+```
+# Build
+/workspace/cuvs_rabitq/cpp/build/bench/ann/CUVS_IVF_RABITQ_ANN_BENCH --build --force --data_prefix=/workspace/data --benchmark_filter=cuvs_ivf_rabitq --benchmark_out_format=csv --benchmark_out=res_build_rabitq.csv --benchmark_counters_tabular=true cuvs_rabitq/bench_config/openai_1M.json
+# Search
+cpp/build/bench/ann/CUVS_IVF_RABITQ_ANN_BENCH --search --force --data_prefix=<parent dir of query dataset> --benchmark_filter=rabitq --benchmark_out_format=csv --benchmark_out=res_search_rabitq.csv --benchmark_counters_tabular=true cuvs_rabitq/bench_config/openai_1M.json
+```
+
+#### 5.1.2 IVF-PQ benchmarks
+```
+# build
+/workspace/cuvs_rabitq/cpp/build/bench/ann/CUVS_IVF_PQ_ANN_BENCH --build --force --data_prefix=/workspace/data --benchmark_filter=cuvs_ivf_pq --benchmark_out_format=csv --benchmark_out=res_build_ivf_pq.csv --benchmark_counters_tabular=true cuvs_rabitq/bench_config/openai_1M.json
+# search
+/workspace/cuvs_rabitq/cpp/build/bench/ann/CUVS_IVF_PQ_ANN_BENCH --search --data_prefix=/workspace/data --benchmark_filter=cuvs_ivf_pq --benchmark_out_format=csv --benchmark_out=res_search_ivf_pq.csv --benchmark_counters_tabular=true cuvs_rabitq/bench_config/openai_1M.json
+```
+### Parameter scan using python wrapper around the benchmark executable
+The python wrapper uses a yaml config file and generates json config files, it calls the benchmark executable afterwards.
+```
+python -m cuvs_bench.run --dataset openai_1M --dataset-path=/workspace/data --dataset-configuration=/workspace/cuvs_rabitq/bench_config/openai.yaml --configuration=/workspace/cuvs_rabitq/bench_config/ivf_pq.yaml -k 10 -bs 1000 --algorithms=cuvs_ivf_pq --groups=openai --search-mode=latency
+```
+
+
+# Original cuVS README
 # <div align="left"><img src="https://rapids.ai/assets/images/rapids_logo.png" width="90px"/>&nbsp;cuVS: Vector Search and Clustering on the GPU</div>
 
 > [!note]

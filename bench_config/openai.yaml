@@ -1,0 +1,14 @@
+- name: openai_5M
+  dims: 1536
+  base_file: openai_5M/base.5M.fbin
+  query_file: openai_5M/queries.fbin
+  groundtruth_neighbors_file: openai_5M/groundtruth.neighbors.ibin
+  distance: euclidean
+
+- name: openai_1M
+  dims: 1536
+  subset_size: 1000000
+  base_file: openai_5M/base.5M.fbin
+  query_file: openai_5M/queries.fbin
+  groundtruth_neighbors_file: openai_5M/groundtruth.1M.neighbors.ibin
+  distance: euclidean

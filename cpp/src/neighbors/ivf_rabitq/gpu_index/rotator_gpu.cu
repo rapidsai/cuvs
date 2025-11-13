@@ -8,7 +8,7 @@
 //
 
 #include <cuvs/neighbors/ivf_rabitq/gpu_index/rotator_gpu.cuh>
-#include <cuvs/neighbors/ivf_rabitq/third/Eigen/Dense>
+#include <Eigen/Dense>
 
 RotatorGPU::RotatorGPU(uint32_t dim)
 {

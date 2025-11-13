@@ -1,0 +1,41 @@
+services:
+  cuvsdev:
+    build:
+      dockerfile_inline: |
+        FROM "rapidsai/devcontainers:25.12-cpp-mambaforge"
+        ENV TERM=linux \
+            DEBIAN_FRONTEND=noninteractive
+            
+        SHELL ["/bin/bash", "--login", "-c"]
+        ENV PATH=/workspace/conda/bin:$PATH
+
+        RUN wget --quiet \
+        https://raw.githubusercontent.com/rapidsai/cuvs/refs/heads/main/conda/environments/bench_ann_cuda-129_arch-`uname -m`.yaml \
+        -O /opt/conda/cuvs_dev_bench_env.yml && \
+        wget --quiet \
+        https://raw.githubusercontent.com/rapidsai/cuvs/refs/heads/main/conda/environments/all_cuda-129_arch-`uname -m`.yaml \
+        -O /opt/conda/cuvs_dev_all_env.yml 
+        RUN umask 0002 && mamba create -n cuvs_dev python=3.12 && \
+            mamba env update -n cuvs_dev --file=/opt/conda/cuvs_dev_bench_env.yml && \
+            mamba env update -n cuvs_dev --file=/opt/conda/cuvs_dev_all_env.yml && mamba install -n cuvs_dev s3fs conda-forge::pyarrow
+        RUN umask 0002 && echo -e "\n. /opt/conda/etc/profile.d/conda.sh\nconda activate cuvs_dev" >> ~/.bashrc
+
+    pull_policy: always
+    ulimits:
+        memlock: -1
+        stack: 67108864
+    shm_size: 1g
+    deploy:
+        resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                count: all
+                capabilities: [gpu] 
+    volumes:
+      - /ephemeral:/workspace
+    working_dir: /workspace
+    entrypoint: ["/bin/bash"]
+    tty: true
+    stdin_open: true
+    restart: unless-stopped

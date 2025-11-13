@@ -1,0 +1,56 @@
+{
+  "dataset": {
+    "name": "openai_1M",
+    "subset_size": 1000000,
+    "base_file": "openai_5M/base.5M.fbin",
+    "query_file": "openai_5M/queries.fbin",
+    "groundtruth_neighbors_file": "openai_5M/groundtruth.1M.neighbors.ibin",
+    "distance": "euclidean"
+  },
+  "search_basic_param": {
+    "batch_size": 1000,
+    "k": 10
+  },
+
+  "index": [  
+    {
+      "name": "cuvs_ivf_rabitq.test",
+      "algo": "cuvs_ivf_rabitq",
+      "build_param": {"nlist":1000, "niter":20, "ex_bits":4, "fast_quantize_flag":true},
+      "file": "openai_1M/cuvs_ivf_rabitq/test",
+      "search_params": [
+         { "nprobe": 5, "mode": "quant4" },
+         { "nprobe": 10, "mode": "quant4" },
+         { "nprobe": 20, "mode": "quant4" },
+         { "nprobe": 30, "mode": "quant4" },
+         { "nprobe": 40, "mode": "quant4" },
+         { "nprobe": 50, "mode": "quant4" },
+         { "nprobe": 100, "mode": "quant4" },
+         { "nprobe": 200, "mode": "quant4" },
+         { "nprobe": 500, "mode": "quant4" }
+      ]
+    },
+    {
+      "name": "cuvs_ivf_pq.test",
+      "algo": "cuvs_ivf_pq",
+      "build_param": {
+        "pq_dim": 768,
+        "pq_bits": 4,
+        "nlist": 1000,
+        "niter": 20,
+        "ratio": 10
+      },
+      "file": "openai_1M/cuvs_ivf_pq/test",
+      "search_params": [
+        { "nprobe": 5, "internalDistanceDtype": "half", "smemLutDtype": "half", "refine_ratio": 5 },
+        { "nprobe": 10, "internalDistanceDtype": "half", "smemLutDtype": "half", "refine_ratio": 5 },
+        { "nprobe": 20, "internalDistanceDtype": "half", "smemLutDtype": "half", "refine_ratio": 5 },
+        { "nprobe": 30, "internalDistanceDtype": "half", "smemLutDtype": "half", "refine_ratio": 5 },
+        { "nprobe": 40, "internalDistanceDtype": "half", "smemLutDtype": "half", "refine_ratio": 5 },
+        { "nprobe": 50, "internalDistanceDtype": "half", "smemLutDtype": "half", "refine_ratio": 5 },
+        { "nprobe": 100, "internalDistanceDtype": "half", "smemLutDtype": "half", "refine_ratio": 5 },
+        { "nprobe": 200, "internalDistanceDtype": "half", "smemLutDtype": "half", "refine_ratio": 5 },
+        { "nprobe": 500, "internalDistanceDtype": "half", "smemLutDtype": "half", "refine_ratio": 5 }
+      ]
+    }]
+}

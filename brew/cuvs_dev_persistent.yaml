@@ -1,0 +1,22 @@
+services:
+  cuvsdev:
+    image: "rapidsai/devcontainers:25.12-cpp-cuda13.0-ucx1.19.0-openmpi5.0.7"
+    pull_policy: always
+    ulimits:
+        memlock: -1
+        stack: 67108864
+    shm_size: 1g
+    deploy:
+        resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                count: all
+                capabilities: [gpu] 
+    volumes:
+      - /ephemeral:/workspace
+    working_dir: /workspace
+    entrypoint: ["/bin/bash"]
+    tty: true
+    stdin_open: true
+    restart: unless-stopped
