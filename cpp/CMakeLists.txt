@@ -217,6 +217,7 @@ if(NOT BUILD_CPU_ONLY)
               "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
               "$<INSTALL_INTERFACE:include>"
   )
+  target_link_libraries(cuvs_cpp_headers INTERFACE raft::raft rmm::rmm)
 
   add_library(
     cuvs-cagra-search OBJECT
@@ -311,7 +312,7 @@ if(NOT BUILD_CPU_ONLY)
                CUDA_SEPARABLE_COMPILATION ON
                POSITION_INDEPENDENT_CODE ON
   )
-  target_link_libraries(cuvs-cagra-search PRIVATE raft::raft cuvs::cuvs_cpp_headers)
+  target_link_libraries(cuvs-cagra-search PRIVATE cuvs::cuvs_cpp_headers)
   target_compile_options(
     cuvs-cagra-search PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
                               "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
@@ -553,7 +554,7 @@ if(NOT BUILD_CPU_ONLY)
 
   target_link_libraries(
     cuvs_objs
-    PRIVATE raft::raft rmm::rmm cuvs::cuvs_cpp_headers ${CUVS_CTK_MATH_DEPENDENCIES}
+    PRIVATE cuvs::cuvs_cpp_headers ${CUVS_CTK_MATH_DEPENDENCIES}
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX> $<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>
   )
 
