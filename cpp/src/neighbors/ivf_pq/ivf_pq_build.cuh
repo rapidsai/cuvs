@@ -1705,7 +1705,9 @@ auto build_owning(
                  owning_index.centers().size(),
                  stream);
     } else {
-      RAFT_LOG_WARN("centers is not padded, the give rotation matrix will be ignored and recomputed from the centers and rotation matrix");
+      RAFT_LOG_WARN(
+        "centers is not padded, the give rotation matrix will be ignored and recomputed from the "
+        "centers and rotation matrix");
       set_centers(handle, &owning_index, centers);
     }
   }
