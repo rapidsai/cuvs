@@ -1582,7 +1582,7 @@ auto extend(raft::resources const& handle,
 /**
  * @brief Extend the index with the new data.
  *
-  * Note, the user can set a stream pool in the input raft::resource with
+ * Note, the user can set a stream pool in the input raft::resource with
  * at least one stream to enable kernel and copy overlapping.
  *
  * Usage example:
