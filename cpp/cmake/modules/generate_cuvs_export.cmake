@@ -31,7 +31,6 @@ function(generate_cuvs_export)
       [=[
 
   if(NOT TARGET cuvs::cuvs_cpp_headers)
-
     file(GLOB cuvs_component_dep_files LIST_DIRECTORIES FALSE
             "${CMAKE_CURRENT_LIST_DIR}/cuvs-cuvs_cpp_headers*-dependencies.cmake")
     foreach(f IN LISTS  cuvs_component_dep_files)
@@ -46,8 +45,7 @@ function(generate_cuvs_export)
     endforeach()
   endif()
 
-  if(NOT cuvs_FIND_COMPONENTS)
-
+  if(NOT TARGET cuvs::cuvs)
     file(GLOB cuvs_component_dep_files LIST_DIRECTORIES FALSE
             "${CMAKE_CURRENT_LIST_DIR}/cuvs-cuvs_shared*-dependencies.cmake")
     foreach(f IN LISTS  cuvs_component_dep_files)
