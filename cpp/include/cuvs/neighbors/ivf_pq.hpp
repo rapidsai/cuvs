@@ -287,6 +287,9 @@ using list_data = ivf::list<list_spec, SizeT, IdxT>;
 
 template <typename IdxT>
 struct index_iface {
+  using pq_centers_extents = std::experimental::
+    extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
+
   index_iface(raft::resources const& handle,
               cuvs::distance::DistanceType metric,
               codebook_gen codebook_kind,
@@ -321,10 +324,9 @@ struct index_iface {
   raft::host_vector_view<IdxT, uint32_t, raft::row_major> accum_sorted_sizes() noexcept;
   raft::host_vector_view<const IdxT, uint32_t, raft::row_major> accum_sorted_sizes() const noexcept;
 
-  virtual raft::device_mdspan<float, typename index<IdxT>::pq_centers_extents, raft::row_major>
+  virtual raft::device_mdspan<float, pq_centers_extents, raft::row_major>
   pq_centers() noexcept = 0;
-  virtual raft::
-    device_mdspan<const float, typename index<IdxT>::pq_centers_extents, raft::row_major>
+  virtual raft::device_mdspan<const float, pq_centers_extents, raft::row_major>
     pq_centers() const noexcept = 0;
 
   virtual raft::device_matrix_view<float, uint32_t, raft::row_major> centers() noexcept = 0;
@@ -338,6 +340,15 @@ struct index_iface {
   virtual raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix() noexcept = 0;
   virtual raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix()
     const noexcept = 0;
+
+  raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> rotation_matrix_int8(
+    const raft::resources& res) const;
+  raft::device_matrix_view<const half, uint32_t, raft::row_major> rotation_matrix_half(
+    const raft::resources& res) const;
+  raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> centers_int8(
+    const raft::resources& res) const;
+  raft::device_matrix_view<const half, uint32_t, raft::row_major> centers_half(
+    const raft::resources& res) const;
   
  protected:
   cuvs::distance::DistanceType metric_;
@@ -362,7 +373,7 @@ struct index_iface {
 
 template <typename IdxT>
 struct owning_impl : index_iface<IdxT> {
-  using pq_centers_extents = typename index<IdxT>::pq_centers_extents;
+  using pq_centers_extents = typename index_iface<IdxT>::pq_centers_extents;
 
   owning_impl(raft::resources const& handle,
               cuvs::distance::DistanceType metric,
@@ -396,13 +407,13 @@ struct owning_impl : index_iface<IdxT> {
   raft::device_matrix<float, uint32_t, raft::row_major> centers_rot_;
   raft::device_matrix<float, uint32_t, raft::row_major> rotation_matrix_;
 
-  static typename index<IdxT>::pq_centers_extents make_pq_centers_extents(
+  static pq_centers_extents make_pq_centers_extents(
     uint32_t dim, uint32_t pq_dim, uint32_t pq_bits, codebook_gen codebook_kind, uint32_t n_lists);
 };
 
 template <typename IdxT>
 struct view_impl : index_iface<IdxT> {
-  using pq_centers_extents = typename index<IdxT>::pq_centers_extents;
+  using pq_centers_extents = typename index_iface<IdxT>::pq_centers_extents;
 
   view_impl(raft::resources const& handle,
             cuvs::distance::DistanceType metric,
@@ -498,8 +509,7 @@ struct index : cuvs::neighbors::index {
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 
-  using pq_centers_extents = std::experimental::
-    extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
+  using pq_centers_extents = typename index_iface<IdxT>::pq_centers_extents;
 
  public:
   index(const index&) = delete;
