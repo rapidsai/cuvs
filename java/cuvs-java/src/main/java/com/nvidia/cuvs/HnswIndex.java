@@ -51,8 +51,7 @@ public interface HnswIndex extends AutoCloseable {
    * @return A new HNSW index
    * @throws Throwable if an error occurs during conversion
    */
-  static HnswIndex fromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex)
-      throws Throwable {
+  static HnswIndex fromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex) throws Throwable {
     Objects.requireNonNull(hnswParams);
     Objects.requireNonNull(cagraIndex);
     return CuVSProvider.provider().hnswIndexFromCagra(hnswParams, cagraIndex);

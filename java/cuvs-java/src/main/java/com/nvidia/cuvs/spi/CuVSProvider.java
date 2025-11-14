@@ -121,8 +121,7 @@ public interface CuVSProvider {
    * @return A new HNSW index
    * @throws Throwable if an error occurs during conversion
    */
-  HnswIndex hnswIndexFromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex)
-      throws Throwable;
+  HnswIndex hnswIndexFromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex) throws Throwable;
 
   /** Creates a new TieredIndex Builder. */
   TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources)
