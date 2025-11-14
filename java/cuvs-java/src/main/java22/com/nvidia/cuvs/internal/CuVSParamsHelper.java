@@ -122,6 +122,25 @@ public final class CuVSParamsHelper {
     }
   }
 
+  public static CloseableHandle createAceParams() {
+    try (var localArena = Arena.ofConfined()) {
+      var paramsPtrPtr = localArena.allocate(cuvsAceParams_t);
+      checkCuVSError(cuvsAceParamsCreate(paramsPtrPtr), "cuvsAceParamsCreate");
+      var paramsPtr = paramsPtrPtr.get(cuvsAceParams_t, 0L);
+      return new CloseableHandle() {
+        @Override
+        public MemorySegment handle() {
+          return paramsPtr;
+        }
+
+        @Override
+        public void close() {
+          checkCuVSError(cuvsAceParamsDestroy(paramsPtr), "cuvsAceParamsDestroy");
+        }
+      };
+    }
+  }
+
   static CloseableHandle createHnswIndexParams() {
     try (var localArena = Arena.ofConfined()) {
       var paramsPtrPtr = localArena.allocate(cuvsHnswIndexParams_t);
