@@ -11,7 +11,6 @@ function(generate_cuvs_export)
   set(multi_value EXPORT_SETS COMPONENTS)
   cmake_parse_arguments(_CUVS_RAPIDS "${options}" "${one_value}" "${multi_value}" ${ARGN})
 
-
   set(placehold_name "cuvs_placeholder")
   if(_CUVS_RAPIDS_CLIB)
     string(APPEND placehold_name "_c")
