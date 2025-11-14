@@ -243,58 +243,6 @@ auto calculate_offsets_and_indices(IdxT n_rows,
 }
 
 template <typename IdxT>
-void set_centers(raft::resources const& handle, index<IdxT>* index, const float* cluster_centers)
-{
-  auto stream         = raft::resource::get_cuda_stream(handle);
-  auto* device_memory = raft::resource::get_workspace_resource(handle);
-
-  // Make sure to have trailing zeroes between dim and dim_ext;
-  // We rely on this to enable padded tensor gemm kernels during coarse search.
-  cuvs::spatial::knn::detail::utils::memzero(
-    index->centers().data_handle(), index->centers().size(), stream);
-  // combine cluster_centers and their norms
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle(),
-                                  sizeof(float) * index->dim_ext(),
-                                  cluster_centers,
-                                  sizeof(float) * index->dim(),
-                                  sizeof(float) * index->dim(),
-                                  index->n_lists(),
-                                  cudaMemcpyDefault,
-                                  stream));
-
-  rmm::device_uvector<float> center_norms(index->n_lists(), stream, device_memory);
-  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-    center_norms.data(), cluster_centers, index->dim(), index->n_lists(), stream);
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle() + index->dim(),
-                                  sizeof(float) * index->dim_ext(),
-                                  center_norms.data(),
-                                  sizeof(float),
-                                  sizeof(float),
-                                  index->n_lists(),
-                                  cudaMemcpyDefault,
-                                  stream));
-
-  //     Rotate cluster_centers
-  float alpha = 1.0;
-  float beta  = 0.0;
-  raft::linalg::gemm(handle,
-                     true,
-                     false,
-                     index->rot_dim(),
-                     index->n_lists(),
-                     index->dim(),
-                     &alpha,
-                     index->rotation_matrix().data_handle(),
-                     index->dim(),
-                     cluster_centers,
-                     index->dim(),
-                     &beta,
-                     index->centers_rot().data_handle(),
-                     index->rot_dim(),
-                     raft::resource::get_cuda_stream(handle));
-}
-
-template <typename IdxT>
 void transpose_pq_centers(const raft::resources& handle,
                           index<IdxT>& index,
                           const float* pq_centers_source)
