@@ -20,9 +20,6 @@ function(generate_cuvs_export)
   # We need a placeholder target in cuvs-exports so that we can generate an export set since all the
   # real targets are conditional
   #
-  # tasks: need a second name for when calling from cuvs_c
-  # tasks: need to write a query over set(cuvs_comp_names cuvs_shared;cuvs_static;cuvs_cpp_headers;c_api)
-  #.       since we need that to be invariant
   if(NOT TARGET cuvs::${placehold_name})
     add_library(${placehold_name} INTERFACE)
     add_library(cuvs::${placehold_name} ALIAS ${placehold_name})
