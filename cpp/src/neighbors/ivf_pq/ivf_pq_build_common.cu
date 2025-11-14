@@ -282,18 +282,14 @@ void set_centers(raft::resources const& handle,
 
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  // Copy centers, handling padding if needed
   if (cluster_centers.extent(1) == index->dim_ext()) {
-    // Already padded, just copy
     raft::copy(index->centers().data_handle(),
                cluster_centers.data_handle(),
                cluster_centers.size(),
                stream);
   } else {
-    // Need to pad - zero out first
     cuvs::spatial::knn::detail::utils::memzero(
       index->centers().data_handle(), index->centers().size(), stream);
-    // Copy the actual data
     RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle(),
                                     sizeof(float) * index->dim_ext(),
                                     cluster_centers.data_handle(),
@@ -304,7 +300,6 @@ void set_centers(raft::resources const& handle,
                                     stream));
   }
 
-  // Compute rotated centers if rotation matrix exists
   if (index->rotation_matrix().extent(0) > 0 && index->rotation_matrix().extent(1) > 0) {
     float alpha = 1.0;
     float beta  = 0.0;
@@ -369,7 +364,6 @@ void set_centers(raft::resources const& handle,
     uint32_t input_dim =
       (cluster_centers.extent(1) == index->dim()) ? index->dim() : index->dim_ext();
 
-    // Need to copy cluster_centers to device for GEMM since we can't use host data directly
     auto cluster_centers_dev = raft::make_device_matrix<float, uint32_t>(
       handle, cluster_centers.extent(0), cluster_centers.extent(1));
     raft::copy(cluster_centers_dev.data_handle(),
