@@ -17,6 +17,7 @@
 #include <raft/linalg/dot.cuh>
 #include <raft/linalg/linalg_types.hpp>
 #include <raft/linalg/map.cuh>
+#include <raft/linalg/matrix_vector.cuh>
 #include <raft/linalg/matrix_vector_op.cuh>
 #include <raft/linalg/multiply.cuh>
 #include <raft/linalg/norm.cuh>

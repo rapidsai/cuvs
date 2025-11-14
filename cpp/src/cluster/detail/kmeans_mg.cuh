@@ -416,14 +416,14 @@ void initKMeansPlusPlus(const raft::resources& handle,
     cuvs::cluster::kmeans::params params_copy = params;
     params_copy.rng_state                     = default_params.rng_state;
 
-    cuvs::cluster::kmeans::fit_main(handle,
-                                    params_copy,
-                                    const_centroids,
-                                    weight_view,
-                                    centroidsRawData,
-                                    inertia.view(),
-                                    n_iter.view(),
-                                    workspace);
+    cuvs::cluster::kmeans::fit_main<DataT, IndexT>(handle,
+                                                   params_copy,
+                                                   const_centroids,
+                                                   weight_view,
+                                                   centroidsRawData,
+                                                   inertia.view(),
+                                                   n_iter.view(),
+                                                   workspace);
 
   } else if ((IndexT)potentialCentroids.extent(0) < (IndexT)n_clusters) {
     // supplement with random

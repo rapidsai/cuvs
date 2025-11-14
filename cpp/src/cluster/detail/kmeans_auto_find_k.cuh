@@ -1,11 +1,12 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
 #include "kmeans.cuh"
+#include <cuvs/cluster/kmeans.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
@@ -44,7 +45,7 @@ void compute_dispersion(raft::resources const& handle,
 
   params.n_clusters = val;
 
-  cuvs::cluster::kmeans::detail::kmeans_fit_predict<value_t, idx_t>(
+  cuvs::cluster::kmeans::fit_predict(
     handle, params, X, std::nullopt, std::make_optional(centroids_view), labels, residual, n_iter);
 
   detail::countLabels(handle, labels.data_handle(), clusterSizes.data_handle(), n, val, workspace);
@@ -208,15 +209,14 @@ void find_k(raft::resources const& handle,
       raft::make_device_matrix_view<value_t, idx_t>(centroids.data_handle(), best_k[0], d);
 
     params.n_clusters = best_k[0];
-    cuvs::cluster::kmeans::detail::kmeans_fit_predict<value_t, idx_t>(
-      handle,
-      params,
-      X,
-      std::nullopt,
-      std::make_optional(centroids_view),
-      labels.view(),
-      residual,
-      n_iter);
+    cuvs::cluster::kmeans::fit_predict(handle,
+                                       params,
+                                       X,
+                                       std::nullopt,
+                                       std::make_optional(centroids_view),
+                                       labels.view(),
+                                       residual,
+                                       n_iter);
   }
 }
 }  // namespace  cuvs::cluster::kmeans::detail
