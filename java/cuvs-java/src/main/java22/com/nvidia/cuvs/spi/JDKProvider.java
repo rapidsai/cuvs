@@ -37,6 +37,9 @@ final class JDKProvider implements CuVSProvider {
   private static final MethodHandle createNativeDataset$mh;
   private static final MethodHandle createNativeDatasetWithStrides$mh;
 
+  private final cuvsRMMMemoryResourceReset cuvsRMMMemoryResourceResetInvoker =
+      cuvsRMMMemoryResourceReset.makeInvoker();
+
   static {
     try {
       var lookup = MethodHandles.lookup();
@@ -186,6 +189,25 @@ final class JDKProvider implements CuVSProvider {
   @Override
   public GPUInfoProvider gpuInfoProvider() {
     return new GPUInfoProviderImpl();
+  }
+
+  @Override
+  public void enableRMMPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent) {
+    checkCuVSError(
+        cuvsRMMPoolMemoryResourceEnable(initialPoolSizePercent, maxPoolSizePercent, false),
+        "cuvsRMMPoolMemoryResourceEnable");
+  }
+
+  @Override
+  public void enableRMMManagedPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent) {
+    checkCuVSError(
+        cuvsRMMPoolMemoryResourceEnable(initialPoolSizePercent, maxPoolSizePercent, true),
+        "cuvsRMMPoolMemoryResourceEnable");
+  }
+
+  @Override
+  public void resetRMMPooledMemory() {
+    checkCuVSError(cuvsRMMMemoryResourceResetInvoker.apply(), "cuvsRMMMemoryResourceReset");
   }
 
   @Override
