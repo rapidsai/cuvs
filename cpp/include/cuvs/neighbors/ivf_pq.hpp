@@ -364,7 +364,6 @@ struct index : cuvs::neighbors::index {
    * @brief Construct an index with specified parameters.
    *
    * This constructor creates an owning index with the given parameters.
-   * The index will be empty and need to be populated with `extend` or loaded with `deserialize`.
    *
    * @param handle RAFT resources handle
    * @param metric Distance metric for clustering
@@ -520,7 +519,6 @@ struct index : cuvs::neighbors::index {
    * @brief Construct index from implementation pointer.
    *
    * This constructor is used internally by build/extend/deserialize functions.
-   * Users typically don't call this directly.
    *
    * @param impl Implementation pointer (owning or view)
    */
@@ -539,10 +537,6 @@ struct index : cuvs::neighbors::index {
 /**
  * @}
  */
-
-// Extern template declarations to prevent implicit instantiation
-// The explicit instantiation is in ivf_pq_index.cu where index_iface is complete
-extern template struct index<int64_t>;
 
 /**
  * @defgroup ivf_pq_cpp_index_build IVF-PQ index build
@@ -1012,83 +1006,27 @@ void build(raft::resources const& handle,
            raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
            cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 
-auto build(
-  raft::resources const& handle,
-  const cuvs::neighbors::ivf_pq::index_params& index_params,
-  const uint32_t dim,
-  raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
-  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> centers_rot_opt,
-  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix)
-  -> cuvs::neighbors::ivf_pq::index<int64_t>;
-
-/**
- * @brief Build an IVF-PQ index from host memory centroids and codebook.
- *
- * This function allows building an IVF-PQ index from pre-computed centroids and codebooks
- * that reside in host memory. The data will be copied to device memory internally.
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   raft::resources res;
- *   // Prepare host data
- *   auto pq_centers = raft::make_host_mdarray<float>(...);
- *   auto centers = raft::make_host_matrix<float>(...);
- *   // ... fill with pre-computed values ...
- *
- *   // Build index from host data
- *   ivf_pq::index_params params;
- *   auto index = ivf_pq::build(res, params, dim,
- *                              pq_centers.view(),
- *                              centers.view(),
- *                              std::nullopt,
- *                              std::nullopt);
- * @endcode
- *
- * @param[in] handle raft resources handle
- * @param[in] index_params configure the index building
- * @param[in] dim dimensionality of the input data
- * @param[in] pq_centers PQ codebook on host memory
- *   - codebook_gen::PER_SUBSPACE: [pq_dim , pq_len, pq_book_size]
- *   - codebook_gen::PER_CLUSTER:  [n_lists, pq_len, pq_book_size]
- * @param[in] centers Cluster centers on host memory [n_lists, dim] or [n_lists, dim_ext]
- * @param[in] centers_rot Optional rotated cluster centers on host [n_lists, rot_dim]
- * @param[in] rotation_matrix Optional rotation matrix on host [rot_dim, dim]
- *
- * @return the constructed IVF-PQ index
- */
-auto build(
-  raft::resources const& handle,
-  const cuvs::neighbors::ivf_pq::index_params& index_params,
-  const uint32_t dim,
-  raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
-  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
-  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
-  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix)
-  -> cuvs::neighbors::ivf_pq::index<int64_t>;
-
 /**
  * @brief Build an IVF-PQ index from host memory centroids and codebook (in-place).
  *
  * @param[in] handle raft resources handle
  * @param[in] index_params configure the index building
  * @param[in] dim dimensionality of the input data
- * @param[in] pq_centers PQ codebook on host memory
- * @param[in] centers Cluster centers on host memory
- * @param[in] centers_rot Optional rotated cluster centers on host
- * @param[in] rotation_matrix Optional rotation matrix on host
- * @param[out] idx pointer to IVF-PQ index to be built
+ * @param[in] pq_centers PQ codebook
+ * @param[in] centers Cluster centers
+ * @param[in] centers_rot Optional rotated cluster centers
+ * @param[in] rotation_matrix Optional rotation matrix
+ * @param[out] idx pointer to ivf_pq::index
  */
-void build(
+auto build(
   raft::resources const& handle,
   const cuvs::neighbors::ivf_pq::index_params& index_params,
   const uint32_t dim,
-  raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
-  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
-  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
-  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix,
-  cuvs::neighbors::ivf_pq::index<int64_t>* idx);
+  raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
+  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
+  std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix,
+  cuvs::neighbors::ivf_pq::index<int64_t>* idx) -> cuvs::neighbors::ivf_pq::index<int64_t>;
 
 /**
  * @brief Build the index from existing centroids and codebook.
@@ -1126,6 +1064,50 @@ void build(
   std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> centers,
   std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
   std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix,
+  cuvs::neighbors::ivf_pq::index<int64_t>* idx);
+
+/**
+ * @brief Build an IVF-PQ index from host memory centroids and codebook (in-place).
+ *
+ * @param[in] handle raft resources handle
+ * @param[in] index_params configure the index building
+ * @param[in] dim dimensionality of the input data
+ * @param[in] pq_centers PQ codebook
+ * @param[in] centers Cluster centers
+ * @param[in] centers_rot Optional rotated cluster centers
+ * @param[in] rotation_matrix Optional rotation matrix
+ * @param[out] idx pointer to ivf_pq::index
+ */
+auto build(
+  raft::resources const& handle,
+  const cuvs::neighbors::ivf_pq::index_params& index_params,
+  const uint32_t dim,
+  raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix,
+  cuvs::neighbors::ivf_pq::index<int64_t>* idx);
+
+/**
+ * @brief Build an IVF-PQ index from host memory centroids and codebook (in-place).
+ *
+ * @param[in] handle raft resources handle
+ * @param[in] index_params configure the index building
+ * @param[in] dim dimensionality of the input data
+ * @param[in] pq_centers PQ codebook on host memory
+ * @param[in] centers Cluster centers on host memory
+ * @param[in] centers_rot Optional rotated cluster centers on host
+ * @param[in] rotation_matrix Optional rotation matrix on host
+ * @param[out] idx pointer to IVF-PQ index to be built
+ */
+void build(
+  raft::resources const& handle,
+  const cuvs::neighbors::ivf_pq::index_params& index_params,
+  const uint32_t dim,
+  raft::host_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> centers_rot,
+  std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix,
   cuvs::neighbors::ivf_pq::index<int64_t>* idx);
 /**
  * @}
