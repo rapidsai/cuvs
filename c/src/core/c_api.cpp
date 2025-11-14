@@ -185,7 +185,7 @@ extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_per
 extern "C" cuvsError_t cuvsRMMMemoryResourceReset()
 {
   return cuvs::core::translate_exceptions([=] {
-    rmm::mr::set_current_device_resource(nullptr);
+    rmm::mr::set_current_device_resource(rmm::mr::detail::initial_resource());
     pool_mr.reset();
   });
 }
