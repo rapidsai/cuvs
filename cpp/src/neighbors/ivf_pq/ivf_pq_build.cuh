@@ -1463,8 +1463,6 @@ void build(raft::resources const& handle,
   *index = build(handle, params, dataset);
 }
 
-// Build function that creates index with view_impl (non-owning) when all device matrices are
-// provided
 template <typename IdxT>
 auto build_view(
   raft::resources const& handle,
@@ -1480,14 +1478,12 @@ auto build_view(
                                                                         dim);
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  // Infer dimensional parameters from provided matrix extents
   uint32_t n_lists      = centers.extent(0);
   uint32_t dim_ext      = centers.extent(1);
   uint32_t rot_dim      = centers_rot.extent(1);
   uint32_t pq_len       = pq_centers.extent(1);
   uint32_t pq_book_size = pq_centers.extent(2);
 
-  // Derive pq_bits from pq_book_size
   uint32_t pq_bits = 0;
   for (uint32_t b = 4; b <= 8; b++) {
     if ((1u << b) == pq_book_size) {
@@ -1499,13 +1495,12 @@ auto build_view(
                "pq_book_size must be 2^b where b in [4,8], but got pq_book_size=%u",
                pq_book_size);
 
-  // Derive pq_dim from pq_centers extent based on codebook_kind
   uint32_t pq_dim;
   if (index_params.codebook_kind == codebook_gen::PER_SUBSPACE) {
     pq_dim = pq_centers.extent(0);
     RAFT_EXPECTS(pq_centers.extent(0) > 0,
                  "For PER_SUBSPACE codebook, pq_centers.extent(0) must be > 0 (represents pq_dim)");
-  } else {  // PER_CLUSTER
+  } else {
     RAFT_EXPECTS(pq_centers.extent(0) == n_lists,
                  "For PER_CLUSTER codebook, pq_centers.extent(0) must equal n_lists. "
                  "Got pq_centers.extent(0)=%u, n_lists=%u",
@@ -1514,7 +1509,6 @@ auto build_view(
     pq_dim = rot_dim / pq_len;
   }
 
-  // Verify dimensional consistency
   RAFT_EXPECTS(dim_ext == raft::round_up_safe(dim + 1, 8u),
                "centers.extent(1) must be round_up(dim + 1, 8). "
                "Expected %u, got %u",
@@ -1542,14 +1536,12 @@ auto build_view(
                centers.extent(0),
                centers_rot.extent(0));
 
-  // Verify pq_bits * pq_dim is a multiple of 8
   RAFT_EXPECTS((pq_bits * pq_dim) % 8 == 0,
                "pq_bits * pq_dim must be a multiple of 8. Got pq_bits=%u, pq_dim=%u, product=%u",
                pq_bits,
                pq_dim,
                pq_bits * pq_dim);
 
-  // Create view implementation (non-owning, uses external data)
   auto impl = std::make_unique<view_impl<IdxT>>(handle,
                                                 index_params.metric,
                                                 index_params.codebook_kind,
@@ -1563,7 +1555,6 @@ auto build_view(
                                                 centers_rot,
                                                 rotation_matrix);
 
-  // Construct the index with view impl (metadata/lists already initialized in impl)
   index<IdxT> view_index(std::move(impl));
 
   utils::memzero(
@@ -1590,13 +1581,11 @@ auto build_owning(
                                                                         dim);
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  // Infer dimensional parameters from provided matrix extents
   uint32_t n_lists      = centers.extent(0);
   uint32_t pq_len       = pq_centers.extent(1);
   uint32_t pq_book_size = pq_centers.extent(2);
   uint32_t dim_ext      = raft::round_up_safe(dim + 1, 8u);
 
-  // Derive pq_bits from pq_book_size
   uint32_t pq_bits = 0;
   for (uint32_t b = 4; b <= 8; b++) {
     if ((1u << b) == pq_book_size) {
@@ -1613,7 +1602,7 @@ auto build_owning(
     pq_dim = pq_centers.extent(0);
     RAFT_EXPECTS(pq_centers.extent(0) > 0,
                  "For PER_SUBSPACE codebook, pq_centers.extent(0) must be > 0 (represents pq_dim)");
-  } else {  // PER_CLUSTER
+  } else {
     RAFT_EXPECTS(pq_centers.extent(0) == n_lists,
                  "For PER_CLUSTER codebook, pq_centers.extent(0) must equal n_lists. "
                  "Got pq_centers.extent(0)=%u, n_lists=%u",
@@ -1662,7 +1651,6 @@ auto build_owning(
                  centers_rot.value().extent(1));
   }
 
-  // Create index with constructor (handles metadata/lists initialization in impl)
   index<IdxT> owning_index(handle,
                            index_params.metric,
                            index_params.codebook_kind,
@@ -1860,11 +1848,9 @@ auto build(
   utils::memzero(owning_index.data_ptrs().data_handle(), owning_index.data_ptrs().size(), stream);
   utils::memzero(owning_index.inds_ptrs().data_handle(), owning_index.inds_ptrs().size(), stream);
 
-  // Handle rotation_matrix: copy if provided, otherwise generate
   if (!rotation_matrix.has_value()) {
     helpers::make_rotation_matrix(handle, &owning_index, index_params.force_random_rotation);
   } else {
-    // Copy rotation_matrix from host to device
     auto rotation_matrix_dev = raft::make_device_matrix<float, uint32_t>(
       handle, rotation_matrix.value().extent(0), rotation_matrix.value().extent(1));
     raft::copy(rotation_matrix_dev.data_handle(),
