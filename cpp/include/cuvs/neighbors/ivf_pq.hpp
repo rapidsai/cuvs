@@ -346,14 +346,14 @@ struct index : cuvs::neighbors::index {
     extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
 
  public:
-  index(const index&)                    = delete;
+  index(const index&) = delete;
   index(index&&) noexcept;
   auto operator=(const index&) -> index& = delete;
   auto operator=(index&&) -> index&;
   ~index();
 
-  /** 
-  * @brief Construct an empty index.
+  /**
+   * @brief Construct an empty index.
    *
    * Constructs an empty index. This index will either need to be trained with `build`
    * or loaded from a saved copy with `deserialize`
