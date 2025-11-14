@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -14,7 +14,7 @@
 #include <raft/core/device_resources.hpp>
 #include <raft/random/rng.cuh>
 
-#include <rmm/mr/device/pool_memory_resource.hpp>
+#include <rmm/mr/pool_memory_resource.hpp>
 
 #include <cstdint>
 #include <future>

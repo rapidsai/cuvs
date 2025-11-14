@@ -49,7 +49,7 @@
 
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/device_uvector.hpp>
-#include <rmm/mr/device/managed_memory_resource.hpp>
+#include <rmm/mr/managed_memory_resource.hpp>
 
 #include <cuda_fp16.h>
 #include <thrust/extrema.h>

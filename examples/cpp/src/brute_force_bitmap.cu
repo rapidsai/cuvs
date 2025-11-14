@@ -11,7 +11,7 @@
 #include <raft/random/make_blobs.cuh>
 
 #include <iostream>
-#include <rmm/mr/device/device_memory_resource.hpp>
+#include <rmm/mr/device_memory_resource.hpp>
 
 void load_dataset(const raft::device_resources& res, float* data_ptr, int n_vectors, int dim)
 {
