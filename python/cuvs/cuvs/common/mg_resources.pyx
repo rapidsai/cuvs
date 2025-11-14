@@ -10,6 +10,7 @@ from cuvs.common.c_api cimport (
     cuvsMultiGpuResourcesCreate,
     cuvsMultiGpuResourcesCreateWithDeviceIds,
     cuvsMultiGpuResourcesDestroy,
+    cuvsMultiGpuResourcesSetMemoryPool,
     cuvsResources_t,
     cuvsStreamSet,
     cuvsStreamSync,
@@ -88,6 +89,24 @@ cdef class MultiGpuResources:
 
     def sync(self):
         check_cuvs(cuvsStreamSync(self.c_obj))
+
+    def set_memory_pool(self, percent_of_free_memory):
+        """
+        Set a memory pool on all devices managed by these resources.
+
+        Parameters
+        ----------
+        percent_of_free_memory : int
+            Percentage of free device memory to allocate for the pool.
+
+        Examples
+        --------
+        >>> from cuvs.common import MultiGpuResources
+        >>> handle = MultiGpuResources()
+        >>> handle.set_memory_pool(80)  # Use 80% of free memory
+        """
+        check_cuvs(cuvsMultiGpuResourcesSetMemoryPool(
+            self.c_obj, percent_of_free_memory))
 
     def get_c_obj(self):
         """

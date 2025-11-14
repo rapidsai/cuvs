@@ -157,6 +157,15 @@ cuvsError_t cuvsMultiGpuResourcesCreateWithDeviceIds(cuvsResources_t* res,
  * @return cuvsError_t
  */
 cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res);
+
+/**
+ * @brief Set a memory pool on all devices managed by the multi-GPU resources
+ *
+ * @param[in] res cuvsResources_t opaque C handle for multi-GPU resources
+ * @param[in] percent_of_free_memory Percent of free memory to allocate for the pool
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsMultiGpuResourcesSetMemoryPool(cuvsResources_t res, int percent_of_free_memory);
 /** @} */
 
 /**
