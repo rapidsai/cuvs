@@ -1474,13 +1474,14 @@ void build(raft::resources const& handle,
 // Build function that creates index with view_impl (non-owning) when all device matrices are
 // provided
 template <typename IdxT>
-auto build(raft::resources const& handle,
-           const cuvs::neighbors::ivf_pq::index_params& index_params,
-           const uint32_t dim,
-           raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
-           raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
-           raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot,
-           raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix)
+auto build_view(
+  raft::resources const& handle,
+  const cuvs::neighbors::ivf_pq::index_params& index_params,
+  const uint32_t dim,
+  raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix)
   -> cuvs::neighbors::ivf_pq::index<IdxT>
 {
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("ivf_pq::build_view(%u)",
@@ -1494,10 +1495,7 @@ auto build(raft::resources const& handle,
   uint32_t pq_len       = pq_centers.extent(1);
   uint32_t pq_book_size = pq_centers.extent(2);
 
-  // Derive pq_dim and pq_bits from extents
-  uint32_t pq_dim  = (index_params.codebook_kind == codebook_gen::PER_SUBSPACE)
-                       ? pq_centers.extent(0)
-                       : rot_dim / pq_len;
+  // Derive pq_bits from pq_book_size
   uint32_t pq_bits = 0;
   for (uint32_t b = 4; b <= 8; b++) {
     if ((1u << b) == pq_book_size) {
@@ -1505,15 +1503,59 @@ auto build(raft::resources const& handle,
       break;
     }
   }
-  RAFT_EXPECTS(pq_bits >= 4 && pq_bits <= 8, "pq_book_size must be 2^b where b in [4,8]");
+  RAFT_EXPECTS(pq_bits >= 4 && pq_bits <= 8,
+               "pq_book_size must be 2^b where b in [4,8], but got pq_book_size=%u",
+               pq_book_size);
 
-  // Verify consistency
+  // Derive pq_dim from pq_centers extent based on codebook_kind
+  uint32_t pq_dim;
+  if (index_params.codebook_kind == codebook_gen::PER_SUBSPACE) {
+    pq_dim = pq_centers.extent(0);
+    RAFT_EXPECTS(pq_centers.extent(0) > 0,
+                 "For PER_SUBSPACE codebook, pq_centers.extent(0) must be > 0 (represents pq_dim)");
+  } else {  // PER_CLUSTER
+    RAFT_EXPECTS(pq_centers.extent(0) == n_lists,
+                 "For PER_CLUSTER codebook, pq_centers.extent(0) must equal n_lists. "
+                 "Got pq_centers.extent(0)=%u, n_lists=%u",
+                 pq_centers.extent(0),
+                 n_lists);
+    pq_dim = rot_dim / pq_len;
+  }
+
+  // Verify dimensional consistency
   RAFT_EXPECTS(dim_ext == raft::round_up_safe(dim + 1, 8u),
-               "centers extent(1) should be round_up(dim + 1, 8)");
+               "centers.extent(1) must be round_up(dim + 1, 8). "
+               "Expected %u, got %u",
+               raft::round_up_safe(dim + 1, 8u),
+               dim_ext);
+
   RAFT_EXPECTS(rot_dim == pq_len * pq_dim,
-               "Inconsistent rot_dim: centers_rot.extent(1) != pq_len * pq_dim");
+               "Inconsistent dimensions: centers_rot.extent(1) must equal pq_len * pq_dim. "
+               "Got centers_rot.extent(1)=%u, pq_len=%u, pq_dim=%u, pq_len*pq_dim=%u",
+               rot_dim,
+               pq_len,
+               pq_dim,
+               pq_len * pq_dim);
+
   RAFT_EXPECTS(rotation_matrix.extent(0) == rot_dim && rotation_matrix.extent(1) == dim,
-               "rotation_matrix must have extent [rot_dim, dim]");
+               "rotation_matrix must have extent [rot_dim, dim] = [%u, %u]. Got [%u, %u]",
+               rot_dim,
+               dim,
+               rotation_matrix.extent(0),
+               rotation_matrix.extent(1));
+
+  RAFT_EXPECTS(centers.extent(0) == n_lists && centers_rot.extent(0) == n_lists,
+               "centers and centers_rot must have the same number of rows (n_lists). "
+               "Got centers.extent(0)=%u, centers_rot.extent(0)=%u",
+               centers.extent(0),
+               centers_rot.extent(0));
+
+  // Verify pq_bits * pq_dim is a multiple of 8
+  RAFT_EXPECTS((pq_bits * pq_dim) % 8 == 0,
+               "pq_bits * pq_dim must be a multiple of 8. Got pq_bits=%u, pq_dim=%u, product=%u",
+               pq_bits,
+               pq_dim,
+               pq_bits * pq_dim);
 
   // Create view implementation (non-owning, uses external data)
   auto impl = std::make_unique<view_impl<IdxT>>(handle,
@@ -1543,7 +1585,7 @@ auto build(raft::resources const& handle,
 
 // Build function that creates index with owning_impl and copies/computes data as needed
 template <typename IdxT>
-auto build(
+auto build_owning(
   raft::resources const& handle,
   const cuvs::neighbors::ivf_pq::index_params& index_params,
   const uint32_t dim,
@@ -1557,15 +1599,11 @@ auto build(
                                                                         dim);
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  // Infer dimensional parameters from provided matrix extents (not from index_params)
+  // Infer dimensional parameters from provided matrix extents
   uint32_t n_lists      = centers.extent(0);
   uint32_t pq_len       = pq_centers.extent(1);
   uint32_t pq_book_size = pq_centers.extent(2);
-
-  // Derive pq_dim from pq_centers extent(0) based on codebook_kind
-  uint32_t pq_dim = (index_params.codebook_kind == codebook_gen::PER_SUBSPACE)
-                      ? pq_centers.extent(0)
-                      : raft::div_rounding_up_unsafe(dim, pq_len);
+  uint32_t dim_ext      = raft::round_up_safe(dim + 1, 8u);
 
   // Derive pq_bits from pq_book_size
   uint32_t pq_bits = 0;
@@ -1575,13 +1613,68 @@ auto build(
       break;
     }
   }
-  RAFT_EXPECTS(pq_bits >= 4 && pq_bits <= 8, "pq_book_size must be 2^b where b in [4,8]");
+  RAFT_EXPECTS(pq_bits >= 4 && pq_bits <= 8,
+               "pq_book_size must be 2^b where b in [4,8], but got pq_book_size=%u",
+               pq_book_size);
 
-  uint32_t dim_ext = raft::round_up_safe(dim + 1, 8u);
+  // Derive pq_dim from pq_centers extent based on codebook_kind
+  uint32_t pq_dim;
+  if (index_params.codebook_kind == codebook_gen::PER_SUBSPACE) {
+    pq_dim = pq_centers.extent(0);
+    RAFT_EXPECTS(pq_centers.extent(0) > 0,
+                 "For PER_SUBSPACE codebook, pq_centers.extent(0) must be > 0 (represents pq_dim)");
+  } else {  // PER_CLUSTER
+    RAFT_EXPECTS(pq_centers.extent(0) == n_lists,
+                 "For PER_CLUSTER codebook, pq_centers.extent(0) must equal n_lists. "
+                 "Got pq_centers.extent(0)=%u, n_lists=%u",
+                 pq_centers.extent(0),
+                 n_lists);
+    pq_dim = raft::div_rounding_up_unsafe(dim, pq_len);
+  }
 
-  // Check centers extents (can be either dim or dim_ext)
+  // Compute expected rot_dim
+  uint32_t rot_dim = pq_len * pq_dim;
+
+  // Verify pq_bits * pq_dim is a multiple of 8
+  RAFT_EXPECTS((pq_bits * pq_dim) % 8 == 0,
+               "pq_bits * pq_dim must be a multiple of 8. Got pq_bits=%u, pq_dim=%u, product=%u",
+               pq_bits,
+               pq_dim,
+               pq_bits * pq_dim);
+
+  // Validate centers shape (can be either dim or dim_ext)
   RAFT_EXPECTS((centers.extent(1) == dim || centers.extent(1) == dim_ext),
-               "centers must have extent [n_lists, dim] or [n_lists, dim_ext]");
+               "centers must have extent [n_lists, dim] or [n_lists, dim_ext]. "
+               "Got centers.extent(1)=%u, expected dim=%u or dim_ext=%u",
+               centers.extent(1),
+               dim,
+               dim_ext);
+
+  // Validate optional parameters if provided
+  if (rotation_matrix.has_value()) {
+    RAFT_EXPECTS(
+      rotation_matrix.value().extent(0) == rot_dim && rotation_matrix.value().extent(1) == dim,
+      "rotation_matrix must have extent [rot_dim, dim] = [%u, %u]. Got [%u, %u]",
+      rot_dim,
+      dim,
+      rotation_matrix.value().extent(0),
+      rotation_matrix.value().extent(1));
+  }
+
+  if (centers_rot.has_value()) {
+    RAFT_EXPECTS(centers_rot.value().extent(0) == n_lists,
+                 "centers_rot must have extent [n_lists, rot_dim]. "
+                 "centers_rot.extent(0) must equal n_lists=%u, got %u",
+                 n_lists,
+                 centers_rot.value().extent(0));
+    RAFT_EXPECTS(centers_rot.value().extent(1) == rot_dim,
+                 "centers_rot must have extent [n_lists, rot_dim]. "
+                 "centers_rot.extent(1) must equal rot_dim=%u (pq_len=%u * pq_dim=%u), got %u",
+                 rot_dim,
+                 pq_len,
+                 pq_dim,
+                 centers_rot.value().extent(1));
+  }
 
   // Create index with constructor (handles metadata/lists initialization in impl)
   index<IdxT> owning_index(handle,
@@ -1611,56 +1704,20 @@ auto build(
                stream);
   }
 
-  // Handle centers_rot: copy if provided, otherwise compute
   if (!centers_rot.has_value()) {
-    // Rotate cluster_centers
-    float alpha = 1.0;
-    float beta  = 0.0;
-    raft::linalg::gemm(handle,
-                       true,
-                       false,
-                       owning_index.rot_dim(),
-                       owning_index.n_lists(),
-                       owning_index.dim(),
-                       &alpha,
-                       owning_index.rotation_matrix().data_handle(),
-                       owning_index.dim(),
-                       centers.data_handle(),
-                       centers.extent(1),
-                       &beta,
-                       owning_index.centers_rot().data_handle(),
-                       owning_index.rot_dim(),
-                       stream);
+    helpers::set_centers(handle, &owning_index, centers);
   } else {
-    // Copy centers_rot to owned storage
-    raft::copy(owning_index.centers_rot().data_handle(),
-               centers_rot.value().data_handle(),
-               centers_rot.value().size(),
-               stream);
+    if (centers.extent(1) == owning_index.dim_ext()) {
+      raft::copy(owning_index.centers().data_handle(),
+                 centers.data_handle(),
+                 owning_index.centers().size(),
+                 stream);
+    } else {
+      RAFT_LOG_WARN("centers is not padded, the give rotation matrix will be ignored and recomputed from the centers and rotation matrix");
+      set_centers(handle, &owning_index, centers);
+    }
   }
 
-  // Handle centers: always copy, handling padding if needed
-  if (centers.extent(1) == owning_index.dim_ext()) {
-    // Already padded, just copy
-    raft::copy(owning_index.centers().data_handle(),
-               centers.data_handle(),
-               owning_index.centers().size(),
-               stream);
-  } else {
-    // Need to pad - zero out and copy
-    utils::memzero(owning_index.centers().data_handle(), owning_index.centers().size(), stream);
-    RAFT_CUDA_TRY(
-      cudaMemcpy2DAsync(owning_index.centers().data_handle(),
-                        sizeof(float) * owning_index.dim_ext(),
-                        centers.data_handle(),
-                        sizeof(float) * centers.extent(1),
-                        sizeof(float) * std::min(centers.extent(1), owning_index.dim_ext()),
-                        std::min(centers.extent(0), owning_index.n_lists()),
-                        cudaMemcpyDefault,
-                        stream));
-  }
-
-  // Handle pq_centers: always copy
   raft::copy(
     owning_index.pq_centers().data_handle(), pq_centers.data_handle(), pq_centers.size(), stream);
 
@@ -1768,13 +1825,13 @@ auto build(
 
   // Call the device owning variant (with optional params) - this will copy the device data again
   // into the owned index storage
-  return build<IdxT>(handle,
-                     index_params,
-                     dim,
-                     pq_centers_dev.view(),
-                     centers_dev.view(),
-                     centers_rot_view,
-                     rotation_matrix_view);
+  return build_owning<IdxT>(handle,
+                           index_params,
+                           dim,
+                           pq_centers_dev.view(),
+                           centers_dev.view(),
+                           centers_rot_view,
+                           rotation_matrix_view);
 }
 
 template <typename IdxT>
