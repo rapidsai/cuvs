@@ -17,7 +17,7 @@ namespace cuvs::neighbors::ivf_pq {
 
 /**
  * @brief Base class for index implementation (PIMPL pattern)
- * 
+ *
  * Contains ALL index state: metadata, lists, and center/matrix storage.
  * Only the storage strategy for centers/matrices varies (owned vs viewed).
  */
@@ -156,13 +156,13 @@ struct owning_impl : index_iface<IdxT> {
               uint32_t pq_dim,
               bool conservative_memory_allocation)
     : index_iface<IdxT>(handle,
-                  metric,
-                  codebook_kind,
-                  n_lists,
-                  dim,
-                  pq_bits,
-                  pq_dim,
-                  conservative_memory_allocation),
+                        metric,
+                        codebook_kind,
+                        n_lists,
+                        dim,
+                        pq_bits,
+                        pq_dim,
+                        conservative_memory_allocation),
       pq_centers_{raft::make_device_mdarray<float>(
         handle, make_pq_centers_extents(dim, pq_dim, pq_bits, codebook_kind, n_lists))},
       centers_{raft::make_device_matrix<float, uint32_t>(
@@ -221,7 +221,7 @@ struct owning_impl : index_iface<IdxT> {
   raft::device_matrix<float, uint32_t, raft::row_major> centers_;
   raft::device_matrix<float, uint32_t, raft::row_major> centers_rot_;
   raft::device_matrix<float, uint32_t, raft::row_major> rotation_matrix_;
-  
+
   static typename index<IdxT>::pq_centers_extents make_pq_centers_extents(
     uint32_t dim, uint32_t pq_dim, uint32_t pq_bits, codebook_gen codebook_kind, uint32_t n_lists)
   {
@@ -258,13 +258,13 @@ struct view_impl : index_iface<IdxT> {
             raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot_view,
             raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix_view)
     : index_iface<IdxT>(handle,
-                  metric,
-                  codebook_kind,
-                  n_lists,
-                  dim,
-                  pq_bits,
-                  pq_dim,
-                  conservative_memory_allocation),
+                        metric,
+                        codebook_kind,
+                        n_lists,
+                        dim,
+                        pq_bits,
+                        pq_dim,
+                        conservative_memory_allocation),
       pq_centers_view_(pq_centers_view),
       centers_view_(centers_view),
       centers_rot_view_(centers_rot_view),
@@ -351,12 +351,10 @@ index_params index_params::from_dataset(raft::matrix_extent<int64_t> dataset,
   return params;
 }
 
-
 // Constructor from impl pointer
 template <typename IdxT>
 index<IdxT>::index(std::unique_ptr<index_iface<IdxT>> impl)
-  : cuvs::neighbors::index(),
-    impl_(std::move(impl))
+  : cuvs::neighbors::index(), impl_(std::move(impl))
 {
 }
 

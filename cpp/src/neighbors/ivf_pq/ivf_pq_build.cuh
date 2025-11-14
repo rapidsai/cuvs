@@ -1485,11 +1485,12 @@ auto build(raft::resources const& handle,
   uint32_t rot_dim      = centers_rot.extent(1);
   uint32_t pq_len       = pq_centers.extent(1);
   uint32_t pq_book_size = pq_centers.extent(2);
-  
+
   // Derive pq_dim and pq_bits from extents
-  uint32_t pq_dim       = (index_params.codebook_kind == codebook_gen::PER_SUBSPACE) 
-                            ? pq_centers.extent(0) : rot_dim / pq_len;
-  uint32_t pq_bits      = 0;
+  uint32_t pq_dim  = (index_params.codebook_kind == codebook_gen::PER_SUBSPACE)
+                       ? pq_centers.extent(0)
+                       : rot_dim / pq_len;
+  uint32_t pq_bits = 0;
   for (uint32_t b = 4; b <= 8; b++) {
     if ((1u << b) == pq_book_size) {
       pq_bits = b;
@@ -1497,7 +1498,7 @@ auto build(raft::resources const& handle,
     }
   }
   RAFT_EXPECTS(pq_bits >= 4 && pq_bits <= 8, "pq_book_size must be 2^b where b in [4,8]");
-  
+
   // Verify consistency
   RAFT_EXPECTS(dim_ext == raft::round_up_safe(dim + 1, 8u),
                "centers extent(1) should be round_up(dim + 1, 8)");
@@ -1508,17 +1509,17 @@ auto build(raft::resources const& handle,
 
   // Create view implementation (non-owning, uses external data)
   auto impl = std::make_unique<view_impl<IdxT>>(handle,
-                                                 index_params.metric,
-                                                 index_params.codebook_kind,
-                                                 n_lists,
-                                                 dim,
-                                                 pq_bits,
-                                                 pq_dim,
-                                                 index_params.conservative_memory_allocation,
-                                                 pq_centers,
-                                                 centers,
-                                                 centers_rot,
-                                                 rotation_matrix);
+                                                index_params.metric,
+                                                index_params.codebook_kind,
+                                                n_lists,
+                                                dim,
+                                                pq_bits,
+                                                pq_dim,
+                                                index_params.conservative_memory_allocation,
+                                                pq_centers,
+                                                centers,
+                                                centers_rot,
+                                                rotation_matrix);
 
   // Construct the index with view impl (metadata/lists already initialized in impl)
   index<IdxT> view_index(std::move(impl));
@@ -1552,11 +1553,12 @@ auto build(
   uint32_t n_lists      = centers.extent(0);
   uint32_t pq_len       = pq_centers.extent(1);
   uint32_t pq_book_size = pq_centers.extent(2);
-  
+
   // Derive pq_dim from pq_centers extent(0) based on codebook_kind
-  uint32_t pq_dim = (index_params.codebook_kind == codebook_gen::PER_SUBSPACE) 
-                      ? pq_centers.extent(0) : raft::div_rounding_up_unsafe(dim, pq_len);
-  
+  uint32_t pq_dim = (index_params.codebook_kind == codebook_gen::PER_SUBSPACE)
+                      ? pq_centers.extent(0)
+                      : raft::div_rounding_up_unsafe(dim, pq_len);
+
   // Derive pq_bits from pq_book_size
   uint32_t pq_bits = 0;
   for (uint32_t b = 4; b <= 8; b++) {
@@ -1566,7 +1568,7 @@ auto build(
     }
   }
   RAFT_EXPECTS(pq_bits >= 4 && pq_bits <= 8, "pq_book_size must be 2^b where b in [4,8]");
-  
+
   uint32_t dim_ext = raft::round_up_safe(dim + 1, 8u);
 
   // Check centers extents (can be either dim or dim_ext)
