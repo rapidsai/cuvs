@@ -18,99 +18,33 @@ struct topk_by_radix_sort_base {
 
 template <class IdxT>
 struct topk_by_radix_sort : topk_by_radix_sort_base {
-  __device__ void operator()(uint32_t max_topk,
-                             uint32_t topk,
-                             uint32_t len_x,
-                             const uint32_t* _x,
-                             const IdxT* _in_vals,
-                             uint32_t* _y,
-                             IdxT* _out_vals,
-                             uint32_t* work,
-                             uint32_t* _hints,
-                             bool sort,
-                             uint32_t* _smem)
+  RAFT_DEVICE_INLINE_FUNCTION void operator()(uint32_t max_topk,
+                                              uint32_t topk,
+                                              uint32_t len_x,
+                                              const uint32_t* _x,
+                                              const IdxT* _in_vals,
+                                              uint32_t* _y,
+                                              IdxT* _out_vals,
+                                              uint32_t* work,
+                                              uint32_t* _hints,
+                                              bool sort,
+                                              uint32_t* _smem)
   {
     assert(blockDim.x >= V / 4);
     std::uint8_t* const state = reinterpret_cast<std::uint8_t*>(work);
-    if (max_topk <= 64) {
-      topk_cta_11_core<topk_by_radix_sort_base::state_bit_length,
-                       topk_by_radix_sort_base::vecLen,
-                       64,
-                       32,
-                       IdxT>(topk,
-                             len_x,
-                             _x,
-                             _in_vals,
-                             _y,
-                             _out_vals,
-                             state,
-                             _hints,
-                             sort,
-                             _smem);
-    }
-    else if (max_topk <= 128) {
-      topk_cta_11_core<topk_by_radix_sort_base::state_bit_length,
-                       topk_by_radix_sort_base::vecLen,
-                       128,
-                       32,
-                       IdxT>(topk,
-                             len_x,
-                             _x,
-                             _in_vals,
-                             _y,
-                             _out_vals,
-                             state,
-                             _hints,
-                             sort,
-                             _smem);
-    }
-    else if (max_topk <= 256) {
+    if (max_topk <= 256) {
       topk_cta_11_core<topk_by_radix_sort_base::state_bit_length,
                        topk_by_radix_sort_base::vecLen,
                        256,
                        64,
-                       IdxT>(topk,
-                             len_x,
-                             _x,
-                             _in_vals,
-                             _y,
-                             _out_vals,
-                             state,
-                             _hints,
-                             sort,
-                             _smem);
-    }
-    else if (max_topk <= 512) {
+                       IdxT>(topk, len_x, _x, _in_vals, _y, _out_vals, state, _hints, sort, _smem);
+    } else {
+      assert(max_topk <= 512);
       topk_cta_11_core<topk_by_radix_sort_base::state_bit_length,
                        topk_by_radix_sort_base::vecLen,
                        512,
                        128,
-                       IdxT>(topk,
-                             len_x,
-                             _x,
-                             _in_vals,
-                             _y,
-                             _out_vals,
-                             state,
-                             _hints,
-                             sort,
-                             _smem);
-    }
-    else {
-      topk_cta_11_core<topk_by_radix_sort_base::state_bit_length,
-                       topk_by_radix_sort_base::vecLen,
-                       1024,
-                       256,
-                       IdxT>(topk,
-                             len_x,
-                             _x,
-                             _in_vals,
-                             _y,
-                             _out_vals,
-                             state,
-                             _hints,
-                             sort,
-                             _smem);
+                       IdxT>(topk, len_x, _x, _in_vals, _y, _out_vals, state, _hints, sort, _smem);
     }
   }
 };
