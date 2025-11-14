@@ -13,4 +13,3 @@ CUVS_INST_IVF_PQ_BUILD_PRECOMPUTED(int64_t);
 #undef CUVS_INST_IVF_PQ_BUILD_PRECOMPUTED
 
 }  // namespace cuvs::neighbors::ivf_pq
-
