@@ -168,22 +168,22 @@ if(PROJECT_IS_TOP_LEVEL)
   install(
     TARGETS cuvs_c
     DESTINATION ${lib_dir}
-    COMPONENT cuvs_c
+    COMPONENT c_api
     EXPORT cuvs-c-exports
   )
   install(
     DIRECTORY include/cuvs
-    COMPONENT cuvs_c
+    COMPONENT c_api
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   )
   install(
     FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cuvs/core/c_config.h
-    COMPONENT cuvs_c
+    COMPONENT c_api
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cuvs/core/
   )
 
   include(../cpp/cmake/modules/generate_cuvs_export.cmake)
-  generate_cuvs_export(CLIB COMPONENTS cuvs_c EXPORT_SETS cuvs-c-exports)
+  generate_cuvs_export(CLIB COMPONENTS c_api EXPORT_SETS cuvs-c-exports)
 
 endif()
 

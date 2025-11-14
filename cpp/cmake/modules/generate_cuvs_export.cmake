@@ -5,7 +5,7 @@
 # cmake-format: on
 # =============================================================================
 
-function(generate_cuvs_export )
+function(generate_cuvs_export)
   set(options "CLIB")
   set(one_value "")
   set(multi_value EXPORT_SETS COMPONENTS)
@@ -26,16 +26,13 @@ function(generate_cuvs_export )
   if(NOT TARGET cuvs::${placehold_name})
     add_library(${placehold_name} INTERFACE)
     add_library(cuvs::${placehold_name} ALIAS ${placehold_name})
-    install(
-        TARGETS ${placehold_name}
-        EXPORT cuvs-exports
-    )
+    install(TARGETS ${placehold_name} EXPORT cuvs-exports)
   endif()
 
   # tasks we need to add in dependencies file inclusion as well
 
   set(cuvs_final_code_block
-  [=[
+      [=[
 
   if(NOT TARGET cuvs::cuvs_cpp_headers)
 
@@ -77,7 +74,8 @@ function(generate_cuvs_export )
       endif()
     endif()
   endforeach()
-  ]=])
+  ]=]
+  )
 
   rapids_export(
     INSTALL cuvs
