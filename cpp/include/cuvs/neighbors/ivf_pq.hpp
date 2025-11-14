@@ -1250,6 +1250,8 @@ void extend(raft::resources const& handle,
  * @param[in] handle
  * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
  * @param[in] new_indices a device vector view to a vector of indices [n_rows].
+ *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
+ *    here to imply a continuous range `[0...n_rows)`.
  * @param[inout] idx
  */
 auto extend(raft::resources const& handle,
@@ -1277,9 +1279,9 @@ auto extend(raft::resources const& handle,
  * @param[in] handle
  * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
  * @param[in] new_indices a device vector view to a vector of indices [n_rows].
- * @param[inout] idx
  *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
  *    here to imply a continuous range `[0...n_rows)`.
+ * @param[inout] idx
  */
 void extend(raft::resources const& handle,
             raft::device_matrix_view<const int8_t, int64_t, raft::row_major> new_vectors,
@@ -1305,9 +1307,9 @@ void extend(raft::resources const& handle,
  * @param[in] handle
  * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
  * @param[in] new_indices a device vector view to a vector of indices [n_rows].
- * @param[inout] idx
  *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
  *    here to imply a continuous range `[0...n_rows)`.
+ * @param[inout] idx
  */
 auto extend(raft::resources const& handle,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> new_vectors,
@@ -1332,9 +1334,9 @@ auto extend(raft::resources const& handle,
  * @param[in] handle
  * @param[in] new_vectors a device matrix view to a row-major matrix [n_rows, idx.dim()]
  * @param[in] new_indices a device vector view to a vector of indices [n_rows].
- * @param[inout] idx
  *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
  *    here to imply a continuous range `[0...n_rows)`.
+ * @param[inout] idx
  */
 void extend(raft::resources const& handle,
             raft::device_matrix_view<const uint8_t, int64_t, raft::row_major> new_vectors,
@@ -1366,9 +1368,9 @@ void extend(raft::resources const& handle,
  * @param[in] handle
  * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
  * @param[in] new_indices a host vector view to a vector of indices [n_rows].
- * @param[inout] idx
  *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
  *    here to imply a continuous range `[0...n_rows)`.
+ * @param[inout] idx
  */
 auto extend(raft::resources const& handle,
             raft::host_matrix_view<const float, int64_t, raft::row_major> new_vectors,
@@ -1400,9 +1402,9 @@ auto extend(raft::resources const& handle,
  * @param[in] handle
  * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
  * @param[in] new_indices a host vector view to a vector of indices [n_rows].
- * @param[inout] idx
  *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
  *    here to imply a continuous range `[0...n_rows)`.
+ * @param[inout] idx
  */
 void extend(raft::resources const& handle,
             raft::host_matrix_view<const float, int64_t, raft::row_major> new_vectors,
@@ -1434,9 +1436,9 @@ void extend(raft::resources const& handle,
  * @param[in] handle
  * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
  * @param[in] new_indices a host vector view to a vector of indices [n_rows].
- * @param[inout] idx
  *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
  *    here to imply a continuous range `[0...n_rows)`.
+ * @param[inout] idx
  */
 auto extend(raft::resources const& handle,
             raft::host_matrix_view<const half, int64_t, raft::row_major> new_vectors,
@@ -1469,9 +1471,9 @@ auto extend(raft::resources const& handle,
  * @param[in] handle
  * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
  * @param[in] new_indices a host vector view to a vector of indices [n_rows].
- * @param[inout] idx
  *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
  *    here to imply a continuous range `[0...n_rows)`.
+ * @param[inout] idx
  */
 void extend(raft::resources const& handle,
             raft::host_matrix_view<const half, int64_t, raft::row_major> new_vectors,
@@ -1500,9 +1502,9 @@ void extend(raft::resources const& handle,
  * @param[in] handle
  * @param[in] new_vectors a host matrix view to a row-major matrix [n_rows, idx.dim()]
  * @param[in] new_indices a host vector view to a vector of indices [n_rows].
- * @param[inout] idx
  *    If the original index is empty (`idx.size() == 0`), you can pass `std::nullopt`
  *    here to imply a continuous range `[0...n_rows)`.
+ * @param[inout] idx
  */
 auto extend(raft::resources const& handle,
             raft::host_matrix_view<const int8_t, int64_t, raft::row_major> new_vectors,
