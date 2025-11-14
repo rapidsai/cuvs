@@ -331,10 +331,6 @@ struct view_impl : index_iface<IdxT> {
   raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix_view_;
 };
 
-// ============================================================================
-// index<IdxT> implementation
-// ============================================================================
-
 index_params index_params::from_dataset(raft::matrix_extent<int64_t> dataset,
                                         cuvs::distance::DistanceType metric)
 {

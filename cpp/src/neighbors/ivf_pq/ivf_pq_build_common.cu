@@ -334,16 +334,65 @@ void set_centers(raft::resources const& handle,
                  index<int64_t>* index,
                  raft::host_matrix_view<const float, uint32_t, raft::row_major> cluster_centers)
 {
+  RAFT_EXPECTS(cluster_centers.extent(0) == index->n_lists(),
+               "Number of rows in the new centers must be equal to the number of IVF lists");
+  RAFT_EXPECTS(
+    cluster_centers.extent(1) == index->dim() || cluster_centers.extent(1) == index->dim_ext(),
+    "Number of columns in the new cluster centers must be equal to dim or dim_ext");
+
+  RAFT_EXPECTS(index->size() == 0, "set_centers requires an empty index.");
+
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  // Copy centers from host to device
-  auto centers_dev = raft::make_device_matrix<float, uint32_t>(
-    handle, cluster_centers.extent(0), cluster_centers.extent(1));
-  raft::copy(
-    centers_dev.data_handle(), cluster_centers.data_handle(), cluster_centers.size(), stream);
+  if (cluster_centers.extent(1) == index->dim_ext()) {
+    raft::copy(index->centers().data_handle(),
+               cluster_centers.data_handle(),
+               cluster_centers.size(),
+               stream);
+  } else {
+    cuvs::spatial::knn::detail::utils::memzero(
+      index->centers().data_handle(), index->centers().size(), stream);
+    RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle(),
+                                    sizeof(float) * index->dim_ext(),
+                                    cluster_centers.data_handle(),
+                                    sizeof(float) * cluster_centers.extent(1),
+                                    sizeof(float) * cluster_centers.extent(1),
+                                    cluster_centers.extent(0),
+                                    cudaMemcpyHostToDevice,
+                                    stream));
+  }
 
-  // Call the device version with const view
-  set_centers(handle, index, raft::make_const_mdspan(centers_dev.view()));
+  if (index->rotation_matrix().extent(0) > 0 && index->rotation_matrix().extent(1) > 0) {
+    float alpha = 1.0;
+    float beta  = 0.0;
+
+    uint32_t input_dim =
+      (cluster_centers.extent(1) == index->dim()) ? index->dim() : index->dim_ext();
+
+    // Need to copy cluster_centers to device for GEMM since we can't use host data directly
+    auto cluster_centers_dev = raft::make_device_matrix<float, uint32_t>(
+      handle, cluster_centers.extent(0), cluster_centers.extent(1));
+    raft::copy(cluster_centers_dev.data_handle(),
+               cluster_centers.data_handle(),
+               cluster_centers.size(),
+               stream);
+
+    raft::linalg::gemm(handle,
+                       true,
+                       false,
+                       index->rot_dim(),
+                       index->n_lists(),
+                       index->dim(),
+                       &alpha,
+                       index->rotation_matrix().data_handle(),
+                       index->dim(),
+                       cluster_centers_dev.data_handle(),
+                       input_dim,
+                       &beta,
+                       index->centers_rot().data_handle(),
+                       index->rot_dim(),
+                       stream);
+  }
 }
 
 void extract_centers(raft::resources const& res,
