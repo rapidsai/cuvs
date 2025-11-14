@@ -21,7 +21,7 @@ namespace cuvs::neighbors::ivf_pq {
     raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix)              \
     -> cuvs::neighbors::ivf_pq::index<IdxT>                                                        \
   {                                                                                                \
-    return detail::build_view(                                                                     \
+    return detail::build_view<IdxT>(                                                               \
       handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix);               \
   }                                                                                                \
   auto build_owning(                                                                               \
@@ -34,7 +34,7 @@ namespace cuvs::neighbors::ivf_pq {
     std::optional<raft::device_matrix_view<const float, uint32_t, raft::row_major>>                \
       rotation_matrix) -> cuvs::neighbors::ivf_pq::index<IdxT>                                     \
   {                                                                                                \
-    return detail::build_owning(                                                                   \
+    return detail::build_owning<IdxT>(                                                             \
       handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix);               \
   }                                                                                                \
   auto build(                                                                                      \
@@ -47,7 +47,7 @@ namespace cuvs::neighbors::ivf_pq {
     std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix) \
     -> cuvs::neighbors::ivf_pq::index<IdxT>                                                        \
   {                                                                                                \
-    return detail::build(                                                                          \
+    return detail::build<IdxT>(                                                                    \
       handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix);               \
   }                                                                                                \
   void build(                                                                                      \
@@ -60,7 +60,8 @@ namespace cuvs::neighbors::ivf_pq {
     std::optional<raft::host_matrix_view<const float, uint32_t, raft::row_major>> rotation_matrix, \
     cuvs::neighbors::ivf_pq::index<IdxT>* idx)                                                     \
   {                                                                                                \
-    detail::build(                                                                                 \
+    detail::build<IdxT>(                                                                           \
       handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix, idx);          \
   }
+
 }  // namespace cuvs::neighbors::ivf_pq
