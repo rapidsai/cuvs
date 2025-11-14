@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -14,6 +14,7 @@ TEST_BUILD_HOST_INPUT_SEARCH(f32_f32_i64)
 TEST_BUILD_HOST_INPUT_OVERLAP_SEARCH(f32_f32_i64)
 TEST_BUILD_EXTEND_SEARCH(f32_f32_i64)
 TEST_BUILD_SERIALIZE_SEARCH(f32_f32_i64)
+TEST_BUILD_PRECOMPUTED(f32_f32_i64)
 INSTANTIATE(f32_f32_i64,
             defaults() + small_dims() + big_dims_moderate_lut() + enum_variety_l2() +
               enum_variety_l2sqrt() + enum_variety_ip() + enum_variety_cosine());
