@@ -1318,6 +1318,8 @@ auto extend(raft::resources const& handle,
   -> cuvs::neighbors::ivf_pq::index<int64_t>;
 
 /**
+ * @brief Extend the index with the new data.
+ *
  * Usage example:
  * @code{.cpp}
  *   using namespace cuvs::neighbors;
@@ -1379,6 +1381,8 @@ auto extend(raft::resources const& handle,
   -> cuvs::neighbors::ivf_pq::index<int64_t>;
 
 /**
+ * @brief Extend the index with the new data.
+ *
  * Note, the user can set a stream pool in the input raft::resource with
  * at least one stream to enable kernel and copy overlapping.
  *
@@ -1516,6 +1520,7 @@ auto extend(raft::resources const& handle,
 
 /**
  * @brief Extend the index with the new data.
+ *
  * Note, the user can set a stream pool in the input raft::resource with
  * at least one stream to enable kernel and copy overlapping.
  *
