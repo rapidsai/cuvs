@@ -409,4 +409,5 @@ void recompute_internal_state(const raft::resources& res, index<int64_t>* index)
 }
 
 }  // namespace helpers
+
 }  // namespace cuvs::neighbors::ivf_pq
