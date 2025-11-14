@@ -217,26 +217,6 @@ void benchmark_fusedl2nn(benchmark::State& state)
   state.counters["FLOP/s"] =
     benchmark::Counter(total_ops, benchmark::Counter::kIsIterationInvariantRate);
 
-  /*
-       int64_t num_flops = int64_t(2) * m * n * k;
-
-       int64_t read_elts = int64_t(n) * k + m * k;
-       int64_t write_elts = m;
-
-       state.counters["M"] = m;
-       state.counters["N"] = n;
-       state.counters["K"] = k;
-
-       state.counters["FLOP/s"] = benchmark::Counter(
-         num_flops, benchmark::Counter::kIsIterationInvariantRate,
-     benchmark::Counter::OneK::kIs1000);
-
-       state.counters["BW Wr"] = benchmark::Counter(write_elts * sizeof(OutT),
-                                                   benchmark::Counter::kIsIterationInvariantRate,
-                                                   benchmark::Counter::OneK::kIs1000);
-       state.counters["BW Rd"] = benchmark::Counter(read_elts * sizeof(DataT),
-                                                   benchmark::Counter::kIsIterationInvariantRate,
-                                                   benchmark::Counter::OneK::kIs1000);*/
 }
 
 template <typename IdxT>
