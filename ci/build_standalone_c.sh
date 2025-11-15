@@ -29,8 +29,6 @@ if [ ! -e "/usr/local/bin/cmake" ]; then
 fi
 
 source rapids-configure-sccache
-export SCCACHE_RECACHE=1
-
 source rapids-date-string
 
 rapids-print-env
