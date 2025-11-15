@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -57,9 +57,14 @@ void ivf_pq_build_search(cuvsResources_t* res,
   search_params->internal_distance_dtype = CUDA_R_16F;
   search_params->lut_dtype               = CUDA_R_16F;
 
+  // Create filter (no filtering)
+  cuvsFilter filter;
+  filter.type = NO_FILTER;
+  filter.addr = (uintptr_t)NULL;
+
   // Search the `index` built using `cuvsIvfPqBuild`
   CHECK_CUVS(cuvsIvfPqSearch(
-    *res, search_params, index, queries_tensor, &neighbors_tensor, &distances_tensor));
+    *res, search_params, index, queries_tensor, &neighbors_tensor, &distances_tensor, filter));
 
   int64_t* neighbors = (int64_t*)malloc(n_queries * topk * sizeof(int64_t));
   float* distances   = (float*)malloc(n_queries * topk * sizeof(float));
