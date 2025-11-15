@@ -40,7 +40,7 @@ export SKBUILD_CMAKE_ARGS
 
 rapids-logger "Building '${package_name}' wheel"
 
-sccache --zero-stats
+sccache --stop-server 2>/dev/null || true
 
 rapids-pip-retry wheel \
     -w dist \
