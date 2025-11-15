@@ -24,7 +24,7 @@
 namespace cuvs::neighbors::ivf_pq {
 
 template <typename IdxT>
-struct index_impl;
+struct index_iface;
 template <typename IdxT>
 struct owning_impl;
 template <typename IdxT>
@@ -286,11 +286,11 @@ template <typename IdxT, typename SizeT = uint32_t>
 using list_data = ivf::list<list_spec, SizeT, IdxT>;
 
 template <typename IdxT>
-struct index_impl {
+struct index_iface {
   using pq_centers_extents = std::experimental::
     extents<uint32_t, raft::dynamic_extent, raft::dynamic_extent, raft::dynamic_extent>;
 
-  index_impl(raft::resources const& handle,
+  index_iface(raft::resources const& handle,
               cuvs::distance::DistanceType metric,
               codebook_gen codebook_kind,
               uint32_t n_lists,
@@ -299,7 +299,7 @@ struct index_impl {
               uint32_t pq_dim,
               bool conservative_memory_allocation);
 
-  ~index_impl();
+  ~index_iface();
 
   cuvs::distance::DistanceType metric() const noexcept;
   codebook_gen codebook_kind() const noexcept;
@@ -372,8 +372,8 @@ struct index_impl {
 };
 
 template <typename IdxT>
-struct owning_impl : index_impl<IdxT> {
-  using pq_centers_extents = typename index_impl<IdxT>::pq_centers_extents;
+struct owning_impl : index_iface<IdxT> {
+  using pq_centers_extents = typename index_iface<IdxT>::pq_centers_extents;
 
   owning_impl(raft::resources const& handle,
               cuvs::distance::DistanceType metric,
@@ -412,8 +412,8 @@ struct owning_impl : index_impl<IdxT> {
 };
 
 template <typename IdxT>
-struct view_impl : index_impl<IdxT> {
-  using pq_centers_extents = typename index_impl<IdxT>::pq_centers_extents;
+struct view_impl : index_iface<IdxT> {
+  using pq_centers_extents = typename index_iface<IdxT>::pq_centers_extents;
 
   view_impl(raft::resources const& handle,
             cuvs::distance::DistanceType metric,
@@ -509,7 +509,7 @@ struct index : cuvs::neighbors::index {
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
 
-  using pq_centers_extents = typename index_impl<IdxT>::pq_centers_extents;
+  using pq_centers_extents = typename index_iface<IdxT>::pq_centers_extents;
 
  public:
   index(const index&) = delete;
@@ -688,7 +688,7 @@ struct index : cuvs::neighbors::index {
    *
    * @param impl Implementation pointer (owning or view)
    */
-  explicit index(std::unique_ptr<index_impl<IdxT>> impl);
+  explicit index(std::unique_ptr<index_iface<IdxT>> impl);
 
  private:
   /** Throw an error if the index content is inconsistent. */
@@ -698,7 +698,7 @@ struct index : cuvs::neighbors::index {
 
   static uint32_t calculate_pq_dim(uint32_t dim);
 
-  std::unique_ptr<index_impl<IdxT>> impl_;
+  std::unique_ptr<index_iface<IdxT>> impl_;
 };
 /**
  * @}
