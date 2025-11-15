@@ -198,6 +198,7 @@ jobs:
       artifact-name: "libcuvs_c_${{ matrix.cuda_version }}.tar.gz"
       file_to_upload: "libcuvs_c.tar.gz"
       sha: ${{ inputs.sha }}
+      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   rocky8-clib-tests:
     needs: [rocky8-clib-standalone-build, changed-files]
     secrets: inherit
