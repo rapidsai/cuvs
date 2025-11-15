@@ -381,6 +381,8 @@ if(NOT BUILD_CPU_ONLY)
     src/cluster/spectral.cu
     src/core/bitset.cu
     src/core/omp_wrapper.cpp
+    src/util/file_io.cpp
+    src/util/host_memory.cpp
     src/distance/detail/kernels/gram_matrix.cu
     src/distance/detail/kernels/kernel_factory.cu
     src/distance/detail/kernels/kernel_matrices.cu
@@ -472,6 +474,7 @@ if(NOT BUILD_CPU_ONLY)
     src/neighbors/cagra_index_wrapper.cu
     src/neighbors/composite/index.cu
     src/neighbors/composite/merge.cpp
+    $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/cagra.cpp>
     $<$<BOOL:${BUILD_CAGRA_HNSWLIB}>:src/neighbors/hnsw.cpp>
     src/neighbors/ivf_flat_index.cpp
     src/neighbors/ivf_flat/ivf_flat_build_extend_float_int64_t.cu
@@ -715,10 +718,10 @@ SECTIONS
       PUBLIC rmm::rmm
              raft::raft
              ${CUVS_CTK_MATH_DEPENDENCIES}
-             $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:NCCL::NCCL>>
-             $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>>
-             $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
+             $<TARGET_NAME_IF_EXISTS:NCCL::NCCL> # needs to be public for DT_NEEDED
+             $<BUILD_LOCAL_INTERFACE:$<TARGET_NAME_IF_EXISTS:hnswlib::hnswlib>> # header only
       PRIVATE nvidia::cutlass::cutlass $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
+              $<$<BOOL:${CUVS_NVTX}>:CUDA::nvtx3>
     )
   endif()
 

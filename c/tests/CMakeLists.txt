@@ -15,6 +15,9 @@ if(PROJECT_IS_TOP_LEVEL)
   rapids_test_init()
 endif()
 
+rapids_cmake_install_lib_dir(lib_dir)
+include(GNUInstallDirs)
+
 include(${rapids-cmake-dir}/cpm/gtest.cmake)
 rapids_cpm_gtest(BUILD_STATIC)
 
@@ -46,7 +49,7 @@ function(ConfigureTest)
   set_target_properties(
     ${TEST_NAME}
     PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<BUILD_INTERFACE:${CUVS_C_BINARY_DIR}/gtests>"
-               INSTALL_RPATH "\$ORIGIN/../../../lib"
+               INSTALL_RPATH "\$ORIGIN/../../../${lib_dir}"
   )
 
   target_include_directories(

@@ -157,6 +157,12 @@ final class JDKProvider implements CuVSProvider {
   }
 
   @Override
+  public HnswIndex hnswIndexFromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex)
+      throws Throwable {
+    return HnswIndexImpl.fromCagra(hnswParams, cagraIndex);
+  }
+
+  @Override
   public TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources) {
     return TieredIndexImpl.newBuilder(Objects.requireNonNull(cuVSResources));
   }
