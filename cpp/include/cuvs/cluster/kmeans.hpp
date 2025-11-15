@@ -1181,7 +1181,7 @@ void transform(raft::resources const& handle,
 void cluster_cost(const raft::resources& handle,
                   raft::device_matrix_view<const float, int> X,
                   raft::device_matrix_view<const float, int> centroids,
-                  raft::host_scalar_view<float> cost);
+                  raft::host_scalar_view<float, int> cost);
 
 /**
  * @brief Compute cluster cost
@@ -1199,7 +1199,7 @@ void cluster_cost(const raft::resources& handle,
 void cluster_cost(const raft::resources& handle,
                   raft::device_matrix_view<const double, int> X,
                   raft::device_matrix_view<const double, int> centroids,
-                  raft::host_scalar_view<double> cost);
+                  raft::host_scalar_view<double, int> cost);
 
 /**
  * @}
@@ -1222,7 +1222,7 @@ namespace helpers {
  *
  *   #include <raft/random/make_blobs.cuh>
  *
- *   using namespace  cuvs::cluster;
+ *   using namespace cuvs::cluster;
  *
  *   raft::handle_t handle;
  *   int n_samples = 100, n_features = 15, n_clusters = 10;
@@ -1231,9 +1231,9 @@ namespace helpers {
  *
  *   raft::random::make_blobs(handle, X, labels, n_clusters);
  *
- *   auto best_k = raft::make_host_scalar<int>(0);
- *   auto n_iter = raft::make_host_scalar<int>(0);
- *   auto inertia = raft::make_host_scalar<int>(0);
+ *   auto best_k = raft::make_host_scalar<int, int>(0);
+ *   auto n_iter = raft::make_host_scalar<int, int>(0);
+ *   auto inertia = raft::make_host_scalar<int, int>(0);
  *
  *   kmeans::find_k(handle, X, best_k.view(), inertia.view(), n_iter.view(), n_clusters+1);
  *

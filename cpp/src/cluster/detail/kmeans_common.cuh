@@ -183,7 +183,7 @@ template <typename InputT,
 void computeClusterCost(raft::resources const& handle,
                         raft::device_vector_view<InputT, IndexT> minClusterDistance,
                         rmm::device_uvector<char>& workspace,
-                        raft::device_scalar_view<OutputT> clusterCost,
+                        raft::device_scalar_view<OutputT, IndexT> clusterCost,
                         MainOpT main_op,
                         ReductionOpT reduction_op)
 {

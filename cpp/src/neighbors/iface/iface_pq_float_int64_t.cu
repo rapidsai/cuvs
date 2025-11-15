@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,14 +17,14 @@
 namespace cuvs::neighbors {
 
 #define CUVS_INST_MG_PQ(T, IdxT)                                                                  \
-  using T_ha    = raft::host_device_accessor<std::experimental::default_accessor<const T>,        \
+  using T_ha =                                                                                    \
+    raft::host_device_accessor<cuda::std::default_accessor<const T>, raft::memory_type::device>;  \
+  using T_da =                                                                                    \
+    raft::host_device_accessor<cuda::std::default_accessor<const T>, raft::memory_type::host>;    \
+  using IdxT_ha = raft::host_device_accessor<cuda::std::default_accessor<const IdxT>,             \
                                              raft::memory_type::device>;                          \
-  using T_da    = raft::host_device_accessor<std::experimental::default_accessor<const T>,        \
-                                             raft::memory_type::host>;                            \
-  using IdxT_ha = raft::host_device_accessor<std::experimental::default_accessor<const IdxT>,     \
-                                             raft::memory_type::device>;                          \
-  using IdxT_da = raft::host_device_accessor<std::experimental::default_accessor<const IdxT>,     \
-                                             raft::memory_type::host>;                            \
+  using IdxT_da =                                                                                 \
+    raft::host_device_accessor<cuda::std::default_accessor<const IdxT>, raft::memory_type::host>; \
                                                                                                   \
   template void build(                                                                            \
     const raft::resources& handle,                                                                \

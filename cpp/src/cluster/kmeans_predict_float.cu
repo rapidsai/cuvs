@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -15,7 +15,7 @@ void predict(raft::resources const& handle,
              raft::device_matrix_view<const float, int> centroids,
              raft::device_vector_view<int, int> labels,
              bool normalize_weight,
-             raft::host_scalar_view<float> inertia)
+             raft::host_scalar_view<float, int> inertia)
 
 {
   cuvs::cluster::kmeans::predict<float, int>(
@@ -28,7 +28,7 @@ void predict(raft::resources const& handle,
              raft::device_matrix_view<const float, int> centroids,
              raft::device_vector_view<int64_t, int> labels,
              bool normalize_weight,
-             raft::host_scalar_view<float> inertia)
+             raft::host_scalar_view<float, int> inertia)
 
 {
   cuvs::cluster::kmeans::predict<float, int64_t>(

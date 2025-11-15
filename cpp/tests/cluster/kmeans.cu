@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -39,7 +39,7 @@ struct KmeansInputs {
 // void run_cluster_cost(const raft::resources& handle,
 //                       raft::device_vector_view<DataT, IndexT> minClusterDistance,
 //                       rmm::device_uvector<char>& workspace,
-//                       raft::device_scalar_view<DataT> clusterCost)
+//                       raft::device_scalar_view<DataT, IndexT> clusterCost)
 //{
 //   cuvs::cluster::kmeans::cluster_cost(
 //     handle, minClusterDistance, workspace, clusterCost, raft::add_op{});
@@ -153,8 +153,8 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
   //                                    X_view,
   //                                    weight_view,
   //                                    centroids_view,
-  //                                    raft::make_host_scalar_view(&inertia),
-  //                                    raft::make_host_scalar_view(&n_iter),
+  //                                    raft::make_host_scalar_view<T, int>(&inertia),
+  //                                    raft::make_host_scalar_view<int, int>(&n_iter),
   //                                    workspace);
   //
   //    // Check that the cluster cost decreased
@@ -256,7 +256,7 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
     d_labels_ref.resize(n_samples, stream);
     d_centroids.resize(params.n_clusters * n_features, stream);
 
-    std::optional<raft::device_vector_view<const T>> d_sw = std::nullopt;
+    std::optional<raft::device_vector_view<const T, int>> d_sw = std::nullopt;
     auto d_centroids_view =
       raft::make_device_matrix_view<T, int>(d_centroids.data(), params.n_clusters, n_features);
     if (testparams.weighted) {
@@ -282,8 +282,8 @@ class KmeansTest : public ::testing::TestWithParam<KmeansInputs<T>> {
       d_sw,
       d_centroids_view,
       raft::make_device_vector_view<int, int>(d_labels.data(), n_samples),
-      raft::make_host_scalar_view<T>(&inertia),
-      raft::make_host_scalar_view<int>(&n_iter));
+      raft::make_host_scalar_view<T, int>(&inertia),
+      raft::make_host_scalar_view<int, int>(&n_iter));
 
     raft::resource::sync_stream(handle, stream);
 

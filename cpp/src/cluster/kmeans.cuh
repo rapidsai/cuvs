@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2020-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -82,8 +82,8 @@ void fit(raft::resources const& handle,
          raft::device_matrix_view<const DataT, IndexT> X,
          std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
          raft::device_matrix_view<DataT, IndexT> centroids,
-         raft::host_scalar_view<DataT> inertia,
-         raft::host_scalar_view<IndexT> n_iter)
+         raft::host_scalar_view<DataT, IndexT> inertia,
+         raft::host_scalar_view<IndexT, IndexT> n_iter)
 {
   // use the mnmg kmeans fit if we have comms initialize, single gpu otherwise
   if (raft::resource::comms_initialized(handle)) {
@@ -154,7 +154,7 @@ void predict(raft::resources const& handle,
              raft::device_matrix_view<const DataT, IndexT> centroids,
              raft::device_vector_view<IndexT, IndexT> labels,
              bool normalize_weight,
-             raft::host_scalar_view<DataT> inertia)
+             raft::host_scalar_view<DataT, IndexT> inertia)
 {
   cuvs::cluster::kmeans::detail::kmeans_predict<DataT, IndexT>(
     handle, params, X, sample_weight, centroids, labels, normalize_weight, inertia);
@@ -216,8 +216,8 @@ void fit_predict(raft::resources const& handle,
                  std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
                  std::optional<raft::device_matrix_view<DataT, IndexT>> centroids,
                  raft::device_vector_view<IndexT, IndexT> labels,
-                 raft::host_scalar_view<DataT> inertia,
-                 raft::host_scalar_view<IndexT> n_iter)
+                 raft::host_scalar_view<DataT, IndexT> inertia,
+                 raft::host_scalar_view<IndexT, IndexT> n_iter)
 {
   cuvs::cluster::kmeans::detail::kmeans_fit_predict<DataT, IndexT>(
     handle, params, X, sample_weight, centroids, labels, inertia, n_iter);
@@ -282,9 +282,9 @@ void transform(raft::resources const& handle,
  *
  *   raft::random::make_blobs(handle, X, labels, n_clusters);
  *
- *   auto best_k = raft::make_host_scalar<int>(0);
- *   auto n_iter = raft::make_host_scalar<int>(0);
- *   auto inertia = raft::make_host_scalar<int>(0);
+ *   auto best_k = raft::make_host_scalar<int, int>(0);
+ *   auto n_iter = raft::make_host_scalar<int, int>(0);
+ *   auto inertia = raft::make_host_scalar<int, int>(0);
  *
  *   kmeans::find_k(handle, X, best_k.view(), inertia.view(), n_iter.view(), n_clusters+1);
  *
@@ -305,9 +305,9 @@ void transform(raft::resources const& handle,
 template <typename idx_t, typename value_t>
 void find_k(raft::resources const& handle,
             raft::device_matrix_view<const value_t, idx_t> X,
-            raft::host_scalar_view<idx_t> best_k,
-            raft::host_scalar_view<value_t> inertia,
-            raft::host_scalar_view<idx_t> n_iter,
+            raft::host_scalar_view<idx_t, idx_t> best_k,
+            raft::host_scalar_view<value_t, idx_t> inertia,
+            raft::host_scalar_view<idx_t, idx_t> n_iter,
             idx_t kmax,
             idx_t kmin    = 1,
             idx_t maxiter = 100,
@@ -367,7 +367,7 @@ template <typename DataT, typename IndexT, typename ReductionOpT>
 void cluster_cost(raft::resources const& handle,
                   raft::device_vector_view<DataT, IndexT> minClusterDistance,
                   rmm::device_uvector<char>& workspace,
-                  raft::device_scalar_view<DataT> clusterCost,
+                  raft::device_scalar_view<DataT, IndexT> clusterCost,
                   ReductionOpT reduction_op)
 {
   cuvs::cluster::kmeans::detail::computeClusterCost(
@@ -458,7 +458,7 @@ template <typename DataT, typename IndexT>
 void cluster_cost(raft::resources const& handle,
                   raft::device_matrix_view<const DataT, IndexT> X,
                   raft::device_matrix_view<const DataT, IndexT> centroids,
-                  raft::host_scalar_view<DataT> cost)
+                  raft::host_scalar_view<DataT, IndexT> cost)
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
@@ -468,12 +468,12 @@ void cluster_cost(raft::resources const& handle,
 
   rmm::device_uvector<char> workspace(n_samples * sizeof(IndexT), stream);
 
-  auto x_norms = raft::make_device_vector<DataT>(handle, n_samples);
+  auto x_norms = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
 
   raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
     x_norms.data_handle(), X.data_handle(), n_features, n_samples, stream);
 
-  auto min_cluster_distance = raft::make_device_vector<DataT>(handle, n_samples);
+  auto min_cluster_distance = raft::make_device_vector<DataT, IndexT>(handle, n_samples);
   rmm::device_uvector<DataT> l2_norm_or_distance_buffer(0, stream);
 
   auto metric = cuvs::distance::DistanceType::L2Expanded;
@@ -493,11 +493,12 @@ void cluster_cost(raft::resources const& handle,
 
   rmm::device_scalar<DataT> device_cost(0, stream);
 
-  cuvs::cluster::kmeans::cluster_cost(handle,
-                                      min_cluster_distance.view(),
-                                      workspace,
-                                      raft::make_device_scalar_view<DataT>(device_cost.data()),
-                                      raft::add_op{});
+  cuvs::cluster::kmeans::cluster_cost(
+    handle,
+    min_cluster_distance.view(),
+    workspace,
+    raft::make_device_scalar_view<DataT, IndexT>(device_cost.data()),
+    raft::add_op{});
   raft::update_host(cost.data_handle(), device_cost.data(), 1, stream);
 
   raft::resource::sync_stream(handle);
@@ -670,8 +671,8 @@ void fit_main(raft::resources const& handle,
               raft::device_matrix_view<const DataT, IndexT> X,
               raft::device_vector_view<const DataT, IndexT> sample_weights,
               raft::device_matrix_view<DataT, IndexT> centroids,
-              raft::host_scalar_view<DataT> inertia,
-              raft::host_scalar_view<IndexT> n_iter,
+              raft::host_scalar_view<DataT, IndexT> inertia,
+              raft::host_scalar_view<IndexT, IndexT> n_iter,
               rmm::device_uvector<char>& workspace)
 {
   cuvs::cluster::kmeans::detail::kmeans_fit_main<DataT, IndexT>(
@@ -717,8 +718,8 @@ void kmeans_fit(raft::resources const& handle,
                 raft::device_matrix_view<const DataT, IndexT> X,
                 std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
                 raft::device_matrix_view<DataT, IndexT> centroids,
-                raft::host_scalar_view<DataT> inertia,
-                raft::host_scalar_view<IndexT> n_iter)
+                raft::host_scalar_view<DataT, IndexT> inertia,
+                raft::host_scalar_view<IndexT, IndexT> n_iter)
 {
   kmeans::fit<DataT, IndexT>(handle, params, X, sample_weight, centroids, inertia, n_iter);
 }
@@ -766,7 +767,7 @@ void kmeans_predict(raft::resources const& handle,
                     raft::device_matrix_view<const DataT, IndexT> centroids,
                     raft::device_vector_view<IndexT, IndexT> labels,
                     bool normalize_weight,
-                    raft::host_scalar_view<DataT> inertia)
+                    raft::host_scalar_view<DataT, IndexT> inertia)
 {
   kmeans::predict<DataT, IndexT>(
     handle, params, X, sample_weight, centroids, labels, normalize_weight, inertia);
@@ -830,8 +831,8 @@ void kmeans_fit_predict(raft::resources const& handle,
                         std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
                         std::optional<raft::device_matrix_view<DataT, IndexT>> centroids,
                         raft::device_vector_view<IndexT, IndexT> labels,
-                        raft::host_scalar_view<DataT> inertia,
-                        raft::host_scalar_view<IndexT> n_iter)
+                        raft::host_scalar_view<DataT, IndexT> inertia,
+                        raft::host_scalar_view<IndexT, IndexT> n_iter)
 {
   kmeans::fit_predict<DataT, IndexT>(
     handle, params, X, sample_weight, centroids, labels, inertia, n_iter);
@@ -946,7 +947,7 @@ template <typename DataT, typename IndexT, typename ReductionOpT>
 void computeClusterCost(raft::resources const& handle,
                         raft::device_vector_view<DataT, IndexT> minClusterDistance,
                         rmm::device_uvector<char>& workspace,
-                        raft::device_scalar_view<DataT> clusterCost,
+                        raft::device_scalar_view<DataT, IndexT> clusterCost,
                         ReductionOpT reduction_op)
 {
   kmeans::cluster_cost(handle, minClusterDistance, workspace, clusterCost, reduction_op);
@@ -1157,8 +1158,8 @@ void kmeans_fit_main(raft::resources const& handle,
                      raft::device_matrix_view<const DataT, IndexT> X,
                      raft::device_vector_view<const DataT, IndexT> weight,
                      raft::device_matrix_view<DataT, IndexT> centroidsRawData,
-                     raft::host_scalar_view<DataT> inertia,
-                     raft::host_scalar_view<IndexT> n_iter,
+                     raft::host_scalar_view<DataT, IndexT> inertia,
+                     raft::host_scalar_view<IndexT, IndexT> n_iter,
                      rmm::device_uvector<char>& workspace)
 {
   kmeans::fit_main<DataT, IndexT>(
