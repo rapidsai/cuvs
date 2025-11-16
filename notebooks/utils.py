@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2023, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 
@@ -9,6 +9,7 @@ import os
 import tempfile
 import time
 import urllib
+
 
 ## Check the quality of the prediction (recall)
 def calc_recall(found_indices, ground_truth):

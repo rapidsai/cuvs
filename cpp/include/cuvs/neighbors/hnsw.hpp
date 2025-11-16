@@ -132,6 +132,11 @@ struct index : cuvs::neighbors::index {
   */
   virtual void set_ef(int ef) const;
 
+  /**
+  @brief Get file path for disk-backed index
+  */
+  virtual std::string file_path() const { return ""; }
+
  private:
   int dim_;
   cuvs::distance::DistanceType metric_;
