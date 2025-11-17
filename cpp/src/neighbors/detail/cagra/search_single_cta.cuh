@@ -142,6 +142,16 @@ struct search
                         64);  // multi_warps = true if (threadDim.x >= 64) && (itopk_size > 256)
           max_elements = 512 / 2 /* multi_warps = true */;
         }
+        if (num_itopk_candidates > 64) {  // use shared memory instead of stack variables (which may
+                                          // or may not be placed in registers) for bitonic sort
+          if (num_itopk_candidates <= 128) {
+            max_elements = std::max(uint32_t{128}, max_elements);
+          } else {
+            static_assert(min_block_size >=
+                          64);  // multi_warps = true if (threadDim.x >= 64) && (itopk_size > 128)
+            max_elements = std::max(uint32_t{256 / 2 /* multi_warps = true */}, max_elements);
+          }
+        }
       }
       additional_smem_size += max_block_size *
                               ((max_elements + (raft::warp_size() - 1)) / raft::warp_size()) *

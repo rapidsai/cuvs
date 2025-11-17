@@ -66,11 +66,10 @@ struct topk_by_radix_sort : topk_by_radix_sort_base {
                                               bool sort,
                                               uint32_t* _smem)
   {
-    if constexpr (std::is_same_v<IdxT, uint32_t>) {  // use a non-template wrapper function to avoid
-                                                     // co-optimizing the max_itopk <= 256 and
-                                                     // max_itopk <= 512 cases (which negatively
-                                                     // impacts the performance of the max_itopk
-                                                     // <=256 by over-estimating register pressure).
+    if constexpr (std::is_same_v<IdxT,
+                                 uint32_t>) {  // use a non-template wrapper function to avoid
+                                               // pre-inlining the topk_cta_11_core function (vs
+                                               // post-inlining, this impacts register pressure)
       std::uint8_t* const state = reinterpret_cast<std::uint8_t*>(work);
       if (max_itopk <= 256) {
         topk_cta_11_core_wrapper_256(
