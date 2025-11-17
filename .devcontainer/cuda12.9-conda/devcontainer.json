@@ -5,7 +5,7 @@
     "args": {
       "CUDA": "12.9",
       "PYTHON_PACKAGE_MANAGER": "conda",
-      "BASE": "rapidsai/devcontainers:25.12-cpp-mambaforge"
+      "BASE": "rapidsai/devcontainers:26.02-cpp-mambaforge"
     }
   },
   "runArgs": [
@@ -17,7 +17,7 @@
   ],
   "hostRequirements": {"gpu": "optional"},
   "features": {
-    "ghcr.io/rapidsai/devcontainers/features/rapids-build-utils:25.12": {}
+    "ghcr.io/rapidsai/devcontainers/features/rapids-build-utils:26.2": {}
   },
   "overrideFeatureInstallOrder": [
     "ghcr.io/rapidsai/devcontainers/features/rapids-build-utils"
