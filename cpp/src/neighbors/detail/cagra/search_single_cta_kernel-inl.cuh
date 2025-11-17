@@ -1518,9 +1518,6 @@ struct search_kernel_config {
       // Radix-based topk is used
       return dispatch_kernel<Persistent, 0, DATASET_DESCRIPTOR_T, SourceIndexT, SAMPLE_FILTER_T>;
     }
-    THROW("No kernel for parameters itopk_size %u, num_itopk_candidates %u",
-          itopk_size,
-          num_itopk_candidates);
   }
 };
 
@@ -2375,6 +2372,7 @@ void select_and_run(
   }
 
   uint32_t max_itopk{};
+  assert(ps.itopk_size <= 512);
   if (num_itopk_candidates <= 256) {  // bitonic sort
     if (ps.itopk_size <= 64) {
       max_itopk = 64;
@@ -2382,18 +2380,14 @@ void select_and_run(
       max_itopk = 128;
     } else if (ps.itopk_size <= 256) {
       max_itopk = 256;
-    } else if (ps.itopk_size <= 512) {
-      max_itopk = 512;
     } else {
-      THROW("No kernel for parameter itopk_size %u", ps.itopk_size);
+      max_itopk = 512;
     }
   } else {  // radix sort
     if (ps.itopk_size <= 256) {
       max_itopk = 256;
-    } else if (ps.itopk_size <= 512) {
-      max_itopk = 512;
     } else {
-      THROW("No kernel for parameter itopk_size %u", ps.itopk_size);
+      max_itopk = 512;
     }
   }
 
