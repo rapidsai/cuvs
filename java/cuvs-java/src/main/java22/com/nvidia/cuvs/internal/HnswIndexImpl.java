@@ -268,15 +268,9 @@ public class HnswIndexImpl implements HnswIndex {
       MemorySegment hnswParamsMemorySegment = hnswParamsHandle.handle();
 
       // Set HNSW params
-      cuvsHnswIndexParams.hierarchy(
-          hnswParamsMemorySegment,
-          hnswParams.getHierarchy().value);
-      cuvsHnswIndexParams.ef_construction(
-          hnswParamsMemorySegment,
-          hnswParams.getEfConstruction());
-      cuvsHnswIndexParams.num_threads(
-          hnswParamsMemorySegment,
-          hnswParams.getNumThreads());
+      cuvsHnswIndexParams.hierarchy(hnswParamsMemorySegment, hnswParams.getHierarchy().value);
+      cuvsHnswIndexParams.ef_construction(hnswParamsMemorySegment, hnswParams.getEfConstruction());
+      cuvsHnswIndexParams.num_threads(hnswParamsMemorySegment, hnswParams.getNumThreads());
 
       try (var resourcesAccessor = resources.access()) {
         var cuvsRes = resourcesAccessor.handle();
@@ -284,10 +278,7 @@ public class HnswIndexImpl implements HnswIndex {
         // Call cuvsHnswFromCagra
         int returnValue =
             cuvsHnswFromCagra(
-                cuvsRes,
-                hnswParamsMemorySegment,
-                cagraImpl.getCagraIndexReference(),
-                hnswIndex);
+                cuvsRes, hnswParamsMemorySegment, cagraImpl.getCagraIndexReference(), hnswIndex);
         checkCuVSError(returnValue, "cuvsHnswFromCagra");
 
         returnValue = cuvsStreamSync(cuvsRes);

@@ -29,6 +29,8 @@ cdef extern from "cuvs/core/c_api.h":
         cuvsResources_t* res,
         DLManagedTensor* device_ids)
     cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res)
+    cuvsError_t cuvsMultiGpuResourcesSetMemoryPool(cuvsResources_t res,
+                                                   int percent_of_free_memory)
 
     cuvsError_t cuvsMatrixCopy(cuvsResources_t res, DLManagedTensor * src,
                                DLManagedTensor * dst)
