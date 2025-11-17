@@ -108,10 +108,10 @@ If installing a version that has not yet been released, the `rapidsai` channel c
 
 ```bash
 # CUDA 13
-conda install -c rapidsai-nightly -c conda-forge cuvs=25.12 cuda-version=13.0
+conda install -c rapidsai-nightly -c conda-forge cuvs=26.02 cuda-version=13.0
 
 # CUDA 12
-conda install -c rapidsai-nightly -c conda-forge cuvs=25.12 cuda-version=12.9
+conda install -c rapidsai-nightly -c conda-forge cuvs=26.02 cuda-version=12.9
 ```
 
 cuVS also has `pip` wheel packages that can be installed. Please see the [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build/) for more information on installing the available cuVS packages and building from source.
