@@ -30,34 +30,21 @@ function(generate_cuvs_export)
   set(cuvs_final_code_block
       [=[
 
-  if(NOT TARGET cuvs::cuvs_cpp_headers)
-    file(GLOB cuvs_component_dep_files LIST_DIRECTORIES FALSE
-            "${CMAKE_CURRENT_LIST_DIR}/cuvs-cuvs_cpp_headers*-dependencies.cmake")
-    foreach(f IN LISTS  cuvs_component_dep_files)
-      include("${f}")
-    endforeach()
-
-    file(GLOB cuvs_component_target_files LIST_DIRECTORIES FALSE
-                "${CMAKE_CURRENT_LIST_DIR}/cuvs-cuvs_cpp_headers*-targets.cmake")
-
-    foreach(f IN LISTS  cuvs_component_target_files)
-      include("${f}")
-    endforeach()
-  endif()
-
-  if(NOT TARGET cuvs::cuvs)
-    file(GLOB cuvs_component_dep_files LIST_DIRECTORIES FALSE
-            "${CMAKE_CURRENT_LIST_DIR}/cuvs-cuvs_shared*-dependencies.cmake")
-    foreach(f IN LISTS  cuvs_component_dep_files)
-      include("${f}")
-    endforeach()
-
-    file(GLOB cuvs_component_target_files LIST_DIRECTORIES FALSE
-            "${CMAKE_CURRENT_LIST_DIR}/cuvs-cuvs_shared*-targets.cmake")
-    foreach(f IN LISTS  cuvs_component_target_files)
-      include("${f}")
-    endforeach()
-  endif()
+  set(_cuvs_implicit_comp_names cuvs_cpp_headers cuvs_shared cuvs_static)
+  foreach(_cuvs_comp IN LISTS _cuvs_implicit_comp_names)
+    if(NOT TARGET cuvs::${_cuvs_comp})
+      file(GLOB cuvs_component_dep_files LIST_DIRECTORIES FALSE
+            "${CMAKE_CURRENT_LIST_DIR}/cuvs-${_cuvs_comp}*-dependencies.cmake")
+      foreach(f IN LISTS  cuvs_component_dep_files)
+        include("${f}")
+      endforeach()
+      file(GLOB cuvs_component_target_files LIST_DIRECTORIES FALSE
+                "${CMAKE_CURRENT_LIST_DIR}/cuvs-${_cuvs_comp}_headers*-targets.cmake")
+      foreach(f IN LISTS  cuvs_component_target_files)
+        include("${f}")
+      endforeach()
+    endif()
+  endforeach()
 
   foreach(target IN LISTS rapids_namespaced_global_targets)
     if(TARGET ${target})
