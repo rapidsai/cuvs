@@ -263,7 +263,7 @@ void _copy_matrix(cuvsResources_t res, DLManagedTensor* src_managed, DLManagedTe
     for (int64_t i = 0; i < src.ndim; ++i) {
       elements *= src.shape[i];
     }
-    cudaMemcpyAsync(dst.data, src.data, elements * sizeof(T), cudaMemcpyDefault, stream);
+    raft::copy<T>(static_cast<T*>(dst.data), static_cast<const T*>(src.data), elements, stream);
   }
 }
 }  // namespace
