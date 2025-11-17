@@ -65,26 +65,62 @@ declaration_macro = """
 #define COMMA ,
 """
 
-none_filter_int64 = "cuvs::neighbors::filtering::ivf_to_sample_filter" \
-                    "<int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>"
-bitset_filter64 = "cuvs::neighbors::filtering::ivf_to_sample_filter" \
-                  "<int64_t COMMA cuvs::neighbors::filtering::bitset_filter<uint32_t COMMA int64_t>>"
+none_filter_int64 = (
+    "cuvs::neighbors::filtering::ivf_to_sample_filter"
+    "<int64_t COMMA cuvs::neighbors::filtering::none_sample_filter>"
+)
+bitset_filter64 = (
+    "cuvs::neighbors::filtering::ivf_to_sample_filter"
+    "<int64_t COMMA cuvs::neighbors::filtering::bitset_filter<uint32_t COMMA int64_t>>"
+)
 
 types = dict(
-    half_fp8_false=("half", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>", none_filter_int64),
-    half_fp8_true=("half", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>", none_filter_int64),
+    half_fp8_false=(
+        "half",
+        "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>",
+        none_filter_int64,
+    ),
+    half_fp8_true=(
+        "half",
+        "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>",
+        none_filter_int64,
+    ),
     half_half=("half", "half", none_filter_int64),
     float_half=("float", "half", none_filter_int64),
-    float_float= ("float", "float", none_filter_int64),
-    float_fp8_false=("float", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>", none_filter_int64),
-    float_fp8_true=("float", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>", none_filter_int64),
-    half_fp8_false_bitset64=("half", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>", bitset_filter64),
-    half_fp8_true_bitset64=("half", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>", bitset_filter64),
+    float_float=("float", "float", none_filter_int64),
+    float_fp8_false=(
+        "float",
+        "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>",
+        none_filter_int64,
+    ),
+    float_fp8_true=(
+        "float",
+        "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>",
+        none_filter_int64,
+    ),
+    half_fp8_false_bitset64=(
+        "half",
+        "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>",
+        bitset_filter64,
+    ),
+    half_fp8_true_bitset64=(
+        "half",
+        "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>",
+        bitset_filter64,
+    ),
     half_half_bitset64=("half", "half", bitset_filter64),
     float_half_bitset64=("float", "half", bitset_filter64),
-    float_float_bitset64= ("float", "float", bitset_filter64),
-    float_fp8_false_bitset64=("float", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>", bitset_filter64),
-    float_fp8_true_bitset64=("float", "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>", bitset_filter64)
+    float_float_bitset64=("float", "float", bitset_filter64),
+    float_fp8_false_bitset64=(
+        "float",
+        "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA false>",
+        bitset_filter64,
+    ),
+    float_fp8_true_bitset64=(
+        "float",
+        "cuvs::neighbors::ivf_pq::detail::fp_8bit<5u COMMA true>",
+        bitset_filter64,
+    ),
 )
 
 for path_key, (OutT, LutT, FilterT) in types.items():
@@ -92,5 +128,7 @@ for path_key, (OutT, LutT, FilterT) in types.items():
     with open(path, "w") as f:
         f.write(header)
         f.write(declaration_macro)
-        f.write(f"instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select({OutT}, {LutT}, {FilterT});\n")
+        f.write(
+            f"instantiate_cuvs_neighbors_ivf_pq_detail_compute_similarity_select({OutT}, {LutT}, {FilterT});\n"
+        )
     print(f"src/neighbors/ivf_pq/{path}")
