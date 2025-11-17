@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -153,6 +142,11 @@ void search_main(raft::resources const& res,
                  raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
                  CagraSampleFilterT sample_filter = CagraSampleFilterT())
 {
+  RAFT_EXPECTS(!index.dataset_fd().has_value(),
+               "Cannot search a CAGRA index that is stored on disk. "
+               "Use cuvs::neighbors::hnsw::from_cagra() to convert the index and "
+               "cuvs::neighbors::hnsw::deserialize() to load it into memory before searching.");
+
   // n_rows has the same type as the dataset index (the array extents type)
   using ds_idx_type    = decltype(index.data().n_rows());
   using graph_idx_type = uint32_t;

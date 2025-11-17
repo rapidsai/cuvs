@@ -1,18 +1,7 @@
 
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <cstdint>
@@ -23,6 +12,7 @@
 #include <raft/core/resources.hpp>
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/distance/distance.h>
 #include <cuvs/distance/distance.hpp>
 
 #include "../core/exceptions.hpp"
@@ -46,8 +36,9 @@ void _pairwise_distance(cuvsResources_t res,
   auto x_mds         = cuvs::core::from_dlpack<mdspan_type>(x_tensor);
   auto y_mds         = cuvs::core::from_dlpack<mdspan_type>(y_tensor);
   auto distances_mds = cuvs::core::from_dlpack<distances_mdspan_type>(distances_tensor);
+  auto metric_type   = static_cast<cuvs::distance::DistanceType>(metric);
 
-  cuvs::distance::pairwise_distance(*res_ptr, x_mds, y_mds, distances_mds, metric, metric_arg);
+  cuvs::distance::pairwise_distance(*res_ptr, x_mds, y_mds, distances_mds, metric_type, metric_arg);
 }
 }  // namespace
 

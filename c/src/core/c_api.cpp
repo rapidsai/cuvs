@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <cuvs/core/c_api.h>
@@ -25,11 +14,11 @@
 #include <raft/util/cudart_utils.hpp>
 #include <rapids_logger/logger.hpp>
 #include <rmm/cuda_stream_view.hpp>
-#include <rmm/mr/device/device_memory_resource.hpp>
-#include <rmm/mr/device/managed_memory_resource.hpp>
-#include <rmm/mr/device/owning_wrapper.hpp>
-#include <rmm/mr/device/per_device_resource.hpp>
-#include <rmm/mr/device/pool_memory_resource.hpp>
+#include <rmm/mr/device_memory_resource.hpp>
+#include <rmm/mr/managed_memory_resource.hpp>
+#include <rmm/mr/owning_wrapper.hpp>
+#include <rmm/mr/per_device_resource.hpp>
+#include <rmm/mr/pool_memory_resource.hpp>
 #include <rmm/mr/pinned_host_memory_resource.hpp>
 
 #include "../core/exceptions.hpp"
@@ -98,6 +87,15 @@ extern "C" cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res)
   });
 }
 
+extern "C" cuvsError_t cuvsMultiGpuResourcesSetMemoryPool(cuvsResources_t res,
+                                                          int percent_of_free_memory)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto res_ptr = reinterpret_cast<raft::device_resources_snmg*>(res);
+    res_ptr->set_memory_pool(percent_of_free_memory);
+  });
+}
+
 extern "C" cuvsError_t cuvsStreamSet(cuvsResources_t res, cudaStream_t stream)
 {
   return cuvs::core::translate_exceptions([=] {
@@ -135,7 +133,7 @@ extern "C" cuvsError_t cuvsRMMAlloc(cuvsResources_t res, void** ptr, size_t byte
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
     auto mr      = rmm::mr::get_current_device_resource();
-    *ptr         = mr->allocate(bytes, raft::resource::get_cuda_stream(*res_ptr));
+    *ptr         = mr->allocate(raft::resource::get_cuda_stream(*res_ptr), bytes);
   });
 }
 
@@ -144,7 +142,7 @@ extern "C" cuvsError_t cuvsRMMFree(cuvsResources_t res, void* ptr, size_t bytes)
   return cuvs::core::translate_exceptions([=] {
     auto res_ptr = reinterpret_cast<raft::resources*>(res);
     auto mr      = rmm::mr::get_current_device_resource();
-    mr->deallocate(ptr, bytes, raft::resource::get_cuda_stream(*res_ptr));
+    mr->deallocate(raft::resource::get_cuda_stream(*res_ptr), ptr, bytes);
   });
 }
 
@@ -198,13 +196,13 @@ extern "C" cuvsError_t cuvsRMMHostAlloc(void** ptr, size_t bytes)
 {
   return cuvs::core::translate_exceptions([=] {
     if (pinned_mr == nullptr) { pinned_mr = std::make_unique<rmm::mr::pinned_host_memory_resource>(); }
-    *ptr = pinned_mr->allocate(bytes);
+    *ptr = pinned_mr->allocate_sync(bytes);
   });
 }
 
 extern "C" cuvsError_t cuvsRMMHostFree(void* ptr, size_t bytes)
 {
-  return cuvs::core::translate_exceptions([=] { pinned_mr->deallocate(ptr, bytes); });
+  return cuvs::core::translate_exceptions([=] { pinned_mr->deallocate_sync(ptr, bytes); });
 }
 
 thread_local std::string last_error_text = "";

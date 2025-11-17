@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #include "../../../core/omp_wrapper.hpp"
 #include "../ann_utils.cuh"
@@ -368,6 +357,11 @@ void extend_core(
   std::optional<raft::device_matrix_view<T, int64_t, raft::layout_stride>> new_dataset_buffer_view,
   std::optional<raft::device_matrix_view<IdxT, int64_t>> new_graph_buffer_view)
 {
+  RAFT_EXPECTS(!index.dataset_fd().has_value(),
+               "Cannot extend a disk-backed CAGRA index. Convert it with "
+               "cuvs::neighbors::hnsw::from_cagra() and load it into memory via "
+               "cuvs::neighbors::hnsw::deserialize() before calling extend().");
+
   if (dynamic_cast<const non_owning_dataset<T, IdxT>*>(&index.data()) != nullptr &&
       !new_dataset_buffer_view.has_value()) {
     RAFT_LOG_WARN(

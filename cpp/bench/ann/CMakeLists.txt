@@ -1,15 +1,8 @@
 # =============================================================================
-# Copyright (c) 2024-2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
-# in compliance with the License. You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software distributed under the License
-# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
-# or implied. See the License for the specific language governing permissions and limitations under
-# the License.
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
 # =============================================================================
 
 list(APPEND CMAKE_MODULE_PATH "${CUVS_SOURCE_DIR}")
@@ -100,6 +93,7 @@ if(CUVS_ANN_BENCH_USE_HNSWLIB OR CUVS_ANN_BENCH_USE_CUVS_CAGRA_HNSWLIB)
 endif()
 
 include(cmake/thirdparty/get_nlohmann_json)
+include(cmake/thirdparty/get_sqlite)
 
 if(CUVS_ANN_BENCH_USE_GGNN)
   include(cmake/thirdparty/get_ggnn)
@@ -151,6 +145,7 @@ function(ConfigureAnnBench)
     ${BENCH_NAME}
     PRIVATE ${ConfigureAnnBench_LINKS}
             nlohmann_json::nlohmann_json
+            sqlite3
             Threads::Threads
             $<$<BOOL:${GPU_BUILD}>:CUDA::cudart_static>
             $<TARGET_NAME_IF_EXISTS:OpenMP::OpenMP_CXX>
@@ -365,7 +360,7 @@ if(CUVS_ANN_BENCH_SINGLE_EXE)
   target_include_directories(ANN_BENCH PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 
   target_link_libraries(
-    ANN_BENCH PRIVATE raft::raft nlohmann_json::nlohmann_json benchmark::benchmark dl
+    ANN_BENCH PRIVATE raft::raft nlohmann_json::nlohmann_json sqlite3 benchmark::benchmark dl
                       $<$<TARGET_EXISTS:CUDA::nvtx3>:CUDA::nvtx3>
   )
   set_target_properties(

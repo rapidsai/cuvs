@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.internal.common;
 
@@ -64,6 +53,11 @@ public class Util {
   private static final MethodHandle cudaMemcpyAsync$mh =
       LINKER.downcallHandle(
           cudaMemcpyAsync$address(), cudaMemcpyAsync$descriptor(), Linker.Option.critical(true));
+
+  private static final MethodHandle strdup$mh =
+      LINKER.downcallHandle(
+          SYMBOL_LOOKUP.find("strdup").orElseThrow(UnsatisfiedLinkError::new),
+          FunctionDescriptor.of(C_POINTER, C_POINTER));
 
   private static final MethodHandle cudaGetDeviceProperties$mh =
       LINKER.downcallHandle(
@@ -224,6 +218,19 @@ public class Util {
       varHandle.set(stringMemorySegment, 0L, (byte) sb.charAt(i));
     }
     return stringMemorySegment;
+  }
+
+  /**
+   * Allocates a native (C-owned) copy of a string using strdup(). The returned memory must be freed
+   * by the native side (e.g. cuVS APIs) via free().
+   */
+  public static MemorySegment duplicateNativeString(String str) {
+    try (var arena = Arena.ofConfined()) {
+      MemorySegment src = buildMemorySegment(arena, str);
+      return (MemorySegment) strdup$mh.invokeExact(src);
+    } catch (Throwable t) {
+      throw new RuntimeException("Failed to duplicate native string", t);
+    }
   }
 
   /**

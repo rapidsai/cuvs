@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 package com.nvidia.cuvs.internal;
 
@@ -517,6 +506,20 @@ public class CagraIndexImpl implements CagraIndex {
   }
 
   /**
+   * Gets the CAGRA index reference (for internal use).
+   * Package-private to allow access from HnswIndexImpl.
+   *
+   * @return the memory segment representing the CAGRA index
+   */
+  MemorySegment getCagraIndexReference() {
+    return cagraIndexReference.getMemorySegment();
+  }
+
+  CuVSMatrix getDatasetForConversion() {
+    return cagraIndexReference.dataset;
+  }
+
+  /**
    * Allocates the native CagraIndexParams data structures and fills the configured index parameters in.
    */
   private static CloseableHandle segmentFromIndexParams(CagraIndexParams params) {
@@ -621,6 +624,25 @@ public class CagraIndexImpl implements CagraIndex {
           cuvsIvfPqParamsMemorySegment, params.getCuVSIvfPqParams().getRefinementRate());
 
       cuvsCagraIndexParams.graph_build_params(indexPtr, cuvsIvfPqParamsMemorySegment);
+    } else if (params.getCagraGraphBuildAlgo().equals(CagraGraphBuildAlgo.ACE)) {
+      var aceParams = createAceParams();
+      // Note: Do NOT add aceParams to handles list.
+      // The cuvsCagraIndexParamsDestroy will handle freeing the ACE params
+      // when graph_build_algo is ACE, just like it does for IVF-PQ params.
+      MemorySegment cuvsAceParamsMemorySegment = aceParams.handle();
+      CuVSAceParams cuVSAceParams = params.getCuVSAceParams();
+
+      cuvsAceParams.npartitions(cuvsAceParamsMemorySegment, cuVSAceParams.getNpartitions());
+      cuvsAceParams.ef_construction(cuvsAceParamsMemorySegment, cuVSAceParams.getEfConstruction());
+      cuvsAceParams.use_disk(cuvsAceParamsMemorySegment, cuVSAceParams.isUseDisk());
+
+      String buildDir = cuVSAceParams.getBuildDir();
+      if (buildDir != null && !buildDir.isEmpty()) {
+        MemorySegment buildDirSegment = Util.duplicateNativeString(buildDir);
+        cuvsAceParams.build_dir(cuvsAceParamsMemorySegment, buildDirSegment);
+      }
+
+      cuvsCagraIndexParams.graph_build_params(indexPtr, cuvsAceParamsMemorySegment);
     }
   }
 

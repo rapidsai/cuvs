@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -22,17 +11,24 @@
 #include <cuvs/neighbors/graph_build_types.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
+#include <cuvs/util/file_io.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/mdspan.hpp>
 #include <raft/core/mdspan_types.hpp>
 #include <raft/core/resource/stream_view.hpp>
+#include <raft/core/serialize.hpp>
+
+#include <fcntl.h>
+#include <filesystem>
+#include <fstream>
 #include <raft/core/resources.hpp>
 #include <raft/util/integer_utils.hpp>
 #include <rmm/cuda_stream_view.hpp>
 
 #include <optional>
+#include <string>
 #include <variant>
 
 namespace cuvs::neighbors::cagra {
@@ -42,6 +38,40 @@ namespace graph_build_params = cuvs::neighbors::graph_build_params;
  * @defgroup cagra_cpp_index_params CAGRA index build parameters
  * @{
  */
+
+/**
+ * @brief A strategy for selecting the graph build parameters based on similar HNSW index
+ * parameters.
+ *
+ * Define how `cagra::index_params::from_hnsw_params` should construct a graph to construct a graph
+ * that is to be converted to (used by) a CPU HNSW index.
+ */
+enum class hnsw_heuristic_type : uint32_t {
+  /**
+   * Create a graph that is very similar to an HNSW graph in
+   * terms of the number of nodes and search performance. Since HNSW produces a variable-degree
+   * graph (2M being the max graph degree) and CAGRA produces a fixed-degree graph, there's always a
+   * difference in the performance of the two.
+   *
+   * This function attempts to produce such a graph that the QPS and recall of the two graphs being
+   * searched by HNSW are close for any search parameter combination. The CAGRA-produced graph tends
+   * to have a "longer tail" on the low recall side (that is being slightly faster and less
+   * precise).
+   *
+   */
+  SIMILAR_SEARCH_PERFORMANCE = 0,
+  /**
+   * Create a graph that has the same binary size as an HNSW graph with the given parameters
+   * (`graph_degree = 2 * M`) while trying to match the search performance as closely as possible.
+   *
+   * The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce
+   * the same recalls and QPS for the same parameter `ef`. The graphs are different internally. For
+   * the same `ef`, the from-CAGRA index likely has a slightly higher recall and slightly lower QPS.
+   * However, the Recall-QPS curves should be similar (i.e. the points are just shifted along the
+   * curve).
+   */
+  SAME_GRAPH_FOOTPRINT = 1
+};
 
 struct index_params : cuvs::neighbors::index_params {
   /** Degree of input graph for pruning. */
@@ -56,9 +86,9 @@ struct index_params : cuvs::neighbors::index_params {
 
   /** Parameters for graph building.
    *
-   * Set ivf_pq_params, nn_descent_params, or iterative_search_params to select the graph build
-   * algorithm and control their parameters. The default (std::monostate) is to use a heuristic
-   *  to decide the algorithm and its parameters.
+   * Set ivf_pq_params, nn_descent_params, ace_params, or iterative_search_params to select the
+   * graph build algorithm and control their parameters. The default (std::monostate) is to use a
+   * heuristic to decide the algorithm and its parameters.
    *
    * @code{.cpp}
    * cagra::index_params params;
@@ -70,7 +100,10 @@ struct index_params : cuvs::neighbors::index_params {
    * params.graph_build_params =
    * cagra::graph_build_params::nn_descent_params(params.intermediate_graph_degree);
    *
-   * // 3. Choose iterative graph building using CAGRA's search() and optimize()  [Experimental]
+   * // 3. Choose ACE algorithm for graph construction
+   * params.graph_build_params = cagra::graph_build_params::ace_params();
+   *
+   * // 4. Choose iterative graph building using CAGRA's search() and optimize()  [Experimental]
    * params.graph_build_params =
    * cagra::graph_build_params::iterative_search_params();
    * @endcode
@@ -78,9 +111,9 @@ struct index_params : cuvs::neighbors::index_params {
   std::variant<std::monostate,
                graph_build_params::ivf_pq_params,
                graph_build_params::nn_descent_params,
+               graph_build_params::ace_params,
                graph_build_params::iterative_search_params>
     graph_build_params;
-
   /**
    * Whether to use MST optimization to guarantee graph connectivity.
    */
@@ -116,6 +149,39 @@ struct index_params : cuvs::neighbors::index_params {
    * @endcode
    */
   bool attach_dataset_on_build = true;
+
+  /**
+   * @brief Create a CAGRA index parameters compatible with HNSW index
+   *
+   * @param dataset The shape of the input dataset
+   * @param M HNSW index parameter M
+   * @param ef_construction HNSW index parameter ef_construction
+   * @param heuristic The heuristic to use for selecting the graph build parameters
+   * @param metric The distance metric to search
+   *
+   * * IMPORTANT NOTE *
+   *
+   * The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce
+   * exactly the same recalls and QPS for the same parameter `ef`. The graphs are different
+   * internally. Depending on the selected heuristics, the CAGRA-produced graph's QPS-Recall curve
+   * may be shifted along the curve right or left. See the heuristics descriptions for more details.
+   *
+   * Usage example:
+   * @code{.cpp}
+   *   using namespace cuvs::neighbors;
+   *   raft::resources res;
+   *   auto dataset = raft::make_device_matrix<float, int64_t>(res, N, D);
+   *   auto cagra_params = cagra::index_params::from_hnsw_params(dataset.extents(), M, efc);
+   *   auto cagra_index = cagra::build(res, cagra_params, dataset);
+   *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, cagra_index);
+   * @endcode
+   */
+  static cagra::index_params from_hnsw_params(
+    raft::matrix_extent<int64_t> dataset,
+    int M,
+    int ef_construction,
+    hnsw_heuristic_type heuristic       = hnsw_heuristic_type::SIMILAR_SEARCH_PERFORMANCE,
+    cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 };
 
 /**
@@ -307,15 +373,19 @@ struct index : cuvs::neighbors::index {
   [[nodiscard]] constexpr inline auto size() const noexcept -> IdxT
   {
     auto data_rows = dataset_->n_rows();
+    if (dataset_fd_.has_value()) { return n_rows_; }
     return data_rows > 0 ? data_rows : graph_view_.extent(0);
   }
 
   /** Dimensionality of the data. */
-  [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t { return dataset_->dim(); }
+  [[nodiscard]] constexpr inline auto dim() const noexcept -> uint32_t
+  {
+    return dataset_fd_.has_value() ? dim_ : dataset_->dim();
+  }
   /** Graph degree */
   [[nodiscard]] constexpr inline auto graph_degree() const noexcept -> uint32_t
   {
-    return graph_view_.extent(1);
+    return dataset_fd_.has_value() ? graph_degree_ : graph_view_.extent(1);
   }
 
   [[nodiscard]] inline auto dataset() const noexcept
@@ -348,6 +418,27 @@ struct index : cuvs::neighbors::index {
              ? std::optional<raft::device_vector_view<const index_type, int64_t>>(
                  source_indices_->view())
              : std::nullopt;
+  }
+
+  /** Get the dataset file descriptor (for disk-backed index) */
+  [[nodiscard]] inline auto dataset_fd() const noexcept
+    -> const std::optional<cuvs::util::file_descriptor>&
+  {
+    return dataset_fd_;
+  }
+
+  /** Get the graph file descriptor (for disk-backed index) */
+  [[nodiscard]] inline auto graph_fd() const noexcept
+    -> const std::optional<cuvs::util::file_descriptor>&
+  {
+    return graph_fd_;
+  }
+
+  /** Get the mapping file descriptor (for disk-backed index) */
+  [[nodiscard]] inline auto mapping_fd() const noexcept
+    -> const std::optional<cuvs::util::file_descriptor>&
+  {
+    return mapping_fd_;
   }
 
   /** Dataset norms for cosine distance [size] */
@@ -621,6 +712,117 @@ struct index : cuvs::neighbors::index {
                raft::resource::get_cuda_stream(res));
   }
 
+  /**
+   * Update the dataset from a disk file using a file descriptor.
+   *
+   * This method configures the index to use a disk-based dataset.
+   * The dataset file should contain a numpy header followed by vectors in row-major format.
+   * The number of rows and dimensionality are read from the numpy header.
+   *
+   * @param[in] res raft resources
+   * @param[in] fd File descriptor (will be moved into the index for lifetime management)
+   */
+  void update_dataset(raft::resources const& res, cuvs::util::file_descriptor&& fd)
+  {
+    RAFT_EXPECTS(fd.is_valid(), "Invalid file descriptor provided for dataset");
+
+    auto stream = fd.make_istream();
+    if (lseek(fd.get(), 0, SEEK_SET) == -1) {
+      RAFT_FAIL("Failed to seek to beginning of dataset file");
+    }
+    auto header = raft::detail::numpy_serializer::read_header(stream);
+    RAFT_EXPECTS(header.shape.size() == 2,
+                 "Dataset file should be 2D, got %zu dimensions",
+                 header.shape.size());
+
+    n_rows_ = header.shape[0];
+    dim_    = header.shape[1];
+
+    RAFT_LOG_DEBUG("ACE: Dataset has shape [%zu, %zu]", n_rows_, dim_);
+
+    // Re-open the file descriptor in read-only mode for subsequent operations
+    dataset_fd_.emplace(std::move(fd));
+
+    dataset_ = std::make_unique<cuvs::neighbors::empty_dataset<int64_t>>(0);
+    dataset_norms_.reset();
+  }
+
+  /**
+   * Update the graph from a disk file using a file descriptor.
+   *
+   * This method configures the index to use a disk-based graph.
+   * The graph file should contain a numpy header followed by neighbor indices in row-major format.
+   * The number of rows and graph degree are read from the numpy header.
+   *
+   * @param[in] res raft resources
+   * @param[in] fd File descriptor (will be moved into the index for lifetime management)
+   */
+  void update_graph(raft::resources const& res, cuvs::util::file_descriptor&& fd)
+  {
+    RAFT_EXPECTS(fd.is_valid(), "Invalid file descriptor provided for graph");
+
+    auto stream = fd.make_istream();
+    if (lseek(fd.get(), 0, SEEK_SET) == -1) {
+      RAFT_FAIL("Failed to seek to beginning of graph file");
+    }
+    auto header = raft::detail::numpy_serializer::read_header(stream);
+    RAFT_EXPECTS(
+      header.shape.size() == 2, "Graph file should be 2D, got %zu dimensions", header.shape.size());
+
+    if (dataset_fd_.has_value() && n_rows_ != 0) {
+      RAFT_EXPECTS(n_rows_ == header.shape[0],
+                   "Graph size (%zu) must match dataset size (%zu)",
+                   header.shape[0],
+                   n_rows_);
+    }
+
+    n_rows_       = header.shape[0];
+    graph_degree_ = header.shape[1];
+
+    RAFT_LOG_DEBUG("ACE: Graph has shape [%zu, %zu]", n_rows_, graph_degree_);
+
+    // Re-open the file descriptor in read-only mode for subsequent operations
+    graph_fd_.emplace(std::move(fd));
+
+    graph_      = raft::make_device_matrix<IdxT, int64_t>(res, 0, 0);
+    graph_view_ = graph_.view();
+  }
+
+  /**
+   * Update the dataset mapping from a disk file using a file descriptor.
+   *
+   * This method configures the index to use a disk-based dataset mapping.
+   * The mapping file should contain a numpy header followed by index mappings.
+   *
+   * @param[in] res raft resources
+   * @param[in] fd File descriptor (will be moved into the index for lifetime management)
+   */
+  void update_mapping(raft::resources const& res, cuvs::util::file_descriptor&& fd)
+  {
+    RAFT_EXPECTS(fd.is_valid(), "Invalid file descriptor provided for mapping");
+
+    // Read header from file using ifstream
+    auto stream = fd.make_istream();
+    if (lseek(fd.get(), 0, SEEK_SET) == -1) {
+      RAFT_FAIL("Failed to seek to beginning of mapping file");
+    }
+    auto header = raft::detail::numpy_serializer::read_header(stream);
+    RAFT_EXPECTS(header.shape.size() == 1,
+                 "Mapping file should be 1D, got %zu dimensions",
+                 header.shape.size());
+
+    if (dataset_fd_.has_value() && n_rows_ != 0) {
+      RAFT_EXPECTS(header.shape[0] == n_rows_,
+                   "Mapping size (%zu) must match dataset size (%zu)",
+                   header.shape[0],
+                   n_rows_);
+    }
+
+    RAFT_LOG_DEBUG("ACE: Mapping has %zu elements", header.shape[0]);
+
+    mapping_fd_.emplace(std::move(fd));
+  }
+
  private:
   cuvs::distance::DistanceType metric_;
   raft::device_matrix<graph_index_type, int64_t, raft::row_major> graph_;
@@ -631,7 +833,15 @@ struct index : cuvs::neighbors::index {
   // only float distances supported at the moment
   std::optional<raft::device_vector<float, int64_t>> dataset_norms_;
 
+  // File descriptors for disk-backed index components (ACE disk mode)
+  std::optional<cuvs::util::file_descriptor> dataset_fd_;
+  std::optional<cuvs::util::file_descriptor> graph_fd_;
+  std::optional<cuvs::util::file_descriptor> mapping_fd_;
+
   void compute_dataset_norms_(raft::resources const& res);
+  size_t n_rows_       = 0;
+  size_t dim_          = 0;
+  size_t graph_degree_ = 0;
 };
 /**
  * @}
@@ -2809,6 +3019,166 @@ auto deserialize(const raft::resources& clique, const std::string& filename)
 template <typename T, typename IdxT>
 auto distribute(const raft::resources& clique, const std::string& filename)
   -> cuvs::neighbors::mg_index<cagra::index<T, IdxT>, T, IdxT>;
+
+/**
+ * @brief Build a kNN graph using IVF-PQ.
+ *
+ * The kNN graph is the first building block for CAGRA index.
+ *
+ * The output is a dense matrix that stores the neighbor indices for each point in the dataset.
+ * Each point has the same number of neighbors.
+ *
+ * See [cagra::build](#cagra::build) for an alternative method.
+ *
+ * The following distance metrics are supported:
+ * - L2Expanded
+ * - InnerProduct
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters based on shape of the dataset
+ *   ivf_pq::index_params build_params = ivf_pq::index_params::from_dataset(dataset);
+ *   ivf_pq::search_params search_params;
+ *   auto knn_graph      = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 128);
+ *   // create knn graph
+ *   cagra::build_knn_graph(res, dataset, knn_graph.view(), 2, build_params, search_params);
+ *   auto optimized_gaph = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 64);
+ *   cagra::optimize(res, dataset, knn_graph.view(), optimized_graph.view());
+ *   // Construct an index from dataset and optimized knn_graph
+ *   auto index = cagra::index<T, IdxT>(res, build_params.metric(), dataset,
+ *                                      optimized_graph.view());
+ * @endcode
+ *
+ * @param[in] res raft resources
+ * @param[in] dataset a matrix view (host or device) to a row-major matrix [n_rows, dim]
+ * @param[out] knn_graph a host matrix view to store the output knn graph [n_rows, graph_degree]
+ * @param[in] build_params ivf-pq parameters for graph build
+ */
+void build_knn_graph(raft::resources const& res,
+                     raft::host_matrix_view<const float, int64_t, raft::row_major> dataset,
+                     raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
+                     cuvs::neighbors::cagra::graph_build_params::ivf_pq_params build_params);
+
+/**
+ * @brief Build a kNN graph using IVF-PQ.
+ *
+ * The kNN graph is the first building block for CAGRA index.
+ *
+ * The output is a dense matrix that stores the neighbor indices for each point in the dataset.
+ * Each point has the same number of neighbors.
+ *
+ * See [cagra::build](#cagra::build) for an alternative method.
+ *
+ * The following distance metrics are supported:
+ * - L2Expanded
+ * - InnerProduct
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters based on shape of the dataset
+ *   ivf_pq::index_params build_params = ivf_pq::index_params::from_dataset(dataset);
+ *   ivf_pq::search_params search_params;
+ *   auto knn_graph      = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 128);
+ *   // create knn graph
+ *   cagra::build_knn_graph(res, dataset, knn_graph.view(), 2, build_params, search_params);
+ *   auto optimized_gaph = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 64);
+ *   cagra::optimize(res, dataset, knn_graph.view(), optimized_graph.view());
+ *   // Construct an index from dataset and optimized knn_graph
+ *   auto index = cagra::index<T, IdxT>(res, build_params.metric(), dataset,
+ *                                      optimized_graph.view());
+ * @endcode
+ *
+ * @param[in] res raft resources
+ * @param[in] dataset a matrix view (host or device) to a row-major matrix [n_rows, dim]
+ * @param[out] knn_graph a host matrix view to store the output knn graph [n_rows, graph_degree]
+ * @param[in] build_params ivf-pq parameters for graph build
+ */
+void build_knn_graph(raft::resources const& res,
+                     raft::host_matrix_view<const half, int64_t, raft::row_major> dataset,
+                     raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
+                     cuvs::neighbors::cagra::graph_build_params::ivf_pq_params build_params);
+
+/**
+ * @brief Build a kNN graph using IVF-PQ.
+ *
+ * The kNN graph is the first building block for CAGRA index.
+ *
+ * The output is a dense matrix that stores the neighbor indices for each point in the dataset.
+ * Each point has the same number of neighbors.
+ *
+ * See [cagra::build](#cagra::build) for an alternative method.
+ *
+ * The following distance metrics are supported:
+ * - L2Expanded
+ * - InnerProduct
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters based on shape of the dataset
+ *   ivf_pq::index_params build_params = ivf_pq::index_params::from_dataset(dataset);
+ *   ivf_pq::search_params search_params;
+ *   auto knn_graph      = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 128);
+ *   // create knn graph
+ *   cagra::build_knn_graph(res, dataset, knn_graph.view(), 2, build_params, search_params);
+ *   auto optimized_gaph = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 64);
+ *   cagra::optimize(res, dataset, knn_graph.view(), optimized_graph.view());
+ *   // Construct an index from dataset and optimized knn_graph
+ *   auto index = cagra::index<T, IdxT>(res, build_params.metric(), dataset,
+ *                                      optimized_graph.view());
+ * @endcode
+ *
+ * @param[in] res raft resources
+ * @param[in] dataset a matrix view (host or device) to a row-major matrix [n_rows, dim]
+ * @param[out] knn_graph a host matrix view to store the output knn graph [n_rows, graph_degree]
+ * @param[in] build_params ivf-pq parameters for graph build
+ */
+void build_knn_graph(raft::resources const& res,
+                     raft::host_matrix_view<const int8_t, int64_t, raft::row_major> dataset,
+                     raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
+                     cuvs::neighbors::cagra::graph_build_params::ivf_pq_params build_params);
+
+/**
+ * @brief Build a kNN graph using IVF-PQ.
+ *
+ * The kNN graph is the first building block for CAGRA index.
+ *
+ * The output is a dense matrix that stores the neighbor indices for each point in the dataset.
+ * Each point has the same number of neighbors.
+ *
+ * See [cagra::build](#cagra::build) for an alternative method.
+ *
+ * The following distance metrics are supported:
+ * - L2Expanded
+ * - InnerProduct
+ *
+ * Usage example:
+ * @code{.cpp}
+ *   using namespace cuvs::neighbors;
+ *   // use default index parameters based on shape of the dataset
+ *   ivf_pq::index_params build_params = ivf_pq::index_params::from_dataset(dataset);
+ *   ivf_pq::search_params search_params;
+ *   auto knn_graph      = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 128);
+ *   // create knn graph
+ *   cagra::build_knn_graph(res, dataset, knn_graph.view(), 2, build_params, search_params);
+ *   auto optimized_gaph = raft::make_host_matrix<IdxT, IdxT>(dataset.extent(0), 64);
+ *   cagra::optimize(res, dataset, knn_graph.view(), optimized_graph.view());
+ *   // Construct an index from dataset and optimized knn_graph
+ *   auto index = cagra::index<T, IdxT>(res, build_params.metric(), dataset,
+ *                                      optimized_graph.view());
+ * @endcode
+ *
+ * @param[in] res raft resources
+ * @param[in] dataset a matrix view (host or device) to a row-major matrix [n_rows, dim]
+ * @param[out] knn_graph a host matrix view to store the output knn graph [n_rows, graph_degree]
+ * @param[in] build_params ivf-pq parameters for graph build
+ */
+void build_knn_graph(raft::resources const& res,
+                     raft::host_matrix_view<const uint8_t, int64_t, raft::row_major> dataset,
+                     raft::host_matrix_view<uint32_t, int64_t, raft::row_major> knn_graph,
+                     cuvs::neighbors::cagra::graph_build_params::ivf_pq_params build_params);
 
 }  // namespace cuvs::neighbors::cagra
 

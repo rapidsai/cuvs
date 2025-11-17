@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -129,12 +118,7 @@ void build_knn_graph(
     raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, accessor>(
       dataset.data_handle(), dataset.extent(0), dataset.extent(1));
 
-  cagra::detail::build_knn_graph(res,
-                                 dataset_internal,
-                                 knn_graph_internal,
-                                 ivf_pq_params.refinement_rate,
-                                 ivf_pq_params.build_params,
-                                 ivf_pq_params.search_params);
+  cagra::detail::build_knn_graph(res, dataset_internal, knn_graph_internal, ivf_pq_params);
 }
 
 /**
@@ -289,6 +273,15 @@ index<T, IdxT> build(
   const index_params& params,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
 {
+  // Check if ACE dispatch is requested via graph_build_params
+  if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
+    // ACE expects the dataset to be on host due to the large dataset size
+    RAFT_EXPECTS(raft::get_device_for_address(dataset.data_handle()) == -1,
+                 "ACE: Dataset must be on host for ACE build");
+    auto dataset_view = raft::make_host_matrix_view<const T, int64_t, row_major>(
+      dataset.data_handle(), dataset.extent(0), dataset.extent(1));
+    return cuvs::neighbors::cagra::detail::build_ace<T, IdxT>(res, params, dataset_view);
+  }
   return cuvs::neighbors::cagra::detail::build<T, IdxT, Accessor>(res, params, dataset);
 }
 
