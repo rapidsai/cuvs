@@ -63,13 +63,13 @@ struct lightweight_uvector {
     auto& [r, s] = std::get<rmm_res_type>(res_);
     T* new_ptr   = nullptr;
     if (new_size > 0) {
-      new_ptr = reinterpret_cast<T*>(r.allocate_async(new_size * sizeof(T), kAlign, s));
+      new_ptr = reinterpret_cast<T*>(r.allocate(s, new_size * sizeof(T), kAlign));
     }
     auto copy_size = std::min(size_, new_size);
     if (copy_size > 0) {
       cudaMemcpyAsync(new_ptr, ptr_, copy_size * sizeof(T), cudaMemcpyDefault, s);
     }
-    if (size_ > 0) { r.deallocate_async(ptr_, size_ * sizeof(T), kAlign, s); }
+    if (size_ > 0) { r.deallocate(s, ptr_, size_ * sizeof(T), kAlign); }
     ptr_  = new_ptr;
     size_ = new_size;
   }
@@ -90,7 +90,7 @@ struct lightweight_uvector {
   {
     if (size_ > 0) {
       auto& [r, s] = std::get<rmm_res_type>(res_);
-      r.deallocate_async(ptr_, size_ * sizeof(T), kAlign, s);
+      r.deallocate(s, ptr_, size_ * sizeof(T), kAlign);
     }
   }
 };

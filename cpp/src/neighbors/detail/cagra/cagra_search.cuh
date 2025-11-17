@@ -141,6 +141,11 @@ void search_main(raft::resources const& res,
                  raft::device_matrix_view<DistanceT, int64_t, raft::row_major> distances,
                  CagraSampleFilterT sample_filter = CagraSampleFilterT())
 {
+  RAFT_EXPECTS(!index.dataset_fd().has_value(),
+               "Cannot search a CAGRA index that is stored on disk. "
+               "Use cuvs::neighbors::hnsw::from_cagra() to convert the index and "
+               "cuvs::neighbors::hnsw::deserialize() to load it into memory before searching.");
+
   // n_rows has the same type as the dataset index (the array extents type)
   using ds_idx_type    = decltype(index.data().n_rows());
   using graph_idx_type = uint32_t;

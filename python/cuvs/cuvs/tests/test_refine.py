@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2022-2023, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 
@@ -23,7 +23,6 @@ def run_refine(
     dtype=np.float32,
     memory_type="device",
 ):
-
     dataset = generate_data((n_rows, n_cols), dtype)
     queries = generate_data((n_queries, n_cols), dtype)
 
