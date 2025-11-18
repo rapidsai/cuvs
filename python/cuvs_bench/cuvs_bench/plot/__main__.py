@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # This script is inspired by
-# 1: https://github.com/erikbern/ann-benchmarks/blob/release/25.12/plot.py
-# 2: https://github.com/erikbern/ann-benchmarks/blob/release/25.12/ann_benchmarks/plotting/utils.py  # noqa: E501
-# 3: https://github.com/erikbern/ann-benchmarks/blob/release/25.12/ann_benchmarks/plotting/metrics.py  # noqa: E501
-# License: https://github.com/rapidsai/cuvs/blob/release/25.12/thirdparty/LICENSES/LICENSE.ann-benchmark # noqa: E501
+# 1: https://github.com/erikbern/ann-benchmarks/blob/main/plot.py
+# 2: https://github.com/erikbern/ann-benchmarks/blob/main/ann_benchmarks/plotting/utils.py  # noqa: E501
+# 3: https://github.com/erikbern/ann-benchmarks/blob/main/ann_benchmarks/plotting/metrics.py  # noqa: E501
+# License: https://github.com/rapidsai/cuvs/blob/main/thirdparty/LICENSES/LICENSE.ann-benchmark # noqa: E501
 
 import itertools
 import os
@@ -502,7 +502,7 @@ def load_all_results(
     is_flag=True,
     help="Show raw results (not just Pareto frontier) of the mode argument.",
 )
-def release/25.12(
+def main(
     dataset: str,
     dataset_path: str,
     output_filepath: str,
@@ -603,4 +603,4 @@ def release/25.12(
 
 
 if __name__ == "__main__":
-    release/25.12()
+    main()
