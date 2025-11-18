@@ -567,33 +567,35 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort_and_merge(
 
   // The results sorted above are merged with the internal intermediate top-k
   // results so far using bitonic merge.
-  if (max_itopk <= 64) {
-    topk_by_bitonic_sort_and_merge_wrapper_64_false(itopk_distances,
-                                                    itopk_indices,
-                                                    num_itopk,
-                                                    candidate_distances,
-                                                    candidate_indices,
-                                                    num_candidates,
-                                                    work_buf,
-                                                    first);
-  } else if (max_itopk <= 128) {
-    topk_by_bitonic_sort_and_merge_wrapper_128_false(itopk_distances,
-                                                     itopk_indices,
-                                                     num_itopk,
-                                                     candidate_distances,
-                                                     candidate_indices,
-                                                     num_candidates,
-                                                     work_buf,
-                                                     first);
-  } else if (max_itopk <= 256) {
-    topk_by_bitonic_sort_and_merge_wrapper_256_false(itopk_distances,
-                                                     itopk_indices,
-                                                     num_itopk,
-                                                     candidate_distances,
-                                                     candidate_indices,
-                                                     num_candidates,
-                                                     work_buf,
-                                                     first);
+  if (max_itopk <= 256) {
+    if (max_itopk <= 64) {
+      topk_by_bitonic_sort_and_merge_wrapper_64_false(itopk_distances,
+                                                      itopk_indices,
+                                                      num_itopk,
+                                                      candidate_distances,
+                                                      candidate_indices,
+                                                      num_candidates,
+                                                      work_buf,
+                                                      first);
+    } else if (max_itopk <= 128) {
+      topk_by_bitonic_sort_and_merge_wrapper_128_false(itopk_distances,
+                                                       itopk_indices,
+                                                       num_itopk,
+                                                       candidate_distances,
+                                                       candidate_indices,
+                                                       num_candidates,
+                                                       work_buf,
+                                                       first);
+    } else {
+      topk_by_bitonic_sort_and_merge_wrapper_256_false(itopk_distances,
+                                                       itopk_indices,
+                                                       num_itopk,
+                                                       candidate_distances,
+                                                       candidate_indices,
+                                                       num_candidates,
+                                                       work_buf,
+                                                       first);
+    }
   } else {
     assert(max_itopk <= 512);
     topk_by_bitonic_sort_and_merge_wrapper_512_true(itopk_distances,
