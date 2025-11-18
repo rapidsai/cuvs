@@ -36,8 +36,8 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
     public RowView getRow(long row) {
       try (var access = resources.access()) {
         var hostBuffer = CuVSResourcesImpl.getHostBuffer(access);
+        long rowBytes = columns * valueByteSize;
         if (row < bufferedMatrixRowStart || row >= bufferedMatrixRowEnd) {
-          long rowBytes = columns * valueByteSize;
           var endRow = Math.min(row + (PinnedMemoryBuffer.CHUNK_BYTES / rowBytes), size);
           populateBuffer(access, row, endRow, hostBuffer);
           bufferedMatrixRowStart = row;
@@ -45,7 +45,7 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
         }
         var startRow = row - bufferedMatrixRowStart;
         return new SliceRowView(
-            hostBuffer.asSlice(startRow * rowSize, columns * valueByteSize),
+            hostBuffer.asSlice(startRow * rowSize, rowBytes),
             columns,
             valueLayout,
             dataType,
