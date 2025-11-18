@@ -3,9 +3,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # This script is inspired by
-# 1: https://github.com/erikbern/ann-benchmarks/blob/release/25.12/plot.py
-# 2: https://github.com/erikbern/ann-benchmarks/blob/release/25.12/ann_benchmarks/plotting/utils.py  # noqa: E501
-# 3: https://github.com/erikbern/ann-benchmarks/blob/release/25.12/ann_benchmarks/plotting/metrics.py  # noqa: E501
+# 1: https://github.com/erikbern/ann-benchmarks/blob/release/main/plot.py
+# 2: https://github.com/erikbern/ann-benchmarks/blob/release/main/ann_benchmarks/plotting/utils.py  # noqa: E501
+# 3: https://github.com/erikbern/ann-benchmarks/blob/release/main/ann_benchmarks/plotting/metrics.py  # noqa: E501
 # License: https://github.com/rapidsai/cuvs/blob/release/25.12/thirdparty/LICENSES/LICENSE.ann-benchmark # noqa: E501
 
 import itertools
