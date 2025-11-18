@@ -7,10 +7,10 @@
 // Created by Stardust on 3/24/25.
 //
 
-#include <cuvs/neighbors/ivf_rabitq/gpu_index/rotator_gpu.cuh>
 #include <Eigen/Dense>
+#include <cuvs/neighbors/ivf_rabitq/gpu_index/rotator_gpu.cuh>
 
-RotatorGPU::RotatorGPU(uint32_t dim)
+RotatorGPU::RotatorGPU(raft::resources const& handle, uint32_t dim)
 {
   // Compute padded dimension
   // A padding function that rounds up to a multiple of 64.

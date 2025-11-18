@@ -10,6 +10,8 @@
 #ifndef EXRABITQ_ROTATOR_GPU_CUH
 #define EXRABITQ_ROTATOR_GPU_CUH
 
+#include <raft/core/resources.hpp>
+
 #include <cstdint>
 #include <cublas_v2.h>
 #include <cuvs/neighbors/ivf_rabitq/defines.hpp>
@@ -33,7 +35,7 @@ class RotatorGPU {
                              * The constructor generates a random rotation matrix on the CPU (using Eigen) and then
                              * copies it into                    device memory in column-major order.
                              */
-  explicit RotatorGPU(uint32_t dim);
+  explicit RotatorGPU(raft::resources const& handle, uint32_t dim);
   explicit RotatorGPU() {}
 
   ~RotatorGPU();

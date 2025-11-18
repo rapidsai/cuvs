@@ -66,7 +66,7 @@ void load_vecs(const char* filename, M& Mat)
     abort();
   }
 
-  T* ptr;
+  // T* ptr;
   assert(typeid(ptr) == typeid(Mat.data()));
 
   uint32_t tmp;

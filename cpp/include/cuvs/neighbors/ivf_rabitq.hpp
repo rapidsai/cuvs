@@ -108,13 +108,17 @@ struct index : cuvs::neighbors::index {
    * @brief Construct an empty index yet to be populated.
    *
    */
-  index();
+  index(raft::resources const& handle);
 
   /** Construct an empty index yet to be populated. */
-  index(size_t n_rows, uint32_t dim, uint32_t n_lists, uint32_t bits_per_dim);
+  index(raft::resources const& handle,
+        size_t n_rows,
+        uint32_t dim,
+        uint32_t n_lists,
+        uint32_t bits_per_dim);
 
   /** Construct an empty index. It needs to be trained and then populated. */
-  index(const index_params& params, uint32_t dim);
+  index(raft::resources const& handle, const index_params& params, uint32_t dim);
 
   /** Dimensionality of the input data. */
   uint32_t dim() const noexcept;

@@ -10,6 +10,8 @@
 #ifndef EXRABITQ_IVF_GPU_CUH
 #define EXRABITQ_IVF_GPU_CUH
 
+#include <raft/core/resources.hpp>
+
 #include <cstdint>
 #include <cstdlib>
 #include <cuda_runtime.h>
@@ -178,9 +180,14 @@ class IVFGPU {
    * @param k Num of centroids.
    * @param bits_per_dim totalbits = EX_BITS+1
    */
-  IVFGPU(size_t n, size_t dim, size_t k, size_t bits_per_dim, bool batch_flag);
-  IVFGPU()
-    : Rota(128),
+  IVFGPU(raft::resources const& handle,
+         size_t n,
+         size_t dim,
+         size_t k,
+         size_t bits_per_dim,
+         bool batch_flag);
+  IVFGPU(raft::resources const& handle)
+    : Rota(handle, 128),
       d_short_data(nullptr),
       d_long_code(nullptr),
       d_short_factors_batch(nullptr),
@@ -268,9 +275,9 @@ class IVFGPU {
   // load_transposed only applies for new batch index
   void save(const char* filename, bool save_batch_flag = false) const;
 
-  void load(const char* filename, bool load_batch_flag = false);
+  void load(raft::resources const& handle, const char* filename, bool load_batch_flag = false);
 
-  void load_transposed(const char* filename);
+  void load_transposed(raft::resources const& handle, const char* filename);
 
   size_t padded_dim() { return this->num_padded_dim; }
 

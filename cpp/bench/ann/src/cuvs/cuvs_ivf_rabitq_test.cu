@@ -14,6 +14,11 @@
 #include <cuvs/neighbors/ivf_rabitq/utils/IO.hpp>
 #include <cuvs/neighbors/ivf_rabitq/utils/StopW.hpp>
 
+#include <raft/core/device_resources.hpp>
+
+#include <rmm/mr/device_memory_resource.hpp>
+#include <rmm/mr/pool_memory_resource.hpp>
+
 namespace {
 
 // search parameters
@@ -21,7 +26,7 @@ size_t TOPK          = 10;
 size_t ROUND         = 3;
 size_t EXPAND_FACTOR = 1;
 
-int test_ivf_rabitq_construct_batch(int argc, char* argv[])
+int test_ivf_rabitq_construct_batch(raft::resources const& handle, int argc, char* argv[])
 {
   assert(argc >= 4);
   char* DATASET = argv[1];
@@ -66,7 +71,7 @@ int test_ivf_rabitq_construct_batch(int argc, char* argv[])
 
   StopW stopw;
   // Create an IVFGPU instance. (Its constructor will allocate device memory as needed.)
-  IVFGPU ivf(N, DIM, K, B, true);
+  IVFGPU ivf(handle, N, DIM, K, B, true);
 
   // Construct the index (this function performs necessary host-to-device transfers internally).
   ivf.construct(data.data(), centroids.data(), cids.data(), fast_quantize_flag);
@@ -146,7 +151,7 @@ double get_ratio_standalone(size_t numq,
   return ret / valid_k * K;
 }
 
-int test_ivf_rabitq_search_batch(int argc, char* argv[])
+int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* argv[])
 {
   cudaSetDevice(0);
   int deviceCount;
@@ -158,9 +163,9 @@ int test_ivf_rabitq_search_batch(int argc, char* argv[])
   std::cout << "Found " << deviceCount << " CUDA device(s)." << std::endl;
 
   assert(argc >= 4);
-  char* DATASET             = argv[1];
-  int B                     = atoi(argv[3]);
-  int query_bits            = -1;
+  char* DATASET = argv[1];
+  int B         = atoi(argv[3]);
+  //   int query_bits            = -1;
   bool rabitq_quantize_flag = true;
   std::string mode;
   if (argc > 5) {
@@ -205,8 +210,8 @@ int test_ivf_rabitq_search_batch(int argc, char* argv[])
   std::cout << "\tNQ: " << NQ << '\n';
 
   StopW stopw;
-  IVFGPU ivf;
-  ivf.load_transposed(ivf_file);
+  IVFGPU ivf(handle);
+  ivf.load_transposed(handle, ivf_file);
 
   std::vector<size_t> all_nprobes;
   // ssss
@@ -291,14 +296,14 @@ int test_ivf_rabitq_search_batch(int argc, char* argv[])
   long int total_num_vectors = 0;
   for (auto i : ivf.h_cluster_meta) {
     total_num_vectors += i.num;
-    if (i.num > max_cluster_length) { max_cluster_length = i.num; }
+    if (i.num > (unsigned int)max_cluster_length) { max_cluster_length = i.num; }
   }
   // TODO: this should be part of the load function
   ivf.max_cluster_length = max_cluster_length;
   std::cout << "max cluster length: " << max_cluster_length << std::endl;
 
   searcher.AllocateSearcherSpace(ivf, NQ, TOPK, 3000, max_cluster_length, 0);
-  bool multiple_cluster_search = true;
+  //   bool multiple_cluster_search = true;
 
   // prepare CPU side data for offloading computation
   // TODO: Later consider fix the space for computation offloading
@@ -495,14 +500,21 @@ int test_ivf_rabitq_search_batch(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
-  int ret = test_ivf_rabitq_construct_batch(argc, argv);
+  raft::device_resources handle;
+  // Set pool memory resource with 1 GiB initial pool size. All allocations use
+  // the same pool.
+  rmm::mr::pool_memory_resource<rmm::mr::device_memory_resource> pool_mr(
+    rmm::mr::get_current_device_resource(), 1024 * 1024 * 1024ull);
+  rmm::mr::set_current_device_resource(&pool_mr);
+
+  int ret = test_ivf_rabitq_construct_batch(handle, argc, argv);
   if (ret) {
     std::cerr << "IVF-RaBitQ index construction failed." << std::endl;
     return ret;
   }
   std::cout << "IVF-RaBitQ index construction complete." << std::endl;
 
-  ret = test_ivf_rabitq_search_batch(argc, argv);
+  ret = test_ivf_rabitq_search_batch(handle, argc, argv);
   if (ret) {
     std::cerr << "IVF-RaBitQ search failed." << std::endl;
   } else {

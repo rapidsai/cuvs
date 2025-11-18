@@ -10,20 +10,24 @@ list(APPEND CMAKE_MODULE_PATH "${CUVS_SOURCE_DIR}")
 # ##################################################################################################
 # * benchmark options ------------------------------------------------------------------------------
 
-option(CUVS_ANN_BENCH_USE_FAISS_GPU_FLAT "Include faiss' brute-force knn algorithm in benchmark" OFF)
+option(CUVS_ANN_BENCH_USE_FAISS_GPU_FLAT "Include faiss' brute-force knn algorithm in benchmark"
+       OFF
+)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_FLAT "Include faiss' ivf flat algorithm in benchmark" OFF)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_IVF_PQ "Include faiss' ivf pq algorithm in benchmark" OFF)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_CAGRA "Include faiss' cagra algorithm in benchmark" OFF)
 option(CUVS_ANN_BENCH_USE_FAISS_GPU_CAGRA_HNSW
        "Include faiss' cagra algorithm for build and hnsw for search in benchmark" OFF
 )
-option(CUVS_ANN_BENCH_USE_FAISS_CPU_FLAT "Include faiss' cpu brute-force algorithm in benchmark" OFF)
+option(CUVS_ANN_BENCH_USE_FAISS_CPU_FLAT "Include faiss' cpu brute-force algorithm in benchmark"
+       OFF
+)
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_FLAT "Include faiss' cpu ivf flat algorithm in benchmark"
        OFF
 )
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_PQ "Include faiss' cpu ivf pq algorithm in benchmark" OFF)
-option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_RABITQ "Include faiss' cpu ivf rabitq algorithm in benchmark"
-       OFF
+option(CUVS_ANN_BENCH_USE_FAISS_CPU_IVF_RABITQ
+       "Include faiss' cpu ivf rabitq algorithm in benchmark" OFF
 )
 option(CUVS_ANN_BENCH_USE_FAISS_CPU_HNSW_FLAT "Include faiss' hnsw algorithm in benchmark" OFF)
 option(CUVS_ANN_BENCH_USE_CUVS_IVF_FLAT "Include cuVS ivf flat algorithm in benchmark" ON)
@@ -112,7 +116,6 @@ endif()
 if(CUVS_ANN_BENCH_USE_FAISS)
   include(cmake/thirdparty/get_faiss)
 endif()
-
 
 # ##################################################################################################
 # * Target function -------------------------------------------------------------
@@ -412,7 +415,7 @@ endif()
 if(CUVS_ANN_BENCH_USE_CUVS_IVF_RABITQ)
   add_executable(RABITQ_BENCH_TEST src/cuvs/cuvs_ivf_rabitq_test.cu)
 
-  target_link_libraries(RABITQ_BENCH_TEST PRIVATE ivf_rabitq_lib CUDA::cublas)
+  target_link_libraries(RABITQ_BENCH_TEST PRIVATE ivf_rabitq_lib cuvs)
 
   target_include_directories(
     RABITQ_BENCH_TEST PUBLIC "$<BUILD_INTERFACE:${CUVS_SOURCE_DIR}/include>"
@@ -428,6 +431,13 @@ if(CUVS_ANN_BENCH_USE_CUVS_IVF_RABITQ)
                BUILD_RPATH "\$ORIGIN"
                INSTALL_RPATH "\$ORIGIN"
                CUDA_SEPARABLE_COMPILATION ON
+  )
+
+  target_compile_options(
+    RABITQ_BENCH_TEST
+    PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CUVS_CXX_FLAGS}>"
+            "$<$<COMPILE_LANGUAGE:CUDA>:${CUVS_CUDA_FLAGS}>"
+            "-DLIBCUDACXX_ENABLE_EXPERIMENTAL_MEMORY_RESOURCE"
   )
 
   install(

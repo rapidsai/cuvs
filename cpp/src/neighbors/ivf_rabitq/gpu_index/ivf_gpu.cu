@@ -20,7 +20,12 @@
 #include <raft/matrix/select_k.cuh>
 #include <thrust/sort.h>
 
-IVFGPU::IVFGPU(size_t n, size_t dim, size_t k, size_t bits_per_dim, bool batch_flag = false)
+IVFGPU::IVFGPU(raft::resources const& handle,
+               size_t n,
+               size_t dim,
+               size_t k,
+               size_t bits_per_dim,
+               bool batch_flag = false)
   : num_vectors(n),
     num_dimensions(dim),
     num_padded_dim(rd_up_to_multiple_of_new(dim, 64)),
@@ -39,7 +44,7 @@ IVFGPU::IVFGPU(size_t n, size_t dim, size_t k, size_t bits_per_dim, bool batch_f
     h_ex_factor(nullptr),
     h_ids(nullptr),
     DQ(dim, bits_per_dim - 1, batch_flag),
-    Rota(dim)
+    Rota(handle, dim)
 {
 }
 
@@ -143,7 +148,7 @@ void IVFGPU::FreeDeviceMemory() const
   delete initializer;
 }
 
-void IVFGPU::load(const char* filename, bool load_batch_flag)
+void IVFGPU::load(raft::resources const& handle, const char* filename, bool load_batch_flag)
 {
   std::cout << "Loading IVFGPU index... from " << filename << "\n";
   std::ifstream input(filename, std::ios::binary);
@@ -161,7 +166,7 @@ void IVFGPU::load(const char* filename, bool load_batch_flag)
 
   // Initialize quantizer and rotator (host objects that drive GPU routines).
   this->DQ   = DataQuantizerGPU(num_dimensions, ex_bits, batch_flag);
-  this->Rota = RotatorGPU(num_dimensions);
+  this->Rota = RotatorGPU(handle, num_dimensions);
   // Load cluster sizes.
   std::vector<size_t> cluster_sizes(num_centroids, 0);
   input.read(reinterpret_cast<char*>(cluster_sizes.data()), sizeof(size_t) * num_centroids);
@@ -219,7 +224,7 @@ void IVFGPU::load(const char* filename, bool load_batch_flag)
 }
 
 // load transposed data for short codes
-void IVFGPU::load_transposed(const char* filename)
+void IVFGPU::load_transposed(raft::resources const& handle, const char* filename)
 {
   std::cout << "Loading IVFGPU index... from " << filename << "\n";
   std::ifstream input(filename, std::ios::binary);
@@ -237,7 +242,7 @@ void IVFGPU::load_transposed(const char* filename)
 
   // Initialize quantizer and rotator (host objects that drive GPU routines).
   this->DQ   = DataQuantizerGPU(num_dimensions, ex_bits, batch_flag);
-  this->Rota = RotatorGPU(num_dimensions);
+  this->Rota = RotatorGPU(handle, num_dimensions);
   // Load cluster sizes.
   std::vector<size_t> cluster_sizes(num_centroids, 0);
   input.read(reinterpret_cast<char*>(cluster_sizes.data()), sizeof(size_t) * num_centroids);

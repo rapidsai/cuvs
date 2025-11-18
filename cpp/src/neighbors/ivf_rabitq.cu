@@ -251,30 +251,35 @@ void deserialize(raft::resources const& handle,
                  const std::string& filename,
                  cuvs::neighbors::ivf_rabitq::index<IdxT>* index)
 {
-  index->rabitq_index()->load_transposed(filename.c_str());
+  index->rabitq_index()->load_transposed(handle, filename.c_str());
 }
 
 }  // namespace detail
 
 template <typename IdxT>
-index<IdxT>::index()
+index<IdxT>::index(raft::resources const& handle)
   // this constructor is just for a temporary index, for use in the deserialization
   // api. all the parameters here will get replaced with loaded values - that aren't
   // necessarily known ahead of time before deserialization.
   // TODO: do we even need a handle here - could just construct one?
-  : rabitq_index_()
+  : rabitq_index_(handle)
 {
 }
 
 template <typename IdxT>
-index<IdxT>::index(size_t n_rows, uint32_t dim, uint32_t n_lists, uint32_t bits_per_dim)
-  : rabitq_index_(n_rows, dim, n_lists, bits_per_dim, /* batch_flag = */ true)
+index<IdxT>::index(raft::resources const& handle,
+                   size_t n_rows,
+                   uint32_t dim,
+                   uint32_t n_lists,
+                   uint32_t bits_per_dim)
+  : rabitq_index_(handle, n_rows, dim, n_lists, bits_per_dim, /* batch_flag = */ true)
 {
   RAFT_EXPECTS(bits_per_dim >= 2 && bits_per_dim <= 9, "Unsupported bits_per_dim");
 }
 
 template <typename IdxT>
-index<IdxT>::index(const index_params& params, uint32_t dim) : index()
+index<IdxT>::index(raft::resources const& handle, const index_params& params, uint32_t dim)
+  : index(handle)
 {
 }
 

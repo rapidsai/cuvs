@@ -93,7 +93,7 @@ void cuvs_ivf_rabitq<T, IdxT>::save(const std::string& file) const
 template <typename T, typename IdxT>
 void cuvs_ivf_rabitq<T, IdxT>::load(const std::string& file)
 {
-  index_ = std::make_shared<cuvs::neighbors::ivf_rabitq::index<IdxT>>(index_params_, dim_);
+  index_ = std::make_shared<cuvs::neighbors::ivf_rabitq::index<IdxT>>(handle_, index_params_, dim_);
   cuvs::neighbors::ivf_rabitq::deserialize(handle_, file, index_.get());
 }
 
@@ -105,7 +105,7 @@ void cuvs_ivf_rabitq<T, IdxT>::build(const T* dataset, size_t nrow)
   raft::resource::set_cuda_stream_pool(handle_, std::make_shared<rmm::cuda_stream_pool>(n_streams));
   auto dataset_v = raft::make_device_matrix_view<const T, IdxT>(dataset, IdxT(nrow), dim_);
   index_         = std::make_shared<cuvs::neighbors::ivf_rabitq::index<IdxT>>(
-    nrow, dim_, index_params_.n_lists, index_params_.bits_per_dim);
+    handle_, nrow, dim_, index_params_.n_lists, index_params_.bits_per_dim);
   cuvs::neighbors::ivf_rabitq::build(handle_, index_params_, dataset_v, index_.get());
   // Note: internally the IVF-RaBitQ build works with simple pointers, and accepts both host and
   // device pointer. Therefore, although we provide here a device_mdspan, this works with host
