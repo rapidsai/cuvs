@@ -10,8 +10,16 @@
 #include <Eigen/Dense>
 #include <cuvs/neighbors/ivf_rabitq/gpu_index/rotator_gpu.cuh>
 
+#include <raft/core/cublas_macros.hpp>
+#include <raft/core/resource/cuda_stream.hpp>
+#include <raft/util/cuda_rt_essentials.hpp>
+
 RotatorGPU::RotatorGPU(raft::resources const& handle, uint32_t dim)
 {
+  // keep track of cuda stream
+  // note that the cuBlas handle `m_handle` is not set to `m_stream`, or the results would end up
+  // being incorrect
+  m_stream = raft::resource::get_cuda_stream(handle);
   // Compute padded dimension
   // A padding function that rounds up to a multiple of 64.
   auto rd_up_to_multiple_of = [](uint32_t dim, uint32_t mult) -> size_t {
@@ -38,27 +46,34 @@ RotatorGPU::RotatorGPU(raft::resources const& handle, uint32_t dim)
   float* hostP = new float[D * D];
 
   std::memcpy(hostP, P.data(), sizeof(float) * D * D);
-  CUDA_CHECK(cudaMalloc((void**)&d_P, sizeof(float) * D * D));
-  CUDA_CHECK(cudaMemcpy(d_P, hostP, sizeof(float) * D * D, cudaMemcpyHostToDevice));
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_P, sizeof(float) * D * D, m_stream));
+  RAFT_CUDA_TRY(
+    cudaMemcpyAsync(d_P, hostP, sizeof(float) * D * D, cudaMemcpyHostToDevice, m_stream));
+  RAFT_CUDA_TRY(cudaStreamSynchronize(m_stream));
+  delete[] hostP;
 
-  cublasStatus_t status = cublasCreate(&m_handle);
+  RAFT_CUBLAS_TRY(cublasCreate(&m_handle));
 }
 
 RotatorGPU::~RotatorGPU()
 {
-  if (d_P) { cudaFree(d_P); }
-  cublasDestroy(m_handle);
+  if (d_P) { RAFT_CUDA_TRY(cudaFreeAsync(d_P, m_stream)); }
+  RAFT_CUBLAS_TRY(cublasDestroy(m_handle));
 }
 
 RotatorGPU& RotatorGPU::operator=(const RotatorGPU& other)
 {
   if (this != &other) {
-    D = other.D;
+    D        = other.D;
+    m_stream = other.m_stream;
+    RAFT_CUBLAS_TRY(cublasCreate(&m_handle));
     // Firstly free it in case not dimension not match
-    if (d_P) { cudaFree(d_P); }
-    cudaMalloc((void**)&d_P, sizeof(float) * D * D);
+    if (d_P) { RAFT_CUDA_TRY(cudaFreeAsync(d_P, m_stream)); }
+    RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_P, sizeof(float) * D * D, m_stream));
     // Copy the rotation matrix from the other object.
-    cudaMemcpy(d_P, other.d_P, sizeof(float) * D * D, cudaMemcpyDeviceToDevice);
+    RAFT_CUDA_TRY(
+      cudaMemcpyAsync(d_P, other.d_P, sizeof(float) * D * D, cudaMemcpyDeviceToDevice, m_stream));
+    RAFT_CUDA_TRY(cudaStreamSynchronize(m_stream));
   }
   return *this;
 }
@@ -71,14 +86,18 @@ void RotatorGPU::load(std::ifstream& input)
   for (size_t i = 0; i < D * D; ++i) {
     input.read(reinterpret_cast<char*>(&hostP[i]), sizeof(float));
   }
-  CUDA_CHECK(cudaMemcpy(d_P, hostP, sizeof(float) * D * D, cudaMemcpyHostToDevice));
+  RAFT_CUDA_TRY(
+    cudaMemcpyAsync(d_P, hostP, sizeof(float) * D * D, cudaMemcpyHostToDevice, m_stream));
+  RAFT_CUDA_TRY(cudaStreamSynchronize(m_stream));
   delete[] hostP;
 }
 
 void RotatorGPU::save(std::ofstream& output) const
 {
   float* hostP = new float[D * D];
-  CUDA_CHECK(cudaMemcpy(hostP, d_P, sizeof(float) * D * D, cudaMemcpyDeviceToHost));
+  RAFT_CUDA_TRY(
+    cudaMemcpyAsync(hostP, d_P, sizeof(float) * D * D, cudaMemcpyDeviceToHost, m_stream));
+  RAFT_CUDA_TRY(cudaStreamSynchronize(m_stream));
   for (size_t i = 0; i < D * D; ++i) {
     output.write(reinterpret_cast<char*>(&hostP[i]), sizeof(float));
   }
@@ -99,14 +118,8 @@ void RotatorGPU::rotate(const float* d_A, float* d_RAND_A, size_t N) const
   // which is equivalent to RAND_A = A * P, if we interpret the data as row-major.
   // Note that in Cublas it is RAND_A^T in column major, which is what we want in row-major
   // Here, we use cublasSgemm with appropriate parameters.
-  const float alpha     = 1.0f;
-  const float beta      = 0.0f;
-  cublasStatus_t status = cublasSgemm(
-    m_handle, CUBLAS_OP_N, CUBLAS_OP_N, D, N, D, &alpha, d_P, D, d_A, D, &beta, d_RAND_A, D);
-  if (status != CUBLAS_STATUS_SUCCESS) {
-    // jamxia edit
-    // std::cerr << "cuBLAS sgemm failed" << std::endl;
-    std::cerr << "cuBLAS sgemm failed with status: " << status << std::endl;
-    exit(EXIT_FAILURE);
-  }
+  const float alpha = 1.0f;
+  const float beta  = 0.0f;
+  RAFT_CUBLAS_TRY(cublasSgemm(
+    m_handle, CUBLAS_OP_N, CUBLAS_OP_N, D, N, D, &alpha, d_P, D, d_A, D, &beta, d_RAND_A, D));
 }

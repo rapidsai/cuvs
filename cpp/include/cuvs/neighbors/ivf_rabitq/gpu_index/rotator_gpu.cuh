@@ -25,6 +25,7 @@
 class RotatorGPU {
  private:
   size_t D;                 // Padded dimension
+  cudaStream_t m_stream;    // CUDA stream
   cublasHandle_t m_handle;  // The cuBLAS handle
                             // Device pointer for the rotation matrix (stored in row-major order)
  public:                    /**
