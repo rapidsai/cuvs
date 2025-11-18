@@ -25,7 +25,15 @@ set +eu
 conda activate rust
 set -eu
 
+source rapids-configure-sccache
+
 rapids-print-env
+
+rapids-logger "Begin rust build"
+
+sccache --stop-server 2>/dev/null || true
+
+export SCCACHE_S3_KEY_PREFIX="cuvs-rs/$(uname -m)/cuda${RAPIDS_CUDA_VERSION%.*}"
 
 # we need to set up LIBCLANG_PATH to allow rust bindgen to work,
 # grab it from the conda env
@@ -34,6 +42,8 @@ export LIBCLANG_PATH
 echo "LIBCLANG_PATH=$LIBCLANG_PATH"
 
 bash ./build.sh rust
+
+sccache --show-adv-stats
 
 # Also test out that we can publish cuvs-sys via a dry-run
 pushd ./rust/cuvs-sys
