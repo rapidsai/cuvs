@@ -79,7 +79,7 @@ static_assert(std::is_aggregate_v<search_params>);
 template <typename SizeT, typename ValueT, typename IdxT>
 struct list_spec {
   using value_type   = ValueT;
-  using list_extents = raft::matrix_extent<SizeT>;
+  using list_extents = raft::matrix_extent<IdxT>;
   using index_type   = IdxT;
 
   SizeT align_max;
@@ -103,7 +103,7 @@ struct list_spec {
   /** Determine the extents of an array enough to hold a given amount of data. */
   constexpr auto make_list_extents(SizeT n_rows) const -> list_extents
   {
-    return raft::make_extents<SizeT>(n_rows, dim);
+    return raft::make_extents<IdxT>(n_rows, dim);
   }
 };
 

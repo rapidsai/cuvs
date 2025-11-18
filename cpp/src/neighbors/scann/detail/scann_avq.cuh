@@ -131,7 +131,7 @@ void compute_cluster_offsets(raft::resources const& dev_resources,
 template <typename T>
 void sum_reduce_vector(raft::resources const& dev_resources,
                        raft::device_vector_view<T, int64_t> v,
-                       raft::device_scalar_view<T> s)
+                       raft::device_scalar_view<T, int64_t> s)
 {
   cudaStream_t stream = raft::resource::get_cuda_stream(dev_resources);
   rmm::device_async_resource_ref device_memory =
@@ -219,7 +219,7 @@ void compute_avq_centroid(raft::resources const& dev_resources,
 
   // Compute || x_i || ^ 0.5 * (eta -3)
   auto norms_eta_3 = raft::make_device_vector<float, int64_t>(dev_resources, x.extent(0));
-  auto eta_3       = raft::make_host_scalar<float>((eta - 3) / 2);
+  auto eta_3       = raft::make_host_scalar<float, int64_t>((eta - 3) / 2);
 
   raft::linalg::power_scalar(dev_resources,
                              raft::make_const_mdspan(norms.view()),
@@ -228,14 +228,14 @@ void compute_avq_centroid(raft::resources const& dev_resources,
 
   // Compute || x_i || ^ (eta - 1)
   auto norms_eta_1 = raft::make_device_vector<float, int64_t>(dev_resources, x.extent(0));
-  auto eta_1       = raft::make_host_scalar<float>(eta - 1);
+  auto eta_1       = raft::make_host_scalar<float, int64_t>(eta - 1);
 
   raft::linalg::power_scalar(dev_resources,
                              raft::make_const_mdspan(norms.view()),
                              norms_eta_1.view(),
                              raft::make_const_mdspan(eta_1.view()));
 
-  auto sum_norms_eta_1 = raft::make_device_scalar<float>(dev_resources, 0.0);
+  auto sum_norms_eta_1 = raft::make_device_scalar<float, int64_t>(dev_resources, 0.0);
 
   sum_reduce_vector(dev_resources, norms_eta_1.view(), sum_norms_eta_1.view());
 
@@ -277,7 +277,7 @@ void compute_avq_centroid(raft::resources const& dev_resources,
 
   raft::matrix::eye(dev_resources, x_trans_x.view());
 
-  auto eta_m_1       = raft::make_device_scalar<float>(dev_resources, eta - 1);
+  auto eta_m_1       = raft::make_device_scalar<float, int64_t>(dev_resources, eta - 1);
   auto cublas_handle = raft::resource::get_cublas_handle(dev_resources);
 
   raft::linalg::detail::cublas_device_pointer_mode<true> pm(cublas_handle);
@@ -301,7 +301,7 @@ void compute_avq_centroid(raft::resources const& dev_resources,
 
   cholesky_solver(dev_resources, x_trans_x.view(), avq_centroid, avq_centroid);
 
-  auto h_eta = raft::make_host_scalar<float>(eta);
+  auto h_eta = raft::make_host_scalar<float, int64_t>(eta);
 
   raft::linalg::multiply_scalar(dev_resources,
                                 raft::make_const_mdspan(avq_centroid),
@@ -340,8 +340,8 @@ void rescale_avq_centroids(raft::resources const& dev_resources,
                            raft::device_vector_view<uint32_t, int64_t> cluster_sizes,
                            uint32_t dataset_size)
 {
-  auto rescale_num   = raft::make_device_scalar<float>(dev_resources, 0);
-  auto rescale_denom = raft::make_device_scalar<float>(dev_resources, 0);
+  auto rescale_num   = raft::make_device_scalar<float, int64_t>(dev_resources, 0);
+  auto rescale_denom = raft::make_device_scalar<float, int64_t>(dev_resources, 0);
 
   sum_reduce_vector(dev_resources, rescale_num_v, rescale_num.view());
 
@@ -394,8 +394,8 @@ class cluster_loader {
   raft::device_matrix<T, int64_t> d_cluster_buf_;
   raft::device_matrix<T, int64_t> d_cluster_copy_buf_;
   const T* dataset_ptr_;
-  raft::host_vector_view<const LabelT> h_cluster_offsets_;
-  raft::device_vector_view<const LabelT> cluster_ids_;
+  raft::host_vector_view<const LabelT, int64_t> h_cluster_offsets_;
+  raft::device_vector_view<const LabelT, int64_t> cluster_ids_;
   cudaStream_t stream_;
   int64_t dim_;
   int64_t n_rows_;
@@ -418,8 +418,8 @@ class cluster_loader {
                  int64_t n_rows,
                  int64_t max_cluster_size,
                  int64_t h_buf_size,
-                 raft::host_vector_view<LabelT> h_cluster_offsets,
-                 raft::device_vector_view<LabelT> cluster_ids,
+                 raft::host_vector_view<LabelT, int64_t> h_cluster_offsets,
+                 raft::device_vector_view<LabelT, int64_t> cluster_ids,
                  bool needs_copy,
                  cudaStream_t stream)
     : dim_(dim),
@@ -439,8 +439,8 @@ class cluster_loader {
  public:
   cluster_loader(raft::resources const& res,
                  raft::device_matrix_view<const T, int64_t> dataset_view,
-                 raft::host_vector_view<LabelT> h_cluster_offsets,
-                 raft::device_vector_view<LabelT> cluster_ids,
+                 raft::host_vector_view<LabelT, int64_t> h_cluster_offsets,
+                 raft::device_vector_view<LabelT, int64_t> cluster_ids,
                  int64_t max_cluster_size,
                  cudaStream_t stream)
     : cluster_loader(res,
@@ -459,8 +459,8 @@ class cluster_loader {
 
   cluster_loader(raft::resources const& res,
                  raft::host_matrix_view<const T, int64_t> dataset_view,
-                 raft::host_vector_view<LabelT> h_cluster_offsets,
-                 raft::device_vector_view<LabelT> cluster_ids,
+                 raft::host_vector_view<LabelT, int64_t> h_cluster_offsets,
+                 raft::device_vector_view<LabelT, int64_t> cluster_ids,
                  int64_t max_cluster_size,
                  cudaStream_t stream)
     : cluster_loader(res,
@@ -576,10 +576,10 @@ class cluster_loader {
  * @param eta the weight for the parallel component of the residual in the avq update
  */
 template <typename T,
-          typename IdxT     = int64_t,
-          typename LabelT   = uint32_t,
-          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
-                                                         raft::memory_type::host>>
+          typename IdxT   = int64_t,
+          typename LabelT = uint32_t,
+          typename Accessor =
+            raft::host_device_accessor<cuda::std::default_accessor<T>, raft::memory_type::host>>
 void apply_avq(raft::resources const& res,
                raft::mdspan<const T, raft::matrix_extent<IdxT>, raft::row_major, Accessor> dataset,
                raft::device_matrix_view<T, IdxT> centroids_view,

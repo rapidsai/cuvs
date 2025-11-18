@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -12,9 +12,9 @@ namespace cuvs::cluster::kmeans::helpers {
 
 void find_k(raft::resources const& handle,
             raft::device_matrix_view<const float, int> X,
-            raft::host_scalar_view<int> best_k,
-            raft::host_scalar_view<float> inertia,
-            raft::host_scalar_view<int> n_iter,
+            raft::host_scalar_view<int, int> best_k,
+            raft::host_scalar_view<float, int> inertia,
+            raft::host_scalar_view<int, int> n_iter,
             int kmax,
             int kmin,
             int maxiter,

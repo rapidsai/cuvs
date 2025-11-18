@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2020-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -335,7 +335,7 @@ class sparse_knn_t {
       raft::make_device_matrix_view<const value_idx, int64_t>(merge_buffer_indices, rows, 2 * k),
       raft::make_device_matrix_view<value_t, int64_t>(out_dists, rows, k),
       raft::make_device_matrix_view<value_idx, int64_t>(out_indices, rows, k),
-      raft::make_device_vector_view<value_idx>(trans.data(), id_ranges.size()));
+      raft::make_device_vector_view<value_idx, uint32_t>(trans.data(), id_ranges.size()));
   }
 
   void perform_k_selection(csr_batcher_t<value_idx, value_t> idx_batcher,

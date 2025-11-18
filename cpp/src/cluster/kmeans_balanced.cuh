@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -253,14 +253,15 @@ template <typename DataT,
           typename LabelT,
           typename CounterT,
           typename MappingOpT>
-void build_clusters(const raft::resources& handle,
-                    const cuvs::cluster::kmeans::balanced_params& params,
-                    raft::device_matrix_view<const DataT, IndexT> X,
-                    raft::device_matrix_view<MathT, IndexT> centroids,
-                    raft::device_vector_view<LabelT, IndexT> labels,
-                    raft::device_vector_view<CounterT, IndexT> cluster_sizes,
-                    MappingOpT mapping_op = raft::identity_op(),
-                    std::optional<raft::device_vector_view<const MathT>> X_norm = std::nullopt)
+void build_clusters(
+  const raft::resources& handle,
+  const cuvs::cluster::kmeans::balanced_params& params,
+  raft::device_matrix_view<const DataT, IndexT> X,
+  raft::device_matrix_view<MathT, IndexT> centroids,
+  raft::device_vector_view<LabelT, IndexT> labels,
+  raft::device_vector_view<CounterT, IndexT> cluster_sizes,
+  MappingOpT mapping_op                                               = raft::identity_op(),
+  std::optional<raft::device_vector_view<const MathT, IndexT>> X_norm = std::nullopt)
 {
   RAFT_EXPECTS(X.extent(0) == labels.extent(0),
                "Number of rows in dataset and labels are different");

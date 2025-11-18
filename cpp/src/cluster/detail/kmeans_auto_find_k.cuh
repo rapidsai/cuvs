@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -24,13 +24,13 @@ void compute_dispersion(raft::resources const& handle,
                         raft::device_matrix_view<const value_t, idx_t> X,
                         cuvs::cluster::kmeans::params& params,
                         raft::device_matrix_view<value_t, idx_t> centroids_view,
-                        raft::device_vector_view<idx_t> labels,
-                        raft::device_vector_view<idx_t> clusterSizes,
+                        raft::device_vector_view<idx_t, idx_t> labels,
+                        raft::device_vector_view<idx_t, idx_t> clusterSizes,
                         rmm::device_uvector<char>& workspace,
-                        raft::host_vector_view<value_t> clusterDispertionView,
-                        raft::host_vector_view<value_t> resultsView,
-                        raft::host_scalar_view<value_t> residual,
-                        raft::host_scalar_view<idx_t> n_iter,
+                        raft::host_vector_view<value_t, idx_t> clusterDispertionView,
+                        raft::host_vector_view<value_t, idx_t> resultsView,
+                        raft::host_scalar_view<value_t, idx_t> residual,
+                        raft::host_scalar_view<idx_t, idx_t> n_iter,
                         int val,
                         idx_t n,
                         idx_t d)
@@ -57,9 +57,9 @@ void compute_dispersion(raft::resources const& handle,
 template <typename idx_t, typename value_t>
 void find_k(raft::resources const& handle,
             raft::device_matrix_view<const value_t, idx_t> X,
-            raft::host_scalar_view<idx_t> best_k,
-            raft::host_scalar_view<value_t> residual,
-            raft::host_scalar_view<idx_t> n_iter,
+            raft::host_scalar_view<idx_t, idx_t> best_k,
+            raft::host_scalar_view<value_t, idx_t> residual,
+            raft::host_scalar_view<idx_t, idx_t> n_iter,
             idx_t kmax,
             idx_t kmin    = 1,
             idx_t maxiter = 100,
@@ -78,16 +78,16 @@ void find_k(raft::resources const& handle,
   // Device memory
 
   auto centroids    = raft::make_device_matrix<value_t, idx_t>(handle, kmax, X.extent(1));
-  auto clusterSizes = raft::make_device_vector<idx_t>(handle, kmax);
-  auto labels       = raft::make_device_vector<idx_t>(handle, n);
+  auto clusterSizes = raft::make_device_vector<idx_t, idx_t>(handle, kmax);
+  auto labels       = raft::make_device_vector<idx_t, idx_t>(handle, n);
 
   rmm::device_uvector<char> workspace(0, raft::resource::get_cuda_stream(handle));
 
   idx_t* clusterSizes_ptr = clusterSizes.data_handle();
 
   // Host memory
-  auto results           = raft::make_host_vector<value_t>(kmax + 1);
-  auto clusterDispersion = raft::make_host_vector<value_t>(kmax + 1);
+  auto results           = raft::make_host_vector<value_t, idx_t>(kmax + 1);
+  auto clusterDispersion = raft::make_host_vector<value_t, idx_t>(kmax + 1);
 
   auto clusterDispertionView = clusterDispersion.view();
   auto resultsView           = results.view();
