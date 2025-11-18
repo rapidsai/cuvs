@@ -502,7 +502,7 @@ def load_all_results(
     is_flag=True,
     help="Show raw results (not just Pareto frontier) of the mode argument.",
 )
-def release/25.12(
+def main(
     dataset: str,
     dataset_path: str,
     output_filepath: str,
@@ -603,4 +603,4 @@ def release/25.12(
 
 
 if __name__ == "__main__":
-    release/25.12()
+    main()
