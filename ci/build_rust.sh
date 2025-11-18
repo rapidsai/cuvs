@@ -27,14 +27,16 @@ set -eu
 
 source rapids-configure-sccache
 
+# Don't use the build cluster because conda rust toolchains are too large
+export SCCACHE_NO_DIST_COMPILE=1
+# shellcheck disable=SC2155
+export SCCACHE_S3_KEY_PREFIX="cuvs-rs/$(uname -m)/cuda${RAPIDS_CUDA_VERSION%.*}"
+
 rapids-print-env
 
 rapids-logger "Begin rust build"
 
 sccache --stop-server 2>/dev/null || true
-
-# shellcheck disable=SC2155
-export SCCACHE_S3_KEY_PREFIX="cuvs-rs/$(uname -m)/cuda${RAPIDS_CUDA_VERSION%.*}"
 
 # we need to set up LIBCLANG_PATH to allow rust bindgen to work,
 # grab it from the conda env
