@@ -129,34 +129,7 @@ struct search
       sizeof(std::uint32_t) * topk_ws_size + sizeof(std::uint32_t);
 
     std::uint32_t additional_smem_size = 0;
-    if (num_itopk_candidates <= 256) {  // bitonic sort
-      // Tentatively calculate the required shared memory size when bitonic sort based topk is used,
-      // assuming the block size is the maximum.
-      uint32_t max_elements{0};
-      if (itopk_size > 128) {  // use shared memory instead of stack variables (which may or may not
-                               // be placed in registers) for bitonic sort
-        if (itopk_size <= 256) {
-          max_elements = 256;
-        } else {
-          static_assert(min_block_size >=
-                        64);  // multi_warps = true if (threadDim.x >= 64) && (itopk_size > 256)
-          max_elements = 512 / 2 /* multi_warps = true */;
-        }
-        if (num_itopk_candidates > 64) {  // use shared memory instead of stack variables (which may
-                                          // or may not be placed in registers) for bitonic sort
-          if (num_itopk_candidates <= 128) {
-            max_elements = std::max(uint32_t{128}, max_elements);
-          } else {
-            static_assert(min_block_size >=
-                          64);  // multi_warps = true if (threadDim.x >= 64) && (itopk_size > 128)
-            max_elements = std::max(uint32_t{256 / 2 /* multi_warps = true */}, max_elements);
-          }
-        }
-      }
-      additional_smem_size += max_block_size *
-                              ((max_elements + (raft::warp_size() - 1)) / raft::warp_size()) *
-                              (sizeof(float) + sizeof(INDEX_T));
-    } else {  // radix sort
+    if (num_itopk_candidates > 256) {  // radix sort
       // Tentatively calculate the required shared memory size when radix sort based topk is used,
       // assuming the block size is the maximum.
       if (itopk_size <= 256) {
