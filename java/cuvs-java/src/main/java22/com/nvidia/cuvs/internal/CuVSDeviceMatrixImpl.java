@@ -23,8 +23,6 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
   private final long rowStride;
   private final long columnStride;
 
-  private final PinnedMemoryBuffer hostBuffer;
-
   protected CuVSDeviceMatrixImpl(
       CuVSResources resources,
       MemorySegment deviceMemorySegment,
@@ -48,7 +46,6 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
     this.resources = resources;
     this.rowStride = rowStride;
     this.columnStride = columnStride;
-    this.hostBuffer = new PinnedMemoryBuffer(size, columns, valueLayout);
   }
 
   @Override
@@ -63,14 +60,11 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
         arena, memorySegment, new long[] {size, columns}, strides, code(), bits(), kDLCUDA());
   }
 
-  private void populateBuffer(long startRow) {
+  private void populateBuffer(long startRow, MemorySegment bufferAddress) {
     try (var localArena = Arena.ofConfined()) {
       long rowBytes = columns * valueLayout.byteSize();
-      var endRow = Math.min(startRow + (hostBuffer.size() / rowBytes), size);
+      var endRow = Math.min(startRow + (PinnedMemoryBuffer.CHUNK_BYTES / rowBytes), size);
       var rowCount = endRow - startRow;
-
-      //      System.out.printf(
-      //          Locale.ROOT, "startRow: %d, endRow %d, count: %d\n", startRow, endRow, rowCount);
 
       MemorySegment sliceManagedTensor = DLManagedTensor.allocate(localArena);
       DLManagedTensor.dl_tensor(sliceManagedTensor, DLTensor.allocate(localArena));
@@ -85,12 +79,7 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
 
       MemorySegment bufferTensor =
           prepareTensor(
-              localArena,
-              hostBuffer.address(),
-              new long[] {rowCount, columns},
-              code(),
-              bits(),
-              kDLCPU());
+              localArena, bufferAddress, new long[] {rowCount, columns}, code(), bits(), kDLCPU());
 
       try (var resourceAccess = resources.access()) {
         checkCuVSError(
@@ -106,19 +95,23 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
 
   @Override
   public RowView getRow(long row) {
-    if (row < bufferedMatrixRowStart || row >= bufferedMatrixRowEnd) {
-      populateBuffer(row);
-    }
     var valueByteSize = valueLayout.byteSize();
     var startRow = row - bufferedMatrixRowStart;
 
-    var rowSize = rowStride > 0 ? rowStride * valueByteSize : columns * valueByteSize;
-    return new SliceRowView(
-        hostBuffer.address().asSlice(startRow * rowSize, columns * valueByteSize),
-        columns,
-        valueLayout,
-        dataType,
-        valueByteSize);
+
+    try (var access = resources.access()) {
+      var hostBuffer = CuVSResourcesImpl.getHostBuffer(access);
+      if (row < bufferedMatrixRowStart || row >= bufferedMatrixRowEnd) {
+        populateBuffer(row, hostBuffer);
+      }
+      var rowSize = rowStride > 0 ? rowStride * valueByteSize : columns * valueByteSize;
+      return new SliceRowView(
+              hostBuffer.asSlice(startRow * rowSize, columns * valueByteSize),
+              columns,
+              valueLayout,
+              dataType,
+              valueByteSize);
+    }
   }
 
   @Override
@@ -199,9 +192,7 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
   }
 
   @Override
-  public void close() {
-    hostBuffer.close();
-  }
+  public void close() {}
 
   private static class CuVSDeviceMatrixDelegate implements CuVSDeviceMatrix, CuVSMatrixInternal {
     private final CuVSDeviceMatrixImpl deviceMatrix;
