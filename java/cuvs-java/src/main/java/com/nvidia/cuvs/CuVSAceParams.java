@@ -52,8 +52,7 @@ public class CuVSAceParams {
    */
   private final boolean useDisk;
 
-  private CuVSAceParams(
-      long npartitions, long efConstruction, String buildDir, boolean useDisk) {
+  private CuVSAceParams(long npartitions, long efConstruction, String buildDir, boolean useDisk) {
     this.npartitions = npartitions;
     this.efConstruction = efConstruction;
     this.buildDir = buildDir;
