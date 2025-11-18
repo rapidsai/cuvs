@@ -33,6 +33,7 @@ rapids-logger "Begin rust build"
 
 sccache --stop-server 2>/dev/null || true
 
+# shellcheck disable=SC2155
 export SCCACHE_S3_KEY_PREFIX="cuvs-rs/$(uname -m)/cuda${RAPIDS_CUDA_VERSION%.*}"
 
 # we need to set up LIBCLANG_PATH to allow rust bindgen to work,
