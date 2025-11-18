@@ -15,13 +15,44 @@ import java.lang.foreign.*;
 
 public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDeviceMatrix {
 
-  private long bufferedMatrixRowStart = 0;
-  private long bufferedMatrixRowEnd = 0;
+  private interface RowAccessStrategy {
+    RowView getRow(long row);
+  }
 
   private final CuVSResources resources;
 
   private final long rowStride;
   private final long columnStride;
+  private final long rowSize;
+  private final long valueByteSize;
+
+  private final RowAccessStrategy rowAccessStrategy;
+
+  private class BufferedRowAccessStrategy implements RowAccessStrategy {
+    private long bufferedMatrixRowStart = 0;
+    private long bufferedMatrixRowEnd = 0;
+
+    @Override
+    public RowView getRow(long row) {
+      try (var access = resources.access()) {
+        var hostBuffer = CuVSResourcesImpl.getHostBuffer(access);
+        if (row < bufferedMatrixRowStart || row >= bufferedMatrixRowEnd) {
+          long rowBytes = columns * valueByteSize;
+          var endRow = Math.min(row + (PinnedMemoryBuffer.CHUNK_BYTES / rowBytes), size);
+          populateBuffer(access, row, endRow, hostBuffer);
+          bufferedMatrixRowStart = row;
+          bufferedMatrixRowEnd = endRow;
+        }
+        var startRow = row - bufferedMatrixRowStart;
+        return new SliceRowView(
+            hostBuffer.asSlice(startRow * rowSize, columns * valueByteSize),
+            columns,
+            valueLayout,
+            dataType,
+            valueByteSize);
+      }
+    }
+  }
 
   protected CuVSDeviceMatrixImpl(
       CuVSResources resources,
@@ -46,6 +77,15 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
     this.resources = resources;
     this.rowStride = rowStride;
     this.columnStride = columnStride;
+
+    this.valueByteSize = valueLayout.byteSize();
+    this.rowSize = rowStride > 0 ? rowStride * valueByteSize : columns * valueByteSize;
+    //    if (rowSize > PinnedMemoryBuffer.CHUNK_BYTES) {
+    //      // The shared buffer is too small for this row size, use a direct access strategy
+    //      this.rowAccessStrategy = new DirectRowAccessStrategy();
+    //    } else {
+    this.rowAccessStrategy = new BufferedRowAccessStrategy();
+    //   }
   }
 
   @Override
@@ -60,10 +100,12 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
         arena, memorySegment, new long[] {size, columns}, strides, code(), bits(), kDLCUDA());
   }
 
-  private void populateBuffer(long startRow, MemorySegment bufferAddress) {
+  private void populateBuffer(
+      CuVSResources.ScopedAccess resourceAccess,
+      long startRow,
+      long endRow,
+      MemorySegment bufferAddress) {
     try (var localArena = Arena.ofConfined()) {
-      long rowBytes = columns * valueLayout.byteSize();
-      var endRow = Math.min(startRow + (PinnedMemoryBuffer.CHUNK_BYTES / rowBytes), size);
       var rowCount = endRow - startRow;
 
       MemorySegment sliceManagedTensor = DLManagedTensor.allocate(localArena);
@@ -81,37 +123,16 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
           prepareTensor(
               localArena, bufferAddress, new long[] {rowCount, columns}, code(), bits(), kDLCPU());
 
-      try (var resourceAccess = resources.access()) {
-        checkCuVSError(
-            cuvsMatrixCopy(resourceAccess.handle(), sliceManagedTensor, bufferTensor),
-            "cuvsMatrixCopy");
-        checkCuVSError(cuvsStreamSync(resourceAccess.handle()), "cuvsStreamSync");
-
-        bufferedMatrixRowStart = startRow;
-        bufferedMatrixRowEnd = endRow;
-      }
+      checkCuVSError(
+          cuvsMatrixCopy(resourceAccess.handle(), sliceManagedTensor, bufferTensor),
+          "cuvsMatrixCopy");
+      checkCuVSError(cuvsStreamSync(resourceAccess.handle()), "cuvsStreamSync");
     }
   }
 
   @Override
   public RowView getRow(long row) {
-    var valueByteSize = valueLayout.byteSize();
-    var startRow = row - bufferedMatrixRowStart;
-
-
-    try (var access = resources.access()) {
-      var hostBuffer = CuVSResourcesImpl.getHostBuffer(access);
-      if (row < bufferedMatrixRowStart || row >= bufferedMatrixRowEnd) {
-        populateBuffer(row, hostBuffer);
-      }
-      var rowSize = rowStride > 0 ? rowStride * valueByteSize : columns * valueByteSize;
-      return new SliceRowView(
-              hostBuffer.asSlice(startRow * rowSize, columns * valueByteSize),
-              columns,
-              valueLayout,
-              dataType,
-              valueByteSize);
-    }
+    return rowAccessStrategy.getRow(row);
   }
 
   @Override
