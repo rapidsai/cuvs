@@ -9,6 +9,7 @@ import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 
 import java.util.Random;
+import java.util.concurrent.*;
 
 @Fork(value = 1, warmups = 0)
 @State(Scope.Benchmark)
@@ -21,6 +22,8 @@ public class CuVSDeviceMatrixBenchmarks {
   private int size;
 
   private static final Random random = new Random();
+  private static final int ALLOCATIONS = 10_000;
+  private static final int NUM_THREADS = 10;
 
   private float[][] data;
 
@@ -92,5 +95,47 @@ public class CuVSDeviceMatrixBenchmarks {
       CuVSDeviceMatrix matrix = builder.build();
       matrix.close();
     }
+  }
+
+  @Benchmark
+  @Threads(1)
+  public void multipleDeviceAllocations() throws Throwable {
+    try (CuVSResources resources = CuVSResources.create()) {
+      for (int i = 0; i < ALLOCATIONS; ++i) {
+        var builder = CuVSMatrix.deviceBuilder(resources, size, dims, CuVSMatrix.DataType.FLOAT);
+        var matrix = builder.build();
+        matrix.close();
+      }
+    }
+  }
+
+  @Benchmark
+  @Threads(1)
+  public void multipleConcurrentDeviceAllocations() throws Throwable {
+    final var allocationsPerThread = ALLOCATIONS / NUM_THREADS;
+    Utils.runConcurrently(false, NUM_THREADS, () -> {
+      try (CuVSResources resources = CuVSResources.create()) {
+        for (int i = 0; i < allocationsPerThread; ++i) {
+          var builder = CuVSMatrix.deviceBuilder(resources, size, dims, CuVSMatrix.DataType.FLOAT);
+          var matrix = builder.build();
+          matrix.close();
+        }
+      }
+    });
+  }
+
+  @Benchmark
+  @Threads(1)
+  public void multipleConcurrentDeviceAllocationsWithPooledMemory() throws Throwable {
+    final var allocationsPerThread = ALLOCATIONS / NUM_THREADS;
+    Utils.runConcurrently(true, NUM_THREADS, () -> {
+      try (CuVSResources resources = CuVSResources.create()) {
+        for (int i = 0; i < allocationsPerThread; ++i) {
+          var builder = CuVSMatrix.deviceBuilder(resources, size, dims, CuVSMatrix.DataType.FLOAT);
+          var matrix = builder.build();
+          matrix.close();
+        }
+      }
+    });
   }
 }
