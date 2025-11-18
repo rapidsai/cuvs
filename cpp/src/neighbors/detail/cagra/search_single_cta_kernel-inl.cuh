@@ -55,8 +55,6 @@
 namespace cuvs::neighbors::cagra::detail {
 namespace single_cta_search {
 
-struct empty_t {};
-
 // #define _CLK_BREAKDOWN
 
 template <unsigned TOPK_BY_BITONIC_SORT, class INDEX_T>
