@@ -11,8 +11,79 @@
 #include <cuvs/preprocessing/quantize/pq.hpp>
 #include <raft/core/operators.hpp>
 #include <raft/matrix/init.cuh>
+#include <raft/matrix/sample_rows.cuh>
+#include <raft/matrix/slice.cuh>
 
 namespace cuvs::preprocessing::quantize::pq::detail {
+
+template <typename MathT, typename DatasetT>
+auto train_pq_subspaces(
+  const raft::resources& res,
+  const cuvs::neighbors::vpq_params& params,
+  const DatasetT& dataset,
+  std::optional<const raft::device_matrix_view<const MathT, uint32_t, raft::row_major>> vq_centers)
+  -> raft::device_matrix<MathT, uint32_t, raft::row_major>
+{
+  using ix_t              = int64_t;
+  const ix_t n_rows       = dataset.extent(0);
+  const ix_t dim          = dataset.extent(1);
+  const ix_t pq_dim       = params.pq_dim;
+  const ix_t pq_bits      = params.pq_bits;
+  const ix_t pq_n_centers = ix_t{1} << pq_bits;
+  const ix_t pq_len       = raft::div_rounding_up_safe(dim, pq_dim);
+  RAFT_EXPECTS((dim % pq_dim) == 0, "Dimension must be divisible by pq_dim");
+  const ix_t n_rows_train = n_rows * params.pq_kmeans_trainset_fraction;
+  raft::random::RngState random_state{137};
+
+  auto pq_trainset = raft::make_device_matrix<MathT, int64_t>(res, n_rows_train, dim);
+  raft::matrix::sample_rows<MathT, int64_t>(res, random_state, dataset, pq_trainset.view());
+
+  // Subtract VQ centers
+  if (vq_centers) {
+    auto vq_labels =
+      cuvs::neighbors::detail::predict_vq<uint32_t>(res, pq_trainset, vq_centers.value());
+    using index_type = typename DatasetT::index_type;
+    raft::linalg::map_offset(
+      res,
+      pq_trainset.view(),
+      [labels = vq_labels.view(), centers = vq_centers.value(), dim] __device__(index_type off,
+                                                                                MathT x) {
+        index_type i = off / dim;
+        index_type j = off % dim;
+        return x - centers(labels(i), j);
+      },
+      raft::make_const_mdspan(pq_trainset.view()));
+  }
+
+  // Train PQ centers for each subspace
+  vq_centers     = std::nullopt;  // not needed for subspace training
+  auto subparams = params;
+  subparams.pq_dim =
+    1;  // For VPQ, pq_dim is the number of subspaces, not the dimension of the subspaces
+  subparams.pq_kmeans_trainset_fraction = 1.0;
+  auto sub_dataset = raft::make_device_matrix<MathT, ix_t>(res, n_rows_train, pq_len);
+
+  auto pq_centers =
+    raft::make_device_matrix<MathT, uint32_t, raft::row_major>(res, pq_dim * pq_n_centers, pq_len);
+  for (ix_t m = 0; m < pq_dim; m++) {
+    ix_t sub_dim_start = m * pq_len;
+    ix_t sub_dim_end   = (m + 1) * pq_len;
+    raft::matrix::slice_coordinates<int64_t> sub_coords(
+      0, sub_dim_start, n_rows_train, sub_dim_end);
+    raft::matrix::slice(
+      res, raft::make_const_mdspan(pq_trainset.view()), sub_dataset.view(), sub_coords);
+
+    auto pq_code_book = cuvs::neighbors::detail::train_pq<MathT>(
+      res, subparams, raft::make_const_mdspan(sub_dataset.view()), vq_centers);
+    raft::copy(pq_centers.data_handle() + m * pq_code_book.size(),
+               pq_code_book.data_handle(),
+               pq_code_book.size(),
+               raft::resource::get_cuda_stream(res));
+  }
+
+  return pq_centers;
+}
+
 template <typename T>
 quantizer<T> train(raft::resources const& res,
                    const cuvs::preprocessing::quantize::pq::params params,
@@ -33,12 +104,22 @@ quantizer<T> train(raft::resources const& res,
   } else {
     vq_code_book_opt = raft::make_device_matrix<T, uint32_t, raft::row_major>(res, 0, 0);
   }
-
-  auto pq_code_book = cuvs::neighbors::detail::train_pq<T>(res, ps, dataset, vq_code_book_view_opt);
-  auto empty_codes  = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, 0, 0);
-  return {ps,
-          cuvs::neighbors::vpq_dataset<T, int64_t>{
-            std::move(vq_code_book_opt.value()), std::move(pq_code_book), std::move(empty_codes)}};
+  if (ps.use_subspaces) {
+    auto pq_code_book = train_pq_subspaces<T>(res, ps, dataset, vq_code_book_view_opt);
+    auto empty_codes  = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, 0, 0);
+    return {
+      ps,
+      cuvs::neighbors::vpq_dataset<T, int64_t>{
+        std::move(vq_code_book_opt.value()), std::move(pq_code_book), std::move(empty_codes)}};
+  } else {
+    auto pq_code_book =
+      cuvs::neighbors::detail::train_pq<T>(res, ps, dataset, vq_code_book_view_opt);
+    auto empty_codes = raft::make_device_matrix<uint8_t, int64_t, raft::row_major>(res, 0, 0);
+    return {
+      ps,
+      cuvs::neighbors::vpq_dataset<T, int64_t>{
+        std::move(vq_code_book_opt.value()), std::move(pq_code_book), std::move(empty_codes)}};
+  }
 }
 
 template <typename T, typename QuantI = uint8_t>
@@ -63,13 +144,23 @@ void transform(raft::resources const& res,
     vq_centers = raft::make_const_mdspan(quantizer.vpq_codebooks.vq_code_book.view());
   }
 
-  cuvs::neighbors::detail::process_and_fill_codes<T, int64_t>(
-    res,
-    quantizer.params_quantizer,
-    dataset,
-    vq_centers,
-    raft::make_const_mdspan(quantizer.vpq_codebooks.pq_code_book.view()),
-    out);
+  if (quantizer.params_quantizer.use_subspaces) {
+    cuvs::neighbors::detail::process_and_fill_codes_subspaces<T, int64_t>(
+      res,
+      quantizer.params_quantizer,
+      dataset,
+      vq_centers,
+      raft::make_const_mdspan(quantizer.vpq_codebooks.pq_code_book.view()),
+      out);
+  } else {
+    cuvs::neighbors::detail::process_and_fill_codes<T, int64_t>(
+      res,
+      quantizer.params_quantizer,
+      dataset,
+      vq_centers,
+      raft::make_const_mdspan(quantizer.vpq_codebooks.pq_code_book.view()),
+      out);
+  }
 }
 
 template <uint32_t BlockSize,
@@ -82,14 +173,16 @@ __launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_vectors_kernel(
   raft::device_matrix_view<const uint8_t, IdxT, raft::row_major> codes,
   raft::device_matrix_view<DataT, IdxT, raft::row_major> dataset,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
-  const uint32_t pq_dim,
-  std::optional<raft::device_matrix_view<const DataT, IdxT, raft::row_major>> vq_centers)
+  std::optional<raft::device_matrix_view<const DataT, IdxT, raft::row_major>> vq_centers,
+  bool use_subspaces)
 {
-  const uint32_t kSubWarpSize = raft::WarpSize;
-  using subwarp_align         = raft::Pow2<kSubWarpSize>;
+  const uint32_t kSubWarpSize  = raft::WarpSize;
+  constexpr uint32_t n_centers = 1 << PqBits;
+  using subwarp_align          = raft::Pow2<kSubWarpSize>;
   const IdxT row_ix = subwarp_align::div(IdxT{threadIdx.x} + IdxT{BlockSize} * IdxT{blockIdx.x});
   if (row_ix >= dataset.extent(0)) { return; }
-  uint32_t lane_id = subwarp_align::mod(raft::laneId());
+  uint32_t lane_id      = subwarp_align::mod(raft::laneId());
+  const uint32_t pq_len = raft::div_rounding_up_unsafe(dataset.extent(1), pq_centers.extent(1));
 
   const uint8_t* out_codes_ptr = &codes(row_ix, 0);
   LabelT vq_label              = 0;
@@ -98,14 +191,16 @@ __launch_bounds__(BlockSize) RAFT_KERNEL reconstruct_vectors_kernel(
     out_codes_ptr = (&codes(row_ix, 0)) + sizeof(LabelT);
   }
   cuvs::neighbors::ivf_pq::detail::bitfield_view_t<PqBits, const uint8_t> code_view{out_codes_ptr};
-  for (uint32_t j = lane_id; j < pq_dim; j += kSubWarpSize) {
-    uint8_t code = code_view[j];
+  for (uint32_t j = lane_id; j < pq_len; j += kSubWarpSize) {
+    const uint8_t code = code_view[j];
     for (uint32_t k = 0; k < pq_centers.extent(1); k++) {
-      const auto col = j * pq_centers.extent(1) + k;
+      const auto col                    = j * pq_centers.extent(1) + k;
+      const uint32_t pq_subspace_offset = use_subspaces ? n_centers * j : 0;
       if (vq_centers) {
-        dataset(row_ix, col) = pq_centers(code, k) + vq_centers.value()(vq_label, col);
+        dataset(row_ix, col) =
+          pq_centers(pq_subspace_offset + code, k) + vq_centers.value()(vq_label, col);
       } else {
-        dataset(row_ix, col) = pq_centers(code, k);
+        dataset(row_ix, col) = pq_centers(pq_subspace_offset + code, k);
       }
     }
   }
@@ -118,7 +213,8 @@ auto reconstruct_vectors(
   raft::device_matrix_view<const uint8_t, IdxT, raft::row_major> codes,
   raft::device_matrix_view<const MathT, uint32_t, raft::row_major> pq_centers,
   std::optional<raft::device_matrix_view<const DataT, uint32_t, raft::row_major>> vq_centers,
-  raft::device_matrix_view<DataT, IdxT, raft::row_major> out_vectors)
+  raft::device_matrix_view<DataT, IdxT, raft::row_major> out_vectors,
+  bool use_subspaces)
 {
   using data_t = DataT;
   using ix_t   = IdxT;
@@ -145,7 +241,7 @@ auto reconstruct_vectors(
     }
   }(pq_bits);
   dim3 blocks(raft::div_rounding_up_safe<ix_t>(n_rows, kBlockSize / threads_per_vec), 1, 1);
-  kernel<<<blocks, threads, 0, stream>>>(codes, out_vectors, pq_centers, pq_dim, vq_centers);
+  kernel<<<blocks, threads, 0, stream>>>(codes, out_vectors, pq_centers, vq_centers, use_subspaces);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   return codes;
@@ -181,6 +277,7 @@ void inverse_transform(raft::resources const& res,
     codes,
     raft::make_const_mdspan(quant.vpq_codebooks.pq_code_book.view()),
     vq_centers_opt,
-    out);
+    out,
+    quant.params_quantizer.use_subspaces);
 }
 }  // namespace cuvs::preprocessing::quantize::pq::detail

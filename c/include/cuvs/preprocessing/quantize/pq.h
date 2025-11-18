@@ -65,6 +65,12 @@ struct cuvsProductQuantizerParams {
    * When true, VQ is used before PQ. When false, only product quantization is used.
    */
   bool use_vq;
+  /**
+   * Whether to use subspaces for product quantization (PQ).
+   * When true, one PQ codebook is used for each subspace. Otherwise, a single
+   * PQ codebook is used.
+   */
+  bool use_subspaces;
 };
 
 typedef struct cuvsProductQuantizerParams* cuvsProductQuantizerParams_t;

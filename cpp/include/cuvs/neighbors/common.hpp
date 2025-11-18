@@ -79,7 +79,13 @@ struct vpq_params {
    * Whether to use vector quantization (VQ) before product quantization (PQ).
    * When true, VQ is used before PQ.
    */
-  bool use_vq = true;
+  bool use_vq = false;
+  /**
+   * Whether to use subspaces for product quantization (PQ).
+   * When true, one PQ codebook is used for each subspace. Otherwise, a single
+   * PQ codebook is used.
+   */
+  bool use_subspaces = true;
 };
 
 /** @} */  // end group cagra_cpp_index_params

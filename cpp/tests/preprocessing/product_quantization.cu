@@ -21,12 +21,12 @@ template <typename T>
 struct ProductQuantizationInputs {
   int n_samples;                                      // Number of samples in the dataset
   int n_features;                                     // Number of features in the dataset
-  int n_queries;                                      // Number of queries in the dataset
   uint32_t pq_bits;                                   // PQ bits
   uint32_t pq_dim;                                    // PQ dimension
   cuvs::cluster::kmeans::kmeans_type pq_kmeans_type;  // PQ kmeans type
   uint32_t n_vq_centers;                              // Number of VQ centers
   bool use_vq;                                        // Whether to use VQ
+  bool use_subspaces;                                 // Whether to use subspaces
   uint64_t seed;                                      // Random seed
 };
 
@@ -34,8 +34,8 @@ template <typename T>
 std::ostream& operator<<(std::ostream& os, const ProductQuantizationInputs<T>& inputs)
 {
   return os << "n_samples:" << inputs.n_samples << " n_features:" << inputs.n_features
-            << " n_queries:" << inputs.n_queries << " pq_bits:" << inputs.pq_bits
-            << " pq_dim:" << inputs.pq_dim << " pq_kmeans_type:" << (int)inputs.pq_kmeans_type
+            << " pq_bits:" << inputs.pq_bits << " pq_dim:" << inputs.pq_dim
+            << " pq_kmeans_type:" << (int)inputs.pq_kmeans_type
             << " n_vq_centers:" << inputs.n_vq_centers << " use_vq:" << inputs.use_vq
             << " seed:" << inputs.seed;
 }
@@ -93,12 +93,9 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
       stream(raft::resource::get_cuda_stream(handle)),
       dataset_(raft::make_device_matrix<T, int64_t, raft::row_major>(
         handle, params_.n_samples, params_.n_features)),
-      queries_(raft::make_device_matrix<T, int64_t, raft::row_major>(
-        handle, params_.n_queries, params_.n_features)),
       labels_(raft::make_device_vector<int64_t, int64_t>(handle, params_.n_samples)),
       n_samples_(params_.n_samples),
-      n_features_(params_.n_features),
-      n_queries_(params_.n_queries)
+      n_features_(params_.n_features)
   {
   }
 
@@ -122,9 +119,6 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
         static_cast<T>(-10.0),  // Center box min
         static_cast<T>(10.0),   // Center box max
         params_.seed);          // Random seed
-      raft::random::RngState r(params_.seed);
-      raft::random::uniform(
-        handle, r, queries_.data_handle(), n_queries_ * n_features_, T(-10.0), T(10.0));
     }
   }
 
@@ -217,11 +211,9 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
   ProductQuantizationInputs<T> params_;
   int n_samples_;
   int n_features_;
-  int n_queries_;
 
   raft::device_matrix<T, int64_t, raft::row_major> dataset_;
   raft::device_vector<int64_t, int64_t, raft::row_major> labels_;
-  raft::device_matrix<T, int64_t, raft::row_major> queries_;
   params config_;
 };
 
@@ -229,24 +221,25 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
 template <typename T>
 const std::vector<ProductQuantizationInputs<T>> inputs = {
   // Small dataset
-  {100, 32, 10, 4, 4, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, false, 42ULL},
+  {100, 64, 4, 8, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, false, false, 42ULL},
 
   // Small dataset with bigger dims
-  {100, 90, 10, 6, 10, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, false, 42ULL},
-  {100, 91, 50, 7, 7, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, true, 42ULL},
+  {100, 90, 6, 10, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, false, false, 42ULL},
+  {300, 128, 7, 32, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, true, true, 42ULL},
 
   // Medium dataset
-  {500, 40, 100, 5, 8, cuvs::cluster::kmeans::kmeans_type::KMeans, 0, false, 42ULL},
-  {500, 60, 100, 6, 6, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 4, true, 42ULL},
+  {500, 40, 5, 8, cuvs::cluster::kmeans::kmeans_type::KMeans, 0, false, false, 42ULL},
+  {500, 60, 6, 6, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 4, true, true, 42ULL},
+  {500, 128, 5, 8, cuvs::cluster::kmeans::kmeans_type::KMeans, 0, true, false, 42ULL},
 
   // Larger dataset
-  {1000, 40, 100, 4, 10, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, false, 42ULL},
-  {3000, 1024, 100, 4, 32, cuvs::cluster::kmeans::kmeans_type::KMeans, 0, false, 42ULL},
-  {1000, 2048, 100, 4, 128, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, true, 42ULL},
+  {1000, 40, 4, 10, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, false, false, 42ULL},
+  {3000, 1024, 4, 32, cuvs::cluster::kmeans::kmeans_type::KMeans, 0, false, false, 42ULL},
+  {1000, 2048, 4, 128, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, true, true, 42ULL},
 
   // Benchmark datasets
-  {50000, 1024, 100, 8, 128, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, false, 42ULL},
-  {50000, 2048, 100, 8, 128, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 10, true, 42ULL}};
+  {50000, 1024, 8, 128, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 0, false, true, 42ULL},
+  {50000, 2048, 8, 128, cuvs::cluster::kmeans::kmeans_type::KMeansBalanced, 10, true, true, 42ULL}};
 
 typedef ProductQuantizationTest<float> ProductQuantizationTestF;
 TEST_P(ProductQuantizationTestF, Result) { this->testProductQuantizationFromDataset(); }

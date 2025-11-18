@@ -53,6 +53,10 @@ cdef class QuantizerParams:
     use_vq: bool
         specifies whether to use vector quantization (VQ) before product
         quantization (PQ).
+    use_subspaces: bool
+        specifies whether to use subspaces for product quantization (PQ).
+        When true, one PQ codebook is used for each subspace. Otherwise, a
+        single PQ codebook is used.
     """
 
     cdef cuvsProductQuantizerParams * params
@@ -67,7 +71,8 @@ cdef class QuantizerParams:
                  kmeans_n_iters=25, vq_kmeans_trainset_fraction=0.0,
                  pq_kmeans_trainset_fraction=0.0,
                  pq_kmeans_type="kmeans_balanced",
-                 use_vq=True):
+                 use_vq=False,
+                 use_subspaces=True):
         if pq_bits not in [4, 5, 6, 7, 8]:
             raise ValueError("pq_bits must be one of [4, 5, 6, 7, 8]")
         self.params.pq_bits = pq_bits
@@ -79,6 +84,7 @@ cdef class QuantizerParams:
         pq_kmeans_type_c = PQ_KMEANS_TYPES[pq_kmeans_type]
         self.params.pq_kmeans_type = <cuvsKMeansType>pq_kmeans_type_c
         self.params.use_vq = use_vq
+        self.params.use_subspaces = use_subspaces
 
     @property
     def pq_bits(self):
@@ -111,6 +117,10 @@ cdef class QuantizerParams:
     @property
     def use_vq(self):
         return self.params.use_vq
+
+    @property
+    def use_subspaces(self):
+        return self.params.use_subspaces
 
 
 cdef class Quantizer:

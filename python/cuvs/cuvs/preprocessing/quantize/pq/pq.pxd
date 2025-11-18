@@ -23,6 +23,7 @@ cdef extern from "cuvs/preprocessing/quantize/pq.h" nogil:
         double pq_kmeans_trainset_fraction
         cuvsKMeansType pq_kmeans_type
         bool use_vq
+        bool use_subspaces
 
     ctypedef cuvsProductQuantizerParams* cuvsProductQuantizerParams_t
 

@@ -106,7 +106,7 @@ inline int64_t get_quantized_dim(const params& config)
     return sizeof(LabelT) * (1 + raft::div_rounding_up_safe<int64_t>(config.pq_dim * config.pq_bits,
                                                                      8 * sizeof(LabelT)));
   } else {
-    return config.pq_dim * config.pq_bits;
+    return raft::div_rounding_up_safe<int64_t>(config.pq_dim * config.pq_bits, 8);
   }
 }
 
