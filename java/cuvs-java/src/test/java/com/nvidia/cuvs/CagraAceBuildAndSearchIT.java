@@ -15,7 +15,6 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -174,8 +173,7 @@ public class CagraAceBuildAndSearchIT extends CuVSTestCase {
 
         // Verify ACE created the expected output files in the build directory
         assertTrue(
-            "CAGRA graph file should exist",
-            Files.exists(buildDir.resolve("cagra_graph.npy")));
+            "CAGRA graph file should exist", Files.exists(buildDir.resolve("cagra_graph.npy")));
         assertTrue(
             "Reordered dataset file should exist",
             Files.exists(buildDir.resolve("reordered_dataset.npy")));
