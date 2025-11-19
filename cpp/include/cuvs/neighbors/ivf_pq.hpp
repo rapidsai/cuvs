@@ -23,9 +23,6 @@
 
 namespace cuvs::neighbors::ivf_pq {
 
-template <typename IdxT>
-class index_iface;
-
 /**
  * @defgroup ivf_pq_cpp_index_params IVF-PQ index build parameters
  * @{
