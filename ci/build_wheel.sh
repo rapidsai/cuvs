@@ -11,6 +11,10 @@ source rapids-configure-sccache
 source rapids-date-string
 source rapids-init-pip
 
+# shellcheck disable=SC2155
+export SCCACHE_S3_PREPROCESSOR_CACHE_KEY_PREFIX="${package_name}/${RAPIDS_CONDA_ARCH}/cuda${RAPIDS_CUDA_VERSION%%.*}/wheel/preprocessor-cache"
+export SCCACHE_S3_USE_PREPROCESSOR_CACHE_MODE=true
+
 rapids-generate-version > ./VERSION
 
 cd "${package_dir}"
@@ -52,6 +56,7 @@ rapids-pip-retry wheel \
     .
 
 sccache --show-adv-stats
+sccache --stop-server >/dev/null 2>&1 || true
 
 # repair wheels and write to the location that artifact-uploading code expects to find them
 python -m auditwheel repair -w "${RAPIDS_WHEEL_BLD_OUTPUT_DIR}" "${EXCLUDE_ARGS[@]}" dist/*

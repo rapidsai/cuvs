@@ -56,7 +56,6 @@ rapids-logger "Begin cpp build"
 
 sccache --stop-server 2>/dev/null || true
 
-
 RAPIDS_PACKAGE_VERSION=$(rapids-generate-version)
 export RAPIDS_PACKAGE_VERSION
 
@@ -76,6 +75,9 @@ scl enable gcc-toolset-${TOOLSET_VERSION} -- \
             -DCUVS_STATIC_RAPIDS_LIBRARIES=ON
 cmake --build cpp/build "-j${PARALLEL_LEVEL}"
 
+sccache --show-adv-stats
+sccache --stop-server >/dev/null 2>&1 || true
+
 rapids-logger "Begin c build"
 
 scl enable gcc-toolset-${TOOLSET_VERSION} -- \
@@ -85,6 +87,9 @@ scl enable gcc-toolset-${TOOLSET_VERSION} -- \
             -DCMAKE_PREFIX_PATH="$PWD/cpp/build/" \
             -DBUILD_TESTS=${BUILD_C_LIB_TESTS}
 cmake --build c/build "-j${PARALLEL_LEVEL}"
+
+sccache --show-adv-stats
+sccache --stop-server >/dev/null 2>&1 || true
 
 rapids-logger "Begin c install"
 cmake --install c/build --prefix c/build/install
@@ -104,5 +109,3 @@ fi
 rapids-logger "Begin c tarball creation"
 tar czf libcuvs_c.tar.gz -C c/build/install/ .
 ls -lh libcuvs_c.tar.gz
-
-sccache --show-adv-stats

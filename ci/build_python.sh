@@ -19,8 +19,6 @@ version=$(rapids-generate-version)
 export RAPIDS_PACKAGE_VERSION=${version}
 echo "${version}" > VERSION
 
-sccache --stop-server 2>/dev/null || true
-
 # populates `RATTLER_CHANNELS` array and `RATTLER_ARGS` array
 source rapids-rattler-channel-string
 
@@ -28,9 +26,9 @@ rapids-logger "Prepending channel ${CPP_CHANNEL} to RATTLER_CHANNELS"
 
 RATTLER_CHANNELS=("--channel" "${CPP_CHANNEL}" "${RATTLER_CHANNELS[@]}")
 
-sccache --stop-server 2>/dev/null || true
-
 rapids-logger "Building cuvs"
+
+sccache --stop-server 2>/dev/null || true
 
 # --no-build-id allows for caching with `sccache`
 # more info is available at
@@ -40,7 +38,7 @@ rattler-build build --recipe conda/recipes/cuvs \
                     "${RATTLER_CHANNELS[@]}"
 
 sccache --show-adv-stats
-sccache --stop-server 2>/dev/null || true
+sccache --stop-server >/dev/null 2>&1 || true
 
 rattler-build build --recipe conda/recipes/cuvs-bench \
                     --test skip \
@@ -48,7 +46,7 @@ rattler-build build --recipe conda/recipes/cuvs-bench \
                     "${RATTLER_CHANNELS[@]}"
 
 sccache --show-adv-stats
-sccache --stop-server 2>/dev/null || true
+sccache --stop-server >/dev/null 2>&1 || true
 
 # Build cuvs-bench-cpu only in one CUDA major version since it only depends on
 # python version
@@ -58,4 +56,5 @@ if [[ ${RAPIDS_CUDA_MAJOR} == "13" ]]; then
                       "${RATTLER_ARGS[@]}" \
                       "${RATTLER_CHANNELS[@]}"
   sccache --show-adv-stats
+  sccache --stop-server >/dev/null 2>&1 || true
 fi
