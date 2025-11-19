@@ -268,7 +268,7 @@ void make_rotation_matrix(raft::resources const& res,
                        index->rotation_matrix().data_handle());
 }
 
-void set_centers(raft::resources const& handle,
+void transform_centers(raft::resources const& handle,
                  index<int64_t>* index,
                  raft::device_matrix_view<const float, uint32_t, raft::row_major> cluster_centers)
 {
@@ -278,7 +278,7 @@ void set_centers(raft::resources const& handle,
     cluster_centers.extent(1) == index->dim() || cluster_centers.extent(1) == index->dim_ext(),
     "Number of columns in the new cluster centers must be equal to dim or dim_ext");
 
-  RAFT_EXPECTS(index->size() == 0, "set_centers requires an empty index.");
+  RAFT_EXPECTS(index->size() == 0, "transform_centers requires an empty index.");
 
   auto stream = raft::resource::get_cuda_stream(handle);
 
@@ -325,7 +325,7 @@ void set_centers(raft::resources const& handle,
   }
 }
 
-void set_centers(raft::resources const& handle,
+void transform_centers(raft::resources const& handle,
                  index<int64_t>* index,
                  raft::host_matrix_view<const float, uint32_t, raft::row_major> cluster_centers)
 {
@@ -335,7 +335,7 @@ void set_centers(raft::resources const& handle,
     cluster_centers.extent(1) == index->dim() || cluster_centers.extent(1) == index->dim_ext(),
     "Number of columns in the new cluster centers must be equal to dim or dim_ext");
 
-  RAFT_EXPECTS(index->size() == 0, "set_centers requires an empty index.");
+  RAFT_EXPECTS(index->size() == 0, "transform_centers requires an empty index.");
 
   auto stream = raft::resource::get_cuda_stream(handle);
 

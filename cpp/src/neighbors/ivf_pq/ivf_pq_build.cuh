@@ -1370,7 +1370,7 @@ auto build(raft::resources const& handle,
     // Make rotation matrix
     helpers::make_rotation_matrix(handle, &idx, params.force_random_rotation);
 
-    helpers::set_centers(handle, &idx, raft::make_const_mdspan(centers_view));
+    helpers::transform_centers(handle, &idx, raft::make_const_mdspan(centers_view));
 
     // Train PQ codebooks
     switch (idx.codebook_kind()) {
@@ -1681,7 +1681,7 @@ auto build(
   }
 
   if (!centers_rot.has_value()) {
-    helpers::set_centers(handle, &owning_index, centers);
+    helpers::transform_centers(handle, &owning_index, centers);
   } else {
     auto centers_rot_dev = raft::make_device_matrix<float, uint32_t>(
       handle, centers_rot.value().extent(0), centers_rot.value().extent(1));
@@ -1700,7 +1700,7 @@ auto build(
                  owning_index.centers().size(),
                  stream);
     } else {
-      helpers::set_centers(handle, &owning_index, centers);
+      helpers::transform_centers(handle, &owning_index, centers);
     }
   }
 

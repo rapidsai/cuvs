@@ -3059,7 +3059,7 @@ void make_rotation_matrix(raft::resources const& res,
  *   // recompute the state of the index
  *   cuvs::neighbors::ivf_pq::helpers::recompute_internal_state(res, index);
  *   // Write the IVF centroids
- *   cuvs::neighbors::ivf_pq::helpers::set_centers(
+ *   cuvs::neighbors::ivf_pq::helpers::transform_centers(
                     res,
                     &index,
                     cluster_centers);
@@ -3069,7 +3069,7 @@ void make_rotation_matrix(raft::resources const& res,
  * @param[inout] index pointer to IVF-PQ index
  * @param[in] cluster_centers new cluster centers [index.n_lists(), index.dim()]
  */
-void set_centers(raft::resources const& res,
+void transform_centers(raft::resources const& res,
                  index<int64_t>* index,
                  raft::device_matrix_view<const float, uint32_t> cluster_centers);
 
@@ -3090,7 +3090,7 @@ void set_centers(raft::resources const& res,
  *   // ... fill centers ...
  *
  *   // Set centers from host memory
- *   ivf_pq::helpers::set_centers(res, &index, centers.view());
+ *   ivf_pq::helpers::transform_centers(res, &index, centers.view());
  * @endcode
  *
  * Note: This function requires the index to be empty (no data added yet).
@@ -3102,7 +3102,7 @@ void set_centers(raft::resources const& res,
  * @param[in] cluster_centers new cluster centers on host memory [n_lists, dim] or [n_lists,
  * dim_ext]
  */
-void set_centers(raft::resources const& res,
+void transform_centers(raft::resources const& res,
                  index<int64_t>* index,
                  raft::host_matrix_view<const float, uint32_t> cluster_centers);
 
