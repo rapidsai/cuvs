@@ -1,36 +1,30 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package com.nvidia.cuvs;
 
 import java.util.Arrays;
-import java.util.List;
+import java.util.Objects;
+import java.util.function.LongToIntFunction;
 
 /**
  * HnswQuery holds the query vectors to be used while invoking search on the
  * HNSW index.
  *
+ * <p><strong>Thread Safety:</strong> Each HnswQuery instance should use its own
+ * CuVSResources object that is not shared with other threads. Sharing CuVSResources
+ * between threads can lead to memory allocation errors or JVM crashes.
+ *
  * @since 25.02
  */
 public class HnswQuery {
 
-  private HnswSearchParams hnswSearchParams;
-  private List<Integer> mapping;
-  private float[][] queryVectors;
-  private int topK;
+  private final HnswSearchParams hnswSearchParams;
+  private final LongToIntFunction mapping;
+  private final float[][] queryVectors;
+  private final int topK;
+  private final CuVSResources resources;
 
   /**
    * Constructs an instance of {@link HnswQuery} using queryVectors, mapping, and
@@ -38,14 +32,21 @@ public class HnswQuery {
    *
    * @param hnswSearchParams the search parameters to use
    * @param queryVectors     2D float query vector array
-   * @param mapping          an instance of ID mapping
+   * @param mapping          a function mapping ordinals (neighbor IDs) to custom user IDs
    * @param topK             the top k results to return
+   * @param resources        CuVSResources instance to use for this query
    */
-  private HnswQuery(HnswSearchParams hnswSearchParams, float[][] queryVectors, List<Integer> mapping, int topK) {
+  private HnswQuery(
+      HnswSearchParams hnswSearchParams,
+      float[][] queryVectors,
+      LongToIntFunction mapping,
+      int topK,
+      CuVSResources resources) {
     this.hnswSearchParams = hnswSearchParams;
     this.queryVectors = queryVectors;
     this.mapping = mapping;
     this.topK = topK;
+    this.resources = resources;
   }
 
   /**
@@ -67,11 +68,9 @@ public class HnswQuery {
   }
 
   /**
-   * Gets the passed map instance.
-   *
-   * @return a map of ID mappings
+   * Gets the function mapping ordinals (neighbor IDs) to custom user IDs
    */
-  public List<Integer> getMapping() {
+  public LongToIntFunction getMapping() {
     return mapping;
   }
 
@@ -84,20 +83,49 @@ public class HnswQuery {
     return topK;
   }
 
+  /**
+   * Gets the CuVSResources instance for this query.
+   *
+   * @return the CuVSResources instance
+   */
+  public CuVSResources getResources() {
+    return resources;
+  }
+
   @Override
   public String toString() {
-    return "HnswQuery [mapping=" + mapping + ", queryVectors=" + Arrays.toString(queryVectors) + ", topK=" + topK + "]";
+    return "HnswQuery [mapping="
+        + mapping
+        + ", queryVectors="
+        + Arrays.toString(queryVectors)
+        + ", topK="
+        + topK
+        + "]";
   }
 
   /**
-   * Builder helps configure and create an instance of BruteForceQuery.
+   * Builder helps configure and create an instance of HnswQuery.
    */
   public static class Builder {
 
     private HnswSearchParams hnswSearchParams;
     private float[][] queryVectors;
-    private List<Integer> mapping;
+    private LongToIntFunction mapping = SearchResults.IDENTITY_MAPPING;
     private int topK = 2;
+    private final CuVSResources resources;
+
+    /**
+     * Constructor that requires CuVSResources.
+     *
+     * <p><strong>Important:</strong> The provided CuVSResources instance should not be
+     * shared with other threads. Each thread performing searches should create its own
+     * CuVSResources instance to avoid memory allocation conflicts and potential JVM crashes.
+     *
+     * @param resources the CuVSResources instance to use for this query (must not be shared between threads)
+     */
+    public Builder(CuVSResources resources) {
+      this.resources = Objects.requireNonNull(resources, "resources cannot be null");
+    }
 
     /**
      * Sets the instance of configured HnswSearchParams to be passed for search.
@@ -123,12 +151,12 @@ public class HnswQuery {
     }
 
     /**
-     * Sets the instance of mapping to be used for ID mapping.
+     * Sets the function used to map ordinals (neighbor IDs) to custom user IDs
      *
-     * @param mapping the ID mapping instance
+     * @param mapping a function mapping ordinals (neighbor IDs) to custom user IDs
      * @return an instance of this Builder
      */
-    public Builder withMapping(List<Integer> mapping) {
+    public Builder withMapping(LongToIntFunction mapping) {
       this.mapping = mapping;
       return this;
     }
@@ -150,7 +178,7 @@ public class HnswQuery {
      * @return an instance of {@link HnswQuery}
      */
     public HnswQuery build() {
-      return new HnswQuery(hnswSearchParams, queryVectors, mapping, topK);
+      return new HnswQuery(hnswSearchParams, queryVectors, mapping, topK, resources);
     }
   }
 }

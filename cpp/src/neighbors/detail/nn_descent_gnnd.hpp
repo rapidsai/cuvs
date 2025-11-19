@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -207,11 +196,13 @@ class GNND {
   GNND(const GNND&)            = delete;
   GNND& operator=(const GNND&) = delete;
 
+  template <typename DistEpilogue_t = raft::identity_op>
   void build(Data_t* data,
              const Index_t nrow,
              Index_t* output_graph,
              bool return_distances,
-             DistData_t* output_distances);
+             DistData_t* output_distances,
+             DistEpilogue_t dist_epilogue = DistEpilogue_t{});
   ~GNND()    = default;
   using ID_t = InternalID_t<Index_t>;
   void reset(raft::resources const& res);
@@ -222,7 +213,9 @@ class GNND {
                          Index_t* d_rev_graph_ptr,
                          int2* list_sizes,
                          cudaStream_t stream = 0);
-  void local_join(cudaStream_t stream = 0);
+
+  template <typename DistEpilogue_t = raft::identity_op>
+  void local_join(cudaStream_t stream = 0, DistEpilogue_t dist_epilogue = DistEpilogue_t{});
 
   raft::resources const& res;
 
@@ -267,10 +260,11 @@ inline BuildConfig get_build_config(raft::resources const& res,
   auto allowed_metrics = params.metric == cuvs::distance::DistanceType::L2Expanded ||
                          params.metric == cuvs::distance::DistanceType::L2SqrtExpanded ||
                          params.metric == cuvs::distance::DistanceType::CosineExpanded ||
-                         params.metric == cuvs::distance::DistanceType::InnerProduct;
+                         params.metric == cuvs::distance::DistanceType::InnerProduct ||
+                         params.metric == cuvs::distance::DistanceType::BitwiseHamming;
   RAFT_EXPECTS(allowed_metrics,
-               "The metric for NN Descent should be L2Expanded, L2SqrtExpanded, CosineExpanded or "
-               "InnerProduct");
+               "The metric for NN Descent should be L2Expanded, L2SqrtExpanded, CosineExpanded, "
+               "InnerProduct or BitwiseHamming");
   RAFT_EXPECTS(
     metric == params.metric,
     "The metrics set in nn_descent::index_params and nn_descent::index are inconsistent");

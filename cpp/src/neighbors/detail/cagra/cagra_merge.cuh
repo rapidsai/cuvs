@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -44,6 +33,10 @@ index<T, IdxT> merge(raft::resources const& handle,
                      const cagra::merge_params& params,
                      std::vector<cuvs::neighbors::cagra::index<T, IdxT>*>& indices)
 {
+  // we're doing a physical merge here, make sure that this matches the merge_params
+  RAFT_EXPECTS(params.merge_strategy == cuvs::neighbors::MergeStrategy::MERGE_STRATEGY_PHYSICAL,
+               "cagra::merge only supports merge_strategy=MERGE_STRATEGY_PHYSICAL");
+
   using cagra_index_t = cuvs::neighbors::cagra::index<T, IdxT>;
   using ds_idx_type   = typename cagra_index_t::dataset_index_type;
 

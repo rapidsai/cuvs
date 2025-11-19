@@ -1,19 +1,7 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package com.nvidia.cuvs;
 
 /**
@@ -56,8 +44,8 @@ public class HnswIndexParams {
   private int numThreads = 2;
   private int vectorDimension;
 
-  private HnswIndexParams(CuvsHnswHierarchy hierarchy, int efConstruction, int numThreads,
-      int vectorDimension) {
+  private HnswIndexParams(
+      CuvsHnswHierarchy hierarchy, int efConstruction, int numThreads, int vectorDimension) {
     this.hierarchy = hierarchy;
     this.efConstruction = efConstruction;
     this.numThreads = numThreads;
@@ -98,8 +86,15 @@ public class HnswIndexParams {
 
   @Override
   public String toString() {
-    return "HnswIndexParams [hierarchy=" + hierarchy + ", efConstruction=" + efConstruction + ", numThreads="
-        + numThreads + ", vectorDimension=" + vectorDimension + "]";
+    return "HnswIndexParams [hierarchy="
+        + hierarchy
+        + ", efConstruction="
+        + efConstruction
+        + ", numThreads="
+        + numThreads
+        + ", vectorDimension="
+        + vectorDimension
+        + "]";
   }
 
   /**
@@ -115,7 +110,7 @@ public class HnswIndexParams {
     /**
      * Constructs this Builder with an instance of Arena.
      */
-    public Builder() { }
+    public Builder() {}
 
     /**
      * Sets the hierarchy for HNSW index when converting from CAGRA index.

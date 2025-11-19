@@ -1,4 +1,5 @@
-# Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 schema_version: 1
 
 context:
@@ -57,13 +58,12 @@ requirements:
     - ninja
     - ${{ stdlib("c") }}
   host:
-    - benchmark
     - glog ${{ glog_version }}
     - nlohmann_json ${{ nlohmann_json_version }}
     - openblas
     - pip
     - python =${{ py_version }}
-    - rapids-build-backend>=0.3.0,<0.4.0.dev0
+    - rapids-build-backend>=0.4.0,<0.5.0.dev0
     - setuptools >=64.0.0
     - if: linux64
       then:
@@ -71,7 +71,6 @@ requirements:
         - libboost-devel=1.87
         - mkl-devel=2023
   run:
-    - benchmark
     - click
     - glog ${{ glog_version }}
     - h5py ${{ h5py_version }}
@@ -88,7 +87,6 @@ requirements:
   ignore_run_exports:
     by_name:
       - glog
-      - libaio
       - libboost
       - libcublas
       - mkl  # relaxes pin from host `mkl-devel`

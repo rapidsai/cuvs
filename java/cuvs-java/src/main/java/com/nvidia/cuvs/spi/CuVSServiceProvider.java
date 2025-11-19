@@ -1,23 +1,13 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package com.nvidia.cuvs.spi;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.ServiceLoader;
 
 /**
@@ -38,31 +28,40 @@ public abstract class CuVSServiceProvider {
     private static CuVSProvider loadProvider() {
       var builtinProvider = builtinProvider();
       return ServiceLoader.load(CuVSServiceProvider.class)
-              .findFirst()
-              .map(p -> p.get(builtinProvider))
-              .orElse(builtinProvider);
+          .findFirst()
+          .map(p -> p.get(builtinProvider))
+          .orElse(builtinProvider);
     }
 
     static CuVSProvider builtinProvider() {
-      if (Runtime.version().feature() > 21 && isLinuxAmd64()) {
+      var supportedJavaRuntime = Runtime.version().feature() > 21;
+      var supportedOs = System.getProperty("os.name").startsWith("Linux");
+      var supportedArchitecture = System.getProperty("os.arch").equals("amd64");
+      if (supportedJavaRuntime && supportedOs && supportedArchitecture) {
         try {
           var cls = Class.forName("com.nvidia.cuvs.spi.JDKProvider");
-          var ctr = MethodHandles.lookup().findConstructor(cls, MethodType.methodType(void.class));
+          var ctr =
+              MethodHandles.lookup()
+                  .findStatic(cls, "create", MethodType.methodType(CuVSProvider.class));
           return (CuVSProvider) ctr.invoke();
+        } catch (ProviderInitializationException e) {
+          return new UnsupportedProvider("Cannot create JDKProvider: " + e.getMessage());
         } catch (Throwable e) {
           throw new AssertionError(e);
         }
       }
-      return new UnsupportedProvider();
-    }
+      List<String> unsupportedReasons = new ArrayList<>();
+      if (!supportedJavaRuntime) {
+        unsupportedReasons.add("cuvs-java requires Java Runtime version 22 or greater");
+      }
+      if (!supportedOs) {
+        unsupportedReasons.add("cuvs-java supports only Linux");
+      }
+      if (!supportedArchitecture) {
+        unsupportedReasons.add("cuvs-java supports only x86");
+      }
 
-    /**
-     * Returns true iff the architecture is x64 (amd64) and the OS Linux
-     * (the * OS we currently support for the native lib).
-     */
-    static boolean isLinuxAmd64() {
-      String name = System.getProperty("os.name");
-      return (name.startsWith("Linux")) && System.getProperty("os.arch").equals("amd64");
+      return new UnsupportedProvider(String.join("; ", unsupportedReasons));
     }
   }
 }

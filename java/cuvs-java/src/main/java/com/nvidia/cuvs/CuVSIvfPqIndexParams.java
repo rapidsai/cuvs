@@ -1,19 +1,7 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package com.nvidia.cuvs;
 
 import com.nvidia.cuvs.CagraIndexParams.CodebookGen;
@@ -120,9 +108,19 @@ public class CuVSIvfPqIndexParams {
    */
   private final int maxTrainPointsPerPqCode;
 
-  private CuVSIvfPqIndexParams(CuvsDistanceType metric, CodebookGen codebookKind, float metricArg,
-      double kmeansTrainsetFraction, int nLists, int kmeansNIters, int pqBits, int pqDim, boolean addDataOnBuild,
-      boolean forceRandomRotation, boolean conservativeMemoryAllocation, int maxTrainPointsPerPqCode) {
+  private CuVSIvfPqIndexParams(
+      CuvsDistanceType metric,
+      CodebookGen codebookKind,
+      float metricArg,
+      double kmeansTrainsetFraction,
+      int nLists,
+      int kmeansNIters,
+      int pqBits,
+      int pqDim,
+      boolean addDataOnBuild,
+      boolean forceRandomRotation,
+      boolean conservativeMemoryAllocation,
+      int maxTrainPointsPerPqCode) {
     super();
     this.metric = metric;
     this.codebookKind = codebookKind;
@@ -250,11 +248,31 @@ public class CuVSIvfPqIndexParams {
 
   @Override
   public String toString() {
-    return "CuVSIvfPqIndexParams [metric=" + metric + ", codebookKind=" + codebookKind + ", metricArg=" + metricArg
-        + ", kmeansTrainsetFraction=" + kmeansTrainsetFraction + ", nLists=" + nLists + ", kmeansNIters=" + kmeansNIters
-        + ", pqBits=" + pqBits + ", pqDim=" + pqDim + ", addDataOnBuild=" + addDataOnBuild + ", forceRandomRotation="
-        + forceRandomRotation + ", conservativeMemoryAllocation=" + conservativeMemoryAllocation
-        + ", maxTrainPointsPerPqCode=" + maxTrainPointsPerPqCode + "]";
+    return "CuVSIvfPqIndexParams [metric="
+        + metric
+        + ", codebookKind="
+        + codebookKind
+        + ", metricArg="
+        + metricArg
+        + ", kmeansTrainsetFraction="
+        + kmeansTrainsetFraction
+        + ", nLists="
+        + nLists
+        + ", kmeansNIters="
+        + kmeansNIters
+        + ", pqBits="
+        + pqBits
+        + ", pqDim="
+        + pqDim
+        + ", addDataOnBuild="
+        + addDataOnBuild
+        + ", forceRandomRotation="
+        + forceRandomRotation
+        + ", conservativeMemoryAllocation="
+        + conservativeMemoryAllocation
+        + ", maxTrainPointsPerPqCode="
+        + maxTrainPointsPerPqCode
+        + "]";
   }
 
   /**
@@ -361,8 +379,7 @@ public class CuVSIvfPqIndexParams {
      */
     private int maxTrainPointsPerPqCode = 256;
 
-    public Builder() {
-    }
+    public Builder() {}
 
     /**
      * Sets the distance type.
@@ -506,8 +523,19 @@ public class CuVSIvfPqIndexParams {
      * @return an instance of {@link CuVSIvfPqIndexParams}
      */
     public CuVSIvfPqIndexParams build() {
-      return new CuVSIvfPqIndexParams(metric, codebookKind, metricArg, kmeansTrainsetFraction, nLists, kmeansNIters,
-          pqBits, pqDim, addDataOnBuild, forceRandomRotation, conservativeMemoryAllocation, maxTrainPointsPerPqCode);
+      return new CuVSIvfPqIndexParams(
+          metric,
+          codebookKind,
+          metricArg,
+          kmeansTrainsetFraction,
+          nLists,
+          kmeansNIters,
+          pqBits,
+          pqDim,
+          addDataOnBuild,
+          forceRandomRotation,
+          conservativeMemoryAllocation,
+          maxTrainPointsPerPqCode);
     }
   }
 }

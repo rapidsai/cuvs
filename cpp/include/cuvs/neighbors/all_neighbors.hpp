@@ -1,50 +1,24 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
-#include <cuvs/neighbors/ivf_pq.hpp>
-#include <cuvs/neighbors/nn_descent.hpp>
-
+#include <cuvs/neighbors/graph_build_types.hpp>
 #include <variant>
 
 namespace cuvs::neighbors::all_neighbors {
+// For re-exporting into all_neighbors namespace
+namespace graph_build_params = cuvs::neighbors::graph_build_params;
 /**
  * @defgroup all_neighbors_cpp_params The all-neighbors algorithm parameters.
  * @{
  */
 
-/**
- * @brief Parameters used to build an all-neighbors knn graph (find nearest neighbors for all the
- * training vectors)
- */
-namespace graph_build_params {
-
-/** Specialized parameters utilizing IVF-PQ to build knn graph */
-struct ivf_pq_params {
-  cuvs::neighbors::ivf_pq::index_params build_params;
-  cuvs::neighbors::ivf_pq::search_params search_params;
-  float refinement_rate = 2.0;
-};
-
-using nn_descent_params = cuvs::neighbors::nn_descent::index_params;
-}  // namespace graph_build_params
-
-using GraphBuildParams =
-  std::variant<graph_build_params::ivf_pq_params, graph_build_params::nn_descent_params>;
+using GraphBuildParams = std::variant<graph_build_params::ivf_pq_params,
+                                      graph_build_params::nn_descent_params,
+                                      graph_build_params::brute_force_params>;
 
 /**
  * @brief Parameters used to build an all-neighbors graph (find nearest neighbors for all the
@@ -59,11 +33,12 @@ using GraphBuildParams =
  */
 struct all_neighbors_params {
   /** Parameters for knn graph building algorithm
-   * Approximate nearest neighbors methods are used to build the knn graph. Currently supported
-   * options are 'IVF-PQ' and 'NN Descent'. IVF-PQ is more accurate, but slower compared to NN
-   * Descent.
+   * Approximate nearest neighbors methods or a brute force approach are supported to build the knn
+   * graph. Currently supported options are 'IVF-PQ', 'NN Descent', or 'Brute Force'. IVF-PQ is more
+   * accurate, but slower compared to NN Descent. Note that 'Brute Force' can also be approximate if
+   * n_clusters > 1.
    *
-   * Set ivf_pq_params, or nn_descent_params to select the graph build
+   * Set ivf_pq_params, nn_descent_params, or brute_force_params to select the graph build
    * algorithm and control their parameters.
    *
    * @code{.cpp}
@@ -73,6 +48,9 @@ struct all_neighbors_params {
    *
    * // 2. Choose NN Descent algorithm for kNN graph construction
    * params.graph_build_params = all_neighbors::graph_build_params::nn_descent_params{};
+   *
+   * // 3. Choose Brute Force algorithm for kNN graph construction
+   * params.graph_build_params = all_neighbors::graph_build_params::brute_force_params{};
    *
    * @endcode
    */
@@ -137,13 +115,19 @@ struct all_neighbors_params {
  *                in host memory
  * @param[out] indices nearest neighbor indices of shape [n_row x k]
  * @param[out] distances nearest neighbor distances [n_row x k]
+ * @param[out] core_distances array for core distances of size [n_row]. Requires distances matrix to
+ * compute core_distances. If core_distances is given, the resulting indices and distances will be
+ * mutual reachability space.
+ * @param[in] alpha distance scaling parameter as used in robust single linkage.
  */
 void build(
   const raft::resources& handle,
   const all_neighbors_params& params,
   raft::host_matrix_view<const float, int64_t, row_major> dataset,
   raft::device_matrix_view<int64_t, int64_t, row_major> indices,
-  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances = std::nullopt);
+  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances      = std::nullopt,
+  std::optional<raft::device_vector_view<float, int64_t, row_major>> core_distances = std::nullopt,
+  float alpha                                                                       = 1.0);
 
 /**
  * @brief Builds an approximate all-neighbors knn graph (find nearest neighbors for all the training
@@ -167,13 +151,19 @@ void build(
  *                in device memory
  * @param[out] indices nearest neighbor indices of shape [n_row x k]
  * @param[out] distances nearest neighbor distances [n_row x k]
+ * @param[out] core_distances array for core distances of size [n_row]. Requires distances matrix to
+ * compute core_distances. If core_distances is given, the resulting indices and distances will be
+ * mutual reachability space.
+ * @param[in] alpha distance scaling parameter as used in robust single linkage.
  */
 void build(
   const raft::resources& handle,
   const all_neighbors_params& params,
   raft::device_matrix_view<const float, int64_t, row_major> dataset,
   raft::device_matrix_view<int64_t, int64_t, row_major> indices,
-  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances = std::nullopt);
+  std::optional<raft::device_matrix_view<float, int64_t, row_major>> distances      = std::nullopt,
+  std::optional<raft::device_vector_view<float, int64_t, row_major>> core_distances = std::nullopt,
+  float alpha                                                                       = 1.0);
 
 /** @} */
 }  // namespace cuvs::neighbors::all_neighbors

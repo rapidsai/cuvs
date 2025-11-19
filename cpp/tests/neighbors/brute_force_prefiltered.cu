@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "../test_utils.cuh"
@@ -21,6 +10,7 @@
 #include <cuvs/neighbors/brute_force.hpp>
 
 #include <raft/core/host_mdspan.hpp>
+#include <raft/linalg/unary_op.cuh>
 #include <raft/matrix/copy.cuh>
 #include <raft/random/make_blobs.cuh>
 #include <raft/random/rmat_rectangular_generator.cuh>
@@ -32,10 +22,6 @@
 #include <gtest/gtest.h>
 
 #include <cuda_fp16.h>
-#include <thrust/device_vector.h>
-#include <thrust/iterator/transform_iterator.h>
-#include <thrust/reduce.h>
-#include <thrust/transform.h>
 
 #include <algorithm>
 #include <cmath>
@@ -431,28 +417,19 @@ class PrefilteredBruteForceOnBitmapTest
     raft::copy(dataset_h.data(), blobs_in_val.data_handle(), dataset_size, stream);
 
     if constexpr (std::is_same_v<value_t, half>) {
-      thrust::device_ptr<dist_t> d_output_ptr =
-        thrust::device_pointer_cast(blobs_in_val.data_handle());
-      thrust::device_ptr<value_t> d_value_ptr = thrust::device_pointer_cast(dataset_d.data());
-      thrust::transform(thrust::cuda::par.on(stream),
-                        d_output_ptr,
-                        d_output_ptr + dataset_size,
-                        d_value_ptr,
-                        float_to_half());
+      raft::linalg::unaryOp(
+        dataset_d.data(), blobs_in_val.data_handle(), dataset_size, float_to_half(), stream);
     } else {
       raft::copy(dataset_d.data(), blobs_in_val.data_handle(), dataset_size, stream);
     }
 
     raft::copy(queries_h.data(), blobs_in_val.data_handle() + dataset_size, queries_size, stream);
     if constexpr (std::is_same_v<value_t, half>) {
-      thrust::device_ptr<dist_t> d_output_ptr =
-        thrust::device_pointer_cast(blobs_in_val.data_handle() + dataset_size);
-      thrust::device_ptr<value_t> d_value_ptr = thrust::device_pointer_cast(queries_d.data());
-      thrust::transform(thrust::cuda::par.on(stream),
-                        d_output_ptr,
-                        d_output_ptr + queries_size,
-                        d_value_ptr,
-                        float_to_half());
+      raft::linalg::unaryOp(queries_d.data(),
+                            blobs_in_val.data_handle() + dataset_size,
+                            queries_size,
+                            float_to_half(),
+                            stream);
     } else {
       raft::copy(queries_d.data(), blobs_in_val.data_handle() + dataset_size, queries_size, stream);
     }
@@ -861,28 +838,19 @@ class PrefilteredBruteForceOnBitsetTest
     raft::copy(dataset_h.data(), blobs_in_val.data_handle(), dataset_size, stream);
 
     if constexpr (std::is_same_v<value_t, half>) {
-      thrust::device_ptr<dist_t> d_output_ptr =
-        thrust::device_pointer_cast(blobs_in_val.data_handle());
-      thrust::device_ptr<value_t> d_value_ptr = thrust::device_pointer_cast(dataset_d.data());
-      thrust::transform(thrust::cuda::par.on(stream),
-                        d_output_ptr,
-                        d_output_ptr + dataset_size,
-                        d_value_ptr,
-                        float_to_half());
+      raft::linalg::unaryOp(
+        dataset_d.data(), blobs_in_val.data_handle(), dataset_size, float_to_half(), stream);
     } else {
       raft::copy(dataset_d.data(), blobs_in_val.data_handle(), dataset_size, stream);
     }
 
     raft::copy(queries_h.data(), blobs_in_val.data_handle() + dataset_size, queries_size, stream);
     if constexpr (std::is_same_v<value_t, half>) {
-      thrust::device_ptr<dist_t> d_output_ptr =
-        thrust::device_pointer_cast(blobs_in_val.data_handle() + dataset_size);
-      thrust::device_ptr<value_t> d_value_ptr = thrust::device_pointer_cast(queries_d.data());
-      thrust::transform(thrust::cuda::par.on(stream),
-                        d_output_ptr,
-                        d_output_ptr + queries_size,
-                        d_value_ptr,
-                        float_to_half());
+      raft::linalg::unaryOp(queries_d.data(),
+                            blobs_in_val.data_handle() + dataset_size,
+                            queries_size,
+                            float_to_half(),
+                            stream);
     } else {
       raft::copy(queries_d.data(), blobs_in_val.data_handle() + dataset_size, queries_size, stream);
     }

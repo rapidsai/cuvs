@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2021-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "../test_utils.cuh"
@@ -23,15 +12,14 @@
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resource/thrust_policy.hpp>
+#include <raft/linalg/unary_op.cuh>
 #include <raft/random/make_blobs.cuh>
 #include <raft/util/cudart_utils.hpp>
 
 #include <rmm/device_uvector.hpp>
 #include <rmm/exec_policy.hpp>
 
-#include <thrust/count.h>
 #include <thrust/fill.h>
-#include <thrust/transform.h>
 
 #include <gtest/gtest.h>
 
@@ -193,16 +181,10 @@ class BallCoverKNNQueryTest : public ::testing::TestWithParam<BallCoverInputs<va
                                          raft::resource::get_cuda_stream(handle));
 
     if (metric == cuvs::distance::DistanceType::Haversine) {
-      thrust::transform(raft::resource::get_thrust_policy(handle),
-                        X.data(),
-                        X.data() + X.size(),
-                        X.data(),
-                        ToRadians());
-      thrust::transform(raft::resource::get_thrust_policy(handle),
-                        X2.data(),
-                        X2.data() + X2.size(),
-                        X2.data(),
-                        ToRadians());
+      raft::linalg::unaryOp(
+        X.data(), X.data(), X.size(), ToRadians(), raft::resource::get_cuda_stream(handle));
+      raft::linalg::unaryOp(
+        X2.data(), X2.data(), X2.size(), ToRadians(), raft::resource::get_cuda_stream(handle));
     }
 
     compute_bfknn(handle,
@@ -305,11 +287,8 @@ class BallCoverAllKNNTest : public ::testing::TestWithParam<BallCoverInputs<valu
       (const value_t*)X.data(), params.n_rows, params.n_cols);
 
     if (metric == cuvs::distance::DistanceType::Haversine) {
-      thrust::transform(raft::resource::get_thrust_policy(handle),
-                        X.data(),
-                        X.data() + X.size(),
-                        X.data(),
-                        ToRadians());
+      raft::linalg::unaryOp(
+        X.data(), X.data(), X.size(), ToRadians(), raft::resource::get_cuda_stream(handle));
     }
 
     compute_bfknn(handle,

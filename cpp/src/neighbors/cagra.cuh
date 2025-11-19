@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -22,10 +11,12 @@
 #include "detail/cagra/cagra_search.cuh"
 #include "detail/cagra/graph_core.cuh"
 
+#include "detail/ann_utils.cuh"
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
 #include <raft/core/mdspan.hpp>
 #include <raft/core/resources.hpp>
+#include <raft/linalg/norm.cuh>
 
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.hpp>
@@ -35,6 +26,37 @@
 #include <rmm/cuda_stream_view.hpp>
 
 namespace cuvs::neighbors::cagra {
+
+// Member function implementations for cagra::index
+template <typename T, typename IdxT>
+void index<T, IdxT>::compute_dataset_norms_(raft::resources const& res)
+{
+  // Get the dataset view
+  auto dataset_view = this->dataset();
+
+  // Allocate norms vector if not already allocated
+  if (!dataset_norms_.has_value() || dataset_norms_->extent(0) != dataset_view.extent(0)) {
+    dataset_norms_.reset();
+    dataset_norms_ = raft::make_device_vector<float, int64_t>(res, dataset_view.extent(0));
+  }
+
+  constexpr float kScale = cuvs::spatial::knn::detail::utils::config<T>::kDivisor /
+                           cuvs::spatial::knn::detail::utils::config<float>::kDivisor;
+
+  // first scale the dataset and then compute norms
+  auto scaled_sq_op = raft::compose_op(
+    raft::sq_op{}, raft::div_const_op<float>{float(kScale)}, raft::cast_op<float>());
+  raft::linalg::reduce<true, true, T, float, int64_t>(dataset_norms_->data_handle(),
+                                                      dataset_view.data_handle(),
+                                                      dataset_view.stride(0),
+                                                      dataset_view.extent(0),
+                                                      (float)0,
+                                                      raft::resource::get_cuda_stream(res),
+                                                      false,
+                                                      scaled_sq_op,
+                                                      raft::add_op(),
+                                                      raft::sqrt_op{});
+}
 
 /**
  * @defgroup cagra CUDA ANN Graph-based nearest neighbor search
@@ -96,12 +118,7 @@ void build_knn_graph(
     raft::mdspan<const DataT, raft::matrix_extent<int64_t>, raft::row_major, accessor>(
       dataset.data_handle(), dataset.extent(0), dataset.extent(1));
 
-  cagra::detail::build_knn_graph(res,
-                                 dataset_internal,
-                                 knn_graph_internal,
-                                 ivf_pq_params.refinement_rate,
-                                 ivf_pq_params.build_params,
-                                 ivf_pq_params.search_params);
+  cagra::detail::build_knn_graph(res, dataset_internal, knn_graph_internal, ivf_pq_params);
 }
 
 /**
@@ -256,6 +273,15 @@ index<T, IdxT> build(
   const index_params& params,
   raft::mdspan<const T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
 {
+  // Check if ACE dispatch is requested via graph_build_params
+  if (std::holds_alternative<graph_build_params::ace_params>(params.graph_build_params)) {
+    // ACE expects the dataset to be on host due to the large dataset size
+    RAFT_EXPECTS(raft::get_device_for_address(dataset.data_handle()) == -1,
+                 "ACE: Dataset must be on host for ACE build");
+    auto dataset_view = raft::make_host_matrix_view<const T, int64_t, row_major>(
+      dataset.data_handle(), dataset.extent(0), dataset.extent(1));
+    return cuvs::neighbors::cagra::detail::build_ace<T, IdxT>(res, params, dataset_view);
+  }
   return cuvs::neighbors::cagra::detail::build<T, IdxT, Accessor>(res, params, dataset);
 }
 

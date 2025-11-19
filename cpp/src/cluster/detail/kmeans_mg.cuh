@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -175,9 +164,20 @@ void initKMeansPlusPlus(const raft::resources& handle,
   //          X which will be used as the initial centroid for kmeans++
   //    1.3 - Communicate the initial centroid chosen by rank-r' to all other
   //          ranks
-  std::mt19937 gen(params.rng_state.seed);
-  std::uniform_int_distribution<> dis(0, n_rank - 1);
-  int rp = dis(gen);
+  // Choose rp on rank 0 and broadcast to all ranks to guarantee agreement
+  int rp = 0;
+  if (my_rank == KMEANS_COMM_ROOT) {
+    std::mt19937 gen(params.rng_state.seed);
+    std::uniform_int_distribution<> dis(0, n_rank - 1);
+    rp = dis(gen);
+  }
+  {
+    rmm::device_scalar<int> rp_d(stream);
+    raft::copy(rp_d.data(), &rp, 1, stream);
+    comm.bcast<int>(rp_d.data(), 1, /*root=*/KMEANS_COMM_ROOT, stream);
+    raft::copy(&rp, rp_d.data(), 1, stream);
+    raft::resource::sync_stream(handle);
+  }
 
   // buffer to flag the sample that is chosen as initial centroids
   std::vector<std::uint8_t> h_isSampleCentroid(n_samples);
@@ -654,21 +654,17 @@ void fit(const raft::resources& handle,
     //   samples in cluster-i.
     // Note - when wtInCluster[i] is 0, newCentroid[i] is reset to 0
 
-    raft::linalg::matrixVectorOp(
-      newCentroids.data_handle(),
-      newCentroids.data_handle(),
-      wtInCluster.data_handle(),
-      newCentroids.extent(1),
-      newCentroids.extent(0),
-      true,
-      false,
+    raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
+      handle,
+      raft::make_const_mdspan(newCentroids.view()),
+      raft::make_const_mdspan(wtInCluster.view()),
+      newCentroids.view(),
       cuda::proclaim_return_type<DataT>([=] __device__(DataT mat, DataT vec) {
         if (vec == 0)
           return DataT(0);
         else
           return mat / vec;
-      }),
-      stream);
+      }));
 
     // copy the centroids[i] to newCentroids[i] when wtInCluster[i] is 0
     cub::ArgIndexInputIterator<DataT*> itr_wt(wtInCluster.data_handle());

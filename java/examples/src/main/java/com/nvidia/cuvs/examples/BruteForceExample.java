@@ -1,17 +1,20 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 package com.nvidia.cuvs.examples;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.util.UUID;
-import java.util.logging.Logger;
 
 import com.nvidia.cuvs.BruteForceIndex;
 import com.nvidia.cuvs.BruteForceIndexParams;
 import com.nvidia.cuvs.BruteForceQuery;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.SearchResults;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.util.UUID;
+import java.util.logging.Logger;
 
 public class BruteForceExample {
 
@@ -21,36 +24,34 @@ public class BruteForceExample {
 
     // Sample data and query
     float[][] vectors = {
-        { 0.74021935f, 0.9209938f },
-        { 0.03902049f, 0.9689629f },
-        { 0.92514056f, 0.4463501f },
-        { 0.6673192f, 0.10993068f }
-       };
+      {0.74021935f, 0.9209938f},
+      {0.03902049f, 0.9689629f},
+      {0.92514056f, 0.4463501f},
+      {0.6673192f, 0.10993068f}
+    };
 
     float[][] queries = {
-        { 0.48216683f, 0.0428398f },
-        { 0.5084142f, 0.6545497f },
-        { 0.51260436f, 0.2643005f },
-        { 0.05198065f, 0.5789965f }
-       };
+      {0.48216683f, 0.0428398f},
+      {0.5084142f, 0.6545497f},
+      {0.51260436f, 0.2643005f},
+      {0.05198065f, 0.5789965f}
+    };
 
     try (CuVSResources resources = CuVSResources.create()) {
 
       // Create a query object with the query vectors
-      BruteForceQuery cuvsQuery = new BruteForceQuery.Builder()
-          .withTopK(3)
-          .withQueryVectors(queries)
-          .build();
+      BruteForceQuery cuvsQuery =
+          new BruteForceQuery.Builder().withTopK(3).withQueryVectors(queries).build();
 
       // Set index parameters
-      BruteForceIndexParams indexParams = new BruteForceIndexParams.Builder()
-          .build();
+      BruteForceIndexParams indexParams = new BruteForceIndexParams.Builder().build();
 
       // Create the index with the dataset
-      BruteForceIndex index = BruteForceIndex.newBuilder(resources)
-          .withDataset(vectors)
-          .withIndexParams(indexParams)
-          .build();
+      BruteForceIndex index =
+          BruteForceIndex.newBuilder(resources)
+              .withDataset(vectors)
+              .withIndexParams(indexParams)
+              .build();
 
       // Saving the index on to the disk.
       String indexFileName = UUID.randomUUID().toString() + ".bf";
@@ -59,9 +60,7 @@ public class BruteForceExample {
       // Loading a BRUTEFORCE index from disk.
       File indexFile = new File(indexFileName);
       InputStream inputStream = new FileInputStream(indexFile);
-      BruteForceIndex loadedIndex = BruteForceIndex.newBuilder(resources)
-          .from(inputStream)
-          .build();
+      BruteForceIndex loadedIndex = BruteForceIndex.newBuilder(resources).from(inputStream).build();
 
       // Perform the search
       SearchResults resultsFromLoadedIndex = loadedIndex.search(cuvsQuery);

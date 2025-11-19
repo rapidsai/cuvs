@@ -1,56 +1,58 @@
 /*
- * Copyright (c) 2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package com.nvidia.cuvs;
 
 import java.util.Arrays;
 import java.util.BitSet;
-import java.util.List;
+import java.util.Objects;
+import java.util.function.LongToIntFunction;
 
 /**
  * BruteForceQuery holds the query vectors to be used while invoking search.
+ *
+ * <p><strong>Thread Safety:</strong> Each BruteForceQuery instance should use its own
+ * CuVSResources object that is not shared with other threads. Sharing CuVSResources
+ * between threads can lead to memory allocation errors or JVM crashes.
  *
  * @since 25.02
  */
 public class BruteForceQuery {
 
-  private List<Integer> mapping;
-  private float[][] queryVectors;
-  private BitSet[] prefilters;
+  private final LongToIntFunction mapping;
+  private final float[][] queryVectors;
+  private final BitSet[] prefilters;
   private int numDocs = -1;
-  private int topK;
+  private final int topK;
+  private final CuVSResources resources;
 
   /**
    * Constructs an instance of {@link BruteForceQuery} using queryVectors,
    * mapping, and topK.
    *
    * @param queryVectors 2D float query vector array
-   * @param mapping      an instance of ID mapping
+   * @param mapping      a function mapping ordinals (neighbor IDs) to custom user IDs
    * @param topK         the top k results to return
    * @param prefilters   the prefilters data to use while searching the BRUTEFORCE
    *                     index
    * @param numDocs      Maximum of bits in each prefilter, representing number of documents in this index.
    *                     Used only when prefilter(s) is/are passed.
+   * @param resources    CuVSResources instance to use for this query
    */
-  public BruteForceQuery(float[][] queryVectors, List<Integer> mapping, int topK, BitSet[] prefilters, int numDocs) {
+  public BruteForceQuery(
+      float[][] queryVectors,
+      LongToIntFunction mapping,
+      int topK,
+      BitSet[] prefilters,
+      int numDocs,
+      CuVSResources resources) {
     this.queryVectors = queryVectors;
     this.mapping = mapping;
     this.topK = topK;
     this.prefilters = prefilters;
     this.numDocs = numDocs;
+    this.resources = resources;
   }
 
   /**
@@ -63,11 +65,9 @@ public class BruteForceQuery {
   }
 
   /**
-   * Gets the passed map instance.
-   *
-   * @return a map of ID mappings
+   * Gets the function mapping ordinals (neighbor IDs) to custom user IDs
    */
-  public List<Integer> getMapping() {
+  public LongToIntFunction getMapping() {
     return mapping;
   }
 
@@ -98,10 +98,26 @@ public class BruteForceQuery {
     return numDocs;
   }
 
+  /**
+   * Gets the CuVSResources instance for this query.
+   *
+   * @return the CuVSResources instance
+   */
+  public CuVSResources getResources() {
+    return resources;
+  }
+
   @Override
   public String toString() {
-    return "BruteForceQuery [mapping=" + mapping + ", queryVectors=" + Arrays.toString(queryVectors) + ", prefilter="
-        + Arrays.toString(prefilters) + ", topK=" + topK + "]";
+    return "BruteForceQuery [mapping="
+        + mapping
+        + ", queryVectors="
+        + Arrays.toString(queryVectors)
+        + ", prefilter="
+        + Arrays.toString(prefilters)
+        + ", topK="
+        + topK
+        + "]";
   }
 
   /**
@@ -112,8 +128,22 @@ public class BruteForceQuery {
     private float[][] queryVectors;
     private BitSet[] prefilters;
     private int numDocs;
-    private List<Integer> mapping;
+    private LongToIntFunction mapping = SearchResults.IDENTITY_MAPPING;
     private int topK = 2;
+    private final CuVSResources resources;
+
+    /**
+     * Constructor that requires CuVSResources.
+     *
+     * <p><strong>Important:</strong> The provided CuVSResources instance should not be
+     * shared with other threads. Each thread performing searches should create its own
+     * CuVSResources instance to avoid memory allocation conflicts and potential JVM crashes.
+     *
+     * @param resources the CuVSResources instance to use for this query (must not be shared between threads)
+     */
+    public Builder(CuVSResources resources) {
+      this.resources = Objects.requireNonNull(resources, "resources cannot be null");
+    }
 
     /**
      * Registers the query vectors to be passed in the search call.
@@ -127,12 +157,12 @@ public class BruteForceQuery {
     }
 
     /**
-     * Sets the instance of mapping to be used for ID mapping.
+     * Sets the function used to map ordinals (neighbor IDs) to custom user IDs
      *
-     * @param mapping the ID mapping instance
+     * @param mapping a function mapping ordinals (neighbor IDs) to custom user IDs
      * @return an instance of this Builder
      */
-    public Builder withMapping(List<Integer> mapping) {
+    public Builder withMapping(LongToIntFunction mapping) {
       this.mapping = mapping;
       return this;
     }
@@ -167,7 +197,7 @@ public class BruteForceQuery {
      * @return an instance of {@link BruteForceQuery}
      */
     public BruteForceQuery build() {
-      return new BruteForceQuery(queryVectors, mapping, topK, prefilters, numDocs);
+      return new BruteForceQuery(queryVectors, mapping, topK, prefilters, numDocs, resources);
     }
   }
 }

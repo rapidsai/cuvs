@@ -1,17 +1,20 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 package com.nvidia.cuvs.internal.common;
-
-import com.nvidia.cuvs.CuVSTestCase;
-import org.junit.Before;
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
 
 import static com.carrotsearch.randomizedtesting.RandomizedTest.assumeTrue;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
+
+import com.nvidia.cuvs.CuVSTestCase;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import org.junit.Before;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class UtilIT extends CuVSTestCase {
 

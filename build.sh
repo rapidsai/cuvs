@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Copyright (c) 2020-2024, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
 # cuvs build scripts
 
@@ -88,75 +89,78 @@ BUILD_SHARED_LIBS=ON
 TEST_TARGETS=""
 ANN_BENCH_TARGETS=""
 
-CACHE_ARGS=""
+CACHE_ARGS=()
 NVTX=ON
 LOG_COMPILE_TIME=OFF
 CLEAN=0
 DISABLE_DEPRECATION_WARNINGS=ON
-CMAKE_TARGET=""
+CMAKE_TARGET=()
 EXTRA_CMAKE_ARGS=""
 
 # Set defaults for vars that may not have been defined externally
 INSTALL_PREFIX=${INSTALL_PREFIX:=${PREFIX:=${CONDA_PREFIX:=$LIBCUVS_BUILD_DIR/install}}}
-PARALLEL_LEVEL=${PARALLEL_LEVEL:=`nproc`}
+PARALLEL_LEVEL=${PARALLEL_LEVEL:=$(nproc)}
 BUILD_ABI=${BUILD_ABI:=ON}
 
 # Default to Ninja if generator is not specified
 export CMAKE_GENERATOR="${CMAKE_GENERATOR:=Ninja}"
 
 function hasArg {
-    (( ${NUMARGS} != 0 )) && (echo " ${ARGS} " | grep -q " $1 ")
+    (( NUMARGS != 0 )) && (echo " ${ARGS} " | grep -q " $1 ")
 }
 
 function cmakeArgs {
     # Check for multiple cmake args options
-    if [[ $(echo $ARGS | { grep -Eo "\-\-cmake\-args" || true; } | wc -l ) -gt 1 ]]; then
+    if [[ $(echo "$ARGS" | { grep -Eo "\-\-cmake\-args" || true; } | wc -l ) -gt 1 ]]; then
         echo "Multiple --cmake-args options were provided, please provide only one: ${ARGS}"
         exit 1
     fi
 
     # Check for cmake args option
-    if [[ -n $(echo $ARGS | { grep -E "\-\-cmake\-args" || true; } ) ]]; then
+    if [[ -n $(echo "$ARGS" | { grep -E "\-\-cmake\-args" || true; } ) ]]; then
         # There are possible weird edge cases that may cause this regex filter to output nothing and fail silently
         # the true pipe will catch any weird edge cases that may happen and will cause the program to fall back
         # on the invalid option error
-        EXTRA_CMAKE_ARGS=$(echo $ARGS | { grep -Eo "\-\-cmake\-args=\".+\"" || true; })
+        EXTRA_CMAKE_ARGS=$(echo "$ARGS" | { grep -Eo "\-\-cmake\-args=\".+\"" || true; })
         if [[ -n ${EXTRA_CMAKE_ARGS} ]]; then
             # Remove the full  EXTRA_CMAKE_ARGS argument from list of args so that it passes validArgs function
             ARGS=${ARGS//$EXTRA_CMAKE_ARGS/}
             # Filter the full argument down to just the extra string that will be added to cmake call
-            EXTRA_CMAKE_ARGS=$(echo $EXTRA_CMAKE_ARGS | grep -Eo "\".+\"" | sed -e 's/^"//' -e 's/"$//')
+            EXTRA_CMAKE_ARGS=$(echo "$EXTRA_CMAKE_ARGS" | grep -Eo "\".+\"" | sed -e 's/^"//' -e 's/"$//')
         fi
     fi
+    read -ra EXTRA_CMAKE_ARGS <<< "$EXTRA_CMAKE_ARGS"
 }
 
 function cacheTool {
     # Check for multiple cache options
-    if [[ $(echo $ARGS | { grep -Eo "\-\-cache\-tool" || true; } | wc -l ) -gt 1 ]]; then
+    if [[ $(echo "$ARGS" | { grep -Eo "\-\-cache\-tool" || true; } | wc -l ) -gt 1 ]]; then
         echo "Multiple --cache-tool options were provided, please provide only one: ${ARGS}"
         exit 1
     fi
     # Check for cache tool option
-    if [[ -n $(echo $ARGS | { grep -E "\-\-cache\-tool" || true; } ) ]]; then
+    if [[ -n $(echo "$ARGS" | { grep -E "\-\-cache\-tool" || true; } ) ]]; then
         # There are possible weird edge cases that may cause this regex filter to output nothing and fail silently
         # the true pipe will catch any weird edge cases that may happen and will cause the program to fall back
         # on the invalid option error
-        CACHE_TOOL=$(echo $ARGS | sed -e 's/.*--cache-tool=//' -e 's/ .*//')
+        CACHE_TOOL=$(echo "$ARGS" | sed -e 's/.*--cache-tool=//' -e 's/ .*//')
         if [[ -n ${CACHE_TOOL} ]]; then
             # Remove the full CACHE_TOOL argument from list of args so that it passes validArgs function
             ARGS=${ARGS//--cache-tool=$CACHE_TOOL/}
-            CACHE_ARGS="-DCMAKE_CUDA_COMPILER_LAUNCHER=${CACHE_TOOL} -DCMAKE_C_COMPILER_LAUNCHER=${CACHE_TOOL} -DCMAKE_CXX_COMPILER_LAUNCHER=${CACHE_TOOL}"
+            CACHE_ARGS=("-DCMAKE_CUDA_COMPILER_LAUNCHER=${CACHE_TOOL}"
+                        "-DCMAKE_C_COMPILER_LAUNCHER=${CACHE_TOOL}"
+                        "-DCMAKE_CXX_COMPILER_LAUNCHER=${CACHE_TOOL}")
         fi
     fi
 }
 
 function limitTests {
     # Check for option to limit the set of test binaries to build
-    if [[ -n $(echo $ARGS | { grep -E "\-\-limit\-tests" || true; } ) ]]; then
+    if [[ -n $(echo "$ARGS" | { grep -E "\-\-limit\-tests" || true; } ) ]]; then
         # There are possible weird edge cases that may cause this regex filter to output nothing and fail silently
         # the true pipe will catch any weird edge cases that may happen and will cause the program to fall back
         # on the invalid option error
-        LIMIT_TEST_TARGETS=$(echo $ARGS | sed -e 's/.*--limit-tests=//' -e 's/ .*//')
+        LIMIT_TEST_TARGETS=$(echo "$ARGS" | sed -e 's/.*--limit-tests=//' -e 's/ .*//')
         if [[ -n ${LIMIT_TEST_TARGETS} ]]; then
             # Remove the full LIMIT_TEST_TARGETS argument from list of args so that it passes validArgs function
             ARGS=${ARGS//--limit-tests=$LIMIT_TEST_TARGETS/}
@@ -168,11 +172,11 @@ function limitTests {
 
 function limitAnnBench {
     # Check for option to limit the set of test binaries to build
-    if [[ -n $(echo $ARGS | { grep -E "\-\-limit\-bench-ann" || true; } ) ]]; then
+    if [[ -n $(echo "$ARGS" | { grep -E "\-\-limit\-bench-ann" || true; } ) ]]; then
         # There are possible weird edge cases that may cause this regex filter to output nothing and fail silently
         # the true pipe will catch any weird edge cases that may happen and will cause the program to fall back
         # on the invalid option error
-        LIMIT_ANN_BENCH_TARGETS=$(echo $ARGS | sed -e 's/.*--limit-bench-ann=//' -e 's/ .*//')
+        LIMIT_ANN_BENCH_TARGETS=$(echo "$ARGS" | sed -e 's/.*--limit-bench-ann=//' -e 's/ .*//')
         if [[ -n ${LIMIT_ANN_BENCH_TARGETS} ]]; then
             # Remove the full LIMIT_TEST_TARGETS argument from list of args so that it passes validArgs function
             ARGS=${ARGS//--limit-bench-ann=$LIMIT_ANN_BENCH_TARGETS/}
@@ -183,16 +187,16 @@ function limitAnnBench {
 
 function buildMetrics {
     # Check for multiple build-metrics options
-    if [[ $(echo $ARGS | { grep -Eo "\-\-build\-metrics" || true; } | wc -l ) -gt 1 ]]; then
+    if [[ $(echo "$ARGS" | { grep -Eo "\-\-build\-metrics" || true; } | wc -l ) -gt 1 ]]; then
         echo "Multiple --build-metrics options were provided, please provide only one: ${ARGS}"
         exit 1
     fi
     # Check for build-metrics option
-    if [[ -n $(echo $ARGS | { grep -E "\-\-build\-metrics" || true; } ) ]]; then
+    if [[ -n $(echo "$ARGS" | { grep -E "\-\-build\-metrics" || true; } ) ]]; then
         # There are possible weird edge cases that may cause this regex filter to output nothing and fail silently
         # the true pipe will catch any weird edge cases that may happen and will cause the program to fall back
         # on the invalid option error
-        BUILD_REPORT_METRICS=$(echo $ARGS | sed -e 's/.*--build-metrics=//' -e 's/ .*//')
+        BUILD_REPORT_METRICS=$(echo "$ARGS" | sed -e 's/.*--build-metrics=//' -e 's/ .*//')
         if [[ -n ${BUILD_REPORT_METRICS} ]]; then
             # Remove the full BUILD_REPORT_METRICS argument from list of args so that it passes validArgs function
             ARGS=${ARGS//--build-metrics=$BUILD_REPORT_METRICS/}
@@ -202,7 +206,7 @@ function buildMetrics {
 
 function gpuArch {
     # Check if both --gpu-arch and --allgpuarch are specified
-    if hasArg --allgpuarch && [[ -n $(echo $ARGS | { grep -E "\-\-gpu\-arch" || true; } ) ]]; then
+    if hasArg --allgpuarch && [[ -n $(echo "$ARGS" | { grep -E "\-\-gpu\-arch" || true; } ) ]]; then
         echo "Error: Cannot specify both --gpu-arch and --allgpuarch"
         echo "Use either:"
         echo "  --gpu-arch=\"80-real;90-real\"    (for specific architectures)"
@@ -211,7 +215,7 @@ function gpuArch {
     fi
 
     # Check for multiple gpu-arch options
-    if [[ $(echo $ARGS | { grep -Eo "\-\-gpu\-arch" || true; } | wc -l ) -gt 1 ]]; then
+    if [[ $(echo "$ARGS" | { grep -Eo "\-\-gpu\-arch" || true; } | wc -l ) -gt 1 ]]; then
         echo "Error: Multiple --gpu-arch options were provided. Please combine architectures into a single option."
         echo "Instead of: --gpu-arch=80-real --gpu-arch=90-real"
         echo "Use:       --gpu-arch=\"80-real;90-real\""
@@ -219,13 +223,13 @@ function gpuArch {
     fi
 
     # Check for gpu-arch option
-    if [[ -n $(echo $ARGS | { grep -E "\-\-gpu\-arch" || true; } ) ]]; then
-        GPU_ARCH_ARG=$(echo $ARGS | { grep -Eo "\-\-gpu\-arch=.+( |$)" || true; })
+    if [[ -n $(echo "$ARGS" | { grep -E "\-\-gpu\-arch" || true; } ) ]]; then
+        GPU_ARCH_ARG=$(echo "$ARGS" | { grep -Eo "\-\-gpu\-arch=.+( |$)" || true; })
         if [[ -n ${GPU_ARCH_ARG} ]]; then
             # Remove the full argument from ARGS
             ARGS=${ARGS//$GPU_ARCH_ARG/}
             # Extract just the architecture value
-            CUVS_CMAKE_CUDA_ARCHITECTURES=$(echo $GPU_ARCH_ARG | sed -e 's/--gpu-arch=//' -e 's/ .*//')
+            CUVS_CMAKE_CUDA_ARCHITECTURES=$(echo "$GPU_ARCH_ARG" | sed -e 's/--gpu-arch=//' -e 's/ .*//')
             echo "Building for specified GPU architectures: ${CUVS_CMAKE_CUDA_ARCHITECTURES}"
         fi
     fi
@@ -237,7 +241,7 @@ if hasArg -h || hasArg --help; then
 fi
 
 # Check for valid usage
-if (( ${NUMARGS} != 0 )); then
+if (( NUMARGS != 0 )); then
     cmakeArgs
     cacheTool
     limitTests
@@ -255,18 +259,20 @@ fi
 # This should run before build/install
 if hasArg --uninstall; then
 
-    if hasArg cuvs || hasArg libcuvs || (( ${NUMARGS} == 1 )); then
+    if hasArg cuvs || hasArg libcuvs || (( NUMARGS == 1 )); then
 
       echo "Removing libcuvs files..."
-      if [ -e ${LIBCUVS_BUILD_DIR}/install_manifest.txt ]; then
-          xargs rm -fv < ${LIBCUVS_BUILD_DIR}/install_manifest.txt > /dev/null 2>&1
+      if [ -e "${LIBCUVS_BUILD_DIR}"/install_manifest.txt ]; then
+          xargs rm -fv < "${LIBCUVS_BUILD_DIR}"/install_manifest.txt > /dev/null 2>&1
       fi
     fi
 
-    if hasArg cuvs || (( ${NUMARGS} == 1 )); then
+    if hasArg cuvs || (( NUMARGS == 1 )); then
       echo "Uninstalling cuvs package..."
-      if [ -e ${PYLIBCUVS_BUILD_DIR}/install_manifest.txt ]; then
-          xargs rm -fv < ${PYLIBCUVS_BUILD_DIR}/install_manifest.txt > /dev/null 2>&1
+      # PYLIBCUVS_BUILD_DIR isn't defined in `build.sh` but maybe defined by user
+      # shellcheck disable=SC2153
+      if [ -e "${PYLIBCUVS_BUILD_DIR}"/install_manifest.txt ]; then
+          xargs rm -fv < "${PYLIBCUVS_BUILD_DIR}"/install_manifest.txt > /dev/null 2>&1
       fi
 
       # Try to uninstall via pip if it is installed
@@ -305,18 +311,18 @@ if hasArg --no-mg; then
     BUILD_MG_ALGOS=OFF
 fi
 
-if hasArg tests || (( ${NUMARGS} == 0 )); then
+if hasArg tests || (( NUMARGS == 0 )); then
     BUILD_TESTS=ON
-    CMAKE_TARGET="${CMAKE_TARGET};${TEST_TARGETS}"
+    CMAKE_TARGET+=("${TEST_TARGETS}")
 fi
 
-if hasArg bench-ann || (( ${NUMARGS} == 0 )); then
+if hasArg bench-ann || (( NUMARGS == 0 )); then
     BUILD_CUVS_BENCH=ON
     if ! hasArg tests; then
         BUILD_TESTS=OFF
     fi
     COMPILE_LIBRARY=OFF
-    CMAKE_TARGET="${CMAKE_TARGET};${ANN_BENCH_TARGETS}"
+    CMAKE_TARGET+=("${ANN_BENCH_TARGETS}")
     if hasArg --cpu-only; then
         BUILD_CPU_ONLY=ON
         BUILD_SHARED_LIBS=OFF
@@ -345,20 +351,20 @@ if hasArg --incl-cache-stats; then
     BUILD_REPORT_INCL_CACHE_STATS=ON
 fi
 
-if [[ ${CMAKE_TARGET} == "" ]]; then
-    CMAKE_TARGET="all"
+if [[ ${#CMAKE_TARGET} -eq 0 ]]; then
+    CMAKE_TARGET=("all")
 fi
 
 # If clean given, run it prior to any other steps
-if (( ${CLEAN} == 1 )); then
+if (( CLEAN == 1 )); then
     # If the dirs to clean are mounted dirs in a container, the
     # contents should be removed but the mounted dirs will remain.
     # The find removes all contents but leaves the dirs, the rmdir
     # attempts to remove the dirs but can fail safely.
     for bd in ${BUILD_DIRS}; do
-      if [ -d ${bd} ]; then
-          find ${bd} -mindepth 1 -delete
-          rmdir ${bd} || true
+      if [ -d "${bd}" ]; then
+          find "${bd}" -mindepth 1 -delete
+          rmdir "${bd}" || true
       fi
     done
 fi
@@ -367,15 +373,13 @@ fi
 # Configure for building all C++ targets
 if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg bench-prims || hasArg bench-ann; then
     COMPILE_LIBRARY=ON
-    if (( ${BUILD_SHARED_LIBS} == "OFF" )); then
-        CMAKE_TARGET="${CMAKE_TARGET};"
-    else
-        CMAKE_TARGET="${CMAKE_TARGET};cuvs"
+    if [[ "${BUILD_SHARED_LIBS}" != "OFF" ]]; then
+        CMAKE_TARGET+=("cuvs")
     fi
 
     # get the current count before the compile starts
     CACHE_TOOL=${CACHE_TOOL:-sccache}
-    if [[ "$BUILD_REPORT_INCL_CACHE_STATS" == "ON" && -x "$(command -v ${CACHE_TOOL})" ]]; then
+    if [[ "$BUILD_REPORT_INCL_CACHE_STATS" == "ON" && -x "$(command -v "${CACHE_TOOL}")" ]]; then
         "${CACHE_TOOL}" --zero-stats
     fi
 
@@ -390,11 +394,11 @@ if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg
         fi
     fi
 
-    mkdir -p ${LIBCUVS_BUILD_DIR}
-    cd ${LIBCUVS_BUILD_DIR}
-    cmake -S ${REPODIR}/cpp -B ${LIBCUVS_BUILD_DIR} \
-          -DCMAKE_INSTALL_PREFIX=${INSTALL_PREFIX} \
-          -DCMAKE_CUDA_ARCHITECTURES=${CUVS_CMAKE_CUDA_ARCHITECTURES} \
+    mkdir -p "${LIBCUVS_BUILD_DIR}"
+    cd "${LIBCUVS_BUILD_DIR}"
+    cmake -S "${REPODIR}"/cpp -B "${LIBCUVS_BUILD_DIR}" \
+          -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
+          -DCMAKE_CUDA_ARCHITECTURES="${CUVS_CMAKE_CUDA_ARCHITECTURES}" \
           -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
           -DBUILD_C_LIBRARY=${COMPILE_LIBRARY} \
           -DCUVS_NVTX=${NVTX} \
@@ -402,21 +406,21 @@ if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg
           -DDISABLE_DEPRECATION_WARNINGS=${DISABLE_DEPRECATION_WARNINGS} \
           -DBUILD_TESTS=${BUILD_TESTS} \
           -DBUILD_C_TESTS=${BUILD_TESTS} \
-          -DBUILD_CUVS_BENCH=${BUILD_CUVS_BENCH} \
-          -DBUILD_CPU_ONLY=${BUILD_CPU_ONLY} \
+          -DBUILD_CUVS_BENCH="${BUILD_CUVS_BENCH}" \
+          -DBUILD_CPU_ONLY="${BUILD_CPU_ONLY}" \
           -DBUILD_MG_ALGOS=${BUILD_MG_ALGOS} \
           -DCMAKE_MESSAGE_LOG_LEVEL=${CMAKE_LOG_LEVEL} \
           -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS} \
-          ${CACHE_ARGS} \
-          ${EXTRA_CMAKE_ARGS}
+          "${CACHE_ARGS[@]}" \
+          "${EXTRA_CMAKE_ARGS[@]}"
 
   compile_start=$(date +%s)
-  if [[ ${CMAKE_TARGET} != "" ]]; then
-      echo "-- Compiling targets: ${CMAKE_TARGET}, verbose=${VERBOSE_FLAG}"
+  if [[ ${#CMAKE_TARGET} -ne 0 ]]; then
+      echo "-- Compiling targets: " "${CMAKE_TARGET[@]}" ", verbose=${VERBOSE_FLAG}"
       if [[ ${INSTALL_TARGET} != "" ]]; then
-        cmake --build  "${LIBCUVS_BUILD_DIR}" ${VERBOSE_FLAG} -j${PARALLEL_LEVEL} --target ${CMAKE_TARGET} ${INSTALL_TARGET}
+        cmake --build  "${LIBCUVS_BUILD_DIR}" ${VERBOSE_FLAG} -j"${PARALLEL_LEVEL}" --target "${CMAKE_TARGET[@]// /;}" ${INSTALL_TARGET}
       else
-        cmake --build  "${LIBCUVS_BUILD_DIR}" ${VERBOSE_FLAG} -j${PARALLEL_LEVEL} --target ${CMAKE_TARGET}
+        cmake --build  "${LIBCUVS_BUILD_DIR}" ${VERBOSE_FLAG} -j"${PARALLEL_LEVEL}" --target "${CMAKE_TARGET[@]// /;}"
       fi
   fi
   compile_end=$(date +%s)
@@ -439,7 +443,7 @@ if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg
               MSG="${MSG}<br/>cache hit rate ${HIT_RATE} %"
           elif [[ ${CACHE_TOOL} == "ccache" && -x "$(command -v ccache)" ]]; then
               CACHE_STATS_LINE=$(ccache -s | grep "Hits: \+ [0-9]\+ / [0-9]\+" | tail -n1)
-              if [[ ! -z "$CACHE_STATS_LINE" ]]; then
+              if [[ -n "$CACHE_STATS_LINE" ]]; then
                   CACHE_HITS=$(echo "$CACHE_STATS_LINE" - | awk '{ print $2 }')
                   COMPILE_REQUESTS=$(echo "$CACHE_STATS_LINE" - | awk '{ print $4 }')
                   HIT_RATE=$(COMPILE_REQUESTS="${COMPILE_REQUESTS}" CACHE_HITS="${CACHE_HITS}" python3 -c "import os; print(f'{int(os.getenv(\"CACHE_HITS\")) / int(os.getenv(\"COMPILE_REQUESTS\")):.2f}' if int(os.getenv(\"COMPILE_REQUESTS\")) else 'nan')")
@@ -450,53 +454,53 @@ if (( NUMARGS == 0 )) || hasArg libcuvs || hasArg docs || hasArg tests || hasArg
       MSG="${MSG}<br/>parallel setting: $PARALLEL_LEVEL"
       MSG="${MSG}<br/>parallel build time: $compile_total seconds"
       if [[ -f "${LIBCUVS_BUILD_DIR}/libcuvs.so" ]]; then
-          LIBCUVS_FS=$(stat -c %s ${LIBCUVS_BUILD_DIR}/libcuvs.so | awk '{printf "%.2f MB", $1/1024/1024}')
+          LIBCUVS_FS=$(find "${LIBCUVS_BUILD_DIR}" -name libcuvs.so -printf '%s'| awk '{printf "%.2f MB", $1/1024/1024}')
           MSG="${MSG}<br/>libcuvs.so size: $LIBCUVS_FS"
       fi
       BMR_DIR=${RAPIDS_ARTIFACTS_DIR:-"${LIBCUVS_BUILD_DIR}"}
       echo "The HTML report can be found at [${BMR_DIR}/${BUILD_REPORT_METRICS}.html]. In CI, this report"
       echo "will also be uploaded to the appropriate subdirectory of https://downloads.rapids.ai/ci/cuvs/, and"
       echo "the entire URL can be found in \"conda-cpp-build\" runs under the task \"Upload additional artifacts\""
-      mkdir -p ${BMR_DIR}
+      mkdir -p "${BMR_DIR}"
       MSG_OUTFILE="$(mktemp)"
       echo "$MSG" > "${MSG_OUTFILE}"
-      PATH=".:$PATH" python rapids-build-metrics-reporter.py ${LIBCUVS_BUILD_DIR}/.ninja_log --fmt html --msg "${MSG_OUTFILE}" > ${BMR_DIR}/${BUILD_REPORT_METRICS}.html
-      cp ${LIBCUVS_BUILD_DIR}/.ninja_log ${BMR_DIR}/ninja.log
+      PATH=".:$PATH" python rapids-build-metrics-reporter.py "${LIBCUVS_BUILD_DIR}"/.ninja_log --fmt html --msg "${MSG_OUTFILE}" > "${BMR_DIR}"/"${BUILD_REPORT_METRICS}".html
+      cp "${LIBCUVS_BUILD_DIR}"/.ninja_log "${BMR_DIR}"/ninja.log
   fi
 fi
 
 # Build and (optionally) install the cuvs Python package
-if (( ${NUMARGS} == 0 )) || hasArg python; then
-    SKBUILD_CMAKE_ARGS="${EXTRA_CMAKE_ARGS}" \
+if (( NUMARGS == 0 )) || hasArg python; then
+    SKBUILD_CMAKE_ARGS="${EXTRA_CMAKE_ARGS[*]}" \
         SKBUILD_BUILD_OPTIONS="-j${PARALLEL_LEVEL}" \
-        python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true ${REPODIR}/python/cuvs
+        python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true "${REPODIR}"/python/cuvs
 fi
 
 # Build and (optionally) install the cuvs-bench Python package
 if (( NUMARGS == 0 )) || (hasArg bench-ann && ! hasArg -n); then
-    python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true ${REPODIR}/python/cuvs_bench
+    python -m pip install --no-build-isolation --no-deps --config-settings rapidsai.disable-cuda=true "${REPODIR}"/python/cuvs_bench
 fi
 
 # Build the cuvs Rust bindings
-if (( ${NUMARGS} == 0 )) || hasArg rust; then
-    cd ${REPODIR}/rust
+if (( NUMARGS == 0 )) || hasArg rust; then
+    cd "${REPODIR}"/rust
     cargo build --examples --lib
     cargo test
 fi
 
 # Build the cuvs Go bindings
-if (( ${NUMARGS} == 0 )) || hasArg go; then
-    cd ${REPODIR}/go
+if (( NUMARGS == 0 )) || hasArg go; then
+    cd "${REPODIR}"/go
     go build ./...
     go test ./...
 fi
 
 # Build the cuvs Java bindings
-if (( ${NUMARGS} == 0 )) || hasArg java; then
+if (( NUMARGS == 0 )) || hasArg java; then
     if ! hasArg libcuvs; then
         echo "Please add 'libcuvs' to this script's arguments (ex. './build.sh libcuvs java') if libcuvs libraries are not already built"
     fi
-    cd ${REPODIR}/java
+    cd "${REPODIR}"/java
     if hasArg --run-java-tests; then
         ./build.sh --run-java-tests
     else
@@ -511,20 +515,20 @@ export RAPIDS_VERSION_MAJOR_MINOR
 
 if hasArg docs; then
     set -x
-    cd ${DOXYGEN_BUILD_DIR}
+    cd "${DOXYGEN_BUILD_DIR}"
     doxygen Doxyfile
-    cd ${SPHINX_BUILD_DIR}
-    sphinx-build -b html source _html
-    cd ${REPODIR}/rust
+    cd "${SPHINX_BUILD_DIR}"
+    make html
+    cd "${REPODIR}"/rust
     cargo doc -p cuvs --no-deps
-    rsync -av ${RUST_BUILD_DIR}/doc/ ${SPHINX_BUILD_DIR}/_html/_static/rust
+    rsync -av "${RUST_BUILD_DIR}"/doc/ "${SPHINX_BUILD_DIR}"/build/html/_static/rust
 fi
 
 ################################################################################
 # Initiate build for c++ examples (if needed)
 
 if hasArg examples; then
-    pushd ${REPODIR}/examples
+    pushd "${REPODIR}"/examples
     ./build.sh
     popd
 fi

@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2022-2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
@@ -46,7 +35,7 @@
 
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/device_scalar.hpp>
-#include <rmm/mr/device/managed_memory_resource.hpp>
+#include <rmm/mr/managed_memory_resource.hpp>
 #include <rmm/resource_ref.hpp>
 
 #include <thrust/gather.h>
@@ -314,9 +303,12 @@ void calc_centers_and_sizes(const raft::resources& handle,
 {
   auto stream = raft::resource::get_cuda_stream(handle);
 
+  auto centersView      = raft::make_device_matrix_view<MathT>(centers, n_clusters, dim);
+  auto clusterSizesView = raft::make_device_vector_view<const CounterT>(cluster_sizes, n_clusters);
+
   if (!reset_counters) {
-    raft::linalg::matrixVectorOp(
-      centers, centers, cluster_sizes, dim, n_clusters, true, false, raft::mul_op(), stream);
+    raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(
+      handle, raft::make_const_mdspan(centersView), clusterSizesView, centersView, raft::mul_op{});
   }
 
   rmm::device_uvector<char> workspace(0, stream, mr);
@@ -350,15 +342,11 @@ void calc_centers_and_sizes(const raft::resources& handle,
     raft::linalg::add(cluster_sizes, cluster_sizes, temp_sizes, n_clusters, stream);
   }
 
-  raft::linalg::matrixVectorOp(centers,
-                               centers,
-                               cluster_sizes,
-                               dim,
-                               n_clusters,
-                               true,
-                               false,
-                               raft::div_checkzero_op(),
-                               stream);
+  raft::linalg::matrix_vector_op<raft::Apply::ALONG_COLUMNS>(handle,
+                                                             raft::make_const_mdspan(centersView),
+                                                             clusterSizesView,
+                                                             centersView,
+                                                             raft::div_checkzero_op{});
 }
 
 /** Computes the L2 norm of the dataset, converting to MathT if necessary */
