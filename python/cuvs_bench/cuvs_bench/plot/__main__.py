@@ -6,7 +6,7 @@
 # 1: https://github.com/erikbern/ann-benchmarks/blob/main/plot.py
 # 2: https://github.com/erikbern/ann-benchmarks/blob/main/ann_benchmarks/plotting/utils.py  # noqa: E501
 # 3: https://github.com/erikbern/ann-benchmarks/blob/main/ann_benchmarks/plotting/metrics.py  # noqa: E501
-# License: https://github.com/rapidsai/cuvs/blob/branch-25.12/thirdparty/LICENSES/LICENSE.ann-benchmark # noqa: E501
+# License: https://github.com/rapidsai/cuvs/blob/release/25.12/thirdparty/LICENSES/LICENSE.ann-benchmark # noqa: E501
 
 import itertools
 import os
@@ -520,7 +520,6 @@ def main(
     time_unit: str,
     raw: bool,
 ) -> None:
-
     args = locals()
 
     if args["algorithms"]:
