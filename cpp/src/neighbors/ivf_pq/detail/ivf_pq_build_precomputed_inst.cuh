@@ -50,5 +50,18 @@ namespace cuvs::neighbors::ivf_pq {
     return detail::build<IdxT>(                                                                    \
       handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix);               \
   }                                                                                                \
+  void build(                                                                                      \
+    raft::resources const& handle,                                                                 \
+    const cuvs::neighbors::ivf_pq::index_params& index_params,                                     \
+    const uint32_t dim,                                                                            \
+    raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,       \
+    raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,                      \
+    raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot,                  \
+    raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix,               \
+    cuvs::neighbors::ivf_pq::index<IdxT>* idx)                                                     \
+  {                                                                                                \
+    detail::build<IdxT>(                                                                           \
+      handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix, idx);          \
+  }                                                                                                \
 
 }  // namespace cuvs::neighbors::ivf_pq
