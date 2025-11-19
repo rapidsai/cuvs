@@ -4,6 +4,7 @@
  */
 
 #include <cstdint>
+#include <cstring>
 #include <dlpack/dlpack.h>
 
 #include <raft/core/error.hpp>
@@ -12,9 +13,12 @@
 #include <raft/core/serialize.hpp>
 
 #include <cuvs/core/c_api.h>
+#include <cuvs/distance/distance.h>
+#include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/cagra.h>
 #include <cuvs/neighbors/common.h>
 #include <cuvs/neighbors/cagra.hpp>
+#include <cuvs/neighbors/graph_build_types.hpp>
 
 #include "../core/exceptions.hpp"
 #include "../core/interop.hpp"
@@ -28,6 +32,7 @@ static void _set_graph_build_params(
   std::variant<std::monostate,
                cuvs::neighbors::cagra::graph_build_params::ivf_pq_params,
                cuvs::neighbors::cagra::graph_build_params::nn_descent_params,
+               cuvs::neighbors::cagra::graph_build_params::ace_params,
                cuvs::neighbors::cagra::graph_build_params::iterative_search_params>& out_params,
   cuvsCagraIndexParams& params,
   cuvsCagraGraphBuildAlgo algo,
@@ -77,6 +82,18 @@ static void _set_graph_build_params(
         cuvs::neighbors::nn_descent::index_params(params.intermediate_graph_degree, metric);
       nn_params.max_iterations = params.nn_descent_niter;
       out_params               = nn_params;
+      break;
+    }
+    case cuvsCagraGraphBuildAlgo::ACE: {
+      cuvs::neighbors::cagra::graph_build_params::ace_params ace_p;
+      if (params.graph_build_params) {
+        auto ace_params_c             = static_cast<cuvsAceParams*>(params.graph_build_params);
+        ace_p.npartitions     = ace_params_c->npartitions;
+        ace_p.ef_construction = ace_params_c->ef_construction;
+        ace_p.build_dir       = std::string(ace_params_c->build_dir);
+        ace_p.use_disk        = ace_params_c->use_disk;
+      }
+      out_params = ace_p;
       break;
     }
     case cuvsCagraGraphBuildAlgo::ITERATIVE_CAGRA_SEARCH: {
@@ -386,7 +403,19 @@ static void _populate_cagra_index_params_from_cpp(cuvsCagraIndexParams_t c_param
       std::get<cuvs::neighbors::cagra::graph_build_params::ivf_pq_params>(
         cpp_params.graph_build_params);
 
-    _populate_c_ivf_pq_params(c_params->graph_build_params, ivf_pq_params);
+    _populate_c_ivf_pq_params(static_cast<cuvsIvfPqParams*>(c_params->graph_build_params), ivf_pq_params);
+  } else if (std::holds_alternative<cuvs::neighbors::cagra::graph_build_params::ace_params>(
+               cpp_params.graph_build_params)) {
+    c_params->build_algo = ACE;
+    auto ace_params =
+      std::get<cuvs::neighbors::cagra::graph_build_params::ace_params>(
+        cpp_params.graph_build_params);
+    cuvsAceParams* c_ace_params = new cuvsAceParams;
+    c_ace_params->npartitions = ace_params.npartitions;
+    c_ace_params->ef_construction = ace_params.ef_construction;
+    c_ace_params->build_dir = ace_params.build_dir.empty() ? nullptr : strdup(ace_params.build_dir.c_str());
+    c_ace_params->use_disk = ace_params.use_disk;
+    c_params->graph_build_params = c_ace_params;
   }
 }
 
@@ -698,7 +727,26 @@ extern "C" cuvsError_t cuvsCagraIndexParamsCreate(cuvsCagraIndexParams_t* params
 extern "C" cuvsError_t cuvsCagraIndexParamsDestroy(cuvsCagraIndexParams_t params)
 {
   return cuvs::core::translate_exceptions([=] {
-    delete params->graph_build_params;
+    // Delete graph_build_params based on the build algorithm type
+    if (params->graph_build_params != nullptr) {
+      switch (params->build_algo) {
+      case cuvsCagraGraphBuildAlgo::IVF_PQ:
+        delete static_cast<cuvsIvfPqParams *>(params->graph_build_params);
+        break;
+      case cuvsCagraGraphBuildAlgo::ACE: {
+        auto ace_params = static_cast<cuvsAceParams *>(params->graph_build_params);
+        // Free the allocated build directory string
+        if (ace_params->build_dir) { free(const_cast<char*>(ace_params->build_dir)); }
+        delete ace_params;
+        break;
+      }
+      case cuvsCagraGraphBuildAlgo::AUTO_SELECT:
+      case cuvsCagraGraphBuildAlgo::NN_DESCENT:
+      case cuvsCagraGraphBuildAlgo::ITERATIVE_CAGRA_SEARCH:
+        // These algorithms don't have separate parameter structs
+        break;
+      }
+    }
     delete params;
   });
 }
@@ -720,6 +768,32 @@ extern "C" cuvsError_t cuvsCagraCompressionParamsCreate(cuvsCagraCompressionPara
 extern "C" cuvsError_t cuvsCagraCompressionParamsDestroy(cuvsCagraCompressionParams_t params)
 {
   return cuvs::core::translate_exceptions([=] { delete params; });
+}
+
+extern "C" cuvsError_t cuvsAceParamsCreate(cuvsAceParams_t* params)
+{
+  return cuvs::core::translate_exceptions([=] {
+    auto ps = cuvs::neighbors::cagra::graph_build_params::ace_params();
+
+    // Allocate and copy the build directory string
+    const char* build_dir = strdup(ps.build_dir.c_str());
+
+    *params = new cuvsAceParams{.npartitions     = ps.npartitions,
+                                .ef_construction = ps.ef_construction,
+                                .build_dir       = build_dir,
+                                .use_disk        = ps.use_disk};
+  });
+}
+
+extern "C" cuvsError_t cuvsAceParamsDestroy(cuvsAceParams_t params)
+{
+  return cuvs::core::translate_exceptions([=] {
+    if (params) {
+      // Free the allocated build directory string
+      if (params->build_dir) { free(const_cast<char*>(params->build_dir)); }
+      delete params;
+    }
+  });
 }
 
 extern "C" cuvsError_t cuvsCagraIndexParamsFromHnswParams(cuvsCagraIndexParams_t params,

@@ -6,13 +6,8 @@
       "git_tag": "v1.12.0",
       "patches" : [
         {
-          "file" : "${current_json_dir}/faiss/fix-missing-includes-for-thrust-copy.patch",
-          "issue" : "Fix missing Thrust includes. https://github.com/facebookresearch/faiss/pull/4597",
-          "fixed_in" : ""
-        },
-        {
-          "file" : "${current_json_dir}/faiss/refactor-rmm-memory-resources.patch",
-          "issue" : "Refactor RMM memory resources to use updated APIs",
+          "file" : "${current_json_dir}/faiss-25.12.diff",
+          "issue" : "Multiple fixes for cuVS and RMM compatibility",
           "fixed_in" : ""
         }
       ]

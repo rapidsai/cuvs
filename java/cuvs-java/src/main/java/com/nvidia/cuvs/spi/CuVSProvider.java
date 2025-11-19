@@ -113,6 +113,16 @@ public interface CuVSProvider {
   HnswIndex.Builder newHnswIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;
 
+  /**
+   * Creates an HNSW index from an existing CAGRA index.
+   *
+   * @param hnswParams Parameters for the HNSW index
+   * @param cagraIndex The CAGRA index to convert from
+   * @return A new HNSW index
+   * @throws Throwable if an error occurs during conversion
+   */
+  HnswIndex hnswIndexFromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex) throws Throwable;
+
   /** Creates a new TieredIndex Builder. */
   TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;

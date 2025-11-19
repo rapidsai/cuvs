@@ -1,10 +1,11 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
+#include "../neighbors/detail/ann_utils.cuh"
 #include "detail/kmeans_balanced.cuh"
 #include <raft/core/mdarray.hpp>
 #include <raft/core/resource/device_memory_resource.hpp>
@@ -60,15 +61,13 @@ namespace cuvs::cluster::kmeans_balanced {
  * @param[out] centroids  The generated centroids [dim = n_clusters x n_features]
  * @param[in]  mapping_op (optional) Functor to convert from the input datatype to the arithmetic
  *                        datatype. If DataT == MathT, this must be the identity.
- * @param[in]  X_norm        (optional) Dataset's row norms [dim = n_samples]
  */
 template <typename DataT, typename MathT, typename IndexT, typename MappingOpT = raft::identity_op>
 void fit(const raft::resources& handle,
          cuvs::cluster::kmeans::balanced_params const& params,
          raft::device_matrix_view<const DataT, IndexT> X,
          raft::device_matrix_view<MathT, IndexT> centroids,
-         MappingOpT mapping_op                                               = raft::identity_op(),
-         std::optional<raft::device_vector_view<const MathT, IndexT>> X_norm = std::nullopt)
+         MappingOpT mapping_op = raft::identity_op())
 {
   RAFT_EXPECTS(X.extent(1) == centroids.extent(1),
                "Number of features in dataset and centroids are different");
@@ -79,16 +78,14 @@ void fit(const raft::resources& handle,
                "The number of centroids must be strictly positive and cannot exceed the number of "
                "points in the training dataset.");
 
-  cuvs::cluster::kmeans::detail::build_hierarchical(
-    handle,
-    params,
-    X.extent(1),
-    X.data_handle(),
-    X.extent(0),
-    centroids.data_handle(),
-    centroids.extent(0),
-    mapping_op,
-    X_norm.has_value() ? X_norm.value().data_handle() : nullptr);
+  cuvs::cluster::kmeans::detail::build_hierarchical(handle,
+                                                    params,
+                                                    X.extent(1),
+                                                    X.data_handle(),
+                                                    X.extent(0),
+                                                    centroids.data_handle(),
+                                                    centroids.extent(0),
+                                                    mapping_op);
 }
 
 /**
@@ -118,7 +115,6 @@ void fit(const raft::resources& handle,
  * @param[out] labels     The output labels [dim = n_samples]
  * @param[in]  mapping_op (optional) Functor to convert from the input datatype to the arithmetic
  *                        datatype. If DataT == MathT, this must be the identity.
- * @param[in]  X_norm     (optional) Dataset's row norms [dim = n_samples]
  */
 template <typename DataT,
           typename MathT,
@@ -130,8 +126,7 @@ void predict(const raft::resources& handle,
              raft::device_matrix_view<const DataT, IndexT> X,
              raft::device_matrix_view<const MathT, IndexT> centroids,
              raft::device_vector_view<LabelT, IndexT> labels,
-             MappingOpT mapping_op = raft::identity_op(),
-             std::optional<raft::device_vector_view<const MathT, IndexT>> X_norm = std::nullopt)
+             MappingOpT mapping_op = raft::identity_op())
 {
   RAFT_EXPECTS(X.extent(0) == labels.extent(0),
                "Number of rows in dataset and labels are different");
@@ -144,67 +139,16 @@ void predict(const raft::resources& handle,
                  static_cast<uint64_t>(std::numeric_limits<LabelT>::max()),
                "The chosen label type cannot represent all cluster labels");
 
-  cuvs::cluster::kmeans::detail::predict(
-    handle,
-    params,
-    centroids.data_handle(),
-    centroids.extent(0),
-    X.extent(1),
-    X.data_handle(),
-    X.extent(0),
-    labels.data_handle(),
-    mapping_op,
-    raft::resource::get_workspace_resource(handle),
-    X_norm.has_value() ? X_norm.value().data_handle() : nullptr);
-}
-
-/**
- * @brief Compute hierarchical balanced k-means clustering and predict cluster index for each sample
- * in the input.
- *
- * @code{.cpp}
- *   #include <raft/core/handle.hpp>
- *   #include <cuvs/cluster/kmeans_balanced.cuh>
- *   #include <cuvs/cluster/kmeans_balanced_types.hpp>
- *   ...
- *   raft::handle_t handle;
- *    cuvs::cluster::balanced_params params;
- *   auto centroids = raft::make_device_matrix<float, int>(handle, n_clusters, n_features);
- *   auto labels = raft::make_device_vector<float, int>(handle, n_rows);
- *    cuvs::cluster::kmeans_balanced::fit_predict(
- *       handle, params, X, centroids.view(), labels.view());
- * @endcode
- *
- * @tparam DataT Type of the input data.
- * @tparam MathT Type of the centroids and mapped data.
- * @tparam IndexT Type used for indexing.
- * @tparam LabelT Type of the output labels.
- * @tparam MappingOpT Type of the mapping function.
- * @param[in]  handle     The raft resources
- * @param[in]  params     Structure containing the hyper-parameters
- * @param[in]  X          Training instances to cluster. The data must be in row-major format.
- *                        [dim = n_samples x n_features]
- * @param[out] centroids  The output centroids [dim = n_clusters x n_features]
- * @param[out] labels     The output labels [dim = n_samples]
- * @param[in]  mapping_op (optional) Functor to convert from the input datatype to the arithmetic
- *                        datatype. If DataT and MathT are the same, this must be the identity.
- */
-template <typename DataT,
-          typename MathT,
-          typename IndexT,
-          typename LabelT,
-          typename MappingOpT = raft::identity_op>
-void fit_predict(const raft::resources& handle,
-                 cuvs::cluster::kmeans::balanced_params const& params,
-                 raft::device_matrix_view<const DataT, IndexT> X,
-                 raft::device_matrix_view<MathT, IndexT> centroids,
-                 raft::device_vector_view<LabelT, IndexT> labels,
-                 MappingOpT mapping_op = raft::identity_op())
-{
-  auto centroids_const = raft::make_device_matrix_view<const MathT, IndexT>(
-    centroids.data_handle(), centroids.extent(0), centroids.extent(1));
-  cuvs::cluster::kmeans_balanced::fit(handle, params, X, centroids, mapping_op);
-  cuvs::cluster::kmeans_balanced::predict(handle, params, X, centroids_const, labels, mapping_op);
+  cuvs::cluster::kmeans::detail::predict(handle,
+                                         params,
+                                         centroids.data_handle(),
+                                         centroids.extent(0),
+                                         X.extent(1),
+                                         X.data_handle(),
+                                         X.extent(0),
+                                         labels.data_handle(),
+                                         mapping_op,
+                                         raft::resource::get_workspace_resource(handle));
 }
 
 namespace helpers {
@@ -260,29 +204,25 @@ void build_clusters(const raft::resources& handle,
                     raft::device_vector_view<LabelT, IndexT> labels,
                     raft::device_vector_view<CounterT, IndexT> cluster_sizes,
                     MappingOpT mapping_op = raft::identity_op(),
-                    std::optional<raft::device_vector_view<const MathT>> X_norm = std::nullopt)
-{
-  RAFT_EXPECTS(X.extent(0) == labels.extent(0),
-               "Number of rows in dataset and labels are different");
-  RAFT_EXPECTS(X.extent(1) == centroids.extent(1),
-               "Number of features in dataset and centroids are different");
-  RAFT_EXPECTS(centroids.extent(0) == cluster_sizes.extent(0),
-               "Number of rows in centroids and clusyer_sizes are different");
+                    std::optional<raft::device_vector_view<const MathT>> X_norm = std::nullopt);
 
-  cuvs::cluster::kmeans::detail::build_clusters(
-    handle,
-    params,
-    X.extent(1),
-    X.data_handle(),
-    X.extent(0),
-    centroids.extent(0),
-    centroids.data_handle(),
-    labels.data_handle(),
-    cluster_sizes.data_handle(),
-    mapping_op,
-    raft::resource::get_workspace_resource(handle),
-    X_norm.has_value() ? X_norm.value().data_handle() : nullptr);
-}
+#define EXTERN_TEMPLATE_BUILD_CLUSTERS(DataT, MathT, IndexT, LabelT, CounterT, MappingOpT) \
+  extern template void build_clusters<DataT, MathT, IndexT, LabelT, CounterT, MappingOpT>( \
+    const raft::resources& handle,                                                         \
+    const cuvs::cluster::kmeans::balanced_params& params,                                  \
+    raft::device_matrix_view<const DataT, IndexT> X,                                       \
+    raft::device_matrix_view<MathT, IndexT> centroids,                                     \
+    raft::device_vector_view<LabelT, IndexT> labels,                                       \
+    raft::device_vector_view<CounterT, IndexT> cluster_sizes,                              \
+    MappingOpT mapping_op,                                                                 \
+    std::optional<raft::device_vector_view<const MathT>> X_norm);
+
+// Extern template declaration for the instantiation actually used in IVF-PQ build
+// IVF-PQ converts input data to float before calling build_clusters
+EXTERN_TEMPLATE_BUILD_CLUSTERS(
+  float, float, int64_t, uint32_t, uint32_t, cuvs::spatial::knn::detail::utils::mapping<float>)
+
+#undef EXTERN_TEMPLATE_BUILD_CLUSTERS
 
 /**
  * @brief Given the data and labels, calculate cluster centers and sizes in one sweep.
