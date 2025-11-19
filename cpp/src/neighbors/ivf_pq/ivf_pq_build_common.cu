@@ -408,6 +408,90 @@ void recompute_internal_state(const raft::resources& res, index<int64_t>* index)
   ivf::detail::recompute_internal_state(res, *index);
 }
 
+void make_rotation_matrix(
+  raft::resources const& res,
+  raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix,
+  bool force_random_rotation)
+{
+  RAFT_EXPECTS(rotation_matrix.extent(0) > 0 && rotation_matrix.extent(1) > 0,
+               "rotation_matrix must have non-zero extents");
+  
+  uint32_t rot_dim = rotation_matrix.extent(0);
+  uint32_t dim = rotation_matrix.extent(1);
+  
+  make_rotation_matrix(res,
+                       force_random_rotation,
+                       rot_dim,
+                       dim,
+                       rotation_matrix.data_handle());
+}
+
+void compute_centers_rot(
+  raft::resources const& res,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix,
+  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot)
+{
+  uint32_t n_lists = centers.extent(0);
+  uint32_t centers_dim = centers.extent(1);
+  uint32_t rot_dim = rotation_matrix.extent(0);
+  uint32_t dim = rotation_matrix.extent(1);
+  
+  RAFT_EXPECTS(centers_rot.extent(0) == n_lists,
+               "centers_rot must have extent(0) == n_lists. Got centers_rot.extent(0) = %u, "
+               "expected %u",
+               centers_rot.extent(0),
+               n_lists);
+  RAFT_EXPECTS(centers_rot.extent(1) == rot_dim,
+               "centers_rot must have extent(1) == rot_dim. Got centers_rot.extent(1) = %u, "
+               "expected %u",
+               centers_rot.extent(1),
+               rot_dim);
+  RAFT_EXPECTS(centers_dim >= dim,
+               "centers must have at least dim columns. Got centers.extent(1) = %u, "
+               "expected >= %u",
+               centers_dim,
+               dim);
+  
+  auto stream = raft::resource::get_cuda_stream(res);
+  
+  // Compute centers_rot = rotation_matrix^T * centers[:, 0:dim]
+  // rotation_matrix is [rot_dim, dim]
+  // centers is [n_lists, centers_dim] but we only use [:, 0:dim]
+  // Result is [n_lists, rot_dim] stored in centers_rot
+  
+  float alpha = 1.0f;
+  float beta = 0.0f;
+  
+  raft::linalg::gemm(res,
+                     true,   // transpose rotation_matrix
+                     false,  // don't transpose centers
+                     rot_dim,
+                     n_lists,
+                     dim,
+                     &alpha,
+                     rotation_matrix.data_handle(),
+                     dim,         // lda (leading dim of rotation_matrix)
+                     centers.data_handle(),
+                     centers_dim, // ldb (leading dim of centers, accounting for potential padding)
+                     &beta,
+                     centers_rot.data_handle(),
+                     rot_dim,     // ldc (leading dim of output)
+                     stream);
+}
+
+uint32_t calculate_pq_dim(uint32_t dim)
+{
+  if (dim >= 128) { dim /= 2; }
+  auto r = raft::round_down_safe<uint32_t>(dim, 32);
+  if (r > 0) return r;
+  r = 1;
+  while ((r << 1) <= dim) {
+    r = r << 1;
+  }
+  return r;
+}
+
 }  // namespace helpers
 
 }  // namespace cuvs::neighbors::ivf_pq

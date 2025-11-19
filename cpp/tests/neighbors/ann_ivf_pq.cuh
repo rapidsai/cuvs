@@ -274,30 +274,30 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       raft::make_device_matrix_view<const DataT, int64_t>(database.data(), ps.num_db_vecs, ps.dim);
     auto base_index = cuvs::neighbors::ivf_pq::build(handle_, ipams, database_view);
 
-    auto view_index = cuvs::neighbors::ivf_pq::build_view(handle_,
-                                                          ipams,
-                                                          base_index.dim(),
-                                                          base_index.pq_centers(),
-                                                          base_index.centers(),
-                                                          base_index.centers_rot(),
-                                                          base_index.rotation_matrix());
+    auto view_index = cuvs::neighbors::ivf_pq::build(handle_,
+                                                     ipams,
+                                                     base_index.dim(),
+                                                     base_index.pq_centers(),
+                                                     base_index.centers(),
+                                                     base_index.centers_rot(),
+                                                     base_index.rotation_matrix());
 
     auto owning_index_full =
-      cuvs::neighbors::ivf_pq::build_owning(handle_,
-                                            ipams,
-                                            base_index.dim(),
-                                            base_index.pq_centers(),
-                                            base_index.centers(),
-                                            std::make_optional(base_index.centers_rot()),
-                                            std::make_optional(base_index.rotation_matrix()));
+      cuvs::neighbors::ivf_pq::build(handle_,
+                                     ipams,
+                                     base_index.dim(),
+                                     base_index.pq_centers(),
+                                     base_index.centers(),
+                                     std::make_optional(base_index.centers_rot()),
+                                     std::make_optional(base_index.rotation_matrix()));
 
-    auto owning_index_minimal = cuvs::neighbors::ivf_pq::build_owning(handle_,
-                                                                      ipams,
-                                                                      base_index.dim(),
-                                                                      base_index.pq_centers(),
-                                                                      base_index.centers(),
-                                                                      std::nullopt,
-                                                                      std::nullopt);
+    auto owning_index_minimal = cuvs::neighbors::ivf_pq::build(handle_,
+                                                               ipams,
+                                                               base_index.dim(),
+                                                               base_index.pq_centers(),
+                                                               base_index.centers(),
+                                                               std::nullopt,
+                                                               std::nullopt);
 
     auto db_indices = raft::make_device_vector<IdxT>(handle_, ps.num_db_vecs);
     raft::linalg::map_offset(handle_, db_indices.view(), raft::identity_op{});
