@@ -74,7 +74,7 @@ int test_ivf_rabitq_construct_batch(raft::resources const& handle, int argc, cha
   IVFGPU ivf(handle, N, DIM, K, B, true);
 
   // Construct the index (this function performs necessary host-to-device transfers internally).
-  ivf.construct(data.data(), centroids.data(), cids.data(), fast_quantize_flag);
+  ivf.construct(handle, data.data(), centroids.data(), cids.data(), fast_quantize_flag);
 
   float minutes = stopw.getElapsedTimeMili() / 1000.0f / 60.0f;
   float seconds = stopw.getElapsedTimeMili() / 1000.0f;
@@ -269,7 +269,7 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
   // The RotatorGPU::rotate function is defined as:
   //    void RotatorGPU::rotate(const float* d_A, float* d_RAND_A, size_t N) const;
   // where d_A is the input matrix (N x padded_dim) and d_RAND_A is the output.
-  ivf.rotator().rotate(d_query, d_rotated_query, NQ);
+  ivf.rotator().rotate(handle, d_query, d_rotated_query, NQ);
 
   float rotate_time = stopw.getElapsedTimeMicro();
 

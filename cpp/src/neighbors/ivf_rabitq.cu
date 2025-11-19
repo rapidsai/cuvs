@@ -111,7 +111,8 @@ void build(raft::resources const& handle,
   auto h_labels_array = raft::make_host_mdarray<uint32_t>(raft::make_extents<int64_t>(n_rows));
   raft::copy(h_labels_array.view().data_handle(), labels_view.data_handle(), n_rows, stream);
   // Call RaBitQ index construct
-  index->rabitq_index()->construct(h_dataset_ptr,
+  index->rabitq_index()->construct(handle,
+                                   h_dataset_ptr,
                                    h_centers_array.view().data_handle(),
                                    h_labels_array.view().data_handle(),
                                    params.fast_quantize_flag);
@@ -145,7 +146,8 @@ void search(raft::resources const& handle,
   auto rotated_queries = raft::make_device_matrix<T, int64_t>(handle, NQ, padded_dim);
 
   // TODO: replace RotatorGPU::rotate with cuVS/RAFT primitives
-  rabitq_idx->rotator().rotate(padded_queries.data_handle(), rotated_queries.data_handle(), NQ);
+  rabitq_idx->rotator().rotate(
+    handle, padded_queries.data_handle(), rotated_queries.data_handle(), NQ);
 
   auto search_mode_to_string = [](search_mode mode) -> std::string {
     switch (mode) {

@@ -24,6 +24,8 @@
 #include <cuvs/neighbors/ivf_rabitq/utils/space_cuda.cuh>
 #include <cuvs/neighbors/ivf_rabitq/utils/tools_gpu.cuh>
 
+#include <raft/core/resources.hpp>
+
 // Define PID and ExFactor as in your CPU version.
 typedef uint32_t PID;
 // typedef float ExFactor; // example
@@ -153,7 +155,8 @@ class DataQuantizerGPU {
   //                  const RotatorGPU& rotator,
   //                  uint8_t* outShort, uint8_t* outLong, ExFactor* outExFactor, float* outTemp)
   //                  const;
-  void quantize(const float* d_data,
+  void quantize(raft::resources const& handle,
+                const float* d_data,
                 const float* d_centroid,
                 const PID* d_IDs,
                 size_t num_points,
@@ -176,7 +179,8 @@ class DataQuantizerGPU {
    * @param outTemp Temporary buffer.
    */
 
-  void quantize_batch(const float* d_data,
+  void quantize_batch(raft::resources const& handle,
+                      const float* d_data,
                       const float* d_centroid,
                       const PID* d_IDs,
                       size_t num_points,
@@ -187,7 +191,8 @@ class DataQuantizerGPU {
                       float* d_ex_factor,
                       float* d_rotated_c) const;
 
-  void quantize_batch_opt(const float* d_data,
+  void quantize_batch_opt(raft::resources const& handle,
+                          const float* d_data,
                           const float* d_centroid,
                           const PID* d_IDs,
                           size_t num_points,
@@ -247,7 +252,8 @@ class DataQuantizerGPU {
   //                             const std::vector<PID>& pids,
   //                             const RotatorGPU& rotator,
   //                             float* out, float* floatMat, int* intMat) const;
-  void data_transformation(const float* d_data,
+  void data_transformation(raft::resources const& handle,
+                           const float* d_data,
                            const float* d_centroid,
                            const PID* d_IDs,
                            size_t num_points,
@@ -256,7 +262,8 @@ class DataQuantizerGPU {
                            float* d_XP_norm,
                            int* d_bin_XP) const;
 
-  void data_transformation_batch(const float* d_data,
+  void data_transformation_batch(raft::resources const& handle,
+                                 const float* d_data,
                                  const float* d_centroid,
                                  const PID* d_IDs,
                                  size_t num_points,
@@ -266,7 +273,8 @@ class DataQuantizerGPU {
                                  int* d_bin_XP,
                                  float* d_XP) const;
 
-  void data_transformation_batch_opt(const float* d_data,
+  void data_transformation_batch_opt(raft::resources const& handle,
+                                     const float* d_data,
                                      const float* d_centroid,
                                      const PID* d_IDs,
                                      size_t num_points,

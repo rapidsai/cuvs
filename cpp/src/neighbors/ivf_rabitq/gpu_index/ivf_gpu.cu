@@ -531,7 +531,8 @@ void IVFGPU::save(const char* filename, bool save_batch_flag) const
   std::cout << "IVFGPU index saved\n";
 }
 
-void IVFGPU::construct(const float* host_data,
+void IVFGPU::construct(raft::resources const& handle,
+                       const float* host_data,
                        const float* host_centroids,
                        const PID* host_cluster_ids,
                        bool fast_quantize)
@@ -626,7 +627,7 @@ void IVFGPU::construct(const float* host_data,
 #ifdef DEBUG_BATCH_CONSTRUCT
     std::cout << "cluster size:" << h_cluster_meta[i].num << std::endl;
 #endif
-    quantize_cluster(cp, d_data, cur_centroid, cur_rotated_c);
+    quantize_cluster(handle, cp, d_data, cur_centroid, cur_rotated_c);
     if (i % 100 == 0) printf("Cluster %d quantization finished!\n", i);
   }
 
@@ -645,7 +646,8 @@ void IVFGPU::construct(const float* host_data,
                         cudaMemcpyDeviceToHost));
 }
 
-void IVFGPU::quantize_cluster(GPUClusterMeta& cp,
+void IVFGPU::quantize_cluster(raft::resources const& handle,
+                              GPUClusterMeta& cp,
                               //                              const std::vector<PID>& IDs,
                               const float* d_data,      // device pointer
                               const float* d_centroid,  // device pointer
@@ -666,7 +668,8 @@ void IVFGPU::quantize_cluster(GPUClusterMeta& cp,
   // the device pointer for IDs, the number of points, the RotatorGPU instance,
   // and pointers for the output short data, long code, ex_factor, and rotated centroid.
   if (!batch_flag) {
-    DQ.quantize(d_data,
+    DQ.quantize(handle,
+                d_data,
                 d_centroid,
                 idp,
                 num,
@@ -685,7 +688,8 @@ void IVFGPU::quantize_cluster(GPUClusterMeta& cp,
     //                              d_rotated_c);
     //        }
     //        else {
-    DQ.quantize_batch_opt(d_data,
+    DQ.quantize_batch_opt(handle,
+                          d_data,
                           d_centroid,
                           idp,
                           num,

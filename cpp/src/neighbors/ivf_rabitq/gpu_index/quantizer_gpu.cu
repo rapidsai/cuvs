@@ -337,7 +337,8 @@ __global__ void binarizeKernel(const float* __restrict__ d_XP,
 // 5. Save the rotated centroid CP into d_rotated_c.
 // 6. Normalize XP rowwise to produce XP_norm.
 // 7. Binarize XP to produce bin_XP.
-void DataQuantizerGPU::data_transformation(const float* d_data,
+void DataQuantizerGPU::data_transformation(raft::resources const& handle,
+                                           const float* d_data,
                                            const float* d_centroid,
                                            const PID* d_IDs,
                                            size_t num_points,
@@ -368,12 +369,12 @@ void DataQuantizerGPU::data_transformation(const float* d_data,
   // Rotate X_pad -> XP. Allocate XP (num_points x D).
   float* d_XP;
   CUDA_CHECK(cudaMalloc((void**)&d_XP, num_points * D * sizeof(float)));
-  rotator.rotate(d_X_pad, d_XP, num_points);
+  rotator.rotate(handle, d_X_pad, d_XP, num_points);
 
   // Rotate C_pad -> CP. Allocate CP (1 x D).
   float* d_CP;
   CUDA_CHECK(cudaMalloc((void**)&d_CP, D * sizeof(float)));
-  rotator.rotate(d_C_pad, d_CP, 1);
+  rotator.rotate(handle, d_C_pad, d_CP, 1);
 
   // Subtract CP from each row of XP: XP = XP - CP.
   int totalElements = num_points * D;
@@ -416,7 +417,8 @@ void DataQuantizerGPU::data_transformation(const float* d_data,
 // 6. Normalize XP rowwise to produce XP_norm.
 // 7. Binarize XP to produce bin_XP.
 // slightly modified for batch data;
-void DataQuantizerGPU::data_transformation_batch(const float* d_data,
+void DataQuantizerGPU::data_transformation_batch(raft::resources const& handle,
+                                                 const float* d_data,
                                                  const float* d_centroid,
                                                  const PID* d_IDs,
                                                  size_t num_points,
@@ -446,12 +448,12 @@ void DataQuantizerGPU::data_transformation_batch(const float* d_data,
   CUDA_CHECK(cudaDeviceSynchronize());
 
   // Rotate X_pad -> XP. Allocate XP (num_points x D).
-  rotator.rotate(d_X_pad, d_XP, num_points);
+  rotator.rotate(handle, d_X_pad, d_XP, num_points);
 
   // Rotate C_pad -> CP. Allocate CP (1 x D).
   float* d_CP;
   CUDA_CHECK(cudaMalloc((void**)&d_CP, D * sizeof(float)));
-  rotator.rotate(d_C_pad, d_CP, 1);
+  rotator.rotate(handle, d_C_pad, d_CP, 1);
 
   // Subtract CP from each row of XP: XP = XP - CP.
   int totalElements = num_points * D;
@@ -2014,7 +2016,8 @@ void DataQuantizerGPU::exrabitq_codes_batch(const int* d_bin_XP,
 //   d_ex_factor  : output buffer for ExRaBitQ factors (pre-allocated on device)
 //   d_rotated_c  : output rotated centroid (size: D floats) on device
 //-----------------------------------------------------------------------------
-void DataQuantizerGPU::quantize(const float* d_data,
+void DataQuantizerGPU::quantize(raft::resources const& handle,
+                                const float* d_data,
                                 const float* d_centroid,
                                 const PID* d_IDs,
                                 size_t num_points,
@@ -2040,7 +2043,7 @@ void DataQuantizerGPU::quantize(const float* d_data,
   CUDA_CHECK(cudaMalloc((void**)&d_XP_norm, num_points * D * sizeof(float)));
   CUDA_CHECK(cudaMalloc((void**)&d_bin_XP, num_points * D * sizeof(int)));
   data_transformation(
-    d_data, d_centroid, d_IDs, num_points, rotator, d_rotated_c, d_XP_norm, d_bin_XP);
+    handle, d_data, d_centroid, d_IDs, num_points, rotator, d_rotated_c, d_XP_norm, d_bin_XP);
 #ifdef DEBUG_TIME
   cudaEventRecord(stop);
   cudaEventSynchronize(stop);
@@ -2442,7 +2445,8 @@ void compute_factors_packed_batch(const float* d_centroid,  // [D]
 int debug_first_cluster_count_2 = 0;
 #endif
 
-void DataQuantizerGPU::quantize_batch(const float* d_data,
+void DataQuantizerGPU::quantize_batch(raft::resources const& handle,
+                                      const float* d_data,
                                       const float* d_centroid,
                                       const PID* d_IDs,
                                       size_t num_points,
@@ -2471,7 +2475,7 @@ void DataQuantizerGPU::quantize_batch(const float* d_data,
   CUDA_CHECK(cudaMalloc((void**)&d_bin_XP, num_points * D * sizeof(int)));
   CUDA_CHECK(cudaMalloc((void**)&d_XP, num_points * D * sizeof(float)));
   data_transformation_batch(
-    d_data, d_centroid, d_IDs, num_points, rotator, d_rotated_c, d_XP_norm, d_bin_XP, d_XP);
+    handle, d_data, d_centroid, d_IDs, num_points, rotator, d_rotated_c, d_XP_norm, d_bin_XP, d_XP);
 #ifdef DEBUG_TIME
   cudaEventRecord(stop);
   cudaEventSynchronize(stop);

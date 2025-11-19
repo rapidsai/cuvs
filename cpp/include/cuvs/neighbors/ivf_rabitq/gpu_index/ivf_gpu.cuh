@@ -208,7 +208,8 @@ class IVFGPU {
    * @param host_centroids pointer to centroids.
    * @param pids PIDs of vectors.
    */
-  void construct(const float* host_data,
+  void construct(raft::resources const& handle,
+                 const float* host_data,
                  const float* host_centroids,
                  const uint32_t* pids,
                  bool fast_quantize = false);
@@ -414,7 +415,8 @@ class IVFGPU {
   size_t GetLongCodeBytes() const { return sizeof(uint8_t) * DQ.long_code_length() * num_vectors; }
   void init_clusters(const std::vector<size_t>& cluster_sizes);
 
-  void quantize_cluster(GPUClusterMeta& cp,
+  void quantize_cluster(raft::resources const& handle,
+                        GPUClusterMeta& cp,
                         /*const std::vector<PID> &IDs,*/ const float* data,
                         const float* cur_centroid,
                         float* rotated_c) const;

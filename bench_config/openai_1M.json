@@ -12,11 +12,11 @@
     "k": 10
   },
 
-  "index": [  
+  "index": [
     {
       "name": "cuvs_ivf_rabitq.test",
       "algo": "cuvs_ivf_rabitq",
-      "build_param": {"nlist":1000, "niter":20, "ex_bits":4, "fast_quantize_flag":true},
+      "build_param": {"nlist":1000, "niter":20, "bits_per_dim":4, "fast_quantize_flag":true},
       "file": "openai_1M/cuvs_ivf_rabitq/test",
       "search_params": [
          { "nprobe": 5, "mode": "quant4" },

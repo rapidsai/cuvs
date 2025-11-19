@@ -67,7 +67,7 @@ class RotatorGPU {
   // Rotate matrix A and store the result in RAND_A.
   // A and RAND_A are device pointers representing matrices of size N x D.
   // This function computes: RAND_A = A * P using cuBLAS.
-  void rotate(const float* d_A, float* d_RAND_A, size_t N) const;
+  void rotate(raft::resources const& handle, const float* d_A, float* d_RAND_A, size_t N) const;
 
   float* d_P;
 };

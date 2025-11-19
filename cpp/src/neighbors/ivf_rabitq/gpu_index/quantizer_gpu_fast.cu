@@ -427,6 +427,7 @@ __global__ void exrabitq_fused_kernel_batch(
 }
 
 void DataQuantizerGPU::data_transformation_batch_opt(
+  raft::resources const& handle,
   const float* d_data,
   const float* d_centroid,
   const PID* d_IDs,
@@ -462,7 +463,7 @@ void DataQuantizerGPU::data_transformation_batch_opt(
 
   // 4. Perform a single, combined rotation.
   // The input is d_X_and_C_pad, output is d_XP_and_CP. The number of "points" is num_points + 1.
-  rotator.rotate(d_X_and_C_pad, d_XP_and_CP, num_points + 1);
+  rotator.rotate(handle, d_X_and_C_pad, d_XP_and_CP, num_points + 1);
 
   // Create pointers to the specific results within the combined buffer.
   float* d_XP = d_XP_and_CP;
@@ -552,7 +553,8 @@ void DataQuantizerGPU::exrabitq_codes_and_factors_fused(const int* d_bin_XP,
     d_ex_factor);
 }
 
-void DataQuantizerGPU::quantize_batch_opt(const float* d_data,
+void DataQuantizerGPU::quantize_batch_opt(raft::resources const& handle,
+                                          const float* d_data,
                                           const float* d_centroid,
                                           const PID* d_IDs,
                                           size_t num_points,
@@ -575,7 +577,7 @@ void DataQuantizerGPU::quantize_batch_opt(const float* d_data,
   cudaMalloc((void**)&d_bin_XP, num_points * D * sizeof(int));
   cudaMalloc((void**)&d_XP, (num_points + 1) * D * sizeof(float));
   data_transformation_batch_opt(
-    d_data, d_centroid, d_IDs, num_points, rotator, d_rotated_c, d_XP_norm, d_bin_XP, d_XP);
+    handle, d_data, d_centroid, d_IDs, num_points, rotator, d_rotated_c, d_XP_norm, d_bin_XP, d_XP);
 
 #ifdef DEBUG_BATCH_CONSTRUCT
 //    if (debug_first_cluster_count_2 == 0) {
