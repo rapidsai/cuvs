@@ -65,8 +65,12 @@ void serialize(raft::resources const& res,
   raft::serialize_mdspan(res, os, index_.graph());
 
   include_dataset &= (index_.data().n_rows() > 0);
-  bool has_source_indices = index_.source_indices().has_value();
-  uint32_t content_map    = 0x1u * include_dataset + 0x2u * has_source_indices;
+  bool has_source_indices         = index_.source_indices().has_value();
+  bool has_rand_orth_preprocessor = std::holds_alternative<
+    cuvs::preprocessing::linear_transform::random_orthogonal::transformer<T>>(
+    index_.preprocess_transformer());
+  uint32_t content_map =
+    0x1u * include_dataset + 0x2u * has_source_indices + 0x4u * has_rand_orth_preprocessor;
 
   raft::serialize_scalar(res, os, content_map);
   if (include_dataset) {
@@ -77,6 +81,19 @@ void serialize(raft::resources const& res,
   }
 
   if (has_source_indices) { raft::serialize_mdspan(res, os, index_.source_indices().value()); }
+  if (has_rand_orth_preprocessor) {
+    const auto& rand_orth_transformer =
+      std::get<cuvs::preprocessing::linear_transform::random_orthogonal::transformer<T>>(
+        index_.preprocess_transformer());
+
+    auto host_matrix = raft::make_host_matrix<T, int64_t>(index_.dim(), index_.dim());
+    raft::copy(host_matrix.data_handle(),
+               rand_orth_transformer.orthogonal_matrix.data_handle(),
+               index_.dim() * index_.dim(),
+               raft::resource::get_cuda_stream(res));
+    raft::resource::sync_stream(res);
+    raft::serialize_mdspan(res, os, host_matrix.view());
+  }
 }
 
 template <typename T, typename IdxT>
@@ -300,6 +317,21 @@ void deserialize(raft::resources const& res, std::istream& is, index<T, IdxT>* i
     index_->update_source_indices(res, raft::make_const_mdspan(source_indices.view()));
     raft::resource::sync_stream(
       res);  // Don't let the vector out of the scope before the copy is finished
+  }
+
+  bool has_rand_orth_preprocessor = content_map & 0x4u;
+  if (has_rand_orth_preprocessor) {
+    auto host_matrix = raft::make_host_matrix<T, int64_t>(dim, dim);
+    raft::deserialize_mdspan(res, is, host_matrix.view());
+
+    auto device_matrix = raft::make_device_matrix<T, int64_t>(res, dim, dim);
+    raft::copy(device_matrix.data_handle(),
+               host_matrix.data_handle(),
+               dim * dim,
+               raft::resource::get_cuda_stream(res));
+    index_->preprocess_transformer() =
+      cuvs::preprocessing::linear_transform::random_orthogonal::transformer<T>{
+        std::move(device_matrix)};
   }
 }
 

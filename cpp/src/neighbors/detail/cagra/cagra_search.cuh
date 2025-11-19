@@ -180,6 +180,36 @@ void search_main(raft::resources const& res,
     RAFT_FAIL("FP32 VPQ dataset support is coming soon");
   } else if (auto* vpq_dset = dynamic_cast<const vpq_dataset<half, ds_idx_type>*>(&index.data());
              vpq_dset != nullptr) {
+    raft::device_matrix_view<const T, int64_t, raft::row_major> queries_ = queries;
+
+    // Preprocess if needed
+    auto mr = raft::resource::get_workspace_resource(res);
+    auto preprocessed_queries =
+      raft::make_device_mdarray<T, std::int64_t>(res, mr, raft::make_extents<std::int64_t>(0, 0));
+    if (std::holds_alternative<
+          cuvs::preprocessing::linear_transform::random_orthogonal::transformer<T>>(
+          index.preprocess_transformer())) {
+      constexpr bool is_supported_dtype = std::is_same_v<T, float> || std::is_same_v<T, half>;
+      RAFT_EXPECTS(is_supported_dtype,
+                   "Only the float and half data types are supported in the random orthogonal "
+                   "transform preprocessing");
+      if constexpr (is_supported_dtype) {
+        const auto& rand_orth_transformer =
+          std::get<cuvs::preprocessing::linear_transform::random_orthogonal::transformer<T>>(
+            index.preprocess_transformer());
+        // cuvs::preprocessing::linear_transform::random_orthogonal::params params;
+        // auto rand_orth_transformer =
+        // cuvs::preprocessing::linear_transform::random_orthogonal::train(res, params, queries);
+
+        auto preprocessed_queries = raft::make_device_mdarray<T, std::int64_t>(
+          res, mr, raft::make_extents<std::int64_t>(queries.extent(0), queries.extent(1)));
+
+        cuvs::preprocessing::linear_transform::random_orthogonal::transform(
+          res, rand_orth_transformer, queries, preprocessed_queries.view());
+        queries_ = raft::make_const_mdspan(preprocessed_queries.view());
+      }
+    }
+
     auto desc = dataset_descriptor_init_with_cache<T, graph_idx_type, DistanceT>(
       res, params, *vpq_dset, index.metric(), nullptr);
     search_main_core<T, graph_idx_type, DistanceT, CagraSampleFilterT, IdxT, OutputIdxT>(
@@ -188,7 +218,7 @@ void search_main(raft::resources const& res,
       desc,
       index.graph(),
       index.source_indices(),
-      queries,
+      queries_,
       neighbors,
       distances,
       sample_filter);

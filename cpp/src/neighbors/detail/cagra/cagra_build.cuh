@@ -2065,6 +2065,8 @@ index<T, IdxT> build(
       std::holds_alternative<cagra::graph_build_params::ivf_pq_params>(knn_build_params) ||
       std::holds_alternative<cagra::graph_build_params::nn_descent_params>(knn_build_params),
     "CosineExpanded distance is not supported for iterative CAGRA graph build.");
+  RAFT_EXPECTS(std::holds_alternative<std::monostate>(params.preprocess_params),
+               "Dataset preprocessing is not supported in cagra::build with const dataset");
 
   // Validate data type for BitwiseHamming metric
   RAFT_EXPECTS(params.metric != cuvs::distance::DistanceType::BitwiseHamming ||
@@ -2166,6 +2168,40 @@ index<T, IdxT> build(
   }
   index<T, IdxT> idx(res, params.metric);
   idx.update_graph(res, raft::make_const_mdspan(cagra_graph.view()));
+  return idx;
+}
+
+template <typename T,
+          typename IdxT     = uint32_t,
+          typename Accessor = raft::host_device_accessor<std::experimental::default_accessor<T>,
+                                                         raft::memory_type::host>>
+index<T, IdxT> build(
+  raft::resources const& res,
+  const index_params& params,
+  raft::mdspan<T, raft::matrix_extent<int64_t>, raft::row_major, Accessor> dataset)
+{
+  std::variant<std::monostate,
+               cuvs::preprocessing::linear_transform::random_orthogonal::transformer<T>>
+    preprocess_transformer;
+  if (std::holds_alternative<cuvs::preprocessing::linear_transform::random_orthogonal::params>(
+        params.preprocess_params)) {
+    const auto rand_orth_params =
+      std::get<cuvs::preprocessing::linear_transform::random_orthogonal::params>(
+        params.preprocess_params);
+
+    auto transformer = cuvs::preprocessing::linear_transform::random_orthogonal::train(
+      res, rand_orth_params, raft::make_const_mdspan(dataset));
+    cuvs::preprocessing::linear_transform::random_orthogonal::transform(
+      res, rand_orth_params, dataset, raft::make_const_mdspan(dataset));
+
+    preprocess_transformer.emplace(transformer);
+  }
+  index_params new_params      = params;
+  new_params.preprocess_params = std::monostate{};
+
+  auto idx                   = build<T, IdxT, Accessor>(res, params, dataset);
+  idx.preprocess_transformer = preprocess_transformer;
+
   return idx;
 }
 }  // namespace cuvs::neighbors::cagra::detail

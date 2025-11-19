@@ -11,6 +11,7 @@
 #include <cuvs/neighbors/graph_build_types.hpp>
 #include <cuvs/neighbors/ivf_pq.hpp>
 #include <cuvs/neighbors/nn_descent.hpp>
+#include <cuvs/preprocessing/linear_transform/random_orthogonal.hpp>
 #include <cuvs/util/file_io.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_device_accessor.hpp>
@@ -149,6 +150,12 @@ struct index_params : cuvs::neighbors::index_params {
    * @endcode
    */
   bool attach_dataset_on_build = true;
+
+  /**
+   * Preprocess transformation configure
+   */
+  std::variant<std::monostate, cuvs::preprocessing::linear_transform::random_orthogonal::params>
+    preprocess_params;
 
   /**
    * @brief Create a CAGRA index parameters compatible with HNSW index
@@ -447,6 +454,22 @@ struct index : cuvs::neighbors::index {
   {
     if (dataset_norms_.has_value()) { return raft::make_const_mdspan(dataset_norms_->view()); }
     return std::nullopt;
+  }
+
+  /** Get the preprocess taransformer */
+  [[nodiscard]] inline auto preprocess_transformer() const noexcept -> const
+    std::variant<std::monostate,
+                 cuvs::preprocessing::linear_transform::random_orthogonal::transformer<value_type>>&
+  {
+    return preprocess_transformer_;
+  }
+
+  /** Get the preprocess taransformer */
+  [[nodiscard]] inline auto preprocess_transformer() noexcept -> std::variant<
+    std::monostate,
+    cuvs::preprocessing::linear_transform::random_orthogonal::transformer<value_type>>&
+  {
+    return preprocess_transformer_;
   }
 
   // Don't allow copying the index for performance reasons (try avoiding copying data)
@@ -837,6 +860,11 @@ struct index : cuvs::neighbors::index {
   std::optional<cuvs::util::file_descriptor> dataset_fd_;
   std::optional<cuvs::util::file_descriptor> graph_fd_;
   std::optional<cuvs::util::file_descriptor> mapping_fd_;
+
+  // Preprocess transformer
+  std::variant<std::monostate,
+               cuvs::preprocessing::linear_transform::random_orthogonal::transformer<value_type>>
+    preprocess_transformer_;
 
   void compute_dataset_norms_(raft::resources const& res);
   size_t n_rows_       = 0;
