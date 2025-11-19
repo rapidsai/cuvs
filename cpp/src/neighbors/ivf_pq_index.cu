@@ -194,16 +194,6 @@ owning_impl<IdxT>::owning_impl(raft::resources const& handle,
     rotation_matrix_{raft::make_device_matrix<float, uint32_t>(
       handle, raft::div_rounding_up_unsafe(dim, pq_dim) * pq_dim, dim)}
 {
-  // Initialize device arrays to zero to ensure deterministic behavior
-  auto stream = raft::resource::get_cuda_stream(handle);
-  RAFT_CUDA_TRY(cudaMemsetAsync(
-    pq_centers_.data_handle(), 0, pq_centers_.size() * sizeof(float), stream));
-  RAFT_CUDA_TRY(
-    cudaMemsetAsync(centers_.data_handle(), 0, centers_.size() * sizeof(float), stream));
-  RAFT_CUDA_TRY(
-    cudaMemsetAsync(centers_rot_.data_handle(), 0, centers_rot_.size() * sizeof(float), stream));
-  RAFT_CUDA_TRY(cudaMemsetAsync(
-    rotation_matrix_.data_handle(), 0, rotation_matrix_.size() * sizeof(float), stream));
 }
 
 template <typename IdxT>
@@ -415,6 +405,8 @@ index<IdxT>::index(raft::resources const& handle,
                                               pq_dim == 0 ? calculate_pq_dim(dim) : pq_dim,
                                               conservative_memory_allocation))
 {
+  check_consistency();
+  accum_sorted_sizes()(n_lists) = 0;
 }
 
 template <typename IdxT>
@@ -434,7 +426,7 @@ index<IdxT>::index(raft::resources const& handle, const index_params& params, ui
 template <typename IdxT>
 IdxT index<IdxT>::size() const noexcept
 {
-  return impl_->accum_sorted_sizes()(impl_->lists().size());
+  return accum_sorted_sizes()(n_lists());
 }
 
 template <typename IdxT>
