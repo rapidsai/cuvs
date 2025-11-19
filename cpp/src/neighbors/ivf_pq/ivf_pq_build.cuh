@@ -8,9 +8,9 @@
 #include "../../core/nvtx.hpp"
 #include "../ivf_common.cuh"
 #include "../ivf_list.cuh"
+#include "../ivf_pq_impl.hpp"
 #include "ivf_pq_codepacking.cuh"
 #include "ivf_pq_contiguous_list_data.cuh"
-#include "../ivf_pq_impl.hpp"
 #include "ivf_pq_process_and_fill_codes.cuh"
 #include <cuvs/distance/distance.hpp>
 #include <cuvs/neighbors/common.hpp>
@@ -1413,18 +1413,16 @@ void build(raft::resources const& handle,
 }
 
 template <typename IdxT>
-auto build(
-  raft::resources const& handle,
-  const cuvs::neighbors::ivf_pq::index_params& index_params,
-  const uint32_t dim,
-  raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot,
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix)
+auto build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_pq::index_params& index_params,
+           const uint32_t dim,
+           raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+           raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
+           raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot,
+           raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix)
   -> cuvs::neighbors::ivf_pq::index<IdxT>
 {
-  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("ivf_pq::build(%u)",
-                                                                        dim);
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("ivf_pq::build(%u)", dim);
   auto stream = raft::resource::get_cuda_stream(handle);
 
   uint32_t n_lists      = centers.extent(0);
@@ -1513,6 +1511,19 @@ auto build(
   utils::memzero(view_index.inds_ptrs().data_handle(), view_index.inds_ptrs().size(), stream);
 
   return view_index;
+}
+
+template <typename IdxT>
+void build(raft::resources const& handle,
+           const cuvs::neighbors::ivf_pq::index_params& index_params,
+           const uint32_t dim,
+           raft::device_mdspan<const float, raft::extent_3d<uint32_t>, raft::row_major> pq_centers,
+           raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
+           raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot,
+           raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix,
+           index<IdxT>* idx)
+{
+  *idx = build<IdxT>(handle, index_params, dim, pq_centers, centers, centers_rot, rotation_matrix);
 }
 
 template <typename T, typename IdxT, typename accessor, typename accessor2>
