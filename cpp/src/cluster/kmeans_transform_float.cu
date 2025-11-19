@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,7 +13,6 @@ void transform(raft::resources const& handle,
                raft::device_matrix_view<const float, int> X,
                raft::device_matrix_view<const float, int> centroids,
                raft::device_matrix_view<float, int> X_new)
-
 {
   cuvs::cluster::kmeans::transform<float, int>(handle, params, X, centroids, X_new);
 }
