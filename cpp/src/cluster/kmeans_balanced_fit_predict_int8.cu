@@ -4,7 +4,7 @@
  */
 
 // clang-format off
-#include "kmeans_balanced.cuh"
+#include "kmeans_balanced_impl_fit_predict.cuh"
 #include "../neighbors/detail/ann_utils.cuh"
 #include <raft/core/resources.hpp>
 // clang-format on
@@ -17,8 +17,7 @@ void fit_predict(const raft::resources& handle,
                  raft::device_matrix_view<float, int64_t> centroids,
                  raft::device_vector_view<uint32_t, int64_t> labels)
 {
-  cuvs::cluster::kmeans_balanced::fit_predict(
-    handle, params, X, centroids, labels, cuvs::spatial::knn::detail::utils::mapping<float>{});
+  cuvs::cluster::kmeans_balanced::fit_predict(handle, params, X, centroids, labels);
 }
 
 void fit_predict(const raft::resources& handle,
@@ -27,7 +26,6 @@ void fit_predict(const raft::resources& handle,
                  raft::device_matrix_view<float, int64_t> centroids,
                  raft::device_vector_view<int, int64_t> labels)
 {
-  cuvs::cluster::kmeans_balanced::fit_predict(
-    handle, params, X, centroids, labels, cuvs::spatial::knn::detail::utils::mapping<float>{});
+  cuvs::cluster::kmeans_balanced::fit_predict(handle, params, X, centroids, labels);
 }
 }  // namespace cuvs::cluster::kmeans

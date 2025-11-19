@@ -432,11 +432,17 @@ void transform(raft::resources const& res,
       raft::copy(
         threshold_ptr, casted_vec.data_handle(), dataset_dim, raft::resource::get_cuda_stream(res));
     }
+    // Populate the threshold_ptr on the host side before the host parallel loop.
+    raft::resource::sync_stream(res);
   }
 
 #pragma omp parallel for collapse(2)
   for (size_t i = 0; i < dataset_size; ++i) {
-    for (uint32_t out_j = 0; out_j < minimul_out_dim; ++out_j) {
+    for (uint32_t out_j = 0; out_j < out_dim; ++out_j) {
+      if (out_j >= minimul_out_dim) {
+        out(i, out_j) = 0;
+        continue;
+      }
       QuantI pack = 0;
       for (uint32_t pack_j = 0; pack_j < bits_per_pack; ++pack_j) {
         const uint32_t in_j = out_j * bits_per_pack + pack_j;

@@ -112,8 +112,9 @@ public class CuVSDeviceMatrixImpl extends CuVSMatrixBaseImpl implements CuVSDevi
     var valueByteSize = valueLayout.byteSize();
     var startRow = row - bufferedMatrixRowStart;
 
+    var rowSize = rowStride > 0 ? rowStride * valueByteSize : columns * valueByteSize;
     return new SliceRowView(
-        hostBuffer.address().asSlice(startRow * columns * valueByteSize, columns * valueByteSize),
+        hostBuffer.address().asSlice(startRow * rowSize, columns * valueByteSize),
         columns,
         valueLayout,
         dataType,

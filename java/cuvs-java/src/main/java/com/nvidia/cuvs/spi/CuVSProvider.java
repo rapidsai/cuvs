@@ -113,6 +113,16 @@ public interface CuVSProvider {
   HnswIndex.Builder newHnswIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;
 
+  /**
+   * Creates an HNSW index from an existing CAGRA index.
+   *
+   * @param hnswParams Parameters for the HNSW index
+   * @param cagraIndex The CAGRA index to convert from
+   * @return A new HNSW index
+   * @throws Throwable if an error occurs during conversion
+   */
+  HnswIndex hnswIndexFromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex) throws Throwable;
+
   /** Creates a new TieredIndex Builder. */
   TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources)
       throws UnsupportedOperationException;
@@ -143,8 +153,36 @@ public interface CuVSProvider {
   /** Returns a {@link GPUInfoProvider} to query the system for GPU related information */
   GPUInfoProvider gpuInfoProvider();
 
+  void setLogLevel(java.util.logging.Level level);
+
+  java.util.logging.Level getLogLevel();
+
   /** Retrieves the system-wide provider. */
   static CuVSProvider provider() {
     return CuVSServiceProvider.Holder.INSTANCE;
   }
+
+  /**
+   * Create a CAGRA index parameters compatible with HNSW index
+   *
+   * Note: The reference HNSW index and the corresponding from-CAGRA generated HNSW index will NOT produce
+   * exactly the same recalls and QPS for the same parameter `ef`. The graphs are different
+   * internally. Depending on the selected heuristics, the CAGRA-produced graph's QPS-Recall curve
+   * may be shifted along the curve right or left. See the heuristics descriptions for more details.
+   *
+   * @param rows The number of rows in the input dataset
+   * @param dim The number of dimensions in the input dataset
+   * @param m HNSW index parameter M
+   * @param efConstruction HNSW index parameter ef_construction
+   * @param heuristic The heuristic to use for selecting the graph build parameters
+   * @param metric The distance metric to search
+   * @return A new CAGRA index parameters object
+   */
+  CagraIndexParams cagraIndexParamsFromHnswParams(
+      long rows,
+      long dim,
+      int m,
+      int efConstruction,
+      CagraIndexParams.HnswHeuristicType heuristic,
+      CagraIndexParams.CuvsDistanceType metric);
 }

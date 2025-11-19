@@ -10,7 +10,6 @@ import os
 import re
 import subprocess
 import sys
-from functools import partial
 from operator import attrgetter
 
 orig = inspect.isfunction
@@ -18,7 +17,6 @@ orig = inspect.isfunction
 
 # See https://opendreamkit.org/2017/06/09/CythonSphinx/
 def isfunction(obj):
-
     orig_val = orig(obj)
 
     new_val = hasattr(type(obj), "__code__")
@@ -125,7 +123,6 @@ def _linkcode_resolve(domain, info, package, url_fmt, revision):
         try:
             lineno = inspect.getsourcelines(obj)[1]
         except Exception:
-
             # Can happen if its a cyfunction. See if it has `__code__`
             if hasattr(obj, "__code__"):
                 lineno = obj.__code__.co_firstlineno

@@ -207,24 +207,24 @@ cagra_macro = """
                    const std::string& filename);
 """
 
-flat_macros = dict (
-    flat = dict(
+flat_macros = dict(
+    flat=dict(
         include=include_macro,
         definition=flat_macro,
         name="CUVS_INST_MG_FLAT",
     )
 )
 
-pq_macros = dict (
-    pq = dict(
+pq_macros = dict(
+    pq=dict(
         include=include_macro,
         definition=pq_macro,
         name="CUVS_INST_MG_PQ",
     )
 )
 
-cagra_macros = dict (
-    cagra = dict(
+cagra_macros = dict(
+    cagra=dict(
         include=include_macro,
         definition=cagra_macro,
         name="CUVS_INST_MG_CAGRA",
@@ -252,17 +252,21 @@ cagra_types = dict(
     uint8_t_uint32_t=("uint8_t", "uint32_t"),
 )
 
-for macros, types in [(flat_macros, flat_types), (pq_macros, pq_types), (cagra_macros, cagra_types)]:
-  for type_path, (T, IdxT) in types.items():
-      for macro_path, macro in macros.items():
-          path = f"iface_{macro_path}_{type_path}.cu"
-          with open(path, "w") as f:
-              f.write(header)
-              f.write(macro['include'])
-              f.write(namespace_macro)
-              f.write(macro["definition"])
-              f.write(f"{macro['name']}({T}, {IdxT});\n\n")
-              f.write(f"#undef {macro['name']}\n")
-              f.write(footer)
+for macros, types in [
+    (flat_macros, flat_types),
+    (pq_macros, pq_types),
+    (cagra_macros, cagra_types),
+]:
+    for type_path, (T, IdxT) in types.items():
+        for macro_path, macro in macros.items():
+            path = f"iface_{macro_path}_{type_path}.cu"
+            with open(path, "w") as f:
+                f.write(header)
+                f.write(macro["include"])
+                f.write(namespace_macro)
+                f.write(macro["definition"])
+                f.write(f"{macro['name']}({T}, {IdxT});\n\n")
+                f.write(f"#undef {macro['name']}\n")
+                f.write(footer)
 
-          print(f"src/neighbors/iface/{path}")
+            print(f"src/neighbors/iface/{path}")

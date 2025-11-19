@@ -12,6 +12,8 @@ import static com.nvidia.cuvs.internal.common.Util.checkCuVSError;
 import static com.nvidia.cuvs.internal.common.Util.prepareTensor;
 import static com.nvidia.cuvs.internal.panama.headers_h.*;
 
+import com.nvidia.cuvs.CagraIndex;
+import com.nvidia.cuvs.CuVSMatrix;
 import com.nvidia.cuvs.CuVSResources;
 import com.nvidia.cuvs.HnswIndex;
 import com.nvidia.cuvs.HnswIndexParams;
@@ -57,6 +59,20 @@ public class HnswIndexImpl implements HnswIndex {
     this.hnswIndexParams = hnswIndexParams;
     this.resources = resources;
     this.hnswIndexReference = deserialize(inputStream);
+  }
+
+  /**
+   * Constructor for creating index from an existing IndexReference
+   *
+   * @param indexReference the index reference
+   * @param resources      an instance of {@link CuVSResources}
+   * @param hnswIndexParams an instance of {@link HnswIndexParams}
+   */
+  private HnswIndexImpl(
+      IndexReference indexReference, CuVSResources resources, HnswIndexParams hnswIndexParams) {
+    this.hnswIndexParams = hnswIndexParams;
+    this.resources = resources;
+    this.hnswIndexReference = indexReference;
   }
 
   /**
@@ -220,6 +236,96 @@ public class HnswIndexImpl implements HnswIndex {
 
   public static HnswIndex.Builder newBuilder(CuVSResources cuvsResources) {
     return new HnswIndexImpl.Builder(Objects.requireNonNull(cuvsResources));
+  }
+
+  /**
+   * Creates an HNSW index from an existing CAGRA index.
+   *
+   * @param hnswParams Parameters for the HNSW index
+   * @param cagraIndex The CAGRA index to convert from
+   * @return A new HNSW index for in-memory indices, or null for disk-based indices
+   * @throws Throwable if an error occurs during conversion
+   */
+  public static HnswIndex fromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex)
+      throws Throwable {
+    Objects.requireNonNull(hnswParams);
+    Objects.requireNonNull(cagraIndex);
+
+    // Get the CAGRA index implementation to access internals
+    if (!(cagraIndex instanceof CagraIndexImpl)) {
+      throw new IllegalArgumentException("Invalid CagraIndex implementation");
+    }
+    CagraIndexImpl cagraImpl = (CagraIndexImpl) cagraIndex;
+    CuVSResources resources = cagraImpl.getCuVSResources();
+
+    // Create HNSW index
+    MemorySegment hnswIndex = createHnswIndexHandle();
+
+    initializeIndexDType(hnswIndex, cagraImpl.getDatasetForConversion());
+
+    try (var localArena = Arena.ofConfined();
+        var hnswParamsHandle = createHnswIndexParams()) {
+      MemorySegment hnswParamsMemorySegment = hnswParamsHandle.handle();
+
+      // Set HNSW params
+      cuvsHnswIndexParams.hierarchy(hnswParamsMemorySegment, hnswParams.getHierarchy().value);
+      cuvsHnswIndexParams.ef_construction(hnswParamsMemorySegment, hnswParams.getEfConstruction());
+      cuvsHnswIndexParams.num_threads(hnswParamsMemorySegment, hnswParams.getNumThreads());
+
+      try (var resourcesAccessor = resources.access()) {
+        var cuvsRes = resourcesAccessor.handle();
+
+        // Call cuvsHnswFromCagra
+        int returnValue =
+            cuvsHnswFromCagra(
+                cuvsRes, hnswParamsMemorySegment, cagraImpl.getCagraIndexReference(), hnswIndex);
+        checkCuVSError(returnValue, "cuvsHnswFromCagra");
+
+        returnValue = cuvsStreamSync(cuvsRes);
+        checkCuVSError(returnValue, "cuvsStreamSync");
+      }
+    }
+    return new HnswIndexImpl(new IndexReference(hnswIndex), resources, hnswParams);
+  }
+
+  /**
+   * Creates a new HNSW index handle.
+   */
+  private static MemorySegment createHnswIndexHandle() {
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment indexPtrPtr = localArena.allocate(cuvsHnswIndex_t);
+      var returnValue = cuvsHnswIndexCreate(indexPtrPtr);
+      checkCuVSError(returnValue, "cuvsHnswIndexCreate");
+      return indexPtrPtr.get(cuvsHnswIndex_t, 0);
+    }
+  }
+
+  private static void initializeIndexDType(MemorySegment hnswIndex, CuVSMatrix dataset) {
+    int bits = 32;
+    int code = kDLFloat();
+
+    if (dataset instanceof CuVSMatrixInternal matrixInternal) {
+      bits = matrixInternal.bits();
+      code = matrixInternal.code();
+    } else if (dataset != null) {
+      bits = bitsFromDataType(dataset.dataType());
+      code = CuVSMatrixInternal.code(dataset.dataType());
+    }
+
+    try (var localArena = Arena.ofConfined()) {
+      MemorySegment dtype = DLDataType.allocate(localArena);
+      DLDataType.bits(dtype, (byte) bits);
+      DLDataType.code(dtype, (byte) code);
+      DLDataType.lanes(dtype, (byte) 1);
+      cuvsHnswIndex.dtype(hnswIndex, dtype);
+    }
+  }
+
+  private static int bitsFromDataType(CuVSMatrix.DataType dataType) {
+    return switch (dataType) {
+      case BYTE -> 8;
+      default -> 32;
+    };
   }
 
   /**
