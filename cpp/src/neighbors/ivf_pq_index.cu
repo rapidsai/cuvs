@@ -381,15 +381,6 @@ index<IdxT>::index(std::unique_ptr<index_iface<IdxT>> impl)
 }
 
 template <typename IdxT>
-index<IdxT>::~index() = default;
-
-template <typename IdxT>
-index<IdxT>::index(index&&) noexcept = default;
-
-template <typename IdxT>
-auto index<IdxT>::operator=(index&&) -> index& = default;
-
-template <typename IdxT>
 index<IdxT>::index(raft::resources const& handle)
   : index(std::make_unique<owning_impl<IdxT>>(handle,
                                               cuvs::distance::DistanceType::L2Expanded,
