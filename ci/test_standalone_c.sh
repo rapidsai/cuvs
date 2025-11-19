@@ -4,21 +4,11 @@
 
 set -euo pipefail
 
-CMAKE_VERSION=4.1.2
-CMAKE_ARCH=x86_64
-
-# Fetch and install CMake.
-if [ ! -e "/usr/local/bin/cmake" ]; then
-      pushd /usr/local
-      wget --quiet https://github.com/Kitware/CMake/releases/download/v"${CMAKE_VERSION}"/cmake-"${CMAKE_VERSION}"-linux-"${CMAKE_ARCH}".tar.gz
-      tar zxf cmake-"${CMAKE_VERSION}"-linux-"${CMAKE_ARCH}".tar.gz
-      rm cmake-"${CMAKE_VERSION}"-linux-"${CMAKE_ARCH}".tar.gz
-      ln -s /usr/local/cmake-"${CMAKE_VERSION}"-linux-"${CMAKE_ARCH}"/bin/cmake /usr/local/bin/cmake
-      popd
-fi
+rapids-pip-retry install cmake
+pyenv rehash
 
 # Download the standalone C library artifact
-payload_name="libcuvs_c_${RAPIDS_CUDA_VERSION}.tar.gz"
+payload_name="libcuvs_c_${RAPIDS_CUDA_VERSION}_${RAPIDS_TEST_ARCH}.tar.gz"
 pkg_name="libcuvs_c.tar.gz"
 rapids-logger "Download ${payload_name} artifacts from previous jobs"
 DOWNLOAD_LOCATION=$(rapids-download-from-github "${payload_name}")
