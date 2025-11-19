@@ -13,7 +13,6 @@
 #include <raft/core/resources.hpp>
 
 #include <cstdint>
-#include <cublas_v2.h>
 #include <cuvs/neighbors/ivf_rabitq/defines.hpp>
 #include <cuvs/neighbors/ivf_rabitq/utils/utils_cuda.cuh>
 #include <fstream>
@@ -24,18 +23,16 @@
 // It is assumed that A and RAND_A reside in GPU memory.
 class RotatorGPU {
  private:
-  size_t D;                 // Padded dimension
-  cudaStream_t m_stream;    // CUDA stream
-  cublasHandle_t m_handle;  // The cuBLAS handle
-                            // Device pointer for the rotation matrix (stored in row-major order)
- public:                    /**
-                             * @brief Construct a new RotatorGPU object.
-                             * @param dim The original dimension; the padded dimension D is computed as
-                             * rd_up_to_multiple_of(dim, 64).
-                             *
-                             * The constructor generates a random rotation matrix on the CPU (using Eigen) and then
-                             * copies it into                    device memory in column-major order.
-                             */
+  size_t D;               // Padded dimension
+  cudaStream_t m_stream;  // CUDA stream
+ public:                  /**
+                           * @brief Construct a new RotatorGPU object.
+                           * @param dim The original dimension; the padded dimension D is computed as
+                           * rd_up_to_multiple_of(dim, 64).
+                           *
+                           * The constructor generates a random rotation matrix on the CPU (using Eigen) and then
+                           * copies it into                    device memory in column-major order.
+                           */
   explicit RotatorGPU(raft::resources const& handle, uint32_t dim);
   explicit RotatorGPU() {}
 
@@ -69,7 +66,7 @@ class RotatorGPU {
   // This function computes: RAND_A = A * P using cuBLAS.
   void rotate(raft::resources const& handle, const float* d_A, float* d_RAND_A, size_t N) const;
 
-  float* d_P;
+  float* d_P;  // Device pointer for the rotation matrix (stored in row-major order)
 };
 
 #endif  // EXRABITQ_ROTATOR_GPU_CUH

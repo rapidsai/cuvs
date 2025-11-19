@@ -11,7 +11,6 @@
 #include <Eigen/Dense>
 #include <cuvs/neighbors/ivf_rabitq/gpu_index/rotator_gpu.cuh>
 
-#include <raft/core/cublas_macros.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/mdspan_types.hpp>
@@ -24,8 +23,7 @@
 RotatorGPU::RotatorGPU(raft::resources const& handle, uint32_t dim)
 {
   // keep track of cuda stream
-  // note that the cuBlas handle `m_handle` is not set to `m_stream`, or the results would end up
-  // being incorrect
+  // TODO: remove after migrating data member `d_P` to RAII containers from RAFT
   m_stream = raft::resource::get_cuda_stream(handle);
   // Compute padded dimension
   // A padding function that rounds up to a multiple of 64.
@@ -39,14 +37,11 @@ RotatorGPU::RotatorGPU(raft::resources const& handle, uint32_t dim)
   raft::random::normal(handle, rng, d_P, D * D, 0.0f, 1.0f);
   // Compute the random rotation matrix in-place
   raft::linalg::detail::qrGetQ_inplace(handle, d_P, D, D, m_stream);
-
-  RAFT_CUBLAS_TRY(cublasCreate(&m_handle));
 }
 
 RotatorGPU::~RotatorGPU()
 {
   if (d_P) { RAFT_CUDA_TRY(cudaFreeAsync(d_P, m_stream)); }
-  RAFT_CUBLAS_TRY(cublasDestroy(m_handle));
 }
 
 RotatorGPU& RotatorGPU::operator=(const RotatorGPU& other)
@@ -54,7 +49,6 @@ RotatorGPU& RotatorGPU::operator=(const RotatorGPU& other)
   if (this != &other) {
     D        = other.D;
     m_stream = other.m_stream;
-    RAFT_CUBLAS_TRY(cublasCreate(&m_handle));
     // Firstly free it in case not dimension not match
     if (d_P) { RAFT_CUDA_TRY(cudaFreeAsync(d_P, m_stream)); }
     RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_P, sizeof(float) * D * D, m_stream));

@@ -10,6 +10,9 @@
 #include "omp.h"
 #include <chrono>
 #include <cuda_runtime.h>
+
+#include <cublas_v2.h>
+
 #include <cuvs/neighbors/ivf_rabitq/gpu_index/ivf_gpu.cuh>
 #include <cuvs/neighbors/ivf_rabitq/gpu_index/query_gatherer.cuh>
 #include <cuvs/neighbors/ivf_rabitq/gpu_index/searcher_gpu.cuh>
