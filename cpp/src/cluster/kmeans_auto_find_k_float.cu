@@ -1,9 +1,9 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2023, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "kmeans.cuh"
+#include "detail/kmeans_auto_find_k.cuh"
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/host_mdspan.hpp>
 #include <raft/core/resources.hpp>
@@ -20,7 +20,7 @@ void find_k(raft::resources const& handle,
             int maxiter,
             float tol)
 {
-  cuvs::cluster::kmeans::find_k<int, float>(
+  cuvs::cluster::kmeans::detail::find_k<int, float>(
     handle, X, best_k, inertia, n_iter, kmax, kmin, maxiter, tol);
 }
 }  // namespace cuvs::cluster::kmeans::helpers

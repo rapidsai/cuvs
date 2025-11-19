@@ -141,7 +141,8 @@ elif [[ "${RUN_CONTEXT}" == "release" ]]; then
   # In release context, use release branch for documentation links (word boundaries to avoid partial matches)
   sed_runner "/rapidsai\\/cuvs/ s|\\bmain\\b|release/${NEXT_SHORT_TAG}|g" docs/source/developer_guide.md
   sed_runner "s|\\bmain\\b|release/${NEXT_SHORT_TAG}|g" README.md
-  sed_runner "s|\\bmain\\b|release/${NEXT_SHORT_TAG}|g" python/cuvs_bench/cuvs_bench/plot/__main__.py
+  # Only update the GitHub URL, not the main() function
+  sed_runner "s|/cuvs/blob/\\bmain\\b/|/cuvs/blob/release/${NEXT_SHORT_TAG}/|g" python/cuvs_bench/cuvs_bench/plot/__main__.py
 fi
 
 # Update cuvs-bench Docker image references (version-only, not branch-related)
