@@ -282,26 +282,8 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
                                                      base_index.centers_rot(),
                                                      base_index.rotation_matrix());
 
-    auto owning_index_full =
-      cuvs::neighbors::ivf_pq::build(handle_,
-                                     ipams,
-                                     base_index.dim(),
-                                     base_index.pq_centers(),
-                                     base_index.centers(),
-                                     std::make_optional(base_index.centers_rot()),
-                                     std::make_optional(base_index.rotation_matrix()));
-
-    auto owning_index_minimal = cuvs::neighbors::ivf_pq::build(handle_,
-                                                               ipams,
-                                                               base_index.dim(),
-                                                               base_index.pq_centers(),
-                                                               base_index.centers(),
-                                                               std::nullopt,
-                                                               std::nullopt);
-
     auto db_indices = raft::make_device_vector<IdxT>(handle_, ps.num_db_vecs);
     raft::linalg::map_offset(handle_, db_indices.view(), raft::identity_op{});
-    raft::resource::sync_stream(handle_);
 
     auto vecs_view =
       raft::make_device_matrix_view<const DataT, int64_t>(database.data(), ps.num_db_vecs, ps.dim);
@@ -309,60 +291,30 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
       raft::make_device_vector_view<const IdxT, int64_t>(db_indices.data_handle(), ps.num_db_vecs);
 
     cuvs::neighbors::ivf_pq::extend(handle_, vecs_view, inds_view, &view_index);
-    cuvs::neighbors::ivf_pq::extend(handle_, vecs_view, inds_view, &owning_index_full);
-    cuvs::neighbors::ivf_pq::extend(handle_, vecs_view, inds_view, &owning_index_minimal);
+    cuvs::neighbors::ivf_pq::extend(handle_, vecs_view, inds_view, &base_index);
 
     size_t queries_size = ps.num_queries * ps.k;
-    rmm::device_uvector<EvalT> distances_view(queries_size, stream_);
-    rmm::device_uvector<IdxT> indices_view(queries_size, stream_);
-    rmm::device_uvector<EvalT> distances_owning_full(queries_size, stream_);
-    rmm::device_uvector<IdxT> indices_owning_full(queries_size, stream_);
-    rmm::device_uvector<EvalT> distances_owning_minimal(queries_size, stream_);
-    rmm::device_uvector<IdxT> indices_owning_minimal(queries_size, stream_);
-
-    auto query_view =
-      raft::make_device_matrix_view<DataT, uint32_t>(search_queries.data(), ps.num_queries, ps.dim);
-
-    auto inds_view_out =
-      raft::make_device_matrix_view<IdxT, uint32_t>(indices_view.data(), ps.num_queries, ps.k);
-    auto dists_view_out =
-      raft::make_device_matrix_view<EvalT, uint32_t>(distances_view.data(), ps.num_queries, ps.k);
-    cuvs::neighbors::ivf_pq::search(
-      handle_, ps.search_params, view_index, query_view, inds_view_out, dists_view_out);
-
-    auto inds_owning_full_out = raft::make_device_matrix_view<IdxT, uint32_t>(
-      indices_owning_full.data(), ps.num_queries, ps.k);
-    auto dists_owning_full_out = raft::make_device_matrix_view<EvalT, uint32_t>(
-      distances_owning_full.data(), ps.num_queries, ps.k);
+    auto distances_view = raft::make_device_vector<EvalT>(handle_, queries_size);
+    auto indices_view   = raft::make_device_vector<IdxT>(handle_, queries_size);
+    auto distances_base = raft::make_device_vector<EvalT>(handle_, queries_size);
+    auto indices_base   = raft::make_device_vector<IdxT>(handle_, queries_size);
     cuvs::neighbors::ivf_pq::search(handle_,
                                     ps.search_params,
-                                    owning_index_full,
-                                    query_view,
-                                    inds_owning_full_out,
-                                    dists_owning_full_out);
-
-    auto inds_owning_minimal_out = raft::make_device_matrix_view<IdxT, uint32_t>(
-      indices_owning_minimal.data(), ps.num_queries, ps.k);
-    auto dists_owning_minimal_out = raft::make_device_matrix_view<EvalT, uint32_t>(
-      distances_owning_minimal.data(), ps.num_queries, ps.k);
+                                    view_index,
+                                    search_queries.view(),
+                                    indices_view.view(),
+                                    distances_view.view());
     cuvs::neighbors::ivf_pq::search(handle_,
                                     ps.search_params,
-                                    owning_index_minimal,
-                                    query_view,
-                                    inds_owning_minimal_out,
-                                    dists_owning_minimal_out);
+                                    base_index,
+                                    search_queries.view(),
+                                    indices_base.view(),
+                                    distances_base.view());
 
     ASSERT_TRUE(cuvs::devArrMatch(
-      indices_view.data(), indices_owning_full.data(), queries_size, cuvs::Compare<IdxT>{}));
+      indices_view.data(), indices_base.data(), queries_size, cuvs::Compare<IdxT>{}));
     ASSERT_TRUE(cuvs::devArrMatch(distances_view.data(),
-                                  distances_owning_full.data(),
-                                  queries_size,
-                                  cuvs::CompareApprox<EvalT>{0.001}));
-
-    ASSERT_TRUE(cuvs::devArrMatch(
-      indices_view.data(), indices_owning_minimal.data(), queries_size, cuvs::Compare<IdxT>{}));
-    ASSERT_TRUE(cuvs::devArrMatch(distances_view.data(),
-                                  distances_owning_minimal.data(),
+                                  distances_base.data(),
                                   queries_size,
                                   cuvs::CompareApprox<EvalT>{0.001}));
   }

@@ -40,7 +40,6 @@ index_impl<IdxT>::index_impl(raft::resources const& handle,
   accum_sorted_sizes_(n_lists) = 0;
 }
 
-
 template <typename IdxT>
 cuvs::distance::DistanceType index_impl<IdxT>::metric() const noexcept
 {
@@ -183,14 +182,8 @@ owning_impl<IdxT>::owning_impl(raft::resources const& handle,
                                uint32_t pq_bits,
                                uint32_t pq_dim,
                                bool conservative_memory_allocation)
-  : index_impl<IdxT>(handle,
-                     metric,
-                     codebook_kind,
-                     n_lists,
-                     dim,
-                     pq_bits,
-                     pq_dim,
-                     conservative_memory_allocation),
+  : index_impl<IdxT>(
+      handle, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, conservative_memory_allocation),
     pq_centers_{raft::make_device_mdarray<float>(
       handle, raft::make_extents<uint32_t>(pq_dim, dim / pq_dim, 1 << pq_bits))},
     centers_{
@@ -303,8 +296,8 @@ view_impl<IdxT>::pq_centers() noexcept
 }
 
 template <typename IdxT>
-raft::device_mdspan<const float, pq_centers_extents, raft::row_major>
-view_impl<IdxT>::pq_centers() const noexcept
+raft::device_mdspan<const float, pq_centers_extents, raft::row_major> view_impl<IdxT>::pq_centers()
+  const noexcept
 {
   return pq_centers_view_;
 }
@@ -500,15 +493,14 @@ bool index<IdxT>::conservative_memory_allocation() const noexcept
 }
 
 template <typename IdxT>
-raft::device_mdspan<float, pq_centers_extents, raft::row_major>
-index<IdxT>::pq_centers() noexcept
+raft::device_mdspan<float, pq_centers_extents, raft::row_major> index<IdxT>::pq_centers() noexcept
 {
   return impl_->pq_centers();
 }
 
 template <typename IdxT>
-raft::device_mdspan<const float, pq_centers_extents, raft::row_major>
-index<IdxT>::pq_centers() const noexcept
+raft::device_mdspan<const float, pq_centers_extents, raft::row_major> index<IdxT>::pq_centers()
+  const noexcept
 {
   return impl_->pq_centers();
 }
@@ -637,7 +629,6 @@ void index<IdxT>::check_consistency()
                impl_->pq_bits() * impl_->pq_dim());
 }
 
-
 template <typename IdxT>
 uint32_t index<IdxT>::calculate_pq_dim(uint32_t dim)
 {
@@ -677,8 +668,7 @@ raft::device_matrix_view<const int8_t, uint32_t, raft::row_major> index_impl<Idx
     uint32_t dim          = this->dim();
     uint32_t dim_ext      = raft::round_up_safe(dim + 1, 8u);
     uint32_t dim_ext_int8 = raft::round_up_safe(dim + 2, 16u);
-    centers_int8_.emplace(
-      raft::make_device_matrix<int8_t, uint32_t>(res, n_lists, dim_ext_int8));
+    centers_int8_.emplace(raft::make_device_matrix<int8_t, uint32_t>(res, n_lists, dim_ext_int8));
     auto* inputs = this->centers().data_handle();
     /* NOTE: maximizing the range and the precision of int8_t GEMM
 
@@ -742,7 +732,8 @@ index_impl<IdxT>::rotation_matrix_half(const raft::resources& res) const
   if (!rotation_matrix_half_.has_value()) {
     rotation_matrix_half_.emplace(
       raft::make_device_mdarray<half, uint32_t>(res, this->rotation_matrix().extents()));
-    raft::linalg::map(res, rotation_matrix_half_->view(), raft::cast_op<half>{}, this->rotation_matrix());
+    raft::linalg::map(
+      res, rotation_matrix_half_->view(), raft::cast_op<half>{}, this->rotation_matrix());
   }
   return rotation_matrix_half_->view();
 }
@@ -752,7 +743,8 @@ raft::device_matrix_view<const half, uint32_t, raft::row_major> index_impl<IdxT>
   const raft::resources& res) const
 {
   if (!centers_half_.has_value()) {
-    centers_half_.emplace(raft::make_device_mdarray<half, uint32_t>(res, this->centers().extents()));
+    centers_half_.emplace(
+      raft::make_device_mdarray<half, uint32_t>(res, this->centers().extents()));
     raft::linalg::map(res, centers_half_->view(), raft::cast_op<half>{}, this->centers());
   }
   return centers_half_->view();

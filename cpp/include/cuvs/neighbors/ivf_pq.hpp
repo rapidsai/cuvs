@@ -289,17 +289,17 @@ class index_iface {
  public:
   virtual ~index_iface() = default;
 
-  virtual cuvs::distance::DistanceType metric() const noexcept = 0;
-  virtual codebook_gen codebook_kind() const noexcept          = 0;
-  virtual uint32_t dim() const noexcept                        = 0;
-  virtual uint32_t dim_ext() const noexcept                    = 0;
-  virtual uint32_t rot_dim() const noexcept                    = 0;
-  virtual uint32_t pq_bits() const noexcept                    = 0;
-  virtual uint32_t pq_dim() const noexcept                     = 0;
-  virtual uint32_t pq_len() const noexcept                     = 0;
-  virtual uint32_t pq_book_size() const noexcept               = 0;
-  virtual uint32_t n_lists() const noexcept                    = 0;
-  virtual bool conservative_memory_allocation() const noexcept = 0;
+  virtual cuvs::distance::DistanceType metric() const noexcept           = 0;
+  virtual codebook_gen codebook_kind() const noexcept                    = 0;
+  virtual uint32_t dim() const noexcept                                  = 0;
+  virtual uint32_t dim_ext() const noexcept                              = 0;
+  virtual uint32_t rot_dim() const noexcept                              = 0;
+  virtual uint32_t pq_bits() const noexcept                              = 0;
+  virtual uint32_t pq_dim() const noexcept                               = 0;
+  virtual uint32_t pq_len() const noexcept                               = 0;
+  virtual uint32_t pq_book_size() const noexcept                         = 0;
+  virtual uint32_t n_lists() const noexcept                              = 0;
+  virtual bool conservative_memory_allocation() const noexcept           = 0;
   virtual uint32_t get_list_size_in_bytes(uint32_t label) const noexcept = 0;
 
   virtual std::vector<std::shared_ptr<list_data<IdxT>>>& lists() noexcept             = 0;
@@ -404,7 +404,7 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
   using index_type         = IdxT;
   static_assert(!raft::is_narrowing_v<uint32_t, IdxT>,
                 "IdxT must be able to represent all values of uint32_t");
-  
+
   index(const index&)                    = delete;
   index(index&&)                         = default;
   auto operator=(const index&) -> index& = delete;
@@ -592,7 +592,8 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
 
  private:
   void check_consistency();
-  pq_centers_extents make_pq_centers_extents(uint32_t dim, uint32_t pq_dim, uint32_t pq_bits, codebook_gen codebook_kind, uint32_t n_lists);
+  pq_centers_extents make_pq_centers_extents(
+    uint32_t dim, uint32_t pq_dim, uint32_t pq_bits, codebook_gen codebook_kind, uint32_t n_lists);
   uint32_t calculate_pq_dim(uint32_t dim);
 
   std::unique_ptr<index_iface<IdxT>> impl_;
@@ -3070,8 +3071,8 @@ void make_rotation_matrix(raft::resources const& res,
  * @param[in] cluster_centers new cluster centers [index.n_lists(), index.dim()]
  */
 void transform_centers(raft::resources const& res,
-                 index<int64_t>* index,
-                 raft::device_matrix_view<const float, uint32_t> cluster_centers);
+                       index<int64_t>* index,
+                       raft::device_matrix_view<const float, uint32_t> cluster_centers);
 
 /**
  * @brief Set IVF cluster centers from host memory.
@@ -3103,8 +3104,8 @@ void transform_centers(raft::resources const& res,
  * dim_ext]
  */
 void transform_centers(raft::resources const& res,
-                 index<int64_t>* index,
-                 raft::host_matrix_view<const float, uint32_t> cluster_centers);
+                       index<int64_t>* index,
+                       raft::host_matrix_view<const float, uint32_t> cluster_centers);
 
 /**
  * @brief Public helper API for fetching a trained index's IVF centroids
@@ -3170,10 +3171,10 @@ void recompute_internal_state(const raft::resources& res, index<int64_t>* index)
  *   raft::resources res;
  *   uint32_t dim = 128, pq_dim = 32;
  *   uint32_t rot_dim = pq_dim * ((dim + pq_dim - 1) / pq_dim);  // rounded up
- *   
+ *
  *   // Allocate rotation matrix buffer [rot_dim, dim]
  *   auto rotation_matrix = raft::make_device_matrix<float, uint32_t>(res, rot_dim, dim);
- *   
+ *
  *   // Generate the rotation matrix
  *   ivf_pq::helpers::make_rotation_matrix(
  *     res, rotation_matrix.view(), true);
@@ -3200,16 +3201,16 @@ void make_rotation_matrix(
  * @code{.cpp}
  *   raft::resources res;
  *   uint32_t n_lists = 1000, dim = 128, rot_dim = 128;
- *   
+ *
  *   // User has centers [n_lists, dim] and rotation_matrix [rot_dim, dim]
  *   auto centers = raft::make_device_matrix<float, uint32_t>(res, n_lists, dim);
  *   auto rotation_matrix = raft::make_device_matrix<float, uint32_t>(res, rot_dim, dim);
- *   
+ *
  *   // ... fill centers and rotation_matrix ...
- *   
+ *
  *   // Allocate output for rotated centers
  *   auto centers_rot = raft::make_device_matrix<float, uint32_t>(res, n_lists, rot_dim);
- *   
+ *
  *   // Compute rotated centers
  *   ivf_pq::helpers::compute_centers_rot(
  *     res, centers.view(), rotation_matrix.view(), centers_rot.view());

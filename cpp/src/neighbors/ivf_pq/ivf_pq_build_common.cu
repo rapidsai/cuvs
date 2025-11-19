@@ -268,9 +268,10 @@ void make_rotation_matrix(raft::resources const& res,
                        index->rotation_matrix().data_handle());
 }
 
-void transform_centers(raft::resources const& handle,
-                 index<int64_t>* index,
-                 raft::device_matrix_view<const float, uint32_t, raft::row_major> cluster_centers)
+void transform_centers(
+  raft::resources const& handle,
+  index<int64_t>* index,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> cluster_centers)
 {
   RAFT_EXPECTS(cluster_centers.extent(0) == index->n_lists(),
                "Number of rows in the new centers must be equal to the number of IVF lists");
@@ -325,9 +326,10 @@ void transform_centers(raft::resources const& handle,
   }
 }
 
-void transform_centers(raft::resources const& handle,
-                 index<int64_t>* index,
-                 raft::host_matrix_view<const float, uint32_t, raft::row_major> cluster_centers)
+void transform_centers(
+  raft::resources const& handle,
+  index<int64_t>* index,
+  raft::host_matrix_view<const float, uint32_t, raft::row_major> cluster_centers)
 {
   RAFT_EXPECTS(cluster_centers.extent(0) == index->n_lists(),
                "Number of rows in the new centers must be equal to the number of IVF lists");
@@ -415,15 +417,11 @@ void make_rotation_matrix(
 {
   RAFT_EXPECTS(rotation_matrix.extent(0) > 0 && rotation_matrix.extent(1) > 0,
                "rotation_matrix must have non-zero extents");
-  
+
   uint32_t rot_dim = rotation_matrix.extent(0);
-  uint32_t dim = rotation_matrix.extent(1);
-  
-  make_rotation_matrix(res,
-                       force_random_rotation,
-                       rot_dim,
-                       dim,
-                       rotation_matrix.data_handle());
+  uint32_t dim     = rotation_matrix.extent(1);
+
+  make_rotation_matrix(res, force_random_rotation, rot_dim, dim, rotation_matrix.data_handle());
 }
 
 void compute_centers_rot(
@@ -432,11 +430,11 @@ void compute_centers_rot(
   raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix,
   raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot)
 {
-  uint32_t n_lists = centers.extent(0);
+  uint32_t n_lists     = centers.extent(0);
   uint32_t centers_dim = centers.extent(1);
-  uint32_t rot_dim = rotation_matrix.extent(0);
-  uint32_t dim = rotation_matrix.extent(1);
-  
+  uint32_t rot_dim     = rotation_matrix.extent(0);
+  uint32_t dim         = rotation_matrix.extent(1);
+
   RAFT_EXPECTS(centers_rot.extent(0) == n_lists,
                "centers_rot must have extent(0) == n_lists. Got centers_rot.extent(0) = %u, "
                "expected %u",
@@ -452,17 +450,17 @@ void compute_centers_rot(
                "expected >= %u",
                centers_dim,
                dim);
-  
+
   auto stream = raft::resource::get_cuda_stream(res);
-  
+
   // Compute centers_rot = rotation_matrix^T * centers[:, 0:dim]
   // rotation_matrix is [rot_dim, dim]
   // centers is [n_lists, centers_dim] but we only use [:, 0:dim]
   // Result is [n_lists, rot_dim] stored in centers_rot
-  
+
   float alpha = 1.0f;
-  float beta = 0.0f;
-  
+  float beta  = 0.0f;
+
   raft::linalg::gemm(res,
                      true,   // transpose rotation_matrix
                      false,  // don't transpose centers
@@ -471,12 +469,12 @@ void compute_centers_rot(
                      dim,
                      &alpha,
                      rotation_matrix.data_handle(),
-                     dim,         // lda (leading dim of rotation_matrix)
+                     dim,  // lda (leading dim of rotation_matrix)
                      centers.data_handle(),
-                     centers_dim, // ldb (leading dim of centers, accounting for potential padding)
+                     centers_dim,  // ldb (leading dim of centers, accounting for potential padding)
                      &beta,
                      centers_rot.data_handle(),
-                     rot_dim,     // ldc (leading dim of output)
+                     rot_dim,  // ldc (leading dim of output)
                      stream);
 }
 
