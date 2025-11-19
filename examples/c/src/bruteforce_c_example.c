@@ -1,39 +1,45 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 #include <cuvs/neighbors/brute_force.h>
 #include <stdint.h>
 
-static const char dataset[] = {
-    0.74021935f, 0.9209938f,
-    0.03902049f, 0.9689629f,
-    0.92514056f, 0.4463501f,
-    0.6673192f, 0.10993068f
-  };
-  
-static const char queries[] = {
-    0.48216683f, 0.0428398f,
-    0.5084142f,  0.6545497f,
-    0.51260436f, 0.2643005f,
-    0.05198065f, 0.5789965f
-  };
+static const char dataset[] = {0.74021935f,
+                               0.9209938f,
+                               0.03902049f,
+                               0.9689629f,
+                               0.92514056f,
+                               0.4463501f,
+                               0.6673192f,
+                               0.10993068f};
 
+static const char queries[] = {0.48216683f,
+                               0.0428398f,
+                               0.5084142f,
+                               0.6545497f,
+                               0.51260436f,
+                               0.2643005f,
+                               0.05198065f,
+                               0.5789965f};
 
 void index_and_search()
 {
-  int64_t n_rows = 4;
-  int64_t n_queries = 4;
-  int64_t n_dim = 2;
+  int64_t n_rows       = 4;
+  int64_t n_queries    = 4;
+  int64_t n_dim        = 2;
   uint32_t n_neighbors = 2;
 
   float* index_data;
   float* query_data;
 
-  long indexBytes = sizeof(float) * n_rows * n_dim;
-  long queriesBytes = sizeof(float) * n_queries * n_dim;
+  long indexBytes     = sizeof(float) * n_rows * n_dim;
+  long queriesBytes   = sizeof(float) * n_queries * n_dim;
   long neighborsBytes = sizeof(long) * n_queries * n_neighbors;
-  long distanceBytes = sizeof(float) * n_queries * n_neighbors;
+  long distanceBytes  = sizeof(float) * n_queries * n_neighbors;
 
-
-  uint32_t* prefilter_data = NULL;
+  uint32_t* prefilter_data           = NULL;
   enum cuvsFilterType prefilter_type = NO_FILTER;
 
   float* distances_data;
@@ -145,7 +151,7 @@ void index_and_search()
   cuvsResourcesDestroy(res);
 }
 
-int main() 
+int main()
 {
   // Perform indexing and search with pooled resources
   cuvsRMMPoolMemoryResourceEnable(10, 60, false);
