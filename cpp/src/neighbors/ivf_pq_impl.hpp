@@ -98,7 +98,7 @@ class owning_impl : public index_impl<IdxT> {
               uint32_t pq_dim,
               bool conservative_memory_allocation);
 
-  ~owning_impl();
+  ~owning_impl() = default;
 
   raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept override;
   raft::device_mdspan<const float, pq_centers_extents, raft::row_major> pq_centers()
