@@ -11,7 +11,7 @@
   "runArgs": [
     "--rm",
     "--name",
-    "${localEnv:USER:anon}-rapids-${localWorkspaceFolderBasename}-25.12-cuda13.0-pip",
+    "${localEnv:USER:anon}-rapids-${localWorkspaceFolderBasename}-26.02-cuda13.0-pip",
     "--ulimit",
     "nofile=500000"
   ],
