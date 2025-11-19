@@ -185,8 +185,7 @@ owning_impl<IdxT>::owning_impl(raft::resources const& handle,
   : index_impl<IdxT>(
       handle, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, conservative_memory_allocation),
     pq_centers_{raft::make_device_mdarray<float>(
-      handle,
-      index<IdxT>::make_pq_centers_extents(dim, pq_dim, pq_bits, codebook_kind, n_lists))},
+      handle, index<IdxT>::make_pq_centers_extents(dim, pq_dim, pq_bits, codebook_kind, n_lists))},
     centers_{
       raft::make_device_matrix<float, uint32_t>(handle, n_lists, raft::round_up_safe(dim + 1, 8u))},
     centers_rot_{raft::make_device_matrix<float, uint32_t>(

@@ -268,62 +268,55 @@ void make_rotation_matrix(raft::resources const& res,
                        index->rotation_matrix().data_handle());
 }
 
-void transform_centers(
-  raft::resources const& handle,
-  index<int64_t>* index,
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> cluster_centers)
+void transform_centers(raft::resources const& handle, index<int64_t>* index, raft::device_matrix_view<const float, uint32_t, raft::row_major> cluster_centers)
 {
-  RAFT_EXPECTS(cluster_centers.extent(0) == index->n_lists(),
-               "Number of rows in the new centers must be equal to the number of IVF lists");
-  RAFT_EXPECTS(
-    cluster_centers.extent(1) == index->dim() || cluster_centers.extent(1) == index->dim_ext(),
-    "Number of columns in the new cluster centers must be equal to dim or dim_ext");
+  auto stream         = raft::resource::get_cuda_stream(handle);
+  auto* device_memory = raft::resource::get_workspace_resource(handle);
 
-  RAFT_EXPECTS(index->size() == 0, "transform_centers requires an empty index.");
+  // Make sure to have trailing zeroes between dim and dim_ext;
+  // We rely on this to enable padded tensor gemm kernels during coarse search.
+  cuvs::spatial::knn::detail::utils::memzero(
+    index->centers().data_handle(), index->centers().size(), stream);
+  // combine cluster_centers and their norms
+  RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle(),
+                                  sizeof(float) * index->dim_ext(),
+                                  cluster_centers.data_handle(),
+                                  sizeof(float) * index->dim(),
+                                  sizeof(float) * index->dim(),
+                                  index->n_lists(),
+                                  cudaMemcpyDefault,
+                                  stream));
 
-  auto stream = raft::resource::get_cuda_stream(handle);
+  rmm::device_uvector<float> center_norms(index->n_lists(), stream, device_memory);
+  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+    center_norms.data(), cluster_centers.data_handle(), index->dim(), index->n_lists(), stream);
+  RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle() + index->dim(),
+                                  sizeof(float) * index->dim_ext(),
+                                  center_norms.data(),
+                                  sizeof(float),
+                                  sizeof(float),
+                                  index->n_lists(),
+                                  cudaMemcpyDefault,
+                                  stream));
 
-  if (cluster_centers.extent(1) == index->dim_ext()) {
-    raft::copy(index->centers().data_handle(),
-               cluster_centers.data_handle(),
-               cluster_centers.size(),
-               stream);
-  } else {
-    cuvs::spatial::knn::detail::utils::memzero(
-      index->centers().data_handle(), index->centers().size(), stream);
-    RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle(),
-                                    sizeof(float) * index->dim_ext(),
-                                    cluster_centers.data_handle(),
-                                    sizeof(float) * cluster_centers.extent(1),
-                                    sizeof(float) * cluster_centers.extent(1),
-                                    cluster_centers.extent(0),
-                                    cudaMemcpyDefault,
-                                    stream));
-  }
-
-  if (index->rotation_matrix().extent(0) > 0 && index->rotation_matrix().extent(1) > 0) {
-    float alpha = 1.0;
-    float beta  = 0.0;
-
-    uint32_t input_dim =
-      (cluster_centers.extent(1) == index->dim()) ? index->dim() : index->dim_ext();
-
-    raft::linalg::gemm(handle,
-                       true,
-                       false,
-                       index->rot_dim(),
-                       index->n_lists(),
-                       index->dim(),
-                       &alpha,
-                       index->rotation_matrix().data_handle(),
-                       index->dim(),
-                       cluster_centers.data_handle(),
-                       input_dim,
-                       &beta,
-                       index->centers_rot().data_handle(),
-                       index->rot_dim(),
-                       stream);
-  }
+  //     Rotate cluster_centers
+  float alpha = 1.0;
+  float beta  = 0.0;
+  raft::linalg::gemm(handle,
+                     true,
+                     false,
+                     index->rot_dim(),
+                     index->n_lists(),
+                     index->dim(),
+                     &alpha,
+                     index->rotation_matrix().data_handle(),
+                     index->dim(),
+                     cluster_centers.data_handle(),
+                     index->dim(),
+                     &beta,
+                     index->centers_rot().data_handle(),
+                     index->rot_dim(),
+                     raft::resource::get_cuda_stream(handle));
 }
 
 void transform_centers(
@@ -341,12 +334,6 @@ void transform_centers(
 
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  if (cluster_centers.extent(1) == index->dim_ext()) {
-    raft::copy(index->centers().data_handle(),
-               cluster_centers.data_handle(),
-               cluster_centers.size(),
-               stream);
-  } else {
     cuvs::spatial::knn::detail::utils::memzero(
       index->centers().data_handle(), index->centers().size(), stream);
     RAFT_CUDA_TRY(cudaMemcpy2DAsync(index->centers().data_handle(),
@@ -357,7 +344,6 @@ void transform_centers(
                                     cluster_centers.extent(0),
                                     cudaMemcpyHostToDevice,
                                     stream));
-  }
 
   if (index->rotation_matrix().extent(0) > 0 && index->rotation_matrix().extent(1) > 0) {
     float alpha = 1.0;
@@ -383,7 +369,7 @@ void transform_centers(
                        index->rotation_matrix().data_handle(),
                        index->dim(),
                        cluster_centers_dev.data_handle(),
-                       input_dim,
+                       index->dim(),
                        &beta,
                        index->centers_rot().data_handle(),
                        index->rot_dim(),
