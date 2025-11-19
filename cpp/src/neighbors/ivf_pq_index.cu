@@ -185,7 +185,8 @@ owning_impl<IdxT>::owning_impl(raft::resources const& handle,
   : index_impl<IdxT>(
       handle, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, conservative_memory_allocation),
     pq_centers_{raft::make_device_mdarray<float>(
-      handle, raft::make_extents<uint32_t>(pq_dim, dim / pq_dim, 1 << pq_bits))},
+      handle,
+      index<IdxT>::make_pq_centers_extents(dim, pq_dim, pq_bits, codebook_kind, n_lists))},
     centers_{
       raft::make_device_matrix<float, uint32_t>(handle, n_lists, raft::round_up_safe(dim + 1, 8u))},
     centers_rot_{raft::make_device_matrix<float, uint32_t>(
@@ -193,6 +194,16 @@ owning_impl<IdxT>::owning_impl(raft::resources const& handle,
     rotation_matrix_{raft::make_device_matrix<float, uint32_t>(
       handle, raft::div_rounding_up_unsafe(dim, pq_dim) * pq_dim, dim)}
 {
+  // Initialize device arrays to zero to ensure deterministic behavior
+  auto stream = raft::resource::get_cuda_stream(handle);
+  RAFT_CUDA_TRY(cudaMemsetAsync(
+    pq_centers_.data_handle(), 0, pq_centers_.size() * sizeof(float), stream));
+  RAFT_CUDA_TRY(
+    cudaMemsetAsync(centers_.data_handle(), 0, centers_.size() * sizeof(float), stream));
+  RAFT_CUDA_TRY(
+    cudaMemsetAsync(centers_rot_.data_handle(), 0, centers_rot_.size() * sizeof(float), stream));
+  RAFT_CUDA_TRY(cudaMemsetAsync(
+    rotation_matrix_.data_handle(), 0, rotation_matrix_.size() * sizeof(float), stream));
 }
 
 template <typename IdxT>

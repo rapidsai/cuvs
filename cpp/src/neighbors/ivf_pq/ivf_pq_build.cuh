@@ -879,6 +879,8 @@ void process_and_fill_codes(raft::resources const& handle,
                             IdxT n_rows,
                             rmm::device_async_resource_ref mr)
 {
+  RAFT_LOG_INFO("index.rot_dim(): %d", index.rot_dim());
+  RAFT_LOG_INFO("n_rows: %d", n_rows);
   auto new_vectors_residual =
     raft::make_device_mdarray<float>(handle, mr, raft::make_extents<IdxT>(n_rows, index.rot_dim()));
 
@@ -1275,6 +1277,9 @@ auto build(raft::resources const& handle,
                   params.conservative_memory_allocation);
 
   auto stream = raft::resource::get_cuda_stream(handle);
+  RAFT_LOG_INFO("Building index with %zu rows and %zu dimensions", n_rows, dim);
+  RAFT_LOG_INFO("index.data_ptrs().size() = %zu", idx.data_ptrs().size());
+  RAFT_LOG_INFO("index.inds_ptrs().size() = %zu", idx.inds_ptrs().size());
   utils::memzero(idx.accum_sorted_sizes().data_handle(), idx.accum_sorted_sizes().size(), stream);
   utils::memzero(idx.list_sizes().data_handle(), idx.list_sizes().size(), stream);
   utils::memzero(idx.data_ptrs().data_handle(), idx.data_ptrs().size(), stream);
