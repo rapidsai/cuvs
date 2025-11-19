@@ -49,7 +49,7 @@ jobs:
       RAPIDS_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Check if nightly CI is passing
-        uses: rapidsai/shared-actions/check_nightly_success/dispatch@release/25.12
+        uses: rapidsai/shared-actions/check_nightly_success/dispatch@main
         with:
           repo: cuvs
           max_days_without_success: 30
@@ -337,6 +337,6 @@ jobs:
     continue-on-error: true
     steps:
       - name: Telemetry summarize
-        uses: rapidsai/shared-actions/telemetry-dispatch-summarize@release/25.12
+        uses: rapidsai/shared-actions/telemetry-dispatch-summarize@release/main
     env:
       GH_TOKEN: ${{ github.token }}
