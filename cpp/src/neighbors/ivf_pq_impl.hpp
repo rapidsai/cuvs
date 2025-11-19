@@ -21,10 +21,10 @@ class index_impl : public index_iface<IdxT> {
              uint32_t pq_dim,
              bool conservative_memory_allocation);
 
-  ~index_impl() = default;
-  index_impl(index_impl&&) = default;
-  index_impl& operator=(index_impl&&) = default;
-  index_impl(const index_impl&) = delete;
+  ~index_impl()                            = default;
+  index_impl(index_impl&&)                 = default;
+  index_impl& operator=(index_impl&&)      = default;
+  index_impl(const index_impl&)            = delete;
   index_impl& operator=(const index_impl&) = delete;
 
   cuvs::distance::DistanceType metric() const noexcept override;
@@ -104,9 +104,9 @@ class owning_impl : public index_impl<IdxT> {
 
   ~owning_impl() = default;
 
-  owning_impl(owning_impl&&) = default;
-  owning_impl& operator=(owning_impl&&) = default;
-  owning_impl(const owning_impl&) = delete;
+  owning_impl(owning_impl&&)                 = default;
+  owning_impl& operator=(owning_impl&&)      = default;
+  owning_impl(const owning_impl&)            = delete;
   owning_impl& operator=(const owning_impl&) = delete;
 
   raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept override;
@@ -148,10 +148,10 @@ class view_impl : public index_impl<IdxT> {
             raft::device_matrix_view<const float, uint32_t, raft::row_major> centers_rot_view,
             raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix_view);
 
-  ~view_impl() = default;
-  view_impl(view_impl&&) = default;
-  view_impl& operator=(view_impl&&) = default;
-  view_impl(const view_impl&) = delete;
+  ~view_impl()                           = default;
+  view_impl(view_impl&&)                 = default;
+  view_impl& operator=(view_impl&&)      = default;
+  view_impl(const view_impl&)            = delete;
   view_impl& operator=(const view_impl&) = delete;
 
   raft::device_mdspan<float, pq_centers_extents, raft::row_major> pq_centers() noexcept override;
