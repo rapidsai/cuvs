@@ -127,7 +127,7 @@ struct index_params : cuvs::neighbors::index_params {
    * @endcode
    */
   static index_params from_dataset(
-    raft::matrix_extent<int64_t> dataset,
+    raft::extents<int64_t, raft::dynamic_extent, raft::dynamic_extent> dataset,
     cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 };
 /**
@@ -3041,9 +3041,36 @@ void make_rotation_matrix(raft::resources const& res,
                           index<int64_t>* index,
                           bool force_random_rotation);
 
+/**
+ * @brief Pad cluster centers with their L2 norms for efficient GEMM operations.
+ *
+ * This function takes cluster centers and pads them with their L2 norms to create
+ * extended centers suitable for coarse search operations. The output has dimensions
+ * [n_centers, dim_ext] where dim_ext = round_up(dim + 1, 8).
+ *
+ * @param[in] res raft resource
+ * @param[in] centers cluster centers [n_centers, dim]
+ * @param[out] padded_centers padded centers with norms [n_centers, dim_ext]
+ */
 void pad_centers_with_norms(
   raft::resources const& res,
-  raft::mdspan<const float, raft::matrix_extents<uint32_t>, raft::row_major, data_accessor> centers,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
+  raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers);
+
+/**
+ * @brief Pad cluster centers with their L2 norms for efficient GEMM operations.
+ *
+ * This function takes cluster centers and pads them with their L2 norms to create
+ * extended centers suitable for coarse search operations. The output has dimensions
+ * [n_centers, dim_ext] where dim_ext = round_up(dim + 1, 8).
+ *
+ * @param[in] res raft resource
+ * @param[in] centers cluster centers [n_centers, dim]
+ * @param[out] padded_centers padded centers with norms [n_centers, dim_ext]
+ */
+void pad_centers_with_norms(
+  raft::resources const& res,
+  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
   raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers);
 
 void rotate_padded_centers(
@@ -3051,7 +3078,6 @@ void rotate_padded_centers(
   raft::device_matrix_view<const float, uint32_t, raft::row_major> padded_centers,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix,
   raft::device_matrix_view<float, uint32_t, raft::row_major> rotated_centers);
-
 
 /**
  * @brief Public helper API for fetching a trained index's IVF centroids
