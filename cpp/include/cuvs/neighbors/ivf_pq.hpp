@@ -3041,69 +3041,17 @@ void make_rotation_matrix(raft::resources const& res,
                           index<int64_t>* index,
                           bool force_random_rotation);
 
-/**
- * @brief Public helper API for externally modifying the index's IVF centroids.
- * NB: The index must be reset before this. Use raft::neighbors::ivf_pq::extend to construct IVF
- lists according to new centroids.
- *
- * Usage example:
- * @code{.cpp}
- *   raft::resources res;
- *   // allocate the buffer for the input centers
- *   auto cluster_centers = raft::make_device_matrix<float, uint32_t>(res, index.n_lists(),
- index.dim());
- *   ... prepare ivf centroids in cluster_centers ...
- *   // reset the index
- *   reset_index(res, &index);
- *   // recompute the state of the index
- *   cuvs::neighbors::ivf_pq::helpers::recompute_internal_state(res, index);
- *   // Write the IVF centroids
- *   cuvs::neighbors::ivf_pq::helpers::transform_centers(
-                    res,
-                    &index,
-                    cluster_centers);
- * @endcode
- *
- * @param[in] res raft resource
- * @param[inout] index pointer to IVF-PQ index
- * @param[in] cluster_centers new cluster centers [index.n_lists(), index.dim()]
- */
-void transform_centers(raft::resources const& res,
-                       index<int64_t>* index,
-                       raft::device_matrix_view<const float, uint32_t> cluster_centers);
+void pad_centers_with_norms(
+  raft::resources const& res,
+  raft::mdspan<const float, raft::matrix_extents<uint32_t>, raft::row_major, data_accessor> centers,
+  raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers);
 
-/**
- * @brief Set IVF cluster centers from host memory.
- *
- * Usage example:
- * @code{.cpp}
- *   using namespace cuvs::neighbors;
- *   raft::resources res;
- *
- *   // Initialize empty index
- *   ivf_pq::index_params params;
- *   ivf_pq::index<int64_t> index(res, params, D);
- *
- *   // Prepare centers on host
- *   auto centers = raft::make_host_matrix<float>(params.n_lists, D);
- *   // ... fill centers ...
- *
- *   // Set centers from host memory
- *   ivf_pq::helpers::transform_centers(res, &index, centers.view());
- * @endcode
- *
- * Note: This function requires the index to be empty (no data added yet).
- * The centers will be copied to device memory and the rotated centers
- * will be computed if a rotation matrix exists.
- *
- * @param[in] res raft resources handle
- * @param[inout] index pointer to the IVF-PQ index
- * @param[in] cluster_centers new cluster centers on host memory [n_lists, dim] or [n_lists,
- * dim_ext]
- */
-void transform_centers(raft::resources const& res,
-                       index<int64_t>* index,
-                       raft::host_matrix_view<const float, uint32_t> cluster_centers);
+void rotate_padded_centers(
+  raft::resources const& res,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> padded_centers,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix,
+  raft::device_matrix_view<float, uint32_t, raft::row_major> rotated_centers);
+
 
 /**
  * @brief Public helper API for fetching a trained index's IVF centroids
