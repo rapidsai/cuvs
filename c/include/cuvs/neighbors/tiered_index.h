@@ -251,6 +251,9 @@ cuvsError_t cuvsTieredIndexExtend(cuvsResources_t res,
  * @return cuvsError_t
  */
 cuvsError_t cuvsTieredIndexCompact(cuvsResources_t res, cuvsTieredIndex_t index);
+/**
+ * @}
+ */
 
 /**
  * @defgroup tiered_c_index_merge Tiered index merge
