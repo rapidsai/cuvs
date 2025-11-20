@@ -1375,7 +1375,7 @@ auto build(raft::resources const& handle,
     // Make rotation matrix
     helpers::make_rotation_matrix(handle, &idx, params.force_random_rotation);
 
-    helpers::transform_centers(handle, &idx, raft::make_const_mdspan(centers_view));
+    set_centers(handle, &idx, raft::make_const_mdspan(centers_view));
 
     // Train PQ codebooks
     switch (idx.codebook_kind()) {
