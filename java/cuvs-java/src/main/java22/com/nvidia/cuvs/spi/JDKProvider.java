@@ -34,6 +34,73 @@ import java.util.logging.Level;
 
 final class JDKProvider implements CuVSProvider {
 
+  record CuVSVersion(short major, short minor, short patch) {
+    private static final int MAX_VERSION_DISTANCE = 3;
+
+    static CuVSVersion fromString(String versionString) {
+      var tokens = versionString.split("\\.");
+      final short major = parseToken(tokens, 0);
+      final short minor = parseToken(tokens, 1);
+      final short patch = parseToken(tokens, 2);
+      if (major == 0 || minor == 0) {
+        return null;
+      }
+      return new CuVSVersion(major, minor, patch);
+    }
+
+    private static short parseToken(String[] tokens, int index) {
+      if (index < tokens.length) {
+        try {
+          return Short.parseShort(tokens[index]);
+        } catch (NumberFormatException _) {
+        }
+      }
+      return 0;
+    }
+
+    static boolean isCuVSMoreRecent(CuVSVersion mavenVersion, CuVSVersion cuvsVersion) {
+      return (cuvsVersion.major == mavenVersion.major && cuvsVersion.minor >= mavenVersion.minor)
+          || cuvsVersion.major > mavenVersion.major;
+    }
+
+    static boolean isCuVSWithinMaxRange(CuVSVersion mavenVersion, CuVSVersion cuvsVersion)
+        throws ProviderInitializationException {
+      var maxVersionFromSyspropString = System.getProperty("cuvs.max_version");
+
+      final CuVSVersion maxVersion;
+      if (maxVersionFromSyspropString != null) {
+        maxVersion = fromString(maxVersionFromSyspropString);
+        if (maxVersion == null) {
+          throw new ProviderInitializationException(
+              "System property 'cuvs.max_version' is not a valid cuVS version: "
+                  + maxVersionFromSyspropString);
+        }
+      } else {
+        maxVersion = addReleases(mavenVersion, MAX_VERSION_DISTANCE);
+      }
+
+      return cuvsVersion.major < maxVersion.major
+          || (cuvsVersion.major == maxVersion.major && cuvsVersion.minor <= maxVersion.minor);
+    }
+
+    private static CuVSVersion addReleases(CuVSVersion currentVersion, int numberOfReleases) {
+      short candidateMinor = (short) (currentVersion.minor + numberOfReleases * 2);
+      short releaseMinor = (short) (candidateMinor % 12);
+      short releaseMajor = (short) (currentVersion.major + (candidateMinor / 12));
+      if (releaseMinor == 0) {
+        releaseMinor = 12;
+        releaseMajor -= 1;
+      }
+
+      return new CuVSVersion(releaseMajor, releaseMinor, (short) 0);
+    }
+
+    @Override
+    public String toString() {
+      return String.format(Locale.ROOT, "%02d.%02d.%d", major, minor, patch);
+    }
+  }
+
   private static final MethodHandle createNativeDataset$mh;
   private static final MethodHandle createNativeDatasetWithStrides$mh;
 
@@ -75,8 +142,6 @@ final class JDKProvider implements CuVSProvider {
   static CuVSProvider create() throws ProviderInitializationException {
     NativeDependencyLoader.loadLibraries();
 
-    var mavenVersion = readCuVSVersionFromManifest();
-
     try (var localArena = Arena.ofConfined()) {
       var majorPtr = localArena.allocate(uint16_t);
       var minorPtr = localArena.allocate(uint16_t);
@@ -86,17 +151,41 @@ final class JDKProvider implements CuVSProvider {
       var minor = minorPtr.get(uint16_t, 0);
       var patch = patchPtr.get(uint16_t, 0);
 
-      var cuvsVersionString = String.format(Locale.ROOT, "%02d.%02d.%d", major, minor, patch);
-      if (mavenVersion != null && !cuvsVersionString.equals(mavenVersion)) {
+      var mavenVersionString = readCuVSVersionFromManifest();
+      checkCuVSVersionMatching(mavenVersionString, major, minor, patch);
+    }
+    return new JDKProvider();
+  }
+
+  static void checkCuVSVersionMatching(
+      String mavenVersionString, short major, short minor, short patch)
+      throws ProviderInitializationException {
+    var mavenVersion = CuVSVersion.fromString(mavenVersionString);
+    var cuvsVersion = new CuVSVersion(major, minor, patch);
+
+    if (mavenVersion != null) {
+      if (!CuVSVersion.isCuVSMoreRecent(mavenVersion, cuvsVersion)) {
         throw new ProviderInitializationException(
             String.format(
                 Locale.ROOT,
-                "libcuvs_c version mismatch: expected [%s], found [%s]",
-                mavenVersion,
-                cuvsVersionString));
+                """
+                Version mismatch: outdated libcuvs_c (libcuvs_c [%s], cuvs-java version [%s]).\
+                 Please upgrade your libcuvs_c installation to match at lease the cuvs-java\
+                 version.\
+                """,
+                cuvsVersion,
+                mavenVersion));
+      }
+      if (!CuVSVersion.isCuVSWithinMaxRange(mavenVersion, cuvsVersion)) {
+        throw new ProviderInitializationException(
+            String.format(
+                Locale.ROOT,
+                "Version mismatch: unsupported libcuvs_c (libcuvs_c [%s], cuvs-java version [%s]). "
+                    + "Please upgrade your software, or install a previous version of libcuvs_c.",
+                cuvsVersion,
+                mavenVersion));
       }
     }
-    return new JDKProvider();
   }
 
   /**
