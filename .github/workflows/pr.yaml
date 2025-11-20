@@ -190,7 +190,7 @@ jobs:
     with:
       build_type: pull-request
       arch: "amd64"
-      date: ${{ inputs.date }}_c
+      date: ${{ inputs.date }}
       container_image: "rapidsai/ci-wheel:25.12-cuda${{ matrix.cuda_version }}-rockylinux8-py3.10"
       node_type: "cpu16"
       # requires_license_builder: false
@@ -214,7 +214,7 @@ jobs:
       build_type: pull-request
       node_type: "gpu-l4-latest-1"
       arch: "amd64"
-      date: ${{ inputs.date }}_c
+      date: ${{ inputs.date }}
       container_image: "rapidsai/ci-wheel:25.12-cuda${{ matrix.cuda_version }}-rockylinux8-py3.10"
       script: "ci/test_standalone_c.sh"
       sha: ${{ inputs.sha }}
