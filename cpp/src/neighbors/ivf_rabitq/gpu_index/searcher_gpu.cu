@@ -1428,8 +1428,12 @@ void SearcherGPU::SearchClustershowingTime(const IVFGPU& cur_ivf,
             << std::setprecision(3) << total_ms << '\n';
 }
 
-SearcherGPU::SearcherGPU(
-  const float* q, size_t d, size_t ex_bits, std::string mode, bool rabitq_quantize_flag)
+SearcherGPU::SearcherGPU(raft::resources const& handle,
+                         const float* q,
+                         size_t d,
+                         size_t ex_bits,
+                         std::string mode,
+                         bool rabitq_quantize_flag)
   : D(d),
     query(q),
     one_over_sqrtD(1.0 / std::sqrt((float)D)),
@@ -1443,9 +1447,9 @@ SearcherGPU::SearcherGPU(
   float temp = INFINITY;
   if (mode == "quant4") {
     best_rescaling_factor = DataQuantizerGPU::get_const_scaling_factors(
-      d, 3);  // suppose that always quantize query to 4 bits (1 + 3) per dim
+      handle, d, 3);  // suppose that always quantize query to 4 bits (1 + 3) per dim
   } else if (mode == "quant8") {
-    best_rescaling_factor = DataQuantizerGPU::get_const_scaling_factors(d, 7);
+    best_rescaling_factor = DataQuantizerGPU::get_const_scaling_factors(handle, d, 7);
   }
   cudaMalloc((void**)&d_filter_distk, sizeof(float));
   cudaMemcpy(d_filter_distk, &temp, sizeof(float), cudaMemcpyHostToDevice);

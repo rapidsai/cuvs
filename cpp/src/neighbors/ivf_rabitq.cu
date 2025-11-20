@@ -158,7 +158,8 @@ void search(raft::resources const& handle,
       default: RAFT_FAIL("Invalid search mode");
     }
   };
-  ::SearcherGPU searcher(rotated_queries.data_handle(),
+  ::SearcherGPU searcher(handle,
+                         rotated_queries.data_handle(),
                          padded_dim,
                          rabitq_idx->ex_bits,
                          search_mode_to_string(params.mode),

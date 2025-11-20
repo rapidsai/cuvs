@@ -8,6 +8,14 @@
 //
 
 #include <cuvs/neighbors/ivf_rabitq/gpu_index/quantizer_gpu.cuh>
+
+#include <raft/core/device_mdarray.hpp>
+#include <raft/core/host_mdarray.hpp>
+#include <raft/linalg/map.cuh>
+#include <raft/linalg/norm_types.hpp>
+#include <raft/linalg/normalize.cuh>
+#include <raft/random/rng.cuh>
+
 #include <queue>
 
 //---------------------------------------------------------------------------
@@ -681,16 +689,35 @@ inline double best_rescale_factor(const T* o_abs, size_t dim, size_t ex_bits)
   return t;
 }
 
-float DataQuantizerGPU::get_const_scaling_factors(size_t dim, size_t ex_bits)
+float DataQuantizerGPU::get_const_scaling_factors(raft::resources const& handle,
+                                                  size_t dim,
+                                                  size_t ex_bits)
 {
   constexpr long kConstNum = 100;
 
-  RowMajorArray<double> rand = random_gaussian_matrix<double>(kConstNum, dim);
-  rand                       = rand.rowwise().normalized().abs();
+  // random matrix with normal distribution
+  auto rand = raft::make_device_matrix<double, size_t>(handle, kConstNum, dim);
+  raft::random::RngState rng(7ULL);
+  raft::random::normal(handle, rng, rand.data_handle(), kConstNum * dim, 0., 1.);
+  // row-wise normalization
+  auto row_normalized = raft::make_device_matrix<double, size_t>(handle, kConstNum, dim);
+  raft::linalg::row_normalize<raft::linalg::L2Norm, double, size_t>(
+    handle, rand.view(), row_normalized.view());
+  // take abs values (reusing memory allocation for `rand`)
+  raft::linalg::map(handle,
+                    rand.view(),
+                    raft::abs_op{},
+                    raft::make_device_vector_view<const double, size_t>(
+                      row_normalized.data_handle(), kConstNum * dim));
+  auto h_rand_row_normalized_abs = raft::make_host_matrix<double, size_t>(kConstNum, dim);
+  raft::copy(h_rand_row_normalized_abs.data_handle(),
+             rand.data_handle(),
+             kConstNum * dim,
+             raft::resource::get_cuda_stream(handle));
 
   double sum = 0;
   for (long j = 0; j < kConstNum; ++j) {
-    sum += best_rescale_factor(&rand(j, 0), dim, ex_bits);
+    sum += best_rescale_factor(&h_rand_row_normalized_abs(j, 0), dim, ex_bits);
   }
 
   double t_const = sum / kConstNum;

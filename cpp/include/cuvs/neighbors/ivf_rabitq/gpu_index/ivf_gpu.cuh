@@ -222,13 +222,15 @@ class IVFGPU {
    * @param k number of nearest neighbors to retrieve.
    * @param nprobe number of nearest clusters to probe.
    */
-  void search(const float* d_query,
+  void search(raft::resources const& handle,
+              const float* d_query,
               size_t k,
               size_t nprobe,
               PID* results,
               cudaStream_t single_stream = nullptr) const;
   //    void search(const float* host_query, float* results, size_t k, size_t nprobe) const;
-  void search_with_time(const float* d_query,
+  void search_with_time(raft::resources const& handle,
+                        const float* d_query,
                         size_t k,
                         size_t nprobe,
                         PID* results,

@@ -94,7 +94,8 @@ class SearcherGPU {
   //    float* c_query = nullptr;
   //    int* d_starts = nullptr;
 
-  explicit SearcherGPU(const float* q,
+  explicit SearcherGPU(raft::resources const& handle,
+                       const float* q,
                        size_t d,
                        size_t ex_bits,
                        std::string mode          = "",
