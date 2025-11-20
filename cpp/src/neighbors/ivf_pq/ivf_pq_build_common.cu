@@ -372,18 +372,6 @@ void rotate_padded_centers(
                      stream);
 }
 
-uint32_t calculate_pq_dim(uint32_t dim)
-{
-  if (dim >= 128) { dim /= 2; }
-  auto r = raft::round_down_safe<uint32_t>(dim, 32);
-  if (r > 0) return r;
-  r = 1;
-  while ((r << 1) <= dim) {
-    r = r << 1;
-  }
-  return r;
-}
-
 }  // namespace helpers
 
 }  // namespace cuvs::neighbors::ivf_pq

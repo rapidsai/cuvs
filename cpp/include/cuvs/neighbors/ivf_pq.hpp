@@ -590,9 +590,10 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
   static pq_centers_extents make_pq_centers_extents(
     uint32_t dim, uint32_t pq_dim, uint32_t pq_bits, codebook_gen codebook_kind, uint32_t n_lists);
 
+  static uint32_t calculate_pq_dim(uint32_t dim);
+
  private:
   void check_consistency();
-  uint32_t calculate_pq_dim(uint32_t dim);
 
   std::unique_ptr<index_iface<IdxT>> impl_;
 };
@@ -3169,30 +3170,6 @@ void make_rotation_matrix(
   raft::resources const& res,
   raft::device_matrix_view<float, uint32_t, raft::row_major> rotation_matrix,
   bool force_random_rotation);
-
-/**
- * @brief Calculate optimal PQ dimension using heuristics.
- *
- * This helper computes a good default value for pq_dim based on the dataset dimension.
- * Users can call this when they want to use auto-selection (pq_dim=0 in index_params).
- *
- * Usage example:
- * @code{.cpp}
- *   uint32_t dim = 768;
- *   uint32_t pq_dim = ivf_pq::helpers::calculate_pq_dim(dim);
- *   // For dim=768, this returns 384 (half of 768, rounded to multiple of 32)
- * @endcode
- *
- * Heuristic:
- * - If dim >= 128, start with dim/2
- * - Round down to nearest multiple of 32 (for good performance)
- * - If result is 0, return the largest power of 2 <= dim
- *
- * @param[in] dim Dataset dimensionality
- * @return Recommended pq_dim value
- */
-uint32_t calculate_pq_dim(uint32_t dim);
-
 /**
  * @}
  */

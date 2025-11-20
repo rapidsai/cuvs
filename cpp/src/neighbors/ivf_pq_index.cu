@@ -381,7 +381,7 @@ index<IdxT>::index(raft::resources const& handle)
                                               0,
                                               0,
                                               8,
-                                              0,
+                                              1,  // pq_dim = 1 to avoid division by zero
                                               true))
 {
 }
@@ -634,7 +634,14 @@ void index<IdxT>::check_consistency()
 template <typename IdxT>
 uint32_t index<IdxT>::calculate_pq_dim(uint32_t dim)
 {
-  return helpers::calculate_pq_dim(dim);
+  if (dim >= 128) { dim /= 2; }
+  auto r = raft::round_down_safe<uint32_t>(dim, 32);
+  if (r > 0) return r;
+  r = 1;
+  while ((r << 1) <= dim) {
+    r = r << 1;
+  }
+  return r;
 }
 
 template <typename IdxT>
