@@ -3073,6 +3073,14 @@ void pad_centers_with_norms(
   raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
   raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers);
 
+/**
+ * @brief Rotate padded centers with the rotation matrix.
+ *
+ * @param[in] res raft resource
+ * @param[in] padded_centers padded centers [n_centers, dim_ext]
+ * @param[in] rotation_matrix rotation matrix [rot_dim, dim]
+ * @param[out] rotated_centers rotated centers [n_centers, rot_dim]
+ */
 void rotate_padded_centers(
   raft::resources const& res,
   raft::device_matrix_view<const float, uint32_t, raft::row_major> padded_centers,
