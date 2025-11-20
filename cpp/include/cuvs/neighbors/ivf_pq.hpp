@@ -3163,43 +3163,6 @@ void make_rotation_matrix(
   bool force_random_rotation);
 
 /**
- * @brief Compute rotated centroids from centers and rotation matrix (standalone version).
- *
- * This standalone helper computes centers_rot = rotation_matrix^T * centers[:, 0:dim]
- * without requiring an index object. The centers can be either [n_lists, dim] or
- * [n_lists, dim_ext] where dim_ext >= dim and only the first dim columns are used.
- *
- * Usage example:
- * @code{.cpp}
- *   raft::resources res;
- *   uint32_t n_lists = 1000, dim = 128, rot_dim = 128;
- *
- *   // User has centers [n_lists, dim] and rotation_matrix [rot_dim, dim]
- *   auto centers = raft::make_device_matrix<float, uint32_t>(res, n_lists, dim);
- *   auto rotation_matrix = raft::make_device_matrix<float, uint32_t>(res, rot_dim, dim);
- *
- *   // ... fill centers and rotation_matrix ...
- *
- *   // Allocate output for rotated centers
- *   auto centers_rot = raft::make_device_matrix<float, uint32_t>(res, n_lists, rot_dim);
- *
- *   // Compute rotated centers
- *   ivf_pq::helpers::compute_centers_rot(
- *     res, centers.view(), rotation_matrix.view(), centers_rot.view());
- * @endcode
- *
- * @param[in] res raft resource
- * @param[in] centers Input cluster centers [n_lists, dim] or [n_lists, dim_ext]
- * @param[in] rotation_matrix Rotation matrix [rot_dim, dim]
- * @param[out] centers_rot Output rotated centers [n_lists, rot_dim]
- */
-void compute_centers_rot(
-  raft::resources const& res,
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
-  raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix,
-  raft::device_matrix_view<float, uint32_t, raft::row_major> centers_rot);
-
-/**
  * @brief Calculate optimal PQ dimension using heuristics.
  *
  * This helper computes a good default value for pq_dim based on the dataset dimension.
