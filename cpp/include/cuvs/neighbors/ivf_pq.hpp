@@ -127,7 +127,7 @@ struct index_params : cuvs::neighbors::index_params {
    * @endcode
    */
   static index_params from_dataset(
-    raft::extents<int64_t, raft::dynamic_extent, raft::dynamic_extent> dataset,
+    raft::matrix_extent<int64_t> dataset,
     cuvs::distance::DistanceType metric = cuvs::distance::DistanceType::L2Expanded);
 };
 /**
