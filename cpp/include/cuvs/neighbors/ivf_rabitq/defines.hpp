@@ -5,10 +5,10 @@
 
 #pragma once
 
+#include <raft/core/host_mdarray.hpp>
+
 #include <random>
 #include <stdint.h>
-
-#include <Eigen/Dense>
 
 #define FORCE_INLINE inline __attribute__((always_inline))
 #define likely(x)    __builtin_expect(!!(x), 1)
@@ -18,45 +18,11 @@
 
 constexpr size_t FAST_SIZE = 32;
 
-using PID          = uint32_t;
-using pair_di      = std::pair<double, int>;
-using FloatRowMat  = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-using IntRowMat    = Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-using UintRowMat   = Eigen::Matrix<uint32_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-using DoubleRowMat = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-
-template <typename T>
-using RowMajorMatrix = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-
-template <typename T>
-using RowMajorArray = Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-
-template <typename T>
-RowMajorMatrix<T> random_gaussian_matrix(size_t rows, size_t cols)
-{
-  RowMajorMatrix<T> rand(rows, cols);
-
-#ifdef DEBUG_BATCH_CONSTRUCT
-  static std::mt19937 gen(42);
-  std::normal_distribution<T> dist(0, 1);
-#else
-  static std::random_device rd;
-  static std::mt19937 gen(rd());
-  std::normal_distribution<T> dist(0, 1);
-#endif
-
-  for (size_t i = 0; i < rows; ++i) {
-    for (size_t j = 0; j < cols; ++j) {
-      rand(i, j) = dist(gen);
-      //            if (i == 0) {
-      //                std::cout << rand(i,j) ;
-      //            }
-    }
-  }
-  //    std::cout << std::endl;
-
-  return rand;
-}
+using PID         = uint32_t;
+using pair_di     = std::pair<double, int>;
+using FloatRowMat = raft::host_matrix<float, int64_t>;
+using IntRowMat   = raft::host_matrix<int32_t, int64_t>;
+using UintRowMat  = raft::host_matrix<uint32_t, int64_t>;
 
 struct Candidate {
   PID id;

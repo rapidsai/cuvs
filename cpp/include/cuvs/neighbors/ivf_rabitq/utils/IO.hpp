@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <raft/core/host_mdarray.hpp>
+
 #include <stdint.h>
 #include <sys/stat.h>
 
@@ -66,8 +68,7 @@ void load_vecs(const char* filename, M& Mat)
     abort();
   }
 
-  // T* ptr;
-  assert(typeid(ptr) == typeid(Mat.data()));
+  static_assert(std::is_same_v<T, typename M::element_type>, "T must match M::element_type");
 
   uint32_t tmp;
   size_t file_size = get_filesize(filename);
@@ -77,7 +78,7 @@ void load_vecs(const char* filename, M& Mat)
 
   size_t cols = tmp;
   size_t rows = file_size / (cols * sizeof(T) + sizeof(uint32_t));
-  Mat         = M(rows, cols);
+  Mat         = raft::make_host_matrix<T, int64_t>(rows, cols);
 
   input.seekg(0, input.beg);
 
@@ -95,7 +96,7 @@ void load_vecs(const char* filename, M& Mat)
 template <typename T, class M>
 void load_vecs_k(const char* filename, M& Mat, size_t k)
 {
-  static_assert(std::is_same_v<T, typename M::Scalar>, "T must match M::Scalar");
+  static_assert(std::is_same_v<T, typename M::element_type>, "T must match M::element_type");
   // 你的 exists / filesize 等工具函数省略
   if (!file_exits(filename)) {
     std::cerr << "File " << filename << " not exists\n";
@@ -114,7 +115,7 @@ void load_vecs_k(const char* filename, M& Mat, size_t k)
   const size_t rows = file_size / (cols * sizeof(T) + sizeof(uint32_t));
 
   // 分配最终大小：行数 * k
-  Mat = M(rows * k, cols);
+  Mat = raft::make_host_matrix<T, int64_t>(rows * k, cols);
 
   // 回到文件开头，逐行读取
   input.seekg(0, input.beg);
@@ -145,8 +146,7 @@ void load_bin(const char* filename, M& Mat)
     abort();
   }
 
-  T* ptr;
-  assert(typeid(ptr) == typeid(Mat.data()));
+  static_assert(std::is_same_v<T, typename M::element_type>, "T must match M::element_type");
 
   uint32_t rows, cols;
   std::ifstream input(filename, std::ios::binary);

@@ -31,8 +31,8 @@ double get_ratio(size_t numq,
   for (size_t i = 0; i < K; ++i) {
     PID gt_id  = gt(numq, i);
     PID ann_id = ann_results[i];
-    gt_distances.emplace(dist_func(&query(numq, 0), &data(gt_id, 0), data.cols()));
-    ann_distances.emplace(dist_func(&query(numq, 0), &data(ann_id, 0), data.cols()));
+    gt_distances.emplace(dist_func(&query(numq, 0), &data(gt_id, 0), data.extent(1)));
+    ann_distances.emplace(dist_func(&query(numq, 0), &data(ann_id, 0), data.extent(1)));
   }
 
   double ret     = 0;

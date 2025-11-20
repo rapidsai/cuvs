@@ -8,6 +8,8 @@
 //
 
 #include <cuvs/neighbors/ivf_rabitq/gpu_index/quantizer_gpu.cuh>
+
+#include <atomic>
 #include <thread>
 
 #define MAX_D 2048

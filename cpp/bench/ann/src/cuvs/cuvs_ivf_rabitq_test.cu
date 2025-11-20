@@ -57,15 +57,16 @@ int test_ivf_rabitq_construct_batch(raft::resources const& handle, int argc, cha
   sprintf(ivf_file, "ivf_exhaf%d_gpu_batch.index", B);
 
   // Load data from file (using your load_vecs template functions).
-  FloatRowMat data;
-  FloatRowMat centroids;
-  UintRowMat cids;  // Assume cids are stored as uint32_t
+  FloatRowMat data      = raft::make_host_matrix<float, int64_t>(0, 0);
+  FloatRowMat centroids = raft::make_host_matrix<float, int64_t>(0, 0);
+  UintRowMat cids       = raft::make_host_matrix<uint32_t, int64_t>(0, 0);
+  ;  // Assume cids are stored as uint32_t
   load_vecs<float, FloatRowMat>(data_file, data);
   load_vecs<float, FloatRowMat>(centroids_file, centroids);
   load_vecs<PID, UintRowMat>(cids_file, cids);
 
-  size_t N   = data.rows();
-  size_t DIM = data.cols();
+  size_t N   = data.extent(0);
+  size_t DIM = data.extent(1);
 
   std::cout << "Data loaded:\n\tN: " << N << "\n\tDIM: " << DIM << std::endl;
 
@@ -74,7 +75,8 @@ int test_ivf_rabitq_construct_batch(raft::resources const& handle, int argc, cha
   IVFGPU ivf(handle, N, DIM, K, B, true);
 
   // Construct the index (this function performs necessary host-to-device transfers internally).
-  ivf.construct(handle, data.data(), centroids.data(), cids.data(), fast_quantize_flag);
+  ivf.construct(
+    handle, data.data_handle(), centroids.data_handle(), cids.data_handle(), fast_quantize_flag);
 
   float minutes = stopw.getElapsedTimeMili() / 1000.0f / 60.0f;
   float seconds = stopw.getElapsedTimeMili() / 1000.0f;
@@ -126,9 +128,9 @@ double get_ratio_standalone(size_t numq,
   for (size_t i = 0; i < K; ++i) {
     PID gt_id  = gt(numq, i);
     PID ann_id = ann_results[i];
-    if (gt_id > data.rows() || ann_id > data.rows()) { continue; }
-    gt_distances.emplace(dist_func(&query(numq, 0), &data(gt_id, 0), data.cols()));
-    ann_distances.emplace(dist_func(&query(numq, 0), &data(ann_id, 0), data.cols()));
+    if (gt_id > data.extent(0) || ann_id > data.extent(0)) { continue; }
+    gt_distances.emplace(dist_func(&query(numq, 0), &data(gt_id, 0), data.extent(1)));
+    ann_distances.emplace(dist_func(&query(numq, 0), &data(ann_id, 0), data.extent(1)));
   }
 
   double ret     = 0;
@@ -191,17 +193,17 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
   sprintf(ivf_file, "ivf_exhaf%d_gpu_batch.index", B);
   //    sprintf(ivf_file, "../bin/test_gpu.index", DATASET, B);
 
-  FloatRowMat data;
-  FloatRowMat query;
-  UintRowMat gt;
+  FloatRowMat data  = raft::make_host_matrix<float, int64_t>(0, 0);
+  FloatRowMat query = raft::make_host_matrix<float, int64_t>(0, 0);
+  UintRowMat gt     = raft::make_host_matrix<uint32_t, int64_t>(0, 0);
 
   load_vecs<float, FloatRowMat>(data_file, data);
   load_vecs_k<float, FloatRowMat>(query_file, query, EXPAND_FACTOR);
   load_vecs_k<PID, UintRowMat>(gt_file, gt, EXPAND_FACTOR);
 
-  size_t N   = data.rows();
-  size_t DIM = data.cols();
-  size_t NQ  = query.rows();
+  size_t N   = data.extent(0);
+  size_t DIM = data.extent(1);
+  size_t NQ  = query.extent(0);
   //    NQ = 1;
 
   std::cout << "data loaded\n";
@@ -245,9 +247,10 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
   size_t total_count = NQ * TOPK;
   //    StopW stopw;
 
-  FloatRowMat padded_query(NQ, ivf.padded_dim());
-  padded_query.setZero();
-  FloatRowMat rotated_query(NQ, ivf.padded_dim());
+  FloatRowMat padded_query = raft::make_host_matrix<float, int64_t>(NQ, ivf.padded_dim());
+  // padded_query.setZero();
+  memset(padded_query.data_handle(), 0, sizeof(float) * NQ * ivf.padded_dim());
+  FloatRowMat rotated_query = raft::make_host_matrix<float, int64_t>(NQ, ivf.padded_dim());
   for (size_t i = 0; i < NQ; ++i) {
     std::memcpy(&padded_query(i, 0), &query(i, 0), sizeof(float) * DIM);
   }
@@ -258,8 +261,10 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
   cudaMalloc(&d_query, NQ * ivf.padded_dim() * sizeof(float));
 
   // Copy query vectors from host to device.
-  cudaMemcpy(
-    d_query, padded_query.data(), NQ * ivf.padded_dim() * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_query,
+             padded_query.data_handle(),
+             NQ * ivf.padded_dim() * sizeof(float),
+             cudaMemcpyHostToDevice);
 
   // Allocate device memory for rotated queries.
   float* d_rotated_query = nullptr;
@@ -289,7 +294,7 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
 
   // Create a GPU searcher instance (which uses the device query, etc.).
   SearcherGPU searcher(
-    &rotated_query(0, 0), ivf.padded_dim(), ivf.ex_bits, mode, rabitq_quantize_flag);
+    handle, &rotated_query(0, 0), ivf.padded_dim(), ivf.ex_bits, mode, rabitq_quantize_flag);
 
   // find the longest cluster to allocate space;
   int max_cluster_length     = 0;

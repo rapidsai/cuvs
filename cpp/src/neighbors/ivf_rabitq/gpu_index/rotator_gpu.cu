@@ -7,8 +7,6 @@
 // Created by Stardust on 3/24/25.
 //
 
-// TODO: remove Eigen
-#include <Eigen/Dense>
 #include <cuvs/neighbors/ivf_rabitq/gpu_index/rotator_gpu.cuh>
 
 #include <raft/core/device_mdarray.hpp>
