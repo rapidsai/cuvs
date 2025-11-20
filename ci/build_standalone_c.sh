@@ -7,6 +7,7 @@ set -euo pipefail
 TOOLSET_VERSION=14
 CMAKE_VERSION=3.31.8
 CMAKE_ARCH=x86_64
+NINJA_VERSION=v1.13.1
 
 BUILD_C_LIB_TESTS="OFF"
 if [[ "${1:-}" == "--build-tests" ]]; then
@@ -22,10 +23,10 @@ dnf install -y \
 if ! command -V ninja >/dev/null 2>&1; then
     case "$(uname -m)" in
         x86_64)
-            wget --no-hsts -q -O /tmp/ninja-linux.zip "https://github.com/ninja-build/ninja/releases/download/v1.13.1/ninja-linux.zip";
+            wget --no-hsts -q -O /tmp/ninja-linux.zip "https://github.com/ninja-build/ninja/releases/download/${NINJA_VERSION}/ninja-linux.zip";
             ;;
         aarch64)
-            wget --no-hsts -q -O /tmp/ninja-linux.zip "https://github.com/ninja-build/ninja/releases/download/v1.13.1/ninja-linux-aarch64.zip";
+            wget --no-hsts -q -O /tmp/ninja-linux.zip "https://github.com/ninja-build/ninja/releases/download/${NINJA_VERSION}/ninja-linux-aarch64.zip";
             ;;
         *)
             echo "Unrecognized platform '$(uname -m)'" >&2
