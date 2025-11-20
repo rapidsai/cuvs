@@ -301,39 +301,21 @@ void make_rotation_matrix(
   make_rotation_matrix(res, force_random_rotation, rot_dim, dim, rotation_matrix.data_handle());
 }
 
-template <typename data_accessor>
 void pad_centers_with_norms(
   raft::resources const& res,
-  raft::mdspan<const float, raft::matrix_extents<uint32_t>, raft::row_major, data_accessor> centers,
+  raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
   raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers)
 {
-  auto stream = raft::resource::get_cuda_stream(res);
+  // Create mdspan from device matrix view and call the template version
+  detail::pad_centers_with_norms(res, centers, padded_centers);
+}
 
-  // Make sure to have trailing zeroes between dim and dim_ext;
-  // We rely on this to enable padded tensor gemm kernels during coarse search.
-  cuvs::spatial::knn::detail::utils::memzero(
-    padded_centers.data_handle(), padded_centers.size(), stream);
-  // combine cluster_centers and their norms
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_centers.data_handle(),
-                                  sizeof(float) * padded_centers.extent(1),
-                                  centers.data_handle(),
-                                  sizeof(float) * centers.extent(1),
-                                  sizeof(float) * centers.extent(1),
-                                  centers.extent(0),
-                                  cudaMemcpyDefault,
-                                  stream));
-
-  rmm::device_uvector<float> center_norms(centers.extent(0), stream);
-  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-    center_norms.data(), centers.data_handle(), centers.extent(1), centers.extent(0), stream);
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_centers.data_handle() + padded_centers.extent(1),
-                                  sizeof(float) * padded_centers.extent(1),
-                                  center_norms.data(),
-                                  sizeof(float),
-                                  sizeof(float),
-                                  index->n_lists(),
-                                  cudaMemcpyDefault,
-                                  stream));
+void pad_centers_with_norms(
+  raft::resources const& res,
+  raft::host_matrix_view<const float, uint32_t, raft::row_major> centers,
+  raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers)
+{
+  detail::pad_centers_with_norms(res, centers, padded_centers);
 }
 
 void rotate_padded_centers(
@@ -342,20 +324,20 @@ void rotate_padded_centers(
   raft::device_matrix_view<const float, uint32_t, raft::row_major> rotation_matrix,
   raft::device_matrix_view<float, uint32_t, raft::row_major> rotated_centers)
 {
-  uint32_t n_lists     = centers.extent(0);
-  uint32_t centers_dim = centers.extent(1);
+  uint32_t n_lists     = padded_centers.extent(0);
+  uint32_t centers_dim = padded_centers.extent(1);
   uint32_t rot_dim     = rotation_matrix.extent(0);
   uint32_t dim         = rotation_matrix.extent(1);
 
-  RAFT_EXPECTS(centers_rot.extent(0) == n_lists,
+  RAFT_EXPECTS(rotated_centers.extent(0) == n_lists,
                "centers_rot must have extent(0) == n_lists. Got centers_rot.extent(0) = %u, "
                "expected %u",
-               centers_rot.extent(0),
+               rotated_centers.extent(0),
                n_lists);
-  RAFT_EXPECTS(centers_rot.extent(1) == rot_dim,
+  RAFT_EXPECTS(rotated_centers.extent(1) == rot_dim,
                "centers_rot must have extent(1) == rot_dim. Got centers_rot.extent(1) = %u, "
                "expected %u",
-               centers_rot.extent(1),
+               rotated_centers.extent(1),
                rot_dim);
   RAFT_EXPECTS(centers_dim >= dim,
                "centers must have at least dim columns. Got centers.extent(1) = %u, "
@@ -382,10 +364,10 @@ void rotate_padded_centers(
                      &alpha,
                      rotation_matrix.data_handle(),
                      dim,  // lda (leading dim of rotation_matrix)
-                     centers.data_handle(),
+                     padded_centers.data_handle(),
                      centers_dim,  // ldb (leading dim of centers, accounting for potential padding)
                      &beta,
-                     centers_rot.data_handle(),
+                     rotated_centers.data_handle(),
                      rot_dim,  // ldc (leading dim of output)
                      stream);
 }

@@ -244,6 +244,63 @@ auto calculate_offsets_and_indices(IdxT n_rows,
   return max_cluster_size;
 }
 
+template <typename accessor>
+void pad_centers_with_norms(
+  raft::resources const& res,
+  raft::mdspan<const float, raft::matrix_extent<uint32_t>, raft::row_major, accessor> centers,
+  raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers)
+{
+  auto stream = raft::resource::get_cuda_stream(res);
+
+  // Make sure to have trailing zeroes between dim and dim_ext;
+  // We rely on this to enable padded tensor gemm kernels during coarse search.
+  cuvs::spatial::knn::detail::utils::memzero(
+    padded_centers.data_handle(), padded_centers.size(), stream);
+  // combine cluster_centers and their norms
+  RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_centers.data_handle(),
+                                  sizeof(float) * padded_centers.extent(1),
+                                  centers.data_handle(),
+                                  sizeof(float) * centers.extent(1),
+                                  sizeof(float) * centers.extent(1),
+                                  centers.extent(0),
+                                  cudaMemcpyDefault,
+                                  stream));
+
+  rmm::device_uvector<float> center_norms(centers.extent(0), stream);
+  raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
+    center_norms.data(), centers.data_handle(), centers.extent(1), centers.extent(0), stream);
+  RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_centers.data_handle() + padded_centers.extent(1),
+                                  sizeof(float) * padded_centers.extent(1),
+                                  center_norms.data(),
+                                  sizeof(float),
+                                  sizeof(float),
+                                  padded_centers.extent(0),
+                                  cudaMemcpyDefault,
+                                  stream));
+}
+
+template <typename IdxT>
+void set_centers(raft::resources const& handle, index<IdxT>* index, const float* cluster_centers)
+{
+  switch (utils::check_pointer_residency(cluster_centers)) {
+    case utils::pointer_residency::host_only:
+      cuvs::neighbors::ivf_pq::helpers::pad_centers_with_norms(
+        handle,
+        raft::make_host_matrix_view<const float, uint32_t, raft::row_major>(
+          cluster_centers, index->n_lists(), index->dim()),
+        index->centers());
+      break;
+    default:
+      cuvs::neighbors::ivf_pq::helpers::pad_centers_with_norms(
+        handle,
+        raft::make_device_matrix_view<const float, uint32_t, raft::row_major>(
+          cluster_centers, index->n_lists(), index->dim()),
+        index->centers());
+  }
+  cuvs::neighbors::ivf_pq::helpers::rotate_padded_centers(
+    handle, index->centers(), index->rotation_matrix(), index->centers_rot());
+}
+
 template <typename IdxT>
 void transpose_pq_centers(const raft::resources& handle,
                           index<IdxT>& index,
@@ -1370,7 +1427,7 @@ auto build(raft::resources const& handle,
     // Make rotation matrix
     helpers::make_rotation_matrix(handle, &idx, params.force_random_rotation);
 
-    set_centers(handle, &idx, raft::make_const_mdspan(centers_view));
+    set_centers(handle, &idx, cluster_centers);
 
     // Train PQ codebooks
     switch (idx.codebook_kind()) {
@@ -1691,28 +1748,24 @@ auto build(
                stream);
   }
 
-  if (!centers_rot.has_value()) {
-    helpers::transform_centers(handle, &owning_index, centers);
+  if (centers.extent(1) == owning_index.dim_ext()) {
+    raft::copy(owning_index.centers().data_handle(),
+               centers.data_handle(),
+               owning_index.centers().size(),
+               stream);
   } else {
-    auto centers_rot_dev = raft::make_device_matrix<float, uint32_t>(
-      handle, centers_rot.value().extent(0), centers_rot.value().extent(1));
-    raft::copy(centers_rot_dev.data_handle(),
+    cuvs::neighbors::ivf_pq::helpers::pad_centers_with_norms(
+      handle, centers, owning_index.centers());
+  }
+
+  if (!centers_rot.has_value()) {
+    cuvs::neighbors::ivf_pq::helpers::rotate_padded_centers(
+      handle, owning_index.centers(), owning_index.rotation_matrix(), owning_index.centers_rot());
+  } else {
+    raft::copy(owning_index.centers_rot().data_handle(),
                centers_rot.value().data_handle(),
                centers_rot.value().size(),
                stream);
-    raft::copy(owning_index.centers_rot().data_handle(),
-               centers_rot_dev.data_handle(),
-               centers_rot_dev.size(),
-               stream);
-
-    if (centers.extent(1) == owning_index.dim_ext()) {
-      raft::copy(owning_index.centers().data_handle(),
-                 centers.data_handle(),
-                 owning_index.centers().size(),
-                 stream);
-    } else {
-      helpers::transform_centers(handle, &owning_index, centers);
-    }
   }
 
   raft::copy(
