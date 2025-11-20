@@ -68,6 +68,9 @@ final class JDKProvider implements CuVSProvider {
     }
   }
 
+  private final cuvsRMMMemoryResourceReset cuvsRMMMemoryResourceResetInvoker =
+      cuvsRMMMemoryResourceReset.makeInvoker();
+
   private final cuvsGetLogLevel GET_LOG_LEVEL_INVOKER = cuvsGetLogLevel.makeInvoker();
 
   private JDKProvider() {}
@@ -336,6 +339,25 @@ final class JDKProvider implements CuVSProvider {
       return Level.OFF;
     }
     throw new IllegalArgumentException("Unexpected log level [" + logLevel + "]");
+  }
+
+  @Override
+  public void enableRMMPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent) {
+    checkCuVSError(
+        cuvsRMMPoolMemoryResourceEnable(initialPoolSizePercent, maxPoolSizePercent, false),
+        "cuvsRMMPoolMemoryResourceEnable");
+  }
+
+  @Override
+  public void enableRMMManagedPooledMemory(int initialPoolSizePercent, int maxPoolSizePercent) {
+    checkCuVSError(
+        cuvsRMMPoolMemoryResourceEnable(initialPoolSizePercent, maxPoolSizePercent, true),
+        "cuvsRMMPoolMemoryResourceEnable");
+  }
+
+  @Override
+  public void resetRMMPooledMemory() {
+    checkCuVSError(cuvsRMMMemoryResourceResetInvoker.apply(), "cuvsRMMMemoryResourceReset");
   }
 
   @Override
