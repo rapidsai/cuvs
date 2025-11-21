@@ -1502,6 +1502,7 @@ auto build(raft::resources const& handle,
     "centers must have extent [n_lists, round_up(dim + 1, 8)]. Expected [%u, %u], got [%u, %u]",
     index_params.n_lists,
     raft::round_up_safe(dim + 1, 8u),
+    centers.extent(0),
     centers.extent(1));
 
   auto pq_len = raft::div_rounding_up_unsafe(dim, pq_dim);
