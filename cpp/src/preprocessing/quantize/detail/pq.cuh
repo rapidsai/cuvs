@@ -14,6 +14,8 @@
 #include <raft/core/operators.hpp>
 #include <raft/matrix/init.cuh>
 
+#include "../../../cluster/kmeans_balanced.cuh"
+
 namespace cuvs::preprocessing::quantize::pq::detail {
 
 template <typename MathT, typename IdxT>
@@ -27,13 +29,38 @@ void train_pq_centers(
     cuvs::cluster::kmeans::balanced_params kmeans_params;
     kmeans_params.n_iters = params.kmeans_n_iters;
     kmeans_params.metric  = cuvs::distance::DistanceType::L2Expanded;
-    cuvs::cluster::kmeans::fit(res, kmeans_params, pq_trainset_view, pq_centers_view);
+    auto device_memory    = raft::resource::get_workspace_resource(res);
+    auto stream           = raft::resource::get_cuda_stream(res);
+    rmm::device_uvector<uint32_t> sub_labels(pq_trainset_view.extent(0), stream, device_memory);
+    rmm::device_uvector<uint32_t> pq_cluster_sizes(
+      pq_centers_view.extent(0), stream, device_memory);
+    auto sub_labels_view =
+      raft::make_device_vector_view<uint32_t, IdxT>(sub_labels.data(), pq_trainset_view.extent(0));
+    auto pq_cluster_sizes_view = raft::make_device_vector_view<uint32_t, IdxT>(
+      pq_cluster_sizes.data(), pq_centers_view.extent(0));
+
+    cuvs::cluster::kmeans_balanced::helpers::build_clusters<
+      MathT,
+      MathT,
+      IdxT,
+      uint32_t,
+      uint32_t,
+      cuvs::spatial::knn::detail::utils::mapping<MathT>>(
+      res,
+      kmeans_params,
+      pq_trainset_view,
+      pq_centers_view,
+      sub_labels_view,
+      pq_cluster_sizes_view,
+      cuvs::spatial::knn::detail::utils::mapping<MathT>{});
   } else {
     const auto pq_n_centers = pq_centers_view.extent(0);
     cuvs::cluster::kmeans::params kmeans_params;
     kmeans_params.n_clusters = pq_n_centers;
     kmeans_params.max_iter   = params.kmeans_n_iters;
     kmeans_params.metric     = cuvs::distance::DistanceType::L2Expanded;
+    kmeans_params.init       = cuvs::cluster::kmeans::params::InitMethod::Random;
+
     std::optional<raft::device_vector_view<const MathT, IdxT>> sample_weight = std::nullopt;
     MathT inertia;
     IdxT n_iter;
@@ -100,7 +127,6 @@ auto train_pq_subspaces(
                                     n_rows_train,
                                     cudaMemcpyDefault,
                                     raft::resource::get_cuda_stream(res)));
-
     auto pq_centers_subspace_view = raft::make_device_matrix_view<MathT, uint32_t, raft::row_major>(
       pq_centers.data_handle() + m * pq_n_centers * pq_len, pq_n_centers, pq_len);
     train_pq_centers<MathT, ix_t>(
