@@ -1483,12 +1483,8 @@ auto build(raft::resources const& handle,
   auto stream = raft::resource::get_cuda_stream(handle);
 
   auto pq_dim = index_params.pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : index_params.pq_dim;
-  auto expected_pq_centers_extents =
-    index<IdxT>::make_pq_centers_extents(dim,
-                                         pq_dim,
-                                         index_params.pq_bits,
-                                         index_params.codebook_kind,
-                                         index_params.n_lists);
+  auto expected_pq_centers_extents = index<IdxT>::make_pq_centers_extents(
+    dim, pq_dim, index_params.pq_bits, index_params.codebook_kind, index_params.n_lists);
   RAFT_EXPECTS(pq_centers.extent(0) == expected_pq_centers_extents.extent(0) &&
                  pq_centers.extent(1) == expected_pq_centers_extents.extent(1) &&
                  pq_centers.extent(2) == expected_pq_centers_extents.extent(2),
