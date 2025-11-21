@@ -307,44 +307,11 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
                                     inds_view,
                                     const_cast<cuvs::neighbors::ivf_pq::index<IdxT>*>(&base_index));
 
-    // size_t queries_size = ps.num_queries * ps.k;
-    // auto distances_view = raft::make_device_vector<EvalT>(handle_, queries_size);
-    // auto indices_view   = raft::make_device_vector<IdxT>(handle_, queries_size);
-    // auto distances_base = raft::make_device_vector<EvalT>(handle_, queries_size);
-    // auto indices_base   = raft::make_device_vector<IdxT>(handle_, queries_size);
-    // auto search_queries_view =
-    //   raft::make_device_matrix_view<DataT, int64_t>(search_queries.data(), ps.num_queries,
-    //   ps.dim);
-
-    // auto indices_view_matrix = raft::make_device_matrix_view<IdxT, int64_t>(
-    //   indices_view.data_handle(), ps.num_queries, ps.k);
-    // auto distances_view_matrix = raft::make_device_matrix_view<EvalT, int64_t>(
-    //   distances_view.data_handle(), ps.num_queries, ps.k);
-    // auto indices_base_matrix = raft::make_device_matrix_view<IdxT, int64_t>(
-    //   indices_base.data_handle(), ps.num_queries, ps.k);
-    // auto distances_base_matrix = raft::make_device_matrix_view<EvalT, int64_t>(
-    //   distances_base.data_handle(), ps.num_queries, ps.k);
-
-    // cuvs::neighbors::ivf_pq::search(handle_,
-    //                                 ps.search_params,
-    //                                 view_index,
-    //                                 search_queries_view,
-    //                                 indices_view_matrix,
-    //                                 distances_view_matrix);
-    // cuvs::neighbors::ivf_pq::search(handle_,
-    //                                 ps.search_params,
-    //                                 base_index,
-    //                                 search_queries_view,
-    //                                 indices_base_matrix,
-    //                                 distances_base_matrix);
-
-    // ASSERT_TRUE(cuvs::devArrMatch(
-    //   indices_view.data_handle(), indices_base.data_handle(), queries_size,
-    //   cuvs::Compare<IdxT>{}));
-    // ASSERT_TRUE(cuvs::devArrMatch(distances_view.data_handle(),
-    //                               distances_base.data_handle(),
-    //                               queries_size,
-    //                               cuvs::CompareApprox<EvalT>{0.001}));
+    // Verify that both indices have identical list sizes after extension
+    ASSERT_TRUE(cuvs::devArrMatch(base_index.list_sizes().data_handle(),
+                                  view_index.list_sizes().data_handle(),
+                                  base_index.n_lists(),
+                                  cuvs::Compare<uint32_t>{}));
   }
 
   void check_reconstruction(const index<IdxT>& index,
