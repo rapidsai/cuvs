@@ -29,7 +29,7 @@ index_impl<IdxT>::index_impl(raft::resources const& handle,
     codebook_kind_(codebook_kind),
     dim_(dim),
     pq_bits_(pq_bits),
-    pq_dim_(pq_dim == 0 ? calculate_pq_dim(dim) : pq_dim),
+    pq_dim_(pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : pq_dim),
     conservative_memory_allocation_(conservative_memory_allocation),
     lists_(n_lists),
     list_sizes_{raft::make_device_vector<uint32_t, uint32_t>(handle, n_lists)},
@@ -186,7 +186,7 @@ owning_impl<IdxT>::owning_impl(raft::resources const& handle,
   : index_impl<IdxT>(
       handle, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, conservative_memory_allocation),
     pq_centers_{raft::make_device_mdarray<float>(
-      handle, make_pq_centers_extents(dim, pq_dim, pq_bits, codebook_kind, n_lists))},
+      handle, index<IdxT>::make_pq_centers_extents(dim, pq_dim, pq_bits, codebook_kind, n_lists))},
     centers_{
       raft::make_device_matrix<float, uint32_t>(handle, n_lists, raft::round_up_safe(dim + 1, 8u))},
     centers_rot_{raft::make_device_matrix<float, uint32_t>(
@@ -197,9 +197,16 @@ owning_impl<IdxT>::owning_impl(raft::resources const& handle,
 }
 
 template <typename IdxT>
-pq_centers_extents index_impl<IdxT>::make_pq_centers_extents(
+pq_centers_extents index<IdxT>::make_pq_centers_extents(
   uint32_t dim, uint32_t pq_dim, uint32_t pq_bits, codebook_gen codebook_kind, uint32_t n_lists)
 {
+  RAFT_LOG_INFO(
+    "make_pq_centers_extents: dim=%u, pq_dim=%u, pq_bits=%u, codebook_kind=%u, n_lists=%u",
+    dim,
+    pq_dim,
+    pq_bits,
+    codebook_kind,
+    n_lists);
   uint32_t pq_len       = raft::div_rounding_up_unsafe(dim, pq_dim);
   uint32_t pq_book_size = 1u << pq_bits;
   switch (codebook_kind) {
@@ -396,8 +403,15 @@ index<IdxT>::index(raft::resources const& handle,
                    uint32_t pq_bits,
                    uint32_t pq_dim,
                    bool conservative_memory_allocation)
-  : index(std::make_unique<owning_impl<IdxT>>(
-      handle, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, conservative_memory_allocation))
+  : index(
+      std::make_unique<owning_impl<IdxT>>(handle,
+                                          metric,
+                                          codebook_kind,
+                                          n_lists,
+                                          dim,
+                                          pq_bits,
+                                          pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : pq_dim,
+                                          conservative_memory_allocation))
 {
 }
 
@@ -625,7 +639,7 @@ void index_impl<IdxT>::check_consistency()
 }
 
 template <typename IdxT>
-uint32_t index_impl<IdxT>::calculate_pq_dim(uint32_t dim)
+uint32_t index<IdxT>::calculate_pq_dim(uint32_t dim)
 {
   if (dim >= 128) { dim /= 2; }
   auto r = raft::round_down_safe<uint32_t>(dim, 32);

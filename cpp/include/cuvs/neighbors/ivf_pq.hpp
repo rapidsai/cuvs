@@ -587,6 +587,11 @@ class index : public index_iface<IdxT>, cuvs::neighbors::index {
    */
   explicit index(std::unique_ptr<index_iface<IdxT>> impl);
 
+  static pq_centers_extents make_pq_centers_extents(
+    uint32_t dim, uint32_t pq_dim, uint32_t pq_bits, codebook_gen codebook_kind, uint32_t n_lists);
+
+  static uint32_t calculate_pq_dim(uint32_t dim);
+
  private:
   std::unique_ptr<index_iface<IdxT>> impl_;
 };
