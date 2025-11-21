@@ -91,7 +91,7 @@ It is recommended to use [mamba](https://conda.github.io/conda-libmamba-solver/u
 conda install -c rapidsai -c conda-forge cuvs
 ```
 
-The cuVS Python package can also be `installed through pip <https://docs.rapids.ai/install#pip>`_.
+The cuVS Python package can also be `installed through [pip](https://docs.rapids.ai/install#pip>).
 
 ```bash
 # CUDA 13
@@ -113,7 +113,7 @@ conda install -c rapidsai-nightly -c conda-forge cuvs=25.12 cuda-version=12.9
 ```
 
 > [!NOTE]
-> If compiled binary size is a concern, please note that the cuVS builds for CUDA 13 roughly half the size of CUDA 12 builds. This is a result of improved compression rates in the newer supported CUDA drivers. We will be adopting the newer drivers for CUDA 12 builds in Spring of 2026, which will ultimately bring them down to roughly the size of the CUDA 13 builds. In the meantime, the NVIDIA cuVS team is continuing to shave down the binary sizes for all supported CUDA versions. If binary size is an issue for you, please consider doing a static build.
+> If compiled binary size is a concern, please note that the cuVS builds for CUDA 13 are roughly half the size of CUDA 12 builds. This is a result of improved compression rates in the newer supported CUDA drivers. We will be adopting the newer drivers for CUDA 12 builds in Spring of 2026, which will ultimately bring them down to roughly the size of the CUDA 13 builds. In the meantime, the NVIDIA cuVS team is continuing to shave down the binary sizes for all supported CUDA versions. If binary size is an issue for you, please consider doing a static build.
 
 Please see the [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build/) for more information on installing the available cuVS packages and building from source.
 
