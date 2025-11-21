@@ -7,8 +7,7 @@
 // Created by Stardust on 4/14/25.
 //
 
-#ifndef EXRABITQ_POOL_GPU_CUH
-#define EXRABITQ_POOL_GPU_CUH
+#pragma once
 
 #include <algorithm>
 #include <cstdint>
@@ -139,5 +138,3 @@ inline void freeDeviceResultPool(DeviceResultPool* pool, cudaStream_t stream = 0
  * @param host_results  Host array (of size at least pool->size) where the IDs will be copied.
  */
 void copy_results_from_pool(const DeviceResultPool* d_pool, uint32_t* host_results);
-
-#endif  // EXRABITQ_POOL_GPU_CUH

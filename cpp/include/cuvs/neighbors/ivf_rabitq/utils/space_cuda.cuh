@@ -3,8 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef EXRABITQ_SPACE_CUDA_H
-#define EXRABITQ_SPACE_CUDA_H
+#pragma once
 
 #include <thrust/device_vector.h>
 #include <thrust/functional.h>
@@ -69,5 +68,3 @@ inline float compute_sum_q(const float* __restrict__ q, size_t D)
   }
   return sum;  // same as _mm512_reduce_add_ps
 }
-
-#endif  // EXRABITQ_SPACE_CUDA_H

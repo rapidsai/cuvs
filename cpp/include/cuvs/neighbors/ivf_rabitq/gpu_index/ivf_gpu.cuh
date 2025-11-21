@@ -7,8 +7,7 @@
 // Created by Stardust on 2/23/25.
 //
 
-#ifndef EXRABITQ_IVF_GPU_CUH
-#define EXRABITQ_IVF_GPU_CUH
+#pragma once
 
 #include <raft/core/resources.hpp>
 
@@ -434,5 +433,3 @@ class IVFGPU {
                                 size_t batch_size,
                                 cudaStream_t single_stream);
 };
-
-#endif  // EXRABITQ_IVF_GPU_CUH

@@ -7,8 +7,7 @@
 // Created by Stardust on 3/24/25.
 //
 
-#ifndef EXRABITQ_ROTATOR_GPU_CUH
-#define EXRABITQ_ROTATOR_GPU_CUH
+#pragma once
 
 #include <raft/core/resources.hpp>
 
@@ -68,5 +67,3 @@ class RotatorGPU {
 
   float* d_P;  // Device pointer for the rotation matrix (stored in row-major order)
 };
-
-#endif  // EXRABITQ_ROTATOR_GPU_CUH

@@ -7,6 +7,8 @@
 // Created by Stardust on 3/4/25.
 //
 
+#pragma once
+
 #include <iostream>
 
 #define CUDA_CHECK(call)                                                  \

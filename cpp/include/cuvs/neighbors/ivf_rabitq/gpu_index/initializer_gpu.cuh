@@ -7,8 +7,7 @@
 // Created by Stardust on 3/3/25.
 //
 
-#ifndef EXRABITQ_INITIALIZER_GPU_CUH
-#define EXRABITQ_INITIALIZER_GPU_CUH
+#pragma once
 
 #include <cstdint>
 #include <cuvs/neighbors/ivf_rabitq/defines.hpp>
@@ -129,5 +128,3 @@ class FlatInitializerGPU : public InitializerGPU {
 
   [[nodiscard]] size_t data_bytes() const { return sizeof(float) * K * D; }
 };
-
-#endif  // EXRABITQ_INITIALIZER_GPU_CUH

@@ -7,8 +7,7 @@
 // Created by Stardust on 3/10/25.
 //
 
-#ifndef EXRABITQ_QUANTIZER_GPU_CUH
-#define EXRABITQ_QUANTIZER_GPU_CUH
+#pragma once
 
 #include <cassert>
 #include <cmath>
@@ -327,5 +326,3 @@ class DataQuantizerGPU {
                                             const float* d_centroid,
                                             size_t num_points) const;
 };
-
-#endif  // EXRABITQ_QUANTIZER_GPU_CUH

@@ -7,8 +7,7 @@
 // Created by Stardust on 4/14/25.
 //
 
-#ifndef EXRABITQ_SEARCHER_GPU_CUH
-#define EXRABITQ_SEARCHER_GPU_CUH
+#pragma once
 
 #include <cuvs/neighbors/ivf_rabitq/gpu_index/ivf_gpu.cuh>
 #include <cuvs/neighbors/ivf_rabitq/gpu_index/pool_gpu.cuh>
@@ -312,5 +311,3 @@ __global__ void compute_ip_kernel(const int16_t* quant_query_gpu,
                                   float sumq,
                                   float qnorm,
                                   float one_over_sqrtD);
-
-#endif  // EXRABITQ_SEARCHER_GPU_CUH

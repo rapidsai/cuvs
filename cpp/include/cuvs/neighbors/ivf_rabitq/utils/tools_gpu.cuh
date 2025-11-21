@@ -7,8 +7,7 @@
 // Created by Stardust on 4/1/25.
 //
 
-#ifndef EXRABITQ_TOOLS_GPU_CUH
-#define EXRABITQ_TOOLS_GPU_CUH
+#pragma once
 
 inline constexpr size_t div_rd_up_new(size_t x, size_t y)
 {
@@ -23,5 +22,3 @@ inline constexpr size_t rd_up_to_multiple_of_new(size_t x, size_t y)
 std::vector<cudaStream_t> create_cuda_streams(size_t num_streams);
 
 void delete_cuda_streams(std::vector<cudaStream_t>& streams);
-
-#endif  // EXRABITQ_TOOLS_GPU_CUH
