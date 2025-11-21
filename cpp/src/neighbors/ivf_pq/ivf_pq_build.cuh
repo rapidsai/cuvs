@@ -1640,12 +1640,17 @@ auto build(
   utils::memzero(owning_index.data_ptrs().data_handle(), owning_index.data_ptrs().size(), stream);
   utils::memzero(owning_index.inds_ptrs().data_handle(), owning_index.inds_ptrs().size(), stream);
 
-  RAFT_EXPECTS((centers.extent(1) == dim || centers.extent(1) == raft::round_up_safe(dim + 1, 8u)),
-               "centers must have extent [n_lists, dim] or [n_lists, round_up(dim + 1, 8)]. "
-               "Got centers.extent(1)=%u, expected dim=%u or round_up(dim + 1, 8)=%u",
-               centers.extent(1),
-               dim,
-               raft::round_up_safe(dim + 1, 8u));
+  RAFT_EXPECTS(
+    (centers.extent(1) == dim || centers.extent(1) == raft::round_up_safe(dim + 1, 8u)) &&
+      centers.extent(0) == owning_index.n_lists(),
+    "centers must have extent [n_lists, dim] or [n_lists, round_up(dim + 1, 8)]. "
+    "Got centers.extent(1)=%u, expected dim=%u or round_up(dim + 1, 8)=%u, and "
+    "centers.extent(0)=%u, expected n_lists=%u",
+    centers.extent(1),
+    dim,
+    raft::round_up_safe(dim + 1, 8u),
+    centers.extent(0),
+    owning_index.n_lists());
 
   if (centers.extent(1) == owning_index.dim_ext()) {
     raft::copy(owning_index.centers().data_handle(),
