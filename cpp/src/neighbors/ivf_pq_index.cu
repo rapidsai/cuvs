@@ -382,7 +382,7 @@ index<IdxT>::index(raft::resources const& handle)
                                               0,
                                               0,
                                               8,
-                                              1,  // pq_dim = 1 to avoid division by zero
+                                              0,
                                               true))
 {
 }
