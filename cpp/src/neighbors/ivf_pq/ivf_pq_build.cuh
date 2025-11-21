@@ -1482,26 +1482,7 @@ auto build(raft::resources const& handle,
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("ivf_pq::build(%u)", dim);
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  uint32_t n_lists      = centers.extent(0);
-  uint32_t dim_ext      = centers.extent(1);
-  uint32_t rot_dim      = centers_rot.extent(1);
-  uint32_t pq_len       = pq_centers.extent(1);
-  uint32_t pq_book_size = pq_centers.extent(2);
-
-  uint32_t pq_bits = 0;
-  for (uint32_t b = 4; b <= 8; b++) {
-    if ((1u << b) == pq_book_size) {
-      pq_bits = b;
-      break;
-    }
-  }
-  RAFT_EXPECTS(pq_bits >= 4 && pq_bits <= 8,
-               "pq_book_size must be 2^b where b in [4,8], but got pq_book_size=%u",
-               pq_book_size);
-
-  uint32_t pq_dim;
   if (index_params.codebook_kind == codebook_gen::PER_SUBSPACE) {
-    pq_dim = pq_centers.extent(0);
     RAFT_EXPECTS(pq_centers.extent(0) > 0,
                  "For PER_SUBSPACE codebook, pq_centers.extent(0) must be > 0 (represents pq_dim)");
   } else {
@@ -1549,10 +1530,10 @@ auto build(raft::resources const& handle,
   auto impl = std::make_unique<view_impl<IdxT>>(handle,
                                                 index_params.metric,
                                                 index_params.codebook_kind,
-                                                n_lists,
+                                                index_params.n_lists,
                                                 dim,
-                                                pq_bits,
-                                                pq_dim,
+                                                index_params.pq_bits,
+                                                index_params.pq_dim,
                                                 index_params.conservative_memory_allocation,
                                                 pq_centers,
                                                 centers,
