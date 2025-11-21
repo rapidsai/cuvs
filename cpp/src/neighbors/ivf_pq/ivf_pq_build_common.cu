@@ -306,7 +306,6 @@ void pad_centers_with_norms(
   raft::device_matrix_view<const float, uint32_t, raft::row_major> centers,
   raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers)
 {
-  // Create mdspan from device matrix view and call the template version
   detail::pad_centers_with_norms(res, centers, padded_centers);
 }
 
@@ -346,11 +345,6 @@ void rotate_padded_centers(
                dim);
 
   auto stream = raft::resource::get_cuda_stream(res);
-
-  // Compute centers_rot = rotation_matrix^T * centers[:, 0:dim]
-  // rotation_matrix is [rot_dim, dim]
-  // centers is [n_lists, centers_dim] but we only use [:, 0:dim]
-  // Result is [n_lists, rot_dim] stored in centers_rot
 
   float alpha = 1.0f;
   float beta  = 0.0f;
