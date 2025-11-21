@@ -1,7 +1,5 @@
 # <div align="left"><img src="https://rapids.ai/assets/images/rapids_logo.png" width="90px"/>&nbsp;cuVS: Vector Search and Clustering on the GPU</div>
 
-> [!note]
-> cuVS is a new library mostly derived from the approximate nearest neighbors and clustering algorithms in the [RAPIDS RAFT](https://github.com/rapidsai/raft) library of machine learning and data mining primitives. As of version 24.10 (Release in October 2024), cuVS contains the most fully-featured versions of the approximate nearest neighbors and clustering algorithms from RAFT. The algorithms which have been migrated over to cuVS will be removed from RAFT in version 24.12 (released in December 2024).
 
 ## Contents
 
@@ -67,7 +65,7 @@ There are several benefits to using cuVS and GPUs for vector search, including
 6. Multiple language support
 7. Building blocks for composing new or accelerating existing algorithms
 
-In addition to the items above, cuVS takes on the burden of keeping non-trivial accelerated code up to date as new NVIDIA architectures and CUDA versions are released. This provides a delightful development experience, guaranteeing that any libraries, databases, or applications built on top of it will always be getting the best performance and scale.
+In addition to the items above, cuVS shoulders the burden of keeping non-trivial accelerated code up to date as new NVIDIA architectures and CUDA versions are released. This provides a delightful development experience, guaranteeing that any libraries, databases, or applications built on top of it will always be getting the best performance and scale.
 
 ## cuVS Technology Stack
 
@@ -114,7 +112,10 @@ conda install -c rapidsai-nightly -c conda-forge cuvs=25.12 cuda-version=13.0
 conda install -c rapidsai-nightly -c conda-forge cuvs=25.12 cuda-version=12.9
 ```
 
-cuVS also has `pip` wheel packages that can be installed. Please see the [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build/) for more information on installing the available cuVS packages and building from source.
+> [!NOTE]
+> If compiled binary size is a concern, please note that the cuVS builds for CUDA 13 roughly half the size of CUDA 12 builds. This is a result of improved compression rates in the newer supported CUDA drivers. We will be adopting the newer drivers for CUDA 12 builds in Spring of 2026, which will ultimately bring them down to roughly the size of the CUDA 13 builds. In the meantime, the NVIDIA cuVS team is continuing to shave down the binary sizes for all supported CUDA versions. If binary size is an issue for you, please consider doing a static build.
+
+Please see the [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build/) for more information on installing the available cuVS packages and building from source.
 
 ## Getting Started
 
