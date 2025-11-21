@@ -1482,9 +1482,10 @@ auto build(raft::resources const& handle,
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("ivf_pq::build(%u)", dim);
   auto stream = raft::resource::get_cuda_stream(handle);
 
+  auto pq_dim = index_params.pq_dim == 0 ? index<IdxT>::calculate_pq_dim(dim) : index_params.pq_dim;
   auto expected_pq_centers_extents =
     index<IdxT>::make_pq_centers_extents(dim,
-                                         index_params.pq_dim,
+                                         pq_dim,
                                          index_params.pq_bits,
                                          index_params.codebook_kind,
                                          index_params.n_lists);
@@ -1531,7 +1532,7 @@ auto build(raft::resources const& handle,
                                                 index_params.n_lists,
                                                 dim,
                                                 index_params.pq_bits,
-                                                index_params.pq_dim,
+                                                pq_dim,
                                                 index_params.conservative_memory_allocation,
                                                 pq_centers,
                                                 centers,
