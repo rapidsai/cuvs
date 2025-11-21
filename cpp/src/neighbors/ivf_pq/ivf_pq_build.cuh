@@ -1669,13 +1669,13 @@ auto build(
   }
 
   if (centers_rot.has_value()) {
-    RAFT_EXPECTS(
-      centers_rot.value().extent(0) == n_list && centers_rot.value().extent(1) == pq_len * pq_dim,
-      "centers_rot must have extent [n_lists, rot_dim]. Expected [%u, %u], got [%u, %u]",
-      n_lists,
-      pq_len * pq_dim,
-      centers_rot.value().extent(0),
-      centers_rot.value().extent(1));
+    RAFT_EXPECTS(centers_rot.value().extent(0) == owning_index.n_lists() &&
+                   centers_rot.value().extent(1) == owning_index.rot_dim(),
+                 "centers_rot must have extent [n_lists, rot_dim]. Expected [%u, %u], got [%u, %u]",
+                 owning_index.n_lists(),
+                 owning_index.rot_dim(),
+                 centers_rot.value().extent(0),
+                 centers_rot.value().extent(1));
     raft::copy(owning_index.centers_rot().data_handle(),
                centers_rot.value().data_handle(),
                centers_rot.value().size(),
