@@ -88,6 +88,13 @@ class index_impl : public index_iface<IdxT> {
   mutable std::optional<raft::device_matrix<int8_t, uint32_t, raft::row_major>>
     rotation_matrix_int8_;
   mutable std::optional<raft::device_matrix<half, uint32_t, raft::row_major>> rotation_matrix_half_;
+
+  void check_consistency();
+
+  pq_centers_extents make_pq_centers_extents(
+    uint32_t dim, uint32_t pq_dim, uint32_t pq_bits, codebook_gen codebook_kind, uint32_t n_lists);
+
+  static uint32_t calculate_pq_dim(uint32_t dim);
 };
 
 template <typename IdxT>

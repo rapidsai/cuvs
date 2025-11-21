@@ -285,7 +285,8 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     ASSERT_EQ(base_index.pq_centers().data_handle(), view_index.pq_centers().data_handle());
     ASSERT_EQ(base_index.centers().data_handle(), view_index.centers().data_handle());
     ASSERT_EQ(base_index.centers_rot().data_handle(), view_index.centers_rot().data_handle());
-    ASSERT_EQ(base_index.rotation_matrix().data_handle(), view_index.rotation_matrix().data_handle());
+    ASSERT_EQ(base_index.rotation_matrix().data_handle(),
+              view_index.rotation_matrix().data_handle());
 
     ASSERT_EQ(base_index.pq_centers().extents(), view_index.pq_centers().extents());
     ASSERT_EQ(base_index.centers().extents(), view_index.centers().extents());
@@ -312,7 +313,8 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     // auto distances_base = raft::make_device_vector<EvalT>(handle_, queries_size);
     // auto indices_base   = raft::make_device_vector<IdxT>(handle_, queries_size);
     // auto search_queries_view =
-    //   raft::make_device_matrix_view<DataT, int64_t>(search_queries.data(), ps.num_queries, ps.dim);
+    //   raft::make_device_matrix_view<DataT, int64_t>(search_queries.data(), ps.num_queries,
+    //   ps.dim);
 
     // auto indices_view_matrix = raft::make_device_matrix_view<IdxT, int64_t>(
     //   indices_view.data_handle(), ps.num_queries, ps.k);
@@ -337,7 +339,8 @@ class ivf_pq_test : public ::testing::TestWithParam<ivf_pq_inputs> {
     //                                 distances_base_matrix);
 
     // ASSERT_TRUE(cuvs::devArrMatch(
-    //   indices_view.data_handle(), indices_base.data_handle(), queries_size, cuvs::Compare<IdxT>{}));
+    //   indices_view.data_handle(), indices_base.data_handle(), queries_size,
+    //   cuvs::Compare<IdxT>{}));
     // ASSERT_TRUE(cuvs::devArrMatch(distances_view.data_handle(),
     //                               distances_base.data_handle(),
     //                               queries_size,
