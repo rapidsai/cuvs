@@ -1482,50 +1482,48 @@ auto build(raft::resources const& handle,
   raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("ivf_pq::build(%u)", dim);
   auto stream = raft::resource::get_cuda_stream(handle);
 
-  if (index_params.codebook_kind == codebook_gen::PER_SUBSPACE) {
-    RAFT_EXPECTS(pq_centers.extent(0) > 0,
-                 "For PER_SUBSPACE codebook, pq_centers.extent(0) must be > 0 (represents pq_dim)");
-  } else {
-    RAFT_EXPECTS(pq_centers.extent(0) == n_lists,
-                 "For PER_CLUSTER codebook, pq_centers.extent(0) must equal n_lists. "
-                 "Got pq_centers.extent(0)=%u, n_lists=%u",
-                 pq_centers.extent(0),
-                 n_lists);
-    pq_dim = rot_dim / pq_len;
-  }
+  auto expected_pq_centers_extents =
+    index<IdxT>::make_pq_centers_extents(dim,
+                                         index_params.pq_dim,
+                                         index_params.pq_bits,
+                                         index_params.codebook_kind,
+                                         index_params.n_lists);
+  RAFT_EXPECTS(pq_centers.extent(0) == expected_pq_centers_extents.extent(0) &&
+                 pq_centers.extent(1) == expected_pq_centers_extents.extent(1) &&
+                 pq_centers.extent(2) == expected_pq_centers_extents.extent(2),
+               "pq_centers must have extent [%u, %u, %u]. Got [%u, %u, %u]",
+               expected_pq_centers_extents.extent(0),
+               expected_pq_centers_extents.extent(1),
+               expected_pq_centers_extents.extent(2),
+               pq_centers.extent(0),
+               pq_centers.extent(1),
+               pq_centers.extent(2));
 
-  RAFT_EXPECTS(dim_ext == raft::round_up_safe(dim + 1, 8u),
-               "centers.extent(1) must be round_up(dim + 1, 8). "
-               "Expected %u, got %u",
-               raft::round_up_safe(dim + 1, 8u),
-               dim_ext);
+  RAFT_EXPECTS(
+    centers.extent(0) == index_params.n_lists &&
+      centers.extent(1) == raft::round_up_safe(dim + 1, 8u),
+    "centers must have extent [n_lists, round_up(dim + 1, 8)]. Expected [%u, %u], got [%u, %u]",
+    index_params.n_lists,
+    raft::round_up_safe(dim + 1, 8u),
+    centers.extent(1));
 
-  RAFT_EXPECTS(rot_dim == pq_len * pq_dim,
-               "Inconsistent dimensions: centers_rot.extent(1) must equal pq_len * pq_dim. "
-               "Got centers_rot.extent(1)=%u, pq_len=%u, pq_dim=%u, pq_len*pq_dim=%u",
-               rot_dim,
-               pq_len,
-               pq_dim,
-               pq_len * pq_dim);
+  RAFT_EXPECTS(
+    centers_rot.extent(0) == index_params.n_lists &&
+      centers_rot.extent(1) == expected_pq_centers_extents.extent(1) * index_params.pq_dim,
+    "centers_rot must have extent [n_lists, pq_len * pq_dim]. Expected [%u, %u], got [%u, %u]",
+    index_params.n_lists,
+    expected_pq_centers_extents.extent(1) * index_params.pq_dim,
+    centers_rot.extent(0),
+    centers_rot.extent(1));
 
-  RAFT_EXPECTS(rotation_matrix.extent(0) == rot_dim && rotation_matrix.extent(1) == dim,
-               "rotation_matrix must have extent [rot_dim, dim] = [%u, %u]. Got [%u, %u]",
-               rot_dim,
-               dim,
-               rotation_matrix.extent(0),
-               rotation_matrix.extent(1));
-
-  RAFT_EXPECTS(centers.extent(0) == n_lists && centers_rot.extent(0) == n_lists,
-               "centers and centers_rot must have the same number of rows (n_lists). "
-               "Got centers.extent(0)=%u, centers_rot.extent(0)=%u",
-               centers.extent(0),
-               centers_rot.extent(0));
-
-  RAFT_EXPECTS((pq_bits * pq_dim) % 8 == 0,
-               "pq_bits * pq_dim must be a multiple of 8. Got pq_bits=%u, pq_dim=%u, product=%u",
-               pq_bits,
-               pq_dim,
-               pq_bits * pq_dim);
+  RAFT_EXPECTS(
+    rotation_matrix.extent(0) == expected_pq_centers_extents.extent(1) * index_params.pq_dim &&
+      rotation_matrix.extent(1) == dim,
+    "rotation_matrix must have extent [rot_dim, dim] = [%u, %u]. Got [%u, %u]",
+    expected_pq_centers_extents.extent(1) * index_params.pq_dim,
+    dim,
+    rotation_matrix.extent(0),
+    rotation_matrix.extent(1));
 
   auto impl = std::make_unique<view_impl<IdxT>>(handle,
                                                 index_params.metric,
