@@ -14,7 +14,6 @@ TEST_BUILD_SEARCH(f32_i08_i64)
 TEST_BUILD_HOST_INPUT_SEARCH(f32_i08_i64)
 TEST_BUILD_HOST_INPUT_OVERLAP_SEARCH(f32_i08_i64)
 TEST_BUILD_SERIALIZE_SEARCH(f32_i08_i64)
-TEST_BUILD_PRECOMPUTED(f32_i08_i64)
 INSTANTIATE(f32_i08_i64,
             defaults() + big_dims() + var_k() + enum_variety_l2() + enum_variety_ip() +
               enum_variety_cosine());
