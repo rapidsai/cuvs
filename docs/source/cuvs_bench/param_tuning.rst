@@ -201,7 +201,7 @@ CAGRA uses a graph-based index, which creates an intermediate, approximate kNN g
  * - `graph_build_algo`
    - `build`
    - `N`
-   - [`IVF_PQ`, `NN_DESCENT`]
+   - [`IVF_PQ`, `NN_DESCENT`, `ACE`]
    - `IVF_PQ`
    - Algorithm to use for building the initial kNN graph, from which CAGRA will optimize into the navigable CAGRA graph
 
@@ -211,6 +211,34 @@ CAGRA uses a graph-based index, which creates an intermediate, approximate kNN g
    - [`device`, `host`, `mmap`]
    - `mmap`
    - Where should the dataset reside?
+
+ * - `npartitions`
+   - `build`
+   - N
+   - Positive integer >0
+   - 1
+   - The number of partitions to use for the ACE build. Small values might improve recall but potentially degrade performance and increase memory usage. Partitions should not be too small to prevent issues in KNN graph construction. 100k - 5M vectors per partition is recommended depending on the available host and GPU memory. The partition size is on average 2 * (n_rows / npartitions) * dim * sizeof(T). 2 is because of the core and augmented vectors. Please account for imbalance in the partition sizes (up to 3x in our tests).
+
+ * - `build_dir`
+   - `build`
+   - N
+   - String
+   - "/tmp/ace_build"
+   - The directory to use for the ACE build. Must be specified when using ACE build. This should be the fastest disk in the system and hold enough space for twice the dataset, final graph, and label mapping.
+
+ * - `ef_construction`
+   - `build`
+   - Y
+   - Positive integer >0
+   - 120
+   - Controls index time and accuracy when using ACE build. Bigger values increase the index quality. At some point, increasing this will no longer improve the quality.
+
+ * - `use_disk`
+   - `build`
+   - N
+   - Boolean
+   - `false`
+   - Whether to use disk-based storage for ACE build. When true, forces ACE to use disk-based storage even if the graph fits in host and GPU memory. When false, ACE will use in-memory storage if the graph fits in host and GPU memory and disk-based storage otherwise.
 
  * - `query_memory_type`
    - `search`

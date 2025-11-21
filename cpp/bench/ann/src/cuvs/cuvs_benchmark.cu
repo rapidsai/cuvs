@@ -6,7 +6,7 @@
 #include "../common/ann_types.hpp"
 #include "cuvs_ann_bench_param_parser.h"
 
-#include <rmm/mr/device/per_device_resource.hpp>
+#include <rmm/mr/per_device_resource.hpp>
 
 #include <algorithm>
 #include <cmath>

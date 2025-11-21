@@ -7,7 +7,6 @@
 
 #include <cuda_runtime.h>
 #include <dlpack/dlpack.h>
-#include <rapids_logger/log_levels.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -48,13 +47,13 @@ void cuvsSetLastErrorText(const char* error);
  *
  */
 typedef enum {
-  CUVS_LOG_LEVEL_TRACE    = RAPIDS_LOGGER_LOG_LEVEL_TRACE,
-  CUVS_LOG_LEVEL_DEBUG    = RAPIDS_LOGGER_LOG_LEVEL_DEBUG,
-  CUVS_LOG_LEVEL_INFO     = RAPIDS_LOGGER_LOG_LEVEL_INFO,
-  CUVS_LOG_LEVEL_WARN     = RAPIDS_LOGGER_LOG_LEVEL_WARN,
-  CUVS_LOG_LEVEL_ERROR    = RAPIDS_LOGGER_LOG_LEVEL_ERROR,
-  CUVS_LOG_LEVEL_CRITICAL = RAPIDS_LOGGER_LOG_LEVEL_CRITICAL,
-  CUVS_LOG_LEVEL_OFF      = RAPIDS_LOGGER_LOG_LEVEL_OFF
+  CUVS_LOG_LEVEL_TRACE    = 0,
+  CUVS_LOG_LEVEL_DEBUG    = 1,
+  CUVS_LOG_LEVEL_INFO     = 2,
+  CUVS_LOG_LEVEL_WARN     = 3,
+  CUVS_LOG_LEVEL_ERROR    = 4,
+  CUVS_LOG_LEVEL_CRITICAL = 5,
+  CUVS_LOG_LEVEL_OFF      = 6
 } cuvsLogLevel_t;
 
 /** @brief Returns the current log level
@@ -157,6 +156,15 @@ cuvsError_t cuvsMultiGpuResourcesCreateWithDeviceIds(cuvsResources_t* res,
  * @return cuvsError_t
  */
 cuvsError_t cuvsMultiGpuResourcesDestroy(cuvsResources_t res);
+
+/**
+ * @brief Set a memory pool on all devices managed by the multi-GPU resources
+ *
+ * @param[in] res cuvsResources_t opaque C handle for multi-GPU resources
+ * @param[in] percent_of_free_memory Percent of free memory to allocate for the pool
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsMultiGpuResourcesSetMemoryPool(cuvsResources_t res, int percent_of_free_memory);
 /** @} */
 
 /**

@@ -77,7 +77,7 @@ for type_path, (T, IdxT) in types.items():
         path = f"ivf_pq_{macro_path}_{type_path}.cu"
         with open(path, "w") as f:
             f.write(header)
-            f.write(macro['include'])
+            f.write(macro["include"])
             f.write(namespace_macro)
             f.write(macro["definition"])
             f.write(f"{macro['name']}({T}, {IdxT});\n\n")

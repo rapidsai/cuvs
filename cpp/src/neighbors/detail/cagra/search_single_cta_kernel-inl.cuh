@@ -33,7 +33,7 @@
 
 #include <rmm/cuda_stream.hpp>
 #include <rmm/device_uvector.hpp>
-#include <rmm/mr/device/cuda_memory_resource.hpp>
+#include <rmm/mr/cuda_memory_resource.hpp>
 #include <rmm/mr/pinned_host_memory_resource.hpp>
 
 #include <cuda/atomic>

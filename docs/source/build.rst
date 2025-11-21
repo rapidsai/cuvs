@@ -88,7 +88,7 @@ Prerequisites
 
 - CMake 3.26.4+
 - GCC 9.3+ (11.4+ recommended)
-- CUDA Toolkit 12.0+
+- CUDA Toolkit 12.2+
 - Ampere architecture or better (compute capability >= 8.0)
 
 Create a build environment
@@ -98,7 +98,7 @@ Conda environment scripts are provided for installing the necessary dependencies
 
 .. code-block:: bash
 
-    conda env create --name cuvs -f conda/environments/all_cuda-130_arch-x86_64.yaml
+    conda env create --name cuvs -f conda/environments/all_cuda-130_arch-$(uname -m).yaml
     conda activate cuvs
 
 The recommended way to build and install cuVS from source is to use the `build.sh` script in the root of the repository. This script can build both the C++ and Python artifacts and provides CMake options for building and installing the headers, tests, benchmarks, and the pre-compiled shared library.

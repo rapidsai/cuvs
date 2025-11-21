@@ -11,8 +11,8 @@
 #include <raft/linalg/map.cuh>
 #include <raft/util/cudart_utils.hpp>
 
-#include <rmm/mr/device/device_memory_resource.hpp>
-#include <rmm/mr/device/pool_memory_resource.hpp>
+#include <rmm/mr/device_memory_resource.hpp>
+#include <rmm/mr/pool_memory_resource.hpp>
 
 #include <cstdint>
 #include <optional>

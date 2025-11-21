@@ -5,7 +5,7 @@
 1. Go to brev login page https://brev.nvidia.com/org/org-349mMmwltH7qlP4grYeHrPERafd/environments/fdqzxyjd5#Access
 
    If the node is stopped then press `Start`.
-   
+
    Once you finished your work, then `Stop` the node.
 
    Click in the `brev login --toke *****` field to copy the command together with the token.
@@ -18,7 +18,7 @@ brev shell cuvspersistentl40s-075bc8
 # connect to the container that is already started on the node
 docker exec -it workspace-cuvsdev-1 /bin/bash
 
-```  
+```
 
 To copy (scp) files to your Brev instance:
 ```
@@ -64,7 +64,7 @@ mv /tmp/data/openai_5M /workspace/data/
 Generate ground truth for smaller subsets:
 ```
 python -m cuvs_bench.generate_groundtruth --queries data/openai_5M/queries.fbin -k 100 --metric euclidean --dtype=float32 --output data/openai_1M -N 1000000 -D 1536 data/openai_5M/base.5M.fbin
-mv data/openai_1M/groundtruth.neighbors.ibin data/openai_5M/groundtruth.1M.neighbors.ibin 
+mv data/openai_1M/groundtruth.neighbors.ibin data/openai_5M/groundtruth.1M.neighbors.ibin
 ```
 
 ## 5. Run benchmarks
@@ -205,10 +205,10 @@ If installing a version that has not yet been released, the `rapidsai` channel c
 
 ```bash
 # CUDA 13
-conda install -c rapidsai-nightly -c conda-forge cuvs=25.12 cuda-version=13.0
+conda install -c rapidsai-nightly -c conda-forge cuvs=26.02 cuda-version=13.0
 
 # CUDA 12
-conda install -c rapidsai-nightly -c conda-forge cuvs=25.12 cuda-version=12.9
+conda install -c rapidsai-nightly -c conda-forge cuvs=26.02 cuda-version=12.9
 ```
 
 cuVS also has `pip` wheel packages that can be installed. Please see the [Build and Install Guide](https://docs.rapids.ai/api/cuvs/nightly/build/) for more information on installing the available cuVS packages and building from source.
@@ -268,7 +268,7 @@ cuvsCagraIndexParamsDestroy(index_params);
 cuvsResourcesDestroy(res);
 ```
 
-For more code examples of the C APIs, including drop-in Cmake project templates, please refer to the [C examples](https://github.com/rapidsai/cuvs/tree/branch-25.12/examples/c)
+For more code examples of the C APIs, including drop-in Cmake project templates, please refer to the [C examples](https://github.com/rapidsai/cuvs/tree/main/examples/c)
 
 ### Rust API
 
@@ -331,7 +331,7 @@ fn cagra_example() -> Result<()> {
 }
 ```
 
-For more code examples of the Rust APIs, including a drop-in project templates, please refer to the [Rust examples](https://github.com/rapidsai/cuvs/tree/branch-25.12/examples/rust).
+For more code examples of the Rust APIs, including a drop-in project templates, please refer to the [Rust examples](https://github.com/rapidsai/cuvs/tree/main/examples/rust).
 
 ## Contributing
 

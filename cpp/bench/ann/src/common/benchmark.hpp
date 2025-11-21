@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
@@ -7,6 +7,7 @@
 #include "ann_types.hpp"
 #include "conf.hpp"
 #include "dataset.hpp"
+#include "nvtx_stats.hpp"
 #include "util.hpp"
 
 #include <benchmark/benchmark.h>
@@ -138,6 +139,7 @@ void bench_build(::benchmark::State& state,
 
   cuda_timer gpu_timer{algo};
   {
+    nvtx_stats nvtx_stats{state};
     nvtx_case nvtx{state.name()};
     /* Note: GPU timing
 
@@ -293,6 +295,7 @@ void bench_search(::benchmark::State& state,
   auto* distances_ptr = reinterpret_cast<float*>(neighbors_ptr + result_elem_count);
 
   {
+    nvtx_stats nvtx_stats{state};
     nvtx_case nvtx{state.name()};
 
     std::unique_ptr<algo<T>> a{nullptr};

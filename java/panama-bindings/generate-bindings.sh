@@ -20,15 +20,6 @@ else
   exit 1
 fi
 
-if [ -n "${RAPIDS_LOGGER_INCLUDE_DIR:-}" ]; then
-  echo "Using user-defined RAPIDS_LOGGER_INCLUDE_DIR"
-elif [ -n "${CONDA_PREFIX:-}" ]; then
-  RAPIDS_LOGGER_INCLUDE_DIR="${CONDA_PREFIX}/include"
-else
-  echo "Couldn't find a suitable CUDA include directory."
-  exit 1
-fi
-
 PATH="$(pwd)/jextract-22/bin/:${PATH}"
 export PATH
 
@@ -46,7 +37,6 @@ fi
 jextract \
  --include-dir "${REPODIR}"/java/internal/build/bindings/include/ \
  --include-dir "${CUDA_INCLUDE_DIR}" \
- --include-dir "${RAPIDS_LOGGER_INCLUDE_DIR}" \
  --output "${REPODIR}/java/cuvs-java/src/main/java22/" \
  --target-package ${TARGET_PACKAGE} \
  --library cuvs_c \

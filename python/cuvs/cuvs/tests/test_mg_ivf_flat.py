@@ -572,9 +572,9 @@ def test_mg_ivf_flat_simple():
     # Distances should be non-negative and sorted
     assert np.all(distances >= 0)
     for i in range(n_queries):
-        assert np.all(
-            distances[i, :-1] <= distances[i, 1:]
-        ), f"Distances not sorted for query {i}"
+        assert np.all(distances[i, :-1] <= distances[i, 1:]), (
+            f"Distances not sorted for query {i}"
+        )
 
 
 # Integration test with multiple operations

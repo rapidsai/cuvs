@@ -1,7 +1,11 @@
+#c code owners
+c/                 @rapidsai/cuvs-c-codeowners
+examples/c/        @rapidsai/cuvs-c-codeowners
+
 #cpp code owners
 cpp/               @rapidsai/cuvs-cpp-codeowners
 examples/cpp/      @rapidsai/cuvs-cpp-codeowners
-examples/c/        @rapidsai/cuvs-cpp-codeowners
+
 
 #java code owners
 java/              @rapidsai/cuvs-java-codeowners

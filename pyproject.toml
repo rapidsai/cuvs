@@ -1,22 +1,27 @@
-[tool.black]
+# SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+[tool.ruff]
 line-length = 79
-target-version = ["py310"]
-include = '\.py?$'
-force-exclude = '''
-/(
-    thirdparty |
-    \.eggs |
-    \.git |
-    \.hg |
-    \.mypy_cache |
-    \.tox |
-    \.venv |
-    _build |
-    buck-out |
-    build |
-    dist
-)/
-'''
+exclude = [
+    "__init__.py",
+]
+
+[tool.ruff.lint]
+ignore = [
+    # whitespace before :
+    "E203",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"*.ipynb" = [
+    # unused imports
+    "F401",
+    # unused variable
+    "F841",
+    # ambiguous variable name
+    "E741",
+]
 
 [tool.pydocstyle]
 # Due to https://github.com/PyCQA/pydocstyle/issues/363, we must exclude rather

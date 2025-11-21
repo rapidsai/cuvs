@@ -1,9 +1,9 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "kmeans.cuh"
+#include "kmeans_impl_fit_predict.cuh"
 #include <raft/core/resources.hpp>
 
 namespace cuvs::cluster::kmeans {

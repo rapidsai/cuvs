@@ -93,38 +93,38 @@ macro_pass_eps = """
 
 """
 
-euclideanSq="cuvs::neighbors::ball_cover::detail::EuclideanSqFunc"
+euclideanSq = "cuvs::neighbors::ball_cover::detail::EuclideanSqFunc"
 
 types = dict(
     int64_float=("std::int64_t", "float"),
 )
 
-path = f"registers_pass_one.cu"
+path = "registers_pass_one.cu"
 with open(path, "w") as f:
     f.write(header)
     f.write(macro_pass_one)
     for type_path, (int_t, data_t) in types.items():
-        f.write(f"instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(\n")
+        f.write("instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one(\n")
         f.write(f"  {int_t}, {data_t});\n")
     f.write("#undef instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_one\n")
 print(f"src/neighbors/ball_cover/detail/ball_cover/{path}")
 
-path = f"registers_pass_two.cu"
+path = "registers_pass_two.cu"
 with open(path, "w") as f:
     f.write(header)
     f.write(macro_pass_two)
     for type_path, (int_t, data_t) in types.items():
-        f.write(f"instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two(\n")
+        f.write("instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two(\n")
         f.write(f"  {int_t}, {data_t});\n")
     f.write("#undef instantiate_cuvs_neighbors_detail_rbc_low_dim_pass_two\n")
 print(f"src/neighbors/ball_cover/detail/ball_cover/{path}")
 
-path="registers_eps_pass_euclidean.cu"
+path = "registers_eps_pass_euclidean.cu"
 with open(path, "w") as f:
     f.write(header)
     f.write(macro_pass_eps)
     for type_path, (int_t, data_t) in types.items():
-        f.write(f"instantiate_cuvs_neighbors_detail_rbc_eps_pass(\n")
+        f.write("instantiate_cuvs_neighbors_detail_rbc_eps_pass(\n")
         f.write(f"  {int_t}, {data_t}, {euclideanSq});\n")
     f.write("#undef instantiate_cuvs_neighbors_detail_rbc_eps_pass\n")
     print(f"src/neighbors/ball_cover/detail/ball_cover/{path}")

@@ -38,14 +38,10 @@ requirements:
     - setuptools >=64.0.0
   run:
     - ${{ pin_compatible("cuda-version", upper_bound="x", lower_bound="x") }}
-    - benchmark
     - click
-    - cuda-cudart
     - cupy >=13.6.0
     - cuvs =${{ version }}
-    - glog ${{ glog_version }}
     - h5py ${{ h5py_version }}
-    - libcublas
     - libcuvs-bench-ann =${{ version }}
     - matplotlib-base>=3.9
     - pandas
@@ -56,17 +52,9 @@ requirements:
     # rmm is needed to determine if package is gpu-enabled
     - rmm =${{ minor_version }}
     - scikit-learn>=1.5
-    - if: linux64
-      then: mkl =2023
   ignore_run_exports:
     by_name:
       - cuda-version
-      - cuda-cudart
-      - glog
-      - libaio
-      - libboost
-      - libcublas
-      - mkl
 
 tests:
   - package_contents:

@@ -57,7 +57,7 @@ struct index_params : cuvs::neighbors::index_params {
  * @brief Create a CAGRA index parameters compatible with HNSW index
  *
  * @param dataset The shape of the input dataset.
- * @param M HNSW index parameter M.
+ * @param M HNSW index parameter M (graph degree = 2*M).
  * @param ef_construction HNSW index parameter ef_construction.
  * @param metric The distance metric to search.
  *
@@ -80,6 +80,7 @@ struct index_params : cuvs::neighbors::index_params {
  *   auto hnsw_index = hnsw::from_cagra(res, hnsw_params, cagra_index);
  * @endcode
  */
+[[deprecated("Use cagra::index_params::from_hnsw_params instead")]]
 cuvs::neighbors::cagra::index_params to_cagra_params(
   raft::matrix_extent<int64_t> dataset,
   int M,
@@ -130,6 +131,11 @@ struct index : cuvs::neighbors::index {
   @brief Set ef for search
   */
   virtual void set_ef(int ef) const;
+
+  /**
+  @brief Get file path for disk-backed index
+  */
+  virtual std::string file_path() const { return ""; }
 
  private:
   int dim_;

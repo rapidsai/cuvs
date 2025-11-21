@@ -41,6 +41,12 @@ final class UnsupportedProvider implements CuVSProvider {
   }
 
   @Override
+  public HnswIndex hnswIndexFromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex)
+      throws Throwable {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
   public TieredIndex.Builder newTieredIndexBuilder(CuVSResources cuVSResources) {
     throw new UnsupportedOperationException(reasons);
   }
@@ -70,6 +76,17 @@ final class UnsupportedProvider implements CuVSProvider {
 
   @Override
   public GPUInfoProvider gpuInfoProvider() {
+    throw new UnsupportedOperationException(reasons);
+  }
+
+  @Override
+  public CagraIndexParams cagraIndexParamsFromHnswParams(
+      long rows,
+      long dim,
+      int m,
+      int efConstruction,
+      CagraIndexParams.HnswHeuristicType heuristic,
+      CagraIndexParams.CuvsDistanceType metric) {
     throw new UnsupportedOperationException(reasons);
   }
 

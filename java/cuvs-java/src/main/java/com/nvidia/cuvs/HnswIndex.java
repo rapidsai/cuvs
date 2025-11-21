@@ -44,6 +44,20 @@ public interface HnswIndex extends AutoCloseable {
   }
 
   /**
+   * Creates an HNSW index from an existing CAGRA index.
+   *
+   * @param hnswParams Parameters for the HNSW index
+   * @param cagraIndex The CAGRA index to convert from
+   * @return A new HNSW index
+   * @throws Throwable if an error occurs during conversion
+   */
+  static HnswIndex fromCagra(HnswIndexParams hnswParams, CagraIndex cagraIndex) throws Throwable {
+    Objects.requireNonNull(hnswParams);
+    Objects.requireNonNull(cagraIndex);
+    return CuVSProvider.provider().hnswIndexFromCagra(hnswParams, cagraIndex);
+  }
+
+  /**
    * Builder helps configure and create an instance of {@link HnswIndex}.
    */
   interface Builder {

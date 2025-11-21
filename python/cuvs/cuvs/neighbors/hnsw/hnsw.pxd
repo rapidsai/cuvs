@@ -1,10 +1,11 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 #
 # cython: language_level=3
 
 from libc.stdint cimport int32_t, uintptr_t
+from libcpp cimport bool
 
 from cuvs.common.c_api cimport cuvsError_t, cuvsResources_t
 from cuvs.common.cydlpack cimport DLDataType, DLManagedTensor
