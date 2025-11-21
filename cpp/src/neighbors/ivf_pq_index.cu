@@ -200,13 +200,6 @@ template <typename IdxT>
 pq_centers_extents index<IdxT>::make_pq_centers_extents(
   uint32_t dim, uint32_t pq_dim, uint32_t pq_bits, codebook_gen codebook_kind, uint32_t n_lists)
 {
-  RAFT_LOG_INFO(
-    "make_pq_centers_extents: dim=%u, pq_dim=%u, pq_bits=%u, codebook_kind=%u, n_lists=%u",
-    dim,
-    pq_dim,
-    pq_bits,
-    codebook_kind,
-    n_lists);
   uint32_t pq_len       = raft::div_rounding_up_unsafe(dim, pq_dim);
   uint32_t pq_book_size = 1u << pq_bits;
   switch (codebook_kind) {
@@ -389,7 +382,7 @@ index<IdxT>::index(raft::resources const& handle)
                                               0,
                                               0,
                                               8,
-                                              0,
+                                              1,
                                               true))
 {
 }
