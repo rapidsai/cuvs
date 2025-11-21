@@ -32,7 +32,6 @@ namespace cuvs::preprocessing::quantize::pq {
   }
 
 CUVS_INST_QUANTIZATION(float, uint8_t);
-CUVS_INST_QUANTIZATION(double, uint8_t);
 
 #undef CUVS_INST_QUANTIZATION
 

@@ -200,7 +200,7 @@ def train(QuantizerParams params, dataset, resources=None):
     Parameters
     ----------
     params : QuantizerParams object
-    dataset : row major device dataset. FP32 or FP64
+    dataset : row major device dataset. FP32
     {resources_docstring}
 
     Returns
@@ -226,8 +226,7 @@ def train(QuantizerParams params, dataset, resources=None):
         cydlpack.dlpack_c(dataset_ai)
 
     _check_input_array(dataset_ai,
-                       [np.dtype("float32"),
-                        np.dtype("float64")])
+                       [np.dtype("float32")])
 
     cdef cuvsResources_t res = <cuvsResources_t>resources.get_c_obj()
     cdef Quantizer ret = Quantizer()
@@ -249,7 +248,7 @@ def transform(Quantizer quantizer, dataset, output=None, resources=None):
     Parameters
     ----------
     quantizer : trained Quantizer object
-    dataset : row major device dataset to transform. FP32 or FP64
+    dataset : row major device dataset to transform. FP32
     output : optional preallocated output memory, on device memory
     {resources_docstring}
 
@@ -273,8 +272,7 @@ def transform(Quantizer quantizer, dataset, output=None, resources=None):
     dataset_ai = wrap_array(dataset)
 
     _check_input_array(dataset_ai,
-                       [np.dtype("float32"),
-                        np.dtype("float64")])
+                       [np.dtype("float32")])
 
     if output is None:
         on_device = hasattr(dataset, "__cuda_array_interface__")

@@ -13,7 +13,7 @@
 #include <raft/matrix/init.cuh>
 #include <raft/random/make_blobs.cuh>
 #include <raft/util/cudart_utils.hpp>
-#include <rmm/mr/device/managed_memory_resource.hpp>
+#include <rmm/mr/managed_memory_resource.hpp>
 
 namespace cuvs::preprocessing::quantize::pq {
 
@@ -166,7 +166,7 @@ class ProductQuantizationTest : public ::testing::TestWithParam<ProductQuantizat
     raft::resource::sync_stream(handle);
     auto pq = train(handle, config_, dataset_.view());
 
-    auto n_encoded_cols = get_quantized_dim<LabelT>(pq.params_quantizer);
+    auto n_encoded_cols = get_quantized_dim(pq.params_quantizer);
     auto d_quantized_output =
       raft::make_device_matrix<uint8_t, int64_t>(handle, n_samples_, n_encoded_cols);
 
@@ -244,14 +244,8 @@ const std::vector<ProductQuantizationInputs<T>> inputs = {
 typedef ProductQuantizationTest<float> ProductQuantizationTestF;
 TEST_P(ProductQuantizationTestF, Result) { this->testProductQuantizationFromDataset(); }
 
-typedef ProductQuantizationTest<double> ProductQuantizationTestD;
-TEST_P(ProductQuantizationTestD, Result) { this->testProductQuantizationFromDataset(); }
-
 INSTANTIATE_TEST_CASE_P(ProductQuantizationTests,
                         ProductQuantizationTestF,
                         ::testing::ValuesIn(inputs<float>));
-INSTANTIATE_TEST_CASE_P(ProductQuantizationTests,
-                        ProductQuantizationTestD,
-                        ::testing::ValuesIn(inputs<double>));
 
 }  // namespace cuvs::preprocessing::quantize::pq

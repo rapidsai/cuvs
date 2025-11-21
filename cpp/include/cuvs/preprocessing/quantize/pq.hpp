@@ -55,11 +55,6 @@ quantizer<float> train(raft::resources const& res,
                        const params params,
                        raft::device_matrix_view<const float, int64_t> dataset);
 
-/** @copydoc train */
-quantizer<double> train(raft::resources const& res,
-                        const params params,
-                        raft::device_matrix_view<const double, int64_t> dataset);
-
 /**
  * @brief Applies quantization transform to given dataset
  *
@@ -87,21 +82,15 @@ void transform(raft::resources const& res,
                raft::device_matrix_view<const float, int64_t> dataset,
                raft::device_matrix_view<uint8_t, int64_t> out);
 
-/** @copydoc transform */
-void transform(raft::resources const& res,
-               const quantizer<double>& quant,
-               raft::device_matrix_view<const double, int64_t> dataset,
-               raft::device_matrix_view<uint8_t, int64_t> out);
-
 /**
  * @brief Get the dimension of the quantized dataset
  *
  * @param[in] config product quantizer parameters
  * @return the dimension of the quantized dataset
  */
-template <typename LabelT = uint32_t>
 inline int64_t get_quantized_dim(const params& config)
 {
+  using LabelT = uint32_t;
   if (config.use_vq) {
     return sizeof(LabelT) * (1 + raft::div_rounding_up_safe<int64_t>(config.pq_dim * config.pq_bits,
                                                                      8 * sizeof(LabelT)));
@@ -124,11 +113,6 @@ void inverse_transform(raft::resources const& res,
                        raft::device_matrix_view<const uint8_t, int64_t> codes,
                        raft::device_matrix_view<float, int64_t> out);
 
-/** @copydoc inverse_transform */
-void inverse_transform(raft::resources const& res,
-                       const quantizer<double>& quant,
-                       raft::device_matrix_view<const uint8_t, int64_t> codes,
-                       raft::device_matrix_view<double, int64_t> out);
 /** @} */  // end of group product
 
 }  // namespace cuvs::preprocessing::quantize::pq
