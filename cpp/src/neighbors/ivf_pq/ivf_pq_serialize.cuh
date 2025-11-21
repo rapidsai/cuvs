@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2022-2024, NVIDIA CORPORATION.
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -134,9 +134,9 @@ auto deserialize(raft::resources const& handle_, std::istream& is) -> index<IdxT
                  static_cast<int>(pq_bits),
                  static_cast<int>(n_lists));
 
-  auto index = cuvs::neighbors::ivf_pq::index<IdxT>(
-    handle_, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, cma);
+  index<IdxT> index(handle_, metric, codebook_kind, n_lists, dim, pq_bits, pq_dim, cma);
 
+  // Deserialize center/matrix data
   raft::deserialize_mdspan(handle_, is, index.pq_centers());
   raft::deserialize_mdspan(handle_, is, index.centers());
   raft::deserialize_mdspan(handle_, is, index.centers_rot());
