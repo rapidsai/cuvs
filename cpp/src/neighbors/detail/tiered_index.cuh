@@ -22,6 +22,8 @@
 #include <cuvs/neighbors/knn_merge_parts.hpp>
 #include <cuvs/neighbors/tiered_index.hpp>
 
+#include "knn_brute_force.cuh"
+
 namespace cuvs::neighbors::tiered_index::detail {
 /**
   Storage for brute force based incremental indices
@@ -210,19 +212,62 @@ struct index_state {
         temp_distances.data_handle(), n_queries, k),
       sample_filter);
 
-    // search the bfknn index
     auto offset          = n_queries * k;
     auto bfknn_neighbors = raft::make_device_matrix_view<int64_t, int64_t>(
       temp_neighbors.data_handle() + offset, n_queries, k);
     auto bfknn_distances = raft::make_device_matrix_view<value_type, int64_t>(
       temp_distances.data_handle() + offset, n_queries, k);
-    brute_force::search(res,
-                        brute_force::search_params(),
-                        bfknn_index,
-                        queries,
-                        bfknn_neighbors,
-                        bfknn_distances,
-                        sample_filter);
+
+    switch (sample_filter.get_filter_type()) {
+      case filtering::FilterType::None: {
+        brute_force::search(res,
+                            brute_force::search_params(),
+                            bfknn_index,
+                            queries,
+                            bfknn_neighbors,
+                            bfknn_distances,
+                            sample_filter);
+        break;
+      }
+      case filtering::FilterType::Bitset: {
+        // We need to adjust the filter by the number of ann rows - which
+        // is a little tricky since this might not be aligned to the uint32_t
+        // bitset filter.  Use the detail api directly here which can support this
+        auto idx_norm =
+          bfknn_index.has_norms() ? const_cast<float*>(bfknn_index.norms().data_handle()) : nullptr;
+
+        auto actual_filter =
+          dynamic_cast<const cuvs::neighbors::filtering::bitset_filter<uint32_t, int64_t>*>(
+            &sample_filter);
+        const uint32_t* filter_data = actual_filter->view().data();
+
+        neighbors::detail::tiled_brute_force_knn<float, int64_t, float>(
+          res,
+          queries.data_handle(),
+          bfknn_index.dataset().data_handle(),
+          n_queries,
+          bfknn_rows(),
+          storage->dim,
+          k,
+          bfknn_distances.data_handle(),
+          bfknn_neighbors.data_handle(),
+          build_params.metric,
+          2.0,
+          0,
+          0,
+          idx_norm,
+          nullptr,
+          filter_data,
+          raft::identity_op(),
+          filtering::FilterType::Bitset,
+          ann_rows());
+
+        break;
+      }
+      default: {
+        RAFT_FAIL("Only bitset filter is supported in tiered index");
+      }
+    }
 
     if (!distance::is_min_close(build_params.metric)) {
       // knn_merge_parts doesn't currently support InnerProduct distances etc

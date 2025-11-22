@@ -783,7 +783,7 @@ cuvsError_t cuvsCagraSerialize(cuvsResources_t res,
  * cuvsError_t res_create_status = cuvsResourcesCreate(&res);
  *
  * // create an index with `cuvsCagraBuild`
- * cuvsCagraSerializeHnswlib(res, "/path/to/index", index);
+ * cuvsCagraSerializeToHnswlib(res, "/path/to/index", index);
  * @endcode
  *
  * @param[in] res cuvsResources_t opaque C handle

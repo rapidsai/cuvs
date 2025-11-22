@@ -240,6 +240,22 @@ cuvsError_t cuvsTieredIndexExtend(cuvsResources_t res,
  */
 
 /**
+ * @defgroup tiered_c_index_compact Tiered index compact
+ * @{
+ */
+/**
+ * @brief Compact the index
+ *
+ * @param[in] res cuvsResources_t opaque C handle
+ * @param[inout] index Tiered index to be compacted
+ * @return cuvsError_t
+ */
+cuvsError_t cuvsTieredIndexCompact(cuvsResources_t res, cuvsTieredIndex_t index);
+/**
+ * @}
+ */
+
+/**
  * @defgroup tiered_c_index_merge Tiered index merge
  * @{
  */
@@ -258,7 +274,6 @@ cuvsError_t cuvsTieredIndexMerge(cuvsResources_t res,
                                  cuvsTieredIndex_t* indices,
                                  size_t num_indices,
                                  cuvsTieredIndex_t output_index);
-
 /**
  * @}
  */
