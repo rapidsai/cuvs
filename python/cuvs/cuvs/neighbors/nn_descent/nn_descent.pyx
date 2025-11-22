@@ -63,6 +63,11 @@ cdef class IndexParams:
         The delta at which nn-descent will terminate its iterations
     return_distances : bool
         Whether to return distances array
+    fp32_dist_computation : bool
+        Whether to use fp32 distance computation for better precision at the cost
+        of performance and memory usage. We recommend setting this to True for
+        smaller dimensions or if the distances array is needed for precision-sensitive
+        workloads.
     """
 
     cdef cuvsNNDescentIndexParams* params
@@ -81,7 +86,8 @@ cdef class IndexParams:
                  intermediate_graph_degree=None,
                  max_iterations=None,
                  termination_threshold=None,
-                 return_distances=None
+                 return_distances=None,
+                 fp32_dist_computation=None
                  ):
         if metric is not None:
             self.params.metric = <cuvsDistanceType>DISTANCE_TYPES[metric]
@@ -95,6 +101,9 @@ cdef class IndexParams:
             self.params.termination_threshold = termination_threshold
         if return_distances is not None:
             self.params.return_distances = return_distances
+        if fp32_dist_computation is not None:
+            self.params.fp32_dist_computation = fp32_dist_computation
+
 
     @property
     def metric(self):
