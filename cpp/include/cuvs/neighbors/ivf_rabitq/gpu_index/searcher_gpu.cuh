@@ -13,6 +13,8 @@
 #include <cuvs/neighbors/ivf_rabitq/gpu_index/pool_gpu.cuh>
 #include <cuvs/neighbors/ivf_rabitq/gpu_index/quantizer_gpu.cuh>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 struct Candidate3 {  // unchanged
   float dist;
   float ip;
@@ -311,3 +313,5 @@ __global__ void compute_ip_kernel(const int16_t* quant_query_gpu,
                                   float sumq,
                                   float qnorm,
                                   float one_over_sqrtD);
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

@@ -124,10 +124,10 @@ struct index : cuvs::neighbors::index {
   uint32_t dim() const noexcept;
 
   /** Accessor for underlying RaBitQ index */
-  ::IVFGPU* rabitq_index() noexcept;
+  detail::IVFGPU* rabitq_index() noexcept;
 
  private:
-  ::IVFGPU rabitq_index_;
+  detail::IVFGPU rabitq_index_;
 };
 /**
  * @}

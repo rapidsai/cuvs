@@ -12,6 +12,8 @@
 #include <atomic>
 #include <thread>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 #define MAX_D 2048
 
 ////---------------------------------------------------------------------------
@@ -2642,3 +2644,5 @@ void DataQuantizerGPU::quantize_batch(raft::resources const& handle,
   cudaEventDestroy(stop);
 #endif
 }
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

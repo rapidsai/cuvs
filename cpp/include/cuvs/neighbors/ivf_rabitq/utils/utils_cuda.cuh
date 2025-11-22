@@ -11,6 +11,8 @@
 
 #include <iostream>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 #define CUDA_CHECK(call)                                                  \
   do {                                                                    \
     cudaError_t err = call;                                               \
@@ -29,3 +31,5 @@
       std::exit(EXIT_FAILURE);                                                                \
     }                                                                                         \
   } while (0)
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

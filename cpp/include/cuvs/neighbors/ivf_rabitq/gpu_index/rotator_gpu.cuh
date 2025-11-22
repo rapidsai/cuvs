@@ -16,6 +16,8 @@
 #include <cuvs/neighbors/ivf_rabitq/utils/utils_cuda.cuh>
 #include <fstream>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 // The RotatorGPU class holds a rotation matrix (P) on the GPU. The matrix is computed
 // on the CPU (using Eigen, similar to your CPU code) and then copied to device memory.
 // The rotate() function uses cuBLAS to compute the product: RAND_A = A * P.
@@ -67,3 +69,5 @@ class RotatorGPU {
 
   float* d_P;  // Device pointer for the rotation matrix (stored in row-major order)
 };
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

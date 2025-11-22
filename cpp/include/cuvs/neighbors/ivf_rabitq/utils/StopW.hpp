@@ -7,6 +7,8 @@
 
 #include <chrono>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 class StopW {
   std::chrono::steady_clock::time_point time_begin;
 
@@ -39,3 +41,5 @@ class StopW {
 
   void reset() { time_begin = std::chrono::steady_clock::now(); }
 };
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

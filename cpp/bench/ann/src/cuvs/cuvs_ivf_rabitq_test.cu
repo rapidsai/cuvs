@@ -21,6 +21,8 @@
 
 namespace {
 
+using namespace cuvs::neighbors::ivf_rabitq::detail;
+
 // search parameters
 size_t TOPK          = 10;
 size_t ROUND         = 3;

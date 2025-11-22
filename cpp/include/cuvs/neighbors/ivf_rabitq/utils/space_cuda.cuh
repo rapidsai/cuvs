@@ -9,6 +9,8 @@
 #include <thrust/functional.h>
 #include <thrust/transform_reduce.h>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 struct L2Functor {
   __host__ __device__ float operator()(const thrust::tuple<float, float>& t) const
   {
@@ -68,3 +70,5 @@ inline float compute_sum_q(const float* __restrict__ q, size_t D)
   }
   return sum;  // same as _mm512_reduce_add_ps
 }
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

@@ -9,6 +9,8 @@
 
 #include <cuvs/neighbors/ivf_rabitq/gpu_index/pool_gpu.cuh>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 // Host function to create and initialize a DeviceResultPool.
 DeviceResultPool* createDeviceResultPool(int capacity, cudaStream_t stream)
 {
@@ -55,3 +57,5 @@ void copy_results_from_pool(const DeviceResultPool* d_pool, uint32_t* host_resul
   CUDA_CHECK(cudaMemcpy(
     host_results, h_pool.ids, num_candidates * sizeof(uint32_t), cudaMemcpyDeviceToHost));
 }
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

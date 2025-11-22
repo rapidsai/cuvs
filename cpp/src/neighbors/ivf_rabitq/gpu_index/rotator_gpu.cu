@@ -18,6 +18,8 @@
 #include <raft/random/rng.cuh>
 #include <raft/util/cuda_rt_essentials.hpp>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 RotatorGPU::RotatorGPU(raft::resources const& handle, uint32_t dim)
 {
   // keep track of cuda stream
@@ -109,3 +111,5 @@ void RotatorGPU::rotate(raft::resources const& handle,
   // TODO: remove this after making all other operations stream-ordered?
   RAFT_CUDA_TRY(cudaStreamSynchronize(m_stream));
 }
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

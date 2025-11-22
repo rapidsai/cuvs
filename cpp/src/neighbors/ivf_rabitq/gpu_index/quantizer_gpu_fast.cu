@@ -18,6 +18,8 @@
 
 #include <queue>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 //---------------------------------------------------------------------------
 // Kernel: subtract_normalize_binarize_Kernel (Fused)
 // This single kernel performs three sequential operations:
@@ -1103,3 +1105,5 @@ void DataQuantizerGPU::exrabitq_codes_and_factors_fused_ori(const int* d_bin_XP,
                                              d_long_code,
                                              d_ex_factor);
 }
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

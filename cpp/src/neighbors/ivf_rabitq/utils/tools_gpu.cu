@@ -10,6 +10,8 @@
 #include <cuvs/neighbors/ivf_rabitq/utils/tools_gpu.cuh>
 #include <iostream>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 /**
  * @brief Creates a specified number of CUDA streams.
  * * @param num_streams The number of CUDA streams to create.
@@ -57,3 +59,5 @@ void delete_cuda_streams(std::vector<cudaStream_t>& streams)
   streams.clear();
   //    std::cout << "Streams vector has been cleared." << std::endl;
 }
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

@@ -13,6 +13,8 @@
 #include <thrust/sort.h>
 #include <thrust/version.h>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 // A simple L2-squared function (provided for compatibility).
 __host__ __device__ float L2SqrGPU(const float* a, const float* b, size_t d)
 {
@@ -591,3 +593,5 @@ void FlatInitializerGPU::SaveCentroidsTranspose(std::ofstream& output, const cha
   delete[] hostCentroidsTransposed;
   delete[] hostCentroidsRowMajor;
 }
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

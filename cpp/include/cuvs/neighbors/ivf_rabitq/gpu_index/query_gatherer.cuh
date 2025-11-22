@@ -14,6 +14,8 @@
 #include <unordered_map>
 #include <vector>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 class BatchedQueryGatherer {
   // private:
 
@@ -127,3 +129,5 @@ class BatchedQueryGatherer {
   int get_current_batch_queries() const { return current_batch_queries; }
   int get_current_batch_clusters() const { return current_batch_clusters; }
 };
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

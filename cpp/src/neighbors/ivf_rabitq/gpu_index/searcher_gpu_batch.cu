@@ -22,6 +22,8 @@
 #include <thrust/gather.h>
 #include <thrust/sequence.h>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 #define MAX_TOP_K               64  // power of 2, as local_topk_capacity, assumes that topk is less than 100
 #define MAX_CANDIDATES_PER_PAIR 1000  // suppose topk = 100, M = 10
 
@@ -5408,3 +5410,5 @@ void SearcherGPU::SearchClusterQueryPairsPreComputeThreshold(
   cudaFreeAsync(d_lut_for_queries, stream);
   cudaFreeAsync(d_query_write_counters, stream);
 }
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

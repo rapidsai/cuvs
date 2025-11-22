@@ -158,12 +158,12 @@ void search(raft::resources const& handle,
       default: RAFT_FAIL("Invalid search mode");
     }
   };
-  ::SearcherGPU searcher(handle,
-                         rotated_queries.data_handle(),
-                         padded_dim,
-                         rabitq_idx->ex_bits,
-                         search_mode_to_string(params.mode),
-                         /* rabitq_quantize_flag = */ true);
+  detail::SearcherGPU searcher(handle,
+                               rotated_queries.data_handle(),
+                               padded_dim,
+                               rabitq_idx->ex_bits,
+                               search_mode_to_string(params.mode),
+                               /* rabitq_quantize_flag = */ true);
 
   // find the longest cluster to allocate space
   size_t max_cluster_length = 0;
@@ -289,7 +289,7 @@ index<IdxT>::index(raft::resources const& handle, const index_params& params, ui
 template struct index<int64_t>;
 
 template <typename IdxT>
-::IVFGPU* index<IdxT>::rabitq_index() noexcept
+detail::IVFGPU* index<IdxT>::rabitq_index() noexcept
 {
   return &rabitq_index_;
 }

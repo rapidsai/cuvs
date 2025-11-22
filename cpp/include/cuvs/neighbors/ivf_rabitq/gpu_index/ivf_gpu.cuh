@@ -22,6 +22,8 @@
 #include <cuvs/neighbors/ivf_rabitq/utils/utils_cuda.cuh>
 #include <vector>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 // Structure for cluster-query pairs
 struct ClusterQueryPair {
   int cluster_idx;
@@ -433,3 +435,5 @@ class IVFGPU {
                                 size_t batch_size,
                                 cudaStream_t single_stream);
 };
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

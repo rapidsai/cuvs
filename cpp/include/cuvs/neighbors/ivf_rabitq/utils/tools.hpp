@@ -10,6 +10,8 @@
 
 #include <cuvs/neighbors/ivf_rabitq/defines.hpp>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 inline constexpr size_t div_rd_up(size_t x, size_t y)
 {
   return (x / y) + static_cast<size_t>((x % y) != 0);
@@ -76,3 +78,5 @@ std::vector<T> horizontal_avg(const std::vector<std::vector<T>>& data)
 
   return avg;
 }
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

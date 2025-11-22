@@ -23,6 +23,8 @@
 #include <raft/matrix/select_k.cuh>
 #include <thrust/sort.h>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 IVFGPU::IVFGPU(raft::resources const& handle,
                size_t n,
                size_t dim,
@@ -3110,3 +3112,5 @@ void IVFGPU::FreeHostMemory() const
   if (h_long_code) free(h_long_code);
   if (h_ids) free(h_ids);
 }
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

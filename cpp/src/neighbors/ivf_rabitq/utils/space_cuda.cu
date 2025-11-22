@@ -12,6 +12,8 @@
 #include <numeric>
 #include <vector>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 float L2SqrThrust(const float* h_x, const float* h_y, size_t N)
 {
   // Copy host data to device vectors
@@ -268,3 +270,5 @@ void high_acc_quantize16_scalar(int16_t* __restrict__ result,
     result[i] = static_cast<int16_t>(q32);
   }
 }
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

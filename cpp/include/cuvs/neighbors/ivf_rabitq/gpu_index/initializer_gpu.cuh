@@ -17,6 +17,8 @@
 // #include "index/Quantizer.hpp"  // For ExFactor, etc.
 #include <cuvs/neighbors/ivf_rabitq/utils/utils_cuda.cuh>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 class InitializerGPU {
  public:
   /**
@@ -128,3 +130,5 @@ class FlatInitializerGPU : public InitializerGPU {
 
   [[nodiscard]] size_t data_bytes() const { return sizeof(float) * K * D; }
 };
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

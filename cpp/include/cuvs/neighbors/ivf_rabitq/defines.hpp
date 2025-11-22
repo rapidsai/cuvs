@@ -10,6 +10,8 @@
 #include <random>
 #include <stdint.h>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 #define FORCE_INLINE inline __attribute__((always_inline))
 #define likely(x)    __builtin_expect(!!(x), 1)
 #define unlikely(x)  __builtin_expect(!!(x), 0)
@@ -39,3 +41,5 @@ struct Candidate {
 struct ExFactor {
   float xipnorm;
 };
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

@@ -11,10 +11,6 @@
 #include <cuvs/neighbors/ivf_rabitq/utils/memory.hpp>
 #include <cuvs/neighbors/ivf_rabitq/utils/space_cuda.cuh>
 
-#ifndef WARP_SIZE
-#define WARP_SIZE 32
-#endif
-
 #include <cassert>
 #include <chrono>
 #include <cstdint>
@@ -29,6 +25,12 @@
 #include <thrust/sequence.h>
 #include <thrust/sort.h>
 #include <vector>
+
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
+#ifndef WARP_SIZE
+#define WARP_SIZE 32
+#endif
 
 struct StepStat {
   const char* name;
@@ -4345,3 +4347,5 @@ __global__ void compute_ip_kernel(const int16_t* quant_query_gpu,
     //        }
   }
 }
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

@@ -13,7 +13,9 @@
 
 // jamxia edit
 // #include "utils/tools.hpp"
-#include "tools.hpp"
+#include <cuvs/neighbors/ivf_rabitq/utils/tools.hpp>
+
+namespace cuvs::neighbors::ivf_rabitq::detail {
 
 #define PORTABLE_ALIGN32 __attribute__((aligned(32)))
 #define PORTABLE_ALIGN64 __attribute__((aligned(64)))
@@ -52,3 +54,4 @@ struct align_allocator {
   bool operator==(const align_allocator& rhs) { return alignment_ == rhs.alignment_; }
 };
 }  // namespace memory
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

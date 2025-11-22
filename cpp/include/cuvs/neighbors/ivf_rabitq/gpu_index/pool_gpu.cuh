@@ -14,6 +14,8 @@
 #include <cuvs/neighbors/ivf_rabitq/utils/utils_cuda.cuh>
 #include <limits>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 // A simple candidate structure.
 struct DistId {
   float est_dist;
@@ -138,3 +140,5 @@ inline void freeDeviceResultPool(DeviceResultPool* pool, cudaStream_t stream = 0
  * @param host_results  Host array (of size at least pool->size) where the IDs will be copied.
  */
 void copy_results_from_pool(const DeviceResultPool* d_pool, uint32_t* host_results);
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

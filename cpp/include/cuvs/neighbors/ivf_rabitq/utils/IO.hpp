@@ -14,6 +14,8 @@
 #include <fstream>
 #include <iostream>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 size_t get_filesize(const char* filename)
 {
   struct stat64 stat_buf;
@@ -164,3 +166,5 @@ void load_bin(const char* filename, M& Mat)
   std::cout << "Rows " << rows << " Cols " << cols << '\n' << std::flush;
   input.close();
 }
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

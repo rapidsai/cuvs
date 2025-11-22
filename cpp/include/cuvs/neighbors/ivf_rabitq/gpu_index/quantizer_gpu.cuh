@@ -25,6 +25,8 @@
 
 #include <raft/core/resources.hpp>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 // Define PID and ExFactor as in your CPU version.
 typedef uint32_t PID;
 // typedef float ExFactor; // example
@@ -326,3 +328,5 @@ class DataQuantizerGPU {
                                             const float* d_centroid,
                                             size_t num_points) const;
 };
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail

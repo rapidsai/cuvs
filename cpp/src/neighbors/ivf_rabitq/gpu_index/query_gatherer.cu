@@ -10,6 +10,8 @@
 #include <cstdio>
 #include <cuvs/neighbors/ivf_rabitq/gpu_index/query_gatherer.cuh>
 
+namespace cuvs::neighbors::ivf_rabitq::detail {
+
 // ============================
 // Kernel definitions
 // ============================
@@ -163,3 +165,5 @@ void BatchedQueryGatherer::execute_batch(const float* d_rotated_queries, int bat
   // Ensure completion before handing buffers to the callback
   cudaStreamSynchronize(stream);
 }
+
+}  // namespace cuvs::neighbors::ivf_rabitq::detail
