@@ -239,6 +239,7 @@ jobs:
       script: "ci/test_java.sh"
       artifact-name: "cuvs-java-cuda${{ matrix.cuda_version }}"
       file_to_upload: "java/cuvs-java/target/"
+      sccache-dist-token-secret-name: GIST_REPO_READ_ORG_GITHUB_TOKEN
   rust-build:
     needs: [conda-cpp-build, changed-files]
     secrets: inherit
