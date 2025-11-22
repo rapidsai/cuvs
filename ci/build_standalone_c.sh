@@ -7,6 +7,7 @@ set -euo pipefail
 TOOLSET_VERSION=14
 CMAKE_VERSION=3.31.8
 CMAKE_ARCH=x86_64
+NINJA_VERSION=v1.13.1
 
 BUILD_C_LIB_TESTS="OFF"
 if [[ "${1:-}" == "--build-tests" ]]; then
@@ -16,7 +17,26 @@ fi
 dnf install -y \
       patch \
       tar \
-      make
+      unzip \
+      wget
+
+if ! command -V ninja >/dev/null 2>&1; then
+    case "$(uname -m)" in
+        x86_64)
+            wget --no-hsts -q -O /tmp/ninja-linux.zip "https://github.com/ninja-build/ninja/releases/download/${NINJA_VERSION}/ninja-linux.zip";
+            ;;
+        aarch64)
+            wget --no-hsts -q -O /tmp/ninja-linux.zip "https://github.com/ninja-build/ninja/releases/download/${NINJA_VERSION}/ninja-linux-aarch64.zip";
+            ;;
+        *)
+            echo "Unrecognized platform '$(uname -m)'" >&2
+            exit 1
+            ;;
+    esac
+    unzip -d /usr/bin /tmp/ninja-linux.zip
+    chmod +x /usr/bin/ninja
+    rm /tmp/ninja-linux.zip
+fi
 
 # Fetch and install CMake.
 if [ ! -e "/usr/local/bin/cmake" ]; then
@@ -29,15 +49,13 @@ if [ ! -e "/usr/local/bin/cmake" ]; then
 fi
 
 source rapids-configure-sccache
-
 source rapids-date-string
 
 rapids-print-env
 
 rapids-logger "Begin cpp build"
 
-sccache --zero-stats
-
+sccache --stop-server 2>/dev/null || true
 
 RAPIDS_PACKAGE_VERSION=$(rapids-generate-version)
 export RAPIDS_PACKAGE_VERSION
@@ -47,7 +65,7 @@ mkdir -p "${RAPIDS_ARTIFACTS_DIR}"
 export RAPIDS_ARTIFACTS_DIR
 
 scl enable gcc-toolset-${TOOLSET_VERSION} -- \
-      cmake -S cpp -B cpp/build/ \
+      cmake -S cpp -B cpp/build/ -GNinja \
             -DCMAKE_CUDA_HOST_COMPILER=/opt/rh/gcc-toolset-${TOOLSET_VERSION}/root/usr/bin/gcc \
             -DCMAKE_CUDA_ARCHITECTURES=RAPIDS \
             -DBUILD_SHARED_LIBS=OFF \
@@ -58,15 +76,21 @@ scl enable gcc-toolset-${TOOLSET_VERSION} -- \
             -DCUVS_STATIC_RAPIDS_LIBRARIES=ON
 cmake --build cpp/build "-j${PARALLEL_LEVEL}"
 
+sccache --show-adv-stats
+sccache --stop-server >/dev/null 2>&1 || true
+
 rapids-logger "Begin c build"
 
 scl enable gcc-toolset-${TOOLSET_VERSION} -- \
-      cmake -S c -B c/build \
+      cmake -S c -B c/build -GNinja \
             -DCMAKE_CUDA_HOST_COMPILER=/opt/rh/gcc-toolset-${TOOLSET_VERSION}/root/usr/bin/gcc \
             -DCUVSC_STATIC_CUVS_LIBRARY=ON \
             -DCMAKE_PREFIX_PATH="$PWD/cpp/build/" \
             -DBUILD_TESTS=${BUILD_C_LIB_TESTS}
 cmake --build c/build "-j${PARALLEL_LEVEL}"
+
+sccache --show-adv-stats
+sccache --stop-server >/dev/null 2>&1 || true
 
 rapids-logger "Begin c install"
 cmake --install c/build --prefix c/build/install
@@ -86,5 +110,3 @@ fi
 rapids-logger "Begin c tarball creation"
 tar czf libcuvs_c.tar.gz -C c/build/install/ .
 ls -lh libcuvs_c.tar.gz
-
-sccache --show-adv-stats
