@@ -2,6 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-from cuvs.preprocessing.quantize import binary, scalar
+from cuvs.preprocessing.quantize import binary, pq, scalar
 
-__all__ = ["binary", "scalar"]
+__all__ = ["binary", "pq", "scalar"]
