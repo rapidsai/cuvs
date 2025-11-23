@@ -226,16 +226,9 @@ RAFT_DEVICE_INLINE_FUNCTION void warp_merge(K k[N], V v[N], unsigned range, cons
 template <class K, class V, unsigned N, unsigned warp_size = 32>
 RAFT_DEVICE_INLINE_FUNCTION void warp_sort(K k[N], V v[N], const bool asc = true)
 {
-  if constexpr (N < 8) {
 #pragma unroll
-    for (std::uint32_t range = 1; range <= warp_size; range <<= 1) {
-      warp_merge<K, V, N, warp_size>(k, v, range, asc);
-    }
-  } else {
-#pragma unroll 1
-    for (std::uint32_t range = 1; range <= warp_size; range <<= 1) {
-      warp_merge<K, V, N, warp_size>(k, v, range, asc);
-    }
+  for (std::uint32_t range = 1; range <= warp_size; range <<= 1) {
+    warp_merge<K, V, N, warp_size>(k, v, range, asc);
   }
 }
 

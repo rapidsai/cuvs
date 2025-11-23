@@ -117,7 +117,7 @@ struct search
     //
     // Determine the thread block size
     //
-    constexpr unsigned min_block_size       = 64;  // 32 or 64
+    constexpr unsigned min_block_size       = 64;
     constexpr unsigned min_block_size_radix = 256;
     constexpr unsigned max_block_size       = 1024;
     //
