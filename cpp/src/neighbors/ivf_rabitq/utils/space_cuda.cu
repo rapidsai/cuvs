@@ -5,6 +5,7 @@
 
 #include <cuvs/neighbors/ivf_rabitq/utils/space_cuda.cuh>
 
+#include <raft/core/resource/cuda_stream.hpp>
 #include <raft/util/cuda_rt_essentials.hpp>
 
 #include <algorithm>  // std::max, std::min, std::clamp
@@ -124,13 +125,12 @@ __global__ void l2sqr_main_kernel(const float* __restrict__ x,
 }
 
 // 主机函数封装
-float L2Sqr_CUDA(const float* x, const float* y, size_t L)
+float L2Sqr_CUDA(raft::resources const& handle, const float* x, const float* y, size_t L)
 {
-  cudaStream_t stream;
-  RAFT_CUDA_TRY(cudaStreamCreate(&stream));
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   float* d_output;
-  RAFT_CUDA_TRY(cudaMalloc(&d_output, sizeof(float)));
-  RAFT_CUDA_TRY(cudaMemset(d_output, 0, sizeof(float)));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_output, sizeof(float), stream));
+  RAFT_CUDA_TRY(cudaMemsetAsync(d_output, 0, sizeof(float), stream));
 
   // 计算主部分（16倍数部分）
   const size_t num16 = L - (L % 16);
@@ -150,8 +150,8 @@ float L2Sqr_CUDA(const float* x, const float* y, size_t L)
   // 回传结果
   float result;
   RAFT_CUDA_TRY(cudaMemcpyAsync(&result, d_output, sizeof(float), cudaMemcpyDeviceToHost, stream));
-  RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
-  RAFT_CUDA_TRY(cudaFree(d_output));
+  raft::resource::sync_stream(handle);
+  RAFT_CUDA_TRY(cudaFreeAsync(d_output, stream));
 
   return result;
 }

@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <raft/core/resources.hpp>
+
 #include <thrust/device_vector.h>
 #include <thrust/functional.h>
 #include <thrust/transform_reduce.h>
@@ -25,7 +27,7 @@ float L2SqrThrust(const float* h_x, const float* h_y, size_t N);
 
 float L2SqrCPU_STL(const float* h_x, const float* h_y, size_t N);
 
-float L2Sqr_CUDA(const float* x, const float* y, size_t L);
+float L2Sqr_CUDA(raft::resources const& handle, const float* x, const float* y, size_t L);
 
 void high_acc_quantize16_scalar(int16_t* __restrict__ result,
                                 const float* __restrict__ q,
