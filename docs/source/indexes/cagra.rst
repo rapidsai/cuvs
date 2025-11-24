@@ -100,17 +100,14 @@ The 3 hyper-parameters that are most often tuned are `graph_degree`, `intermedia
 Memory footprint
 ================
 
-CAGRA stores the dataset (raw vectors) and nearest-neighbor graph (neighbor IDs) in memory.
-The dataset can be on **host or device**; the graph is **pinned to host memory**.
+CAGRA builds a nearest-neighbor graph(neighbor IDs) that ultimately ends up on the host while it needs to keep the original dataset(raw vectors) around (can be on host or device)
 
 Baseline Memory Footprint
 --------------
 
-These are the steady-state sizes of the stored data structures.
-
 .. math::
 
-   \text{dataset\_size}
+   \text{dataset\_size (device)}
    \;=\;
    \text{number\_vectors} \times \text{vector\_dimension} \times \text{bytes\_per\_dimension}
 
@@ -120,6 +117,8 @@ These are the steady-state sizes of the stored data structures.
    \;=\;
    \text{number\_vectors} \times \text{graph\_degree} \times \operatorname{sizeof}\!\big(\mathrm{IdxT}\big)
 
+Note: Dataset needs to be on GPU during the index build process, however it need not be attached to index once build is done.
+
 **Example** (1,000,000 vectors, dim = 1024, fp32, graph\_degree = 64, IdxT = int32):
 
 - dataset\_size = 4,096,000,000 B = **3906.25 MiB**
@@ -128,12 +127,13 @@ These are the steady-state sizes of the stored data structures.
 Build peak memory usage
 -----------------------
 
-Index build has two phases: (1) construct an intermediate graph, then (2) optimize it (prune/reorder).
-The initial graph can be built with IVF-PQ (supports out-of-core, so datasets larger than GPU memory can be streamed)
-or NN-descent. The steps below are sequential with distinct peak memory consumption. The overall peak memory utilization depends on the configured memory resource.
+Index build has two phases: (1) construct a knn graph, then (2) optimize it to remove redundant and unecessary paths.
+The initial knn graph can be built with IVF-PQ or nn-descent. IVF-PQ has the additional benefit that it supports out-of-core construction, allowing CAGRA to be trained on datasets larger than available GPU memory.
+The steps below are sequential with distinct peak memory consumption. The overall peak memory utilization depends on the configured RMM memory resource.
 
 Out-of-core IVF-PQ
-~~~~~~~~~~~~~~~~~~~~~~~
+
+knn graph constructured with IVF-PQ algorithm involves training the cluster centroids and assigning the vectors to the nearest centroids.
 
 **IVF-PQ Build (centroid training)** — uses a training subset to compute cluster centroids and assignments.
 
@@ -149,8 +149,7 @@ Out-of-core IVF-PQ
 
 **Example** (n = 1e6; dim = 1024; n\_clusters = 1024; train\_set\_ratio = 10): **395.01 MiB**
 
-**IVF-PQ Search (forms the intermediate graph)** — batches vectors to the GPU, finds nearest lists, and records
-per-query candidate neighbors (IDs + distances). Max batch size is 1024.
+**IVF-PQ Search (forms the intermediate graph)** — Construct the knn-graph by assigning raw vectors to trained cluster centroids in batches.
 
 .. math::
 
@@ -163,11 +162,6 @@ per-query candidate neighbors (IDs + distances). Max batch size is 1024.
    \text{batch\_size} \times \text{intermediate\_degree} \times 4
 
 **Example** (batch = 1024, dim = 1024, intermediate\_degree = 128): **5.00 MiB**
-
-**NN-descent peak memory** 
-~~~~~~~~~~~~~~~~~~~~~~~
-
-*TBD* (depends on implementation details and parameters).
 
 Optimize phase (device)
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -186,7 +180,7 @@ Pruning/reordering the intermediate graph; peak scales linearly with intermediat
 Overall Index Build peak (device)
 ---------------------
 
-Depending on the selected rmm memory resource, the overall peak memory footprint on the device would be different. For ``cuda_memory_resource``, peak is the maximum allocation across each step; For ``managed_memory_resource memory``, the
+Depending on the selected memory resource, the overall peak memory footprint on the device would be different. For ``cuda_memory_resource``, peak is the maximum allocation across each step; For ``managed_memory_resource memory``, the
 peaks from sequential steps are additive;
 
 ``cuda_memory_resource``:
@@ -216,8 +210,9 @@ peaks from sequential steps are additive;
 Search peak memory usage
 ------------------------
 
-During search, the dataset and graph are staged to the GPU and per-batch buffers hold the current queries and their top-k results. If multiple batches run concurrently/overlapped, add one result\_size
-(and any per-batch scratch) per extra in-flight batch. Distances are fp32 by default.
+CAGRA search is performed by having the dataset and graph in GPU memory, and requiring memory to store the search results of a batch of queries. 
+If multiple batches are to be launched concurrently or overlapped, separate results buffers will be needed for each. 
+The below memory estimate assumes just one batch of queries being run at a time and reusing the buffers.
 
 .. math::
 
