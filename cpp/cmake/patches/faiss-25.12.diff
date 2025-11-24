@@ -11,17 +11,33 @@ index c82c73e7d..b9100c272 100644
 
          auto resImpl = prov->getResources();
          auto res = resImpl.get();
-diff --git a/faiss/gpu/StandardGpuResources.cpp b/faiss/gpu/StandardGpuResources.cpp
-index 649b7cb5c..765fdb3d0 100644
---- a/faiss/gpu/StandardGpuResources.cpp
-+++ b/faiss/gpu/StandardGpuResources.cpp
-@@ -24,8 +24,8 @@
+diff --git a/faiss/gpu/GpuResources.h b/faiss/gpu/GpuResources.h
+index c0c851a89..61d9d4dbe 100644
+--- a/faiss/gpu/GpuResources.h
++++ b/faiss/gpu/GpuResources.h
+@@ -33,7 +33,7 @@
+
  #if defined USE_NVIDIA_CUVS
  #include <raft/core/device_resources.hpp>
- #include <rmm/mr/device/managed_memory_resource.hpp>
-+#include <rmm/mr/pinned_host_memory_resource.hpp>
- #include <rmm/mr/device/per_device_resource.hpp>
+-#include <rmm/mr/device/device_memory_resource.hpp>
++#include <rmm/mr/device_memory_resource.hpp>
+ #endif
+
+ namespace faiss {
+diff --git a/faiss/gpu/StandardGpuResources.cpp b/faiss/gpu/StandardGpuResources.cpp
+index 649b7cb5c..622443044 100644
+--- a/faiss/gpu/StandardGpuResources.cpp
++++ b/faiss/gpu/StandardGpuResources.cpp
+@@ -23,9 +23,9 @@
+
+ #if defined USE_NVIDIA_CUVS
+ #include <raft/core/device_resources.hpp>
+-#include <rmm/mr/device/managed_memory_resource.hpp>
+-#include <rmm/mr/device/per_device_resource.hpp>
 -#include <rmm/mr/host/pinned_memory_resource.hpp>
++#include <rmm/mr/managed_memory_resource.hpp>
++#include <rmm/mr/per_device_resource.hpp>
++#include <rmm/mr/pinned_host_memory_resource.hpp>
  #include <memory>
  #endif
 
@@ -80,7 +96,7 @@ index 649b7cb5c..765fdb3d0 100644
          auto err = cudaFree(p);
          FAISS_ASSERT_FMT(
 diff --git a/faiss/gpu/StandardGpuResources.h b/faiss/gpu/StandardGpuResources.h
-index f23ca19d8..c43926fce 100644
+index f23ca19d8..3ba606606 100644
 --- a/faiss/gpu/StandardGpuResources.h
 +++ b/faiss/gpu/StandardGpuResources.h
 @@ -25,7 +25,8 @@
@@ -88,7 +104,7 @@ index f23ca19d8..c43926fce 100644
  #if defined USE_NVIDIA_CUVS
  #include <raft/core/device_resources.hpp>
 -#include <rmm/mr/host/pinned_memory_resource.hpp>
-+#include <rmm/mr/device/device_memory_resource.hpp>
++#include <rmm/mr/device_memory_resource.hpp>
 +#include <rmm/mr/pinned_host_memory_resource.hpp>
  #endif
 

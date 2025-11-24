@@ -45,3 +45,7 @@ target_link_libraries(IVF_FLAT_C_EXAMPLE PRIVATE cuvs::c_api $<TARGET_NAME_IF_EX
 add_executable(IVF_PQ_C_EXAMPLE src/ivf_pq_c_example.c)
 target_include_directories(IVF_PQ_C_EXAMPLE PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>")
 target_link_libraries(IVF_PQ_C_EXAMPLE PRIVATE cuvs::c_api $<TARGET_NAME_IF_EXISTS:conda_env>)
+
+add_executable(BRUTEFORCE_C_EXAMPLE src/bruteforce_c_example.c)
+target_include_directories(BRUTEFORCE_C_EXAMPLE PUBLIC "$<BUILD_INTERFACE:${DLPACK_INCLUDE_DIR}>")
+target_link_libraries(BRUTEFORCE_C_EXAMPLE PRIVATE cuvs::c_api $<TARGET_NAME_IF_EXISTS:conda_env>)

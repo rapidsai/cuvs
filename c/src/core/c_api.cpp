@@ -185,7 +185,7 @@ extern "C" cuvsError_t cuvsRMMPoolMemoryResourceEnable(int initial_pool_size_per
 extern "C" cuvsError_t cuvsRMMMemoryResourceReset()
 {
   return cuvs::core::translate_exceptions([=] {
-    rmm::mr::set_current_device_resource(nullptr);
+    rmm::mr::set_current_device_resource(rmm::mr::detail::initial_resource());
     pool_mr.reset();
   });
 }
@@ -214,7 +214,32 @@ extern "C" const char* cuvsGetLastErrorText()
 
 extern "C" void cuvsSetLogLevel(cuvsLogLevel_t verbosity)
 {
-  raft::default_logger().set_level(static_cast<rapids_logger::level_enum>(verbosity));
+  rapids_logger::level_enum level = rapids_logger::level_enum::trace;
+  switch (verbosity) {
+    case CUVS_LOG_LEVEL_TRACE:
+      level = rapids_logger::level_enum::trace;
+      break;
+    case CUVS_LOG_LEVEL_DEBUG:
+      level = rapids_logger::level_enum::debug;
+      break;
+    case CUVS_LOG_LEVEL_INFO:
+      level = rapids_logger::level_enum::info;
+      break;
+    case CUVS_LOG_LEVEL_WARN:
+      level = rapids_logger::level_enum::warn;
+      break;
+    case CUVS_LOG_LEVEL_ERROR:
+      level = rapids_logger::level_enum::error;
+      break;
+    case CUVS_LOG_LEVEL_CRITICAL:
+      level = rapids_logger::level_enum::critical;
+      break;
+    case CUVS_LOG_LEVEL_OFF:
+      level = rapids_logger::level_enum::off;
+      break;
+    default: RAFT_FAIL("Unsupported cuvsLogLevel_t value provided");
+  }
+  raft::default_logger().set_level(level);
 }
 
 extern "C" cuvsLogLevel_t cuvsGetLogLevel()
