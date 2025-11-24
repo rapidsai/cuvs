@@ -506,6 +506,20 @@ public class CagraIndexImpl implements CagraIndex {
   }
 
   /**
+   * Gets the CAGRA index reference (for internal use).
+   * Package-private to allow access from HnswIndexImpl.
+   *
+   * @return the memory segment representing the CAGRA index
+   */
+  MemorySegment getCagraIndexReference() {
+    return cagraIndexReference.getMemorySegment();
+  }
+
+  CuVSMatrix getDatasetForConversion() {
+    return cagraIndexReference.dataset;
+  }
+
+  /**
    * Allocates the native CagraIndexParams data structures and fills the configured index parameters in.
    */
   private static CloseableHandle segmentFromIndexParams(CagraIndexParams params) {
@@ -610,6 +624,25 @@ public class CagraIndexImpl implements CagraIndex {
           cuvsIvfPqParamsMemorySegment, params.getCuVSIvfPqParams().getRefinementRate());
 
       cuvsCagraIndexParams.graph_build_params(indexPtr, cuvsIvfPqParamsMemorySegment);
+    } else if (params.getCagraGraphBuildAlgo().equals(CagraGraphBuildAlgo.ACE)) {
+      var aceParams = createAceParams();
+      // Note: Do NOT add aceParams to handles list.
+      // The cuvsCagraIndexParamsDestroy will handle freeing the ACE params
+      // when graph_build_algo is ACE, just like it does for IVF-PQ params.
+      MemorySegment cuvsAceParamsMemorySegment = aceParams.handle();
+      CuVSAceParams cuVSAceParams = params.getCuVSAceParams();
+
+      cuvsAceParams.npartitions(cuvsAceParamsMemorySegment, cuVSAceParams.getNpartitions());
+      cuvsAceParams.ef_construction(cuvsAceParamsMemorySegment, cuVSAceParams.getEfConstruction());
+      cuvsAceParams.use_disk(cuvsAceParamsMemorySegment, cuVSAceParams.isUseDisk());
+
+      String buildDir = cuVSAceParams.getBuildDir();
+      if (buildDir != null && !buildDir.isEmpty()) {
+        MemorySegment buildDirSegment = Util.duplicateNativeString(buildDir);
+        cuvsAceParams.build_dir(cuvsAceParamsMemorySegment, buildDirSegment);
+      }
+
+      cuvsCagraIndexParams.graph_build_params(indexPtr, cuvsAceParamsMemorySegment);
     }
   }
 

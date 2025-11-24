@@ -40,9 +40,9 @@ def test_get_dataset_creates_expected_files(temp_datasets_dir: Path):
     # Verify that each expected file exists in the datasets directory.
     for filename in expected_files:
         file_path = temp_datasets_dir / filename
-        assert (
-            file_path.exists()
-        ), f"Expected file {filename} was not generated."
+        assert file_path.exists(), (
+            f"Expected file {filename} was not generated."
+        )
 
 
 def test_run_command_creates_results(temp_datasets_dir: Path):
@@ -82,9 +82,9 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         "--force",
     ]
     result = runner.invoke(run_main, run_args)
-    assert (
-        result.exit_code == 0
-    ), f"Run command failed with output:\n{result.output}"
+    assert result.exit_code == 0, (
+        f"Run command failed with output:\n{result.output}"
+    )
 
     common_build_header = [
         "algo_name",
@@ -426,9 +426,9 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
     for rel_path, expectations in expected_files.items():
         file_path = temp_datasets_dir / rel_path
         assert file_path.exists(), f"Expected file {file_path} does not exist."
-        assert (
-            file_path.stat().st_size > 0
-        ), f"Expected file {file_path} is empty."
+        assert file_path.stat().st_size > 0, (
+            f"Expected file {file_path} is empty."
+        )
 
         df = pd.read_csv(file_path)
 
@@ -436,9 +436,9 @@ def test_run_command_creates_results(temp_datasets_dir: Path):
         actual_rows = len(df)
 
         # breakpoint()
-        assert (
-            actual_header == expectations["header"]
-        ), f"Wrong header produced in file f{rel_path}"
+        assert actual_header == expectations["header"], (
+            f"Wrong header produced in file f{rel_path}"
+        )
         assert actual_rows == expectations["rows"]
 
 
@@ -483,9 +483,9 @@ def test_plot_command_creates_png_files(temp_datasets_dir: Path):
         "latency",
     ]
     result = runner.invoke(plot_main, args)
-    assert (
-        result.exit_code == 0
-    ), f"Plot command failed with output:\n{result.output}"
+    assert result.exit_code == 0, (
+        f"Plot command failed with output:\n{result.output}"
+    )
 
     # Expected output file names.
     expected_files = [
@@ -496,6 +496,6 @@ def test_plot_command_creates_png_files(temp_datasets_dir: Path):
     for filename in expected_files:
         file_path = temp_datasets_dir / filename
         assert file_path.exists(), f"Expected file {filename} does not exist."
-        assert (
-            file_path.stat().st_size > 0
-        ), f"Expected file {filename} is empty."
+        assert file_path.stat().st_size > 0, (
+            f"Expected file {filename} is empty."
+        )

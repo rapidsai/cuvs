@@ -68,6 +68,15 @@ if(BUILD_CAGRA_HNSWLIB)
   include(../cpp/cmake/thirdparty/get_hnswlib.cmake)
 endif()
 
+if(BUILD_MG_ALGOS AND CUVSC_STATIC_CUVS_LIBRARY)
+  rapids_find_generate_module(
+    NCCL
+    HEADER_NAMES nccl.h
+    LIBRARY_NAMES nccl
+  )
+  find_package(NCCL REQUIRED)
+endif()
+
 # ##################################################################################################
 # * cuvs_c -------------------------------------------------------------------------------
 add_library(
