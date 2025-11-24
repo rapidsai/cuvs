@@ -8,7 +8,7 @@ rapids-pip-retry install cmake
 pyenv rehash
 
 # Download the standalone C library artifact
-payload_name="libcuvs_c_${RAPIDS_CUDA_VERSION}.tar.gz"
+payload_name="libcuvs_c_${RAPIDS_CUDA_VERSION}_${RAPIDS_TEST_ARCH}.tar.gz"
 pkg_name="libcuvs_c.tar.gz"
 rapids-logger "Download ${payload_name} artifacts from previous jobs"
 DOWNLOAD_LOCATION=$(rapids-download-from-github "${payload_name}")
