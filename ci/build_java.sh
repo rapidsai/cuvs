@@ -1,5 +1,6 @@
 #!/bin/bash
-# Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
 set -euo pipefail
 
@@ -11,7 +12,9 @@ if [[ "${1:-}" == "--run-java-tests" ]]; then
   EXTRA_BUILD_ARGS+=("--run-java-tests")
 fi
 
-. /opt/conda/etc/profile.d/conda.sh
+if [ -e "/opt/conda/etc/profile.d/conda.sh" ]; then
+  . /opt/conda/etc/profile.d/conda.sh
+fi
 
 rapids-logger "Downloading artifacts from previous jobs"
 CPP_CHANNEL=$(rapids-download-conda-from-github cpp)

@@ -1,15 +1,8 @@
 # =============================================================================
-# Copyright (c) 2021-2025, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
-# in compliance with the License. You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software distributed under the License
-# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
-# or implied. See the License for the specific language governing permissions and limitations under
-# the License.
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
 # =============================================================================
 
 # ##################################################################################################
@@ -124,7 +117,7 @@ ConfigureTest(
 ConfigureTest(
   NAME CLUSTER_TEST
   PATH cluster/kmeans.cu cluster/kmeans_balanced.cu cluster/kmeans_find_k.cu cluster/linkage.cu
-       cluster/connect_knn.cu
+       cluster/connect_knn.cu cluster/spectral.cu
   GPUS 1
   PERCENT 100
 )
@@ -197,6 +190,34 @@ ConfigureTest(
 ConfigureTest(
   NAME NEIGHBORS_ANN_CAGRA_UINT8_UINT32_TEST
   PATH neighbors/ann_cagra/test_uint8_t_uint32_t.cu
+  GPUS 1
+  PERCENT 100
+)
+
+ConfigureTest(
+  NAME NEIGHBORS_ANN_CAGRA_ACE_FLOAT_UINT32_TEST
+  PATH neighbors/ann_cagra_ace/test_float_uint32_t.cu
+  GPUS 1
+  PERCENT 100
+)
+
+ConfigureTest(
+  NAME NEIGHBORS_ANN_CAGRA_ACE_HALF_UINT32_TEST
+  PATH neighbors/ann_cagra_ace/test_half_uint32_t.cu
+  GPUS 1
+  PERCENT 100
+)
+
+ConfigureTest(
+  NAME NEIGHBORS_ANN_CAGRA_ACE_INT8_UINT32_TEST
+  PATH neighbors/ann_cagra_ace/test_int8_t_uint32_t.cu
+  GPUS 1
+  PERCENT 100
+)
+
+ConfigureTest(
+  NAME NEIGHBORS_ANN_CAGRA_ACE_UINT8_UINT32_TEST
+  PATH neighbors/ann_cagra_ace/test_uint8_t_uint32_t.cu
   GPUS 1
   PERCENT 100
 )

@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
 set -e -u -o pipefail
 
@@ -19,6 +20,9 @@ else
   exit 1
 fi
 
+PATH="$(pwd)/jextract-22/bin/:${PATH}"
+export PATH
+
 if [[ $(command -v jextract) == "" ]];
 then
   JEXTRACT_FILENAME="openjdk-22-jextract+6-47_linux-x64_bin.tar.gz"
@@ -26,8 +30,6 @@ then
   echo "jextract doesn't exist. Downloading it from $JEXTRACT_DOWNLOAD_URL.";
   wget -c $JEXTRACT_DOWNLOAD_URL
   tar -xvf ./"${JEXTRACT_FILENAME}"
-  PATH="$(pwd)/jextract-22/bin/:${PATH}"
-  export PATH
   echo "jextract downloaded to $(pwd)/jextract-22"
 fi
 

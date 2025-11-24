@@ -1,22 +1,12 @@
 /*
- * Copyright (c) 2023-2024, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #pragma once
 
 #include "kmeans.cuh"
+#include <cuvs/cluster/kmeans.hpp>
 #include <raft/core/device_mdarray.hpp>
 #include <raft/core/device_mdspan.hpp>
 #include <raft/core/error.hpp>
@@ -55,7 +45,7 @@ void compute_dispersion(raft::resources const& handle,
 
   params.n_clusters = val;
 
-  cuvs::cluster::kmeans::detail::kmeans_fit_predict<value_t, idx_t>(
+  cuvs::cluster::kmeans::fit_predict(
     handle, params, X, std::nullopt, std::make_optional(centroids_view), labels, residual, n_iter);
 
   detail::countLabels(handle, labels.data_handle(), clusterSizes.data_handle(), n, val, workspace);
@@ -219,15 +209,14 @@ void find_k(raft::resources const& handle,
       raft::make_device_matrix_view<value_t, idx_t>(centroids.data_handle(), best_k[0], d);
 
     params.n_clusters = best_k[0];
-    cuvs::cluster::kmeans::detail::kmeans_fit_predict<value_t, idx_t>(
-      handle,
-      params,
-      X,
-      std::nullopt,
-      std::make_optional(centroids_view),
-      labels.view(),
-      residual,
-      n_iter);
+    cuvs::cluster::kmeans::fit_predict(handle,
+                                       params,
+                                       X,
+                                       std::nullopt,
+                                       std::make_optional(centroids_view),
+                                       labels.view(),
+                                       residual,
+                                       n_iter);
   }
 }
 }  // namespace  cuvs::cluster::kmeans::detail

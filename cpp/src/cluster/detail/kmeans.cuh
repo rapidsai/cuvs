@@ -1,17 +1,6 @@
 /*
- * Copyright (c) 2020-2025, NVIDIA CORPORATION.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #pragma once
 
@@ -1114,62 +1103,6 @@ void kmeans_predict(raft::resources const& handle,
                                                                inertiaView);
 }
 
-template <typename DataT, typename IndexT = int>
-void kmeans_fit_predict(raft::resources const& handle,
-                        const cuvs::cluster::kmeans::params& pams,
-                        raft::device_matrix_view<const DataT, IndexT> X,
-                        std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weight,
-                        std::optional<raft::device_matrix_view<DataT, IndexT>> centroids,
-                        raft::device_vector_view<IndexT, IndexT> labels,
-                        raft::host_scalar_view<DataT> inertia,
-                        raft::host_scalar_view<IndexT> n_iter)
-{
-  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> fun_scope("kmeans_fit_predict");
-  if (!centroids.has_value()) {
-    auto n_features = X.extent(1);
-    auto centroids_matrix =
-      raft::make_device_matrix<DataT, IndexT>(handle, pams.n_clusters, n_features);
-    cuvs::cluster::kmeans::detail::kmeans_fit<DataT, IndexT>(
-      handle, pams, X, sample_weight, centroids_matrix.view(), inertia, n_iter);
-    cuvs::cluster::kmeans::detail::kmeans_predict<DataT, IndexT>(
-      handle, pams, X, sample_weight, centroids_matrix.view(), labels, true, inertia);
-  } else {
-    cuvs::cluster::kmeans::detail::kmeans_fit<DataT, IndexT>(
-      handle, pams, X, sample_weight, centroids.value(), inertia, n_iter);
-    cuvs::cluster::kmeans::detail::kmeans_predict<DataT, IndexT>(
-      handle, pams, X, sample_weight, centroids.value(), labels, true, inertia);
-  }
-}
-
-template <typename DataT, typename IndexT = int>
-void kmeans_fit_predict(raft::resources const& handle,
-                        const cuvs::cluster::kmeans::params& pams,
-                        const DataT* X,
-                        const DataT* sample_weight,
-                        DataT* centroids,
-                        IndexT n_samples,
-                        IndexT n_features,
-                        IndexT* labels,
-                        DataT& inertia,
-                        IndexT& n_iter)
-{
-  auto XView = raft::make_device_matrix_view<const DataT, IndexT>(X, n_samples, n_features);
-  std::optional<raft::device_vector_view<const DataT, IndexT>> sample_weightView{std::nullopt};
-  if (sample_weight)
-    sample_weightView.emplace(
-      raft::make_device_vector_view<const DataT, IndexT>(sample_weight, n_samples));
-  std::optional<raft::device_matrix_view<DataT, IndexT>> centroidsView{std::nullopt};
-  if (centroids)
-    centroidsView.emplace(
-      raft::make_device_matrix_view<DataT, IndexT>(centroids, pams.n_clusters, n_features));
-  auto labelsView  = raft::make_device_vector_view<IndexT, IndexT>(labels, n_samples);
-  auto inertiaView = raft::make_host_scalar_view(&inertia);
-  auto n_iterView  = raft::make_host_scalar_view(&n_iter);
-
-  cuvs::cluster::kmeans::detail::kmeans_fit_predict<DataT, IndexT>(
-    handle, pams, XView, sample_weightView, centroidsView, labelsView, inertiaView, n_iterView);
-}
-
 /**
  * @brief Transform X to a cluster-distance space.
  *
@@ -1220,23 +1153,5 @@ void kmeans_transform(raft::resources const& handle,
     pairwise_distance_kmeans<DataT, IndexT>(
       handle, datasetView, centroids, pairwiseDistanceView, metric);
   }
-}
-
-template <typename DataT, typename IndexT = int>
-void kmeans_transform(raft::resources const& handle,
-                      const cuvs::cluster::kmeans::params& pams,
-                      const DataT* X,
-                      const DataT* centroids,
-                      IndexT n_samples,
-                      IndexT n_features,
-                      DataT* X_new)
-{
-  auto XView = raft::make_device_matrix_view<const DataT, IndexT>(X, n_samples, n_features);
-  auto centroidsView =
-    raft::make_device_matrix_view<const DataT, IndexT>(centroids, pams.n_clusters, n_features);
-  auto X_newView = raft::make_device_matrix_view<DataT, IndexT>(X_new, n_samples, n_features);
-
-  cuvs::cluster::kmeans::detail::kmeans_transform<DataT, IndexT>(
-    handle, pams, XView, centroidsView, X_newView);
 }
 }  // namespace cuvs::cluster::kmeans::detail
