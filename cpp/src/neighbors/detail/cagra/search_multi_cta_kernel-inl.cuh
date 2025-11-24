@@ -142,6 +142,30 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort(float* distances,  // [num
   }
 }
 
+RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort_wrapper_64(
+  float* distances,   // [num_elements]
+  uint32_t* indices,  // [num_elements]
+  const uint32_t num_elements)
+{
+  topk_by_bitonic_sort<64, uint32_t>(distances, indices, num_elements);
+}
+
+RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort_wrapper_128(
+  float* distances,   // [num_elements]
+  uint32_t* indices,  // [num_elements]
+  const uint32_t num_elements)
+{
+  topk_by_bitonic_sort<128, uint32_t>(distances, indices, num_elements);
+}
+
+RAFT_DEVICE_INLINE_FUNCTION void topk_by_bitonic_sort_wrapper_256(
+  float* distances,   // [num_elements]
+  uint32_t* indices,  // [num_elements]
+  const uint32_t num_elements)
+{
+  topk_by_bitonic_sort<256, uint32_t>(distances, indices, num_elements);
+}
+
 //
 // multiple CTAs per single query
 //
@@ -266,16 +290,32 @@ RAFT_KERNEL __launch_bounds__(1024, 1) search_kernel(
     _CLK_START();
     if (threadIdx.x < 32) {
       // [1st warp] Topk with bitonic sort
-      if (max_elements <= 64) {
-        topk_by_bitonic_sort<64, INDEX_T>(
-          result_distances_buffer, result_indices_buffer, result_buffer_size_32);
-      } else if (max_elements <= 128) {
-        topk_by_bitonic_sort<128, INDEX_T>(
-          result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+      if constexpr (std::is_same_v<INDEX_T, uint32_t>) {
+        // use a non-template wrapper function to avoid pre-inlining the topk_by_bitonic_sort
+        // function (vs post-inlining, this impacts register pressure)
+        if (max_elements <= 64) {
+          topk_by_bitonic_sort_wrapper_64(
+            result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        } else if (max_elements <= 128) {
+          topk_by_bitonic_sort_wrapper_128(
+            result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        } else {
+          assert(max_elements <= 256);
+          topk_by_bitonic_sort_wrapper_256(
+            result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        }
       } else {
-        assert(max_elements <= 256);
-        topk_by_bitonic_sort<256, INDEX_T>(
-          result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        if (max_elements <= 64) {
+          topk_by_bitonic_sort<64, INDEX_T>(
+            result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        } else if (max_elements <= 128) {
+          topk_by_bitonic_sort<128, INDEX_T>(
+            result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        } else {
+          assert(max_elements <= 256);
+          topk_by_bitonic_sort<256, INDEX_T>(
+            result_distances_buffer, result_indices_buffer, result_buffer_size_32);
+        }
       }
     }
     __syncthreads();

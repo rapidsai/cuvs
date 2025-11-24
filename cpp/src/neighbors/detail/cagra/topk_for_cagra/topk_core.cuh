@@ -643,6 +643,7 @@ RAFT_DEVICE_INLINE_FUNCTION void topk_cta_11_core(uint32_t topk,
   //
   // Search for the maximum threshold that satisfies "(x < threshold).sum() <= topk".
   //
+#pragma unroll
   for (int j = 0; j < 3; j += 1) {
     uint32_t num_bins;
     uint32_t shift;
