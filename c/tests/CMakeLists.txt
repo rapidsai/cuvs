@@ -78,7 +78,6 @@ ConfigureTest(
   NAME ALL_NEIGHBORS_C_TEST PATH neighbors/run_all_neighbors_c.c neighbors/all_neighbors_c.cu
 )
 
-
 if(BUILD_MG_ALGOS)
   ConfigureTest(NAME MG_C_TEST PATH neighbors/run_mg_c.c neighbors/ann_mg_c.cu)
   target_compile_definitions(MG_C_TEST PUBLIC CUVS_BUILD_MG_ALGOS)
