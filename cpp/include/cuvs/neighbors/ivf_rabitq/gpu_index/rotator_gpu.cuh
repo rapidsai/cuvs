@@ -24,16 +24,16 @@ namespace cuvs::neighbors::ivf_rabitq::detail {
 // It is assumed that A and RAND_A reside in GPU memory.
 class RotatorGPU {
  private:
-  size_t D;               // Padded dimension
-  cudaStream_t m_stream;  // CUDA stream
- public:                  /**
-                           * @brief Construct a new RotatorGPU object.
-                           * @param dim The original dimension; the padded dimension D is computed as
-                           * rd_up_to_multiple_of(dim, 64).
-                           *
-                           * The constructor generates a random rotation matrix on the CPU (using Eigen) and then
-                           * copies it into                    device memory in column-major order.
-                           */
+  size_t D;              // Padded dimension
+  cudaStream_t stream_;  // CUDA stream
+ public:                 /**
+                          * @brief Construct a new RotatorGPU object.
+                          * @param dim The original dimension; the padded dimension D is computed as
+                          * rd_up_to_multiple_of(dim, 64).
+                          *
+                          * The constructor generates a random rotation matrix on the CPU (using Eigen) and then
+                          * copies it into                    device memory in column-major order.
+                          */
   explicit RotatorGPU(raft::resources const& handle, uint32_t dim);
   explicit RotatorGPU() {}
 
@@ -55,6 +55,7 @@ class RotatorGPU {
 
   /**
    * @brief Save the rotation matrix to a file.
+   * @param handle Resource handle
    * @param output Output stream.
    *
    * The function copies the rotation matrix from device memory, transposes it from column-major to

@@ -21,10 +21,9 @@
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
 RotatorGPU::RotatorGPU(raft::resources const& handle, uint32_t dim)
+  : stream_(raft::resource::get_cuda_stream(handle))
 {
   // keep track of cuda stream
-  // TODO: remove after migrating data member `d_P` to RAII containers from RAFT
-  m_stream = raft::resource::get_cuda_stream(handle);
   // Compute padded dimension
   // A padding function that rounds up to a multiple of 64.
   auto rd_up_to_multiple_of = [](uint32_t dim, uint32_t mult) -> size_t {
@@ -32,30 +31,30 @@ RotatorGPU::RotatorGPU(raft::resources const& handle, uint32_t dim)
   };
   D = rd_up_to_multiple_of(dim, 64);
   // Create a random matrix (size D x D)
-  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_P, sizeof(float) * D * D, m_stream));
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_P, sizeof(float) * D * D, stream_));
   raft::random::RngState rng(7ULL);
   raft::random::normal(handle, rng, d_P, D * D, 0.0f, 1.0f);
   // Compute the random rotation matrix in-place
-  raft::linalg::detail::qrGetQ_inplace(handle, d_P, D, D, m_stream);
+  raft::linalg::detail::qrGetQ_inplace(handle, d_P, D, D, stream_);
 }
 
 RotatorGPU::~RotatorGPU()
 {
-  if (d_P) { RAFT_CUDA_TRY(cudaFreeAsync(d_P, m_stream)); }
+  if (d_P) { RAFT_CUDA_TRY(cudaFreeAsync(d_P, stream_)); }
 }
 
 RotatorGPU& RotatorGPU::operator=(const RotatorGPU& other)
 {
   if (this != &other) {
-    D        = other.D;
-    m_stream = other.m_stream;
+    D       = other.D;
+    stream_ = other.stream_;
     // Firstly free it in case not dimension not match
-    if (d_P) { RAFT_CUDA_TRY(cudaFreeAsync(d_P, m_stream)); }
-    RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_P, sizeof(float) * D * D, m_stream));
+    if (d_P) { RAFT_CUDA_TRY(cudaFreeAsync(d_P, stream_)); }
+    RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_P, sizeof(float) * D * D, stream_));
     // Copy the rotation matrix from the other object.
     RAFT_CUDA_TRY(
-      cudaMemcpyAsync(d_P, other.d_P, sizeof(float) * D * D, cudaMemcpyDeviceToDevice, m_stream));
-    RAFT_CUDA_TRY(cudaStreamSynchronize(m_stream));
+      cudaMemcpyAsync(d_P, other.d_P, sizeof(float) * D * D, cudaMemcpyDeviceToDevice, stream_));
+    RAFT_CUDA_TRY(cudaStreamSynchronize(stream_));
   }
   return *this;
 }
@@ -69,8 +68,8 @@ void RotatorGPU::load(std::ifstream& input)
     input.read(reinterpret_cast<char*>(&hostP[i]), sizeof(float));
   }
   RAFT_CUDA_TRY(
-    cudaMemcpyAsync(d_P, hostP, sizeof(float) * D * D, cudaMemcpyHostToDevice, m_stream));
-  RAFT_CUDA_TRY(cudaStreamSynchronize(m_stream));
+    cudaMemcpyAsync(d_P, hostP, sizeof(float) * D * D, cudaMemcpyHostToDevice, stream_));
+  RAFT_CUDA_TRY(cudaStreamSynchronize(stream_));
   delete[] hostP;
 }
 
@@ -78,8 +77,8 @@ void RotatorGPU::save(std::ofstream& output) const
 {
   float* hostP = new float[D * D];
   RAFT_CUDA_TRY(
-    cudaMemcpyAsync(hostP, d_P, sizeof(float) * D * D, cudaMemcpyDeviceToHost, m_stream));
-  RAFT_CUDA_TRY(cudaStreamSynchronize(m_stream));
+    cudaMemcpyAsync(hostP, d_P, sizeof(float) * D * D, cudaMemcpyDeviceToHost, stream_));
+  RAFT_CUDA_TRY(cudaStreamSynchronize(stream_));
   for (size_t i = 0; i < D * D; ++i) {
     output.write(reinterpret_cast<char*>(&hostP[i]), sizeof(float));
   }
@@ -109,7 +108,7 @@ void RotatorGPU::rotate(raft::resources const& handle,
     raft::make_device_matrix_view<float, int64_t, raft::col_major>(const_cast<float*>(d_A), D, N),
     raft::make_device_matrix_view<float, int64_t, raft::col_major>(d_RAND_A, D, N));
   // TODO: remove this after making all other operations stream-ordered?
-  RAFT_CUDA_TRY(cudaStreamSynchronize(m_stream));
+  RAFT_CUDA_TRY(cudaStreamSynchronize(stream_));
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
