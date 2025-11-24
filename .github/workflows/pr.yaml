@@ -218,9 +218,7 @@ jobs:
       arch: "${{matrix.arch}}"
       date: ${{ inputs.date }}_c
       container_image: "rapidsai/ci-wheel:26.02-cuda${{ matrix.cuda_version }}-rockylinux8-py3.10"
-      env: |
-        RAPIDS_TEST_ARCH=${{ matrix.arch }}
-      script: "ci/test_standalone_c.sh"
+      script: "ci/test_standalone_c.sh libcuvs_c_${{ matrix.cuda_version }}_${{ matrix.arch }}.tar.gz"
       sha: ${{ inputs.sha }}
   conda-java-build-and-tests:
     needs: [conda-cpp-build, changed-files]
