@@ -49,7 +49,8 @@ IVFGPU::IVFGPU(raft::resources const& handle,
     h_ex_factor(nullptr),
     h_ids(nullptr),
     DQ(handle, dim, bits_per_dim - 1, batch_flag),
-    Rota(handle, dim)
+    Rota(handle, dim),
+    stream_(raft::resource::get_cuda_stream(handle))
 {
 }
 
@@ -59,7 +60,7 @@ IVFGPU::~IVFGPU()
   FreeHostMemory();
 }
 
-void IVFGPU::AllocateDeviceMemory(size_t* cluster_sizes, size_t num_clusters)
+void IVFGPU::AllocateDeviceMemory(raft::resources const& handle)
 {
   std::cout << "Allocating device memory for IVFGPU..." << std::endl;
 
@@ -79,19 +80,22 @@ void IVFGPU::AllocateDeviceMemory(size_t* cluster_sizes, size_t num_clusters)
 
   // Allocate memory for the quantized arrays.
   if (!batch_flag) {
-    RAFT_CUDA_TRY(cudaMalloc((void**)&d_short_data, short_data_size));
+    RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_short_data, short_data_size, stream_));
   } else {
-    RAFT_CUDA_TRY(cudaMalloc((void**)&d_short_data, short_data_size));
-    RAFT_CUDA_TRY(cudaMalloc((void**)&d_short_factors_batch, GetShortDataFactorBytesBatch()));
+    RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_short_data, short_data_size, stream_));
+    RAFT_CUDA_TRY(
+      cudaMallocAsync((void**)&d_short_factors_batch, GetShortDataFactorBytesBatch(), stream_));
   }
-  RAFT_CUDA_TRY(cudaMalloc((void**)&d_long_code, long_code_size));
-  RAFT_CUDA_TRY(cudaMalloc((void**)&d_ex_factor, ex_factor_size));
-  RAFT_CUDA_TRY(cudaMalloc((void**)&d_ids, pids_size));
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_long_code, long_code_size, stream_));
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_ex_factor, ex_factor_size, stream_));
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_ids, pids_size, stream_));
 
   // Allocate memory for the per-cluster metadata and centroids.
-  RAFT_CUDA_TRY(cudaMalloc((void**)&d_cluster_meta, num_centroids * sizeof(GPUClusterMeta)));
+  RAFT_CUDA_TRY(
+    cudaMallocAsync((void**)&d_cluster_meta, num_centroids * sizeof(GPUClusterMeta), stream_));
   //    RAFT_CUDA_TRY(cudaMalloc((void**)&d_centroids, num_centroids * num_dimensions *
   //    sizeof(float)));
+  raft::resource::sync_stream(handle);
 
   std::cout << "Allocated " << short_data_size << " bytes for d_short_data" << std::endl;
   std::cout << "Allocated " << long_code_size << " bytes for d_long_code" << std::endl;
@@ -99,7 +103,7 @@ void IVFGPU::AllocateDeviceMemory(size_t* cluster_sizes, size_t num_clusters)
   std::cout << "Allocated " << pids_size << " bytes for d_ids" << std::endl;
 }
 
-void IVFGPU::AllocateHostMemory(size_t* cluster_sizes, size_t num_clusters)
+void IVFGPU::AllocateHostMemory()
 {
   std::cout << "Allocating Host memory for CPU Part..." << std::endl;
 
@@ -140,14 +144,14 @@ void IVFGPU::AllocateHostMemory(size_t* cluster_sizes, size_t num_clusters)
 
 void IVFGPU::FreeDeviceMemory() const
 {
-  if (d_short_data) RAFT_CUDA_TRY(cudaFree(d_short_data));
-  //    if (d_short_data_batch) RAFT_CUDA_TRY(cudaFree(d_short_data_batch));
-  if (d_short_factors_batch) RAFT_CUDA_TRY(cudaFree(d_short_factors_batch));
-  if (d_long_code) RAFT_CUDA_TRY(cudaFree(d_long_code));
-  if (d_ex_factor) RAFT_CUDA_TRY(cudaFree(d_ex_factor));
-  if (d_ids) RAFT_CUDA_TRY(cudaFree(d_ids));
-  if (d_cluster_meta) RAFT_CUDA_TRY(cudaFree(d_cluster_meta));
-  //    if (d_centroids)    cudaFree(d_centroids);
+  if (d_short_data) RAFT_CUDA_TRY(cudaFreeAsync(d_short_data, stream_));
+  //    if (d_short_data_batch) RAFT_CUDA_TRY(cudaFreeAsync(d_short_data_batch, stream_));
+  if (d_short_factors_batch) RAFT_CUDA_TRY(cudaFreeAsync(d_short_factors_batch, stream_));
+  if (d_long_code) RAFT_CUDA_TRY(cudaFreeAsync(d_long_code, stream_));
+  if (d_ex_factor) RAFT_CUDA_TRY(cudaFreeAsync(d_ex_factor, stream_));
+  if (d_ids) RAFT_CUDA_TRY(cudaFreeAsync(d_ids, stream_));
+  if (d_cluster_meta) RAFT_CUDA_TRY(cudaFreeAsync(d_cluster_meta, stream_));
+  //    if (d_centroids)    cudaFreeAsync(d_centroids, stream_);
   // jamxia edit: not setting initializer to nullptr due to constness of FreeDeviceMemory(), but
   // really this function should set all pointers to null after freeing
   delete initializer;
@@ -182,8 +186,7 @@ void IVFGPU::load(raft::resources const& handle, const char* filename, bool load
   // Free any previously allocated device memory.
   FreeDeviceMemory();
   // Allocate device memory based on the cluster sizes.
-  // AllocateDeviceMemory() takes a pointer to an array of size_t and the number of clusters.
-  AllocateDeviceMemory(cluster_sizes.data(), num_centroids);
+  AllocateDeviceMemory(handle);
   // Load initializer data (e.g., centroids) from file.
   this->initializer->LoadCentroids(input, filename);
   // Read raw arrays from file into device memory.
@@ -193,7 +196,8 @@ void IVFGPU::load(raft::resources const& handle, const char* filename, bool load
     if (input.gcount() != static_cast<std::streamsize>(n_bytes))
       throw std::runtime_error("unexpected EOF");
 
-    RAFT_CUDA_TRY(cudaMemcpy(d_ptr, h_buf.data(), n_bytes, cudaMemcpyHostToDevice));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(d_ptr, h_buf.data(), n_bytes, cudaMemcpyHostToDevice, stream_));
+    raft::resource::sync_stream(handle);
   };
 
   auto read_into_device_host = [&](void* d_ptr, void* h_ptr, size_t n_bytes) {
@@ -202,7 +206,8 @@ void IVFGPU::load(raft::resources const& handle, const char* filename, bool load
     if (input.gcount() != static_cast<std::streamsize>(n_bytes))
       throw std::runtime_error("unexpected EOF");
 
-    RAFT_CUDA_TRY(cudaMemcpy(d_ptr, h_buf.data(), n_bytes, cudaMemcpyHostToDevice));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(d_ptr, h_buf.data(), n_bytes, cudaMemcpyHostToDevice, stream_));
+    raft::resource::sync_stream(handle);
     memcpy(h_ptr, h_buf.data(), n_bytes);
   };
 
@@ -212,7 +217,7 @@ void IVFGPU::load(raft::resources const& handle, const char* filename, bool load
   //    read_into_device(d_ids,        GetPIDsBytes());
 
   // New change: host copy of ivf.
-  AllocateHostMemory(cluster_sizes.data(), num_centroids);
+  AllocateHostMemory();
   //    std::cout << "batch flag: " << batch_flag << std::endl;
   read_into_device_host(d_short_data, h_short_data, GetShortDataBytesSimple());
   if (batch_flag)
@@ -258,8 +263,7 @@ void IVFGPU::load_transposed(raft::resources const& handle, const char* filename
   // Free any previously allocated device memory.
   FreeDeviceMemory();
   // Allocate device memory based on the cluster sizes.
-  // AllocateDeviceMemory() takes a pointer to an array of size_t and the number of clusters.
-  AllocateDeviceMemory(cluster_sizes.data(), num_centroids);
+  AllocateDeviceMemory(handle);
   // Load initializer data (e.g., centroids) from file.
   this->initializer->LoadCentroids(input, filename);
   // Read raw arrays from file into device memory.
@@ -269,7 +273,8 @@ void IVFGPU::load_transposed(raft::resources const& handle, const char* filename
     if (input.gcount() != static_cast<std::streamsize>(n_bytes))
       throw std::runtime_error("unexpected EOF");
 
-    RAFT_CUDA_TRY(cudaMemcpy(d_ptr, h_buf.data(), n_bytes, cudaMemcpyHostToDevice));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(d_ptr, h_buf.data(), n_bytes, cudaMemcpyHostToDevice, stream_));
+    raft::resource::sync_stream(handle);
   };
 
   auto read_into_device_host = [&](void* d_ptr, void* h_ptr, size_t n_bytes) {
@@ -283,7 +288,8 @@ void IVFGPU::load_transposed(raft::resources const& handle, const char* filename
           << got << (input.eof() ? " (hit EOF)" : "") << (input.bad() ? " (I/O error)" : "");
     }
 
-    RAFT_CUDA_TRY(cudaMemcpy(d_ptr, h_buf.data(), n_bytes, cudaMemcpyHostToDevice));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(d_ptr, h_buf.data(), n_bytes, cudaMemcpyHostToDevice, stream_));
+    raft::resource::sync_stream(handle);
     memcpy(h_ptr, h_buf.data(), n_bytes);
   };
 
@@ -336,7 +342,9 @@ void IVFGPU::load_transposed(raft::resources const& handle, const char* filename
     }
 
     // Copy transposed data to device and host
-    RAFT_CUDA_TRY(cudaMemcpy(d_ptr, h_transposed.data(), n_bytes, cudaMemcpyHostToDevice));
+    RAFT_CUDA_TRY(
+      cudaMemcpyAsync(d_ptr, h_transposed.data(), n_bytes, cudaMemcpyHostToDevice, stream_));
+    raft::resource::sync_stream(handle);
     memcpy(h_ptr, h_transposed.data(), n_bytes);
   };
 
@@ -346,7 +354,7 @@ void IVFGPU::load_transposed(raft::resources const& handle, const char* filename
   //    read_into_device(d_ids,        GetPIDsBytes());
 
   // New change: host copy of ivf.
-  AllocateHostMemory(cluster_sizes.data(), num_centroids);
+  AllocateHostMemory();
   //    std::cout << "batch flag: " << batch_flag << std::endl;
   read_into_device_host_transposed_short(d_short_data, h_short_data, GetShortDataBytesSimple());
   if (batch_flag)
@@ -386,10 +394,11 @@ void IVFGPU::init_clusters(const std::vector<size_t>& cluster_sizes)
 
   // Copy the host cluster metadata to device memory.
   // d_cluster_meta must have been allocated with size: num_centroids * sizeof(GPUClusterMeta)
-  RAFT_CUDA_TRY(cudaMemcpy(d_cluster_meta,
-                           h_cluster_meta.data(),
-                           num_centroids * sizeof(GPUClusterMeta),
-                           cudaMemcpyHostToDevice));
+  RAFT_CUDA_TRY(cudaMemcpyAsync(d_cluster_meta,
+                                h_cluster_meta.data(),
+                                num_centroids * sizeof(GPUClusterMeta),
+                                cudaMemcpyHostToDevice,
+                                stream_));
 
   //    h_cluster_meta = &h_cluster_meta_temp;
 }
@@ -444,7 +453,7 @@ void print_first_vector(uint8_t* ex_data_, float* ex_factors_, size_t dim, int e
   std::cout << "F_exrescale = " << *f_exrescale << "\n";
 }
 
-void IVFGPU::save(const char* filename, bool save_batch_flag) const
+void IVFGPU::save(raft::resources const& handle, const char* filename, bool save_batch_flag) const
 {
   if (num_centroids == 0) {
     std::cerr << "IVF not constructed\n";
@@ -467,10 +476,9 @@ void IVFGPU::save(const char* filename, bool save_batch_flag) const
 
   // Save number of vectors of each cluster.
   std::vector<GPUClusterMeta> h_cluster_meta(num_centroids);
-  RAFT_CUDA_TRY(cudaMemcpy(h_cluster_meta.data(),
-                           d_cluster_meta,
-                           num_centroids * sizeof(GPUClusterMeta),
-                           cudaMemcpyDeviceToHost));
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+  raft::copy(h_cluster_meta.data(), d_cluster_meta, num_centroids, stream);
+  raft::resource::sync_stream(handle);
   std::vector<size_t> cluster_sizes(num_centroids);
   for (int i = 0; i < num_centroids; i++) {
     cluster_sizes[i] = h_cluster_meta[i].num;
@@ -500,16 +508,21 @@ void IVFGPU::save(const char* filename, bool save_batch_flag) const
   uint8_t* h_short_factors_batch = new uint8_t[short_factors_size];
 
   // Copy device data to host.
-  if (!batch_flag) {
-    RAFT_CUDA_TRY(cudaMemcpy(h_short_data, d_short_data, short_data_size, cudaMemcpyDeviceToHost));
-  } else {
-    RAFT_CUDA_TRY(cudaMemcpy(h_short_data, d_short_data, short_data_size, cudaMemcpyDeviceToHost));
-    RAFT_CUDA_TRY(cudaMemcpy(
-      h_short_factors_batch, d_short_factors_batch, short_factors_size, cudaMemcpyDeviceToHost));
+  RAFT_CUDA_TRY(
+    cudaMemcpyAsync(h_short_data, d_short_data, short_data_size, cudaMemcpyDeviceToHost, stream));
+  if (batch_flag) {
+    RAFT_CUDA_TRY(cudaMemcpyAsync(h_short_factors_batch,
+                                  d_short_factors_batch,
+                                  short_factors_size,
+                                  cudaMemcpyDeviceToHost,
+                                  stream));
   }
-  RAFT_CUDA_TRY(cudaMemcpy(h_long_code, d_long_code, long_code_size, cudaMemcpyDeviceToHost));
-  RAFT_CUDA_TRY(cudaMemcpy(h_ex_factor, d_ex_factor, ex_factor_size, cudaMemcpyDeviceToHost));
-  RAFT_CUDA_TRY(cudaMemcpy(h_ids, d_ids, ids_size, cudaMemcpyDeviceToHost));
+  RAFT_CUDA_TRY(
+    cudaMemcpyAsync(h_long_code, d_long_code, long_code_size, cudaMemcpyDeviceToHost, stream));
+  RAFT_CUDA_TRY(
+    cudaMemcpyAsync(h_ex_factor, d_ex_factor, ex_factor_size, cudaMemcpyDeviceToHost, stream));
+  RAFT_CUDA_TRY(cudaMemcpyAsync(h_ids, d_ids, ids_size, cudaMemcpyDeviceToHost, stream));
+  raft::resource::sync_stream(handle);
 
   // Write raw arrays to file.
   output.write(reinterpret_cast<const char*>(h_short_data), short_data_size);
@@ -589,21 +602,24 @@ void IVFGPU::construct(raft::resources const& handle,
   size_t centroid_bytes = num_centroids * num_dimensions * sizeof(float);
   size_t ids_bytes      = num_vectors * sizeof(float);
   DQ.fast_quantize_flag = fast_quantize;
-  RAFT_CUDA_TRY(cudaMalloc((void**)&d_data, data_bytes));
-  RAFT_CUDA_TRY(cudaMalloc((void**)&d_centroid, centroid_bytes));
-  RAFT_CUDA_TRY(cudaMemcpy(d_data, host_data, data_bytes, cudaMemcpyHostToDevice));
-  RAFT_CUDA_TRY(cudaMemcpy(d_centroid, host_centroids, centroid_bytes, cudaMemcpyHostToDevice));
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_data, data_bytes, stream_));
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_centroid, centroid_bytes, stream_));
+  RAFT_CUDA_TRY(cudaMemcpyAsync(d_data, host_data, data_bytes, cudaMemcpyHostToDevice, stream_));
+  RAFT_CUDA_TRY(
+    cudaMemcpyAsync(d_centroid, host_centroids, centroid_bytes, cudaMemcpyHostToDevice, stream_));
   // -------------------------
   // Allocate device memory for IVF arrays based on cluster sizes.
   // -------------------------
-  AllocateDeviceMemory(counts.data(), num_centroids);
-  RAFT_CUDA_TRY(cudaMemcpy(d_ids, flat_pids.data(), ids_bytes, cudaMemcpyHostToDevice));
+  AllocateDeviceMemory(handle);
+  RAFT_CUDA_TRY(
+    cudaMemcpyAsync(d_ids, flat_pids.data(), ids_bytes, cudaMemcpyHostToDevice, stream_));
 
   // 数据可能需要按照cluster重新组织！
-  RAFT_CUDA_TRY(cudaMemcpy(d_cluster_meta,
-                           h_cluster_meta.data(),
-                           num_centroids * sizeof(GPUClusterMeta),
-                           cudaMemcpyHostToDevice));
+  RAFT_CUDA_TRY(cudaMemcpyAsync(d_cluster_meta,
+                                h_cluster_meta.data(),
+                                num_centroids * sizeof(GPUClusterMeta),
+                                cudaMemcpyHostToDevice,
+                                stream_));
 
   //    cudaDeviceSynchronize();
   //    auto end_gpu_normal = std::chrono::high_resolution_clock::now();
@@ -615,8 +631,8 @@ void IVFGPU::construct(raft::resources const& handle,
   // Note: rotated centroids will be stored as a matrix with num_centroids rows and D columns.
   // -------------------------
   float* d_rotated_centroids = nullptr;
-  RAFT_CUDA_TRY(
-    cudaMalloc((void**)&d_rotated_centroids, num_centroids * num_padded_dim * sizeof(float)));
+  RAFT_CUDA_TRY(cudaMallocAsync(
+    (void**)&d_rotated_centroids, num_centroids * num_padded_dim * sizeof(float), stream_));
 
   // -------------------------
   // For each cluster, perform quantization.
@@ -641,15 +657,10 @@ void IVFGPU::construct(raft::resources const& handle,
   initializer->AddVectorsD2D(d_rotated_centroids);
 
   // Clean up: free temporary device buffers.
-  RAFT_CUDA_TRY(cudaFree(d_data));
-  RAFT_CUDA_TRY(cudaFree(d_centroid));
-  RAFT_CUDA_TRY(cudaFree(d_rotated_centroids));
-  RAFT_CUDA_TRY(cudaDeviceSynchronize());
-  std::vector<GPUClusterMeta> h_cluster_meta_test(num_centroids);
-  RAFT_CUDA_TRY(cudaMemcpy(h_cluster_meta_test.data(),
-                           d_cluster_meta,
-                           num_centroids * sizeof(GPUClusterMeta),
-                           cudaMemcpyDeviceToHost));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_data, stream_));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_centroid, stream_));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_rotated_centroids, stream_));
+  raft::resource::sync_stream(handle);
 }
 
 void IVFGPU::quantize_cluster(raft::resources const& handle,
@@ -715,26 +726,35 @@ void IVFGPU::quantize_cluster(raft::resources const& handle,
 /// @param nprobe      number of clusters probed
 /// @param TOPK        how many final neighbors to return
 /// @param results     host‐array[TOPK] to receive the final PIDs
-void merge_knn_pools(DeviceResultPool** knn_array, int nprobe, int TOPK, PID* results)
+void merge_knn_pools(
+  raft::resources const& handle, DeviceResultPool** knn_array, int nprobe, int TOPK, PID* results)
 {
-  int Ncombined = nprobe * TOPK;
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+  int Ncombined       = nprobe * TOPK;
 
   // 1) Allocate two temporary buffers on the device:
   float* d_combined_dist    = nullptr;
   uint32_t* d_combined_pids = nullptr;
-  RAFT_CUDA_TRY(cudaMalloc(&d_combined_dist, sizeof(float) * Ncombined));
-  RAFT_CUDA_TRY(cudaMalloc(&d_combined_pids, sizeof(uint32_t) * Ncombined));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_combined_dist, sizeof(float) * Ncombined, stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_combined_pids, sizeof(uint32_t) * Ncombined, stream));
 
   // 2) Copy each pool’s TOPK entries into the combined arrays:
   for (int i = 0; i < nprobe; i++) {
     DeviceResultPool* pool = knn_array[i];
     // distances
-    RAFT_CUDA_TRY(cudaMemcpy(
-      d_combined_dist + i * TOPK, pool->distances, sizeof(float) * TOPK, cudaMemcpyDeviceToDevice));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(d_combined_dist + i * TOPK,
+                                  pool->distances,
+                                  sizeof(float) * TOPK,
+                                  cudaMemcpyDeviceToDevice,
+                                  stream));
     // pids
-    RAFT_CUDA_TRY(cudaMemcpy(
-      d_combined_pids + i * TOPK, pool->ids, sizeof(uint32_t) * TOPK, cudaMemcpyDeviceToDevice));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(d_combined_pids + i * TOPK,
+                                  pool->ids,
+                                  sizeof(uint32_t) * TOPK,
+                                  cudaMemcpyDeviceToDevice,
+                                  stream));
   }
+  raft::resource::sync_stream(handle);
 
   // 3) In‑place sort the Ncombined distances ascending, carrying along the pids:
   thrust::device_ptr<float> dist_ptr(d_combined_dist);
@@ -742,11 +762,14 @@ void merge_knn_pools(DeviceResultPool** knn_array, int nprobe, int TOPK, PID* re
   thrust::sort_by_key(dist_ptr, dist_ptr + Ncombined, pid_ptr);
 
   // 4) Copy out the first TOPK pids (the overall nearest neighbors) back to host:
-  RAFT_CUDA_TRY(cudaMemcpy(results, d_combined_pids, sizeof(PID) * TOPK, cudaMemcpyDeviceToHost));
+  RAFT_CUDA_TRY(
+    cudaMemcpyAsync(results, d_combined_pids, sizeof(PID) * TOPK, cudaMemcpyDeviceToHost, stream));
 
   // 5) Cleanup
-  RAFT_CUDA_TRY(cudaFree(d_combined_dist));
-  RAFT_CUDA_TRY(cudaFree(d_combined_pids));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_combined_dist, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_combined_pids, stream));
+
+  raft::resource::sync_stream(handle);
 }
 
 /// Merge the partial K-NN pools produced for each probed cluster.
@@ -760,11 +783,13 @@ void merge_knn_pools(DeviceResultPool** knn_array, int nprobe, int TOPK, PID* re
 /// If fewer than TOPK total candidates exist, the remaining slots are filled
 /// with `INVALID_PID` (here taken as `std::numeric_limits<uint32_t>::max()`).
 ///
-void merge_knn_pools_filter(DeviceResultPool** knn_array,  // host array of length nprobe
+void merge_knn_pools_filter(raft::resources const& handle,
+                            DeviceResultPool** knn_array,  // host array of length nprobe
                             int nprobe,
                             int TOPK,
                             PID* results)  // host array [TOPK]
 {
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   //    printf("I'm in \n");
   //------------------------------------------------------------------
   // 1) Work out how many candidates really exist
@@ -787,8 +812,8 @@ void merge_knn_pools_filter(DeviceResultPool** knn_array,  // host array of leng
   //------------------------------------------------------------------
   float* d_combined_dist    = nullptr;
   uint32_t* d_combined_pids = nullptr;
-  RAFT_CUDA_TRY(cudaMalloc(&d_combined_dist, sizeof(float) * Ncombined));
-  RAFT_CUDA_TRY(cudaMalloc(&d_combined_pids, sizeof(uint32_t) * Ncombined));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_combined_dist, sizeof(float) * Ncombined, stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_combined_pids, sizeof(uint32_t) * Ncombined, stream));
 
   //------------------------------------------------------------------
   // 3) Copy each pool’s *valid* entries into the combined buffers
@@ -799,13 +824,20 @@ void merge_knn_pools_filter(DeviceResultPool** knn_array,  // host array of leng
     if (sz <= 0) continue;  // skip empty pools
 
     // distances
-    RAFT_CUDA_TRY(cudaMemcpy(
-      d_combined_dist + offset[i], pool->distances, sizeof(float) * sz, cudaMemcpyDeviceToDevice));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(d_combined_dist + offset[i],
+                                  pool->distances,
+                                  sizeof(float) * sz,
+                                  cudaMemcpyDeviceToDevice,
+                                  stream));
 
     // ids
-    RAFT_CUDA_TRY(cudaMemcpy(
-      d_combined_pids + offset[i], pool->ids, sizeof(uint32_t) * sz, cudaMemcpyDeviceToDevice));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(d_combined_pids + offset[i],
+                                  pool->ids,
+                                  sizeof(uint32_t) * sz,
+                                  cudaMemcpyDeviceToDevice,
+                                  stream));
   }
+  raft::resource::sync_stream(handle);
 
   //------------------------------------------------------------------
   // 4) In-place sort ascending (distance, pid carried along)
@@ -819,8 +851,9 @@ void merge_knn_pools_filter(DeviceResultPool** knn_array,  // host array of leng
   //------------------------------------------------------------------
   int n_to_copy = std::min(TOPK, Ncombined);
 
-  RAFT_CUDA_TRY(
-    cudaMemcpy(results, d_combined_pids, sizeof(PID) * n_to_copy, cudaMemcpyDeviceToHost));
+  RAFT_CUDA_TRY(cudaMemcpyAsync(
+    results, d_combined_pids, sizeof(PID) * n_to_copy, cudaMemcpyDeviceToHost, stream));
+  raft::resource::sync_stream(handle);
   //    printf("copy finished \n");
 
   // If there were fewer than TOPK candidates, pad with INVALID_PID
@@ -829,18 +862,21 @@ void merge_knn_pools_filter(DeviceResultPool** knn_array,  // host array of leng
   //------------------------------------------------------------------
   // 6) Clean-up
   //------------------------------------------------------------------
-  RAFT_CUDA_TRY(cudaFree(d_combined_dist));
-  RAFT_CUDA_TRY(cudaFree(d_combined_pids));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_combined_dist, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_combined_pids, stream));
   //    printf("clean finished \n");
+  raft::resource::sync_stream(handle);
 }
 
 // … (DeviceResultPool definition, RAFT_CUDA_TRY macro, etc.) …
 
-void merge_knn_pools_filter_cub(DeviceResultPool** knn_array,  // host array of length nprobe
+void merge_knn_pools_filter_cub(raft::resources const& handle,
+                                DeviceResultPool** knn_array,  // host array of length nprobe
                                 int nprobe,
                                 int TOPK,
                                 PID* results)  // host array [TOPK]
 {
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   //------------------------------------------------------------------
   // 1) Work out how many candidates really exist
   //------------------------------------------------------------------
@@ -862,8 +898,8 @@ void merge_knn_pools_filter_cub(DeviceResultPool** knn_array,  // host array of 
   //------------------------------------------------------------------
   float* d_combined_dist    = nullptr;
   uint32_t* d_combined_pids = nullptr;
-  RAFT_CUDA_TRY(cudaMalloc(&d_combined_dist, sizeof(float) * Ncombined));
-  RAFT_CUDA_TRY(cudaMalloc(&d_combined_pids, sizeof(uint32_t) * Ncombined));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_combined_dist, sizeof(float) * Ncombined, stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_combined_pids, sizeof(uint32_t) * Ncombined, stream));
 
   //------------------------------------------------------------------
   // 3) Copy each pool’s *valid* entries into the combined buffers
@@ -873,11 +909,17 @@ void merge_knn_pools_filter_cub(DeviceResultPool** knn_array,  // host array of 
     int sz                 = std::min(pool->size, pool->capacity);
     if (sz <= 0) continue;
 
-    RAFT_CUDA_TRY(cudaMemcpy(
-      d_combined_dist + offset[i], pool->distances, sizeof(float) * sz, cudaMemcpyDeviceToDevice));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(d_combined_dist + offset[i],
+                                  pool->distances,
+                                  sizeof(float) * sz,
+                                  cudaMemcpyDeviceToDevice,
+                                  stream));
 
-    RAFT_CUDA_TRY(cudaMemcpy(
-      d_combined_pids + offset[i], pool->ids, sizeof(uint32_t) * sz, cudaMemcpyDeviceToDevice));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(d_combined_pids + offset[i],
+                                  pool->ids,
+                                  sizeof(uint32_t) * sz,
+                                  cudaMemcpyDeviceToDevice,
+                                  stream));
   }
 
   //------------------------------------------------------------------
@@ -885,8 +927,9 @@ void merge_knn_pools_filter_cub(DeviceResultPool** knn_array,  // host array of 
   //------------------------------------------------------------------
   float* d_alt_dist   = nullptr;  // alternate buffers for CUB
   uint32_t* d_alt_pid = nullptr;
-  RAFT_CUDA_TRY(cudaMalloc(&d_alt_dist, sizeof(float) * Ncombined));
-  RAFT_CUDA_TRY(cudaMalloc(&d_alt_pid, sizeof(uint32_t) * Ncombined));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_alt_dist, sizeof(float) * Ncombined, stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_alt_pid, sizeof(uint32_t) * Ncombined, stream));
+  raft::resource::sync_stream(handle);
 
   cub::DoubleBuffer<float> dist_db(d_combined_dist, d_alt_dist);
   cub::DoubleBuffer<uint32_t> pid_db(d_combined_pids, d_alt_pid);
@@ -903,7 +946,8 @@ void merge_knn_pools_filter_cub(DeviceResultPool** knn_array,  // host array of 
                                   sizeof(float) * 8);  // end bit     – 32 bits
 
   // b) allocate temp storage and run the sort
-  RAFT_CUDA_TRY(cudaMalloc(&d_temp_storage, temp_bytes));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_temp_storage, temp_bytes, stream));
+  raft::resource::sync_stream(handle);
   cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_bytes, dist_db, pid_db, Ncombined);
 
   // After the call, the *current* pointer of each DoubleBuffer
@@ -915,18 +959,20 @@ void merge_knn_pools_filter_cub(DeviceResultPool** knn_array,  // host array of 
   // 5) Copy back the global TOP-K (or all that exist) to host
   //------------------------------------------------------------------
   int n_to_copy = std::min(TOPK, Ncombined);
-  RAFT_CUDA_TRY(cudaMemcpy(results, d_sorted_pid, sizeof(PID) * n_to_copy, cudaMemcpyDeviceToHost));
+  RAFT_CUDA_TRY(cudaMemcpyAsync(
+    results, d_sorted_pid, sizeof(PID) * n_to_copy, cudaMemcpyDeviceToHost, stream));
+  raft::resource::sync_stream(handle);
 
   std::fill(results + n_to_copy, results + TOPK, std::numeric_limits<uint32_t>::max());
 
   //------------------------------------------------------------------
   // 6) Clean-up
   //------------------------------------------------------------------
-  RAFT_CUDA_TRY(cudaFree(d_temp_storage));
-  RAFT_CUDA_TRY(cudaFree(d_alt_dist));
-  RAFT_CUDA_TRY(cudaFree(d_alt_pid));
-  RAFT_CUDA_TRY(cudaFree(d_combined_dist));
-  RAFT_CUDA_TRY(cudaFree(d_combined_pids));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_temp_storage, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_alt_dist, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_alt_pid, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_combined_dist, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_combined_pids, stream));
 }
 
 template <typename T>
@@ -942,8 +988,9 @@ pinned_unique<T> make_pinned(size_t count)
   return pinned_unique<T>(ptr, [](T* p) { RAFT_CUDA_TRY(cudaFreeHost(p)); });
 }
 void merge_knn_pools_filter_host_cumh(
-  DeviceResultPool** knn_array, int nprobe, int TOPK, PID* results, cudaStream_t stream = 0)
+  raft::resources const& handle, DeviceResultPool** knn_array, int nprobe, int TOPK, PID* results)
 {
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   //------------------------------------------------------------------
   // 1) Count valid candidates
   //------------------------------------------------------------------
@@ -987,7 +1034,7 @@ void merge_knn_pools_filter_host_cumh(
   //------------------------------------------------------------------
   // 4) Wait *only* until the copies finish, then choose TOP-K on CPU
   //------------------------------------------------------------------
-  RAFT_CUDA_TRY(cudaStreamSynchronize(stream));  // could also use an event
+  raft::resource::sync_stream(handle);  // could also use an event
 
   std::vector<std::pair<float, uint32_t>> pairs(Ncombined);
   for (int i = 0; i < Ncombined; ++i)
@@ -1015,8 +1062,9 @@ void merge_knn_pools_filter_host_cumh(
  * @param results   host array [TOPK] – receives the PIDs of the best K
  */
 void merge_knn_pools_filter_host(
-  DeviceResultPool** knn_array, int nprobe, int TOPK, PID* results, cudaStream_t stream = 0)
+  raft::resources const& handle, DeviceResultPool** knn_array, int nprobe, int TOPK, PID* results)
 {
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   //------------------------------------------------------------------
   // 1) How many *valid* candidates do we have in total?
   //------------------------------------------------------------------
@@ -1071,7 +1119,7 @@ void merge_knn_pools_filter_host(
   //------------------------------------------------------------------
   std::vector<std::pair<float, uint32_t>> pairs;
   pairs.reserve(Ncombined);
-  RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
+  raft::resource::sync_stream(handle);
   for (int i = 0; i < Ncombined; ++i)
     pairs.emplace_back(h_dist[i], h_pid[i]);
 
@@ -1096,13 +1144,15 @@ void merge_knn_pools_filter_host(
  * @param probe_counts  (host) length-nprobe array that will be filled with how many
  *                      of the final TOPK came from probe 0, 1, …, nprobe-1
  */
-void merge_knn_pools_with_stats(DeviceResultPool** knn_array,
+void merge_knn_pools_with_stats(raft::resources const& handle,
+                                DeviceResultPool** knn_array,
                                 int nprobe,
                                 int TOPK,
                                 PID* results,
                                 int* probe_counts  // caller allocates & zero-initialises
 )
 {
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   const int Ncombined = nprobe * TOPK;
 
   /* ------------------------------------------------------------------ *
@@ -1112,9 +1162,10 @@ void merge_knn_pools_with_stats(DeviceResultPool** knn_array,
   uint32_t* d_pid = nullptr;
   int* d_src      = nullptr;  // NEW: keeps the probe index (0 … nprobe-1)
 
-  RAFT_CUDA_TRY(cudaMalloc(&d_dist, sizeof(float) * Ncombined));
-  RAFT_CUDA_TRY(cudaMalloc(&d_pid, sizeof(uint32_t) * Ncombined));
-  RAFT_CUDA_TRY(cudaMalloc(&d_src, sizeof(int) * Ncombined));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_dist, sizeof(float) * Ncombined, stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_pid, sizeof(uint32_t) * Ncombined, stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_src, sizeof(int) * Ncombined, stream));
+  raft::resource::sync_stream(handle);
 
   /* ------------------------------------------------------------------ *
    * 2)  Pack every per-probe pool into the combined arrays              *
@@ -1124,16 +1175,17 @@ void merge_knn_pools_with_stats(DeviceResultPool** knn_array,
     DeviceResultPool* pool = knn_array[i];
 
     // copy distances & pids
-    RAFT_CUDA_TRY(cudaMemcpy(
-      d_dist + i * TOPK, pool->distances, sizeof(float) * TOPK, cudaMemcpyDeviceToDevice));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(
+      d_dist + i * TOPK, pool->distances, sizeof(float) * TOPK, cudaMemcpyDeviceToDevice, stream));
 
-    RAFT_CUDA_TRY(
-      cudaMemcpy(d_pid + i * TOPK, pool->ids, sizeof(uint32_t) * TOPK, cudaMemcpyDeviceToDevice));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(
+      d_pid + i * TOPK, pool->ids, sizeof(uint32_t) * TOPK, cudaMemcpyDeviceToDevice, stream));
 
     // fill the “source-probe” column with value i
     thrust::device_ptr<int> src_ptr(d_src);
     thrust::fill_n(src_ptr + i * TOPK, TOPK, i);
   }
+  raft::resource::sync_stream(handle);
 
   /* ------------------------------------------------------------------ *
    * 3)  Global sort by distance, carrying (pid, src) as the value       *
@@ -1151,10 +1203,13 @@ void merge_knn_pools_with_stats(DeviceResultPool** knn_array,
   /* ------------------------------------------------------------------ *
    * 4)  Copy back the overall TOPK winners                              *
    * ------------------------------------------------------------------ */
-  RAFT_CUDA_TRY(cudaMemcpy(results, d_pid, sizeof(PID) * TOPK, cudaMemcpyDeviceToHost));
+  RAFT_CUDA_TRY(
+    cudaMemcpyAsync(results, d_pid, sizeof(PID) * TOPK, cudaMemcpyDeviceToHost, stream));
 
   std::vector<int> h_src(TOPK);
-  RAFT_CUDA_TRY(cudaMemcpy(h_src.data(), d_src, sizeof(int) * TOPK, cudaMemcpyDeviceToHost));
+  RAFT_CUDA_TRY(
+    cudaMemcpyAsync(h_src.data(), d_src, sizeof(int) * TOPK, cudaMemcpyDeviceToHost, stream));
+  raft::resource::sync_stream(handle);
 
   /* ------------------------------------------------------------------ *
    * 5)  Tally how many winners each probe contributed                   *
@@ -1168,9 +1223,10 @@ void merge_knn_pools_with_stats(DeviceResultPool** knn_array,
   /* ------------------------------------------------------------------ *
    * 6)  Clean-up                                                       *
    * ------------------------------------------------------------------ */
-  RAFT_CUDA_TRY(cudaFree(d_dist));
-  RAFT_CUDA_TRY(cudaFree(d_pid));
-  RAFT_CUDA_TRY(cudaFree(d_src));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_dist, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_pid, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_src, stream));
+  raft::resource::sync_stream(handle);
 }
 
 void IVFGPU::search(raft::resources const& handle,
@@ -1180,20 +1236,23 @@ void IVFGPU::search(raft::resources const& handle,
                     PID* results,
                     cudaStream_t single_stream) const
 {
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   // Compute distances from query to centroids on GPU.
   // d_query is on CPU now
   Candidate* d_centroid_candidates = nullptr;
-  RAFT_CUDA_TRY(cudaMalloc(&d_centroid_candidates, nprobe * sizeof(Candidate)));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_centroid_candidates, nprobe * sizeof(Candidate), stream));
+  raft::resource::sync_stream(handle);
   initializer->ComputeCentroidsDistances(
     d_query, nprobe, d_centroid_candidates, nprobe, single_stream);
 
   // Copy only the top nprobe candidates to host.
   std::vector<Candidate> centroid_candidates(nprobe);
-  RAFT_CUDA_TRY(cudaMemcpy(centroid_candidates.data(),
-                           d_centroid_candidates,
-                           nprobe * sizeof(Candidate),
-                           cudaMemcpyDeviceToHost));
-  RAFT_CUDA_TRY(cudaFree(d_centroid_candidates));
+  RAFT_CUDA_TRY(cudaMemcpyAsync(centroid_candidates.data(),
+                                d_centroid_candidates,
+                                nprobe * sizeof(Candidate),
+                                cudaMemcpyDeviceToHost,
+                                stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_centroid_candidates, stream));
 
   // Create a device result pool. (k*nprobe for multiple use)
   DeviceResultPool** knn_array = new DeviceResultPool*[nprobe];
@@ -1241,7 +1300,6 @@ void IVFGPU::search(raft::resources const& handle,
   for (size_t i = 0; i < nprobe; ++i) {
     //        const int tid      = omp_get_thread_num();
     //        cudaStream_t s     = streams[tid % num_streams];
-    cudaStream_t s = 0;
 
     PID cid     = centroid_candidates[i].id;
     float sqr_y = centroid_candidates[i].distance;
@@ -1251,7 +1309,7 @@ void IVFGPU::search(raft::resources const& handle,
     float* h_centroid       = centroid_data + cid * num_padded_dim;
 
     RAFT_CUDA_TRY(cudaMemcpyAsync(
-      h_centroid, d_centroid, num_padded_dim * sizeof(float), cudaMemcpyDeviceToHost, s));
+      h_centroid, d_centroid, num_padded_dim * sizeof(float), cudaMemcpyDeviceToHost, stream));
 
     // 3-b) launch the probe-level search on the **same** stream
     searcher.SearchClusterWithFilter(/* add a stream parameter */
@@ -1260,18 +1318,18 @@ void IVFGPU::search(raft::resources const& handle,
                                      sqr_y,
                                      knn_array[i],
                                      h_centroid,
-                                     s);
+                                     stream);
   }
   free(centroid_data);
 
   // aggregate results for different knns
   // Copy the result pool back to host.
   //    copy_results_from_pool(KNNs, results);
-  RAFT_CUDA_TRY(cudaDeviceSynchronize());
-  merge_knn_pools_filter(knn_array, nprobe, k, results);
+  raft::resource::sync_stream(handle);
+  merge_knn_pools_filter(handle, knn_array, nprobe, k, results);
   // free pools
   for (size_t i = 0; i < nprobe; ++i) {
-    freeDeviceResultPool(knn_array[i]);
+    freeDeviceResultPool(knn_array[i], stream);
   }
 }
 
@@ -1297,9 +1355,14 @@ void init_buffers_to_inf_kernel(float* d_ip_results,
   // optional: RAFT_CUDA_TRY(cudaGetLastError());
 }
 
-void IVFGPU::MemOptimizedSearch(
-  const float* d_query, size_t k, size_t nprobe, PID* results, void* searcher1) const
+void IVFGPU::MemOptimizedSearch(raft::resources const& handle,
+                                const float* d_query,
+                                size_t k,
+                                size_t nprobe,
+                                PID* results,
+                                void* searcher1) const
 {
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   // Compute distances from query to centroids on GPU.
   // d_query is on CPU now
   SearcherGPU* searcher = ((SearcherGPU*)searcher1);
@@ -1307,8 +1370,8 @@ void IVFGPU::MemOptimizedSearch(
   searcher->query          = d_query;
   searcher->h_filter_distk = INFINITY;
   float temp               = INFINITY;
-  RAFT_CUDA_TRY(
-    cudaMemcpyAsync(searcher->d_filter_distk, &temp, sizeof(float), cudaMemcpyHostToDevice, 0));
+  RAFT_CUDA_TRY(cudaMemcpyAsync(
+    searcher->d_filter_distk, &temp, sizeof(float), cudaMemcpyHostToDevice, stream));
   //    printf("querying...\n");
   //    SearcherGPU searcher(d_query, num_padded_dim, ex_bits);
   //    RAFT_CUDA_TRY(cudaMemset(searcher->d_unit_q_gpu, 0, sizeof(float)  * num_dimensions));
@@ -1331,16 +1394,18 @@ void IVFGPU::MemOptimizedSearch(
   //    RAFT_CUDA_TRY(cudaMemset(searcher->d_ip2, 0, sizeof(float)  * KM));
 
   Candidate* d_centroid_candidates = nullptr;
-  RAFT_CUDA_TRY(cudaMalloc(&d_centroid_candidates, nprobe * sizeof(Candidate)));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_centroid_candidates, nprobe * sizeof(Candidate), stream));
+  raft::resource::sync_stream(handle);
   initializer->ComputeCentroidsDistances(d_query, nprobe, d_centroid_candidates, nprobe, nullptr);
 
   // Copy only the top nprobe candidates to host.
   std::vector<Candidate> centroid_candidates(nprobe);
-  RAFT_CUDA_TRY(cudaMemcpy(centroid_candidates.data(),
-                           d_centroid_candidates,
-                           nprobe * sizeof(Candidate),
-                           cudaMemcpyDeviceToHost));
-  RAFT_CUDA_TRY(cudaFree(d_centroid_candidates));
+  RAFT_CUDA_TRY(cudaMemcpyAsync(centroid_candidates.data(),
+                                d_centroid_candidates,
+                                nprobe * sizeof(Candidate),
+                                cudaMemcpyDeviceToHost,
+                                stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_centroid_candidates, stream));
 
   // Create a device result pool. (k*nprobe for multiple use)
   DeviceResultPool** knn_array = new DeviceResultPool*[nprobe];
@@ -1356,21 +1421,19 @@ void IVFGPU::MemOptimizedSearch(
   for (size_t i = 0; i < nprobe; ++i) {
     //        const int tid      = omp_get_thread_num();
     //        cudaStream_t s     = streams[tid % num_streams];
-    cudaStream_t s = 0;
-
     PID cid     = centroid_candidates[i].id;
     float sqr_y = centroid_candidates[i].distance;
 
     //        constexpr uint32_t FP32_POS_INF = 0x7f800000u;
     //        init_buffers_to_inf_kernel(searcher->d_ip_results, searcher->d_est_dis,
-    //        h_cluster_meta[cid].num, s);
+    //        h_cluster_meta[cid].num, stream);
 
     // 3-a) async copy centroid i -> pinned host buffer
     const float* d_centroid = this->initializer->GetCentroid(cid);
     float* h_centroid       = centroid_data + cid * num_padded_dim;
 
     RAFT_CUDA_TRY(cudaMemcpyAsync(
-      h_centroid, d_centroid, num_padded_dim * sizeof(float), cudaMemcpyDeviceToHost, s));
+      h_centroid, d_centroid, num_padded_dim * sizeof(float), cudaMemcpyDeviceToHost, stream));
 
     // 3-b) launch the probe-level search on the **same** stream
     searcher->SearchClusterWithFilterMemOpt(/* add a stream parameter */
@@ -1379,18 +1442,18 @@ void IVFGPU::MemOptimizedSearch(
                                             sqr_y,
                                             knn_array[i],
                                             h_centroid,
-                                            s);
+                                            stream);
   }
   free(centroid_data);
 
   // aggregate results for different knns
   // Copy the result pool back to host.
   //    copy_results_from_pool(KNNs, results);
-  RAFT_CUDA_TRY(cudaDeviceSynchronize());
-  merge_knn_pools_filter(knn_array, nprobe, k, results);
+  raft::resource::sync_stream(handle);
+  merge_knn_pools_filter(handle, knn_array, nprobe, k, results);
   // free pools
   for (size_t i = 0; i < nprobe; ++i) {
-    freeDeviceResultPool(knn_array[i]);
+    freeDeviceResultPool(knn_array[i], stream);
   }
 }
 
@@ -1570,13 +1633,14 @@ __global__ void combine_to_pairs(const int* d_sorted_clusters,
 }
 
 // Sorting cluster_query pairs using cub sort
-void sort_cluster_query_pairs(int* d_raft_idx,                   // Input: cluster indices
+void sort_cluster_query_pairs(raft::resources const& handle,
+                              int* d_raft_idx,                   // Input: cluster indices
                               ClusterQueryPair* d_sorted_pairs,  // Output: sorted pairs
                               int batch_size,
-                              int nprobe,
-                              cudaStream_t cuda_stream)  // Your existing CUDA stream
+                              int nprobe)
 {
-  int total_pairs = batch_size * nprobe;
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+  int total_pairs     = batch_size * nprobe;
 
   // Allocate temporary arrays for sorting
   int* d_cluster_keys;
@@ -1584,16 +1648,16 @@ void sort_cluster_query_pairs(int* d_raft_idx,                   // Input: clust
   int* d_sorted_clusters;
   int* d_sorted_queries;
 
-  RAFT_CUDA_TRY(cudaMalloc(&d_cluster_keys, total_pairs * sizeof(int)));
-  RAFT_CUDA_TRY(cudaMalloc(&d_query_values, total_pairs * sizeof(int)));
-  RAFT_CUDA_TRY(cudaMalloc(&d_sorted_clusters, total_pairs * sizeof(int)));
-  RAFT_CUDA_TRY(cudaMalloc(&d_sorted_queries, total_pairs * sizeof(int)));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_cluster_keys, total_pairs * sizeof(int), stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_query_values, total_pairs * sizeof(int), stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_sorted_clusters, total_pairs * sizeof(int), stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_sorted_queries, total_pairs * sizeof(int), stream));
 
   // Prepare data for sorting
   int threads_per_block = 256;
   int num_blocks        = (total_pairs + threads_per_block - 1) / threads_per_block;
 
-  prepare_keys_values<<<num_blocks, threads_per_block, 0, cuda_stream>>>(
+  prepare_keys_values<<<num_blocks, threads_per_block, 0, stream>>>(
     d_raft_idx, d_cluster_keys, d_query_values, batch_size, nprobe);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
@@ -1610,11 +1674,11 @@ void sort_cluster_query_pairs(int* d_raft_idx,                   // Input: clust
                                   total_pairs,
                                   0,
                                   sizeof(int) * 8,
-                                  cuda_stream);
+                                  stream);
 
   // Allocate temporary storage
   void* d_temp_storage;
-  RAFT_CUDA_TRY(cudaMalloc(&d_temp_storage, temp_storage_bytes));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_temp_storage, temp_storage_bytes, stream));
 
   // Perform radix sort
   cub::DeviceRadixSort::SortPairs(d_temp_storage,
@@ -1626,7 +1690,7 @@ void sort_cluster_query_pairs(int* d_raft_idx,                   // Input: clust
                                   total_pairs,
                                   0,
                                   sizeof(int) * 8,
-                                  cuda_stream);
+                                  stream);
   // ------
 
   // ---- or sort by query id
@@ -1635,7 +1699,7 @@ void sort_cluster_query_pairs(int* d_raft_idx,                   // Input: clust
   //            nullptr, temp_storage_bytes,
   //            d_query_values, d_sorted_queries,    // query indices as keys
   //            d_cluster_keys, d_sorted_clusters,   // cluster indices as values
-  //            total_pairs, 0, sizeof(int) * 8, cuda_stream);
+  //            total_pairs, 0, sizeof(int) * 8, stream);
   //
   //// Allocate temporary storage
   //    void* d_temp_storage;
@@ -1646,36 +1710,40 @@ void sort_cluster_query_pairs(int* d_raft_idx,                   // Input: clust
   //            d_temp_storage, temp_storage_bytes,
   //            d_query_values, d_sorted_queries,    // query indices as keys
   //            d_cluster_keys, d_sorted_clusters,   // cluster indices as values
-  //            total_pairs, 0, sizeof(int) * 8, cuda_stream);
+  //            total_pairs, 0, sizeof(int) * 8, stream);
 
   //--------
 
   // Combine sorted results into pairs
-  combine_to_pairs<<<num_blocks, threads_per_block, 0, cuda_stream>>>(
+  combine_to_pairs<<<num_blocks, threads_per_block, 0, stream>>>(
     d_sorted_clusters, d_sorted_queries, d_sorted_pairs, total_pairs);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // debug for non-sorting
-  //    combine_to_pairs<<<num_blocks, threads_per_block, 0, cuda_stream>>>(
+  //    combine_to_pairs<<<num_blocks, threads_per_block, 0, stream>>>(
   //            d_cluster_keys, d_query_values, d_sorted_pairs, total_pairs);
 
   // Free temporary memory
   // jamxia edit: uncomment line below
-  RAFT_CUDA_TRY(cudaFree(d_temp_storage));
-  RAFT_CUDA_TRY(cudaFree(d_cluster_keys));
-  RAFT_CUDA_TRY(cudaFree(d_query_values));
-  RAFT_CUDA_TRY(cudaFree(d_sorted_clusters));
-  RAFT_CUDA_TRY(cudaFree(d_sorted_queries));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_temp_storage, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_cluster_keys, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_query_values, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_sorted_clusters, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_sorted_queries, stream));
+
+  raft::resource::sync_stream(handle);
 }
 
 void sort_cluster_query_pairs_separate(
+  raft::resources const& handle,
   int* d_raft_idx,                           // Input: cluster indices
   ClusterQueryPair* d_nearest_sorted_pairs,  // Output: sorted nearest pairs
   ClusterQueryPair* d_rest_sorted_pairs,     // Output: sorted rest pairs
   int batch_size,
-  int nprobe,
-  cudaStream_t cuda_stream)
+  int nprobe)
 {
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+
   int nearest_pairs = batch_size;
   int rest_pairs    = batch_size * (nprobe - 1);
 
@@ -1692,22 +1760,22 @@ void sort_cluster_query_pairs_separate(
   int* d_rest_sorted_queries;
 
   // Allocate memory for unsorted keys/values
-  RAFT_CUDA_TRY(cudaMalloc(&d_nearest_cluster_keys, nearest_pairs * sizeof(int)));
-  RAFT_CUDA_TRY(cudaMalloc(&d_nearest_query_values, nearest_pairs * sizeof(int)));
-  RAFT_CUDA_TRY(cudaMalloc(&d_rest_cluster_keys, rest_pairs * sizeof(int)));
-  RAFT_CUDA_TRY(cudaMalloc(&d_rest_query_values, rest_pairs * sizeof(int)));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_nearest_cluster_keys, nearest_pairs * sizeof(int), stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_nearest_query_values, nearest_pairs * sizeof(int), stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_rest_cluster_keys, rest_pairs * sizeof(int), stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_rest_query_values, rest_pairs * sizeof(int), stream));
 
   // Allocate memory for sorted results
   //    cudaMalloc(&d_nearest_sorted_clusters, nearest_pairs * sizeof(int));
   //    cudaMalloc(&d_nearest_sorted_queries, nearest_pairs * sizeof(int));
-  RAFT_CUDA_TRY(cudaMalloc(&d_rest_sorted_clusters, rest_pairs * sizeof(int)));
-  RAFT_CUDA_TRY(cudaMalloc(&d_rest_sorted_queries, rest_pairs * sizeof(int)));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_rest_sorted_clusters, rest_pairs * sizeof(int), stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_rest_sorted_queries, rest_pairs * sizeof(int), stream));
 
   // Prepare data using v2 kernel
   int threads_per_block = 256;
   int num_blocks = (max(nearest_pairs, rest_pairs) + threads_per_block - 1) / threads_per_block;
 
-  prepare_keys_values_separated_v2<<<num_blocks, threads_per_block, 0, cuda_stream>>>(
+  prepare_keys_values_separated_v2<<<num_blocks, threads_per_block, 0, stream>>>(
     d_raft_idx,
     d_nearest_cluster_keys,
     d_nearest_query_values,
@@ -1728,10 +1796,10 @@ void sort_cluster_query_pairs_separate(
                                   rest_pairs,
                                   0,
                                   sizeof(int) * 8,
-                                  cuda_stream);
+                                  stream);
 
   void* d_rest_temp_storage;
-  RAFT_CUDA_TRY(cudaMalloc(&d_rest_temp_storage, rest_temp_storage_bytes));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_rest_temp_storage, rest_temp_storage_bytes, stream));
 
   cub::DeviceRadixSort::SortPairs(d_rest_temp_storage,
                                   rest_temp_storage_bytes,
@@ -1742,28 +1810,30 @@ void sort_cluster_query_pairs_separate(
                                   rest_pairs,
                                   0,
                                   sizeof(int) * 8,
-                                  cuda_stream);
+                                  stream);
 
   // Combine sorted results into pairs for nearest
   int nearest_blocks = (nearest_pairs + threads_per_block - 1) / threads_per_block;
-  combine_to_pairs<<<nearest_blocks, threads_per_block, 0, cuda_stream>>>(
+  combine_to_pairs<<<nearest_blocks, threads_per_block, 0, stream>>>(
     d_nearest_cluster_keys, d_nearest_query_values, d_nearest_sorted_pairs, nearest_pairs);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Combine sorted results into pairs for rest
   int rest_blocks = (rest_pairs + threads_per_block - 1) / threads_per_block;
-  combine_to_pairs<<<rest_blocks, threads_per_block, 0, cuda_stream>>>(
+  combine_to_pairs<<<rest_blocks, threads_per_block, 0, stream>>>(
     d_rest_sorted_clusters, d_rest_sorted_queries, d_rest_sorted_pairs, rest_pairs);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Clean up
-  RAFT_CUDA_TRY(cudaFree(d_nearest_cluster_keys));
-  RAFT_CUDA_TRY(cudaFree(d_nearest_query_values));
-  RAFT_CUDA_TRY(cudaFree(d_rest_cluster_keys));
-  RAFT_CUDA_TRY(cudaFree(d_rest_query_values));
-  RAFT_CUDA_TRY(cudaFree(d_rest_sorted_clusters));
-  RAFT_CUDA_TRY(cudaFree(d_rest_sorted_queries));
-  RAFT_CUDA_TRY(cudaFree(d_rest_temp_storage));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_nearest_cluster_keys, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_nearest_query_values, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_rest_cluster_keys, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_rest_query_values, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_rest_sorted_clusters, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_rest_sorted_queries, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_rest_temp_storage, stream));
+
+  raft::resource::sync_stream(handle);
 }
 
 // Warp-level reduction using shuffle instructions
@@ -1993,7 +2063,8 @@ void computeQueryFactors(const T* d_query,
 //}
 
 // normal way to first sort (cluster, query) pairs, then use a CTA to do the search
-void IVFGPU::BatchClusterSearch(const float* d_query,
+void IVFGPU::BatchClusterSearch(raft::resources const& handle,
+                                const float* d_query,
                                 size_t k,
                                 size_t nprobe,
                                 void* searcher,
@@ -2001,9 +2072,10 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
                                 float* d_topk_dists,
                                 float* d_final_dists,
                                 PID* d_topk_pids,
-                                PID* d_final_pids,
-                                cudaStream_t single_stream)
+                                PID* d_final_pids)
 {
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+
   SearcherGPU* searcher_batch = ((SearcherGPU*)searcher);
   // batch_size = num_queries
   // First compute distances from query to centroids on CPU and select TOPK for each
@@ -2011,7 +2083,7 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
   // Step 1: Compute -2 * Q * C^T using cuBLAS
   cublasHandle_t cb;
   cublasCreate(&cb);
-  cublasSetStream(cb, single_stream);
+  cublasSetStream(cb, stream);
   const float alpha = -2.f, beta = 0.f;
   RABITQ_CUBLAS_CHECK(cublasSgemm(cb,
                                   CUBLAS_OP_T,
@@ -2032,7 +2104,7 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
   int grid                  = num_centroids + batch_size;
   const int norm_block_size = 256;
   size_t norm_shared_mem    = ((norm_block_size + 31) / 32) * sizeof(float);
-  row_norms_fused_kernel<<<grid, norm_block_size, norm_shared_mem, single_stream>>>(
+  row_norms_fused_kernel<<<grid, norm_block_size, norm_shared_mem, stream>>>(
     d_query,
     batch_size,
     num_padded_dim,
@@ -2046,12 +2118,11 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
   // Step3: add all norms together
   int add_threads = 256;
   int add_blocks  = (batch_size * num_centroids + add_threads - 1) / add_threads;
-  add_norms_kernel<<<add_blocks, add_threads, 0, single_stream>>>(
-    searcher_batch->d_centroid_distances,
-    searcher_batch->d_q_norms,
-    searcher_batch->d_c_norms,
-    batch_size,
-    num_centroids);
+  add_norms_kernel<<<add_blocks, add_threads, 0, stream>>>(searcher_batch->d_centroid_distances,
+                                                           searcher_batch->d_q_norms,
+                                                           searcher_batch->d_c_norms,
+                                                           batch_size,
+                                                           num_centroids);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Step4: select topk and copy back
@@ -2059,12 +2130,10 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
   // RAFT select_k outputs
   float* d_raft_vals = nullptr;
   int* d_raft_idx    = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_vals, batch_size * nprobe * sizeof(float), single_stream));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_idx, batch_size * nprobe * sizeof(int), single_stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_vals, batch_size * nprobe * sizeof(float), stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_idx, batch_size * nprobe * sizeof(int), stream));
 
   // Then TOPK is copied back to CPU side
-  raft::resources handle;  // default stream
-  raft::resource::set_cuda_stream(handle, single_stream);
   auto in_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
     searcher_batch->d_centroid_distances, batch_size, num_centroids);
   auto outv_v =
@@ -2085,16 +2154,15 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
   // Sortpairs
   ClusterQueryPair* d_sorted_pairs;
   int total_pairs = batch_size * nprobe;
-  RAFT_CUDA_TRY(
-    cudaMallocAsync(&d_sorted_pairs, total_pairs * sizeof(ClusterQueryPair), single_stream));
-  sort_cluster_query_pairs(d_raft_idx, d_sorted_pairs, batch_size, nprobe, single_stream);
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_sorted_pairs, total_pairs * sizeof(ClusterQueryPair), stream));
+  sort_cluster_query_pairs(handle, d_raft_idx, d_sorted_pairs, batch_size, nprobe);
 
   // Compute query factors
   float *d_G_k1xSumq, *d_G_kbxSumq;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_k1xSumq, batch_size * sizeof(float), single_stream));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_kbxSumq, batch_size * sizeof(float), single_stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_k1xSumq, batch_size * sizeof(float), stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_kbxSumq, batch_size * sizeof(float), stream));
   computeQueryFactors<float>(
-    d_query, d_G_k1xSumq, d_G_kbxSumq, batch_size, num_padded_dim, ex_bits, single_stream);
+    d_query, d_G_k1xSumq, d_G_kbxSumq, batch_size, num_padded_dim, ex_bits, stream);
   // Then launch the search function
 
   searcher_batch->SearchClusterQueryPairs(*this,
@@ -2110,19 +2178,20 @@ void IVFGPU::BatchClusterSearch(const float* d_query,
                                           d_topk_pids,
                                           d_final_dists,
                                           d_final_pids,
-                                          single_stream);
+                                          stream);
 
   // clear
   cublasDestroy(cb);
-  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_vals, single_stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_idx, single_stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_sorted_pairs, single_stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_G_k1xSumq, single_stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_G_kbxSumq, single_stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_vals, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_idx, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_sorted_pairs, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_G_k1xSumq, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_G_kbxSumq, stream));
 }
 
 // normal way to first sort (cluster, query) pairs, then use a CTA to do the search
-void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
+void IVFGPU::BatchClusterSearchLUT16(raft::resources const& handle,
+                                     const float* d_query,
                                      size_t k,
                                      size_t nprobe,
                                      void* searcher,
@@ -2130,9 +2199,10 @@ void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
                                      float* d_topk_dists,
                                      float* d_final_dists,
                                      PID* d_topk_pids,
-                                     PID* d_final_pids,
-                                     cudaStream_t single_stream)
+                                     PID* d_final_pids)
 {
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+
   SearcherGPU* searcher_batch = ((SearcherGPU*)searcher);
   // batch_size = num_queries
   // First compute distances from query to centroids on CPU and select TOPK for each
@@ -2140,7 +2210,7 @@ void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
   // Step 1: Compute -2 * Q * C^T using cuBLAS
   cublasHandle_t cb;
   cublasCreate(&cb);
-  cublasSetStream(cb, single_stream);
+  cublasSetStream(cb, stream);
   const float alpha = -2.f, beta = 0.f;
   RABITQ_CUBLAS_CHECK(cublasSgemm(cb,
                                   CUBLAS_OP_T,
@@ -2161,7 +2231,7 @@ void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
   int grid                  = num_centroids + batch_size;
   const int norm_block_size = 256;
   size_t norm_shared_mem    = ((norm_block_size + 31) / 32) * sizeof(float);
-  row_norms_fused_kernel<<<grid, norm_block_size, norm_shared_mem, single_stream>>>(
+  row_norms_fused_kernel<<<grid, norm_block_size, norm_shared_mem, stream>>>(
     d_query,
     batch_size,
     num_padded_dim,
@@ -2175,12 +2245,11 @@ void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
   // Step3: add all norms together
   int add_threads = 256;
   int add_blocks  = (batch_size * num_centroids + add_threads - 1) / add_threads;
-  add_norms_kernel<<<add_blocks, add_threads, 0, single_stream>>>(
-    searcher_batch->d_centroid_distances,
-    searcher_batch->d_q_norms,
-    searcher_batch->d_c_norms,
-    batch_size,
-    num_centroids);
+  add_norms_kernel<<<add_blocks, add_threads, 0, stream>>>(searcher_batch->d_centroid_distances,
+                                                           searcher_batch->d_q_norms,
+                                                           searcher_batch->d_c_norms,
+                                                           batch_size,
+                                                           num_centroids);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Step4: select topk and copy back
@@ -2188,12 +2257,10 @@ void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
   // RAFT select_k outputs
   float* d_raft_vals = nullptr;
   int* d_raft_idx    = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_vals, batch_size * nprobe * sizeof(float), single_stream));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_idx, batch_size * nprobe * sizeof(int), single_stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_vals, batch_size * nprobe * sizeof(float), stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_idx, batch_size * nprobe * sizeof(int), stream));
 
   // Then TOPK is copied back to CPU side
-  raft::resources handle;  // default stream
-  raft::resource::set_cuda_stream(handle, single_stream);
   auto in_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
     searcher_batch->d_centroid_distances, batch_size, num_centroids);
   auto outv_v =
@@ -2214,16 +2281,15 @@ void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
   // Sortpairs
   ClusterQueryPair* d_sorted_pairs;
   int total_pairs = batch_size * nprobe;
-  RAFT_CUDA_TRY(
-    cudaMallocAsync(&d_sorted_pairs, total_pairs * sizeof(ClusterQueryPair), single_stream));
-  sort_cluster_query_pairs(d_raft_idx, d_sorted_pairs, batch_size, nprobe, single_stream);
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_sorted_pairs, total_pairs * sizeof(ClusterQueryPair), stream));
+  sort_cluster_query_pairs(handle, d_raft_idx, d_sorted_pairs, batch_size, nprobe);
 
   // Compute query factors
   float *d_G_k1xSumq, *d_G_kbxSumq;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_k1xSumq, batch_size * sizeof(float), single_stream));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_kbxSumq, batch_size * sizeof(float), single_stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_k1xSumq, batch_size * sizeof(float), stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_kbxSumq, batch_size * sizeof(float), stream));
   computeQueryFactors<float>(
-    d_query, d_G_k1xSumq, d_G_kbxSumq, batch_size, num_padded_dim, ex_bits, single_stream);
+    d_query, d_G_k1xSumq, d_G_kbxSumq, batch_size, num_padded_dim, ex_bits, stream);
   // Then launch the search function
 
   searcher_batch->SearchClusterQueryPairsSharedMemOpt(*this,
@@ -2239,19 +2305,20 @@ void IVFGPU::BatchClusterSearchLUT16(const float* d_query,
                                                       d_topk_pids,
                                                       d_final_dists,
                                                       d_final_pids,
-                                                      single_stream);
+                                                      stream);
 
   // clear
   cublasDestroy(cb);
-  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_vals, single_stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_idx, single_stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_sorted_pairs, single_stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_G_k1xSumq, single_stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_G_kbxSumq, single_stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_vals, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_idx, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_sorted_pairs, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_G_k1xSumq, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_G_kbxSumq, stream));
 }
 
 // normal way to first sort (cluster, query) pairs, then use a CTA to do the search
-void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
+void IVFGPU::BatchClusterSearchQuantizeQuery(raft::resources const& handle,
+                                             const float* d_query,
                                              size_t k,
                                              size_t nprobe,
                                              void* searcher,
@@ -2260,9 +2327,10 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
                                              float* d_final_dists,
                                              PID* d_topk_pids,
                                              PID* d_final_pids,
-                                             int query_bits,
-                                             cudaStream_t single_stream)
+                                             int query_bits)
 {
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+
   SearcherGPU* searcher_batch = ((SearcherGPU*)searcher);
   // batch_size = num_queries
   // First compute distances from query to centroids on CPU and select TOPK for each
@@ -2270,7 +2338,7 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
   // Step 1: Compute -2 * Q * C^T using cuBLAS
   cublasHandle_t cb;
   cublasCreate(&cb);
-  cublasSetStream(cb, single_stream);
+  cublasSetStream(cb, stream);
   const float alpha = -2.f, beta = 0.f;
   RABITQ_CUBLAS_CHECK(cublasSgemm(cb,
                                   CUBLAS_OP_T,
@@ -2291,7 +2359,7 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
   int grid                  = num_centroids + batch_size;
   const int norm_block_size = 256;
   size_t norm_shared_mem    = ((norm_block_size + 31) / 32) * sizeof(float);
-  row_norms_fused_kernel<<<grid, norm_block_size, norm_shared_mem, single_stream>>>(
+  row_norms_fused_kernel<<<grid, norm_block_size, norm_shared_mem, stream>>>(
     d_query,
     batch_size,
     num_padded_dim,
@@ -2305,12 +2373,11 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
   // Step3: add all norms together
   int add_threads = 256;
   int add_blocks  = (batch_size * num_centroids + add_threads - 1) / add_threads;
-  add_norms_kernel<<<add_blocks, add_threads, 0, single_stream>>>(
-    searcher_batch->d_centroid_distances,
-    searcher_batch->d_q_norms,
-    searcher_batch->d_c_norms,
-    batch_size,
-    num_centroids);
+  add_norms_kernel<<<add_blocks, add_threads, 0, stream>>>(searcher_batch->d_centroid_distances,
+                                                           searcher_batch->d_q_norms,
+                                                           searcher_batch->d_c_norms,
+                                                           batch_size,
+                                                           num_centroids);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Step4: select topk and copy back
@@ -2318,12 +2385,10 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
   // RAFT select_k outputs
   float* d_raft_vals = nullptr;
   int* d_raft_idx    = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_vals, batch_size * nprobe * sizeof(float), single_stream));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_idx, batch_size * nprobe * sizeof(int), single_stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_vals, batch_size * nprobe * sizeof(float), stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_idx, batch_size * nprobe * sizeof(int), stream));
 
   // Then TOPK is copied back to CPU side
-  raft::resources handle;  // default stream
-  raft::resource::set_cuda_stream(handle, single_stream);
   auto in_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
     searcher_batch->d_centroid_distances, batch_size, num_centroids);
   auto outv_v =
@@ -2344,16 +2409,15 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
   // Sortpairs
   ClusterQueryPair* d_sorted_pairs;
   int total_pairs = batch_size * nprobe;
-  RAFT_CUDA_TRY(
-    cudaMallocAsync(&d_sorted_pairs, total_pairs * sizeof(ClusterQueryPair), single_stream));
-  sort_cluster_query_pairs(d_raft_idx, d_sorted_pairs, batch_size, nprobe, single_stream);
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_sorted_pairs, total_pairs * sizeof(ClusterQueryPair), stream));
+  sort_cluster_query_pairs(handle, d_raft_idx, d_sorted_pairs, batch_size, nprobe);
 
   // Compute query factors
   float *d_G_k1xSumq, *d_G_kbxSumq;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_k1xSumq, batch_size * sizeof(float), single_stream));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_kbxSumq, batch_size * sizeof(float), single_stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_k1xSumq, batch_size * sizeof(float), stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_kbxSumq, batch_size * sizeof(float), stream));
   computeQueryFactors<float>(
-    d_query, d_G_k1xSumq, d_G_kbxSumq, batch_size, num_padded_dim, ex_bits, single_stream);
+    d_query, d_G_k1xSumq, d_G_kbxSumq, batch_size, num_padded_dim, ex_bits, stream);
   // Then launch the search function
 
   searcher_batch->SearchClusterQueryPairsQuantizeQuery(*this,
@@ -2369,19 +2433,20 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(const float* d_query,
                                                        d_topk_pids,
                                                        d_final_dists,
                                                        d_final_pids,
-                                                       single_stream,
+                                                       stream,
                                                        query_bits == 4);
 
   // clear
   cublasDestroy(cb);
-  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_vals, single_stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_idx, single_stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_sorted_pairs, single_stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_G_k1xSumq, single_stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_G_kbxSumq, single_stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_vals, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_idx, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_sorted_pairs, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_G_k1xSumq, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_G_kbxSumq, stream));
 }
 
-void IVFGPU::BatchClusterSearchPreComputeThresholds(const float* d_query,
+void IVFGPU::BatchClusterSearchPreComputeThresholds(raft::resources const& handle,
+                                                    const float* d_query,
                                                     size_t k,
                                                     size_t nprobe,
                                                     void* searcher,
@@ -2389,9 +2454,10 @@ void IVFGPU::BatchClusterSearchPreComputeThresholds(const float* d_query,
                                                     float* d_topk_dists,
                                                     float* d_final_dists,
                                                     PID* d_topk_pids,
-                                                    PID* d_final_pids,
-                                                    cudaStream_t single_stream)
+                                                    PID* d_final_pids)
 {
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+
   SearcherGPU* searcher_batch = ((SearcherGPU*)searcher);
   // batch_size = num_queries
   // First compute distances from query to centroids on CPU and select TOPK for each
@@ -2399,7 +2465,7 @@ void IVFGPU::BatchClusterSearchPreComputeThresholds(const float* d_query,
   // Step 1: Compute -2 * Q * C^T using cuBLAS
   cublasHandle_t cb;
   cublasCreate(&cb);
-  cublasSetStream(cb, single_stream);
+  cublasSetStream(cb, stream);
   const float alpha = -2.f, beta = 0.f;
   RABITQ_CUBLAS_CHECK(cublasSgemm(cb,
                                   CUBLAS_OP_T,
@@ -2420,7 +2486,7 @@ void IVFGPU::BatchClusterSearchPreComputeThresholds(const float* d_query,
   int grid                  = num_centroids + batch_size;
   const int norm_block_size = 256;
   size_t norm_shared_mem    = ((norm_block_size + 31) / 32) * sizeof(float);
-  row_norms_fused_kernel<<<grid, norm_block_size, norm_shared_mem, single_stream>>>(
+  row_norms_fused_kernel<<<grid, norm_block_size, norm_shared_mem, stream>>>(
     d_query,
     batch_size,
     num_padded_dim,
@@ -2434,12 +2500,11 @@ void IVFGPU::BatchClusterSearchPreComputeThresholds(const float* d_query,
   // Step3: add all norms together
   int add_threads = 256;
   int add_blocks  = (batch_size * num_centroids + add_threads - 1) / add_threads;
-  add_norms_kernel<<<add_blocks, add_threads, 0, single_stream>>>(
-    searcher_batch->d_centroid_distances,
-    searcher_batch->d_q_norms,
-    searcher_batch->d_c_norms,
-    batch_size,
-    num_centroids);
+  add_norms_kernel<<<add_blocks, add_threads, 0, stream>>>(searcher_batch->d_centroid_distances,
+                                                           searcher_batch->d_q_norms,
+                                                           searcher_batch->d_c_norms,
+                                                           batch_size,
+                                                           num_centroids);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Step4: select topk and copy back
@@ -2447,12 +2512,10 @@ void IVFGPU::BatchClusterSearchPreComputeThresholds(const float* d_query,
   // RAFT select_k outputs
   float* d_raft_vals = nullptr;
   int* d_raft_idx    = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_vals, batch_size * nprobe * sizeof(float), single_stream));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_idx, batch_size * nprobe * sizeof(int), single_stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_vals, batch_size * nprobe * sizeof(float), stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_raft_idx, batch_size * nprobe * sizeof(int), stream));
 
   // Then TOPK is copied back to CPU side
-  raft::resources handle;  // default stream
-  raft::resource::set_cuda_stream(handle, single_stream);
   auto in_view = raft::make_device_matrix_view<const float, int64_t, raft::row_major>(
     searcher_batch->d_centroid_distances, batch_size, num_centroids);
   auto outv_v =
@@ -2474,18 +2537,18 @@ void IVFGPU::BatchClusterSearchPreComputeThresholds(const float* d_query,
   ClusterQueryPair *d_rest_sorted_pairs, *d_nearest_sorted_pairs;
   //    int total_pairs = batch_size * nprobe;
   RAFT_CUDA_TRY(
-    cudaMallocAsync(&d_nearest_sorted_pairs, batch_size * sizeof(ClusterQueryPair), single_stream));
+    cudaMallocAsync(&d_nearest_sorted_pairs, batch_size * sizeof(ClusterQueryPair), stream));
   RAFT_CUDA_TRY(cudaMallocAsync(
-    &d_rest_sorted_pairs, batch_size * (nprobe - 1) * sizeof(ClusterQueryPair), single_stream));
+    &d_rest_sorted_pairs, batch_size * (nprobe - 1) * sizeof(ClusterQueryPair), stream));
   sort_cluster_query_pairs_separate(
-    d_raft_idx, d_nearest_sorted_pairs, d_rest_sorted_pairs, batch_size, nprobe, single_stream);
+    handle, d_raft_idx, d_nearest_sorted_pairs, d_rest_sorted_pairs, batch_size, nprobe);
 
   // Compute query factors
   float *d_G_k1xSumq, *d_G_kbxSumq;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_k1xSumq, batch_size * sizeof(float), single_stream));
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_kbxSumq, batch_size * sizeof(float), single_stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_k1xSumq, batch_size * sizeof(float), stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_G_kbxSumq, batch_size * sizeof(float), stream));
   computeQueryFactors<float>(
-    d_query, d_G_k1xSumq, d_G_kbxSumq, batch_size, num_padded_dim, ex_bits, single_stream);
+    d_query, d_G_k1xSumq, d_G_kbxSumq, batch_size, num_padded_dim, ex_bits, stream);
   // Then launch the search function
 
   searcher_batch->SearchClusterQueryPairsPreComputeThreshold(*this,
@@ -2502,27 +2565,29 @@ void IVFGPU::BatchClusterSearchPreComputeThresholds(const float* d_query,
                                                              d_topk_pids,
                                                              d_final_dists,
                                                              d_final_pids,
-                                                             single_stream);
+                                                             stream);
 
   // clear
   cublasDestroy(cb);
-  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_vals, single_stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_idx, single_stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_rest_sorted_pairs, single_stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_nearest_sorted_pairs, single_stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_G_k1xSumq, single_stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_G_kbxSumq, single_stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_vals, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_raft_idx, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_rest_sorted_pairs, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_nearest_sorted_pairs, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_G_k1xSumq, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_G_kbxSumq, stream));
 }
 
-void IVFGPU::MultiClusterSearch(const float* d_query,
+void IVFGPU::MultiClusterSearch(raft::resources const& handle,
+                                const float* d_query,
                                 size_t k,
                                 size_t nprobe,
                                 PID* results,
                                 void* searcher1,
-                                cudaStream_t single_stream,
                                 DeviceResultPool** knn_array,
                                 std::vector<Candidate>& centroid_candidates) const
 {
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+
   // Compute distances from query to centroids on GPU.
   // d_query is on CPU now
   SearcherGPU* searcher = ((SearcherGPU*)searcher1);
@@ -2531,25 +2596,21 @@ void IVFGPU::MultiClusterSearch(const float* d_query,
   searcher->h_filter_distk = INFINITY;
   float temp               = INFINITY;
   RAFT_CUDA_TRY(cudaMemcpyAsync(
-    searcher->d_filter_distk, &temp, sizeof(float), cudaMemcpyHostToDevice, single_stream));
-  //    cudaMemsetAsync(searcher->d_est_dis, 0, sizeof(float)  * this->num_vectors, single_stream);
+    searcher->d_filter_distk, &temp, sizeof(float), cudaMemcpyHostToDevice, stream));
+  //    cudaMemsetAsync(searcher->d_est_dis, 0, sizeof(float)  * this->num_vectors, stream);
 
   Candidate* d_centroid_candidates = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_centroid_candidates, nprobe * sizeof(Candidate), single_stream));
-  initializer->ComputeCentroidsDistances(
-    d_query, nprobe, d_centroid_candidates, nprobe, single_stream);
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_centroid_candidates, nprobe * sizeof(Candidate), stream));
+  initializer->ComputeCentroidsDistances(d_query, nprobe, d_centroid_candidates, nprobe, stream);
 
   // Copy only the top nprobe candidates to host.
   cudaEvent_t copyDone;
   RAFT_CUDA_TRY(
     cudaEventCreateWithFlags(&copyDone, cudaEventDisableTiming));  // cheaper, no timestamps
   Candidate first_candidate;
-  RAFT_CUDA_TRY(cudaMemcpyAsync(&first_candidate,
-                                d_centroid_candidates,
-                                sizeof(Candidate),
-                                cudaMemcpyDeviceToHost,
-                                single_stream));
-  RAFT_CUDA_TRY(cudaEventRecord(copyDone, single_stream));
+  RAFT_CUDA_TRY(cudaMemcpyAsync(
+    &first_candidate, d_centroid_candidates, sizeof(Candidate), cudaMemcpyDeviceToHost, stream));
+  RAFT_CUDA_TRY(cudaEventRecord(copyDone, stream));
 
   // For each of the nprobe closest centroids, perform GPU search. and finally get TOPK *
   // num_centroids results
@@ -2557,16 +2618,16 @@ void IVFGPU::MultiClusterSearch(const float* d_query,
 
   // Gather GPU Cluster Meta on the CPU side
   GPUClusterMeta* d_selected_meta = nullptr;
-  RAFT_CUDA_TRY(cudaMallocAsync(&d_selected_meta, sizeof(GPUClusterMeta) * nprobe, single_stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_selected_meta, sizeof(GPUClusterMeta) * nprobe, stream));
   const int BLK = 128;
   int GRD       = (nprobe + BLK - 1) / BLK;
-  gather_cluster_meta_kernel<<<GRD, BLK, 0, single_stream>>>(
+  gather_cluster_meta_kernel<<<GRD, BLK, 0, stream>>>(
     d_centroid_candidates, d_cluster_meta, d_selected_meta, nprobe);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
 #ifdef DEBUG_MULTIPLE_SEARCH
   printf("Gather Cluster Meta Done\n");
-  RAFT_CUDA_TRY(cudaStreamSynchronize(single_stream));
+  raft::resource::sync_stream(handle);
   RAFT_CUDA_TRY(cudaGetLastError());
 #endif
 
@@ -2583,11 +2644,8 @@ void IVFGPU::MultiClusterSearch(const float* d_query,
     const float* d_centroid = this->initializer->GetCentroid(cid);
     float* h_centroid       = centroid_data + cid * num_padded_dim;
 
-    RAFT_CUDA_TRY(cudaMemcpyAsync(h_centroid,
-                                  d_centroid,
-                                  num_padded_dim * sizeof(float),
-                                  cudaMemcpyDeviceToHost,
-                                  single_stream));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(
+      h_centroid, d_centroid, num_padded_dim * sizeof(float), cudaMemcpyDeviceToHost, stream));
 
     searcher->SearchClusterWithFilterMemOptOneforMulti(/* add a stream parameter */
                                                        *this,
@@ -2595,12 +2653,12 @@ void IVFGPU::MultiClusterSearch(const float* d_query,
                                                        sqr_y,
                                                        knn_array[i],
                                                        h_centroid,
-                                                       single_stream);
+                                                       stream);
   }
 
 #ifdef DEBUG_MULTIPLE_SEARCH
   printf("First Cluster Search Done\n");
-  RAFT_CUDA_TRY(cudaStreamSynchronize(0));
+  raft::resource::sync_stream(handle);
   RAFT_CUDA_TRY(cudaGetLastError());
 #endif
 
@@ -2613,7 +2671,7 @@ void IVFGPU::MultiClusterSearch(const float* d_query,
                                      d_centroid_candidates + 1,
                                      knn_array[1],
                                      this->initializer->GetCentroid(0),
-                                     single_stream,
+                                     stream,
                                      d_query,
                                      nprobe - 1);
   }
@@ -2633,19 +2691,24 @@ void IVFGPU::MultiClusterSearch(const float* d_query,
 
   if (nprobe > 1) {
     //        merge_knn_pools_filter_cub(knn_array, 2, k, results);
-    merge_knn_pools_filter_host(knn_array, 2, k, results, single_stream);
+    merge_knn_pools_filter_host(handle, knn_array, 2, k, results);
     // actually we only have two result pool here
   } else {
-    merge_knn_pools_filter_host(knn_array, 1, k, results, single_stream);
+    merge_knn_pools_filter_host(handle, knn_array, 1, k, results);
   }
   free(centroid_data);
-  RAFT_CUDA_TRY(cudaFreeAsync(d_selected_meta, single_stream));
-  RAFT_CUDA_TRY(cudaFreeAsync(d_centroid_candidates, single_stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_selected_meta, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_centroid_candidates, stream));
 }
 
-void IVFGPU::MemOptimizedSearchV2(
-  const float* d_query, size_t k, size_t nprobe, PID* results, void* searcher1) const
+void IVFGPU::MemOptimizedSearchV2(raft::resources const& handle,
+                                  const float* d_query,
+                                  size_t k,
+                                  size_t nprobe,
+                                  PID* results,
+                                  void* searcher1) const
 {
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   // Compute distances from query to centroids on GPU.
   // d_query is on CPU now
   SearcherGPU* searcher = ((SearcherGPU*)searcher1);
@@ -2653,8 +2716,8 @@ void IVFGPU::MemOptimizedSearchV2(
   searcher->query          = d_query;
   searcher->h_filter_distk = INFINITY;
   float temp               = INFINITY;
-  RAFT_CUDA_TRY(
-    cudaMemcpyAsync(searcher->d_filter_distk, &temp, sizeof(float), cudaMemcpyHostToDevice, 0));
+  RAFT_CUDA_TRY(cudaMemcpyAsync(
+    searcher->d_filter_distk, &temp, sizeof(float), cudaMemcpyHostToDevice, stream));
   //    printf("querying...\n");
   //    SearcherGPU searcher(d_query, num_padded_dim, ex_bits);
   //    RAFT_CUDA_TRY(cudaMemset(searcher->d_unit_q_gpu, 0, sizeof(float)  * num_dimensions));
@@ -2677,16 +2740,18 @@ void IVFGPU::MemOptimizedSearchV2(
   //    RAFT_CUDA_TRY(cudaMemset(searcher->d_ip2, 0, sizeof(float)  * KM));
 
   Candidate* d_centroid_candidates = nullptr;
-  RAFT_CUDA_TRY(cudaMalloc(&d_centroid_candidates, nprobe * sizeof(Candidate)));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_centroid_candidates, nprobe * sizeof(Candidate), stream));
+  raft::resource::sync_stream(handle);
   initializer->ComputeCentroidsDistances(d_query, nprobe, d_centroid_candidates, nprobe, nullptr);
 
   // Copy only the top nprobe candidates to host.
   std::vector<Candidate> centroid_candidates(nprobe);
-  RAFT_CUDA_TRY(cudaMemcpy(centroid_candidates.data(),
-                           d_centroid_candidates,
-                           nprobe * sizeof(Candidate),
-                           cudaMemcpyDeviceToHost));
-  RAFT_CUDA_TRY(cudaFree(d_centroid_candidates));
+  RAFT_CUDA_TRY(cudaMemcpyAsync(centroid_candidates.data(),
+                                d_centroid_candidates,
+                                nprobe * sizeof(Candidate),
+                                cudaMemcpyDeviceToHost,
+                                stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_centroid_candidates, stream));
 
   // Create a device result pool. (k*nprobe for multiple use)
   DeviceResultPool** knn_array = new DeviceResultPool*[nprobe];
@@ -2698,11 +2763,11 @@ void IVFGPU::MemOptimizedSearchV2(
   // num_centroids results
   float* centroid_data = (float*)malloc(sizeof(float) * num_padded_dim * num_centroids);
 
+  raft::resource::sync_stream(handle);
   // #pragma omp parallel for schedule(static)
   for (size_t i = 0; i < nprobe; ++i) {
     //        const int tid      = omp_get_thread_num();
     //        cudaStream_t s     = streams[tid % num_streams];
-    cudaStream_t s = 0;
 
     PID cid     = centroid_candidates[i].id;
     float sqr_y = centroid_candidates[i].distance;
@@ -2711,16 +2776,16 @@ void IVFGPU::MemOptimizedSearchV2(
     //        init_buffers_to_inf_kernel(searcher->d_ip_results, searcher->d_est_dis,
     //        h_cluster_meta[cid].num, s);
     RAFT_CUDA_TRY(
-      cudaMemsetAsync(searcher->d_ip_results, 0, sizeof(float) * h_cluster_meta[cid].num, s));
+      cudaMemsetAsync(searcher->d_ip_results, 0, sizeof(float) * h_cluster_meta[cid].num, stream));
     RAFT_CUDA_TRY(
-      cudaMemsetAsync(searcher->d_est_dis, 0, sizeof(float) * h_cluster_meta[cid].num, s));
+      cudaMemsetAsync(searcher->d_est_dis, 0, sizeof(float) * h_cluster_meta[cid].num, stream));
 
     // 3-a) async copy centroid i -> pinned host buffer
     const float* d_centroid = this->initializer->GetCentroid(cid);
     float* h_centroid       = centroid_data + cid * num_padded_dim;
 
     RAFT_CUDA_TRY(cudaMemcpyAsync(
-      h_centroid, d_centroid, num_padded_dim * sizeof(float), cudaMemcpyDeviceToHost, s));
+      h_centroid, d_centroid, num_padded_dim * sizeof(float), cudaMemcpyDeviceToHost, stream));
 
     // 3-b) launch the probe-level search on the **same** stream
     searcher->SearchClusterWithFilterMemOptV2(/* add a stream parameter */
@@ -2729,7 +2794,7 @@ void IVFGPU::MemOptimizedSearchV2(
                                               sqr_y,
                                               knn_array[i],
                                               h_centroid,
-                                              s);
+                                              stream);
   }
   free(centroid_data);
 
@@ -2737,16 +2802,23 @@ void IVFGPU::MemOptimizedSearchV2(
   // Copy the result pool back to host.
   //    copy_results_from_pool(KNNs, results);
   RAFT_CUDA_TRY(cudaDeviceSynchronize());
-  merge_knn_pools_filter(knn_array, nprobe, k, results);
+  raft::resource::sync_stream(handle);
+  merge_knn_pools_filter(handle, knn_array, nprobe, k, results);
   // free pools
   for (size_t i = 0; i < nprobe; ++i) {
-    freeDeviceResultPool(knn_array[i]);
+    freeDeviceResultPool(knn_array[i], stream);
   }
 }
 
-void IVFGPU::CPUGPUCoSearch(
-  const float* d_query, size_t k, size_t nprobe, PID* results, void* searcher1) const
+void IVFGPU::CPUGPUCoSearch(raft::resources const& handle,
+                            const float* d_query,
+                            size_t k,
+                            size_t nprobe,
+                            PID* results,
+                            void* searcher1) const
 {
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
+
   // Compute distances from query to centroids on GPU.
   // d_query is on CPU now
   SearcherGPU* searcher = ((SearcherGPU*)searcher1);
@@ -2754,20 +2826,22 @@ void IVFGPU::CPUGPUCoSearch(
   searcher->query          = d_query;
   searcher->h_filter_distk = INFINITY;
   float temp               = INFINITY;
-  RAFT_CUDA_TRY(
-    cudaMemcpyAsync(searcher->d_filter_distk, &temp, sizeof(float), cudaMemcpyHostToDevice, 0));
+  RAFT_CUDA_TRY(cudaMemcpyAsync(
+    searcher->d_filter_distk, &temp, sizeof(float), cudaMemcpyHostToDevice, stream));
 
   Candidate* d_centroid_candidates = nullptr;
-  RAFT_CUDA_TRY(cudaMalloc(&d_centroid_candidates, nprobe * sizeof(Candidate)));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_centroid_candidates, nprobe * sizeof(Candidate), stream));
+  raft::resource::sync_stream(handle);
   initializer->ComputeCentroidsDistances(d_query, nprobe, d_centroid_candidates, nprobe, nullptr);
 
   // Copy only the top nprobe candidates to host.
   std::vector<Candidate> centroid_candidates(nprobe);
-  RAFT_CUDA_TRY(cudaMemcpy(centroid_candidates.data(),
-                           d_centroid_candidates,
-                           nprobe * sizeof(Candidate),
-                           cudaMemcpyDeviceToHost));
-  RAFT_CUDA_TRY(cudaFree(d_centroid_candidates));
+  RAFT_CUDA_TRY(cudaMemcpyAsync(centroid_candidates.data(),
+                                d_centroid_candidates,
+                                nprobe * sizeof(Candidate),
+                                cudaMemcpyDeviceToHost,
+                                stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_centroid_candidates, stream));
 
   // Create a device result pool. (k*nprobe for multiple use)
   // In the offload version, always merge the following part to the first one
@@ -2780,11 +2854,11 @@ void IVFGPU::CPUGPUCoSearch(
   // num_centroids results
   float* centroid_data = (float*)malloc(sizeof(float) * num_padded_dim * num_centroids);
 
+  raft::resource::sync_stream(handle);
   // #pragma omp parallel for schedule(static)
   for (size_t i = 0; i < nprobe; ++i) {
     //        const int tid      = omp_get_thread_num();
     //        cudaStream_t s     = streams[tid % num_streams];
-    cudaStream_t s = 0;
 
     PID cid     = centroid_candidates[i].id;
     float sqr_y = centroid_candidates[i].distance;
@@ -2794,7 +2868,7 @@ void IVFGPU::CPUGPUCoSearch(
     float* h_centroid       = centroid_data + cid * num_padded_dim;
 
     RAFT_CUDA_TRY(cudaMemcpyAsync(
-      h_centroid, d_centroid, num_padded_dim * sizeof(float), cudaMemcpyDeviceToHost, s));
+      h_centroid, d_centroid, num_padded_dim * sizeof(float), cudaMemcpyDeviceToHost, stream));
 
     // 3-b) launch the probe-level search on the **same** stream
     searcher->SearchClusterWithFilterMemOptOffload(/* add a stream parameter */
@@ -2803,7 +2877,7 @@ void IVFGPU::CPUGPUCoSearch(
                                                    sqr_y,
                                                    knn_array[i],
                                                    h_centroid,
-                                                   s);
+                                                   stream);
 
     // Merge final results and
     // TODO: Asychrounsly merge results
@@ -2826,16 +2900,21 @@ void IVFGPU::CPUGPUCoSearch(
     results[i] = knn_array[0]->candidates()[i].id;
   }
   //    copy_results_from_pool(KNNs, results);
-  RAFT_CUDA_TRY(cudaDeviceSynchronize());
+  raft::resource::sync_stream(handle);
   // free pools
   for (size_t i = 0; i < nprobe; ++i) {
     delete knn_array[i];
   }
 }
 
-void IVFGPU::CPUGPUCoSearchV2(
-  const float* d_query, size_t k, size_t nprobe, PID* results, void* searcher1) const
+void IVFGPU::CPUGPUCoSearchV2(raft::resources const& handle,
+                              const float* d_query,
+                              size_t k,
+                              size_t nprobe,
+                              PID* results,
+                              void* searcher1) const
 {
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
   // Compute distances from query to centroids on GPU.
   // d_query is on CPU now
   SearcherGPU* searcher = ((SearcherGPU*)searcher1);
@@ -2843,20 +2922,22 @@ void IVFGPU::CPUGPUCoSearchV2(
   searcher->query          = d_query;
   searcher->h_filter_distk = INFINITY;
   float temp               = INFINITY;
-  RAFT_CUDA_TRY(
-    cudaMemcpyAsync(searcher->d_filter_distk, &temp, sizeof(float), cudaMemcpyHostToDevice, 0));
+  RAFT_CUDA_TRY(cudaMemcpyAsync(
+    searcher->d_filter_distk, &temp, sizeof(float), cudaMemcpyHostToDevice, stream));
 
   Candidate* d_centroid_candidates = nullptr;
-  RAFT_CUDA_TRY(cudaMalloc(&d_centroid_candidates, nprobe * sizeof(Candidate)));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_centroid_candidates, nprobe * sizeof(Candidate), stream));
+  raft::resource::sync_stream(handle);
   initializer->ComputeCentroidsDistances(d_query, nprobe, d_centroid_candidates, nprobe, nullptr);
 
   // Copy only the top nprobe candidates to host.
   std::vector<Candidate> centroid_candidates(nprobe);
-  RAFT_CUDA_TRY(cudaMemcpy(centroid_candidates.data(),
-                           d_centroid_candidates,
-                           nprobe * sizeof(Candidate),
-                           cudaMemcpyDeviceToHost));
-  RAFT_CUDA_TRY(cudaFree(d_centroid_candidates));
+  RAFT_CUDA_TRY(cudaMemcpyAsync(centroid_candidates.data(),
+                                d_centroid_candidates,
+                                nprobe * sizeof(Candidate),
+                                cudaMemcpyDeviceToHost,
+                                stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_centroid_candidates, stream));
 
   // Create a device result pool. (k*nprobe for multiple use)
   // In the offload version, always merge the following part to the first one
@@ -2879,10 +2960,10 @@ void IVFGPU::CPUGPUCoSearchV2(
   float* first_3_dis = (float*)malloc(sizeof(float) * k * 3);
   PID* first_3_pid   = (PID*)malloc(sizeof(PID) * k * 3);
 
+  raft::resource::sync_stream(handle);
   for (size_t i = 0; i < startpoint; ++i) {
     //        const int tid      = omp_get_thread_num();
     //        cudaStream_t s     = streams[tid % num_streams];
-    cudaStream_t s = 0;
 
     PID cid     = centroid_candidates[i].id;
     float sqr_y = centroid_candidates[i].distance;
@@ -2892,7 +2973,7 @@ void IVFGPU::CPUGPUCoSearchV2(
     float* h_centroid       = centroid_data + cid * num_padded_dim;
 
     RAFT_CUDA_TRY(cudaMemcpyAsync(
-      h_centroid, d_centroid, num_padded_dim * sizeof(float), cudaMemcpyDeviceToHost, s));
+      h_centroid, d_centroid, num_padded_dim * sizeof(float), cudaMemcpyDeviceToHost, stream));
 
     // 3-b) launch the probe-level search on the **same** stream
     searcher->SearchClusterWithFilterMemOpt(/* add a stream parameter */
@@ -2901,19 +2982,19 @@ void IVFGPU::CPUGPUCoSearchV2(
                                             sqr_y,
                                             knn_array_gpu[i],
                                             h_centroid,
-                                            s);
+                                            stream);
 
     RAFT_CUDA_TRY(cudaMemcpyAsync(first_3_dis,
                                   knn_array_gpu[i]->distances,
                                   knn_array_gpu[i]->size * sizeof(float),
                                   cudaMemcpyDeviceToHost,
-                                  s));
+                                  stream));
     RAFT_CUDA_TRY(cudaMemcpyAsync(first_3_pid,
                                   knn_array_gpu[i]->ids,
                                   knn_array_gpu[i]->size * sizeof(PID),
                                   cudaMemcpyDeviceToHost,
-                                  s));
-    RAFT_CUDA_TRY(cudaDeviceSynchronize());
+                                  stream));
+    raft::resource::sync_stream(handle);
     //        printf("filter dist before: %f\n", searcher->h_filter_distk);
     for (int j = 0; j < knn_array_gpu[i]->size; ++j) {
       knn_array[0]->insert({first_3_dis[j], first_3_pid[j]});
@@ -2925,7 +3006,6 @@ void IVFGPU::CPUGPUCoSearchV2(
   for (size_t i = startpoint; i < nprobe; ++i) {
     //        const int tid      = omp_get_thread_num();
     //        cudaStream_t s     = streams[tid % num_streams];
-    cudaStream_t s = 0;
 
     PID cid     = centroid_candidates[i].id;
     float sqr_y = centroid_candidates[i].distance;
@@ -2935,7 +3015,7 @@ void IVFGPU::CPUGPUCoSearchV2(
     float* h_centroid       = centroid_data + cid * num_padded_dim;
 
     RAFT_CUDA_TRY(cudaMemcpyAsync(
-      h_centroid, d_centroid, num_padded_dim * sizeof(float), cudaMemcpyDeviceToHost, s));
+      h_centroid, d_centroid, num_padded_dim * sizeof(float), cudaMemcpyDeviceToHost, stream));
 
     // 3-b) launch the probe-level search on the **same** stream
     searcher->SearchClusterWithFilterMemOptOffload(/* add a stream parameter */
@@ -2944,7 +3024,7 @@ void IVFGPU::CPUGPUCoSearchV2(
                                                    sqr_y,
                                                    knn_array[i - startpoint + 1],
                                                    h_centroid,
-                                                   s);
+                                                   stream);
 
     // Merge final results and
     // TODO: Asychrounsly merge results
@@ -2968,14 +3048,14 @@ void IVFGPU::CPUGPUCoSearchV2(
     results[i] = knn_array[0]->candidates()[i].id;
   }
   //    copy_results_from_pool(KNNs, results);
-  RAFT_CUDA_TRY(cudaDeviceSynchronize());
+  raft::resource::sync_stream(handle);
   // free pools
   for (size_t i = 0; i < nprobe; ++i) {
     delete knn_array[i];
   }
 
   for (size_t i = 0; i < startpoint; ++i) {
-    freeDeviceResultPool(knn_array_gpu[i]);
+    freeDeviceResultPool(knn_array_gpu[i], stream);
   }
 }
 
@@ -3036,27 +3116,31 @@ void IVFGPU::search_with_time(raft::resources const& handle,
   stats.reserve(10);
   CpuTimer2 cpu;
   GpuTimer2 gpu;
+  cudaStream_t stream = raft::resource::get_cuda_stream(handle);
 
   //------------------------------------------------------------------
   // 1) Compute distances query→centroids   (GPU)
   //------------------------------------------------------------------
-  gpu.start();
+  gpu.start(stream);
   Candidate* d_centroid_candidates = nullptr;
-  RAFT_CUDA_TRY(cudaMalloc(&d_centroid_candidates, nprobe * sizeof(Candidate)));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_centroid_candidates, nprobe * sizeof(Candidate), stream));
+  raft::resource::sync_stream(handle);
   initializer->ComputeCentroidsDistances(d_query, nprobe, d_centroid_candidates, nprobe, nullptr);
-  stats.push_back({"centroid_dist", gpu.stop()});
+  stats.push_back({"centroid_dist", gpu.stop(stream)});
 
   //------------------------------------------------------------------
   // 2) Copy top-nprobe candidates to host  (D2H)
   //------------------------------------------------------------------
-  gpu.start();
+  gpu.start(stream);
   std::vector<Candidate> centroid_candidates(nprobe);
-  RAFT_CUDA_TRY(cudaMemcpy(centroid_candidates.data(),
-                           d_centroid_candidates,
-                           nprobe * sizeof(Candidate),
-                           cudaMemcpyDeviceToHost));
-  RAFT_CUDA_TRY(cudaFree(d_centroid_candidates));
-  stats.push_back({"copy_candidates", gpu.stop()});
+  RAFT_CUDA_TRY(cudaMemcpyAsync(centroid_candidates.data(),
+                                d_centroid_candidates,
+                                nprobe * sizeof(Candidate),
+                                cudaMemcpyDeviceToHost,
+                                stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_centroid_candidates, stream));
+  raft::resource::sync_stream(handle);
+  stats.push_back({"copy_candidates", gpu.stop(stream)});
 
   //------------------------------------------------------------------
   // 3) Create nprobe result pools         (CPU)
@@ -3070,13 +3154,11 @@ void IVFGPU::search_with_time(raft::resources const& handle,
   //------------------------------------------------------------------
   // 4) Per-centroid GPU search loop       (mixed)
   //------------------------------------------------------------------
-  gpu.start();
+  gpu.start(stream);
   float* centroid_data =
     static_cast<float*>(malloc(sizeof(float) * num_padded_dim * num_centroids));
   SearcherGPU searcher(handle, d_query, num_padded_dim, ex_bits);
   for (size_t i = 0; i < nprobe; ++i) {
-    cudaStream_t s = 0;  // (optionally pick from a pool) debug: only for 1 stream
-
     PID cid     = centroid_candidates[i].id;
     float sqr_y = centroid_candidates[i].distance;
 
@@ -3084,14 +3166,14 @@ void IVFGPU::search_with_time(raft::resources const& handle,
     float* h_centroid       = centroid_data + cid * num_padded_dim;
 
     RAFT_CUDA_TRY(cudaMemcpyAsync(
-      h_centroid, d_centroid, num_padded_dim * sizeof(float), cudaMemcpyDeviceToHost, s));
+      h_centroid, d_centroid, num_padded_dim * sizeof(float), cudaMemcpyDeviceToHost, stream));
 
     searcher.SearchClusterWithFilter(
-      *this, h_cluster_meta[cid], sqr_y, knn_array[i], h_centroid, s);
+      *this, h_cluster_meta[cid], sqr_y, knn_array[i], h_centroid, stream);
   }
-  RAFT_CUDA_TRY(cudaDeviceSynchronize());  // wait for all async work
+  raft::resource::sync_stream(handle);
   free(centroid_data);
-  stats.push_back({"probe_loops", gpu.stop()});
+  stats.push_back({"probe_loops", gpu.stop(stream)});
 
   //------------------------------------------------------------------
   // 5) Merge knn pools (CPU)
@@ -3100,9 +3182,9 @@ void IVFGPU::search_with_time(raft::resources const& handle,
   cpu.start();
   std::vector<int> probe_hist(nprobe, 0);
   //    merge_knn_pools_with_stats(knn_array, nprobe, k, results, probe_hist.data());
-  merge_knn_pools_filter(knn_array, nprobe, k, results);
+  merge_knn_pools_filter(handle, knn_array, nprobe, k, results);
   for (size_t i = 0; i < nprobe; ++i)
-    freeDeviceResultPool(knn_array[i]);
+    freeDeviceResultPool(knn_array[i], stream);
   delete[] knn_array;
   stats.push_back({"merge_pools", cpu.stop()});
 

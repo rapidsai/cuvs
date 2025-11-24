@@ -85,7 +85,7 @@ int test_ivf_rabitq_construct_batch(raft::resources const& handle, int argc, cha
   std::cout << "IVFGPU constructed\n";
 
   // Save the index to a file.
-  ivf.save(ivf_file, true);
+  ivf.save(handle, ivf_file, true);
 
   std::cout << "Indexing time: " << seconds << " seconds\n";
 
@@ -317,8 +317,7 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
   //    searcher.h_est_dis = (float*)malloc(sizeof(float) * max_cluster_length);
   //    searcher.h_ip_results = (float*)malloc(sizeof(float) * max_cluster_length);
 
-  cudaStream_t single_stream = 0;
-  cudaStreamCreate(&single_stream);
+  cudaStream_t single_stream = raft::resource::get_cuda_stream(handle);
   // Create a device result pool. (k*nprobe for multiple use)
   for (size_t r = 0; r < ROUND; r++) {
     std::vector<int> probe_hist_global(all_nprobes[0], 0);  // only support length = 1
@@ -337,7 +336,8 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
 
       if (searcher.mode == "lut32") {
         stopw.reset();
-        ivf.BatchClusterSearch(d_rotated_query,
+        ivf.BatchClusterSearch(handle,
+                               d_rotated_query,
                                TOPK,
                                nprobe,
                                &searcher,
@@ -345,15 +345,15 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
                                d_topk_dists,
                                d_final_dists,
                                d_topk_pids,
-                               d_final_pids,
-                               single_stream);
+                               d_final_pids);
         cudaDeviceSynchronize();
         total_time += stopw.getElapsedTimeMicro();
         // time stop
       } else if (searcher.mode == "lut16") {
         // test v3 lut using fp16
         stopw.reset();
-        ivf.BatchClusterSearchLUT16(d_rotated_query,
+        ivf.BatchClusterSearchLUT16(handle,
+                                    d_rotated_query,
                                     TOPK,
                                     nprobe,
                                     &searcher,
@@ -361,13 +361,13 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
                                     d_topk_dists,
                                     d_final_dists,
                                     d_topk_pids,
-                                    d_final_pids,
-                                    single_stream);
+                                    d_final_pids);
         cudaDeviceSynchronize();
         total_time += stopw.getElapsedTimeMicro();
       } else if (searcher.mode == "quant8") {
         stopw.reset();
-        ivf.BatchClusterSearchQuantizeQuery(d_rotated_query,
+        ivf.BatchClusterSearchQuantizeQuery(handle,
+                                            d_rotated_query,
                                             TOPK,
                                             nprobe,
                                             &searcher,
@@ -376,13 +376,13 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
                                             d_final_dists,
                                             d_topk_pids,
                                             d_final_pids,
-                                            8,
-                                            single_stream);
+                                            8);
         cudaDeviceSynchronize();
         total_time += stopw.getElapsedTimeMicro();
       } else if (searcher.mode == "quant4") {
         stopw.reset();
-        ivf.BatchClusterSearchQuantizeQuery(d_rotated_query,
+        ivf.BatchClusterSearchQuantizeQuery(handle,
+                                            d_rotated_query,
                                             TOPK,
                                             nprobe,
                                             &searcher,
@@ -391,8 +391,7 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
                                             d_final_dists,
                                             d_topk_pids,
                                             d_final_pids,
-                                            4,
-                                            single_stream);
+                                            4);
         cudaDeviceSynchronize();
         total_time += stopw.getElapsedTimeMicro();
       }
@@ -499,7 +498,6 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
               << ratio << std::endl;
   }
 
-  cudaStreamDestroy(single_stream);
   return 0;
 }
 

@@ -183,7 +183,8 @@ void search(raft::resources const& handle,
   RAFT_CUDA_TRY(cudaMallocAsync(&d_final_ids, NQ * k * sizeof(uint32_t), stream));
 
   if (params.mode == search_mode::LUT32) {
-    rabitq_idx->BatchClusterSearch(rotated_queries.data_handle(),
+    rabitq_idx->BatchClusterSearch(handle,
+                                   rotated_queries.data_handle(),
                                    k,
                                    params.n_probes,
                                    &searcher,
@@ -191,11 +192,11 @@ void search(raft::resources const& handle,
                                    d_topk_dists,
                                    distances.data_handle(),
                                    d_topk_ids,
-                                   d_final_ids,
-                                   stream);
+                                   d_final_ids);
   } else if (params.mode == search_mode::LUT16) {
     // test v3 lut using fp16
-    rabitq_idx->BatchClusterSearchLUT16(rotated_queries.data_handle(),
+    rabitq_idx->BatchClusterSearchLUT16(handle,
+                                        rotated_queries.data_handle(),
                                         k,
                                         params.n_probes,
                                         &searcher,
@@ -203,10 +204,10 @@ void search(raft::resources const& handle,
                                         d_topk_dists,
                                         distances.data_handle(),
                                         d_topk_ids,
-                                        d_final_ids,
-                                        stream);
+                                        d_final_ids);
   } else if (params.mode == search_mode::QUANT8) {
-    rabitq_idx->BatchClusterSearchQuantizeQuery(rotated_queries.data_handle(),
+    rabitq_idx->BatchClusterSearchQuantizeQuery(handle,
+                                                rotated_queries.data_handle(),
                                                 k,
                                                 params.n_probes,
                                                 &searcher,
@@ -215,10 +216,10 @@ void search(raft::resources const& handle,
                                                 distances.data_handle(),
                                                 d_topk_ids,
                                                 d_final_ids,
-                                                8,
-                                                stream);
+                                                8);
   } else if (params.mode == search_mode::QUANT4) {
-    rabitq_idx->BatchClusterSearchQuantizeQuery(rotated_queries.data_handle(),
+    rabitq_idx->BatchClusterSearchQuantizeQuery(handle,
+                                                rotated_queries.data_handle(),
                                                 k,
                                                 params.n_probes,
                                                 &searcher,
@@ -227,8 +228,7 @@ void search(raft::resources const& handle,
                                                 distances.data_handle(),
                                                 d_topk_ids,
                                                 d_final_ids,
-                                                4,
-                                                stream);
+                                                4);
   }
 
   // cast data in d_final_ids to array of IdxT in neighbors
@@ -243,10 +243,10 @@ void search(raft::resources const& handle,
 }
 
 template <typename IdxT>
-void serialize(raft::resources const& handle_, const std::string& filename, index<IdxT>& index)
+void serialize(raft::resources const& handle, const std::string& filename, index<IdxT>& index)
 {
   // Save the index to a file.
-  index.rabitq_index()->save(filename.c_str(), /* save_batch_flag = */ true);
+  index.rabitq_index()->save(handle, filename.c_str(), /* save_batch_flag = */ true);
 }
 
 template <typename IdxT>

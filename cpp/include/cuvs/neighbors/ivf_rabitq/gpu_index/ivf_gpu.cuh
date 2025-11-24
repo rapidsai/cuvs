@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <raft/core/resource/cuda_stream.hpp>
 #include <raft/core/resources.hpp>
 
 #include <cstdint>
@@ -196,7 +197,8 @@ class IVFGPU {
       d_ids(nullptr),
       initializer(nullptr),
       d_cluster_meta(nullptr),
-      batch_flag(false)
+      batch_flag(false),
+      stream_(raft::resource::get_cuda_stream(handle))
   {
   }
 
@@ -277,7 +279,9 @@ class IVFGPU {
 
   // save_batch_flag and load_batch_flag are add for compatity with the previous non-batch index,
   // load_transposed only applies for new batch index
-  void save(const char* filename, bool save_batch_flag = false) const;
+  void save(raft::resources const& handle,
+            const char* filename,
+            bool save_batch_flag = false) const;
 
   void load(raft::resources const& handle, const char* filename, bool load_batch_flag = false);
 
@@ -289,28 +293,45 @@ class IVFGPU {
 
   size_t num_clusters() const { return num_centroids; }
 
-  void MemOptimizedSearch(
-    const float* d_query, size_t k, size_t nprobe, PID* results, void* searcher) const;
+  void MemOptimizedSearch(raft::resources const& handle,
+                          const float* d_query,
+                          size_t k,
+                          size_t nprobe,
+                          PID* results,
+                          void* searcher) const;
 
-  void CPUGPUCoSearch(
-    const float* d_query, size_t k, size_t nprobe, PID* results, void* searcher1) const;
+  void CPUGPUCoSearch(raft::resources const& handle,
+                      const float* d_query,
+                      size_t k,
+                      size_t nprobe,
+                      PID* results,
+                      void* searcher1) const;
 
-  void CPUGPUCoSearchV2(
-    const float* d_query, size_t k, size_t nprobe, PID* results, void* searcher1) const;
+  void CPUGPUCoSearchV2(raft::resources const& handle,
+                        const float* d_query,
+                        size_t k,
+                        size_t nprobe,
+                        PID* results,
+                        void* searcher1) const;
 
-  void MemOptimizedSearchV2(
-    const float* d_query, size_t k, size_t nprobe, PID* results, void* searcher1) const;
+  void MemOptimizedSearchV2(raft::resources const& handle,
+                            const float* d_query,
+                            size_t k,
+                            size_t nprobe,
+                            PID* results,
+                            void* searcher1) const;
 
-  void MultiClusterSearch(const float* d_query,
+  void MultiClusterSearch(raft::resources const& handle,
+                          const float* d_query,
                           size_t k,
                           size_t nprobe,
                           PID* results,
                           void* searcher1,
-                          cudaStream_t single_stream,
                           DeviceResultPool** knn_array,
                           std::vector<Candidate>& centroid_candidates) const;
 
-  void BatchClusterSearch(const float* d_query,
+  void BatchClusterSearch(raft::resources const& handle,
+                          const float* d_query,
                           size_t k,
                           size_t nprobe,
                           void* searcher,
@@ -318,10 +339,10 @@ class IVFGPU {
                           float* d_topk_dists,
                           float* d_final_dists,
                           PID* d_topk_pids,
-                          PID* d_final_pids,
-                          cudaStream_t single_stream);
+                          PID* d_final_pids);
 
-  void BatchClusterSearchPreComputeThresholds(const float* d_query,
+  void BatchClusterSearchPreComputeThresholds(raft::resources const& handle,
+                                              const float* d_query,
                                               size_t k,
                                               size_t nprobe,
                                               void* searcher,
@@ -329,10 +350,10 @@ class IVFGPU {
                                               float* d_topk_dists,
                                               float* d_final_dists,
                                               PID* d_topk_pids,
-                                              PID* d_final_pids,
-                                              cudaStream_t single_stream);
+                                              PID* d_final_pids);
 
-  void BatchClusterSearchLUT16(const float* d_query,
+  void BatchClusterSearchLUT16(raft::resources const& handle,
+                               const float* d_query,
                                size_t k,
                                size_t nprobe,
                                void* searcher,
@@ -340,10 +361,10 @@ class IVFGPU {
                                float* d_topk_dists,
                                float* d_final_dists,
                                PID* d_topk_pids,
-                               PID* d_final_pids,
-                               cudaStream_t single_stream);
+                               PID* d_final_pids);
 
-  void BatchClusterSearchQuantizeQuery(const float* d_query,
+  void BatchClusterSearchQuantizeQuery(raft::resources const& handle,
+                                       const float* d_query,
                                        size_t k,
                                        size_t nprobe,
                                        void* searcher,
@@ -352,8 +373,7 @@ class IVFGPU {
                                        float* d_final_dists,
                                        PID* d_topk_pids,
                                        PID* d_final_pids,
-                                       int query_bits,
-                                       cudaStream_t single_stream);
+                                       int query_bits);
 
  private:
   //    // Host copy of per-cluster metadata.
@@ -364,7 +384,7 @@ class IVFGPU {
    *
    * @param cluster_sizes
    */
-  void AllocateDeviceMemory(size_t* cluster_sizes, size_t num_clusters);
+  void AllocateDeviceMemory(raft::resources const& handle);
 
   /**
    * @brief function to free all memory
@@ -424,7 +444,7 @@ class IVFGPU {
                         const float* cur_centroid,
                         float* rotated_c) const;
 
-  void AllocateHostMemory(size_t* cluster_sizes, size_t num_clusters);
+  void AllocateHostMemory();
 
   void FreeHostMemory() const;
 
@@ -434,6 +454,7 @@ class IVFGPU {
                                 void* searcher,
                                 size_t batch_size,
                                 cudaStream_t single_stream);
+  cudaStream_t stream_;
 };
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
