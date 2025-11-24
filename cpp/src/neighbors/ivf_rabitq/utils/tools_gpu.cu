@@ -8,6 +8,9 @@
 //
 
 #include <cuvs/neighbors/ivf_rabitq/utils/tools_gpu.cuh>
+
+#include <raft/util/cuda_rt_essentials.hpp>
+
 #include <iostream>
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
@@ -25,7 +28,7 @@ std::vector<cudaStream_t> create_cuda_streams(size_t num_streams)
   for (size_t i = 0; i < num_streams; ++i) {
     // cudaStreamCreate allocates a new stream and returns its handle.
     // The handle is stored in the vector at the current index.
-    cudaStreamCreate(&streams[i]);
+    RAFT_CUDA_TRY(cudaStreamCreate(&streams[i]));
 
     // Always check for errors after a CUDA API call.
     //        CUDA_CHECK(err);
@@ -48,7 +51,7 @@ void delete_cuda_streams(std::vector<cudaStream_t>& streams)
   // Iterate over the vector of stream handles
   for (cudaStream_t stream : streams) {
     // cudaStreamDestroy frees the resources associated with a stream.
-    cudaStreamDestroy(stream);
+    RAFT_CUDA_TRY(cudaStreamDestroy(stream));
 
     // It's good practice to check for errors even during cleanup.
     //        CUDA_CHECK(err);

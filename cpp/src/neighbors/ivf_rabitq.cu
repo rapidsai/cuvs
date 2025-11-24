@@ -178,9 +178,9 @@ void search(raft::resources const& handle,
 
   float* d_topk_dists;
   uint32_t *d_topk_ids, *d_final_ids;
-  cudaMallocAsync(&d_topk_dists, NQ * params.n_probes * k * sizeof(float), stream);
-  cudaMallocAsync(&d_topk_ids, NQ * params.n_probes * k * sizeof(uint32_t), stream);
-  cudaMallocAsync(&d_final_ids, NQ * k * sizeof(uint32_t), stream);
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_topk_dists, NQ * params.n_probes * k * sizeof(float), stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_topk_ids, NQ * params.n_probes * k * sizeof(uint32_t), stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_final_ids, NQ * k * sizeof(uint32_t), stream));
 
   if (params.mode == search_mode::LUT32) {
     rabitq_idx->BatchClusterSearch(rotated_queries.data_handle(),
@@ -237,9 +237,9 @@ void search(raft::resources const& handle,
                     raft::cast_op<IdxT>{},
                     raft::make_device_vector_view<const uint32_t, IdxT>(d_final_ids, NQ * k));
 
-  cudaFreeAsync(d_topk_dists, stream);
-  cudaFreeAsync(d_topk_ids, stream);
-  cudaFreeAsync(d_final_ids, stream);
+  RAFT_CUDA_TRY(cudaFreeAsync(d_topk_dists, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_topk_ids, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_final_ids, stream));
 }
 
 template <typename IdxT>

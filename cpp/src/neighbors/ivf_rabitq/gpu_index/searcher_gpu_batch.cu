@@ -120,14 +120,15 @@ void launchPrecomputeLUTs(const float* d_query,
   // Optional: Initialize to -infinity to mark as uncomputed
   // (You can skip this if you always call precompute before main kernel)
   float neg_inf = -std::numeric_limits<float>::infinity();
-  cudaMemsetAsync(
-    d_lut_for_queries, *reinterpret_cast<int*>(&neg_inf), total_lut_size * sizeof(float), stream);
+  RAFT_CUDA_TRY(cudaMemsetAsync(
+    d_lut_for_queries, *reinterpret_cast<int*>(&neg_inf), total_lut_size * sizeof(float), stream));
 
   // Launch precompute kernel
   dim3 gridDim(num_queries, 1, 1);
   dim3 blockDim(256, 1, 1);  // Can tune this
 
   precomputeAllLUTs<<<gridDim, blockDim, 0, stream>>>(d_query, d_lut_for_queries, num_queries, D);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Check for errors
   //    CUDA_CHECK(cudaPeekAtLastError());
@@ -208,6 +209,7 @@ void launchPrecomputeLUTs_optimized(const float* d_query,
 
   precomputeAllLUTs_optimized<<<gridDim, blockDim, shared_mem_size, stream>>>(
     d_query, d_lut_for_queries, num_queries, D);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 __global__ void computeInnerProductsWithLUT(
   const ClusterQueryPair* d_sorted_pairs,
@@ -4053,7 +4055,7 @@ void mergeClusterTopKFinal(const float* d_topk_dists,  // Input: top-k distances
 
   // Allocate temporary array for cleaned data
   float* d_clean_dists;
-  cudaMalloc(&d_clean_dists, total_elements * sizeof(float));
+  RAFT_CUDA_TRY(cudaMalloc(&d_clean_dists, total_elements * sizeof(float)));
 
   //    // Clean the input distances
   //    int threads = 256;
@@ -4095,20 +4097,24 @@ void mergeClusterTopKFinal(const float* d_topk_dists,  // Input: top-k distances
 #ifdef DEBUG_BATCH_SEARCH
   float h_topk_dist;
   PID h_topk_pid;
-  cudaMemcpyAsync(&h_topk_dist, d_final_dists, sizeof(float), cudaMemcpyDeviceToHost, stream);
-  cudaMemcpyAsync(&h_topk_pid, d_final_pids, sizeof(PID), cudaMemcpyDeviceToHost, stream);
-  cudaDeviceSynchronize();
+  RAFT_CUDA_TRY(
+    cudaMemcpyAsync(&h_topk_dist, d_final_dists, sizeof(float), cudaMemcpyDeviceToHost, stream));
+  RAFT_CUDA_TRY(
+    cudaMemcpyAsync(&h_topk_pid, d_final_pids, sizeof(PID), cudaMemcpyDeviceToHost, stream));
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
   std::cout << h_topk_dist << std::endl;
   std::cout << h_topk_pid << std::endl;
 
-  cudaMemcpyAsync(&h_topk_dist, d_final_dists + 1, sizeof(float), cudaMemcpyDeviceToHost, stream);
-  cudaMemcpyAsync(&h_topk_pid, d_final_pids + 1, sizeof(PID), cudaMemcpyDeviceToHost, stream);
-  cudaDeviceSynchronize();
+  RAFT_CUDA_TRY(cudaMemcpyAsync(
+    &h_topk_dist, d_final_dists + 1, sizeof(float), cudaMemcpyDeviceToHost, stream));
+  RAFT_CUDA_TRY(
+    cudaMemcpyAsync(&h_topk_pid, d_final_pids + 1, sizeof(PID), cudaMemcpyDeviceToHost, stream));
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
   std::cout << h_topk_dist << std::endl;
   std::cout << h_topk_pid << std::endl;
 
   // Clean up
-  cudaFree(d_clean_dists);
+  RAFT_CUDA_TRY(cudaFree(d_clean_dists));
 #endif
 }
 
@@ -4123,8 +4129,10 @@ void checkAndPrintNegativeValues(ClusterQueryPair* d_sorted_pairs,
   std::vector<ClusterQueryPair> h_pairs(total_pairs);
 
   // Copy data from GPU to CPU
-  cudaMemcpy(
-    h_pairs.data(), d_sorted_pairs, total_pairs * sizeof(ClusterQueryPair), cudaMemcpyDeviceToHost);
+  RAFT_CUDA_TRY(cudaMemcpy(h_pairs.data(),
+                           d_sorted_pairs,
+                           total_pairs * sizeof(ClusterQueryPair),
+                           cudaMemcpyDeviceToHost));
 
   // Check for negative values and print them
   bool found_negative = false;
@@ -4191,7 +4199,7 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
     num_queries * (cur_ivf.num_padded_dim / BITS_PER_CHUNK) * LUT_SIZE * sizeof(float);
   // each line's space is (cur_ivf.num_padded_dim / BITS_PER_CHUNK) * LUT_SIZE * sizeof(float);
   float* d_lut_for_queries = nullptr;
-  cudaMallocAsync(&d_lut_for_queries, lut_size, stream);
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_lut_for_queries, lut_size, stream));
   thrust::fill(thrust::cuda::par.on(stream),
                d_lut_for_queries,
                d_lut_for_queries + (lut_size / sizeof(float)),
@@ -4206,14 +4214,16 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
   int blocks                  = (total_elements + threads - 1) / threads;
 
   initDistancesKernel<<<blocks, threads, 0, stream>>>(d_topk_dists, total_elements);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
   // #endif
   int* d_query_write_counters;  // One counter per query, indicates where to store final results
                                 // (0~nprobe)
-  cudaMallocAsync(&d_query_write_counters, num_queries * sizeof(int), stream);
-  cudaMemsetAsync(d_query_write_counters, 0, num_queries * sizeof(int), stream);  // Initialize to 0
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_query_write_counters, num_queries * sizeof(int), stream));
+  RAFT_CUDA_TRY(cudaMemsetAsync(
+    d_query_write_counters, 0, num_queries * sizeof(int), stream));  // Initialize to 0
 
   float* d_topk_threshold_batch;
-  cudaMallocAsync(&d_topk_threshold_batch, sizeof(float) * num_queries, stream);
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_topk_threshold_batch, sizeof(float) * num_queries, stream));
   thrust::fill(thrust::cuda::par.on(stream),
                d_topk_threshold_batch,
                d_topk_threshold_batch + num_queries,
@@ -4261,9 +4271,9 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
 #ifdef DEBUG_BATCH_SEARCH
     printf("Using larger shared memory of %d:\n", shared_mem_size);
 #endif
-    cudaFuncSetAttribute(computeInnerProductsWithLUT,
-                         cudaFuncAttributeMaxDynamicSharedMemorySize,
-                         98304);  // 96KB for ampere devices
+    RAFT_CUDA_TRY(cudaFuncSetAttribute(computeInnerProductsWithLUT,
+                                       cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                       98304));  // 96KB for ampere devices
   }
 #ifdef DEBUG_BATCH_SEARCH
   printf("ivf.max_cluster_length: %d\n", cur_ivf.max_cluster_length);
@@ -4294,6 +4304,7 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
     d_topk_dists,
     d_topk_pids,
     d_query_write_counters);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 
 #ifdef DEBUG_BATCH_SEARCH
   err = cudaGetLastError();
@@ -4314,9 +4325,9 @@ void SearcherGPU::SearchClusterQueryPairs(const IVFGPU& cur_ivf,
                         stream);
 
   //    std::cout << "block distances merged!" << std::endl;
-  cudaFreeAsync(d_topk_threshold_batch, stream);
-  cudaFreeAsync(d_lut_for_queries, stream);
-  cudaFreeAsync(d_query_write_counters, stream);
+  RAFT_CUDA_TRY(cudaFreeAsync(d_topk_threshold_batch, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_lut_for_queries, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_query_write_counters, stream));
 }
 
 // Simpler non-optimized version with BF16
@@ -4430,9 +4441,11 @@ void launchPrecomputeLUTs_bf16(const float* d_query,
     size_t shared_mem_size = (BITS_PER_CHUNK + LUT_SIZE) * sizeof(float);
     precomputeAllLUTs_bf16_optimized<<<gridDim, blockDim, shared_mem_size, stream>>>(
       d_query, d_lut_for_queries, num_queries, D);
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
   } else {
     precomputeAllLUTs_bf16_simple<<<gridDim, blockDim, 0, stream>>>(
       d_query, d_lut_for_queries, num_queries, D);
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 }
 
@@ -4660,7 +4673,7 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
   size_t lut_size     = lut_elements * sizeof(lut_dtype);
 
   lut_dtype* d_lut_for_queries = nullptr;
-  cudaMallocAsync(&d_lut_for_queries, lut_size, stream);
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_lut_for_queries, lut_size, stream));
 
   // Initialize with -infinity (convert to BF16)
   float neg_inf = -std::numeric_limits<float>::infinity();
@@ -4683,14 +4696,16 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
   int blocks                  = (total_elements + threads - 1) / threads;
 
   initDistancesKernel<<<blocks, threads, 0, stream>>>(d_topk_dists, total_elements);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
   // #endif
   int* d_query_write_counters;  // One counter per query, indicates where to store final results
                                 // (0~nprobe)
-  cudaMallocAsync(&d_query_write_counters, num_queries * sizeof(int), stream);
-  cudaMemsetAsync(d_query_write_counters, 0, num_queries * sizeof(int), stream);  // Initialize to 0
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_query_write_counters, num_queries * sizeof(int), stream));
+  RAFT_CUDA_TRY(cudaMemsetAsync(
+    d_query_write_counters, 0, num_queries * sizeof(int), stream));  // Initialize to 0
 
   float* d_topk_threshold_batch;
-  cudaMallocAsync(&d_topk_threshold_batch, sizeof(float) * num_queries, stream);
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_topk_threshold_batch, sizeof(float) * num_queries, stream));
   thrust::fill(thrust::cuda::par.on(stream),
                d_topk_threshold_batch,
                d_topk_threshold_batch + num_queries,
@@ -4739,9 +4754,9 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
 #ifdef DEBUG_BATCH_SEARCH
     printf("Using larger shared memory of %d:\n", shared_mem_size);
 #endif
-    cudaFuncSetAttribute(computeInnerProductsWithLUT,
-                         cudaFuncAttributeMaxDynamicSharedMemorySize,
-                         98304);  // 96KB for ampere devices
+    RAFT_CUDA_TRY(cudaFuncSetAttribute(computeInnerProductsWithLUT,
+                                       cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                       98304));  // 96KB for ampere devices
   }
 #ifdef DEBUG_BATCH_SEARCH
   printf("ivf.max_cluster_length: %d\n", cur_ivf.max_cluster_length);
@@ -4773,13 +4788,7 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
     d_topk_dists,
     d_topk_pids,
     d_query_write_counters);
-
-#ifdef DEBUG_BATCH_SEARCH
-  err = cudaGetLastError();
-  if (err != cudaSuccess) {
-    throw std::runtime_error(std::string("Error Before Merge! ") + cudaGetErrorString(err));
-  }
-#endif
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // merge results from different blocks
   mergeClusterTopKFinal(d_topk_dists,
@@ -4793,9 +4802,9 @@ void SearcherGPU::SearchClusterQueryPairsSharedMemOpt(
                         stream);
 
   //    std::cout << "block distances merged!" << std::endl;
-  cudaFreeAsync(d_topk_threshold_batch, stream);
-  cudaFreeAsync(d_lut_for_queries, stream);
-  cudaFreeAsync(d_query_write_counters, stream);
+  RAFT_CUDA_TRY(cudaFreeAsync(d_topk_threshold_batch, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_lut_for_queries, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_query_write_counters, stream));
 }
 
 __global__ void findQueryRanges(const float* __restrict__ queries,
@@ -5018,10 +5027,10 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   size_t quantized_size = num_queries * cur_ivf.num_padded_dim * sizeof(int8_t);
   size_t packed_size    = num_queries * num_bits * num_words * sizeof(uint32_t);
 
-  cudaMallocAsync(&d_query_ranges, ranges_size, stream);
-  cudaMallocAsync(&d_widths, widths_size, stream);
-  cudaMallocAsync(&d_quantized_queries, quantized_size, stream);
-  cudaMallocAsync(&d_packed_queries, packed_size, stream);
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_query_ranges, ranges_size, stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_widths, widths_size, stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_quantized_queries, quantized_size, stream));
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_packed_queries, packed_size, stream));
 
   if (rabitq_quantize_flag) {
     const int block_size = 256;
@@ -5036,6 +5045,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
                                                       1.9f,
                                                       d_quantized_queries,
                                                       d_widths);
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
   } else {  // scalar quantize
     // Step 1: Find min/max for each query
     {
@@ -5043,6 +5053,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
       dim3 grid(num_queries);
       findQueryRanges<<<grid, block, 0, stream>>>(
         d_query, d_query_ranges, num_queries, cur_ivf.num_padded_dim);
+      RAFT_CUDA_TRY(cudaPeekAtLastError());
     }
 
     // Step 2: Quantize queries to int8_t with BQ=8
@@ -5058,6 +5069,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
                                                                     d_widths,
                                                                     num_queries,
                                                                     cur_ivf.num_padded_dim);
+        RAFT_CUDA_TRY(cudaPeekAtLastError());
       } else {
         quantizeQueriesToInt8<<<grid_size, block_size, 0, stream>>>(d_query,
                                                                     d_query_ranges,
@@ -5065,6 +5077,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
                                                                     d_widths,
                                                                     num_queries,
                                                                     cur_ivf.num_padded_dim);
+        RAFT_CUDA_TRY(cudaPeekAtLastError());
       }
     }
   }
@@ -5077,9 +5090,11 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
     if (use_4bit) {
       packInt4QueryBitPlanes<<<grid_size, block_size, 0, stream>>>(
         d_quantized_queries, d_packed_queries, num_queries, cur_ivf.num_padded_dim);
+      RAFT_CUDA_TRY(cudaPeekAtLastError());
     } else {
       packInt8QueryBitPlanes<<<grid_size, block_size, 0, stream>>>(
         d_quantized_queries, d_packed_queries, num_queries, cur_ivf.num_padded_dim);
+      RAFT_CUDA_TRY(cudaPeekAtLastError());
     }
   }
 
@@ -5089,13 +5104,14 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
   int threads                 = 256;
   int blocks                  = (total_elements + threads - 1) / threads;
   initDistancesKernel<<<blocks, threads, 0, stream>>>(d_topk_dists, total_elements);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   int* d_query_write_counters;
-  cudaMallocAsync(&d_query_write_counters, num_queries * sizeof(int), stream);
-  cudaMemsetAsync(d_query_write_counters, 0, num_queries * sizeof(int), stream);
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_query_write_counters, num_queries * sizeof(int), stream));
+  RAFT_CUDA_TRY(cudaMemsetAsync(d_query_write_counters, 0, num_queries * sizeof(int), stream));
 
   float* d_topk_threshold_batch;
-  cudaMallocAsync(&d_topk_threshold_batch, sizeof(float) * num_queries, stream);
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_topk_threshold_batch, sizeof(float) * num_queries, stream));
   thrust::fill(thrust::cuda::par.on(stream),
                d_topk_threshold_batch,
                d_topk_threshold_batch + num_queries,
@@ -5134,8 +5150,8 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
 #endif
 
   if (shared_mem_size > 49152) {
-    cudaFuncSetAttribute(
-      computeInnerProductsWithBitwiseOpt, cudaFuncAttributeMaxDynamicSharedMemorySize, 98304);
+    RAFT_CUDA_TRY(cudaFuncSetAttribute(
+      computeInnerProductsWithBitwiseOpt, cudaFuncAttributeMaxDynamicSharedMemorySize, 98304));
   }
 
   if (!use_4bit) {
@@ -5169,6 +5185,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
       num_bits,  // Add num_bits parameter
       num_words  // Add num_words parameter
     );
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
   } else {
     //        std::cout << "using 4bit queries" << std::endl;
     computeInnerProductsWithBitwiseOpt4bit<<<gridDim, blockDim, shared_mem_size, stream>>>(
@@ -5201,6 +5218,7 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
       num_bits,  // Add num_bits parameter
       num_words  // Add num_words parameter
     );
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 
 #ifdef DEBUG_BATCH_SEARCH
@@ -5225,12 +5243,12 @@ void SearcherGPU::SearchClusterQueryPairsQuantizeQuery(
                         stream);
 
   // Cleanup
-  cudaFreeAsync(d_topk_threshold_batch, stream);
-  cudaFreeAsync(d_query_ranges, stream);
-  cudaFreeAsync(d_widths, stream);
-  cudaFreeAsync(d_quantized_queries, stream);
-  cudaFreeAsync(d_packed_queries, stream);
-  cudaFreeAsync(d_query_write_counters, stream);
+  RAFT_CUDA_TRY(cudaFreeAsync(d_topk_threshold_batch, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_query_ranges, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_widths, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_quantized_queries, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_packed_queries, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_query_write_counters, stream));
 }
 
 // For two-round kernel search: first round for each query's nearest clusters, in this process we
@@ -5262,7 +5280,7 @@ void SearcherGPU::SearchClusterQueryPairsPreComputeThreshold(
     num_queries * (cur_ivf.num_padded_dim / BITS_PER_CHUNK) * LUT_SIZE * sizeof(float);
   // each line's space is (cur_ivf.num_padded_dim / BITS_PER_CHUNK) * LUT_SIZE * sizeof(float);
   float* d_lut_for_queries = nullptr;
-  cudaMallocAsync(&d_lut_for_queries, lut_size, stream);
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_lut_for_queries, lut_size, stream));
   thrust::fill(thrust::cuda::par.on(stream),
                d_lut_for_queries,
                d_lut_for_queries + (lut_size / sizeof(float)),
@@ -5274,13 +5292,15 @@ void SearcherGPU::SearchClusterQueryPairsPreComputeThreshold(
   int blocks                  = (total_elements + threads - 1) / threads;
 
   initDistancesKernel<<<blocks, threads, 0, stream>>>(d_topk_dists, total_elements);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
   int* d_query_write_counters;  // One counter per query, indicates where to store final results
                                 // (0~nprobe)
-  cudaMallocAsync(&d_query_write_counters, num_queries * sizeof(int), stream);
-  cudaMemsetAsync(d_query_write_counters, 0, num_queries * sizeof(int), stream);  // Initialize to 0
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_query_write_counters, num_queries * sizeof(int), stream));
+  RAFT_CUDA_TRY(cudaMemsetAsync(
+    d_query_write_counters, 0, num_queries * sizeof(int), stream));  // Initialize to 0
 
   float* d_topk_threshold_batch;
-  cudaMallocAsync(&d_topk_threshold_batch, sizeof(float) * num_queries, stream);
+  RAFT_CUDA_TRY(cudaMallocAsync(&d_topk_threshold_batch, sizeof(float) * num_queries, stream));
   thrust::fill(thrust::cuda::par.on(stream),
                d_topk_threshold_batch,
                d_topk_threshold_batch + num_queries,
@@ -5318,9 +5338,9 @@ void SearcherGPU::SearchClusterQueryPairsPreComputeThreshold(
 #ifdef DEBUG_BATCH_SEARCH
     printf("Using larger shared memory of %d:\n", shared_mem_size);
 #endif
-    cudaFuncSetAttribute(computeInnerProductsWithLUT,
-                         cudaFuncAttributeMaxDynamicSharedMemorySize,
-                         98304);  // 96KB for ampere devices
+    RAFT_CUDA_TRY(cudaFuncSetAttribute(computeInnerProductsWithLUT,
+                                       cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                       98304));  // 96KB for ampere devices
   }
 #ifdef DEBUG_BATCH_SEARCH
   printf("ivf.max_cluster_length: %d\n", cur_ivf.max_cluster_length);
@@ -5353,6 +5373,7 @@ void SearcherGPU::SearchClusterQueryPairsPreComputeThreshold(
     d_topk_dists,
     d_topk_pids,
     d_query_write_counters);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
   if (num_rest_pairs > 0) {
     gridDim.x = num_rest_pairs;
     // second round: use previously computed LUT and threshold to search rest pairs
@@ -5385,14 +5406,8 @@ void SearcherGPU::SearchClusterQueryPairsPreComputeThreshold(
       d_topk_dists,
       d_topk_pids,
       d_query_write_counters);
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
-
-#ifdef DEBUG_BATCH_SEARCH
-  err = cudaGetLastError();
-  if (err != cudaSuccess) {
-    throw std::runtime_error(std::string("Error Before Merge! ") + cudaGetErrorString(err));
-  }
-#endif
 
   // merge results from different blocks
   mergeClusterTopKFinal(d_topk_dists,
@@ -5406,9 +5421,9 @@ void SearcherGPU::SearchClusterQueryPairsPreComputeThreshold(
                         stream);
 
   //    std::cout << "block distances merged!" << std::endl;
-  cudaFreeAsync(d_topk_threshold_batch, stream);
-  cudaFreeAsync(d_lut_for_queries, stream);
-  cudaFreeAsync(d_query_write_counters, stream);
+  RAFT_CUDA_TRY(cudaFreeAsync(d_topk_threshold_batch, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_lut_for_queries, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_query_write_counters, stream));
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

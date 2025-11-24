@@ -128,37 +128,26 @@ void DataQuantizerGPU::rabitq_codes(const int* d_bin_XP,
 
   // Allocate device memory for the intermediate binary representation.
   //    uint64_t* d_binary;
-  //    CUDA_CHECK(cudaMalloc((void**)&d_binary, total_uint64 * sizeof(uint64_t)));
+  //    RAFT_CUDA_TRY(cudaMalloc((void**)&d_binary, total_uint64 * sizeof(uint64_t)));
 
   // Launch kernel: one block per data point, each with (D/64) threads.
   dim3 grid(num_points);
   dim3 block(blocks_per_point);
   pack_binary_kernel<<<grid, block>>>(d_bin_XP, d_packed_code, num_points, D);
-  CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
   // Launch kernel to pack the binary codes into 8-bit packed codes.
   //    // Here, we assume a simple scheme where each uint64_t is converted to 8 bytes.
   int threads  = 256;
   int gridSize = (total_uint64 + threads - 1) / threads;
   //    pack_codes_kernel<<<gridSize, threads>>>(D, d_binary, num_points, d_packed_code);
-  CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  // RAFT_CUDA_TRY(cudaGetLastError());
+  // RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
   // Free the intermediate binary array.
   //    cudaFree(d_binary);
 }
-
-// CUDA error-checking macro.
-#define CUDA_CHECK(call)                                                  \
-  do {                                                                    \
-    cudaError_t err = call;                                               \
-    if (err != cudaSuccess) {                                             \
-      std::cerr << "CUDA error in " << __FILE__ << ":" << __LINE__ << " " \
-                << cudaGetErrorString(err) << std::endl;                  \
-      exit(EXIT_FAILURE);                                                 \
-    }                                                                     \
-  } while (0)
 
 //---------------------------------------------------------------------------
 // Kernel: gatherKernel
@@ -353,61 +342,61 @@ void DataQuantizerGPU::data_transformation(raft::resources const& handle,
 {
   // Allocate temporary matrix X_pad (num_points x D) on GPU.
   float* d_X_pad;
-  CUDA_CHECK(cudaMalloc((void**)&d_X_pad, num_points * D * sizeof(float)));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_X_pad, num_points * D * sizeof(float)));
 
   // Launch kernel to gather and pad data.
   int blockSize = 256;
   int gridSize  = (num_points + blockSize - 1) / blockSize;
   gatherKernel<<<gridSize, blockSize>>>(d_data, d_IDs, d_X_pad, num_points, DIM, D);
-  CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
   // Allocate temporary matrix C_pad (1 x D) on GPU.
   float* d_C_pad;
-  CUDA_CHECK(cudaMalloc((void**)&d_C_pad, D * sizeof(float)));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_C_pad, D * sizeof(float)));
   int gridSizeC = (D + blockSize - 1) / blockSize;
   copyCentroidKernel<<<gridSizeC, blockSize>>>(d_centroid, d_C_pad, DIM, D);
-  CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
   // Rotate X_pad -> XP. Allocate XP (num_points x D).
   float* d_XP;
-  CUDA_CHECK(cudaMalloc((void**)&d_XP, num_points * D * sizeof(float)));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_XP, num_points * D * sizeof(float)));
   rotator.rotate(handle, d_X_pad, d_XP, num_points);
 
   // Rotate C_pad -> CP. Allocate CP (1 x D).
   float* d_CP;
-  CUDA_CHECK(cudaMalloc((void**)&d_CP, D * sizeof(float)));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_CP, D * sizeof(float)));
   rotator.rotate(handle, d_C_pad, d_CP, 1);
 
   // Subtract CP from each row of XP: XP = XP - CP.
   int totalElements = num_points * D;
   gridSize          = (totalElements + blockSize - 1) / blockSize;
   subtractKernel<<<gridSize, blockSize>>>(d_XP, d_CP, num_points, D);
-  CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
   // Save the rotated centroid: copy CP into d_rotated_c (assumed size D).
-  CUDA_CHECK(cudaMemcpy(d_rotated_c, d_CP, D * sizeof(float), cudaMemcpyDeviceToDevice));
+  RAFT_CUDA_TRY(cudaMemcpy(d_rotated_c, d_CP, D * sizeof(float), cudaMemcpyDeviceToDevice));
 
   // Normalize XP rowwise: compute XP_norm = XP / norm(XP).
   gridSize = (num_points + blockSize - 1) / blockSize;
   normalizeKernel<<<gridSize, blockSize>>>(d_XP, d_XP_norm, num_points, D);
-  CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
   // Generate binary representation: bin_XP = (XP > 0).
   totalElements = num_points * D;
   gridSize      = (totalElements + blockSize - 1) / blockSize;
   binarizeKernel<<<gridSize, blockSize>>>(d_XP_norm, d_bin_XP, num_points, D);
-  CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
   // Free temporary buffers.
-  cudaFree(d_X_pad);
-  cudaFree(d_C_pad);
-  cudaFree(d_XP);
-  cudaFree(d_CP);
+  RAFT_CUDA_TRY(cudaFree(d_X_pad));
+  RAFT_CUDA_TRY(cudaFree(d_C_pad));
+  RAFT_CUDA_TRY(cudaFree(d_XP));
+  RAFT_CUDA_TRY(cudaFree(d_CP));
 }
 
 //---------------------------------------------------------------------------
@@ -434,58 +423,58 @@ void DataQuantizerGPU::data_transformation_batch(raft::resources const& handle,
 {
   // Allocate temporary matrix X_pad (num_points x D) on GPU.
   float* d_X_pad;
-  CUDA_CHECK(cudaMalloc((void**)&d_X_pad, num_points * D * sizeof(float)));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_X_pad, num_points * D * sizeof(float)));
 
   // Launch kernel to gather and pad data.
   int blockSize = 256;
   int gridSize  = (num_points + blockSize - 1) / blockSize;
   gatherKernel<<<gridSize, blockSize>>>(d_data, d_IDs, d_X_pad, num_points, DIM, D);
-  CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
   // Allocate temporary matrix C_pad (1 x D) on GPU.
   float* d_C_pad;
-  CUDA_CHECK(cudaMalloc((void**)&d_C_pad, D * sizeof(float)));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_C_pad, D * sizeof(float)));
   int gridSizeC = (D + blockSize - 1) / blockSize;
   copyCentroidKernel<<<gridSizeC, blockSize>>>(d_centroid, d_C_pad, DIM, D);
-  CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
   // Rotate X_pad -> XP. Allocate XP (num_points x D).
   rotator.rotate(handle, d_X_pad, d_XP, num_points);
 
   // Rotate C_pad -> CP. Allocate CP (1 x D).
   float* d_CP;
-  CUDA_CHECK(cudaMalloc((void**)&d_CP, D * sizeof(float)));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_CP, D * sizeof(float)));
   rotator.rotate(handle, d_C_pad, d_CP, 1);
 
   // Subtract CP from each row of XP: XP = XP - CP.
   int totalElements = num_points * D;
   gridSize          = (totalElements + blockSize - 1) / blockSize;
   subtractKernel<<<gridSize, blockSize>>>(d_XP, d_CP, num_points, D);
-  CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
   // Save the rotated centroid: copy CP into d_rotated_c (assumed size D).
-  CUDA_CHECK(cudaMemcpy(d_rotated_c, d_CP, D * sizeof(float), cudaMemcpyDeviceToDevice));
+  RAFT_CUDA_TRY(cudaMemcpy(d_rotated_c, d_CP, D * sizeof(float), cudaMemcpyDeviceToDevice));
 
   // Normalize XP rowwise: compute XP_norm = XP / norm(XP).
   gridSize = (num_points + blockSize - 1) / blockSize;
   normalizeKernel<<<gridSize, blockSize>>>(d_XP, d_XP_norm, num_points, D);
-  CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
   // Generate binary representation: bin_XP = (XP > 0).
   totalElements = num_points * D;
   gridSize      = (totalElements + blockSize - 1) / blockSize;
   binarizeKernel<<<gridSize, blockSize>>>(d_XP_norm, d_bin_XP, num_points, D);
-  CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
   // Free temporary buffers.
-  cudaFree(d_X_pad);
-  cudaFree(d_C_pad);
-  cudaFree(d_CP);
+  RAFT_CUDA_TRY(cudaFree(d_X_pad));
+  RAFT_CUDA_TRY(cudaFree(d_C_pad));
+  RAFT_CUDA_TRY(cudaFree(d_CP));
 }
 
 // void DataQuantizerGPU::data_transformation(const float* d_data,
@@ -502,21 +491,21 @@ void DataQuantizerGPU::data_transformation_batch(raft::resources const& handle,
 //     const int gridND= (N*D + block - 1)/block;
 //
 //     // 1) gather
-//     float* d_X_pad; CUDA_CHECK(cudaMalloc(&d_X_pad, N*D*sizeof(float)));
+//     float* d_X_pad; RAFT_CUDA_TRY(cudaMalloc(&d_X_pad, N*D*sizeof(float)));
 //     gatherKernel<<<gridN, block>>>(d_data, d_IDs, d_X_pad, N, DIM, D);
-//     CUDA_CHECK(cudaGetLastError());
+//     RAFT_CUDA_TRY(cudaGetLastError());
 //
 //     // 2) centroid pad
-//     float* d_C_pad; CUDA_CHECK(cudaMalloc(&d_C_pad, D*sizeof(float)));
+//     float* d_C_pad; RAFT_CUDA_TRY(cudaMalloc(&d_C_pad, D*sizeof(float)));
 //     copyCentroidKernel<<<gridD, block>>>(d_centroid, d_C_pad, DIM, D);
 //
 //
 //
 //
 //     // 3) rotate
-//     float* d_XP; CUDA_CHECK(cudaMalloc(&d_XP, N*D*sizeof(float)));
+//     float* d_XP; RAFT_CUDA_TRY(cudaMalloc(&d_XP, N*D*sizeof(float)));
 //     rotator.rotate(d_X_pad, d_XP, N);
-//     float* d_CP; CUDA_CHECK(cudaMalloc(&d_CP, D*sizeof(float)));
+//     float* d_CP; RAFT_CUDA_TRY(cudaMalloc(&d_CP, D*sizeof(float)));
 //     rotator.rotate(d_C_pad, d_CP, 1);
 //
 //     //debug
@@ -525,7 +514,7 @@ void DataQuantizerGPU::data_transformation_batch(raft::resources const& handle,
 ////        fprintf(stderr, "Host malloc failed!\n");
 ////        exit(EXIT_FAILURE);
 ////    }
-////    CUDA_CHECK(cudaMemcpy(h_C_pad, d_CP, D * sizeof(float), cudaMemcpyDeviceToHost));
+////    RAFT_CUDA_TRY(cudaMemcpy(h_C_pad, d_CP, D * sizeof(float), cudaMemcpyDeviceToHost));
 ////    printf("d_CP values on GPU:\n");
 ////    for (int i = 0; i < D; ++i) {
 ////        printf("h_CP[%d] = %f\n", i, h_C_pad[i]);
@@ -536,7 +525,7 @@ void DataQuantizerGPU::data_transformation_batch(raft::resources const& handle,
 //    subtractKernel<<<gridND, block>>>(d_XP, d_CP, N, D);
 //
 //    // 5) save rotated centroid
-//    CUDA_CHECK(cudaMemcpy(d_rotated_c, d_CP, D*sizeof(float), cudaMemcpyDeviceToDevice));
+//    RAFT_CUDA_TRY(cudaMemcpy(d_rotated_c, d_CP, D*sizeof(float), cudaMemcpyDeviceToDevice));
 //
 //    // 6) normalize
 //    int warpsPerBlock = block/32;
@@ -545,8 +534,8 @@ void DataQuantizerGPU::data_transformation_batch(raft::resources const& handle,
 //
 //    // 7) binarize
 //    binarizeKernel<<<gridND, block>>>(d_XP_norm, d_bin_XP, N, D);
-//    CUDA_CHECK(cudaGetLastError());
-//    CUDA_CHECK(cudaDeviceSynchronize());
+//    RAFT_CUDA_TRY(cudaGetLastError());
+//    RAFT_CUDA_TRY(cudaDeviceSynchronize());
 //
 //    cudaFree(d_X_pad);
 //    cudaFree(d_C_pad);
@@ -663,8 +652,8 @@ void DataQuantizerGPU::rabitq_factor(const float* d_data,
                                                 this->D,
                                                 FAC_NORM,
                                                 FAC_ERR);
-  CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
 }
 
 //==============================================================================
@@ -819,42 +808,42 @@ __global__ void store_compacted_code_kernel_7(const uint8_t* o_raw,
 void DataQuantizerGPU::store_compacted_code(uint8_t* o_raw, uint8_t* o_compact) const
 {
   if (EX_BITS == 8) {
-    CUDA_CHECK(cudaMemcpy(o_compact, o_raw, sizeof(uint8_t) * D, cudaMemcpyDeviceToDevice));
+    RAFT_CUDA_TRY(cudaMemcpy(o_compact, o_raw, sizeof(uint8_t) * D, cudaMemcpyDeviceToDevice));
   } else if (EX_BITS == 4) {
     size_t num_blocks = D / 32;  // Each block processes 32 bytes.
     int blockSize     = 256;
     int gridSize      = (num_blocks + blockSize - 1) / blockSize;
     store_compacted_code_kernel_4<<<gridSize, blockSize>>>(o_raw, o_compact, num_blocks);
-    CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaDeviceSynchronize());
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
+    RAFT_CUDA_TRY(cudaDeviceSynchronize());
   } else if (EX_BITS == 6) {
     size_t num_blocks = D / 64;  // Each block processes 64 bytes.
     int blockSize     = 256;
     int gridSize      = (num_blocks + blockSize - 1) / blockSize;
     store_compacted_code_kernel_6<<<gridSize, blockSize>>>(o_raw, o_compact, num_blocks);
-    CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaDeviceSynchronize());
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
+    RAFT_CUDA_TRY(cudaDeviceSynchronize());
   } else if (EX_BITS == 2) {
     size_t num_blocks = D / 64;
     int blockSize     = 256;
     int gridSize      = (num_blocks + blockSize - 1) / blockSize;
     store_compacted_code_kernel_2<<<gridSize, blockSize>>>(o_raw, o_compact, num_blocks);
-    CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaDeviceSynchronize());
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
+    RAFT_CUDA_TRY(cudaDeviceSynchronize());
   } else if (EX_BITS == 3) {
     size_t num_blocks = D / 64;
     int blockSize     = 256;
     int gridSize      = (num_blocks + blockSize - 1) / blockSize;
     store_compacted_code_kernel_3<<<gridSize, blockSize>>>(o_raw, o_compact, num_blocks);
-    CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaDeviceSynchronize());
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
+    RAFT_CUDA_TRY(cudaDeviceSynchronize());
   } else if (EX_BITS == 7) {
     size_t num_blocks = D / 64;
     int blockSize     = 256;
     int gridSize      = (num_blocks + blockSize - 1) / blockSize;
     store_compacted_code_kernel_7<<<gridSize, blockSize>>>(o_raw, o_compact, num_blocks);
-    CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaDeviceSynchronize());
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
+    RAFT_CUDA_TRY(cudaDeviceSynchronize());
   } else {
     std::cerr << "store_compacted_code: EX_BITS value " << EX_BITS << " not implemented."
               << std::endl;
@@ -1343,19 +1332,19 @@ void DataQuantizerGPU::exrabitq_codes_hybrid_advanced(const int* d_bin_XP,
 
   for (int i = 0; i < num_buffers; i++) {
     // Allocate pinned host memory
-    CUDA_CHECK(cudaMallocHost(&buffers[i].h_XP_norm, batch_size * D * sizeof(float)));
-    CUDA_CHECK(cudaMallocHost(&buffers[i].h_tmp_codes, batch_size * D * sizeof(uint8_t)));
-    CUDA_CHECK(cudaMallocHost(&buffers[i].h_ip_norms, batch_size * sizeof(float)));
+    RAFT_CUDA_TRY(cudaMallocHost(&buffers[i].h_XP_norm, batch_size * D * sizeof(float)));
+    RAFT_CUDA_TRY(cudaMallocHost(&buffers[i].h_tmp_codes, batch_size * D * sizeof(uint8_t)));
+    RAFT_CUDA_TRY(cudaMallocHost(&buffers[i].h_ip_norms, batch_size * sizeof(float)));
 
     // Allocate device staging buffers
-    CUDA_CHECK(cudaMalloc(&buffers[i].d_tmp_codes, batch_size * D * sizeof(uint8_t)));
-    CUDA_CHECK(cudaMalloc(&buffers[i].d_ip_norms, batch_size * sizeof(float)));
+    RAFT_CUDA_TRY(cudaMalloc(&buffers[i].d_tmp_codes, batch_size * D * sizeof(uint8_t)));
+    RAFT_CUDA_TRY(cudaMalloc(&buffers[i].d_ip_norms, batch_size * sizeof(float)));
 
     // Create stream and events
-    CUDA_CHECK(cudaStreamCreate(&buffers[i].stream));
-    CUDA_CHECK(cudaEventCreate(&buffers[i].h2d_done));
-    CUDA_CHECK(cudaEventCreate(&buffers[i].d2h_done));
-    CUDA_CHECK(cudaEventCreate(&buffers[i].gpu_compute_done));
+    RAFT_CUDA_TRY(cudaStreamCreate(&buffers[i].stream));
+    RAFT_CUDA_TRY(cudaEventCreate(&buffers[i].h2d_done));
+    RAFT_CUDA_TRY(cudaEventCreate(&buffers[i].d2h_done));
+    RAFT_CUDA_TRY(cudaEventCreate(&buffers[i].gpu_compute_done));
   }
 
   // Thread pool for CPU computation
@@ -1366,7 +1355,7 @@ void DataQuantizerGPU::exrabitq_codes_hybrid_advanced(const int* d_bin_XP,
     auto& buffer = buffers[buf_id];
 
     // Wait for D2H transfer to complete
-    CUDA_CHECK(cudaEventSynchronize(buffer.d2h_done));
+    RAFT_CUDA_TRY(cudaEventSynchronize(buffer.d2h_done));
 
     // Perform CPU computation
     fast_quantize_cpu_batch(
@@ -1389,19 +1378,19 @@ void DataQuantizerGPU::exrabitq_codes_hybrid_advanced(const int* d_bin_XP,
     size_t batch_size_actual = buffer.state.batch_size;
 
     // Transfer results H2D
-    CUDA_CHECK(cudaMemcpyAsync(buffer.d_tmp_codes,
-                               buffer.h_tmp_codes,
-                               batch_size_actual * D * sizeof(uint8_t),
-                               cudaMemcpyHostToDevice,
-                               buffer.stream));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(buffer.d_tmp_codes,
+                                  buffer.h_tmp_codes,
+                                  batch_size_actual * D * sizeof(uint8_t),
+                                  cudaMemcpyHostToDevice,
+                                  buffer.stream));
 
-    CUDA_CHECK(cudaMemcpyAsync(buffer.d_ip_norms,
-                               buffer.h_ip_norms,
-                               batch_size_actual * sizeof(float),
-                               cudaMemcpyHostToDevice,
-                               buffer.stream));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(buffer.d_ip_norms,
+                                  buffer.h_ip_norms,
+                                  batch_size_actual * sizeof(float),
+                                  cudaMemcpyHostToDevice,
+                                  buffer.stream));
 
-    CUDA_CHECK(cudaEventRecord(buffer.h2d_done, buffer.stream));
+    RAFT_CUDA_TRY(cudaEventRecord(buffer.h2d_done, buffer.stream));
 
     // Launch GPU kernel
     int blockSize = 256;
@@ -1418,8 +1407,9 @@ void DataQuantizerGPU::exrabitq_codes_hybrid_advanced(const int* d_bin_XP,
       D,
       EX_BITS,
       long_code_stride);
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
 
-    CUDA_CHECK(cudaEventRecord(buffer.gpu_compute_done, buffer.stream));
+    RAFT_CUDA_TRY(cudaEventRecord(buffer.gpu_compute_done, buffer.stream));
     buffer.state.gpu_done = true;
   };
 
@@ -1436,13 +1426,13 @@ void DataQuantizerGPU::exrabitq_codes_hybrid_advanced(const int* d_bin_XP,
     buffer.state.reset(batch_start, batch_size_actual);
 
     // Start D2H transfer
-    CUDA_CHECK(cudaMemcpyAsync(buffer.h_XP_norm,
-                               d_XP_norm + batch_start * D,
-                               batch_size_actual * D * sizeof(float),
-                               cudaMemcpyDeviceToHost,
-                               buffer.stream));
+    RAFT_CUDA_TRY(cudaMemcpyAsync(buffer.h_XP_norm,
+                                  d_XP_norm + batch_start * D,
+                                  batch_size_actual * D * sizeof(float),
+                                  cudaMemcpyDeviceToHost,
+                                  buffer.stream));
 
-    CUDA_CHECK(cudaEventRecord(buffer.d2h_done, buffer.stream));
+    RAFT_CUDA_TRY(cudaEventRecord(buffer.d2h_done, buffer.stream));
 
     // Launch CPU computation thread
     cpu_threads.emplace_back(cpu_compute_task, i, batch_start, batch_size_actual);
@@ -1465,7 +1455,7 @@ void DataQuantizerGPU::exrabitq_codes_hybrid_advanced(const int* d_bin_XP,
       // Check if this buffer is completely done and can be reused
       if (buffer.state.batch_size > 0 && buffer.state.gpu_done) {
         // Wait for GPU work to actually complete
-        CUDA_CHECK(cudaEventSynchronize(buffer.gpu_compute_done));
+        RAFT_CUDA_TRY(cudaEventSynchronize(buffer.gpu_compute_done));
 
         completed_batches++;
 
@@ -1477,13 +1467,13 @@ void DataQuantizerGPU::exrabitq_codes_hybrid_advanced(const int* d_bin_XP,
           buffer.state.reset(batch_start, batch_size_actual);
 
           // Start D2H transfer for new batch
-          CUDA_CHECK(cudaMemcpyAsync(buffer.h_XP_norm,
-                                     d_XP_norm + batch_start * D,
-                                     batch_size_actual * D * sizeof(float),
-                                     cudaMemcpyDeviceToHost,
-                                     buffer.stream));
+          RAFT_CUDA_TRY(cudaMemcpyAsync(buffer.h_XP_norm,
+                                        d_XP_norm + batch_start * D,
+                                        batch_size_actual * D * sizeof(float),
+                                        cudaMemcpyDeviceToHost,
+                                        buffer.stream));
 
-          CUDA_CHECK(cudaEventRecord(buffer.d2h_done, buffer.stream));
+          RAFT_CUDA_TRY(cudaEventRecord(buffer.d2h_done, buffer.stream));
 
           // Launch CPU computation thread
           cpu_threads.emplace_back(cpu_compute_task, buf_id, batch_start, batch_size_actual);
@@ -1506,25 +1496,25 @@ void DataQuantizerGPU::exrabitq_codes_hybrid_advanced(const int* d_bin_XP,
 
   // Synchronize all streams
   for (int i = 0; i < num_buffers; i++) {
-    CUDA_CHECK(cudaStreamSynchronize(buffers[i].stream));
+    RAFT_CUDA_TRY(cudaStreamSynchronize(buffers[i].stream));
   }
 
   // Cleanup
   for (int i = 0; i < num_buffers; i++) {
     // Free host memory
-    CUDA_CHECK(cudaFreeHost(buffers[i].h_XP_norm));
-    CUDA_CHECK(cudaFreeHost(buffers[i].h_tmp_codes));
-    CUDA_CHECK(cudaFreeHost(buffers[i].h_ip_norms));
+    RAFT_CUDA_TRY(cudaFreeHost(buffers[i].h_XP_norm));
+    RAFT_CUDA_TRY(cudaFreeHost(buffers[i].h_tmp_codes));
+    RAFT_CUDA_TRY(cudaFreeHost(buffers[i].h_ip_norms));
 
     // Free device memory
-    CUDA_CHECK(cudaFree(buffers[i].d_tmp_codes));
-    CUDA_CHECK(cudaFree(buffers[i].d_ip_norms));
+    RAFT_CUDA_TRY(cudaFree(buffers[i].d_tmp_codes));
+    RAFT_CUDA_TRY(cudaFree(buffers[i].d_ip_norms));
 
     // Destroy stream and events
-    CUDA_CHECK(cudaStreamDestroy(buffers[i].stream));
-    CUDA_CHECK(cudaEventDestroy(buffers[i].h2d_done));
-    CUDA_CHECK(cudaEventDestroy(buffers[i].d2h_done));
-    CUDA_CHECK(cudaEventDestroy(buffers[i].gpu_compute_done));
+    RAFT_CUDA_TRY(cudaStreamDestroy(buffers[i].stream));
+    RAFT_CUDA_TRY(cudaEventDestroy(buffers[i].h2d_done));
+    RAFT_CUDA_TRY(cudaEventDestroy(buffers[i].d2h_done));
+    RAFT_CUDA_TRY(cudaEventDestroy(buffers[i].gpu_compute_done));
   }
 }
 
@@ -1942,8 +1932,8 @@ void DataQuantizerGPU::exrabitq_codes(const int* d_bin_XP,
   int gridSize  = (num_points + blockSize - 1) / blockSize;
   exrabitq_codes_kernel<<<gridSize, blockSize>>>(
     d_bin_XP, d_XP_norm, d_long_code, d_ex_factor, d_fac_x2, num_points, D, EX_BITS);
-  CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
 }
 #ifdef DEBUG_BATCH_CONSTRUCT
 int debug_first_cluster_count = 0;
@@ -1964,15 +1954,15 @@ void DataQuantizerGPU::exrabitq_codes_batch(const int* d_bin_XP,
   int gridSize       = (num_points + blockSize - 1) / blockSize;
   float* ip_norm_inv = nullptr;
   int* d_temp_codes  = nullptr;
-  CUDA_CHECK(cudaMalloc((void**)&ip_norm_inv, num_points * sizeof(float)));
-  CUDA_CHECK(cudaMalloc((void**)&d_temp_codes, num_points * sizeof(int) * D));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&ip_norm_inv, num_points * sizeof(float)));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_temp_codes, num_points * sizeof(int) * D));
   // Allocate workspace in global memory
   int workspace_per_vector = D * 2 + D * 2 * sizeof(HeapItem) / sizeof(int);
   int* d_workspace;
-  cudaMalloc(&d_workspace, num_points * workspace_per_vector * sizeof(int));
+  RAFT_CUDA_TRY(cudaMalloc(&d_workspace, num_points * workspace_per_vector * sizeof(int)));
 
   // Initialize workspace to zero (IMPORTANT!)
-  cudaMemset(d_workspace, 0, num_points * workspace_per_vector * sizeof(int));
+  RAFT_CUDA_TRY(cudaMemset(d_workspace, 0, num_points * workspace_per_vector * sizeof(int)));
   exrabitq_codes_kernel_batch<<<gridSize, blockSize>>>(d_bin_XP,
                                                        d_XP_norm,
                                                        d_long_code,
@@ -1982,6 +1972,7 @@ void DataQuantizerGPU::exrabitq_codes_batch(const int* d_bin_XP,
                                                        ip_norm_inv,
                                                        d_temp_codes,
                                                        d_workspace);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 
 #ifdef DEBUG_BATCH_CONSTRUCT
   if (debug_first_cluster_count < 1) {
@@ -1989,7 +1980,7 @@ void DataQuantizerGPU::exrabitq_codes_batch(const int* d_bin_XP,
     std::cout << "No." << debug_first_cluster_count
               << " vector of the first cluster's first 20 long codes:\n";
     int h_bin_XP[20];
-    CUDA_CHECK(cudaMemcpy(h_bin_XP, d_temp_codes, 20 * sizeof(int), cudaMemcpyDeviceToHost));
+    RAFT_CUDA_TRY(cudaMemcpy(h_bin_XP, d_temp_codes, 20 * sizeof(int), cudaMemcpyDeviceToHost));
 
     // Print them
     for (int i = 0; i < 20; i++) {
@@ -2000,11 +1991,11 @@ void DataQuantizerGPU::exrabitq_codes_batch(const int* d_bin_XP,
   // Then compute factors
   compute_factors_packed_batch(
     d_centroid, d_temp_codes, d_XP, ip_norm_inv, num_points, D, 1.9, d_ex_factor, EX_BITS);
-  cudaFree(d_workspace);
-  CUDA_CHECK(cudaFree(ip_norm_inv));
-  CUDA_CHECK(cudaFree(d_temp_codes));
-  CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  RAFT_CUDA_TRY(cudaFree(d_workspace));
+  RAFT_CUDA_TRY(cudaFree(ip_norm_inv));
+  RAFT_CUDA_TRY(cudaFree(d_temp_codes));
+  RAFT_CUDA_TRY(cudaGetLastError());
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
 }
 
 //-----------------------------------------------------------------------------
@@ -2034,79 +2025,79 @@ void DataQuantizerGPU::quantize(raft::resources const& handle,
 #ifdef DEBUG_TIME
   cudaEvent_t start, stop;
   float elapsed;
-  cudaEventCreate(&start);
-  cudaEventCreate(&stop);
+  RAFT_CUDA_TRY(cudaEventCreate(&start));
+  RAFT_CUDA_TRY(cudaEventCreate(&stop));
 #endif
 
   // 1. Data Transformation:
 #ifdef DEBUG_TIME
-  cudaEventRecord(start);
+  RAFT_CUDA_TRY(cudaEventRecord(start));
 #endif
   float* d_XP_norm = nullptr;
   int* d_bin_XP    = nullptr;
-  CUDA_CHECK(cudaMalloc((void**)&d_XP_norm, num_points * D * sizeof(float)));
-  CUDA_CHECK(cudaMalloc((void**)&d_bin_XP, num_points * D * sizeof(int)));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_XP_norm, num_points * D * sizeof(float)));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_bin_XP, num_points * D * sizeof(int)));
   data_transformation(
     handle, d_data, d_centroid, d_IDs, num_points, rotator, d_rotated_c, d_XP_norm, d_bin_XP);
 #ifdef DEBUG_TIME
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&elapsed, start, stop);
+  RAFT_CUDA_TRY(cudaEventRecord(stop));
+  RAFT_CUDA_TRY(cudaEventSynchronize(stop));
+  RAFT_CUDA_TRY(cudaEventElapsedTime(&elapsed, start, stop));
   printf("Step 1 (Data Transformation): %f seconds\n", elapsed / 1000.0f);
 #endif
 
   // 2. Compute total blocks for factors and short codes.
 #ifdef DEBUG_TIME
-  cudaEventRecord(start);
+  RAFT_CUDA_TRY(cudaEventRecord(start));
 #endif
 //    size_t total_blocks = div_rd_up(num_points, FAST_SIZE);
 #ifdef DEBUG_TIME
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&elapsed, start, stop);
+  RAFT_CUDA_TRY(cudaEventRecord(stop));
+  RAFT_CUDA_TRY(cudaEventSynchronize(stop));
+  RAFT_CUDA_TRY(cudaEventElapsedTime(&elapsed, start, stop));
   printf("Step 2 (Compute total blocks): %f seconds\n", elapsed / 1000.0f);
 #endif
 
   // 3. Allocate intermediate buffers on device.
 #ifdef DEBUG_TIME
-  cudaEventRecord(start);
+  RAFT_CUDA_TRY(cudaEventRecord(start));
 #endif
   size_t code_len             = short_code_length();  // from quantizer parameters.
   size_t short_codes_bytes    = code_len * num_points * sizeof(uint32_t);
   uint32_t* d_all_short_codes = nullptr;
-  CUDA_CHECK(cudaMalloc((void**)&d_all_short_codes, short_codes_bytes));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_all_short_codes, short_codes_bytes));
 
   size_t factor_bytes       = num_points * sizeof(float);
   float* d_all_factor_x2    = nullptr;
   float* d_all_factor_ip    = nullptr;
   float* d_all_factor_sumxb = nullptr;
   float* d_all_factor_err   = nullptr;
-  CUDA_CHECK(cudaMalloc((void**)&d_all_factor_x2, factor_bytes));
-  CUDA_CHECK(cudaMalloc((void**)&d_all_factor_ip, factor_bytes));
-  CUDA_CHECK(cudaMalloc((void**)&d_all_factor_sumxb, factor_bytes));
-  CUDA_CHECK(cudaMalloc((void**)&d_all_factor_err, factor_bytes));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_all_factor_x2, factor_bytes));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_all_factor_ip, factor_bytes));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_all_factor_sumxb, factor_bytes));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_all_factor_err, factor_bytes));
 #ifdef DEBUG_TIME
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&elapsed, start, stop);
+  RAFT_CUDA_TRY(cudaEventRecord(stop));
+  RAFT_CUDA_TRY(cudaEventSynchronize(stop));
+  RAFT_CUDA_TRY(cudaEventElapsedTime(&elapsed, start, stop));
   printf("Step 3 (Allocate intermediate buffers): %f seconds\n", elapsed / 1000.0f);
 #endif
 
   // 4. Compute RaBitQ quantization codes.
 #ifdef DEBUG_TIME
-  cudaEventRecord(start);
+  RAFT_CUDA_TRY(cudaEventRecord(start));
 #endif
   rabitq_codes(d_bin_XP, d_all_short_codes, num_points);
 #ifdef DEBUG_TIME
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&elapsed, start, stop);
+  RAFT_CUDA_TRY(cudaEventRecord(stop));
+  RAFT_CUDA_TRY(cudaEventSynchronize(stop));
+  RAFT_CUDA_TRY(cudaEventElapsedTime(&elapsed, start, stop));
   printf("Step 4 (Compute RaBitQ codes): %f seconds\n", elapsed / 1000.0f);
 #endif
 
   // 5. Compute re-ranking factors.
 #ifdef DEBUG_TIME
-  cudaEventRecord(start);
+  RAFT_CUDA_TRY(cudaEventRecord(start));
 #endif
   rabitq_factor(d_data,
                 d_centroid,
@@ -2119,42 +2110,43 @@ void DataQuantizerGPU::quantize(raft::resources const& handle,
                 d_all_factor_err,
                 num_points);
 #ifdef DEBUG_TIME
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&elapsed, start, stop);
+  RAFT_CUDA_TRY(cudaEventRecord(stop));
+  RAFT_CUDA_TRY(cudaEventSynchronize(stop));
+  RAFT_CUDA_TRY(cudaEventElapsedTime(&elapsed, start, stop));
   printf("Step 5 (Compute re-ranking factors): %f seconds\n", elapsed / 1000.0f);
 #endif
 
   // 6. Compute ExRaBitQ quantization codes.
 #ifdef DEBUG_TIME
-  cudaEventRecord(start);
+  RAFT_CUDA_TRY(cudaEventRecord(start));
 #endif
   exrabitq_codes(d_bin_XP, d_XP_norm, d_long_code, d_ex_factor, d_all_factor_x2, num_points);
 #ifdef DEBUG_TIME
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&elapsed, start, stop);
+  RAFT_CUDA_TRY(cudaEventRecord(stop));
+  RAFT_CUDA_TRY(cudaEventSynchronize(stop));
+  RAFT_CUDA_TRY(cudaEventElapsedTime(&elapsed, start, stop));
   printf("Step 6 (Compute ExRaBitQ codes): %f seconds\n", elapsed / 1000.0f);
 #endif
 
   // 7. Copy short codes and factor blocks into final output d_short_data.
 #ifdef DEBUG_TIME
-  cudaEventRecord(start);
+  RAFT_CUDA_TRY(cudaEventRecord(start));
 #endif
   uint32_t* cur_block = d_short_data;
   // copy point by point (follows point-factor data layout)
   for (size_t i = 0; i < num_points; i++) {
     size_t block_code_bytes = code_len * sizeof(uint32_t);
     //        printf("short code Len %d in uint32_t", code_len);
-    CUDA_CHECK(cudaMemcpy(
+    RAFT_CUDA_TRY(cudaMemcpy(
       cur_block, d_all_short_codes + i * code_len, block_code_bytes, cudaMemcpyDeviceToDevice));
 #if defined(HIGH_ACC_FAST_SCAN)
     float* block_fac = (float*)block_factor(cur_block, D);
-    CUDA_CHECK(cudaMemcpy(block_fac, d_all_factor_x2 + i, sizeof(float), cudaMemcpyDeviceToDevice));
+    RAFT_CUDA_TRY(
+      cudaMemcpy(block_fac, d_all_factor_x2 + i, sizeof(float), cudaMemcpyDeviceToDevice));
 
     // debug
     //        float temp_float;
-    //        CUDA_CHECK(cudaMemcpy(&temp_float,
+    //        RAFT_CUDA_TRY(cudaMemcpy(&temp_float,
     //                              d_all_factor_x2 + i,
     //                              sizeof(float), cudaMemcpyDeviceToHost));
     //        printf("factors: %f\n", temp_float);
@@ -2168,53 +2160,53 @@ void DataQuantizerGPU::quantize(raft::resources const& handle,
     float* cur_ip      = factor_ip(block_fac, FAST_SIZE);
     float* cur_sumxb   = factor_sumxb(block_fac, FAST_SIZE);
     float* cur_err     = factor_err(block_fac, FAST_SIZE);
-    CUDA_CHECK(cudaMemcpy(cur_x2,
-                          d_all_factor_x2 + i * FAST_SIZE,
-                          FAST_SIZE * sizeof(float),
-                          cudaMemcpyDeviceToDevice));
-    CUDA_CHECK(cudaMemcpy(cur_ip,
-                          d_all_factor_ip + i * FAST_SIZE,
-                          FAST_SIZE * sizeof(float),
-                          cudaMemcpyDeviceToDevice));
-    CUDA_CHECK(cudaMemcpy(cur_sumxb,
-                          d_all_factor_sumxb + i * FAST_SIZE,
-                          FAST_SIZE * sizeof(float),
-                          cudaMemcpyDeviceToDevice));
-    CUDA_CHECK(cudaMemcpy(cur_err,
-                          d_all_factor_err + i * FAST_SIZE,
-                          FAST_SIZE * sizeof(float),
-                          cudaMemcpyDeviceToDevice));
+    RAFT_CUDA_TRY(cudaMemcpy(cur_x2,
+                             d_all_factor_x2 + i * FAST_SIZE,
+                             FAST_SIZE * sizeof(float),
+                             cudaMemcpyDeviceToDevice));
+    RAFT_CUDA_TRY(cudaMemcpy(cur_ip,
+                             d_all_factor_ip + i * FAST_SIZE,
+                             FAST_SIZE * sizeof(float),
+                             cudaMemcpyDeviceToDevice));
+    RAFT_CUDA_TRY(cudaMemcpy(cur_sumxb,
+                             d_all_factor_sumxb + i * FAST_SIZE,
+                             FAST_SIZE * sizeof(float),
+                             cudaMemcpyDeviceToDevice));
+    RAFT_CUDA_TRY(cudaMemcpy(cur_err,
+                             d_all_factor_err + i * FAST_SIZE,
+                             FAST_SIZE * sizeof(float),
+                             cudaMemcpyDeviceToDevice));
 #endif
     cur_block = next_block(cur_block, code_len, FAST_SIZE, NUM_SHORT_FACTORS);
   }
 #ifdef DEBUG_TIME
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&elapsed, start, stop);
+  RAFT_CUDA_TRY(cudaEventRecord(stop));
+  RAFT_CUDA_TRY(cudaEventSynchronize(stop));
+  RAFT_CUDA_TRY(cudaEventElapsedTime(&elapsed, start, stop));
   printf("Step 7 (Copy short codes and factor blocks): %f seconds\n", elapsed / 1000.0f);
 #endif
 
   // 8. Free intermediate buffers.
 #ifdef DEBUG_TIME
-  cudaEventRecord(start);
+  RAFT_CUDA_TRY(cudaEventRecord(start));
 #endif
-  cudaFree(d_all_short_codes);
-  cudaFree(d_all_factor_x2);
-  cudaFree(d_all_factor_ip);
-  cudaFree(d_all_factor_sumxb);
-  cudaFree(d_all_factor_err);
-  cudaFree(d_XP_norm);
-  cudaFree(d_bin_XP);
+  RAFT_CUDA_TRY(cudaFree(d_all_short_codes));
+  RAFT_CUDA_TRY(cudaFree(d_all_factor_x2));
+  RAFT_CUDA_TRY(cudaFree(d_all_factor_ip));
+  RAFT_CUDA_TRY(cudaFree(d_all_factor_sumxb));
+  RAFT_CUDA_TRY(cudaFree(d_all_factor_err));
+  RAFT_CUDA_TRY(cudaFree(d_XP_norm));
+  RAFT_CUDA_TRY(cudaFree(d_bin_XP));
 #ifdef DEBUG_TIME
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&elapsed, start, stop);
+  RAFT_CUDA_TRY(cudaEventRecord(stop));
+  RAFT_CUDA_TRY(cudaEventSynchronize(stop));
+  RAFT_CUDA_TRY(cudaEventElapsedTime(&elapsed, start, stop));
   printf("Step 8 (Free intermediate buffers): %f seconds\n", elapsed / 1000.0f);
 #endif
 
 #ifdef DEBUG_TIME
-  cudaEventDestroy(start);
-  cudaEventDestroy(stop);
+  RAFT_CUDA_TRY(cudaEventDestroy(start));
+  RAFT_CUDA_TRY(cudaEventDestroy(stop));
 #endif
 }
 
@@ -2315,13 +2307,13 @@ void compute_factors_packed(const float* d_centroid,  // [D]
   dim3 block(threads_per_block);
   RowwisePackedKernel<<<grid, block, 0, stream>>>(
     d_centroid, d_bin_XP, d_XP, N, D, d_out, kConstEpsilon);
-  CUDA_CHECK(cudaGetLastError());
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 #ifdef DEBUG_BATCH_CONSTRUCT
   if (debug_first_cluster_count_4 == 0) {
     debug_first_cluster_count_4++;
     std::cout << "First vector of the first cluster's short factors:\n";
     float h_bin_XP[3];
-    CUDA_CHECK(cudaMemcpy(h_bin_XP, d_out, 3 * sizeof(float), cudaMemcpyDeviceToHost));
+    RAFT_CUDA_TRY(cudaMemcpy(h_bin_XP, d_out, 3 * sizeof(float), cudaMemcpyDeviceToHost));
 
     std::cout << "f_add = " << h_bin_XP[0] << std::endl;
     std::cout << "f_rescale = " << h_bin_XP[1] << std::endl;
@@ -2425,24 +2417,24 @@ void compute_factors_packed_batch(const float* d_centroid,  // [D]
   dim3 block(threads_per_block);
   RowwisePackedKernelBatch<<<grid, block, 0, stream>>>(
     d_centroid, d_xu, d_XP, ipnorm_inv, N, D, d_out, kConstEpsilon, ex_bits);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 #ifdef DEBUG_BATCH_CONSTRUCT
   if (debug_first_cluster_count_3 == 0) {
     debug_first_cluster_count_3++;
     std::cout << "First vector of the first cluster's ex factors:\n";
     float h_bin_XP[2];
-    CUDA_CHECK(cudaMemcpy(h_bin_XP, d_out, 2 * sizeof(float), cudaMemcpyDeviceToHost));
+    RAFT_CUDA_TRY(cudaMemcpy(h_bin_XP, d_out, 2 * sizeof(float), cudaMemcpyDeviceToHost));
 
     std::cout << "f_ex_add = " << h_bin_XP[0] << std::endl;
     std::cout << "f_ex_rescale = " << h_bin_XP[1] << std::endl;
 
-    CUDA_CHECK(cudaMemcpy(h_bin_XP, d_out + 2, 2 * sizeof(float), cudaMemcpyDeviceToHost));
+    RAFT_CUDA_TRY(cudaMemcpy(h_bin_XP, d_out + 2, 2 * sizeof(float), cudaMemcpyDeviceToHost));
 
     std::cout << "Second vector of the first cluster's ex factors:\n";
     std::cout << "f_ex_add = " << h_bin_XP[0] << std::endl;
     std::cout << "f_ex_rescale = " << h_bin_XP[1] << std::endl;
   }
 #endif
-  CUDA_CHECK(cudaGetLastError());
 }
 
 #ifdef DEBUG_BATCH_CONSTRUCT
@@ -2464,26 +2456,26 @@ void DataQuantizerGPU::quantize_batch(raft::resources const& handle,
 #ifdef DEBUG_TIME
   cudaEvent_t start, stop;
   float elapsed;
-  cudaEventCreate(&start);
-  cudaEventCreate(&stop);
+  RAFT_CUDA_TRY(cudaEventCreate(&start));
+  RAFT_CUDA_TRY(cudaEventCreate(&stop));
 #endif
 
   // 1. Data Transformation:
 #ifdef DEBUG_TIME
-  cudaEventRecord(start);
+  RAFT_CUDA_TRY(cudaEventRecord(start));
 #endif
   float* d_XP_norm = nullptr;
   int* d_bin_XP    = nullptr;
   float* d_XP;
-  CUDA_CHECK(cudaMalloc((void**)&d_XP_norm, num_points * D * sizeof(float)));
-  CUDA_CHECK(cudaMalloc((void**)&d_bin_XP, num_points * D * sizeof(int)));
-  CUDA_CHECK(cudaMalloc((void**)&d_XP, num_points * D * sizeof(float)));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_XP_norm, num_points * D * sizeof(float)));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_bin_XP, num_points * D * sizeof(int)));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_XP, num_points * D * sizeof(float)));
   data_transformation_batch(
     handle, d_data, d_centroid, d_IDs, num_points, rotator, d_rotated_c, d_XP_norm, d_bin_XP, d_XP);
 #ifdef DEBUG_TIME
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&elapsed, start, stop);
+  RAFT_CUDA_TRY(cudaEventRecord(stop));
+  RAFT_CUDA_TRY(cudaEventSynchronize(stop));
+  RAFT_CUDA_TRY(cudaEventElapsedTime(&elapsed, start, stop));
   printf("Step 1 (Data Transformation): %f seconds\n", elapsed / 1000.0f);
 #endif
 
@@ -2492,7 +2484,7 @@ void DataQuantizerGPU::quantize_batch(raft::resources const& handle,
     debug_first_cluster_count_2++;
     std::cout << "First vector of the first cluster's first 20 short codes:\n";
     int h_bin_XP[20];
-    CUDA_CHECK(cudaMemcpy(h_bin_XP, d_bin_XP, 20 * sizeof(int), cudaMemcpyDeviceToHost));
+    RAFT_CUDA_TRY(cudaMemcpy(h_bin_XP, d_bin_XP, 20 * sizeof(int), cudaMemcpyDeviceToHost));
 
     // Print them
     for (int i = 0; i < 20; i++) {
@@ -2503,24 +2495,24 @@ void DataQuantizerGPU::quantize_batch(raft::resources const& handle,
 
   // 2. Compute total blocks for factors and short codes.
 #ifdef DEBUG_TIME
-  cudaEventRecord(start);
+  RAFT_CUDA_TRY(cudaEventRecord(start));
 #endif
 //    size_t total_blocks = div_rd_up(num_points, FAST_SIZE);
 #ifdef DEBUG_TIME
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&elapsed, start, stop);
+  RAFT_CUDA_TRY(cudaEventRecord(stop));
+  RAFT_CUDA_TRY(cudaEventSynchronize(stop));
+  RAFT_CUDA_TRY(cudaEventElapsedTime(&elapsed, start, stop));
   printf("Step 2 (Compute total blocks): %f seconds\n", elapsed / 1000.0f);
 #endif
 
   // 3. Allocate intermediate buffers on device.
 #ifdef DEBUG_TIME
-  cudaEventRecord(start);
+  RAFT_CUDA_TRY(cudaEventRecord(start));
 #endif
   size_t code_len          = short_code_length();  // from quantizer parameters.
   size_t short_codes_bytes = code_len * num_points * sizeof(uint32_t);
   //    uint32_t* d_all_short_codes = nullptr;
-  //    CUDA_CHECK(cudaMalloc((void**) &d_all_short_codes, short_codes_bytes));
+  //    RAFT_CUDA_TRY(cudaMalloc((void**) &d_all_short_codes, short_codes_bytes));
 
   size_t factor_bytes = num_points * sizeof(float) * 3;  // we have 3 factors for batch data
 //    float* d_all_data_factors = nullptr;
@@ -2529,68 +2521,68 @@ void DataQuantizerGPU::quantize_batch(raft::resources const& handle,
 //    float* d_all_factor_ip = nullptr;
 //    float* d_all_factor_sumxb = nullptr;
 //    float* d_all_factor_err = nullptr;
-//    CUDA_CHECK(cudaMalloc((void**) &d_all_factor_x2, factor_bytes));
-//    CUDA_CHECK(cudaMalloc((void**) &d_all_factor_ip, factor_bytes));
-//    CUDA_CHECK(cudaMalloc((void**) &d_all_factor_sumxb, factor_bytes));
-//    CUDA_CHECK(cudaMalloc((void**) &d_all_factor_err, factor_bytes));
+//    RAFT_CUDA_TRY(cudaMalloc((void**) &d_all_factor_x2, factor_bytes));
+//    RAFT_CUDA_TRY(cudaMalloc((void**) &d_all_factor_ip, factor_bytes));
+//    RAFT_CUDA_TRY(cudaMalloc((void**) &d_all_factor_sumxb, factor_bytes));
+//    RAFT_CUDA_TRY(cudaMalloc((void**) &d_all_factor_err, factor_bytes));
 #ifdef DEBUG_TIME
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&elapsed, start, stop);
+  RAFT_CUDA_TRY(cudaEventRecord(stop));
+  RAFT_CUDA_TRY(cudaEventSynchronize(stop));
+  RAFT_CUDA_TRY(cudaEventElapsedTime(&elapsed, start, stop));
   printf("Step 3 (Allocate intermediate buffers): %f seconds\n", elapsed / 1000.0f);
 #endif
 
   // 4. Compute RaBitQ quantization codes.
 #ifdef DEBUG_TIME
-  cudaEventRecord(start);
+  RAFT_CUDA_TRY(cudaEventRecord(start));
 #endif
   rabitq_codes(d_bin_XP, d_short_data, num_points);
 #ifdef DEBUG_TIME
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&elapsed, start, stop);
+  RAFT_CUDA_TRY(cudaEventRecord(stop));
+  RAFT_CUDA_TRY(cudaEventSynchronize(stop));
+  RAFT_CUDA_TRY(cudaEventElapsedTime(&elapsed, start, stop));
   printf("Step 4 (Compute RaBitQ codes): %f seconds\n", elapsed / 1000.0f);
 #endif
 
   // 5. Compute RaBitQ factors.
 #ifdef DEBUG_TIME
-  cudaEventRecord(start);
+  RAFT_CUDA_TRY(cudaEventRecord(start));
 #endif
   compute_factors_packed(d_rotated_c, d_bin_XP, d_XP, num_points, D, 1.9, d_short_data_factors);
 #ifdef DEBUG_TIME
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&elapsed, start, stop);
+  RAFT_CUDA_TRY(cudaEventRecord(stop));
+  RAFT_CUDA_TRY(cudaEventSynchronize(stop));
+  RAFT_CUDA_TRY(cudaEventElapsedTime(&elapsed, start, stop));
   printf("Step 5 (Compute re-ranking factors): %f seconds\n", elapsed / 1000.0f);
 #endif
 
   // 6. Compute ExRaBitQ quantization codes.
 #ifdef DEBUG_TIME
-  cudaEventRecord(start);
+  RAFT_CUDA_TRY(cudaEventRecord(start));
 #endif
   exrabitq_codes_batch(
     d_bin_XP, d_XP_norm, d_XP, d_long_code, d_ex_factor, d_rotated_c, num_points);
 #ifdef DEBUG_TIME
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&elapsed, start, stop);
+  RAFT_CUDA_TRY(cudaEventRecord(stop));
+  RAFT_CUDA_TRY(cudaEventSynchronize(stop));
+  RAFT_CUDA_TRY(cudaEventElapsedTime(&elapsed, start, stop));
   printf("Step 6 (Compute ExRaBitQ codes): %f seconds\n", elapsed / 1000.0f);
 #endif
 
   // 7. Copy short codes and factor blocks into final output d_short_data.
 #ifdef DEBUG_TIME
-  cudaEventRecord(start);
+  RAFT_CUDA_TRY(cudaEventRecord(start));
 #endif
   uint32_t* cur_block = d_short_data;
   // copy point by point (follows point-factor data layout)
   for (size_t i = 0; i < num_points; i++) {
     size_t block_code_bytes = code_len * sizeof(uint32_t);
-//        CUDA_CHECK(cudaMemcpy(cur_block,
+//        RAFT_CUDA_TRY(cudaMemcpy(cur_block,
 //                              d_all_short_codes + i * code_len,
 //                              block_code_bytes, cudaMemcpyDeviceToDevice));
 #if defined(HIGH_ACC_FAST_SCAN)
     float* block_fac = (float*)block_factor(cur_block, D);
-    //        CUDA_CHECK(cudaMemcpy(block_fac,
+    //        RAFT_CUDA_TRY(cudaMemcpy(block_fac,
     //                              d_all_factor_x2 + i,
     //                              sizeof(float), cudaMemcpyDeviceToDevice));
 
@@ -2600,48 +2592,48 @@ void DataQuantizerGPU::quantize_batch(raft::resources const& handle,
     float* cur_ip      = factor_ip(block_fac, FAST_SIZE);
     float* cur_sumxb   = factor_sumxb(block_fac, FAST_SIZE);
     float* cur_err     = factor_err(block_fac, FAST_SIZE);
-    CUDA_CHECK(cudaMemcpy(cur_x2,
-                          d_all_factor_x2 + i * FAST_SIZE,
-                          FAST_SIZE * sizeof(float),
-                          cudaMemcpyDeviceToDevice));
-    CUDA_CHECK(cudaMemcpy(cur_ip,
-                          d_all_factor_ip + i * FAST_SIZE,
-                          FAST_SIZE * sizeof(float),
-                          cudaMemcpyDeviceToDevice));
-    CUDA_CHECK(cudaMemcpy(cur_sumxb,
-                          d_all_factor_sumxb + i * FAST_SIZE,
-                          FAST_SIZE * sizeof(float),
-                          cudaMemcpyDeviceToDevice));
-    CUDA_CHECK(cudaMemcpy(cur_err,
-                          d_all_factor_err + i * FAST_SIZE,
-                          FAST_SIZE * sizeof(float),
-                          cudaMemcpyDeviceToDevice));
+    RAFT_CUDA_TRY(cudaMemcpy(cur_x2,
+                             d_all_factor_x2 + i * FAST_SIZE,
+                             FAST_SIZE * sizeof(float),
+                             cudaMemcpyDeviceToDevice));
+    RAFT_CUDA_TRY(cudaMemcpy(cur_ip,
+                             d_all_factor_ip + i * FAST_SIZE,
+                             FAST_SIZE * sizeof(float),
+                             cudaMemcpyDeviceToDevice));
+    RAFT_CUDA_TRY(cudaMemcpy(cur_sumxb,
+                             d_all_factor_sumxb + i * FAST_SIZE,
+                             FAST_SIZE * sizeof(float),
+                             cudaMemcpyDeviceToDevice));
+    RAFT_CUDA_TRY(cudaMemcpy(cur_err,
+                             d_all_factor_err + i * FAST_SIZE,
+                             FAST_SIZE * sizeof(float),
+                             cudaMemcpyDeviceToDevice));
 #endif
     cur_block = next_block(cur_block, code_len, FAST_SIZE, NUM_SHORT_FACTORS);
   }
 #ifdef DEBUG_TIME
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&elapsed, start, stop);
+  RAFT_CUDA_TRY(cudaEventRecord(stop));
+  RAFT_CUDA_TRY(cudaEventSynchronize(stop));
+  RAFT_CUDA_TRY(cudaEventElapsedTime(&elapsed, start, stop));
   printf("Step 7 (Copy short codes and factor blocks): %f seconds\n", elapsed / 1000.0f);
 #endif
 
   // 8. Free intermediate buffers.
 #ifdef DEBUG_TIME
-  cudaEventRecord(start);
+  RAFT_CUDA_TRY(cudaEventRecord(start));
 #endif
-  cudaFree(d_XP_norm);
-  cudaFree(d_bin_XP);
+  RAFT_CUDA_TRY(cudaFree(d_XP_norm));
+  RAFT_CUDA_TRY(cudaFree(d_bin_XP));
 #ifdef DEBUG_TIME
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&elapsed, start, stop);
+  RAFT_CUDA_TRY(cudaEventRecord(stop));
+  RAFT_CUDA_TRY(cudaEventSynchronize(stop));
+  RAFT_CUDA_TRY(cudaEventElapsedTime(&elapsed, start, stop));
   printf("Step 8 (Free intermediate buffers): %f seconds\n", elapsed / 1000.0f);
 #endif
 
 #ifdef DEBUG_TIME
-  cudaEventDestroy(start);
-  cudaEventDestroy(stop);
+  RAFT_CUDA_TRY(cudaEventDestroy(start));
+  RAFT_CUDA_TRY(cudaEventDestroy(stop));
 #endif
 }
 

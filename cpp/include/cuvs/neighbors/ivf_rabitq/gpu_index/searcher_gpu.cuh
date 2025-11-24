@@ -280,7 +280,7 @@ class SearcherGPU {
   /* ---------- tiny helpers ---------- */
   static inline void safeCudaFree(void* p) noexcept
   {
-    if (p) cudaFree(p);  // ignore error in a noexcept dtor
+    if (p) RAFT_CUDA_TRY_NO_THROW(cudaFree(p));  // ignore error in a noexcept dtor
   }
   template <typename T>
   static inline void safeHostFree(T*& p) noexcept

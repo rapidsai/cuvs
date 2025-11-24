@@ -451,7 +451,7 @@ void DataQuantizerGPU::data_transformation_batch_opt(
 {
   // 1. Allocate a single temporary buffer for both padded data and the padded centroid.
   float* d_X_and_C_pad;
-  cudaMalloc((void**)&d_X_and_C_pad, (num_points + 1) * D * sizeof(float));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_X_and_C_pad, (num_points + 1) * D * sizeof(float)));
 
   // Create a pointer to the start of the centroid section for the kernel.
   float* d_C_pad_ptr = d_X_and_C_pad + num_points * D;
@@ -462,11 +462,7 @@ void DataQuantizerGPU::data_transformation_batch_opt(
   int gridPadSize         = (totalPadElements + blockSize - 1) / blockSize;
   gatherAndPadKernel<<<gridPadSize, blockSize>>>(
     d_data, d_IDs, d_centroid, d_X_and_C_pad, num_points, DIM, D);
-
-#ifdef DEBUG_BATCH_CONSTRUCT
-  CUDA_CHECK(cudaGetLastError());
-  // No sync needed here, the next GPU operation will wait.
-#endif
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // 3. Allocate a single output buffer for both rotated data (XP) and rotated centroid (CP).
   float* d_XP_and_CP = d_XP_output;
@@ -480,7 +476,7 @@ void DataQuantizerGPU::data_transformation_batch_opt(
   float* d_CP = d_XP_and_CP + num_points * D;
 
   // 5. Save the rotated centroid: copy CP into d_rotated_c.
-  cudaMemcpy(d_rotated_c, d_CP, D * sizeof(float), cudaMemcpyDeviceToDevice);
+  RAFT_CUDA_TRY(cudaMemcpy(d_rotated_c, d_CP, D * sizeof(float), cudaMemcpyDeviceToDevice));
 
   // 6. Launch the single FUSED kernel for subtract, normalize, and binarize.
   const unsigned int FusedBlockSize = 256;  // A good default, can be tuned.
@@ -496,12 +492,10 @@ void DataQuantizerGPU::data_transformation_batch_opt(
                                            d_bin_XP,     // Output 3: Binarized data
                                            num_points,
                                            D);
-#ifdef DEBUG_BATCH_CONSTRUCT
-  CUDA_CHECK(cudaGetLastError());
-#endif
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Free temporary buffers.
-  cudaFree(d_X_and_C_pad);
+  RAFT_CUDA_TRY(cudaFree(d_X_and_C_pad));
 }
 
 // Fused function to compute RaBitQ codes and factors in a single pass.
@@ -525,6 +519,7 @@ void DataQuantizerGPU::rabitq_codes_and_factors_fused(const float* d_rotated_c,
     D,
     d_short_data_factors,
     d_short_data);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
 //---------------------------------------------------------------------------
@@ -561,6 +556,7 @@ void DataQuantizerGPU::exrabitq_codes_and_factors_fused(const int* d_bin_XP,
     1.9f,                  // kConstEpsilon
     d_long_code,
     d_ex_factor);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
 void DataQuantizerGPU::quantize_batch_opt(raft::resources const& handle,
@@ -583,9 +579,9 @@ void DataQuantizerGPU::quantize_batch_opt(raft::resources const& handle,
   float* d_XP_norm = nullptr;
   int* d_bin_XP    = nullptr;
   float* d_XP;
-  cudaMalloc((void**)&d_XP_norm, num_points * D * sizeof(float));
-  cudaMalloc((void**)&d_bin_XP, num_points * D * sizeof(int));
-  cudaMalloc((void**)&d_XP, (num_points + 1) * D * sizeof(float));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_XP_norm, num_points * D * sizeof(float)));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_bin_XP, num_points * D * sizeof(int)));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_XP, (num_points + 1) * D * sizeof(float)));
   data_transformation_batch_opt(
     handle, d_data, d_centroid, d_IDs, num_points, rotator, d_rotated_c, d_XP_norm, d_bin_XP, d_XP);
 
@@ -615,10 +611,10 @@ void DataQuantizerGPU::quantize_batch_opt(raft::resources const& handle,
   }
 
   // Free intermediate buffers.
-  cudaFree(d_XP_norm);
-  cudaFree(d_bin_XP);
+  RAFT_CUDA_TRY(cudaFree(d_XP_norm));
+  RAFT_CUDA_TRY(cudaFree(d_bin_XP));
   // jamxia edit
-  cudaFree(d_XP);
+  RAFT_CUDA_TRY(cudaFree(d_XP));
 }
 
 constexpr std::array<float, 9> kTightStart = {
@@ -1104,6 +1100,7 @@ void DataQuantizerGPU::exrabitq_codes_and_factors_fused_ori(const int* d_bin_XP,
                                              1.9f,  // kConstEpsilon
                                              d_long_code,
                                              d_ex_factor);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

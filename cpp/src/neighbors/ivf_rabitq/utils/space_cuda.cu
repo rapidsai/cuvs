@@ -5,6 +5,8 @@
 
 #include <cuvs/neighbors/ivf_rabitq/utils/space_cuda.cuh>
 
+#include <raft/util/cuda_rt_essentials.hpp>
+
 #include <algorithm>  // std::max, std::min, std::clamp
 #include <cmath>      // std::abs
 #include <cstdint>    // int16_t, int32_t
@@ -125,29 +127,31 @@ __global__ void l2sqr_main_kernel(const float* __restrict__ x,
 float L2Sqr_CUDA(const float* x, const float* y, size_t L)
 {
   cudaStream_t stream;
-  cudaStreamCreate(&stream);
+  RAFT_CUDA_TRY(cudaStreamCreate(&stream));
   float* d_output;
-  cudaMalloc(&d_output, sizeof(float));
-  cudaMemset(d_output, 0, sizeof(float));
+  RAFT_CUDA_TRY(cudaMalloc(&d_output, sizeof(float)));
+  RAFT_CUDA_TRY(cudaMemset(d_output, 0, sizeof(float)));
 
   // 计算主部分（16倍数部分）
   const size_t num16 = L - (L % 16);
   if (num16 > 0) {
     const int grid_size = (num16 + BLOCK_SIZE * 4 - 1) / (BLOCK_SIZE * 4);
     l2sqr_main_kernel<<<grid_size, BLOCK_SIZE, 0, stream>>>(x, y, d_output, num16);
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 
   // 处理尾部剩余元素
   if (L > num16) {
     const int tail_grid = (L - num16 + BLOCK_SIZE - 1) / BLOCK_SIZE;
     l2sqr_tail_kernel<<<tail_grid, BLOCK_SIZE, 0, stream>>>(x, y, d_output, num16, L);
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
   }
 
   // 回传结果
   float result;
-  cudaMemcpyAsync(&result, d_output, sizeof(float), cudaMemcpyDeviceToHost, stream);
-  cudaStreamSynchronize(stream);
-  cudaFree(d_output);
+  RAFT_CUDA_TRY(cudaMemcpyAsync(&result, d_output, sizeof(float), cudaMemcpyDeviceToHost, stream));
+  RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
+  RAFT_CUDA_TRY(cudaFree(d_output));
 
   return result;
 }

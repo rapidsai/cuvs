@@ -9,6 +9,8 @@
 
 #include <cuvs/neighbors/ivf_rabitq/gpu_index/pool_gpu.cuh>
 
+#include <raft/util/cuda_rt_essentials.hpp>
+
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
 // Host function to create and initialize a DeviceResultPool.
@@ -23,8 +25,8 @@ DeviceResultPool* createDeviceResultPool(int capacity, cudaStream_t stream)
   // Allocate device memory for the arrays.
   uint32_t* d_ids    = nullptr;
   float* d_distances = nullptr;
-  cudaMallocAsync((void**)&d_ids, (capacity + 1) * sizeof(uint32_t), stream);
-  cudaMallocAsync((void**)&d_distances, (capacity + 1) * sizeof(float), stream);
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_ids, (capacity + 1) * sizeof(uint32_t), stream));
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_distances, (capacity + 1) * sizeof(float), stream));
 
   // Initialize a host instance of the pool.
   h_pool->ids       = d_ids;
@@ -47,14 +49,14 @@ void copy_results_from_pool(const DeviceResultPool* d_pool, uint32_t* host_resul
 {
   // First, copy the DeviceResultPool struct from device to host.
   DeviceResultPool h_pool;
-  CUDA_CHECK(cudaMemcpy(&h_pool, d_pool, sizeof(DeviceResultPool), cudaMemcpyDeviceToHost));
+  RAFT_CUDA_TRY(cudaMemcpy(&h_pool, d_pool, sizeof(DeviceResultPool), cudaMemcpyDeviceToHost));
 
   // Now, h_pool.size tells us how many candidates were inserted.
   size_t num_candidates = h_pool.size;
   std::cout << "Number of candidates in pool: " << num_candidates << std::endl;
 
   // Copy the candidate IDs array from device (h_pool.ids) to host.
-  CUDA_CHECK(cudaMemcpy(
+  RAFT_CUDA_TRY(cudaMemcpy(
     host_results, h_pool.ids, num_candidates * sizeof(uint32_t), cudaMemcpyDeviceToHost));
 }
 

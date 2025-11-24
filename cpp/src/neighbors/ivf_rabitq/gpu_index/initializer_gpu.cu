@@ -285,13 +285,13 @@ __global__ void FillCandidatesKernel(const float* d_distances,
 FlatInitializerGPU::FlatInitializerGPU(size_t d, size_t k)
   : InitializerGPU(d, k), Centroids(nullptr)
 {
-  CUDA_CHECK(cudaMalloc((void**)&Centroids, data_bytes()));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&Centroids, data_bytes()));
   dist_func = L2SqrGPU;
 }
 
 FlatInitializerGPU::~FlatInitializerGPU()
 {
-  if (Centroids) { cudaFree(Centroids); }
+  if (Centroids) { RAFT_CUDA_TRY(cudaFree(Centroids)); }
 }
 
 __host__ __device__ float* FlatInitializerGPU::GetCentroid(PID id) const
@@ -301,12 +301,12 @@ __host__ __device__ float* FlatInitializerGPU::GetCentroid(PID id) const
 
 void FlatInitializerGPU::AddVectors(const float* cent)
 {
-  CUDA_CHECK(cudaMemcpy(Centroids, cent, data_bytes(), cudaMemcpyHostToDevice));
+  RAFT_CUDA_TRY(cudaMemcpy(Centroids, cent, data_bytes(), cudaMemcpyHostToDevice));
 }
 
 void FlatInitializerGPU::AddVectorsD2D(const float* cent)
 {
-  cudaMemcpy(Centroids, cent, data_bytes(), cudaMemcpyDeviceToDevice);
+  RAFT_CUDA_TRY(cudaMemcpy(Centroids, cent, data_bytes(), cudaMemcpyDeviceToDevice));
 }
 
 // Kernel to initialize sequence
@@ -324,12 +324,12 @@ void FlatInitializerGPU::ComputeCentroidsDistances(const float* query,
 {
   // Allocate device memory for the query vector.
   float* d_query = nullptr;
-  cudaMallocAsync((void**)&d_query, sizeof(float) * D, stream);
-  cudaMemcpyAsync(d_query, query, sizeof(float) * D, cudaMemcpyHostToDevice, stream);
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_query, sizeof(float) * D, stream));
+  RAFT_CUDA_TRY(cudaMemcpyAsync(d_query, query, sizeof(float) * D, cudaMemcpyHostToDevice, stream));
 
   // Allocate device memory for distances (one per centroid).
   float* d_distances = nullptr;
-  cudaMallocAsync((void**)&d_distances, sizeof(float) * K, stream);
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_distances, sizeof(float) * K, stream));
   // Launch kernel: each thread computes distance for one centroid.
   int blockSize = 256;
   int gridSize  = (K + blockSize - 1) / blockSize;
@@ -347,13 +347,14 @@ void FlatInitializerGPU::ComputeCentroidsDistances(const float* query,
                                                          d_distances,
                                                          K,
                                                          D / 4);
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
   //    ComputeDistancesKernelNormal<<<gridSize, blockSize>>>(Centroids, d_query, d_distances, K,
   //    D); ComputeDistancesKernelOptimized<<<gridSize, blockSize, sharedMemSize>>>(
   //            Centroids, d_query, d_distances, K, D);
 
   // Allocate device memory for candidate IDs.
   PID* d_candidate_ids = nullptr;
-  cudaMallocAsync((void**)&d_candidate_ids, sizeof(PID) * K, stream);
+  RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_candidate_ids, sizeof(PID) * K, stream));
   //    auto policy = thrust::cuda::par.on(stream);
   //    {
   //        // Initialize candidate IDs as a sequence 0,1,...,K-1 using Thrust.
@@ -374,7 +375,8 @@ void FlatInitializerGPU::ComputeCentroidsDistances(const float* query,
     int block_size = 256;
     int grid_size  = (K + block_size - 1) / block_size;
     init_sequence_kernel<<<grid_size, block_size, 0, stream>>>(d_candidate_ids, K);
-    cudaStreamSynchronize(stream);  // Wait for kernel completion
+    RAFT_CUDA_TRY(cudaPeekAtLastError());
+    RAFT_CUDA_TRY(cudaStreamSynchronize(stream));  // Wait for kernel completion
   }
 
   // Replace the second block with:
@@ -396,7 +398,7 @@ void FlatInitializerGPU::ComputeCentroidsDistances(const float* query,
                                     stream);
 
     // Allocate temporary storage
-    cudaMallocAsync(&d_temp_storage, temp_storage_bytes, stream);
+    RAFT_CUDA_TRY(cudaMallocAsync(&d_temp_storage, temp_storage_bytes, stream));
 
     // Run sorting operation
     cub::DeviceRadixSort::SortPairs(d_temp_storage,
@@ -411,7 +413,7 @@ void FlatInitializerGPU::ComputeCentroidsDistances(const float* query,
                                     stream);
 
     // Clean up temporary storage
-    cudaFreeAsync(d_temp_storage, stream);
+    RAFT_CUDA_TRY(cudaFreeAsync(d_temp_storage, stream));
   }
 
   // Fill the output Candidate array with the top nprobe candidates.
@@ -419,13 +421,14 @@ void FlatInitializerGPU::ComputeCentroidsDistances(const float* query,
   int gridSize2  = (nprobe + blockSize2 - 1) / blockSize2;
   FillCandidatesKernel<<<gridSize2, blockSize2, 0, stream>>>(
     d_distances, d_candidate_ids, candidates, nprobe);
-  //    CUDA_CHECK(cudaGetLastError());
-  //    CUDA_CHECK(cudaDeviceSynchronize());
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  //    RAFT_CUDA_TRY(cudaGetLastError());
+  //    RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
   // Free temporary device memory.
-  cudaFreeAsync(d_query, stream);
-  cudaFreeAsync(d_distances, stream);
-  cudaFreeAsync(d_candidate_ids, stream);
+  RAFT_CUDA_TRY(cudaFreeAsync(d_query, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_distances, stream));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_candidate_ids, stream));
 }
 
 // Loads the centroids from a file.
@@ -438,7 +441,7 @@ void FlatInitializerGPU::LoadCentroids(std::ifstream& input, const char* filenam
   // Read the raw data from the file.
   input.read(reinterpret_cast<char*>(hostCentroids), data_bytes());
   // Copy the data from host to device.
-  CUDA_CHECK(cudaMemcpy(Centroids, hostCentroids, data_bytes(), cudaMemcpyHostToDevice));
+  RAFT_CUDA_TRY(cudaMemcpy(Centroids, hostCentroids, data_bytes(), cudaMemcpyHostToDevice));
   // Free temporary host memory.
   delete[] hostCentroids;
 }
@@ -451,7 +454,7 @@ void FlatInitializerGPU::SaveCentroids(std::ofstream& output, const char* filena
   // Allocate temporary host buffer for centroids.
   auto* hostCentroids = new float[K * D];
   // Copy centroids from device to host.
-  CUDA_CHECK(cudaMemcpy(hostCentroids, Centroids, data_bytes(), cudaMemcpyDeviceToHost));
+  RAFT_CUDA_TRY(cudaMemcpy(hostCentroids, Centroids, data_bytes(), cudaMemcpyDeviceToHost));
   // Write the raw data to the file.
   output.write(reinterpret_cast<char*>(hostCentroids), data_bytes());
   // Free temporary host memory.
@@ -478,7 +481,7 @@ void FlatInitializerGPU::AddVectorsTranspose(const float* cent)
     }
   }
   // Copy the transposed data to device memory.
-  CUDA_CHECK(cudaMemcpy(Centroids, hostTransposed, data_bytes(), cudaMemcpyHostToDevice));
+  RAFT_CUDA_TRY(cudaMemcpy(Centroids, hostTransposed, data_bytes(), cudaMemcpyHostToDevice));
   delete[] hostTransposed;
 }
 
@@ -489,17 +492,17 @@ void FlatInitializerGPU::ComputeCentroidsDistancesTranspose(const float* query,
 {
   // Allocate device memory for the query vector.
   float* d_query = nullptr;
-  CUDA_CHECK(cudaMalloc((void**)&d_query, sizeof(float) * D));
-  CUDA_CHECK(cudaMemcpy(d_query, query, sizeof(float) * D, cudaMemcpyHostToDevice));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_query, sizeof(float) * D));
+  RAFT_CUDA_TRY(cudaMemcpy(d_query, query, sizeof(float) * D, cudaMemcpyHostToDevice));
 
   // Allocate device memory for final distances (one per centroid).
   float* d_distances = nullptr;
-  CUDA_CHECK(cudaMalloc((void**)&d_distances, sizeof(float) * K));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_distances, sizeof(float) * K));
 
   // Allocate a temporary device array for partial results:
   // one float for each dimension for each centroid.
   float* d_partial = nullptr;
-  CUDA_CHECK(cudaMalloc((void**)&d_partial, sizeof(float) * K * D));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_partial, sizeof(float) * K * D));
 
   // Launch Kernel 1: Compute partial distances.
   // We'll use a 2D grid where:
@@ -509,19 +512,19 @@ void FlatInitializerGPU::ComputeCentroidsDistancesTranspose(const float* query,
   int gridSizeX  = (K + blockSize1 - 1) / blockSize1;
   dim3 gridDim1(gridSizeX, D);
   computePartialDistancesKernel<<<gridDim1, blockSize1>>>(Centroids, d_query, d_partial, K, D);
-  CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
   // Launch Kernel 2: Reduce over dimensions for each centroid.
   int blockSize2 = 512;
   int gridSize2  = (K + blockSize2 - 1) / blockSize2;
   reduceDistancesKernel<<<gridSize2, blockSize2>>>(d_partial, d_distances, K, D);
-  CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
   // Now, as before, sort the distances (with candidate IDs) using Thrust.
   PID* d_candidate_ids = nullptr;
-  CUDA_CHECK(cudaMalloc((void**)&d_candidate_ids, sizeof(PID) * K));
+  RAFT_CUDA_TRY(cudaMalloc((void**)&d_candidate_ids, sizeof(PID) * K));
   {
     thrust::device_ptr<PID> dev_ptr = thrust::device_pointer_cast(d_candidate_ids);
     thrust::sequence(dev_ptr, dev_ptr + K);
@@ -535,14 +538,14 @@ void FlatInitializerGPU::ComputeCentroidsDistancesTranspose(const float* query,
   int blockSize3 = 512;
   int gridSize3  = (nprobe + blockSize3 - 1) / blockSize3;
   FillCandidatesKernel<<<gridSize3, blockSize3>>>(d_distances, d_candidate_ids, candidates, nprobe);
-  CUDA_CHECK(cudaGetLastError());
-  CUDA_CHECK(cudaDeviceSynchronize());
+  RAFT_CUDA_TRY(cudaPeekAtLastError());
+  RAFT_CUDA_TRY(cudaDeviceSynchronize());
 
   // Free temporary device memory.
-  cudaFree(d_query);
-  cudaFree(d_distances);
-  cudaFree(d_partial);
-  cudaFree(d_candidate_ids);
+  RAFT_CUDA_TRY(cudaFree(d_query));
+  RAFT_CUDA_TRY(cudaFree(d_distances));
+  RAFT_CUDA_TRY(cudaFree(d_partial));
+  RAFT_CUDA_TRY(cudaFree(d_candidate_ids));
 }
 
 // LoadCentroids centroids from file.
@@ -564,7 +567,8 @@ void FlatInitializerGPU::LoadCentroidsTranspose(std::ifstream& input, const char
     }
   }
   // Copy transposed data to device memory.
-  CUDA_CHECK(cudaMemcpy(Centroids, hostCentroidsTransposed, data_bytes(), cudaMemcpyHostToDevice));
+  RAFT_CUDA_TRY(
+    cudaMemcpy(Centroids, hostCentroidsTransposed, data_bytes(), cudaMemcpyHostToDevice));
 
   delete[] hostCentroidsRowMajor;
   delete[] hostCentroidsTransposed;
@@ -579,7 +583,8 @@ void FlatInitializerGPU::SaveCentroidsTranspose(std::ofstream& output, const cha
   auto* hostCentroidsRowMajor   = new float[K * D];
 
   // Copy centroids from device (transposed) to host.
-  CUDA_CHECK(cudaMemcpy(hostCentroidsTransposed, Centroids, data_bytes(), cudaMemcpyDeviceToHost));
+  RAFT_CUDA_TRY(
+    cudaMemcpy(hostCentroidsTransposed, Centroids, data_bytes(), cudaMemcpyDeviceToHost));
 
   // Transpose from column-major to row-major.
   for (size_t i = 0; i < K; i++) {
