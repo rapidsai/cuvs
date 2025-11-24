@@ -31,8 +31,9 @@ function(generate_cuvs_export)
       [=[
 
   set(_cuvs_implicit_comp_names cuvs_cpp_headers cuvs_shared cuvs_static)
-  foreach(_cuvs_comp IN LISTS _cuvs_implicit_comp_names)
-    if(NOT TARGET cuvs::${_cuvs_comp})
+  set(_cuvs_implicit_target_names cuvs_cpp_headers cuvs cuvs_static)
+  foreach(_cuvs_comp _cuvs_target IN ZIP_LISTS _cuvs_implicit_comp_names _cuvs_implicit_target_names)
+    if(NOT TARGET cuvs::${_cuvs_target})
       file(GLOB cuvs_component_dep_files LIST_DIRECTORIES FALSE
             "${CMAKE_CURRENT_LIST_DIR}/cuvs-${_cuvs_comp}*-dependencies.cmake")
       foreach(f IN LISTS  cuvs_component_dep_files)
