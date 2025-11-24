@@ -7,17 +7,20 @@ set -euo pipefail
 rapids-pip-retry install cmake
 pyenv rehash
 
-# Download the standalone C library artifact
-payload_name="libcuvs_c_${RAPIDS_CUDA_VERSION}_${RAPIDS_TEST_ARCH}.tar.gz"
-pkg_name="libcuvs_c.tar.gz"
-rapids-logger "Download ${payload_name} artifacts from previous jobs"
-DOWNLOAD_LOCATION=$(rapids-download-from-github "${payload_name}")
-
-# Extract the artifact to a staging directory
 INSTALL_PREFIX="${PWD}/libcuvs_c_install"
 mkdir -p "${INSTALL_PREFIX}"
-ls -l "${DOWNLOAD_LOCATION}"
-tar -xf "${DOWNLOAD_LOCATION}/${pkg_name}" -C "${INSTALL_PREFIX}"
+
+# Download the standalone C library artifact
+if [[ -n "${1}" ]]; then
+  payload_name="$1"
+  pkg_name="libcuvs_c.tar.gz"
+  rapids-logger "Download ${payload_name} artifacts from previous jobs"
+  DOWNLOAD_LOCATION=$(rapids-download-from-github "${payload_name}")
+
+  # Extract the artifact to a staging directory
+  tar -xf "${DOWNLOAD_LOCATION}/${pkg_name}" -C "${INSTALL_PREFIX}"
+fi
+
 
 rapids-logger "Run C API tests"
 ls -l "${INSTALL_PREFIX}"
