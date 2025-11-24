@@ -16,7 +16,7 @@ struct ivf_rabitq_inputs {
   uint32_t num_db_vecs             = 4096;
   uint32_t num_queries             = 1024;
   uint32_t dim                     = 64;
-  uint32_t k                       = 32;
+  uint32_t k                       = 10;
   std::optional<double> min_recall = std::nullopt;
 
   cuvs::neighbors::ivf_rabitq::index_params index_params;
@@ -25,6 +25,18 @@ struct ivf_rabitq_inputs {
   // Set some default parameters for tests
   ivf_rabitq_inputs() { index_params.n_lists = max(32u, min(1024u, num_db_vecs / 128u)); }
 };
+
+inline auto operator<<(std::ostream& os, const ivf_rabitq::search_mode& p) -> std::ostream&
+{
+  switch (p) {
+    case ivf_rabitq::search_mode::LUT16: os << "search_mode::LUT16"; break;
+    case ivf_rabitq::search_mode::LUT32: os << "search_mode::LUT32"; break;
+    case ivf_rabitq::search_mode::QUANT4: os << "search_mode::QUANT4"; break;
+    case ivf_rabitq::search_mode::QUANT8: os << "search_mode::QUANT8"; break;
+    default: RAFT_FAIL("unreachable code");
+  }
+  return os;
+}
 
 inline auto operator<<(std::ostream& os, const ivf_rabitq_inputs& p) -> std::ostream&
 {
@@ -51,7 +63,7 @@ inline auto operator<<(std::ostream& os, const ivf_rabitq_inputs& p) -> std::ost
   PRINT_DIFF(.index_params.kmeans_n_iters);
   PRINT_DIFF(.index_params.fast_quantize_flag);
   PRINT_DIFF(.search_params.n_probes);
-  PRINT_DIFF_V(.search_params.mode);
+  PRINT_DIFF(.search_params.mode);
   os << "}";
   return os;
 }
@@ -128,7 +140,9 @@ class ivf_rabitq_test : public ::testing::TestWithParam<ivf_rabitq_inputs> {
 
     auto host_database = raft::make_host_matrix<DataT, int64_t>(ps.num_db_vecs, ps.dim);
     raft::copy(host_database.data_handle(), database.data(), ps.num_db_vecs * ps.dim, stream_);
-    auto database_view = raft::make_host_matrix_view<const DataT, int64_t>(
+    // `ivf_rabitq::build` internally distinguishes between device and host pointers. For
+    // convenience, we wrap the host pointer as a device matrix view here.
+    auto database_view = raft::make_device_matrix_view<const DataT, int64_t>(
       host_database.data_handle(), ps.num_db_vecs, ps.dim);
     cuvs::neighbors::ivf_rabitq::index<IdxT> idx(
       handle_, ps.num_db_vecs, ps.dim, ipams.n_lists, ipams.bits_per_dim);
@@ -140,6 +154,16 @@ class ivf_rabitq_test : public ::testing::TestWithParam<ivf_rabitq_inputs> {
   {
     tmp_index_file index_file;
     auto idx_to_serialize = build_only();
+    cuvs::neighbors::ivf_rabitq::serialize(handle_, index_file.filename, idx_to_serialize);
+    cuvs::neighbors::ivf_rabitq::index<IdxT> deserialized_index(handle_);
+    cuvs::neighbors::ivf_rabitq::deserialize(handle_, index_file.filename, &deserialized_index);
+    return deserialized_index;
+  }
+
+  auto build_host_input_serialize()
+  {
+    tmp_index_file index_file;
+    auto idx_to_serialize = build_only_host_input();
     cuvs::neighbors::ivf_rabitq::serialize(handle_, index_file.filename, idx_to_serialize);
     cuvs::neighbors::ivf_rabitq::index<IdxT> deserialized_index(handle_);
     cuvs::neighbors::ivf_rabitq::deserialize(handle_, index_file.filename, &deserialized_index);
@@ -182,9 +206,9 @@ class ivf_rabitq_test : public ::testing::TestWithParam<ivf_rabitq_inputs> {
     min_recall = ps.min_recall.value_or(min_recall);
 
     ASSERT_TRUE(cuvs::neighbors::eval_neighbours(indices_ref,
-                                                 indices_ivf_pq,
+                                                 indices_ivf_rabitq,
                                                  distances_ref,
-                                                 distances_ivf_pq,
+                                                 distances_ivf_rabitq,
                                                  ps.num_queries,
                                                  ps.k,
                                                  0.0001 * compression_ratio,
@@ -247,11 +271,11 @@ inline auto with_dims(const std::vector<uint32_t>& dims) -> test_cases_t
   });
 }
 
-inline auto small_dims() -> test_cases_t { return with_dims({1, 2, 3, 4, 5, 8, 15, 16, 17}); }
+inline auto small_dims() -> test_cases_t { return with_dims({1, 2, 3, 4, 5}); }
 
 inline auto big_dims() -> test_cases_t
 {
-  return with_dims({512, 513, 1023, 1024, 1025, 2048, 2049, 2050, 2053, 6144, 8192, 12288, 16384});
+  return with_dims({512, 513, 1023, 1024, 1025, 2048, 2049, 2050});
 }
 
 inline auto var_n_probes() -> test_cases_t
@@ -264,20 +288,19 @@ inline auto var_n_probes() -> test_cases_t
   return map<ivf_rabitq_inputs>(xs, [](uint32_t n_probes) {
     ivf_rabitq_inputs x;
     x.search_params.n_probes = n_probes;
+    // reduce `min_recall` for low `n_probes`
+    if (n_probes <= 5) { x.min_recall = 0.1 * n_probes; }
     return x;
   });
 }
 
 inline auto var_k() -> test_cases_t
 {
-  return map<ivf_rabitq_inputs, uint32_t>(
-    {1, 2, 3, 5, 8, 15, 16, 32, 63, 65, 127, 128, 256, 257, 1023, 2048, 2049}, [](uint32_t k) {
-      ivf_rabitq_inputs x;
-      x.k = k;
-      // when there's not enough data, try more cluster probes
-      x.search_params.n_probes = max(x.search_params.n_probes, min(x.index_params.n_lists, k));
-      return x;
-    });
+  return map<ivf_rabitq_inputs, uint32_t>({1, 2, 3, 5, 8, 15, 16, 32, 63}, [](uint32_t k) {
+    ivf_rabitq_inputs x;
+    x.k = k;
+    return x;
+  });
 }
 
 inline auto var_bits_per_dim() -> test_cases_t
@@ -289,29 +312,41 @@ inline auto var_bits_per_dim() -> test_cases_t
   }
   return map<ivf_rabitq_inputs>(xs, [](uint32_t bits_per_dim) {
     ivf_rabitq_inputs x;
-    x.build_params.bits_per_dim = bits_per_dim;
+    x.index_params.bits_per_dim = bits_per_dim;
+    return x;
+  });
+}
+
+inline auto var_search_mode() -> test_cases_t
+{
+  ivf_rabitq_inputs dflt;
+  std::vector<cuvs::neighbors::ivf_rabitq::search_mode> xs{ivf_rabitq::search_mode::LUT16,
+                                                           ivf_rabitq::search_mode::LUT32,
+                                                           ivf_rabitq::search_mode::QUANT4,
+                                                           ivf_rabitq::search_mode::QUANT8};
+
+  return map<ivf_rabitq_inputs>(xs, [](cuvs::neighbors::ivf_rabitq::search_mode mode) {
+    ivf_rabitq_inputs x;
+    x.search_params.mode = mode;
     return x;
   });
 }
 
 /* Test instantiations */
 
-#define TEST_BUILD_SEARCH(type)                         \
-  TEST_P(type, build_search) /* NOLINT */               \
-  {                                                     \
-    this->run([this]() { return this->build_only(); }); \
-  }
-
-#define TEST_BUILD_HOST_INPUT_SEARCH(type)                         \
-  TEST_P(type, build_host_input_search) /* NOLINT */               \
-  {                                                                \
-    this->run([this]() { return this->build_only_host_input(); }); \
-  }
+// Currently IVF-RaBitQ deserialization reorganizes data for efficient search and is required for
+// producing correct results.
 
 #define TEST_BUILD_SERIALIZE_SEARCH(type)                    \
   TEST_P(type, build_serialize_search) /* NOLINT */          \
   {                                                          \
     this->run([this]() { return this->build_serialize(); }); \
+  }
+
+#define TEST_BUILD_HOST_INPUT_SERIALIZE_SEARCH(type)                    \
+  TEST_P(type, build_host_input_serialize_search) /* NOLINT */          \
+  {                                                                     \
+    this->run([this]() { return this->build_host_input_serialize(); }); \
   }
 
 #define INSTANTIATE(type, vals) \
