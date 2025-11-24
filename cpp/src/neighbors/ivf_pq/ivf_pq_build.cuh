@@ -244,10 +244,11 @@ auto calculate_offsets_and_indices(IdxT n_rows,
   return max_cluster_size;
 }
 
-template <typename accessor>
 void pad_centers_with_norms(
   raft::resources const& res,
-  raft::mdspan<const float, raft::matrix_extent<uint32_t>, raft::row_major, accessor> centers,
+  const float* centers,
+  uint32_t n_lists,
+  uint32_t dim,
   raft::device_matrix_view<float, uint32_t, raft::row_major> padded_centers)
 {
   auto stream = raft::resource::get_cuda_stream(res);
@@ -259,17 +260,17 @@ void pad_centers_with_norms(
   // combine cluster_centers and their norms
   RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_centers.data_handle(),
                                   sizeof(float) * padded_centers.extent(1),
-                                  centers.data_handle(),
-                                  sizeof(float) * centers.extent(1),
-                                  sizeof(float) * centers.extent(1),
-                                  centers.extent(0),
+                                  centers,
+                                  sizeof(float) * dim,
+                                  sizeof(float) * dim,
+                                  n_lists,
                                   cudaMemcpyDefault,
                                   stream));
 
-  rmm::device_uvector<float> center_norms(centers.extent(0), stream);
+  rmm::device_uvector<float> center_norms(n_lists, stream);
   raft::linalg::rowNorm<raft::linalg::L2Norm, true>(
-    center_norms.data(), centers.data_handle(), centers.extent(1), centers.extent(0), stream);
-  RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_centers.data_handle() + centers.extent(1),
+    center_norms.data(), centers, dim, n_lists, stream);
+  RAFT_CUDA_TRY(cudaMemcpy2DAsync(padded_centers.data_handle() + dim,
                                   sizeof(float) * padded_centers.extent(1),
                                   center_norms.data(),
                                   sizeof(float),
