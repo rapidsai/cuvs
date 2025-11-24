@@ -39,7 +39,7 @@ function(generate_cuvs_export)
         include("${f}")
       endforeach()
       file(GLOB cuvs_component_target_files LIST_DIRECTORIES FALSE
-                "${CMAKE_CURRENT_LIST_DIR}/cuvs-${_cuvs_comp}_headers*-targets.cmake")
+                "${CMAKE_CURRENT_LIST_DIR}/cuvs-${_cuvs_comp}*-targets.cmake")
       foreach(f IN LISTS  cuvs_component_target_files)
         include("${f}")
       endforeach()
