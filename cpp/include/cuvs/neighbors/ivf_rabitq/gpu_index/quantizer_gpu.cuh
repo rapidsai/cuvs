@@ -61,7 +61,8 @@ class DataQuantizerGPU {
   //                       const std::vector<PID>& pids,
   //                       const int* intMat, const float* floatMat,
   //                       float* out1, float* out2, float* out3, float* out4) const;
-  void rabitq_factor(const float* d_data,
+  void rabitq_factor(raft::resources const& handle,
+                     const float* d_data,
                      const float* d_centroid,
                      const PID* d_IDs,
                      const int* d_bin_XP,
@@ -72,17 +73,21 @@ class DataQuantizerGPU {
                      float* fac_err,
                      size_t num_points) const;
   //    void fast_quantize(const float* data, uint8_t* code, float& factor) const;
-  void rabitq_codes(const int* d_bin_XP, uint32_t* d_packed_code, size_t num_points) const;
+  void rabitq_codes(raft::resources const& handle,
+                    const int* d_bin_XP,
+                    uint32_t* d_packed_code,
+                    size_t num_points) const;
   //    void exrabitq_codes(const int* intMat, const float* floatMat,
   //                         uint8_t* code, ExFactor* exFactor, const float* extra) const;
-  void exrabitq_codes(const int* d_bin_XP,
+  void exrabitq_codes(raft::resources const& handle,
+                      const int* d_bin_XP,
                       const float* d_XP_norm,
                       uint8_t* d_long_code,
                       float* d_ex_factor,
                       const float* d_fac_x2,
                       size_t num_points) const;
 
-  void store_compacted_code(uint8_t* dest, uint8_t* src) const;
+  void store_compacted_code(raft::resources const& handle, uint8_t* dest, uint8_t* src) const;
 
   //     rd_up_to_multiple_of = [](uint32_t dim, uint32_t mult) -> size_t {
   //        return ((dim + mult - 1) / mult) * mult;
@@ -288,14 +293,16 @@ class DataQuantizerGPU {
                                      int* d_bin_XP,
                                      float* d_XP) const;
 
-  void exrabitq_codes_hybrid_advanced(const int* d_bin_XP,
+  void exrabitq_codes_hybrid_advanced(raft::resources const& handle,
+                                      const int* d_bin_XP,
                                       const float* d_XP_norm,
                                       uint8_t* d_long_code,
                                       float* d_ex_factor,
                                       const float* d_fac_x2,
                                       size_t num_points) const;
 
-  void exrabitq_codes_batch(const int* d_bin_XP,
+  void exrabitq_codes_batch(raft::resources const& handle,
+                            const int* d_bin_XP,
                             const float* d_XP_norm,
                             float* d_XP,
                             uint8_t* d_long_code,
@@ -303,7 +310,8 @@ class DataQuantizerGPU {
                             const float* d_fac_x2,
                             size_t num_points) const;
 
-  void exrabitq_codes_and_factors_fused(const int* d_bin_XP,
+  void exrabitq_codes_and_factors_fused(raft::resources const& handle,
+                                        const int* d_bin_XP,
                                         const float* d_XP_norm,
                                         float* d_XP,
                                         uint8_t* d_long_code,
@@ -311,7 +319,8 @@ class DataQuantizerGPU {
                                         const float* d_fac_x2,
                                         size_t num_points) const;
 
-  void rabitq_codes_and_factors_fused(const float* d_rotated_c,
+  void rabitq_codes_and_factors_fused(raft::resources const& handle,
+                                      const float* d_rotated_c,
                                       const int* d_bin_XP,
                                       const float* d_XP,
                                       uint32_t* d_short_data,
@@ -320,7 +329,8 @@ class DataQuantizerGPU {
 
   bool fast_quantize_flag;
 
-  void exrabitq_codes_and_factors_fused_ori(const int* d_bin_XP,
+  void exrabitq_codes_and_factors_fused_ori(raft::resources const& handle,
+                                            const int* d_bin_XP,
                                             const float* d_XP_norm,
                                             float* d_XP,
                                             uint8_t* d_long_code,

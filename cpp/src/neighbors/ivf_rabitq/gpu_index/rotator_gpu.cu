@@ -107,8 +107,7 @@ void RotatorGPU::rotate(raft::resources const& handle,
     raft::make_device_matrix_view<float, int64_t, raft::col_major>(const_cast<float*>(d_P), D, D),
     raft::make_device_matrix_view<float, int64_t, raft::col_major>(const_cast<float*>(d_A), D, N),
     raft::make_device_matrix_view<float, int64_t, raft::col_major>(d_RAND_A, D, N));
-  // TODO: remove this after making all other operations stream-ordered?
-  RAFT_CUDA_TRY(cudaStreamSynchronize(stream_));
+  raft::resource::sync_stream(handle);
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail

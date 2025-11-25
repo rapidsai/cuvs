@@ -112,7 +112,7 @@ struct HostResultPool {
   int size = 0;      // current number of candidates
 };
 
-DeviceResultPool* createDeviceResultPool(int capacity, cudaStream_t stream = 0);
+DeviceResultPool* createDeviceResultPool(int capacity, cudaStream_t stream);
 
 // Frees both the device buffers and the host‑side wrapper.
 // Safe to call with a nullptr.
