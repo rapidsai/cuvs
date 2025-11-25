@@ -42,7 +42,7 @@ class BatchedQueryGatherer {
   int start_cluster_idx      = 0;
 
   // CUDA stream for async operations
-  cudaStream_t stream = nullptr;
+  cudaStream_t stream_ = nullptr;
 
   // Ctors / Dtor
   BatchedQueryGatherer(int dim,

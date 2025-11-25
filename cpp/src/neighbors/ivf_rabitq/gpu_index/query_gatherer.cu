@@ -76,16 +76,17 @@ BatchedQueryGatherer::BatchedQueryGatherer(int dim,
   : D(dim),
     inner_batch_size(max_batch_size),
     max_clusters_per_batch(max_clusters),
-    stream(stream_input)
+    stream_(stream_input)
 {
   // Allocate device memory
-  RAFT_CUDA_TRY(
-    cudaMalloc(&d_gathered_queries, static_cast<size_t>(inner_batch_size) * D * sizeof(float)));
-  RAFT_CUDA_TRY(
-    cudaMalloc(&d_cluster_offsets, static_cast<size_t>(max_clusters_per_batch + 1) * sizeof(int)));
-  RAFT_CUDA_TRY(
-    cudaMalloc(&d_cluster_ids, static_cast<size_t>(max_clusters_per_batch) * sizeof(int)));
-  RAFT_CUDA_TRY(cudaMalloc(&d_gather_indices, static_cast<size_t>(inner_batch_size) * sizeof(int)));
+  RAFT_CUDA_TRY(cudaMallocAsync(
+    &d_gathered_queries, static_cast<size_t>(inner_batch_size) * D * sizeof(float), stream_));
+  RAFT_CUDA_TRY(cudaMallocAsync(
+    &d_cluster_offsets, static_cast<size_t>(max_clusters_per_batch + 1) * sizeof(int), stream_));
+  RAFT_CUDA_TRY(cudaMallocAsync(
+    &d_cluster_ids, static_cast<size_t>(max_clusters_per_batch) * sizeof(int), stream_));
+  RAFT_CUDA_TRY(cudaMallocAsync(
+    &d_gather_indices, static_cast<size_t>(inner_batch_size) * sizeof(int), stream_));
 
   // Allocate pinned host memory for faster transfers
   RAFT_CUDA_TRY(
@@ -99,15 +100,16 @@ BatchedQueryGatherer::BatchedQueryGatherer(int dim,
   //    cudaStreamCreate(&stream);
 
   reset_batch();
+  RAFT_CUDA_TRY(cudaStreamSynchronize(stream_));
 }
 
 BatchedQueryGatherer::~BatchedQueryGatherer()
 {
   // Free device memory
-  RAFT_CUDA_TRY(cudaFree(d_gathered_queries));
-  RAFT_CUDA_TRY(cudaFree(d_cluster_offsets));
-  RAFT_CUDA_TRY(cudaFree(d_cluster_ids));
-  RAFT_CUDA_TRY(cudaFree(d_gather_indices));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_gathered_queries, stream_));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_cluster_offsets, stream_));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_cluster_ids, stream_));
+  RAFT_CUDA_TRY(cudaFreeAsync(d_gather_indices, stream_));
 
   // Free pinned host memory
   RAFT_CUDA_TRY(cudaFreeHost(h_gather_indices));
@@ -149,31 +151,31 @@ void BatchedQueryGatherer::execute_batch(const float* d_rotated_queries, int bat
                                 h_gather_indices,
                                 static_cast<size_t>(current_batch_queries) * sizeof(int),
                                 cudaMemcpyHostToDevice,
-                                stream));
+                                stream_));
 
   RAFT_CUDA_TRY(cudaMemcpyAsync(d_cluster_offsets,
                                 h_cluster_offsets,
                                 static_cast<size_t>(current_batch_clusters + 1) * sizeof(int),
                                 cudaMemcpyHostToDevice,
-                                stream));
+                                stream_));
 
   RAFT_CUDA_TRY(cudaMemcpyAsync(d_cluster_ids,
                                 h_cluster_ids,
                                 static_cast<size_t>(current_batch_clusters) * sizeof(int),
                                 cudaMemcpyHostToDevice,
-                                stream));
+                                stream_));
 
   // Launch kernel
   int threads     = 256;
   long long total = static_cast<long long>(current_batch_queries) * D;  // guard overflow
   int blocks      = static_cast<int>((total + threads - 1) / threads);
 
-  gather_queries_kernel<<<blocks, threads, 0, stream>>>(
+  gather_queries_kernel<<<blocks, threads, 0, stream_>>>(
     d_rotated_queries, d_gather_indices, d_gathered_queries, current_batch_queries, D, batch_size);
   RAFT_CUDA_TRY(cudaPeekAtLastError());
 
   // Ensure completion before handing buffers to the callback
-  RAFT_CUDA_TRY(cudaStreamSynchronize(stream));
+  RAFT_CUDA_TRY(cudaStreamSynchronize(stream_));
 }
 
 }  // namespace cuvs::neighbors::ivf_rabitq::detail
