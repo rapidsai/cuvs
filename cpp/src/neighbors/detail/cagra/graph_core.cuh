@@ -30,6 +30,8 @@
 #include <memory>
 #include <random>
 
+#include <sys/mman.h>
+
 namespace cuvs::neighbors::cagra::detail::graph {
 
 // unnamed namespace to avoid multiple definition error
@@ -487,6 +489,53 @@ void shift_array(T* array, uint64_t num)
     array[i] = array[i - 1];
   }
 }
+
+// RAII wrapper for allocating memory with Transparent HugePage
+struct mmap_owner {
+  // Allocate a new memory (not backed by a file)
+  mmap_owner(size_t size) : size_{size}
+  {
+    int flags = MAP_ANONYMOUS | MAP_PRIVATE;
+    ptr_      = mmap(nullptr, size, PROT_READ | PROT_WRITE, flags, -1, 0);
+    if (ptr_ == MAP_FAILED) {
+      ptr_ = nullptr;
+      throw std::runtime_error("cuvs::mmap_owner error");
+    }
+    if (madvise(ptr_, size, MADV_HUGEPAGE) != 0) {
+      munmap(ptr_, size);
+      ptr_ = nullptr;
+      throw std::runtime_error("cuvs::mmap_owner error");
+    }
+  }
+
+  ~mmap_owner() noexcept
+  {
+    if (ptr_ != nullptr) { munmap(ptr_, size_); }
+  }
+
+  // No copies for owning struct
+  mmap_owner(const mmap_owner& res)                      = delete;
+  auto operator=(const mmap_owner& other) -> mmap_owner& = delete;
+  // Moving is fine
+  mmap_owner(mmap_owner&& other)
+    : ptr_{std::exchange(other.ptr_, nullptr)}, size_{std::exchange(other.size_, 0)}
+  {
+  }
+  auto operator=(mmap_owner&& other) -> mmap_owner&
+  {
+    std::swap(this->ptr_, other.ptr_);
+    std::swap(this->size_, other.size_);
+    return *this;
+  }
+
+  [[nodiscard]] auto data() const -> void* { return ptr_; }
+  [[nodiscard]] auto size() const -> size_t { return size_; }
+
+ private:
+  void* ptr_;
+  size_t size_;
+};
+
 }  // namespace
 
 template <
@@ -1157,6 +1206,180 @@ void count_2hop_detours(raft::host_matrix_view<IdxT, int64_t, raft::row_major> k
   }
 }
 
+//
+// [CPU] Create a reverse graph by reversing the direction of the edges in the knn graph.
+//
+// * Since the reverse graph to be created is fixed degree, it may not retain
+//   all the reversed edges, and it is necessary to decide which ones to retain.
+// * The knn graph as input is assumed to be sorted in order of proximity, with
+//   the closest edge having rank 0, the next closest having rank 1, and so on.
+// * If there are too many reversed edges for a node, the edge with the lower rank
+//   number is retained in preference.
+//
+// In this implementation, the knn graph is scanned twice. The first scan and subsequent
+// prefix-sum compute where each edge of the knn graph can be retained after reversal,
+// and the second graph scan stores the reversed edges in reverse graph.
+//
+template <typename IdxT = uint32_t>
+void make_rev_graph_2scan(raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
+                          raft::host_matrix_view<IdxT, int64_t, raft::row_major> rev_graph,
+                          raft::host_vector_view<uint32_t, int64_t> rev_graph_count)
+{
+  RAFT_EXPECTS(knn_graph.extent(0) == rev_graph.extent(0),
+               "Size of knn_graph and rev_graph are expected to be the same");
+  RAFT_EXPECTS(rev_graph.extent(0) == rev_graph_count.extent(0),
+               "Size of rev_graph and rev_graph_count are expected to be the same");
+  const uint64_t graph_size       = knn_graph.extent(0);
+  const uint64_t knn_graph_degree = knn_graph.extent(1);
+  const uint64_t rev_graph_degree = rev_graph.extent(1);
+
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
+    "cagra::graph::optimize/reverse_CPU-2scan");
+  RAFT_LOG_DEBUG("# reverse_CPU-2scan");
+
+  auto loc = raft::make_host_matrix<uint8_t, int64_t>(graph_size, knn_graph_degree);
+  constexpr uint8_t loc_max = 255;
+  // Initialize arrays
+#pragma omp parallel for
+  for (uint64_t i = 0; i < graph_size; i++) {
+    for (uint64_t k = 0; k < knn_graph_degree; k++) {
+      loc(i, k)       = 0;
+      rev_graph(i, k) = graph_size;
+    }
+    rev_graph_count(i) = 0;
+  }
+  // 1st graph scan: compute histogram
+#pragma omp parallel for
+  for (uint64_t i = 0; i < graph_size; i++) {
+    for (uint64_t k = 0; k < knn_graph_degree; k++) {
+      uint64_t j = knn_graph(i, k);
+      if (j == i) { continue; }
+#pragma omp atomic
+      loc(j, k)++;
+    }
+  }
+  // Prefix-sum: compute where to write
+#pragma omp parallel for
+  for (uint64_t j = 0; j < graph_size; j++) {
+    for (uint64_t k = 1; k < knn_graph_degree; k++) {
+      loc(j, k) = std::min((uint32_t)loc_max, (uint32_t)loc(j, k - 1) + (uint32_t)loc(j, k));
+    }
+    uint64_t k         = knn_graph_degree - 1;
+    rev_graph_count(j) = std::min(rev_graph_degree, (uint64_t)loc(j, k));
+    while (k > 0) {
+      loc(j, k) = loc(j, k - 1);
+      k--;
+    }
+    loc(j, 0) = 0;
+  }
+  // 2nd graph scan: create rev_graph
+#pragma omp parallel for
+  for (uint64_t i = 0; i < graph_size; i++) {
+    for (uint64_t k = 0; k < knn_graph_degree; k++) {
+      uint64_t j = knn_graph(i, k);
+      if ((j == i) || (loc(j, k) >= rev_graph_degree)) { continue; }
+      uint8_t l;
+#pragma omp atomic capture
+      l = loc(j, k)++;
+      if (l >= rev_graph_degree) { continue; }
+      rev_graph(j, l) = i;
+    }
+  }
+}
+
+//
+// [CPU] Create a reverse graph by reversing the direction of the edges in the knn graph.
+//
+// * Since the reverse graph to be created is fixed degree, it may not retain
+//   all the reversed edges, and it is necessary to decide which ones to retain.
+// * The knn graph as input is assumed to be sorted in order of proximity, with
+//   the closest edge having rank 0, the next closest having rank 1, and so on.
+// * If there are too many reversed edges for a node, the edge with the lower rank
+//   number is retained in preference.
+//
+// In this implementation, the knn graph is scanned only oncce. At first glance,
+// this seems faster than make_rev_graph_2scan, which scans the knn graph twice,
+// but in reality, this often has lower performance because it requires lots of
+// memory copies instead of only one scan. However, if the knn graph is too large
+// to fit in host memory and must be placed on slow storage, this may be faster.
+//
+template <typename IdxT = uint32_t>
+void make_rev_graph_1scan(raft::host_matrix_view<IdxT, int64_t, raft::row_major> knn_graph,
+                          raft::host_matrix_view<IdxT, int64_t, raft::row_major> rev_graph,
+                          raft::host_vector_view<uint32_t, int64_t> rev_graph_count)
+{
+  RAFT_EXPECTS(knn_graph.extent(0) == rev_graph.extent(0),
+               "Size of knn_graph and rev_graph are expected to be the same");
+  RAFT_EXPECTS(rev_graph.extent(0) == rev_graph_count.extent(0),
+               "Size of rev_graph and rev_graph_count are expected to be the same");
+  const uint64_t graph_size       = knn_graph.extent(0);
+  const uint64_t knn_graph_degree = knn_graph.extent(1);
+  const uint64_t rev_graph_degree = rev_graph.extent(1);
+
+  raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
+    "cagra::graph::optimize/reverse_CPU-1scan");
+  RAFT_LOG_DEBUG("# reverse_CPU-1scan");
+
+  auto rank = raft::make_host_matrix<uint8_t, int64_t>(graph_size, rev_graph_degree);
+  constexpr uint8_t max_rank = 255;
+  // Initialize arrays
+#pragma omp parallel for
+  for (uint64_t i = 0; i < graph_size; i++) {
+    for (uint64_t k = 0; k < rev_graph_degree; k++) {
+      rank(i, k)      = max_rank;
+      rev_graph(i, k) = graph_size;
+    }
+    rev_graph_count(i) = 0;
+  }
+  // Scan the graph
+#pragma omp parallel
+  {
+    int tid         = 0;
+    int num_threads = 1;
+#ifdef _OPENMP
+    tid         = omp_get_thread_num();
+    num_threads = omp_get_num_threads();
+#endif
+    for (uint64_t i = 0; i < graph_size; i++) {
+      for (uint64_t r = 0; r < knn_graph_degree; r++) {
+        uint64_t j = knn_graph(i, r);
+        if (j == i) {
+          // Ignore the self-edge.
+          continue;
+        }
+        if ((j % (uint64_t)num_threads) != (uint64_t)tid) {
+          // Restrict update of a ceartain array element to be
+          // done by a certain thread to make it atomic-free.
+          continue;
+        }
+        // Find a location to insert
+        uint64_t l0 = 0;
+        uint64_t l1 = std::min(rev_graph_degree, (uint64_t)rev_graph_count(j));
+        uint64_t loc;
+        while (l0 < l1) {
+          loc = (l0 + l1) / 2;
+          if (rank(j, loc) <= r) {
+            l0 = loc + 1;
+          } else {
+            l1 = loc;
+          }
+        }
+        loc = (l0 + l1) / 2;
+        if (loc >= rev_graph_degree) { continue; }
+        // Insert: copy and write
+        for (uint64_t l = std::min(rev_graph_degree - 1, (uint64_t)rev_graph_count(j)); l > loc;
+             l--) {
+          rank(j, l)      = rank(j, l - 1);
+          rev_graph(j, l) = rev_graph(j, l - 1);
+        }
+        rank(j, loc)      = r;
+        rev_graph(j, loc) = i;
+        if (rev_graph_count(j) < rev_graph_degree) { rev_graph_count(j) += 1; }
+      }
+    }
+  }
+}
+
 template <
   typename IdxT = uint32_t,
   typename g_accessor =
@@ -1414,7 +1637,15 @@ void optimize(
     RAFT_LOG_DEBUG("# Pruning time: %.1lf ms", (time_prune_end - time_prune_start) * 1000.0);
   }
 
-  auto rev_graph       = raft::make_host_matrix<IdxT, int64_t>(graph_size, output_graph_degree);
+  // Allocate memory for rev_graph using Transparent HugePage
+  constexpr size_t thp_size = 2 * 1024 * 1024;
+  size_t byte_size          = sizeof(IdxT) * graph_size * output_graph_degree;
+  if (byte_size % thp_size) { byte_size += thp_size - (byte_size % thp_size); }
+  mmap_owner rev_graph(byte_size);
+  IdxT* rev_graph_ptr = (IdxT*)rev_graph.data();
+  memset(rev_graph_ptr, 0, byte_size);
+  auto rev_graph_view =
+    raft::make_host_matrix_view<IdxT, int64_t>(rev_graph_ptr, graph_size, output_graph_degree);
   auto rev_graph_count = raft::make_host_vector<uint32_t, int64_t>(graph_size);
 
   {
@@ -1425,60 +1656,89 @@ void optimize(
     //
     const double time_make_start = cur_time();
 
-    device_matrix_view_from_host<IdxT, int64_t> d_rev_graph(res, rev_graph.view());
-    RAFT_CUDA_TRY(cudaMemsetAsync(d_rev_graph.data_handle(),
-                                  0xff,
-                                  graph_size * output_graph_degree * sizeof(IdxT),
-                                  raft::resource::get_cuda_stream(res)));
-
-    auto d_rev_graph_count = raft::make_device_mdarray<uint32_t>(
-      res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
-    RAFT_CUDA_TRY(cudaMemsetAsync(d_rev_graph_count.data_handle(),
-                                  0x00,
-                                  graph_size * sizeof(uint32_t),
-                                  raft::resource::get_cuda_stream(res)));
-
-    auto dest_nodes = raft::make_host_vector<IdxT, int64_t>(graph_size);
-    auto d_dest_nodes =
-      raft::make_device_mdarray<IdxT>(res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
-
-    for (uint64_t k = 0; k < output_graph_degree; k++) {
-#pragma omp parallel for
-      for (uint64_t i = 0; i < graph_size; i++) {
-        // dest_nodes.data_handle()[i] = output_graph_ptr[k + (output_graph_degree * i)];
-        dest_nodes(i) = output_graph_ptr[k + (output_graph_degree * i)];
+    bool _use_gpu = use_gpu;
+    if (_use_gpu) {
+      try {
+        // throw std::bad_alloc(); // **** DEBUG: force to use CPU implementation ****
+        auto d_rev_graph =
+          raft::make_device_matrix<IdxT, int64_t>(res, graph_size, output_graph_degree);
+      } catch (std::bad_alloc& e) {
+        RAFT_LOG_DEBUG("Insufficient memory for making reverse graph on GPU");
+        _use_gpu = false;
+      } catch (raft::logic_error& e) {
+        RAFT_LOG_DEBUG("Insufficient memory for making reverse graph on GPU (logic error)");
+        _use_gpu = false;
       }
-      raft::resource::sync_stream(res);
+    }
+    if (_use_gpu) {
+      raft::common::nvtx::range<cuvs::common::nvtx::domain::cuvs> block_scope(
+        "cagra::graph::optimize/reverse_GPU");
+      RAFT_LOG_DEBUG("# reverse_GPU");
 
-      raft::copy(d_dest_nodes.data_handle(),
-                 dest_nodes.data_handle(),
+      device_matrix_view_from_host<IdxT, int64_t> d_rev_graph(res, rev_graph_view);
+      RAFT_CUDA_TRY(cudaMemsetAsync(d_rev_graph.data_handle(),
+                                    0xff,
+                                    graph_size * output_graph_degree * sizeof(IdxT),
+                                    raft::resource::get_cuda_stream(res)));
+
+      auto d_rev_graph_count = raft::make_device_mdarray<uint32_t>(
+        res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
+      RAFT_CUDA_TRY(cudaMemsetAsync(d_rev_graph_count.data_handle(),
+                                    0x00,
+                                    graph_size * sizeof(uint32_t),
+                                    raft::resource::get_cuda_stream(res)));
+
+      auto dest_nodes = raft::make_host_vector<IdxT, int64_t>(graph_size);
+      auto d_dest_nodes =
+        raft::make_device_mdarray<IdxT>(res, large_tmp_mr, raft::make_extents<int64_t>(graph_size));
+
+      for (uint64_t k = 0; k < output_graph_degree; k++) {
+#pragma omp parallel for
+        for (uint64_t i = 0; i < graph_size; i++) {
+          // dest_nodes.data_handle()[i] = output_graph_ptr[k + (output_graph_degree * i)];
+          dest_nodes(i) = output_graph_ptr[k + (output_graph_degree * i)];
+        }
+        raft::resource::sync_stream(res);
+
+        raft::copy(d_dest_nodes.data_handle(),
+                   dest_nodes.data_handle(),
+                   graph_size,
+                   raft::resource::get_cuda_stream(res));
+
+        dim3 threads(256, 1, 1);
+        dim3 blocks(1024, 1, 1);
+        kern_make_rev_graph<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
+          d_dest_nodes.data_handle(),
+          d_rev_graph.data_handle(),
+          d_rev_graph_count.data_handle(),
+          graph_size,
+          output_graph_degree);
+        RAFT_LOG_DEBUG("# Making reverse graph on GPUs: %lu / %u    \r", k, output_graph_degree);
+      }
+
+      raft::resource::sync_stream(res);
+      RAFT_LOG_DEBUG("\n");
+
+      if (d_rev_graph.allocated_memory()) {
+        raft::copy(rev_graph_view.data_handle(),
+                   d_rev_graph.data_handle(),
+                   graph_size * output_graph_degree,
+                   raft::resource::get_cuda_stream(res));
+      }
+      raft::copy(rev_graph_count.data_handle(),
+                 d_rev_graph_count.data_handle(),
                  graph_size,
                  raft::resource::get_cuda_stream(res));
-
-      dim3 threads(256, 1, 1);
-      dim3 blocks(1024, 1, 1);
-      kern_make_rev_graph<<<blocks, threads, 0, raft::resource::get_cuda_stream(res)>>>(
-        d_dest_nodes.data_handle(),
-        d_rev_graph.data_handle(),
-        d_rev_graph_count.data_handle(),
-        graph_size,
-        output_graph_degree);
-      RAFT_LOG_DEBUG("# Making reverse graph on GPUs: %lu / %u    \r", k, output_graph_degree);
+    } else {
+      RAFT_EXPECTS(output_graph_degree < 256,
+                   "Degree of the generated graph must be less than 256.");
+      bool use_cpu_2scan = true;
+      if (use_cpu_2scan) {
+        make_rev_graph_2scan<IdxT>(new_graph, rev_graph_view, rev_graph_count.view());
+      } else {
+        make_rev_graph_1scan<IdxT>(new_graph, rev_graph_view, rev_graph_count.view());
+      }
     }
-
-    raft::resource::sync_stream(res);
-    RAFT_LOG_DEBUG("\n");
-
-    if (d_rev_graph.allocated_memory()) {
-      raft::copy(rev_graph.data_handle(),
-                 d_rev_graph.data_handle(),
-                 graph_size * output_graph_degree,
-                 raft::resource::get_cuda_stream(res));
-    }
-    raft::copy(rev_graph_count.data_handle(),
-               d_rev_graph_count.data_handle(),
-               graph_size,
-               raft::resource::get_cuda_stream(res));
 
     const double time_make_end = cur_time();
     RAFT_LOG_DEBUG("# Making reverse graph time: %.1lf ms",
@@ -1496,7 +1756,7 @@ void optimize(
     bool check_num_protected_edges = true;
 #pragma omp parallel for
     for (uint64_t i = 0; i < graph_size; i++) {
-      auto my_rev_graph = rev_graph.data_handle() + (output_graph_degree * i);
+      auto my_rev_graph = rev_graph_view.data_handle() + (output_graph_degree * i);
       auto my_out_graph = output_graph_ptr + (output_graph_degree * i);
 
       // If guarantee_connectivity == true, use a temporal list to merge the neighbor lists of the
