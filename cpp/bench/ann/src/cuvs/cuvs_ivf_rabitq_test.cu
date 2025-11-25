@@ -309,7 +309,7 @@ int test_ivf_rabitq_search_batch(raft::resources const& handle, int argc, char* 
   ivf.max_cluster_length = max_cluster_length;
   std::cout << "max cluster length: " << max_cluster_length << std::endl;
 
-  searcher.AllocateSearcherSpace(ivf, NQ, TOPK, 3000, max_cluster_length, 0);
+  searcher.AllocateSearcherSpace(ivf, NQ, TOPK, 3000, max_cluster_length);
   //   bool multiple_cluster_search = true;
 
   // prepare CPU side data for offloading computation

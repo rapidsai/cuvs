@@ -15,7 +15,7 @@
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
 // Host function to create and initialize a DeviceResultPool.
-DeviceResultPool* createDeviceResultPool(int capacity, cudaStream_t stream)
+DeviceResultPool* createDeviceResultPool(int capacity, rmm::cuda_stream_view stream)
 {
   // Allocate device memory for the DeviceResultPool structure.
   // In each pool, only two pointers pointed space is on the device

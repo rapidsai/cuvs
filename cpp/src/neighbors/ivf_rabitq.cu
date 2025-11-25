@@ -174,7 +174,7 @@ void search(raft::resources const& handle,
   rabitq_idx->max_cluster_length = max_cluster_length;
 
   auto k = neighbors.extent(1);
-  searcher.AllocateSearcherSpace(*rabitq_idx, NQ, k, params.n_probes, max_cluster_length, stream);
+  searcher.AllocateSearcherSpace(*rabitq_idx, NQ, k, params.n_probes, max_cluster_length);
 
   float* d_topk_dists;
   uint32_t *d_topk_ids, *d_final_ids;

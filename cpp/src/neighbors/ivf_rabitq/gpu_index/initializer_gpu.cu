@@ -551,14 +551,13 @@ void FlatInitializerGPU::ComputeCentroidsDistancesTranspose(raft::resources cons
   PID* d_candidate_ids = nullptr;
   RAFT_CUDA_TRY(cudaMallocAsync((void**)&d_candidate_ids, sizeof(PID) * K, stream));
   {
-    raft::resource::sync_stream(handle);
     thrust::device_ptr<PID> dev_ptr = thrust::device_pointer_cast(d_candidate_ids);
-    thrust::sequence(dev_ptr, dev_ptr + K);
+    thrust::sequence(thrust::cuda::par.on(stream), dev_ptr, dev_ptr + K);
   }
   {
     thrust::device_ptr<float> dist_ptr = thrust::device_pointer_cast(d_distances);
     thrust::device_ptr<PID> id_ptr     = thrust::device_pointer_cast(d_candidate_ids);
-    thrust::sort_by_key(dist_ptr, dist_ptr + K, id_ptr);
+    thrust::sort_by_key(thrust::cuda::par.on(stream), dist_ptr, dist_ptr + K, id_ptr);
   }
   // Use the same kernel to fill the output Candidate array.
   int blockSize3 = 512;

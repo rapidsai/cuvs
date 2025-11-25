@@ -17,7 +17,7 @@
 
 namespace cuvs::neighbors::ivf_rabitq::detail {
 
-float L2SqrThrust(const float* h_x, const float* h_y, size_t N)
+float L2SqrThrust(raft::resources const& handle, const float* h_x, const float* h_y, size_t N)
 {
   // Copy host data to device vectors
   thrust::device_vector<float> d_x(h_x, h_x + N);
@@ -29,12 +29,14 @@ float L2SqrThrust(const float* h_x, const float* h_y, size_t N)
   auto end   = thrust::make_zip_iterator(thrust::make_tuple(d_x.end(), d_y.end()));
 
   // Compute the L2 squared distance using transform_reduce
-  float result = thrust::transform_reduce(begin,
-                                          end,                   // Input range
-                                          L2Functor(),           // Unary operation
-                                          0.0f,                  // Initial value
-                                          thrust::plus<float>()  // Summation operation
-  );
+  float result =
+    thrust::transform_reduce(thrust::cuda::par.on(raft::resource::get_cuda_stream(handle)),
+                             begin,
+                             end,                   // Input range
+                             L2Functor(),           // Unary operation
+                             0.0f,                  // Initial value
+                             thrust::plus<float>()  // Summation operation
+    );
 
   return result;
 }

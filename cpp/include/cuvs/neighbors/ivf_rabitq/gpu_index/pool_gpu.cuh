@@ -13,6 +13,8 @@
 
 #include <raft/core/resources.hpp>
 
+#include <rmm/cuda_stream_view.hpp>
+
 #include <algorithm>
 #include <cstdint>
 #include <limits>
@@ -112,11 +114,11 @@ struct HostResultPool {
   int size = 0;      // current number of candidates
 };
 
-DeviceResultPool* createDeviceResultPool(int capacity, cudaStream_t stream);
+DeviceResultPool* createDeviceResultPool(int capacity, rmm::cuda_stream_view stream);
 
 // Frees both the device buffers and the host‑side wrapper.
 // Safe to call with a nullptr.
-inline void freeDeviceResultPool(DeviceResultPool* pool, cudaStream_t stream = 0)
+inline void freeDeviceResultPool(DeviceResultPool* pool, rmm::cuda_stream_view stream)
 {
   if (pool == nullptr) {  // nothing to do
     return;

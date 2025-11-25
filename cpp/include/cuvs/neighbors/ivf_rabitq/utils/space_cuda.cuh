@@ -23,7 +23,7 @@ struct L2Functor {
   }
 };
 
-float L2SqrThrust(const float* h_x, const float* h_y, size_t N);
+float L2SqrThrust(raft::resources const& handle, const float* h_x, const float* h_y, size_t N);
 
 float L2SqrCPU_STL(const float* h_x, const float* h_y, size_t N);
 

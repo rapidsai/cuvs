@@ -754,12 +754,11 @@ void merge_knn_pools(
                                   cudaMemcpyDeviceToDevice,
                                   stream));
   }
-  raft::resource::sync_stream(handle);
 
   // 3) In‑place sort the Ncombined distances ascending, carrying along the pids:
   thrust::device_ptr<float> dist_ptr(d_combined_dist);
   thrust::device_ptr<uint32_t> pid_ptr(d_combined_pids);
-  thrust::sort_by_key(dist_ptr, dist_ptr + Ncombined, pid_ptr);
+  thrust::sort_by_key(thrust::cuda::par.on(stream), dist_ptr, dist_ptr + Ncombined, pid_ptr);
 
   // 4) Copy out the first TOPK pids (the overall nearest neighbors) back to host:
   RAFT_CUDA_TRY(
@@ -837,14 +836,13 @@ void merge_knn_pools_filter(raft::resources const& handle,
                                   cudaMemcpyDeviceToDevice,
                                   stream));
   }
-  raft::resource::sync_stream(handle);
 
   //------------------------------------------------------------------
   // 4) In-place sort ascending (distance, pid carried along)
   //------------------------------------------------------------------
   thrust::device_ptr<float> dist_ptr(d_combined_dist);
   thrust::device_ptr<uint32_t> pid_ptr(d_combined_pids);
-  thrust::sort_by_key(dist_ptr, dist_ptr + Ncombined, pid_ptr);
+  thrust::sort_by_key(thrust::cuda::par.on(stream), dist_ptr, dist_ptr + Ncombined, pid_ptr);
   //    printf("sort finished \n");
   //------------------------------------------------------------------
   // 5) Copy back the global TOP-K (or all that exist) to host
@@ -1165,7 +1163,6 @@ void merge_knn_pools_with_stats(raft::resources const& handle,
   RAFT_CUDA_TRY(cudaMallocAsync(&d_dist, sizeof(float) * Ncombined, stream));
   RAFT_CUDA_TRY(cudaMallocAsync(&d_pid, sizeof(uint32_t) * Ncombined, stream));
   RAFT_CUDA_TRY(cudaMallocAsync(&d_src, sizeof(int) * Ncombined, stream));
-  raft::resource::sync_stream(handle);
 
   /* ------------------------------------------------------------------ *
    * 2)  Pack every per-probe pool into the combined arrays              *
@@ -1183,9 +1180,8 @@ void merge_knn_pools_with_stats(raft::resources const& handle,
 
     // fill the “source-probe” column with value i
     thrust::device_ptr<int> src_ptr(d_src);
-    thrust::fill_n(src_ptr + i * TOPK, TOPK, i);
+    thrust::fill_n(thrust::cuda::par.on(stream), src_ptr + i * TOPK, TOPK, i);
   }
-  raft::resource::sync_stream(handle);
 
   /* ------------------------------------------------------------------ *
    * 3)  Global sort by distance, carrying (pid, src) as the value       *
@@ -1196,7 +1192,8 @@ void merge_knn_pools_with_stats(raft::resources const& handle,
 
   auto value_zip = thrust::make_zip_iterator(thrust::make_tuple(pid_ptr, src_ptr));
 
-  thrust::sort_by_key(dist_ptr,             /* keys  */
+  thrust::sort_by_key(thrust::cuda::par.on(stream),
+                      dist_ptr,             /* keys  */
                       dist_ptr + Ncombined, /* keys end */
                       value_zip);           /* values carried along */
 
@@ -1209,12 +1206,12 @@ void merge_knn_pools_with_stats(raft::resources const& handle,
   std::vector<int> h_src(TOPK);
   RAFT_CUDA_TRY(
     cudaMemcpyAsync(h_src.data(), d_src, sizeof(int) * TOPK, cudaMemcpyDeviceToHost, stream));
-  raft::resource::sync_stream(handle);
 
   /* ------------------------------------------------------------------ *
    * 5)  Tally how many winners each probe contributed                   *
    * ------------------------------------------------------------------ */
   std::fill(probe_counts, probe_counts + nprobe, 0);
+  raft::resource::sync_stream(handle);
   for (int i = 0; i < TOPK; ++i) {
     int probe_id = h_src[i];
     if (probe_id >= 0 && probe_id < nprobe) ++probe_counts[probe_id];
@@ -1313,8 +1310,7 @@ void IVFGPU::search(
                                      h_cluster_meta[cid],
                                      sqr_y,
                                      knn_array[i],
-                                     h_centroid,
-                                     stream);
+                                     h_centroid);
   }
   free(centroid_data);
 
@@ -1438,8 +1434,7 @@ void IVFGPU::MemOptimizedSearch(raft::resources const& handle,
                                             h_cluster_meta[cid],
                                             sqr_y,
                                             knn_array[i],
-                                            h_centroid,
-                                            stream);
+                                            h_centroid);
   }
   free(centroid_data);
 
@@ -2174,8 +2169,7 @@ void IVFGPU::BatchClusterSearch(raft::resources const& handle,
                                           d_topk_dists,
                                           d_topk_pids,
                                           d_final_dists,
-                                          d_final_pids,
-                                          stream);
+                                          d_final_pids);
 
   // clear
   cublasDestroy(cb);
@@ -2301,8 +2295,7 @@ void IVFGPU::BatchClusterSearchLUT16(raft::resources const& handle,
                                                       d_topk_dists,
                                                       d_topk_pids,
                                                       d_final_dists,
-                                                      d_final_pids,
-                                                      stream);
+                                                      d_final_pids);
 
   // clear
   cublasDestroy(cb);
@@ -2430,7 +2423,6 @@ void IVFGPU::BatchClusterSearchQuantizeQuery(raft::resources const& handle,
                                                        d_topk_pids,
                                                        d_final_dists,
                                                        d_final_pids,
-                                                       stream,
                                                        query_bits == 4);
 
   // clear
@@ -2561,8 +2553,7 @@ void IVFGPU::BatchClusterSearchPreComputeThresholds(raft::resources const& handl
                                                              d_topk_dists,
                                                              d_topk_pids,
                                                              d_final_dists,
-                                                             d_final_pids,
-                                                             stream);
+                                                             d_final_pids);
 
   // clear
   cublasDestroy(cb);
@@ -2649,8 +2640,7 @@ void IVFGPU::MultiClusterSearch(raft::resources const& handle,
                                                        h_cluster_meta[cid],
                                                        sqr_y,
                                                        knn_array[i],
-                                                       h_centroid,
-                                                       stream);
+                                                       h_centroid);
   }
 
 #ifdef DEBUG_MULTIPLE_SEARCH
@@ -2668,7 +2658,6 @@ void IVFGPU::MultiClusterSearch(raft::resources const& handle,
                                      d_centroid_candidates + 1,
                                      knn_array[1],
                                      this->initializer->GetCentroid(0),
-                                     stream,
                                      d_query,
                                      nprobe - 1);
   }
@@ -2790,8 +2779,7 @@ void IVFGPU::MemOptimizedSearchV2(raft::resources const& handle,
                                               h_cluster_meta[cid],
                                               sqr_y,
                                               knn_array[i],
-                                              h_centroid,
-                                              stream);
+                                              h_centroid);
   }
   free(centroid_data);
 
@@ -2873,8 +2861,7 @@ void IVFGPU::CPUGPUCoSearch(raft::resources const& handle,
                                                    h_cluster_meta[cid],
                                                    sqr_y,
                                                    knn_array[i],
-                                                   h_centroid,
-                                                   stream);
+                                                   h_centroid);
 
     // Merge final results and
     // TODO: Asychrounsly merge results
@@ -2978,8 +2965,7 @@ void IVFGPU::CPUGPUCoSearchV2(raft::resources const& handle,
                                             h_cluster_meta[cid],
                                             sqr_y,
                                             knn_array_gpu[i],
-                                            h_centroid,
-                                            stream);
+                                            h_centroid);
 
     RAFT_CUDA_TRY(cudaMemcpyAsync(first_3_dis,
                                   knn_array_gpu[i]->distances,
@@ -3020,8 +3006,7 @@ void IVFGPU::CPUGPUCoSearchV2(raft::resources const& handle,
                                                    h_cluster_meta[cid],
                                                    sqr_y,
                                                    knn_array[i - startpoint + 1],
-                                                   h_centroid,
-                                                   stream);
+                                                   h_centroid);
 
     // Merge final results and
     // TODO: Asychrounsly merge results
@@ -3166,8 +3151,7 @@ void IVFGPU::search_with_time(raft::resources const& handle,
     RAFT_CUDA_TRY(cudaMemcpyAsync(
       h_centroid, d_centroid, num_padded_dim * sizeof(float), cudaMemcpyDeviceToHost, stream));
 
-    searcher.SearchClusterWithFilter(
-      *this, h_cluster_meta[cid], sqr_y, knn_array[i], h_centroid, stream);
+    searcher.SearchClusterWithFilter(*this, h_cluster_meta[cid], sqr_y, knn_array[i], h_centroid);
   }
   raft::resource::sync_stream(handle);
   free(centroid_data);
